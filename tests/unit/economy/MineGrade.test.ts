@@ -43,7 +43,7 @@ describe('createGradeState', () => {
   it('starts at grade 0 with nothing tracked and nothing pending', () => {
     expect(createGradeState()).toEqual({
       grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null,
-      strikeTicks: [], inspectionRolls: 0,
+      strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0,
     });
   });
 
@@ -430,7 +430,7 @@ describe('advanceGradeApplication', () => {
 describe('sanitizeGradeState', () => {
   const valid = (): GradeState => ({
     grade: 2, oreDeliveredKg: 1500.5, deepestPitM: 11, rockBrokenM3: 300, blastsFired: 4,
-    pending: { toGrade: 3, ticksLeft: 20 }, strikeTicks: [], inspectionRolls: 0,
+    pending: { toGrade: 3, ticksLeft: 20 }, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0,
   });
 
   it('accepts a valid state, pending or not', () => {

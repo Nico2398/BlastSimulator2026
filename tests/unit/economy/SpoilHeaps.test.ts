@@ -35,6 +35,25 @@ describe('isBarrenFragment', () => {
     expect(isBarrenFragment({ blingite: SPOIL_BARREN_ORE_FRACTION_THRESHOLD })).toBe(true);
   });
 
+  it('a scaled fragment is barren only at or below threshold * scale (#1932)', () => {
+    const scale = 0.2;
+    const edge = SPOIL_BARREN_ORE_FRACTION_THRESHOLD * scale;
+    expect(isBarrenFragment({ blingite: edge }, scale)).toBe(true);
+    expect(isBarrenFragment({ blingite: edge * 1.5 }, scale)).toBe(false);
+  });
+
+  it('a fragment scaled by s at gradeScale s classifies like the unscaled one at scale 1 (#1932)', () => {
+    const scale = 0.2;
+    for (const d of [0.005, 0.02, 0.03, 0.5]) {
+      expect(isBarrenFragment({ blingite: d * scale }, scale)).toBe(isBarrenFragment({ blingite: d }, 1));
+    }
+  });
+
+  it('scale 1 behaves as today (#1932)', () => {
+    expect(isBarrenFragment({ blingite: SPOIL_BARREN_ORE_FRACTION_THRESHOLD }, 1)).toBe(true);
+    expect(isBarrenFragment({ blingite: SPOIL_BARREN_ORE_FRACTION_THRESHOLD + 0.001 }, 1)).toBe(false);
+  });
+
   it('just above the threshold is not barren', () => {
     expect(isBarrenFragment({ blingite: SPOIL_BARREN_ORE_FRACTION_THRESHOLD + 0.001 })).toBe(false);
   });
@@ -199,6 +218,27 @@ describe('rubbleStockKg / stateRubbleStockKg', () => {
       buildings: { buildings: [heap(30), heap(20)] },
     };
     expect(stateRubbleStockKg(slice)).toBe(150);
+  });
+});
+
+describe('rubble stock at a scaled grade (#1932)', () => {
+  const SCALE = 0.2;
+  // Proportionally scaled densities classify at SCALE exactly as the unscaled ones at 1.
+  const fragments = () => [0.005, 0.02, 0.03, 0.5].map((d, i) => frag(100 * (i + 1), { blingite: d * SCALE }));
+  const unscaled = () => [0.005, 0.02, 0.03, 0.5].map((d, i) => frag(100 * (i + 1), { blingite: d }));
+
+  it('rubbleStockKg matches the unscaled stock at scale 1', () => {
+    expect(rubbleStockKg(fragments(), [heap(30)], SCALE)).toBe(rubbleStockKg(unscaled(), [heap(30)], 1));
+    expect(rubbleStockKg(fragments(), [heap(30)], SCALE)).toBe(330);
+  });
+
+  it('stateRubbleStockKg reads world.oreGradeScale', () => {
+    const slice = (world: { oreGradeScale?: number }) => ({
+      logistics: { fragments: fragments() }, buildings: { buildings: [heap(30)] }, world,
+    });
+    expect(stateRubbleStockKg(slice({ oreGradeScale: SCALE }))).toBe(330);
+    // Unset scale reads at 1, where the scaled densities all fall under the 0.02 cut except the last.
+    expect(stateRubbleStockKg(slice({}))).toBe(630);
   });
 });
 

@@ -593,6 +593,8 @@ export interface WorldState {
   oreDeposits?: boolean;
   /** Pit mask shape the terrain was generated with; absent means DEFAULT_PIT_MASK (#1680). */
   pitMask?: PitMaskShape;
+  /** Ore grade scale lever (#1932); absent = default. */
+  oreGradeScale?: number;
 }
 
 export interface SavedBlastPlan {

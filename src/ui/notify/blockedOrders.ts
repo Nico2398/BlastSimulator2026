@@ -19,6 +19,13 @@ export function isInTransitBlock(action: Pick<PendingAction, 'blockedReason'>): 
   return action.blockedReason === 'explosives_in_transit';
 }
 
+/** Block state of a QUEUED order (callers filter on status): the one ladder behind the Operations counts and groups. */
+export function classifyQueuedBlock(action: Pick<PendingAction, 'blockedReason'>): 'open' | 'inTransit' | 'blocked' | 'stranded' {
+  if (action.blockedReason == null) return 'open';
+  if (isInTransitBlock(action)) return 'inTransit';
+  return isFailureBlock(action) ? 'blocked' : 'stranded';
+}
+
 /** Builds the notification body naming the blocked order and its missing requirement (#1061). */
 export function buildBlockedOrderMessage(action: PendingAction, nowTick?: number): string {
   const order = t(ACTION_LABEL_KEY[action.type]);

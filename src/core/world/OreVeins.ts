@@ -9,7 +9,7 @@
 
 import { createNoise3D, type NoiseFunction3D } from 'simplex-noise';
 import {
-  ORE_DEPOSIT_CORE_GAIN, ORE_DEPOSIT_EDGE_WIDTH, ORE_DEPOSIT_FREQ, ORE_DEPOSIT_RARITY_COVERAGE,
+  ORE_DEPOSIT_CORE_GAIN, ORE_GRADE_SCALE_DEFAULT, ORE_DEPOSIT_EDGE_WIDTH, ORE_DEPOSIT_FREQ, ORE_DEPOSIT_RARITY_COVERAGE,
 } from '../config/balance.js';
 import { Random } from '../math/Random.js';
 import { subSeed, cellRand } from '../math/Hash.js';
@@ -67,6 +67,8 @@ function depositLayer(seed: number, ore: OreType): NonNullable<OreField['deposit
 
 /** Sampler options (#1682). */
 interface OreVeinOptions {
+  /** Ore grade scale (#1932): multiplies every stored density; absent or 1 leaves output untouched. */
+  readonly gradeScale?: number;
   /** Gate veins to discrete deposits by rarity tier; off keeps the legacy continuous veins. */
   readonly deposits?: boolean;
 }
@@ -74,8 +76,10 @@ interface OreVeinOptions {
 /** Samples per-ore anisotropic vein density from rock composition + a depth window (#458 A12). */
 export class OreVeinSampler {
   private readonly fields = new Map<string, OreField>();
+  private readonly gradeScale: number;
 
   constructor(seed: number, options: OreVeinOptions = {}) {
+    this.gradeScale = options.gradeScale ?? ORE_GRADE_SCALE_DEFAULT;
     for (const ore of getAllOres()) {
       const rng = new Random(subSeed(seed, `ore:${ore.id}`));
       const noise = createNoise3D(() => rng.next());
@@ -114,7 +118,8 @@ export class OreVeinSampler {
       if (n > threshold) {
         const density = Math.min(1, (n - threshold) * DENSITY_GAIN);
         if (density > MIN_STORED_DENSITY) {
-          result[ore.id] = Math.round(density * 100) / 100;
+          const stored = Math.round(density * 100) / 100;
+          result[ore.id] = this.gradeScale === ORE_GRADE_SCALE_DEFAULT ? stored : stored * this.gradeScale;
         }
       }
     }

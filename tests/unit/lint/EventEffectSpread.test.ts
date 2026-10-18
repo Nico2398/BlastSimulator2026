@@ -39,6 +39,7 @@ const MAX_KIND_SHARE = 0.3;
 const LASTING_KINDS: ReadonlySet<string> = new Set([
   'work_stoppage', 'work_rate', 'morale_shift', 'salary', 'recurring_charge', 'ban', 'cost_factor',
   'contract_price', 'forced_weather', 'event_weight', 'employee_leaves', 'employee_joins', 'cancel_contract',
+  'permit_processing',
 ]);
 const HOUR_KINDS: ReadonlySet<string> = new Set(['work_stoppage', 'work_rate', 'morale_shift', 'ban', 'forced_weather', 'building_closed', 'vehicle_breakdown']);
 const DAY_KINDS: ReadonlySet<string> = new Set(['salary', 'recurring_charge', 'cost_factor', 'contract_price', 'event_weight']);
@@ -46,15 +47,16 @@ const ALT_KINDS: ReadonlySet<string> = new Set(['employee_leaves', 'employee_inj
 
 const EVENT_SOURCE_FILES = [
   'UnionEvents1', 'UnionEvents2', 'PoliticsEvents1', 'PoliticsEvents2', 'WeatherEvents1', 'WeatherEvents2',
-  'MafiaEvents1', 'MafiaEvents2', 'LawsuitEvents1', 'LawsuitEvents2', 'FollowUpEvents',
+  'MafiaEvents1', 'MafiaEvents2', 'LawsuitEvents1', 'LawsuitEvents2', 'FollowUpEvents', 'PermitEvents1',
 ].map(f => join(ROOT, 'src/core/events', `${f}.ts`));
 const RAW_LITERAL = /\b(hours|days|pct|perDay|perHour|amount)\s*:\s*-?\d/;
 
-/** Catalog kinds: the `ui.event.effect.<kind>` keys, minus what.* / pick.* sub-keys, scope_all, the _permanent variant and the _named/_nobody chip texts of employee_leaves (#1908; display keys, not spec types). */
+/** Catalog kinds: the `ui.event.effect.<kind>` keys, minus what.* / pick.* sub-keys, scope_all, the _permanent variant and the _named/_nobody chip texts of employee_leaves (#1908), and the _next/_by_safety/_approve chip texts of permit_processing (#1927); display keys, not spec types. */
 const CATALOG_KINDS = new Set(
   Object.keys(en)
     .map(k => /^ui\.event\.effect\.([a-z_]+)$/.exec(k)?.[1])
-    .filter((k): k is string => k !== undefined && k !== 'scope_all' && !k.endsWith('_permanent') && !k.endsWith('_named') && !k.endsWith('_nobody')),
+    .filter((k): k is string => k !== undefined && k !== 'scope_all' && !k.endsWith('_permanent') && !k.endsWith('_named') && !k.endsWith('_nobody')
+      && !k.endsWith('_next') && !k.endsWith('_by_safety') && !k.endsWith('_approve')),
 );
 
 const followUpIds = new Set(FOLLOWUP_EVENTS.map(e => e.id));

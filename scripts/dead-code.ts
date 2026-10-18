@@ -58,6 +58,9 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Progression probe reload gate (#1974): the unit-tested contract; production uses it inside the reinvest strategy.
+  'scripts/shared/probe-strategies.ts:RELOAD_FRACTION',
+  'scripts/shared/probe-strategies.ts:shouldReload',
   // Fragment/ramp inspector (#1769): the unit-tested contracts; production composes them inside fragmentContent / rampContent.
   'src/core/economy/FragmentOre.ts:FragmentOreBreakdown',
   'src/ui/panels/inspector/rampContent.ts:WidenState',

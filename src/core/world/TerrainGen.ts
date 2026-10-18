@@ -7,6 +7,7 @@ import { VoxelGrid, surfaceDensityAt, MAX_TERRAIN_GEN_DIMENSION, isValidVoxelY, 
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
 import type { PitMaskShape } from '../config/balance.js';
+import { isValidOreGradeScale } from '../economy/OreGrade.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
 import { WorldNoiseFields } from './NoiseFields.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
@@ -112,6 +113,8 @@ export interface TerrainConfig {
   oreDeposits?: boolean;
   /** Pit mask shape; defaults to DEFAULT_PIT_MASK (#1680). */
   pitMask?: PitMaskShape;
+  /** Ore grade scale lever (#1932); absent = default. */
+  oreGradeScale?: number;
 }
 
 export interface TerrainContext {
@@ -154,7 +157,7 @@ export function resolveGeneratedBiome(
  * which genuinely must be the same instance — see LandscapeMap.ts).
  */
 export function buildTerrainContext(config: TerrainConfig): TerrainContext {
-  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, oreDeposits, pitMask } = config;
+  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, oreDeposits, pitMask, oreGradeScale } = config;
 
   const worldGen = createWorldGenContext(seed, sizeX, datum, sizeZ, (fields) => (x, z) => {
     const weights = selectBiomeWeights(fields.temperature(x, z), fields.humidity(x, z), climateBias, 1.0);
@@ -167,7 +170,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
     ? buildMixedHardnessStrata(biome.dominantRocks)
     : buildStrataProfile(biome.dominantRocks);
   const strata = new StrataSampler(seed, profile);
-  const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true });
+  const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true, ...(oreGradeScale !== undefined ? { gradeScale: oreGradeScale } : {}) });
 
   return { worldGen, biome, strata, oreVeins };
 }
@@ -308,4 +311,12 @@ export function climateBiasLandingOn(
     target.climateCenter[0] - fields.temperature(sizeX / 2, sizeZ / 2),
     target.climateCenter[1] - fields.humidity(sizeX / 2, sizeZ / 2),
   ];
+}
+
+/** Validates an ore grade scale (#1932). */
+export function requireValidOreGradeScale(value: number, label: string): number {
+  if (!isValidOreGradeScale(value)) {
+    throw new Error(`corrupt save: ${label} is not a valid ore grade scale`);
+  }
+  return value;
 }

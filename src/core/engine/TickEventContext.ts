@@ -5,7 +5,7 @@
 // console-only `GameContext` — it only ever read fields already on
 // GameState.
 
-import type { GameState } from '../state/GameState.js';
+import { isProgressionSite, type GameState } from '../state/GameState.js';
 import type { EventContext } from '../events/EventPool.js';
 import { getEventsByCategory } from '../events/EventPool.js';
 import { getLivingEmployees } from '../entities/Employee.js';
@@ -30,5 +30,8 @@ export function buildTickEventContext(s: GameState): EventContext {
     hasBlasted: s.damage.blastCount > 0,
     protections: s.corruption.protections,
     unionGrievance: s.events.unionGrievance,
+    hasProgression: isProgressionSite(s),
+    applicationPending: s.grade?.pending != null,
+    lastBlastChargeShare: s.grade?.lastBlastChargeShare ?? 0,
   };
 }

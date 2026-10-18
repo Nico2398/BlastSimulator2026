@@ -66,6 +66,7 @@ import { isExposed, smugglingIncomeForTick, applyInvestigation, decayExposure } 
 import { bookTaxAuditIncome, tickTaxAudit, settleTaxAudit, taxAuditRng, type AuditOutcome } from '../events/TaxAudit.js';
 import { getOperatingIncomePerHour } from '../economy/OperatingFinance.js';
 import { stateRubbleStockKg } from '../economy/SpoilHeaps.js';
+import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { resolveContractOres, resolveContractPriceMultiplier, resolveHiringScript, resolveScriptedOreSale } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { settleAwaitingFundsCharges } from '../mining/ChargeOrder.js';
@@ -209,7 +210,7 @@ export function runTick(
 
   // 3. Contracts — stored ore is delivered first, so a deadline tick that stock
   // can still fill pays out and completes before the penalty is assessed.
-  const contractsDelivered = autoDeliverContracts(state.contracts, state.logistics, state.collectedOre, state.tickCount, state.buildings.buildings);
+  const contractsDelivered = autoDeliverContracts(state.contracts, state.logistics, state.collectedOre, state.tickCount, state.buildings.buildings, oreGradeScaleOf(state.world));
   for (const delivery of contractsDelivered) {
     bookDeliveryCashflow(state, delivery.contractId, delivery, state.tickCount);
     recordOreDelivery(state.grade, delivery.contractType, delivery.kg);

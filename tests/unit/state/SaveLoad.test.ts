@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { createGame, SAVE_VERSION } from '../../../src/core/state/GameState.js';
+import { createGame, createWorldState, SAVE_VERSION } from '../../../src/core/state/GameState.js';
 import { createBuildingState, placeBuilding, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { enterBuilding } from '../../../src/core/engine/Mount.js';
 import { serialize, deserialize, backfillRaises } from '../../../src/core/state/SaveLoad.js';
@@ -2423,7 +2423,7 @@ describe('serialize/deserialize — mine grade state (#1921)', () => {
   it('round-trips the grade state including a pending countdown', () => {
     const state = createGame({ seed: 42 });
     state.grade = {
-      grade: 1, oreDeliveredKg: 31_000, deepestPitM: 12.5, rockBrokenM3: 800, blastsFired: 5, strikeTicks: [], inspectionRolls: 0,
+      grade: 1, oreDeliveredKg: 31_000, deepestPitM: 12.5, rockBrokenM3: 800, blastsFired: 5, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0,
       pending: { toGrade: 2, ticksLeft: 31 },
     };
     expect(deserialize(serialize(state)).grade).toEqual(state.grade);
@@ -2431,7 +2431,7 @@ describe('serialize/deserialize — mine grade state (#1921)', () => {
 
   it('round-trips a grade state with nothing pending', () => {
     const state = createGame({ seed: 42 });
-    state.grade = { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0 };
+    state.grade = { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0 };
     expect(deserialize(serialize(state)).grade).toEqual(state.grade);
   });
 
@@ -2474,5 +2474,19 @@ describe('deserialize — malformed PendingAction.blockedDetail is dropped (#193
     ['a null detail', null],
   ])('drops %s', (_name, detail) => {
     expect(loadWithDetail(detail).blockedDetail).toBeUndefined();
+  });
+});
+
+describe('serialize / deserialize — world.oreGradeScale (#1932)', () => {
+  it('round-trips a set scale', () => {
+    const state = createGame({ seed: 42 });
+    state.world = { ...createWorldState(64, 24, 64, true), oreGradeScale: 0.2 };
+    expect(deserialize(serialize(state)).world!.oreGradeScale).toBe(0.2);
+  });
+
+  it('an absent scale stays absent after a round trip', () => {
+    const state = createGame({ seed: 42 });
+    state.world = createWorldState(64, 24, 64, true);
+    expect(deserialize(serialize(state)).world!.oreGradeScale).toBeUndefined();
   });
 });

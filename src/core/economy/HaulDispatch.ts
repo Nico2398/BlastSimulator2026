@@ -12,6 +12,7 @@ import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
 import { haulDestinationOf, isBarrenFragment } from './SpoilHeaps.js';
+import { oreGradeScaleOf } from './OreGrade.js';
 import type { TrackedFragment } from './Logistics.js';
 import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
@@ -255,8 +256,9 @@ export function createStorageFit(state: GameState): StorageFit {
   let sites: ReturnType<typeof freightWarehouseSites> | null = null;
   let heaps: ReturnType<typeof spoilHeapSites> | null = null;
   let used: Map<number, number> | null = null;
+  const gradeScale = oreGradeScaleOf(state.world);
   return (tracked) => {
-    const barren = isBarrenFragment(tracked.fragment.oreDensities);
+    const barren = isBarrenFragment(tracked.fragment.oreDensities, gradeScale);
     let candidates: ReturnType<typeof freightWarehouseSites>;
     if (barren) candidates = heaps ??= spoilHeapSites(state.buildings);
     else candidates = sites ??= freightWarehouseSites(state.buildings);
@@ -333,11 +335,12 @@ export function findNearbyHaulableFragments(state: GameState, primary: TrackedFr
     if (isQueuedUnclaimedHaul(a) && typeof fragmentId === 'number') queued.add(fragmentId);
   }
   const { x, z } = primary.fragment.position;
-  const destination = haulDestinationOf(primary.fragment);
+  const gradeScale = oreGradeScaleOf(state.world);
+  const destination = haulDestinationOf(primary.fragment, gradeScale);
   const near: Array<{ tracked: TrackedFragment; dist: number }> = [];
   for (const tracked of state.logistics.fragments) {
     const f = tracked.fragment;
-    if (tracked.state !== 'on_ground' || f.id === primary.fragment.id || !queued.has(f.id) || isOversized(f.volume) || haulDestinationOf(f) !== destination) continue;
+    if (tracked.state !== 'on_ground' || f.id === primary.fragment.id || !queued.has(f.id) || isOversized(f.volume) || haulDestinationOf(f, gradeScale) !== destination) continue;
     const dist = octileHeuristic(x, z, f.position.x, f.position.z);
     if (dist <= radiusCells) near.push({ tracked, dist });
   }
@@ -345,8 +348,10 @@ export function findNearbyHaulableFragments(state: GameState, primary: TrackedFr
   return near.map(n => n.tracked);
 }
 
+export type AutoDebrisActionType = 'haul_debris' | 'fragment_debris';
+
 /** True for actions the haul dispatch creates itself (haul_debris / fragment_debris), not player orders (#1302). */
-export function isAutoDebrisAction(type: ActionType): boolean {
+export function isAutoDebrisAction(type: ActionType): type is AutoDebrisActionType {
   return type === 'haul_debris' || type === 'fragment_debris';
 }
 
@@ -375,7 +380,7 @@ export function haulBlockedReason(
   if (action.type !== 'haul_debris') return null;
   const tracked = resolveTrackedFragment(state, action, lookup);
   if (!tracked || tracked.state !== 'on_ground') return null;
-  if (isBarrenFragment(tracked.fragment.oreDensities)) {
+  if (isBarrenFragment(tracked.fragment.oreDensities, oreGradeScaleOf(state.world))) {
     if (fits(tracked)) return null;
     return spoilHeapSites(state.buildings).length === 0 ? 'no_spoil_heap' : 'spoil_heap_full';
   }

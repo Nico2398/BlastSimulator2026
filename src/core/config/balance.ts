@@ -1165,11 +1165,13 @@ export const ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS: number = 64;
 // which a fragment earns the full demand bonus (#1828). Richer fragments are
 // capped here; leaner ones scale down proportionally. A half-ore fragment is
 // already a rich haul, so grade above it adds no extra urgency.
+// Defined at ore grade scale 1; scaled by the site's oreGradeScale (#1932).
 export const ORE_DEMAND_FULL_GRADE: number = 0.5;
 
 // Below this ore share a fragment counts as trace and earns no demand bonus
 // (#1828), so a speck of ore in plain spoil does not pull haulers off real
 // work. 5% is lean enough to ignore, rich enough that genuine ore clears it.
+// Defined at ore grade scale 1; scaled by the site's oreGradeScale (#1932).
 export const ORE_DEMAND_MIN_GRADE: number = 0.05;
 
 /**
@@ -1435,7 +1437,7 @@ export const BUILDING_CONSTRUCTION_TIER_MULTIPLIER: Record<BuildingTier, number>
  */
 export const BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD = 1;
 
-/** Summed ore density of a fragment at or below which it counts as barren and goes to a spoil heap (#1530). */
+/** Summed ore density of a fragment at or below which it counts as barren and goes to a spoil heap (#1530). Defined at ore grade scale 1; scaled by the site's oreGradeScale (#1932). */
 export const SPOIL_BARREN_ORE_FRACTION_THRESHOLD = 0.02;
 
 /**
@@ -3060,3 +3062,27 @@ export const PERMIT_STRIKES_TO_SUSPEND = 3;
 export const PERMIT_STRIKE_WINDOW_TICKS = 2000;
 /** Ticks a suspension lasts. */
 export const PERMIT_SUSPENSION_TICKS = 72;
+
+// ── Permit and petition events (#1927) ───────────────────────────────────────
+export const EVENT_PERMIT_TOUR_STOP_HOURS = 8;
+export const EVENT_PERMIT_TOUR_SAFETY_MIN = 50;
+export const EVENT_PERMIT_TOUR_IMPRESSED_TICKS = -24;
+export const EVENT_PERMIT_TOUR_TRIPPED_TICKS = 24;
+export const EVENT_PERMIT_STAMP_FEE_PCT = 25;
+export const EVENT_PERMIT_STAMP_CORRUPTION = 5;
+export const EVENT_PERMIT_HIDE_DELAY_TICKS = 72;
+export const EVENT_PETITION_MIN_BLAST_SHARE = 0.5;
+export const EVENT_PETITION_MAX_NEIGHBOURS = 50;
+export const EVENT_PETITION_BBQ_COST = 6000;
+export const EVENT_PETITION_BBQ_NEIGHBOURS = 6;
+export const EVENT_PETITION_BERM_COST = 20000;
+export const EVENT_PETITION_BERM_NEIGHBOURS = 10;
+export const EVENT_PETITION_BERM_ECOLOGY = 5;
+export const EVENT_PETITION_IGNORE_NEIGHBOURS = -8;
+export const EVENT_PETITION_IGNORE_DELAY_TICKS = 48;
+export const EVENT_BALANCE_PERMIT_APPROVE_TICKS = 96;
+export const EVENT_BALANCE_REFERENCE_PERMIT_FEE = 20000;
+
+/** Ore grade scale lever (#1932): default and upper bound. */
+export const ORE_GRADE_SCALE_DEFAULT = 1;
+export const ORE_GRADE_SCALE_MAX = 1;

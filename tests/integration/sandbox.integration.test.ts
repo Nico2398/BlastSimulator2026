@@ -817,3 +817,53 @@ describe('sandbox kit save round trip (#1891)', () => {
     expect(restored.employees.employees.map(e => e.name).sort()).toEqual(live.employees.employees.map(e => e.name).sort());
   });
 });
+
+describe('sandbox start ore_grade lever (#1932)', () => {
+  function fresh() {
+    const { runner, ctx } = createRunner();
+    return { runner, ctx };
+  }
+
+  it('ore_grade:0.2 sets world.oreGradeScale', () => {
+    const { runner, ctx } = fresh();
+    const result = runner.run('sandbox start biome:desert_badlands kit:digger seed:42 ore_grade:0.2');
+    expect(result.success, result.output).toBe(true);
+    expect(ctx.state!.world!.oreGradeScale).toBe(0.2);
+  });
+
+  it('ore_grade:1 is accepted and recorded', () => {
+    const { runner, ctx } = fresh();
+    expect(runner.run('sandbox start biome:desert_badlands seed:42 ore_grade:1').success).toBe(true);
+    expect(ctx.state!.world!.oreGradeScale).toBe(1);
+  });
+
+  it('the default sandbox pins no scale', () => {
+    const { runner, ctx } = fresh();
+    expect(runner.run('sandbox start biome:desert_badlands seed:42').success).toBe(true);
+    expect(ctx.state!.world!.oreGradeScale).toBeUndefined();
+  });
+
+  it.each(['0', 'abc', '1.5', '-0.3'])('ore_grade:%s is refused with the sandbox.invalid_ore_grade copy', (bad) => {
+    const { runner, ctx } = fresh();
+    const result = runner.run(`sandbox start biome:desert_badlands seed:42 ore_grade:${bad}`);
+    expect(result.success).toBe(false);
+    expect(result.output).not.toContain('sandbox.invalid_ore_grade');
+    expect(result.output.length).toBeGreaterThan(0);
+    expect(ctx.state).toBeNull();
+  });
+
+  it('the invalid-grade message exists in both locales', async () => {
+    const en = (await import('../../src/core/i18n/locales/en.json')).default as Record<string, string>;
+    const fr = (await import('../../src/core/i18n/locales/fr.json')).default as Record<string, string>;
+    expect(en['sandbox.invalid_ore_grade']).toBeTruthy();
+    expect(fr['sandbox.invalid_ore_grade']).toBeTruthy();
+  });
+
+  it('a scaled site saved and reloaded keeps its scale', () => {
+    const { runner, ctx } = fresh();
+    runner.run('sandbox start biome:desert_badlands kit:digger seed:42 ore_grade:0.2');
+    const restored = deserialize(serialize(stateForSave(ctx, ctx.state!)));
+    expect(restored.world!.oreGradeScale).toBe(0.2);
+    expect(loadGridForState(ctx, restored)).toBeNull();
+  });
+});
