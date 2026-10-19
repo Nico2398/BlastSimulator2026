@@ -82,6 +82,10 @@
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
         {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
           "type": "awaitUsable",
           "selector": "#bs-build-panel [data-build-section=\"vanity\"] [data-build-type=\"ceo_statue\"] .bs-build-buy-btn"
         },
