@@ -1265,9 +1265,9 @@ import { BUYER_TIERS, buyerSupplyQtyRange, type BuyerTierId } from '../../../src
 import { unlockLinesFor } from '../../../src/core/economy/MineGrade.js';
 
 /** Offers over `refreshes` production-board refreshes at the given buyer grade (undefined = tier-less). */
-function tieredBoards(seed: number, refreshes: number, buyerGrade: number | undefined, market: 'legacy' | 'production' | undefined = 'production', rubbleStockKg = Infinity): Contract[] {
+function tieredBoards(seed: number, refreshes: number, buyerGrade: number | undefined, market: 'legacy' | 'production' | 'unset' = 'production', rubbleStockKg = Infinity): Contract[] {
   const state = createContractState();
-  if (market !== undefined) state.market = market;
+  if (market !== 'unset') state.market = market; // 'unset' keeps createContractState's default (undefined cannot be passed: it triggers the parameter default)
   const rng = new Random(seed);
   const seen: Contract[] = [];
   for (let i = 0; i < refreshes; i++) {
@@ -1367,7 +1367,7 @@ describe('untiered boards stay byte-identical (#1929)', () => {
     const graded = tieredBoards(42, 20, 5, 'legacy');
     expect(graded).toEqual(boardsOver('legacy', 42, 20));
     for (const c of graded) expect(c).not.toHaveProperty('buyerTier');
-    expect(tieredBoards(42, 20, 5, undefined)).toEqual(boardsOver(undefined, 42, 20));
+    expect(tieredBoards(42, 20, 5, 'unset')).toEqual(boardsOver(undefined, 42, 20));
   });
 });
 
