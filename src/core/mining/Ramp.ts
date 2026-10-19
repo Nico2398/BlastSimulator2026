@@ -354,7 +354,8 @@ export interface RampSegmentDef {
    * once, in `defineRampSegments`'s Pass 1/2, against the pristine pre-dig
    * grid, because it depends on that column's original surface height,
    * which later carve calls (running against an already-partially-dug grid)
-   * can no longer recover.
+   * can no longer recover. The cell is emitted even when its row is air, if the
+   * column's partial top voxel still stands above the line (#2001).
    */
   cells: {
     x: number; y: number; z: number; floorAdjustment?: number;
@@ -387,7 +388,7 @@ interface RampColumn {
   floorRowY: number;
   /** `RampSegmentDef.cells[i].floorAdjustment` for this column's floor-row cell — see that field's doc. */
   floorAdjustment: number;
-  /** True when this column's existing terrain dips below the ramp's straight `floorY` line, requiring a fill rather than a cut (#1172). */
+  /** True when this column's continuous surface height is not above the line, i.e. its terrain dips below the ramp's straight `floorY` line, requiring a fill rather than a cut (#1172). */
   isFillColumn: boolean;
   /** Leg this column belongs to (#1939). */
   legIndex: number;
@@ -498,7 +499,12 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarved
     // silently skips it (#1172). Existing (non-dip) columns always have
     // surfaceY >= floorY, so this is a no-op there.
     const ceilingY = Math.max(surfaceY, floorY) + clearanceHeight;
-    const isFillColumn = surfaceY < floorY - RAMP_FILL_EPSILON;
+    // (#2001) Classify on the continuous height, not the integer top-voxel
+    // index: a partial top voxel (index 15, height 15.9) sits above a floorY of
+    // 15.27 although its index is below it. A column whose height is not above
+    // the line (including NaN, no ground, #1184) is a fill; the rest are cuts.
+    const surfaceHeight = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
+    const isFillColumn = !(surfaceHeight > floorY + RAMP_FILL_EPSILON);
     columns.push({
       cx: cell.x, cz: cell.z, floorY, ceilingY, floorRowY: Math.ceil(floorY), floorAdjustment, isFillColumn,
       legIndex: cell.legIndex,
@@ -566,8 +572,14 @@ function emitLegSegments(
         // bypass the density gate entirely and push a fillTarget cell
         // instead of the cut/floorAdjustment cell below (#1172).
         if (grid.containsColumn(wx, wz)) cell = { x: wx, y, z: wz, fillTarget: col.floorY };
+      } else if (isFloorRow) {
+        // A cut column (continuous height above the line) emits its floor row
+        // even when that row is air: a partial top voxel stands above the line (#2001).
+        if (grid.densityAt(wx, y, wz) > 0 || grid.containsColumn(wx, wz)) {
+          cell = { x: wx, y, z: wz, floorAdjustment: col.floorAdjustment };
+        }
       } else if (grid.densityAt(wx, y, wz) > 0) {
-        cell = isFloorRow ? { x: wx, y, z: wz, floorAdjustment: col.floorAdjustment } : { x: wx, y, z: wz };
+        cell = { x: wx, y, z: wz };
       }
 
       if (!cell) continue;
@@ -646,6 +658,16 @@ export function isRampCellPending(grid: VoxelGrid, cell: RampSegmentDef['cells']
     if (!Number.isFinite(currentHeight)) return true;
     return currentHeight < cell.fillTarget - FLOOR_TARGET_EPSILON;
   }
+  if (cell.floorAdjustment !== undefined) {
+    // (#2001) Judged by the column's continuous height, matching carveRampCell's
+    // idempotency check: banding leaves this very row at a small nonzero
+    // residual density, so a raw density>0 test would never read as done. An
+    // air floor row is still pending while a partial top voxel stands above
+    // the line.
+    const currentHeight = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
+    if (!Number.isFinite(currentHeight)) return grid.densityAt(cell.x, cell.y, cell.z) > 0;
+    return currentHeight > (cell.y - 1 + cell.floorAdjustment) + FLOOR_TARGET_EPSILON;
+  }
   return grid.densityAt(cell.x, cell.y, cell.z) > 0;
 }
 
@@ -709,8 +731,10 @@ function carveRampCell(
     return { cleared: false, bandedMaxY: null, filled: false };
   }
 
-  if (!carveCellIfSolid(grid, cell)) return { cleared: false, bandedMaxY: null, filled: false };
-  return { cleared: true, bandedMaxY: bandRampFloorColumn(grid, cell.x, cell.z, intendedTarget), filled: false };
+  // Air floor row with a partial top voxel above the line (#2001): nothing to
+  // clear, but the column still bands down to the target.
+  const cleared = carveCellIfSolid(grid, cell);
+  return { cleared, bandedMaxY: bandRampFloorColumn(grid, cell.x, cell.z, intendedTarget), filled: false };
 }
 
 /**

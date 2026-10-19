@@ -2141,3 +2141,160 @@ describe('multi-leg ramps (#1939)', () => {
     });
   });
 });
+
+describe('columns with a partial top voxel below the floor line, #2001', () => {
+  const SURFACE = 15; // integer top voxel of the flat grid
+  const ORIGIN_X = 20;
+  const ORIGIN_Z = 10;
+  const LENGTH = 22;
+  const DEPTH = 8; // ratio ~0.36, under RAMP_CUT_SLOPE_RATIO
+  const WIDTH = 3;
+  /** Integer top voxel SURFACE-1, continuous height SURFACE-0.1: above the floor line near the start. */
+  const PARTIAL_HEIGHT = SURFACE - 1 + 0.9;
+  const TOL = 1e-6;
+  const RAMP: RampDef = { originX: ORIGIN_X, originZ: ORIGIN_Z, direction: 'south', length: LENGTH, targetDepth: DEPTH, width: WIDTH };
+  const PATH = { originX: ORIGIN_X, originZ: ORIGIN_Z, legs: [{ direction: 'south' as const, length: LENGTH }] };
+
+  /** The ramp's floor line starts at the origin's integer surface voxel. */
+  function baseHeight(): number {
+    return SURFACE;
+  }
+
+  /** Partial-top columns: a 2x2 block at steps 2..3 plus a few others. */
+  function makePartialGrid(): VoxelGrid {
+    const grid = makeElevatedGrid(40, 50, SURFACE);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
+    const partial: [number, number][] = [
+      [ORIGIN_X, ORIGIN_Z + 2], [ORIGIN_X + 1, ORIGIN_Z + 2],
+      [ORIGIN_X, ORIGIN_Z + 3], [ORIGIN_X + 1, ORIGIN_Z + 3],
+      [ORIGIN_X - 1, ORIGIN_Z + 4], [ORIGIN_X, ORIGIN_Z + 5], [ORIGIN_X + 1, ORIGIN_Z + 6],
+    ];
+    for (const [x, z] of partial) setVoxelColumnSurfaceHeight(grid, x, z, PARTIAL_HEIGHT, compId);
+    return grid;
+  }
+
+  function stepOf(cell: { z: number }): number {
+    return cell.z - ORIGIN_Z;
+  }
+
+  /** Every footprint tile sits no higher than the line (fill columns already below it may stay below). */
+  function expectOnTheLine(grid: VoxelGrid): void {
+    const top = baseHeight();
+    for (const cell of rampPathCells(PATH, WIDTH)) {
+      const line = top - rampFloorDepthAt(stepOf(cell), LENGTH, DEPTH);
+      const h = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
+      expect(h, `tile ${cell.x},${cell.z} (step ${stepOf(cell)}) height ${h} vs line ${line}`).toBeLessThanOrEqual(line + TOL);
+    }
+  }
+
+  function expectCentrelineOnTheLine(grid: VoxelGrid): void {
+    const top = baseHeight();
+    for (const cell of rampCenterline({ originX: ORIGIN_X, originZ: ORIGIN_Z, legs: PATH.legs })) {
+      const line = top - rampFloorDepthAt(stepOf(cell), LENGTH, DEPTH);
+      expect(computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z)).toBeCloseTo(line, 5);
+    }
+  }
+
+  it('fixture: partial columns are below the grid surface but above the line at steps 2..3', () => {
+    const grid = makePartialGrid();
+    expect(computeVoxelColumnSurfaceHeight(grid, ORIGIN_X, ORIGIN_Z + 2)).toBeCloseTo(PARTIAL_HEIGHT, 6);
+    expect(computeVoxelColumnSurfaceY(grid, ORIGIN_X, ORIGIN_Z + 2)).toBe(SURFACE - 1);
+    expect(PARTIAL_HEIGHT).toBeGreaterThan(baseHeight() - rampFloorDepthAt(3, LENGTH, DEPTH));
+  });
+
+  it('carveRampSegment digs every partial-top footprint column down to the floor line', () => {
+    const grid = makePartialGrid();
+    for (const segment of defineRampSegments(grid, RAMP)) carveRampSegment(grid, segment);
+    expectOnTheLine(grid);
+    expectCentrelineOnTheLine(grid);
+  });
+
+  it('carveRampSegmentSlice in 1-cell slices digs every partial-top column down to the floor line', () => {
+    const grid = makePartialGrid();
+    for (const segment of defineRampSegments(grid, RAMP)) {
+      for (let i = 0; i < segment.cells.length; i++) carveRampSegmentSlice(grid, segment.cells, i, i + 1);
+    }
+    expectOnTheLine(grid);
+    expectCentrelineOnTheLine(grid);
+  });
+
+  it('a second carve pass over the finished grid changes nothing', () => {
+    const grid = makePartialGrid();
+    const segments = defineRampSegments(grid, RAMP);
+    for (const segment of segments) carveRampSegment(grid, segment);
+    const before = rampPathCells(PATH, WIDTH).map(c => computeVoxelColumnSurfaceHeight(grid, c.x, c.z));
+
+    let cleared = 0;
+    let filled = 0;
+    for (const segment of segments) {
+      const r = carveRampSegment(grid, segment);
+      cleared += r.voxelsCleared;
+      filled += r.voxelsFilled;
+    }
+
+    expect(cleared).toBe(0);
+    expect(filled).toBe(0);
+    const after = rampPathCells(PATH, WIDTH).map(c => computeVoxelColumnSurfaceHeight(grid, c.x, c.z));
+    expect(after).toEqual(before);
+  });
+
+  it('adjacent centreline columns never steepen past the ordered grade after a full dig', () => {
+    const grid = makePartialGrid();
+    for (const segment of defineRampSegments(grid, RAMP)) carveRampSegment(grid, segment);
+    const line = rampCenterline({ originX: ORIGIN_X, originZ: ORIGIN_Z, legs: PATH.legs });
+    const orderedRatio = DEPTH / LENGTH;
+    for (let i = 0; i + 1 < line.length; i++) {
+      const a = computeVoxelColumnSurfaceHeight(grid, line[i]!.x, line[i]!.z);
+      const b = computeVoxelColumnSurfaceHeight(grid, line[i + 1]!.x, line[i + 1]!.z);
+      expect(a - b, `step ${i} -> ${i + 1}`).toBeLessThanOrEqual(orderedRatio + 0.05);
+      expect(isStepClimbable(a, b, 1), `step ${i} -> ${i + 1} (${a} -> ${b})`).toBe(true);
+    }
+  });
+
+  it('a column truly below the line is still filled up to it', () => {
+    const grid = makeElevatedGrid(40, 50, SURFACE);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
+    // 3m dip at step 4 (line there is ~SURFACE - 1.45): far below the line.
+    setVoxelColumnSurfaceHeight(grid, ORIGIN_X, ORIGIN_Z + 4, SURFACE - 3, compId);
+    const line = baseHeight() - rampFloorDepthAt(4, LENGTH, DEPTH);
+
+    let filled = 0;
+    for (const segment of defineRampSegments(grid, RAMP)) filled += carveRampSegment(grid, segment).voxelsFilled;
+
+    expect(filled).toBeGreaterThan(0);
+    expect(computeVoxelColumnSurfaceHeight(grid, ORIGIN_X, ORIGIN_Z + 4)).toBeCloseTo(line, 5);
+  });
+
+  describe('isRampCellPending with a floorAdjustment cell', () => {
+    it('is pending while the cell row is air but the column still stands above the target, and done after banding', () => {
+      const grid = new VoxelGrid(10, 10);
+      const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+      // Rows 0..4 solid (row 5 is air), full-voxel height 4.5; target = (5 - 1) + 0.2 = 4.2.
+      for (let y = 0; y <= 4; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1.0);
+      const cell = { x: 3, y: 5, z: 3, floorAdjustment: 0.2 };
+      expect(grid.densityAt(3, 5, 3)).toBe(0);
+
+      expect(isRampCellPending(grid, cell)).toBe(true);
+
+      carveRampSegment(grid, { cells: [cell] } as unknown as RampSegmentDef);
+      expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeLessThanOrEqual(4.2 + TOL);
+      expect(isRampCellPending(grid, cell)).toBe(false);
+    });
+
+    it('is not pending when the column already sits at or below the target', () => {
+      const grid = new VoxelGrid(10, 10);
+      const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+      for (let y = 0; y <= 3; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1.0);
+      expect(isRampCellPending(grid, { x: 3, y: 5, z: 3, floorAdjustment: 0.2 })).toBe(false);
+    });
+
+    it('fillTarget cells keep their behaviour', () => {
+      const grid = new VoxelGrid(10, 10);
+      const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+      setVoxelColumnSurfaceHeight(grid, 3, 3, 3, compId);
+      expect(isRampCellPending(grid, { x: 3, y: 5, z: 3, fillTarget: 5 })).toBe(true);
+      setVoxelColumnSurfaceHeight(grid, 3, 3, 5, compId);
+      expect(isRampCellPending(grid, { x: 3, y: 5, z: 3, fillTarget: 5 })).toBe(false);
+    });
+  });
+});
