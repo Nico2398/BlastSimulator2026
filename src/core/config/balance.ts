@@ -2901,8 +2901,45 @@ export const PRODUCTION_ORE_SALE_QTY_KG = { min: 250, max: 2_000 } as const;
  * opening-kit scenario (#1789 sandbox-economy-balance) is ~9 kg/tick (8,353 kg in 919 ticks).
  * Invariant: qtyMax * 1.5 <= deliveredRate * deadlineMin (8,000 * 1.5 = 12,000 <= 9 * 1,500
  * = 13,500), so every supply offer is deliverable in full on time with a 1.5x margin.
+ * Buyer tiers (#1929) keep the invariant per tier: qtyMax * BUYER_DEADLINE_MARGIN <= refRate *
+ * deadlineMin, where refRate is `BUYER_REF_HAUL_KG_PER_TICK` and deadlineMin is derived from it.
  */
 export const PRODUCTION_SUPPLY_QTY_KG = { min: 4_000, max: 8_000 } as const;
+/** Supply quantity multiplier on `PRODUCTION_SUPPLY_QTY_KG` per buyer tier (#1929). */
+export const BUYER_SUPPLY_QTY_FACTOR = { local: 0.5, regional: 1, national: 6, global: 25 } as const;
+/** Mine grade at which each buyer tier starts offering contracts (#1929). */
+export const BUYER_UNLOCK_GRADE = { local: 0, regional: 1, national: 3, global: 5 } as const;
+/** Ore-sale lot size range (kg) per buyer tier (#1929); local lots are 100-1000 kg by design. */
+export const BUYER_ORE_SALE_QTY_KG = {
+  local: { min: 100, max: 1_000 },
+  regional: { min: 1_000, max: 5_000 },
+  national: { min: 10_000, max: 40_000 },
+  global: { min: 50_000, max: 250_000 },
+} as const;
+/** Quantity rounding step (kg) per buyer tier (#1929). */
+export const BUYER_QTY_STEP_KG = { local: 100, regional: 250, national: 1_000, global: 5_000 } as const;
+/** Price factor range (against the ore's market base price) per buyer tier; richer for small local buyers (#1929). */
+export const BUYER_PRICE_FACTOR = {
+  local: { min: 1.15, max: 1.3 },
+  regional: { min: 0.95, max: 1.1 },
+  national: { min: 0.85, max: 1.0 },
+  global: { min: 0.75, max: 0.95 },
+} as const;
+/** Relative chance of each buyer tier among the unlocked ones (#1929). */
+export const BUYER_TIER_WEIGHT = { local: 0.35, regional: 0.35, national: 0.2, global: 0.1 } as const;
+/**
+ * Reference haul rate (kg/tick) a buyer tier's deadlines are sized for (#1929). Local and
+ * regional: the measured ~9 kg/tick delivered rate of one ore from the opening kit. National and
+ * global scale that by the reference fleet of the grade that unlocks them (grade 3: 3x, grade 5:
+ * 10x the opening kit's haul), so a fleet of that grade can still fill the tier's biggest offer.
+ */
+export const BUYER_REF_HAUL_KG_PER_TICK = { local: 9, regional: 9, national: 27, global: 90 } as const;
+/** A buyer offer's shortest deadline lets the reference rate haul its biggest quantity this many times over. */
+export const BUYER_DEADLINE_MARGIN = 1.5;
+/** Longest buyer deadline as a multiple of the shortest (2,500 / 1,500 of the #1789 supply range). */
+export const BUYER_DEADLINE_SPAN_RATIO = 5 / 3;
+/** Supply deals pay this share of the buyer tier's rolled price factor (volume discount). */
+export const BUYER_SUPPLY_DISCOUNT = 0.75;
 /**
  * Default deadline range (ticks) for every non-supply offer on any market, plus supply on the
  * legacy market. Production-market supply uses `PRODUCTION_SUPPLY_DEADLINE_TICKS` instead.

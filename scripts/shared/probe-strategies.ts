@@ -17,8 +17,9 @@
 //            DECISION_INTERVAL_TICKS. In this order, each only if cash minus
 //            REINVEST_CASH_RESERVE covers it:
 //            a. accept and fill fillable contracts (free)
-//            b. fire the next blast when haulable ore on the ground has fallen under
-//               RELOAD_FRACTION of the last blast's yield (shouldReload), the drill is idle
+//            b. fire the next blast when the next grade still needs blasts (#1929), or haulable ore
+//               on the ground has fallen under RELOAD_FRACTION of the last blast's yield
+//               (shouldReload); the drill is idle
 //                and cash covers the shot; footprints keep SHOT_SPAN clear of earlier shots
 //            c. buy a Research Center
 //            d. research and order the tier-2 Freight Warehouse upgrade
@@ -329,6 +330,15 @@ function orderShotOnce(s: ProbeSession, m: ReinvestMemory): Shot | null {
   return ordered as Shot | null; // assigned inside the closure, which TS narrowing cannot see
 }
 
+/**
+ * True while the next grade still asks for more blasts. Tier-0 buyers take 100-1000 kg lots (#1929), so a
+ * full warehouse drains slowly and the ground stock may never fall under the reload gate; the permit
+ * ladder's own blast count must not wait on it.
+ */
+function gradeNeedsBlast(s: ProbeSession): boolean {
+  return nextGradeTargets(s.state).some(t => t.kind === 'blasts' && !t.met);
+}
+
 function reinvestShot(s: ProbeSession, m: ReinvestMemory): void {
   if (m.yieldPending) { // the blast resolved on the first command after it fired
     m.lastYieldKg = haulableOreOnGroundKg(s.state);
@@ -339,7 +349,7 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory): void {
     const idle = s.state.plannedDrillHoles.length === 0 && Object.keys(s.state.plannedChargesByHole).length === 0
       && s.state.drillHoles.length === 0;
     const shotCost = SHOT_EXPLOSIVE_KG + RE_FIRE_CASH_CUSHION;
-    if (idle && spendable(s) >= shotCost && shouldReload(haulableOreOnGroundKg(s.state), m.lastYieldKg)) {
+    if (idle && spendable(s) >= shotCost && (gradeNeedsBlast(s) || shouldReload(haulableOreOnGroundKg(s.state), m.lastYieldKg))) {
       m.shot = orderShotOnce(s, m);
     }
     return;

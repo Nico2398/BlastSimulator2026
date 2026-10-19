@@ -1258,3 +1258,131 @@ describe('contractAcceptBlocker — paid clearance fee (#1892)', () => {
     expect(contractAcceptBlocker(offer({ type: 'ore_sale' }), false, 0)).toBe('needs_freight_warehouse');
   });
 });
+
+// ── Buyer tiers (#1929) ─────────────────────────────────────────────────────
+
+import { BUYER_TIERS, buyerSupplyQtyRange, type BuyerTierId } from '../../../src/core/economy/BuyerTiers.js';
+import { unlockLinesFor } from '../../../src/core/economy/MineGrade.js';
+
+/** Offers over `refreshes` production-board refreshes at the given buyer grade (undefined = tier-less). */
+function tieredBoards(seed: number, refreshes: number, buyerGrade: number | undefined, market: 'legacy' | 'production' | 'unset' = 'production', rubbleStockKg = Infinity): Contract[] {
+  const state = createContractState();
+  if (market !== 'unset') state.market = market; // 'unset' keeps createContractState's default (undefined cannot be passed: it triggers the parameter default)
+  const rng = new Random(seed);
+  const seen: Contract[] = [];
+  for (let i = 0; i < refreshes; i++) {
+    generateContracts(state, rng, i * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, rubbleStockKg, buyerGrade);
+    seen.push(...state.available.slice(-CONTRACTS_PER_REFRESH));
+  }
+  return seen;
+}
+
+const tierOf = (id: BuyerTierId) => BUYER_TIERS.find(b => b.id === id)!;
+
+describe('tiered production boards (#1929)', () => {
+  it('a grade-0 board is all local, ore sales 100-1000 kg on a 100 kg step', () => {
+    const offers = tieredBoards(42, 40, 0).filter(c => c.type !== 'rubble_disposal');
+    expect(offers.length).toBeGreaterThan(10);
+    for (const c of offers) {
+      expect(c.buyerTier).toBe('local');
+      if (c.type === 'ore_sale') {
+        expect(c.quantityKg).toBeGreaterThanOrEqual(100);
+        expect(c.quantityKg).toBeLessThanOrEqual(1000);
+        expect(c.quantityKg % 100).toBe(0);
+      }
+    }
+  });
+
+  it('local supply offers sit in half the production supply range', () => {
+    const supply = tieredBoards(42, 60, 0).filter(c => c.type === 'supply');
+    expect(supply.length).toBeGreaterThan(0);
+    const range = buyerSupplyQtyRange(tierOf('local'), PRODUCTION_SUPPLY_QTY_KG);
+    for (const c of supply) {
+      expect(c.quantityKg).toBeGreaterThanOrEqual(range.min);
+      expect(c.quantityKg).toBeLessThanOrEqual(range.max);
+    }
+  });
+
+  it('rubble offers carry no buyer tier', () => {
+    const rubble = tieredBoards(42, 40, 5).filter(c => c.type === 'rubble_disposal');
+    expect(rubble.length).toBeGreaterThan(0);
+    for (const c of rubble) expect(c.buyerTier).toBeUndefined();
+  });
+
+  it('a regional offer appears once the mine reaches grade 1, and no tier above the unlocked ones', () => {
+    const offers = Array.from({ length: 10 }, (_, i) => tieredBoards(300 + i, 20, 1)).flat().filter(c => c.type !== 'rubble_disposal');
+    expect(offers.some(c => c.buyerTier === 'regional')).toBe(true);
+    expect(offers.some(c => c.buyerTier === 'local')).toBe(true);
+    for (const c of offers) expect(['local', 'regional']).toContain(c.buyerTier);
+  });
+
+  it('a grade-5 board reaches national and global buyers with matching sizes and price factors', () => {
+    const offers = Array.from({ length: 10 }, (_, i) => tieredBoards(700 + i, 25, 5)).flat().filter(c => c.type === 'ore_sale');
+    for (const id of ['national', 'global'] as const) {
+      const mine = offers.filter(c => c.buyerTier === id);
+      expect(mine.length, id).toBeGreaterThan(0);
+      const tier = tierOf(id);
+      for (const c of mine) {
+        expect(c.quantityKg).toBeGreaterThanOrEqual(tier.oreSaleQtyKg.min);
+        expect(c.quantityKg).toBeLessThanOrEqual(tier.oreSaleQtyKg.max);
+        expect(c.quantityKg % tier.stepKg).toBe(0);
+        const base = oreContractBasePrice(c.materialId, 'production');
+        expect(c.pricePerKg).toBeGreaterThanOrEqual(base * tier.priceFactor.min - 1e-9);
+        expect(c.pricePerKg).toBeLessThanOrEqual(base * tier.priceFactor.max + 1e-9);
+      }
+    }
+  });
+
+  it('every tiered offer can be hauled 1.5x over by the tier reference rate within its deadline', () => {
+    const offers = Array.from({ length: 12 }, (_, i) => tieredBoards(900 + i, 25, 5)).flat()
+      .filter(c => c.type !== 'rubble_disposal');
+    expect(offers.length).toBeGreaterThan(50);
+    for (const c of offers) {
+      const tier = tierOf(c.buyerTier!);
+      expect(1.5 * c.quantityKg).toBeLessThanOrEqual(tier.refHaulKgPerTick * c.deadlineTicks + 1e-6);
+    }
+  });
+
+  it('offerSpecialContract also tiers its offer when given a grade', () => {
+    const state = createContractState();
+    state.market = 'production';
+    const seen = new Set<string | undefined>();
+    const rng = new Random(4);
+    for (let i = 0; i < 60; i++) {
+      const c = offerSpecialContract(state, rng, 1, ALL_ORES, 0, 0);
+      if (c) seen.add(c.buyerTier);
+    }
+    expect([...seen]).toEqual(['local']);
+  });
+});
+
+describe('untiered boards stay byte-identical (#1929)', () => {
+  it('an undefined buyerGrade on the production market equals the pre-tier output', () => {
+    const withUndefined = tieredBoards(42, 20, undefined);
+    expect(withUndefined).toEqual(boardsOver('production', 42, 20));
+    for (const c of withUndefined) expect(c).not.toHaveProperty('buyerTier');
+  });
+
+  it('a legacy market ignores buyerGrade', () => {
+    const graded = tieredBoards(42, 20, 5, 'legacy');
+    expect(graded).toEqual(boardsOver('legacy', 42, 20));
+    for (const c of graded) expect(c).not.toHaveProperty('buyerTier');
+    expect(tieredBoards(42, 20, 5, 'unset')).toEqual(boardsOver(undefined, 42, 20));
+  });
+});
+
+describe('buyer unlock lines (#1929)', () => {
+  const keys = (g: number) => unlockLinesFor(g).map(l => l.key);
+
+  it.each([[1, 'regional'], [3, 'national'], [5, 'global']] as const)('grade %i lists the %s buyer', (g, id) => {
+    expect(keys(g)).toContain(`progression.unlock.buyer.${id}`);
+  });
+
+  it.each([2, 4, 6])('grade %i lists no buyer line', (g) => {
+    expect(keys(g).filter(k => k.startsWith('progression.unlock.buyer.'))).toEqual([]);
+  });
+
+  it('there is no local buyer line, local is open from the start', () => {
+    for (let g = 0; g <= 8; g++) expect(keys(g)).not.toContain('progression.unlock.buyer.local');
+  });
+});

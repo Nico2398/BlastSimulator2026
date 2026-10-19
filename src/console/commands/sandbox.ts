@@ -152,7 +152,7 @@ export function sandboxCommand(
     if (startGrade.grade !== undefined) ctx.state.grade.grade = startGrade.grade;
   }
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
-  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state));
+  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state), ctx.state.grade?.grade);
 
   return {
     success: true,

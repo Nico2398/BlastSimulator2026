@@ -204,7 +204,7 @@ export function campaignStartCommand(
 
   // Generate initial contracts so they're available immediately
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
-  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state));
+  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state), ctx.state.grade?.grade);
   ensureScriptedOreSale(ctx.state.contracts, level.scriptedOreSale, level.contractPriceMultiplier);
 
   // Report the cash actually in hand, not the level default — an override that
