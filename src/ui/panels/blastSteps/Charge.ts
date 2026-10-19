@@ -211,6 +211,7 @@ export class ChargeStep {
 
     this.allowedIds = resolveAvailableExplosives(state.campaign.activeLevelId);
     if (this.playerPickedExplosive && !this.allowedIds.includes(this.selectedExplosiveId)) this.playerPickedExplosive = false;
+    // Deliberately re-run on every update until the player clicks: the step instance outlives Continue/load, so the preselection follows live stock.
     if (!this.playerPickedExplosive) {
       const preferred = preferredExplosiveId(
         state.patternCharge?.explosiveId, getExplosivesStockByType(state.buildings), this.allowedIds,

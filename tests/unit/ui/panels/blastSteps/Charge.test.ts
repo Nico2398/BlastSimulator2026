@@ -1224,7 +1224,7 @@ describe('ChargeStep initial explosive (#2016)', () => {
     expect(selectedIds(step)).toEqual(['boomite']);
   });
 
-  it('keeps a player pick of the stocked-out default even when it equals the unpicked default', () => {
+  it('a click on the already-preselected card still locks the pick', () => {
     const { step } = makeStep();
     const state = makeState();
     withWarehouse(state, { boomite: 10 });
