@@ -251,7 +251,7 @@ export const UNION_EVENT_MIN_INTERVAL_TICKS = 120;
 /** Union events' own cooldown clock (#1907): random extra ticks (0 to value-1) added to the union cooldown. */
 export const UNION_EVENT_MIN_INTERVAL_RANDOM_RANGE = 60;
 
-/** Minimum number of user-initiated actions required between events. */
+/** Minimum number of user-initiated actions required between events, counted per clock: since the last non-union event (shared) and, separately, since the last union event. */
 export const MIN_EVENT_INTERVAL_ACTIONS = 10;
 
 // ─── Traffic ───────────────────────────────────────────────────────────────────

@@ -226,7 +226,9 @@ export function tickEventSystem(
       const isUnion = timer.category === 'union';
       let blocked: boolean;
       if (isUnion) {
-        blocked = !unionCooldownOpen(state, ctx.tickCount, ctx.unionMemberCount, ctx.employeeCount, rng);
+        // unionCooldownOpen is evaluated first so its RNG draw never depends on the action gate.
+        const cooldownOpen = unionCooldownOpen(state, ctx.tickCount, ctx.unionMemberCount, ctx.employeeCount, rng);
+        blocked = !cooldownOpen || state.unionActionCountSinceEvent < MIN_EVENT_INTERVAL_ACTIONS;
       } else {
         if (state.cooldownMinIntervalTicks === null) {
           state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS + rng.nextInt(0, MIN_EVENT_INTERVAL_RANDOM_RANGE);
@@ -253,6 +255,7 @@ export function tickEventSystem(
         if (isUnion) {
           state.lastUnionEventTick = ctx.tickCount;
           state.unionCooldownMinIntervalTicks = null;
+          state.unionActionCountSinceEvent = 0;
         } else {
           state.lastEventTick = ctx.tickCount;
           state.actionCountSinceEvent = 0;
@@ -285,6 +288,7 @@ export function queueFollowUp(state: EventSystemState, eventId: string): void {
 /** Increment the action count since the last event. Used for cooldown gating. */
 export function incrementActionCount(state: EventSystemState): void {
   state.actionCountSinceEvent++;
+  state.unionActionCountSinceEvent++;
 }
 
 // ── Selection ──
