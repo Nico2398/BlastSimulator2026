@@ -70,6 +70,34 @@
       }
     },
     {
+      "command": "state",
+      "timeout": 90,
+      "description": "Player clicks the dug switchback in the scene (near top-down focus on leg one's midpoint (15,21), click at viewport centre). The inspector shows the multi-leg ramp: Legs, Length and Grade rows, and the Widen action (disabled for a multi-leg ramp).",
+      "interaction": [
+        {
+          "type": "focusTile",
+          "x": 15,
+          "z": 21,
+          "distance": 16,
+          "pitch": 80
+        },
+        {
+          "type": "click",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector [data-action=\"widen\"]",
+          "timeout": 60000
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "note": "Multi-leg ramp selected; inspector lists Legs, Length, Grade."
+      }
+    },
+    {
       "command": "vehicle driver 2 3",
       "description": "Crew the debris_hauler #2 with driver #3 (the only truck-licensed driver; driver #4 stays on the rock_digger).",
       "interaction": [
