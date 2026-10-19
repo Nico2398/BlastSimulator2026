@@ -192,6 +192,10 @@ export interface SecondaryBlastReport {
   radiusM: number;
   casualties: number;
   destroyedIds: number[];
+  /** Voxels the detonation's crater cleared (#1896). */
+  craterVoxels: number;
+  /** Fragments the crater left to haul (#1896). */
+  craterFragments: number;
 }
 
 /** True when the blast cleared rock but never broke out of its sealed void (#1724). */
