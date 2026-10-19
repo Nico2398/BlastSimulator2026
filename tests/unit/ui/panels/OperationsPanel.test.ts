@@ -771,8 +771,8 @@ describe('OperationsPanel — Unclaimed Work with blocked orders (#1810)', () =>
     expect(text.indexOf('warehouse space')).toBeLessThan(text.indexOf('nobody able to do them'));
   });
 
-  it('i18n has the blocked-note wording with a {blocked} placeholder', () => {
-    expect(t('ui.operations.unclaimed_work_note_blocked', { blocked: 2 })).toContain('2');
+  it('i18n has the blocked-note wording with a {reasons} placeholder', () => {
+    expect(t('ui.operations.unclaimed_work_note_blocked', { reasons: 'no truck' })).toContain('no truck');
     expect(t('ui.operations.work_queue_status_stranded')).toBe('Out of reach');
   });
 });

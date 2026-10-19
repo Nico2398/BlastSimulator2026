@@ -89,7 +89,7 @@ export function buildBlockedOrderMessage(action: PendingAction, nowTick?: number
 }
 
 /** Max cause lines shown for a pile of blocked orders. */
-const BLOCKED_PHRASE_LINES = 3;
+export const BLOCKED_PHRASE_LINES = 3;
 
 const BLOCKED_PHRASE_KINDS = ['crew_fleet', 'storage_full', 'no_warehouse', 'no_spoil_heap', 'spoil_heap_full', 'unreachable'] as const;
 
@@ -98,7 +98,7 @@ type BlockedPhraseKind = typeof BLOCKED_PHRASE_KINDS[number];
 interface BlockedKindCount { kind: BlockedPhraseKind; count: number }
 
 /** Phrase kind of a failure reason; null for non-failure or absent reasons. */
-function blockedPhraseKind(reason: BlockedOrderReason | null | undefined): BlockedPhraseKind | null {
+export function blockedPhraseKind(reason: BlockedOrderReason | null | undefined): BlockedPhraseKind | null {
   switch (reason) {
     case 'no_qualified_employee':
     case 'no_dual_qualified_employee':
@@ -142,7 +142,7 @@ export function rankBlockedKinds(counts: Partial<Record<BlockedOrderReason, numb
 }
 
 /** Count plus remedy sentence for one kind. */
-function blockedPhrase(entry: BlockedKindCount): string {
+export function blockedPhrase(entry: BlockedKindCount): string {
   return t(`notification.blocked_phrase.${entry.kind}`, { count: entry.count.toLocaleString('en-US') });
 }
 
