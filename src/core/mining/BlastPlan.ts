@@ -3,7 +3,8 @@
 
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
-import { isBuildingFootprintCell, type Building, type BuildingType, type FootprintOccupant } from '../entities/Building.js';
+import { DRILL_GRID_DEFAULT_SPACING_M } from '../config/balance.js';
+import { getBuildingDef, isBuildingFootprintCell, warehouseStockKg, type Building, type BuildingType, type FootprintOccupant } from '../entities/Building.js';
 
 export interface BlastPlan {
   holes: DrillHole[];
@@ -116,20 +117,56 @@ export interface BuildingAtRisk {
   stockKg: number;
 }
 
-/** Hole-grid pitch: larger of the smallest x gap and smallest z gap; default spacing when undetermined. */
-export function holePatternSpacing(holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z'>>): number {
-  void holes;
-  // TODO: implement
-  return 0;
+const SPACING_EPSILON = 1e-6;
+
+/** Smallest gap between distinct values, or null with fewer than two. */
+function smallestGap(values: number[]): number | null {
+  const sorted = [...new Set(values)].sort((a, b) => a - b);
+  let best: number | null = null;
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = sorted[i]! - sorted[i - 1]!;
+    if (gap > SPACING_EPSILON && (best === null || gap < best)) best = gap;
+  }
+  return best;
 }
 
-/** Buildings within reach of the planned holes (#2021). */
+/** Hole-grid pitch: larger of the smallest x gap and smallest z gap; default spacing when undetermined. */
+export function holePatternSpacing(holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z'>>): number {
+  const gx = smallestGap(holes.map(h => h.x));
+  const gz = smallestGap(holes.map(h => h.z));
+  if (gx === null && gz === null) return DRILL_GRID_DEFAULT_SPACING_M;
+  return Math.max(gx ?? 0, gz ?? 0);
+}
+
+/** Buildings within reach of the planned holes (#2021): any footprint cell inside the holes' bbox grown by `marginM`. */
 export function buildingsInBlastReach(
   holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z'>>,
   buildings: ReadonlyArray<Pick<Building, 'id' | 'type' | 'tier' | 'x' | 'z' | 'storedExplosives'>>,
-  marginM?: number,
+  marginM: number = holePatternSpacing(holes),
 ): BuildingAtRisk[] {
-  void holes; void buildings; void marginM;
-  // TODO: implement
-  return [];
+  if (holes.length === 0 || buildings.length === 0) return [];
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const h of holes) {
+    const hx = Math.floor(h.x);
+    const hz = Math.floor(h.z);
+    if (hx < minX) minX = hx;
+    if (hx > maxX) maxX = hx;
+    if (hz < minZ) minZ = hz;
+    if (hz > maxZ) maxZ = hz;
+  }
+  minX -= marginM; maxX += marginM; minZ -= marginM; maxZ += marginM;
+  const result: BuildingAtRisk[] = [];
+  for (const b of buildings) {
+    const inReach = getBuildingDef(b.type, b.tier).footprint.some(([dx, dz]) => {
+      const cx = b.x + dx;
+      const cz = b.z + dz;
+      return cx >= minX && cx <= maxX && cz >= minZ && cz <= maxZ;
+    });
+    if (!inReach) continue;
+    result.push({
+      buildingId: b.id, type: b.type, x: b.x, z: b.z,
+      stockKg: b.type === 'explosive_warehouse' ? warehouseStockKg(b) : 0,
+    });
+  }
+  return result.sort((a, c) => a.buildingId - c.buildingId);
 }

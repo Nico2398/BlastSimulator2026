@@ -3837,6 +3837,8 @@
   "ui.blast_workshop.preflight.predicted_locked_projections": "projections — T3",
   "ui.blast_workshop.preflight.no_preview": "Lancez l'analyse dans l'étape Prévisions pour voir les résultats ici.",
   "ui.blast_workshop.preflight.warn_protected": "{count} trou(s), dont {hole}, se trouvent directement sur l'emprise d'un bâtiment.",
+  "ui.blast_workshop.preflight.warn_building": "{building} est dans la zone de tir et sera détruit.",
+  "ui.blast_workshop.preflight.warn_building_stocked": "{building} ({kg} kg en stock) est dans la zone de tir : il sera détruit et son stock explosera en tir secondaire.",
   "ui.blast_workshop.preflight.warn_charge_loading": "{count} trou(s) sont encore en cours de chargement. Attendez la fin du chargement avant de lancer le blast.",
   "ui.blast_workshop.preflight.warn_charge_awaiting_delivery": "{count} trou(s) attendent l'arrivée des explosifs {when} (dans {duration}). Le tir est bloqué tant qu'ils ne sont pas chargés.",
   "ui.blast_workshop.preflight.warn_undrilled": "{count} trou(s) pas encore foré(s). Lancer le blast maintenant annule leurs ordres de forage.",
