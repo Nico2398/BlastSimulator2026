@@ -1168,6 +1168,11 @@ export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
 // (32 ticks), doubled = 64 ticks: 4x the base ore bonus, scaled by urgency.
 export const ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS: number = 64;
 
+// Extra haul-priority bonus for an on-ground fragment lying on a planned
+// drill hole, so rubble burying a hole is cleared before other rubble (#1937).
+// Same magnitude as the ore-demand bonus: one grid crossing there and back.
+export const BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS: number = 64;
+
 // Ore density (share of the fragment's volume that is the demanded ore) at
 // which a fragment earns the full demand bonus (#1828). Richer fragments are
 // capped here; leaner ones scale down proportionally. A half-ore fragment is
