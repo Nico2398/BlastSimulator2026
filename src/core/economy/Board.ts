@@ -57,7 +57,7 @@ function isPositive(v: unknown): v is number {
 function cleanConfig(raw: Partial<Record<keyof BoardConfig, unknown>>): BoardConfig | undefined {
   if (!isPositive(raw.oreTargetT) || !isPositive(raw.profitTarget)) return undefined;
   return {
-    quarterTicks: isPositive(raw.quarterTicks) ? Math.floor(raw.quarterTicks) || BOARD_QUARTER_TICKS : BOARD_QUARTER_TICKS,
+    quarterTicks: isPositive(raw.quarterTicks) && Number.isInteger(raw.quarterTicks) ? raw.quarterTicks : BOARD_QUARTER_TICKS,
     oreTargetT: raw.oreTargetT,
     profitTarget: raw.profitTarget,
     growth: isPositive(raw.growth) ? raw.growth : BOARD_TARGET_GROWTH,
@@ -107,6 +107,9 @@ export function sanitizeBoardState(raw: unknown): BoardState | undefined {
   const r = raw as Record<string, unknown>;
   const cfg = r['config'];
   if (typeof cfg !== 'object' || cfg === null || Array.isArray(cfg)) return undefined;
+  // A saved cadence must already be valid; only a fresh level config gets defaults.
+  const ticks = (cfg as Record<string, unknown>)['quarterTicks'];
+  if (!isPositive(ticks) || !Number.isInteger(ticks)) return undefined;
   const config = cleanConfig(cfg as Record<string, unknown>);
   const { quarter, quarterStartTick, oreDeliveredKg, profitAtQuarterStart, confidence, lastDividend } = r;
   if (!config || !isFiniteNum(quarter) || !Number.isInteger(quarter) || quarter < 1) return undefined;
@@ -119,7 +122,7 @@ export function sanitizeBoardState(raw: unknown): BoardState | undefined {
 }
 
 /** Targets of a quarter: the base targets grown by `growth` for every quarter after the first. */
-function quarterTargets(config: BoardConfig, quarter: number): QuarterTargets {
+export function quarterTargets(config: BoardConfig, quarter: number): QuarterTargets {
   const factor = (config.growth ?? BOARD_TARGET_GROWTH) ** (quarter - 1);
   return { oreT: config.oreTargetT * factor, profit: config.profitTarget * factor };
 }
@@ -130,18 +133,21 @@ export function recordBoardOre(board: BoardState | undefined, type: ContractType
   board.oreDeliveredKg += kg;
 }
 
-/** This quarter's targets, progress and ticks until the review. */
+/** This quarter's targets and progress so far. */
 export function boardProgress(
   board: BoardState,
   finances: FinanceState,
-  tickCount: number,
-): { targets: QuarterTargets; oreT: number; profit: number; ticksLeft: number } {
+): { targets: QuarterTargets; oreT: number; profit: number } {
   return {
     targets: quarterTargets(board.config, board.quarter),
     oreT: board.oreDeliveredKg / 1000,
     profit: getOperatingProfit(finances) - board.profitAtQuarterStart,
-    ticksLeft: Math.max(0, board.quarterStartTick + board.config.quarterTicks - tickCount),
   };
+}
+
+/** Ticks until the quarter's review is due. */
+export function boardTicksLeft(board: BoardState, tickCount: number): number {
+  return Math.max(0, board.quarterStartTick + board.config.quarterTicks - tickCount);
 }
 
 /**
@@ -149,12 +155,12 @@ export function boardProgress(
  * booked, then the dividend sweep, then the next quarter opens. Null when no review is due.
  */
 export function runBoardReview(
-  state: Pick<GameState, 'board' | 'cash' | 'finances' | 'tickCount'>,
+  state: Pick<GameState, 'cash' | 'finances' | 'tickCount'> & { board?: BoardState | undefined },
 ): BoardReview | null {
   const board = state.board;
   if (!board || state.tickCount - board.quarterStartTick < board.config.quarterTicks) return null;
 
-  const { targets, oreT, profit } = boardProgress(board, state.finances, state.tickCount);
+  const { targets, oreT, profit } = boardProgress(board, state.finances);
   const oreMet = oreT >= targets.oreT;
   const profitMet = profit >= targets.profit;
   const confidenceBefore = board.confidence;

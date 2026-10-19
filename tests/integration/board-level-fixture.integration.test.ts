@@ -36,6 +36,9 @@ const QUARTER = 48;
 function newGame(): GameState {
   const state = createGameForLevel(createCampaignState(), 'board_fixture')!;
   expect(state).not.toBeNull();
+  // The level opens below the dividend floor and an idle mine burns upkeep; start rich so
+  // dividends can fire and a quarter's operating profit is judged on income alone.
+  state.cash = 200_000;
   return state;
 }
 
@@ -56,7 +59,7 @@ function tickThroughQuarter(state: GameState): TickReport | undefined {
 /** Hit this quarter's targets with margin (quarter 1 needs 1 t / $1000; later ones 25% more each). */
 function meetTargets(state: GameState): void {
   recordBoardOre(state.board, 'ore_sale', 5_000);
-  addIncome(state.finances, 5_000, 'sales', 'ore', state.tickCount);
+  addIncome(state.finances, 50_000, 'sales', 'ore', state.tickCount);
 }
 
 describe('board level fixture — opening', () => {
@@ -111,29 +114,40 @@ describe('board level fixture — meeting the targets', () => {
 });
 
 describe('board level fixture — idling', () => {
-  it('is fired at the third review: 60 -> 35 -> 10 -> 0', () => {
+  // An idle mine delivers no ore and burns upkeep, so it misses both targets: -50 a review.
+  it('is fired at the second review: 60 -> 10 -> 0', () => {
+    const state = newGame();
+    const seen: number[] = [];
+    for (let q = 0; q < 2; q++) {
+      const report = tickThroughQuarter(state);
+      seen.push(report!.boardReview!.confidenceAfter);
+    }
+    expect(seen).toEqual([10, 0]);
+    expect(state.levelEnded).toBe(true);
+    expect(state.levelEndReason).toBe('fired');
+  });
+
+  it('is not fired after one bad quarter', () => {
+    const state = newGame();
+    tickThroughQuarter(state);
+    expect(state.levelEnded).toBe(false);
+    expect(state.board!.confidence).toBe(10);
+  });
+
+  it('a mine that earns money but delivers no ore is fired at the third review: 60 -> 35 -> 10 -> 0', () => {
     const state = newGame();
     const seen: number[] = [];
     for (let q = 0; q < 3; q++) {
-      const report = tickThroughQuarter(state);
-      seen.push(report!.boardReview!.confidenceAfter);
+      addIncome(state.finances, 50_000, 'sales', 'ore', state.tickCount);
+      seen.push(tickThroughQuarter(state)!.boardReview!.confidenceAfter);
     }
     expect(seen).toEqual([35, 10, 0]);
     expect(state.levelEnded).toBe(true);
     expect(state.levelEndReason).toBe('fired');
   });
 
-  it('is not fired after two bad quarters', () => {
-    const state = newGame();
-    tickThroughQuarter(state);
-    tickThroughQuarter(state);
-    expect(state.levelEnded).toBe(false);
-    expect(state.board!.confidence).toBe(10);
-  });
-
   it('reports the firing in the game-over report of the same tick', () => {
     const state = newGame();
-    tickThroughQuarter(state);
     tickThroughQuarter(state);
     let fired = false;
     for (let i = 0; i < QUARTER; i++) {
@@ -145,7 +159,7 @@ describe('board level fixture — idling', () => {
 
   it('no further reviews run once the level ended', () => {
     const state = newGame();
-    for (let q = 0; q < 3; q++) tickThroughQuarter(state);
+    for (let q = 0; q < 2; q++) tickThroughQuarter(state);
     const quarter = state.board!.quarter;
     for (let i = 0; i < QUARTER * 2; i++) expect(tick(state).boardReview ?? null).toBeNull();
     expect(state.board!.quarter).toBe(quarter);
@@ -156,7 +170,7 @@ describe('board level fixture — idling', () => {
 describe('board level fixture — one target missed', () => {
   it('missing only profit costs 25, books no bonus, still pays a dividend', () => {
     const state = newGame();
-    recordBoardOre(state.board, 'ore_sale', 5_000); // ore met, profit not
+    recordBoardOre(state.board, 'ore_sale', 5_000); // ore met, profit not (upkeep makes it negative)
     const txBefore = state.finances.transactions.length;
     const review = tickThroughQuarter(state)!.boardReview!;
 
@@ -171,7 +185,7 @@ describe('board level fixture — one target missed', () => {
 
   it('missing only ore costs 25', () => {
     const state = newGame();
-    addIncome(state.finances, 5_000, 'sales', 'ore', 1);
+    addIncome(state.finances, 50_000, 'sales', 'ore', 1);
     const review = tickThroughQuarter(state)!.boardReview!;
     expect(review).toMatchObject({ oreMet: false, profitMet: true, confidenceAfter: 35 });
   });
@@ -179,7 +193,7 @@ describe('board level fixture — one target missed', () => {
   it('rubble disposal does not satisfy the ore target', () => {
     const state = newGame();
     recordBoardOre(state.board, 'rubble_disposal', 50_000);
-    addIncome(state.finances, 5_000, 'sales', 'ore', 1);
+    addIncome(state.finances, 50_000, 'sales', 'ore', 1);
     expect(tickThroughQuarter(state)!.boardReview!.oreMet).toBe(false);
   });
 });

@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { boardProgress, createBoardState } from '../../core/economy/Board.js';
+import { boardProgress, boardTicksLeft, createBoardState } from '../../core/economy/Board.js';
 import { getOperatingProfit } from '../../core/economy/Finance.js';
 import { TICKS_PER_DAY, BOARD_QUARTER_TICKS, BOARD_DEBUG_ORE_TARGET_T, BOARD_DEBUG_PROFIT_TARGET } from '../../core/config/balance.js';
 import { requireGame } from './commandUtils.js';
@@ -13,11 +13,11 @@ function boardStatus(ctx: GameContext): CommandResult {
   const state = ctx.state!;
   const board = state.board;
   if (!board) return { success: false, output: t('board.no_board') };
-  const p = boardProgress(board, state.finances, state.tickCount);
+  const p = boardProgress(board, state.finances);
   return {
     success: true,
     output: [
-      t('board.status.quarter', { quarter: board.quarter, days: Math.ceil(p.ticksLeft / TICKS_PER_DAY) }),
+      t('board.status.quarter', { quarter: board.quarter, days: Math.ceil(boardTicksLeft(board, state.tickCount) / TICKS_PER_DAY) }),
       t('board.status.ore', { current: p.oreT.toFixed(1), target: p.targets.oreT.toFixed(1) }),
       t('board.status.profit', { current: formatMoney(p.profit), target: formatMoney(p.targets.profit) }),
       t('board.status.confidence', { confidence: Math.round(board.confidence) }),
@@ -56,6 +56,7 @@ export function boardCommand(
   const err = requireGame(ctx);
   if (err) return err;
   switch (args[0]) {
+    case undefined:
     case 'status': return boardStatus(ctx);
     case 'start': return boardStart(ctx, named);
     default: return { success: false, output: t('board.usage') };

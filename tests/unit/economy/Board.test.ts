@@ -424,11 +424,22 @@ describe('confidence clamp and firing', () => {
     expect(s.board.confidence).toBe(0);
   });
 
-  it('an idle board falls 60 -> 35 -> 10 -> 0 over three reviews', () => {
+  it('an idle board missing both targets falls 60 -> 10 -> 0 over two reviews', () => {
+    const s = makeState();
+    const seen: number[] = [];
+    for (let i = 0; i < 2; i++) {
+      playQuarter(s, 0, 0);
+      seen.push(runBoardReview(s)!.confidenceAfter);
+    }
+    expect(seen).toEqual([10, 0]);
+    expect(isBoardFired(s.board)).toBe(true);
+  });
+
+  it('a board missing one target every quarter falls 60 -> 35 -> 10 -> 0 over three reviews', () => {
     const s = makeState();
     const seen: number[] = [];
     for (let i = 0; i < 3; i++) {
-      playQuarter(s, 0, 0);
+      playQuarter(s, 0, 100_000);
       seen.push(runBoardReview(s)!.confidenceAfter);
     }
     expect(seen).toEqual([35, 10, 0]);

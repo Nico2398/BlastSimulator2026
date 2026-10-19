@@ -15,7 +15,7 @@ import { formatDollars } from '../../core/economy/formatMoney.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import { getLevelObjective } from '../../core/campaign/LevelObjective.js';
 import { gradeDef, nextGradeTargets } from '../../core/economy/MineGrade.js';
-import { boardProgress } from '../../core/economy/Board.js';
+import { boardTicksLeft } from '../../core/economy/Board.js';
 import { getOperatingSummary } from '../../core/economy/OperatingFinance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
@@ -559,15 +559,15 @@ export class TopBar {
   /** Show the quarter countdown and board confidence on board levels. */
   private updateBoardChip(state: GameState): void {
     const board = state.board;
-    const p = board ? boardProgress(board, state.finances, state.tickCount) : undefined;
-    const sig = board && p ? `${board.quarter}|${Math.ceil(p.ticksLeft / TICKS_PER_DAY)}|${Math.round(board.confidence)}` : '';
+    const days = board ? Math.ceil(boardTicksLeft(board, state.tickCount) / TICKS_PER_DAY) : 0;
+    const sig = board ? `${board.quarter}|${days}|${Math.round(board.confidence)}` : '';
     if (sig === this.lastBoardSig) return;
     this.lastBoardSig = sig;
-    if (!board || !p) { this.boardWrap.style.display = 'none'; return; }
+    if (!board) { this.boardWrap.style.display = 'none'; return; }
     this.boardWrap.style.display = 'flex';
     this.boardText.textContent = t('shell.topbar.board', {
       quarter: board.quarter,
-      days: Math.ceil(p.ticksLeft / TICKS_PER_DAY),
+      days,
       confidence: Math.round(board.confidence),
     });
   }
