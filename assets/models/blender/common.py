@@ -468,3 +468,10 @@ def bend(ob: bpy.types.Object, angle_deg: float, axis: str = 'Y') -> bpy.types.S
     m.angle = math.radians(angle_deg)
     m.deform_axis = axis
     return m
+
+
+def yawed(origin, yaw: float, local) -> tuple[float, float, float]:
+    """World position of `local` (x, y, z) rotated by `yaw` degrees about Z around `origin`."""
+    c, s = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+    x, y, z = local
+    return (origin[0] + x * c - y * s, origin[1] + x * s + y * c, origin[2] + z)

@@ -1,7 +1,6 @@
 // Exported model assets — every id the game asks for exists, parses, stays
 // within budget, and carries the nodes and tint materials the renderer relies on.
 
-import { isVanityType } from '../../../../src/core/entities/BuildingVanity.js';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
@@ -28,6 +27,8 @@ const MAX_ASSET_KB = 400;
  * added, so the ceiling is on the transfer size instead.
  */
 const MAX_TRANSFER_MB = 4;
+/** Triangle ceiling of the building family (tier 3 is the heaviest, 13.2 k measured; see dev-3d-models). */
+const MAX_BUILDING_TRIS = 13200;
 /** Raw bytes still get a loose ceiling, so a runaway model count trips something. */
 const MAX_TOTAL_MB = 16;
 
@@ -118,8 +119,7 @@ describe('public/models', () => {
   });
 
   it('every building fits its footprint, grows taller with tier and exposes the wall tint', () => {
-    // Vanity projects (#1947) have no model yet: they render as the stand-in.
-    for (const type of (Object.keys(BUILDING_DEFS) as BuildingType[]).filter(ty => !isVanityType(ty))) {
+    for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
       let previousHeight = 0;
       const tiers: BuildingTier[] = isSingleTierType(type) ? [1] : [1, 2, 3];
       for (const tier of tiers) {
@@ -138,6 +138,75 @@ describe('public/models', () => {
     expect(heap.bounds.getSize(new THREE.Vector3()).y, 'spoil heap height').toBeLessThanOrEqual(2.0);
     const ruin = library.instantiate(BUILDING_RUIN_MODEL_ID, { size: [1, 1, 1] });
     expect(ruin.bounds.getSize(new THREE.Vector3()).x).toBeLessThanOrEqual(2.6);
+  });
+
+  describe('vanity project models (#1948)', () => {
+    /** Vanity parts may overhang the footprint a little (carpet ramp, boulders, tilted cart). */
+    const FOOTPRINT_OVERHANG = 1.0;
+    const VANITY = ['ceo_statue', 'golf_course', 'executive_helipad', 'gold_tower'] as const;
+    const height = (type: BuildingType): number =>
+      library.instantiate(buildingModelId(type, 1), { size: [1, 1, 1] }).bounds.getSize(new THREE.Vector3()).y;
+    const countTris = (root: THREE.Object3D): number => {
+      let tris = 0;
+      root.traverse(o => {
+        if (o instanceof THREE.Mesh && !o.userData['outlineHull']) {
+          const g = o.geometry as THREE.BufferGeometry;
+          tris += (g.index ? g.index.count : g.getAttribute('position').count) / 3;
+        }
+      });
+      return tris;
+    };
+    const hasEmissive = (root: THREE.Object3D): boolean => {
+      let found = false;
+      root.traverse(o => {
+        if (!(o instanceof THREE.Mesh)) return;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) {
+          const e = (m as THREE.MeshStandardMaterial).emissive;
+          if (e && e.getHex() !== 0) found = true;
+        }
+      });
+      return found;
+    };
+
+    for (const type of VANITY) {
+      const id = buildingModelId(type, 1);
+
+      it(`${type}: glb exists, parses and stays within the size budget`, () => {
+        const file = resolve(MODEL_DIR, `${id}.glb`);
+        expect(existsSync(file), `${id}.glb missing — run npm run models:build`).toBe(true);
+        expect(statSync(file).size / 1024).toBeLessThanOrEqual(MAX_ASSET_KB);
+        expect(library.has(id)).toBe(true);
+      });
+
+      it(`${type}: tinted body on the ground, inside its footprint, as a single Body node`, () => {
+        const inst = library.instantiate(id, { size: [1, 1, 1] });
+        expect(inst.tints.has('TintBody')).toBe(true);
+        expect(inst.bounds.min.y).toBeCloseTo(0, 1);
+        const { sizeX, sizeZ } = getFootprintSize(BUILDING_DEFS[type][1].footprint);
+        const size = inst.bounds.getSize(new THREE.Vector3());
+        expect(size.x, 'width').toBeLessThanOrEqual(sizeX + FOOTPRINT_OVERHANG);
+        expect(size.z, 'depth').toBeLessThanOrEqual(sizeZ + FOOTPRINT_OVERHANG);
+        expect(size.y, 'height').toBeGreaterThan(0.3);
+        expect(library.prototype(id)!.root.children.map(c => c.name)).toEqual(['Body']);
+      });
+
+      it(`${type}: stays under the triangle budget`, () => {
+        expect(countTris(library.prototype(id)!.root)).toBeLessThanOrEqual(MAX_BUILDING_TRIS);
+      });
+    }
+
+    it('the golf course lies flat and the gold tower out-tops the other vanity projects', () => {
+      expect(height('golf_course')).toBeLessThanOrEqual(2.0);
+      for (const other of ['ceo_statue', 'golf_course', 'executive_helipad'] as const) {
+        expect(height('gold_tower'), `gold_tower vs ${other}`).toBeGreaterThan(height(other));
+      }
+    });
+
+    it('the gold tower and the executive helipad carry an emissive material', () => {
+      expect(hasEmissive(library.prototype(buildingModelId('gold_tower', 1))!.root), 'gold_tower').toBe(true);
+      expect(hasEmissive(library.prototype(buildingModelId('executive_helipad', 1))!.root), 'executive_helipad').toBe(true);
+    });
   });
 
   it('every tree and bush is a single Body node standing on the ground, sized for the sway and instancing budget', () => {

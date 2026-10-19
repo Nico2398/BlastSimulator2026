@@ -51,6 +51,8 @@ def _registry() -> dict[str, tuple[str, callable]]:
     for name, builder in buildings.registry().items():
         reg[name] = ('buildings', builder)
     for btype in buildings.TYPE_BUILDERS:
+        if btype in buildings.VANITY_TYPES:
+            continue  # drawn whole by buildings_vanity.py
         for tier, mod in overrides.items():
             if tier not in buildings.tiers_for(btype):
                 continue

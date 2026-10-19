@@ -210,7 +210,7 @@ Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJE
 - **Board confidence** applies only where a board exists (`addBoardConfidence`, clamped 0..100).
 - **No refund**: demolish cost 0, nothing returned; the confirm modal says "Sunk cost, like the CEO's judgement."
 - **Build menu**: separate "Vanity" section after the regular rows (`data-build-section="vanity"`); locked rows show "Unlocks at grade 4" and disable Buy.
-- **Rendering**: no models yet; `allModelIds` skips them and `BuildingMesh` draws the stand-in box.
+- **Rendering**: one Blender model each (`building_<type>_t1`, `buildings_vanity.py`, #1948); the gold tower is the tallest building model.
 - **Console**: `sandbox start grade:N` starts a progression sandbox at grade N (scenarios reach grade 4 this way).
 - **Decisions**: a "touch" means sharing an edge (diagonal-only or a one-cell gap does not count); neighbour relations are the `nuisance` score (high = good), so -N lowers it.
 

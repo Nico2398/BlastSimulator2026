@@ -315,6 +315,51 @@
         }
       }
     },
+    "building_ceo_statue_t1": {
+      "builder": "buildings_vanity.py",
+      "triangles": 2520,
+      "glbKb": 53,
+      "size": [
+        2.19,
+        3.18,
+        1.8
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [],
+      "materials": [
+        "Dark",
+        "Gold",
+        "Plinth",
+        "StripeYellow",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 2520,
+          "parts": [
+            "ArmHip",
+            "ArmPoint",
+            "Belly",
+            "Finger",
+            "HatBrim",
+            "HatDome",
+            "Head",
+            "LegL",
+            "LegR",
+            "Nose",
+            "Plaque",
+            "PlaqueBack",
+            "PlinthCap",
+            "PlinthMarble",
+            "PlinthStep",
+            "Suit"
+          ]
+        }
+      }
+    },
     "building_driving_center_t1": {
       "builder": "buildings_t1.py",
       "triangles": 4656,
@@ -625,6 +670,62 @@
             "TrophyStem",
             "Tyre",
             "Walls"
+          ]
+        }
+      }
+    },
+    "building_executive_helipad_t1": {
+      "builder": "buildings_vanity.py",
+      "triangles": 1204,
+      "glbKb": 41,
+      "size": [
+        3.8,
+        2.07,
+        4.88
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Carpet",
+        "Cone",
+        "Dark",
+        "Gold",
+        "Lamp",
+        "Steel",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 1204,
+          "parts": [
+            "CarpetRamp",
+            "EdgeLight0",
+            "EdgeLight1",
+            "EdgeLight2",
+            "EdgeLight3",
+            "EdgeLight4",
+            "EdgeLight5",
+            "EdgeLight6",
+            "EdgeLight7",
+            "HBarL",
+            "HBarMid",
+            "HBarR",
+            "PadBase",
+            "PadDisc",
+            "PadRing",
+            "Sock",
+            "SockRing",
+            "StanchionKnobL",
+            "StanchionKnobR",
+            "StanchionL",
+            "StanchionR",
+            "WindPole"
           ]
         }
       }
@@ -1505,6 +1606,124 @@
             "WinBPane",
             "WinSFrame",
             "WinSPane"
+          ]
+        }
+      }
+    },
+    "building_gold_tower_t1": {
+      "builder": "buildings_vanity.py",
+      "triangles": 1776,
+      "glbKb": 52,
+      "size": [
+        3.4,
+        9.35,
+        3.4
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Dark",
+        "Glass",
+        "Gold",
+        "Lamp",
+        "Plinth",
+        "Steel",
+        "StripeYellow",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 1776,
+          "parts": [
+            "LogoBar",
+            "LogoCoin",
+            "LogoLegL",
+            "LogoLegR",
+            "LogoRim",
+            "LogoSlashA",
+            "LogoSlashB",
+            "Penthouse",
+            "PenthouseRoof",
+            "PenthouseSlab",
+            "PenthouseWindow",
+            "PenthouseWindowFrame",
+            "Podium",
+            "Rib",
+            "RibbonBack",
+            "RibbonFront",
+            "Shaft"
+          ]
+        }
+      }
+    },
+    "building_golf_course_t1": {
+      "builder": "buildings_vanity.py",
+      "triangles": 1444,
+      "glbKb": 55,
+      "size": [
+        6.5,
+        1.9,
+        6.4
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [],
+      "materials": [
+        "Dark",
+        "Green",
+        "Red",
+        "Rock",
+        "Rubble",
+        "RubbleDark",
+        "Sand",
+        "Steel",
+        "StripeBlack",
+        "TintBody",
+        "White"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 1444,
+          "parts": [
+            "Boulder0",
+            "Boulder1",
+            "Boulder10",
+            "Boulder11",
+            "Boulder12",
+            "Boulder13",
+            "Boulder2",
+            "Boulder3",
+            "Boulder4",
+            "Boulder5",
+            "Boulder6",
+            "Boulder7",
+            "Boulder8",
+            "Boulder9",
+            "BunkerRim",
+            "CartBody",
+            "CartPost0",
+            "CartPost1",
+            "CartPost2",
+            "CartPost3",
+            "CartRoof",
+            "CartSeat",
+            "CartWheel0",
+            "CartWheel1",
+            "CartWheel2",
+            "Flag",
+            "FlagPole",
+            "Hole",
+            "Lawn",
+            "PuttingGreen",
+            "RubbleSlab",
+            "Sand"
           ]
         }
       }
