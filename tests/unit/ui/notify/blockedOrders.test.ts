@@ -26,6 +26,11 @@ describe('blockedPhraseKind', () => {
     expect(blockedPhraseKind('target_unreachable')).toBe('unreachable');
   });
 
+  it('maps buried_under_rubble to its own buried kind, apart from unreachable (#2012)', () => {
+    expect(blockedPhraseKind('buried_under_rubble')).toBe('buried');
+    expect(blockedPhraseKind('target_unreachable')).toBe('unreachable');
+  });
+
   it('returns null for non-failure and absent reasons', () => {
     expect(blockedPhraseKind('debris_out_of_reach')).toBeNull();
     expect(blockedPhraseKind('explosives_in_transit')).toBeNull();
@@ -68,6 +73,11 @@ describe('rankBlockedKinds', () => {
       .toEqual(['crew_fleet', 'storage_full', 'spoil_heap_full']);
   });
 
+  it('breaks a 3/3 tie with unreachable before buried (#2012)', () => {
+    expect(rankBlockedKinds({ buried_under_rubble: 3, target_unreachable: 3 }).map(e => e.kind))
+      .toEqual(['unreachable', 'buried']);
+  });
+
   it('drops zero counts and non-failure reasons', () => {
     expect(rankBlockedKinds({ storage_full: 0, debris_out_of_reach: 9, explosives_in_transit: 3, no_spoil_heap: 1 }))
       .toEqual([{ kind: 'no_spoil_heap', count: 1 }]);
@@ -90,7 +100,7 @@ describe('blockedPhrase', () => {
     expect(p).toContain('nobody able to do them');
   });
 
-  it.each(['no_warehouse', 'no_spoil_heap', 'spoil_heap_full', 'unreachable'] as const)('phrases %s with its count, not as crew', (kind) => {
+  it.each(['no_warehouse', 'no_spoil_heap', 'spoil_heap_full', 'unreachable', 'buried'] as const)('phrases %s with its count, not as crew', (kind) => {
     const p = blockedPhrase({ kind, count: 7 });
     expect(p).toContain('7');
     expect(p).not.toContain('nobody able');
@@ -98,10 +108,19 @@ describe('blockedPhrase', () => {
   });
 });
 
+describe('blockedPhrase buried (#2012)', () => {
+  it('names the buried holes and the haul-away remedy', () => {
+    const p = blockedPhrase({ kind: 'buried', count: 9 });
+    expect(p).toContain('9');
+    expect(p).toContain('buried under rubble');
+    expect(p).toContain('haul the debris');
+  });
+});
+
 describe('blockedKindLabel', () => {
   it('gives a short label per kind, storage full for storage_full', () => {
     expect(blockedKindLabel('storage_full')).toBe('storage full');
-    for (const k of ['crew_fleet', 'no_warehouse', 'no_spoil_heap', 'spoil_heap_full', 'unreachable'] as const) {
+    for (const k of ['crew_fleet', 'no_warehouse', 'no_spoil_heap', 'spoil_heap_full', 'unreachable', 'buried'] as const) {
       expect(blockedKindLabel(k).length).toBeGreaterThan(0);
       expect(blockedKindLabel(k)).not.toMatch(/\{|\}/);
     }
@@ -109,6 +128,26 @@ describe('blockedKindLabel', () => {
 });
 
 describe('describeBlockedReasons', () => {
+  it('words buried orders as rubble, not as a route problem (#2012)', () => {
+    const lines = describeBlockedReasons({ buried_under_rubble: 9 });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('9');
+    expect(lines[0]).toContain('buried under rubble');
+    expect(lines[0]).toContain('haul the debris');
+    expect(lines[0]).not.toMatch(/route/i);
+  });
+
+  it('keeps the unreachable wording for target_unreachable (#2012)', () => {
+    expect(describeBlockedReasons({ target_unreachable: 5 })[0]).toMatch(/can't reach their target/);
+  });
+
+  it('lists buried and unreachable as two lines, buried first when larger (#2012)', () => {
+    const lines = describeBlockedReasons({ buried_under_rubble: 9, target_unreachable: 5 });
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('buried under rubble');
+    expect(lines[1]).toMatch(/can't reach their target/);
+  });
+
   it('caps at 3 lines by default', () => {
     expect(BLOCKED_PHRASE_LINES).toBe(3);
     const lines = describeBlockedReasons({
