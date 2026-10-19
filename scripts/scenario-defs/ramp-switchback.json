@@ -94,6 +94,9 @@
       ],
       "role": "player",
       "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        },
         "note": "Multi-leg ramp selected; inspector lists Legs, Length, Grade."
       }
     },
