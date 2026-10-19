@@ -3,19 +3,19 @@
   "description": "Per-vehicle-tier climb limit on a progression site (#1938): tier 1 / 2 / 3 vehicles climb 30 / 24 / 18 degrees. On a sandbox site a pit served only by a steep (about 27 degree) ramp cannot be reached by a tier-3 vehicle: an order at the foot of the ramp reads unreachable and says which ramp is too steep. Once a gentle (about 16 degree) ramp is dug the order clears and the tier-3 rig drills the hole. The player selects the gentle ramp and the inspector opens on it. Stands in for the hauler of the issue with a drill rig, whose reachability is judged by the same per-tier rule.",
   "steps": [
     {
-      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 grade:4",
       "role": "setup",
-      "description": "Progression site (#1921): the sandbox opens at grade 0, so vehicle tiers carry slope limits (tier 1 / 2 / 3 climb 30 / 24 / 18 degrees). Kit:full brings five tier-1 vehicles (drill rig #1, debris hauler #2, charging truck #3, rock digger #4, rock fragmenter #5) and drivers #3-#5.",
+      "description": "Progression site (#1921): the sandbox opens at grade 4 (tier-3 dealer access, #1928), so vehicle tiers carry slope limits (tier 1 / 2 / 3 climb 30 / 24 / 18 degrees). Kit:full brings five tier-1 vehicles (drill rig #1, debris hauler #2, charging truck #3, rock digger #4, rock fragmenter #5) and drivers #3-#5.",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 grade:4"
         }
       ],
       "expect": {
         "equals": {
           "mineGrade": {
-            "grade": 0,
+            "grade": 4,
             "pendingTicksLeft": null
           },
           "vehicleCount": 5

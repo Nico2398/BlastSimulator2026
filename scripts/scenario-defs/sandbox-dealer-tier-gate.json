@@ -1,0 +1,93 @@
+{
+  "name": "sandbox-dealer-tier-gate",
+  "description": "Dealer tier gate (#1928): on a progression site at grade 0 the equipment dealer refuses a tier-2 debris hauler (console refuses, Fleet panel button is greyed with a lock line); once the site is at grade 2 the same purchase succeeds, and tier 3 stays locked until grade 4.",
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:digger seed:42",
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "sandbox start biome:desert_badlands kit:digger seed:42" }
+      ],
+      "description": "Progression site at grade 0 with the digger kit.",
+      "expect": {
+        "equals": { "mineGrade": { "grade": 0, "pendingTicksLeft": null } }
+      }
+    },
+    {
+      "command": "vehicle list",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"vehicles\"]" },
+        { "type": "waitForSelector", "selector": ".bs-fleet-tier-btn[data-role=\"debris_hauler\"][data-tier=\"2\"]" }
+      ],
+      "description": "Open the Fleet panel; the dealership lists the hauler tiers.",
+      "expect": {
+        "usable": ".bs-fleet-tier-btn[data-role=\"debris_hauler\"][data-tier=\"1\"]"
+      }
+    },
+    {
+      "command": "vehicle buy debris_hauler tier:2",
+      "role": "guard",
+      "commandOutcome": "refused",
+      "interaction": [
+        { "type": "waitForSelector", "selector": ".bs-fleet-tier-btn[data-role=\"debris_hauler\"][data-tier=\"2\"] .bs-fleet-tier-lock" }
+      ],
+      "description": "Grade 0: the tier-2 hauler button is greyed out with a lock line and the console refuses the same purchase.",
+      "expect": {
+        "blocked": ".bs-fleet-tier-btn[data-role=\"debris_hauler\"][data-tier=\"2\"]",
+        "changedBy": { "vehicleCount": 0, "cash": 0 }
+      }
+    },
+    {
+      "command": "vehicle buy debris_hauler tier:3",
+      "role": "guard",
+      "commandOutcome": "refused",
+      "interaction": [
+        { "type": "waitForSelector", "selector": ".bs-fleet-tier-btn[data-role=\"debris_hauler\"][data-tier=\"3\"] .bs-fleet-tier-lock" }
+      ],
+      "description": "Tier 3 is locked as well.",
+      "expect": {
+        "blocked": ".bs-fleet-tier-btn[data-role=\"debris_hauler\"][data-tier=\"3\"]",
+        "changedBy": { "vehicleCount": 0 }
+      }
+    },
+    {
+      "command": "sandbox start biome:desert_badlands kit:digger seed:42 grade:2",
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "sandbox start biome:desert_badlands kit:digger seed:42 grade:2" }
+      ],
+      "description": "Reach grade 2 (restart the site at grade 2 instead of playing the permit ladder).",
+      "expect": {
+        "equals": { "mineGrade": { "grade": 2, "pendingTicksLeft": null } }
+      }
+    },
+    {
+      "command": "vehicle buy debris_hauler tier:2",
+      "role": "player",
+      "interaction": [
+        { "type": "ensurePanel", "panel": "vehicles" },
+        { "type": "awaitUsable", "selector": ".bs-fleet-tier-btn[data-role=\"debris_hauler\"][data-tier=\"2\"]" },
+        { "type": "clickSelector", "selector": ".bs-fleet-tier-btn[data-role=\"debris_hauler\"][data-tier=\"2\"]" }
+      ],
+      "description": "Grade 2: the tier-2 hauler is on sale and the purchase succeeds.",
+      "expect": {
+        "changedBy": { "vehicleCount": 1 },
+        "decreased": ["cash"]
+      }
+    },
+    {
+      "command": "vehicle buy debris_hauler tier:3",
+      "role": "guard",
+      "commandOutcome": "refused",
+      "interaction": [
+        { "type": "waitForSelector", "selector": ".bs-fleet-tier-btn[data-role=\"debris_hauler\"][data-tier=\"3\"] .bs-fleet-tier-lock" }
+      ],
+      "description": "Grade 2 still does not unlock tier 3.",
+      "expect": {
+        "blocked": ".bs-fleet-tier-btn[data-role=\"debris_hauler\"][data-tier=\"3\"]",
+        "changedBy": { "vehicleCount": 0 }
+      }
+    }
+  ]
+}

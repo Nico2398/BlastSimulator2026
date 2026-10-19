@@ -11,6 +11,7 @@ import type { Employee } from '../../../../src/core/entities/Employee.js';
 import { NavGrid } from '../../../../src/core/nav/NavGrid.js';
 import { addBlastFragments } from '../../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../../src/core/mining/BlastExecution.js';
+import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
 import { SELECTED_ROW_CLASS } from '../../../../src/ui/selectionRoute.js';
 
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
@@ -705,5 +706,85 @@ describe('FleetPanel — scroll-bounded vehicle list section (#958)', () => {
     for (const bodyEl of [emptyBodyEl, fullBodyEl]) {
       expect(bodyEl.style.overflowY).toBe('auto');
     }
+  });
+});
+
+describe('FleetPanel dealership grade gate (#1928)', () => {
+  const tierBtn = (panel: FleetPanel, role: string, tier: number) =>
+    [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')]
+      .find(b => b.dataset['role'] === role && b.dataset['tier'] === String(tier))!;
+
+  function progressionState(grade: number): GameState {
+    const state = makeState([]);
+    state.cash = 50_000_000;
+    state.grade = createGradeState();
+    state.grade.grade = grade;
+    return state;
+  }
+
+  it('at grade 1 tier-2 and tier-3 buttons are locked with a "Needs <grade>" line, tier 1 is open', () => {
+    const { panel } = makePanel();
+    panel.update(progressionState(1));
+    const t1 = tierBtn(panel, 'debris_hauler', 1);
+    const t2 = tierBtn(panel, 'debris_hauler', 2);
+    const t3 = tierBtn(panel, 'debris_hauler', 3);
+    expect(t1.disabled).toBe(false);
+    expect(t1.dataset['locked']).toBeUndefined();
+    expect(t1.querySelector('.bs-fleet-tier-lock')).toBeNull();
+    expect(t2.disabled).toBe(true);
+    expect(t2.dataset['locked']).toBe('grade');
+    expect(t2.querySelector('.bs-fleet-tier-lock')!.textContent).toBe('Needs Licensed Quarry');
+    expect(t3.disabled).toBe(true);
+    expect(t3.dataset['locked']).toBe('grade');
+    expect(t3.querySelector('.bs-fleet-tier-lock')!.textContent).toBe('Needs Strategic National Excavation');
+  });
+
+  it('every role is locked the same way', () => {
+    const { panel } = makePanel();
+    panel.update(progressionState(1));
+    const locked = [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')]
+      .filter(b => b.dataset['locked'] === 'grade');
+    expect(locked.length).toBe(6 * 2);
+  });
+
+  it('clicking a locked button dispatches nothing', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    panel.update(progressionState(1));
+    tierBtn(panel, 'debris_hauler', 2).click();
+    expect(calls).toEqual([]);
+  });
+
+  it('unlocks in place when the grade rises', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    const state = progressionState(1);
+    panel.update(state);
+    state.grade!.grade = 2;
+    panel.update(state);
+    const t2 = tierBtn(panel, 'debris_hauler', 2);
+    expect(t2.disabled).toBe(false);
+    expect(t2.dataset['locked']).toBeUndefined();
+    expect(t2.querySelector('.bs-fleet-tier-lock')).toBeNull();
+    expect(tierBtn(panel, 'debris_hauler', 3).dataset['locked']).toBe('grade');
+    t2.click();
+    expect(calls).toContain('vehicle buy debris_hauler tier:2');
+  });
+
+  it('grade 4 unlocks tier 3', () => {
+    const { panel } = makePanel();
+    panel.update(progressionState(4));
+    expect(tierBtn(panel, 'debris_hauler', 3).disabled).toBe(false);
+  });
+
+  it('a non-progression site shows no lock', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    state.cash = 50_000_000;
+    panel.update(state);
+    expect(panel.root.querySelectorAll('.bs-fleet-tier-lock').length).toBe(0);
+    expect(tierBtn(panel, 'debris_hauler', 3).disabled).toBe(false);
   });
 });
