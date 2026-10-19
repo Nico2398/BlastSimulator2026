@@ -250,7 +250,7 @@ export class BlastReportModal {
     }
     for (const sb of report.secondaryBlasts ?? []) {
       notes.push(this.makeNoteCard('build', 'rgba(255,91,76,', 'var(--bsx-critical-text)',
-        t('ui.blast_workshop.report.secondary_blast', { kg: sb.explosivesKg, id: sb.buildingId, casualties: sb.casualties })));
+        t('ui.blast_workshop.report.secondary_blast', { kg: sb.explosivesKg, id: sb.buildingId, casualties: sb.casualties, voxels: sb.craterVoxels ?? 0 })));
     }
     if (report.oversizedFragments > 0) {
       notes.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',

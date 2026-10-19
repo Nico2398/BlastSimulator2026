@@ -208,6 +208,7 @@ expose it as `muckPile`, so a browser harness and a headless run read the same n
   and how fast they were going.
 - **Buildings** are destroyed when a cleared voxel falls under their footprint.
 
+- **Secondary crater (#1896):** a stocked Explosive Warehouse destroyed by accident fires its own one-hole blast through this pipeline; spec and decisions in `gameplay-buildings` (Destruction Effects).
 ## Blast Report and Rating
 
 `BlastResult` carries `clearedVoxels`, `crackedVoxels`, fragment counts and sizes, `projectionCount`,
