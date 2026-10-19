@@ -28,7 +28,7 @@ import { formatTaskCompletion } from '../../../src/console/commands/tickTaskComp
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { completePendingAction } from '../../../src/core/engine/TaskDispatch.js';
 import * as DamageModule from '../../../src/core/entities/Damage.js';
-import { destroyVehicle } from '../../../src/core/entities/Vehicle.js';
+import { destroyVehicle, purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { board } from '../../../src/core/engine/Mount.js';
 import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
@@ -2029,7 +2029,7 @@ describe('drillPlanCommand — add subcommand dispatch (#790 characterization)',
   it('queues one drill_hole PendingAction with the expected payload', () => {
     const ctx = makeMiningContext();
 
-    const result = drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.15' });
+    const result = drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.089' });
 
     expect(result.success).toBe(true);
     const drillActions = ctx.state!.pendingActions.filter(a => a.type === 'drill_hole');
@@ -2040,7 +2040,7 @@ describe('drillPlanCommand — add subcommand dispatch (#790 characterization)',
     expect(action.targetX).toBe(5);
     expect(action.targetZ).toBe(5);
     expect(action.payload['depth']).toBe(8);
-    expect(action.payload['diameter']).toBe(0.15);
+    expect(action.payload['diameter']).toBe(0.089);
     expect(typeof action.payload['durationTicks']).toBe('number');
     expect(action.payload['durationTicks'] as number).toBeGreaterThan(0);
   });
@@ -2048,7 +2048,7 @@ describe('drillPlanCommand — add subcommand dispatch (#790 characterization)',
   it('pushes the new hole into plannedDrillHoles', () => {
     const ctx = makeMiningContext();
 
-    const result = drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.15' });
+    const result = drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.089' });
 
     expect(result.success).toBe(true);
     expect(ctx.state!.plannedDrillHoles).toHaveLength(1);
@@ -2062,7 +2062,7 @@ describe('drillPlanCommand — add subcommand dispatch (#790 characterization)',
     const gridCount = ctx.state!.plannedDrillHoles.length;
     expect(gridCount).toBe(2);
 
-    drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.15' });
+    drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.089' });
 
     expect(ctx.state!.plannedDrillHoles.length).toBe(gridCount + 1);
   });
@@ -2103,24 +2103,26 @@ describe('drillPlanCommand — omitted diameter defaults to DRILL_HOLE_DEFAULT_D
 
   it('grid: an explicit diameter argument still overrides the default', () => {
     const ctx = makeMiningContext();
+    purchaseVehicle(ctx.state!.vehicles, 'drill_rig', 0, 0, 2); // 127 mm needs a tier-2 rig (#1934)
 
-    const result = drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8', diameter: '0.2' });
+    const result = drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8', diameter: '0.127' });
 
     expect(result.success).toBe(true);
     const action = ctx.state!.pendingActions.find(a => a.type === 'drill_hole')!;
-    expect(action.payload['diameter']).toBe(0.2);
-    expect(action.payload['durationTicks']).toBe(computeDrillHoleDurationTicks(8, 0.2));
+    expect(action.payload['diameter']).toBe(0.127);
+    expect(action.payload['durationTicks']).toBe(computeDrillHoleDurationTicks(8, 0.127));
   });
 
   it('add: an explicit diameter argument still overrides the default', () => {
     const ctx = makeMiningContext();
+    purchaseVehicle(ctx.state!.vehicles, 'drill_rig', 0, 0, 2); // 127 mm needs a tier-2 rig (#1934)
 
-    const result = drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.2' });
+    const result = drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.127' });
 
     expect(result.success).toBe(true);
     const action = ctx.state!.pendingActions.find(a => a.type === 'drill_hole')!;
-    expect(action.payload['diameter']).toBe(0.2);
-    expect(action.payload['durationTicks']).toBe(computeDrillHoleDurationTicks(8, 0.2));
+    expect(action.payload['diameter']).toBe(0.127);
+    expect(action.payload['durationTicks']).toBe(computeDrillHoleDurationTicks(8, 0.127));
   });
 });
 

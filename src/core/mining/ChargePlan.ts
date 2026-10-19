@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Charge plan definition
 // Assigns explosives and stemming to each hole in the drill plan.
 
-import { getExplosive } from '../world/ExplosiveCatalog.js';
+import { getExplosive, type ExplosiveType } from '../world/ExplosiveCatalog.js';
 import { tierShortfall, type ColumnRock } from './ExplosiveRockFit.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { drawFromStockPool } from './ExplosiveStock.js';
@@ -9,8 +9,9 @@ import { t } from '../i18n/I18n.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import {
   MIN_STEMMING_M, VEHICLE_TIER_MULTIPLIERS, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
-  CHARGE_KG_PER_METRE, CHARGE_FIT_EPSILON,
+  CHARGE_FIT_EPSILON, DRILL_HOLE_DEFAULT_DIAMETER_M,
 } from '../config/balance.js';
+import { chargeKgPerMetre, holeCapacityFactor } from './HoleDiameter.js';
 
 export interface HoleCharge {
   explosiveId: string;
@@ -31,14 +32,16 @@ export function createCharge(
   amountKg: number,
   stemmingM: number,
   holeDepth: number,
+  diameterM: number = DRILL_HOLE_DEFAULT_DIAMETER_M,
 ): { charge: HoleCharge } | { error: string } {
   const explosive = getExplosive(explosiveId);
   if (!explosive) {
     return { error: `Unknown explosive: "${explosiveId}"` };
   }
-  if (!Number.isFinite(amountKg) || amountKg < explosive.minChargeKg || amountKg > explosive.maxChargeKg) {
+  const { minKg, maxKg } = explosiveHoleLimits(explosive, diameterM);
+  if (!Number.isFinite(amountKg) || amountKg < minKg || amountKg > maxKg) {
     return {
-      error: `Amount ${amountKg}kg out of range [${explosive.minChargeKg}–${explosive.maxChargeKg}kg] for ${explosiveId}`,
+      error: `Amount ${amountKg}kg out of range [${minKg}–${maxKg}kg] for ${explosiveId}`,
     };
   }
   if (!Number.isFinite(stemmingM) || stemmingM < MIN_STEMMING_M) {
@@ -47,14 +50,14 @@ export function createCharge(
   if (stemmingM > holeDepth) {
     return { error: `Stemming ${stemmingM}m exceeds hole depth ${holeDepth}m` };
   }
-  if (!chargeFitsHole(amountKg, stemmingM, holeDepth)) {
+  if (!chargeFitsHole(amountKg, stemmingM, holeDepth, diameterM)) {
     return {
       error: t('mining.charge.column_exceeds_hole', {
         amount: amountKg,
-        column: +chargeColumnM(amountKg).toFixed(2),
+        column: +chargeColumnM(amountKg, diameterM).toFixed(2),
         stemming: stemmingM,
         depth: holeDepth,
-        max: maxFittingChargeKg(holeDepth, stemmingM),
+        max: maxFittingChargeKg(holeDepth, stemmingM, diameterM),
       }),
     };
   }
@@ -69,13 +72,14 @@ export function batchCharge(
   explosiveId: string,
   amountKg: number,
   stemmingM: number,
+  holeDiameters?: Record<string, number>,
 ): { charges: Record<string, HoleCharge>; errors: ChargeError[] } {
   const charges: Record<string, HoleCharge> = {};
   const errors: ChargeError[] = [];
 
   for (const id of holeIds) {
     const depth = holeDepths[id] ?? 0;
-    const result = createCharge(explosiveId, amountKg, stemmingM, depth);
+    const result = createCharge(explosiveId, amountKg, stemmingM, depth, holeDiameters?.[id]);
     if ('charge' in result) {
       charges[id] = result.charge;
     } else {
@@ -185,24 +189,33 @@ function addSplit(split: ChargeCostSplit, explosiveId: string, amountKg: number,
 }
 
 /** Metres of hole column that `amountKg` of explosive occupies. */
-export function chargeColumnM(amountKg: number): number {
-  return amountKg / CHARGE_KG_PER_METRE;
+export function chargeColumnM(amountKg: number, diameterM?: number): number {
+  return amountKg / chargeKgPerMetre(diameterM);
 }
 
 /** Raw (unrounded) heaviest charge that fits a hole of `holeDepth` under `stemmingM`; never negative. */
-export function maxChargeKgForHole(holeDepth: number, stemmingM: number): number {
-  return Math.max(0, (holeDepth - stemmingM) * CHARGE_KG_PER_METRE);
+export function maxChargeKgForHole(holeDepth: number, stemmingM: number, diameterM?: number): number {
+  return Math.max(0, (holeDepth - stemmingM) * chargeKgPerMetre(diameterM));
 }
 
 /** True when `amountKg` plus `stemmingM` of stemming fits a hole of `holeDepth` (within float tolerance). */
-export function chargeFitsHole(amountKg: number, stemmingM: number, holeDepth: number): boolean {
-  return chargeColumnM(amountKg) + stemmingM <= holeDepth + CHARGE_FIT_EPSILON;
+export function chargeFitsHole(amountKg: number, stemmingM: number, holeDepth: number, diameterM?: number): boolean {
+  return chargeColumnM(amountKg, diameterM) + stemmingM <= holeDepth + CHARGE_FIT_EPSILON;
 }
 
 /** Heaviest charge to show/accept for a hole: floored to 0.1 kg so the displayed maximum is itself accepted. */
-export function maxFittingChargeKg(holeDepth: number, stemmingM: number): number {
-  const kg = maxChargeKgForHole(holeDepth, stemmingM) + CHARGE_FIT_EPSILON;
+export function maxFittingChargeKg(holeDepth: number, stemmingM: number, diameterM?: number): number {
+  const kg = maxChargeKgForHole(holeDepth, stemmingM, diameterM) + CHARGE_FIT_EPSILON;
   return Math.floor(kg * 10) / 10;
+}
+
+/** Charge-per-hole limits (kg) of an explosive in a hole of `diameterM`; scales with hole capacity (#1934). */
+export function explosiveHoleLimits(
+  explosive: Pick<ExplosiveType, 'minChargeKg' | 'maxChargeKg'>,
+  diameterM: number,
+): { minKg: number; maxKg: number } {
+  const factor = holeCapacityFactor(diameterM);
+  return { minKg: explosive.minChargeKg * factor, maxKg: explosive.maxChargeKg * factor };
 }
 
 /** Count of holes whose dominant rock outclasses the explosive (#1358). */

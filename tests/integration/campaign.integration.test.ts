@@ -726,7 +726,7 @@ describe('campaign status finale line (#1320)', () => {
 describe('charge respects the active level availableExplosives (#1357)', () => {
   function withHoles(ctx: GameContext, n = 2): void {
     const st = ctx.state!;
-    for (let i = 0; i < n; i++) addHole(st, st.drillHoles, 10 + i * 4, 10, 6, 0.15);
+    for (let i = 0; i < n; i++) addHole(st, st.drillHoles, 10 + i * 4, 10, 6, 0.089);
   }
   function charge(ctx: GameContext, named: Record<string, string>) {
     return chargeCommand(ctx as never, [], named);
@@ -808,7 +808,7 @@ describe('charge respects the active level availableExplosives (#1357)', () => {
     const cash = st.cash;
     const queued = st.pendingActions.length;
     const saved = {
-      drillHoles: [{ id: 'H1', x: 12, z: 12, depth: 6, diameter: 0.15 }],
+      drillHoles: [{ id: 'H1', x: 12, z: 12, depth: 6, diameter: 0.089 }],
       chargesByHole: { H1: { explosiveId: 'dynatomics', amountKg: 3, stemmingM: 2 } },
     };
 

@@ -17,7 +17,7 @@ const BOOMITE_5KG = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
 const COST_5KG = 60; // boomite $12/kg x 5 kg
 
 function hole(n: number, depth = 8): DrillHole {
-  return { id: `H${n}`, x: 10 + n * 3, z: 10, depth, diameter: 0.15 };
+  return { id: `H${n}`, x: 10 + n * 3, z: 10, depth, diameter: 0.089 };
 }
 
 function makeState(cash = 10_000): GameState {

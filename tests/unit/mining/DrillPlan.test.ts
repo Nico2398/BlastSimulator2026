@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createGridPlan, addHole, removeHole, holeNumericId, maxHoleNumericId, digVoxel, landDrilledHole, computeDrillHoleDurationTicks, fleetDrillReachM, drillDepthRefusal, minDrillRigTier } from '../../../src/core/mining/DrillPlan.js';
+import { createGridPlan, addHole, removeHole, holeNumericId, maxHoleNumericId, digVoxel, landDrilledHole, computeDrillHoleDurationTicks, fleetDrillReachM, drillDepthRefusal, minDrillRigTier, fleetDrillDiameterM, drillDiameterRefusal } from '../../../src/core/mining/DrillPlan.js';
 import type { DigVoxelResult, PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 import {
   VoxelGrid, computeVoxelColumnSurfaceY, setVoxelColumnSurfaceHeight,
@@ -519,5 +519,64 @@ describe('minDrillRigTier (#1714)', () => {
     for (const depth of [1, 12, 12.1, 18, 24, 24.1, 40]) {
       expect(drillDepthRefusal(depth, [rig(minDrillRigTier(depth))])).toBeNull();
     }
+  });
+});
+
+describe('fleetDrillDiameterM (#1934)', () => {
+  it('is the widest hole the best drill rig can bore', () => {
+    expect(fleetDrillDiameterM([rig(1)])).toBe(0.089);
+    expect(fleetDrillDiameterM([rig(1), rig(2)])).toBe(0.127);
+    expect(fleetDrillDiameterM([rig(3), rig(1)])).toBe(0.165);
+  });
+
+  it('ignores vehicles that are not drill rigs', () => {
+    expect(fleetDrillDiameterM([rig(1), { type: 'rock_digger', tier: 3 }])).toBe(0.089);
+  });
+
+  it('boundary: with no rig falls back to the tier-1 diameter', () => {
+    expect(fleetDrillDiameterM([])).toBe(0.089);
+  });
+});
+
+describe('drillDiameterRefusal (#1934)', () => {
+  it('refuses 127 mm with only a tier-1 rig, naming diameter and max', () => {
+    const refusal = drillDiameterRefusal(0.127, [rig(1)]);
+    expect(refusal).not.toBeNull();
+    expect(refusal!.key).toBe('mining.drill_plan.refused_diameter');
+    // Params are millimetres: the i18n text reads "{diameter} mm ... up to {reach} mm".
+    expect(refusal!.params.reach).toBe(89);
+    expect(refusal!.params.diameter).toBe(127);
+  });
+
+  it('accepts 127 mm with a tier-2 rig', () => {
+    expect(drillDiameterRefusal(0.127, [rig(2)])).toBeNull();
+  });
+
+  it('165 mm needs a tier-3 rig', () => {
+    expect(drillDiameterRefusal(0.165, [rig(2)])).not.toBeNull();
+    expect(drillDiameterRefusal(0.165, [rig(3)])).toBeNull();
+  });
+
+  it('boundary: the default diameter is never refused, even with no rig', () => {
+    expect(drillDiameterRefusal(0.089, [rig(1)])).toBeNull();
+    expect(drillDiameterRefusal(0.089, [])).toBeNull();
+  });
+
+  it('no rig behaves like a tier-1 rig', () => {
+    expect(drillDiameterRefusal(0.127, [])).not.toBeNull();
+  });
+
+  it('a non-rig vehicle does not extend the diameter', () => {
+    expect(drillDiameterRefusal(0.127, [rig(1), { type: 'rock_digger', tier: 3 }])).not.toBeNull();
+  });
+});
+
+describe('computeDrillHoleDurationTicks ignores the new capacity rules (#1934 pin)', () => {
+  it('still scales linearly with diameter and only with diameter, depth and base', () => {
+    const base = computeDrillHoleDurationTicks(8, 0.089);
+    expect(computeDrillHoleDurationTicks(8, 0.127)).toBe(
+      Math.max(1, Math.round(DRILL_HOLE_BASE_DURATION_TICKS * (8 / DRILL_HOLE_REFERENCE_DEPTH_M) * (0.127 / DRILL_HOLE_REFERENCE_DIAMETER_M))),
+    );
+    expect(computeDrillHoleDurationTicks(8, 0.127)).toBeGreaterThan(base);
   });
 });

@@ -508,3 +508,28 @@ describe('EnergyPropagation — a trench beside a charged pattern (#1793)', () =
     });
   }
 });
+
+describe('EnergyPropagation — buildHoleSeeds with hole diameter (#1934)', () => {
+  it('no diameter equals the explicit 89 mm default', () => {
+    expect(buildHoleSeeds(10, 6, 8, 1000, 3, 3)).toEqual(buildHoleSeeds(10, 6, 8, 1000, 3, 3, 0, 0.089));
+  });
+
+  it('the same kg in a wider hole fills a shorter column of fewer cells', () => {
+    const narrow = buildHoleSeeds(30, 20, 16, 1000, 0, 0, 0, 0.089);
+    const wide = buildHoleSeeds(30, 20, 16, 1000, 0, 0, 0, 0.165);
+    expect(narrow).toHaveLength(8);
+    expect(wide.length).toBeLessThan(narrow.length);
+    expect(wide.length).toBe(Math.max(1, Math.round(16 / 6.87)));
+  });
+
+  it('keeps the column on the hole bottom and conserves the total energy', () => {
+    const wide = buildHoleSeeds(30, 20, 16, 1000, 2, 5, 0, 0.127);
+    const ys = wide.map(s => s.y).sort((a, b) => a - b);
+    expect(ys[0]).toBe(10);
+    expect(wide.reduce((sum, s) => sum + s.energy, 0)).toBeCloseTo(1000, 6);
+  });
+
+  it('boundary: a tiny charge in a wide hole still occupies one cell', () => {
+    expect(buildHoleSeeds(30, 20, 1, 100, 0, 0, 0, 0.165)).toHaveLength(1);
+  });
+});

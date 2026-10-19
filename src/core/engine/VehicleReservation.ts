@@ -31,6 +31,7 @@ import { isVehicleUnderRepair } from '../entities/VehicleRepair.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { licenceLevelOf, canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { minDrillRigTier } from '../mining/DrillPlan.js';
+import { minRigTierForDiameter } from '../mining/HoleDiameter.js';
 import { moveTo } from './MoveTo.js';
 import { returnFragmentToGround } from '../economy/Logistics.js';
 import { haulDestinationOf } from '../economy/SpoilHeaps.js';
@@ -179,7 +180,9 @@ export function isLicensedForRole(employee: Employee, role: VehicleRole): boolea
 export function minVehicleTierFor(action: Pick<PendingAction, 'type' | 'payload'>): VehicleTier {
   if (action.type !== 'drill_hole') return 1;
   const depth = action.payload['depth'];
-  return typeof depth === 'number' ? minDrillRigTier(depth) : 1;
+  const diameter = action.payload['diameter'];
+  const depthTier = typeof depth === 'number' ? minDrillRigTier(depth) : 1;
+  return typeof diameter === 'number' ? (Math.max(depthTier, minRigTierForDiameter(diameter)) as VehicleTier) : depthTier;
 }
 
 /** Lowest tier among the fleet's vehicles of `role`, or null when it owns none (#1524). */

@@ -196,7 +196,7 @@ export function createRunner(): RunnerWithContext {
   );
 
   // --- Mining commands (Phase 3) ---
-  runner.register('drill_plan', 'Manage drill plan (grid|add|show)', (args, named) =>
+  runner.register('drill_plan', 'Manage drill plan (grid|add|show; diameter: 89|127|165 mm)', (args, named) =>
     drillPlanCommand(ctx, args, named),
   );
   runner.register('charge', 'Set charges (hole:* explosive:X amount:Ykg stemming:Zm)', (args, named) =>

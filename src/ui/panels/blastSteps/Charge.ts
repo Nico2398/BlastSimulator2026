@@ -27,14 +27,15 @@ import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature, drainReasonText, type HoleDrainView } from './ChargeHoleList.js';
 import { ChargeStockBlock, buildStockView, deliveryTransitText } from './ChargeStock.js';
-import { chargeFitsHole, maxFittingChargeKg, weakHoleSummary, type WeakHoleSummary } from '../../../core/mining/ChargePlan.js';
+import { chargeFitsHole, maxFittingChargeKg, maxChargeKgForHole, explosiveHoleLimits, weakHoleSummary, type WeakHoleSummary } from '../../../core/mining/ChargePlan.js';
 import { getRock } from '../../../core/world/RockCatalog.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
 import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
+import { chargeKgPerMetre } from '../../../core/mining/HoleDiameter.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { drainBlockReason } from '../../../core/mining/HoleDrain.js';
 import { TUBING_COST, hasTubing } from '../../../core/mining/Tubing.js';
-import { MIN_STEMMING_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, HOLE_DRAIN_COST_PER_HOLE } from '../../../core/config/balance.js';
+import { MIN_STEMMING_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, HOLE_DRAIN_COST_PER_HOLE, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
@@ -54,6 +55,7 @@ export class ChargeStep {
   private readonly chargeAllBtn: HTMLButtonElement;
   private readonly chargeLineEl: HTMLElement;
   private readonly fitLineEl: HTMLElement;
+  private readonly capacityLineEl: HTMLElement;
   private readonly weakLineEl: HTMLElement;
   private readonly patternLineEl: HTMLElement;
   private readonly awaitingLineEl: HTMLElement;
@@ -70,6 +72,9 @@ export class ChargeStep {
   private allowedIds: readonly string[] = resolveAvailableExplosives(null);
   private amountKg = CHARGE_DEFAULT_AMOUNT_KG;
   private stemmingM = CHARGE_DEFAULT_STEMMING_M;
+  /** Diameters (m) of the narrowest and widest drilled holes: the max follows the first, the min the second (#1934). */
+  private narrowestM = DRILL_HOLE_DEFAULT_DIAMETER_M;
+  private widestM = DRILL_HOLE_DEFAULT_DIAMETER_M;
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
@@ -125,6 +130,8 @@ export class ChargeStep {
     this.chargeAllBtn.addEventListener('click', () => this.chargeAll());
 
     this.fitLineEl = el('div');
+    this.capacityLineEl = el('div', { attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
+    this.capacityLineEl.dataset['info'] = 'hole-capacity';
     this.weakLineEl = el('div');
     this.patternLineEl = el('div');
     this.awaitingLineEl = el('div');
@@ -144,7 +151,7 @@ export class ChargeStep {
 
     // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
-      this.transitBannerEl, productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.awaitingLineEl, this.stockBlock.root, this.weakLineEl,
+      this.transitBannerEl, productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.awaitingLineEl, this.stockBlock.root, this.weakLineEl,
       this.holeList.root, this.drainEl, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
@@ -166,7 +173,21 @@ export class ChargeStep {
   update(state: GameState, _weather?: WeatherState): void {
     const wet = wetHoles(state);
     const holes = state.drillHoles;
-    const shallowest = holes.length > 0 ? Math.min(...holes.map(h => h.depth)) : null;
+    // The binding hole is the one that holds the least charge under the current stemming.
+    let tightest: DrillHole | null = null;
+    for (const h of holes) {
+      if (tightest === null
+        || maxChargeKgForHole(h.depth, this.stemmingM, h.diameter) < maxChargeKgForHole(tightest.depth, this.stemmingM, tightest.diameter)) tightest = h;
+    }
+    const tightestDepth = tightest?.depth ?? null;
+    const tightestDiameter = tightest?.diameter ?? DRILL_HOLE_DEFAULT_DIAMETER_M;
+    const narrowest = holes.length > 0 ? Math.min(...holes.map(h => h.diameter)) : DRILL_HOLE_DEFAULT_DIAMETER_M;
+    const widest = holes.length > 0 ? Math.max(...holes.map(h => h.diameter)) : DRILL_HOLE_DEFAULT_DIAMETER_M;
+    if (narrowest !== this.narrowestM || widest !== this.widestM) {
+      this.narrowestM = narrowest;
+      this.widestM = widest;
+      this.clampAmount();
+    }
 
     this.allowedIds = resolveAvailableExplosives(state.campaign.activeLevelId);
     if (!this.allowedIds.includes(this.selectedExplosiveId) && this.allowedIds[0] !== undefined) {
@@ -200,7 +221,7 @@ export class ChargeStep {
       holes: holes.map(h => h.id),
       charges: holes.map(h => holeChargeSignature(state.chargesByHole[h.id])),
       planned: holes.map(h => holeChargeSignature(state.plannedChargesByHole[h.id])),
-      shallowest,
+      tightestDepth, narrowest, widest, tightestDiameter,
       planned_holes: state.plannedDrillHoles.length,
       pattern: state.patternCharge ? holeChargeSignature(state.patternCharge) + state.patternCharge.explosiveId : null,
       awaiting: state.chargeAwaitingFunds ?? [],
@@ -219,7 +240,8 @@ export class ChargeStep {
     this.transitBannerEl.style.display = transitText === null ? 'none' : '';
     this.stockBlock.render(stockView);
     this.updateChargeLine(holes.length, stockView.paidCash);
-    this.updateFitLine(shallowest, holes.length + state.plannedDrillHoles.length === 0);
+    this.updateCapacityLine();
+    this.updateFitLine(tightestDepth, tightestDiameter, holes.length + state.plannedDrillHoles.length === 0);
     this.updatePatternLines(state);
     this.updateWeakLine(weakHoleSummary(this.selectedExplosiveId, columns));
     this.holeList.render(holes, state.chargesByHole, state.plannedChargesByHole, new Set(state.chargeAwaitingFunds ?? []), drainViews);
@@ -262,7 +284,7 @@ export class ChargeStep {
     statsRow.style.cssText = 'display:flex;gap:10px;font:400 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)';
     statsRow.append(
       el('span', { text: `${explosive.energyPerKg} MJ/kg` }),
-      el('span', { text: `${explosive.maxChargeKg} kg max` }),
+      el('span', { text: `${Math.round(explosiveHoleLimits(explosive, this.narrowestM).maxKg * 10) / 10} kg max` }),
     );
     if (explosive.waterSensitive && anyWet) {
       const badge = el('span', { attrs: { style: 'display:flex;align-items:center;gap:3px;color:var(--bsx-info)' } });
@@ -280,6 +302,14 @@ export class ChargeStep {
     return card;
   }
 
+  /** Per-metre capacity of the narrowest hole, so a wider bore's bigger charge is visible (#1934). */
+  private updateCapacityLine(): void {
+    this.capacityLineEl.textContent = t('ui.blast_workshop.charge.hole_capacity', {
+      diameter: Math.round(this.narrowestM * 1000),
+      kgPerMetre: +chargeKgPerMetre(this.narrowestM).toFixed(2),
+    });
+  }
+
   private updateChargeLine(holeCount: number, cashCost: number): void {
     const explosive = getExplosive(this.selectedExplosiveId);
     const name = explosive ? t(explosive.nameKey) : this.selectedExplosiveId;
@@ -288,22 +318,22 @@ export class ChargeStep {
     });
   }
 
-  // Charge column + stemming overflowing the shallowest hole: say why and block
+  // Charge column + stemming overflowing the tightestDepth hole: say why and block
   // Charge All. The stepper is left alone so the player sees what they asked for.
-  private updateFitLine(shallowest: number | null, noHoles: boolean): void {
-    const overflows = shallowest !== null
-      && !chargeFitsHole(this.amountKg, this.stemmingM, shallowest);
+  private updateFitLine(tightestDepth: number | null, diameterM: number, noHoles: boolean): void {
+    const overflows = tightestDepth !== null
+      && !chargeFitsHole(this.amountKg, this.stemmingM, tightestDepth, diameterM);
     this.chargeAllBtn.disabled = overflows || noHoles;
     if (noHoles) {
       this.fitLineEl.replaceChildren(reasonLine(t('ui.blast_workshop.charge.no_holes_reason')));
       return;
     }
-    if (!overflows || shallowest === null) {
+    if (!overflows || tightestDepth === null) {
       this.fitLineEl.replaceChildren();
       return;
     }
-    const max = maxFittingChargeKg(shallowest, this.stemmingM);
-    this.fitLineEl.replaceChildren(reasonLine(t('ui.blast_workshop.charge.too_much_for_hole', { depth: shallowest, max })));
+    const max = maxFittingChargeKg(tightestDepth, this.stemmingM, diameterM);
+    this.fitLineEl.replaceChildren(reasonLine(t('ui.blast_workshop.charge.too_much_for_hole', { depth: tightestDepth, max })));
   }
 
   // Pattern settings (#1345) and, when set, why some holes are waiting for cash.
@@ -440,15 +470,20 @@ export class ChargeStep {
   private clampAmount(): void {
     const explosive = getExplosive(this.selectedExplosiveId);
     if (!explosive) return;
-    this.amountKg = Math.max(explosive.minChargeKg, Math.min(explosive.maxChargeKg, this.amountKg));
+    this.amountKg = this.withinHoleLimits(explosive, this.amountKg);
     this.amountValueEl.textContent = `${this.amountKg} kg`;
+  }
+
+  /** `kg` clamped to the narrowest hole's max, then raised to the widest hole's min so no hole refuses it as too small. */
+  private withinHoleLimits(explosive: ExplosiveType, kg: number): number {
+    const { maxKg } = explosiveHoleLimits(explosive, this.narrowestM);
+    const { minKg } = explosiveHoleLimits(explosive, this.widestM);
+    return Math.max(minKg, Math.min(maxKg, kg));
   }
 
   private adjustAmount(delta: number): void {
     const explosive = getExplosive(this.selectedExplosiveId);
-    const max = explosive?.maxChargeKg ?? 100;
-    const min = explosive?.minChargeKg ?? 1;
-    this.amountKg = Math.max(min, Math.min(max, this.amountKg + delta));
+    this.amountKg = explosive ? this.withinHoleLimits(explosive, this.amountKg + delta) : Math.max(1, Math.min(100, this.amountKg + delta));
     this.amountValueEl.textContent = `${this.amountKg} kg`;
     this.lastSignature = '';
   }

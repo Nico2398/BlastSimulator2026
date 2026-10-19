@@ -7,7 +7,7 @@ import type { MiningContext } from './types.js';
 import { requireGameWithSub, resolveHoleId, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState, emitHoleCellsChanged } from './shared.js';
 import {
   gridCellPositions, createHolesAt, addHole, removeHole,
-  computeDrillHoleDurationTicks, drillDepthRefusal,
+  computeDrillHoleDurationTicks, drillDepthRefusal, drillDiameterRefusal,
 } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
@@ -16,6 +16,7 @@ import { removeHoleTubing } from '../../../core/mining/Tubing.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { coveredByFootprint, partitionByFootprint } from '../../../core/mining/BlastPlan.js';
 import { cancelOutstandingChargeAction, removeAwaiting, planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
+import { normaliseHoleDiameter, holeDiameterOptionsMm } from '../../../core/mining/HoleDiameter.js';
 import { claimForAction } from '../siteExpansion.js';
 
 /** Payload carried by a queued `drill_hole` PendingAction (#553). */
@@ -104,6 +105,25 @@ export function dispatchDrillHoleAction(
   }, { skipQualificationCheck: true });
 }
 
+/** The `diameter:` option (mm or m) as metres; a refusal listing the options when it is none of them or beyond the fleet (#1934). */
+function resolveDiameter(ctx: MiningContext, raw: string | undefined): { diameter: number } | { refusal: CommandResult } {
+  if (raw === undefined) return { diameter: DRILL_HOLE_DEFAULT_DIAMETER_M };
+  const diameter = normaliseHoleDiameter(parseFloat(raw));
+  if (diameter === null) {
+    return { refusal: { success: false, output: t('mining.drill_plan.invalid_diameter', { options: holeDiameterOptionsMm() }) } };
+  }
+  const tooWide = drillDiameterRefusal(diameter, ctx.state!.vehicles.vehicles);
+  if (tooWide) return { refusal: { success: false, output: t(tooWide.key, tooWide.params) } };
+  return { diameter };
+}
+
+/** Depth refusal first, then the `diameter:` option; the diameter in metres or the refusal to return. */
+function resolveHoleSize(ctx: MiningContext, depth: number, rawDiameter: string | undefined): { diameter: number } | { refusal: CommandResult } {
+  const tooDeep = drillDepthRefusal(depth, ctx.state!.vehicles.vehicles);
+  if (tooDeep) return { refusal: { success: false, output: t(tooDeep.key, tooDeep.params) } };
+  return resolveDiameter(ctx, rawDiameter);
+}
+
 export function drillPlanCommand(
   ctx: MiningContext,
   args: string[],
@@ -119,7 +139,6 @@ export function drillPlanCommand(
     const cols = parseInt(named['cols'] ?? '3', 10);
     const spacing = parseFloat(named['spacing'] ?? '3');
     const depth = parseFloat(named['depth'] ?? '8');
-    const diameter = parseFloat(named['diameter'] ?? String(DRILL_HOLE_DEFAULT_DIAMETER_M));
 
     if (!Number.isFinite(rows) || !Number.isFinite(cols) || rows < 1 || cols < 1) {
       return { success: false, output: t('mining.drill_plan.invalid_grid') };
@@ -131,8 +150,9 @@ export function drillPlanCommand(
       };
     }
 
-    const tooDeep = drillDepthRefusal(depth, ctx.state!.vehicles.vehicles);
-    if (tooDeep) return { success: false, output: t(tooDeep.key, tooDeep.params) };
+    const sized = resolveHoleSize(ctx, depth, named['diameter']);
+    if ('refusal' in sized) return sized.refusal;
+    const diameter = sized.diameter;
 
     const cells = gridCellPositions({ x: origin[0] ?? 0, z: origin[1] ?? 0 }, rows, cols, spacing);
 
@@ -183,9 +203,9 @@ export function drillPlanCommand(
     const x = parseFloat(named['x'] ?? '0');
     const z = parseFloat(named['z'] ?? named['y'] ?? '0');
     const depth = parseFloat(named['depth'] ?? '8');
-    const diameter = parseFloat(named['diameter'] ?? String(DRILL_HOLE_DEFAULT_DIAMETER_M));
-    const tooDeep = drillDepthRefusal(depth, ctx.state!.vehicles.vehicles);
-    if (tooDeep) return { success: false, output: t(tooDeep.key, tooDeep.params) };
+    const sized = resolveHoleSize(ctx, depth, named['diameter']);
+    if ('refusal' in sized) return sized.refusal;
+    const diameter = sized.diameter;
     const claim = claimForAction(ctx, [{ x, z }], 'drill');
     if (!claim.ok) return { success: false, output: claim.output! };
     if (coveredByFootprint([{ id: 'add', x, z }], buildingFootprintOccupants(ctx.state!)).size > 0) {

@@ -1995,9 +1995,9 @@ describe('drill_hole actions — dispatch and landing (#553)', () => {
     purchaseVehicle(state.vehicles, 'drill_rig', 30, 0);
 
     const planned: PlannedHole[] = [
-      { id: 'H1', x: 2, z: 0, depth: 8, diameter: 0.15 },
-      { id: 'H2', x: 28, z: 0, depth: 8, diameter: 0.15 },
-      { id: 'H3', x: 15, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H1', x: 2, z: 0, depth: 8, diameter: 0.089 },
+      { id: 'H2', x: 28, z: 0, depth: 8, diameter: 0.089 },
+      { id: 'H3', x: 15, z: 0, depth: 8, diameter: 0.089 },
     ];
     state.plannedDrillHoles.push(...planned);
     for (const hole of planned) queueDrillHoleAction(state, hole);
@@ -2024,9 +2024,9 @@ describe('drill_hole actions — dispatch and landing (#553)', () => {
 
     // Distances from (0,0): H3 (5) nearest, H1 (20) middle, H2 (30) farthest.
     const planned: PlannedHole[] = [
-      { id: 'H1', x: 20, z: 0, depth: 8, diameter: 0.15 },
-      { id: 'H2', x: 30, z: 0, depth: 8, diameter: 0.15 },
-      { id: 'H3', x: 5, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H1', x: 20, z: 0, depth: 8, diameter: 0.089 },
+      { id: 'H2', x: 30, z: 0, depth: 8, diameter: 0.089 },
+      { id: 'H3', x: 5, z: 0, depth: 8, diameter: 0.089 },
     ];
     state.plannedDrillHoles.push(...planned);
     for (const hole of planned) queueDrillHoleAction(state, hole);
@@ -2135,9 +2135,9 @@ describe('charge_hole actions — dispatch and landing (#554)', () => {
     makeBlaster(state, rng, 30, 0);
 
     const holes: DrillHole[] = [
-      { id: 'H1', x: 2, z: 0, depth: 8, diameter: 0.15 },
-      { id: 'H2', x: 28, z: 0, depth: 8, diameter: 0.15 },
-      { id: 'H3', x: 15, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H1', x: 2, z: 0, depth: 8, diameter: 0.089 },
+      { id: 'H2', x: 28, z: 0, depth: 8, diameter: 0.089 },
+      { id: 'H3', x: 15, z: 0, depth: 8, diameter: 0.089 },
     ];
     state.drillHoles.push(...holes);
     for (const hole of holes) queueChargeHoleAction(state, hole);
@@ -2171,9 +2171,9 @@ describe('charge_hole actions — dispatch and landing (#554)', () => {
 
     // Distances from (0,0): H3 (5) nearest, H1 (20) middle, H2 (30) farthest.
     const holes: DrillHole[] = [
-      { id: 'H1', x: 20, z: 0, depth: 8, diameter: 0.15 },
-      { id: 'H2', x: 30, z: 0, depth: 8, diameter: 0.15 },
-      { id: 'H3', x: 5, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H1', x: 20, z: 0, depth: 8, diameter: 0.089 },
+      { id: 'H2', x: 30, z: 0, depth: 8, diameter: 0.089 },
+      { id: 'H3', x: 5, z: 0, depth: 8, diameter: 0.089 },
     ];
     state.drillHoles.push(...holes);
     for (const hole of holes) queueChargeHoleAction(state, hole);
@@ -2413,13 +2413,13 @@ describe('isChargeHoleClaimable (#1342)', () => {
 
   it('is false for a charge_hole whose hole is still only planned (drill order not landed)', () => {
     const state = createGame({ seed: 1 });
-    state.plannedDrillHoles.push({ id: 'H7', x: 3, z: 3, depth: 6, diameter: 0.15 } as never);
+    state.plannedDrillHoles.push({ id: 'H7', x: 3, z: 3, depth: 6, diameter: 0.089 } as never);
     expect(isChargeHoleClaimable(state, makeAction('charge_hole', { holeId: 'H7' }))).toBe(false);
   });
 
   it('is true for a charge_hole whose hole is not planned (already drilled)', () => {
     const state = createGame({ seed: 1 });
-    state.drillHoles.push({ id: 'H7', x: 3, z: 3, depth: 6, diameter: 0.15 });
+    state.drillHoles.push({ id: 'H7', x: 3, z: 3, depth: 6, diameter: 0.089 });
     expect(isChargeHoleClaimable(state, makeAction('charge_hole', { holeId: 'H7' }))).toBe(true);
   });
 
@@ -2430,7 +2430,7 @@ describe('isChargeHoleClaimable (#1342)', () => {
 
   it('is true for other action types even when their holeId is planned', () => {
     const state = createGame({ seed: 1 });
-    state.plannedDrillHoles.push({ id: 'H7', x: 3, z: 3, depth: 6, diameter: 0.15 } as never);
+    state.plannedDrillHoles.push({ id: 'H7', x: 3, z: 3, depth: 6, diameter: 0.089 } as never);
     expect(isChargeHoleClaimable(state, makeAction('drill_hole', { holeId: 'H7' }))).toBe(true);
   });
 });
@@ -2580,7 +2580,7 @@ describe('charge_hole is vehicle-gated work: a mounted blaster is not alighted b
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.charging_truck, 1);
     const vehicle = withTruck ? purchaseVehicle(state.vehicles, 'charging_truck', 0, 0).vehicle : null;
     if (vehicle) expect(board(state, vehicle.id, employee.id).success).toBe(true);
-    const hole: DrillHole = { id: 'H1', x: 20, z: 0, depth: 8, diameter: 0.15 };
+    const hole: DrillHole = { id: 'H1', x: 20, z: 0, depth: 8, diameter: 0.089 };
     state.drillHoles.push(hole);
     dispatchChargeAction(state, hole, { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
     state.tickCount += EXPLOSIVE_DELIVERY_TICKS; // explosives have arrived (#1895)
