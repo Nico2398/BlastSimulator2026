@@ -3,19 +3,19 @@
   "description": "Hole diameter (#1934): with only a tier-1 rig a 127 mm grid is refused and 16 kg will not load into an 89 mm, 8 m hole. After buying a tier-2 rig the player steps the Drill diameter to 127 mm, drills two 8 m holes, loads 16 kg into each (about 4.07 kg/m instead of 2) and fires.",
   "steps": [
     {
-      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 grade:4",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 grade:4"
         }
       ],
       "description": "Progression site (kit:full): tier-1 drill rig only, so only 89 mm holes can be drilled at first.",
       "expect": {
         "equals": {
           "mineGrade": {
-            "grade": 0,
+            "grade": 4,
             "pendingTicksLeft": null
           }
         }

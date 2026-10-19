@@ -9,6 +9,7 @@ import { ROLE_LICENCE_REQUIRED, vehicleDriverId, computeScrapResidualValue } fro
 import type { GameState, PendingAction } from '../../../core/state/GameState.js';
 import type { Employee } from '../../../core/entities/Employee.js';
 import type { ConfirmModalConfig } from '../ConfirmModal.js';
+import { vehicleTierRefusal } from '../../../core/economy/VehicleTierGate.js';
 import { rosterCanDriveVehicleTier, canAffordVehicleUpgrade, computeVehicleUpgradeCost, nextVehicleTier } from '../../../core/entities/VehicleUpgrade.js';
 import { missingHp } from '../../../core/entities/VehicleRepair.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -93,18 +94,26 @@ interface UpgradeState {
   available: boolean;
   affordable: boolean;
   cost: number | null;
+  /** Dealer refusal text when the next tier is above the mine grade; null when allowed. */
+  locked?: string;
 }
 
 /** Next-tier upgrade availability and price; the single source for the Inspector. */
-export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number): UpgradeState {
+export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number, grade?: number): UpgradeState {
   const cost = computeVehicleUpgradeCost(v.type, v.tier);
-  const available = nextVehicleTier(v.tier) !== null && cost !== null;
-  return { available, affordable: available && canAffordVehicleUpgrade(v, cash), cost: available ? cost : null };
+  const next = nextVehicleTier(v.tier);
+  const available = next !== null && cost !== null;
+  const refusal = next === null ? null : vehicleTierRefusal(grade, next);
+  return {
+    available, affordable: available && canAffordVehicleUpgrade(v, cash), cost: available ? cost : null,
+    ...(refusal ? { locked: refusal } : {}),
+  };
 }
 
 /** Why the upgrade control is disabled (max tier, or cost beyond cash); null when it can be used. Single source for the Inspector. */
-export function upgradeDisabledReason({ available, affordable, cost }: UpgradeState): string | null {
+export function upgradeDisabledReason({ available, affordable, cost, locked }: UpgradeState): string | null {
   if (!available || cost === null) return t('ui.fleet.upgrade_max');
+  if (locked !== undefined) return locked;
   return affordable ? null : t('ui.fleet.tip.cannot_afford_upgrade', { cost: formatMoney(cost) });
 }
 

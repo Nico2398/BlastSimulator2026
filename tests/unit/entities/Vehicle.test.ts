@@ -1911,3 +1911,12 @@ describe('canReleaseDriver with multi-item cargo (#1370)', () => {
     expect(canReleaseDriver(vs, vehicle.id).success).toBe(false);
   });
 });
+
+describe('purchaseVehicle stays ungated (#1928)', () => {
+  it('buys a tier-3 vehicle of every role with no grade involved', () => {
+    for (const role of getAllVehicleRoles()) {
+      const { vehicle } = purchaseVehicle(createVehicleState(), role, 0, 0, 3);
+      expect(vehicle.tier).toBe(3);
+    }
+  });
+});

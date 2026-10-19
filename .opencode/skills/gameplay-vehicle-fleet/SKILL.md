@@ -416,3 +416,10 @@ On progression sites (`state.grade !== undefined`) a vehicle climbs at most its 
 - Console: `employee assign_skill <id> skill:driving.<role> level:N licence:1-3` sets the driver's licence level.
 
 **Decision (#1938): per-step limit, diagonals included.** A diagonal step over an x-graded ramp has grade `atan(tan g / sqrt(2))`, so ramps at least 2 cells wide are climbable by a diagonal zigzag up to about `tan(limit) * sqrt(2)`. The inspector grade is the steepest cardinal step; its tiers line is conservative. Recorded decision (see `gameplay-navmesh`).
+
+## Dealer grade gate (#1928)
+
+On progression sites (`state.grade` present) the dealer sells tier 2 from mine grade 2 (Licensed Quarry) and tier 3 from grade 4. Lever: `VEHICLE_TIER_UNLOCK_GRADE` in `src/core/config/balance.ts` ({1:0, 2:2, 3:4}). Helpers in `src/core/economy/VehicleTierGate.ts`: `vehicleTierGate(grade, tier)` (null = allowed; undefined grade = non-progression site, always allowed), `vehicleTierRefusalText`, `vehicleTierLockLabel`. Each distinct gated grade registers a `progression.unlock.vehicle_tier.<grade>` approval-letter line.
+
+- Gated: console `vehicle buy` (before the cash check) and `vehicle upgrade` (next tier, after the max-tier check); Fleet panel tier buttons (disabled, greyed, `data-locked="grade"`, `.bs-fleet-tier-lock` label; lock wins over affordability); Inspector Upgrade button.
+- Ungated: tier 1, starting kits, `purchaseVehicle` / `upgradeVehicle` themselves, scrap, repair, campaign levels.

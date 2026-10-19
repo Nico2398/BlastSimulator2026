@@ -160,3 +160,11 @@ describe('canAffordVehicleUpgrade', () => {
     expect(canAffordVehicleUpgrade({ type: 'debris_hauler', tier: VEHICLE_MAX_TIER as 3 }, 1e12)).toBe(false);
   });
 });
+
+describe('upgradeVehicle stays a pure mutator (#1928)', () => {
+  it('upgrades tier 1 to 2 and 2 to 3 with no grade gate of its own', () => {
+    const { vehicle } = purchaseVehicle(createVehicleState(), 'debris_hauler');
+    expect(upgradeVehicle(vehicle)).toMatchObject({ success: true, toTier: 2 });
+    expect(upgradeVehicle(vehicle)).toMatchObject({ success: true, toTier: 3 });
+  });
+});
