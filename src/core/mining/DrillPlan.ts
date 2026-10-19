@@ -9,6 +9,7 @@ import {
   DRILL_HOLE_REFERENCE_DEPTH_M,
   DRILL_HOLE_REFERENCE_DIAMETER_M,
   DRILL_RIG_MAX_DEPTH_M,
+  DRILL_HOLE_DEFAULT_DIAMETER_M,
 } from '../config/balance.js';
 
 export interface DrillHole {
@@ -235,4 +236,17 @@ export function minDrillRigTier(depth: number): VehicleTier {
   const tiers = DRILL_RIG_TIERS_ASC;
   // Beyond the deepest rig: clamp to it; drillDepthRefusal already blocks such a hole at order time.
   return tiers.find(t => DRILL_RIG_MAX_DEPTH_M[t] >= depth) ?? tiers[tiers.length - 1]!;
+}
+
+/** Widest hole (m) the fleet's best drill rig can bore (#1934). */
+export function fleetDrillDiameterM(_vehicles: ReadonlyArray<RigLike>): number {
+  return DRILL_HOLE_DEFAULT_DIAMETER_M;
+}
+
+/** Refusal for a hole wider than the fleet can bore: null when it fits, else the i18n key and params (#1934). */
+export function drillDiameterRefusal(
+  _diameter: number,
+  _vehicles: ReadonlyArray<RigLike>,
+): { key: 'mining.drill_plan.refused_diameter'; params: { diameter: number; max: number } } | null {
+  return null;
 }

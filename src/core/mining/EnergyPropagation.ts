@@ -404,6 +404,7 @@ export function buildHoleSeeds(
   x: number,
   z: number,
   floorY = 0,
+  _diameterM?: number,
 ): EnergySeed[] {
   if (!(totalEnergy > 0) || depth <= 0 || amountKg <= 0) return [];
 

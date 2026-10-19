@@ -520,6 +520,13 @@ export const DRILL_HOLE_REFERENCE_DIAMETER_M = 0.15;
  *  drillPlan.ts's console default and Drill.ts's UI default (#965). */
 export const DRILL_HOLE_DEFAULT_DIAMETER_M = 0.089;
 
+/** Hole diameters (m) a drill plan may order (#1934). */
+export const DRILL_HOLE_DIAMETER_OPTIONS_M: readonly number[] = [0.089, 0.127, 0.165];
+/** Widest hole (m) a drill rig can bore, by tier (#1934). */
+export const DRILL_RIG_MAX_DIAMETER_M: Record<VehicleTier, number> = { 1: 0.089, 2: 0.127, 3: 0.165 };
+/** Metres a raw diameter may miss an option by and still snap to it (#1934). */
+export const DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M = 0.0005;
+
 /** Hole spacing (m) the grid tool's placement strip opens at before the player
  *  steps it (#1069) — the value a scenario's dragTiles rectangle is measured
  *  against when its interaction array never clicks the spacing stepper. Four
