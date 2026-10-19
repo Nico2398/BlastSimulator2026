@@ -5,6 +5,8 @@ import {
   BUILDING_CAPACITY_UNIT_KEY,
   buildingCardLine,
   buildingCardTooltip,
+  buildingCardEffects,
+  buildingScoreEffectLines,
   formatPerHour,
   vehicleCardLine,
   vehicleCardTooltip,
@@ -291,5 +293,45 @@ describe('vehicleCapacityText (#1850)', () => {
       const def = getVehicleDefByTier(role, 1);
       expect(vehicleCardTooltip(def)).toContain(vehicleCapacityText(role, def.capacity));
     }
+  });
+});
+
+describe('buildingScoreEffectLines / buildingCardEffects (#1977)', () => {
+  it('a positive effect renders as a signed +N line naming the score', () => {
+    const lines = buildingScoreEffectLines(getBuildingDef('management_office', 1));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('+2');
+    expect(lines[0]).toContain(t('score.safety'));
+  });
+
+  it('a negative effect renders with a minus sign', () => {
+    const lines = buildingScoreEffectLines(getBuildingDef('explosive_warehouse', 1));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/[-\u2212]1/);
+    expect(lines[0]).not.toContain('+');
+    expect(lines[0]).toContain(t('score.safety'));
+  });
+
+  it('a building with no effects yields no lines and an empty card string', () => {
+    const def = getBuildingDef('driving_center', 1);
+    expect(buildingScoreEffectLines(def)).toEqual([]);
+    expect(buildingCardEffects(def)).toBe('');
+  });
+
+  it('multiple effects give one line each, joined in the card string', () => {
+    const def = getBuildingDef('management_office', 3);
+    const lines = buildingScoreEffectLines(def);
+    expect(lines).toHaveLength(2);
+    expect(lines.some(l => l.includes('+4'))).toBe(true);
+    expect(lines.some(l => l.includes('+1') && l.includes(t('score.wellBeing')))).toBe(true);
+    const card = buildingCardEffects(def);
+    for (const l of lines) expect(card).toContain(l);
+  });
+
+  it('score names follow the locale', () => {
+    setLocale('fr');
+    const line = buildingScoreEffectLines(getBuildingDef('management_office', 1))[0]!;
+    expect(line).toContain(t('score.safety'));
+    expect(line).toContain('+2');
   });
 });
