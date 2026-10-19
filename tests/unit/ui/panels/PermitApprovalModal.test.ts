@@ -20,9 +20,9 @@ function makeModal(): { modal: PermitApprovalModal; container: HTMLElement; cons
   const container = document.createElement('div');
   document.body.appendChild(container);
   const modal = new PermitApprovalModal(container);
-  const fn = vi.fn(() => ({ success: true, output: '' }));
+  const fn = vi.fn<any[], any>(() => ({ success: true, output: '' }));
   modal.setGameConsole(fn as unknown as GameConsoleFn);
-  return { modal, container, console: fn };
+  return { modal, container, console: fn as unknown as ReturnType<typeof vi.fn> };
 }
 
 const dismissBtn = (c: HTMLElement) => c.querySelectorAll('.bs-permit-approval-dismiss');

@@ -69,6 +69,10 @@ export class PermitApprovalModal {
     this.overlay.style.display = '';
     if (grade === this.shownGrade) return;
     this.shownGrade = grade;
+    this.renderGrade(grade);
+  }
+
+  private renderGrade(grade: number): void {
     const def = gradeDef(grade);
     this.gradeNameEl.textContent = t(def.nameKey, def.nameParams);
     this.unlockListEl.replaceChildren(...unlockLinesFor(grade).map(line => el('li', { text: t(line.key, line.params) })));
@@ -84,7 +88,7 @@ export class PermitApprovalModal {
   /** Re-render locale-dependent text after a language change. */
   refreshLocale(): void {
     this.locale.refresh();
-    this.shownGrade = null; // next update() rebuilds the grade name and lines
+    if (this.shownGrade !== null) this.renderGrade(this.shownGrade);
   }
 
   dispose(): void { this.overlay.remove(); }

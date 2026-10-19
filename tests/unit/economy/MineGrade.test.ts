@@ -25,6 +25,7 @@ import { setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.j
 import { MINE_GRADES } from '../../../src/core/config/balance.js';
 // Importing PermitLimits registers its unlock line at module level (#1926).
 import { permitLimitsFor } from '../../../src/core/economy/PermitLimits.js';
+import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 import en from '../../../src/core/i18n/locales/en.json';
 import fr from '../../../src/core/i18n/locales/fr.json';
@@ -595,7 +596,7 @@ describe('unlockLinesFor (#1926)', () => {
     const lines = unlockLinesFor(g);
     expect(lines.length).toBeGreaterThanOrEqual(3);
     const limits = permitLimitsFor(g);
-    expect(lines[0]!.params).toMatchObject({ maxChargeKg: limits.maxChargeKg, maxHoles: limits.maxHoles, fee: limits.fee });
+    expect(lines[0]!.params).toMatchObject({ maxChargeKg: limits.maxChargeKg, maxHoles: limits.maxHoles, fee: formatMoney(limits.fee) });
     const keys = lines.map(l => l.key);
     expect(keys.indexOf(`progression.unlock.flavour.${g}`)).toBe(1);
     expect(keys.indexOf(`progression.unlock.hint.${g}`)).toBe(2);
@@ -624,7 +625,7 @@ describe('unlockLinesFor (#1926)', () => {
     for (const g of [6, 7, 12]) {
       const lines = unlockLinesFor(g);
       const limits = permitLimitsFor(g);
-      expect(lines[0]!.params).toMatchObject({ maxChargeKg: limits.maxChargeKg, maxHoles: limits.maxHoles, fee: limits.fee });
+      expect(lines[0]!.params).toMatchObject({ maxChargeKg: limits.maxChargeKg, maxHoles: limits.maxHoles, fee: formatMoney(limits.fee) });
       const keys = lines.map(l => l.key);
       expect(keys).toContain('progression.unlock.flavour.class');
       expect(keys).toContain('progression.unlock.hint.class');
