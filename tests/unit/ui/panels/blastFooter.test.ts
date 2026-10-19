@@ -8,7 +8,7 @@ import { setLocale } from '../../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { readFileSync } from 'node:fs';
 import { t } from '../../../../src/core/i18n/I18n.js';
-import { addChargedPattern, makeCoverageSurvey, makeOreGrid } from '../../../helpers/oreSurveyFixture.js';
+import { addChargedPattern, addDrilledPattern, addWeakChargedPattern, makeBarrenSurvey, makeCoverageSurvey, makeOreGrid } from '../../../helpers/oreSurveyFixture.js';
 import { Random } from '../../../../src/core/math/Random.js';
 import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
 import { dispatchChargeAction } from '../../../../src/core/mining/ChargeOrder.js';
@@ -213,7 +213,7 @@ describe('BlastFooter ore estimate coverage (#1960)', () => {
     const grid = makeOreGrid();
     const state = makeState();
     addChargedPattern(state, holeCounter);
-    if (survey === 'half') state.surveyResults.push(makeCoverageSurvey(0, 20));
+    if (survey === 'half') state.surveyResults.push(makeCoverageSurvey(0, 20, 1, 0, 20));
     if (survey === 'full') state.surveyResults.push(makeCoverageSurvey(0, 39));
     if (survey === 'stale') state.surveyResults.push({ ...makeCoverageSurvey(0, 39), stale: true });
     footer.update(state);
@@ -312,6 +312,98 @@ describe('BlastFooter ore estimate coverage (#1960)', () => {
     const { footer } = setup('none');
     expect(value(footer.root).textContent).toBe(t('ui.blast_workshop.footer.est_ore_unknown'));
     expect(value(footer.root).textContent).not.toBe('No survey');
+  });
+});
+
+describe('BlastFooter ore estimate: surveyed ground and nothing broken (#1967)', () => {
+  const NO_SURVEY = 'No survey';
+  const hint = () => t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') });
+  const value = (root: HTMLElement) => {
+    const label = [...root.querySelectorAll('span')].find(s => s.textContent === t('ui.blast_workshop.footer.est_ore_value'));
+    if (!label) throw new Error('no est ore value label');
+    return (label.nextElementSibling as HTMLElement).textContent ?? '';
+  };
+
+  type Holes = 'drilled' | 'weak' | 'charged';
+  function setup(holes: Holes, survey: 'none' | 'full' | 'barren') {
+    const { footer } = makeFooter();
+    const grid = makeOreGrid();
+    footer.setGridProvider(() => grid);
+    const state = makeState();
+    if (holes === 'drilled') addDrilledPattern(state, holeCounter);
+    if (holes === 'weak') addWeakChargedPattern(state, holeCounter);
+    if (holes === 'charged') addChargedPattern(state, holeCounter);
+    if (survey === 'full') state.surveyResults.push(makeCoverageSurvey(0, 39));
+    if (survey === 'barren') state.surveyResults.push(makeBarrenSurvey());
+    footer.update(state);
+    return { footer, state };
+  }
+
+  it('surveyed but uncharged holes show a neutral dash, not "No survey"', () => {
+    const { footer } = setup('drilled', 'full');
+    expect(value(footer.root)).toBe('—');
+    expect(footer.root.textContent).not.toContain(NO_SURVEY);
+  });
+
+  it('surveyed but uncharged holes show no survey hint', () => {
+    const { footer } = setup('drilled', 'full');
+    expect(footer.root.textContent).not.toContain(hint());
+  });
+
+  it('holes drilled in a barren surveyed disc are neutral with no hint', () => {
+    const { footer } = setup('drilled', 'barren');
+    expect(value(footer.root)).toBe('—');
+    expect(footer.root.textContent).not.toContain(hint());
+  });
+
+  it('unsurveyed uncharged holes keep "No survey" and the hint', () => {
+    const { footer } = setup('drilled', 'none');
+    expect(value(footer.root)).toBe(NO_SURVEY);
+    expect(footer.root.textContent).toContain(hint());
+  });
+
+  it('a charge that breaks nothing on surveyed ground is neutral with no hint', () => {
+    const { footer } = setup('weak', 'full');
+    expect(value(footer.root)).toBe('—');
+    expect(footer.root.textContent).not.toContain(NO_SURVEY);
+    expect(footer.root.textContent).not.toContain(hint());
+  });
+
+  it('a charge that breaks nothing is neutral even unsurveyed', () => {
+    const { footer } = setup('weak', 'none');
+    expect(value(footer.root)).toBe('—');
+    expect(footer.root.textContent).not.toContain(hint());
+  });
+
+  it('a surveyed barren charged pattern reads $0 with no share and no hint', () => {
+    const { footer } = setup('charged', 'barren');
+    expect(value(footer.root)).toBe('$0');
+    expect(footer.root.textContent).not.toContain('surveyed');
+    expect(footer.root.textContent).not.toContain(NO_SURVEY);
+    expect(footer.root.textContent).not.toContain(hint());
+  });
+
+  it('a charged pattern wholly inside a fresh disc reads full coverage with no share', () => {
+    const { footer } = setup('charged', 'full');
+    expect(value(footer.root)).toMatch(/^\$[\d,.]+$/);
+    expect(footer.root.textContent).not.toContain('% surveyed');
+  });
+
+  it('charging surveyed drilled holes moves the value from neutral to a dollar figure', () => {
+    const { footer, state } = setup('drilled', 'full');
+    expect(value(footer.root)).toBe('—');
+    for (const h of state.drillHoles) {
+      const res = createCharge('krackle', 8, 2, h.depth);
+      if ('charge' in res) state.chargesByHole[h.id] = res.charge;
+    }
+    footer.update(state);
+    expect(value(footer.root)).toMatch(/^\$/);
+  });
+
+  it('plan cost does not depend on the neutral state', () => {
+    const weak = setup('weak', 'full');
+    const none = setup('weak', 'none');
+    expect(weak.footer.root.textContent).toBe(none.footer.root.textContent);
   });
 });
 

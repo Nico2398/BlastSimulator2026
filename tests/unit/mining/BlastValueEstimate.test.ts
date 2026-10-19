@@ -43,10 +43,10 @@ function makeHole(id: string, x: number, z: number, depth = 8): DrillHole {
   return { id, x, z, depth, diameter: 0.15 };
 }
 
-function chargedPlan(holes: DrillHole[], kg = 8): BlastPlan {
+function chargedPlan(holes: DrillHole[], kg = 8, explosive = 'krackle'): BlastPlan {
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
-  const { charges } = batchCharge(holes.map(h => h.id), depths, 'krackle', kg, 2);
+  const { charges } = batchCharge(holes.map(h => h.id), depths, explosive, kg, 2);
   return assembleBlastPlan(holes, charges);
 }
 
@@ -65,6 +65,9 @@ interface SurveyOpts {
   density?: number;
   min?: number;
   max?: number;
+  /** Disc centre; the column estimates above are independent of it (#1967). */
+  centerX?: number;
+  centerZ?: number;
 }
 
 function makeSurvey(opts: SurveyOpts = {}): SurveyResult {
@@ -72,6 +75,7 @@ function makeSurvey(opts: SurveyOpts = {}): SurveyResult {
     method = 'seismic', confidence = 1.0, completedTick = 10, id = 1,
     bands = [{ fromM: 0, toM: 25, ores: { blingite: 0.2 } }],
     surfaceY = SURFACE_Y, density = 0.2, min = 0, max = 39,
+    centerX = 20, centerZ = 20,
   } = opts;
   const estimates: Record<string, Record<string, number>> = {};
   const depthProfile: Record<string, SurveyDepthBand[]> = {};
@@ -84,7 +88,7 @@ function makeSurvey(opts: SurveyOpts = {}): SurveyResult {
       if (surfaceY !== null) surfaceYs[key] = surfaceY;
     }
   }
-  const survey: SurveyResult = { id, method, centerX: 20, centerZ: 20, completedTick, surveyorId: 1, estimates, confidence };
+  const survey: SurveyResult = { id, method, centerX, centerZ, completedTick, surveyorId: 1, estimates, confidence };
   if (bands) survey.depthProfile = depthProfile;
   if (surfaceY !== null) survey.surfaceYs = surfaceYs;
   return survey;
@@ -476,7 +480,12 @@ describe('estimateBlastOre — value and survey coverage (#1960)', () => {
   });
 
   it('coverage is 0 with no surveys', () => {
-    expect(estimateBlastOre(PLAN, [], grid)).toEqual({ value: 0, coverage: 0 });
+    const r = estimateBlastOre(PLAN, [], grid);
+    expect(r.value).toBe(0);
+    expect(r.coverage).toBe(0);
+    expect(r.charged).toBe(true);
+    expect(r.brokenVoxels).toBeGreaterThan(0);
+    expect(r.holeCoverage).toBe(0);
   });
 
   it('coverage is 0 when every survey is stale', () => {
@@ -488,13 +497,15 @@ describe('estimateBlastOre — value and survey coverage (#1960)', () => {
 
   it('coverage is 0 (not NaN) for an empty plan', () => {
     const r = estimateBlastOre(assembleBlastPlan([], {}), [makeSurvey()], grid);
-    expect(r).toEqual({ value: 0, coverage: 0 });
+    expect(r).toEqual({ value: 0, coverage: 0, brokenVoxels: 0, charged: false, holeCoverage: 0 });
   });
 
   it('coverage is 0 (not NaN) for uncharged holes, where nothing breaks', () => {
     const r = estimateBlastOre({ holes: [HOLE], charges: {} }, [makeSurvey()], grid);
     expect(r.coverage).toBe(0);
     expect(Number.isNaN(r.coverage)).toBe(false);
+    expect(r.brokenVoxels).toBe(0);
+    expect(r.charged).toBe(false);
   });
 
   it('coverage is 1 under a survey covering the whole blast', () => {
@@ -502,11 +513,11 @@ describe('estimateBlastOre — value and survey coverage (#1960)', () => {
   });
 
   it('coverage is 0 when the survey covers no blast column', () => {
-    expect(estimateBlastOre(PLAN, [makeSurvey({ min: 0, max: 3 })], grid).coverage).toBe(0);
+    expect(estimateBlastOre(PLAN, [makeSurvey({ min: 0, max: 3, centerX: 0, centerZ: 0 })], grid).coverage).toBe(0);
   });
 
   it('coverage is strictly between 0 and 1 when the survey covers part of the broken volume', () => {
-    const r = estimateBlastOre(PLAN, [makeSurvey({ min: 20, max: 39 })], grid);
+    const r = estimateBlastOre(PLAN, [makeSurvey({ min: 20, max: 39, centerX: 40, centerZ: 20 })], grid);
     expect(r.coverage).toBeGreaterThan(0);
     expect(r.coverage).toBeLessThan(1);
   });
@@ -515,7 +526,7 @@ describe('estimateBlastOre — value and survey coverage (#1960)', () => {
     const holes: DrillHole[] = [];
     for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) holes.push(makeHole(`H${r}${c}`, 12 + 8 * c, 20 + 2 * r));
     const plan = chargedPlan(holes);
-    const half = estimateBlastOre(plan, [makeSurvey({ min: 0, max: 20 })], grid);
+    const half = estimateBlastOre(plan, [makeSurvey({ min: 0, max: 20, centerX: 0, centerZ: 22 })], grid);
     const full = estimateBlastOre(plan, [makeSurvey()], grid);
     expect(half.coverage).toBeGreaterThan(0);
     expect(half.coverage).toBeLessThan(1);
@@ -548,10 +559,155 @@ describe('estimateBlastOre — value and survey coverage (#1960)', () => {
   });
 
   it('coverage stays within 0..1', () => {
-    for (const surveys of [[], [makeSurvey()], [makeSurvey({ min: 20, max: 39 })]]) {
+    for (const surveys of [[], [makeSurvey()], [makeSurvey({ min: 20, max: 39, centerX: 40, centerZ: 20 })]]) {
       const c = estimateBlastOre(PLAN, surveys, grid).coverage;
       expect(c).toBeGreaterThanOrEqual(0);
       expect(c).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe('estimateBlastOre — coverage is disc membership, barren or not (#1967)', () => {
+  const grid = makeGrid();
+  /** A fresh disc centred on the blast whose survey recorded no ore column at all. */
+  const barrenSurvey = (opts: SurveyOpts = {}): SurveyResult => makeSurvey({ min: 1, max: 0, ...opts });
+
+  function pattern3x3(): BlastPlan {
+    const holes: DrillHole[] = [];
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) holes.push(makeHole(`H${r}${c}`, 16 + 4 * c, 16 + 4 * r));
+    return chargedPlan(holes);
+  }
+
+  it('a pattern wholly inside a fresh disc over partly barren ground has coverage 1', () => {
+    const partlyBarren = makeSurvey({ min: 20, max: 39 });
+    const r = estimateBlastOre(pattern3x3(), [partlyBarren], grid);
+    expect(r.coverage).toBe(1);
+    expect(r.value).toBeGreaterThan(0);
+  });
+
+  it('partly barren ground values only the ore columns', () => {
+    const plan = pattern3x3();
+    const part = estimateBlastOre(plan, [makeSurvey({ min: 20, max: 39 })], grid);
+    const all = estimateBlastOre(plan, [makeSurvey()], grid);
+    expect(part.value).toBeLessThan(all.value);
+  });
+
+  it('a surveyed barren pattern has coverage 1 and value 0', () => {
+    const r = estimateBlastOre(pattern3x3(), [barrenSurvey()], grid);
+    expect(r.coverage).toBe(1);
+    expect(r.value).toBe(0);
+    expect(r.brokenVoxels).toBeGreaterThan(0);
+  });
+
+  it('a single hole in a barren disc has coverage 1 and value 0', () => {
+    const r = estimateBlastOre(PLAN, [barrenSurvey()], grid);
+    expect(r.coverage).toBe(1);
+    expect(r.value).toBe(0);
+  });
+
+  it('a core sample (radius 0) covers only its own column', () => {
+    const core = barrenSurvey({ method: 'core_sample', centerX: 20, centerZ: 20 });
+    const r = estimateBlastOre(PLAN, [core], grid);
+    expect(r.coverage).toBeGreaterThan(0);
+    expect(r.coverage).toBeLessThan(1);
+  });
+
+  it('a barren disc over part of the pattern gives partial coverage', () => {
+    const r = estimateBlastOre(pattern3x3(), [barrenSurvey({ centerX: 0, centerZ: 18 })], grid);
+    expect(r.coverage).toBeGreaterThan(0);
+    expect(r.coverage).toBeLessThan(1);
+  });
+
+  it('a disc elsewhere leaves the pattern uncovered', () => {
+    const r = estimateBlastOre(pattern3x3(), [barrenSurvey({ centerX: 0, centerZ: 0 })], grid);
+    expect(r.coverage).toBe(0);
+  });
+
+  it('a stale disc covers nothing', () => {
+    const stale = { ...barrenSurvey(), stale: true };
+    const r = estimateBlastOre(pattern3x3(), [stale], grid);
+    expect(r.coverage).toBe(0);
+    expect(r.holeCoverage).toBe(0);
+  });
+
+  it('an older fresh disc covers where a newer stale one does not', () => {
+    const older = barrenSurvey({ id: 1, completedTick: 10 });
+    const newerStale = { ...barrenSurvey({ id: 2, completedTick: 20 }), stale: true };
+    expect(estimateBlastOre(pattern3x3(), [older, newerStale], grid).coverage).toBe(1);
+  });
+});
+
+describe('estimateBlastOre — charged, brokenVoxels and holeCoverage (#1967)', () => {
+  const grid = makeGrid();
+
+  it('a charged plan that breaks rock reports charged and a positive broken count', () => {
+    const r = estimateBlastOre(PLAN, [makeSurvey()], grid);
+    expect(r.charged).toBe(true);
+    expect(r.brokenVoxels).toBeGreaterThan(0);
+  });
+
+  it('brokenVoxels equals the fragmented voxel count of the plan\'s own field', () => {
+    const field = buildPlanEnergyField(PLAN, grid, new Set())!;
+    const expected = identifyFragmentedVoxels(field, grid, false).fragmented.length;
+    expect(estimateBlastOre(PLAN, [], grid).brokenVoxels).toBe(expected);
+    expect(estimateBlastOre(PLAN, [makeSurvey()], grid).brokenVoxels).toBe(expected);
+  });
+
+  it('holes with no charges are not charged and break nothing', () => {
+    const r = estimateBlastOre({ holes: [HOLE], charges: {} }, [makeSurvey()], grid);
+    expect(r.charged).toBe(false);
+    expect(r.brokenVoxels).toBe(0);
+  });
+
+  it('an empty plan is not charged and has no hole coverage', () => {
+    const r = estimateBlastOre(assembleBlastPlan([], {}), [makeSurvey()], grid);
+    expect(r.charged).toBe(false);
+    expect(r.holeCoverage).toBe(0);
+  });
+
+  it('a charge too weak for the rock is charged with nothing broken', () => {
+    const weak = chargedPlan([HOLE], 0.5, 'pop_rock');
+    const field = buildPlanEnergyField(weak, grid, new Set());
+    expect(field).not.toBeNull();
+    expect(identifyFragmentedVoxels(field!, grid, false).fragmented).toHaveLength(0);
+    const r = estimateBlastOre(weak, [makeSurvey()], grid);
+    expect(r.charged).toBe(true);
+    expect(r.brokenVoxels).toBe(0);
+    expect(r.coverage).toBe(0);
+    expect(r.holeCoverage).toBe(1);
+  });
+
+  it('an unsurveyed weak charge is still charged with nothing broken', () => {
+    const r = estimateBlastOre(chargedPlan([HOLE], 0.5, 'pop_rock'), [], grid);
+    expect(r.charged).toBe(true);
+    expect(r.brokenVoxels).toBe(0);
+    expect(r.holeCoverage).toBe(0);
+  });
+
+  it('holeCoverage is 1 when every hole column lies inside a fresh disc', () => {
+    const holes = [makeHole('A', 16, 16), makeHole('B', 24, 24)];
+    expect(estimateBlastOre({ holes, charges: {} }, [makeSurvey({ min: 1, max: 0 })], grid).holeCoverage).toBe(1);
+  });
+
+  it('holeCoverage is the share of hole columns inside a fresh disc', () => {
+    const holes = [makeHole('A', 10, 20), makeHole('B', 11, 20), makeHole('C', 30, 20), makeHole('D', 31, 20)];
+    const survey = makeSurvey({ method: 'seismic', centerX: 0, centerZ: 20 });
+    expect(estimateBlastOre({ holes, charges: {} }, [survey], grid).holeCoverage).toBe(0.5);
+  });
+
+  it('holeCoverage counts barren discs, with or without charges', () => {
+    const barren = makeSurvey({ min: 1, max: 0 });
+    expect(estimateBlastOre({ holes: [HOLE], charges: {} }, [barren], grid).holeCoverage).toBe(1);
+    expect(estimateBlastOre(PLAN, [barren], grid).holeCoverage).toBe(1);
+  });
+
+  it('holeCoverage ignores stale surveys', () => {
+    const stale = { ...makeSurvey(), stale: true };
+    expect(estimateBlastOre({ holes: [HOLE], charges: {} }, [stale], grid).holeCoverage).toBe(0);
+  });
+
+  it('holeCoverage is 0 when the disc lies elsewhere', () => {
+    const away = makeSurvey({ centerX: 0, centerZ: 0 });
+    expect(estimateBlastOre({ holes: [HOLE], charges: {} }, [away], grid).holeCoverage).toBe(0);
   });
 });
