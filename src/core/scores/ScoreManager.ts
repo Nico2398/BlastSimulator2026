@@ -123,6 +123,12 @@ function wellBeingDelta(wellBeing: number, buildingWb: number, inputs: ScoreInpu
   return gain * headroom + negativeBuilding - moraleLoss - drag;
 }
 
+/** Safety score the site is pulled towards given its building safety effect and equipment. */
+export function safetyTarget(_buildingSafety: number, _hasEquipment: boolean): number {
+  // TODO: implement
+  return undefined as unknown as number;
+}
+
 /**
  * Update scores based on current inputs. Mutates state.
  * Each tick, building effects are applied and then scores decay towards neutral.

@@ -81,6 +81,18 @@ export function buildingCardTooltip(def: BuildingDef): string {
   ].join('\n');
 }
 
+/** Lines naming the score effects a building has (safety, well-being, ...), for its card. */
+export function buildingScoreEffectLines(_def: BuildingDef): string[] {
+  // TODO: implement
+  return [];
+}
+
+/** Score effects of a building joined into one card string. */
+export function buildingCardEffects(_def: BuildingDef): string {
+  // TODO: implement
+  return '';
+}
+
 /** Capacity of a vehicle role with its work unit, e.g. "2 holes/h". */
 export function vehicleCapacityText(role: VehicleRole, capacity: number): string {
   const unitKey = VEHICLE_WORK_UNIT_KEY[role];
