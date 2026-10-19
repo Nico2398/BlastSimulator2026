@@ -3,7 +3,7 @@
 
 import { oreContractBasePrice, resolveMarket, type MarketId, type MarketRange } from './Market.js';
 import { Random } from '../math/Random.js';
-import type { BuyerTierId } from './BuyerTiers.js';
+import { buyerDeadlineRange, buyerPriceFactor, buyerSupplyQtyRange, pickBuyerTier, type BuyerTier, type BuyerTierId } from './BuyerTiers.js';
 import type { ScriptedOreSaleOffer } from '../config/balance.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
@@ -128,7 +128,6 @@ export function generateContracts(
   /** Mine grade selecting the unlocked buyer tiers (#1929). */
   buyerGrade?: number,
 ): void {
-  void buyerGrade;
   // Only refresh if enough time has passed
   if (currentTick - state.lastRefreshTick < CONTRACT_REFRESH_INTERVAL && state.available.length > 0) return;
 
@@ -138,7 +137,7 @@ export function generateContracts(
 
   // A refresh may add fewer offers than CONTRACTS_PER_REFRESH: a rubble-only site with too little barren rock offers nothing.
   for (let i = 0; i < CONTRACTS_PER_REFRESH; i++) {
-    const offer = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg);
+    const offer = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg, buyerGrade);
     if (offer) state.available.push(offer);
   }
   state.lastRefreshTick = currentTick;
@@ -148,8 +147,7 @@ export function generateContracts(
 export function offerSpecialContract(
   state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number, buyerGrade?: number,
 ): Contract | null {
-  void buyerGrade;
-  const contract = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg);
+  const contract = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg, buyerGrade);
   if (!contract) return null;
   if (state.available.length >= MAX_AVAILABLE_CONTRACTS) state.available.shift();
   state.available.push(contract);
@@ -169,36 +167,56 @@ function commonOres(ores: readonly string[], market: MarketId | undefined): stri
  * (#1892); when the stock is under the market's smallest rubble quantity the roll becomes an ore sale.
  */
 function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number, buyerGrade?: number): Contract | null {
-  void buyerGrade;
   const profile = resolveMarket(state.market);
   const typeRoll = rng.nextFloat(0, 1);
   // A site whose rocks yield no ore has nothing to sell or supply: rubble only.
   const rubbleOnly = availableOres.length === 0;
-  if (!rubbleOnly && typeRoll < 0.5) return generateOreSaleOffer(state, rng, priceMultiplier, availableOres);
-  if (rubbleOnly || typeRoll < 0.8) return generateRubbleOffer(state, rng, priceMultiplier, availableOres, rubbleStockKg);
+  if (!rubbleOnly && typeRoll < 0.5) return generateOreSaleOffer(state, rng, priceMultiplier, availableOres, buyerGrade);
+  if (rubbleOnly || typeRoll < 0.8) return generateRubbleOffer(state, rng, priceMultiplier, availableOres, rubbleStockKg, buyerGrade);
 
   // Supply contract (larger quantity, lower price, longer deadline)
   const market = state.market;
+  const buyer = tieredBuyer(state, rng, buyerGrade);
   const materialId = rng.pick(commonOres(availableOres, market)); // Only the site's cheapest ores for supply
+  if (buyer) {
+    const qty = buyerSupplyQtyRange(buyer, profile.supplyQtyKg);
+    const base = oreContractBasePrice(materialId, market) * buyerPriceFactor(buyer, 'supply', rng);
+    const offer = rollOffer(state, rng, priceMultiplier, 'supply', materialId, `Supply ${materialId} (bulk)`, base, qty, buyerDeadlineRange(qty.max, buyer.refHaulKgPerTick), buyer.stepKg);
+    offer.buyerTier = buyer.id;
+    return offer;
+  }
   const basePricePerKg = oreContractBasePrice(materialId, market) * rng.nextFloat(profile.supplyPriceFactor.min, profile.supplyPriceFactor.max);
-  return rollOffer(state, rng, priceMultiplier, 'supply', materialId, `Supply ${materialId} (bulk)`, basePricePerKg, profile.supplyQtyKg, profile.supplyDeadlineTicks);
+  return rollOffer(state, rng, priceMultiplier, 'supply', materialId, `Supply ${materialId} (bulk)`, basePricePerKg, profile.supplyQtyKg, profile.supplyDeadlineTicks, profile.qtyStepKg);
+}
+
+/** The buyer tier posting a progression-site offer (one draw); undefined on the legacy market or without a grade. */
+function tieredBuyer(state: ContractState, rng: Random, buyerGrade: number | undefined): BuyerTier | undefined {
+  if (buyerGrade === undefined || state.market !== 'production') return undefined;
+  return pickBuyerTier(rng, buyerGrade);
 }
 
 /** An ore-sale offer for one of the site's ores. */
 function generateOreSaleOffer(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], buyerGrade?: number): Contract {
-  void buyerGrade;
   const market = state.market;
   const profile = resolveMarket(market);
+  const buyer = tieredBuyer(state, rng, buyerGrade);
   const materialId = rng.pick(availableOres);
+  const description = `Deliver ${materialId} ore`;
+  if (buyer) {
+    const base = oreContractBasePrice(materialId, market) * buyerPriceFactor(buyer, 'ore_sale', rng);
+    const offer = rollOffer(state, rng, priceMultiplier, 'ore_sale', materialId, description, base, buyer.oreSaleQtyKg, buyerDeadlineRange(buyer.oreSaleQtyKg.max, buyer.refHaulKgPerTick), buyer.stepKg);
+    offer.buyerTier = buyer.id;
+    return offer;
+  }
   const basePricePerKg = oreContractBasePrice(materialId, market) * rng.nextFloat(profile.oreSalePriceFactor.min, profile.oreSalePriceFactor.max);
-  return rollOffer(state, rng, priceMultiplier, 'ore_sale', materialId, `Deliver ${materialId} ore`, basePricePerKg, profile.oreSaleQtyKg, LEGACY_OFFER_DEADLINE_TICKS);
+  return rollOffer(state, rng, priceMultiplier, 'ore_sale', materialId, description, basePricePerKg, profile.oreSaleQtyKg, LEGACY_OFFER_DEADLINE_TICKS, profile.qtyStepKg);
 }
 
 /** Roll quantity and deadline for an ore offer whose material and base price are already drawn. */
 function rollOffer(
   state: ContractState, rng: Random, priceMultiplier: number,
   type: ContractType, materialId: string, description: string, basePricePerKg: number,
-  qtyRange: MarketRange, deadlineRange: MarketRange,
+  qtyRange: MarketRange, deadlineRange: MarketRange, qtyStepKg: number,
 ): Contract {
   // The level's multiplier is what its market PAYS for delivered material, so
   // it scales the price and the early-delivery bonus that rides on it. The
@@ -209,7 +227,6 @@ function rollOffer(
   // least able to absorb it — tutorial_pit runs at 16.0, where a single
   // 500kg gloomium contract nobody can fill would fine a $340,000 mine
   // $250,000 for the mistake the tutorial exists to let a player make.
-  const { qtyStepKg } = resolveMarket(state.market);
   const quantityKg = Math.round(rng.nextFloat(qtyRange.min, qtyRange.max) / qtyStepKg) * qtyStepKg;
   const deadlineTicks = rng.nextInt(deadlineRange.min, deadlineRange.max);
   return buildOffer(state, type, materialId, description, quantityKg, deadlineTicks, basePricePerKg, priceMultiplier);
@@ -221,7 +238,7 @@ function rollOffer(
  * Stock under the market minimum re-rolls as an ore sale; a rubble-only site then has no offer (null).
  */
 function generateRubbleOffer(
-  state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number,
+  state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number, buyerGrade?: number,
 ): Contract | null {
   const profile = resolveMarket(state.market);
   const paid = rng.chance(RUBBLE_PAID_OFFER_CHANCE);
@@ -233,7 +250,7 @@ function generateRubbleOffer(
   if (quantityKg < range.min) {
     if (availableOres.length === 0) return null;
     rng.nextFloat(0, 1); // keeps the RNG stream of the earlier fallback (it re-rolled the offer type), so recorded scenario timelines hold
-    return generateOreSaleOffer(state, rng, priceMultiplier, availableOres);
+    return generateOreSaleOffer(state, rng, priceMultiplier, availableOres, buyerGrade);
   }
   const deadlineTicks = rng.nextInt(LEGACY_OFFER_DEADLINE_TICKS.min, LEGACY_OFFER_DEADLINE_TICKS.max);
   const fee = paid ? rng.nextFloat(profile.rubbleFeePerKg.min, profile.rubbleFeePerKg.max) : 0;
