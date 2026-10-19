@@ -1,5 +1,5 @@
 import type { VehicleDef, VehicleRole } from '../core/entities/Vehicle.js';
-import { getFootprintSize, type BuildingDef, type BuildingType } from '../core/entities/Building.js';
+import { getFootprintSize, nonZeroScoreEffects, type BuildingDef, type BuildingType } from '../core/entities/Building.js';
 import { t } from '../core/i18n/I18n.js';
 import { DRILL_RIG_MAX_DEPTH_M } from '../core/config/balance.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
@@ -78,7 +78,19 @@ export function buildingCardTooltip(def: BuildingDef): string {
     t('ui.build.tip.footprint', { w: sizeX, h: sizeZ }),
     ...(unitKey ? [t('ui.build.tip.capacity', { value: num(def.capacity), unit: t(unitKey) })] : []),
     t('ui.build.tip.upkeep', { cost: formatPerHour(def.operatingCostPerTick) }),
+    ...buildingScoreEffectLines(def),
   ].join('\n');
+}
+
+/** Lines naming the score effects a building has (safety, well-being, ...), for its card. */
+export function buildingScoreEffectLines(def: BuildingDef): string[] {
+  return nonZeroScoreEffects(def).map(({ id, amount }) =>
+    t('ui.build.tip.score', { score: t(`score.${id}`), value: `${amount > 0 ? '+' : '-'}${num(Math.abs(amount))}` }));
+}
+
+/** Score effects of a building joined into one card string. */
+export function buildingCardEffects(def: BuildingDef): string {
+  return buildingScoreEffectLines(def).join(', ');
 }
 
 /** Capacity of a vehicle role with its work unit, e.g. "2 holes/h". */

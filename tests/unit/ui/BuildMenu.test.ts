@@ -25,7 +25,7 @@ import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { t } from '../../../src/core/i18n/I18n.js';
-import { buildingCardLine, buildingCardTooltip } from '../../../src/ui/catalogCardText.js';
+import { buildingCardLine, buildingCardTooltip, buildingCardEffects, buildingScoreEffectLines } from '../../../src/ui/catalogCardText.js';
 import type { ClaimRefusalReason } from '../../../src/core/world/PlayableArea.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
 import { RAMP_DEFAULT_WIDTH, RESEARCH_TASK_DEFS } from '../../../src/core/config/balance.js';
@@ -1276,6 +1276,60 @@ describe('BuildMenu — catalog card text and tooltip (#1377)', () => {
       titles.push(row.title);
     }
     expect(titles[0]).not.toBe(titles[1]);
+  });
+});
+
+describe('BuildMenu — safety effect on the card (#1977)', () => {
+  let container: HTMLDivElement;
+  let menu: BuildMenu;
+
+  beforeEach(() => {
+    ({ container, menu } = setupMenu());
+    menu.update(makeMockState());
+  });
+
+  afterEach(() => {
+    menu.dispose();
+    container.remove();
+  });
+
+  const rowOf = (type: BuildingType): HTMLElement => container.querySelector<HTMLElement>(`[data-build-type="${type}"]`)!;
+
+  it('the explosive warehouse card shows a negative safety effect in a visible span and in the title', () => {
+    const row = rowOf('explosive_warehouse');
+    const span = row.querySelector('.bs-build-effects');
+    expect(span).not.toBeNull();
+    expect(span!.textContent).toMatch(/[-\u2212]1/);
+    expect(span!.textContent).toContain(t('score.safety'));
+    expect(span!.textContent).toBe(buildingCardEffects(getBuildingDef('explosive_warehouse', 1)));
+    expect(row.title).toContain(span!.textContent!.split('\n')[0]!);
+  });
+
+  it('the management office card shows +2 safety', () => {
+    const row = rowOf('management_office');
+    const span = row.querySelector('.bs-build-effects')!;
+    expect(span.textContent).toContain('+2');
+    expect(span.textContent).toContain(t('score.safety'));
+    expect(row.title).toContain('+2');
+  });
+
+  it('changing the tier selector updates the effects span and title', () => {
+    const row = rowOf('management_office');
+    const tierSel = row.querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
+    for (const tier of [3, 1] as BuildingTier[]) {
+      tierSel.value = String(tier);
+      tierSel.dispatchEvent(new Event('change'));
+      const def = getBuildingDef('management_office', tier);
+      expect(row.querySelector('.bs-build-effects')!.textContent).toBe(buildingCardEffects(def));
+      expect(row.querySelector('.bs-build-effects')!.textContent).toContain(`+${def.scoreEffects.safety}`);
+      for (const line of buildingScoreEffectLines(def)) expect(row.title).toContain(line);
+    }
+  });
+
+  it('a building without score effects has an empty effects span', () => {
+    const row = rowOf('driving_center');
+    const span = row.querySelector('.bs-build-effects');
+    expect(span === null || span.textContent === '').toBe(true);
   });
 });
 

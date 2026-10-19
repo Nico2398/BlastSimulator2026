@@ -86,6 +86,15 @@ export interface BuildingDef {
 export { BUILDING_DEFS };
 
 /** Look up the definition for a building type and tier (defaults to tier 1). */
+/** Score effects a building has: finite, non-zero `{ id, amount }` pairs. */
+export function nonZeroScoreEffects(def: BuildingDef): Array<{ id: ScoreId; amount: number }> {
+  const effects: Array<{ id: ScoreId; amount: number }> = [];
+  for (const [id, amount] of Object.entries(def.scoreEffects) as Array<[ScoreId, number | undefined]>) {
+    if (typeof amount === 'number' && Number.isFinite(amount) && amount !== 0) effects.push({ id, amount });
+  }
+  return effects;
+}
+
 export function getBuildingDef(type: BuildingType, tier: BuildingTier = 1): BuildingDef {
   return BUILDING_DEFS[type][tier];
 }
