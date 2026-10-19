@@ -195,7 +195,7 @@ Budget by **how many copies are drawn**, not by how important the model feels. A
 | Rocks, houses | hundreds | 1 280 / 216 – 348 | |
 | `prop_twister` | a handful | 5.8 k | not instanced |
 
-File budget, asserted by `ModelAssets.test.ts`: **≤ 400 KB per `.glb`**, ≤ 4 MB gzipped across every asset (what a host actually serves), ≤ 16 MB raw. Current set: 93 models (sizes below measured at 90, before the charging trucks): 10.3 MB raw, 2.0 MB compressed.
+File budget, asserted by `ModelAssets.test.ts`: **≤ 400 KB per `.glb`**, ≤ 4 MB gzipped across every asset (what a host actually serves), ≤ 16 MB raw. Current set: 97 models (sizes below measured at 90, before the charging trucks and vanity projects): 10.3 MB raw, 2.0 MB compressed.
 
 Where the triangles go:
 
