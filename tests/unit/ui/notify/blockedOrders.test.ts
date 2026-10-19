@@ -169,3 +169,56 @@ describe('describeBlockedReasons', () => {
     expect(lines[1]).toContain('nobody able to do them');
   });
 });
+
+describe('barren-overflow storage phrase (#2018)', () => {
+  it('names the rubble contract, another heap, the count and the grouped kg', () => {
+    const [line] = describeBlockedReasons({ storage_full: 2404 }, BLOCKED_PHRASE_LINES, 48_000);
+    expect(line).toContain('2,404');
+    expect(line).toContain('48,000');
+    expect(line).toContain('rubble contract');
+    expect(line).toContain('another heap');
+    expect(line).not.toContain('sell ore');
+  });
+
+  it('keeps today\'s phrase at 0 and when omitted', () => {
+    const today = describeBlockedReasons({ storage_full: 5 });
+    expect(describeBlockedReasons({ storage_full: 5 }, BLOCKED_PHRASE_LINES, 0)).toEqual(today);
+    expect(today[0]).toContain('sell ore or build a Freight Warehouse');
+  });
+
+  it('blockedPhrase takes the barren kg for the storage kind only', () => {
+    expect(blockedPhrase({ kind: 'storage_full', count: 3 }, 12_000)).toContain('12,000');
+    expect(blockedPhrase({ kind: 'storage_full', count: 3 })).toContain('sell ore');
+    expect(blockedPhrase({ kind: 'spoil_heap_full', count: 3 }, 12_000)).toBe(blockedPhrase({ kind: 'spoil_heap_full', count: 3 }));
+    expect(blockedPhrase({ kind: 'spoil_heap_full', count: 3 }, 12_000)).not.toContain('12,000');
+  });
+
+  it('leaves other kinds, order and the max cut unchanged', () => {
+    const counts = { storage_full: 10, no_licensed_driver: 9, target_unreachable: 8, no_spoil_heap: 7 };
+    const plain = describeBlockedReasons(counts);
+    const barren = describeBlockedReasons(counts, BLOCKED_PHRASE_LINES, 5_000);
+    expect(barren).toHaveLength(3);
+    expect(barren[0]).toContain('5,000');
+    expect(barren.slice(1)).toEqual(plain.slice(1));
+    expect(describeBlockedReasons(counts, 1, 5_000)).toHaveLength(1);
+  });
+
+  it('ignores barren kg when no storage_full order is blocked', () => {
+    const counts = { no_licensed_driver: 3, spoil_heap_full: 2 };
+    expect(describeBlockedReasons(counts, BLOCKED_PHRASE_LINES, 9_000)).toEqual(describeBlockedReasons(counts));
+  });
+
+  it('keeps the barren line in its largest-first slot', () => {
+    const lines = describeBlockedReasons({ no_licensed_driver: 30, storage_full: 2 }, BLOCKED_PHRASE_LINES, 7_000);
+    expect(lines[0]).toContain('nobody able to do them');
+    expect(lines[1]).toContain('7,000');
+  });
+
+  it('has the French strings with both placeholders', () => {
+    setLocale('fr');
+    const [line] = describeBlockedReasons({ storage_full: 2404 }, BLOCKED_PHRASE_LINES, 48_000);
+    expect(line).toContain('2,404');
+    expect(line).toContain('48,000');
+    expect(line).not.toContain('{');
+  });
+});
