@@ -2313,10 +2313,12 @@
           "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 1,
-          "surveyCount": 3,
-          "safety": 9.963432462510202
+          "surveyCount": 3
         },
-        "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met. #1977: safety re-measured 0 -> 9.963432462510202 (safety is now a managed target score: pulled towards safetyTarget, accidents knock it down, no neutral decay; command mode, deterministic)"
+        "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met. #1977: safety is now a managed target score (pulled 2%/tick towards 50+12*building effects, +5 with an office, clamped 10..90; each accident in the last 10 ticks knocks 5 off), so the exact value after the mass-casualty blast depends on how many accident ticks the run lands inside the window and differs between command mode (9.96) and interaction mode (24.33). The pin is therefore a ceiling: 12 fresh deaths must hold safety far under the ~50 equilibrium target of this bare site. Ceiling 35 = under both measured values with margin, well under the target.",
+        "atMost": {
+          "safety": 35
+        }
       },
       "description": "#1186: safety re-measured, 50 -> 0. Not a new incident -- deathCount stays 12, unchanged from pattern 1's own blast, and the blast's own fragmentedCount/detachedCount/liftedCount/projectionCount are byte-identical to origin/main (direct-verified). The cause is entirely upstream, at the 'tick 6' step: main's own PRNG stream happened to queue a pending event on the very first sub-tick after the blast, freezing tickCount there (0 of 6 ticks actually ran) before TickPipeline's own recentAccidents penalty (ScoreManager.ts: `sfDelta -= recentAccidents * 5`, a 10-tick lookback window) ever got a chance to see the 12 fresh death accidents from that same blast. This branch's SurveyCalc.ts fix (see the 'tick 6' step's own description) shifts the PRNG stream enough that no event happens to be pending there any more, so all 6 real ticks run for the first time -- and recentAccidents=12 (or more, counting destroyed vehicles) applied every one of those ticks crashes safety to its floor almost immediately, exactly as the formula says it should for a blast that just killed 12 of 15 employees. Re-measured, not loosened: the old 'safety: 50' value was only ever a byproduct of main's own tick call freezing at 0 ticks by coincidence, not of the blast being any less catastrophic."
     },
@@ -2357,12 +2359,14 @@
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "safety": 9.963432462510202,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met. #1977: safety re-measured 0 -> 9.963432462510202 (safety is now a managed target score: pulled towards safetyTarget, accidents knock it down, no neutral decay; command mode, deterministic)"
+        "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met. #1977: safety is now a managed target score (pulled 2%/tick towards 50+12*building effects, +5 with an office, clamped 10..90; each accident in the last 10 ticks knocks 5 off), so the exact value after the mass-casualty blast depends on how many accident ticks the run lands inside the window and differs between command mode (9.96) and interaction mode (24.33). The pin is therefore a ceiling: 12 fresh deaths must hold safety far under the ~50 equilibrium target of this bare site. Ceiling 35 = under both measured values with margin, well under the target.",
+        "atMost": {
+          "safety": 35
+        }
       },
       "description": "Final checkpoint: the level has ended as a real win -- 'completed', not bankrupt, not revolted, profit at the $800,000 threshold; the mine is frozen (#1313) so nothing moves after the force-win."
     }
