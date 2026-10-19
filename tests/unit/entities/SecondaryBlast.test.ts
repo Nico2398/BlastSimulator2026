@@ -4,6 +4,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   secondaryBlastRadiusM,
+  secondaryBlastEventFor,
+  secondaryCraterPlan,
   resolveSecondaryBlasts,
   type SecondaryBlastEvent,
 } from '../../../src/core/entities/SecondaryBlast.js';
@@ -12,12 +14,15 @@ import { createBuildingState, placeBuilding, buildingCenter, getBuildingDef } fr
 import { createVehicleState, purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { VoxelGrid, computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
+import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
 import {
   SECONDARY_BLAST_RADIUS_BASE_M,
   SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M,
   SECONDARY_BLAST_RADIUS_MAX_M,
   SECONDARY_BLAST_DEATH_RADIUS_FRACTION,
   SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION,
+  SECONDARY_BLAST_CRATER_HOLE_DEPTH_M,
 } from '../../../src/core/config/balance.js';
 
 const GRID = 128;
@@ -33,7 +38,7 @@ function makeWorld() {
 }
 
 function event(kg: number, x = 60, z = 60, buildingId = 99): SecondaryBlastEvent {
-  return { buildingId, x, z, explosivesKg: kg };
+  return { buildingId, x, z, explosivesKg: kg, stock: { boomite: kg } };
 }
 
 describe('secondaryBlastRadiusM', () => {
@@ -259,5 +264,144 @@ describe('resolveSecondaryBlasts', () => {
     );
     expect(out.map(o => o.event.buildingId)).toEqual([1, 2]);
     expect(out[1]!.radiusM).toBeGreaterThan(out[0]!.radiusM);
+  });
+});
+
+
+// ── Crater (#1896) ────────────────────────────────────────────────────────────
+
+describe('secondaryBlastEventFor stock (#1896)', () => {
+  it('records the stored kg per explosive', () => {
+    const w = makeWorld();
+    placeBuilding(w.buildings, 'explosive_warehouse', 20, 20, GRID, GRID);
+    const wh = w.buildings.buildings[0]!;
+    wh.storedExplosives = { boomite: 120, krackle: 30 };
+    const ev = secondaryBlastEventFor(wh)!;
+    expect(ev.explosivesKg).toBe(150);
+    expect(ev.stock).toEqual({ boomite: 120, krackle: 30 });
+  });
+
+  it('copies the stock so later changes to the building do not alter the event', () => {
+    const w = makeWorld();
+    placeBuilding(w.buildings, 'explosive_warehouse', 20, 20, GRID, GRID);
+    const wh = w.buildings.buildings[0]!;
+    wh.storedExplosives = { boomite: 100 };
+    const ev = secondaryBlastEventFor(wh)!;
+    wh.storedExplosives.boomite = 0;
+    expect(ev.stock).toEqual({ boomite: 100 });
+  });
+
+  it('yields no event for an empty warehouse, so no crater', () => {
+    const w = makeWorld();
+    placeBuilding(w.buildings, 'explosive_warehouse', 20, 20, GRID, GRID);
+    const wh = w.buildings.buildings[0]!;
+    expect(secondaryBlastEventFor(wh)).toBeNull();
+    wh.storedExplosives = { boomite: 0 };
+    expect(secondaryBlastEventFor(wh)).toBeNull();
+  });
+});
+
+describe('secondaryCraterPlan (#1896)', () => {
+  const ev = (stock: Record<string, number>, x = 20.5, z = 30.5): SecondaryBlastEvent => ({
+    buildingId: 5, x, z, explosivesKg: Object.values(stock).reduce((a, b) => a + b, 0), stock,
+  });
+
+  it('is one hole at the footprint centre column', () => {
+    const plan = secondaryCraterPlan(ev({ boomite: 100 }));
+    expect(plan.holes).toHaveLength(1);
+    expect(Math.floor(plan.holes[0]!.x)).toBe(20);
+    expect(Math.floor(plan.holes[0]!.z)).toBe(30);
+  });
+
+  it('drills SECONDARY_BLAST_CRATER_HOLE_DEPTH_M deep', () => {
+    const plan = secondaryCraterPlan(ev({ boomite: 100 }));
+    expect(plan.holes[0]!.depth).toBe(SECONDARY_BLAST_CRATER_HOLE_DEPTH_M);
+    expect(plan.holes[0]!.diameter).toBeGreaterThan(0);
+  });
+
+  it('charges the hole once, with no stemming', () => {
+    const plan = secondaryCraterPlan(ev({ boomite: 100 }));
+    const id = plan.holes[0]!.id;
+    expect(Object.keys(plan.charges)).toEqual([id]);
+    expect(plan.charges[id]!.stemmingM).toBe(0);
+  });
+
+  it('charges the whole stored mass', () => {
+    const plan = secondaryCraterPlan(ev({ boomite: 300 }));
+    expect(plan.charges[plan.holes[0]!.id]!.amountKg).toBe(300);
+    expect(plan.charges[plan.holes[0]!.id]!.explosiveId).toBe('boomite');
+  });
+
+  it('uses the heaviest stocked explosive and sums every kind into the amount', () => {
+    const plan = secondaryCraterPlan(ev({ krackle: 40, boomite: 120, anfo: 10 }));
+    const charge = plan.charges[plan.holes[0]!.id]!;
+    expect(charge.explosiveId).toBe('boomite');
+    expect(charge.amountKg).toBe(170);
+  });
+
+  it('is deterministic for the same event', () => {
+    expect(secondaryCraterPlan(ev({ boomite: 100 }))).toEqual(secondaryCraterPlan(ev({ boomite: 100 })));
+  });
+
+  it('is carried on every outcome', () => {
+    const w = makeWorld();
+    const out = resolveSecondaryBlasts([event(100, 20, 20, 1), event(400, 90, 90, 2)], w.buildings, w.vehicles, w.employees, w.damage, 7);
+    expect(out).toHaveLength(2);
+    for (const o of out) {
+      expect(o.craterPlan).toEqual(secondaryCraterPlan(o.event));
+      expect(o.craterPlan.holes).toHaveLength(1);
+    }
+    expect(out[1]!.craterPlan.charges[out[1]!.craterPlan.holes[0]!.id]!.amountKg).toBe(400);
+  });
+
+  it('is carried on chained outcomes too', () => {
+    const w = makeWorld();
+    placeBuilding(w.buildings, 'explosive_warehouse', 63, 60, GRID, GRID);
+    const wh = w.buildings.buildings[0]!;
+    wh.storedExplosives = { anfo: 50 };
+    wh.hp = 1;
+    const out = resolveSecondaryBlasts([event(100)], w.buildings, w.vehicles, w.employees, w.damage, 7);
+    expect(out).toHaveLength(2);
+    const chained = out.find(o => o.event.buildingId === wh.id)!;
+    expect(chained.craterPlan.holes).toHaveLength(1);
+    expect(chained.craterPlan.charges[chained.craterPlan.holes[0]!.id]!.explosiveId).toBe('anfo');
+  });
+
+  describe('fired on a grid', () => {
+    function rockGrid(): VoxelGrid {
+      const grid = new VoxelGrid(40, 40);
+      for (let z = 0; z < 40; z++) for (let y = 0; y < 10; y++) for (let x = 0; x < 40; x++) {
+        grid.setVoxel(x, y, z, {
+          composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
+          density: 1.0, oreDensities: {}, fractureModifier: 1.0,
+        });
+      }
+      return grid;
+    }
+    function fire(kg: number) {
+      const grid = rockGrid();
+      const plan = secondaryCraterPlan(ev({ boomite: kg }, 20.5, 20.5));
+      const result = executeBlast(plan, grid, []);
+      return { grid, result };
+    }
+
+    it('breaks rock and lowers the surface at the centre', () => {
+      const before = computeVoxelColumnSurfaceY(rockGrid(), 20, 20)!;
+      const { grid, result } = fire(200);
+      expect(result).not.toBeNull();
+      expect(result!.clearedVoxels).toBeGreaterThan(0);
+      expect(computeVoxelColumnSurfaceY(grid, 20, 20)!).toBeLessThan(before);
+    });
+
+    it('more stock breaks more rock', () => {
+      const small = fire(100).result!;
+      const big = fire(400).result!;
+      expect(big.clearedVoxels).toBeGreaterThan(small.clearedVoxels);
+    });
+
+    it('leaves rock far from the warehouse untouched', () => {
+      const { grid } = fire(100);
+      expect(computeVoxelColumnSurfaceY(grid, 2, 2)).toBe(computeVoxelColumnSurfaceY(rockGrid(), 2, 2));
+    });
   });
 });
