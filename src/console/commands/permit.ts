@@ -1,10 +1,10 @@
-// BlastSimulator2026 — Console command: permit status|apply (#1921)
+// BlastSimulator2026 — Console command: permit status|apply|ack (#1921)
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { applyForGrade, gradeDef, nextGradeTargets, formatGradeAmount, type GradeTargetStatus } from '../../core/economy/MineGrade.js';
+import { acknowledgeApproval, applyForGrade, gradeDef, nextGradeTargets, formatGradeAmount, type GradeTargetStatus } from '../../core/economy/MineGrade.js';
 import { permitRefusalText } from '../../core/economy/permitRefusalText.js';
 import { permitLimitTexts } from '../../core/economy/permitLimitText.js';
 import { requireGame } from './commandUtils.js';
@@ -39,7 +39,7 @@ function permitStatus(ctx: GameContext): CommandResult {
 function permitApply(ctx: GameContext): CommandResult {
   const state = ctx.state!;
   if (!state.grade) return { success: false, output: t('permit.no_ladder') };
-  const result = applyForGrade(state);
+  const result = applyForGrade(state, ctx.emitter);
   if (result.ok) {
     const to = gradeDef(result.toGrade);
     return {
@@ -49,6 +49,14 @@ function permitApply(ctx: GameContext): CommandResult {
   }
   const nextFee = gradeDef(state.grade.grade + 1).fee;
   return { success: false, output: permitRefusalText(result.refusal, result.unmet ?? [], nextFee, state.cash) };
+}
+
+/** Dismisses the approval letter and resumes the clock it paused, unless an event decision still holds it. */
+function permitAck(ctx: GameContext): CommandResult {
+  const state = ctx.state!;
+  if (!state.grade || !acknowledgeApproval(state.grade)) return { success: false, output: t('permit.ack.nothing') };
+  if (!state.events.pendingEvent) state.isPaused = false;
+  return { success: true, output: t('permit.ack.success') };
 }
 
 export function permitCommand(
@@ -61,6 +69,7 @@ export function permitCommand(
   switch (args[0]) {
     case 'status': return permitStatus(ctx);
     case 'apply': return permitApply(ctx);
+    case 'ack': return permitAck(ctx);
     default: return { success: false, output: t('permit.usage') };
   }
 }

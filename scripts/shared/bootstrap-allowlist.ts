@@ -56,8 +56,10 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // the continuous policy elsewhere, restores it afterwards. Exact strings, same reasoning as above.
   'set_policy mode:shift_8h',
   'set_policy mode:shift_8h fatigue:60',
-  // #1921: mine-grade application has no player UI in v1 (the approval ceremony is a later task).
+  // #1921: mine-grade application (the Permit panel also drives it; setup scripts skip the click path).
   'permit apply',
+  // #1926: dismisses the approval letter the player normally closes with the modal's button.
+  'permit ack',
   // #1946: the board of directors is a level option; `board start` attaches one for a scenario (debug only, no UI).
   'board start',
   'weather set',

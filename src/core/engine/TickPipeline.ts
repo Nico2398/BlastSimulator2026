@@ -464,6 +464,8 @@ export function runTick(
     firedEvent = { eventId: fired.eventId };
     state.isPaused = true;
   }
+  // An unseen grade-approval letter holds the clock until the player dismisses it (#1926).
+  if (state.grade?.unseenApproval != null) state.isPaused = true;
 
   return {
     tick: state.tickCount,
