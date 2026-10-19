@@ -1,7 +1,7 @@
 /** Pure grouping model for the Operations work queue (#1972): auto-debris orders collapse into one row per type. */
-import type { PendingAction } from '../../core/state/GameState.js';
+import type { PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { isAutoDebrisAction, type AutoDebrisActionType } from '../../core/economy/HaulDispatch.js';
-import { classifyQueuedBlock, isInTransitBlock } from '../notify/blockedOrders.js';
+import { classifyQueuedBlock, isInTransitBlock, rankBlockedKinds, tallyBlockedReason } from '../notify/blockedOrders.js';
 
 export const DEBRIS_GROUP_PAGE_SIZE = 25;
 
@@ -18,6 +18,8 @@ export interface DebrisGroup {
   blocked: number;
   stranded: number;
   inTransit: number;
+  /** Queued orders per blocked reason (failure reasons drive the cause line). */
+  blockedReasons: Partial<Record<BlockedOrderReason, number>>;
 }
 
 export interface WorkQueueModel {
@@ -36,7 +38,7 @@ export function partitionWorkQueue(actions: readonly PendingAction[]): WorkQueue
     }
     let g = groups.get(a.type);
     if (!g) {
-      g = { type: a.type, ids: [], total: 0, queued: 0, open: 0, assigned: 0, inProgress: 0, blocked: 0, stranded: 0, inTransit: 0 };
+      g = { type: a.type, ids: [], total: 0, queued: 0, open: 0, assigned: 0, inProgress: 0, blocked: 0, stranded: 0, inTransit: 0, blockedReasons: {} };
       groups.set(a.type, g);
     }
     g.ids.push(a.id);
@@ -45,7 +47,9 @@ export function partitionWorkQueue(actions: readonly PendingAction[]): WorkQueue
     else if (a.status === 'in_progress') g.inProgress++;
     else {
       g.queued++;
-      g[classifyQueuedBlock(a)]++;
+      const block = classifyQueuedBlock(a);
+      g[block]++;
+      tallyBlockedReason(g.blockedReasons, a);
     }
   }
   const debris = [...groups.values()];
@@ -56,7 +60,7 @@ export function partitionWorkQueue(actions: readonly PendingAction[]): WorkQueue
 
 /** Counts-only signature of a group (no ids). */
 export function debrisGroupSignature(group: DebrisGroup): string {
-  return `${group.type}:${group.total}:${group.queued}:${group.open}:${group.assigned}:${group.inProgress}:${group.blocked}:${group.stranded}:${group.inTransit}`;
+  return `${group.type}:${group.total}:${group.queued}:${group.open}:${group.assigned}:${group.inProgress}:${group.blocked}:${group.stranded}:${group.inTransit}:${rankBlockedKinds(group.blockedReasons).map(e => `${e.kind}=${e.count}`).join(',')}`;
 }
 
 /** Signature of a list of order rows (player orders, or one expanded debris page); `tick` included for time-dependent display. */

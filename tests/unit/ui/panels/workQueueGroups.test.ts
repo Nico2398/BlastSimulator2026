@@ -109,6 +109,25 @@ describe('partitionWorkQueue', () => {
   });
 });
 
+describe('DebrisGroup.blockedReasons (#2008)', () => {
+  it('tallies queued failure reasons per group', () => {
+    const acts = debris(4).map((a, i) => ({ ...a, blockedReason: i < 3 ? 'storage_full' as const : null }));
+    expect(partitionWorkQueue(acts).debris[0]!.blockedReasons).toEqual({ storage_full: 3 });
+  });
+
+  it('starts empty and excludes stranded and in-transit reasons', () => {
+    expect(partitionWorkQueue(debris(2)).debris[0]!.blockedReasons).toEqual({});
+    const acts = debris(2).map((a, i) => ({ ...a, blockedReason: i === 0 ? 'debris_out_of_reach' as const : 'explosives_in_transit' as const }));
+    expect(partitionWorkQueue(acts).debris[0]!.blockedReasons).toEqual({});
+  });
+
+  it('signature changes when the mix changes at the same total', () => {
+    const mk = (r: 'storage_full' | 'no_spoil_heap') =>
+      partitionWorkQueue(debris(3).map(a => ({ ...a, blockedReason: r }))).debris[0]!;
+    expect(debrisGroupSignature(mk('storage_full'))).not.toBe(debrisGroupSignature(mk('no_spoil_heap')));
+  });
+});
+
 describe('debrisGroupSignature', () => {
   const group = () => partitionWorkQueue(debris(30)).debris[0]!;
 

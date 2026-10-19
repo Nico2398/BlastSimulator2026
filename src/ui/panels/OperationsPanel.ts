@@ -28,7 +28,7 @@ import type { ShiftMode } from '../../core/entities/SitePolicy.js';
 import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 import type { GameConsoleFn } from '../gameConsole.js';
-import { isFailureBlock, isInTransitBlock, classifyQueuedBlock, buildBlockedOrderMessage } from '../notify/blockedOrders.js';
+import { isFailureBlock, isInTransitBlock, classifyQueuedBlock, buildBlockedOrderMessage, countBlockedReasons, describeBlockedReasons, rankBlockedKinds, blockedKindLabel } from '../notify/blockedOrders.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import {
   DEBRIS_GROUP_PAGE_SIZE, partitionWorkQueue, debrisGroupSignature, orderRowsSignature, debrisPageRows,
@@ -63,6 +63,11 @@ export function countQueuedByBlock(
     if (kind !== 'inTransit') counts[kind]++;
   }
   return counts;
+}
+
+/** Failure-block reasons across the queued orders only. */
+function countQueuedBlockedReasons(actions: readonly Pick<PendingAction, 'status' | 'blockedReason'>[]): ReturnType<typeof countBlockedReasons> {
+  return countBlockedReasons(actions.filter(a => a.status === 'queued'));
 }
 
 export class OperationsPanel extends PanelBase {
@@ -175,6 +180,7 @@ export class OperationsPanel extends PanelBase {
       policy: state.sitePolicy.revision,
       // Feeds "Unclaimed Work": counts queued orders the work queue rows leave out (rest).
       unclaimed: countQueuedByBlock(state.pendingActions),
+      blockedReasons: countQueuedBlockedReasons(state.pendingActions),
     }) + `#${playerSig}#${debrisSig}`;
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -257,7 +263,10 @@ export class OperationsPanel extends PanelBase {
     const { open, blocked, stranded } = countQueuedByBlock(state.pendingActions);
     const noteParts: string[] = [];
     if (open > 0 || blocked + stranded === 0) noteParts.push(t('ui.operations.unclaimed_work_note'));
-    if (blocked > 0) noteParts.push(t('ui.operations.unclaimed_work_note_blocked', { blocked }));
+    if (blocked > 0) {
+      const reasons = describeBlockedReasons(countQueuedBlockedReasons(state.pendingActions));
+      noteParts.push(t('ui.operations.unclaimed_work_note_blocked', { reasons: reasons.join('; ') }));
+    }
     if (stranded > 0) noteParts.push(t('ui.operations.unclaimed_work_note_stranded', { stranded }));
     const unclaimedNote = noteParts.join(' ');
 
@@ -313,7 +322,12 @@ export class OperationsPanel extends PanelBase {
     };
     part('in_progress', group.inProgress + group.assigned);
     part('queued', group.open);
-    part('blocked', group.blocked);
+    const topReason = rankBlockedKinds(group.blockedReasons)[0];
+    if (topReason !== undefined && group.blocked > 0) {
+      parts.push(t('ui.operations.work_queue_debris_status_part_blocked_reason', { count: group.blocked, reason: blockedKindLabel(topReason.kind) }));
+    } else {
+      part('blocked', group.blocked);
+    }
     part('stranded', group.stranded);
     part('in_transit', group.inTransit);
 

@@ -754,13 +754,25 @@ describe('OperationsPanel — Unclaimed Work with blocked orders (#1810)', () =>
       blockedFixture(2, 'debris_out_of_reach', { type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler' }),
     ]);
     const text = panel.root.textContent ?? '';
-    expect(text).toContain('1 blocked - waiting on the site');
+    expect(text).toContain('nobody able to do them');
+    expect(text).not.toContain('blocked - waiting on the site');
     expect(text).toContain('1 out of reach - waiting on the site');
     expect(text).not.toContain(UNCLAIMED_NOTE);
   });
 
-  it('i18n has the blocked-note wording with a {blocked} placeholder', () => {
-    expect(t('ui.operations.unclaimed_work_note_blocked', { blocked: 2 })).toContain('2');
+  it('Unclaimed Work note names storage_full with its count instead of the generic site wording (#2008)', () => {
+    const { panel } = renderWith([
+      blockedFixture(1, 'storage_full'), blockedFixture(2, 'storage_full'), blockedFixture(3, 'no_licensed_driver'),
+    ]);
+    const text = panel.root.textContent ?? '';
+    expect(text).toMatch(/warehouse space/i);
+    expect(text).toContain('nobody able to do them');
+    expect(text).not.toContain('waiting on the site, not on a free worker');
+    expect(text.indexOf('warehouse space')).toBeLessThan(text.indexOf('nobody able to do them'));
+  });
+
+  it('i18n has the blocked-note wording with a {reasons} placeholder', () => {
+    expect(t('ui.operations.unclaimed_work_note_blocked', { reasons: 'no truck' })).toContain('no truck');
     expect(t('ui.operations.work_queue_status_stranded')).toBe('Out of reach');
   });
 });
@@ -878,6 +890,28 @@ describe('OperationsPanel — grouped debris queue (#1972)', () => {
     const text = summary(panel, 'haul_debris').textContent ?? '';
     expect(text).toContain(t('ui.operations.work_queue_debris_status_part_blocked', { count: 1 }));
     expect(text).toContain(t('ui.operations.work_queue_debris_status_part_in_transit', { count: 1 }));
+  });
+
+  it('debris group header names the main blocked reason (#2008)', () => {
+    const state = makeState();
+    debrisOrders(state, 'haul_debris', 5, 100);
+    for (const a of state.pendingActions.slice(0, 4)) a.blockedReason = 'storage_full';
+    const { panel } = openPanel(state);
+    expect(summary(panel, 'haul_debris').textContent).toContain('4 blocked (storage full)');
+  });
+
+  it('debris group header rebuilds when the reason mix changes at the same total (#2008)', () => {
+    const state = makeState();
+    debrisOrders(state, 'haul_debris', 4, 100);
+    for (const a of state.pendingActions) a.blockedReason = 'storage_full';
+    const { panel } = openPanel(state);
+    expect(summary(panel, 'haul_debris').textContent).toContain('4 blocked (storage full)');
+    for (const a of state.pendingActions) a.blockedReason = 'no_spoil_heap';
+    panel.update(state);
+    const text = summary(panel, 'haul_debris').textContent ?? '';
+    expect(text).toContain('4 blocked');
+    expect(text).not.toContain('(storage full)');
+    expect(text).toContain('(no spoil heap');
   });
 
   it('gives each debris type its own correct total', () => {
