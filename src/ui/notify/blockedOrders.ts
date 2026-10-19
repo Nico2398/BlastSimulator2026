@@ -93,7 +93,7 @@ export function buildBlockedOrderMessage(action: PendingAction, nowTick?: number
 /** Max cause lines shown for a pile of blocked orders. */
 export const BLOCKED_PHRASE_LINES = 3;
 
-const BLOCKED_PHRASE_KINDS = ['crew_fleet', 'storage_full', 'no_warehouse', 'no_spoil_heap', 'spoil_heap_full', 'unreachable'] as const;
+const BLOCKED_PHRASE_KINDS = ['crew_fleet', 'storage_full', 'no_warehouse', 'no_spoil_heap', 'spoil_heap_full', 'unreachable', 'buried'] as const;
 
 type BlockedPhraseKind = typeof BLOCKED_PHRASE_KINDS[number];
 
@@ -112,7 +112,7 @@ const PHRASE_KIND_BY_REASON: Record<BlockedOrderReason, BlockedPhraseKind | null
   no_spoil_heap: 'no_spoil_heap',
   spoil_heap_full: 'spoil_heap_full',
   target_unreachable: 'unreachable',
-  buried_under_rubble: 'unreachable',
+  buried_under_rubble: 'buried',
   debris_out_of_reach: null,
   explosives_in_transit: null,
 };
