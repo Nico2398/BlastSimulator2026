@@ -73,6 +73,8 @@ export interface EventSystemState {
   cooldownMinIntervalTicks: number | null;
   /** Tick of the most recent union event fire — union events' own cooldown clock (#1907). */
   lastUnionEventTick: number;
+  /** Player actions since the last union event (#1996). */
+  unionActionCountSinceEvent: number;
   /** Union cooldown threshold for the current window, drawn once like cooldownMinIntervalTicks (#1907). Null between windows. */
   unionCooldownMinIntervalTicks: number | null;
   /** Action ids an unqualified_task event has already been raised for (#1380). */
@@ -139,6 +141,7 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     eventFreqMultiplier,
     cooldownMinIntervalTicks: null,
     lastUnionEventTick: 0,
+    unionActionCountSinceEvent: 0,
     unionCooldownMinIntervalTicks: null,
     unionGrievance: 0,
   };
