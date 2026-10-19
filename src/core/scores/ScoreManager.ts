@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Score system
 // Four scores (0-100) that influence events and contracts.
-// Updated each tick based on current game state.
+// Updated each tick based on current game state. Safety is a managed score: it settles at a target set by
+// buildings and equipment (safetyTarget) and accidents knock it down; the other scores decay towards neutral.
 
 import type { ScoreId } from '../entities/Building.js';
 import { getBuildingScoreEffects, type BuildingState } from '../entities/Building.js';
@@ -8,6 +9,12 @@ import {
   ECOLOGY_DUST_PER_TONNE_PER_TICK,
   ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK,
   ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS,
+  SAFETY_ACCIDENT_HIT,
+  SAFETY_EQUIPMENT_TARGET_BONUS,
+  SAFETY_PULL_RATE,
+  SAFETY_TARGET_MAX,
+  SAFETY_TARGET_MIN,
+  SAFETY_TARGET_PER_EFFECT,
   SCORE_DECAY_RATE,
   WB_BUILDING_GAIN,
   WB_NEUTRAL_MORALE,
@@ -124,9 +131,19 @@ function wellBeingDelta(wellBeing: number, buildingWb: number, inputs: ScoreInpu
 }
 
 /** Safety score the site is pulled towards given its building safety effect and equipment. */
-export function safetyTarget(_buildingSafety: number, _hasEquipment: boolean): number {
-  // TODO: implement
-  return undefined as unknown as number;
+export function safetyTarget(buildingSafety: number, hasEquipment: boolean): number {
+  const bSf = Number.isFinite(buildingSafety) ? buildingSafety : 0;
+  const raw = 50 + SAFETY_TARGET_PER_EFFECT * bSf + (hasEquipment ? SAFETY_EQUIPMENT_TARGET_BONUS : 0);
+  return Math.max(SAFETY_TARGET_MIN, Math.min(SAFETY_TARGET_MAX, raw));
+}
+
+/**
+ * Per-tick safety change: a pull towards `safetyTarget` (set by buildings and equipment) minus a hit per recent
+ * accident. Safety settles at the target instead of decaying to neutral, so buildings move the equilibrium.
+ */
+export function safetyDelta(safety: number, buildingSafety: number, inputs: ScoreInputs): number {
+  const target = safetyTarget(buildingSafety, inputs.hasSafetyEquipment);
+  return (target - safety) * SAFETY_PULL_RATE - nonNegative(inputs.recentAccidents) * SAFETY_ACCIDENT_HIT;
 }
 
 /**
@@ -140,11 +157,8 @@ export function updateScores(state: ScoreState, inputs: ScoreInputs): void {
   state.wellBeing = clampScore(state.wellBeing + wellBeingDelta(state.wellBeing, buildingEffects.wellBeing, inputs));
 
   // ── Safety ──
-  // Buildings + accidents + equipment
-  let sfDelta = buildingEffects.safety * 0.1;
-  sfDelta -= inputs.recentAccidents * 5; // Each accident is a big hit
-  if (inputs.hasSafetyEquipment) sfDelta += 0.3;
-  state.safety = clampScore(state.safety + sfDelta);
+  // Pulled towards a building-set target; accidents knock it down. No neutral decay.
+  state.safety = clampScore(state.safety + safetyDelta(state.safety, buildingEffects.safety, inputs));
 
   // ── Ecology ──
   // Spoil heaps (waste management) raise it; vibration and dust from loose
@@ -163,7 +177,6 @@ export function updateScores(state: ScoreState, inputs: ScoreInputs): void {
 
   // Apply decay towards neutral (50), at this state's own per-level rate.
   state.wellBeing = applyDecay(state.wellBeing, state.decayRate);
-  state.safety = applyDecay(state.safety, state.decayRate);
   state.ecology = applyDecay(state.ecology, state.decayRate);
   state.nuisance = applyDecay(state.nuisance, state.decayRate);
 }

@@ -215,6 +215,7 @@ describe('buildingCardTooltip', () => {
           t('ui.build.tip.footprint', { w: sizeX, h: sizeZ }),
           ...(unitKey ? [t('ui.build.tip.capacity', { value: formatMoney(def.capacity), unit: t(unitKey) })] : []),
           t('ui.build.tip.upkeep', { cost: formatPerHour(def.operatingCostPerTick) }),
+          ...buildingScoreEffectLines(def),
         ]);
         const tip = buildingCardTooltip(def);
         expect(tip).not.toMatch(/ui\.build\.tip/);
