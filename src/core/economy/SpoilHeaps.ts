@@ -76,6 +76,30 @@ export function stateRubbleStockKg(
   return rubbleStockKg(state.logistics.fragments, state.buildings.buildings, oreGradeScaleOf(state.world));
 }
 
+/**
+ * Barren kg held in storage when barren rock is at least BARREN_OVERFLOW_STORED_SHARE of the stored mass,
+ * totalSpoilRoomKg(buildings) <= 0 and storedMassKg > 0; otherwise 0.
+ */
+export function barrenOverflowKg(
+  fragments: readonly StoredFragmentLike[],
+  storedMassKg: number,
+  buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[],
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
+): number {
+  // TODO: implement
+  void fragments; void storedMassKg; void buildings; void gradeScale;
+  return 0;
+}
+
+/** barrenOverflowKg for any state slice carrying logistics and buildings (GameState fits). */
+export function stateBarrenOverflowKg(
+  state: { logistics: { fragments: readonly StoredFragmentLike[] }; buildings: { buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[] }; world?: { oreGradeScale?: number } | null },
+): number {
+  // TODO: implement
+  void state;
+  return 0;
+}
+
 /** Remove up to `amountKg` of barren rock from the heaps, in building order; returns the kg removed. */
 export function drawSpoilKg(buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[], amountKg: number): number {
   let remaining = amountKg;
