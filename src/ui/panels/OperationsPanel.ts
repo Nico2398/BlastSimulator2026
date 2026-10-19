@@ -183,6 +183,9 @@ export class OperationsPanel extends PanelBase {
       // Feeds "Unclaimed Work": counts queued orders the work queue rows leave out (rest).
       unclaimed: countQueuedByBlock(state.pendingActions),
       blockedReasons: countQueuedBlockedReasons(state.pendingActions),
+      // Feeds the barren-overflow note: it changes when a heap fills or empties, not only with the queue.
+      barrenOverflow: Math.round(stateBarrenOverflowKg(state)),
+      barrenStored: Math.round(barrenStoredMassKg(state.logistics.fragments, oreGradeScaleOf(state.world))),
     }) + `#${playerSig}#${debrisSig}`;
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;

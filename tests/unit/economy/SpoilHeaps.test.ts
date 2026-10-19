@@ -497,7 +497,13 @@ describe('barrenOverflowKg / stateBarrenOverflowKg (#2018)', () => {
   });
 
   it('is 0 when a heap still has room', () => {
-    expect(barrenOverflowKg([frag(48_000), frag(2_000, ore)], 50_000, [pile(SPOIL_HEAP_CAPACITY_KG - 1), pile(SPOIL_HEAP_CAPACITY_KG)])).toBe(0);
+    expect(barrenOverflowKg([frag(48_000), frag(2_000, ore)], 50_000, [pile(SPOIL_HEAP_CAPACITY_KG - 48_000), pile(SPOIL_HEAP_CAPACITY_KG)])).toBe(0);
+  });
+
+  it('residual room below the smallest barren fragment still overflows; room at it does not', () => {
+    const frags = [frag(3_000), frag(45_000), frag(2_000, ore)];
+    expect(barrenOverflowKg(frags, 50_000, [pile(SPOIL_HEAP_CAPACITY_KG - 2_999)])).toBe(48_000);
+    expect(barrenOverflowKg(frags, 50_000, [pile(SPOIL_HEAP_CAPACITY_KG - 3_000)])).toBe(0);
   });
 
   it('is 0 when nothing is stored', () => {

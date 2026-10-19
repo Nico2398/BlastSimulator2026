@@ -78,7 +78,9 @@ export function stateRubbleStockKg(
 
 /**
  * Barren kg held in storage when barren rock is at least BARREN_OVERFLOW_STORED_SHARE of the stored mass,
- * totalSpoilRoomKg(buildings) <= 0 and storedMassKg > 0; otherwise 0.
+ * storedMassKg > 0 and no heap has room for any stored barren fragment; otherwise 0. Heaps fill in whole
+ * fragments (creditSpoilHeaps), so a heap stops with residual room: the test is the roomiest single heap
+ * against the smallest stored barren fragment, the same fit check releaseBarrenStoredFragments applies.
  */
 export function barrenOverflowKg(
   fragments: readonly StoredFragmentLike[],
@@ -86,8 +88,17 @@ export function barrenOverflowKg(
   buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[],
   gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): number {
-  if (storedMassKg <= 0 || totalSpoilRoomKg(buildings) > 0) return 0;
-  const barren = barrenStoredMassKg(fragments, gradeScale);
+  if (storedMassKg <= 0) return 0;
+  let smallest = Infinity;
+  let barren = 0;
+  for (const f of fragments) {
+    if (!isStoredBarren(f, gradeScale)) continue;
+    barren += f.fragment.mass;
+    smallest = Math.min(smallest, f.fragment.mass);
+  }
+  let roomiest = 0;
+  for (const b of buildings) roomiest = Math.max(roomiest, spoilHeapRoomKg(b));
+  if (roomiest >= smallest) return 0; // some barren fragment still fits a heap
   return barren >= BARREN_OVERFLOW_STORED_SHARE * storedMassKg ? barren : 0;
 }
 
