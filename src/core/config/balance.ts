@@ -2279,6 +2279,12 @@ export const SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION = 0.6;
 /** Fraction of the radius within which people die (#1394). */
 export const SECONDARY_BLAST_DEATH_RADIUS_FRACTION = 0.5;
 
+/** Depth in metres of the single crater hole a secondary blast fires (#1896). */
+export const SECONDARY_BLAST_CRATER_HOLE_DEPTH_M = 3;
+
+/** Cap on blast passes carving one secondary crater (#1896). */
+export const SECONDARY_BLAST_CRATER_MAX_PASSES = 4;
+
 /** Offset added to the game seed to derive the weather cycle's PRNG seed (#1403). */
 export const WEATHER_RNG_SEED_OFFSET = 1000;
 

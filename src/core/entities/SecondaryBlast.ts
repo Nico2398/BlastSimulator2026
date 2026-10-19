@@ -5,6 +5,7 @@ import { recordEmployeeDeath, type AccidentRecord, type DamageState } from './Da
 import { buildingCenter, destroyBuilding, getBuildingDef, warehouseStockKg, type Building, type BuildingState } from './Building.js';
 import { destroyVehicle, getVehicleDefByTier, type VehicleState } from './Vehicle.js';
 import { injureEmployee, type EmployeeState } from './Employee.js';
+import type { BlastPlan } from '../mining/BlastPlan.js';
 import {
   SECONDARY_BLAST_RADIUS_BASE_M,
   SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M,
@@ -19,25 +20,35 @@ export interface SecondaryBlastEvent {
   x: number;
   z: number;
   explosivesKg: number;
+  /** Stored kg per explosive id at the moment of destruction (#1896). */
+  stock: Record<string, number>;
 }
 
 /** Event for a building whose destruction detonates stored explosives, else null. Centred on its footprint. */
 export function secondaryBlastEventFor(b: Building): SecondaryBlastEvent | null {
   if (b.type !== 'explosive_warehouse' || warehouseStockKg(b) <= 0) return null;
   const { cx, cz } = buildingCenter(b);
-  return { buildingId: b.id, x: cx, z: cz, explosivesKg: warehouseStockKg(b) };
+  return { buildingId: b.id, x: cx, z: cz, explosivesKg: warehouseStockKg(b), stock: { ...(b.storedExplosives ?? {}) } };
 }
 
 function distanceBetween(x1: number, z1: number, x2: number, z2: number): number {
   return Math.hypot(x1 - x2, z1 - z2);
 }
 
-interface SecondaryBlastOutcome {
+export interface SecondaryBlastOutcome {
   event: SecondaryBlastEvent;
   radiusM: number;
   accidents: AccidentRecord[];
   /** Further warehouses the detonation destroyed, to be resolved in turn. */
   chained: SecondaryBlastEvent[];
+  /** One-hole blast plan that carves the detonation's crater (#1896). */
+  craterPlan: BlastPlan;
+}
+
+/** Blast plan a detonation feeds the blast pipeline to carve its crater (#1896). */
+export function secondaryCraterPlan(_event: SecondaryBlastEvent): BlastPlan {
+  // TODO: implement
+  return { holes: [], charges: {} };
 }
 
 /** Detonation radius in metres for a stored explosive mass. */
@@ -130,7 +141,7 @@ export function resolveSecondaryBlasts(
     }
 
     damage.accidents.push(...accidents);
-    outcomes.push({ event, radiusM, accidents, chained });
+    outcomes.push({ event, radiusM, accidents, chained, craterPlan: secondaryCraterPlan(event) });
   }
   return outcomes;
 }
