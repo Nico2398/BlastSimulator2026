@@ -9,6 +9,7 @@ import {
 } from '../config/balance.js';
 import type { TutorialProgress } from './TutorialProgress.js';
 import type { GradeState } from '../economy/MineGrade.js';
+import type { BoardState } from '../economy/Board.js';
 import type { PendingDetonation } from '../engine/DetonationSequence.js';
 import type { AgentOccupancy } from '../nav/AgentOccupancy.js';
 import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
@@ -398,6 +399,8 @@ export interface GameState {
   tutorialProgress?: TutorialProgress;
   /** Mine-grade permit state; present only on progression sites (#1921). */
   grade?: GradeState;
+  /** Board of directors; present only when the level opts in (#1946). */
+  board?: BoardState;
 
   /** Mine type preset ID used for this game. */
   mineType: string;
@@ -496,7 +499,7 @@ export interface GameState {
   /** Whether the current level has ended (any game-over or completion). */
   levelEnded: boolean;
   /** Reason the level ended, or null if still active. */
-  levelEndReason: 'completed' | 'bankruptcy' | 'arrest' | 'ecological_shutdown' | 'worker_revolt' | null;
+  levelEndReason: 'completed' | 'bankruptcy' | 'arrest' | 'ecological_shutdown' | 'worker_revolt' | 'fired' | null;
   /** Pending actions waiting for qualified employees. */
   pendingActions: PendingAction[];
   /** Next ID to assign to a newly created PendingAction. */

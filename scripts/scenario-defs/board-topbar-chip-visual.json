@@ -1,0 +1,46 @@
+{
+  "name": "board-topbar-chip-visual",
+  "description": "Board of directors top-bar chip (#1946): a board attached to a running game shows 'Q1 · <days>d · 60%' in the top bar; the chip is absent in a game without a board.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:false",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 staffed:false" }
+      ],
+      "role": "setup",
+      "description": "Open a bare game; it has no board, so the chip is not on screen.",
+      "expect": { "equals": { "levelEnded": false } }
+    },
+    {
+      "command": "board start quarterTicks:720 ore:20 profit:5000",
+      "interaction": [
+        { "type": "command", "command": "board start quarterTicks:720 ore:20 profit:5000" }
+      ],
+      "role": "bootstrap",
+      "description": "Attach a board (console-only primitive, no UI equivalent): quarter 1, confidence 60."
+    },
+    {
+      "command": "tick 24",
+      "interaction": [
+        { "type": "command", "command": "tick 24" },
+        { "type": "waitForSelector", "selector": "[data-action=\"open-board\"]" }
+      ],
+      "role": "setup",
+      "description": "One day passes; the chip appears in the top bar and reads Q1, 29 days left, 60% confidence.",
+      "expect": {
+        "increased": ["tickCount"],
+        "equals": { "levelEnded": false },
+        "usable": "[data-action=\"open-board\"]"
+      }
+    },
+    {
+      "command": "board status",
+      "interaction": [
+        { "type": "command", "command": "board status" }
+      ],
+      "role": "observe",
+      "description": "The console status agrees with the chip.",
+      "expect": { "equals": { "levelEnded": false } }
+    }
+  ]
+}

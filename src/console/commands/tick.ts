@@ -19,7 +19,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { requireGame } from './commandUtils.js';
 import { pushEventOptionLines } from './eventResolution.js';
 import { formatTaskCompletion } from './tickTaskCompletion.js';
-import { formatGameOver } from './tickGameOver.js';
+import { formatGameOver, formatBoardReview } from './tickGameOver.js';
 
 /** Kilograms for a console line: whole numbers stay whole, fractions get one decimal. */
 function formatKg(kg: number): string {
@@ -137,6 +137,7 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] WORLD INVARIANT VIOLATION: ${violation.kind} ${JSON.stringify(violation)}`);
     }
 
+    formatBoardReview(state.tickCount, report.boardReview, lines);
     formatGameOver(state.tickCount, report.gameOver, lines);
 
     const firedEvent: FiredEventReport | null = report.firedEvent;

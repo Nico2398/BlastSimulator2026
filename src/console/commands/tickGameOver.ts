@@ -8,7 +8,24 @@
 // would double the bankruptcy/ecology/arrest/revolt streak bookkeeping a
 // second pass through the checks would trigger.
 
+import { t } from '../../core/i18n/I18n.js';
+import { formatMoney } from '../../core/economy/formatMoney.js';
+import type { BoardReview } from '../../core/economy/Board.js';
 import type { GameOverReport } from '../../core/engine/TickPipeline.js';
+
+/** Console lines for a quarterly board review (#1946). */
+export function formatBoardReview(tickCount: number, review: BoardReview | null | undefined, lines: string[]): void {
+  if (!review) return;
+  const outcome = t(review.oreMet && review.profitMet ? 'board.review.met' : 'board.review.missed');
+  lines.push(`[tick ${tickCount}] ${t('board.review.line', {
+    quarter: review.quarter,
+    outcome,
+    before: Math.round(review.confidenceBefore),
+    after: Math.round(review.confidenceAfter),
+    bonus: formatMoney(review.bonus),
+    dividend: formatMoney(review.dividend),
+  })}`);
+}
 
 export function formatGameOver(tickCount: number, report: GameOverReport, lines: string[]): void {
   if (report.levelCompleted) {
@@ -23,5 +40,7 @@ export function formatGameOver(tickCount: number, report: GameOverReport, lines:
     lines.push(`[tick ${tickCount}] ARRESTED! Criminal charges end your run.`);
   } else if (report.levelEndReason === 'worker_revolt' && report.revolted) {
     lines.push(`[tick ${tickCount}] WORKER REVOLT! Your workforce walks out for good.`);
+  } else if (report.levelEndReason === 'fired' && report.fired) {
+    lines.push(`[tick ${tickCount}] ${t('board.fired')}`);
   }
 }

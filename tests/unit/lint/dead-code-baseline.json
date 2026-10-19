@@ -6,7 +6,6 @@
     "scripts/shared/command-runner.ts:StepResult",
     "scripts/shared/interaction-executor.ts:BOOTSTRAP_COMMAND_ALLOWLIST",
     "scripts/shared/interaction-executor.ts:OBSERVATION_COMMANDS",
-    "scripts/shared/interaction-executor.ts:isObservationCommand",
     "scripts/shared/scenario-goal.ts:GoalCheckResult",
     "scripts/shared/scenario-trace.ts:MODE_INCIDENTAL_STATE_FIELDS",
     "scripts/shared/scenario-trace.ts:StateDivergence",

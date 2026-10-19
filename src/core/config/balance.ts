@@ -3086,3 +3086,17 @@ export const EVENT_BALANCE_REFERENCE_PERMIT_FEE = 20000;
 /** Ore grade scale lever (#1932): default and upper bound. */
 export const ORE_GRADE_SCALE_DEFAULT = 1;
 export const ORE_GRADE_SCALE_MAX = 1;
+
+/** Board of directors (#1946). */
+export const BOARD_QUARTER_TICKS = 720;
+export const BOARD_TARGET_GROWTH = 1.25;
+export const BOARD_CONFIDENCE_START = 60;
+export const BOARD_CONFIDENCE_MAX = 100;
+export const BOARD_CONFIDENCE_MET_GAIN = 15;
+export const BOARD_CONFIDENCE_MISS_PENALTY = 25;
+export const BOARD_BONUS_PROFIT_SHARE = 0.10;
+export const BOARD_DIVIDEND_RATE = 0.20;
+export const BOARD_DIVIDEND_CASH_FLOOR = 100000;
+/** Targets of a board attached with the debug `board start` command when none are given. */
+export const BOARD_DEBUG_ORE_TARGET_T = 50;
+export const BOARD_DEBUG_PROFIT_TARGET = 20000;

@@ -16,6 +16,7 @@ vi.mock('../../../src/core/campaign/LevelTransition.js', () => ({
 import { checkGameOverConditions } from '../../../src/core/engine/GameOverConditions.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { createBoardState } from '../../../src/core/economy/Board.js';
 import { BANKRUPTCY_THRESHOLD, BANKRUPTCY_GRACE_TICKS } from '../../../src/core/campaign/Bankruptcy.js';
 
 describe('checkGameOverConditions — win and lose on the same tick (#1313)', () => {
@@ -33,5 +34,20 @@ describe('checkGameOverConditions — win and lose on the same tick (#1313)', ()
     expect(second.levelCompleted).toBe(false);
     expect(second.bankrupted).toBe(false);
     expect(second.levelEndReason).toBe('completed');
+  });
+});
+
+describe('checkGameOverConditions — win and fired on the same tick (#1946)', () => {
+  it('completed wins the tie against a board that would fire', () => {
+    const state = createGame({ seed: 42 });
+    state.board = createBoardState({ quarterTicks: 100, oreTargetT: 1, profitTarget: 1 });
+    state.board.confidence = 0;
+
+    const report = checkGameOverConditions(state, new EventEmitter());
+
+    expect(report.levelCompleted).toBe(true);
+    expect(report.fired).toBe(false);
+    expect(report.levelEndReason).toBe('completed');
+    expect(state.levelEndReason).toBe('completed');
   });
 });

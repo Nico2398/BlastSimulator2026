@@ -151,9 +151,14 @@ function targetProgress(state: GameState, g: GradeState, kind: GradeTargetKind, 
   }
 }
 
+/** True when a delivery of this contract type counts as ore (rubble disposal does not). */
+export function countsAsOreDelivery(type: ContractType): boolean {
+  return type !== 'rubble_disposal';
+}
+
 /** Book delivered ore kg (ore_sale and supply only). No-op without grade state. */
 export function recordOreDelivery(grade: GradeState | undefined, type: ContractType, kg: number): void {
-  if (!grade || type === 'rubble_disposal' || !(kg > 0)) return;
+  if (!grade || !countsAsOreDelivery(type) || !(kg > 0)) return;
   grade.oreDeliveredKg += kg;
 }
 
