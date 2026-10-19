@@ -195,6 +195,25 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
 - Destroying a heap loses its spoil silently. A save with no `storedSpoilKg` reads as 0. No Blender
   model yet: renders as a stand-in box (#1572).
 
+## Vanity Projects (#1947)
+
+Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJECTS`; constants `VANITY_*` in `balance.ts`). Placed instantly like the spoil heap, charged on order. Effects are one-off deltas applied at completion by `applyVanityCompletion` (`VanityEffects.ts`), never per tick.
+
+| Project | Cost | Footprint | Board confidence | One-off effects | Upkeep |
+|---------|------|-----------|------------------|-----------------|--------|
+| CEO Statue | $250,000 | 2x2 | +10 | every living employee's morale -2 | - |
+| Golf Course on the Spoil Heap | $600,000 | 6x6, must share an edge with a spoil heap | +20 | ecology +2 | $20/tick |
+| Executive Helipad | $1,200,000 | 4x4 | +30 | neighbour relations -3 | - |
+| Gold-Plated HQ Tower | $5,000,000 | 4x4 | +50 | neighbour relations -5, well-being -2 | - |
+
+- **Availability** (`isVanityAvailable`): on any level with a board; on a progression site from grade 4 (`VANITY_MIN_GRADE`, unlock line "The board would like a statue."); otherwise none. A refused order mutates nothing.
+- **Board confidence** applies only where a board exists (`addBoardConfidence`, clamped 0..100).
+- **No refund**: demolish cost 0, nothing returned; the confirm modal says "Sunk cost, like the CEO's judgement."
+- **Build menu**: separate "Vanity" section after the regular rows (`data-build-section="vanity"`); locked rows show "Unlocks at grade 4" and disable Buy.
+- **Rendering**: no models yet; `allModelIds` skips them and `BuildingMesh` draws the stand-in box.
+- **Console**: `sandbox start grade:N` starts a progression sandbox at grade N (scenarios reach grade 4 this way).
+- **Decisions**: a "touch" means sharing an edge (diagonal-only or a one-cell gap does not count); neighbour relations are the `nuisance` score (high = good), so -N lowers it.
+
 ## Destruction Effects
 
 - Building destroyed by a blast → removed from grid immediately; a player demolition is removed when its Building Destroyer finishes (#1392)

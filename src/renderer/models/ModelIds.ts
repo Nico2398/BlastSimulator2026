@@ -7,6 +7,7 @@ import type { EmployeeRole } from '../../core/entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
 import { BUILDING_TIERS, isSingleTierType, type BuildingTier, type BuildingType } from '../../core/entities/Building.js';
 import { BUILDING_DEFS } from '../../core/entities/BuildingDefs.js';
+import { isVanityType } from '../../core/entities/BuildingVanity.js';
 import { getAllVehicleRoles } from '../../core/entities/Vehicle.js';
 
 export const EMPLOYEE_ROLES: readonly EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
@@ -96,6 +97,8 @@ export function allModelIds(): string[] {
     for (const tier of VEHICLE_TIERS) ids.push(vehicleModelId(role, tier));
   }
   for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
+    // Vanity projects (#1947) render as the stand-in box until their models land; drop this skip with those assets.
+    if (isVanityType(type)) continue;
     // A single-tier type has one model (tier 1); the game aliases its higher tiers onto it.
     const tiers = isSingleTierType(type) ? [1 as BuildingTier] : BUILDING_TIERS;
     for (const tier of tiers) ids.push(buildingModelId(type, tier));

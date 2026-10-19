@@ -3188,8 +3188,8 @@ export const VANITY_EXECUTIVE_HELIPAD_CONFIDENCE = 30;
 export const VANITY_GOLD_TOWER_CONFIDENCE = 50;
 export const VANITY_MORALE_ONCE = -2;
 export const VANITY_ECOLOGY_ONCE = 2;
-export const VANITY_GOLF_NUISANCE_ONCE = -3;
-export const VANITY_HELIPAD_NUISANCE_ONCE = -5;
+export const VANITY_HELIPAD_NUISANCE_ONCE = -3;
+export const VANITY_GOLD_TOWER_NUISANCE_ONCE = -5;
 export const VANITY_WELL_BEING_ONCE = -2;
 /** Golf course upkeep ($ per tick). */
 export const VANITY_GOLF_UPKEEP_PER_TICK = 20;

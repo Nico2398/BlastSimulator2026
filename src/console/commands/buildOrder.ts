@@ -16,10 +16,14 @@ import {
   getUpgradeCost,
   type Building,
   checkFootprintPlacement,
+  touchesBuildingOfType,
   type BuildingType,
   type BuildingTier,
 } from '../../core/entities/Building.js';
 import type { GameState, PlannedBuilding } from '../../core/state/GameState.js';
+import { isVanityType, isVanityAvailable, VANITY_PROJECTS } from '../../core/entities/BuildingVanity.js';
+import { applyVanityCompletion } from '../../core/economy/VanityEffects.js';
+import { VANITY_MIN_GRADE } from '../../core/config/balance.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
@@ -99,6 +103,10 @@ export function orderBuildingCommand(
     return { success: false, output: t('entities.build_not_researched', { tier, type: buildingTypeName(type) }) };
   }
 
+  if (isVanityType(type) && !isVanityAvailable({ hasBoard: state.board !== undefined, grade: state.grade?.grade })) {
+    return { success: false, output: t('entities.build_vanity_locked', { type: buildingTypeName(type), grade: VANITY_MIN_GRADE }) };
+  }
+
   const def = getBuildingDef(type, tier);
   if (state.cash < def.constructionCost) {
     return {
@@ -126,6 +134,12 @@ export function orderBuildingCommand(
   );
   if (!check.valid) return { success: false, output: refusalText(check) };
 
+  const mustTouch = isVanityType(type) ? VANITY_PROJECTS[type].mustTouch : undefined;
+  if (mustTouch !== undefined
+    && !touchesBuildingOfType(occupants, { minX: x, minZ: z, maxX: x + footprintX, maxZ: z + footprintZ }, mustTouch)) {
+    return { success: false, output: t('entities.build_vanity_must_touch', { type: buildingTypeName(type), target: buildingTypeName(mustTouch) }) };
+  }
+
   // A crewless building (spoil heap, #1530) needs no builder: charged and placed
   // now, with no PlannedBuilding or place_building action.
   if (isCrewlessBuilding(type)) {
@@ -135,6 +149,7 @@ export function orderBuildingCommand(
     if (!placed.success) return { success: false, output: refusalText(placed) };
     chargeConstruction(state, `Build ${type} T${tier}`, def.constructionCost);
     settleBuiltFootprint(state, ctx.grid, ctx.emitter, x, z, footprintX, footprintZ);
+    if (isVanityType(type)) applyVanityCompletion(state, type);
     return {
       success: true,
       output: `${type} T${tier} placed at (${x},${z}). Cost: $${def.constructionCost}`,

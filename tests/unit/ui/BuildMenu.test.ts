@@ -1242,7 +1242,7 @@ describe('BuildMenu — catalog card text and tooltip (#1377)', () => {
 
   it('every catalog row has a .bs-build-desc span with the tier-1 line and a stats tooltip', () => {
     const rows = container.querySelectorAll<HTMLElement>('[data-build-type]');
-    expect(rows.length).toBe(9);
+    expect(rows.length).toBe(13);
     for (const row of rows) {
       const type = row.dataset['buildType'] as BuildingType;
       const def = getBuildingDef(type, 1);

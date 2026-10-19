@@ -53,7 +53,7 @@ import { advance, type Steps } from './core/engine/Steps.js';
 import { terrainConfigOf, ensureLandscape, loadGridForState, stateForSave } from './console/commands/world.js';
 import { computeVoxelColumnSurfaceY } from './core/world/VoxelGrid.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
-import { getLivingEmployees } from './core/entities/Employee.js';
+import { getLivingEmployees, computeAverageMorale } from './core/entities/Employee.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { stateRubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
@@ -898,6 +898,7 @@ window.__gameState = () => {
     safety: s.scores.safety,
     ecology: s.scores.ecology,
     nuisance: s.scores.nuisance,
+    averageMorale: computeAverageMorale(s.employees.employees),
     muckPile: ctx.grid
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,

@@ -97,7 +97,7 @@ const SERIALIZED_FIELDS = [
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue', 'insideBuildingCount',
   'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'fillableDirtiteSaleOffered', 'fillableRustiteSaleOffered', 'winningRustiteSaleOffered', 'rubbleDisposalOffered', 'supplyOffered', 'blastBanned', 'blingiteSaleOffered', 'fillableSaleOffered', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
-  'arrested', 'taxAuditCount', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
+  'arrested', 'taxAuditCount', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'averageMorale', 'muckPile',
   'storedMassKg', 'storedSpoilKg', 'collectedOreTotal', 'dangerZoneClear', 'corruptionLevel', 'chargeOrderBlockedReason',
 ] as const;
 

@@ -257,10 +257,10 @@ export function getBuildingPeopleCapacity(type: BuildingType, tier: BuildingTier
 }
 
 /** Types with a single tier: tiers 2 and 3 alias tier 1 and cannot be researched (#1530). */
-const SINGLE_TIER_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>(['spoil_heap']);
+const SINGLE_TIER_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>(['spoil_heap', 'ceo_statue', 'golf_course', 'executive_helipad', 'gold_tower']);
 
 /** Types that take no crew (#1530). */
-const CREWLESS_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>(['spoil_heap']);
+const CREWLESS_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>(['spoil_heap', 'ceo_statue', 'golf_course', 'executive_helipad', 'gold_tower']);
 
 /** Whether the type has only one tier. */
 export function isSingleTierType(type: BuildingType): boolean {
@@ -706,7 +706,15 @@ export function touchesBuildingOfType(
   rect: Rect,
   type: BuildingType,
 ): boolean {
-  // TODO: implement
-  void occupants; void rect; void type;
+  for (const occ of occupants) {
+    if (occ.type !== type) continue;
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(occ.type, occ.tier));
+    const oMinX = occ.x, oMaxX = occ.x + sizeX, oMinZ = occ.z, oMaxZ = occ.z + sizeZ;
+    const overlapX = rect.minX < oMaxX && rect.maxX > oMinX;
+    const overlapZ = rect.minZ < oMaxZ && rect.maxZ > oMinZ;
+    const abutX = rect.maxX === oMinX || rect.minX === oMaxX;
+    const abutZ = rect.maxZ === oMinZ || rect.minZ === oMaxZ;
+    if ((overlapX && abutZ) || (overlapZ && abutX)) return true;
+  }
   return false;
 }

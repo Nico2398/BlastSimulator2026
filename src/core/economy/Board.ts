@@ -199,7 +199,7 @@ export function isBoardFired(board: BoardState | undefined): boolean {
 
 /** Add `amount` to board confidence, clamped to its range; false when no board is attached (#1947). */
 export function addBoardConfidence(board: BoardState | undefined, amount: number): boolean {
-  // TODO: implement
-  void board; void amount;
-  return false;
+  if (!board) return false;
+  board.confidence = Math.min(BOARD_CONFIDENCE_MAX, Math.max(0, board.confidence + amount));
+  return true;
 }

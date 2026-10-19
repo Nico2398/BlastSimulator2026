@@ -1,6 +1,7 @@
 // Exported model assets — every id the game asks for exists, parses, stays
 // within budget, and carries the nodes and tint materials the renderer relies on.
 
+import { isVanityType } from '../../../../src/core/entities/BuildingVanity.js';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
@@ -117,7 +118,8 @@ describe('public/models', () => {
   });
 
   it('every building fits its footprint, grows taller with tier and exposes the wall tint', () => {
-    for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
+    // Vanity projects (#1947) have no model yet: they render as the stand-in.
+    for (const type of (Object.keys(BUILDING_DEFS) as BuildingType[]).filter(ty => !isVanityType(ty))) {
       let previousHeight = 0;
       const tiers: BuildingTier[] = isSingleTierType(type) ? [1] : [1, 2, 3];
       for (const tier of tiers) {

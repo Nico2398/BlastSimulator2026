@@ -9,7 +9,7 @@ import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
 import { outstandingChargeBlockedReason } from './core/mining/ChargeOrder.js';
 import { wetHoles } from './core/mining/WetHoles.js';
-import { getLivingEmployees } from './core/entities/Employee.js';
+import { getLivingEmployees, computeAverageMorale } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { stateRubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
 import { getProfitShortfall } from './core/campaign/LevelObjective.js';
@@ -160,6 +160,8 @@ export interface SerializableGameState {
   safety: number;
   ecology: number;
   nuisance: number;
+  /** Mean morale of the living employees (50 when none). */
+  averageMorale: number;
   /** The rock a blast left on the ground; null before a world exists. */
   muckPile: MuckPileSummary | null;
   /** Mine-grade permit state (#1921); null on a site with no permit ladder. */
@@ -265,6 +267,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     safety: s.scores.safety,
     ecology: s.scores.ecology,
     nuisance: s.scores.nuisance,
+    averageMorale: computeAverageMorale(s.employees.employees),
     muckPile: ctx.grid
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
