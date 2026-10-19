@@ -217,7 +217,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('buy_software', 'Buy software upgrade', (args, named) =>
     buySoftwareCommand(ctx, args, named),
   );
-  runner.register('build_ramp', 'Build ramp (origin:X,Z direction:south length:10)', (args, named) =>
+  runner.register('build_ramp', 'Build ramp (origin:X,Z direction:south length:10 | path:X,Z;X,Z;… depth:M width:3|5|7 [grade:DEG])', (args, named) =>
     buildRampCommand(ctx, args, named),
   );
   runner.register('widen_ramp', 'Widen a built ramp (id:N width:5)', (args, named) =>

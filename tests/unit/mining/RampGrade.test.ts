@@ -4,6 +4,9 @@ import { describe, it, expect } from 'vitest';
 import { rampSteepestGradeDegrees, steepestBlockingRamp, describeRampClimb } from '../../../src/core/mining/RampGrade.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { installGradedRamps, buildGradedRampGrid, gradedBuiltRamp } from '../../helpers/gradedRamps.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { rampPathCells, rampBoundingFootprint } from '../../../src/core/mining/RampPath.js';
+import type { BuiltRamp } from '../../../src/core/state/GameState.js';
 import { tierSlopeRatio } from '../../../src/core/nav/ClimbLimit.js';
 
 function stateWith(degrees: number[]): GameState {
@@ -95,5 +98,42 @@ describe('describeRampClimb', () => {
     const out = describeRampClimb(state.navGrid!, state.builtRamps[0]!, false);
     expect(out.gradeDeg).toBeCloseTo(30, 3);
     expect(out.tiers).toEqual([1, 2, 3]);
+  });
+});
+
+// ── #1939: multi-leg ramps ──
+
+describe('rampSteepestGradeDegrees on a multi-leg ramp (#1939)', () => {
+  const LEGS = [{ direction: 'south' as const, length: 8 }, { direction: 'east' as const, length: 8 }];
+  const PATH = { originX: 3, originZ: 3, legs: LEGS };
+  const DEG = 15;
+
+  function lGrid(): NavGrid {
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < 20; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < 20; x++) row.push({ type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false, surfaceY: 50, climbY: 50 });
+      cells.push(row);
+    }
+    for (const c of rampPathCells(PATH, 3)) {
+      const y = c.step * Math.tan((DEG * Math.PI) / 180);
+      cells[c.z]![c.x] = { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false, surfaceY: y, climbY: y };
+    }
+    return new NavGrid(20, 20, cells, 50);
+  }
+
+  function lRamp(): BuiltRamp {
+    const def = { originX: 3, originZ: 3, direction: 'south' as const, length: 16, targetDepth: 4, width: 3 as const, legs: LEGS };
+    return { id: 1, width: 3, def, footprint: rampBoundingFootprint(PATH, 3) };
+  }
+
+  it('measures the grade along the path, not the cliff beside it', () => {
+    const g = rampSteepestGradeDegrees(lGrid(), lRamp());
+    expect(g).toBeGreaterThan(DEG - 1);
+    expect(g).toBeLessThan(DEG + 5);
+  });
+
+  it('is not fooled by the empty corner of the bounding box', () => {
+    expect(rampSteepestGradeDegrees(lGrid(), lRamp())).toBeLessThan(DEG + 5);
   });
 });

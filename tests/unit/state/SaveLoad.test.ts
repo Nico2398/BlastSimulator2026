@@ -10,6 +10,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { createBoardState } from '../../../src/core/economy/Board.js';
 import { hireEmployee, BASE_SALARIES, calculateQualificationBonus } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { rampLegsOf } from '../../../src/core/mining/RampPath.js';
 import { updateScores } from '../../../src/core/scores/ScoreManager.js';
 import { SCORE_DECAY_RATE } from '../../../src/core/config/balance.js';
 
@@ -2548,5 +2549,39 @@ describe('serialize/deserialize — board of directors (#1946)', () => {
     const loaded = deserialize(serialize(state));
     expect(loaded.levelEndReason).toBe('fired');
     expect(loaded.levelEnded).toBe(true);
+  });
+});
+
+// ── multi-leg ramps survive save/load; legless ramps load as one leg (#1939) ──
+
+describe('deserialize — ramp legs (#1939)', () => {
+  const legs = [{ direction: 'south' as const, length: 12 }, { direction: 'east' as const, length: 10 }];
+
+  it('round-trips a built multi-leg ramp with its legs and grade', () => {
+    const state = createGame({ seed: 42 });
+    const def = { originX: 20, originZ: 10, direction: 'south' as const, length: 22, targetDepth: 6, width: 3 as const, legs, gradeDegrees: 20 };
+    state.builtRamps.push({ id: 1, def, width: 3, footprint: { minX: 19, maxX: 29, minZ: 10, maxZ: 23 } });
+    state.nextBuiltRampId = 2;
+    const restored = deserialize(serialize(state));
+    expect(restored.builtRamps[0]!.def.legs).toEqual(legs);
+    expect(restored.builtRamps[0]!.def.gradeDegrees).toBe(20);
+  });
+
+  it('round-trips a planned multi-leg ramp', () => {
+    const state = createGame({ seed: 42 });
+    const def = { originX: 20, originZ: 10, direction: 'south' as const, length: 22, targetDepth: 6, width: 3 as const, legs };
+    state.plannedRamps.push({ id: 1, def, footprint: { minX: 19, maxX: 29, minZ: 10, maxZ: 23 }, segments: [] });
+    const restored = deserialize(serialize(state));
+    expect(restored.plannedRamps[0]!.def.legs).toEqual(legs);
+  });
+
+  it('an old-save ramp without legs loads as a single straight leg', () => {
+    const state = createGame({ seed: 42 });
+    const def = { originX: 1, originZ: 1, direction: 'east' as const, length: 10, targetDepth: 4, width: 5 as const };
+    state.builtRamps.push({ id: 1, def, width: 5, footprint: { minX: 1, maxX: 10, minZ: -1, maxZ: 3 } });
+    state.nextBuiltRampId = 2;
+    const restored = deserialize(serialize(state));
+    expect(restored.builtRamps[0]!.def.legs).toBeUndefined();
+    expect(rampLegsOf(restored.builtRamps[0]!.def)).toEqual([{ direction: 'east', length: 10 }]);
   });
 });
