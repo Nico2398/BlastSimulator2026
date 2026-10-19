@@ -593,7 +593,9 @@ describe('computeDrillHoleDurationTicks stays the tier-1 base (#1935)', () => {
 });
 
 describe('computeRigDurationTicks (#1935)', () => {
-  const base = computeDrillHoleDurationTicks(8, DRILL_HOLE_REFERENCE_DIAMETER_M);
+  // A wide 8 m hole (6x reference diameter, 36 ticks): the 6-tick reference base is too coarse for
+  // ceil-rounding to leave the 1/workRate ratio visible.
+  const base = computeDrillHoleDurationTicks(8, DRILL_HOLE_REFERENCE_DIAMETER_M * 6);
 
   it('tier 1 equals the plain task duration', () => {
     expect(computeRigDurationTicks(base, 1)).toBe(computeTaskDuration(base, 1, 1, 1, 1));
