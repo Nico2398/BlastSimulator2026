@@ -30,6 +30,7 @@ import { ChargeStockBlock, buildStockView, deliveryTransitText } from './ChargeS
 import { chargeFitsHole, maxFittingChargeKg, maxChargeKgForHole, explosiveHoleLimits, weakHoleSummary, type WeakHoleSummary } from '../../../core/mining/ChargePlan.js';
 import { getRock } from '../../../core/world/RockCatalog.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
+import { getExplosivesStockByType } from '../../../core/entities/Building.js';
 import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 import { chargeKgPerMetre } from '../../../core/mining/HoleDiameter.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
@@ -46,6 +47,23 @@ const DEFAULT_EXPLOSIVE = 'boomite';
 /** Stemming stepper increment (m); 0.1 keeps 2.5 and whole-metre values reachable. */
 const STEMMING_STEP_M = 0.1;
 const TUBING_BUY_AMOUNT = 10;
+
+/** Explosive the step preselects: the pattern's, else the best-stocked allowed one, else the default (#2016). */
+function preferredExplosiveId(
+  patternExplosiveId: string | undefined,
+  stockByType: Readonly<Record<string, number>>,
+  allowedIds: readonly string[],
+): string | undefined {
+  if (patternExplosiveId !== undefined && allowedIds.includes(patternExplosiveId)) return patternExplosiveId;
+  let best: string | undefined;
+  let bestKg = 0;
+  for (const id of allowedIds) {
+    const kg = Math.round(stockByType[id] ?? 0);
+    if (kg > bestKg) { best = id; bestKg = kg; }
+  }
+  if (best !== undefined) return best;
+  return allowedIds.includes(DEFAULT_EXPLOSIVE) ? DEFAULT_EXPLOSIVE : allowedIds[0];
+}
 
 export class ChargeStep {
   private readonly el: HTMLElement;
@@ -69,6 +87,8 @@ export class ChargeStep {
   private gameConsole?: GameConsoleFn;
   private holeRockSampler?: (hole: DrillHole) => ColumnRock | null;
   private selectedExplosiveId = DEFAULT_EXPLOSIVE;
+  /** Set by a card click; stops stock and pattern from overriding the player's choice. */
+  private playerPickedExplosive = false;
   private allowedIds: readonly string[] = resolveAvailableExplosives(null);
   private amountKg = CHARGE_DEFAULT_AMOUNT_KG;
   private stemmingM = CHARGE_DEFAULT_STEMMING_M;
@@ -190,9 +210,15 @@ export class ChargeStep {
     }
 
     this.allowedIds = resolveAvailableExplosives(state.campaign.activeLevelId);
-    if (!this.allowedIds.includes(this.selectedExplosiveId) && this.allowedIds[0] !== undefined) {
-      this.selectedExplosiveId = this.allowedIds[0];
-      this.clampAmount();
+    if (this.playerPickedExplosive && !this.allowedIds.includes(this.selectedExplosiveId)) this.playerPickedExplosive = false;
+    if (!this.playerPickedExplosive) {
+      const preferred = preferredExplosiveId(
+        state.patternCharge?.explosiveId, getExplosivesStockByType(state.buildings), this.allowedIds,
+      );
+      if (preferred !== undefined && preferred !== this.selectedExplosiveId) {
+        this.selectedExplosiveId = preferred;
+        this.clampAmount();
+      }
     }
 
     const tubed = holes.filter(h => hasTubing(state.tubingState, h.id)).map(h => h.id);
@@ -295,6 +321,7 @@ export class ChargeStep {
     card.append(nameRow, statsRow);
     card.addEventListener('click', () => {
       this.selectedExplosiveId = explosive.id;
+      this.playerPickedExplosive = true;
       this.clampAmount();
       this.lastSignature = '';
       this.renderProductList(anyWet);
