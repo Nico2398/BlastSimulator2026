@@ -89,38 +89,69 @@ export function buildBlockedOrderMessage(action: PendingAction, nowTick?: number
 }
 
 /** Max cause lines shown for a pile of blocked orders. */
-export const BLOCKED_PHRASE_LINES = 3;
+const BLOCKED_PHRASE_LINES = 3;
 
-export type BlockedPhraseKind = 'crew_fleet' | 'storage_full' | 'no_warehouse' | 'no_spoil_heap' | 'spoil_heap_full' | 'unreachable';
+const BLOCKED_PHRASE_KINDS = ['crew_fleet', 'storage_full', 'no_warehouse', 'no_spoil_heap', 'spoil_heap_full', 'unreachable'] as const;
 
-export interface BlockedKindCount { kind: BlockedPhraseKind; count: number }
+type BlockedPhraseKind = typeof BLOCKED_PHRASE_KINDS[number];
+
+interface BlockedKindCount { kind: BlockedPhraseKind; count: number }
 
 /** Phrase kind of a failure reason; null for non-failure or absent reasons. */
-export function blockedPhraseKind(_reason: BlockedOrderReason | null | undefined): BlockedPhraseKind | null {
-  return null; // TODO: implement
+function blockedPhraseKind(reason: BlockedOrderReason | null | undefined): BlockedPhraseKind | null {
+  switch (reason) {
+    case 'no_qualified_employee':
+    case 'no_dual_qualified_employee':
+    case 'no_vehicle_in_fleet':
+    case 'no_licensed_driver':
+    case 'licence_level_too_low':
+    case 'no_reaching_vehicle':
+      return 'crew_fleet';
+    case 'storage_full': return 'storage_full';
+    case 'no_freight_warehouse': return 'no_warehouse';
+    case 'no_spoil_heap': return 'no_spoil_heap';
+    case 'spoil_heap_full': return 'spoil_heap_full';
+    case 'target_unreachable': return 'unreachable';
+    default: return null;
+  }
 }
 
-/** Tallies blocked reasons across orders. */
-export function countBlockedReasons(_actions: readonly Pick<PendingAction, 'blockedReason'>[]): Partial<Record<BlockedOrderReason, number>> {
-  return {}; // TODO: implement
+/** Tallies failure-block reasons across orders. */
+export function countBlockedReasons(actions: readonly Pick<PendingAction, 'blockedReason'>[]): Partial<Record<BlockedOrderReason, number>> {
+  const counts: Partial<Record<BlockedOrderReason, number>> = {};
+  for (const a of actions) {
+    if (!isFailureBlock(a) || a.blockedReason == null) continue;
+    counts[a.blockedReason] = (counts[a.blockedReason] ?? 0) + 1;
+  }
+  return counts;
 }
 
 /** Failure kinds with counts, largest first; ties by union order. */
-export function rankBlockedKinds(_counts: Partial<Record<BlockedOrderReason, number>>): BlockedKindCount[] {
-  return []; // TODO: implement
+export function rankBlockedKinds(counts: Partial<Record<BlockedOrderReason, number>>): BlockedKindCount[] {
+  const byKind: Partial<Record<BlockedPhraseKind, number>> = {};
+  for (const reason of Object.keys(counts) as BlockedOrderReason[]) {
+    const kind = blockedPhraseKind(reason);
+    const n = counts[reason] ?? 0;
+    if (kind !== null && n > 0) byKind[kind] = (byKind[kind] ?? 0) + n;
+  }
+  // Array.sort is stable: ties keep BLOCKED_PHRASE_KINDS (union) order.
+  return BLOCKED_PHRASE_KINDS
+    .map(kind => ({ kind, count: byKind[kind] ?? 0 }))
+    .filter(e => e.count > 0)
+    .sort((a, b) => b.count - a.count);
 }
 
 /** Count plus remedy sentence for one kind. */
-export function blockedPhrase(_entry: BlockedKindCount): string {
-  return ''; // TODO: implement
+function blockedPhrase(entry: BlockedKindCount): string {
+  return t(`notification.blocked_phrase.${entry.kind}`, { count: entry.count.toLocaleString('en-US') });
 }
 
 /** Short label for a kind, e.g. "storage full". */
-export function blockedKindLabel(_kind: BlockedPhraseKind): string {
-  return ''; // TODO: implement
+export function blockedKindLabel(kind: BlockedPhraseKind): string {
+  return t(`notification.blocked_kind.${kind}`);
 }
 
 /** Up to `max` phrases for the largest blocked kinds. */
-export function describeBlockedReasons(_counts: Partial<Record<BlockedOrderReason, number>>, _max: number = BLOCKED_PHRASE_LINES): string[] {
-  return []; // TODO: implement
+export function describeBlockedReasons(counts: Partial<Record<BlockedOrderReason, number>>, max: number = BLOCKED_PHRASE_LINES): string[] {
+  return rankBlockedKinds(counts).slice(0, max).map(blockedPhrase);
 }

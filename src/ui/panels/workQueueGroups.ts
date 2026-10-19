@@ -1,7 +1,7 @@
 /** Pure grouping model for the Operations work queue (#1972): auto-debris orders collapse into one row per type. */
 import type { PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { isAutoDebrisAction, type AutoDebrisActionType } from '../../core/economy/HaulDispatch.js';
-import { classifyQueuedBlock, isInTransitBlock } from '../notify/blockedOrders.js';
+import { classifyQueuedBlock, isInTransitBlock, rankBlockedKinds } from '../notify/blockedOrders.js';
 
 export const DEBRIS_GROUP_PAGE_SIZE = 25;
 
@@ -47,7 +47,9 @@ export function partitionWorkQueue(actions: readonly PendingAction[]): WorkQueue
     else if (a.status === 'in_progress') g.inProgress++;
     else {
       g.queued++;
-      g[classifyQueuedBlock(a)]++;
+      const block = classifyQueuedBlock(a);
+      g[block]++;
+      if (block === 'blocked' && a.blockedReason != null) g.blockedReasons[a.blockedReason] = (g.blockedReasons[a.blockedReason] ?? 0) + 1;
     }
   }
   const debris = [...groups.values()];
@@ -58,7 +60,7 @@ export function partitionWorkQueue(actions: readonly PendingAction[]): WorkQueue
 
 /** Counts-only signature of a group (no ids). */
 export function debrisGroupSignature(group: DebrisGroup): string {
-  return `${group.type}:${group.total}:${group.queued}:${group.open}:${group.assigned}:${group.inProgress}:${group.blocked}:${group.stranded}:${group.inTransit}`;
+  return `${group.type}:${group.total}:${group.queued}:${group.open}:${group.assigned}:${group.inProgress}:${group.blocked}:${group.stranded}:${group.inTransit}:${rankBlockedKinds(group.blockedReasons).map(e => `${e.kind}=${e.count}`).join(',')}`;
 }
 
 /** Signature of a list of order rows (player orders, or one expanded debris page); `tick` included for time-dependent display. */
