@@ -3,7 +3,7 @@
 
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
-import { isBuildingFootprintCell, type FootprintOccupant } from '../entities/Building.js';
+import { isBuildingFootprintCell, type Building, type BuildingType, type FootprintOccupant } from '../entities/Building.js';
 
 export interface BlastPlan {
   holes: DrillHole[];
@@ -105,4 +105,31 @@ export function partitionByFootprint<T extends { x: number; z: number }>(
 ): { clear: T[]; skipped: number } {
   const covered = coveredByFootprint(cells.map((c, i) => ({ id: String(i), x: c.x, z: c.z })), occupants);
   return { clear: cells.filter((_, i) => !covered.has(String(i))), skipped: covered.size };
+}
+
+/** A building inside a planned blast's reach, with the explosive stock it holds (#2021). */
+export interface BuildingAtRisk {
+  buildingId: number;
+  type: BuildingType;
+  x: number;
+  z: number;
+  stockKg: number;
+}
+
+/** Hole-grid pitch: larger of the smallest x gap and smallest z gap; default spacing when undetermined. */
+export function holePatternSpacing(holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z'>>): number {
+  void holes;
+  // TODO: implement
+  return 0;
+}
+
+/** Buildings within reach of the planned holes (#2021). */
+export function buildingsInBlastReach(
+  holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z'>>,
+  buildings: ReadonlyArray<Pick<Building, 'id' | 'type' | 'tier' | 'x' | 'z' | 'storedExplosives'>>,
+  marginM?: number,
+): BuildingAtRisk[] {
+  void holes; void buildings; void marginM;
+  // TODO: implement
+  return [];
 }
