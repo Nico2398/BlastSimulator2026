@@ -184,6 +184,40 @@ function allLandings(path: RampPathSpec, half: number, wps: readonly { x: number
   });
 }
 
+const SMOOTH_NEIGHBOURS: readonly (readonly [number, number])[] = [
+  [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1],
+];
+
+/**
+ * Pulls the steps of off-centreline tiles within one step per metre of their neighbours'.
+ * The inside of a turn is where two legs' strips meet at very different path positions
+ * (a jump of several steps between adjacent tiles, several times the ordered grade), so
+ * those tiles are relaxed toward their neighbours; centreline tiles keep their own step,
+ * which is what holds the ramp's constant grade.
+ */
+function smoothOffCentreSteps(cells: RampPathCell[], path: RampPathSpec): void {
+  const fixed = new Set(rampCenterline(path).map(c => `${c.x},${c.z}`));
+  const byKey = new Map(cells.map(c => [`${c.x},${c.z}`, c]));
+  for (let pass = 0; pass < cells.length; pass++) {
+    let changed = false;
+    for (const c of cells) {
+      if (fixed.has(`${c.x},${c.z}`)) continue;
+      let lo = -Infinity;
+      let hi = Infinity;
+      for (const [dx, dz] of SMOOTH_NEIGHBOURS) {
+        const n = byKey.get(`${c.x + dx},${c.z + dz}`);
+        if (!n) continue;
+        const reach = Math.hypot(dx, dz);
+        lo = Math.max(lo, n.step - reach);
+        hi = Math.min(hi, n.step + reach);
+      }
+      const next = lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, c.step));
+      if (Math.abs(next - c.step) > 1e-9) { c.step = next; changed = true; }
+    }
+    if (!changed) return;
+  }
+}
+
 /**
  * Every distinct corridor tile at `width`, step by step then across the width. A corner's
  * landing square belongs to the leg leaving the corner and replaces the strip tiles it covers.
@@ -206,6 +240,7 @@ export function rampPathCells(path: RampPathSpec, width: RampWidth): RampPathCel
     landings[k]!.forEach(emit);
     for (const c of strips) if (c.legIndex === k && !landed.has(`${c.x},${c.z}`)) emit(c);
   });
+  if (path.legs.length > 1) smoothOffCentreSteps(out, path);
   return out;
 }
 

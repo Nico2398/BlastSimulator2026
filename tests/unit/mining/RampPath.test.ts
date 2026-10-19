@@ -121,6 +121,17 @@ describe('rampPathCells', () => {
     const centre = new Set(rampPathCells(L_PATH, 3).filter(c => c.lateral === 0).map(key));
     for (const c of rampCenterline(L_PATH)) expect(centre.has(key(c))).toBe(true);
   });
+
+  it.each([3, 5] as const)('adjacent tiles at width %i differ by at most sqrt(2) steps per metre (corner inside smoothed)', (width) => {
+    const cells = rampPathCells(L_PATH, width);
+    const byKey = new Map(cells.map(c => [key(c), c]));
+    for (const c of cells) {
+      for (const [dx, dz] of [[1, 0], [0, 1], [1, 1], [1, -1]] as const) {
+        const n = byKey.get(`${c.x + dx},${c.z + dz}`);
+        if (n) expect(Math.abs(n.step - c.step) / Math.hypot(dx, dz)).toBeLessThanOrEqual(Math.SQRT2 + 1e-6);
+      }
+    }
+  });
 });
 
 describe('footprints and waypoints', () => {
