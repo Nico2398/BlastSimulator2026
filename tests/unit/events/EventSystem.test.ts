@@ -829,8 +829,7 @@ describe('union events keep their own cooldown clock (#1907)', () => {
       expect(unionCooldownOpen(state, CACHED, 0, 0, new Random(7))).toBe(true);
       expect(unionCooldownOpen(state, CACHED - 1, 0, 0, new Random(7))).toBe(false);
     });
-    it('a union event is gated by its own action count, not the shared one (#1996)', () => {
-      expect(MIN_EVENT_INTERVAL_ACTIONS).toBeGreaterThan(0);
+    it('a union event fires on its own action count while the shared count is below the minimum (#1996)', () => {
       const { state, fired } = unionAttempt(CACHED, 10);
       expect(fired?.eventId).toBe('union_ev');
       expect(state.actionCountSinceEvent).toBe(0);
@@ -1031,14 +1030,16 @@ describe('union events share the player-activity gate, counted separately (#1996
   });
 
   it('with no player actions a union event never fires on time alone', () => {
-    const state = createEventSystemState();
+    // Union timer due and union cooldown long elapsed on every tick: only the action gate holds it back.
+    const state = armed('union');
+    state.unionCooldownMinIntervalTicks = CACHED;
+    state.lastUnionEventTick = 0;
     const rng = new Random(11);
-    for (let tick = 1; tick <= 5000; tick++) {
-      const fired = tickEventSystem(state, makeCtx({ tickCount: tick, employeeCount: 10, unionMemberCount: 10 }), rng);
-      if (fired) expect(fired.eventId).not.toBe('union_ev');
-      state.pendingEvent = null;
-      state.firedEventIds = [];
+    for (let tick = CACHED * 2; tick < CACHED * 2 + 200; tick++) {
+      for (const t of state.timers) t.remaining = t.category === 'union' ? 1 : 100000;
+      expect(tickEventSystem(state, makeCtx({ tickCount: tick, employeeCount: 10, unionMemberCount: 10 }), rng)).toBeNull();
     }
+    expect(state.unionActionCountSinceEvent).toBe(0);
   });
 
   it('MIN_EVENT_INTERVAL_ACTIONS - 1 union actions hold the event back and keep the retry delay', () => {

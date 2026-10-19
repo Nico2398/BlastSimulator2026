@@ -48,16 +48,16 @@ function share(clickEvery: number | null): { share: number; mix: Mix } {
 }
 
 describe('event pacing: one activity rule for every category (#1996)', () => {
+  const lightClicker = share(LIGHT_CLICK_EVERY);
+
   it('a light-clicking player does not get an event mix dominated by union events', () => {
-    const watching = share(LIGHT_CLICK_EVERY);
-    expect(watching.mix.total).toBeGreaterThan(0);
-    expect(watching.share).toBeLessThan(0.75);
+    expect(lightClicker.mix.total).toBeGreaterThan(0);
+    expect(lightClicker.share).toBeLessThan(0.75);
   }, 120_000);
 
   it('the union share of events is about equal for a light and a moderately clicking player', () => {
-    const watching = share(LIGHT_CLICK_EVERY);
     const clicking = share(60);
     expect(clicking.mix.total).toBeGreaterThan(0);
-    expect(Math.abs(watching.share - clicking.share)).toBeLessThan(0.2);
+    expect(Math.abs(lightClicker.share - clicking.share)).toBeLessThan(0.2);
   }, 240_000);
 });

@@ -285,7 +285,7 @@ export function queueFollowUp(state: EventSystemState, eventId: string): void {
   state.followUpQueue.push(eventId);
 }
 
-/** Increment the action count since the last event. Used for cooldown gating. */
+/** Bump both action counters since the last event: the shared one and the union one (#1996). Each gates its own cooldown. */
 export function incrementActionCount(state: EventSystemState): void {
   state.actionCountSinceEvent++;
   state.unionActionCountSinceEvent++;
