@@ -8,7 +8,7 @@ import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
 import { placeBuilding } from '../../../../src/core/entities/Building.js';
 import { readFileSync } from 'node:fs';
 import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
-import { addChargedPattern, makeCoverageSurvey, makeOreGrid } from '../../../helpers/oreSurveyFixture.js';
+import { addChargedPattern, addDrilledPattern, addWeakChargedPattern, makeBarrenSurvey, makeCoverageSurvey, makeOreGrid } from '../../../helpers/oreSurveyFixture.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import { dispatchChargeAction } from '../../../../src/core/mining/ChargeOrder.js';
 import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
@@ -522,7 +522,7 @@ describe('PreflightModal ore estimate coverage (#1960)', () => {
     modal.setGridProvider(() => grid);
     const state = makeState();
     addChargedPattern(state, holeCounter);
-    if (survey === 'half') state.surveyResults.push(makeCoverageSurvey(0, 20));
+    if (survey === 'half') state.surveyResults.push(makeCoverageSurvey(0, 20, 1, 0, 20));
     if (survey === 'full') state.surveyResults.push(makeCoverageSurvey(0, 39));
     if (survey === 'stale') state.surveyResults.push({ ...makeCoverageSurvey(0, 39), stale: true });
     modal.show();
@@ -562,6 +562,66 @@ describe('PreflightModal ore estimate coverage (#1960)', () => {
     });
     expect(costs[0]).toMatch(/^\$/);
     expect(new Set(costs).size).toBe(1);
+  });
+});
+
+describe('PreflightModal ore estimate: surveyed ground and nothing broken (#1967)', () => {
+  function statText(modal: PreflightModal, labelKey: string): string {
+    const label = [...modal.root.querySelectorAll('*')]
+      .find(n => n.children.length === 0 && n.textContent === t(labelKey));
+    if (!label) throw new Error(`no stat ${labelKey}`);
+    return label.nextElementSibling?.textContent ?? label.parentElement?.textContent ?? '';
+  }
+  const estValueText = (modal: PreflightModal) => statText(modal, 'ui.blast_workshop.preflight.stat_value');
+  const hint = () => t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') });
+
+  function open(holes: 'drilled' | 'weak' | 'charged', survey: 'none' | 'full' | 'barren'): PreflightModal {
+    setLocale('en');
+    const { modal } = makeModal();
+    const grid = makeOreGrid();
+    modal.setGridProvider(() => grid);
+    const state = makeState();
+    if (holes === 'drilled') addDrilledPattern(state, holeCounter);
+    if (holes === 'weak') addWeakChargedPattern(state, holeCounter);
+    if (holes === 'charged') addChargedPattern(state, holeCounter);
+    if (survey === 'full') state.surveyResults.push(makeCoverageSurvey(0, 39));
+    if (survey === 'barren') state.surveyResults.push(makeBarrenSurvey());
+    modal.show();
+    modal.update(state, 'sunny');
+    return modal;
+  }
+
+  it('surveyed but uncharged holes show a neutral dash, not "No survey"', () => {
+    const modal = open('drilled', 'full');
+    expect(estValueText(modal)).toBe('—');
+    expect(modal.root.textContent).not.toContain('No survey');
+    expect(modal.root.textContent).not.toContain(hint());
+  });
+
+  it('unsurveyed uncharged holes keep "No survey"', () => {
+    expect(estValueText(open('drilled', 'none'))).toContain('No survey');
+  });
+
+  it('a charge that breaks nothing is neutral, surveyed or not', () => {
+    for (const survey of ['full', 'none'] as const) {
+      const modal = open('weak', survey);
+      expect(estValueText(modal)).toBe('—');
+      expect(modal.root.textContent).not.toContain('No survey');
+      expect(modal.root.textContent).not.toContain(hint());
+    }
+  });
+
+  it('a surveyed barren charged pattern reads $0 with no share', () => {
+    const text = estValueText(open('charged', 'barren'));
+    expect(text).toBe('$0');
+    expect(text).not.toContain('surveyed');
+    expect(text).not.toContain('No survey');
+  });
+
+  it('a charged pattern wholly inside a fresh disc reads the dollar value alone', () => {
+    const text = estValueText(open('charged', 'full'));
+    expect(text).toMatch(/^\$[\d,.]+$/);
+    expect(text).not.toContain('surveyed');
   });
 });
 

@@ -73,6 +73,7 @@ import { settleAwaitingFundsCharges } from '../mining/ChargeOrder.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
 import { releaseOccupantsOfRemovedBuildings, releaseOccupantsOfRemovedVehicles, flushUnannouncedLeaves } from './Mount.js';
+import { recordBoardOre, runBoardReview, type BoardReview } from '../economy/Board.js';
 
 /** One need/traffic-jam event that fired and auto-paused the tick loop. */
 export interface FiredEventReport {
@@ -100,12 +101,15 @@ export interface GameOverReport {
   ecoShutdown: boolean;
   arrested: boolean;
   revolted: boolean;
+  fired: boolean;
   levelEndReason: GameState['levelEndReason'];
 }
 
 /** Structured result of advancing the simulation by one tick. */
 export interface TickReport {
   tick: number;
+  /** Quarterly board review result, when one ran this tick (#1946). */
+  boardReview?: BoardReview | null;
   contractsExpired: Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }>;
   /** Stored ore automatically delivered to active contracts this tick. */
   contractsDelivered: Array<{ contractId: number; kg: number; payment: number; bonus: number; completed: boolean }>;
@@ -214,6 +218,7 @@ export function runTick(
   for (const delivery of contractsDelivered) {
     bookDeliveryCashflow(state, delivery.contractId, delivery, state.tickCount);
     recordOreDelivery(state.grade, delivery.contractType, delivery.kg);
+    recordBoardOre(state.board, delivery.contractType, delivery.kg);
   }
   // 3b. Pending mine-grade application (#1921)
   advanceGradeApplication(state, emitter);
@@ -429,6 +434,9 @@ export function runTick(
   // cash above the bankruptcy floor; the rest is collected from later income. Own rng stream.
   const taxAudit = state.levelEnded ? null : runTaxAuditStep(state, smugglingIncome, emitter);
 
+  // 8zz. Quarterly board review (#1946) — before the win/lose checks so a firing ends the level this tick.
+  const boardReview = state.levelEnded ? null : runBoardReview(state);
+
   // 9. Win/lose condition checks (level complete, bankruptcy, ecological
   // shutdown, arrest, worker revolt).
   const gameOver = checkGameOverConditions(state, emitter);
@@ -474,6 +482,7 @@ export function runTick(
     worldInvariantViolations,
     firedEvent,
     gameOver,
+    ...(boardReview ? { boardReview } : {}),
     paused: state.isPaused,
   };
 }

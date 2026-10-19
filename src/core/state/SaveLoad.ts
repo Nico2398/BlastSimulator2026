@@ -17,6 +17,7 @@ import { WEATHER_HISTORY_MAX } from '../config/balance.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
 import { sanitizeTutorialProgress } from './TutorialProgress.js';
 import { sanitizeGradeState } from '../economy/MineGrade.js';
+import { sanitizeBoardState } from '../economy/Board.js';
 
 /**
  * Serialize a GameState to a JSON string.
@@ -1019,6 +1020,10 @@ export function deserialize(json: string): GameState {
   const grade = sanitizeGradeState(obj['grade']);
   if (grade) obj['grade'] = grade;
   else delete obj['grade'];
+  // #1946: board-of-directors state, same treatment.
+  const board = sanitizeBoardState(obj['board']);
+  if (board) obj['board'] = board;
+  else delete obj['board'];
 
   const restored = obj as unknown as GameState;
   // Capacity is derived from the warehouses, never trusted from the save (#1369).

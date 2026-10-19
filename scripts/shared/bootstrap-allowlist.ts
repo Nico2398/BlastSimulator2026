@@ -58,6 +58,8 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   'set_policy mode:shift_8h fatigue:60',
   // #1921: mine-grade application has no player UI in v1 (the approval ceremony is a later task).
   'permit apply',
+  // #1946: the board of directors is a level option; `board start` attaches one for a scenario (debug only, no UI).
+  'board start',
   'weather set',
   'weather',
   'event fire',

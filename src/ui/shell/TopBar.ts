@@ -15,6 +15,7 @@ import { formatDollars } from '../../core/economy/formatMoney.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import { getLevelObjective } from '../../core/campaign/LevelObjective.js';
 import { gradeDef, nextGradeTargets } from '../../core/economy/MineGrade.js';
+import { boardTicksLeft } from '../../core/economy/Board.js';
 import { getOperatingSummary } from '../../core/economy/OperatingFinance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
@@ -93,6 +94,9 @@ export class TopBar {
   private readonly gradeWrap: HTMLButtonElement;
   private readonly gradeText: HTMLElement;
   private lastGradeSig: string | null = null;
+  private readonly boardWrap: HTMLElement;
+  private readonly boardText: HTMLElement;
+  private lastBoardSig: string | null = null;
   /** Grade and all-targets-met flag seen last update; null until the first sighting, and reset when the grade changes. */
   private gradeTracked: { grade: number; allMet: boolean } | null = null;
   private gradePulseTimer: ReturnType<typeof setTimeout> | undefined;
@@ -188,6 +192,15 @@ export class TopBar {
     this.gradeText = el('span', { className: 'bsx-mono' });
     this.gradeText.style.cssText = 'font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px';
     this.gradeWrap.append(iconEl('contract', 14), this.gradeText);
+
+    // ── Board chip ── board levels only; informational, no panel (#1946).
+    this.boardWrap = el('div');
+    this.boardWrap.dataset['action'] = 'open-board';
+    this.boardWrap.style.cssText = 'display:none;flex:0 1 auto;min-width:0;align-items:center;gap:8px;padding:0 12px;border-right:1px solid var(--bsx-hairline)';
+    this.locale.bindTitle(this.boardWrap, 'shell.topbar.board_tip');
+    this.boardText = el('span', { className: 'bsx-mono' });
+    this.boardText.style.cssText = 'font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px';
+    this.boardWrap.append(iconEl('gavel', 14), this.boardText);
 
     // ── Day / clock ──
     const dayWrap = el('div');
@@ -291,7 +304,7 @@ export class TopBar {
 
     rightWrap.append(this.logBtn, savesBtn, mapBtn);
 
-    this.root.append(this.balanceWrap, this.objectiveWrap, this.gradeWrap, dayWrap, speedWrap, alertWrap, this.scoresEl, rightWrap);
+    this.root.append(this.balanceWrap, this.objectiveWrap, this.gradeWrap, this.boardWrap, dayWrap, speedWrap, alertWrap, this.scoresEl, rightWrap);
     container.appendChild(this.root);
 
     shellLayoutRegistry.register({ id: 'topbar', layer: 'hud', bounds: topBarBounds });
@@ -321,6 +334,7 @@ export class TopBar {
 
     this.updateObjective(state);
     this.updateGradeChip(state);
+    this.updateBoardChip(state);
 
     // Day / clock
     const day = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;
@@ -542,6 +556,22 @@ export class TopBar {
     this.gradeText.textContent = t('shell.topbar.grade', { name: t(grade.nameKey, grade.nameParams) });
   }
 
+  /** Show the quarter countdown and board confidence on board levels. */
+  private updateBoardChip(state: GameState): void {
+    const board = state.board;
+    const days = board ? Math.ceil(boardTicksLeft(board, state.tickCount) / TICKS_PER_DAY) : 0;
+    const sig = board ? `${board.quarter}|${days}|${Math.round(board.confidence)}` : '';
+    if (sig === this.lastBoardSig) return;
+    this.lastBoardSig = sig;
+    if (!board) { this.boardWrap.style.display = 'none'; return; }
+    this.boardWrap.style.display = 'flex';
+    this.boardText.textContent = t('shell.topbar.board', {
+      quarter: board.quarter,
+      days,
+      confidence: Math.round(board.confidence),
+    });
+  }
+
   private startGradePulse(): void {
     clearTimeout(this.gradePulseTimer);
     this.gradeWrap.dataset['pulse'] = 'true';
@@ -595,6 +625,8 @@ export class TopBar {
     this.lastObjectiveSig = '';
     this.lastGradeSig = null;
     if (this.lastState) this.updateGradeChip(this.lastState);
+    this.lastBoardSig = null;
+    if (this.lastState) this.updateBoardChip(this.lastState);
     if (this.lastScoreState) this.updateScores(this.lastScoreState);
     if (this.weatherPopoverOpen) this.renderWeatherPopover();
   }

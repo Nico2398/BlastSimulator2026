@@ -132,7 +132,6 @@ export class UIManager {
     this.financesPanel.setCloseHandler(() => this.hideAllPanels());
     this.operationsPanel = new OperationsPanel(leftCol);
     this.operationsPanel.setCloseHandler(() => this.hideAllPanels());
-    this.operationsPanel.setConfirmHandler(config => this.confirmModal.show(config));
     this.buildMenu = new BuildMenu(leftCol);
     this.buildMenu.setCloseHandler(() => this.hideAllPanels());
     this.buildMenu.setConfirmHandler(config => this.confirmModal.show(config));
