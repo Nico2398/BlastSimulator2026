@@ -12,6 +12,8 @@ import {
   SECONDARY_BLAST_RADIUS_MAX_M,
   SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION,
   SECONDARY_BLAST_DEATH_RADIUS_FRACTION,
+  SECONDARY_BLAST_CRATER_HOLE_DEPTH_M,
+  DRILL_HOLE_DEFAULT_DIAMETER_M,
 } from '../config/balance.js';
 
 /** Emitted when an `explosive_warehouse` with stored explosives is destroyed. */
@@ -46,9 +48,26 @@ export interface SecondaryBlastOutcome {
 }
 
 /** Blast plan a detonation feeds the blast pipeline to carve its crater (#1896). */
-export function secondaryCraterPlan(_event: SecondaryBlastEvent): BlastPlan {
-  // TODO: implement
-  return { holes: [], charges: {} };
+export function secondaryCraterPlan(event: SecondaryBlastEvent): BlastPlan {
+  // Heaviest stored explosive sets the charge type; the whole stock is the charge mass.
+  let explosiveId: string | null = null;
+  let heaviestKg = 0;
+  for (const [id, kg] of Object.entries(event.stock)) {
+    if (kg > heaviestKg) { explosiveId = id; heaviestKg = kg; }
+  }
+  if (explosiveId === null) return { holes: [], charges: {} };
+  const totalKg = Object.values(event.stock).reduce((sum, kg) => sum + Math.max(0, kg), 0);
+  const holeId = `secondary-crater-${event.buildingId}`;
+  return {
+    holes: [{
+      id: holeId,
+      x: Math.floor(event.x),
+      z: Math.floor(event.z),
+      depth: SECONDARY_BLAST_CRATER_HOLE_DEPTH_M,
+      diameter: DRILL_HOLE_DEFAULT_DIAMETER_M,
+    }],
+    charges: { [holeId]: { explosiveId, amountKg: totalKg, stemmingM: 0 } },
+  };
 }
 
 /** Detonation radius in metres for a stored explosive mass. */

@@ -14,6 +14,8 @@ import { chargeDeliveryArrivalByHole } from '../../../core/mining/ExplosiveStock
 import { clearTubing } from '../../../core/mining/Tubing.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
+import { bookEmployeeDeath, type AccidentRecord } from '../../../core/entities/Damage.js';
+import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 
 export function requireGame(ctx: MiningContext): string | null {
   if (!ctx.state || !ctx.grid) return t('console.no_game_loaded');
@@ -165,4 +167,31 @@ export function emitHoleCellsChanged(
   for (const h of holes) {
     emitFootprintOccupancyChanged(ctx, Math.floor(h.x), Math.floor(h.z), 1, 1);
   }
+}
+
+/**
+ * Standing on cleared rock is not survivable: kill every living employee and
+ * destroy every vehicle on one of `clearedColumns` ("x,z" keys). Books each
+ * accident on `state.damage` and returns them (blast and secondary crater, #1896).
+ */
+export function destroyEntitiesOnColumns(state: GameState, clearedColumns: readonly string[]): AccidentRecord[] {
+  const accidents: AccidentRecord[] = [];
+  const columns = new Set(clearedColumns);
+  for (const emp of state.employees.employees) {
+    if (!emp.alive) continue;
+    if (!columns.has(`${Math.floor(emp.x)},${Math.floor(emp.z)}`)) continue;
+    const accident = bookEmployeeDeath(state.employees, state.damage, emp.id, state.tickCount);
+    state.damage.accidents.push(accident);
+    accidents.push(accident);
+  }
+  for (const veh of [...state.vehicles.vehicles]) {
+    if (!columns.has(`${Math.floor(veh.x)},${Math.floor(veh.z)}`)) continue;
+    destroyVehicle(state.vehicles, veh.id);
+    const accident: AccidentRecord = {
+      tick: state.tickCount, type: 'vehicle_destroyed', entityId: veh.id, fragmentId: -1, kineticEnergy: 0,
+    };
+    state.damage.accidents.push(accident);
+    accidents.push(accident);
+  }
+  return accidents;
 }
