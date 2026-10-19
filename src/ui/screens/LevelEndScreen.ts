@@ -19,7 +19,7 @@ import { STAR_ECOLOGY_MIN } from '../../core/config/balance.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { getBestStars, getCampaignLevels, isCampaignDone, isFinalCampaignLevel } from '../../core/campaign/Campaign.js';
 import { getLevel } from '../../core/campaign/Level.js';
-import { TICKS_PER_DAY, REVOLT_TICKS } from '../../core/config/balance.js';
+import { TICKS_PER_DAY, REVOLT_TICKS, BOARD_CONFIDENCE_MISS_PENALTY, BOARD_CONFIDENCE_MET_GAIN } from '../../core/config/balance.js';
 import { revoltCause } from '../../core/scores/RevoltCause.js';
 import type { GameState } from '../../core/state/GameState.js';
 
@@ -384,7 +384,7 @@ export class LevelEndScreen {
     this.defeatBodyEl.textContent = t(`ui.level_end.defeat.${reason}.body`, { days: `${days}` });
     this.defeatTipTextEl.textContent = t(
       this.defeatTipKey(reason, state),
-      reason === 'worker_revolt' ? { hours: String(REVOLT_TICKS) } : undefined,
+      this.defeatTipParams(reason),
     );
 
     this.defeatStatGridEl.replaceChildren(statGrid(this.defeatStats(reason, state), 4));
@@ -401,6 +401,14 @@ export class LevelEndScreen {
     this.defeatRetryBtn.textContent = '';
     this.defeatRetryBtn.appendChild(el('span', { text: t('ui.level_end.retry', { level: levelName }) }));
     this.defeatBackBtn.textContent = t(sandbox ? 'ui.level_end.back_to_sandbox' : 'ui.level_end.back_to_portfolio');
+  }
+
+  private defeatTipParams(reason: DefeatReason): Record<string, string> | undefined {
+    if (reason === 'worker_revolt') return { hours: String(REVOLT_TICKS) };
+    if (reason === 'fired') {
+      return { penalty: String(BOARD_CONFIDENCE_MISS_PENALTY), gain: String(BOARD_CONFIDENCE_MET_GAIN) };
+    }
+    return undefined;
   }
 
   private defeatTipKey(reason: DefeatReason, state: GameState): string {

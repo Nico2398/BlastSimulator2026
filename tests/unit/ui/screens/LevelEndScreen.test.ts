@@ -12,7 +12,7 @@ import { calculateStarRating } from '../../../../src/core/campaign/SuccessTracke
 import { getLevel } from '../../../../src/core/campaign/Level.js';
 import en from '../../../../src/core/i18n/locales/en.json';
 import fr from '../../../../src/core/i18n/locales/fr.json';
-import { TICKS_PER_DAY, REVOLT_TICKS } from '../../../../src/core/config/balance.js';
+import { TICKS_PER_DAY, REVOLT_TICKS, BOARD_CONFIDENCE_MISS_PENALTY, BOARD_CONFIDENCE_MET_GAIN } from '../../../../src/core/config/balance.js';
 
 function mount(): { container: HTMLDivElement; screen: LevelEndScreen } {
   const container = document.createElement('div');
@@ -952,7 +952,12 @@ describe('LevelEndScreen fired by the board (#1946)', () => {
     const text = container.querySelector('#bs-level-end-screen')!.textContent!;
     expect(text).toContain(t('ui.level_end.defeat.fired.title'));
     expect(text).toContain("You're fired. Your golden parachute: one (1) hard hat.");
-    expect(text).toContain(t('ui.level_end.defeat.fired.tip'));
+    expect(text).toContain(
+      t('ui.level_end.defeat.fired.tip', {
+        penalty: String(BOARD_CONFIDENCE_MISS_PENALTY),
+        gain: String(BOARD_CONFIDENCE_MET_GAIN),
+      }),
+    );
     screen.dispose();
   });
 

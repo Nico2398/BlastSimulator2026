@@ -2912,7 +2912,7 @@
   "ui.level_end.defeat.worker_revolt.title": "THE CREW HAS WALKED OUT",
   "ui.level_end.defeat.fired.title": "YOU'RE FIRED",
   "ui.level_end.defeat.fired.body": "You're fired. Your golden parachute: one (1) hard hat.",
-  "ui.level_end.defeat.fired.tip": "Board confidence falls 25 points for every missed quarterly target and rises 15 when both are met. Watch the quarter chip in the top bar and deliver ore early.",
+  "ui.level_end.defeat.fired.tip": "Board confidence falls {penalty} points for every missed quarterly target and rises {gain} when both are met. Watch the quarter chip in the top bar and deliver ore early.",
   "ui.level_end.defeat.worker_revolt.body": "Well-being reached zero on day {days}. The union has occupied the Management Office, renamed it, and is currently giving interviews from your desk.",
   "ui.level_end.defeat.worker_revolt.tip.no_rest_policy": "Continuous shifts skip the forced rest that shift-based schedules use, so employees keep working through low fatigue instead of stopping automatically — well-being pays for it. Once it hits zero, the clock to a walkout runs {hours} hours.",
   "ui.level_end.defeat.worker_revolt.tip.no_housing": "With no Living Quarters on site, employees have nowhere to recover and their well-being sinks faster. Build a Living Quarters so they can rest. Once well-being hits zero, the crew walks out after {hours} hours.",

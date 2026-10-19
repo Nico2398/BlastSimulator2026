@@ -2912,7 +2912,7 @@
   "ui.level_end.defeat.worker_revolt.title": "L'ÉQUIPE A TOUT LÂCHÉ",
   "ui.level_end.defeat.fired.title": "VOUS ÊTES LICENCIÉ",
   "ui.level_end.defeat.fired.body": "Vous êtes licencié. Votre parachute doré : un (1) casque de chantier.",
-  "ui.level_end.defeat.fired.tip": "La confiance du conseil baisse de 25 points pour chaque objectif trimestriel manqué et monte de 15 quand les deux sont atteints. Surveillez la pastille de trimestre dans la barre du haut et livrez du minerai tôt.",
+  "ui.level_end.defeat.fired.tip": "La confiance du conseil baisse de {penalty} points pour chaque objectif trimestriel manqué et monte de {gain} quand les deux sont atteints. Surveillez la pastille de trimestre dans la barre du haut et livrez du minerai tôt.",
   "ui.level_end.defeat.worker_revolt.body": "Le bien-être a atteint zéro au jour {days}. Le syndicat a occupé le bureau de direction, l'a rebaptisé, et donne actuellement des interviews depuis votre poste de travail.",
   "ui.level_end.defeat.worker_revolt.tip.no_rest_policy": "Les horaires continus suppriment le repos forcé qu'imposent les horaires par équipes : les employés continuent de travailler malgré une fatigue basse au lieu de s'arrêter automatiquement — le bien-être en paie le prix. Une fois à zéro, le compte à rebours avant la révolte dure {hours} heures.",
   "ui.level_end.defeat.worker_revolt.tip.no_housing": "Sans quartiers d'habitation sur le site, les employés n'ont nulle part où récupérer et leur bien-être chute plus vite. Construisez des quartiers d'habitation pour qu'ils puissent se reposer. Une fois le bien-être à zéro, l'équipe se révolte au bout de {hours} heures.",
