@@ -3,12 +3,11 @@
 
 import { getExplosive, type ExplosiveType } from '../world/ExplosiveCatalog.js';
 import { tierShortfall, type ColumnRock } from './ExplosiveRockFit.js';
-import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { drawFromStockPool } from './ExplosiveStock.js';
 import { t } from '../i18n/I18n.js';
-import type { VehicleTier } from '../entities/Vehicle.js';
+import { computeRigDurationTicks, type VehicleTier } from '../entities/Vehicle.js';
 import {
-  MIN_STEMMING_M, VEHICLE_TIER_MULTIPLIERS, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
+  MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
   CHARGE_FIT_EPSILON, DRILL_HOLE_DEFAULT_DIAMETER_M,
 } from '../config/balance.js';
 import { chargeKgPerMetre, holeCapacityFactor } from './HoleDiameter.js';
@@ -127,9 +126,7 @@ export function computeChargeDurationTicks(
   needMultiplier: number = 1,
   lqMultiplier: number = 1,
 ): number {
-  return computeTaskDuration(
-    baseTicks / VEHICLE_TIER_MULTIPLIERS[tier].workRate, proficiencyLevel, needMultiplier, lqMultiplier, 1,
-  );
+  return computeRigDurationTicks(baseTicks, tier, proficiencyLevel, needMultiplier, lqMultiplier);
 }
 
 /**

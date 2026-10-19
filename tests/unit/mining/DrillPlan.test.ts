@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createGridPlan, addHole, removeHole, holeNumericId, maxHoleNumericId, digVoxel, landDrilledHole, computeDrillHoleDurationTicks, fleetDrillReachM, drillDepthRefusal, minDrillRigTier, fleetDrillDiameterM, drillDiameterRefusal } from '../../../src/core/mining/DrillPlan.js';
+import { computeRigDurationTicks } from '../../../src/core/entities/Vehicle.js';
+import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDuration.js';
 import type { DigVoxelResult, PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 import {
   VoxelGrid, computeVoxelColumnSurfaceY, setVoxelColumnSurfaceHeight,
@@ -578,5 +580,46 @@ describe('computeDrillHoleDurationTicks ignores the new capacity rules (#1934 pi
       Math.max(1, Math.round(DRILL_HOLE_BASE_DURATION_TICKS * (8 / DRILL_HOLE_REFERENCE_DEPTH_M) * (0.127 / DRILL_HOLE_REFERENCE_DIAMETER_M))),
     );
     expect(computeDrillHoleDurationTicks(8, 0.127)).toBeGreaterThan(base);
+  });
+});
+
+describe('computeDrillHoleDurationTicks stays the tier-1 base (#1935)', () => {
+  it('is not pre-divided by any rig work rate', () => {
+    const base = computeDrillHoleDurationTicks(8, DRILL_HOLE_REFERENCE_DIAMETER_M);
+    expect(base).toBe(Math.max(1, Math.round(
+      DRILL_HOLE_BASE_DURATION_TICKS * (8 / DRILL_HOLE_REFERENCE_DEPTH_M),
+    )));
+  });
+});
+
+describe('computeRigDurationTicks (#1935)', () => {
+  // A wide 8 m hole (6x reference diameter, 36 ticks): the 6-tick reference base is too coarse for
+  // ceil-rounding to leave the 1/workRate ratio visible.
+  const base = computeDrillHoleDurationTicks(8, DRILL_HOLE_REFERENCE_DIAMETER_M * 6);
+
+  it('tier 1 equals the plain task duration', () => {
+    expect(computeRigDurationTicks(base, 1)).toBe(computeTaskDuration(base, 1, 1, 1, 1));
+  });
+
+  it('tier 2 divides the base by workRate 1.4 (~0.71x for an 8 m hole)', () => {
+    const t2 = computeRigDurationTicks(base, 2);
+    expect(t2).toBe(computeTaskDuration(base / 1.4, 1, 1, 1, 1));
+    expect(t2 / computeRigDurationTicks(base, 1)).toBeCloseTo(1 / 1.4, 1);
+  });
+
+  it('tier 3 divides the base by workRate 2 (~0.5x for an 8 m hole)', () => {
+    const t3 = computeRigDurationTicks(base, 3);
+    expect(t3).toBe(computeTaskDuration(base / 2, 1, 1, 1, 1));
+    expect(t3 / computeRigDurationTicks(base, 1)).toBeCloseTo(0.5, 1);
+  });
+
+  it('tier 3 < tier 2 < tier 1', () => {
+    expect(computeRigDurationTicks(base, 3)).toBeLessThan(computeRigDurationTicks(base, 2));
+    expect(computeRigDurationTicks(base, 2)).toBeLessThan(computeRigDurationTicks(base, 1));
+  });
+
+  it('proficiency, need and living-quarters multipliers still apply on top of the tier', () => {
+    expect(computeRigDurationTicks(base, 2, 4, 0.9, 0.85))
+      .toBe(computeTaskDuration(base / 1.4, 4, 0.9, 0.85, 1));
   });
 });
