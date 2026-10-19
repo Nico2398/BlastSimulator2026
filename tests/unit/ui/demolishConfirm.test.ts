@@ -115,3 +115,16 @@ describe('freightOreKg (#1758)', () => {
     expect(freightOreKg(l, makeBuilding({ type: 'explosive_warehouse' }))).toBe(0);
   });
 });
+
+describe('buildDemolishConfirm vanity line (#1947)', () => {
+  it.each(['ceo_statue', 'golf_course', 'executive_helipad', 'gold_tower'] as const)('%s body carries the sunk-cost line', (type) => {
+    const cfg = buildDemolishConfirm(makeBuilding({ type }), vi.fn());
+    expect(cfg.body).toContain(t('ui.build.demolish_confirm_vanity'));
+    expect(cfg.body).not.toContain('ui.build.demolish_confirm_vanity');
+  });
+
+  it('a regular building has no sunk-cost line', () => {
+    const cfg = buildDemolishConfirm(makeBuilding(), vi.fn());
+    expect(cfg.body).not.toContain(t('ui.build.demolish_confirm_vanity'));
+  });
+});

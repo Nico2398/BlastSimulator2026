@@ -6,7 +6,8 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { unlockLinesFor } from '../../src/core/economy/MineGrade.js';
-import { BUILDING_DEFS } from '../../src/core/entities/Building.js';
+import { BUILDING_DEFS, getTotalOperatingCost } from '../../src/core/entities/Building.js';
+import { createBoardState } from '../../src/core/economy/Board.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 
 function site(grade: number, cash = 10_000_000) {
@@ -106,5 +107,69 @@ describe('sandbox start grade arg (#1947)', () => {
     const { runner, ctx } = createRunner();
     expect(runner.run(`sandbox start seed:42 kit:full staffed:true grade:${g}`)).toMatchObject({ success: true });
     expect(ctx.state!.grade!.grade).toBe(g);
+  });
+});
+
+describe('vanity build with a board attached (#1947)', () => {
+  const CONFIG = { quarterTicks: 100, oreTargetT: 10, profitTarget: 1000 };
+
+  it('is allowed below grade 4 and raises board confidence by 10', () => {
+    const { run, state } = site(1);
+    state.board = createBoardState(CONFIG, 0);
+    const before = state.board.confidence;
+    expect(run('build ceo_statue at:10,10')).toMatchObject({ success: true });
+    expect(state.board.confidence).toBe(before + 10);
+    expect(ofType(state, 'ceo_statue')).toHaveLength(1);
+  });
+
+  it('clamps confidence at the maximum', () => {
+    const { run, state } = site(1);
+    state.board = createBoardState(CONFIG, 0);
+    state.board.confidence = 95;
+    run('build ceo_statue at:10,10');
+    expect(state.board.confidence).toBe(100);
+  });
+
+  it('a refused build leaves confidence untouched', () => {
+    const { run, state } = site(1, 1000);
+    state.board = createBoardState(CONFIG, 0);
+    const before = state.board.confidence;
+    expect(run('build ceo_statue at:10,10').success).toBe(false);
+    expect(state.board.confidence).toBe(before);
+  });
+
+  it('without a board the build succeeds at grade 4 and nothing throws', () => {
+    const { run, state } = site(4);
+    expect(state.board).toBeUndefined();
+    expect(run('build ceo_statue at:10,10')).toMatchObject({ success: true });
+  });
+});
+
+describe('golf upkeep (#1947)', () => {
+  it('getTotalOperatingCost includes 20 per tick for a golf course', () => {
+    const { run, state } = site(4);
+    const base = getTotalOperatingCost(state.buildings);
+    run('build spoil_heap at:40,20');
+    const withHeap = getTotalOperatingCost(state.buildings);
+    const heapW = Math.max(...BUILDING_DEFS.spoil_heap[1].footprint.map(c => c[0])) + 1;
+    expect(run(`build golf_course at:${40 + heapW},20`)).toMatchObject({ success: true });
+    expect(ofType(state, 'golf_course')).toHaveLength(1);
+    expect(getTotalOperatingCost(state.buildings) - withHeap).toBe(20);
+    expect(withHeap).toBeGreaterThanOrEqual(base);
+  });
+
+  it.each(['ceo_statue', 'executive_helipad', 'gold_tower'] as const)('%s adds no upkeep', (type) => {
+    const { run, state } = site(4);
+    const base = getTotalOperatingCost(state.buildings);
+    expect(run(`build ${type} at:10,10`)).toMatchObject({ success: true });
+    expect(getTotalOperatingCost(state.buildings)).toBe(base);
+  });
+});
+
+describe('sandbox start grade arg validation (#1947)', () => {
+  it.each(['x', '-1', '1.5', ''])('rejects grade:%s', (bad) => {
+    const { runner } = createRunner();
+    const result = runner.run(`sandbox start seed:42 grade:${bad}`) as { success: boolean; message?: string };
+    expect(result.success).toBe(false);
   });
 });
