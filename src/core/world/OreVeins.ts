@@ -3,7 +3,7 @@
 // gets its own sub-seeded 3D ridged field, rotated into a per-ore strike
 // direction and stretched along it (6.7x lower frequency along strike than
 // across it) so veins read as elongated seams rather than isotropic blobs.
-// With deposits on, density is graded by depth (#1933) before the site grade scale (#1932).
+// With deposits on, hosting and windows come from SandboxDeepOre and density is graded by depth (#1933) before the site grade scale (#1932).
 // Gated by a per-ore depth window and weighted by how strongly the voxel's
 // actual rock blend hosts that ore — honours the composition weighting the
 // old scheme only approximated.
@@ -16,6 +16,7 @@ import { Random } from '../math/Random.js';
 import { subSeed, cellRand } from '../math/Hash.js';
 import { getAllOres, type OreType } from './OreCatalog.js';
 import { getRock } from './RockCatalog.js';
+import { sandboxHostProbability, sandboxOreWindow } from './SandboxDeepOre.js';
 import type { VoxelRockComposition } from './VoxelGrid.js';
 
 /** Along-strike frequency; 6.7x lower than across-strike elongates veins along the strike axis. */
@@ -41,12 +42,12 @@ interface OreField {
 }
 
 /** Σ coefficient_i * rock_i.oreProbabilities[oreId] — how strongly this voxel's rock blend hosts oreId. */
-function hostRockAffinity(composition: VoxelRockComposition, oreId: string): number {
+function hostRockAffinity(composition: VoxelRockComposition, oreId: string, sandbox: boolean): number {
   let sum = 0;
   for (const part of composition.rocks) {
     const rock = getRock(part.rockId);
     if (!rock) continue;
-    sum += part.coefficient * (rock.oreProbabilities[oreId] ?? 0);
+    sum += part.coefficient * (sandbox ? sandboxHostProbability(part.rockId, oreId) : rock.oreProbabilities[oreId] ?? 0);
   }
   return sum;
 }
@@ -124,13 +125,15 @@ export class OreVeinSampler {
     const result: Record<string, number> = {};
 
     for (const ore of getAllOres()) {
-      if (depth < ore.depthMin || depth > ore.depthMax) continue;
-
-      const affinity = hostRockAffinity(composition, ore.id);
-      if (affinity <= 0) continue;
-
       const field = this.fields.get(ore.id);
       if (!field) continue;
+      const sandbox = field.deposit !== undefined;
+      const [depthMin, depthMax] = sandbox ? sandboxOreWindow(ore) : [ore.depthMin, ore.depthMax];
+      if (depth < depthMin || depth > depthMax) continue;
+
+      const affinity = hostRockAffinity(composition, ore.id, sandbox);
+      if (affinity <= 0) continue;
+
       const gain = field.deposit
         ? depositGain(field.deposit.noise(x * ORE_DEPOSIT_FREQ, 0, z * ORE_DEPOSIT_FREQ), field.deposit.cutoff)
         : 1;

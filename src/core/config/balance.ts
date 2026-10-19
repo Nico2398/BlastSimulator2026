@@ -3103,3 +3103,26 @@ export const ORE_DEPTH_MULTIPLIER_BANDS: readonly {
 
 /** Metres of smoothstep ramp from each band boundary to the next band (#1933). */
 export const ORE_DEPTH_BLEND_M = 3;
+
+/**
+ * Sandbox-only deep ore content (#1933). With ore deposits on, a (rock, ore) pair here replaces the
+ * RockCatalog host probability, so deeper rock pays more without touching campaign rocks or Level 1's
+ * contract ores. Every ore added has depthMin >= 15 (after SANDBOX_ORE_DEPTH_WINDOWS), so 0-10 m ore is unchanged.
+ */
+export const SANDBOX_DEEP_ORE_AFFINITY: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  cruite: { sparkium: 0.22 },
+  sandite: { sparkium: 0.22 },
+  molite: { rustite: 0.10, blingite: 0.05, dirtite: 0.05, gloomium: 0.22, craktonite: 0.20, absurdium: 0.38 },
+  grumpite: { sparkium: 0.20 },
+  clunkite: { sparkium: 0.12, craktonite: 0.10, absurdium: 0.50 },
+  obstiite: { sparkium: 0, craktonite: 0.06, absurdium: 0.44 },
+  gnarlite: { sparkium: 0.17 },
+  absurdite: { sparkium: 0.15 },
+  titanite: { sparkium: 0.08, absurdium: 0.75 },
+};
+
+/** Sandbox-only depth windows [min, max] metres replacing the OreCatalog window: deep ores start deeper so deep bands out-earn mid ones. */
+export const SANDBOX_ORE_DEPTH_WINDOWS: Readonly<Record<string, readonly [number, number]>> = {
+  craktonite: [28, 45],
+  absurdium: [30, 55],
+};
