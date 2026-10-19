@@ -12,6 +12,12 @@ import { ContractsPanel } from '../../../src/ui/panels/ContractsPanel.js';
 import { ShadyPanel } from '../../../src/ui/panels/ShadyPanel.js';
 import { SurveyPanel } from '../../../src/ui/panels/SurveyPanel.js';
 import { FireStep } from '../../../src/ui/panels/blastSteps/Fire.js';
+import { ConfirmModal } from '../../../src/ui/panels/ConfirmModal.js';
+import { PreflightModal } from '../../../src/ui/panels/PreflightModal.js';
+import { BlastReportModal } from '../../../src/ui/panels/BlastReportModal.js';
+import { BLAST_REPORT_MAX_PLAYBACK_S } from '../../../src/core/config/balance.js';
+import { t } from '../../../src/core/i18n/I18n.js';
+import type { BlastReport } from '../../../src/core/mining/BlastExecution.js';
 import { TopBar } from '../../../src/ui/shell/TopBar.js';
 import { NotificationCenter } from '../../../src/ui/notify/NotificationCenter.js';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -119,11 +125,14 @@ describe('resolver controls', () => {
 });
 
 describe.each(['en', 'fr'] as const)('panel text colour (%s)', locale => {
-  const mount = <T extends { root: HTMLElement }>(make: (c: HTMLElement) => T): T => {
+  const mountPlain = <T extends { root: HTMLElement }>(make: (c: HTMLElement) => T): T => {
     setLocale(locale);
     const c = document.createElement('div');
     document.body.appendChild(c);
-    const p = make(c);
+    return make(c);
+  };
+  const mount = <T extends { root: HTMLElement }>(make: (c: HTMLElement) => T): T => {
+    const p = mountPlain(make);
     expect(p.root.classList.contains('bsx-root')).toBe(true);
     return p;
   };
@@ -240,6 +249,50 @@ describe.each(['en', 'fr'] as const)('panel text colour (%s)', locale => {
     expect(step.root.querySelector('[data-action="sound-horn"]')).toBeNull(); // #1362: no Horn button
     expect(step.root.textContent).toContain(locale === 'en' ? 'IN ZONE' : 'DANS LA ZONE');
     expectNoDefaultColour(step.root);
+  });
+
+  // #1985 — modal titles were bare spans: default black on a dark panel.
+  const TITLE_COLOUR = /(?<![-\w])color\s*:\s*var\(--bsx-text-primary\)/;
+  const titleSpan = (root: HTMLElement, text: string): HTMLElement => {
+    expect(text.length).toBeGreaterThan(0);
+    const hit = [...root.querySelectorAll<HTMLElement>('span')].find(e => e.textContent === text && e.children.length === 0);
+    expect(hit, `title span "${text}"`).toBeDefined();
+    return hit!;
+  };
+
+  it('ConfirmModal title is explicitly coloured', () => {
+    const modal = mountPlain(c => new ConfirmModal(c));
+    const title = locale === 'en' ? 'Replay the tutorial?' : 'Rejouer le tutoriel ?';
+    modal.show({ icon: 'blast', title, body: 'Progress is kept.', confirmLabel: 'Replay', onConfirm: () => {} });
+    expect(modal.visible).toBe(true);
+    const span = titleSpan(modal.root, title);
+    expect(span.getAttribute('style') ?? '').toMatch(TITLE_COLOUR);
+    expectNoDefaultColour(modal.root);
+  });
+
+  it('PreflightModal title is explicitly coloured', () => {
+    const modal = mountPlain(c => new PreflightModal(c));
+    modal.show();
+    modal.update(populated());
+    const span = titleSpan(modal.root, t('ui.blast_workshop.preflight.title'));
+    expect(span.getAttribute('style') ?? '').toMatch(TITLE_COLOUR);
+    expectNoDefaultColour(modal.root);
+  });
+
+  it('BlastReportModal title is explicitly coloured', () => {
+    const modal = mountPlain(c => new BlastReportModal(c));
+    const s = populated();
+    const report: BlastReport = {
+      tick: 1, rating: 'good', clearedVoxels: 10, crackedVoxels: 5, fragmentCount: 3,
+      oversizedFragments: 0, totalRockVolume: 10, projectionCount: 0, maxProjectionDistanceM: 0,
+      totalOreValue: 100, spent: 50, destroyedBuildings: [],
+    };
+    s.lastBlastReport = report;
+    modal.update(s, { report, elapsedS: BLAST_REPORT_MAX_PLAYBACK_S, durationS: 1, isPlaying: false });
+    expect(modal.visible).toBe(true);
+    const span = titleSpan(modal.root, t('ui.blast_workshop.report.title'));
+    expect(span.getAttribute('style') ?? '').toMatch(TITLE_COLOUR);
+    expectNoDefaultColour(modal.root);
   });
 
   it('TopBar: clock, day, balance, weather button and open popover', () => {
