@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
-import { isChargeHoleClaimable } from '../../../src/core/engine/ActionSelection.js';
+import { isHoleOrderClaimable } from '../../../src/core/engine/ActionSelection.js';
 
 function chargeAction(payload: Record<string, unknown>): PendingAction {
   return {
@@ -18,28 +18,28 @@ function stateAt(tick: number): GameState {
   return state;
 }
 
-describe('isChargeHoleClaimable delivery gate (#1895)', () => {
+describe('isHoleOrderClaimable delivery gate (#1895)', () => {
   it('is false before the arrival tick', () => {
-    expect(isChargeHoleClaimable(stateAt(399), chargeAction({ holeId: 'H1', deliveryArrivalTick: 400 }))).toBe(false);
+    expect(isHoleOrderClaimable(stateAt(399), chargeAction({ holeId: 'H1', deliveryArrivalTick: 400 }))).toBe(false);
   });
 
   it('is true at the arrival tick', () => {
-    expect(isChargeHoleClaimable(stateAt(400), chargeAction({ holeId: 'H1', deliveryArrivalTick: 400 }))).toBe(true);
+    expect(isHoleOrderClaimable(stateAt(400), chargeAction({ holeId: 'H1', deliveryArrivalTick: 400 }))).toBe(true);
   });
 
   it('is true after the arrival tick', () => {
-    expect(isChargeHoleClaimable(stateAt(900), chargeAction({ holeId: 'H1', deliveryArrivalTick: 400 }))).toBe(true);
+    expect(isHoleOrderClaimable(stateAt(900), chargeAction({ holeId: 'H1', deliveryArrivalTick: 400 }))).toBe(true);
   });
 
   it('is true at once with no arrival stamp', () => {
-    expect(isChargeHoleClaimable(stateAt(0), chargeAction({ holeId: 'H1' }))).toBe(true);
+    expect(isHoleOrderClaimable(stateAt(0), chargeAction({ holeId: 'H1' }))).toBe(true);
   });
 
   it('old actions without the field stay claimable', () => {
-    expect(isChargeHoleClaimable(stateAt(0), chargeAction({}))).toBe(true);
+    expect(isHoleOrderClaimable(stateAt(0), chargeAction({}))).toBe(true);
   });
 
   it('is false while in transit even without a holeId', () => {
-    expect(isChargeHoleClaimable(stateAt(5), chargeAction({ deliveryArrivalTick: 400 }))).toBe(false);
+    expect(isHoleOrderClaimable(stateAt(5), chargeAction({ deliveryArrivalTick: 400 }))).toBe(false);
   });
 });

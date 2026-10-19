@@ -235,7 +235,7 @@ export type PendingActionStatus = 'queued' | 'assigned' | 'in_progress';
  * Why a PendingAction currently has nobody able to perform it — surfaced as a
  * non-blocking player warning rather than cancelling the order (#1061).
  */
-export type BlockedOrderReason = 'no_qualified_employee' | 'no_dual_qualified_employee' | 'no_vehicle_in_fleet' | 'no_licensed_driver' | 'target_unreachable' | 'debris_out_of_reach' | 'no_freight_warehouse' | 'storage_full' | 'licence_level_too_low' | 'no_spoil_heap' | 'spoil_heap_full' | 'no_reaching_vehicle' | 'explosives_in_transit';
+export type BlockedOrderReason = 'no_qualified_employee' | 'no_dual_qualified_employee' | 'no_vehicle_in_fleet' | 'no_licensed_driver' | 'target_unreachable' | 'debris_out_of_reach' | 'no_freight_warehouse' | 'storage_full' | 'licence_level_too_low' | 'no_spoil_heap' | 'spoil_heap_full' | 'no_reaching_vehicle' | 'explosives_in_transit' | 'buried_under_rubble';
 
 /** A lightweight renderer preview entry — mirrors a PendingAction for ghost-mesh display. */
 export interface GhostPreview {

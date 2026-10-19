@@ -16,6 +16,7 @@
 import type { NavGrid } from '../nav/NavGrid.js';
 import { isProgressionSite, type GameState, type PendingAction, type BlockedOrderReason, type GhostPreview } from '../state/GameState.js';
 import { findById } from '../state/IdIndex.js';
+import { isDrillHoleBuried } from '../mining/BuriedHoles.js';
 import type { Employee } from '../entities/Employee.js';
 import { vehicleDriverId, vehicleMaxSlopeRatio } from '../entities/Vehicle.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../entities/Vehicle.js';
@@ -377,7 +378,8 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
     if (judgement !== undefined && red && judgement.hasActor) {
       // Auto-generated debris work outside the reachable set is a normal,
       // player-owned state (#1302), not a failed order: it waits silently.
-      action.blockedReason = isAutoDebrisAction(action.type) ? 'debris_out_of_reach' : 'target_unreachable';
+      action.blockedReason = isDrillHoleBuried(state, action) ? 'buried_under_rubble'
+        : isAutoDebrisAction(action.type) ? 'debris_out_of_reach' : 'target_unreachable';
       action.blockedLicenceLevel = null;
       delete action.blockedDetail;
       const role = action.requiredVehicleRole;
@@ -402,7 +404,9 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
     ) {
       unqualifiedIds.add(action.id);
     }
-    action.blockedReason = reason
+    // Buried first: rubble over the hole is the cause a player can act on, even when the pit also reads unreachable.
+    action.blockedReason = (isDrillHoleBuried(state, action) ? 'buried_under_rubble' : null)
+      ?? reason
       ?? (isChargeDeliveryPending(action, state.tickCount) ? 'explosives_in_transit' : null)
       ?? haulBlockedReason(state, action, fragmentOf, fits);
     action.blockedLicenceLevel = action.requiredVehicleRole === null ? null
