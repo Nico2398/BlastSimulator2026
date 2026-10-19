@@ -2,7 +2,7 @@
 //
 // Shared by the notification center, the Operations panel and the vehicle inspector.
 
-import type { PendingAction } from '../../core/state/GameState.js';
+import type { PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { readOrderDeliveryTick } from '../../core/mining/ExplosiveStock.js';
 import { formatGameClock } from '../formatGameClock.js';
 import { formatGameDuration } from '../formatGameDuration.js';
@@ -88,4 +88,79 @@ export function buildBlockedOrderMessage(action: PendingAction, nowTick?: number
     default:
       return order;
   }
+}
+
+/** Max cause lines shown for a pile of blocked orders. */
+export const BLOCKED_PHRASE_LINES = 3;
+
+const BLOCKED_PHRASE_KINDS = ['crew_fleet', 'storage_full', 'no_warehouse', 'no_spoil_heap', 'spoil_heap_full', 'unreachable'] as const;
+
+type BlockedPhraseKind = typeof BLOCKED_PHRASE_KINDS[number];
+
+interface BlockedKindCount { kind: BlockedPhraseKind; count: number }
+
+/** Phrase kind per reason; exhaustive, so a new BlockedOrderReason fails to compile until classified. null = not a failure. */
+const PHRASE_KIND_BY_REASON: Record<BlockedOrderReason, BlockedPhraseKind | null> = {
+  no_qualified_employee: 'crew_fleet',
+  no_dual_qualified_employee: 'crew_fleet',
+  no_vehicle_in_fleet: 'crew_fleet',
+  no_licensed_driver: 'crew_fleet',
+  licence_level_too_low: 'crew_fleet',
+  no_reaching_vehicle: 'crew_fleet',
+  storage_full: 'storage_full',
+  no_freight_warehouse: 'no_warehouse',
+  no_spoil_heap: 'no_spoil_heap',
+  spoil_heap_full: 'spoil_heap_full',
+  target_unreachable: 'unreachable',
+  buried_under_rubble: 'unreachable',
+  debris_out_of_reach: null,
+  explosives_in_transit: null,
+};
+
+/** Phrase kind of a failure reason; null for non-failure or absent reasons. */
+export function blockedPhraseKind(reason: BlockedOrderReason | null | undefined): BlockedPhraseKind | null {
+  return reason == null ? null : PHRASE_KIND_BY_REASON[reason];
+}
+
+/** Adds one order to a reason tally when it is a failure block; the single increment behind every tally. */
+export function tallyBlockedReason(counts: Partial<Record<BlockedOrderReason, number>>, action: Pick<PendingAction, 'blockedReason'>): void {
+  if (!isFailureBlock(action) || action.blockedReason == null) return;
+  counts[action.blockedReason] = (counts[action.blockedReason] ?? 0) + 1;
+}
+
+/** Tallies failure-block reasons across orders. */
+export function countBlockedReasons(actions: readonly Pick<PendingAction, 'blockedReason'>[]): Partial<Record<BlockedOrderReason, number>> {
+  const counts: Partial<Record<BlockedOrderReason, number>> = {};
+  for (const a of actions) tallyBlockedReason(counts, a);
+  return counts;
+}
+
+/** Failure kinds with counts, largest first; ties by union order. */
+export function rankBlockedKinds(counts: Partial<Record<BlockedOrderReason, number>>): BlockedKindCount[] {
+  const byKind: Partial<Record<BlockedPhraseKind, number>> = {};
+  for (const reason of Object.keys(counts) as BlockedOrderReason[]) {
+    const kind = blockedPhraseKind(reason);
+    const n = counts[reason] ?? 0;
+    if (kind !== null && n > 0) byKind[kind] = (byKind[kind] ?? 0) + n;
+  }
+  // Array.sort is stable: ties keep BLOCKED_PHRASE_KINDS (union) order.
+  return BLOCKED_PHRASE_KINDS
+    .map(kind => ({ kind, count: byKind[kind] ?? 0 }))
+    .filter(e => e.count > 0)
+    .sort((a, b) => b.count - a.count);
+}
+
+/** Count plus remedy sentence for one kind. */
+export function blockedPhrase(entry: BlockedKindCount): string {
+  return t(`notification.blocked_phrase.${entry.kind}`, { count: entry.count.toLocaleString('en-US') });
+}
+
+/** Short label for a kind, e.g. "storage full". */
+export function blockedKindLabel(kind: BlockedPhraseKind): string {
+  return t(`notification.blocked_kind.${kind}`);
+}
+
+/** Up to `max` phrases for the largest blocked kinds. */
+export function describeBlockedReasons(counts: Partial<Record<BlockedOrderReason, number>>, max: number = BLOCKED_PHRASE_LINES): string[] {
+  return rankBlockedKinds(counts).slice(0, max).map(blockedPhrase);
 }

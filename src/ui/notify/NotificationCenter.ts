@@ -21,7 +21,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
 import { contractShortOfStock, outstandingPenalty } from '../../core/economy/Contract.js';
 import { formatGameDuration } from '../formatGameDuration.js';
-import { buildBlockedOrderMessage, isFailureBlock, isInTransitBlock } from './blockedOrders.js';
+import { buildBlockedOrderMessage, countBlockedReasons, describeBlockedReasons, isFailureBlock, isInTransitBlock } from './blockedOrders.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { isHaulBlockedReason } from '../../core/economy/HaulDispatch.js';
 import type { UiCues } from '../../audio/ui/UiCues.js';
@@ -290,7 +290,7 @@ export class NotificationCenter {
         icon: 'warn',
         label: t('notification.pip.blocked_orders_label', { count: blockedActions.length }),
         tone: 'warn',
-        tip: t('notification.pip.blocked_orders_tip', { count: blockedActions.length }),
+        tip: describeBlockedReasons(countBlockedReasons(blockedActions)).join('\n'),
       });
     }
 
