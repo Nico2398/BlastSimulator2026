@@ -2490,6 +2490,17 @@
       }
     },
     {
+      "command": "tick 5",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "description": "#1977: 5-tick settle pad after the 64-hole plan is ordered. Safety is now a managed target score, which re-weights the random-event draws and shifts crew timing; without the pad the two last charge orders of the pattern were left with two charging trucks wedged on one cell (12,9) and never loaded, bankrupting the mine. Timing pad only, no assertion rides on it."
+    },
+    {
       "command": "tick 150",
       "interaction": [
         {
