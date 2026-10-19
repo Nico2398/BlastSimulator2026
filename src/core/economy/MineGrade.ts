@@ -47,6 +47,8 @@ export interface GradeState {
   inspectionRolls?: number;
   /** Share of the blast charge cap the last blast used (#1927). */
   lastBlastChargeShare?: number;
+  /** Grade whose approval the player has not yet been shown (#1926); null/absent once acknowledged. */
+  unseenApproval?: number | null;
 }
 
 export interface GradeTargetStatus {
@@ -198,7 +200,7 @@ export function permitApplyBlocker(
 }
 
 /** Apply for the next grade: checks, books the fee, starts processing. */
-export function applyForGrade(state: GameState): GradeApplyResult {
+export function applyForGrade(state: GameState, _emitter?: Pick<EventEmitter, 'emit'>): GradeApplyResult {
   const blocker = permitApplyBlocker(state);
   if (blocker) {
     return blocker.unmet.length > 0
@@ -247,4 +249,27 @@ export function approvePendingApplication(g: GradeState, emitter?: EventEmitter)
 export function recordBlastChargeShare(g: GradeState | undefined, planKg: number, maxChargeKg: number): void {
   if (!g || !(maxChargeKg > 0)) return;
   g.lastBlastChargeShare = planKg / maxChargeKg;
+}
+
+/** One line of the "what this grade unlocks" list: a locale key, optionally parameterised by the grade (#1926). */
+export interface UnlockLine {
+  /** A specific grade, or 'class' for every endless class grade. */
+  grade: number | 'class';
+  key: string;
+  params?: (grade: number) => Record<string, string | number>;
+}
+
+/** Registers an unlock line (#1926). */
+export function registerUnlockLine(_line: UnlockLine): void {
+  // TODO: implement
+}
+
+/** Unlock lines that apply to a grade, with params resolved (#1926). */
+export function unlockLinesFor(_grade: number): { key: string; params: Record<string, string | number> }[] {
+  return [];
+}
+
+/** Marks the pending approval as seen; false when there was none (#1926). */
+export function acknowledgeApproval(_g: GradeState): boolean {
+  return false;
 }

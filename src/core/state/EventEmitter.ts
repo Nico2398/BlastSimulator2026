@@ -19,6 +19,8 @@ export interface GameEventMap {
   'time:tick': { dt: number };
   /** A mine-grade application finished processing (#1921). */
   'progression:grade_approved': { grade: number };
+  /** A mine-grade application was filed and its fee booked (#1926). */
+  'progression:grade_applied': { toGrade: number; fee: number };
   'progression:blast_inspected': { overshoot: number; caught: boolean; fine: number; strikes: number; suspended: boolean };
 
   // Phase 7 — Campaign events
