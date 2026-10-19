@@ -4351,9 +4351,6 @@
   "ui.operations.work_queue_debris_collapse": "Masquer les ordres",
   "ui.operations.work_queue_debris_page": "{from}–{to} sur {total}",
   "ui.operations.work_queue_debris_prev": "Précédent",
-  "ui.operations.work_queue_debris_next": "Suivant",
-  "ui.operations.work_queue_debris_cancel": "Tout annuler",
-  "ui.operations.work_queue_debris_confirm_title": "Annuler les ordres de débris ?",
-  "ui.operations.work_queue_debris_confirm_body": "Annuler {count} ordre(s) : {label} ? La cargaison chargée est reposée au sol.",
-  "ui.operations.work_queue_debris_confirm_label": "Annuler les ordres"
+  "ui.operations.work_queue_debris_note": "Mis en file automatiquement pour chaque fragment au sol",
+  "ui.operations.work_queue_debris_next": "Suivant"
 }

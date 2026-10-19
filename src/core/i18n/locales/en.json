@@ -4351,9 +4351,6 @@
   "ui.operations.work_queue_debris_collapse": "Hide orders",
   "ui.operations.work_queue_debris_page": "{from}–{to} of {total}",
   "ui.operations.work_queue_debris_prev": "Previous",
-  "ui.operations.work_queue_debris_next": "Next",
-  "ui.operations.work_queue_debris_cancel": "Cancel all",
-  "ui.operations.work_queue_debris_confirm_title": "Cancel debris orders?",
-  "ui.operations.work_queue_debris_confirm_body": "Cancel {count} orders: {label}? Loaded cargo is dropped back on the ground.",
-  "ui.operations.work_queue_debris_confirm_label": "Cancel orders"
+  "ui.operations.work_queue_debris_note": "Queued automatically for every fragment on the ground",
+  "ui.operations.work_queue_debris_next": "Next"
 }
