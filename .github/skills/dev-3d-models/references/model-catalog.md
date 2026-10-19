@@ -43,7 +43,7 @@ Tier 1 keeps the same node layout at 60–85 % of the tier-2 footprint.
 
 ## Buildings — `buildings_t1.py` / `buildings.py` / `buildings_t3.py`
 
-`building_<type>_t<tier>` for the eight types × tiers 1–3, the single-tier `building_spoil_heap_t1` (below), plus
+`building_<type>_t<tier>` for the eight types × tiers 1–3, the single-tier `building_spoil_heap_t1` and the four vanity projects (below), plus
 `building_ruin` (shared rubble, stretched over any destroyed footprint).
 
 | Type | t1 | t3 |
@@ -61,6 +61,15 @@ Single tier: `building_spoil_heap_t1` — The Dump: lumpy barren-rock mound (`Ti
 `displace()` domes), a leaning THE DUMP board on the -Y side the game camera sees, a tipped rusty barrel, a tyre, an
 arrayed row of loose stones. No doors (crewless). Built in `buildings_t1.py`; `build.py` and `registry()` skip tiers 2 and 3, and the
 renderer maps every tier onto it.
+
+Vanity projects (#1948), single tier, all in `buildings_vanity.py` (`build.py` skips the tier overrides; footprints from `BuildingDefs`):
+
+| Model | Footprint | Caricature |
+|-------|-----------|------------|
+| building_ceo_statue_t1 | 2x2 | Golden CEO in a hard hat, belly out, pointing at the pit, on a marble `TintBody` plinth with a gold plaque on +Y |
+| building_golf_course_t1 | 6x6 | Lurid `TintBody` lawn, flag, sand bunker, one sad tilted golf cart, on a grey rubble slab ringed with boulders (under 2 m) |
+| building_executive_helipad_t1 | 4x4 | Raised `TintBody` pad, painted H, emissive edge lights, windsock, red carpet ramp ending in the dirt |
+| building_gold_tower_t1 | 4x4 | Narrow gold `TintBody` tower (about 9 m, the tallest building), rooftop coin logo, one emissive penthouse window on -Y |
 
 Tier 2 is the plain building: a plinth, one storey per tier, window rows, a
 green-framed entry door and an orange-framed exit door on the +Y face, and a
