@@ -217,6 +217,7 @@ describe('runTick — TickReport reflects what happened', () => {
     // case (superseded here since processFrame is deleted).
     state.events.lastEventTick = -200;
     state.events.actionCountSinceEvent = 10;
+    state.events.unionActionCountSinceEvent = 10;
     for (const timer of state.events.timers) {
       timer.remaining = 1;
     }

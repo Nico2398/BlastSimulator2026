@@ -73,6 +73,8 @@ export interface EventSystemState {
   cooldownMinIntervalTicks: number | null;
   /** Tick of the most recent union event fire — union events' own cooldown clock (#1907). */
   lastUnionEventTick: number;
+  /** Player actions since the last union event (#1996). */
+  unionActionCountSinceEvent: number;
   /** Union cooldown threshold for the current window, drawn once like cooldownMinIntervalTicks (#1907). Null between windows. */
   unionCooldownMinIntervalTicks: number | null;
   /** Action ids an unqualified_task event has already been raised for (#1380). */
@@ -139,6 +141,7 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     eventFreqMultiplier,
     cooldownMinIntervalTicks: null,
     lastUnionEventTick: 0,
+    unionActionCountSinceEvent: 0,
     unionCooldownMinIntervalTicks: null,
     unionGrievance: 0,
   };
@@ -223,7 +226,9 @@ export function tickEventSystem(
       const isUnion = timer.category === 'union';
       let blocked: boolean;
       if (isUnion) {
-        blocked = !unionCooldownOpen(state, ctx.tickCount, ctx.unionMemberCount, ctx.employeeCount, rng);
+        // unionCooldownOpen is evaluated first so its RNG draw never depends on the action gate.
+        const cooldownOpen = unionCooldownOpen(state, ctx.tickCount, ctx.unionMemberCount, ctx.employeeCount, rng);
+        blocked = !cooldownOpen || state.unionActionCountSinceEvent < MIN_EVENT_INTERVAL_ACTIONS;
       } else {
         if (state.cooldownMinIntervalTicks === null) {
           state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS + rng.nextInt(0, MIN_EVENT_INTERVAL_RANDOM_RANGE);
@@ -250,6 +255,7 @@ export function tickEventSystem(
         if (isUnion) {
           state.lastUnionEventTick = ctx.tickCount;
           state.unionCooldownMinIntervalTicks = null;
+          state.unionActionCountSinceEvent = 0;
         } else {
           state.lastEventTick = ctx.tickCount;
           state.actionCountSinceEvent = 0;
@@ -279,9 +285,10 @@ export function queueFollowUp(state: EventSystemState, eventId: string): void {
   state.followUpQueue.push(eventId);
 }
 
-/** Increment the action count since the last event. Used for cooldown gating. */
+/** Bump both action counters since the last event: the shared one and the union one (#1996). Each gates its own cooldown. */
 export function incrementActionCount(state: EventSystemState): void {
   state.actionCountSinceEvent++;
+  state.unionActionCountSinceEvent++;
 }
 
 // ── Selection ──
