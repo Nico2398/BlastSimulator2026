@@ -89,6 +89,13 @@ export function rampLegsOf(
   return def.legs ? def.legs.map(l => ({ ...l })) : [{ direction: def.direction, length: def.length }];
 }
 
+/** The path spec of `def`: its origin plus its legs. */
+export function rampPathOf(
+  def: { originX: number; originZ: number; direction: RampDirection; length: number; legs?: readonly RampLeg[] },
+): RampPathSpec {
+  return { originX: def.originX, originZ: def.originZ, legs: rampLegsOf(def) };
+}
+
 export function rampTotalLength(legs: readonly RampLeg[]): number {
   return legs.reduce((sum, l) => sum + l.length, 0);
 }
@@ -265,6 +272,15 @@ export function rampFootprintRects(path: RampPathSpec, width: RampWidth): RampFo
     }
     return { minX, maxX, minZ, maxZ };
   });
+}
+
+/** Rectangles covering `def`'s corridor at `width`: one per leg of a multi-leg path, else `fallback` (the straight ramp's footprint). */
+export function rampCorridorRects(
+  def: { originX: number; originZ: number; direction: RampDirection; length: number; legs?: readonly RampLeg[] } | undefined,
+  width: RampWidth,
+  fallback: RampFootprint,
+): readonly RampFootprint[] {
+  return def?.legs ? rampFootprintRects(rampPathOf(def), width) : [fallback];
 }
 
 /** Single rectangle bounding the whole corridor. */

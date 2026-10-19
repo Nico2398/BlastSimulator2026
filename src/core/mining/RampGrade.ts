@@ -3,13 +3,13 @@
 import type { NavGrid } from '../nav/NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { GRADE_EPSILON_DEGREES, VEHICLE_TIER_LIST, slopeDegreesForRatio, tiersThatClimb } from '../nav/ClimbLimit.js';
-import { rampCenterline } from './RampPath.js';
+import { rampCenterline, rampPathOf } from './RampPath.js';
 import type { BuiltRamp, GameState } from '../state/GameState.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 
 /** Steepest grade (degrees) between consecutive tiles of a multi-leg ramp's centreline; the corner's inside and the bounding box's empty corner are not the path. */
 function steepestAlongCenterline(navGrid: NavGrid, ramp: BuiltRamp): number {
-  const line = rampCenterline({ originX: ramp.def.originX, originZ: ramp.def.originZ, legs: ramp.def.legs ?? [] });
+  const line = rampCenterline(rampPathOf(ramp.def));
   let steepest = 0;
   for (let i = 1; i < line.length; i++) {
     const y = navGrid.cellAt(line[i - 1]!.x, line[i - 1]!.z)?.surfaceY;

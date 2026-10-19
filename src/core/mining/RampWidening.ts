@@ -8,7 +8,7 @@ import { queueRampOrder } from './RampOrder.js';
 import { RAMP_WIDTH_OPTIONS, isRampWidth, type RampWidth } from '../config/balance.js';
 import type { BuiltRamp, GameState, PlannedRamp, RampFootprint } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import { rampBoundingFootprint, rampFootprintRects } from './RampPath.js';
+import { rampBoundingFootprint, rampCorridorRects, rampPathOf } from './RampPath.js';
 
 /** Failure carries a plain-English `error` fallback plus the translation key the console/UI resolves with `t()` (mirrors validateRampOrder's messageKey). */
 export interface WidenFailure {
@@ -21,7 +21,7 @@ type WidenResult<T> = { success: true; data: T } | WidenFailure;
 
 /** Inclusive tile rectangle of the cells a ramp of `def`'s placement carves at `width`; the bounding box of a multi-leg path (#1939). */
 export function rampFootprint(def: Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length' | 'legs'>, width: RampWidth): RampFootprint {
-  if (def.legs) return rampBoundingFootprint({ originX: def.originX, originZ: def.originZ, legs: def.legs }, width);
+  if (def.legs) return rampBoundingFootprint(rampPathOf(def), width);
   const half = Math.floor(width / 2);
   const ox = Math.floor(def.originX);
   const oz = Math.floor(def.originZ);
@@ -36,9 +36,7 @@ export function rampFootprint(def: Pick<RampDef, 'originX' | 'originZ' | 'direct
 
 /** Inclusive rectangles that together cover a built ramp's corridor: one per leg, or its footprint when straight. */
 function rampRects(r: BuiltRamp): readonly RampFootprint[] {
-  return r.def?.legs
-    ? rampFootprintRects({ originX: r.def.originX, originZ: r.def.originZ, legs: r.def.legs }, r.width)
-    : [r.footprint];
+  return rampCorridorRects(r.def, r.width, r.footprint);
 }
 
 /** The lowest-id built ramp whose corridor contains tile (x, z), or null (a multi-leg ramp's bounding box has empty corners). */

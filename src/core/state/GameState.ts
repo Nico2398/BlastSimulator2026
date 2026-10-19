@@ -7,6 +7,7 @@ import {
   type StartingSiteComposition,
   SPAWN_TILE_SPACING,
 } from '../config/balance.js';
+import type { RampFootprint } from '../mining/RampPath.js';
 import type { TutorialProgress } from './TutorialProgress.js';
 import type { GradeState } from '../economy/MineGrade.js';
 import type { BoardState } from '../economy/Board.js';
@@ -321,7 +322,6 @@ export interface RampSegmentTracker {
   carvedCount?: number;
 }
 
-import type { RampFootprint } from '../mining/RampPath.js';
 export type { RampFootprint };
 
 /** A finished ramp, recorded when its last segment is dug (#1298). */

@@ -2,8 +2,9 @@
 // Ramp and drill-hole cells that a building footprint may not cover.
 
 import type { GameState } from '../state/GameState.js';
-import { RAMP_RESERVATION_MARGIN, HOLE_RESERVATION_RADIUS, RAMP_DEFAULT_WIDTH, type RampWidth } from '../config/balance.js';
-import { rampFootprintRects, type RampLeg } from '../mining/RampPath.js';
+import { RAMP_RESERVATION_MARGIN, HOLE_RESERVATION_RADIUS, RAMP_DEFAULT_WIDTH } from '../config/balance.js';
+import { rampCorridorRects } from '../mining/RampPath.js';
+import type { RampDef } from '../mining/Ramp.js';
 import type { Rect } from '../world/WorldGen.js';
 
 type ReservationKind = 'ramp' | 'hole';
@@ -31,10 +32,8 @@ export function terrainReservations(
   const m = RAMP_RESERVATION_MARGIN;
   for (const r of [...(s.builtRamps ?? []), ...(s.plannedRamps ?? [])]) {
     // Fixtures and old call sites may pass a bare footprint without a def.
-    const def: { originX: number; originZ: number; legs?: RampLeg[]; width?: RampWidth } | undefined = r.def;
-    const parts = def?.legs
-      ? rampFootprintRects({ originX: def.originX, originZ: def.originZ, legs: def.legs }, def.width ?? RAMP_DEFAULT_WIDTH)
-      : [r.footprint];
+    const def: RampDef | undefined = r.def;
+    const parts = rampCorridorRects(def, def?.width ?? RAMP_DEFAULT_WIDTH, r.footprint);
     for (const f of parts) out.push({ kind: 'ramp', minX: f.minX - m, maxX: f.maxX + m, minZ: f.minZ - m, maxZ: f.maxZ + m });
   }
   const h = HOLE_RESERVATION_RADIUS;

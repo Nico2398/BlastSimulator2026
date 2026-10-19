@@ -9,8 +9,8 @@ import {
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
 import { queueRampOrder } from '../../../core/mining/RampOrder.js';
-import type { RampLeg, RampPathCell } from '../../../core/mining/RampPath.js';
-import { rampPathCells, legsFromWaypoints, firstOccupiedPathTile, rampLegsOf, rampTotalLength } from '../../../core/mining/RampPath.js';
+import type { RampPathCell } from '../../../core/mining/RampPath.js';
+import { rampPathCells, legsFromWaypoints, firstOccupiedPathTile, rampPathOf, rampTotalLength } from '../../../core/mining/RampPath.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { isBuildingFootprintCell } from '../../../core/entities/Building.js';
 import { rampFootprint, orderRampWiden, validateWidenRamp, type WidenFailure } from '../../../core/mining/RampWidening.js';
@@ -89,7 +89,7 @@ export function buildRampCommand(
   }
 
   const footprint = rampFootprint(rampDef, rampWidthOf(rampDef));
-  const pathCells = rampDef.legs ? rampPathCells(pathOf(rampDef), rampWidthOf(rampDef)) : null;
+  const pathCells = rampDef.legs ? rampPathCells(rampPathOf(rampDef), rampWidthOf(rampDef)) : null;
   if (pathCells) {
     const refusal = legHitsBuilding(ctx, pathCells);
     if (refusal) return { success: false, output: refusal };
@@ -112,7 +112,7 @@ export function buildRampCommand(
   }
   return {
     success: true,
-    output: `Ramp ordered: ${length}m ${direction}, ${segments.length} segments queued for excavation`,
+    output: t('mining.build_ramp.ordered', { length, direction, segments: segments.length }),
   };
 }
 
@@ -146,10 +146,6 @@ function rampDefFromPath(
   };
   if (legs.length > 1) def.legs = legs;
   return { success: true, def };
-}
-
-function pathOf(def: RampDef): { originX: number; originZ: number; legs: RampLeg[] } {
-  return { originX: def.originX, originZ: def.originZ, legs: rampLegsOf(def) };
 }
 
 /** Refusal text when a corridor tile of a multi-leg ramp lies on a built or planned building, else null. */

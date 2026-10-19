@@ -3,8 +3,9 @@
 // Each ramp clears a diagonal column of voxels from surface to target depth.
 
 import {
-  RAMP_DIR_OFFSETS, findRampPathFault, rampLegsOf, rampPathCells, rampTotalLength, rampWaypoints,
-  type RampDirection, type RampLeg, } from './RampPath.js';
+  RAMP_DIR_OFFSETS, findRampPathFault, rampLegsOf, rampPathCells, rampPathOf, rampTotalLength, rampWaypoints,
+  type RampDirection, type RampLeg,
+} from './RampPath.js';
 import { formatMoney } from '../economy/formatMoney.js';
 import {
   computeVoxelColumnSurfaceHeight, computeVoxelColumnSurfaceY, captureColumnTopsForCarve,
@@ -118,7 +119,7 @@ export function rampEndTile(
     const o = RAMP_DIR_OFFSETS[ramp.direction];
     return { x: ramp.originX + o.dx * ramp.length, z: ramp.originZ + o.dz * ramp.length };
   }
-  return rampWaypoints({ originX: ramp.originX, originZ: ramp.originZ, legs: ramp.legs }).at(-1)!;
+  return rampWaypoints(rampPathOf(ramp)).at(-1)!;
 }
 
 // ── Core function ──
@@ -294,11 +295,9 @@ export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidat
     };
   }
 
-  const fault = findRampPathFault(
-    { originX: ramp.originX, originZ: ramp.originZ, legs }, rampWidthOf(ramp),
-  );
+  const fault = findRampPathFault(rampPathOf(ramp), rampWidthOf(ramp));
   if (fault) {
-    return { success: false, message: fault.key, cost: 0, messageKey: fault.key, messageParams: fault.params };
+    return { success: false, message: 'Invalid ramp path: a leg is shorter than the ramp width or the legs cross.', cost: 0, messageKey: fault.key, messageParams: fault.params };
   }
 
   if (ramp.targetDepth <= 0) {
@@ -440,7 +439,7 @@ export function computeMinimumRampLength(targetDepth: number): number {
 export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarvedWidth?: number): RampSegmentDef[] {
   const legs = rampLegsOf(ramp);
   const total = rampTotalLength(legs);
-  const path = { originX: ramp.originX, originZ: ramp.originZ, legs };
+  const path = rampPathOf(ramp);
   const carvedHalf = alreadyCarvedWidth === undefined ? -1 : Math.floor(alreadyCarvedWidth / 2);
   const clearanceHeight = 3;
 
