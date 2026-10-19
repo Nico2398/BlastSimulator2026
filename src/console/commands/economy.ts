@@ -22,6 +22,7 @@ import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { FRAGMENT_SPLIT_EPSILON_KG } from '../../core/config/balance.js';
 import { negotiateContractAtTick, negotiationRefusalReason } from '../../core/economy/Negotiation.js';
 import { recordOreDelivery } from '../../core/economy/MineGrade.js';
+import { recordBoardOre } from '../../core/economy/Board.js';
 import { deliverStoredOre, bookDeliveryCashflow } from '../../core/economy/ContractFulfilment.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
 import { stateRubbleStockKg, type StoredFragmentLike } from '../../core/economy/SpoilHeaps.js';
@@ -225,6 +226,7 @@ export function contractCommand(
       const result = delivery.data;
       bookDeliveryCashflow(state, id, result, state.tickCount);
       recordOreDelivery(state.grade, result.contractType, result.kg);
+      recordBoardOre(state.board, result.contractType, result.kg);
       const msg = result.completed
         ? `Contract #${id} COMPLETED! Payment: $${result.payment.toFixed(2)}` +
           (result.bonus > 0 ? ` + early bonus: $${result.bonus.toFixed(2)}` : '')

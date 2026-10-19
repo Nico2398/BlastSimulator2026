@@ -7,6 +7,7 @@ import { enterBuilding } from '../../../src/core/engine/Mount.js';
 import { serialize, deserialize, backfillRaises } from '../../../src/core/state/SaveLoad.js';
 import { FilePersistence } from '../../../src/persistence/FilePersistence.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { createBoardState } from '../../../src/core/economy/Board.js';
 import { hireEmployee, BASE_SALARIES, calculateQualificationBonus } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { updateScores } from '../../../src/core/scores/ScoreManager.js';
@@ -2488,5 +2489,64 @@ describe('serialize / deserialize — world.oreGradeScale (#1932)', () => {
     const state = createGame({ seed: 42 });
     state.world = createWorldState(64, 24, 64, true);
     expect(deserialize(serialize(state)).world!.oreGradeScale).toBeUndefined();
+  });
+});
+
+describe('serialize/deserialize — board of directors (#1946)', () => {
+  function boardGame() {
+    const state = createGame({ seed: 42 });
+    state.board = createBoardState({ quarterTicks: 48, oreTargetT: 1, profitTarget: 1000, growth: 1.5 }, 10);
+    state.board.quarter = 3;
+    state.board.confidence = 42;
+    state.board.oreDeliveredKg = 777;
+    state.board.profitAtQuarterStart = -250;
+    state.board.lastDividend = 1234;
+    state.board.lastReview = {
+      quarter: 2, oreMet: true, profitMet: false, confidenceBefore: 60, confidenceAfter: 35, bonus: 0, dividend: 1234,
+    };
+    return state;
+  }
+
+  it('round-trips the board mid-quarter', () => {
+    const state = boardGame();
+    expect(deserialize(serialize(state)).board).toEqual(state.board);
+  });
+
+  it('round-trips a board with no review yet', () => {
+    const state = createGame({ seed: 42 });
+    state.board = createBoardState({ quarterTicks: 48, oreTargetT: 1, profitTarget: 1000 });
+    expect(deserialize(serialize(state)).board).toEqual(state.board);
+  });
+
+  it('a game without a board reloads without a board key', () => {
+    const loaded = deserialize(serialize(createGame({ seed: 42 })));
+    expect(loaded.board).toBeUndefined();
+    expect('board' in loaded).toBe(false);
+  });
+
+  it.each([
+    ['a string', 'nope'],
+    ['an array', []],
+    ['NaN confidence', { confidence: null }],
+    ['out-of-range confidence', { confidence: 250 }],
+    ['quarter 0', { quarter: 0 }],
+    ['bad config', { config: { quarterTicks: 'x' } }],
+  ])('drops a malformed board (%s) on load', (_label, patch) => {
+    const parsed = JSON.parse(serialize(boardGame())) as Record<string, unknown>;
+    parsed['board'] = typeof patch === 'object' && !Array.isArray(patch)
+      ? { ...(parsed['board'] as object), ...patch }
+      : patch;
+    const loaded = deserialize(JSON.stringify(parsed));
+    expect(loaded.board).toBeUndefined();
+    expect('board' in loaded).toBe(false);
+  });
+
+  it('keeps the fired reason through a round trip', () => {
+    const state = boardGame();
+    state.levelEnded = true;
+    state.levelEndReason = 'fired';
+    const loaded = deserialize(serialize(state));
+    expect(loaded.levelEndReason).toBe('fired');
+    expect(loaded.levelEnded).toBe(true);
   });
 });

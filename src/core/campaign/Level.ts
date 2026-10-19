@@ -7,6 +7,7 @@ import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, TUTORIAL_STARTING_SITE, TUTORIAL_RALLY_POINT, TUTORIAL_STARTING_BUILDINGS_NEAR, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition, type PitMaskShape } from '../config/balance.js';
+import type { BoardConfig } from '../economy/Board.js';
 import type { MarketId } from '../economy/Market.js';
 import { getBiome } from '../world/BiomeCatalog.js';
 import { siteRockIds } from '../world/Strata.js';
@@ -16,6 +17,8 @@ import { oresYieldedByRocks } from '../world/RockCatalog.js';
 // ── Types ──
 
 export interface LevelDef {
+  /** Optional board of directors (#1946). */
+  board?: BoardConfig;
   /** Unique identifier. */
   id: string;
   /** i18n key for the level name. */

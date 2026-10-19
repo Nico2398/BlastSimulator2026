@@ -19,7 +19,7 @@ import { STAR_ECOLOGY_MIN } from '../../core/config/balance.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { getBestStars, getCampaignLevels, isCampaignDone, isFinalCampaignLevel } from '../../core/campaign/Campaign.js';
 import { getLevel } from '../../core/campaign/Level.js';
-import { TICKS_PER_DAY, REVOLT_TICKS } from '../../core/config/balance.js';
+import { TICKS_PER_DAY, REVOLT_TICKS, BOARD_CONFIDENCE_MISS_PENALTY, BOARD_CONFIDENCE_MET_GAIN } from '../../core/config/balance.js';
 import { revoltCause } from '../../core/scores/RevoltCause.js';
 import type { GameState } from '../../core/state/GameState.js';
 
@@ -34,6 +34,7 @@ const DEFEAT_ICON: Record<DefeatReason, IconName> = {
   arrest: 'gavel',
   ecological_shutdown: 'water',
   worker_revolt: 'union',
+  fired: 'gavel',
 };
 
 export class LevelEndScreen {
@@ -383,7 +384,7 @@ export class LevelEndScreen {
     this.defeatBodyEl.textContent = t(`ui.level_end.defeat.${reason}.body`, { days: `${days}` });
     this.defeatTipTextEl.textContent = t(
       this.defeatTipKey(reason, state),
-      reason === 'worker_revolt' ? { hours: String(REVOLT_TICKS) } : undefined,
+      this.defeatTipParams(reason),
     );
 
     this.defeatStatGridEl.replaceChildren(statGrid(this.defeatStats(reason, state), 4));
@@ -402,6 +403,14 @@ export class LevelEndScreen {
     this.defeatBackBtn.textContent = t(sandbox ? 'ui.level_end.back_to_sandbox' : 'ui.level_end.back_to_portfolio');
   }
 
+  private defeatTipParams(reason: DefeatReason): Record<string, string> | undefined {
+    if (reason === 'worker_revolt') return { hours: String(REVOLT_TICKS) };
+    if (reason === 'fired') {
+      return { penalty: String(BOARD_CONFIDENCE_MISS_PENALTY), gain: String(BOARD_CONFIDENCE_MET_GAIN) };
+    }
+    return undefined;
+  }
+
   private defeatTipKey(reason: DefeatReason, state: GameState): string {
     if (reason === 'worker_revolt') {
       const hasHousing = state.buildings.buildings.some(b => b.type === 'living_quarters' && b.active);
@@ -417,6 +426,13 @@ export class LevelEndScreen {
     const days = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;
 
     switch (reason) {
+      case 'fired':
+        return [
+          { key: t('ui.level_end.stat.quarters_survived'), value: `${Math.max(0, (state.board?.quarter ?? 1) - 1)}` },
+          { key: t('ui.level_end.stat.days'), value: `${days}` },
+          { key: t('ui.level_end.stat.profit'), value: formatDollars(state.levelStats.totalWealth), color: 'var(--bsx-positive)' },
+          { key: t('ui.level_end.stat.final_balance'), value: formatDollars(state.cash) },
+        ];
       case 'bankruptcy':
         return [
           { key: t('ui.level_end.stat.final_balance'), value: formatDollars(state.cash), color: 'var(--bsx-critical-text)' },

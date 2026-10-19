@@ -1,0 +1,53 @@
+{
+  "name": "board-fired-visual",
+  "description": "Board of directors (#1946): an idle mine with a tiny-quarter board loses the board's confidence review by review (60 -> 35 -> 10 -> 0) and the player is fired; the level-end screen shows the fired defeat.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:false",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 staffed:false" }
+      ],
+      "role": "setup",
+      "description": "Open a bare game with no crew, so nothing is mined or earned.",
+      "expect": { "equals": { "levelEnded": false } }
+    },
+    {
+      "command": "board start quarterTicks:48 ore:1 profit:1000",
+      "interaction": [
+        { "type": "command", "command": "board start quarterTicks:48 ore:1 profit:1000" }
+      ],
+      "role": "bootstrap",
+      "description": "Attach a 48-tick-quarter board asking 1 t of ore and $1,000 profit per quarter.",
+      "expect": { "equals": { "levelEnded": false } }
+    },
+    {
+      "command": "wait_until field:levelEndReason equals:fired max_ticks:200",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "levelEndReason",
+          "equals": "fired",
+          "maxTicks": 200,
+          "timeoutMs": 120000
+        }
+      ],
+      "timeout": 180,
+      "role": "setup",
+      "description": "Three missed quarters (3 x 48 ticks) later the board fires the player. 200 ticks leaves margin over the 144 needed.",
+      "expect": { "equals": { "levelEnded": true, "levelEndReason": "fired" } }
+    },
+    {
+      "command": "state",
+      "interaction": [
+        { "type": "awaitUsable", "selector": "#bs-level-end-screen", "timeoutMs": 30000 }
+      ],
+      "timeout": 60,
+      "role": "observe",
+      "description": "The level-end screen is up with the fired defeat.",
+      "expect": {
+        "usable": "#bs-level-end-screen",
+        "equals": { "levelEnded": true, "levelEndReason": "fired" }
+      }
+    }
+  ]
+}

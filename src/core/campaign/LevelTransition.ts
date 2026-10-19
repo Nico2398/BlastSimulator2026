@@ -8,6 +8,7 @@ import { recordProfit, recordStars, startLevel, type CampaignState } from './Cam
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { calculateStarRating, snapshotStats } from './SuccessTracker.js';
 import { getFinancialReport } from '../economy/Finance.js';
+import { createBoardState } from '../economy/Board.js';
 import { closingAudit, settleTaxAudit, taxAuditRng } from '../events/TaxAudit.js';
 
 // ── Types ──
@@ -60,12 +61,13 @@ type KeepPlayingResult = { success: true; data: undefined } | { success: false; 
  * Refuses unless `levelEndReason === 'completed'`.
  */
 export function convertWinToFreePlay(
-  state: Pick<GameState, 'levelEnded' | 'levelEndReason' | 'campaign'>,
+  state: Pick<GameState, 'levelEnded' | 'levelEndReason' | 'campaign' | 'board'>,
 ): KeepPlayingResult {
   if (state.levelEndReason !== 'completed') return { success: false, error: 'level_not_completed' };
   state.levelEnded = false;
   state.levelEndReason = null;
   state.campaign.activeLevelId = null;
+  delete state.board; // free play has no shareholders (#1946)
   return { success: true, data: undefined };
 }
 
@@ -161,6 +163,7 @@ export function createGameForLevel(
 
   const newState = createGame(config);
   newState.world = createWorldState(level.gridX, level.datum, level.gridZ, false);
+  if (level.board) newState.board = createBoardState(level.board);
 
   return newState;
 }

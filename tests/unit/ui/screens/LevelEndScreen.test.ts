@@ -10,7 +10,9 @@ import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
 import { recordStars, getBestStars } from '../../../../src/core/campaign/Campaign.js';
 import { calculateStarRating } from '../../../../src/core/campaign/SuccessTracker.js';
 import { getLevel } from '../../../../src/core/campaign/Level.js';
-import { TICKS_PER_DAY, REVOLT_TICKS } from '../../../../src/core/config/balance.js';
+import en from '../../../../src/core/i18n/locales/en.json';
+import fr from '../../../../src/core/i18n/locales/fr.json';
+import { TICKS_PER_DAY, REVOLT_TICKS, BOARD_CONFIDENCE_MISS_PENALTY, BOARD_CONFIDENCE_MET_GAIN } from '../../../../src/core/config/balance.js';
 
 function mount(): { container: HTMLDivElement; screen: LevelEndScreen } {
   const container = document.createElement('div');
@@ -928,3 +930,59 @@ describe('LevelEndScreen keep playing (#1647)', () => {
   });
 });
 
+
+describe('LevelEndScreen fired by the board (#1946)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    setLocale('en');
+  });
+
+  function firedState(): GameState {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    s.campaign.activeLevelId = 'dusty_hollow';
+    s.levelEnded = true;
+    s.levelEndReason = 'fired';
+    return s;
+  }
+
+  it('renders the fired title, body and tip', () => {
+    setLocale('en');
+    const { container, screen } = mount();
+    screen.update(firedState());
+    const text = container.querySelector('#bs-level-end-screen')!.textContent!;
+    expect(text).toContain(t('ui.level_end.defeat.fired.title'));
+    expect(text).toContain("You're fired. Your golden parachute: one (1) hard hat.");
+    expect(text).toContain(
+      t('ui.level_end.defeat.fired.tip', {
+        penalty: String(BOARD_CONFIDENCE_MISS_PENALTY),
+        gain: String(BOARD_CONFIDENCE_MET_GAIN),
+      }),
+    );
+    screen.dispose();
+  });
+
+  it('renders a distinct title from bankruptcy', () => {
+    const a = mount();
+    a.screen.update(firedState());
+    const fired = a.container.querySelector('#bs-level-end-screen')!.textContent!.slice(0, 40);
+    a.screen.dispose();
+    const b = mount();
+    b.screen.update(stateAtDefeat('bankruptcy'));
+    const bankrupt = b.container.querySelector('#bs-level-end-screen')!.textContent!.slice(0, 40);
+    b.screen.dispose();
+    expect(fired).not.toBe(bankrupt);
+  });
+
+  it.each(['title', 'body', 'tip'])('has ui.level_end.defeat.fired.%s in both locales', (part) => {
+    const key = `ui.level_end.defeat.fired.${part}`;
+    expect((en as Record<string, string>)[key]).toBeTruthy();
+    expect((fr as Record<string, string>)[key]).toBeTruthy();
+    expect((fr as Record<string, string>)[key]).not.toBe((en as Record<string, string>)[key]);
+  });
+
+  it('English body is the golden parachute line', () => {
+    expect((en as Record<string, string>)['ui.level_end.defeat.fired.body']).toBe(
+      "You're fired. Your golden parachute: one (1) hard hat.",
+    );
+  });
+});

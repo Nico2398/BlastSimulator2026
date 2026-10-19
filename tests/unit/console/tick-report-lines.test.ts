@@ -37,6 +37,7 @@ function baseReport(overrides: Partial<TickReport>): TickReport {
       ecoShutdown: false,
       arrested: false,
       revolted: false,
+      fired: false,
       levelEndReason: null,
     },
     paused: false,

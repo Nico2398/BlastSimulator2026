@@ -261,6 +261,7 @@ describe('runTick — TickReport reflects what happened', () => {
       ecoShutdown: false,
       arrested: false,
       revolted: false,
+      fired: false,
       levelEndReason: 'bankruptcy',
     });
     // Structured status code, never a console-formatted sentence like
