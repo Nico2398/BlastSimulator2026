@@ -14,6 +14,8 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as THREE from 'three';
+import { VANITY_TYPES } from '../../src/core/entities/BuildingVanity.js';
+import { buildingModelId } from '../../src/renderer/models/ModelIds.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const ROOT = resolve(import.meta.dirname, '..', '..');
@@ -68,6 +70,7 @@ function round(value: number, digits = 2): number {
 /**
  * Which generator module writes `id`, following build.py: a tier module owns
  * the tier it caricatures when it exists, and the plain module owns the rest.
+ * Vanity projects are single-tier and drawn whole by buildings_vanity.py.
  */
 function builderModule(id: string): string {
   const defines = (file: string, fn: string): boolean => {
@@ -76,6 +79,7 @@ function builderModule(id: string): string {
   };
   if (id.startsWith('worker_')) return 'workers.py';
   if (id.startsWith('prop_')) return 'props.py';
+  if (VANITY_TYPES.some(type => buildingModelId(type, 1) === id)) return 'buildings_vanity.py';
   const vehicle = /^vehicle_.+_t([123])$/.exec(id);
   if (vehicle) {
     const tier = vehicle[1];

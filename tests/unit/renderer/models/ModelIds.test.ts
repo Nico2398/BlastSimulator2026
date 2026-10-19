@@ -1,6 +1,5 @@
 // ModelIds — asset naming derived from the core catalogs
 
-import { isVanityType } from '../../../../src/core/entities/BuildingVanity.js';
 import { describe, it, expect } from 'vitest';
 import { BUILDING_DEFS } from '../../../../src/core/entities/BuildingDefs.js';
 import { isSingleTierType } from '../../../../src/core/entities/Building.js';
@@ -18,17 +17,17 @@ describe('ModelIds', () => {
     expect(buildingModelId('living_quarters', 3)).toBe('building_living_quarters_t3');
   });
 
-  it('enumerates every asset once: 5 workers, 6 × 3 vehicles, 8 × 3 buildings plus the one-tier spoil heap, the ruin, and the props', () => {
+  it('enumerates every asset once: 5 workers, 6 × 3 vehicles, 8 × 3 buildings plus the one-tier spoil heap and four vanity projects, the ruin, and the props', () => {
     const ids = allModelIds();
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.filter(id => id.startsWith('worker_'))).toHaveLength(EMPLOYEE_ROLES.length);
     expect(ids.filter(id => id.startsWith('vehicle_'))).toHaveLength(18);
-    expect(ids.filter(id => /^building_.*_t[123]$/.test(id))).toHaveLength(25);
+    expect(ids.filter(id => /^building_.*_t[123]$/.test(id))).toHaveLength(29);
     expect(ids).toContain(BUILDING_RUIN_MODEL_ID);
     const props = propModelIds();
     // Each tree ships with its decimated far copy.
     expect(props).toHaveLength(TREE_FAMILIES.length * TREE_VARIANTS * 2 + BUSH_VARIANTS + ROCK_VARIANTS + HOUSE_VARIANTS + GRASS_VARIANTS + FLOWER_VARIANTS + 1);
-    expect(ids).toHaveLength(5 + 18 + 25 + 1 + props.length);
+    expect(ids).toHaveLength(5 + 18 + 29 + 1 + props.length);
   });
 
   it('lists the spoil heap at tier 1 only, since it is a single-tier building', () => {
@@ -39,10 +38,18 @@ describe('ModelIds', () => {
     expect(ids.filter(id => id === 'building_spoil_heap_t1')).toHaveLength(1);
   });
 
+  it('lists the four vanity projects at tier 1 only (#1948)', () => {
+    const ids = allModelIds();
+    for (const type of ['ceo_statue', 'golf_course', 'executive_helipad', 'gold_tower']) {
+      expect(ids.filter(id => id === `building_${type}_t1`), type).toHaveLength(1);
+      expect(ids).not.toContain(`building_${type}_t2`);
+      expect(ids).not.toContain(`building_${type}_t3`);
+    }
+  });
+
   it('emits only tiers 1..3 per building type, and only tier 1 for single-tier types', () => {
     const ids = new Set(allModelIds());
-    // Vanity projects (#1947) have no model yet: they render as the stand-in.
-    for (const type of (Object.keys(BUILDING_DEFS) as BuildingType[]).filter(ty => !isVanityType(ty))) {
+    for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
       const maxTier = isSingleTierType(type) ? 1 : 3;
       for (const tier of [1, 2, 3]) {
         expect(ids.has(buildingModelId(type, tier as 1 | 2 | 3)), `${type} t${tier}`).toBe(tier <= maxTier);

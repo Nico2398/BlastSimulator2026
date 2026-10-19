@@ -1,4 +1,4 @@
-"""Buildings — 8 types × 3 tiers plus the single-tier spoil heap, sized from building-defs.json, plus the ruin.
+"""Buildings — 8 types × 3 tiers plus the single-tier spoil heap and the four vanity projects, sized from building-defs.json, plus the ruin.
 
 Axes: the model is centred on its footprint, x spanning ±sizeX/2 and y
 spanning ±sizeZ/2 (game +Z is Blender −Y, so the FRONT — the row holding
@@ -20,6 +20,8 @@ from common import (
     array, assign, bevel, box, capsule, cylinder, material, pivot, prism, rotate, sphere, torus,
 )
 
+import buildings_vanity  # noqa: E402
+
 DEFS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'building-defs.json')
 
 TYPE_COLORS = {
@@ -32,10 +34,15 @@ TYPE_COLORS = {
     'explosive_warehouse': 0xFF2222,
     'freight_warehouse': 0x888888,
     'spoil_heap': 0x8C8A86,
+    'ceo_statue': 0xEDE8DF,
+    'golf_course': 0x35D65A,
+    'executive_helipad': 0x7C828C,
+    'gold_tower': 0xE6B422,
 }
 
 # Types drawn at tier 1 only; the game aliases tiers 2 and 3 onto tier 1 (isSingleTierType in Building.ts).
-SINGLE_TIER_TYPES = frozenset({'spoil_heap'})
+VANITY_TYPES = frozenset({'ceo_statue', 'golf_course', 'executive_helipad', 'gold_tower'})
+SINGLE_TIER_TYPES = frozenset({'spoil_heap'}) | VANITY_TYPES
 
 FLOOR_H = 1.45
 ENTRY_GREEN = 0x00CC44
@@ -69,6 +76,9 @@ def _materials(btype: str) -> dict[str, bpy.types.Material]:
         'beacon': material('Beacon', 0xFF8A2A, roughness=0.3, emission=0xFF7A1A, emission_strength=0.8),
         'green': material('Green', 0x3FA65B, roughness=0.8),
         'cone': material('Cone', 0xFF7A1A, roughness=0.7),
+        'gold': material('Gold', 0xFFC83A, roughness=0.3, metallic=0.6),
+        'sand': material('Sand', 0xE8D08A, roughness=0.95),
+        'carpet': material('Carpet', 0xB3131F, roughness=0.9),
     }
 
 
@@ -689,6 +699,11 @@ TYPE_BUILDERS = {
     'explosive_warehouse': build_explosive_warehouse,
     'freight_warehouse': build_freight_warehouse,
     'spoil_heap': build_spoil_heap,
+    # Vanity projects (#1948): single tier, drawn in buildings_vanity.py.
+    'ceo_statue': buildings_vanity.build_ceo_statue,
+    'golf_course': buildings_vanity.build_golf_course,
+    'executive_helipad': buildings_vanity.build_executive_helipad,
+    'gold_tower': buildings_vanity.build_gold_tower,
 }
 
 
