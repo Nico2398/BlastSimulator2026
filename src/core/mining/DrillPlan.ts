@@ -3,12 +3,15 @@
 
 import { type VoxelGrid, computeVoxelColumnSurfaceY, renormaliseVoxelColumnAfterCarve } from '../world/VoxelGrid.js';
 import type { Vehicle, VehicleTier } from '../entities/Vehicle.js';
+import { fleetBestRigLimit, lowestRigTierReaching } from './RigLimits.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import {
   DRILL_HOLE_BASE_DURATION_TICKS,
   DRILL_HOLE_REFERENCE_DEPTH_M,
   DRILL_HOLE_REFERENCE_DIAMETER_M,
   DRILL_RIG_MAX_DEPTH_M,
+  DRILL_RIG_MAX_DIAMETER_M,
+  DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M,
 } from '../config/balance.js';
 
 export interface DrillHole {
@@ -206,12 +209,7 @@ type RigLike = Pick<Vehicle, 'type' | 'tier'>;
  * `drill_rig` vehicles. With no rig owned, falls back to the tier-1 value (#1679).
  */
 export function fleetDrillReachM(vehicles: ReadonlyArray<RigLike>): number {
-  let reach = DRILL_RIG_MAX_DEPTH_M[1];
-  for (const v of vehicles) {
-    if (v.type !== 'drill_rig') continue;
-    reach = Math.max(reach, DRILL_RIG_MAX_DEPTH_M[v.tier]);
-  }
-  return reach;
+  return fleetBestRigLimit(DRILL_RIG_MAX_DEPTH_M, vehicles);
 }
 
 /**
@@ -227,12 +225,27 @@ export function drillDepthRefusal(
   return { key: 'mining.drill_plan.refused_depth', params: { depth, reach } };
 }
 
-const DRILL_RIG_TIERS_ASC = Object.keys(DRILL_RIG_MAX_DEPTH_M).map(Number).sort((a, b) => a - b) as VehicleTier[];
-
 /** Lowest drill rig tier whose max depth (DRILL_RIG_MAX_DEPTH_M) reaches `depth`. */
 export function minDrillRigTier(depth: number): VehicleTier {
   if (!(depth > 0)) return 1;
-  const tiers = DRILL_RIG_TIERS_ASC;
-  // Beyond the deepest rig: clamp to it; drillDepthRefusal already blocks such a hole at order time.
-  return tiers.find(t => DRILL_RIG_MAX_DEPTH_M[t] >= depth) ?? tiers[tiers.length - 1]!;
+  // Beyond the deepest rig: clamps to it; drillDepthRefusal already blocks such a hole at order time.
+  return lowestRigTierReaching(DRILL_RIG_MAX_DEPTH_M, depth);
+}
+
+/** Widest hole (m) the fleet's best drill rig can bore: DRILL_RIG_MAX_DIAMETER_M over `drill_rig` vehicles, tier-1 with none (#1934). */
+export function fleetDrillDiameterM(vehicles: ReadonlyArray<RigLike>): number {
+  return fleetBestRigLimit(DRILL_RIG_MAX_DIAMETER_M, vehicles);
+}
+
+/** Refusal for a hole wider than the fleet can bore: null when it fits, else the i18n key and params in mm (#1934). */
+export function drillDiameterRefusal(
+  diameter: number,
+  vehicles: ReadonlyArray<RigLike>,
+): { key: 'mining.drill_plan.refused_diameter'; params: { diameter: number; reach: number } } | null {
+  const reach = fleetDrillDiameterM(vehicles);
+  if (!(diameter > reach + DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M)) return null;
+  return {
+    key: 'mining.drill_plan.refused_diameter',
+    params: { diameter: Math.round(diameter * 1000), reach: Math.round(reach * 1000) },
+  };
 }

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   createCharge, batchCharge, landLoadedCharge, computeChargeHoleDurationTicks, computeChargeDurationTicks, chargeOrderCost,
   chargeColumnM, maxChargeKgForHole, weakHoleSummary,
+  chargeFitsHole, maxFittingChargeKg, explosiveHoleLimits,
   stockAwareChargesCost, recordedChargesCost, plannedChargesCost,
 } from '../../../src/core/mining/ChargePlan.js';
 import type { PlannedCharge } from '../../../src/core/mining/ChargePlan.js';
@@ -492,5 +493,95 @@ describe('landLoadedCharge carries fromStockKg (#1685)', () => {
   it('leaves it absent for an all-cash charge', () => {
     const loaded = landLoadedCharge({ explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
     expect(loaded.fromStockKg).toBeUndefined();
+  });
+});
+
+describe('hole diameter scales charge capacity (#1934)', () => {
+  it('no diameter equals the explicit 89 mm default', () => {
+    expect(chargeColumnM(8)).toBe(chargeColumnM(8, 0.089));
+    expect(maxChargeKgForHole(8, 2)).toBe(maxChargeKgForHole(8, 2, 0.089));
+    expect(maxFittingChargeKg(8, 2)).toBe(maxFittingChargeKg(8, 2, 0.089));
+    expect(chargeFitsHole(12, 2, 8)).toBe(chargeFitsHole(12, 2, 8, 0.089));
+  });
+
+  it('maxChargeKgForHole is proportional to d^2 (127 mm holds about 2.03x of 89 mm)', () => {
+    const ratio = maxChargeKgForHole(8, 2, 0.127) / maxChargeKgForHole(8, 2, 0.089);
+    expect(ratio).toBeCloseTo((0.127 / 0.089) ** 2, 6);
+    expect(ratio).toBeCloseTo(2.03, 1);
+  });
+
+  it('chargeColumnM is shorter for the same kg in a wider hole', () => {
+    expect(chargeColumnM(16, 0.127)).toBeLessThan(chargeColumnM(16, 0.089));
+    expect(chargeColumnM(16, 0.089)).toBeCloseTo(8, 9);
+    expect(chargeColumnM(16, 0.127)).toBeCloseTo(16 / 4.07, 1);
+  });
+
+  it('chargeFitsHole: 16 kg with 2 m stemming fits an 8 m hole at 127 mm, not at 89 mm', () => {
+    expect(chargeFitsHole(16, 2, 8, 0.127)).toBe(true);
+    expect(chargeFitsHole(16, 2, 8, 0.089)).toBe(false);
+    expect(chargeFitsHole(16, 2, 8)).toBe(false);
+  });
+
+  it('maxFittingChargeKg grows with diameter and the displayed maximum is itself accepted', () => {
+    const narrow = maxFittingChargeKg(8, 2, 0.089);
+    const wide = maxFittingChargeKg(8, 2, 0.127);
+    expect(wide).toBeGreaterThan(narrow * 2);
+    expect(chargeFitsHole(wide, 2, 8, 0.127)).toBe(true);
+  });
+
+  it('boundary: stemming past the hole depth leaves zero capacity at any diameter', () => {
+    expect(maxChargeKgForHole(8, 9, 0.165)).toBe(0);
+  });
+
+  it('createCharge accepts 16 kg in an 8 m hole at 127 mm', () => {
+    const result = createCharge('rumblox', 16, 2, 8, 0.127);
+    expect('charge' in result).toBe(true);
+  });
+
+  it('createCharge refuses 16 kg in an 8 m hole at 89 mm, with or without the explicit diameter', () => {
+    expect('error' in createCharge('rumblox', 16, 2, 8, 0.089)).toBe(true);
+    expect('error' in createCharge('rumblox', 16, 2, 8)).toBe(true);
+  });
+
+  it('createCharge refuses a charge past the wider hole too', () => {
+    expect('error' in createCharge('rumblox', 30, 2, 8, 0.127)).toBe(true);
+  });
+
+  it('batchCharge uses each hole\'s own diameter', () => {
+    const { charges, errors } = batchCharge(
+      ['H1', 'H2'], { H1: 8, H2: 8 }, 'rumblox', 16, 2, { H1: 0.127, H2: 0.089 },
+    );
+    expect(Object.keys(charges)).toEqual(['H1']);
+    expect(errors.map(e => e.holeId)).toEqual(['H2']);
+  });
+
+  it('batchCharge without diameters behaves as before (all 89 mm)', () => {
+    const { charges, errors } = batchCharge(['H1'], { H1: 8 }, 'rumblox', 16, 2);
+    expect(Object.keys(charges)).toEqual([]);
+    expect(errors).toHaveLength(1);
+  });
+});
+
+describe('explosiveHoleLimits (#1934)', () => {
+  const boomite = { minChargeKg: 1, maxChargeKg: 8 };
+
+  it('is the catalog range at 89 mm', () => {
+    expect(explosiveHoleLimits(boomite, 0.089)).toEqual({ minKg: 1, maxKg: 8 });
+  });
+
+  it('scales both ends by the capacity factor at 127 mm', () => {
+    const f = (0.127 / 0.089) ** 2;
+    const limits = explosiveHoleLimits(boomite, 0.127);
+    expect(limits.minKg).toBeCloseTo(1 * f, 6);
+    expect(limits.maxKg).toBeCloseTo(8 * f, 6);
+  });
+
+  it('boundary: 165 mm scales further than 127 mm', () => {
+    expect(explosiveHoleLimits(boomite, 0.165).maxKg).toBeGreaterThan(explosiveHoleLimits(boomite, 0.127).maxKg);
+  });
+
+  it('createCharge honours the scaled catalog max: boomite 16 kg fits at 127 mm, 17 kg does not', () => {
+    expect('charge' in createCharge('boomite', 16, 2, 8, 0.127)).toBe(true);
+    expect('error' in createCharge('boomite', 17, 2, 8, 0.127)).toBe(true);
   });
 });

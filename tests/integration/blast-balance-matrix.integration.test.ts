@@ -57,7 +57,7 @@ function fireOnto(shot: Shot): { result: BlastResult; grid: VoxelGrid } {
 
   holeCounter.nextHoleId = 1;
   const grid = bench(rock);
-  const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, rows, cols, spacing, depth, 0.15);
+  const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, rows, cols, spacing, depth, 0.089);
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
   const { charges } = batchCharge(holes.map(h => h.id), depths, explosive, kg, stemming);

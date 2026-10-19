@@ -13,6 +13,8 @@ import { placeBuilding, storeExplosives } from '../../../../../src/core/entities
 import { buyStockBlockReason } from '../../../../../src/core/mining/ExplosiveStock.js';
 import { CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, STOCK_BUY_STEP_KG } from '../../../../../src/core/config/balance.js';
 import { dispatchChargeAction } from '../../../../../src/core/mining/ChargeOrder.js';
+import { explosiveHoleLimits } from '../../../../../src/core/mining/ChargePlan.js';
+import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js';
 import { formatGameDuration } from '../../../../../src/ui/formatGameDuration.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -56,7 +58,7 @@ describe('ChargeStep', () => {
   it('clicking a product card selects it without dispatching a charge command', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
 
     card(step, 'krackle').click();
@@ -72,7 +74,7 @@ describe('ChargeStep', () => {
   it('shows the WATER-SENSITIVE badge only for water-sensitive explosives while a hole is wet', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
 
     step.update(state, 'sunny'); // not raining — no wet holes
     const waterSensitiveId = ['pop_rock', 'krackle', 'shatternite', 'obliviax'].find(id => getExplosive(id)?.waterSensitive)!;
@@ -86,7 +88,7 @@ describe('ChargeStep', () => {
   it('never shows the badge on a non-water-sensitive explosive, even while raining', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     wetAllHoles(state);
     step.update(state, 'heavy_rain');
 
@@ -97,7 +99,7 @@ describe('ChargeStep', () => {
   it('Charge All dispatches the selected explosive, amount, and stemming for every hole', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
     card(step, 'krackle').click();
 
@@ -117,7 +119,7 @@ describe('ChargeStep', () => {
   it('keeps the overflow reason line as the Charge All button next sibling (#1361 scenario selector)', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 6, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 6, 0.089);
     step.update(state, 'sunny');
     card(step, 'krackle').click();
     const chargeAllBtn = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
@@ -132,8 +134,8 @@ describe('ChargeStep', () => {
   it('renders one per-hole row per drill hole, keyed by data-hole, each with its own charge button', () => {
     const { step } = makeStep();
     const state = makeState();
-    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
     step.update(state, 'sunny');
 
     expect(step.root.querySelectorAll('[data-action="charge-hole"]')).toHaveLength(2);
@@ -144,8 +146,8 @@ describe('ChargeStep', () => {
   it('a per-hole Charge button dispatches charge for that hole alone, with the panel\'s selected explosive/amount/stemming', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
     step.update(state, 'sunny');
     card(step, 'krackle').click();
 
@@ -158,7 +160,7 @@ describe('ChargeStep', () => {
   it('a per-hole Charge button picks up the amount/stemming steppers, not the defaults', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
 
     const amountIncBtn = step.root.querySelectorAll('.bsx-stepper-btn')[1] as HTMLButtonElement;
@@ -176,8 +178,8 @@ describe('ChargeStep', () => {
   it('marks a charged hole distinguishable from an uncharged one and shows its charge', () => {
     const { step } = makeStep();
     const state = makeState();
-    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
     state.chargesByHole[h1.id] = { explosiveId: 'krackle', amountKg: 7, stemmingM: 2 };
     step.update(state, 'sunny');
 
@@ -193,7 +195,7 @@ describe('ChargeStep', () => {
   it('re-renders the hole rows once a charge lands, so a row cannot go stale', () => {
     const { step } = makeStep();
     const state = makeState();
-    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
     expect((step.root.querySelector(`[data-hole="${h1.id}"]`) as HTMLElement).dataset['charged']).toBe('false');
 
@@ -246,7 +248,7 @@ describe('ChargeStep', () => {
   it('shows the tubing "settled" card when every hole is dry and tubed', () => {
     const { step } = makeStep();
     const state = makeState();
-    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     state.tubingState.installedHoles.add(hole.id);
 
     step.update(state);
@@ -258,8 +260,8 @@ describe('ChargeStep', () => {
   it('shows the tubing card with buy and install in dry weather, so holes can be tubed ahead of rain (#1350)', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
     state.tubingState.inventory = 5;
 
     step.update(state, 'sunny');
@@ -283,8 +285,8 @@ describe('ChargeStep', () => {
   it('dry-weather tubing install skips holes that are already tubed', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
     state.tubingState.installedHoles.add(h1.id);
     state.tubingState.inventory = 5;
 
@@ -298,8 +300,8 @@ describe('ChargeStep', () => {
   it('shows the tubing "needed" card with the wet count once it starts raining', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
     soak(state);
 
     wetAllHoles(state);
@@ -314,7 +316,7 @@ describe('ChargeStep', () => {
   it('Buy Tubing dispatches the registered buy command', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     wetAllHoles(state);
     step.update(state, 'heavy_rain');
 
@@ -326,7 +328,7 @@ describe('ChargeStep', () => {
   it('the Buy Tubing button shows the real cost (10 × TUBING_COST), not a stale price', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     wetAllHoles(state);
     step.update(state, 'heavy_rain');
 
@@ -337,9 +339,9 @@ describe('ChargeStep', () => {
   it('Install Tubing dispatches one install_tubing per untubed hole', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
-    const h3 = addHole(holeCounter, state.drillHoles, 16, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
+    const h3 = addHole(holeCounter, state.drillHoles, 16, 10, 8, 0.089);
     state.tubingState.installedHoles.add(h3.id);
     state.tubingState.inventory = 5;
     wetAllHoles(state);
@@ -355,8 +357,8 @@ describe('ChargeStep', () => {
   it('disables Install Tubing when stock is short, with a reason line', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
     state.tubingState.inventory = 1; // 2 holes wet, only 1 tube in stock
     wetAllHoles(state);
     step.update(state, 'heavy_rain');
@@ -375,7 +377,7 @@ describe('ChargeStep', () => {
     it('Drain button is disabled with a visible localized reason when no hole is wet', () => {
       const { step, gameConsole } = makeStep();
       const state = makeState();
-      addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+      addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
 
       step.update(state, 'sunny');
 
@@ -389,7 +391,7 @@ describe('ChargeStep', () => {
     it('Drain button is enabled for a wet untubed tight-rock hole and drains every hole', () => {
       const { step, gameConsole } = makeStep();
       const state = makeState();
-      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
       setHoleWater(state, [h1.id], 0.9, 0.03);
 
       step.update(state, 'sunny');
@@ -403,7 +405,7 @@ describe('ChargeStep', () => {
     it('Drain button is disabled with the porous reason when every wet hole is untubed porous rock', () => {
       const { step, gameConsole } = makeStep();
       const state = makeState();
-      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
       setHoleWater(state, [h1.id], 0.9, 0.35);
 
       step.update(state, 'heavy_rain');
@@ -417,7 +419,7 @@ describe('ChargeStep', () => {
     it('Drain button is enabled once the porous wet hole is tubed', () => {
       const { step } = makeStep();
       const state = makeState();
-      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
       setHoleWater(state, [h1.id], 0.9, 0.35);
       state.tubingState.installedHoles.add(h1.id);
 
@@ -429,8 +431,8 @@ describe('ChargeStep', () => {
     it('each wet hole row has its own drain button dispatching drain_hole for that hole', () => {
       const { step, gameConsole } = makeStep();
       const state = makeState();
-      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-      const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+      const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
       setHoleWater(state, [h2.id], 0.9, 0.03);
 
       step.update(state, 'sunny');
@@ -496,7 +498,7 @@ describe('ChargeStep level-limited product list (#1357)', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     state.campaign.activeLevelId = null;
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
     card(step, 'dynatomics').click();
     expect(card(step, 'dynatomics').dataset['selected']).toBe('true');
@@ -524,8 +526,8 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
   it('shows a reason line with the max kg and disables Charge All when amount + stemming overflow the shallowest hole', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.15); // shallowest: default 7 kg (3.5 m column) + 2.5 m stemming > 4 m
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.089); // shallowest: default 7 kg (3.5 m column) + 2.5 m stemming > 4 m
     step.update(state, 'sunny');
 
     expect(chargeAll(step).disabled).toBe(true);
@@ -536,8 +538,8 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
   it('shows no overflow reason and leaves Charge All enabled when the charge fits every hole', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    addHole(holeCounter, state.drillHoles, 13, 10, 6, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 13, 10, 6, 0.089);
     step.update(state, 'sunny');
 
     expect(chargeAll(step).disabled).toBe(false);
@@ -559,7 +561,7 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
   it('a disabled Charge All dispatches no command when clicked', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.15);
+    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.089);
     step.update(state, 'sunny');
 
     chargeAll(step).click();
@@ -578,8 +580,8 @@ describe('ChargeStep — explosive too weak for the rock warning (#1358)', () =>
   function stepWithHoles(sample: (hole: DrillHole) => ColumnRock | null) {
     const made = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
     made.step.setHoleRockSampler(sample);
     return { ...made, state };
   }
@@ -625,7 +627,7 @@ describe('ChargeStep — explosive too weak for the rock warning (#1358)', () =>
   it('shows no warning when no sampler was provided', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
     card(step, 'pop_rock').click();
     step.update(state, 'sunny');
@@ -650,7 +652,7 @@ describe('ChargeStep — pattern line, awaiting funds, refusal notice (#1345)', 
   it('shows the pattern line only while a pattern charge is set', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
     expect(step.root.querySelector('[data-info="pattern-charge"]')).toBeNull();
 
@@ -669,8 +671,8 @@ describe('ChargeStep — pattern line, awaiting funds, refusal notice (#1345)', 
   it('shows the awaiting-funds reason listing the waiting holes, and clears it when empty', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    addHole(holeCounter, state.drillHoles, 14, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 14, 10, 8, 0.089);
     state.chargeAwaitingFunds = ['H1', 'H2'];
     step.update(state, 'sunny');
     const warning = step.root.querySelector('[data-warning="awaiting-funds"]')!;
@@ -684,7 +686,7 @@ describe('ChargeStep — pattern line, awaiting funds, refusal notice (#1345)', 
   it('shows a refused command output as a notice and hides it after a successful one', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
     const chargeAll = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
 
@@ -706,7 +708,7 @@ describe('ChargeStep — draining (#1350)', () => {
   it('disables Drain with a visible reason when no hole is wet', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state);
 
     expect(drainAll(step).disabled).toBe(true);
@@ -719,7 +721,7 @@ describe('ChargeStep — draining (#1350)', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     state.cash = 1000;
-    const h = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const h = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     soak(state);
     step.update(state);
 
@@ -735,7 +737,7 @@ describe('ChargeStep — draining (#1350)', () => {
     const { step } = makeStep();
     const state = makeState();
     state.cash = 1000;
-    const h = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const h = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     soak(state, 0.35);
     step.update(state);
 
@@ -753,7 +755,7 @@ describe('ChargeStep — draining (#1350)', () => {
     const { step } = makeStep();
     const state = makeState();
     state.cash = 1000;
-    const h = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const h = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     soak(state);
     step.update(state);
     expect(drainAll(step).disabled).toBe(false);
@@ -907,7 +909,7 @@ describe('ChargeStep explosive stock (#1685)', () => {
   it('charging with no warehouse still works as before', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
     (step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement).click();
     expect(gameConsole.mock.calls[0]![0]).toContain('charge hole:*');
@@ -916,7 +918,7 @@ describe('ChargeStep explosive stock (#1685)', () => {
   it('paid-from line: stock covering the whole pattern shows all kg from stock and $0 cash', () => {
     const { step } = makeStep();
     const state = makeState();
-    for (let i = 0; i < 3; i++) addHole(holeCounter, state.drillHoles, 10 + 3 * i, 10, 8, 0.15);
+    for (let i = 0; i < 3; i++) addHole(holeCounter, state.drillHoles, 10 + 3 * i, 10, 8, 0.089);
     withWarehouse(state, { boomite: 100 });
     step.update(state, 'sunny');
 
@@ -928,7 +930,7 @@ describe('ChargeStep explosive stock (#1685)', () => {
   it('paid-from line: partly covered prices only the shortfall in cash', () => {
     const { step } = makeStep();
     const state = makeState();
-    for (let i = 0; i < 3; i++) addHole(holeCounter, state.drillHoles, 10 + 3 * i, 10, 8, 0.15);
+    for (let i = 0; i < 3; i++) addHole(holeCounter, state.drillHoles, 10 + 3 * i, 10, 8, 0.089);
     withWarehouse(state, { boomite: 5 });
     step.update(state, 'sunny');
 
@@ -941,7 +943,7 @@ describe('ChargeStep explosive stock (#1685)', () => {
   it('paid-from line: no stock shows 0 kg from stock and the full list price in cash', () => {
     const { step } = makeStep();
     const state = makeState();
-    for (let i = 0; i < 3; i++) addHole(holeCounter, state.drillHoles, 10 + 3 * i, 10, 8, 0.15);
+    for (let i = 0; i < 3; i++) addHole(holeCounter, state.drillHoles, 10 + 3 * i, 10, 8, 0.089);
     step.update(state, 'sunny');
     const full = 3 * CHARGE_DEFAULT_AMOUNT_KG * getExplosive('boomite')!.costPerKg;
     expect(paidFrom(step)).toContain(`$${full}`);
@@ -950,7 +952,7 @@ describe('ChargeStep explosive stock (#1685)', () => {
   it('paid-from line follows the selected explosive', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     withWarehouse(state, { krackle: 100 });
     step.update(state, 'sunny');
     expect(paidFrom(step)).not.toContain('$0');
@@ -962,7 +964,7 @@ describe('ChargeStep explosive stock (#1685)', () => {
   it('Charge All line (button sub-label) shows net cash cost when stock covers the pattern', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     withWarehouse(state, { boomite: 100 });
     step.update(state, 'sunny');
     const btn = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
@@ -976,7 +978,7 @@ describe('ChargeStep delivery wait (#1966)', () => {
     state.tickCount = 280;
     state.cash = 100_000;
     state.finances.cash = 100_000;
-    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     dispatchChargeAction(state, { id: hole.id, x: 10, z: 10 }, { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
     return state;
   }
@@ -1011,7 +1013,7 @@ describe('ChargeStep delivery wait (#1966)', () => {
   it('is hidden when nothing is in transit', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
     const el = banner(step);
     expect(el === null || el.style.display === 'none').toBe(true);
@@ -1036,11 +1038,58 @@ describe('ChargeStep delivery wait (#1966)', () => {
   it('the delivery hint states a duration, not ticks', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
     const hint = step.root.querySelector('[data-info="delivery-hint"]') as HTMLElement | null;
     expect(hint).not.toBeNull();
     expect(hint!.textContent).toContain(formatGameDuration(400));
     expect(hint!.textContent).not.toContain('tick');
+  });
+});
+
+describe('ChargeStep — hole diameter (#1934)', () => {
+  it('capacity line names the narrowest hole\'s bore and kg per metre', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.127);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.165);
+    step.update(state, 'sunny');
+
+    const line = step.root.querySelector('[data-info="hole-capacity"]')!.textContent;
+    expect(line).toBe(t('ui.blast_workshop.charge.hole_capacity', {
+      diameter: 127, kgPerMetre: +chargeKgPerMetre(0.127).toFixed(2),
+    }));
+  });
+
+  it('kg max label scales with the narrowest hole', () => {
+    const { step } = makeStep();
+    const narrow = makeState();
+    addHole(holeCounter, narrow.drillHoles, 10, 10, 8, 0.089);
+    step.update(narrow, 'sunny');
+    const narrowLabel = card(step, 'boomite').textContent;
+
+    const { step: wideStep } = makeStep();
+    const wide = makeState();
+    addHole(holeCounter, wide.drillHoles, 10, 10, 8, 0.127);
+    wideStep.update(wide, 'sunny');
+
+    const boomite = getExplosive('boomite')!;
+    const maxOf = (d: number) => Math.round(explosiveHoleLimits(boomite, d).maxKg * 10) / 10;
+    expect(narrowLabel).toContain(`${maxOf(0.089)} kg max`);
+    expect(card(wideStep, 'boomite').textContent).toContain(`${maxOf(0.127)} kg max`);
+  });
+
+  it('Charge All amount is raised to the widest hole\'s minimum', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.165);
+    step.update(state, 'sunny');
+    card(step, 'boomite').click();
+
+    (step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement).click();
+    const minWide = explosiveHoleLimits(getExplosive('boomite')!, 0.165).minKg;
+    const amount = Number(/amount:([\d.]+)/.exec(gameConsole.mock.calls[0]![0] as string)![1]);
+    expect(amount).toBeGreaterThanOrEqual(minWide);
   });
 });

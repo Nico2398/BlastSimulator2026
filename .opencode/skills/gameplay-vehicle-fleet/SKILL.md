@@ -37,6 +37,8 @@ Six roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
 
 **Drill rig reach (#1679).** A rig's tier caps the deepest hole it can drill: `DRILL_RIG_MAX_DEPTH_M` = 12 / 24 / 40 m for tiers 1 / 2 / 3, minimum `DRILL_HOLE_MIN_DEPTH_M` = 1. The fleet's reach (`fleetDrillReachM`, `DrillPlan.ts`) is the best owned rig's value; with no rig owned it falls back to the tier-1 value (12 m). `drill_plan grid|add` and the saved-plan load refuse a deeper hole (`drillDepthRefusal`, `mining.drill_plan.refused_depth`) before any mutation; the Blast Workshop depth stepper is clamped to the reach and the Fleet tooltip lists it.
 
+**Drill rig bore (#1934).** A rig's tier also caps the widest hole it can bore: `DRILL_RIG_MAX_DIAMETER_M` = 89 / 127 / 165 mm for tiers 1 / 2 / 3 (`minRigTierForDiameter`, `HoleDiameter.ts`). `fleetDrillDiameterM` is the best owned rig's value (tier-1 with none); `drill_plan grid|add` and saved-plan load refuse a wider hole (`drillDiameterRefusal`, `mining.drill_plan.refused_diameter`) before any mutation. A `drill_hole` order needs `max(depth tier, diameter tier)` (`minVehicleTierFor`, reads `payload.diameter` in metres). The Drill step diameter stepper (`data-field="diameter"`, mm) skips options above the fleet and clamps down if a rig is lost.
+
 **Charging Truck decisions (#1645, defaulted).** Licence: the existing `driving.truck`, like the hauler and destroyer
 (no new `SkillCategory`, Driving Center course or starting qualification; Drivers already hold it). Base stats
 (`VEHICLE_BASE_STATS.charging_truck`): 28 000 $, workRate 6, capacity 500, speed 2, maxHp 115, upkeep 4, fuel 6 per tick

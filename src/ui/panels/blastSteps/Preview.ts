@@ -27,6 +27,7 @@ import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { SOFTWARE_TIER_COSTS, MAX_SOFTWARE_TIER, type BlastPreviewSummary } from '../../../core/mining/Software.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../../core/mining/BlastPlan.js';
+import { chargeKgPerMetre } from '../../../core/mining/HoleDiameter.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
@@ -60,6 +61,7 @@ export class PreviewStep {
   private readonly predictedListEl: HTMLElement;
   private readonly runBtn: HTMLButtonElement;
   private readonly reasonEl: HTMLElement;
+  private readonly boreEl: HTMLElement;
 
   private gameConsole?: GameConsoleFn;
   private lastSignature = '';
@@ -93,6 +95,8 @@ export class PreviewStep {
     this.runBtn.addEventListener('click', () => this.gameConsole?.('blast_preview'));
 
     this.reasonEl = el('div');
+    this.boreEl = el('div', { attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
+    this.boreEl.dataset['info'] = 'plan-bore';
 
     const callout = el('div');
     callout.style.cssText = 'display:flex;align-items:center;gap:7px;padding:9px 11px;border-radius:5px;background:rgba(169,140,255,.08);border:1px solid rgba(169,140,255,.24)';
@@ -103,7 +107,7 @@ export class PreviewStep {
     );
     callout.append(calloutIcon, calloutText);
 
-    this.el.append(suiteHeader, this.tierListEl, predictedHeader, this.predictedListEl, this.runBtn, this.reasonEl, callout);
+    this.el.append(suiteHeader, this.tierListEl, predictedHeader, this.predictedListEl, this.boreEl, this.runBtn, this.reasonEl, callout);
     container.appendChild(this.el);
   }
 
@@ -111,18 +115,28 @@ export class PreviewStep {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
+  /** Distinct hole diameters of the plan with their charge capacity, so the preview names what it simulates (#1934). */
+  private boreText(state: GameState): string {
+    const diameters = [...new Set(state.drillHoles.map(h => h.diameter))].sort((a, b) => a - b);
+    return diameters.map(d => t('ui.blast_workshop.preview.bore', {
+      diameter: Math.round(d * 1000), kgPerMetre: +chargeKgPerMetre(d).toFixed(2),
+    })).join(' · ');
+  }
+
   update(state: GameState): void {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const errors = state.drillHoles.length > 0 ? validateBlastPlan(plan) : [];
     const canAnalyze = state.drillHoles.length > 0 && errors.length === 0;
 
+    const boreText = this.boreText(state);
     const signature = JSON.stringify({
       tier: state.softwareTier, cash: state.cash, preview: state.lastBlastPreview,
-      holeCount: state.drillHoles.length, canAnalyze,
+      holeCount: state.drillHoles.length, canAnalyze, bore: boreText,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
+    this.boreEl.textContent = boreText;
     this.renderTierList(state.softwareTier, state.cash);
     this.renderPredicted(state.lastBlastPreview, state.drillHoles.length);
 
