@@ -2,7 +2,7 @@
 
 import type { MiningContext } from './types.js';
 import type { Steps } from '../../../core/engine/Steps.js';
-import { resolveSecondaryBlasts, type SecondaryBlastOutcome } from '../../../core/entities/SecondaryBlast.js';
+import { resolveSecondaryBlasts, type SecondaryBlastEvent, type SecondaryBlastOutcome } from '../../../core/entities/SecondaryBlast.js';
 import { executeBlastSteps, type VillagePosition } from '../../../core/mining/BlastExecution.js';
 import { resolveMarketId } from '../../../core/campaign/Level.js';
 import { addBlastFragments, reserveFragmentIds } from '../../../core/economy/Logistics.js';
@@ -41,7 +41,10 @@ export function* carveSecondaryCraters(
   const visited = new Set<number>();
   let pending = [...outcomes];
   for (let pass = 0; pass < SECONDARY_BLAST_CRATER_MAX_PASSES && pending.length > 0; pass++) {
-    const craterEvents = [];
+    const craterEvents: SecondaryBlastEvent[] = [];
+    // Footprints as they stand before this pass's craters remove any building.
+    const footprints = new Map(state.buildings.buildings.map(b =>
+      [b.id, { x: b.x, z: b.z, ...getDefSize(getBuildingDef(b.type, b.tier)) }] as const));
     for (const outcome of pending) {
       const warehouseId = outcome.event.buildingId;
       if (visited.has(warehouseId)) continue;
@@ -49,8 +52,6 @@ export function* carveSecondaryCraters(
       const plan = outcome.craterPlan;
       if (plan.holes.length === 0) continue;
 
-      const footprints = new Map(state.buildings.buildings.map(b =>
-        [b.id, { x: b.x, z: b.z, ...getDefSize(getBuildingDef(b.type, b.tier)) }] as const));
       yield;
       const result = yield* executeBlastSteps(
         plan, grid, villages, undefined, state.buildings, ctx.emitter, wetHoleIds,
@@ -79,6 +80,8 @@ export function* carveSecondaryCraters(
     }
 
     // Warehouses the craters destroyed detonate in turn; each is carved on the next pass.
+    // Past the last pass nothing would carve them, so they are not resolved (no false crater reports).
+    if (pass + 1 >= SECONDARY_BLAST_CRATER_MAX_PASSES) break;
     const fresh = craterEvents.filter(e => !visited.has(e.buildingId));
     pending = fresh.length === 0 ? [] : resolveSecondaryBlasts(
       fresh, state.buildings, state.vehicles, state.employees, state.damage, state.tickCount,

@@ -21,7 +21,7 @@ import { placeBuilding } from '../../src/core/entities/Building.js';
 import { computeVoxelColumnSurfaceHeight, computeVoxelColumnSurfaceY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { setLocale } from '../../src/core/i18n/I18n.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { EXPLOSIVE_DELIVERY_TICKS, SECONDARY_BLAST_CRATER_MAX_PASSES } from '../../src/core/config/balance.js';
 import { tickUntilFresh } from '../helpers/blastFixtures.js';
 import { equipDemolition, tickUntilDemolished } from '../helpers/demolition.js';
 
@@ -34,12 +34,13 @@ const CX = WX + 1;
 const CZ = WZ + 1;
 const NEAR = 6;
 
+interface ExtraWarehouse { x: number; z: number; stockKg: number }
 interface World { run: Run; state: GameState; ctx: MiningContext; grid: VoxelGrid }
 
 afterEach(() => setLocale('en'));
 
 /** Drilled + charged single-hole pattern at (14,14) with a warehouse at (WX,WZ) holding `stockKg` boomite; not yet fired. */
-function prepare(stockKg: number): World {
+function prepare(stockKg: number, extra: ExtraWarehouse[] = []): World {
   const { runner, ctx } = createRunner();
   const run: Run = cmd => runner.run(cmd) as { success: boolean; output: string };
   expect(run('new_game mine_type:desert_badlands seed:42 size:32 staffed:true').success).toBe(true);
@@ -54,12 +55,17 @@ function prepare(stockKg: number): World {
   expect(placeBuilding(state.buildings, 'explosive_warehouse', WX, WZ, 32, 32, 1).success).toBe(true);
   const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
   if (stockKg > 0) wh.storedExplosives = { boomite: stockKg };
+  for (const e of extra) {
+    expect(placeBuilding(state.buildings, 'explosive_warehouse', e.x, e.z, 32, 32, 1).success).toBe(true);
+    const placed = state.buildings.buildings.find(b => b.type === 'explosive_warehouse' && b.x === e.x && b.z === e.z)!;
+    placed.storedExplosives = { boomite: e.stockKg };
+  }
   for (const unit of [...state.employees.employees, ...state.vehicles.vehicles]) { unit.x = 2; unit.z = 2; }
   return { run, state, ctx, grid: ctx.grid! };
 }
 
-function fire(stockKg: number, locale: 'en' | 'fr' = 'en'): World & { out: string } {
-  const w = prepare(stockKg);
+function fire(stockKg: number, locale: 'en' | 'fr' = 'en', extra: ExtraWarehouse[] = []): World & { out: string } {
+  const w = prepare(stockKg, extra);
   setLocale(locale);
   const res = w.run('blast');
   expect(res.success).toBe(true);
@@ -208,5 +214,75 @@ describe('player notice (#1896)', () => {
   it('prints no crater notice for an empty warehouse', () => {
     const { out } = fire(0);
     expect(out.toLowerCase()).not.toContain('crater');
+  });
+});
+
+describe('chained craters (#1896)', () => {
+  const stocked = (x: number, z: number, stockKg = 200): ExtraWarehouse => ({ x, z, stockKg });
+
+  it('a second stocked warehouse the first crater destroys carves its own crater', () => {
+    // Alone, the second survives the pattern blast and the first's radius damage (hp 200 vs <= 120 damage).
+    const alone = prepare(0, [stocked(20, 14)]);
+    alone.run('blast');
+    expect(alone.state.buildings.buildings.filter(b => b.type === 'explosive_warehouse')).toHaveLength(1);
+
+    const w = fire(300, 'en', [stocked(20, 14)]);
+    const rows = craterRows(w.state);
+    expect(rows).toHaveLength(2);
+    const second = rows.find(r => r.explosivesKg === 200)!;
+    expect(second.craterVoxels).toBeGreaterThan(0);
+    expect(second.craterFragments).toBeGreaterThan(0);
+    const solo = fire(300);
+    expect(w.ctx.lastBlastFragmentData!.length).toBeGreaterThan(solo.ctx.lastBlastFragmentData!.length);
+    expect(surfaceSum(w.grid, 12)).toBeLessThan(surfaceSum(solo.grid, 12));
+  });
+
+  it('no secondary blast reports a zero-voxel crater when the pass cap cuts a long chain short', () => {
+    const chain = [stocked(18, 20, 400), stocked(14, 20, 400), stocked(10, 20, 400), stocked(6, 20, 400), stocked(2, 20, 400)];
+    const w = prepare(300, chain);
+    expect(w.run('blast').success).toBe(true);
+    const rows = craterRows(w.state);
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows.length).toBeLessThanOrEqual(SECONDARY_BLAST_CRATER_MAX_PASSES + chain.length);
+    for (const r of rows) {
+      expect(r.craterVoxels).toBeGreaterThan(0);
+      expect(r.craterFragments).toBeGreaterThan(0);
+    }
+  });
+
+  it('an employee on the crater columns is killed, and survives when the warehouse is empty', () => {
+    const place = (w: World): { alive: boolean } => {
+      const emp = w.state.employees.employees[0]!;
+      emp.x = CX;
+      emp.z = CZ;
+      return emp;
+    };
+    const withStock = prepare(300);
+    const victim = place(withStock);
+    withStock.run('blast');
+    expect(victim.alive).toBe(false);
+
+    const without = prepare(0);
+    const survivor = place(without);
+    without.run('blast');
+    expect(survivor.alive).toBe(true);
+  });
+
+  it('a vehicle on the crater columns is destroyed', () => {
+    const w = prepare(300);
+    const veh = w.state.vehicles.vehicles[0]!;
+    veh.x = CX;
+    veh.z = CZ;
+    const id = veh.id;
+    w.run('blast');
+    expect(w.state.vehicles.vehicles.some(v => v.id === id)).toBe(false);
+
+    const control = prepare(0);
+    const cv = control.state.vehicles.vehicles[0]!;
+    cv.x = CX;
+    cv.z = CZ;
+    const cid = cv.id;
+    control.run('blast');
+    expect(control.state.vehicles.vehicles.some(v => v.id === cid)).toBe(true);
   });
 });
