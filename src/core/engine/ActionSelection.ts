@@ -14,7 +14,6 @@ import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST
 import { computeDemolitionDurationTicks } from '../entities/DemolitionDuration.js';
 import { readDemolishPayload } from './DemolishPayload.js';
 import { computeRampSegmentDurationTicks, isRampCellPending } from '../mining/Ramp.js';
-import { computeChargeDurationTicks } from '../mining/ChargePlan.js';
 import { computeLevelVolume } from '../mining/LevelGround.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, findVehicleReservedForAction, computeRigDurationTicks } from '../entities/Vehicle.js';
@@ -140,17 +139,9 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
     return action.payload['resumeTicks'];
   }
 
-  if (action.type === 'charge_hole') {
-    // Charging truck tier scales the tier-1 base duration (#1649).
-    const tier = (findVehicleReservedForAction(state.vehicles, action.id)?.tier ?? 1) as VehicleTier;
-    const baseTicks = typeof action.payload['durationTicks'] === 'number'
-      ? action.payload['durationTicks'] : BASE_TASK_DURATION_TICKS;
-    const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
-    return computeChargeDurationTicks(baseTicks, tier, level, needMult, lqMult);
-  }
-
-  if (action.type === 'drill_hole') {
-    // Drill rig tier scales the tier-1 base duration (#1935); unreserved estimates at tier 1.
+  if (action.type === 'charge_hole' || action.type === 'drill_hole') {
+    // Reserved vehicle tier scales the tier-1 base duration: charging truck (#1649)
+    // or drill rig (#1935). Unreserved estimates at tier 1.
     const tier = (findVehicleReservedForAction(state.vehicles, action.id)?.tier ?? 1) as VehicleTier;
     const baseTicks = typeof action.payload['durationTicks'] === 'number'
       ? action.payload['durationTicks'] : BASE_TASK_DURATION_TICKS;

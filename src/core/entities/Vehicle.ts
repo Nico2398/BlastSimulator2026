@@ -370,8 +370,9 @@ export function vehicleMaxSlopeRatio(vehicle: Pick<Vehicle, 'tier'>, progression
 }
 
 /**
- * Ticks a drill rig needs for a drill-hole task whose tier-1 base is `baseTicks`.
- * Higher rig tiers work faster (VEHICLE_TIER_MULTIPLIERS[tier].workRate), then the
+ * Ticks a rig or truck crew member needs for a drill-hole or charge-hole task whose
+ * tier-1 base is `baseTicks`.
+ * Higher vehicle tiers work faster (VEHICLE_TIER_MULTIPLIERS[tier].workRate), then the
  * driver's proficiency, need and living-quarters multipliers apply.
  */
 export function computeRigDurationTicks(
