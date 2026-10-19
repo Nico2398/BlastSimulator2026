@@ -67,7 +67,7 @@ describe('build_ramp path: ordering', () => {
     const r = buildRampCommand(ctx, [], ORDER);
     expect(r.success).toBe(true);
     const planned = ctx.state!.plannedRamps[0]!;
-    expect(r.output).toBe(t('mining.build_ramp.ordered_legs', { total: 22, n: 2, segments: planned.segments.length }));
+    expect(r.output).toBe(t('mining.build_ramp.ordered_legs', { length: 22, legs: 2, segments: planned.segments.length }));
     expect(r.output).toMatch(/Ramp ordered: 22m in 2 legs, \d+ segments queued for excavation/);
   });
 

@@ -46,11 +46,11 @@ export interface RampPathCell {
   legIndex: number;
 }
 
-export type LegsFromWaypointsResult =
+type LegsFromWaypointsResult =
   | { success: true; originX: number; originZ: number; legs: RampLeg[] }
   | { success: false; reasonKey: string; params?: Record<string, string | number> };
 
-export interface RampPathFault {
+interface RampPathFault {
   key: 'mining.build_ramp.leg_too_short' | 'mining.build_ramp.legs_cross';
   params: Record<string, string | number>;
 }
@@ -124,13 +124,34 @@ function perpOf(direction: RampDirection): { px: number; pz: number } {
   return direction === 'north' || direction === 'south' ? { px: 1, pz: 0 } : { px: 0, pz: 1 };
 }
 
-/** The width x width corner landing centred on the waypoint where leg `k` starts, as cells of leg `k`. */
+/**
+ * The width x width corner landing centred on the waypoint where leg `k` starts, as cells of leg `k`.
+ * Each cell takes its step and lateral from the centreline it sits on or nearest to, so the
+ * landing carries the path's own grade through the corner (both centreline tiles beside the
+ * waypoint keep lateral 0): `a`/`b` are its offsets along the incoming/outgoing leg. Behind the
+ * outgoing leg's start (b <= 0) it follows the incoming leg; ahead of it, the outgoing leg; on the
+ * inside of the turn, whichever centreline is nearer (a tie goes to the outgoing leg).
+ */
 function landingCells(path: RampPathSpec, wp: { x: number; z: number }, k: number, step: number, half: number): RampPathCell[] {
-  const { px } = perpOf(path.legs[k]!.direction);
+  const inDir = path.legs[k - 1]!.direction;
+  const outDir = path.legs[k]!.direction;
+  const inO = RAMP_DIR_OFFSETS[inDir];
+  const outO = RAMP_DIR_OFFSETS[outDir];
+  const inP = perpOf(inDir);
+  const outP = perpOf(outDir);
   const cells: RampPathCell[] = [];
   for (let dz = -half; dz <= half; dz++) {
     for (let dx = -half; dx <= half; dx++) {
-      cells.push({ x: wp.x + dx, z: wp.z + dz, step, lateral: px === 1 ? dx : dz, legIndex: k });
+      const a = dx * inO.dx + dz * inO.dz;
+      const b = dx * outO.dx + dz * outO.dz;
+      const latIn = dx * inP.px + dz * inP.pz;
+      const latOut = dx * outP.px + dz * outP.pz;
+      const followIn = b <= 0 || (a < 0 && Math.abs(latIn) < Math.abs(latOut));
+      cells.push({
+        x: wp.x + dx, z: wp.z + dz, legIndex: k,
+        step: followIn ? step + a : step + b,
+        lateral: followIn ? latIn : latOut,
+      });
     }
   }
   return cells;

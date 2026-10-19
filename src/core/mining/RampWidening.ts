@@ -36,7 +36,7 @@ export function rampFootprint(def: Pick<RampDef, 'originX' | 'originZ' | 'direct
 
 /** Inclusive rectangles that together cover a built ramp's corridor: one per leg, or its footprint when straight. */
 function rampRects(r: BuiltRamp): readonly RampFootprint[] {
-  return r.def.legs
+  return r.def?.legs
     ? rampFootprintRects({ originX: r.def.originX, originZ: r.def.originZ, legs: r.def.legs }, r.width)
     : [r.footprint];
 }

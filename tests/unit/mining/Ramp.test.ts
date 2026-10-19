@@ -2072,7 +2072,7 @@ describe('multi-leg ramps (#1939)', () => {
       const legOf = new Map(rampPathCells({ originX: 20, originZ: 10, legs: MULTI.legs! }, 3).map(c => [`${c.x},${c.z}`, c.legIndex]));
       const segments = defineRampSegments(makeElevatedGrid(60, 60, 15), MULTI);
       let prevMin = 0;
-      for (const s of segments) {
+      for (const s of segments.filter(seg => seg.cells.length > 0)) {
         const legs = s.cells.map(c => legOf.get(`${c.x},${c.z}`)!);
         expect(Math.min(...legs)).toBeGreaterThanOrEqual(prevMin);
         prevMin = Math.min(...legs);
@@ -2086,8 +2086,9 @@ describe('multi-leg ramps (#1939)', () => {
     it('floor descends at a constant grade along the centreline across the corner', () => {
       const grid = makeElevatedGrid(60, 60, 15);
       const line = centreline();
-      const start = computeVoxelColumnSurfaceHeight(grid, line[0]!.x, line[0]!.z);
       carveAll(grid, MULTI);
+      // The first tile is dug to depth 0: its carved height is the reference, as on a straight ramp.
+      const start = computeVoxelColumnSurfaceHeight(grid, line[0]!.x, line[0]!.z);
       for (let s = 0; s < line.length; s++) {
         const h = computeVoxelColumnSurfaceHeight(grid, line[s]!.x, line[s]!.z);
         expect(start - h).toBeCloseTo(rampFloorDepthAt(s, 22, 6), 0);
@@ -2108,12 +2109,14 @@ describe('multi-leg ramps (#1939)', () => {
       }
     });
 
-    it('the corner landing is level across the whole width x width square', () => {
+    it('the corner landing carries the path through the width x width square: within one step of the corner floor', () => {
       const grid = makeElevatedGrid(60, 60, 15);
       carveAll(grid, MULTI);
-      const heights: number[] = [];
-      for (let x = 19; x <= 21; x++) for (let z = 21; z <= 23; z++) heights.push(computeVoxelColumnSurfaceHeight(grid, x, z));
-      expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(0.05);
+      const corner = computeVoxelColumnSurfaceHeight(grid, 20, 22);
+      const perStep = Math.tan(Math.atan(6 / 22));
+      for (let x = 19; x <= 21; x++) for (let z = 21; z <= 23; z++) {
+        expect(Math.abs(computeVoxelColumnSurfaceHeight(grid, x, z) - corner)).toBeLessThanOrEqual(perStep + 0.05);
+      }
     });
 
     it('leaves the empty inside corner of the L at ground level', () => {
@@ -2127,8 +2130,8 @@ describe('multi-leg ramps (#1939)', () => {
       const grid = makeElevatedGrid(60, 60, 15);
       const def: RampDef = { ...MULTI, gradeDegrees: 25 };
       const line = centreline();
-      const start = computeVoxelColumnSurfaceHeight(grid, line[0]!.x, line[0]!.z);
       carveAll(grid, def);
+      const start = computeVoxelColumnSurfaceHeight(grid, line[0]!.x, line[0]!.z);
       const endDrop = start - computeVoxelColumnSurfaceHeight(grid, line[21]!.x, line[21]!.z);
       expect(endDrop).toBeCloseTo(6, 0);
       const holdDrop = start - computeVoxelColumnSurfaceHeight(grid, line[16]!.x, line[16]!.z);
