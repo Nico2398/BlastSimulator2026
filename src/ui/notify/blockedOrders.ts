@@ -112,6 +112,7 @@ const PHRASE_KIND_BY_REASON: Record<BlockedOrderReason, BlockedPhraseKind | null
   no_spoil_heap: 'no_spoil_heap',
   spoil_heap_full: 'spoil_heap_full',
   target_unreachable: 'unreachable',
+  buried_under_rubble: 'unreachable',
   debris_out_of_reach: null,
   explosives_in_transit: null,
 };
