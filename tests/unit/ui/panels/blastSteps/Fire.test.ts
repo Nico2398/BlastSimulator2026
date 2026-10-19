@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
+import { addReachBuildings, addReachPattern } from '../../../../helpers/blastReachFixture.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
 import { purchaseVehicle } from '../../../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../../../src/core/entities/Employee.js';
@@ -312,5 +313,38 @@ describe('FireStep — within-permit checklist (#1925)', () => {
     const text = step.root.textContent!.toLowerCase();
     expect(text).not.toContain('chance');
     expect(text).not.toContain('overshoot');
+  });
+});
+
+// ── #2021: buildings inside the blast area are listed in the checklist ──────
+
+describe('FireStep — buildings in blast reach (#2021)', () => {
+  it('lists a row per building at risk with the stocked warehouse kg and secondary blast', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addReachPattern(state, holeCounter);
+    addReachBuildings(state);
+    step.update(state, 'sunny');
+    const text = step.root.textContent ?? '';
+    expect(text).toContain('Management Office is inside the blast area and will be destroyed.');
+    expect(text).toContain('Freight Warehouse is inside the blast area and will be destroyed.');
+    expect(text).toContain('Explosive Warehouse (228 kg stocked) is inside the blast area: it will be destroyed and its stock will detonate as a secondary blast.');
+    expect(text).not.toContain('Living Quarters is inside the blast area');
+  });
+
+  it('shows no building row when nothing is in reach', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addReachPattern(state, holeCounter);
+    step.update(state, 'sunny');
+    expect(step.root.textContent).not.toContain('inside the blast area');
+  });
+
+  it('shows no building row when there are no holes', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addReachBuildings(state);
+    step.update(state, 'sunny');
+    expect(step.root.textContent).not.toContain('inside the blast area');
   });
 });

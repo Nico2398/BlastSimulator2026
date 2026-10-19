@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { validateBlastPlan, assembleBlastPlan, coveredByFootprint } from '../../../src/core/mining/BlastPlan.js';
+import { validateBlastPlan, assembleBlastPlan, coveredByFootprint, holePatternSpacing, buildingsInBlastReach, checkProtectedPositions } from '../../../src/core/mining/BlastPlan.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
+import { getBuildingDef } from '../../../src/core/entities/Building.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -134,5 +135,149 @@ describe('validateBlastPlan delivery wait (#1966)', () => {
     const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 1, 3, 8, 0.15);
     const errors = validateBlastPlan(assembleBlastPlan(holes, {}), new Set([holes[0]!.id]));
     expect(errors[0]!.issue).toBe('blast.validation.charge_loading');
+  });
+});
+
+// ── #2021: pre-flight warning for buildings inside the blast's reach ─────────
+
+type TestBuilding = Parameters<typeof buildingsInBlastReach>[1][number];
+
+function bld(id: number, type: TestBuilding['type'], x: number, z: number, storedExplosives?: Record<string, number>): TestBuilding {
+  return { id, type, tier: 1, x, z, ...(storedExplosives ? { storedExplosives } : {}) };
+}
+
+function gridHoles(x0: number, z0: number, n: number, spacing: number): Array<{ id: number; x: number; z: number }> {
+  const out: Array<{ id: number; x: number; z: number }> = [];
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) out.push({ id: out.length + 1, x: x0 + i * spacing, z: z0 + j * spacing });
+  return out;
+}
+
+describe('holePatternSpacing (#2021)', () => {
+  it('returns the grid pitch of a spacing-4 grid', () => {
+    expect(holePatternSpacing(gridHoles(12, 44, 3, 4))).toBe(4);
+  });
+
+  it('returns the grid pitch of a spacing-6 grid', () => {
+    expect(holePatternSpacing(gridHoles(10, 10, 3, 6))).toBe(6);
+  });
+
+  it('falls back to the default spacing for a single hole', () => {
+    expect(holePatternSpacing([{ x: 10, z: 10 }])).toBe(4);
+  });
+
+  it('falls back to the default spacing for no holes', () => {
+    expect(holePatternSpacing([])).toBe(4);
+  });
+
+  it('uses the larger axis pitch when x and z gaps differ', () => {
+    const holes = [{ x: 0, z: 0 }, { x: 3, z: 0 }, { x: 0, z: 5 }, { x: 3, z: 5 }];
+    expect(holePatternSpacing(holes)).toBe(5);
+  });
+
+  it('uses the one axis that has two distinct values for a single row', () => {
+    expect(holePatternSpacing([{ x: 0, z: 7 }, { x: 6, z: 7 }, { x: 12, z: 7 }])).toBe(6);
+  });
+
+  it('takes the smallest gap between distinct values, ignoring duplicates', () => {
+    const holes = [{ x: 0, z: 0 }, { x: 0, z: 4 }, { x: 4, z: 0 }, { x: 4, z: 4 }, { x: 10, z: 0 }];
+    expect(holePatternSpacing(holes)).toBe(4);
+  });
+
+  it('tolerates float noise in hole coordinates', () => {
+    const holes = [{ x: 0.1 + 0.2, z: 0 }, { x: 0.3 + 4, z: 0 }, { x: 0.3, z: 0 }];
+    expect(holePatternSpacing(holes)).toBeCloseTo(4, 6);
+  });
+});
+
+describe('buildingsInBlastReach (#2021)', () => {
+  const holes = gridHoles(12, 44, 3, 4); // x 12/16/20, z 44/48/52
+
+  it('reports the issue layout: office, freight and explosive warehouse, not the quarters', () => {
+    const buildings = [
+      bld(1, 'living_quarters', 30, 48),
+      bld(2, 'explosive_warehouse', 22, 48, { krackle: 228 }),
+      bld(3, 'management_office', 14, 48),
+      bld(4, 'freight_warehouse', 14, 40),
+    ];
+    const result = buildingsInBlastReach(holes, buildings);
+    expect(result.map(r => r.type)).toEqual(['explosive_warehouse', 'management_office', 'freight_warehouse']);
+    expect(result.map(r => r.buildingId)).toEqual([2, 3, 4]);
+    expect(result.some(r => r.type === 'living_quarters')).toBe(false);
+  });
+
+  it('carries id, type, position and stockKg', () => {
+    const result = buildingsInBlastReach(holes, [bld(5, 'management_office', 14, 48)]);
+    expect(result).toEqual([{ buildingId: 5, type: 'management_office', x: 14, z: 48, stockKg: 0 }]);
+  });
+
+  it('reports the stocked explosive warehouse stock summed over explosives', () => {
+    const result = buildingsInBlastReach(holes, [bld(2, 'explosive_warehouse', 22, 48, { krackle: 200, boomite: 28 })]);
+    expect(result[0]!.stockKg).toBe(228);
+  });
+
+  it('reports 0 stock for an empty explosive warehouse', () => {
+    const result = buildingsInBlastReach(holes, [bld(2, 'explosive_warehouse', 22, 48)]);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.stockKg).toBe(0);
+  });
+
+  it('orders results by buildingId regardless of input order', () => {
+    const result = buildingsInBlastReach(holes, [
+      bld(9, 'freight_warehouse', 14, 40),
+      bld(3, 'management_office', 14, 48),
+      bld(6, 'explosive_warehouse', 22, 48),
+    ]);
+    expect(result.map(r => r.buildingId)).toEqual([3, 6, 9]);
+  });
+
+  it('returns none for an empty site', () => {
+    expect(buildingsInBlastReach(holes, [])).toEqual([]);
+  });
+
+  it('returns none when there are no holes', () => {
+    expect(buildingsInBlastReach([], [bld(1, 'management_office', 14, 48)])).toEqual([]);
+  });
+
+  it('includes a cell exactly at maxX + margin and excludes the next cell out', () => {
+    const fp = getBuildingDef('freight_warehouse', 1).footprint;
+    const minDx = Math.min(...fp.map(f => f[0]));
+    const minDz = Math.min(...fp.map(f => f[1]));
+    const zIn = 48 - minDz;
+    // bbox x 12..20 grown by explicit margin 4 -> 24 inclusive
+    const edgeIn = buildingsInBlastReach(holes, [bld(1, 'freight_warehouse', 24 - minDx, zIn)], 4);
+    const edgeOut = buildingsInBlastReach(holes, [bld(1, 'freight_warehouse', 25 - minDx, zIn)], 4);
+    expect(edgeIn).toHaveLength(1);
+    expect(edgeOut).toEqual([]);
+  });
+
+  it('defaults the margin to the hole pattern spacing', () => {
+    const fp = getBuildingDef('freight_warehouse', 1).footprint;
+    const minDx = Math.min(...fp.map(f => f[0]));
+    const minDz = Math.min(...fp.map(f => f[1]));
+    const zIn = 48 - minDz;
+    expect(buildingsInBlastReach(holes, [bld(1, 'freight_warehouse', 24 - minDx, zIn)])).toHaveLength(1);
+    expect(buildingsInBlastReach(holes, [bld(1, 'freight_warehouse', 25 - minDx, zIn)])).toEqual([]);
+  });
+
+  it('a wider explicit margin reaches the quarters 10 m away', () => {
+    const quarters = bld(1, 'living_quarters', 30, 48);
+    expect(buildingsInBlastReach(holes, [quarters])).toEqual([]);
+    expect(buildingsInBlastReach(holes, [quarters], 12).map(r => r.type)).toEqual(['living_quarters']);
+  });
+
+  it('counts a building whose footprint only partly enters the box', () => {
+    const fp = getBuildingDef('management_office', 1).footprint;
+    const maxDx = Math.max(...fp.map(f => f[0]));
+    // anchor left of the box so only the far cells reach in (needs a multi-cell footprint)
+    const x = 8 - maxDx;
+    const result = buildingsInBlastReach(holes, [bld(1, 'management_office', x, 48)], 4);
+    expect(result).toHaveLength(1);
+  });
+
+  it('a building sitting on a hole footprint is reported by checkProtectedPositions AND the reach list', () => {
+    const office = bld(1, 'management_office', 12, 44);
+    const occupants = [{ type: office.type, tier: office.tier, x: office.x, z: office.z }];
+    expect(checkProtectedPositions(holes, occupants).length).toBeGreaterThan(0);
+    expect(buildingsInBlastReach(holes, [office]).map(r => r.buildingId)).toEqual([1]);
   });
 });
