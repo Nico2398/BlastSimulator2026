@@ -149,3 +149,5 @@ Shows: name, portrait, skill qualifications with proficiency stars, current task
 
 `taskQueue` holds `PendingAction` ids beyond the claimed one, bounded by `MAX_EMPLOYEE_TASK_QUEUE_DEPTH` and executed in cheapest-next order recomputed from the employee's current position — the order is not fixed at enqueue time.
 
+
+`drill_hole` order for a hole buried under on-ground rubble (#1937, progression sites): not claimable (`isChargeHoleClaimable`, covering targeted, pool and starved claims), stays `queued` with `blockedReason` `buried_under_rubble` until the rubble is hauled off. Haul candidates of a fragment burying a planned hole get `BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS` (64) off their sort key, in the same `estimateWithBonus` path as the ore demand bonus. Rule detail: `gameplay-blast-system`.

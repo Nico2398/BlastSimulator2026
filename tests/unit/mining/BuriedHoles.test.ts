@@ -136,6 +136,7 @@ describe('buriedHolesOf (#1937)', () => {
     plan(state, 'H1', 22, 20);
     addBlastFragments(state.logistics, [frag(1, 20, 20, 2.2)]);
     expect(isHoleBuried(state, 'H1')).toBe(true);
+    state.tickCount += 1; // the rubble index is cached per tick
     state.logistics.fragments[0]!.fragment.halfExtents = { x: 0.3, y: 0.3, z: 0.3 };
     expect(isHoleBuried(state, 'H1')).toBe(false);
   });

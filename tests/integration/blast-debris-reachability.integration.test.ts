@@ -245,9 +245,19 @@ function tickToppedUntil(run: (cmd: string) => unknown, state: GameState, until:
   for (let i = 0; i < max && !until(); i++) { topUp(state); run('tick 1'); }
 }
 
+/**
+ * Clears the rubble of earlier blasts so a new pattern can be drilled over it. Holes under on-ground rubble
+ * stay buried until it is hauled off (#1937); these cases test blast geometry, not hauling pace.
+ */
+function clearRubble(state: GameState): void {
+  state.logistics.fragments = state.logistics.fragments.filter(f => f.state !== 'on_ground');
+  state.pendingActions = state.pendingActions.filter(a => !isAutoDebrisAction(a.type));
+}
+
 /** Drills, charges and fires a 3x3 Krackle pattern (spacing 4, depth 8) at SEALED_SHOT_START. */
 function fireKrackleShot(run: (cmd: string) => unknown, state: GameState, amountKg: number): void {
   state.lastBlastReport = null;
+  clearRubble(state);
   expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SEALED_SHOT_START}`)).toMatchObject({ success: true });
   tickToppedUntil(run, state, () => state.plannedDrillHoles.length === 0, 1500);
   expect(state.plannedDrillHoles).toHaveLength(0);
@@ -686,6 +696,7 @@ function startBenchSession(biome: string, seed: number): BenchSession {
     }
   };
   const shoot = (rows: number, cols: number, startX: number, startZ: number): void => {
+    clearRubble(state);
     expect(run(`drill_plan grid rows:${rows} cols:${cols} spacing:4 depth:8 start:${startX},${startZ}`)).toMatchObject({ success: true });
     tickWhile(() => state.plannedDrillHoles.length === 0, 3000);
     expect(state.plannedDrillHoles).toHaveLength(0);

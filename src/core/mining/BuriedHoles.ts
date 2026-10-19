@@ -5,10 +5,10 @@ import { findById } from '../state/IdIndex.js';
 import type { TrackedFragment } from '../economy/Logistics.js';
 
 /** Footprint of a rubble fragment on the XZ plane (centre plus half-extents, in cells). */
-export interface FragmentFootprint { x: number; z: number; halfX: number; halfZ: number }
+interface FragmentFootprint { x: number; z: number; halfX: number; halfZ: number }
 
 /** Set of grid cells (packed by `cellKey`) covered by on-ground rubble. */
-export type BuriedCellIndex = ReadonlySet<number>;
+type BuriedCellIndex = ReadonlySet<number>;
 
 const CELL_OFFSET = 1 << 20;
 const CELL_STRIDE = 1 << 21;
