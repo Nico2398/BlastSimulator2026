@@ -285,15 +285,13 @@ export class NotificationCenter {
       });
     }
     if (blockedActions.length > 0) {
+      const counts = countBlockedReasons(blockedActions);
       pips.push({
         kind: 'orders',
         icon: 'warn',
         label: t('notification.pip.blocked_orders_label', { count: blockedActions.length }),
         tone: 'warn',
-        tip: (() => {
-          const counts = countBlockedReasons(blockedActions);
-          return describeBlockedReasons(counts, undefined, (counts.storage_full ?? 0) > 0 ? stateBarrenOverflowKg(state) : 0).join('\n');
-        })(),
+        tip: describeBlockedReasons(counts, undefined, (counts.storage_full ?? 0) > 0 ? stateBarrenOverflowKg(state) : 0).join('\n'),
       });
     }
 

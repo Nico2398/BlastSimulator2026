@@ -4411,7 +4411,7 @@
   "ui.operations.work_queue_debris_status_part_blocked": "{count} bloqué(s)",
   "notification.blocked_phrase.crew_fleet": "{count} ordre(s) en attente, sans personne pour les exécuter — recrutez, formez ou achetez",
   "notification.blocked_phrase.storage_full": "{count} transport(s) attendent de la place en entrepôt — vendez du minerai ou construisez un entrepôt de fret",
-  "notification.blocked_phrase.storage_full_barren": "{count} transport(s) attendent — {kg} kg de roche stérile sans place sur un terril ; prenez un contrat de déblais ou construisez un autre terril",
+  "notification.blocked_phrase.storage_full_barren": "{count} transport(s) attendent — {kg} kg de roche stérile sans place sur un terril ; prenez un contrat de gravats ou construisez un autre terril",
   "notification.blocked_phrase.no_warehouse": "{count} ordre(s) nécessitent un entrepôt de fret — construisez-en un pour stocker la roche",
   "notification.blocked_phrase.no_spoil_heap": "{count} ordre(s) nécessitent un terril pour la roche stérile — construisez-en un",
   "notification.blocked_phrase.spoil_heap_full": "{count} ordre(s) attendent un terril plein — construisez un autre terril ou prenez un contrat de gravats",

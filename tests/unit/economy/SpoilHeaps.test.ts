@@ -4,7 +4,7 @@
 // are dumped on a spoil heap instead of a freight warehouse.
 
 import { describe, it, expect } from 'vitest';
-import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD, SPOIL_HEAP_CAPACITY_KG, BARREN_OVERFLOW_STORED_SHARE } from '../../../src/core/config/balance.js';
+import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD, SPOIL_HEAP_CAPACITY_KG } from '../../../src/core/config/balance.js';
 import {
   creditSpoilHeaps, creditSpoilKg, spoilHeapRoomKg, totalSpoilRoomKg, drawSpoilKg, barrenStoredMassKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg, barrenOverflowKg, stateBarrenOverflowKg,
 } from '../../../src/core/economy/SpoilHeaps.js';
@@ -476,8 +476,11 @@ describe('barrenOverflowKg / stateBarrenOverflowKg (#2018)', () => {
   const ore = { blingite: 0.5 };
   const full = () => [pile(SPOIL_HEAP_CAPACITY_KG)];
 
-  it('share constant is one half', () => {
-    expect(BARREN_OVERFLOW_STORED_SHARE).toBe(0.5);
+  it('a heap whose room is reserved by in-flight hauls does not count as room', () => {
+    const heap = { ...pile(SPOIL_HEAP_CAPACITY_KG - 3_000), id: 7 };
+    const frags = [frag(48_000), frag(3_000), frag(2_000, ore)];
+    expect(barrenOverflowKg(frags, 53_000, [heap], 1, new Map())).toBe(0);
+    expect(barrenOverflowKg(frags, 53_000, [heap], 1, new Map([[7, 1]]))).toBe(51_000);
   });
 
   it('returns the barren kg when barren is most of storage and every heap is full', () => {

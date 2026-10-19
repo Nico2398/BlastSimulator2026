@@ -269,7 +269,8 @@ export class OperationsPanel extends PanelBase {
     const noteParts: string[] = [];
     if (open > 0 || blocked + stranded === 0) noteParts.push(t('ui.operations.unclaimed_work_note'));
     if (blocked > 0) {
-      const reasons = describeBlockedReasons(countQueuedBlockedReasons(state.pendingActions), undefined, stateBarrenOverflowKg(state));
+      const counts = countQueuedBlockedReasons(state.pendingActions);
+      const reasons = describeBlockedReasons(counts, undefined, (counts.storage_full ?? 0) > 0 ? stateBarrenOverflowKg(state) : 0);
       noteParts.push(t('ui.operations.unclaimed_work_note_blocked', { reasons: reasons.join('; ') }));
     }
     if (stranded > 0) noteParts.push(t('ui.operations.unclaimed_work_note_stranded', { stranded }));
