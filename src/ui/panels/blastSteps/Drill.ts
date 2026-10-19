@@ -15,6 +15,7 @@ import type { GameState } from '../../../core/state/GameState.js';
 import { gridCellPositions, fleetDrillReachM, fleetDrillDiameterM } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
+import { buriedHolesOf } from '../../../core/mining/BuriedHoles.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
 import { hoverRefusal, type PlacementKit } from '../../scene/PlacementKit.js';
 import { coveredByFootprint, partitionByFootprint } from '../../../core/mining/BlastPlan.js';
@@ -150,12 +151,14 @@ export class DrillStep {
     const totalCount = holes.length + ordered.length;
     this.lastHoleCount = totalCount;
     const wet = wetHoleIdsFor(state);
+    const buried = buriedHolesOf(state);
 
     const signature = JSON.stringify({
       holes: holes.map(h => [h.id, h.x, h.z, h.depth, h.diameter]),
       ordered: ordered.map(h => [h.id, h.x, h.z, h.depth, h.diameter]),
       tubed: [...state.tubingState.installedHoles].sort(),
       wet: [...wet].sort(),
+      buried: [...buried].sort(),
       pattern: this.lastGridPattern,
       spacing: this.gridSpacing, depth: this.gridDepth, diameter: this.gridDiameter,
       confirmingClear: this.confirmingClear,
@@ -168,7 +171,9 @@ export class DrillStep {
     this.spacingValueEl.textContent = `${this.gridSpacing.toFixed(1)} m`;
     this.depthValueEl.textContent = `${this.gridDepth.toFixed(1)} m`;
 
-    this.holesNoteEl.textContent = t('ui.blast_workshop.drill.planned', { count: totalCount });
+    this.holesNoteEl.textContent = buried.size > 0
+      ? t('ui.blast_workshop.drill.planned_buried', { count: totalCount, buried: buried.size })
+      : t('ui.blast_workshop.drill.planned', { count: totalCount });
     this.clearBtn.disabled = totalCount === 0;
 
     this.renderClearRow(totalCount);
@@ -179,7 +184,7 @@ export class DrillStep {
       return;
     }
     this.holeListEl.replaceChildren(
-      ...ordered.map(h => this.makeOrderedHoleRow(h)),
+      ...ordered.map(h => this.makeOrderedHoleRow(h, buried.has(h.id))),
       ...holes.map(h => this.makeHoleRow(h, state, wet)),
     );
   }
@@ -240,8 +245,11 @@ export class DrillStep {
    * affordance either, since neither exists yet for it — only the remove
    * button (which cancels its queued `drill_hole` action).
    */
-  private makeOrderedHoleRow(hole: PlannedHole): HTMLElement {
-    return this.buildHoleRow(hole, chip(t('ui.blast_workshop.drill.status_ordered'), 'neutral'), ';opacity:.7');
+  private makeOrderedHoleRow(hole: PlannedHole, isBuried: boolean): HTMLElement {
+    const status = isBuried
+      ? chip(t('ui.blast_workshop.drill.status_buried'), 'warn')
+      : chip(t('ui.blast_workshop.drill.status_ordered'), 'neutral');
+    return this.buildHoleRow(hole, status, ';opacity:.7');
   }
 
   private buildHoleRow(hole: Pick<DrillHole, 'id' | 'x' | 'z' | 'depth'>, statusChip: HTMLElement, extraStyle: string): HTMLElement {

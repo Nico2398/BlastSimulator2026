@@ -1,5 +1,6 @@
 // BlastSimulator2026 — Console commands for drill plan management
 
+import { buriedHolesOf } from '../../../core/mining/BuriedHoles.js';
 import type { CommandResult } from '../../ConsoleRunner.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { t } from '../../../core/i18n/I18n.js';
@@ -258,8 +259,9 @@ export function drillPlanCommand(
     if (state.drillHoles.length === 0 && state.plannedDrillHoles.length === 0) {
       return { success: true, output: t('mining.drill_plan.none') };
     }
+    const buried = buriedHolesOf(state);
     const orderedLines = state.plannedDrillHoles.map(h =>
-      `  ${h.id}: (${h.x}, ${h.z}) depth=${h.depth}m dia=${h.diameter}m [ORDERED]`,
+      `  ${h.id}: (${h.x}, ${h.z}) depth=${h.depth}m dia=${h.diameter}m [ORDERED]${buried.has(h.id) ? ` [${t('mining.drill_plan.buried_tag')}]` : ''}`,
     );
     const drilledLines = state.drillHoles.map(h =>
       `  ${h.id}: (${h.x}, ${h.z}) depth=${h.depth}m dia=${h.diameter}m`,
