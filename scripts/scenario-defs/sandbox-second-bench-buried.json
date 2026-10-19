@@ -1,6 +1,6 @@
 {
   "name": "sandbox-second-bench-buried",
-  "description": "Buried holes (#1937): after the first blast, a hole planned on the crater floor sits under on-ground rubble. It stays queued and undrilled while the rubble lies there, then is drilled once the haulers have cleared it.",
+  "description": "Buried holes (#1937): after the first blast, a hole planned on the crater floor sits under on-ground rubble. It stays queued and undrilled while the rubble lies there, then is drilled once the haulers have cleared it. A ramp gives the haulers and rig a way into the crater; a small blast keeps the rubble within the freight warehouse.",
   "steps": [
     {
       "command": "sandbox start biome:desert_badlands kit:full seed:42",
@@ -107,9 +107,9 @@
       "role": "player"
     },
     {
-      "command": "drill_plan add x:36 z:30 depth:8 diameter:89",
+      "command": "drill_plan add x:36 z:31 depth:2 diameter:89",
       "role": "player",
-      "description": "Order one 89 mm, 8 m hole on the virgin bench; it will be blasted away.",
+      "description": "Order one 89 mm, 2 m hole on the virgin bench; it will be blasted away.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -135,17 +135,17 @@
         {
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 8
+          "value": 2
         },
         {
           "type": "focusTile",
           "x": 36,
-          "z": 30
+          "z": 31
         },
         {
           "type": "pickTile",
           "x": 36,
-          "z": 30
+          "z": 31
         },
         {
           "type": "clickSelector",
@@ -155,6 +155,61 @@
       "expect": {
         "increased": [
           "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "build_ramp start:30,31 end:35,31 depth:2",
+      "role": "player",
+      "description": "Dig a ramp into the bench so the haulers and the drill rig can reach the crater floor once it is blasted.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 2
+        },
+        {
+          "type": "focusTile",
+          "x": 32,
+          "z": 31,
+          "distance": 30,
+          "pitch": 75
+        },
+        {
+          "type": "dragTiles",
+          "x1": 30,
+          "z1": 31,
+          "x2": 35,
+          "z2": 31
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount"
         ]
       }
     },
@@ -179,9 +234,41 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:8 stemming:2",
+      "command": "wait_until field:builtRampCount equals:1 max_ticks:800",
+      "role": "setup",
+      "description": "The ramp is dug.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "builtRampCount",
+          "equals": 1,
+          "maxTicks": 800,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "builtRampCount": 1,
+          "orderedRampSegmentCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 30",
+      "role": "setup",
+      "description": "The ramp crew clears off the bench before the charge goes in.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:2 stemming:1",
       "role": "player",
-      "description": "Load 8 kg into the hole.",
+      "description": "Load 2 kg into the hole.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -194,12 +281,12 @@
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
+          "value": 2
         },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 2
+          "value": 1
         },
         {
           "type": "clickSelector",
@@ -256,14 +343,14 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
-      "description": "Blast the first bench; the broken rock lies on the new crater floor as on-ground rubble.",
+      "description": "The hole is consumed and rubble lies where it stood.",
       "timeout": 90,
       "role": "player"
     },
     {
       "command": "wait_until field:holeCount equals:0 max_ticks:600",
       "role": "setup",
-      "description": "The sequence fires; the hole is consumed and rubble lies where it stood.",
+      "description": "Blast the first bench; the broken rock lies on the new crater floor as on-ground rubble.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -281,7 +368,7 @@
       }
     },
     {
-      "command": "drill_plan add x:36 z:30 depth:8 diameter:89",
+      "command": "drill_plan add x:36 z:31 depth:2 diameter:89",
       "role": "player",
       "description": "Second bench: plan a hole on the crater floor, under the fresh rubble. The order is accepted (planning is never refused).",
       "interaction": [
@@ -309,17 +396,17 @@
         {
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 8
+          "value": 2
         },
         {
           "type": "focusTile",
           "x": 36,
-          "z": 30
+          "z": 31
         },
         {
           "type": "pickTile",
           "x": 36,
-          "z": 30
+          "z": 31
         },
         {
           "type": "clickSelector",
@@ -333,13 +420,13 @@
       }
     },
     {
-      "command": "tick 80",
+      "command": "tick 40",
       "role": "setup",
-      "description": "80 ticks is longer than the 57 an unobstructed rig needs to drill the hole, yet too short to haul the rubble off: a hole under rubble cannot be claimed (#1937), so the order stays queued and undrilled while the rubble lies there.",
+      "description": "40 ticks is longer than an unobstructed rig needs to drill a 2 m hole, yet too short to haul the rubble off: a hole under rubble cannot be claimed (#1937), so the order stays queued (buried_under_rubble) and undrilled while the rubble lies there.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 80"
+          "command": "tick 40"
         }
       ],
       "expect": {
@@ -350,7 +437,7 @@
       }
     },
     {
-      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:6000",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:900",
       "role": "setup",
       "description": "Haulers clear the buried-hole rubble first (#1937 haul priority); once uncovered the hole is drilled.",
       "interaction": [
@@ -358,7 +445,7 @@
           "type": "waitUntil",
           "field": "orderedHoleCount",
           "equals": 0,
-          "maxTicks": 6000,
+          "maxTicks": 900,
           "timeoutMs": 600000
         }
       ],

@@ -71,12 +71,15 @@ export function syncHaulDispatch(state: GameState, grid?: VoxelGrid | null): voi
   }
 
   const sealedPositions: Vec3[] = [];
+  const sealedIds = new Set<number>();
+  lastSealedIds.set(state, sealedIds);
   let queued = 0;
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
     if (coveredFragmentIds.has(tracked.fragment.id)) continue;
     if (grid && isFragmentSealed(grid, tracked.fragment.position)) {
       sealedPositions.push(tracked.fragment.position);
+      sealedIds.add(tracked.fragment.id);
       continue;
     }
     // The rest wait for the next tick's pass (DEBRIS_DISPATCH_PER_TICK).
@@ -126,6 +129,13 @@ const lastHaulDispatch = new WeakMap<GameState, string>();
  * most triggers one extra (safe) full pass, via the signature.
  */
 const lastSealedPositions = new WeakMap<GameState, Vec3[]>();
+
+const lastSealedIds = new WeakMap<GameState, ReadonlySet<number>>();
+
+/** Sealed fragment ids from the latest dispatch pass; the set changes identity whenever a pass re-tests. */
+export function sealedFragmentIdsOf(state: GameState): ReadonlySet<number> | undefined {
+  return lastSealedIds.get(state);
+}
 
 /** True when any of the previously sealed positions no longer sits under intact ground. */
 function hasUnsealedPosition(grid: VoxelGrid, positions: readonly Vec3[]): boolean {

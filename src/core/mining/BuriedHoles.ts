@@ -3,6 +3,7 @@
 import { isProgressionSite, type GameState, type PendingAction } from '../state/GameState.js';
 import { findById } from '../state/IdIndex.js';
 import type { TrackedFragment } from '../economy/Logistics.js';
+import { sealedFragmentIdsOf } from '../economy/HaulDispatch.js';
 
 /** Footprint of a rubble fragment on the XZ plane (centre plus half-extents, in cells). */
 interface FragmentFootprint { x: number; z: number; halfX: number; halfZ: number }
@@ -52,17 +53,26 @@ function footprintOf(tracked: TrackedFragment): FragmentFootprint {
   return { x: position.x, z: position.z, halfX: halfExtents?.x ?? 0, halfZ: halfExtents?.z ?? 0 };
 }
 
-interface TickCache<T> { tick: number; count: number; value: T }
+function isHaulableRubble(tracked: TrackedFragment, sealed: ReadonlySet<number> | undefined): boolean {
+  return tracked.state === 'on_ground' && !(sealed?.has(tracked.fragment.id) ?? false);
+}
+
+interface TickCache<T> { tick: number; count: number; value: T; sealed?: ReadonlySet<number> | undefined }
 const rubbleCache = new WeakMap<GameState, TickCache<BuriedCellIndex>>();
 const holeCellCache = new WeakMap<GameState, TickCache<ReadonlySet<number>>>();
 
-/** Rubble cell index, built once per tick (and per fragment count) for a state. */
+/**
+ * Rubble cell index, built once per tick (and per fragment count / dispatch pass) for a state.
+ * Only haulable rubble counts: a fragment sealed under intact rock gets no haul order (#1774),
+ * so burying a hole under it would never clear.
+ */
 function rubbleIndexOf(state: GameState): BuriedCellIndex {
   const fragments = state.logistics.fragments;
+  const sealed = sealedFragmentIdsOf(state);
   const hit = rubbleCache.get(state);
-  if (hit !== undefined && hit.tick === state.tickCount && hit.count === fragments.length) return hit.value;
-  const value = buildBuriedCellIndex(fragments.filter(f => f.state === 'on_ground').map(footprintOf));
-  rubbleCache.set(state, { tick: state.tickCount, count: fragments.length, value });
+  if (hit !== undefined && hit.tick === state.tickCount && hit.count === fragments.length && hit.sealed === sealed) return hit.value;
+  const value = buildBuriedCellIndex(fragments.filter(f => isHaulableRubble(f, sealed)).map(footprintOf));
+  rubbleCache.set(state, { tick: state.tickCount, count: fragments.length, value, sealed });
   return value;
 }
 
@@ -103,7 +113,7 @@ export function isDrillHoleBuried(state: GameState, action: PendingAction): bool
 
 /** True when `tracked` is on the ground and covers at least one planned hole; false off progression sites. */
 export function trackedBuriesPlannedHole(state: GameState, tracked: TrackedFragment): boolean {
-  if (tracked.state !== 'on_ground' || !isProgressionSite(state) || state.plannedDrillHoles.length === 0) return false;
+  if (!isHaulableRubble(tracked, sealedFragmentIdsOf(state)) || !isProgressionSite(state) || state.plannedDrillHoles.length === 0) return false;
   const holeCells = plannedHoleCellsOf(state);
   let buries = false;
   forEachCoveredCell(footprintOf(tracked), key => { if (holeCells.has(key)) buries = true; });

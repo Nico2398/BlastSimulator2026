@@ -8,14 +8,16 @@ import {
   cellKey, buildBuriedCellIndex, isCellBuried, buriedHoleIds,
   buriedHolesOf, isHoleBuried, fragmentBuriesPlannedHole,
 } from '../../../src/core/mining/BuriedHoles.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 
-function frag(id: number, x: number, z: number, half = 0.3): FragmentData {
+function frag(id: number, x: number, z: number, half = 0.3, y = 0): FragmentData {
   return {
-    id, position: { x, y: 0, z }, volume: 0.3, mass: 1000, rockId: 'cruite', oreDensities: {},
+    id, position: { x, y, z }, volume: 0.3, mass: 1000, rockId: 'cruite', oreDensities: {},
     initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
     halfExtents: { x: half, y: half, z: half }, shapeSeed: id, origin: { x, y: 0, z },
   };
@@ -197,5 +199,29 @@ describe('fragmentBuriesPlannedHole (#1937)', () => {
     expect(fragmentBuriesPlannedHole(state, 99)).toBe(false);
     state.logistics.fragments[0]!.state = 'in_transit';
     expect(fragmentBuriesPlannedHole(state, 1)).toBe(false);
+  });
+});
+
+describe('sealed rubble does not bury (#1937, #1774)', () => {
+  function capGrid(): VoxelGrid {
+    const grid = new VoxelGrid(6, 6);
+    for (let y = 0; y < 10; y++) for (let z = 0; z < 6; z++) for (let x = 0; x < 6; x++) {
+      grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
+    }
+    return grid;
+  }
+
+  it('a fragment sealed under intact rock leaves the hole unburied; ground rubble still buries', () => {
+    const state = site();
+    plan(state, 'H1', 2, 2);
+    plan(state, 'H2', 4, 4);
+    addBlastFragments(state.logistics, [frag(1, 2, 2, 0.3, 4), frag(2, 4, 4, 0.3, 3)]);
+    const grid = capGrid();
+    // Open the column under H2's fragment so only fragment 1 stays sealed.
+    for (let y = 2; y < 10; y++) grid.clearVoxel(4, y, 4);
+    syncHaulDispatch(state, grid);
+    expect([...buriedHolesOf(state)]).toEqual(['H2']);
+    expect(fragmentBuriesPlannedHole(state, 1)).toBe(false);
+    expect(fragmentBuriesPlannedHole(state, 2)).toBe(true);
   });
 });
