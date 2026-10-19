@@ -569,6 +569,8 @@ describe('Well-being model — headroom, overwork, crowding, accidents (#1692)',
 describe('Safety model — managed target (#1977)', () => {
   function site(spec: Array<['explosive_warehouse' | 'management_office', 1 | 2 | 3]>) {
     const buildings = createBuildingState();
+    buildings.unlockedTiers.explosive_warehouse = 3;
+    buildings.unlockedTiers.management_office = 3;
     spec.forEach(([type, tier], i) => {
       placeBuilding(buildings, type, (i % 6) * 10, Math.floor(i / 6) * 10, 64, 64, tier);
     });

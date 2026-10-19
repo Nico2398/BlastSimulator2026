@@ -141,7 +141,7 @@ export function safetyTarget(buildingSafety: number, hasEquipment: boolean): num
  * Per-tick safety change: a pull towards `safetyTarget` (set by buildings and equipment) minus a hit per recent
  * accident. Safety settles at the target instead of decaying to neutral, so buildings move the equilibrium.
  */
-export function safetyDelta(safety: number, buildingSafety: number, inputs: ScoreInputs): number {
+function safetyDelta(safety: number, buildingSafety: number, inputs: ScoreInputs): number {
   const target = safetyTarget(buildingSafety, inputs.hasSafetyEquipment);
   return (target - safety) * SAFETY_PULL_RATE - nonNegative(inputs.recentAccidents) * SAFETY_ACCIDENT_HIT;
 }
