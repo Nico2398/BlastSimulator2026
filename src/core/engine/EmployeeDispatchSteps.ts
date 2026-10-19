@@ -14,7 +14,7 @@ import type { Employee } from '../entities/Employee.js';
 import { holdsRequiredSkill, employeeQueueDepth } from '../entities/Employee.js';
 import {
   selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
-  isRampSegmentClaimable, isChargeHoleClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction,
+  isRampSegmentClaimable, isHoleOrderClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction,
   canReleaseStrandedVehicleGatedAction, isActionPastStuckBackoff, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
@@ -66,7 +66,7 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       // cooldown — see isActionPastStuckBackoff's own doc comment.
       && isActionPastStuckBackoff(state, a)
       // #1342: a loaded charge waits for its hole's drill order to land.
-      && isChargeHoleClaimable(state, a)
+      && isHoleOrderClaimable(state, a)
       // #1414: event modifiers (stoppage, drill ban, haul pause) keep it unclaimed.
       && !actionBlocked(state.events.activeModifiers, a.type, state.tickCount, employee.role))
     .sort((a, b) => {
@@ -418,7 +418,7 @@ export function claimOnePoolCandidate(
     candidate => isHaulOrFragmentActionClaimable(state, candidate, fragmentOf, fits)
       && findVehicleForClaim(state, candidate, employee).ok
       && isRampSegmentClaimable(state, candidate)
-      && isChargeHoleClaimable(state, candidate)
+      && isHoleOrderClaimable(state, candidate)
       && (!deferVehicleGatedToIdleAlternative
         || !hasIdleLicensedAlternative(state, candidate, employee)),
     fragmentOf,

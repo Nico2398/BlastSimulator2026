@@ -19,7 +19,7 @@ import { claimPendingAction, completePendingAction, dispatchPendingAction } from
 // point, with no continuity fast path of its own (resolveActionCost/
 // planItinerary own that now).
 import { completeVehicleGatedAction } from '../../../src/core/engine/VehicleReservation.js';
-import { isRampSegmentClaimable, isChargeHoleClaimable } from '../../../src/core/engine/ActionSelection.js';
+import { isRampSegmentClaimable, isHoleOrderClaimable } from '../../../src/core/engine/ActionSelection.js';
 import {
   hireEmployee, assignSkill, getNeedMultiplier, computeTaskDuration, killEmployee, fireEmployee,
 } from '../../../src/core/entities/Employee.js';
@@ -2400,7 +2400,7 @@ describe('isRampSegmentClaimable (#555, relabelled for layer semantics — #925)
   });
 });
 
-describe('isChargeHoleClaimable (#1342)', () => {
+describe('isHoleOrderClaimable (#1342)', () => {
   function makeAction(type: PendingAction['type'], payload: Record<string, unknown>): PendingAction {
     return {
       id: 1, type,
@@ -2414,24 +2414,24 @@ describe('isChargeHoleClaimable (#1342)', () => {
   it('is false for a charge_hole whose hole is still only planned (drill order not landed)', () => {
     const state = createGame({ seed: 1 });
     state.plannedDrillHoles.push({ id: 'H7', x: 3, z: 3, depth: 6, diameter: 0.089 } as never);
-    expect(isChargeHoleClaimable(state, makeAction('charge_hole', { holeId: 'H7' }))).toBe(false);
+    expect(isHoleOrderClaimable(state, makeAction('charge_hole', { holeId: 'H7' }))).toBe(false);
   });
 
   it('is true for a charge_hole whose hole is not planned (already drilled)', () => {
     const state = createGame({ seed: 1 });
     state.drillHoles.push({ id: 'H7', x: 3, z: 3, depth: 6, diameter: 0.089 });
-    expect(isChargeHoleClaimable(state, makeAction('charge_hole', { holeId: 'H7' }))).toBe(true);
+    expect(isHoleOrderClaimable(state, makeAction('charge_hole', { holeId: 'H7' }))).toBe(true);
   });
 
   it('is true for a charge_hole naming an unknown hole', () => {
     const state = createGame({ seed: 1 });
-    expect(isChargeHoleClaimable(state, makeAction('charge_hole', { holeId: 'nope' }))).toBe(true);
+    expect(isHoleOrderClaimable(state, makeAction('charge_hole', { holeId: 'nope' }))).toBe(true);
   });
 
   it('is true for other action types even when their holeId is planned', () => {
     const state = createGame({ seed: 1 });
     state.plannedDrillHoles.push({ id: 'H7', x: 3, z: 3, depth: 6, diameter: 0.089 } as never);
-    expect(isChargeHoleClaimable(state, makeAction('drill_hole', { holeId: 'H7' }))).toBe(true);
+    expect(isHoleOrderClaimable(state, makeAction('drill_hole', { holeId: 'H7' }))).toBe(true);
   });
 });
 

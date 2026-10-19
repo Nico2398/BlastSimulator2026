@@ -24,6 +24,7 @@ import {
   findStarvedActionForEmployee,
   cellsToTravelTicks,
   isActionPastStuckBackoff,
+  isHoleOrderClaimable,
 } from '../../../src/core/engine/ActionSelection.js';
 import * as PathfindingModule from '../../../src/core/nav/Pathfinding.js';
 import * as PlanItineraryModule from '../../../src/core/engine/PlanItinerary.js';
@@ -34,7 +35,8 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle, getVehicleDefByTier, canReleaseDriver, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { actionRankTier, DEBRIS_SELECTION_BINNING_MIN, ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
+import { actionRankTier, DEBRIS_SELECTION_BINNING_MIN, ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS, BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS } from '../../../src/core/config/balance.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
@@ -2576,6 +2578,125 @@ describe('selectBestActionForEmployee — demand-weighted haul ranking (#1817)',
       const sel = selectBestActionForEmployee(state, emp, pool);
 
       expect(sel!.action.id).toBe(richId);
+    });
+  });
+});
+
+describe('buried planned holes (#1937)', () => {
+  function frag(id: number, x: number, z: number): FragmentData {
+    return {
+      id, position: { x, y: 0, z }, volume: 0.3, mass: 1000, rockId: 'cruite', oreDensities: {},
+      initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: id, origin: { x, y: 0, z },
+    };
+  }
+  function drillAction(id: number, holeId: string, x: number, z: number): PendingAction {
+    return makeAction({
+      id, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig', targetX: x, targetZ: z,
+      payload: { holeId, x, z, depth: 6, diameter: 0.089, durationTicks: 10 },
+    });
+  }
+  function withHole(progression: boolean): { state: GameState; action: PendingAction } {
+    const state = makeState(60, 60);
+    if (progression) state.grade = createGradeState();
+    state.plannedDrillHoles.push({ id: 'H1', x: 20, z: 20, depth: 6, diameter: 0.089 });
+    const action = drillAction(1, 'H1', 20, 20);
+    state.pendingActions.push(action);
+    return { state, action };
+  }
+
+  describe('claim gate', () => {
+    it('a drill_hole under on-ground rubble is not claimable on a progression site', () => {
+      const { state, action } = withHole(true);
+      addBlastFragments(state.logistics, [frag(1, 20, 20)]);
+      expect(isHoleOrderClaimable(state, action)).toBe(false);
+    });
+
+    it('the same drill_hole is claimable once the rubble is hauled away', () => {
+      const { state, action } = withHole(true);
+      addBlastFragments(state.logistics, [frag(1, 20, 20)]);
+      expect(isHoleOrderClaimable(state, action)).toBe(false);
+      state.logistics.fragments.splice(0, 1);
+      expect(isHoleOrderClaimable(state, action)).toBe(true);
+    });
+
+    it('rubble that is in transit does not block the claim', () => {
+      const { state, action } = withHole(true);
+      addBlastFragments(state.logistics, [frag(1, 20, 20)]);
+      state.logistics.fragments[0]!.state = 'in_transit';
+      expect(isHoleOrderClaimable(state, action)).toBe(true);
+    });
+
+    it('a drill_hole beside the rubble is claimable', () => {
+      const { state, action } = withHole(true);
+      addBlastFragments(state.logistics, [frag(1, 30, 30)]);
+      expect(isHoleOrderClaimable(state, action)).toBe(true);
+    });
+
+    it('non-progression sites are unchanged: rubble does not gate the claim', () => {
+      const { state, action } = withHole(false);
+      addBlastFragments(state.logistics, [frag(1, 20, 20)]);
+      expect(isHoleOrderClaimable(state, action)).toBe(true);
+    });
+
+    it('findStarvedActionForEmployee skips a buried drill_hole and returns it once cleared', () => {
+      const { state, action } = withHole(true);
+      action.requiredSkill = null;
+      action.requiredVehicleRole = null;
+      const emp = makeEmployee(state, 0, 0);
+      addBlastFragments(state.logistics, [frag(1, 20, 20)]);
+      state.tickCount = ACTION_STARVATION_TICK_THRESHOLD;
+      expect(findStarvedActionForEmployee(state, emp)).toBeNull();
+      state.logistics.fragments.splice(0, 1);
+      expect(findStarvedActionForEmployee(state, emp)?.action.id).toBe(1);
+    });
+  });
+
+  describe('haul ranking', () => {
+    beforeEach(() => {
+      vi.spyOn(PlanItineraryModule, 'planItinerary').mockImplementation((_state, employee, _goal, _fidelity, opts) => (
+        { estTotalTicks: Math.hypot(opts!.action!.targetX - employee.x, opts!.action!.targetZ - employee.z) }
+      ) as unknown as ReturnType<typeof PlanItineraryModule.planItinerary>);
+    });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    function haul(id: number, x: number, z: number): PendingAction {
+      return makeAction({ id, type: 'haul_debris', requiredVehicleRole: 'debris_hauler', targetX: x, targetZ: z, payload: { fragmentId: id } });
+    }
+    /** Fragment 1 at (5+extra, 0) buries a planned hole, fragment 2 at (5, 0) does not; 2 is nearer by `extra`. */
+    function scene(progression: boolean, extra: number) {
+      const state = makeState(60, 60);
+      if (progression) state.grade = createGradeState();
+      const emp = makeEmployee(state, 0, 0);
+      state.plannedDrillHoles.push({ id: 'H1', x: 5 + extra, z: 0, depth: 6, diameter: 0.089 });
+      addBlastFragments(state.logistics, [frag(1, 5 + extra, 0), frag(2, 5, 0)]);
+      return { state, emp, pool: [haul(1, 5 + extra, 0), haul(2, 5, 0)] };
+    }
+
+    it('a burying fragment outranks an otherwise nearer haul within the bonus', () => {
+      const { state, emp, pool } = scene(true, 10);
+      expect(selectBestActionForEmployee(state, emp, pool)!.action.id).toBe(1);
+    });
+
+    it('the reported duration stays the real cost, not the discounted rank', () => {
+      const { state, emp, pool } = scene(true, 10);
+      expect(selectBestActionForEmployee(state, emp, pool)!.totalTicks).toBeCloseTo(15, 10);
+    });
+
+    it('a burying fragment farther than the bonus does not win', () => {
+      const { state, emp, pool } = scene(true, BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS + 20);
+      expect(selectBestActionForEmployee(state, emp, pool)!.action.id).toBe(2);
+    });
+
+    it('equal haul without a buried hole keeps the nearer fragment', () => {
+      const { state, emp, pool } = scene(true, 10);
+      state.plannedDrillHoles.length = 0;
+      expect(selectBestActionForEmployee(state, emp, pool)!.action.id).toBe(2);
+    });
+
+    it('non-progression ranking is unchanged: nearer haul wins despite a planned hole', () => {
+      const { state, emp, pool } = scene(false, 10);
+      expect(selectBestActionForEmployee(state, emp, pool)!.action.id).toBe(2);
     });
   });
 });

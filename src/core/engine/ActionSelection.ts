@@ -4,20 +4,21 @@
 // served. Zero imports from GameLoop.ts — avoids a dependency cycle back into
 // the tick orchestrator that calls these functions.
 
-import type { GameState, PendingAction } from '../state/GameState.js';
+import { type GameState, type PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { getLivingEmployees, holdsRequiredSkill } from '../entities/Employee.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS, actionRankTier, ACTION_STARVATION_TICK_THRESHOLD, DEMOLITION_VEHICLE_TIER_SPEED } from '../config/balance.js';
+import { hasPlannedHolesOnSite, isDrillHoleBuried, trackedBuriesPlannedHole } from '../mining/BuriedHoles.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS, BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS, actionRankTier, ACTION_STARVATION_TICK_THRESHOLD, DEMOLITION_VEHICLE_TIER_SPEED } from '../config/balance.js';
 import { computeDemolitionDurationTicks } from '../entities/DemolitionDuration.js';
 import { readDemolishPayload } from './DemolishPayload.js';
 import { computeRampSegmentDurationTicks, isRampCellPending } from '../mining/Ramp.js';
 import { computeLevelVolume } from '../mining/LevelGround.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, findVehicleReservedForAction, computeRigDurationTicks } from '../entities/Vehicle.js';
-import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulActionOreDensities, isAutoDebrisAction, type FragmentLookup } from '../economy/HaulDispatch.js';
+import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulActionOreDensities, isAutoDebrisAction, resolveTrackedFragment, type FragmentLookup } from '../economy/HaulDispatch.js';
 import { fragmentHaulUrgency, oreHaulUrgency } from '../economy/OreDemand.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { thinDebrisCandidates } from './DebrisCandidateBins.js';
@@ -248,8 +249,16 @@ function estimateWithBonus(
   const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'estimate', { action });
   const rawCost = itinerary !== null ? itinerary.estTotalTicks : Infinity;
   const bonus = haulActionCarriesOre(state, action, fragmentOf) ? ORE_HAUL_PRIORITY_BONUS_TICKS : 0;
-  const demandBonus = demandBonusOf(state, action, fragmentOf, urgency);
+  const demandBonus = demandBonusOf(state, action, fragmentOf, urgency)
+    + buriedHoleBonusOf(state, action, fragmentOf);
   return { cost: Math.max(0, rawCost - bonus) - demandBonus, bonus, demandBonus };
+}
+
+/** BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS for an unheld haul_debris of a fragment burying a planned hole, else 0 (#1937); ranking-only. */
+function buriedHoleBonusOf(state: GameState, action: PendingAction, fragmentOf: FragmentLookup | undefined): number {
+  if (action.holderId !== null || action.type !== 'haul_debris') return 0;
+  const tracked = resolveTrackedFragment(state, action, fragmentOf);
+  return tracked !== undefined && trackedBuriesPlannedHole(state, tracked) ? BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS : 0;
 }
 
 /**
@@ -431,9 +440,11 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
 
 /**
  * True unless `action` is a charge_hole order whose hole is still only
- * planned (its drill order has not landed yet), or whose explosives are still in transit (#1895).
+ * planned (its drill order has not landed yet), or whose explosives are still in transit (#1895),
+ * or a drill_hole order whose hole is buried under rubble (#1937; a drill already in progress continues).
  */
-export function isChargeHoleClaimable(state: GameState, action: PendingAction): boolean {
+export function isHoleOrderClaimable(state: GameState, action: PendingAction): boolean {
+  if (action.type === 'drill_hole') return !isDrillHoleBuried(state, action);
   if (action.type !== 'charge_hole') return true;
   if (isChargeDeliveryPending(action, state.tickCount)) return false;
   const holeId = action.payload['holeId'];
@@ -489,7 +500,7 @@ export function findStarvedActionForEmployee(state: GameState, employee: Employe
     a.requiredVehicleRole === null &&
     !isEvacuationHoldActive(state, a) &&
     isActionPastStuckBackoff(state, a) &&
-    isChargeHoleClaimable(state, a) &&
+    isHoleOrderClaimable(state, a) &&
     state.tickCount - a.queuedAtTick >= ACTION_STARVATION_TICK_THRESHOLD);
 
   return selectBestActionForEmployee(state, employee, candidates);
@@ -531,8 +542,12 @@ function selectWithinIndex(
     || climbReach.canReach(employee.x, employee.z, navGrid.clampX(a.targetX), navGrid.clampZ(a.targetZ));
   // Built once per search (#1817): ores an open ore_sale offer is short of rank their hauls first.
   const urgency = oreHaulUrgency(state.contracts.available, state.contracts.active, state.collectedOre);
-  const isUrgent = urgency.size > 0 && ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS > 0
-    ? (a: PendingAction): boolean => demandBonusOf(state, a, fragmentOf, urgency) > 0
+  const oreUrgent = urgency.size > 0 && ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS > 0;
+  // A fragment burying a planned hole (#1937) is ranked first too, so thinning keeps it as its bin's representative.
+  const holesWait = hasPlannedHolesOnSite(state) && BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS > 0;
+  const isUrgent = oreUrgent || holesWait
+    ? (a: PendingAction): boolean => (oreUrgent && demandBonusOf(state, a, fragmentOf, urgency) > 0)
+      || (holesWait && buriedHoleBonusOf(state, a, fragmentOf) > 0)
     : undefined;
   const claimable = thinDebrisCandidates(
     state, employee, candidates, a => isAutoDebrisAction(a.type), a => haulActionCarriesOre(state, a, fragmentOf), allowed, reachable, isUrgent,

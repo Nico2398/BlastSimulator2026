@@ -71,6 +71,8 @@ export function buildBlockedOrderMessage(action: PendingAction, nowTick?: number
       return t('notification.order_blocked_spoil_heap_full', { order });
     case 'storage_full':
       return t('notification.order_blocked_storage_full', { order });
+    case 'buried_under_rubble':
+      return t('notification.order_blocked_buried', { order });
     case 'explosives_in_transit': {
       const arrivalTick = readOrderDeliveryTick(action) ?? 0;
       const when = formatGameClock(arrivalTick);
