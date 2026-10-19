@@ -152,7 +152,12 @@ export function rankBlockedKinds(counts: Partial<Record<BlockedOrderReason, numb
 
 /** Count plus remedy sentence for one kind. */
 export function blockedPhrase(entry: BlockedKindCount, barrenKg = 0): string {
-  void barrenKg; // TODO: implement
+  if (entry.kind === 'storage_full' && barrenKg > 0) {
+    return t('notification.blocked_phrase.storage_full_barren', {
+      count: entry.count.toLocaleString('en-US'),
+      kg: Math.round(barrenKg).toLocaleString('en-US'),
+    });
+  }
   return t(`notification.blocked_phrase.${entry.kind}`, { count: entry.count.toLocaleString('en-US') });
 }
 
@@ -163,6 +168,5 @@ export function blockedKindLabel(kind: BlockedPhraseKind): string {
 
 /** Up to `max` phrases for the largest blocked kinds. */
 export function describeBlockedReasons(counts: Partial<Record<BlockedOrderReason, number>>, max: number = BLOCKED_PHRASE_LINES, barrenOverflowKg = 0): string[] {
-  void barrenOverflowKg; // TODO: implement
-  return rankBlockedKinds(counts).slice(0, max).map((entry) => blockedPhrase(entry));
+  return rankBlockedKinds(counts).slice(0, max).map((entry) => blockedPhrase(entry, barrenOverflowKg));
 }

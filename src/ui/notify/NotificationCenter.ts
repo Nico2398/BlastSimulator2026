@@ -18,7 +18,7 @@ import { revoltTicksRemaining } from '../../core/campaign/WorkerRevolt.js';
 import { CONTRACT_EXPIRY_WARNING_TICKS, WELL_BEING_ALERT_THRESHOLD } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
+import { stateRubbleStockKg, stateBarrenOverflowKg } from '../../core/economy/SpoilHeaps.js';
 import { contractShortOfStock, outstandingPenalty } from '../../core/economy/Contract.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { buildBlockedOrderMessage, countBlockedReasons, describeBlockedReasons, isFailureBlock, isInTransitBlock } from './blockedOrders.js';
@@ -290,7 +290,10 @@ export class NotificationCenter {
         icon: 'warn',
         label: t('notification.pip.blocked_orders_label', { count: blockedActions.length }),
         tone: 'warn',
-        tip: describeBlockedReasons(countBlockedReasons(blockedActions)).join('\n'),
+        tip: (() => {
+          const counts = countBlockedReasons(blockedActions);
+          return describeBlockedReasons(counts, undefined, (counts.storage_full ?? 0) > 0 ? stateBarrenOverflowKg(state) : 0).join('\n');
+        })(),
       });
     }
 

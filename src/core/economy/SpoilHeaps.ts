@@ -3,7 +3,7 @@
 
 import type { Building } from '../entities/Building.js';
 import { spoilHeapRoomKg } from '../entities/Building.js';
-import { ORE_GRADE_SCALE_DEFAULT, SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../config/balance.js';
+import { ORE_GRADE_SCALE_DEFAULT, SPOIL_BARREN_ORE_FRACTION_THRESHOLD, BARREN_OVERFLOW_STORED_SHARE } from '../config/balance.js';
 import { oreGradeScaleOf, scaledGradeThreshold } from './OreGrade.js';
 
 /** Where a hauled fragment is delivered. */
@@ -86,18 +86,16 @@ export function barrenOverflowKg(
   buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[],
   gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): number {
-  // TODO: implement
-  void fragments; void storedMassKg; void buildings; void gradeScale;
-  return 0;
+  if (storedMassKg <= 0 || totalSpoilRoomKg(buildings) > 0) return 0;
+  const barren = barrenStoredMassKg(fragments, gradeScale);
+  return barren >= BARREN_OVERFLOW_STORED_SHARE * storedMassKg ? barren : 0;
 }
 
 /** barrenOverflowKg for any state slice carrying logistics and buildings (GameState fits). */
 export function stateBarrenOverflowKg(
-  state: { logistics: { fragments: readonly StoredFragmentLike[] }; buildings: { buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[] }; world?: { oreGradeScale?: number } | null },
+  state: { logistics: { fragments: readonly StoredFragmentLike[]; storedMassKg: number }; buildings: { buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[] }; world?: { oreGradeScale?: number } | null },
 ): number {
-  // TODO: implement
-  void state;
-  return 0;
+  return barrenOverflowKg(state.logistics.fragments, state.logistics.storedMassKg, state.buildings.buildings, oreGradeScaleOf(state.world));
 }
 
 /** Remove up to `amountKg` of barren rock from the heaps, in building order; returns the kg removed. */
