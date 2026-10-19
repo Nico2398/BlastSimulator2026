@@ -199,9 +199,9 @@
     },
     {
       "command": "drill_plan grid rows:1 cols:2 spacing:4 depth:8 diameter:127 start:36,30",
-      "role": "guard",
+      "role": "player",
       "commandOutcome": "refused",
-      "description": "With only a tier-1 rig, a 127 mm grid is refused; the Drill strip's diameter stepper shows 89 mm only.",
+      "description": "With only a tier-1 rig, a 127 mm grid is refused (command mode); in the browser the player opens the Drill strip and its diameter stepper reads 89 mm, the only size the fleet can bore.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -229,6 +229,12 @@
           "selector": "#bs-param-strip [data-field=\"diameter\"] .bsx-stepper-value",
           "property": "textContent",
           "expectedValue": "89 mm"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-param-strip [data-field=\"diameter\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "89 mm"
         }
       ],
       "expect": {
@@ -236,7 +242,7 @@
         "equals": {
           "orderedHoleCount": 0
         },
-        "note": "the diameter stepper offers only 89 mm without a tier-2 rig (interaction mode only)"
+        "note": "the diameter stepper reads 89 mm without a tier-2 rig (interaction mode only)"
       }
     },
     {
