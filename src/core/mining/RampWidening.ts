@@ -8,6 +8,7 @@ import { queueRampOrder } from './RampOrder.js';
 import { RAMP_WIDTH_OPTIONS, isRampWidth, type RampWidth } from '../config/balance.js';
 import type { BuiltRamp, GameState, PlannedRamp, RampFootprint } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { rampBoundingFootprint, rampFootprintRects } from './RampPath.js';
 
 /** Failure carries a plain-English `error` fallback plus the translation key the console/UI resolves with `t()` (mirrors validateRampOrder's messageKey). */
 export interface WidenFailure {
@@ -18,8 +19,9 @@ export interface WidenFailure {
 }
 type WidenResult<T> = { success: true; data: T } | WidenFailure;
 
-/** Inclusive tile rectangle of the cells a ramp of `def`'s placement carves at `width`. */
-export function rampFootprint(def: Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length'>, width: RampWidth): RampFootprint {
+/** Inclusive tile rectangle of the cells a ramp of `def`'s placement carves at `width`; the bounding box of a multi-leg path (#1939). */
+export function rampFootprint(def: Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length' | 'legs'>, width: RampWidth): RampFootprint {
+  if (def.legs) return rampBoundingFootprint({ originX: def.originX, originZ: def.originZ, legs: def.legs }, width);
   const half = Math.floor(width / 2);
   const ox = Math.floor(def.originX);
   const oz = Math.floor(def.originZ);
@@ -32,12 +34,18 @@ export function rampFootprint(def: Pick<RampDef, 'originX' | 'originZ' | 'direct
   }
 }
 
-/** The lowest-id built ramp whose footprint contains tile (x, z), or null. */
+/** Inclusive rectangles that together cover a built ramp's corridor: one per leg, or its footprint when straight. */
+function rampRects(r: BuiltRamp): readonly RampFootprint[] {
+  return r.def.legs
+    ? rampFootprintRects({ originX: r.def.originX, originZ: r.def.originZ, legs: r.def.legs }, r.width)
+    : [r.footprint];
+}
+
+/** The lowest-id built ramp whose corridor contains tile (x, z), or null (a multi-leg ramp's bounding box has empty corners). */
 export function findRampAtTile(ramps: readonly BuiltRamp[], x: number, z: number): BuiltRamp | null {
   let found: BuiltRamp | null = null;
   for (const r of ramps) {
-    const f = r.footprint;
-    if (x < f.minX || x > f.maxX || z < f.minZ || z > f.maxZ) continue;
+    if (!rampRects(r).some(f => x >= f.minX && x <= f.maxX && z >= f.minZ && z <= f.maxZ)) continue;
     if (!found || r.id < found.id) found = r;
   }
   return found;
@@ -50,6 +58,12 @@ export function nextRampWidth(current: RampWidth): RampWidth | null {
 
 /** Checks a widen order (wider than current, known option, affordable) without mutating anything. */
 export function validateWidenRamp(ramp: BuiltRamp, toWidth: number, cash: number): WidenResult<{ cost: number; width: RampWidth }> {
+  if (ramp.def.legs) {
+    return {
+      success: false, error: `Ramp #${ramp.id} has several legs; only straight ramps can be widened.`,
+      errorKey: 'mining.widen_ramp.multi_leg', errorParams: { id: ramp.id },
+    };
+  }
   if (!isRampWidth(toWidth)) {
     const options = RAMP_WIDTH_OPTIONS.join(', ');
     return {

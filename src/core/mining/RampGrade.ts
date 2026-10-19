@@ -3,25 +3,36 @@
 import type { NavGrid } from '../nav/NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { GRADE_EPSILON_DEGREES, VEHICLE_TIER_LIST, slopeDegreesForRatio, tiersThatClimb } from '../nav/ClimbLimit.js';
-import type { BuiltRamp, GameState } from '../state/GameState.js';
+import { rampFootprintRects } from './RampPath.js';
+import type { BuiltRamp, GameState, RampFootprint } from '../state/GameState.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 
-/** Steepest step grade (degrees) along the ramp's built surface. */
+/** Corridor tiles of a ramp: its legs' rectangles (the L's empty corner excluded), else its footprint. */
+function corridorRects(ramp: BuiltRamp): readonly RampFootprint[] {
+  return ramp.def.legs
+    ? rampFootprintRects({ originX: ramp.def.originX, originZ: ramp.def.originZ, legs: ramp.def.legs }, ramp.width)
+    : [ramp.footprint];
+}
+
+/** Steepest step grade (degrees) along the ramp's built surface, between tiles of its own corridor. */
 export function rampSteepestGradeDegrees(navGrid: NavGrid, ramp: BuiltRamp): number {
-  const { minX, maxX, minZ, maxZ } = ramp.footprint;
+  const rects = corridorRects(ramp);
+  const inCorridor = (x: number, z: number) => rects.some(r => x >= r.minX && x <= r.maxX && z >= r.minZ && z <= r.maxZ);
   let steepest = 0;
-  for (let z = minZ; z <= maxZ; z++) {
-    for (let x = minX; x <= maxX; x++) {
-      const y = navGrid.cellAt(x, z)?.surfaceY;
-      if (y === undefined) continue;
-      for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
-        const nx = x + dx;
-        const nz = z + dz;
-        if (nx < minX || nx > maxX || nz < minZ || nz > maxZ) continue;
-        const ny = navGrid.cellAt(nx, nz)?.surfaceY;
-        if (ny === undefined) continue;
-        const grade = slopeDegreesForRatio(Math.abs(ny - y) / Math.hypot(dx, dz));
-        if (grade > steepest) steepest = grade;
+  for (const { minX, maxX, minZ, maxZ } of rects) {
+    for (let z = minZ; z <= maxZ; z++) {
+      for (let x = minX; x <= maxX; x++) {
+        const y = navGrid.cellAt(x, z)?.surfaceY;
+        if (y === undefined) continue;
+        for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+          const nx = x + dx;
+          const nz = z + dz;
+          if (!inCorridor(nx, nz)) continue;
+          const ny = navGrid.cellAt(nx, nz)?.surfaceY;
+          if (ny === undefined) continue;
+          const grade = slopeDegreesForRatio(Math.abs(ny - y) / Math.hypot(dx, dz));
+          if (grade > steepest) steepest = grade;
+        }
       }
     }
   }

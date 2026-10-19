@@ -9,8 +9,12 @@ import {
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
 import { queueRampOrder } from '../../../core/mining/RampOrder.js';
+import type { RampLeg, RampPathCell } from '../../../core/mining/RampPath.js';
+import { rampPathCells, legsFromWaypoints, firstOccupiedPathTile, rampLegsOf, rampTotalLength } from '../../../core/mining/RampPath.js';
+import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
+import { isBuildingFootprintCell } from '../../../core/entities/Building.js';
 import { rampFootprint, orderRampWiden, validateWidenRamp, type WidenFailure } from '../../../core/mining/RampWidening.js';
-import { RAMP_DEFAULT_WIDTH, RAMP_WIDTH_OPTIONS, isRampWidth } from '../../../core/config/balance.js';
+import { RAMP_DEFAULT_WIDTH, RAMP_WIDTH_OPTIONS, isRampWidth, type RampWidth } from '../../../core/config/balance.js';
 import { cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { claimForAction, cellsInRect } from '../siteExpansion.js';
@@ -36,14 +40,22 @@ export function buildRampCommand(
     return cancelRampCommand(ctx, rampId);
   }
 
-  let rampDef: RampDef;
   const width = parseWidth(named['width']);
   if (!isRampWidth(width)) {
     return { success: false, output: t('mining.build_ramp.invalid_width', { options: RAMP_WIDTH_OPTIONS.join(', ') }) };
   }
   const depth = parseInt(named['depth'] ?? '8', 10);
+  const grade = named['grade'] === undefined ? undefined : Number(named['grade']);
+  if (grade !== undefined && !Number.isFinite(grade)) {
+    return { success: false, output: t('mining.build_ramp.grade_invalid') };
+  }
 
-  if (named['start'] && named['end']) {
+  let rampDef: RampDef;
+  if (named['path'] !== undefined) {
+    const parsed = rampDefFromPath(named, depth, width);
+    if (!parsed.success) return { success: false, output: parsed.output };
+    rampDef = parsed.def;
+  } else if (named['start'] && named['end']) {
     const start = named['start'].split(',').map(Number);
     const end = named['end'].split(',').map(Number);
     const originX = start[0] ?? 0;
@@ -60,6 +72,7 @@ export function buildRampCommand(
     const length = parseInt(named['length'] ?? '10', 10);
     rampDef = { originX, originZ, direction, length, targetDepth: depth, width };
   }
+  if (grade !== undefined) rampDef.gradeDegrees = grade;
 
   const { direction, length } = rampDef;
 
@@ -76,7 +89,14 @@ export function buildRampCommand(
   }
 
   const footprint = rampFootprint(rampDef, rampWidthOf(rampDef));
-  const rampClaim = claimForAction(ctx, cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp');
+  const pathCells = rampDef.legs ? rampPathCells(pathOf(rampDef), rampWidthOf(rampDef)) : null;
+  if (pathCells) {
+    const refusal = legHitsBuilding(ctx, pathCells);
+    if (refusal) return { success: false, output: refusal };
+  }
+  const rampClaim = claimForAction(
+    ctx, pathCells ?? cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp',
+  );
   if (!rampClaim.ok) return { success: false, output: rampClaim.output! };
 
   const segments = defineRampSegments(ctx.grid!, rampDef);
@@ -84,10 +104,59 @@ export function buildRampCommand(
     return { success: false, output: t('mining.ramp.nothing_to_dig') };
   }
 
+  if (rampDef.legs) {
+    return {
+      success: true,
+      output: t('mining.build_ramp.ordered_legs', { length, legs: rampDef.legs.length, segments: segments.length }),
+    };
+  }
   return {
     success: true,
     output: `Ramp ordered: ${length}m ${direction}, ${segments.length} segments queued for excavation`,
   };
+}
+
+const PATH_CONFLICTS = ['start', 'end', 'origin', 'direction', 'length'] as const;
+
+/** Parses `x,z;x,z;…` into waypoints; null when any piece is not two finite numbers. */
+function parseWaypoints(raw: string): { x: number; z: number }[] | null {
+  const out: { x: number; z: number }[] = [];
+  for (const piece of raw.split(';')) {
+    const parts = piece.split(',').map(p => p.trim());
+    if (parts.length !== 2 || parts.some(p => p === '' || !Number.isFinite(Number(p)))) return null;
+    out.push({ x: Number(parts[0]), z: Number(parts[1]) });
+  }
+  return out;
+}
+
+/** The `path:` form (#1939): waypoints to a def; a two-waypoint path is an ordinary straight ramp. */
+function rampDefFromPath(
+  named: Record<string, string>, depth: number, width: RampWidth,
+): { success: true; def: RampDef } | { success: false; output: string } {
+  if (PATH_CONFLICTS.some(k => named[k] !== undefined)) {
+    return { success: false, output: t('mining.build_ramp.path_conflict') };
+  }
+  const waypoints = parseWaypoints(named['path']!);
+  if (waypoints === null) return { success: false, output: t('mining.build_ramp.path_usage') };
+  const result = legsFromWaypoints(waypoints);
+  if (!result.success) return { success: false, output: t(result.reasonKey, result.params) };
+  const { originX, originZ, legs } = result;
+  const def: RampDef = {
+    originX, originZ, direction: legs[0]!.direction, length: rampTotalLength(legs), targetDepth: depth, width,
+  };
+  if (legs.length > 1) def.legs = legs;
+  return { success: true, def };
+}
+
+function pathOf(def: RampDef): { originX: number; originZ: number; legs: RampLeg[] } {
+  return { originX: def.originX, originZ: def.originZ, legs: rampLegsOf(def) };
+}
+
+/** Refusal text when a corridor tile of a multi-leg ramp lies on a built or planned building, else null. */
+function legHitsBuilding(ctx: MiningContext, cells: readonly RampPathCell[]): string | null {
+  const occupants = buildingFootprintOccupants(ctx.state!);
+  const hit = firstOccupiedPathTile(cells, (x, z) => occupants.some(o => isBuildingFootprintCell(o, x, z)));
+  return hit ? t('mining.build_ramp.leg_hits_building', { leg: hit.legIndex + 1, x: hit.x, z: hit.z }) : null;
 }
 
 /**
