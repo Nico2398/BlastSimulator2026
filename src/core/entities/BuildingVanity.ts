@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Vanity projects: executive-pleasing buildings (#1947)
 
 import type { BuildingType } from './Building.js';
+import type { GameState } from '../state/GameState.js';
 import {
   VANITY_MIN_GRADE,
   VANITY_CEO_STATUE_CONFIDENCE, VANITY_GOLF_COURSE_CONFIDENCE,
@@ -33,6 +34,9 @@ export const VANITY_PROJECTS: Record<VanityType, VanityEffects> = {
   },
 };
 
+/** Every vanity type, in catalog order. */
+export const VANITY_TYPES = Object.keys(VANITY_PROJECTS) as VanityType[];
+
 export function isVanityType(t: BuildingType): t is VanityType {
   return Object.prototype.hasOwnProperty.call(VANITY_PROJECTS, t);
 }
@@ -40,4 +44,9 @@ export function isVanityType(t: BuildingType): t is VanityType {
 /** Whether vanity projects can be built on this site (board attached and grade reached). */
 export function isVanityAvailable(site: { hasBoard: boolean; grade: number | undefined }): boolean {
   return site.hasBoard || (site.grade !== undefined && site.grade >= VANITY_MIN_GRADE);
+}
+
+/** `isVanityAvailable` for a game state: a board is attached, or the mine grade reaches the minimum. */
+export function isVanityAvailableIn(state: Pick<GameState, 'board' | 'grade'>): boolean {
+  return isVanityAvailable({ hasBoard: state.board !== undefined, grade: state.grade?.grade });
 }

@@ -16,9 +16,13 @@ export function applyVanityCompletion(
       if (e.alive) e.morale = clampScore(e.morale + fx.moraleOnce);
     }
   }
-  const scores = state.scores;
-  if (fx.ecologyOnce !== undefined) scores.ecology = clampScore(scores.ecology + fx.ecologyOnce);
-  // Neighbour relations: high = good, so a negative delta worsens them.
-  if (fx.nuisanceOnce !== undefined) scores.nuisance = clampScore(scores.nuisance + fx.nuisanceOnce);
-  if (fx.wellBeingOnce !== undefined) scores.wellBeing = clampScore(scores.wellBeing + fx.wellBeingOnce);
+  // Neighbour relations (`nuisance`): high = good, so a negative delta worsens them.
+  const deltas = [
+    ['ecology', fx.ecologyOnce],
+    ['nuisance', fx.nuisanceOnce],
+    ['wellBeing', fx.wellBeingOnce],
+  ] as const;
+  for (const [score, delta] of deltas) {
+    if (delta !== undefined) state.scores[score] = clampScore(state.scores[score] + delta);
+  }
 }

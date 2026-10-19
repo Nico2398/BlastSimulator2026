@@ -98,6 +98,7 @@ export function allModelIds(): string[] {
   }
   for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
     // Vanity projects (#1947) render as the stand-in box until their models land; drop this skip with those assets.
+    // TODO(#1948): remove this skip once the vanity models land.
     if (isVanityType(type)) continue;
     // A single-tier type has one model (tier 1); the game aliases its higher tiers onto it.
     const tiers = isSingleTierType(type) ? [1 as BuildingTier] : BUILDING_TIERS;

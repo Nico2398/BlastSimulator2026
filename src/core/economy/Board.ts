@@ -174,7 +174,7 @@ export function runBoardReview(
   } else {
     confidence -= (oreMet ? 0 : BOARD_CONFIDENCE_MISS_PENALTY) + (profitMet ? 0 : BOARD_CONFIDENCE_MISS_PENALTY);
   }
-  board.confidence = Math.min(BOARD_CONFIDENCE_MAX, Math.max(0, confidence));
+  board.confidence = clampConfidence(confidence);
 
   const dividend = Math.max(0, state.cash - BOARD_DIVIDEND_CASH_FLOOR) * BOARD_DIVIDEND_RATE;
   deductExpense(state, dividend, 'dividends', `Dividends Q${board.quarter}`);
@@ -192,6 +192,10 @@ export function runBoardReview(
   return review;
 }
 
+function clampConfidence(value: number): number {
+  return Math.min(BOARD_CONFIDENCE_MAX, Math.max(0, value));
+}
+
 /** True once board confidence has run out. */
 export function isBoardFired(board: BoardState | undefined): boolean {
   return !!board && board.confidence <= 0;
@@ -200,6 +204,6 @@ export function isBoardFired(board: BoardState | undefined): boolean {
 /** Add `amount` to board confidence, clamped to its range; false when no board is attached (#1947). */
 export function addBoardConfidence(board: BoardState | undefined, amount: number): boolean {
   if (!board) return false;
-  board.confidence = Math.min(BOARD_CONFIDENCE_MAX, Math.max(0, board.confidence + amount));
+  board.confidence = clampConfidence(board.confidence + amount);
   return true;
 }

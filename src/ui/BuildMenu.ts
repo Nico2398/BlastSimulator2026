@@ -50,7 +50,7 @@ import {
   type Building,
   rectOverlapsOccupants,
 } from '../core/entities/Building.js';
-import { isVanityType, isVanityAvailable } from '../core/entities/BuildingVanity.js';
+import { isVanityType, isVanityAvailableIn } from '../core/entities/BuildingVanity.js';
 import { VANITY_MIN_GRADE } from '../core/config/balance.js';
 import { placementRefusalReason, hoverRefusal, claimRefusalText, type PlacementKit } from './scene/PlacementKit.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
@@ -856,7 +856,7 @@ export class BuildMenu extends PanelBase {
 
   /** Whether the Vanity section is buildable on this site (board level, or progression grade reached). */
   private vanityAvailableIn(state: GameState): boolean {
-    return isVanityAvailable({ hasBoard: state.board !== undefined, grade: state.grade?.grade });
+    return isVanityAvailableIn(state);
   }
 
   /** Sync one catalog row: buy-button state (when `cash` given) and research controls. */

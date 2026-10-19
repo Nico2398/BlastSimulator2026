@@ -21,7 +21,7 @@ import {
   type BuildingTier,
 } from '../../core/entities/Building.js';
 import type { GameState, PlannedBuilding } from '../../core/state/GameState.js';
-import { isVanityType, isVanityAvailable, VANITY_PROJECTS } from '../../core/entities/BuildingVanity.js';
+import { isVanityType, isVanityAvailableIn, VANITY_PROJECTS } from '../../core/entities/BuildingVanity.js';
 import { applyVanityCompletion } from '../../core/economy/VanityEffects.js';
 import { VANITY_MIN_GRADE } from '../../core/config/balance.js';
 import { addExpense } from '../../core/economy/Finance.js';
@@ -103,7 +103,7 @@ export function orderBuildingCommand(
     return { success: false, output: t('entities.build_not_researched', { tier, type: buildingTypeName(type) }) };
   }
 
-  if (isVanityType(type) && !isVanityAvailable({ hasBoard: state.board !== undefined, grade: state.grade?.grade })) {
+  if (isVanityType(type) && !isVanityAvailableIn(state)) {
     return { success: false, output: t('entities.build_vanity_locked', { type: buildingTypeName(type), grade: VANITY_MIN_GRADE }) };
   }
 
@@ -149,6 +149,7 @@ export function orderBuildingCommand(
     if (!placed.success) return { success: false, output: refusalText(placed) };
     chargeConstruction(state, `Build ${type} T${tier}`, def.constructionCost);
     settleBuiltFootprint(state, ctx.grid, ctx.emitter, x, z, footprintX, footprintZ);
+    // Vanity types are crewless, so they complete at placement: their one-time effects fire here.
     if (isVanityType(type)) applyVanityCompletion(state, type);
     return {
       success: true,
