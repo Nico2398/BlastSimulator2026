@@ -9,7 +9,8 @@ import {
   DRILL_HOLE_REFERENCE_DEPTH_M,
   DRILL_HOLE_REFERENCE_DIAMETER_M,
   DRILL_RIG_MAX_DEPTH_M,
-  DRILL_HOLE_DEFAULT_DIAMETER_M,
+  DRILL_RIG_MAX_DIAMETER_M,
+  DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M,
 } from '../config/balance.js';
 
 export interface DrillHole {
@@ -238,15 +239,25 @@ export function minDrillRigTier(depth: number): VehicleTier {
   return tiers.find(t => DRILL_RIG_MAX_DEPTH_M[t] >= depth) ?? tiers[tiers.length - 1]!;
 }
 
-/** Widest hole (m) the fleet's best drill rig can bore (#1934). */
-export function fleetDrillDiameterM(_vehicles: ReadonlyArray<RigLike>): number {
-  return DRILL_HOLE_DEFAULT_DIAMETER_M;
+/** Widest hole (m) the fleet's best drill rig can bore: DRILL_RIG_MAX_DIAMETER_M over `drill_rig` vehicles, tier-1 with none (#1934). */
+export function fleetDrillDiameterM(vehicles: ReadonlyArray<RigLike>): number {
+  let widest = DRILL_RIG_MAX_DIAMETER_M[1];
+  for (const v of vehicles) {
+    if (v.type !== 'drill_rig') continue;
+    widest = Math.max(widest, DRILL_RIG_MAX_DIAMETER_M[v.tier]);
+  }
+  return widest;
 }
 
-/** Refusal for a hole wider than the fleet can bore: null when it fits, else the i18n key and params (#1934). */
+/** Refusal for a hole wider than the fleet can bore: null when it fits, else the i18n key and params in mm (#1934). */
 export function drillDiameterRefusal(
-  _diameter: number,
-  _vehicles: ReadonlyArray<RigLike>,
-): { key: 'mining.drill_plan.refused_diameter'; params: { diameter: number; max: number } } | null {
-  return null;
+  diameter: number,
+  vehicles: ReadonlyArray<RigLike>,
+): { key: 'mining.drill_plan.refused_diameter'; params: { diameter: number; reach: number } } | null {
+  const reach = fleetDrillDiameterM(vehicles);
+  if (!(diameter > reach + DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M)) return null;
+  return {
+    key: 'mining.drill_plan.refused_diameter',
+    params: { diameter: Math.round(diameter * 1000), reach: Math.round(reach * 1000) },
+  };
 }

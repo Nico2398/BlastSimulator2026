@@ -16,6 +16,7 @@
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { drain, type Steps } from '../engine/Steps.js';
 import { getRock } from '../world/RockCatalog.js';
+import { chargeKgPerMetre } from './HoleDiameter.js';
 import { tierShortfall, tierThresholdFactor, dominantRockTierAt } from './ExplosiveRockFit.js';
 import {
   MAX_PROPAGATION_ITERATIONS,
@@ -23,7 +24,6 @@ import {
   PROPAGATION_ENERGY_EPSILON,
   TRANSMISSION_LOSS_BASE,
   TRANSMISSION_LOSS_POROSITY_SCALE,
-  CHARGE_KG_PER_METRE,
   UNCONFINED_THRESHOLD_FACTOR,
   CONFINEMENT_FULL_DEPTH,
   FREE_FACE_BIAS,
@@ -404,7 +404,7 @@ export function buildHoleSeeds(
   x: number,
   z: number,
   floorY = 0,
-  _diameterM?: number,
+  diameterM?: number,
 ): EnergySeed[] {
   if (!(totalEnergy > 0) || depth <= 0 || amountKg <= 0) return [];
 
@@ -413,7 +413,7 @@ export function buildHoleSeeds(
   // keeps the charge whole: seeds outside the field are dropped, so an
   // over-deep hole would otherwise lose that share of its explosive silently.
   const bottomY = Math.max(floorY, Math.floor(surfaceY - depth));
-  const chargeCells = Math.max(1, Math.round(amountKg / CHARGE_KG_PER_METRE));
+  const chargeCells = Math.max(1, Math.round(amountKg / chargeKgPerMetre(diameterM)));
   // Nor can the charge reach past the collar, however much of it there is.
   const topY = Math.max(bottomY, Math.min(surfaceY - 1, bottomY + chargeCells - 1));
   const cellCount = topY - bottomY + 1;
