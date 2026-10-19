@@ -146,9 +146,9 @@ function bld(id: number, type: TestBuilding['type'], x: number, z: number, store
   return { id, type, tier: 1, x, z, ...(storedExplosives ? { storedExplosives } : {}) };
 }
 
-function gridHoles(x0: number, z0: number, n: number, spacing: number): Array<{ id: number; x: number; z: number }> {
-  const out: Array<{ id: number; x: number; z: number }> = [];
-  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) out.push({ id: out.length + 1, x: x0 + i * spacing, z: z0 + j * spacing });
+function gridHoles(x0: number, z0: number, n: number, spacing: number): Array<{ id: string; x: number; z: number }> {
+  const out: Array<{ id: string; x: number; z: number }> = [];
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) out.push({ id: `h${out.length + 1}`, x: x0 + i * spacing, z: z0 + j * spacing });
   return out;
 }
 

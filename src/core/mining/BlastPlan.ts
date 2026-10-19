@@ -4,6 +4,7 @@
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
 import { DRILL_GRID_DEFAULT_SPACING_M } from '../config/balance.js';
+import { computeDangerZone } from '../entities/Zone.js';
 import { getBuildingDef, isBuildingFootprintCell, warehouseStockKg, type Building, type BuildingType, type FootprintOccupant } from '../entities/Building.js';
 
 export interface BlastPlan {
@@ -138,29 +139,29 @@ export function holePatternSpacing(holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z
   return Math.max(gx ?? 0, gz ?? 0);
 }
 
-/** Buildings within reach of the planned holes (#2021): any footprint cell inside the holes' bbox grown by `marginM`. */
+/**
+ * Buildings within reach of the planned holes (#2021), shown as pre-flight warnings.
+ *
+ * Tier-0 prediction rule: a building is at risk when any footprint cell lies inside the
+ * holes' bounding box grown by `marginM` (default: the hole-pattern spacing). Holes are
+ * floored to their grid cell first. The rule is deliberately conservative: it can flag a
+ * building in the margin that would survive the blast, but never misses one inside the
+ * box. `marginM` is the lever for tuning how far past the pattern the warning reaches.
+ */
 export function buildingsInBlastReach(
   holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z'>>,
   buildings: ReadonlyArray<Pick<Building, 'id' | 'type' | 'tier' | 'x' | 'z' | 'storedExplosives'>>,
   marginM: number = holePatternSpacing(holes),
 ): BuildingAtRisk[] {
-  if (holes.length === 0 || buildings.length === 0) return [];
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  for (const h of holes) {
-    const hx = Math.floor(h.x);
-    const hz = Math.floor(h.z);
-    if (hx < minX) minX = hx;
-    if (hx > maxX) maxX = hx;
-    if (hz < minZ) minZ = hz;
-    if (hz > maxZ) maxZ = hz;
-  }
-  minX -= marginM; maxX += marginM; minZ -= marginM; maxZ += marginM;
+  if (buildings.length === 0) return [];
+  const reach = computeDangerZone(holes.map(h => ({ x: Math.floor(h.x), z: Math.floor(h.z) })), marginM);
+  if (reach === null) return [];
   const result: BuildingAtRisk[] = [];
   for (const b of buildings) {
     const inReach = getBuildingDef(b.type, b.tier).footprint.some(([dx, dz]) => {
       const cx = b.x + dx;
       const cz = b.z + dz;
-      return cx >= minX && cx <= maxX && cz >= minZ && cz <= maxZ;
+      return cx >= reach.x1 && cx <= reach.x2 && cz >= reach.z1 && cz <= reach.z2;
     });
     if (!inReach) continue;
     result.push({

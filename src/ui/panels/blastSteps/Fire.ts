@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Blast Workshop: Fire step (redesign P4)
-// Danger-zone occupant list and a pre-flight checklist (dry holes, zone, buildings at risk #2021, permit) (DETONATE clears
-// the zone itself, #1362). The FIRE button itself stays in the
+// Danger-zone occupant list and a pre-flight checklist (dry holes, zone,
+// buildings at risk #2021, permit). DETONATE clears the zone itself (#1362).
+// The FIRE button itself stays in the
 // always-visible sticky footer (blastFooter.ts) — it now opens
 // PreflightModal rather than firing directly (see that file's header).
 //
