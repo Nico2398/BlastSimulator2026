@@ -352,6 +352,134 @@
       ]
     },
     {
+      "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:2000",
+      "description": "Blast 1's rubble is hauled to storage until an ore sale offer fits what is stored; contract offers refresh on their own RNG, so wait on the offer rather than a tick pad.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "fillableOreSaleOffered",
+          "equals": true,
+          "maxTicks": 2000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "timeout": 125
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "description": "Accept an ore sale contract right after blast 1: the sale income arrives before blast 2's long wait, so the payroll burn plus an auto-resolved event fine (the command runner picks option 0, e.g. the $30,000 red carpet) cannot bankrupt the site first.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      },
+      "role": "player"
+    },
+    {
+      "command": "contract deliver type:ore_sale fillable:true amount:5000",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel .bs-contract-amount",
+          "value": "5000"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
+        }
+      ],
+      "description": "Deliver blast 1's stored ore against it: cash in hand before blast 2.",
+      "expect": {
+        "increased": [
+          "cash"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:2000",
+      "description": "Blast 1's rubble is hauled to storage until an ore sale offer fits what is stored; contract offers refresh on their own RNG, so wait on the offer rather than a tick pad.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "fillableOreSaleOffered",
+          "equals": true,
+          "maxTicks": 2000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "timeout": 125
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "description": "Accept an ore sale contract right after blast 1: the sale income arrives before blast 2's long wait, so the payroll burn plus an auto-resolved event fine (the command runner picks option 0, e.g. the $30,000 red carpet) cannot bankrupt the site first.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      },
+      "role": "player"
+    },
+    {
+      "command": "contract deliver type:ore_sale fillable:true amount:5000",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel .bs-contract-amount",
+          "value": "5000"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
+        }
+      ],
+      "description": "Deliver blast 1's stored ore against it: cash in hand before blast 2.",
+      "expect": {
+        "increased": [
+          "cash"
+        ]
+      },
+      "role": "player"
+    },
+    {
       "command": "build_ramp start:12,34 end:34,34 depth:6",
       "interaction": [
         {
