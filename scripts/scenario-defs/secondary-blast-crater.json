@@ -95,7 +95,7 @@
       ]
     },
     {
-      "command": "drill_plan grid rows:1 cols:1 spacing:4 depth:8 diameter:0.089 start:36,30",
+      "command": "drill_plan grid rows:1 cols:1 spacing:4 depth:6 diameter:0.089 start:36,30",
       "description": "One hole beside the warehouse.",
       "role": "player",
       "expect": {

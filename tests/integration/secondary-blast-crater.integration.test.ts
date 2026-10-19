@@ -18,7 +18,7 @@ import type { MiningContext } from '../../src/console/commands/mining/types.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { buildGameNavGrid } from '../../src/core/state/GameState.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
-import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceHeight, computeVoxelColumnSurfaceY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { setLocale } from '../../src/core/i18n/I18n.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
@@ -174,14 +174,15 @@ describe('nav grid around the crater (#1896)', () => {
     const empty = fire(0);
     const lowered = stocked.state.navGrid!.cellAt(CX, CZ)!.surfaceY!;
     expect(lowered).toBeLessThan(empty.state.navGrid!.cellAt(CX, CZ)!.surfaceY!);
-    expect(lowered).toBe(computeVoxelColumnSurfaceY(stocked.grid, CX, CZ));
+    expect(lowered).toBe(computeVoxelColumnSurfaceHeight(stocked.grid, CX, CZ));
   });
 
-  it('a path leads into the crater and across it', () => {
+  it('a path leads to the crater rim and across the patched area', () => {
     const w = fire(300);
     const nav = w.state.navGrid!;
-    const into = findPath(nav, { agentId: 1, fromX: 4, fromZ: 4, toX: CX, toZ: CZ, avoidVehicles: false });
-    expect(into.found).toBe(true);
+    // the crater floor itself is a pit with sheer walls: the nav slope gate keeps walkers out, as for any blast pit
+    const rim = findPath(nav, { agentId: 1, fromX: CX - 5, fromZ: CZ, toX: CX + 4, toZ: CZ, avoidVehicles: false });
+    expect(rim.found).toBe(true);
     const across = findPath(nav, { agentId: 1, fromX: CX - 5, fromZ: CZ, toX: CX + 5, toZ: CZ, avoidVehicles: false });
     expect(across.found).toBe(true);
   });
