@@ -9,6 +9,7 @@ import {
   DRILL_RIG_MAX_DIAMETER_M,
 } from '../config/balance.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
+import { lowestRigTierReaching } from './RigLimits.js';
 
 /** Cross-section ratio of a hole against the default diameter. */
 export function holeCapacityFactor(diameterM: number = DRILL_HOLE_DEFAULT_DIAMETER_M): number {
@@ -22,14 +23,9 @@ export function chargeKgPerMetre(diameterM: number = DRILL_HOLE_DEFAULT_DIAMETER
   return CHARGE_KG_PER_METRE * holeCapacityFactor(diameterM);
 }
 
-const RIG_TIERS_ASC = Object.keys(DRILL_RIG_MAX_DIAMETER_M).map(Number).sort((a, b) => a - b) as VehicleTier[];
-
 /** Lowest drill rig tier able to bore `diameterM`. */
 export function minRigTierForDiameter(diameterM: number): VehicleTier {
-  return (
-    RIG_TIERS_ASC.find(t => DRILL_RIG_MAX_DIAMETER_M[t] + DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M >= diameterM) ??
-    RIG_TIERS_ASC[RIG_TIERS_ASC.length - 1]!
-  );
+  return lowestRigTierReaching(DRILL_RIG_MAX_DIAMETER_M, diameterM, DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M);
 }
 
 /** Raw input (metres if < 1, else millimetres) snapped to an allowed option; null when none matches. */
@@ -39,4 +35,9 @@ export function normaliseHoleDiameter(raw: number): number | null {
   return (
     DRILL_HOLE_DIAMETER_OPTIONS_M.find(o => Math.abs(o - metres) <= DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M) ?? null
   );
+}
+
+/** The allowed diameters in millimetres as a comma-separated list, for refusal messages. */
+export function holeDiameterOptionsMm(): string {
+  return DRILL_HOLE_DIAMETER_OPTIONS_M.map(o => Math.round(o * 1000)).join(', ');
 }

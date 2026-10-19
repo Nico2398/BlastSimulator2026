@@ -13,6 +13,8 @@ import { placeBuilding, storeExplosives } from '../../../../../src/core/entities
 import { buyStockBlockReason } from '../../../../../src/core/mining/ExplosiveStock.js';
 import { CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, STOCK_BUY_STEP_KG } from '../../../../../src/core/config/balance.js';
 import { dispatchChargeAction } from '../../../../../src/core/mining/ChargeOrder.js';
+import { explosiveHoleLimits } from '../../../../../src/core/mining/ChargePlan.js';
+import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js';
 import { formatGameDuration } from '../../../../../src/ui/formatGameDuration.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -1042,5 +1044,52 @@ describe('ChargeStep delivery wait (#1966)', () => {
     expect(hint).not.toBeNull();
     expect(hint!.textContent).toContain(formatGameDuration(400));
     expect(hint!.textContent).not.toContain('tick');
+  });
+});
+
+describe('ChargeStep — hole diameter (#1934)', () => {
+  it('capacity line names the narrowest hole\'s bore and kg per metre', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.127);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.165);
+    step.update(state, 'sunny');
+
+    const line = step.root.querySelector('[data-info="hole-capacity"]')!.textContent;
+    expect(line).toBe(t('ui.blast_workshop.charge.hole_capacity', {
+      diameter: 127, kgPerMetre: +chargeKgPerMetre(0.127).toFixed(2),
+    }));
+  });
+
+  it('kg max label scales with the narrowest hole', () => {
+    const { step } = makeStep();
+    const narrow = makeState();
+    addHole(holeCounter, narrow.drillHoles, 10, 10, 8, 0.089);
+    step.update(narrow, 'sunny');
+    const narrowLabel = card(step, 'boomite').textContent;
+
+    const { step: wideStep } = makeStep();
+    const wide = makeState();
+    addHole(holeCounter, wide.drillHoles, 10, 10, 8, 0.127);
+    wideStep.update(wide, 'sunny');
+
+    const boomite = getExplosive('boomite')!;
+    const maxOf = (d: number) => Math.round(explosiveHoleLimits(boomite, d).maxKg * 10) / 10;
+    expect(narrowLabel).toContain(`${maxOf(0.089)} kg max`);
+    expect(card(wideStep, 'boomite').textContent).toContain(`${maxOf(0.127)} kg max`);
+  });
+
+  it('Charge All amount is raised to the widest hole\'s minimum', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.165);
+    step.update(state, 'sunny');
+    card(step, 'boomite').click();
+
+    (step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement).click();
+    const minWide = explosiveHoleLimits(getExplosive('boomite')!, 0.165).minKg;
+    const amount = Number(/amount:([\d.]+)/.exec(gameConsole.mock.calls[0]![0] as string)![1]);
+    expect(amount).toBeGreaterThanOrEqual(minWide);
   });
 });

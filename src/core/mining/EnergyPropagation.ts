@@ -381,7 +381,7 @@ export interface EnergySeed {
  * Turn a charged hole into per-voxel energy seeds.
  *
  * The explosive sits at the bottom of the hole and fills the length its own
- * mass occupies — `CHARGE_KG_PER_METRE` of hole per kilogram — with the rest of
+ * mass occupies — one metre of hole per `chargeKgPerMetre(diameterM)` kilograms, which grows with the bore (#1934) — with the rest of
  * the hole above it inert. Its energy is split evenly over those voxels, so
  * doubling the charge lengthens the column and keeps the energy per voxel
  * roughly constant, which is what makes a bigger charge break *more* rock

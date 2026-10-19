@@ -715,3 +715,59 @@ describe('DrillStep — permit hole-limit warning (#1925)', () => {
     expect(textOf(arg)).not.toContain('permit');
   });
 });
+
+describe('DrillStep — diameter stepper follows fleet rigs (#1934)', () => {
+  function diameterFieldOf(strip: { show: ReturnType<typeof vi.fn> }): StripField {
+    return (strip.show.mock.calls.at(-1)![0] as StripArg).fields.find(f => f.key === 'diameter')!;
+  }
+
+  function armAddTool(tier: 1 | 2 | 3) {
+    const made = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    made.step.setPlacementKit(kit);
+    made.step.update(stateWithRigTier(tier), 'sunny');
+    (made.step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+    return { ...made, controller, strip, kit };
+  }
+
+  for (const [tier, widestMm] of [[1, 89], [2, 127], [3, 165]] as const) {
+    it(`tier-${tier} rig: stepper tops out at ${widestMm} mm`, () => {
+      const { strip } = armAddTool(tier);
+      for (let i = 0; i < 5; i++) diameterFieldOf(strip).onInc();
+      expect(diameterFieldOf(strip).value).toBe(widestMm);
+    });
+  }
+
+  it('steps through the options in order and back down to the narrowest', () => {
+    const { strip } = armAddTool(3);
+    expect(diameterFieldOf(strip).value).toBe(89);
+    diameterFieldOf(strip).onInc();
+    expect(diameterFieldOf(strip).value).toBe(127);
+    diameterFieldOf(strip).onInc();
+    expect(diameterFieldOf(strip).value).toBe(165);
+    for (let i = 0; i < 5; i++) diameterFieldOf(strip).onDec();
+    expect(diameterFieldOf(strip).value).toBe(89);
+  });
+
+  it('the command carries the stepped diameter', () => {
+    const { gameConsole, controller, strip } = armAddTool(2);
+    diameterFieldOf(strip).onInc();
+    controller.simulateConfirm();
+    expect(gameConsole.mock.calls[0]![0] as string).toContain('diameter:0.127');
+  });
+
+  it('a chosen diameter is clamped down when the wide rig is lost', () => {
+    const { step, gameConsole, controller, strip } = armAddTool(3);
+    for (let i = 0; i < 5; i++) diameterFieldOf(strip).onInc();
+    expect(diameterFieldOf(strip).value).toBe(165);
+    controller.cancel();
+
+    step.update(stateWithRigTier(1), 'sunny');
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+    expect(diameterFieldOf(strip).value).toBe(89);
+    controller.simulateConfirm();
+    expect(gameConsole.mock.calls[0]![0] as string).toContain('diameter:0.089');
+  });
+});

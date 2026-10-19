@@ -4,6 +4,7 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import type { SavedBlastPlan } from '../../../core/state/GameState.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { addHole, drillDepthRefusal, drillDiameterRefusal } from '../../../core/mining/DrillPlan.js';
+import { normaliseHoleDiameter, holeDiameterOptionsMm } from '../../../core/mining/HoleDiameter.js';
 import { createCharge, recordedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { claimForAction } from '../siteExpansion.js';
@@ -31,6 +32,9 @@ export function queueSavedBlastPlan(ctx: MiningContext, saved: SavedBlastPlan, n
   for (const h of fresh) {
     const tooDeep = drillDepthRefusal(h.depth, state.vehicles.vehicles);
     if (tooDeep) return { success: false, output: `${h.id}: ${t(tooDeep.key, tooDeep.params)}` };
+    if (normaliseHoleDiameter(h.diameter) === null) {
+      return { success: false, output: `${h.id}: ${t('mining.drill_plan.invalid_diameter', { options: holeDiameterOptionsMm() })}` };
+    }
     const tooWide = drillDiameterRefusal(h.diameter, state.vehicles.vehicles);
     if (tooWide) return { success: false, output: `${h.id}: ${t(tooWide.key, tooWide.params)}` };
   }
