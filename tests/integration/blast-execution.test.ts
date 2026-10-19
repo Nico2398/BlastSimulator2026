@@ -77,7 +77,7 @@ describe('Blast execution — integration', () => {
     // Boomite 8kg (max): 340×8=2720E. Stemming 2m, depth 8: downward ≈ 2494E.
     // At hole pos (EPSILON=4): 2494/4 = 624. Ratio = 624/500 = 1.25 → good frag.
     // With neighbor contributions at midpoints, ratio ~1.5-2.5 → good to fine frag.
-    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.089);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -97,7 +97,7 @@ describe('Blast execution — integration', () => {
     fillRegion(grid, 'cruite', 5, 25, 0, 10, 5, 25);
 
     // Overcharge: dynatomics (1300 E/kg) × 25kg on soft cruite (threshold 200)
-    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 3, 8, 0.089);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -117,7 +117,7 @@ describe('Blast execution — integration', () => {
     fillRegion(grid, 'titanite', 5, 25, 0, 10, 5, 25);
 
     // Undercharge: pop_rock (200 E/kg) × 2kg — way too weak
-    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 3, 8, 0.089);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -140,7 +140,7 @@ describe('Blast execution — integration', () => {
     const beforeVoxel = grid.getVoxel(12, 2, 12);
     expect(beforeVoxel?.density).toBe(1.0);
 
-    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 2, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 2, 3, 6, 0.089);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -169,7 +169,7 @@ describe('Blast execution — integration', () => {
     const grid = new VoxelGrid(30, 30);
     fillRegion(grid, 'cruite', 8, 20, 0, 8, 8, 20, 'blingite', 0.5);
 
-    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 2, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 2, 3, 6, 0.089);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -189,7 +189,7 @@ describe('Blast execution — integration', () => {
 
   it('returns null for invalid blast plan', () => {
     const grid = new VoxelGrid(20, 20);
-    const holes = createGridPlan(holeCounter, { x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 5, z: 5 }, 1, 1, 3, 6, 0.089);
     // No charges → invalid
     const plan = assembleBlastPlan(holes, {});
     const result = executeBlast(plan, grid, []);
@@ -938,7 +938,7 @@ function sandboxCraterBlast(kg: number, spacing: number) {
   expect(runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42').success).toBe(true);
   const grid = ctx.grid!;
   const counter = { nextHoleId: 1 };
-  const holes = createGridPlan(counter, { x: 28, z: 18 }, 3, 3, spacing, 8, 0.15);
+  const holes = createGridPlan(counter, { x: 28, z: 18 }, 3, 3, spacing, 8, 0.089);
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
   const { charges } = batchCharge(holes.map(h => h.id), depths, 'krackle', kg, 2.5);
@@ -1091,7 +1091,7 @@ function sandboxBlast(spacing: number, depth: number, kg: number, stemming: numb
   const { runner, ctx } = createRunner();
   expect(runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42').success).toBe(true);
   const grid = ctx.grid!;
-  const holes = createGridPlan({ nextHoleId: 1 }, { x: 28, z: 18 }, 3, 3, spacing, depth, 0.15);
+  const holes = createGridPlan({ nextHoleId: 1 }, { x: 28, z: 18 }, 3, 3, spacing, depth, 0.089);
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
   const { charges } = batchCharge(holes.map(h => h.id), depths, 'krackle', kg, stemming);

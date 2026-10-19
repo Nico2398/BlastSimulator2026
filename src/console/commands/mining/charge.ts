@@ -80,7 +80,7 @@ export function chargeCommand(
     return { success: false, output: `Hole "${holeId}" not found` };
   }
 
-  const result = createCharge(explosiveId, amount, stemming, hole.depth);
+  const result = createCharge(explosiveId, amount, stemming, hole.depth, hole.diameter);
   if ('error' in result) return { success: false, output: result.error };
 
   const broke = chargeFundsFailure(ctx.state!, [{ holeId: hole.id, explosiveId, amountKg: amount }]);
@@ -131,8 +131,12 @@ function chargePattern(state: GameState, explosiveId: string, amount: number, st
   }
 
   const depths: Record<string, number> = {};
-  for (const h of [...uncovered, ...state.plannedDrillHoles]) depths[h.id] = h.depth;
-  const check = batchCharge(Object.keys(depths), depths, explosiveId, amount, stemming);
+  const diameters: Record<string, number> = {};
+  for (const h of [...uncovered, ...state.plannedDrillHoles]) {
+    depths[h.id] = h.depth;
+    diameters[h.id] = h.diameter;
+  }
+  const check = batchCharge(Object.keys(depths), depths, explosiveId, amount, stemming, diameters);
   if (check.errors.length > 0) {
     return { success: false, output: `Errors:\n${check.errors.map(e => `  ${e.holeId}: ${e.message}`).join('\n')}` };
   }

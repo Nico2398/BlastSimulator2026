@@ -5,6 +5,8 @@ import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
 import { SOFTWARE_TIER_COSTS } from '../../../../../src/core/mining/Software.js';
+import { t } from '../../../../../src/core/i18n/I18n.js';
+import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js';
 import type { GameState } from '../../../../../src/core/state/GameState.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -159,5 +161,27 @@ describe('PreviewStep', () => {
     expect(() => step.refreshLocale()).not.toThrow();
     step.update(makeState());
     expect(tierRow(step, 1)).not.toBeNull();
+  });
+});
+
+describe('PreviewStep — bore line (#1934)', () => {
+  it('names each distinct hole diameter with its kg per metre', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.127);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.127);
+    addHole(holeCounter, state.drillHoles, 16, 10, 8, 0.089);
+    step.update(state);
+
+    const text = step.root.querySelector('[data-info="plan-bore"]')!.textContent!;
+    expect(text).toContain(t('ui.blast_workshop.preview.bore', { diameter: 89, kgPerMetre: +chargeKgPerMetre(0.089).toFixed(2) }));
+    expect(text).toContain(t('ui.blast_workshop.preview.bore', { diameter: 127, kgPerMetre: +chargeKgPerMetre(0.127).toFixed(2) }));
+    expect(text.indexOf('89 mm')).toBeLessThan(text.indexOf('127 mm'));
+  });
+
+  it('is empty without holes', () => {
+    const { step } = makeStep();
+    step.update(makeState());
+    expect(step.root.querySelector('[data-info="plan-bore"]')!.textContent).toBe('');
   });
 });

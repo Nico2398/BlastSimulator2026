@@ -695,6 +695,7 @@ function* buildBlastEnergyFieldSteps(
       Math.floor(hole.x),
       Math.floor(hole.z),
       box.minY,
+      hole.diameter,
     ));
   }
 

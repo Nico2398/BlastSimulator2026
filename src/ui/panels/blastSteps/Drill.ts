@@ -12,7 +12,7 @@ import { LocaleTextRegistry } from '../../localeText.js';
 import { SavedPlansList, savedPlansSignature } from './SavedPlansList.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { gridCellPositions, fleetDrillReachM } from '../../../core/mining/DrillPlan.js';
+import { gridCellPositions, fleetDrillReachM, fleetDrillDiameterM } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
@@ -26,7 +26,7 @@ import { gridHoleLimitWarning } from '../permitPreview.js';
 import { buildReplacePatternConfirm } from '../../replacePatternConfirm.js';
 import {
   DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, MAX_DRILL_GRID_HOLES, DRILL_GRID_DEFAULT_DEPTH_M,
-  DRILL_HOLE_MIN_DEPTH_M,
+  DRILL_HOLE_MIN_DEPTH_M, DRILL_HOLE_DIAMETER_OPTIONS_M, DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M,
 } from '../../../core/config/balance.js';
 
 
@@ -39,7 +39,6 @@ export class DrillStep {
   private readonly patternValueEl: HTMLElement;
   private readonly spacingValueEl: HTMLElement;
   private readonly depthValueEl: HTMLElement;
-  private readonly diameterValueEl: HTMLElement;
   private readonly holesNoteEl: HTMLElement;
   private readonly holeListEl: HTMLElement;
   private readonly clearRowEl: HTMLElement;
@@ -108,13 +107,11 @@ export class DrillStep {
     };
     const pattern = stripCell('ui.blast_workshop.drill.pattern', true);
     const spacing = stripCell('ui.blast_workshop.drill.spacing', true);
-    const depth = stripCell('ui.blast_workshop.drill.depth', true);
-    const diameter = stripCell('ui.blast_workshop.drill.diameter', false);
+    const depth = stripCell('ui.blast_workshop.drill.depth', false);
     this.patternValueEl = pattern.value;
     this.spacingValueEl = spacing.value;
     this.depthValueEl = depth.value;
-    this.diameterValueEl = diameter.value;
-    const statStrip = el('div', { children: [pattern.wrap, spacing.wrap, depth.wrap, diameter.wrap] });
+    const statStrip = el('div', { children: [pattern.wrap, spacing.wrap, depth.wrap] });
     statStrip.style.cssText = 'display:flex;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-well);overflow:hidden';
 
     this.holesNoteEl = el('span', { className: 'bsx-section-note' });
@@ -170,7 +167,6 @@ export class DrillStep {
     this.patternValueEl.textContent = this.lastGridPattern ? `${this.lastGridPattern.cols} × ${this.lastGridPattern.rows}` : '—';
     this.spacingValueEl.textContent = `${this.gridSpacing.toFixed(1)} m`;
     this.depthValueEl.textContent = `${this.gridDepth.toFixed(1)} m`;
-    this.diameterValueEl.textContent = `${Math.round(this.gridDiameter * 1000)} mm`;
 
     this.holesNoteEl.textContent = t('ui.blast_workshop.drill.planned', { count: totalCount });
     this.clearBtn.disabled = totalCount === 0;
@@ -306,6 +302,38 @@ export class DrillStep {
     this.gridDepth = Math.min(this.gridDepth, this.reachM());
   }
 
+  /** Pull the diameter setting back to the widest option the fleet can bore (a rig may have been lost). */
+  private clampDiameterToFleet(): void {
+    this.gridDiameter = Math.min(this.gridDiameter, this.maxDiameterM());
+  }
+
+  private maxDiameterM(): number {
+    return fleetDrillDiameterM(this.lastState?.vehicles.vehicles ?? []);
+  }
+
+  /** Diameter options the fleet can bore, narrowest first. */
+  private diameterOptions(): number[] {
+    const max = this.maxDiameterM() + DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M;
+    return DRILL_HOLE_DIAMETER_OPTIONS_M.filter(o => o <= max);
+  }
+
+  /** Diameter stepper (mm): hops between allowed options, skipping those above the fleet's rigs. */
+  private diameterField(refresh: () => void) {
+    const options = this.diameterOptions();
+    const idx = Math.max(0, options.findIndex(o => Math.abs(o - this.gridDiameter) <= DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M));
+    const go = (to: number) => () => {
+      const next = options[Math.max(0, Math.min(options.length - 1, to))];
+      if (next !== undefined) this.gridDiameter = next;
+      this.lastSignature = '';
+      refresh();
+    };
+    return {
+      key: 'diameter', label: t('ui.blast_workshop.drill.diameter'),
+      value: Math.round(this.gridDiameter * 1000), format: (v: number) => `${v} mm`,
+      onDec: go(idx - 1), onInc: go(idx + 1),
+    };
+  }
+
   /** Strip field stepping a clamped grid setting; re-renders the strip on change. */
   private stepField(
     key: 'spacing' | 'depth', label: string, prop: 'gridSpacing' | 'gridDepth',
@@ -356,6 +384,7 @@ export class DrillStep {
     this.armTool('rect', (kit, refresh) => {
       const { controller, overlay, strip } = kit;
       this.clampDepthToReach();
+      this.clampDiameterToFleet();
       const sel = controller.selection;
       const region = controller.activeRegion;
       overlay.update(sel ? {
@@ -377,6 +406,7 @@ export class DrillStep {
         fields: [
           this.stepField('spacing', t('ui.blast_workshop.drill.spacing'), 'gridSpacing', 1, 20, refresh),
           this.stepField('depth', t('ui.blast_workshop.drill.depth'), 'gridDepth', DRILL_HOLE_MIN_DEPTH_M, this.reachM(), refresh),
+          this.diameterField(refresh),
         ],
         result: sel
           ? `${cols} × ${rows} ${t('ui.blast_workshop.drill.holes_section')}${coveredCount > 0 ? ` — ${t('ui.blast_workshop.drill.grid_skipped_preview', { count: coveredCount })}` : ''}${permitWarning ? ` — ${permitWarning}` : ''}`
@@ -405,6 +435,7 @@ export class DrillStep {
     this.armTool('point', (kit, refresh) => {
       const { controller, overlay, strip } = kit;
       this.clampDepthToReach();
+      this.clampDiameterToFleet();
       const sel = controller.selection;
       const covered = sel ? this.coveredCount([{ id: 'add', x: sel.x1, z: sel.z1 }]) > 0 : false;
       const footprintReason = covered && sel ? t('mining.drill_plan.refused_footprint', { x: Math.floor(sel.x1), z: Math.floor(sel.z1) }) : null;
@@ -417,6 +448,7 @@ export class DrillStep {
         subtitle: sel ? `(${sel.x1}, ${sel.z1})` : '',
         fields: [
           this.stepField('depth', t('ui.blast_workshop.drill.depth'), 'gridDepth', DRILL_HOLE_MIN_DEPTH_M, this.reachM(), refresh),
+          this.diameterField(refresh),
         ],
         result: sel ? '1' : '—',
         confirmEnabled: controller.canConfirm && !covered,

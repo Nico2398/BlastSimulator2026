@@ -189,7 +189,7 @@ function addAwaiting(state: GameState, holeId: string): void {
 
 /** Order the pattern charge for one hole, funds checked per hole. Caller guarantees the hole is uncovered. */
 function orderPatternCharge(state: GameState, hole: DrillHole, pattern: HoleCharge): AutoChargeOutcome | { error: string } {
-  const created = createCharge(pattern.explosiveId, pattern.amountKg, pattern.stemmingM, hole.depth);
+  const created = createCharge(pattern.explosiveId, pattern.amountKg, pattern.stemmingM, hole.depth, hole.diameter);
   if ('error' in created) {
     removeAwaiting(state, hole.id);
     return { error: created.error };
