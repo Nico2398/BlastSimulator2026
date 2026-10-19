@@ -473,7 +473,8 @@ import {
   sandboxBiomeTraits,
   sandboxKitDetails,
 } from '../../../src/core/campaign/Sandbox.js';
-import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
+import { getRock } from '../../../src/core/world/RockCatalog.js';
+import { sandboxOresYieldedByRocks, sandboxOreWindow } from '../../../src/core/world/SandboxDeepOre.js';
 import { getOre } from '../../../src/core/world/OreCatalog.js';
 import {
   SANDBOX_STARTING_SITES,
@@ -510,16 +511,15 @@ describe('sandboxBiomeTraits (#1686)', () => {
     }
   });
 
-  it('ores are exactly those the dominant rocks yield, with the global ore depth windows', () => {
+  it('ores are exactly those the dominant rocks yield on a sandbox site, with the sandbox ore depth windows (#1933)', () => {
     for (const b of getAllBiomes()) {
-      const expected = oresYieldedByRocks(b.dominantRocks);
+      const expected = sandboxOresYieldedByRocks(b.dominantRocks);
       const ores = sandboxBiomeTraits(b.id).ores;
       expect(ores.map(o => o.oreId), b.id).toEqual(expected);
       for (const o of ores) {
         const def = getOre(o.oreId)!;
         expect(o.nameKey).toBe(def.nameKey);
-        expect(o.depthMin).toBe(def.depthMin);
-        expect(o.depthMax).toBe(def.depthMax);
+        expect([o.depthMin, o.depthMax]).toEqual(sandboxOreWindow(def));
       }
     }
   });
