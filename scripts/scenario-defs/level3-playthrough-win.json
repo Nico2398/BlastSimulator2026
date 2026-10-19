@@ -2071,12 +2071,12 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.61768639416864,
+          "wellBeing": 98.61111089989046,
           "safety": 50,
           "ecology": 49.7635685061019,
           "nuisance": 49.40892126525473
         },
-        "note": "#1778: re-measured for comfort-band morale recovery. #1777: drilling finishes sooner, so charging completes and the shot fires at tick 803 instead of 825; wellBeing 57.41 -> 56.11, ecology 49.7536 -> 49.7636 and nuisance 49.3839 -> 49.4089 re-measured. deathCount 1 and the win are unchanged. #1851: rounded position->cell mapping shifts rest/morale timing; wellBeing 59.799579111137255 -> 60.27667858857491. No behaviour defect. #1873: event timing shift from union cadence; wellBeing 58.8579115411053 -> 58.85780020486362. No behaviour defect. #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met."
+        "note": "#1778: re-measured for comfort-band morale recovery. #1777: drilling finishes sooner, so charging completes and the shot fires at tick 803 instead of 825; wellBeing 57.41 -> 56.11, ecology 49.7536 -> 49.7636 and nuisance 49.3839 -> 49.4089 re-measured. deathCount 1 and the win are unchanged. #1851: rounded position->cell mapping shifts rest/morale timing; wellBeing 59.799579111137255 -> 60.27667858857491. No behaviour defect. #1873: event timing shift from union cadence; wellBeing 58.8579115411053 -> 58.85780020486362. No behaviour defect. #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met. #1996: re-measured (command mode, deterministic) -- union events now also need MIN_EVENT_INTERVAL_ACTIONS player commands since the last union event, which moved the event timeline; deaths, surveys and contracts are unchanged."
       },
       "description": "wellBeing already at its floor (11 deaths' morale hit) -- safety/ecology still the fresh-game baseline here, same reasoning as tutorial-playthrough.json's own post-blast scores step: the recentAccidents/vibration penalties only start applying once ticking resumes."
     },
@@ -2091,7 +2091,7 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "tickCount": 2
+          "tickCount": 6
         },
         "equals": {
           "deathCount": 1,
@@ -2102,7 +2102,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "#1895 merge of #1907: a $60,000 event fires 2 ticks into this window (tick 1539), which halts the tick; the next step resolves it, so its cash change is -60000."
+        "note": "(superseded by #1996 below; was: a $60,000 event fires 2 ticks into this window (tick 1539), which halts the tick; the next step resolves it, so its cash change is -60000.) #1996: the union event gate moves that $60,000 event out of this window -- the tick call now runs all 6 ticks and the next step finds nothing pending (cash unchanged, commandOutcome either)."
       },
       "description": "#1186: re-measured -- was 0/0 (a pending lucky_strike event froze this tick call at 0 of 6 requested ticks; see the next step's old description). SurveyCalc.ts's estimateSurveyResult now samples a bounded depth window below each column's own surface (SURVEY_DEPTH_BELOW_SURFACE) instead of scanning the whole declared column height, which is the actual, required fix (#1186: column storage has no floor/ceiling any more, so 'the whole column' is unbounded) -- but it also changes how many columns around this file's own seismic/core_sample surveys (step 21-22, x:25 z:25) carry a detectable ore, which changes how many rng.gaussian() noise draws each survey consumes. Same seed, same eventual outcome, different point in the shared PRNG stream from here on: lucky_strike no longer happens to be the very next draw the instant this tick call starts, so all 6 requested ticks actually run instead of 0. Nothing about the blast itself changed -- fragmentedCount/detachedCount/liftedCount/projectionCount for pattern 1's blast are byte-identical to origin/main, direct-verified via a debug trace comparing this branch against a clean origin/main worktree.",
       "commandOutcome": "either"
@@ -2117,7 +2117,7 @@
       "role": "player",
       "expect": {
         "changedBy": {
-          "cash": -60000,
+          "cash": 0,
           "tickCount": 0
         },
         "equals": {
@@ -2125,7 +2125,8 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
-        }
+        },
+        "note": "#1996: re-measured (command mode, deterministic) -- union events now also need MIN_EVENT_INTERVAL_ACTIONS player commands since the last union event, which moved the event timeline; deaths, surveys and contracts are unchanged."
       },
       "commandOutcome": "either"
     },
