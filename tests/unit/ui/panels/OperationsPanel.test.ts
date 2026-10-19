@@ -2,7 +2,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { OperationsPanel, countQueuedByBlock } from '../../../../src/ui/panels/OperationsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
-import { createRunner } from '../../../../src/console-api.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { buildBlockedOrderMessage } from '../../../../src/ui/notify/blockedOrders.js';
 import type { GameState, PendingAction, BlockedOrderReason } from '../../../../src/core/state/GameState.js';
