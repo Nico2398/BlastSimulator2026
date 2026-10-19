@@ -2599,3 +2599,53 @@ describe('deserialize — ramp legs (#1939)', () => {
     expect(rampLegsOf(restored.builtRamps[0]!.def)).toEqual([{ direction: 'east', length: 10 }]);
   });
 });
+
+describe('serialize/deserialize — ore saturation (#1930)', () => {
+  function glutGame() {
+    const state = createGame({ seed: 42 });
+    state.grade = { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null };
+    state.saturation = { dirtite: { level: 0.5, tick: 120 }, rustite: { level: 0.25, tick: 90 } };
+    return state;
+  }
+
+  it('round-trips the saturation state', () => {
+    const state = glutGame();
+    expect(deserialize(serialize(state)).saturation).toEqual(state.saturation);
+  });
+
+  it('a game without saturation reloads without it', () => {
+    expect(deserialize(serialize(createGame({ seed: 42 }))).saturation).toBeUndefined();
+  });
+
+  it('an old save with no saturation key loads', () => {
+    const parsed = JSON.parse(serialize(glutGame())) as Record<string, unknown>;
+    delete parsed['saturation'];
+    const loaded = deserialize(JSON.stringify(parsed));
+    expect(loaded.saturation).toBeUndefined();
+    expect(loaded.grade).toBeDefined();
+  });
+
+  it('malformed entries are dropped and good ones kept', () => {
+    const parsed = JSON.parse(serialize(glutGame())) as Record<string, unknown>;
+    parsed['saturation'] = { dirtite: { level: 0.5, tick: 120 }, rustite: { level: 'x' } };
+    expect(deserialize(JSON.stringify(parsed)).saturation).toEqual({ dirtite: { level: 0.5, tick: 120 } });
+  });
+
+  it('a malformed saturation value is dropped entirely', () => {
+    const parsed = JSON.parse(serialize(glutGame())) as Record<string, unknown>;
+    parsed['saturation'] = 'lots';
+    expect(deserialize(JSON.stringify(parsed)).saturation).toBeUndefined();
+  });
+
+  it('an out-of-range level is clamped on load', () => {
+    const parsed = JSON.parse(serialize(glutGame())) as Record<string, unknown>;
+    parsed['saturation'] = { dirtite: { level: 9, tick: 4 } };
+    expect(deserialize(JSON.stringify(parsed)).saturation!['dirtite']!.level).toBe(1);
+  });
+
+  it('saturation is dropped when the save has no grade state', () => {
+    const parsed = JSON.parse(serialize(glutGame())) as Record<string, unknown>;
+    delete parsed['grade'];
+    expect(deserialize(JSON.stringify(parsed)).saturation).toBeUndefined();
+  });
+});

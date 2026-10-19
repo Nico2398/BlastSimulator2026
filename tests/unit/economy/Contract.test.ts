@@ -1386,3 +1386,133 @@ describe('buyer unlock lines (#1929)', () => {
     for (let g = 0; g <= 8; g++) expect(keys(g)).not.toContain('progression.unlock.buyer.local');
   });
 });
+
+// ── Ore saturation on offers (#1930) ────────────────────────────────────────
+
+import type { SaturationReader } from '../../../src/core/economy/OreSaturation.js';
+
+/** Offers over `refreshes` refreshes with a saturation reader (undefined = none passed). */
+function saturatedBoards(
+  seed: number, refreshes: number, buyerGrade: number | undefined, saturation: SaturationReader | undefined,
+  market: 'legacy' | 'production' = 'production', ores: readonly string[] = ALL_ORES, rubbleStockKg = Infinity,
+): Contract[] {
+  const state = createContractState();
+  state.market = market;
+  const rng = new Random(seed);
+  const seen: Contract[] = [];
+  for (let i = 0; i < refreshes; i++) {
+    generateContracts(state, rng, i * CONTRACT_REFRESH_INTERVAL, 1, ores, rubbleStockKg, buyerGrade, saturation);
+    seen.push(...state.available.slice(-CONTRACTS_PER_REFRESH));
+  }
+  return seen;
+}
+
+const satOf = (levels: Record<string, number>): SaturationReader => (ore) => levels[ore] ?? 0;
+const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+describe('saturated ores on progression offers (#1930)', () => {
+  it('a fully saturated ore is priced within half of its tier price range', () => {
+    const offers = saturatedBoards(42, 60, 0, satOf({ dirtite: 1 }), 'production', ['dirtite'])
+      .filter(c => c.type !== 'rubble_disposal');
+    expect(offers.length).toBeGreaterThan(20);
+    const base = oreContractBasePrice('dirtite', 'production');
+    const local = tierOf('local');
+    for (const c of offers) {
+      expect(c.pricePerKg).toBeLessThanOrEqual(base * local.priceFactor.max * 0.5 + 1e-9);
+    }
+  });
+
+  it('halves the average dirtite price at full saturation, quarter-discounts at half', () => {
+    const only = ['dirtite'] as const;
+    const avg = (sat: number) => mean(
+      saturatedBoards(42, 80, 0, satOf({ dirtite: sat }), 'production', only)
+        .filter(c => c.type === 'ore_sale').map(c => c.pricePerKg),
+    );
+    const clean = avg(0);
+    expect(avg(1) / clean).toBeGreaterThan(0.4);
+    expect(avg(1) / clean).toBeLessThan(0.6);
+    expect(avg(0.5) / clean).toBeGreaterThan(0.65);
+    expect(avg(0.5) / clean).toBeLessThan(0.85);
+  });
+
+  it('a saturated ore is picked less often than a clean one', () => {
+    const count = (reader: SaturationReader | undefined) =>
+      saturatedBoards(7, 300, 0, reader).filter(c => c.type === 'ore_sale' && c.materialId === 'dirtite').length;
+    const clean = count(undefined);
+    const glutted = count(satOf({ dirtite: 1 }));
+    expect(clean).toBeGreaterThan(50);
+    expect(glutted).toBeLessThan(clean * 0.8);
+  });
+
+  it('other ores are picked more often while one is saturated', () => {
+    const share = (reader: SaturationReader | undefined, ore: string) => {
+      const sales = saturatedBoards(7, 300, 0, reader).filter(c => c.type === 'ore_sale');
+      return sales.filter(c => c.materialId === ore).length / sales.length;
+    };
+    expect(share(satOf({ dirtite: 1 }), 'rustite')).toBeGreaterThan(share(undefined, 'rustite'));
+  });
+
+  it('only the saturated ore is discounted', () => {
+    const base = (ore: string) => oreContractBasePrice(ore, 'production');
+    const offers = saturatedBoards(42, 80, 0, satOf({ dirtite: 1 }))
+      .filter(c => c.type === 'ore_sale' && c.materialId === 'rustite');
+    expect(offers.length).toBeGreaterThan(10);
+    // an unsaturated ore keeps prices at or above the lowest local factor of its base
+    for (const c of offers) expect(c.pricePerKg).toBeGreaterThanOrEqual(base('rustite') * tierOf('local').priceFactor.min - 1e-9);
+  });
+
+  it('rubble offers keep their price at full saturation', () => {
+    const market = resolveMarket('production');
+    const rubble = saturatedBoards(42, 80, 0, satOf(Object.fromEntries(ALL_ORES.map(o => [o, 1]))))
+      .filter(c => c.type === 'rubble_disposal' && !c.playerPays);
+    expect(rubble.length).toBeGreaterThan(5);
+    for (const c of rubble) expect(c.pricePerKg).toBeGreaterThanOrEqual(market.rubblePricePerKg.min - 1e-9);
+  });
+
+  it('a rubble-only site is byte-identical under saturation', () => {
+    const all1 = satOf(Object.fromEntries(ALL_ORES.map(o => [o, 1])));
+    expect(saturatedBoards(42, 30, 0, all1, 'production', [])).toEqual(saturatedBoards(42, 30, 0, undefined, 'production', []));
+  });
+
+  it('accepted contracts keep their price when the ore saturates later', () => {
+    const state = createContractState();
+    state.market = 'production';
+    const rng = new Random(42);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity, 0, satOf({}));
+    const id = state.available[0]!.id;
+    const accepted = acceptContract(state, id, 0)!;
+    const frozen = JSON.parse(JSON.stringify(accepted));
+    generateContracts(state, rng, CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity, 0, satOf(Object.fromEntries(ALL_ORES.map(o => [o, 1]))));
+    expect(state.active[0]).toEqual(frozen);
+  });
+
+  it('offerSpecialContract applies the discount too', () => {
+    const state = createContractState();
+    state.market = 'production';
+    const rng = new Random(3);
+    const base = oreContractBasePrice('dirtite', 'production');
+    for (let i = 0; i < 40; i++) {
+      const c = offerSpecialContract(state, rng, 1, ['dirtite'], 0, 0, satOf({ dirtite: 1 }));
+      if (c && c.type !== 'rubble_disposal') {
+        expect(c.pricePerKg).toBeLessThanOrEqual(base * tierOf('local').priceFactor.max * 0.5 + 1e-9);
+      }
+    }
+  });
+});
+
+describe('boards without saturation are unchanged (#1930)', () => {
+  it('an all-zero reader equals no reader on a progression board', () => {
+    expect(saturatedBoards(42, 40, 0, satOf({}))).toEqual(saturatedBoards(42, 40, 0, undefined));
+    expect(saturatedBoards(42, 40, 5, satOf({}))).toEqual(saturatedBoards(42, 40, 5, undefined));
+  });
+
+  it('a legacy market ignores saturation', () => {
+    const all1 = satOf(Object.fromEntries(ALL_ORES.map(o => [o, 1])));
+    expect(saturatedBoards(42, 30, 3, all1, 'legacy')).toEqual(saturatedBoards(42, 30, 3, undefined, 'legacy'));
+  });
+
+  it('a board without a buyer grade (campaign) ignores saturation', () => {
+    const all1 = satOf(Object.fromEntries(ALL_ORES.map(o => [o, 1])));
+    expect(saturatedBoards(42, 30, undefined, all1)).toEqual(saturatedBoards(42, 30, undefined, undefined));
+  });
+});
