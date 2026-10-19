@@ -106,6 +106,33 @@
       }
     },
     {
+      "command": "employee hire role:blaster",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "description": "#1977: a spare dual-qualified blaster (blasting plus the charging-truck licence every hired blaster arrives with). A random employee_leaves event (e.g. Ai Replacement 'Automate Mine') can land mid-file, its draw weighted by the safety score; without a spare it can strip the roster of its only truck-licensed blaster and charge orders block on no_dual_qualified_employee for good.",
+      "expect": {
+        "increased": [
+          "employeeCount"
+        ],
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
       "command": "buy explosive:boomite kg:100",
       "interaction": [
         {

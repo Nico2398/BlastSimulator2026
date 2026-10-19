@@ -349,6 +349,33 @@
       ]
     },
     {
+      "command": "employee hire role:blaster",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel button[data-role=\"blaster\"][data-candidate-id]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel button[data-role=\"blaster\"][data-candidate-id]"
+        }
+      ],
+      "description": "#1977: spare blaster. Only the blaster holds blasting plus the truck licence, and a random 'employee leaves' event (AI Replacement's Automate Mine, drawn right after blast 1 in interaction mode) can take him: with nobody dual-qualified blast 2's charge order never loads and the wait stalls. A spare keeps the crew able to charge.",
+      "expect": {
+        "changedBy": {
+          "employeeCount": 1
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
       "command": "build_ramp start:12,34 end:34,34 depth:6",
       "interaction": [
         {
@@ -521,6 +548,55 @@
       "expect": {
         "increased": [
           "orderedChargeCount"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "description": "#1977: bridge sale before blast 2's charges. The crew's payroll keeps running and random event fines (option 0) now land on a different draw, so the cash sat under the bankruptcy threshold for most of the grace window; selling the first ore the hauler has stored resets the clock. Accept an ore sale contract to deliver the stored ore against.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      },
+      "role": "player"
+    },
+    {
+      "command": "contract deliver type:ore_sale fillable:true amount:5000",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel .bs-contract-amount",
+          "value": "5000"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
+        }
+      ],
+      "description": "#1977: bridge sale -- see the accept step above. Deliver at least 5 t of ore: the ore-delivered tracker reaches the grade-1 target.",
+      "expect": {
+        "increased": [
+          "cash"
         ]
       },
       "role": "player"

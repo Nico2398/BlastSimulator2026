@@ -2995,6 +2995,23 @@ export const WB_CROWDING_DRAG_MAX = 0.8;
 /** Well-being drag per tick per accident of the last 10 ticks (about 1.5 points per accident in total); a blast that kills the crew must dent well-being, not zero it. */
 export const WB_ACCIDENT_DRAG = 0.15;
 
+// ── Safety score drivers (#1977) ──
+
+/** Neutral safety equilibrium: the target the score settles at with no building safety effect and no equipment. */
+export const SAFETY_TARGET_BASE = 50;
+/** Safety equilibrium points each unit of building safety effect adds to the target the score is pulled towards. */
+export const SAFETY_TARGET_PER_EFFECT = 12;
+/** Extra safety target points while safety equipment investment exists. */
+export const SAFETY_EQUIPMENT_TARGET_BONUS = 5;
+/** Lowest safety target, however bare the site. */
+export const SAFETY_TARGET_MIN = 10;
+/** Highest safety target, however well equipped the site. */
+export const SAFETY_TARGET_MAX = 90;
+/** Fraction of the gap to the safety target closed per tick. */
+export const SAFETY_PULL_RATE = 0.02;
+/** Safety points lost per accident of the recent window. */
+export const SAFETY_ACCIDENT_HIT = 5;
+
 /** Morale every remaining crew member loses when a colleague is dismissed (not for cause). */
 export const DISMISSAL_CREW_MORALE_DENT = 6;
 
