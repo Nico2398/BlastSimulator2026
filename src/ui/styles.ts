@@ -73,9 +73,46 @@ const CSS = `
 
 /* ─── Permit approval letter (#1926) ───
    Stamp slams in with CSS only; reduced-motion shows it already placed. */
+.bs-permit-approval-letter {
+  position: relative;
+  width: 520px; max-width: 92vw; max-height: 86vh;
+  display: flex; flex-direction: column;
+  border-radius: 9px;
+  background: var(--bsx-panel);
+  border: 1px solid var(--bsx-hairline-strong);
+  box-shadow: 0 30px 80px rgba(0,0,0,.7);
+  overflow: hidden;
+}
+.bs-permit-approval-header {
+  padding: 18px 20px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  border-bottom: 1px solid var(--bsx-hairline);
+}
+.bs-permit-approval-body {
+  padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+  overflow-y: auto;
+}
+.bs-permit-approval-text {
+  margin: 0;
+  font: 400 12px/1.5 var(--bsx-font-ui);
+  color: var(--bsx-text-secondary);
+}
+.bs-permit-approval-grade {
+  font: 800 20px/1.2 var(--bsx-font-ui);
+  color: var(--bsx-text-primary);
+}
+.bs-permit-approval-lines {
+  margin: 0; padding-left: 18px;
+  display: flex; flex-direction: column; gap: 6px;
+  font: 400 12px/1.5 var(--bsx-font-ui);
+  color: var(--bsx-text-secondary);
+}
+.bs-permit-approval-dismiss { margin: 0 20px 20px; }
+/* Stamp sits in the letterhead's empty right side so it never covers body text. */
 .bs-permit-approval-stamp {
   position: absolute;
-  top: 70px;
+  top: 14px;
   right: 22px;
   padding: 4px 12px;
   border: 3px solid var(--bsx-critical-text);

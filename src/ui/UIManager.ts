@@ -301,10 +301,6 @@ export class UIManager {
   showConfirm(config: ConfirmModalConfig): void { this.confirmModal.show(config); }
   get confirmOpen(): boolean { return this.confirmModal.visible; }
   /** True while an event modal is on screen. */
-  /** True while the grade-approval letter is on screen. */
-  get permitApprovalModalVisible(): boolean {
-    return this.permitApprovalModal.visible;
-  }
   get eventModalVisible(): boolean {
     return this.eventModal.visible;
   }

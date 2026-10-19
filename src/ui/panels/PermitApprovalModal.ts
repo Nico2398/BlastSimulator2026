@@ -9,6 +9,9 @@ import { t } from '../../core/i18n/I18n.js';
 import { el } from '../dom.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { gradeDef, unlockLinesFor } from '../../core/economy/MineGrade.js';
+// Side-effect import: registers the permit-limits unlock line that unlockLinesFor lists,
+// so the letter shows it regardless of which module happened to load PermitLimits first.
+import '../../core/economy/PermitLimits.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
@@ -25,32 +28,27 @@ export class PermitApprovalModal {
     this.overlay.style.display = 'none';
 
     const box = el('div', { className: 'bs-permit-approval-letter' });
-    box.style.cssText = 'position:relative;width:520px;max-width:92vw;max-height:86vh;display:flex;flex-direction:column;border-radius:9px;background:var(--bsx-panel);border:1px solid var(--bsx-hairline-strong);box-shadow:0 30px 80px rgba(0,0,0,.7);overflow:hidden';
-
-    const header = el('div');
-    header.style.cssText = 'padding:18px 20px 12px;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid var(--bsx-hairline)';
-    header.append(
+    
+    const header = el('div', { className: 'bs-permit-approval-header' });
+        header.append(
       this.locale.bindText(el('span', { attrs: { style: 'font:800 15px/1 var(--bsx-font-ui);letter-spacing:.08em;color:var(--bsx-amber)' } }), 'progression.approval.ministry'),
       this.locale.bindText(el('span', { attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-micro)' } }), 'progression.approval.letterhead'),
     );
 
-    const body = el('div');
-    body.style.cssText = 'padding:16px 20px;display:flex;flex-direction:column;gap:12px;overflow-y:auto';
-    const text = 'margin:0;font:400 12px/1.5 var(--bsx-font-ui);color:var(--bsx-text-secondary)';
-    this.gradeNameEl = el('div', { className: 'bs-permit-approval-grade', attrs: { style: 'font:800 20px/1.2 var(--bsx-font-ui);color:var(--bsx-text-primary);padding-right:130px' } });
+    const body = el('div', { className: 'bs-permit-approval-body' });
+        this.gradeNameEl = el('div', { className: 'bs-permit-approval-grade', });
     const stamp = this.locale.bindText(el('div', { className: 'bs-permit-approval-stamp' }), 'progression.approval.stamp');
-    this.unlockListEl = el('ul', { className: 'bs-permit-approval-lines', attrs: { style: 'margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font:400 12px/1.5 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } });
+    this.unlockListEl = el('ul', { className: 'bs-permit-approval-lines'});
     body.append(
-      this.locale.bindText(el('p', { attrs: { style: text } }), 'progression.approval.greeting'),
-      this.locale.bindText(el('p', { attrs: { style: text } }), 'progression.approval.body'),
+      this.locale.bindText(el('p', { className: 'bs-permit-approval-text' }), 'progression.approval.greeting'),
+      this.locale.bindText(el('p', { className: 'bs-permit-approval-text' }), 'progression.approval.body'),
       this.gradeNameEl,
       this.locale.bindText(el('div', { attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:var(--bsx-text-micro)' } }), 'progression.approval.unlocks'),
       this.unlockListEl,
     );
 
     const dismiss = el('button', { className: 'bsx-btn bsx-btn-primary bs-btn bs-permit-approval-dismiss' });
-    dismiss.style.cssText = 'margin:0 20px 20px';
-    this.locale.bindText(dismiss, 'progression.approval.dismiss');
+        this.locale.bindText(dismiss, 'progression.approval.dismiss');
     dismiss.addEventListener('click', () => { this.gameConsole?.('permit ack'); });
 
     box.append(header, body, dismiss, stamp);

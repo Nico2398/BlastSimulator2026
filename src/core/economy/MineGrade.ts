@@ -239,7 +239,7 @@ export function shiftPendingApplication(g: GradeState, ticks: number): boolean {
 }
 
 /** Approves a pending application at once, granting the grade (emits only when an emitter is given); false without one (#1927). */
-export function approvePendingApplication(g: GradeState, emitter?: EventEmitter): boolean {
+export function approvePendingApplication(g: GradeState, emitter?: Pick<EventEmitter, 'emit'>): boolean {
   if (!g.pending) return false;
   g.grade = g.pending.toGrade;
   g.pending = null;

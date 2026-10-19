@@ -53,7 +53,8 @@ function limitsUnlockParams(grade: number): Record<string, string | number> {
   const l = permitLimitsFor(grade);
   return { maxChargeKg: l.maxChargeKg, maxHoles: l.maxHoles, fee: formatMoney(l.fee) };
 }
-for (const grade of [1, 2, 3, 4, 5, 'class'] as const) {
+const LIMIT_LINE_GRADES = [...Array.from({ length: LAST_NAMED_GRADE }, (_, i) => i + 1), 'class' as const];
+for (const grade of LIMIT_LINE_GRADES) {
   registerUnlockLine({ grade, leading: true, key: 'progression.unlock.limits', params: limitsUnlockParams });
 }
 

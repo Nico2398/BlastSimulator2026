@@ -31,10 +31,9 @@ describe('PermitApprovalModal (#1926)', () => {
   beforeEach(() => setLocale('en'));
 
   it('is hidden with no pending approval', () => {
-    const { modal, container } = makeModal();
+    const { modal } = makeModal();
     modal.update(makeState(null));
     expect(modal.visible).toBe(false);
-    expect(dismissBtn(container).length === 0 || (dismissBtn(container)[0] as HTMLElement).offsetParent === null || !modal.visible).toBe(true);
   });
 
   it('is hidden when the site has no permit ladder at all', () => {

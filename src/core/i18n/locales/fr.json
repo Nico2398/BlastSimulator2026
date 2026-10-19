@@ -4398,7 +4398,7 @@
   "inspector.ramp.dir_east": "est",
   "inspector.ramp.dir_west": "ouest",
   "shell.selection.ramp_legs": "{legs} tronçons",
-  "progression.unlock.limits": "Par tir : jusqu'à {maxChargeKg} kg de charge et {maxHoles} trous. Frais de notification {fee} $.",
+  "progression.unlock.limits": "Par tir : jusqu'à {maxChargeKg} kg de charge et {maxHoles} trous. Frais de notification ${fee}.",
   "progression.unlock.flavour.1": "Le Ministère des Trous reconnaît officiellement que vous creusez. Il tient à ce que cela soit noté.",
   "progression.unlock.flavour.2": "Votre carrière a désormais un numéro de licence, une plaque et un formulaire pour se plaindre de la plaque.",
   "progression.unlock.flavour.3": "Le Ministère confirme que votre fosse est Industrielle. Les voisins confirment qu'elle est aussi audible.",
