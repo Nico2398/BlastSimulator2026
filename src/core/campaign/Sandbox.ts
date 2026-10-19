@@ -11,7 +11,8 @@
 // at once.
 
 import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
-import { getRock, oresYieldedByRocks } from '../world/RockCatalog.js';
+import { getRock } from '../world/RockCatalog.js';
+import { sandboxOresYieldedByRocks, sandboxOreWindow } from '../world/SandboxDeepOre.js';
 import { getOre } from '../world/OreCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, SANDBOX_STARTING_CASH, type SandboxKitId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET } from '../config/balance.js';
@@ -206,9 +207,11 @@ export function sandboxBiomeTraits(biomeId: string): SandboxBiomeTraits {
   const biome = getBiome(biomeId) ?? getBiome(SANDBOX_DEFAULTS.biome)!;
 
   const tiers = biome.dominantRocks.flatMap(id => getRock(id)?.hardnessTier ?? []);
-  const ores = oresYieldedByRocks(biome.dominantRocks).flatMap(id => {
+  const ores = sandboxOresYieldedByRocks(biome.dominantRocks).flatMap(id => {
     const ore = getOre(id);
-    return ore ? [{ oreId: id, nameKey: ore.nameKey, depthMin: ore.depthMin, depthMax: ore.depthMax }] : [];
+    if (!ore) return [];
+    const [depthMin, depthMax] = sandboxOreWindow(ore);
+    return [{ oreId: id, nameKey: ore.nameKey, depthMin, depthMax }];
   });
 
   const ruggedness: SandboxRuggedness =
