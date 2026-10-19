@@ -21,7 +21,7 @@ import math
 import random
 
 from common import (
-    array, assign, bevel, box, capsule, cylinder, icosphere, pivot, prism, rotate, sphere, torus,
+    array, assign, bevel, box, capsule, cylinder, icosphere, pivot, prism, sphere, torus, yawed,
 )
 
 TOWER_SHAFT_H = 6.4        # wall height above the podium
@@ -40,7 +40,7 @@ def _put(parts, ob, mat, bev=None):
     return ob
 
 
-def _blob(radius: float, wobble: float, seed: int, n: int = 16):
+def _wobbly_outline(radius: float, wobble: float, seed: int, n: int = 16):
     """A lumpy closed outline: n points, radius jittered by a seeded wobble."""
     rng = random.Random(seed)
     return [(math.cos(2 * math.pi * i / n) * radius * (1 + rng.uniform(-wobble, wobble)),
@@ -76,6 +76,24 @@ def build_ceo_statue(sx, sz, tier, ex, xx, m):
     pivot('Body', (0, 0, 0), parts)
 
 
+def _sad_cart(m, x=-1.9, y=2.0, yaw=25.0):
+    """Golf cart tilted on a flat tyre, one wheel gone, roof sagging; built at the origin then placed as a group."""
+    cart = []
+    cz = GOLF_SLAB_H
+    _put(cart, box('CartBody', (1.0, 0.55, 0.28), loc=(0, 0, cz + 0.32)), m['white'], (0.05, 2))
+    _put(cart, box('CartSeat', (0.4, 0.45, 0.3), loc=(-0.15, 0, cz + 0.6)), m['dark'], (0.04, 2))
+    for i, (px, py) in enumerate(((-0.4, -0.3), (0.4, -0.3), (0.4, 0.3))):
+        r = 0.17 if i != 1 else 0.11
+        _put(cart, cylinder(f'CartWheel{i}', r, 0.1, loc=(px, py, cz + r), axis='Y', segments=12), m['stripe_k'])
+    for i, (px, py) in enumerate(((-0.45, -0.25), (-0.45, 0.25), (0.15, -0.25), (0.15, 0.25))):
+        _put(cart, cylinder(f'CartPost{i}', 0.025, 0.55, loc=(px, py, cz + 0.8), segments=6), m['steel'])
+    _put(cart, box('CartRoof', (0.75, 0.6, 0.05), loc=(-0.15, 0, cz + 1.1), rot=(8, 0, 0)), m['red'])
+    for ob in cart:
+        ob.location.x, ob.location.y = yawed((x, y, 0), yaw, (ob.location.x, ob.location.y, 0))[:2]
+        ob.rotation_euler.z += math.radians(yaw)
+    return cart
+
+
 def build_golf_course(sx, sz, tier, ex, xx, m):
     parts = []
     s = min(sx, sz) - 0.1
@@ -89,42 +107,17 @@ def build_golf_course(sx, sz, tier, ex, xx, m):
                          scale=(1, 1, 0.65))
         _put(parts, rock, m['rubble2'] if i % 2 else m['rock'])
     lawn_z = GOLF_SLAB_H
-    _put(parts, prism('Lawn', _blob(s * 0.38, 0.1, 7), GOLF_LAWN_H, loc=(0, 0, lawn_z + GOLF_LAWN_H / 2), axis='Z'),
+    _put(parts, prism('Lawn', _wobbly_outline(s * 0.38, 0.1, 7), GOLF_LAWN_H, loc=(0, 0, lawn_z + GOLF_LAWN_H / 2), axis='Z'),
          m['body'], (0.05, 2))
     top = lawn_z + GOLF_LAWN_H
-    _put(parts, prism('PuttingGreen', _blob(0.95, 0.06, 3), 0.04, loc=(0.9, 0.7, top + 0.02), axis='Z'), m['green'])
-    _put(parts, prism('BunkerRim', _blob(0.8, 0.08, 5), 0.06, loc=(-0.9, -0.5, top + 0.03), axis='Z'), m['stripe_k'])
-    _put(parts, prism('Sand', _blob(0.7, 0.08, 6), 0.08, loc=(-0.9, -0.5, top + 0.04), axis='Z'), m['sand'])
+    _put(parts, prism('PuttingGreen', _wobbly_outline(0.95, 0.06, 3), 0.04, loc=(0.9, 0.7, top + 0.02), axis='Z'), m['green'])
+    _put(parts, prism('BunkerRim', _wobbly_outline(0.8, 0.08, 5), 0.06, loc=(-0.9, -0.5, top + 0.03), axis='Z'), m['stripe_k'])
+    _put(parts, prism('Sand', _wobbly_outline(0.7, 0.08, 6), 0.08, loc=(-0.9, -0.5, top + 0.04), axis='Z'), m['sand'])
     _put(parts, cylinder('Hole', 0.1, 0.02, loc=(0.9, 0.7, top + 0.05), segments=10), m['dark'])
     _put(parts, cylinder('FlagPole', 0.03, 1.3, loc=(0.9, 0.7, top + 0.65), segments=8), m['white'])
     _put(parts, prism('Flag', [(0, 0), (0.55, 0.14), (0, 0.28)], 0.03, loc=(0.9, 0.7, top + 1.0), axis='Y'), m['red'])
-    # The sad golf cart: tilted on a flat tyre, one wheel gone, roof sagging.
-    cx, cy, rz = -1.9, 2.0, 25.0
-    cart = []
-    cz = GOLF_SLAB_H
-    cart.append(box('CartBody', (1.0, 0.55, 0.28), loc=(0, 0, cz + 0.32)))
-    assign(cart[-1], m['white']); bevel(cart[-1], 0.05, 2)
-    cart.append(box('CartSeat', (0.4, 0.45, 0.3), loc=(-0.15, 0, cz + 0.6)))
-    assign(cart[-1], m['dark']); bevel(cart[-1], 0.04, 2)
-    for i, (px, py) in enumerate(((-0.4, -0.3), (0.4, -0.3), (0.4, 0.3))):
-        wheel = cylinder(f'CartWheel{i}', 0.17 if i != 1 else 0.11, 0.1, loc=(px, py, cz + (0.17 if i != 1 else 0.11)),
-                         axis='Y', segments=12)
-        assign(wheel, m['stripe_k']); cart.append(wheel)
-    for i, (px, py) in enumerate(((-0.45, -0.25), (-0.45, 0.25), (0.15, -0.25), (0.15, 0.25))):
-        post = cylinder(f'CartPost{i}', 0.025, 0.55, loc=(px, py, cz + 0.8), segments=6)
-        assign(post, m['steel']); cart.append(post)
-    roof = box('CartRoof', (0.75, 0.6, 0.05), loc=(-0.15, 0, cz + 1.1), rot=(8, 0, 0))
-    assign(roof, m['red']); cart.append(roof)
-    for ob in cart:                             # tilt/place the whole cart as one group
-        ob.location.x, ob.location.y = _rot(ob.location.x, ob.location.y, rz, cx, cy)
-        ob.rotation_euler.z += math.radians(rz)
-    parts += cart
+    parts += _sad_cart(m)
     pivot('Body', (0, 0, 0), parts)
-
-
-def _rot(x, y, deg, ox, oy):
-    c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
-    return x * c - y * s + ox, x * s + y * c + oy
 
 
 def build_executive_helipad(sx, sz, tier, ex, xx, m):
@@ -137,10 +130,9 @@ def build_executive_helipad(sx, sz, tier, ex, xx, m):
     for name, size, loc in (('HBarL', (0.22, 1.2, 0.05), (-0.45, 0, 0)), ('HBarR', (0.22, 1.2, 0.05), (0.45, 0, 0)),
                             ('HBarMid', (1.1, 0.22, 0.05), (0, 0, 0))):
         _put(parts, box(name, size, loc=(loc[0], loc[1], top + 0.07)), m['white'])
-    lights = []
     for i, (lx, ly) in enumerate(((1, 1), (-1, 1), (1, -1), (-1, -1), (0, 1), (0, -1), (1, 0), (-1, 0))):
-        lights.append(_put(parts, sphere(f'EdgeLight{i}', 0.09, loc=(lx * (s / 2 - 0.12), ly * (s / 2 - 0.12), top + 0.07),
-                                         segments=8, rings=4), m['lamp']))
+        _put(parts, sphere(f'EdgeLight{i}', 0.09, loc=(lx * (s / 2 - 0.12), ly * (s / 2 - 0.12), top + 0.07),
+                           segments=8, rings=4), m['lamp'])
     # Windsock on a pole in the back corner.
     px, py = -s / 2 + 0.25, -s / 2 + 0.25
     _put(parts, cylinder('WindPole', 0.035, 1.5, loc=(px, py, top + 0.75), segments=8), m['steel'])

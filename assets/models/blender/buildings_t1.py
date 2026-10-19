@@ -30,7 +30,7 @@ from mathutils import Matrix, Vector
 
 from common import (
     array, assign, bevel, box, capsule, cylinder, displace, hex_rgb, icosphere, material, pivot, prism, rotate,
-    solidify, sphere, srgb_to_linear, torus,
+    solidify, sphere, srgb_to_linear, torus, yawed,
 )
 import buildings as B
 
@@ -91,13 +91,6 @@ def _t1_materials(btype: str, m: dict) -> dict:
 def _shift(ob, vec) -> None:
     """Translate the mesh data so the object origin (its pivot) lands elsewhere on it."""
     ob.data.transform(Matrix.Translation(Vector(vec)))
-
-
-def _yawed(origin, yaw: float, local) -> tuple[float, float, float]:
-    """World position of `local` (x, y, z) rotated by `yaw` degrees about Z around `origin`."""
-    c, s = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
-    x, y, z = local
-    return (origin[0] + x * c - y * s, origin[1] + x * s + y * c, origin[2] + z)
 
 
 # Capital letters as strokes on a 3 × 5 grid, (x, y) with y up.
@@ -344,7 +337,7 @@ def swing_door(name: str, x: float, y_face: float, z0: float, m, frame_mat, widt
     rz = -hinge * facing * swing
     leaf.rotation_euler = (0, 0, math.radians(rz))
     assign(leaf, leaf_mat or m['door'])
-    knob = sphere(f'{name}.Knob', 0.03, loc=_yawed((hx, y_face + facing * 0.05, z0 + height * 0.5), rz,
+    knob = sphere(f'{name}.Knob', 0.03, loc=yawed((hx, y_face + facing * 0.05, z0 + height * 0.5), rz,
                                                     (-hinge * (width - 0.1), facing * 0.045, 0)), segments=10, rings=5)
     assign(knob, m['chrome'])
     out += [leaf, knob]
@@ -371,7 +364,7 @@ def wreck_car(name: str, loc, m, yaw: float = 0.0, body_mat=None, missing=(1, 1)
     def P(local):
         # Part centres follow the sag: roll drops the +Y side, pitch drops the +X side, then yaw.
         x, y, z = local
-        return _yawed(loc, yaw, (x, y, z + y * math.sin(math.radians(roll)) - x * math.sin(math.radians(pitch))))
+        return yawed(loc, yaw, (x, y, z + y * math.sin(math.radians(roll)) - x * math.sin(math.radians(pitch))))
 
     def R(extra=(0, 0, 0)):
         return (roll + extra[0], pitch + extra[1], yaw + extra[2])
@@ -418,11 +411,11 @@ def wreck_car(name: str, loc, m, yaw: float = 0.0, body_mat=None, missing=(1, 1)
             gone = (sx_, sy_) == tuple(missing) or not wheels
             if gone:
                 if bricks:
-                    out += brick(f'{name}.Prop', _yawed(loc, yaw, (wx, sy_ * (W / 2 - 0.12), 0)), m, yaw=yaw + 8)
-                    out += brick(f'{name}.Prop2', _yawed(loc, yaw, (wx, sy_ * (W / 2 - 0.12), 0.08)), m, yaw=yaw - 6)
+                    out += brick(f'{name}.Prop', yawed(loc, yaw, (wx, sy_ * (W / 2 - 0.12), 0)), m, yaw=yaw + 8)
+                    out += brick(f'{name}.Prop2', yawed(loc, yaw, (wx, sy_ * (W / 2 - 0.12), 0.08)), m, yaw=yaw - 6)
                 continue
-            out += tyre(f'{name}.Wheel{sx_}{sy_}', _yawed(loc, yaw, (wx, wy, wr)), m, r=wr * 0.72, rot=(90, 0, yaw))
-            hub = cylinder(f'{name}.Hub', wr * 0.35, 0.09, loc=_yawed(loc, yaw, (wx, wy, wr)), axis='Y', segments=10,
+            out += tyre(f'{name}.Wheel{sx_}{sy_}', yawed(loc, yaw, (wx, wy, wr)), m, r=wr * 0.72, rot=(90, 0, yaw))
+            hub = cylinder(f'{name}.Hub', wr * 0.35, 0.09, loc=yawed(loc, yaw, (wx, wy, wr)), axis='Y', segments=10,
                            rot=(0, 0, yaw))
             assign(hub, m['chrome'])
             out.append(hub)
@@ -431,12 +424,12 @@ def wreck_car(name: str, loc, m, yaw: float = 0.0, body_mat=None, missing=(1, 1)
 
 def cone_down(name: str, loc, m, yaw: float = 0.0) -> list:
     """A traffic cone knocked over on its side, tip pointing along local +X."""
-    c = cylinder(f'{name}.Cone', 0.15, 0.4, loc=_yawed(loc, yaw, (0.12, 0, 0.15)), axis='X', segments=14,
+    c = cylinder(f'{name}.Cone', 0.15, 0.4, loc=yawed(loc, yaw, (0.12, 0, 0.15)), axis='X', segments=14,
                  radius2=0.04, rot=(0, 0, yaw))
     assign(c, m['cone'])
-    base = box(f'{name}.Base', (0.04, 0.32, 0.32), loc=_yawed(loc, yaw, (-0.1, 0, 0.16)), rot=(0, 0, yaw))
+    base = box(f'{name}.Base', (0.04, 0.32, 0.32), loc=yawed(loc, yaw, (-0.1, 0, 0.16)), rot=(0, 0, yaw))
     assign(base, m['dark'])
-    band = cylinder(f'{name}.Band', 0.115, 0.08, loc=_yawed(loc, yaw, (0.18, 0, 0.15)), axis='X', segments=14,
+    band = cylinder(f'{name}.Band', 0.115, 0.08, loc=yawed(loc, yaw, (0.18, 0, 0.15)), axis='X', segments=14,
                     radius2=0.09, rot=(0, 0, yaw))
     assign(band, m['white'])
     return [c, base, band]
@@ -1087,7 +1080,7 @@ def build_geology_lab(sx, sz, ex, xx, m):
     wbx, wby, wyaw = sx / 2 + 0.05, sz / 2 + 0.25, -35
 
     def P(local):
-        return _yawed((wbx, wby, 0), wyaw, local)
+        return yawed((wbx, wby, 0), wyaw, local)
 
     tub = box('Barrow.Tub', (0.62, 0.44, 0.3), loc=P((0, 0, 0.36)), rot=(0, -10, wyaw))
     bevel(tub, 0.07, 3)
@@ -1227,7 +1220,7 @@ def build_living_quarters(sx, sz, ex, xx, m):
         n = max(4, round(length / 0.16))
         for k in range(n + 1):
             t = (k / n) - 0.5
-            bx, by = _yawed((cx, cy_, 0), yaw, (t * length, 0, 0))[:2]
+            bx, by = yawed((cx, cy_, 0), yaw, (t * length, 0, 0))[:2]
             bar = cylinder(f'{name}.Bar{k}', 0.025, bar_h, loc=(bx, by, z0 + kick_h + bar_h / 2), axis='Z',
                           segments=6)
             assign(bar, m['rust'] if k % 6 == 0 else m['body'])
@@ -1383,7 +1376,7 @@ def build_explosive_warehouse(sx, sz, ex, xx, m):
     bevel(board, 0.02, 2)
     assign(board, m['stripe_y'])
     parts.append(board)
-    parts += text('Danger', '!', _yawed((-w / 2 - 0.3, yf + 0.11, 0.62), 24, (0, 0, 0)), 0.2, m['stripe_k'], yaw=24)
+    parts += text('Danger', '!', yawed((-w / 2 - 0.3, yf + 0.11, 0.62), 24, (0, 0, 0)), 0.2, m['stripe_k'], yaw=24)
     post = cylinder('Danger.Post', 0.03, 0.62, loc=(-w / 2 - 0.3, yf + 0.16, 0.31), segments=6)
     assign(post, m['plank2'])
     parts.append(post)
@@ -1520,7 +1513,7 @@ def build_spoil_heap(sx, sz, ex, xx, m):
     bevel(board, 0.02, 2)
     assign(board, m['plank'])
     parts += [post, board]
-    parts += text('SignText', 'THE DUMP', _yawed((bx, by - 0.04, bz), lean, (0, 0, 0)), 0.15, m['red'], yaw=lean)
+    parts += text('SignText', 'THE DUMP', yawed((bx, by - 0.04, bz), lean, (0, 0, 0)), 0.15, m['red'], yaw=lean)
     # A rusty barrel tipped over by the side, and a tyre half-sunk in the heap's flank.
     barrel_ = cylinder('Barrel', 0.2, 0.5, loc=(-0.78, -0.9, z0 + 0.2), axis='X', segments=14, rot=(0, 0, -35))
     bevel(barrel_, 0.025, 2)

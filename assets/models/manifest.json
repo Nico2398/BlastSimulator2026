@@ -316,7 +316,7 @@
       }
     },
     "building_ceo_statue_t1": {
-      "builder": "buildings_t1.py",
+      "builder": "buildings_vanity.py",
       "triangles": 2520,
       "glbKb": 53,
       "size": [
@@ -675,7 +675,7 @@
       }
     },
     "building_executive_helipad_t1": {
-      "builder": "buildings_t1.py",
+      "builder": "buildings_vanity.py",
       "triangles": 1204,
       "glbKb": 41,
       "size": [
@@ -1611,7 +1611,7 @@
       }
     },
     "building_gold_tower_t1": {
-      "builder": "buildings_t1.py",
+      "builder": "buildings_vanity.py",
       "triangles": 1776,
       "glbKb": 52,
       "size": [
@@ -1662,7 +1662,7 @@
       }
     },
     "building_golf_course_t1": {
-      "builder": "buildings_t1.py",
+      "builder": "buildings_vanity.py",
       "triangles": 1444,
       "glbKb": 55,
       "size": [

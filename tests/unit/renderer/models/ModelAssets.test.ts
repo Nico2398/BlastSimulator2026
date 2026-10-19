@@ -27,6 +27,8 @@ const MAX_ASSET_KB = 400;
  * added, so the ceiling is on the transfer size instead.
  */
 const MAX_TRANSFER_MB = 4;
+/** Triangle ceiling of the building family (tier 3 is the heaviest, 13.2 k measured; see dev-3d-models). */
+const MAX_BUILDING_TRIS = 13200;
 /** Raw bytes still get a loose ceiling, so a runaway model count trips something. */
 const MAX_TOTAL_MB = 16;
 
@@ -139,6 +141,8 @@ describe('public/models', () => {
   });
 
   describe('vanity project models (#1948)', () => {
+    /** Vanity parts may overhang the footprint a little (carpet ramp, boulders, tilted cart). */
+    const FOOTPRINT_OVERHANG = 1.0;
     const VANITY = ['ceo_statue', 'golf_course', 'executive_helipad', 'gold_tower'] as const;
     const height = (type: BuildingType): number =>
       library.instantiate(buildingModelId(type, 1), { size: [1, 1, 1] }).bounds.getSize(new THREE.Vector3()).y;
@@ -181,14 +185,14 @@ describe('public/models', () => {
         expect(inst.bounds.min.y).toBeCloseTo(0, 1);
         const { sizeX, sizeZ } = getFootprintSize(BUILDING_DEFS[type][1].footprint);
         const size = inst.bounds.getSize(new THREE.Vector3());
-        expect(size.x, 'width').toBeLessThanOrEqual(sizeX + 2.2);
-        expect(size.z, 'depth').toBeLessThanOrEqual(sizeZ + 2.2);
+        expect(size.x, 'width').toBeLessThanOrEqual(sizeX + FOOTPRINT_OVERHANG);
+        expect(size.z, 'depth').toBeLessThanOrEqual(sizeZ + FOOTPRINT_OVERHANG);
         expect(size.y, 'height').toBeGreaterThan(0.3);
         expect(library.prototype(id)!.root.children.map(c => c.name)).toEqual(['Body']);
       });
 
       it(`${type}: stays under the triangle budget`, () => {
-        expect(countTris(library.prototype(id)!.root)).toBeLessThanOrEqual(13200);
+        expect(countTris(library.prototype(id)!.root)).toBeLessThanOrEqual(MAX_BUILDING_TRIS);
       });
     }
 

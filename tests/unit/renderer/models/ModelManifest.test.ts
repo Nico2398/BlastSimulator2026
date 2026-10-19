@@ -42,5 +42,8 @@ describe('assets/models/manifest.json', () => {
     expect(models['building_spoil_heap_t3']).toBeUndefined();
     expect(models['building_ruin']!.builder).toBe('buildings.py');
     expect(models['prop_grass_0']!.builder).toBe('props.py');
+    for (const id of ['ceo_statue', 'golf_course', 'executive_helipad', 'gold_tower']) {
+      expect(models[`building_${id}_t1`]!.builder, id).toBe('buildings_vanity.py');
+    }
   });
 });
