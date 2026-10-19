@@ -5,6 +5,7 @@ import { registerUnlockLine } from './MineGrade.js';
 import {
   BUYER_SUPPLY_QTY_FACTOR, BUYER_TIER_WEIGHT, BUYER_REF_HAUL_KG_PER_TICK,
   BUYER_DEADLINE_MARGIN, BUYER_DEADLINE_SPAN_RATIO, BUYER_SUPPLY_DISCOUNT,
+  BUYER_UNLOCK_GRADE, BUYER_ORE_SALE_QTY_KG, BUYER_QTY_STEP_KG, BUYER_PRICE_FACTOR,
 } from '../config/balance.js';
 
 export type BuyerTierId = 'local' | 'regional' | 'national' | 'global';
@@ -25,21 +26,21 @@ export interface BuyerTier {
   refHaulKgPerTick: number;
 }
 
-function tier(
-  id: BuyerTierId, unlockGrade: number, oreSaleQtyKg: MarketRange, stepKg: number, priceFactor: MarketRange,
-): BuyerTier {
+function tier(id: BuyerTierId): BuyerTier {
   return {
-    id, nameKey: `economy.buyer.${id}`, unlockGrade, oreSaleQtyKg, stepKg, priceFactor,
-    supplyQtyFactor: BUYER_SUPPLY_QTY_FACTOR[id], weight: BUYER_TIER_WEIGHT[id], refHaulKgPerTick: BUYER_REF_HAUL_KG_PER_TICK[id],
+    id, nameKey: `economy.buyer.${id}`, unlockGrade: BUYER_UNLOCK_GRADE[id], oreSaleQtyKg: BUYER_ORE_SALE_QTY_KG[id],
+    stepKg: BUYER_QTY_STEP_KG[id], priceFactor: BUYER_PRICE_FACTOR[id], supplyQtyFactor: BUYER_SUPPLY_QTY_FACTOR[id],
+    weight: BUYER_TIER_WEIGHT[id], refHaulKgPerTick: BUYER_REF_HAUL_KG_PER_TICK[id],
   };
 }
 
-export const BUYER_TIERS: readonly BuyerTier[] = [
-  tier('local', 0, { min: 100, max: 1_000 }, 100, { min: 1.15, max: 1.3 }),
-  tier('regional', 1, { min: 1_000, max: 5_000 }, 250, { min: 0.95, max: 1.1 }),
-  tier('national', 3, { min: 10_000, max: 40_000 }, 1_000, { min: 0.85, max: 1.0 }),
-  tier('global', 5, { min: 50_000, max: 250_000 }, 5_000, { min: 0.75, max: 0.95 }),
-];
+/** Ascending unlock grade. */
+export const BUYER_TIERS: readonly BuyerTier[] = (['local', 'regional', 'national', 'global'] as const).map(tier);
+
+/** i18n key of a tier's display name. */
+export function buyerTierNameKey(id: BuyerTierId): string {
+  return BUYER_TIERS.find(t => t.id === id)!.nameKey;
+}
 
 for (const t of BUYER_TIERS) {
   if (t.unlockGrade > 0) registerUnlockLine({ grade: t.unlockGrade, key: `progression.unlock.buyer.${t.id}` });

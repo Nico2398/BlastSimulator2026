@@ -2907,6 +2907,24 @@ export const PRODUCTION_ORE_SALE_QTY_KG = { min: 250, max: 2_000 } as const;
 export const PRODUCTION_SUPPLY_QTY_KG = { min: 4_000, max: 8_000 } as const;
 /** Supply quantity multiplier on `PRODUCTION_SUPPLY_QTY_KG` per buyer tier (#1929). */
 export const BUYER_SUPPLY_QTY_FACTOR = { local: 0.5, regional: 1, national: 6, global: 25 } as const;
+/** Mine grade at which each buyer tier starts offering contracts (#1929). */
+export const BUYER_UNLOCK_GRADE = { local: 0, regional: 1, national: 3, global: 5 } as const;
+/** Ore-sale lot size range (kg) per buyer tier (#1929); local lots are 100-1000 kg by design. */
+export const BUYER_ORE_SALE_QTY_KG = {
+  local: { min: 100, max: 1_000 },
+  regional: { min: 1_000, max: 5_000 },
+  national: { min: 10_000, max: 40_000 },
+  global: { min: 50_000, max: 250_000 },
+} as const;
+/** Quantity rounding step (kg) per buyer tier (#1929). */
+export const BUYER_QTY_STEP_KG = { local: 100, regional: 250, national: 1_000, global: 5_000 } as const;
+/** Price factor range (against the ore's market base price) per buyer tier; richer for small local buyers (#1929). */
+export const BUYER_PRICE_FACTOR = {
+  local: { min: 1.15, max: 1.3 },
+  regional: { min: 0.95, max: 1.1 },
+  national: { min: 0.85, max: 1.0 },
+  global: { min: 0.75, max: 0.95 },
+} as const;
 /** Relative chance of each buyer tier among the unlocked ones (#1929). */
 export const BUYER_TIER_WEIGHT = { local: 0.35, regional: 0.35, national: 0.2, global: 0.1 } as const;
 /**

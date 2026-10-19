@@ -179,11 +179,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   const buyer = tieredBuyer(state, rng, buyerGrade);
   const materialId = rng.pick(commonOres(availableOres, market)); // Only the site's cheapest ores for supply
   if (buyer) {
-    const qty = buyerSupplyQtyRange(buyer, profile.supplyQtyKg);
-    const base = oreContractBasePrice(materialId, market) * buyerPriceFactor(buyer, 'supply', rng);
-    const offer = rollOffer(state, rng, priceMultiplier, 'supply', materialId, `Supply ${materialId} (bulk)`, base, qty, buyerDeadlineRange(qty.max, buyer.refHaulKgPerTick), buyer.stepKg);
-    offer.buyerTier = buyer.id;
-    return offer;
+    return rollTieredOffer(state, rng, priceMultiplier, buyer, 'supply', materialId, `Supply ${materialId} (bulk)`, buyerSupplyQtyRange(buyer, profile.supplyQtyKg));
   }
   const basePricePerKg = oreContractBasePrice(materialId, market) * rng.nextFloat(profile.supplyPriceFactor.min, profile.supplyPriceFactor.max);
   return rollOffer(state, rng, priceMultiplier, 'supply', materialId, `Supply ${materialId} (bulk)`, basePricePerKg, profile.supplyQtyKg, profile.supplyDeadlineTicks, profile.qtyStepKg);
@@ -195,6 +191,20 @@ function tieredBuyer(state: ContractState, rng: Random, buyerGrade: number | und
   return pickBuyerTier(rng, buyerGrade);
 }
 
+/**
+ * An ore offer posted by a buyer tier: price factor, then quantity and a deadline the tier's
+ * reference haul rate can meet for the biggest lot, stamped with the tier.
+ */
+function rollTieredOffer(
+  state: ContractState, rng: Random, priceMultiplier: number, buyer: BuyerTier,
+  type: 'ore_sale' | 'supply', materialId: string, description: string, qtyRange: MarketRange,
+): Contract {
+  const base = oreContractBasePrice(materialId, state.market) * buyerPriceFactor(buyer, type, rng);
+  const offer = rollOffer(state, rng, priceMultiplier, type, materialId, description, base, qtyRange, buyerDeadlineRange(qtyRange.max, buyer.refHaulKgPerTick), buyer.stepKg);
+  offer.buyerTier = buyer.id;
+  return offer;
+}
+
 /** An ore-sale offer for one of the site's ores. */
 function generateOreSaleOffer(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], buyerGrade?: number): Contract {
   const market = state.market;
@@ -203,10 +213,7 @@ function generateOreSaleOffer(state: ContractState, rng: Random, priceMultiplier
   const materialId = rng.pick(availableOres);
   const description = `Deliver ${materialId} ore`;
   if (buyer) {
-    const base = oreContractBasePrice(materialId, market) * buyerPriceFactor(buyer, 'ore_sale', rng);
-    const offer = rollOffer(state, rng, priceMultiplier, 'ore_sale', materialId, description, base, buyer.oreSaleQtyKg, buyerDeadlineRange(buyer.oreSaleQtyKg.max, buyer.refHaulKgPerTick), buyer.stepKg);
-    offer.buyerTier = buyer.id;
-    return offer;
+    return rollTieredOffer(state, rng, priceMultiplier, buyer, 'ore_sale', materialId, description, buyer.oreSaleQtyKg);
   }
   const basePricePerKg = oreContractBasePrice(materialId, market) * rng.nextFloat(profile.oreSalePriceFactor.min, profile.oreSalePriceFactor.max);
   return rollOffer(state, rng, priceMultiplier, 'ore_sale', materialId, description, basePricePerKg, profile.oreSaleQtyKg, LEGACY_OFFER_DEADLINE_TICKS, profile.qtyStepKg);

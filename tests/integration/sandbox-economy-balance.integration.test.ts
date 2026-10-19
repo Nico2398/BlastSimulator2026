@@ -161,6 +161,38 @@ describe('sandbox economy: contract board offer volume against a shot', () => {
     expect(production).toBeGreaterThanOrEqual(3 * legacy);
   });
 
+  // #1929: the progression sandbox's board is tiered (grade 0 = local buyer only). The untiered pin above
+  // measures the production profile; the tiered board offers 100-1000 kg lots BY DESIGN, so its kg volume
+  // differs from both the untiered and the legacy board. Pinned here as kg volume and value per offer.
+  it('tiered grade-0 ore-sale board: smaller lots than the untiered board, richer value per kg than legacy (#1929)', () => {
+    const tiered = (seed: number) => {
+      const board = createContractState();
+      board.market = ctx.state!.contracts.market ?? 'production';
+      const rng = new Random(seed);
+      const seen: typeof board.available = [];
+      const refreshes = Math.ceil((ABSORB_DAYS * TICKS_PER_DAY) / CONTRACT_REFRESH_INTERVAL);
+      for (let i = 0; i < refreshes; i++) {
+        generateContracts(board, rng, i * CONTRACT_REFRESH_INTERVAL, 1, ores, Infinity, 0);
+        seen.push(...board.available.slice(-3));
+      }
+      return seen.filter(c => c.type === 'ore_sale' && oreKg[c.materialId] !== undefined);
+    };
+    const legacyOf = (seed: number) => offersOver(seed, 'legacy').filter(c => c.type === 'ore_sale' && oreKg[c.materialId] !== undefined);
+    const seeds = Array.from({ length: BOARD_SEEDS }, (_, i) => 1000 + i);
+    const tieredOffers = seeds.flatMap(tiered);
+    const legacyOffers = seeds.flatMap(legacyOf);
+    const untieredKg = sum(boards.map(b => sum(b.filter(c => c.type === 'ore_sale' && oreKg[c.materialId] !== undefined).map(c => c.quantityKg))));
+    const tieredKg = sum(tieredOffers.map(c => c.quantityKg));
+    const legacyKg = sum(legacyOffers.map(c => c.quantityKg));
+    expect(tieredOffers.length).toBeGreaterThan(0);
+    // Volume: 100-1000 kg lots sit below the untiered 250-2000 kg lots but above the legacy lots.
+    expect(tieredKg).toBeLessThan(untieredKg);
+    expect(tieredKg).toBeGreaterThanOrEqual(legacyKg);
+    // Value per offer: the local buyer's price factor (1.15-1.3) keeps a tiered offer at least as valuable as a legacy one.
+    const valuePerOffer = (offers: typeof tieredOffers) => sum(offers.map(c => c.quantityKg * c.pricePerKg)) / offers.length;
+    expect(valuePerOffer(tieredOffers)).toBeGreaterThanOrEqual(valuePerOffer(legacyOffers));
+  });
+
   // #1892: rubble offers are sized to the barren rock the site holds, so each one can be filled. Cheap
   // clearances take at most RUBBLE_CHEAP_STOCK_SHARE_MAX of the stock, paid ones at most RUBBLE_PAID_STOCK_SHARE_MAX.
   it('rubble disposal offers never exceed the barren rock the site holds, and both kinds appear', () => {

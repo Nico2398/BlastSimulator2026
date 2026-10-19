@@ -33,6 +33,7 @@ import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
 import { resolveContractOres, resolveScriptedOreSale } from '../../core/campaign/Level.js';
+import { buyerTierNameKey } from '../../core/economy/BuyerTiers.js';
 
 // ── finances command ──
 
@@ -158,7 +159,7 @@ export function contractCommand(
       for (const c of state.contracts.available) {
         lines.push(
           `  [${c.id}] ${c.description} — ${c.quantityKg}kg @ $${c.pricePerKg.toFixed(2)}/kg` +
-          (c.buyerTier ? ` | buyer: ${t(`economy.buyer.${c.buyerTier}`)}` : '') +
+          (c.buyerTier ? ` | buyer: ${t(buyerTierNameKey(c.buyerTier))}` : '') +
           ` | deadline: ${c.deadlineTicks} ticks | penalty: $${c.penaltyAmount}`,
         );
       }
