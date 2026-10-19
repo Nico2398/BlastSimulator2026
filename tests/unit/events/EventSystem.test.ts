@@ -152,14 +152,14 @@ describe('Event system engine', () => {
     const unionTimer = state.timers.find(t => t.category === 'union')!;
 
     // Fire the event once
-    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    state.actionCountSinceEvent = state.unionActionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
     unionTimer.remaining = 1;
     const first = tickEventSystem(state, makeCtx({ tickCount: 200 }), new Random(42));
     expect(first?.eventId).toBe('once_only');
     clearPendingEvent(state);
 
     // Attempt to fire again
-    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    state.actionCountSinceEvent = state.unionActionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
     unionTimer.remaining = 1;
     const second = tickEventSystem(state, makeCtx({ tickCount: 400 }), new Random(42));
     expect(second).toBeNull();
@@ -235,7 +235,7 @@ describe('Event system engine', () => {
     const unionTimer = state.timers.find(t => t.category === 'union')!;
 
     // Low well-being → shorter interval
-    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    state.actionCountSinceEvent = state.unionActionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
     unionTimer.remaining = 1;
     const lowCtx = makeCtx({ scores: { ...createScoreState(), wellBeing: 10 }, tickCount: 200 });
     tickEventSystem(state, lowCtx, new Random(42));
@@ -243,7 +243,7 @@ describe('Event system engine', () => {
     const shortInterval = unionTimer.remaining;
 
     // Reset and try with high well-being
-    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    state.actionCountSinceEvent = state.unionActionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
     unionTimer.remaining = 1;
     const highCtx = makeCtx({ scores: { ...createScoreState(), wellBeing: 90 }, tickCount: 400 });
     tickEventSystem(state, highCtx, new Random(42));
@@ -422,7 +422,7 @@ describe('Event system engine', () => {
     // Register an event that would normally fire
     registerEvents([makeEvent('suppressed_test', 'union')]);
     const unionTimer = state.timers.find(t => t.category === 'union')!;
-    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    state.actionCountSinceEvent = state.unionActionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
     unionTimer.remaining = 1;
 
     const ctx = makeCtx({ tickCount: 200 });
@@ -435,7 +435,7 @@ describe('Event system engine', () => {
     registerEvents([makeEvent('normal_test', 'union')]);
     const state = createEventSystemState(1); // default but explicit
     const unionTimer = state.timers.find(t => t.category === 'union')!;
-    state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    state.actionCountSinceEvent = state.unionActionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
     unionTimer.remaining = 1;
 
     const ctx = makeCtx({ tickCount: 200 });
@@ -779,7 +779,8 @@ describe('union events keep their own cooldown clock (#1907)', () => {
     state.unionCooldownMinIntervalTicks = CACHED;
     state.lastUnionEventTick = 0;
     state.lastEventTick = elapsed; // shared cooldown just reset: must not matter
-    state.actionCountSinceEvent = 0; // below MIN_EVENT_INTERVAL_ACTIONS: must not matter
+    state.actionCountSinceEvent = 0; // shared action count below MIN_EVENT_INTERVAL_ACTIONS: must not matter (#1996: the union count gates)
+    state.unionActionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
     state.cooldownMinIntervalTicks = SENTINEL_SHARED;
     const ctx = makeCtx({
       tickCount: elapsed, employeeCount,
@@ -828,7 +829,7 @@ describe('union events keep their own cooldown clock (#1907)', () => {
       expect(unionCooldownOpen(state, CACHED, 0, 0, new Random(7))).toBe(true);
       expect(unionCooldownOpen(state, CACHED - 1, 0, 0, new Random(7))).toBe(false);
     });
-    it('a union event is not gated by MIN_EVENT_INTERVAL_ACTIONS', () => {
+    it('a union event is gated by its own action count, not the shared one (#1996)', () => {
       expect(MIN_EVENT_INTERVAL_ACTIONS).toBeGreaterThan(0);
       const { state, fired } = unionAttempt(CACHED, 10);
       expect(fired?.eventId).toBe('union_ev');
@@ -922,6 +923,7 @@ describe('union events keep their own cooldown clock (#1907)', () => {
       let other = 0;
       for (let tick = 1; tick <= 6000; tick++) {
         state.actionCountSinceEvent = Math.max(state.actionCountSinceEvent, 100);
+        state.unionActionCountSinceEvent = Math.max(state.unionActionCountSinceEvent, 100);
         const f = tickEventSystem(state, makeCtx({ tickCount: tick, employeeCount: 10, unionMemberCount, corruptionLevel: 100 }), rng);
         if (f) { if (f.eventId === 'union_ev') union++; else other++; }
         state.pendingEvent = null;
@@ -978,5 +980,153 @@ describe('strike events are boosted while a strike is due (#1890)', () => {
   });
   it('grievance without members does not boost it', () => {
     expect(strikeShare(UNION_GRIEVANCE_STRIKE_THRESHOLD, 0)).toBeLessThan(0.9);
+  });
+});
+
+describe('union events share the player-activity gate, counted separately (#1996)', () => {
+  beforeEach(() => {
+    clearEvents();
+    registerEvents([
+      makeEvent('pol_ev', 'politics'),
+      makeEvent('union_ev', 'union'),
+    ]);
+  });
+
+  const CACHED = UNION_EVENT_MIN_INTERVAL_TICKS + 30;
+
+  function armed(category: string) {
+    const state = createEventSystemState();
+    for (const t of state.timers) t.remaining = t.category === category ? 1 : 100000;
+    return state;
+  }
+
+  /** Union attempt with the union clock long elapsed; only the action counters vary. */
+  function unionAttempt(unionActions: number, sharedActions = 0, tick = CACHED * 2) {
+    const state = armed('union');
+    state.unionCooldownMinIntervalTicks = CACHED;
+    state.lastUnionEventTick = 0;
+    state.unionActionCountSinceEvent = unionActions;
+    state.actionCountSinceEvent = sharedActions;
+    state.lastEventTick = 5;
+    state.cooldownMinIntervalTicks = 77;
+    const fired = tickEventSystem(state, makeCtx({ tickCount: tick, employeeCount: 10, unionMemberCount: 10 }), new Random(7));
+    return { state, fired };
+  }
+
+  /** Politics attempt with the shared clock long elapsed; only the action counters vary. */
+  function politicsAttempt(sharedActions: number, unionActions = 0) {
+    const state = armed('politics');
+    state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS;
+    state.lastEventTick = 0;
+    state.actionCountSinceEvent = sharedActions;
+    state.unionActionCountSinceEvent = unionActions;
+    state.lastUnionEventTick = 13;
+    state.unionCooldownMinIntervalTicks = CACHED;
+    const fired = tickEventSystem(state, makeCtx({ tickCount: MIN_EVENT_INTERVAL_TICKS, employeeCount: 10, unionMemberCount: 10 }), new Random(7));
+    return { state, fired };
+  }
+
+  it('unionActionCountSinceEvent is 0 in fresh state', () => {
+    expect(createEventSystemState().unionActionCountSinceEvent).toBe(0);
+  });
+
+  it('with no player actions a union event never fires on time alone', () => {
+    const state = createEventSystemState();
+    const rng = new Random(11);
+    for (let tick = 1; tick <= 5000; tick++) {
+      const fired = tickEventSystem(state, makeCtx({ tickCount: tick, employeeCount: 10, unionMemberCount: 10 }), rng);
+      if (fired) expect(fired.eventId).not.toBe('union_ev');
+      state.pendingEvent = null;
+      state.firedEventIds = [];
+    }
+  });
+
+  it('MIN_EVENT_INTERVAL_ACTIONS - 1 union actions hold the event back and keep the retry delay', () => {
+    const { state, fired } = unionAttempt(MIN_EVENT_INTERVAL_ACTIONS - 1);
+    expect(fired).toBeNull();
+    expect(state.timers.find(t => t.category === 'union')!.remaining).toBe(5);
+  });
+
+  it('MIN_EVENT_INTERVAL_ACTIONS union actions let it fire', () => {
+    expect(unionAttempt(MIN_EVENT_INTERVAL_ACTIONS).fired?.eventId).toBe('union_ev');
+  });
+
+  it('the shared action count does not open the union gate', () => {
+    expect(unionAttempt(0, 1000).fired).toBeNull();
+  });
+
+  it('the union action count does not open the shared gate', () => {
+    expect(politicsAttempt(0, 1000).fired).toBeNull();
+    expect(politicsAttempt(MIN_EVENT_INTERVAL_ACTIONS, 0).fired?.eventId).toBe('pol_ev');
+  });
+
+  it('actions alone do not open the union gate while the union clock is closed', () => {
+    const { fired } = unionAttempt(1000, 1000, CACHED - 1);
+    expect(fired).toBeNull();
+  });
+
+  it('a union fire resets only the union counter and clock', () => {
+    const { state, fired } = unionAttempt(MIN_EVENT_INTERVAL_ACTIONS, 42);
+    expect(fired?.eventId).toBe('union_ev');
+    expect(state.unionActionCountSinceEvent).toBe(0);
+    expect(state.lastUnionEventTick).toBe(CACHED * 2);
+    expect(state.actionCountSinceEvent).toBe(42);
+    expect(state.lastEventTick).toBe(5);
+    expect(state.cooldownMinIntervalTicks).toBe(77);
+  });
+
+  it('a non-union fire resets only the shared counter and clock', () => {
+    const { state, fired } = politicsAttempt(MIN_EVENT_INTERVAL_ACTIONS, 42);
+    expect(fired?.eventId).toBe('pol_ev');
+    expect(state.actionCountSinceEvent).toBe(0);
+    expect(state.unionActionCountSinceEvent).toBe(42);
+    expect(state.lastUnionEventTick).toBe(13);
+    expect(state.unionCooldownMinIntervalTicks).toBe(CACHED);
+  });
+
+  it('a follow-up fire resets the shared pair and leaves the union counter alone', () => {
+    registerEvents([{ ...makeEvent('fu_ev', 'union'), followUpOnly: true }]);
+    const state = createEventSystemState();
+    state.actionCountSinceEvent = 9;
+    state.unionActionCountSinceEvent = 9;
+    state.lastUnionEventTick = 13;
+    queueFollowUp(state, 'fu_ev');
+    state.followUpDelayTicks = 1;
+    const fired = tickEventSystem(state, makeCtx({ tickCount: 500 }), new Random(1));
+    expect(fired?.eventId).toBe('fu_ev');
+    expect(state.actionCountSinceEvent).toBe(0);
+    expect(state.lastEventTick).toBe(500);
+    expect(state.unionActionCountSinceEvent).toBe(9);
+    expect(state.lastUnionEventTick).toBe(13);
+  });
+
+  it('incrementActionCount bumps both counters', () => {
+    const state = createEventSystemState();
+    incrementActionCount(state);
+    incrementActionCount(state);
+    expect(state.actionCountSinceEvent).toBe(2);
+    expect(state.unionActionCountSinceEvent).toBe(2);
+  });
+
+  it('unionCooldownOpen is still called once per union check, gate open or shut (rng stream stable)', () => {
+    const shut = unionAttempt(0);
+    const open = unionAttempt(MIN_EVENT_INTERVAL_ACTIONS);
+    // Both draws consumed identical rng: the cached union draw was already set, so neither draws.
+    expect(shut.state.unionCooldownMinIntervalTicks).toBe(CACHED);
+    expect(open.state.unionCooldownMinIntervalTicks).toBeNull(); // cleared by the fire
+    // With no cached draw, a gate-shut check still draws exactly once.
+    const state = armed('union');
+    state.lastUnionEventTick = 0;
+    const rng = new Random(321);
+    tickEventSystem(state, makeCtx({ tickCount: 1, employeeCount: 10, unionMemberCount: 10 }), rng);
+    const expected = UNION_EVENT_MIN_INTERVAL_TICKS + new Random(321).nextInt(0, UNION_EVENT_MIN_INTERVAL_RANDOM_RANGE);
+    expect(state.unionCooldownMinIntervalTicks).toBe(expected);
+  });
+
+  it('a state with unionActionCountSinceEvent survives JSON round-trip', () => {
+    const state = createEventSystemState();
+    state.unionActionCountSinceEvent = 6;
+    const restored = JSON.parse(JSON.stringify(state)) as typeof state;
+    expect(restored.unionActionCountSinceEvent).toBe(6);
   });
 });

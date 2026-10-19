@@ -202,6 +202,7 @@ describe('protection granted the tick an event fires (#1816)', () => {
   /** Open or shut the union cooldown window: union events ignore the action gate (#1907). */
   function setUnionGate(state: ReturnType<typeof justFired>, open: boolean): void {
     state.unionCooldownMinIntervalTicks = open ? 1 : 1_000_000_000;
+    state.unionActionCountSinceEvent = open ? MIN_EVENT_INTERVAL_ACTIONS : 0;
   }
 
   /** Force the category timer to be due on the next tick. */

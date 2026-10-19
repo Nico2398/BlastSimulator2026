@@ -628,6 +628,7 @@ describe('Event system', () => {
       simulateBridge(runner, ctx, 'employee hire role:blaster');
 
       expect(ctx.state!.events.actionCountSinceEvent).toBe(1);
+      expect(ctx.state!.events.unionActionCountSinceEvent).toBe(1);
     });
 
     it('meta command tick does NOT increment actionCountSinceEvent', () => {
@@ -1066,9 +1067,11 @@ describe('bribe protections shield the next event after a resolved one (#1816)',
       expect(runCommand(engine, 'event choose 0').success).toBe(true);
       s.events.lastEventTick = s.tickCount;
       s.events.actionCountSinceEvent = 0;
+      s.events.unionActionCountSinceEvent = 0;
       s.events.cooldownMinIntervalTicks = LONGEST_COOLDOWN_ROLL;
       runCommand(engine, `corrupt target:${target}`);
       s.events.actionCountSinceEvent = 0;
+      s.events.unionActionCountSinceEvent = 0;
       if (s.corruption.protections.some(p => p.target === target)) return engine;
     }
     return expect.unreachable('no successful bribe in 200 seeds');
