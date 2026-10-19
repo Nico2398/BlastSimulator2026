@@ -266,4 +266,54 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
     get 2() { return BUILDING_DEFS.spoil_heap[1]; },
     get 3() { return BUILDING_DEFS.spoil_heap[1]; },
   },
+
+  // ── Vanity projects (#1947) — stub values ──
+  ceo_statue: {
+    1: {
+      type: 'ceo_statue', tier: 1,
+      nameKey: 'building.ceo_statue.t1.name',
+      footprint: rect(2, 2), entryPoint: entry(), exitPoint: exit_(2),
+      constructionCost: 0, demolishCost: 0, operatingCostPerTick: 0,
+      capacity: 0, maxHp: 100, structuralResistance: 1000,
+      scoreEffects: {},
+    },
+    get 2() { return BUILDING_DEFS.ceo_statue[1]; },
+    get 3() { return BUILDING_DEFS.ceo_statue[1]; },
+  },
+  golf_course: {
+    1: {
+      type: 'golf_course', tier: 1,
+      nameKey: 'building.golf_course.t1.name',
+      footprint: rect(2, 2), entryPoint: entry(), exitPoint: exit_(2),
+      constructionCost: 0, demolishCost: 0, operatingCostPerTick: 0,
+      capacity: 0, maxHp: 100, structuralResistance: 1000,
+      scoreEffects: {},
+    },
+    get 2() { return BUILDING_DEFS.golf_course[1]; },
+    get 3() { return BUILDING_DEFS.golf_course[1]; },
+  },
+  executive_helipad: {
+    1: {
+      type: 'executive_helipad', tier: 1,
+      nameKey: 'building.executive_helipad.t1.name',
+      footprint: rect(2, 2), entryPoint: entry(), exitPoint: exit_(2),
+      constructionCost: 0, demolishCost: 0, operatingCostPerTick: 0,
+      capacity: 0, maxHp: 100, structuralResistance: 1000,
+      scoreEffects: {},
+    },
+    get 2() { return BUILDING_DEFS.executive_helipad[1]; },
+    get 3() { return BUILDING_DEFS.executive_helipad[1]; },
+  },
+  gold_tower: {
+    1: {
+      type: 'gold_tower', tier: 1,
+      nameKey: 'building.gold_tower.t1.name',
+      footprint: rect(2, 2), entryPoint: entry(), exitPoint: exit_(2),
+      constructionCost: 0, demolishCost: 0, operatingCostPerTick: 0,
+      capacity: 0, maxHp: 100, structuralResistance: 1000,
+      scoreEffects: {},
+    },
+    get 2() { return BUILDING_DEFS.gold_tower[1]; },
+    get 3() { return BUILDING_DEFS.gold_tower[1]; },
+  },
 };

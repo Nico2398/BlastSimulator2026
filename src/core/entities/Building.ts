@@ -28,7 +28,11 @@ export type BuildingType =
   | 'living_quarters'
   | 'explosive_warehouse'
   | 'freight_warehouse'
-  | 'spoil_heap';
+  | 'spoil_heap'
+  | 'ceo_statue'
+  | 'golf_course'
+  | 'executive_helipad'
+  | 'gold_tower';
 
 /** Building upgrade tier. Tier 1 is the base tier available from the start. */
 export type BuildingTier = 1 | 2 | 3;
@@ -695,3 +699,14 @@ export {
   computePlacementCutoff,
   type PlacementCutoff,
 } from './PlacementCutoff.js';
+
+/** Whether the inclusive-min / exclusive-max world rect overlaps an occupant of `type` (#1947). */
+export function touchesBuildingOfType(
+  occupants: ReadonlyArray<FootprintOccupant>,
+  rect: Rect,
+  type: BuildingType,
+): boolean {
+  // TODO: implement
+  void occupants; void rect; void type;
+  return false;
+}

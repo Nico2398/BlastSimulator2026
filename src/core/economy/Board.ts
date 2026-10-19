@@ -196,3 +196,10 @@ export function runBoardReview(
 export function isBoardFired(board: BoardState | undefined): boolean {
   return !!board && board.confidence <= 0;
 }
+
+/** Add `amount` to board confidence, clamped to its range; false when no board is attached (#1947). */
+export function addBoardConfidence(board: BoardState | undefined, amount: number): boolean {
+  // TODO: implement
+  void board; void amount;
+  return false;
+}
