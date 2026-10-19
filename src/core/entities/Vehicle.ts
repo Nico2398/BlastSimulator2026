@@ -367,3 +367,20 @@ export function canReleaseDriver(
 export function vehicleMaxSlopeRatio(vehicle: Pick<Vehicle, 'tier'>, progression: boolean): number {
   return progression ? tierSlopeRatio(vehicle.tier) : NAV_MAX_SLOPE_RATIO;
 }
+
+/**
+ * Ticks a drill rig needs for a drill-hole task whose tier-1 base is `baseTicks`.
+ * Higher rig tiers work faster (VEHICLE_TIER_MULTIPLIERS[tier].workRate), then the
+ * driver's proficiency, need and living-quarters multipliers apply.
+ */
+export function computeRigDurationTicks(
+  baseTicks: number,
+  tier: VehicleTier,
+  proficiencyLevel: 1 | 2 | 3 | 4 | 5 = 1,
+  needMultiplier = 1,
+  lqMultiplier = 1,
+): number {
+  void tier; void proficiencyLevel; void needMultiplier; void lqMultiplier;
+  // TODO: implement
+  return baseTicks;
+}
