@@ -12,6 +12,7 @@ import {
 } from '../config/balance.js';
 import { tierSlopeRatio, VEHICLE_TIER_LIST } from '../nav/ClimbLimit.js';
 import type { Employee } from './Employee.js';
+import { computeTaskDuration } from './EmployeeTaskDuration.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 
 export { ROLE_LICENCE_REQUIRED, canAssignDriver } from './VehicleDriverAssignment.js';
@@ -380,7 +381,7 @@ export function computeRigDurationTicks(
   needMultiplier = 1,
   lqMultiplier = 1,
 ): number {
-  void tier; void proficiencyLevel; void needMultiplier; void lqMultiplier;
-  // TODO: implement
-  return baseTicks;
+  return computeTaskDuration(
+    baseTicks / VEHICLE_TIER_MULTIPLIERS[tier].workRate, proficiencyLevel, needMultiplier, lqMultiplier, 1,
+  );
 }

@@ -143,7 +143,11 @@ export function landDrilledHole(planned: PlannedHole): DrillHole {
   };
 }
 
-/** Ticks required to drill one hole, scaled from the reference depth/diameter (#553). */
+/**
+ * Ticks required to drill one hole, scaled from the reference depth/diameter (#553).
+ * Tier-1 rig base: the drill_hole work cost divides it by the reserved rig's
+ * workRate (computeActionWorkTicks, #1935), so callers must not pre-scale it.
+ */
 export function computeDrillHoleDurationTicks(depth: number, diameter: number): number {
   return Math.max(
     1,

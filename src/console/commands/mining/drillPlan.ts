@@ -83,6 +83,7 @@ export function dispatchDrillHoleAction(
   ctx: MiningContext,
   hole: DrillHole,
 ): void {
+  // Unscaled tier-1 base: computeActionWorkTicks divides by the reserved rig workRate (#1935); do not scale here.
   const durationTicks = computeDrillHoleDurationTicks(hole.depth, hole.diameter);
   const actionId = ctx.state!.nextPendingActionId++;
   // skipQualificationCheck (#553, mirrors HaulDispatch.ts's #552
