@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../src/core/mining/BlastValueEstimate.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../src/core/mining/BlastValueEstimate.js')>()),
-  estimateBlastOre: vi.fn(() => ({ value: 42, coverage: 0.5 })),
+  estimateBlastOre: vi.fn(() => ({ value: 42, coverage: 0.5, brokenVoxels: 0, charged: false, holeCoverage: 0 })),
 }));
 vi.mock('../../../src/core/mining/WetHoles.js', () => ({
   wetHoleIdsFor: vi.fn(() => new Set<string>()),
@@ -31,7 +31,7 @@ describe('OreEstimateMemo', () => {
   beforeEach(() => { estimate.mockClear(); });
 
   it('returns 0 without a grid and does not estimate', () => {
-    expect(new OreEstimateMemo().get(stateWith([]), planWith(1), null)).toEqual({ value: 0, coverage: 0 });
+    expect(new OreEstimateMemo().get(stateWith([]), planWith(1), null)).toEqual({ value: 0, coverage: 0, brokenVoxels: 0, charged: false, holeCoverage: 0 });
     expect(estimate).not.toHaveBeenCalled();
   });
 
@@ -40,8 +40,8 @@ describe('OreEstimateMemo', () => {
     const grid = new VoxelGrid(16, 16);
     const state = stateWith([]);
     const plan = planWith(1);
-    expect(memo.get(state, plan, grid)).toEqual({ value: 42, coverage: 0.5 });
-    expect(memo.get(state, plan, grid)).toEqual({ value: 42, coverage: 0.5 });
+    expect(memo.get(state, plan, grid)).toEqual({ value: 42, coverage: 0.5, brokenVoxels: 0, charged: false, holeCoverage: 0 });
+    expect(memo.get(state, plan, grid)).toEqual({ value: 42, coverage: 0.5, brokenVoxels: 0, charged: false, holeCoverage: 0 });
     expect(estimate).toHaveBeenCalledTimes(1);
   });
 
@@ -86,21 +86,21 @@ describe('OreEstimateMemo', () => {
   });
 
   it('returns the coverage from the estimate, on a fresh compute and a cached read', () => {
-    estimate.mockReturnValueOnce({ value: 7, coverage: 0.25 });
+    estimate.mockReturnValueOnce({ value: 7, coverage: 0.25, brokenVoxels: 0, charged: false, holeCoverage: 0 });
     const memo = new OreEstimateMemo();
     const grid = new VoxelGrid(16, 16);
     const state = stateWith([]);
     const plan = planWith(1);
-    expect(memo.get(state, plan, grid)).toEqual({ value: 7, coverage: 0.25 });
-    expect(memo.get(state, plan, grid)).toEqual({ value: 7, coverage: 0.25 });
+    expect(memo.get(state, plan, grid)).toEqual({ value: 7, coverage: 0.25, brokenVoxels: 0, charged: false, holeCoverage: 0 });
+    expect(memo.get(state, plan, grid)).toEqual({ value: 7, coverage: 0.25, brokenVoxels: 0, charged: false, holeCoverage: 0 });
   });
 
   it('recomputes coverage when a survey changes while holes stay put', () => {
-    estimate.mockReturnValueOnce({ value: 0, coverage: 0 }).mockReturnValueOnce({ value: 5, coverage: 1 });
+    estimate.mockReturnValueOnce({ value: 0, coverage: 0, brokenVoxels: 0, charged: false, holeCoverage: 0 }).mockReturnValueOnce({ value: 5, coverage: 1, brokenVoxels: 0, charged: false, holeCoverage: 0 });
     const memo = new OreEstimateMemo();
     const grid = new VoxelGrid(16, 16);
     const plan = planWith(1);
     expect(memo.get(stateWith([]), plan, grid).coverage).toBe(0);
-    expect(memo.get(stateWith([{ id: 1, completedTick: 3 }]), plan, grid)).toEqual({ value: 5, coverage: 1 });
+    expect(memo.get(stateWith([{ id: 1, completedTick: 3 }]), plan, grid)).toEqual({ value: 5, coverage: 1, brokenVoxels: 0, charged: false, holeCoverage: 0 });
   });
 });
