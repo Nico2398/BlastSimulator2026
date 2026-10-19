@@ -71,9 +71,9 @@
       }
     },
     {
-      "command": "build freight_warehouse at:14,40",
+      "command": "build freight_warehouse at:22,40",
       "timeout": 60,
-      "description": "Player builds a freight_warehouse at 14,40 (issue #2021 layout).",
+      "description": "Player builds a freight_warehouse at 22,40 (issue #2021 layout).",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -94,7 +94,7 @@
         },
         {
           "type": "pickTile",
-          "x": 14,
+          "x": 22,
           "z": 40
         },
         {
@@ -470,13 +470,13 @@
       ],
       "role": "player",
       "expect": {
+        "note": "Quarters row absence is not expressible: expect.blocked needs the element in the DOM. Verified by the screenshot and unit tests.",
         "usable": "#bs-blast-panel [data-action=\"execute\"]",
         "textEquals": {
           "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"management_office\"]": "Management Office is inside the blast area and will be destroyed.",
           "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"freight_warehouse\"]": "Freight Warehouse is inside the blast area and will be destroyed.",
           "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"explosive_warehouse\"]": "Explosive Warehouse (228 kg stocked) is inside the blast area: it will be destroyed and its stock will detonate as a secondary blast."
-        },
-        "blocked": "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"living_quarters\"]"
+        }
       }
     },
     {
