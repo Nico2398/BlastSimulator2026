@@ -2,7 +2,6 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
-  requiredGradeForVehicleTier,
   vehicleTierGate,
   vehicleTierRefusalText,
   vehicleTierLockLabel,
@@ -24,7 +23,7 @@ describe('VehicleTierGate (#1928)', () => {
   });
 
   it.each([[1, 0], [2, 2], [3, 4]] as const)('tier %i needs grade %i', (tier, grade) => {
-    expect(requiredGradeForVehicleTier(tier)).toBe(grade);
+    expect(vehicleTierGate(-1, tier)).toEqual({ needed: grade });
   });
 
   it('a non-progression site (grade undefined) is never gated', () => {
