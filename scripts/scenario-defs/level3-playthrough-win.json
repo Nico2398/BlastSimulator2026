@@ -2117,7 +2117,6 @@
       "role": "player",
       "expect": {
         "changedBy": {
-          "cash": 0,
           "tickCount": 0
         },
         "equals": {
@@ -2126,7 +2125,7 @@
           "activeContractCount": 0,
           "surveyCount": 3
         },
-        "note": "#1996: re-measured (command mode, deterministic) -- union events now also need MIN_EVENT_INTERVAL_ACTIONS player commands since the last union event, which moved the event timeline; deaths, surveys and contracts are unchanged."
+        "note": "#1996: re-measured (command mode, deterministic) -- union events now also need MIN_EVENT_INTERVAL_ACTIONS player commands since the last union event, which moved the event timeline; deaths, surveys and contracts are unchanged. No cash pin: whether an event is pending here, and what its first option pays (none in command mode, +10000 in interaction mode), follows each mode's event timeline, so the cash change is trajectory-coupled."
       },
       "commandOutcome": "either"
     },
