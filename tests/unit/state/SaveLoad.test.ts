@@ -355,6 +355,20 @@ describe('deserialize — event system field defaults', () => {
   });
 });
 
+describe('deserialize — unionActionCountSinceEvent (#1996)', () => {
+  it('an old save without the field loads with 0', () => {
+    const parsed = JSON.parse(serialize(createGame({ seed: 42 }))) as Record<string, unknown>;
+    delete (parsed['events'] as Record<string, unknown>)['unionActionCountSinceEvent'];
+    expect(deserialize(JSON.stringify(parsed)).events.unionActionCountSinceEvent).toBe(0);
+  });
+
+  it('a non-default value round-trips', () => {
+    const state = createGame({ seed: 42 });
+    state.events.unionActionCountSinceEvent = 8;
+    expect(deserialize(serialize(state)).events.unionActionCountSinceEvent).toBe(8);
+  });
+});
+
 describe('serialize/deserialize — raisedUnqualifiedActionIds (#1380)', () => {
   it('round-trips the ids an unqualified_task event was already raised for', () => {
     const state = createGame({ seed: 42 });

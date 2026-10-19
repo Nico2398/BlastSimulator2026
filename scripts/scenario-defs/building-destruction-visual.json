@@ -388,6 +388,30 @@
       ]
     },
     {
+      "command": "tick 10",
+      "timeout": 130,
+      "description": "#1996: a union event can now fire just before politics_heritage_listing (the first `event choose 1` answers whichever fires first), so advance once more to reach the second event if one is due. Costs 10 quiet ticks when none is.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 1",
+      "description": "#1996: answer the second event, if any, with option 1 too (for heritage it is the option that does not ban blasting). Idempotent: no-op when no event is pending.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending",
+          "option": 1
+        }
+      ]
+    },
+    {
       "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",
       "timeout": 125,
       "interaction": [

@@ -3755,6 +3755,1326 @@
       ]
     },
     {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "description": "#1996: wait for a fresh sale offer. Union events now need player actions as well as time, so the event timeline shifts and the offer stream no longer hands over a large rustite deal inside the six-tick rounds above; spacing the remaining rounds out lets the next offers arrive. Rounds past the level's end are skipped in interaction mode (the browser's clock can reach the goal sooner).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
       "command": "wait_until field:levelEnded equals:true max_ticks:6000",
       "role": "setup",
       "timeout": 1260,

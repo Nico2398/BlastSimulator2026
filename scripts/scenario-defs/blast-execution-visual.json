@@ -2305,6 +2305,27 @@
       "commandOutcome": "either"
     },
     {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1996: the previous tick 24 is cut short when a union event fires one tick in (union events now land at different moments, gated on player actions), so the hiring pool had not refreshed; tick the interval again once the event is resolved."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "employee hire role:driller",
       "interaction": [
         {

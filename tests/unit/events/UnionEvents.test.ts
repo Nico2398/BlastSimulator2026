@@ -172,6 +172,7 @@ describe('union events scale with membership (#1873)', () => {
     const ticks = 6000;
     for (let tick = 1; tick <= ticks; tick++) {
       state.actionCountSinceEvent = Math.max(state.actionCountSinceEvent, MIN_EVENT_INTERVAL_ACTIONS);
+      state.unionActionCountSinceEvent = Math.max(state.unionActionCountSinceEvent, MIN_EVENT_INTERVAL_ACTIONS);
       const ctx = makeCtx({ tickCount: tick, employeeCount: 10, ...(unionMemberCount === undefined ? {} : { unionMemberCount }), scores: lowWellBeing() });
       const f = tickEventSystem(state, ctx, rng);
       if (f && getEventById(f.eventId)?.category === 'union') fired++;
@@ -188,6 +189,7 @@ describe('union events scale with membership (#1873)', () => {
       state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS; // cached draw held fixed
       state.lastEventTick = 0;
       state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+      state.unionActionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
       // Exactly the unstretched interval has elapsed.
       const ctx = makeCtx({ tickCount: MIN_EVENT_INTERVAL_TICKS, employeeCount: 10, unionMemberCount, scores: lowWellBeing() });
       return { state, fired: tickEventSystem(state, ctx, new Random(7)) };
