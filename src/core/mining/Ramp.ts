@@ -2,6 +2,7 @@
 // Ramps provide vehicle access to lower pit levels by carving sloped passages.
 // Each ramp clears a diagonal column of voxels from surface to target depth.
 
+import type { RampDirection, RampLeg } from './RampPath.js';
 import { formatMoney } from '../economy/formatMoney.js';
 import {
   computeVoxelColumnSurfaceHeight, computeVoxelColumnSurfaceY, captureColumnTopsForCarve,
@@ -30,7 +31,7 @@ export function computeRampCost(length: number, width: number): number {
 
 // ── Types ──
 
-export type RampDirection = 'north' | 'south' | 'east' | 'west';
+export type { RampDirection };
 
 export interface RampDef {
   originX: number;
@@ -41,6 +42,10 @@ export interface RampDef {
   targetDepth: number;
   /** Corridor width in voxels; undefined means `RAMP_DEFAULT_WIDTH` (#1298). */
   width?: RampWidth;
+  /** Path legs; undefined means one leg of `direction`/`length` (#1939). */
+  legs?: RampLeg[];
+  /** Chosen grade in degrees; undefined means the straight line to `targetDepth` (#1939). */
+  gradeDegrees?: number;
 }
 
 export interface RampResult {
@@ -79,6 +84,20 @@ export function rampDefFromEndpoints(
     length = Math.abs(Math.round(dx));
   }
   return { originX, originZ, direction, length, targetDepth };
+}
+
+// ── Grade (#1939) ──
+
+/** Grade range in degrees reachable over `totalLength` metres to `targetDepth`. */
+export function rampGradeBoundsDegrees(_totalLength: number, _targetDepth: number): { min: number; max: number } {
+  return undefined as unknown as { min: number; max: number }; // TODO: implement
+}
+
+/** Floor depth at path `step` of a `lineLength`-long ramp, optionally at a chosen grade. */
+export function rampFloorDepthAt(
+  _step: number, _lineLength: number, _targetDepth: number, _gradeDegrees?: number,
+): number {
+  return undefined as unknown as number; // TODO: implement
 }
 
 // ── Direction offsets ──

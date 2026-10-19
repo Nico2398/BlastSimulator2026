@@ -321,13 +321,8 @@ export interface RampSegmentTracker {
   carvedCount?: number;
 }
 
-/** Inclusive tile rectangle a ramp's corridor covers. */
-export interface RampFootprint {
-  minX: number;
-  maxX: number;
-  minZ: number;
-  maxZ: number;
-}
+import type { RampFootprint } from '../mining/RampPath.js';
+export type { RampFootprint };
 
 /** A finished ramp, recorded when its last segment is dug (#1298). */
 export interface BuiltRamp {
