@@ -97,32 +97,38 @@ type BlockedPhraseKind = typeof BLOCKED_PHRASE_KINDS[number];
 
 interface BlockedKindCount { kind: BlockedPhraseKind; count: number }
 
+/** Phrase kind per reason; exhaustive, so a new BlockedOrderReason fails to compile until classified. null = not a failure. */
+const PHRASE_KIND_BY_REASON: Record<BlockedOrderReason, BlockedPhraseKind | null> = {
+  no_qualified_employee: 'crew_fleet',
+  no_dual_qualified_employee: 'crew_fleet',
+  no_vehicle_in_fleet: 'crew_fleet',
+  no_licensed_driver: 'crew_fleet',
+  licence_level_too_low: 'crew_fleet',
+  no_reaching_vehicle: 'crew_fleet',
+  storage_full: 'storage_full',
+  no_freight_warehouse: 'no_warehouse',
+  no_spoil_heap: 'no_spoil_heap',
+  spoil_heap_full: 'spoil_heap_full',
+  target_unreachable: 'unreachable',
+  debris_out_of_reach: null,
+  explosives_in_transit: null,
+};
+
 /** Phrase kind of a failure reason; null for non-failure or absent reasons. */
 export function blockedPhraseKind(reason: BlockedOrderReason | null | undefined): BlockedPhraseKind | null {
-  switch (reason) {
-    case 'no_qualified_employee':
-    case 'no_dual_qualified_employee':
-    case 'no_vehicle_in_fleet':
-    case 'no_licensed_driver':
-    case 'licence_level_too_low':
-    case 'no_reaching_vehicle':
-      return 'crew_fleet';
-    case 'storage_full': return 'storage_full';
-    case 'no_freight_warehouse': return 'no_warehouse';
-    case 'no_spoil_heap': return 'no_spoil_heap';
-    case 'spoil_heap_full': return 'spoil_heap_full';
-    case 'target_unreachable': return 'unreachable';
-    default: return null;
-  }
+  return reason == null ? null : PHRASE_KIND_BY_REASON[reason];
+}
+
+/** Adds one order to a reason tally when it is a failure block; the single increment behind every tally. */
+export function tallyBlockedReason(counts: Partial<Record<BlockedOrderReason, number>>, action: Pick<PendingAction, 'blockedReason'>): void {
+  if (!isFailureBlock(action) || action.blockedReason == null) return;
+  counts[action.blockedReason] = (counts[action.blockedReason] ?? 0) + 1;
 }
 
 /** Tallies failure-block reasons across orders. */
 export function countBlockedReasons(actions: readonly Pick<PendingAction, 'blockedReason'>[]): Partial<Record<BlockedOrderReason, number>> {
   const counts: Partial<Record<BlockedOrderReason, number>> = {};
-  for (const a of actions) {
-    if (!isFailureBlock(a) || a.blockedReason == null) continue;
-    counts[a.blockedReason] = (counts[a.blockedReason] ?? 0) + 1;
-  }
+  for (const a of actions) tallyBlockedReason(counts, a);
   return counts;
 }
 

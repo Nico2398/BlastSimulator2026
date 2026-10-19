@@ -65,6 +65,11 @@ export function countQueuedByBlock(
   return counts;
 }
 
+/** Failure-block reasons across the queued orders only. */
+function countQueuedBlockedReasons(actions: readonly Pick<PendingAction, 'status' | 'blockedReason'>[]): ReturnType<typeof countBlockedReasons> {
+  return countBlockedReasons(actions.filter(a => a.status === 'queued'));
+}
+
 export class OperationsPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private readonly shiftButtons: Record<ShiftMode, HTMLButtonElement>;
@@ -175,7 +180,7 @@ export class OperationsPanel extends PanelBase {
       policy: state.sitePolicy.revision,
       // Feeds "Unclaimed Work": counts queued orders the work queue rows leave out (rest).
       unclaimed: countQueuedByBlock(state.pendingActions),
-      blockedReasons: countBlockedReasons(state.pendingActions.filter(a => a.status === 'queued')),
+      blockedReasons: countQueuedBlockedReasons(state.pendingActions),
     }) + `#${playerSig}#${debrisSig}`;
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -259,7 +264,7 @@ export class OperationsPanel extends PanelBase {
     const noteParts: string[] = [];
     if (open > 0 || blocked + stranded === 0) noteParts.push(t('ui.operations.unclaimed_work_note'));
     if (blocked > 0) {
-      const reasons = describeBlockedReasons(countBlockedReasons(state.pendingActions.filter(a => a.status === 'queued')));
+      const reasons = describeBlockedReasons(countQueuedBlockedReasons(state.pendingActions));
       noteParts.push(t('ui.operations.unclaimed_work_note_blocked', { reasons: reasons.join('; ') }));
     }
     if (stranded > 0) noteParts.push(t('ui.operations.unclaimed_work_note_stranded', { stranded }));

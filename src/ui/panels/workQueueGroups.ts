@@ -1,7 +1,7 @@
 /** Pure grouping model for the Operations work queue (#1972): auto-debris orders collapse into one row per type. */
 import type { PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { isAutoDebrisAction, type AutoDebrisActionType } from '../../core/economy/HaulDispatch.js';
-import { classifyQueuedBlock, isInTransitBlock, rankBlockedKinds } from '../notify/blockedOrders.js';
+import { classifyQueuedBlock, isInTransitBlock, rankBlockedKinds, tallyBlockedReason } from '../notify/blockedOrders.js';
 
 export const DEBRIS_GROUP_PAGE_SIZE = 25;
 
@@ -49,7 +49,7 @@ export function partitionWorkQueue(actions: readonly PendingAction[]): WorkQueue
       g.queued++;
       const block = classifyQueuedBlock(a);
       g[block]++;
-      if (block === 'blocked' && a.blockedReason != null) g.blockedReasons[a.blockedReason] = (g.blockedReasons[a.blockedReason] ?? 0) + 1;
+      tallyBlockedReason(g.blockedReasons, a);
     }
   }
   const debris = [...groups.values()];
