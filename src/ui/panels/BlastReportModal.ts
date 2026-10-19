@@ -88,7 +88,7 @@ export class BlastReportModal {
     iconChip.style.cssText = 'width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(255,176,46,.18);color:var(--bsx-amber)';
     const titleCol = el('div');
     titleCol.style.cssText = 'display:flex;flex-direction:column;gap:4px';
-    titleCol.append(this.locale.bindText(el('span', { attrs: { style: 'font:800 17px/1 var(--bsx-font-ui);letter-spacing:.06em' } }), 'ui.blast_workshop.report.title'));
+    titleCol.append(this.locale.bindText(el('span', { attrs: { style: 'font:800 17px/1 var(--bsx-font-ui);letter-spacing:.06em;color:var(--bsx-text-primary)' } }), 'ui.blast_workshop.report.title'));
 
     const ratingCol = el('div');
     ratingCol.style.cssText = 'margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px';
