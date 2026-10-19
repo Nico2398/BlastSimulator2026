@@ -2011,9 +2011,9 @@ describe('BuildMenu — Vanity section (#1947)', () => {
 
   function stateAt(grade: number | undefined, cash = 10_000_000): GameState {
     const s = makeMockState({ cash });
-    if (grade === undefined) s.grade = undefined;
-    else s.grade = { ...(s.grade ?? { grade: 1 }), grade } as GameState['grade'];
-    s.board = undefined;
+    if (grade === undefined) delete s.grade;
+    else s.grade = { ...(s.grade ?? { grade: 1 }), grade } as NonNullable<GameState['grade']>;
+    delete s.board;
     return s;
   }
 
