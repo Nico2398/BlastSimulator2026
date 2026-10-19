@@ -6,9 +6,11 @@ import {
   buildRamp,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
   computeRampSegmentCarveTarget, carveRampSegmentSlice, computeMinimumRampLength, isRampCellPending,
-  rampDefFromEndpoints, snapRampDepthToEndFloor, rampFootOffset,
+  rampDefFromEndpoints, snapRampDepthToEndFloor, rampFootOffset, rampGradeBoundsDegrees, rampFloorDepthAt,
   type RampDef, type RampDirection, type RampSegmentDef,
 } from '../../../src/core/mining/Ramp.js';
+import { rampCenterline, rampPathCells } from '../../../src/core/mining/RampPath.js';
+import { RAMP_COST_PER_METER_PER_WIDTH } from '../../../src/core/config/balance.js';
 import { isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import {
   MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, RAMP_CUT_SLOPE_RATIO,
@@ -1905,5 +1907,237 @@ describe('defineRampSegments — ramp into a crater snaps to the end floor (#185
     // floor 15 - 11 = 4: foot 7.4 is 3.4 above it, past RAMP_FLOOR_SNAP_REACH_M
     const floors = floorByZ(defineRampSegments(makeCraterGrid(20, 4), ramp(8)));
     expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_SURFACE - (19 / LENGTH) * 8, 6);
+  });
+});
+
+// ── #1939: multi-leg ramps ──
+
+describe('multi-leg ramps (#1939)', () => {
+  const MULTI: RampDef = {
+    originX: 20, originZ: 10, direction: 'south', length: 22, targetDepth: 6, width: 3,
+    legs: [{ direction: 'south', length: 12 }, { direction: 'east', length: 10 }],
+  };
+  const CUT_DEGREES = (Math.atan(RAMP_CUT_SLOPE_RATIO) * 180) / Math.PI;
+
+  function carveAll(grid: VoxelGrid, def: RampDef): RampSegmentDef[] {
+    const segments = defineRampSegments(grid, def);
+    for (const s of segments) carveRampSegment(grid, s);
+    return segments;
+  }
+
+  describe('rampGradeBoundsDegrees', () => {
+    it('min is the straight line to the target depth, max the cut limit', () => {
+      const b = rampGradeBoundsDegrees(22, 6);
+      expect(b.min).toBeCloseTo((Math.atan(6 / 22) * 180) / Math.PI, 6);
+      expect(b.max).toBeCloseTo(CUT_DEGREES, 6);
+    });
+
+    it('a longer path lowers the gentlest grade', () => {
+      expect(rampGradeBoundsDegrees(40, 6).min).toBeLessThan(rampGradeBoundsDegrees(22, 6).min);
+    });
+  });
+
+  describe('rampFloorDepthAt', () => {
+    it('default grade matches the straight ramp: step / length * depth', () => {
+      expect(rampFloorDepthAt(0, 22, 6)).toBeCloseTo(0, 9);
+      expect(rampFloorDepthAt(11, 22, 6)).toBeCloseTo(3, 9);
+      expect(rampFloorDepthAt(5, 22, 6)).toBeCloseTo((5 / 22) * 6, 9);
+    });
+
+    it('an explicit steeper grade descends at tan(grade) per metre then holds at the target depth', () => {
+      const grade = 25;
+      expect(rampFloorDepthAt(4, 22, 6, grade)).toBeCloseTo(4 * Math.tan((grade * Math.PI) / 180), 9);
+      expect(rampFloorDepthAt(21, 22, 6, grade)).toBeCloseTo(6, 9);
+    });
+
+    it('never exceeds the target depth', () => {
+      for (let s = 0; s < 22; s++) expect(rampFloorDepthAt(s, 22, 6, 30)).toBeLessThanOrEqual(6 + 1e-9);
+    });
+  });
+
+  describe('validateRampOrder with legs', () => {
+    it('accepts a two-leg ramp and costs total length x width', () => {
+      const v = validateRampOrder(MULTI, 1e9);
+      expect(v.success).toBe(true);
+      expect(v.cost).toBeCloseTo(22 * 3 * RAMP_COST_PER_METER_PER_WIDTH, 6);
+    });
+
+    it('cost matches the straight ramp of equal total length and width', () => {
+      const straight = validateRampOrder({ originX: 20, originZ: 10, direction: 'south', length: 22, targetDepth: 6, width: 3 }, 1e9);
+      expect(validateRampOrder(MULTI, 1e9).cost).toBeCloseTo(straight.cost, 9);
+    });
+
+    it('refuses a total over MAX_RAMP_LENGTH with the existing too_long reason', () => {
+      const legs = [{ direction: 'south' as const, length: 600 }, { direction: 'east' as const, length: 500 }];
+      const v = validateRampOrder({ ...MULTI, length: 1100, legs, targetDepth: 100 }, 1e12);
+      expect(v.success).toBe(false);
+      expect(v.messageKey).toBe('mining.build_ramp.too_long');
+    });
+
+    it('refuses a leg shorter than the width', () => {
+      const legs = [{ direction: 'south' as const, length: 18 }, { direction: 'east' as const, length: 4 }];
+      const v = validateRampOrder({ ...MULTI, width: 5, length: 22, legs }, 1e9);
+      expect(v.success).toBe(false);
+      expect(v.messageKey).toBe('mining.build_ramp.leg_too_short');
+      expect(v.cost).toBe(0);
+    });
+
+    it('refuses a self-crossing path', () => {
+      const legs = [
+        { direction: 'east' as const, length: 10 }, { direction: 'south' as const, length: 6 },
+        { direction: 'west' as const, length: 10 }, { direction: 'north' as const, length: 10 },
+      ];
+      const v = validateRampOrder({ ...MULTI, direction: 'east', length: 36, legs }, 1e9);
+      expect(v.success).toBe(false);
+      expect(v.messageKey).toBe('mining.build_ramp.legs_cross');
+    });
+
+    it('refuses a 180 degree reversal', () => {
+      const legs = [{ direction: 'east' as const, length: 8 }, { direction: 'west' as const, length: 8 }];
+      const v = validateRampOrder({ ...MULTI, direction: 'east', length: 16, legs }, 1e9);
+      expect(v.messageKey).toBe('mining.build_ramp.legs_cross');
+    });
+
+    it('refuses a grade above the 30 degree cut limit', () => {
+      const v = validateRampOrder({ ...MULTI, gradeDegrees: CUT_DEGREES + 1 }, 1e9);
+      expect(v.success).toBe(false);
+      expect(v.messageKey).toBe('mining.build_ramp.grade_too_steep');
+    });
+
+    it('accepts a grade exactly at the cut limit', () => {
+      expect(validateRampOrder({ ...MULTI, gradeDegrees: CUT_DEGREES - 1e-6 }, 1e9).success).toBe(true);
+    });
+
+    it('refuses a grade gentler than the path allows', () => {
+      const min = rampGradeBoundsDegrees(22, 6).min;
+      const v = validateRampOrder({ ...MULTI, gradeDegrees: min - 1 }, 1e9);
+      expect(v.success).toBe(false);
+      expect(v.messageKey).toBe('mining.build_ramp.grade_too_gentle');
+    });
+
+    it('accepts a grade exactly the gentlest the length allows', () => {
+      const min = rampGradeBoundsDegrees(22, 6).min;
+      expect(validateRampOrder({ ...MULTI, gradeDegrees: min + 1e-6 }, 1e9).success).toBe(true);
+    });
+
+    it('refuses when cash is short, charging nothing', () => {
+      const v = validateRampOrder(MULTI, 10);
+      expect(v.success).toBe(false);
+      expect(v.messageKey).toBe('console.insufficient_funds');
+    });
+  });
+
+  describe('defineRampSegments with legs', () => {
+    it('a single-leg def with explicit legs gives segments identical to the legless def', () => {
+      const base: RampDef = { originX: 20, originZ: 10, direction: 'south', length: 11, targetDepth: 6, width: 3 };
+      const withLegs: RampDef = { ...base, legs: [{ direction: 'south', length: 11 }] };
+      const a = defineRampSegments(makeElevatedGrid(60, 60, 15), base);
+      const b = defineRampSegments(makeElevatedGrid(60, 60, 15), withLegs);
+      expect(b).toEqual(a);
+    });
+
+    it('emits contiguous segment indices from 0', () => {
+      const segments = defineRampSegments(makeElevatedGrid(60, 60, 15), MULTI);
+      expect(segments.length).toBeGreaterThan(0);
+      segments.forEach((s, i) => expect(s.index).toBe(i));
+    });
+
+    it('emits each cell at most once', () => {
+      const segments = defineRampSegments(makeElevatedGrid(60, 60, 15), MULTI);
+      const seen = new Set<string>();
+      for (const s of segments) for (const c of s.cells) {
+        const k = `${c.x},${c.y},${c.z}`;
+        expect(seen.has(k)).toBe(false);
+        seen.add(k);
+      }
+    });
+
+    it('only touches columns of the corridor (legs and corner), not the L bounding-box corner', () => {
+      const cells = new Set(rampPathCells({ originX: 20, originZ: 10, legs: MULTI.legs! }, 3).map(c => `${c.x},${c.z}`));
+      for (const s of defineRampSegments(makeElevatedGrid(60, 60, 15), MULTI)) {
+        for (const c of s.cells) expect(cells.has(`${c.x},${c.z}`)).toBe(true);
+      }
+    });
+
+    it('digs leg k before leg k+1: the first leg start is excavated in an earlier segment than the last tile', () => {
+      const segments = defineRampSegments(makeElevatedGrid(60, 60, 15), MULTI);
+      const indexOfColumn = (x: number, z: number) => segments.find(s => s.cells.some(c => c.x === x && c.z === z))?.index ?? -1;
+      const first = indexOfColumn(20, 10);
+      const last = indexOfColumn(29, 22);
+      expect(first).toBeGreaterThanOrEqual(0);
+      expect(last).toBeGreaterThan(first);
+    });
+
+    it('segment order never returns to an earlier leg', () => {
+      const legOf = new Map(rampPathCells({ originX: 20, originZ: 10, legs: MULTI.legs! }, 3).map(c => [`${c.x},${c.z}`, c.legIndex]));
+      const segments = defineRampSegments(makeElevatedGrid(60, 60, 15), MULTI);
+      let prevMin = 0;
+      for (const s of segments.filter(seg => seg.cells.length > 0)) {
+        const legs = s.cells.map(c => legOf.get(`${c.x},${c.z}`)!);
+        expect(Math.min(...legs)).toBeGreaterThanOrEqual(prevMin);
+        prevMin = Math.min(...legs);
+      }
+    });
+  });
+
+  describe('carved geometry', () => {
+    const centreline = () => rampCenterline({ originX: 20, originZ: 10, legs: MULTI.legs! });
+
+    it('floor descends at a constant grade along the centreline across the corner', () => {
+      const grid = makeElevatedGrid(60, 60, 15);
+      const line = centreline();
+      carveAll(grid, MULTI);
+      // The first tile is dug to depth 0: its carved height is the reference, as on a straight ramp.
+      const start = computeVoxelColumnSurfaceHeight(grid, line[0]!.x, line[0]!.z);
+      for (let s = 0; s < line.length; s++) {
+        const h = computeVoxelColumnSurfaceHeight(grid, line[s]!.x, line[s]!.z);
+        expect(start - h).toBeCloseTo(rampFloorDepthAt(s, 22, 6), 0);
+        expect(Math.abs(start - h - rampFloorDepthAt(s, 22, 6))).toBeLessThan(0.25);
+      }
+    });
+
+    it('never steepens past the ordered grade between adjacent centreline tiles', () => {
+      const grid = makeElevatedGrid(60, 60, 15);
+      carveAll(grid, MULTI);
+      const line = centreline();
+      const maxStep = Math.tan(Math.atan(6 / 22)) + 0.05;
+      for (let s = 1; s < line.length; s++) {
+        const a = computeVoxelColumnSurfaceHeight(grid, line[s - 1]!.x, line[s - 1]!.z);
+        const b = computeVoxelColumnSurfaceHeight(grid, line[s]!.x, line[s]!.z);
+        expect(a - b).toBeLessThanOrEqual(maxStep);
+        expect(a - b).toBeGreaterThanOrEqual(-0.05);
+      }
+    });
+
+    it('the corner landing carries the path through the width x width square: within one step of the corner floor', () => {
+      const grid = makeElevatedGrid(60, 60, 15);
+      carveAll(grid, MULTI);
+      const corner = computeVoxelColumnSurfaceHeight(grid, 20, 22);
+      const perStep = Math.tan(Math.atan(6 / 22));
+      for (let x = 19; x <= 21; x++) for (let z = 21; z <= 23; z++) {
+        expect(Math.abs(computeVoxelColumnSurfaceHeight(grid, x, z) - corner)).toBeLessThanOrEqual(perStep + 0.05);
+      }
+    });
+
+    it('leaves the empty inside corner of the L at ground level', () => {
+      const grid = makeElevatedGrid(60, 60, 15);
+      const before = computeVoxelColumnSurfaceHeight(grid, 26, 12);
+      carveAll(grid, MULTI);
+      expect(computeVoxelColumnSurfaceHeight(grid, 26, 12)).toBe(before);
+    });
+
+    it('an explicit steeper grade reaches the target depth sooner and holds it', () => {
+      const grid = makeElevatedGrid(60, 60, 15);
+      const def: RampDef = { ...MULTI, gradeDegrees: 25 };
+      const line = centreline();
+      carveAll(grid, def);
+      const start = computeVoxelColumnSurfaceHeight(grid, line[0]!.x, line[0]!.z);
+      const endDrop = start - computeVoxelColumnSurfaceHeight(grid, line[21]!.x, line[21]!.z);
+      expect(endDrop).toBeCloseTo(6, 0);
+      const holdDrop = start - computeVoxelColumnSurfaceHeight(grid, line[16]!.x, line[16]!.z);
+      expect(holdDrop).toBeCloseTo(6, 0);
+      const earlyDrop = start - computeVoxelColumnSurfaceHeight(grid, line[8]!.x, line[8]!.z);
+      expect(earlyDrop).toBeCloseTo(8 * Math.tan((25 * Math.PI) / 180), 0);
+    });
   });
 });

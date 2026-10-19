@@ -256,3 +256,52 @@ describe('ramp floor on cross-sloped ground', () => {
     expectLevelAcrossWidth(grid, def, 7);
   });
 });
+
+// ── #1939: multi-leg ramps ──
+
+describe('multi-leg ramps (#1939)', () => {
+  const LEGS = [{ direction: 'south' as const, length: 12 }, { direction: 'east' as const, length: 10 }];
+  const MULTI_DEF: RampDef = { originX: 20, originZ: 10, direction: 'south', length: 22, targetDepth: 6, width: 3, legs: LEGS };
+  const multiRamp = (): BuiltRamp => ({ id: 1, def: MULTI_DEF, width: 3, footprint: { minX: 19, maxX: 29, minZ: 10, maxZ: 23 } });
+
+  it('rampFootprint of a multi-leg def is the path bounding box', () => {
+    expect(rampFootprint(MULTI_DEF, 3)).toEqual({ minX: 19, maxX: 29, minZ: 10, maxZ: 23 });
+  });
+
+  it('rampFootprint of a def without legs is unchanged', () => {
+    expect(rampFootprint(DEF, 3)).toEqual({ minX: 9, maxX: 11, minZ: 5, maxZ: 16 });
+  });
+
+  it('findRampAtTile finds leg and landing tiles', () => {
+    const ramps = [multiRamp()];
+    expect(findRampAtTile(ramps, 20, 10)?.id).toBe(1);   // first leg start
+    expect(findRampAtTile(ramps, 20, 22)?.id).toBe(1);   // corner landing
+    expect(findRampAtTile(ramps, 25, 22)?.id).toBe(1);   // second leg
+    expect(findRampAtTile(ramps, 29, 22)?.id).toBe(1);   // last tile column edge
+  });
+
+  it('findRampAtTile is null in the empty corner of the L bounding box', () => {
+    const ramps = [multiRamp()];
+    expect(findRampAtTile(ramps, 27, 11)).toBeNull();
+    expect(findRampAtTile(ramps, 29, 10)).toBeNull();
+  });
+
+  it('refuses to widen a multi-leg ramp with the multi_leg reason', () => {
+    const r = validateWidenRamp(multiRamp(), 5, 1e9);
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.errorKey).toBe('mining.widen_ramp.multi_leg');
+  });
+
+  it('orderRampWiden on a multi-leg ramp charges nothing and queues nothing', () => {
+    const state = createGame({ seed: 42 });
+    state.cash = 1_000_000;
+    state.builtRamps.push(multiRamp());
+    state.nextBuiltRampId = 2;
+    const grid = makeElevatedGrid(60, 60, 22);
+    const before = snapshot(state);
+    const r = orderRampWiden(state, grid, 1, 5);
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.errorKey).toBe('mining.widen_ramp.multi_leg');
+    expect(snapshot(state)).toEqual(before);
+  });
+});
