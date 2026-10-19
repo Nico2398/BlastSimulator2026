@@ -64,8 +64,17 @@ function parseOreGradeArg(raw: string | undefined): { scale?: number; error?: st
   return { scale: value };
 }
 
+function parseStartGradeArg(raw: string | undefined): { grade?: number; error?: string } {
+  if (raw === undefined) return {};
+  const value = Number(raw);
+  if (raw.trim() === '' || !Number.isInteger(value) || value < 0) {
+    return { error: t('sandbox.invalid_grade', { value: raw }) };
+  }
+  return { grade: value };
+}
+
 /**
- * `sandbox start [biome:… kit:digger|full seed:… ore_grade:0..1 …]` (`difficulty:` is a legacy alias for `kit:`)
+ * `sandbox start [biome:… kit:digger|full seed:… ore_grade:0..1 grade:N …]` (`difficulty:` is a legacy alias for `kit:`)
  *
  * Unlike `campaign start`, this needs no prior `new_game` and is gated by no
  * unlock: a sandbox site is created from nothing, which is the whole point of
@@ -101,6 +110,11 @@ export function sandboxCommand(
     return { success: false, output: oreGrade.error };
   }
 
+  const startGrade = parseStartGradeArg(named['grade']);
+  if (startGrade.error) {
+    return { success: false, output: startGrade.error };
+  }
+
   const config = clampSandboxConfig(requested);
   const level = { ...sandboxLevelDef(config), ...(oreGrade.scale !== undefined ? { oreGradeScale: oreGrade.scale } : {}) };
   // Absent: the kit's free site. true: the global staffed roster, no buildings. false: bare.
@@ -132,7 +146,11 @@ export function sandboxCommand(
   });
 
   if (level.market) ctx.state.contracts.market = level.market;
-  if (level.progression) ctx.state.grade = createGradeState();
+  if (level.progression) {
+    ctx.state.grade = createGradeState();
+    // `grade:N` starts the site at permit grade N (scenarios reach later grades without playing the ladder).
+    if (startGrade.grade !== undefined) ctx.state.grade.grade = startGrade.grade;
+  }
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
   generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state));
 

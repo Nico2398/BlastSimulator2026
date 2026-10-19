@@ -7,6 +7,7 @@
 import type { Rect } from '../world/WorldGen.js';
 import { BUILDING_DEFS } from './BuildingDefs.js';
 import { RESERVATION_REFUSAL, reservationBlocking, type TerrainReservation } from './PlacementReservations.js';
+import { VANITY_TYPES } from './BuildingVanity.js';
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
 import { type VoxelGrid, getSurfaceY } from './BuildingPlacement.js';
@@ -28,7 +29,11 @@ export type BuildingType =
   | 'living_quarters'
   | 'explosive_warehouse'
   | 'freight_warehouse'
-  | 'spoil_heap';
+  | 'spoil_heap'
+  | 'ceo_statue'
+  | 'golf_course'
+  | 'executive_helipad'
+  | 'gold_tower';
 
 /** Building upgrade tier. Tier 1 is the base tier available from the start. */
 export type BuildingTier = 1 | 2 | 3;
@@ -253,10 +258,10 @@ export function getBuildingPeopleCapacity(type: BuildingType, tier: BuildingTier
 }
 
 /** Types with a single tier: tiers 2 and 3 alias tier 1 and cannot be researched (#1530). */
-const SINGLE_TIER_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>(['spoil_heap']);
+const SINGLE_TIER_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>(['spoil_heap', ...VANITY_TYPES]);
 
 /** Types that take no crew (#1530). */
-const CREWLESS_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>(['spoil_heap']);
+const CREWLESS_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>(['spoil_heap', ...VANITY_TYPES]);
 
 /** Whether the type has only one tier. */
 export function isSingleTierType(type: BuildingType): boolean {
@@ -575,6 +580,15 @@ export function rectsOverlap(a: Rect, b: Rect): boolean {
   return a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
 }
 
+/** Whether two rects share an edge segment without overlapping (touching side by side, not diagonally). */
+function rectsAbut(a: Rect, b: Rect): boolean {
+  const overlapX = a.minX < b.maxX && a.maxX > b.minX;
+  const overlapZ = a.minZ < b.maxZ && a.maxZ > b.minZ;
+  const abutX = a.maxX === b.minX || a.minX === b.maxX;
+  const abutZ = a.maxZ === b.minZ || a.minZ === b.maxZ;
+  return (overlapX && abutZ) || (overlapZ && abutX);
+}
+
 /** The first occupant whose footprint overlaps the inclusive-min / exclusive-max world rect, if any (#1830). */
 export function findOverlappingOccupant(
   occupants: ReadonlyArray<FootprintOccupant>,
@@ -695,3 +709,17 @@ export {
   computePlacementCutoff,
   type PlacementCutoff,
 } from './PlacementCutoff.js';
+
+/** Whether the inclusive-min / exclusive-max world rect overlaps an occupant of `type` (#1947). */
+export function touchesBuildingOfType(
+  occupants: ReadonlyArray<FootprintOccupant>,
+  rect: Rect,
+  type: BuildingType,
+): boolean {
+  for (const occ of occupants) {
+    if (occ.type !== type) continue;
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(occ.type, occ.tier));
+    if (rectsAbut(rect, { minX: occ.x, minZ: occ.z, maxX: occ.x + sizeX, maxZ: occ.z + sizeZ })) return true;
+  }
+  return false;
+}

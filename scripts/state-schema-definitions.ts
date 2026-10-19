@@ -92,6 +92,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   safety: { type: 'number', description: '0-100 score (ScoreState)' },
   ecology: { type: 'number', description: '0-100 score (ScoreState)' },
   nuisance: { type: 'number', description: '0-100 score (ScoreState)' },
+  averageMorale: { type: 'number', description: 'Mean morale (0-100) of the living employees; 50 with none' },
   muckPile: { type: 'object', optional: true, description: 'Fragment size, speed and clearance spread after a blast' },
   unseenApprovalGrade: { type: 'number', optional: true, description: 'Grade whose approval letter the player has not dismissed yet; null when none (#1926)' },
   mineGrade: { type: 'object', optional: true, description: 'Mine-grade permit state {grade, pendingTicksLeft}; null on a site with no permit ladder (#1921)' },

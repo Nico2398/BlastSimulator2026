@@ -9,6 +9,7 @@ import {
   boardProgress,
   runBoardReview,
   isBoardFired,
+  addBoardConfidence,
   type BoardConfig,
   type BoardState,
 } from '../../../src/core/economy/Board.js';
@@ -547,5 +548,39 @@ describe('a board-less game', () => {
     expect(runBoardReview(state as ReviewState)).toBeNull();
     recordBoardOre(state.board, 'ore_sale', 1000);
     expect('board' in state).toBe(false);
+  });
+});
+
+describe('addBoardConfidence (#1947)', () => {
+  it('adds to confidence and returns true', () => {
+    const state = makeState();
+    state.board.confidence = 40;
+    expect(addBoardConfidence(state.board, 10)).toBe(true);
+    expect(state.board.confidence).toBe(50);
+  });
+
+  it('clamps at BOARD_CONFIDENCE_MAX', () => {
+    const state = makeState();
+    state.board.confidence = BOARD_CONFIDENCE_MAX - 5;
+    addBoardConfidence(state.board, 50);
+    expect(state.board.confidence).toBe(BOARD_CONFIDENCE_MAX);
+  });
+
+  it('clamps at 0 for a negative amount', () => {
+    const state = makeState();
+    state.board.confidence = 5;
+    addBoardConfidence(state.board, -50);
+    expect(state.board.confidence).toBe(0);
+  });
+
+  it('a zero amount changes nothing', () => {
+    const state = makeState();
+    const before = state.board.confidence;
+    expect(addBoardConfidence(state.board, 0)).toBe(true);
+    expect(state.board.confidence).toBe(before);
+  });
+
+  it('is a no-op returning false when no board is attached', () => {
+    expect(addBoardConfidence(undefined, 10)).toBe(false);
   });
 });

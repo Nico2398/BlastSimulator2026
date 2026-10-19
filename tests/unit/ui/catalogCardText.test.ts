@@ -18,6 +18,7 @@ import {
 import {
   getAllBuildingTypes, getBuildingDef, getFootprintSize, type BuildingTier,
 } from '../../../src/core/entities/Building.js';
+import { VANITY_PROJECTS, VANITY_TYPES } from '../../../src/core/entities/BuildingVanity.js';
 import { DRILL_RIG_MAX_DEPTH_M } from '../../../src/core/config/balance.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
@@ -334,5 +335,38 @@ describe('buildingScoreEffectLines / buildingCardEffects (#1977)', () => {
     const line = buildingScoreEffectLines(getBuildingDef('management_office', 1))[0]!;
     expect(line).toContain(t('score.safety'));
     expect(line).toContain('+2');
+  });
+});
+
+describe('buildingCardEffects vanity lines (#1947)', () => {
+  const effects = (type: Parameters<typeof getBuildingDef>[0]) => buildingCardEffects(getBuildingDef(type, 1));
+
+  it('ceo_statue names confidence +10 and a morale dip once', () => {
+    const text = effects('ceo_statue');
+    expect(text).toContain(t('ui.build.vanity.confidence', { value: '+10' }));
+    expect(text).toContain(t('ui.build.vanity.once', { score: t('ui.employees.morale'), value: '-2' }));
+    expect(text).not.toContain(t('ui.build.vanity.must_touch', { target: t('building.spoil_heap.name') }));
+  });
+
+  it('golf_course names confidence +20, ecology and the spoil heap requirement', () => {
+    const text = effects('golf_course');
+    expect(text).toContain(t('ui.build.vanity.confidence', { value: '+20' }));
+    expect(text).toContain(t('ui.build.vanity.once', { score: t('score.ecology'), value: `+${VANITY_PROJECTS.golf_course.ecologyOnce}` }));
+    expect(text).toContain(t('ui.build.vanity.must_touch', { target: t('building.spoil_heap.name') }));
+  });
+
+  it('every vanity type carries its confidence line, no raw keys', () => {
+    for (const type of VANITY_TYPES) {
+      const text = effects(type);
+      const v = VANITY_PROJECTS[type].boardConfidence;
+      expect(text).toContain(t('ui.build.vanity.confidence', { value: `${v > 0 ? '+' : '-'}${Math.abs(v)}` }));
+      expect(text).not.toMatch(/ui\.build\.vanity/);
+      expect(text).not.toContain('{');
+    }
+  });
+
+  it('a non-vanity building has no vanity lines', () => {
+    expect(effects('management_office')).not.toContain(t('ui.build.vanity.confidence', { value: '+0' }));
+    expect(effects('management_office')).not.toMatch(/once/);
   });
 });

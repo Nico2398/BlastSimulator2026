@@ -2,7 +2,10 @@
 // 9 canonical building types × 3 tiers. Data file — line-limit exempt.
 
 import type { BuildingDef, BuildingTier, BuildingType } from './Building.js';
-import { FREIGHT_WAREHOUSE_CAPACITY_KG, SPOIL_HEAP_CAPACITY_KG } from '../config/balance.js';
+import {
+  FREIGHT_WAREHOUSE_CAPACITY_KG, SPOIL_HEAP_CAPACITY_KG, VANITY_CEO_STATUE_COST, VANITY_GOLF_COURSE_COST,
+  VANITY_EXECUTIVE_HELIPAD_COST, VANITY_GOLD_TOWER_COST, VANITY_GOLF_UPKEEP_PER_TICK,
+} from '../config/balance.js';
 
 // ── Footprint helpers ──
 
@@ -265,5 +268,55 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
     },
     get 2() { return BUILDING_DEFS.spoil_heap[1]; },
     get 3() { return BUILDING_DEFS.spoil_heap[1]; },
+  },
+
+  // ── Vanity projects (#1947) — single tier, crewless, no refund on demolition ──
+  ceo_statue: {
+    1: {
+      type: 'ceo_statue', tier: 1,
+      nameKey: 'building.ceo_statue.t1.name',
+      footprint: rect(2, 2), entryPoint: entry(), exitPoint: exit_(2),
+      constructionCost: VANITY_CEO_STATUE_COST, demolishCost: 0, operatingCostPerTick: 0,
+      capacity: 0, maxHp: 100, structuralResistance: 1000,
+      scoreEffects: {},
+    },
+    get 2() { return BUILDING_DEFS.ceo_statue[1]; },
+    get 3() { return BUILDING_DEFS.ceo_statue[1]; },
+  },
+  golf_course: {
+    1: {
+      type: 'golf_course', tier: 1,
+      nameKey: 'building.golf_course.t1.name',
+      footprint: rect(6, 6), entryPoint: entry(), exitPoint: exit_(6),
+      constructionCost: VANITY_GOLF_COURSE_COST, demolishCost: 0, operatingCostPerTick: VANITY_GOLF_UPKEEP_PER_TICK,
+      capacity: 0, maxHp: 100, structuralResistance: 1000,
+      scoreEffects: {},
+    },
+    get 2() { return BUILDING_DEFS.golf_course[1]; },
+    get 3() { return BUILDING_DEFS.golf_course[1]; },
+  },
+  executive_helipad: {
+    1: {
+      type: 'executive_helipad', tier: 1,
+      nameKey: 'building.executive_helipad.t1.name',
+      footprint: rect(4, 4), entryPoint: entry(), exitPoint: exit_(4),
+      constructionCost: VANITY_EXECUTIVE_HELIPAD_COST, demolishCost: 0, operatingCostPerTick: 0,
+      capacity: 0, maxHp: 100, structuralResistance: 1000,
+      scoreEffects: {},
+    },
+    get 2() { return BUILDING_DEFS.executive_helipad[1]; },
+    get 3() { return BUILDING_DEFS.executive_helipad[1]; },
+  },
+  gold_tower: {
+    1: {
+      type: 'gold_tower', tier: 1,
+      nameKey: 'building.gold_tower.t1.name',
+      footprint: rect(4, 4), entryPoint: entry(), exitPoint: exit_(4),
+      constructionCost: VANITY_GOLD_TOWER_COST, demolishCost: 0, operatingCostPerTick: 0,
+      capacity: 0, maxHp: 100, structuralResistance: 1000,
+      scoreEffects: {},
+    },
+    get 2() { return BUILDING_DEFS.gold_tower[1]; },
+    get 3() { return BUILDING_DEFS.gold_tower[1]; },
   },
 };
