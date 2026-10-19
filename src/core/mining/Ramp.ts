@@ -659,10 +659,13 @@ export function isRampCellPending(grid: VoxelGrid, cell: RampSegmentDef['cells']
     return currentHeight < cell.fillTarget - FLOOR_TARGET_EPSILON;
   }
   if (cell.floorAdjustment !== undefined) {
-    // (#2001) An air floor row is still pending while a partial top voxel
-    // stands above the line.
-    if (grid.densityAt(cell.x, cell.y, cell.z) > 0) return true;
+    // (#2001) Judged by the column's continuous height, matching carveRampCell's
+    // idempotency check: banding leaves this very row at a small nonzero
+    // residual density, so a raw density>0 test would never read as done. An
+    // air floor row is still pending while a partial top voxel stands above
+    // the line.
     const currentHeight = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
+    if (!Number.isFinite(currentHeight)) return grid.densityAt(cell.x, cell.y, cell.z) > 0;
     return currentHeight > (cell.y - 1 + cell.floorAdjustment) + FLOOR_TARGET_EPSILON;
   }
   return grid.densityAt(cell.x, cell.y, cell.z) > 0;
