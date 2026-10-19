@@ -1019,6 +1019,21 @@
       "role": "player"
     },
     {
+      "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:2000",
+      "description": "Blast 1's rubble is hauled to storage until an ore sale offer fits what is stored; contract offers refresh on their own RNG, so wait on the offer rather than a tick pad.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "fillableOreSaleOffered",
+          "equals": true,
+          "maxTicks": 2000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "timeout": 125
+    },
+    {
       "command": "contract accept type:ore_sale fillable:true",
       "interaction": [
         {
