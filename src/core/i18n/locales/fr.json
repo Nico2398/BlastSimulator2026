@@ -2429,6 +2429,7 @@
   "ui.contracts.title": "Contrats",
   "ui.contracts.available_count": "Disponibles · {count}",
   "ui.contracts.active_count": "Actifs · {count}",
+  "ui.contracts.active_summary": "En cours · {count} · prochaine échéance dans {hours}h",
   "ui.contracts.accept": "Accepter",
   "ui.contracts.negotiate": "Négocier",
   "ui.contracts.decline": "Refuser",
