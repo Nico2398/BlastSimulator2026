@@ -18,7 +18,7 @@ function fixture(opts: { board?: boolean; crew?: number } = {}): Fixture {
   for (let i = 0; i < (opts.crew ?? 3); i++) hireEmployee(employees, 'driller', rng);
   const board = opts.board === false ? undefined : createBoardState({ quarterTicks: 100, oreTargetT: 10, profitTarget: 1000 }, 0);
   if (board) board.confidence = 30;
-  return { board, scores: createScoreState(), employees };
+  return { ...(board ? { board } : {}), scores: createScoreState(), employees };
 }
 
 describe('applyVanityCompletion (#1947)', () => {

@@ -62,6 +62,8 @@ describe('vanity build availability (#1947)', () => {
 describe('golf course placement (#1947)', () => {
   const heap = BUILDING_DEFS.spoil_heap[1].footprint;
   const heapW = Math.max(...heap.map(c => c[0])) + 1;
+  // Flat ground on seed 42: a 6x6 course beside the heap must also pass the slope check.
+  const HX = 40, HZ = 20;
 
   it('is refused unless it touches a spoil heap, charging nothing', () => {
     const { run, state } = site(4);
@@ -73,18 +75,18 @@ describe('golf course placement (#1947)', () => {
 
   it('is accepted beside a spoil heap and charges 600000', () => {
     const { run, state } = site(4);
-    expect(run('build spoil_heap at:10,10')).toMatchObject({ success: true });
+    expect(run(`build spoil_heap at:${HX},${HZ}`)).toMatchObject({ success: true });
     const cash = state.cash;
-    expect(run(`build golf_course at:${10 + heapW},10`)).toMatchObject({ success: true });
+    expect(run(`build golf_course at:${HX + heapW},${HZ}`)).toMatchObject({ success: true });
     expect(state.cash).toBe(cash - 600_000);
     expect(ofType(state, 'golf_course')).toHaveLength(1);
   });
 
   it('is refused when only diagonal to the heap', () => {
     const { run, state } = site(4);
-    run('build spoil_heap at:10,10');
+    run(`build spoil_heap at:${HX},${HZ}`);
     const heapD = Math.max(...heap.map(c => c[1])) + 1;
-    expect(run(`build golf_course at:${10 + heapW},${10 + heapD}`).success).toBe(false);
+    expect(run(`build golf_course at:${HX + heapW},${HZ + heapD}`).success).toBe(false);
     expect(ofType(state, 'golf_course')).toHaveLength(0);
   });
 });
