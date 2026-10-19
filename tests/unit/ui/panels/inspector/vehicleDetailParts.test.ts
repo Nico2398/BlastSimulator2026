@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { vehicleDisplayName, vehicleDriverState } from '../../../../../src/ui/fleetDetailSections.js';
 import {
-  upgradeState, licenceWarning, scrapConfirmConfig, repairState,
+  upgradeState, upgradeDisabledReason, licenceWarning, scrapConfirmConfig, repairState,
   makePendingDriverRow, makeNoDriverRow, makeDriverRow,
 } from '../../../../../src/ui/panels/inspector/vehicleDetailParts.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
@@ -88,6 +88,18 @@ describe('vehicleDetailParts — upgradeState', () => {
 
   it('is unavailable at the maximum tier, with no cost', () => {
     expect(upgradeState({ type: 'debris_hauler', tier: 3 }, 9_999_999)).toEqual({ available: false, affordable: false, cost: null });
+  });
+
+  it('is locked by the mine grade even when cash is ample (grade checked before affordability)', () => {
+    const s = upgradeState({ type: 'debris_hauler', tier: 1 }, 9_999_999, 0);
+    expect(s.affordable).toBe(true);
+    expect(s.locked).toContain('dealer');
+    expect(upgradeDisabledReason(s)).toBe(s.locked);
+  });
+
+  it('is not locked once the mine grade reaches the next tier, or on a non-progression site', () => {
+    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, 9_999_999, 9).locked).toBeUndefined();
+    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, 9_999_999, undefined).locked).toBeUndefined();
   });
 });
 

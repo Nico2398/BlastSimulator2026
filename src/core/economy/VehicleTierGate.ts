@@ -4,15 +4,10 @@ import { VEHICLE_TIER_UNLOCK_GRADE } from '../config/balance.js';
 import { gradeDef, registerUnlockLine } from './MineGrade.js';
 import { t } from '../i18n/I18n.js';
 
-/** Mine grade at which a vehicle tier unlocks. */
-function requiredGradeForVehicleTier(tier: VehicleTier): number {
-  return VEHICLE_TIER_UNLOCK_GRADE[tier];
-}
-
 /** Null when allowed (or grade is undefined: non-progression site); else the grade needed. */
 export function vehicleTierGate(grade: number | undefined, tier: VehicleTier): { needed: number } | null {
   if (grade === undefined) return null;
-  const needed = requiredGradeForVehicleTier(tier);
+  const needed = VEHICLE_TIER_UNLOCK_GRADE[tier];
   return grade >= needed ? null : { needed };
 }
 
@@ -21,9 +16,11 @@ function gradeName(grade: number): string {
   return t(def.nameKey, def.nameParams);
 }
 
-/** Refusal message for a gated purchase or upgrade. */
-export function vehicleTierRefusalText(grade: number, needed: number): string {
-  return t('vehicle.tier_locked', { current: gradeName(grade), needed: gradeName(needed) });
+/** Dealer refusal text for a gated purchase or upgrade; null when allowed (or non-progression site). */
+export function vehicleTierRefusal(grade: number | undefined, tier: VehicleTier): string | null {
+  const gate = vehicleTierGate(grade, tier);
+  if (grade === undefined || gate === null) return null;
+  return t('vehicle.tier_locked', { current: gradeName(grade), needed: gradeName(gate.needed) });
 }
 
 /** Short lock label shown on gated UI controls. */

@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   vehicleTierGate,
-  vehicleTierRefusalText,
+  vehicleTierRefusal,
   vehicleTierLockLabel,
 } from '../../../src/core/economy/VehicleTierGate.js';
 import { unlockLinesFor } from '../../../src/core/economy/MineGrade.js';
@@ -48,7 +48,7 @@ describe('VehicleTierGate (#1928)', () => {
   });
 
   it('refusal text names the current and the needed grade', () => {
-    const text = vehicleTierRefusalText(1, 2);
+    const text = vehicleTierRefusal(1, 2);
     expect(text).toBe('The dealer laughs at your Hobby Quarry Licence. Come back with a Licensed Quarry.');
   });
 

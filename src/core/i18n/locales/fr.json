@@ -4186,7 +4186,7 @@
   "vehicle.upgrade_usage": "Utilisation : vehicle upgrade <id>",
   "vehicle.upgrade_success": "Véhicule #{id} amélioré au niveau {tier}. Coût : {cost} $",
   "vehicle.upgrade_max_tier": "Le véhicule #{id} est déjà au niveau maximum.",
-  "vehicle.tier_locked": "Le concessionnaire rit de votre {current}. Revenez avec un(e) {needed}.",
+  "vehicle.tier_locked": "Le concessionnaire rit de votre {current}. Revenez avec : {needed}.",
   "vehicle.upgrade_no_licensed": "Attention : personne dans l'effectif n'a le permis pour conduire ce niveau.",
   "vehicle.scrap_success": "Véhicule #{id} mis à la casse. Valeur résiduelle : {value} $",
   "vehicle.break_usage": "Utilisation : vehicle break <vehicleId> fragment:<fragmentId>",

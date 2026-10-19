@@ -21,7 +21,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
 import type { Employee } from '../../core/entities/Employee.js';
-import { vehicleTierGate, vehicleTierRefusalText, vehicleTierLockLabel } from '../../core/economy/VehicleTierGate.js';
+import { vehicleTierGate, vehicleTierRefusal, vehicleTierLockLabel } from '../../core/economy/VehicleTierGate.js';
 import { getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
 import { countLicenceHolders } from '../../core/entities/VehicleDriverAssignment.js';
 import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
@@ -42,6 +42,15 @@ const ROW_PART_CLASS = {
 } as const;
 
 type RowParts = Record<Exclude<keyof typeof ROW_PART_CLASS, 'load'>, HTMLElement> & { load: HTMLElement | null };
+
+/** Dealer grade lock on a tier button: tooltip refusal plus the short badge label. */
+interface TierLock { refusal: string; label: string }
+
+function tierLock(grade: number | undefined, tier: VehicleTier): TierLock | null {
+  const gate = vehicleTierGate(grade, tier);
+  const refusal = vehicleTierRefusal(grade, tier);
+  return gate && refusal ? { refusal, label: vehicleTierLockLabel(gate.needed) } : null;
+}
 
 const TIER_BTN_BASE_STYLE = 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);color:var(--bsx-text-primary);text-align:left';
 
@@ -238,28 +247,33 @@ export class FleetPanel extends PanelBase {
     btn.dataset['stats'] = vehicleCardTooltip(def);
     const cost = el('span', { text: formatDollars(def.purchaseCost), className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
     btn.append(info, cost);
-    this.setTierButtonAffordable(btn, cash >= def.purchaseCost, def.purchaseCost, vehicleTierGate(state.grade?.grade, tier), state.grade?.grade);
+    this.applyTierButtonState(btn, cash >= def.purchaseCost, def.purchaseCost, tierLock(state.grade?.grade, tier));
     btn.addEventListener('click', () => this.gameConsole?.(`vehicle buy ${role} tier:${tier}`));
     return btn;
   }
 
-  /** `gate` (dealer grade lock) wins over affordability: a locked, affordable tier still shows locked. */
-  private setTierButtonAffordable(btn: HTMLButtonElement, affordable: boolean, purchaseCost: number, gate: { needed: number } | null, grade: number | undefined): void {
-    const usable = affordable && gate === null;
+  /** `lock` (dealer grade lock) wins over affordability: a locked, affordable tier still shows locked. */
+  private applyTierButtonState(btn: HTMLButtonElement, affordable: boolean, purchaseCost: number, lock: TierLock | null): void {
+    const usable = affordable && lock === null;
     btn.disabled = !usable;
     const stats = btn.dataset['stats'] ?? '';
-    if (gate) btn.title = `${stats}\n${vehicleTierRefusalText(grade!, gate.needed)}`;
+    if (lock) btn.title = `${stats}\n${lock.refusal}`;
     else btn.title = affordable ? stats : `${stats}\n${t('ui.fleet.tip.cannot_afford', { cost: formatMoney(purchaseCost) })}`;
-    if (gate) btn.dataset['locked'] = 'grade'; else delete btn.dataset['locked'];
+    if (lock) btn.dataset['locked'] = 'grade'; else delete btn.dataset['locked'];
     // Rewrite the whole attribute: mutating btn.style piecemeal can drop the var() colour in some CSSOM implementations.
     btn.setAttribute('style', `${TIER_BTN_BASE_STYLE};opacity:${usable ? '1' : '.45'};cursor:${usable ? 'pointer' : 'not-allowed'}`);
-    let lock = btn.querySelector<HTMLElement>('.bs-fleet-tier-lock');
-    if (!gate) { lock?.remove(); return; }
-    if (!lock) {
-      lock = el('span', { className: 'bs-fleet-tier-lock', attrs: { style: 'font-size:10px;font-weight:600;color:var(--bsx-amber)' } });
-      btn.querySelector('div')?.appendChild(lock);
+    this.syncTierLockBadge(btn, lock);
+  }
+
+  /** Adds, updates or removes the "Needs <grade>" badge on a dealership tier button. */
+  private syncTierLockBadge(btn: HTMLButtonElement, lock: TierLock | null): void {
+    let badge = btn.querySelector<HTMLElement>('.bs-fleet-tier-lock');
+    if (!lock) { badge?.remove(); return; }
+    if (!badge) {
+      badge = el('span', { className: 'bs-fleet-tier-lock', attrs: { style: 'font-size:10px;font-weight:600;color:var(--bsx-amber)' } });
+      btn.querySelector('div')?.appendChild(badge);
     }
-    lock.textContent = vehicleTierLockLabel(gate.needed);
+    badge.textContent = lock.label;
   }
 
   /** "Licence <name> level N — M hold it" for a dealership tier row. */
@@ -274,7 +288,7 @@ export class FleetPanel extends PanelBase {
       const role = btn.dataset['role'] as VehicleRole;
       const tier = Number(btn.dataset['tier']) as VehicleTier;
       const def = getVehicleDefByTier(role, tier);
-      this.setTierButtonAffordable(btn, cash >= def.purchaseCost, def.purchaseCost, vehicleTierGate(state.grade?.grade, tier), state.grade?.grade);
+      this.applyTierButtonState(btn, cash >= def.purchaseCost, def.purchaseCost, tierLock(state.grade?.grade, tier));
       const line = btn.querySelector<HTMLElement>('.bs-fleet-tier-licence');
       if (line) line.textContent = this.licenceLineText(role, tier, countLicenceHolders(employees, role, tier));
     });

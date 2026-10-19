@@ -27,7 +27,7 @@ import { requestBreakBoulder } from '../../core/economy/BoulderBreaking.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
 import { rallySpawnCell } from '../../core/state/RallyPoint.js';
 import { requireGame, refusalText } from './commandUtils.js';
-import { vehicleTierGate, vehicleTierRefusalText } from '../../core/economy/VehicleTierGate.js';
+import { vehicleTierRefusal } from '../../core/economy/VehicleTierGate.js';
 import { t } from '../../core/i18n/I18n.js';
 
 // ── tier arg parsing ──
@@ -83,8 +83,8 @@ export function vehicleCommand(
         return { success: false, output: t('vehicle.buy_usage_tier') };
       }
       // Dealer grade gate (progression sites only), before cash and before the mutation.
-      const gate = vehicleTierGate(state.grade?.grade, tier);
-      if (gate) return { success: false, output: vehicleTierRefusalText(state.grade!.grade, gate.needed) };
+      const refusal = vehicleTierRefusal(state.grade?.grade, tier);
+      if (refusal) return { success: false, output: refusal };
       // Checked before purchaseVehicle, which *mutates* — it pushes the
       // vehicle and bumps nextId before it can report a cost. Same predicate
       // and same cost source as the UI: FleetPanel disables the per-tier
@@ -183,9 +183,10 @@ export function vehicleCommand(
       const vehicle = state.vehicles.vehicles.find(v => v.id === id);
       if (!vehicle) return { success: false, output: t('vehicle.not_found', { id }) };
       const cost = computeVehicleUpgradeCost(vehicle.type, vehicle.tier);
-      if (cost === null) return { success: false, output: t('vehicle.upgrade_max_tier', { id }) };
-      const gate = vehicleTierGate(state.grade?.grade, nextVehicleTier(vehicle.tier)!);
-      if (gate) return { success: false, output: vehicleTierRefusalText(state.grade!.grade, gate.needed) };
+      const nextTier = nextVehicleTier(vehicle.tier);
+      if (cost === null || nextTier === null) return { success: false, output: t('vehicle.upgrade_max_tier', { id }) };
+      const refusal = vehicleTierRefusal(state.grade?.grade, nextTier);
+      if (refusal) return { success: false, output: refusal };
       // Cash is checked before upgradeVehicle, which mutates tier and hp.
       if (!canAffordVehicleUpgrade(vehicle, state.cash)) {
         return {

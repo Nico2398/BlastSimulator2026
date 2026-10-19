@@ -9,7 +9,7 @@ import { ROLE_LICENCE_REQUIRED, vehicleDriverId, computeScrapResidualValue } fro
 import type { GameState, PendingAction } from '../../../core/state/GameState.js';
 import type { Employee } from '../../../core/entities/Employee.js';
 import type { ConfirmModalConfig } from '../ConfirmModal.js';
-import { vehicleTierGate, vehicleTierRefusalText } from '../../../core/economy/VehicleTierGate.js';
+import { vehicleTierRefusal } from '../../../core/economy/VehicleTierGate.js';
 import { rosterCanDriveVehicleTier, canAffordVehicleUpgrade, computeVehicleUpgradeCost, nextVehicleTier } from '../../../core/entities/VehicleUpgrade.js';
 import { missingHp } from '../../../core/entities/VehicleRepair.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -101,12 +101,12 @@ interface UpgradeState {
 /** Next-tier upgrade availability and price; the single source for the Inspector. */
 export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number, grade?: number): UpgradeState {
   const cost = computeVehicleUpgradeCost(v.type, v.tier);
-  const available = nextVehicleTier(v.tier) !== null && cost !== null;
   const next = nextVehicleTier(v.tier);
-  const gate = next === null ? null : vehicleTierGate(grade, next);
+  const available = next !== null && cost !== null;
+  const refusal = next === null ? null : vehicleTierRefusal(grade, next);
   return {
     available, affordable: available && canAffordVehicleUpgrade(v, cash), cost: available ? cost : null,
-    ...(gate ? { locked: vehicleTierRefusalText(grade!, gate.needed) } : {}),
+    ...(refusal ? { locked: refusal } : {}),
   };
 }
 
