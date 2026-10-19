@@ -39,6 +39,9 @@ import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDura
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
 import { computeChargeDurationTicks } from '../../../src/core/mining/ChargePlan.js';
+import { computeRigDurationTicks } from '../../../src/core/entities/Vehicle.js';
+import { computeDrillHoleDurationTicks } from '../../../src/core/mining/DrillPlan.js';
+import { seedTaskTimerFields } from '../../../src/core/engine/ActionSelection.js';
 import { computeRampSegmentDurationTicks } from '../../../src/core/mining/Ramp.js';
 import { computeLevelVolume } from '../../../src/core/mining/LevelGround.js';
 import { VoxelGrid, setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
@@ -2006,6 +2009,109 @@ describe('computeActionWorkTicks — charge_hole scales with the reserved chargi
     reserveVehicle(state.vehicles, purchaseVehicle(state.vehicles, 'charging_truck', 0, 0, 3).vehicle.id, action.id);
 
     expect(computeActionWorkTicks(state, employee, action)).toBe(11);
+  });
+});
+
+describe('computeActionWorkTicks — drill_hole scales with the reserved drill rig tier (#1935)', () => {
+  const BASE = 120;
+
+  function drillAction(id: number, payload: Record<string, unknown> = { durationTicks: BASE }): PendingAction {
+    return makeWorkAction({ id, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig', payload });
+  }
+
+  function inputs(state: GameState, employee: Employee) {
+    return {
+      needMult: getNeedMultiplier(employee),
+      lqMult: getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length),
+    };
+  }
+
+  function ticksForTier(tier: 1 | 2 | 3, level: 1 | 2 | 3 | 4 | 5 = 1): { ticks: number; expectedBase: number } {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', level);
+    const action = drillAction(1);
+    reserveVehicle(state.vehicles, purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, tier).vehicle.id, action.id);
+    const { needMult, lqMult } = inputs(state, employee);
+    const workRate = { 1: 1, 2: 1.4, 3: 2 }[tier];
+    return {
+      ticks: computeActionWorkTicks(state, employee, action),
+      expectedBase: computeTaskDuration(BASE / workRate, level, needMult, lqMult, 1),
+    };
+  }
+
+  it('tier 1 reservation: plain proficiency/need/LQ scaling of the base', () => {
+    const { ticks, expectedBase } = ticksForTier(1);
+    expect(ticks).toBe(expectedBase);
+  });
+
+  it('tier 2 rig works in 1/1.4 of the tier-1 base', () => {
+    const { ticks, expectedBase } = ticksForTier(2);
+    expect(ticks).toBe(expectedBase);
+  });
+
+  it('tier 3 rig works in 1/2 of the tier-1 base', () => {
+    const { ticks, expectedBase } = ticksForTier(3, 2);
+    expect(ticks).toBe(expectedBase);
+  });
+
+  it('tier 3 < tier 2 < tier 1', () => {
+    const t1 = ticksForTier(1).ticks;
+    const t2 = ticksForTier(2).ticks;
+    const t3 = ticksForTier(3).ticks;
+    expect(t3).toBeLessThan(t2);
+    expect(t2).toBeLessThan(t1);
+  });
+
+  it('matches computeRigDurationTicks', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 3);
+    const action = drillAction(1);
+    reserveVehicle(state.vehicles, purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 2).vehicle.id, action.id);
+    const { needMult, lqMult } = inputs(state, employee);
+    expect(computeActionWorkTicks(state, employee, action)).toBe(computeRigDurationTicks(BASE, 2, 3, needMult, lqMult));
+  });
+
+  it('no reserved vehicle: falls back to tier 1', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    const { needMult, lqMult } = inputs(state, employee);
+    expect(computeActionWorkTicks(state, employee, drillAction(9))).toBe(computeTaskDuration(BASE, 1, needMult, lqMult, 1));
+  });
+
+  it('missing payload durationTicks falls back to BASE_TASK_DURATION_TICKS at the rig tier', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    const action = drillAction(4, {});
+    reserveVehicle(state.vehicles, purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 3).vehicle.id, action.id);
+    const { needMult, lqMult } = inputs(state, employee);
+    expect(computeActionWorkTicks(state, employee, action))
+      .toBe(computeTaskDuration(BASE_TASK_DURATION_TICKS / 2, 1, needMult, lqMult, 1));
+  });
+
+  it('a resumeTicks payload is returned raw, before any tier scaling', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    const action = drillAction(3, { durationTicks: BASE, resumeTicks: 13 });
+    reserveVehicle(state.vehicles, purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 3).vehicle.id, action.id);
+    expect(computeActionWorkTicks(state, employee, action)).toBe(13);
+  });
+
+  it('claimed pendingTaskDuration agrees with the work estimate and the rig helper on a tier-2 rig (no double scaling)', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 2);
+    const baseTicks = computeDrillHoleDurationTicks(8, 0.15);
+    const action = drillAction(5, { durationTicks: baseTicks, depth: 8, diameter: 0.15 });
+    reserveVehicle(state.vehicles, purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 2).vehicle.id, action.id);
+    const { needMult, lqMult } = inputs(state, employee);
+    const expected = computeRigDurationTicks(baseTicks, 2, 2, needMult, lqMult);
+
+    const estimate = computeActionWorkTicks(state, employee, action);
+    seedTaskTimerFields(state, employee, action);
+
+    expect(estimate).toBe(expected);
+    expect(employee.pendingTaskDuration).toBe(expected);
+    expect(action.payload['durationTicks']).toBe(baseTicks);
+    expect(expected).toBeLessThan(computeTaskDuration(baseTicks, 2, needMult, lqMult, 1));
   });
 });
 

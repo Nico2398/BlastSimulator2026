@@ -12,6 +12,7 @@ import {
 } from '../config/balance.js';
 import { tierSlopeRatio, VEHICLE_TIER_LIST } from '../nav/ClimbLimit.js';
 import type { Employee } from './Employee.js';
+import { computeTaskDuration } from './EmployeeTaskDuration.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 
 export { ROLE_LICENCE_REQUIRED, canAssignDriver } from './VehicleDriverAssignment.js';
@@ -366,4 +367,22 @@ export function canReleaseDriver(
 /** Steepest rise/run this vehicle climbs; progression sites use its tier's limit (#1938). */
 export function vehicleMaxSlopeRatio(vehicle: Pick<Vehicle, 'tier'>, progression: boolean): number {
   return progression ? tierSlopeRatio(vehicle.tier) : NAV_MAX_SLOPE_RATIO;
+}
+
+/**
+ * Ticks a rig or truck crew member needs for a drill-hole or charge-hole task whose
+ * tier-1 base is `baseTicks`.
+ * Higher vehicle tiers work faster (VEHICLE_TIER_MULTIPLIERS[tier].workRate), then the
+ * driver's proficiency, need and living-quarters multipliers apply.
+ */
+export function computeRigDurationTicks(
+  baseTicks: number,
+  tier: VehicleTier,
+  proficiencyLevel: 1 | 2 | 3 | 4 | 5 = 1,
+  needMultiplier = 1,
+  lqMultiplier = 1,
+): number {
+  return computeTaskDuration(
+    baseTicks / VEHICLE_TIER_MULTIPLIERS[tier].workRate, proficiencyLevel, needMultiplier, lqMultiplier, 1,
+  );
 }

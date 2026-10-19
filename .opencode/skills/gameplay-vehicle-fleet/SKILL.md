@@ -39,6 +39,8 @@ Six roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
 
 **Drill rig bore (#1934).** A rig's tier also caps the widest hole it can bore: `DRILL_RIG_MAX_DIAMETER_M` = 89 / 127 / 165 mm for tiers 1 / 2 / 3 (`minRigTierForDiameter`, `HoleDiameter.ts`). `fleetDrillDiameterM` is the best owned rig's value (tier-1 with none); `drill_plan grid|add` and saved-plan load refuse a wider hole (`drillDiameterRefusal`, `mining.drill_plan.refused_diameter`) before any mutation. A `drill_hole` order needs `max(depth tier, diameter tier)` (`minVehicleTierFor`, reads `payload.diameter` in metres). The Drill step diameter stepper (`data-field="diameter"`, mm) skips options above the fleet and clamps down if a rig is lost.
 
+**Drill rig work rate (#1935).** `drill_hole` ticks = the tier-1 base (`computeDrillHoleDurationTicks`, stored unscaled in `payload.durationTicks`) divided by the reserved rig's `VEHICLE_TIER_MULTIPLIERS[tier].workRate` (1 / 1.4 / 2), then proficiency, need and LQ (`computeRigDurationTicks`, shared with `computeChargeDurationTicks`). An unreserved estimate uses tier 1; `payload.resumeTicks` stays raw.
+
 **Charging Truck decisions (#1645, defaulted).** Licence: the existing `driving.truck`, like the hauler and destroyer
 (no new `SkillCategory`, Driving Center course or starting qualification; Drivers already hold it). Base stats
 (`VEHICLE_BASE_STATS.charging_truck`): 28 000 $, workRate 6, capacity 500, speed 2, maxHp 115, upkeep 4, fuel 6 per tick
