@@ -1,5 +1,5 @@
 /** Pure grouping model for the Operations work queue (#1972): auto-debris orders collapse into one row per type. */
-import type { PendingAction } from '../../core/state/GameState.js';
+import type { PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { isAutoDebrisAction, type AutoDebrisActionType } from '../../core/economy/HaulDispatch.js';
 import { classifyQueuedBlock, isInTransitBlock } from '../notify/blockedOrders.js';
 
@@ -18,6 +18,8 @@ export interface DebrisGroup {
   blocked: number;
   stranded: number;
   inTransit: number;
+  /** Queued orders per blocked reason (failure reasons drive the cause line). */
+  blockedReasons: Partial<Record<BlockedOrderReason, number>>;
 }
 
 export interface WorkQueueModel {
@@ -36,7 +38,7 @@ export function partitionWorkQueue(actions: readonly PendingAction[]): WorkQueue
     }
     let g = groups.get(a.type);
     if (!g) {
-      g = { type: a.type, ids: [], total: 0, queued: 0, open: 0, assigned: 0, inProgress: 0, blocked: 0, stranded: 0, inTransit: 0 };
+      g = { type: a.type, ids: [], total: 0, queued: 0, open: 0, assigned: 0, inProgress: 0, blocked: 0, stranded: 0, inTransit: 0, blockedReasons: {} };
       groups.set(a.type, g);
     }
     g.ids.push(a.id);

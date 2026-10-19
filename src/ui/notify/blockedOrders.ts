@@ -2,7 +2,7 @@
 //
 // Shared by the notification center, the Operations panel and the vehicle inspector.
 
-import type { PendingAction } from '../../core/state/GameState.js';
+import type { PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { readOrderDeliveryTick } from '../../core/mining/ExplosiveStock.js';
 import { formatGameClock } from '../formatGameClock.js';
 import { formatGameDuration } from '../formatGameDuration.js';
@@ -86,4 +86,41 @@ export function buildBlockedOrderMessage(action: PendingAction, nowTick?: number
     default:
       return order;
   }
+}
+
+/** Max cause lines shown for a pile of blocked orders. */
+export const BLOCKED_PHRASE_LINES = 3;
+
+export type BlockedPhraseKind = 'crew_fleet' | 'storage_full' | 'no_warehouse' | 'no_spoil_heap' | 'spoil_heap_full' | 'unreachable';
+
+export interface BlockedKindCount { kind: BlockedPhraseKind; count: number }
+
+/** Phrase kind of a failure reason; null for non-failure or absent reasons. */
+export function blockedPhraseKind(_reason: BlockedOrderReason | null | undefined): BlockedPhraseKind | null {
+  return null; // TODO: implement
+}
+
+/** Tallies blocked reasons across orders. */
+export function countBlockedReasons(_actions: readonly Pick<PendingAction, 'blockedReason'>[]): Partial<Record<BlockedOrderReason, number>> {
+  return {}; // TODO: implement
+}
+
+/** Failure kinds with counts, largest first; ties by union order. */
+export function rankBlockedKinds(_counts: Partial<Record<BlockedOrderReason, number>>): BlockedKindCount[] {
+  return []; // TODO: implement
+}
+
+/** Count plus remedy sentence for one kind. */
+export function blockedPhrase(_entry: BlockedKindCount): string {
+  return ''; // TODO: implement
+}
+
+/** Short label for a kind, e.g. "storage full". */
+export function blockedKindLabel(_kind: BlockedPhraseKind): string {
+  return ''; // TODO: implement
+}
+
+/** Up to `max` phrases for the largest blocked kinds. */
+export function describeBlockedReasons(_counts: Partial<Record<BlockedOrderReason, number>>, _max: number = BLOCKED_PHRASE_LINES): string[] {
+  return []; // TODO: implement
 }
