@@ -18,6 +18,7 @@ import { resolveMarketId, resolveContractOres } from '../../src/core/campaign/Le
 import { oreValuePerKg, type MarketId } from '../../src/core/economy/Market.js';
 import { createContractState, generateContracts } from '../../src/core/economy/Contract.js';
 import { Random } from '../../src/core/math/Random.js';
+import { t } from '../../src/core/i18n/I18n.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
   ORE_DENSITY_KG_M3,
@@ -179,6 +180,49 @@ describe('sandbox economy: contract board offer volume against a shot', () => {
     const empty = Array.from({ length: BOARD_SEEDS }, (_, i) => offersOver(1000 + i, undefined, 0)).flat();
     expect(empty.filter(c => c.type === 'rubble_disposal')).toHaveLength(0);
     expect(empty.length).toBeGreaterThan(0);
+  });
+});
+
+describe('sandbox economy: tier-aware grade-0 board (#1929)', () => {
+  const { ctx } = startSandbox(DESERT, 42);
+  const ores = resolveContractOres(ctx.state!);
+
+  function gradeZeroOffers(seed: number) {
+    const board = createContractState();
+    board.market = ctx.state!.contracts.market ?? 'production';
+    const rng = new Random(seed);
+    const seen = [];
+    for (let i = 0; i < 12; i++) {
+      generateContracts(board, rng, i * CONTRACT_REFRESH_INTERVAL, 1, ores, Infinity, 0);
+      seen.push(...board.available.slice(-3));
+    }
+    return seen;
+  }
+
+  it('every grade-0 ore sale and supply offer comes from the local buyer, ore sales 100-1000 kg', () => {
+    const offers = Array.from({ length: BOARD_SEEDS }, (_, i) => gradeZeroOffers(1000 + i)).flat()
+      .filter(c => c.type !== 'rubble_disposal');
+    expect(offers.length).toBeGreaterThan(0);
+    for (const c of offers) {
+      expect(c.buyerTier).toBe('local');
+      if (c.type === 'ore_sale') {
+        expect(c.quantityKg).toBeGreaterThanOrEqual(100);
+        expect(c.quantityKg).toBeLessThanOrEqual(1000);
+      }
+    }
+  });
+
+  it('console contract list on a sandbox names the buyer', () => {
+    const { run } = startSandbox(DESERT, 42);
+    const out = run('contract list').output;
+    expect(out).toContain(t('economy.buyer.local'));
+  });
+
+  it('console contract list on a campaign game does not name a buyer', () => {
+    const { runner } = createRunner();
+    expect(runner.run('new_game seed:42').success).toBe(true);
+    const out = runner.run('contract list').output;
+    for (const id of ['local', 'regional', 'national', 'global']) expect(out).not.toContain(t(`economy.buyer.${id}`));
   });
 });
 
