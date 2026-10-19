@@ -2,7 +2,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { OperationsPanel, countQueuedByBlock } from '../../../../src/ui/panels/OperationsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
-import { createRunner } from '../../../../src/console-api.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { buildBlockedOrderMessage } from '../../../../src/ui/notify/blockedOrders.js';
 import type { GameState, PendingAction, BlockedOrderReason } from '../../../../src/core/state/GameState.js';
@@ -827,6 +826,11 @@ function debrisState(haul = 2000, frag = 500): GameState {
   return state;
 }
 
+/** Individual (expanded) debris rows have no cancel control, so count them by their page label. */
+function pageLabel(panel: OperationsPanel, from: number, to: number, total: number): boolean {
+  return (panel.root.textContent ?? '').includes(t('ui.operations.work_queue_debris_page', { from, to, total }));
+}
+
 function openPanel(state: GameState) {
   const ctx = makePanel();
   ctx.panel.show();
@@ -835,10 +839,10 @@ function openPanel(state: GameState) {
 }
 
 function summary(panel: OperationsPanel, type: string): HTMLElement {
-  const btn = panel.root.querySelector(`[data-cancel-debris-group="${type}"]`) as HTMLElement | null;
-  expect(btn, `cancel button for ${type}`).not.toBeNull();
-  // Summary card = parent of the button row that holds toggle and cancel.
-  const node = btn!.parentElement?.parentElement ?? null;
+  const toggle = panel.root.querySelector(`[data-debris-toggle="${type}"]`) as HTMLElement | null;
+  expect(toggle, `toggle for ${type}`).not.toBeNull();
+  // Summary card = parent of the button row that holds the toggle.
+  const node = toggle!.parentElement?.parentElement ?? null;
   expect(node, `summary row for ${type}`).not.toBeNull();
   return node!;
 }
@@ -848,7 +852,7 @@ describe('OperationsPanel — grouped debris queue (#1972)', () => {
     const { panel } = openPanel(debrisState());
     expect(panel.root.querySelectorAll('[data-cancel-action]').length).toBe(3);
     expect(panel.root.querySelectorAll('[data-debris-toggle]').length).toBe(2);
-    expect(panel.root.querySelectorAll('[data-cancel-debris-group]').length).toBe(2);
+    expect(panel.root.querySelectorAll('[data-cancel-debris-group]').length).toBe(0);
     expect(panel.root.querySelectorAll('*').length).toBeLessThan(1500);
   });
 
@@ -908,16 +912,15 @@ describe('OperationsPanel — grouped debris queue (#1972)', () => {
   describe('expand', () => {
     it('shows no individual debris rows until expanded', () => {
       const { panel } = openPanel(debrisState());
-      expect(panel.root.querySelector('[data-cancel-action="10000"]')).toBeNull();
+      expect(panel.root.querySelector('[data-debris-page]')).toBeNull();
+      expect(panel.root.textContent).not.toContain(t('ui.crew.location_coords', { x: 0, z: 0 }));
     });
 
     it('expanding shows at most 25 individual rows and paging controls', () => {
       const { panel } = openPanel(debrisState());
       (panel.root.querySelector('[data-debris-toggle="haul_debris"]') as HTMLElement).click();
-      const rows = panel.root.querySelectorAll('[data-cancel-action]');
-      expect(rows.length).toBe(3 + 25);
-      expect(panel.root.querySelector('[data-cancel-action="10000"]')).not.toBeNull();
-      expect(panel.root.querySelector('[data-cancel-action="10025"]')).toBeNull();
+      expect(pageLabel(panel, 1, 25, 2000)).toBe(true);
+      expect(panel.root.querySelectorAll('[data-cancel-action]').length).toBe(3);
       expect(panel.root.querySelector('[data-debris-page="next"]')).not.toBeNull();
     });
 
@@ -925,11 +928,10 @@ describe('OperationsPanel — grouped debris queue (#1972)', () => {
       const { panel } = openPanel(debrisState());
       (panel.root.querySelector('[data-debris-toggle="haul_debris"]') as HTMLElement).click();
       (panel.root.querySelector('[data-debris-page="next"]') as HTMLElement).click();
-      expect(panel.root.querySelector('[data-cancel-action="10000"]')).toBeNull();
-      expect(panel.root.querySelector('[data-cancel-action="10025"]')).not.toBeNull();
-      expect(panel.root.querySelectorAll('[data-cancel-action]').length).toBe(3 + 25);
+      expect(pageLabel(panel, 26, 50, 2000)).toBe(true);
+      expect(panel.root.querySelectorAll('[data-cancel-action]').length).toBe(3);
       (panel.root.querySelector('[data-debris-page="prev"]') as HTMLElement).click();
-      expect(panel.root.querySelector('[data-cancel-action="10000"]')).not.toBeNull();
+      expect(pageLabel(panel, 1, 25, 2000)).toBe(true);
     });
 
     it('collapsing hides the individual rows again', () => {
@@ -940,53 +942,51 @@ describe('OperationsPanel — grouped debris queue (#1972)', () => {
       expect(panel.root.querySelectorAll('[data-cancel-action]').length).toBe(3);
     });
 
-    it('expanded rows still cancel one order through the console', () => {
-      const { panel, gameConsole } = openPanel(debrisState());
+    it('expanded rows have no cancel', () => {
+      const { panel } = openPanel(debrisState());
       (panel.root.querySelector('[data-debris-toggle="haul_debris"]') as HTMLElement).click();
-      (panel.root.querySelector('[data-cancel-action="10003"]') as HTMLElement).click();
-      expect(gameConsole).toHaveBeenCalledWith('employee cancel 10003');
+      expect(panel.root.querySelector('[data-cancel-action="10003"]')).toBeNull();
+      expect(panel.root.querySelectorAll('[data-cancel-action]').length).toBe(3);
+      expect(panel.root.querySelector('[data-cancel-debris-group]')).toBeNull();
     });
   });
 
-  describe('cancel group', () => {
-    it('requests confirmation and sends nothing until confirmed', () => {
-      const { panel, gameConsole } = openPanel(debrisState(4, 3));
-      const handler = vi.fn();
-      panel.setConfirmHandler(handler);
-      (panel.root.querySelector('[data-cancel-debris-group="haul_debris"]') as HTMLElement).click();
-      expect(handler).toHaveBeenCalledTimes(1);
-      const cfg = handler.mock.calls[0]![0];
-      expect(cfg.title).toBe(t('ui.operations.work_queue_debris_confirm_title'));
-      expect(cfg.body).toContain('4');
-      expect(cfg.confirmLabel).toBe(t('ui.operations.work_queue_debris_confirm_label'));
-      expect(typeof cfg.onConfirm).toBe('function');
-      expect(gameConsole).not.toHaveBeenCalled();
+  describe('no cancel for automatic debris', () => {
+    it('renders no group cancel and a note per group; 3 player cancels survive paging', () => {
+      const { panel } = openPanel(debrisState(2000, 500));
+      const expectClean = (): void => {
+        expect(panel.root.querySelectorAll('[data-cancel-debris-group]').length).toBe(0);
+        expect(panel.root.querySelectorAll('[data-cancel-action]').length).toBe(3);
+      };
+      expectClean();
+      for (const type of ['haul_debris', 'fragment_debris']) {
+        const note = panel.root.querySelector(`[data-debris-note="${type}"]`);
+        expect(note, `note for ${type}`).not.toBeNull();
+        expect(note!.textContent).toBe(t('ui.operations.work_queue_debris_note'));
+        (panel.root.querySelector(`[data-debris-toggle="${type}"]`) as HTMLElement).click();
+        expectClean();
+        (panel.root.querySelector('[data-debris-page="next"]') as HTMLElement).click();
+        expectClean();
+        expect(panel.root.querySelector(`[data-debris-note="${type}"]`)).not.toBeNull();
+      }
     });
 
-    it('confirming cancels exactly the group members, not player orders or the other type', () => {
-      const { panel, gameConsole } = openPanel(debrisState(4, 3));
-      const handler = vi.fn();
-      panel.setConfirmHandler(handler);
-      (panel.root.querySelector('[data-cancel-debris-group="haul_debris"]') as HTMLElement).click();
-      handler.mock.calls[0]![0].onConfirm();
-      const sent = gameConsole.mock.calls.map(c => c[0] as string).sort();
-      expect(sent).toEqual([10000, 10001, 10002, 10003].map(id => `employee cancel ${id}`).sort());
+    it('keeps the note while a group is expanded and after an update', () => {
+      const state = debrisState(30, 0);
+      const { panel } = openPanel(state);
+      (panel.root.querySelector('[data-debris-toggle="haul_debris"]') as HTMLElement).click();
+      panel.update(state);
+      expect(panel.root.querySelector('[data-debris-note="haul_debris"]')).not.toBeNull();
+      expect(panel.root.querySelector('[data-debris-note="fragment_debris"]')).toBeNull();
     });
 
-    it('cancels the fragment group independently', () => {
-      const { panel, gameConsole } = openPanel(debrisState(4, 3));
-      const handler = vi.fn();
-      panel.setConfirmHandler(handler);
-      (panel.root.querySelector('[data-cancel-debris-group="fragment_debris"]') as HTMLElement).click();
-      handler.mock.calls[0]![0].onConfirm();
-      expect(gameConsole).toHaveBeenCalledTimes(3);
-      expect(gameConsole).toHaveBeenCalledWith('employee cancel 20000');
+    it('note text is the queued-automatically copy', () => {
+      expect(t('ui.operations.work_queue_debris_note')).toBe('Queued automatically for every fragment on the ground');
     });
 
-    it('sends no command when no confirm handler is set', () => {
-      const { panel, gameConsole } = openPanel(debrisState(4, 3));
-      (panel.root.querySelector('[data-cancel-debris-group="haul_debris"]') as HTMLElement).click();
-      expect(gameConsole).not.toHaveBeenCalled();
+    it('panel exposes no confirm handler any more', () => {
+      const { panel } = openPanel(debrisState(4, 3));
+      expect((panel as unknown as Record<string, unknown>)['setConfirmHandler']).toBeUndefined();
     });
   });
 
@@ -1034,8 +1034,7 @@ describe('OperationsPanel — grouped debris queue (#1972)', () => {
       (panel.root.querySelector('[data-debris-toggle="haul_debris"]') as HTMLElement).click();
       state.pendingActions = state.pendingActions.filter(a => a.id !== 10000);
       panel.update(state);
-      expect(panel.root.querySelector('[data-cancel-action="10000"]')).toBeNull();
-      expect(panel.root.querySelector('[data-cancel-action="10001"]')).not.toBeNull();
+      expect(pageLabel(panel, 1, 25, 29)).toBe(true);
     });
 
     it('drops a summary row once its last order is gone', () => {
@@ -1110,11 +1109,10 @@ describe('OperationsPanel — grouped debris queue, review fixes (#1972)', () =>
     const { panel } = openPanel(state);
     expandHaul(panel);
     (panel.root.querySelector('[data-debris-page="next"]') as HTMLElement).click();
-    expect(panel.root.querySelector('[data-cancel-action="125"]')).not.toBeNull();
+    expect(pageLabel(panel, 26, 26, 26)).toBe(true);
     state.pendingActions = state.pendingActions.filter(a => a.id !== 125);
     panel.update(state);
-    expect(panel.root.querySelector('[data-cancel-action="100"]')).not.toBeNull();
-    expect(panel.root.querySelector('[data-cancel-action="124"]')).not.toBeNull();
+    expect(pageLabel(panel, 1, 25, 25)).toBe(true);
     expect((panel.root.querySelector('[data-debris-page="next"]') as HTMLButtonElement).disabled).toBe(true);
     expect((panel.root.querySelector('[data-debris-page="prev"]') as HTMLButtonElement).disabled).toBe(true);
   });
@@ -1132,15 +1130,6 @@ describe('OperationsPanel — grouped debris queue, review fixes (#1972)', () =>
     expect(text).toContain(t('ui.operations.work_queue_debris_status_part_in_progress', { count: 2 }));
     expect(text).toContain(t('ui.operations.work_queue_debris_status_part_queued', { count: 1 }));
     expect(text).toContain(t('ui.operations.work_queue_debris_status_part_blocked', { count: 1 }));
-  });
-
-  it('confirm body names the count and the label', () => {
-    const { panel } = openPanel(debrisState(4, 0));
-    const handler = vi.fn();
-    panel.setConfirmHandler(handler);
-    (panel.root.querySelector('[data-cancel-debris-group="haul_debris"]') as HTMLElement).click();
-    expect(handler.mock.calls[0]![0].body).toBe(
-      t('ui.operations.work_queue_debris_confirm_body', { count: 4, label: t('ui.crew.action_haul_debris') }));
   });
 
   describe('cost', () => {
@@ -1170,28 +1159,6 @@ describe('OperationsPanel — grouped debris queue, review fixes (#1972)', () =>
       // Measured ~14.6 ms/update at 2,500 orders vs ~13 ms at 50 (jsdom): the floor is the fixed sections, not the orders.
       expect(bigMs).toBeLessThan(Math.max(smallMs, 0.2) * 100);
       expect(bigMs).toBeLessThan(100);
-    });
-
-    it('confirming a 2,500-order group cancel through the real console stays within a generous budget', () => {
-      const { runner, ctx } = createRunner();
-      runner.run('new_game mine_type:desert seed:1 size:32');
-      const state = ctx.state!;
-      debrisOrders(state, 'haul_debris', 2500, 10000);
-      const { panel } = makePanel();
-      panel.show();
-      // The browser updates every panel after each command (main.ts afterGameCommand); mirror that here.
-      panel.setGameConsole(cmd => { const r = runner.run(cmd); panel.update(ctx.state!); return r; });
-      panel.update(state);
-      const handler = vi.fn();
-      panel.setConfirmHandler(handler);
-      (panel.root.querySelector('[data-cancel-debris-group="haul_debris"]') as HTMLElement).click();
-      const t0 = performance.now();
-      handler.mock.calls[0]![0].onConfirm();
-      const totalMs = performance.now() - t0;
-      expect(ctx.state!.pendingActions.filter(a => a.type === 'haul_debris').length).toBe(0);
-      expect(panel.root.querySelector('[data-debris-toggle="haul_debris"]')).toBeNull();
-      // Measured ~30 ms with the panel's own repaints suppressed during the loop (~6.3 s when it repainted per command).
-      expect(totalMs).toBeLessThan(2000);
     });
   });
 });
