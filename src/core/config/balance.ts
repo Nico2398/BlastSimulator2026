@@ -2984,6 +2984,8 @@ export const WB_ACCIDENT_DRAG = 0.15;
 
 // ── Safety score drivers (#1977) ──
 
+/** Neutral safety equilibrium: the target the score settles at with no building safety effect and no equipment. */
+export const SAFETY_TARGET_BASE = 50;
 /** Safety equilibrium points each unit of building safety effect adds to the target the score is pulled towards. */
 export const SAFETY_TARGET_PER_EFFECT = 12;
 /** Extra safety target points while safety equipment investment exists. */

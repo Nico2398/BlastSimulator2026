@@ -1,7 +1,7 @@
 /** Inspector content for building selections (#1756, #1758). */
 import { t } from '../../../core/i18n/I18n.js';
 import {
-  getBuildingDef, getBuildingPeopleCapacity,
+  getBuildingDef, getBuildingPeopleCapacity, nonZeroScoreEffects,
   type Building,
 } from '../../../core/entities/Building.js';
 import { computeBuildingStatus, type BuildingStatus } from '../../../core/entities/BuildingStatus.js';
@@ -196,7 +196,7 @@ export const buildingContent: KindContent = {
     const research = researchSection(b, state);
     const extras = [storage, peopleSection, research];
     const occupantNames = b.occupantIds.flatMap(id => state.employees.employees.find(e => e.id === id)?.name ?? []);
-    const effects = Object.entries(def.scoreEffects).filter(([, v]) => v !== 0 && v !== undefined);
+    const effects = nonZeroScoreEffects(def);
 
     return {
       title: t(`building.${b.type}.t${b.tier}.name`),
@@ -211,8 +211,7 @@ export const buildingContent: KindContent = {
           hpRow(hp, hpFraction),
           liveRow(t('inspector.upkeep'), 'upkeep', upkeep),
         ];
-        for (const [id, value] of effects) {
-          const amount = value as number;
+        for (const { id, amount } of effects) {
           rows.push(liveRow(t(`score.${id}`), `score-${id}`, `${amount > 0 ? '+' : ''}${amount}`));
         }
         rows.push(liveRow(t('inspector.position'), 'position', `(${b.x}, ${b.z})`));

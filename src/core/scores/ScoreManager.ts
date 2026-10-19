@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Score system
 // Four scores (0-100) that influence events and contracts.
 // Updated each tick based on current game state. Safety is a managed score: it settles at a target set by
-// buildings and equipment (safetyTarget) and accidents knock it down; the other scores decay towards neutral.
+// buildings and equipment (safetyTarget) and accidents knock it down; well-being, ecology and nuisance decay towards neutral.
 
 import type { ScoreId } from '../entities/Building.js';
 import { getBuildingScoreEffects, type BuildingState } from '../entities/Building.js';
@@ -12,6 +12,7 @@ import {
   SAFETY_ACCIDENT_HIT,
   SAFETY_EQUIPMENT_TARGET_BONUS,
   SAFETY_PULL_RATE,
+  SAFETY_TARGET_BASE,
   SAFETY_TARGET_MAX,
   SAFETY_TARGET_MIN,
   SAFETY_TARGET_PER_EFFECT,
@@ -133,7 +134,7 @@ function wellBeingDelta(wellBeing: number, buildingWb: number, inputs: ScoreInpu
 /** Safety score the site is pulled towards given its building safety effect and equipment. */
 export function safetyTarget(buildingSafety: number, hasEquipment: boolean): number {
   const bSf = Number.isFinite(buildingSafety) ? buildingSafety : 0;
-  const raw = 50 + SAFETY_TARGET_PER_EFFECT * bSf + (hasEquipment ? SAFETY_EQUIPMENT_TARGET_BONUS : 0);
+  const raw = SAFETY_TARGET_BASE + SAFETY_TARGET_PER_EFFECT * bSf + (hasEquipment ? SAFETY_EQUIPMENT_TARGET_BONUS : 0);
   return Math.max(SAFETY_TARGET_MIN, Math.min(SAFETY_TARGET_MAX, raw));
 }
 
@@ -148,7 +149,8 @@ function safetyDelta(safety: number, buildingSafety: number, inputs: ScoreInputs
 
 /**
  * Update scores based on current inputs. Mutates state.
- * Each tick, building effects are applied and then scores decay towards neutral.
+ * Each tick, building effects are applied; well-being, ecology and nuisance then decay towards neutral.
+ * Safety does not decay: it is pulled towards its building-set target (`safetyTarget`).
  */
 export function updateScores(state: ScoreState, inputs: ScoreInputs): void {
   const buildingEffects = getBuildingScoreEffects(inputs.buildings);

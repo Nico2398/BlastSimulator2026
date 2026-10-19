@@ -652,20 +652,32 @@ describe('Safety model — managed target (#1977)', () => {
   });
 
   it('well-being and ecology evolve as before for the same inputs', () => {
-    const a = createScoreState();
-    const b = createScoreState();
-    const buildings = site([['management_office', 1]]);
+    // Expected values recorded from the pre-#1977 ScoreManager (main) for identical inputs.
+    const office = createScoreState();
+    const officeAndWarehouse = createScoreState();
     for (let i = 0; i < 50; i++) {
-      updateScores(a, makeInputs({ buildings, avgMorale: 70, maxRecentVibration: 5 }));
-      updateScores(b, makeInputs({ buildings, avgMorale: 70, maxRecentVibration: 5 }));
+      updateScores(office, makeInputs({ buildings: site([['management_office', 1]]), avgMorale: 70, maxRecentVibration: 5 }));
+      updateScores(
+        officeAndWarehouse,
+        makeInputs({ buildings: site([['explosive_warehouse', 1], ['management_office', 1]]), avgMorale: 70, maxRecentVibration: 5 }),
+      );
     }
-    expect(a.wellBeing).toBe(b.wellBeing);
+    expect(office.wellBeing).toBeCloseTo(67.5, 6);
+    expect(office.nuisance).toBeCloseTo(47.5, 6);
+    expect(office.ecology).toBeCloseTo(50, 6);
+    expect(officeAndWarehouse.wellBeing).toBeCloseTo(67.5, 6);
+    expect(officeAndWarehouse.nuisance).toBeCloseTo(47.5, 6);
+    expect(officeAndWarehouse.ecology).toBeCloseTo(50, 6);
     // Decay still applies to the other scores: unfed ecology drifts back toward 50.
     const eco = createScoreState();
     eco.ecology = 90;
     updateScores(eco, makeInputs());
-    expect(eco.ecology).toBeLessThan(90);
-    expect(eco.ecology).toBeGreaterThan(80);
+    expect(eco.ecology).toBeCloseTo(89.95, 6);
+  });
+
+  it('settles at 62 with a warehouse and an office and no equipment', () => {
+    const state = run(site([['explosive_warehouse', 1], ['management_office', 1]]), 600);
+    expect(state.safety).toBeCloseTo(62, 1);
   });
 
   describe('safetyTarget', () => {
