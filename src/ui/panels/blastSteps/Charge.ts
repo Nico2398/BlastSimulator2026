@@ -281,7 +281,7 @@ export class ChargeStep {
     statsRow.style.cssText = 'display:flex;gap:10px;font:400 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)';
     statsRow.append(
       el('span', { text: `${explosive.energyPerKg} MJ/kg` }),
-      el('span', { text: `${explosiveHoleLimits(explosive, this.narrowestM).maxKg} kg max` }),
+      el('span', { text: `${Math.round(explosiveHoleLimits(explosive, this.narrowestM).maxKg * 10) / 10} kg max` }),
     );
     if (explosive.waterSensitive && anyWet) {
       const badge = el('span', { attrs: { style: 'display:flex;align-items:center;gap:3px;color:var(--bsx-info)' } });
