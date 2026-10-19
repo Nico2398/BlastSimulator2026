@@ -290,11 +290,18 @@ export class ContractsPanel extends PanelBase {
       attrs: { type: 'button', style: 'display:flex;align-items:center;gap:8px;flex-shrink:0;width:100%;padding:6px 10px;border-radius:4px;border:1px solid var(--bsx-border,rgba(255,255,255,.1));background:rgba(255,255,255,.05);cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:600 11px/1.2 var(--bsx-font-ui)' },
     });
     strip.dataset['action'] = 'goto-active';
-    strip.append(el('span', {
-      text: t('ui.contracts.active_summary', { count: summary.count, hours: summary.nextDeadlineHours }),
-      className: 'bs-contract-active-summary-deadline',
-      attrs: { style: `min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${this.urgencyColor(soonest, state.tickCount)}` },
-    }));
+    strip.append(
+      el('span', {
+        text: t('ui.contracts.active_summary', { count: summary.count }),
+        className: 'bs-contract-active-summary-label',
+        attrs: { style: 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' },
+      }),
+      el('span', {
+        text: t('ui.contracts.active_deadline', { hours: summary.nextDeadlineHours }),
+        className: 'bs-contract-active-summary-deadline',
+        attrs: { style: `flex-shrink:0;white-space:nowrap;color:${this.urgencyColor(soonest, state.tickCount)}` },
+      }),
+    );
     if (summary.penaltyTotal > 0) {
       strip.append(el('span', {
         text: t('ui.contracts.penalty_line', { amount: formatMoney(summary.penaltyTotal) }),
@@ -306,11 +313,13 @@ export class ContractsPanel extends PanelBase {
   }
 
   private refreshActiveSummary(state: GameState): void {
+    const label = this.bodyEl.querySelector<HTMLElement>('.bs-contract-active-summary-label');
     const deadline = this.bodyEl.querySelector<HTMLElement>('.bs-contract-active-summary-deadline');
     const summary = summarizeActive(state.contracts.active, state.tickCount);
     const soonest = this.soonestActive(state);
-    if (!deadline || !summary || !soonest) return;
-    deadline.textContent = t('ui.contracts.active_summary', { count: summary.count, hours: summary.nextDeadlineHours });
+    if (!label || !deadline || !summary || !soonest) return;
+    label.textContent = t('ui.contracts.active_summary', { count: summary.count });
+    deadline.textContent = t('ui.contracts.active_deadline', { hours: summary.nextDeadlineHours });
     deadline.style.color = this.urgencyColor(soonest, state.tickCount);
   }
 
