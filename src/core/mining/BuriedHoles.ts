@@ -59,6 +59,7 @@ function isHaulableRubble(tracked: TrackedFragment, sealed: ReadonlySet<number> 
 
 interface TickCache<T> { tick: number; count: number; value: T; sealed?: ReadonlySet<number> | undefined }
 const rubbleCache = new WeakMap<GameState, TickCache<BuriedCellIndex>>();
+// Stale when the tick or the planned-hole count changes; a hole moved in place within a tick is not detected.
 const holeCellCache = new WeakMap<GameState, TickCache<ReadonlySet<number>>>();
 
 /**
@@ -86,9 +87,14 @@ function plannedHoleCellsOf(state: GameState): ReadonlySet<number> {
   return value;
 }
 
+/** True on a progression site with at least one planned hole: the precondition for any burial query. */
+export function hasPlannedHolesOnSite(state: GameState): boolean {
+  return isProgressionSite(state) && state.plannedDrillHoles.length > 0;
+}
+
 /** Ids of planned holes buried under on-ground rubble; empty off progression sites. */
 export function buriedHolesOf(state: GameState): Set<string> {
-  if (!isProgressionSite(state) || state.plannedDrillHoles.length === 0) return new Set<string>();
+  if (!hasPlannedHolesOnSite(state)) return new Set<string>();
   return buriedHoleIds(rubbleIndexOf(state), state.plannedDrillHoles);
 }
 
@@ -101,7 +107,7 @@ export function isHoleBuried(state: GameState, holeId: string): boolean {
 
 /** True when the cell containing (x, z) lies under on-ground rubble; false off progression sites. O(1) per query. */
 function isCellUnderRubble(state: GameState, x: number, z: number): boolean {
-  return isProgressionSite(state) && state.plannedDrillHoles.length > 0 && isCellBuried(rubbleIndexOf(state), x, z);
+  return hasPlannedHolesOnSite(state) && isCellBuried(rubbleIndexOf(state), x, z);
 }
 
 /** True for a queued drill_hole order whose planned hole lies under on-ground rubble (#1937). */
@@ -113,7 +119,7 @@ export function isDrillHoleBuried(state: GameState, action: PendingAction): bool
 
 /** True when `tracked` is on the ground and covers at least one planned hole; false off progression sites. */
 export function trackedBuriesPlannedHole(state: GameState, tracked: TrackedFragment): boolean {
-  if (!isHaulableRubble(tracked, sealedFragmentIdsOf(state)) || !isProgressionSite(state) || state.plannedDrillHoles.length === 0) return false;
+  if (!isHaulableRubble(tracked, sealedFragmentIdsOf(state)) || !hasPlannedHolesOnSite(state)) return false;
   const holeCells = plannedHoleCellsOf(state);
   let buries = false;
   forEachCoveredCell(footprintOf(tracked), key => { if (holeCells.has(key)) buries = true; });

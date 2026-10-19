@@ -196,7 +196,7 @@ const fragmentIdOf = (tracked: TrackedFragment): number => tracked.fragment.id;
  * A caller walking many actions passes the pass's `FragmentLookup`; a
  * one-off caller may omit it and pay the linear scan.
  */
-function resolveTrackedFragment(
+export function resolveTrackedFragment(
   state: GameState,
   action: PendingAction,
   lookup?: FragmentLookup,

@@ -24,7 +24,7 @@ import {
   findStarvedActionForEmployee,
   cellsToTravelTicks,
   isActionPastStuckBackoff,
-  isChargeHoleClaimable,
+  isHoleOrderClaimable,
 } from '../../../src/core/engine/ActionSelection.js';
 import * as PathfindingModule from '../../../src/core/nav/Pathfinding.js';
 import * as PlanItineraryModule from '../../../src/core/engine/PlanItinerary.js';
@@ -2609,34 +2609,34 @@ describe('buried planned holes (#1937)', () => {
     it('a drill_hole under on-ground rubble is not claimable on a progression site', () => {
       const { state, action } = withHole(true);
       addBlastFragments(state.logistics, [frag(1, 20, 20)]);
-      expect(isChargeHoleClaimable(state, action)).toBe(false);
+      expect(isHoleOrderClaimable(state, action)).toBe(false);
     });
 
     it('the same drill_hole is claimable once the rubble is hauled away', () => {
       const { state, action } = withHole(true);
       addBlastFragments(state.logistics, [frag(1, 20, 20)]);
-      expect(isChargeHoleClaimable(state, action)).toBe(false);
+      expect(isHoleOrderClaimable(state, action)).toBe(false);
       state.logistics.fragments.splice(0, 1);
-      expect(isChargeHoleClaimable(state, action)).toBe(true);
+      expect(isHoleOrderClaimable(state, action)).toBe(true);
     });
 
     it('rubble that is in transit does not block the claim', () => {
       const { state, action } = withHole(true);
       addBlastFragments(state.logistics, [frag(1, 20, 20)]);
       state.logistics.fragments[0]!.state = 'in_transit';
-      expect(isChargeHoleClaimable(state, action)).toBe(true);
+      expect(isHoleOrderClaimable(state, action)).toBe(true);
     });
 
     it('a drill_hole beside the rubble is claimable', () => {
       const { state, action } = withHole(true);
       addBlastFragments(state.logistics, [frag(1, 30, 30)]);
-      expect(isChargeHoleClaimable(state, action)).toBe(true);
+      expect(isHoleOrderClaimable(state, action)).toBe(true);
     });
 
     it('non-progression sites are unchanged: rubble does not gate the claim', () => {
       const { state, action } = withHole(false);
       addBlastFragments(state.logistics, [frag(1, 20, 20)]);
-      expect(isChargeHoleClaimable(state, action)).toBe(true);
+      expect(isHoleOrderClaimable(state, action)).toBe(true);
     });
 
     it('findStarvedActionForEmployee skips a buried drill_hole and returns it once cleared', () => {

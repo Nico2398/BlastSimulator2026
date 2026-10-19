@@ -4,13 +4,13 @@
 // served. Zero imports from GameLoop.ts — avoids a dependency cycle back into
 // the tick orchestrator that calls these functions.
 
-import { isProgressionSite, type GameState, type PendingAction } from '../state/GameState.js';
+import { type GameState, type PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { getLivingEmployees, holdsRequiredSkill } from '../entities/Employee.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
-import { isDrillHoleBuried, trackedBuriesPlannedHole } from '../mining/BuriedHoles.js';
+import { hasPlannedHolesOnSite, isDrillHoleBuried, trackedBuriesPlannedHole } from '../mining/BuriedHoles.js';
 import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS, BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS, actionRankTier, ACTION_STARVATION_TICK_THRESHOLD, DEMOLITION_VEHICLE_TIER_SPEED } from '../config/balance.js';
 import { computeDemolitionDurationTicks } from '../entities/DemolitionDuration.js';
 import { readDemolishPayload } from './DemolishPayload.js';
@@ -18,7 +18,7 @@ import { computeRampSegmentDurationTicks, isRampCellPending } from '../mining/Ra
 import { computeLevelVolume } from '../mining/LevelGround.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, findVehicleReservedForAction, computeRigDurationTicks } from '../entities/Vehicle.js';
-import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulActionOreDensities, isAutoDebrisAction, type FragmentLookup } from '../economy/HaulDispatch.js';
+import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulActionOreDensities, isAutoDebrisAction, resolveTrackedFragment, type FragmentLookup } from '../economy/HaulDispatch.js';
 import { fragmentHaulUrgency, oreHaulUrgency } from '../economy/OreDemand.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { thinDebrisCandidates } from './DebrisCandidateBins.js';
@@ -257,9 +257,7 @@ function estimateWithBonus(
 /** BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS for an unheld haul_debris of a fragment burying a planned hole, else 0 (#1937); ranking-only. */
 function buriedHoleBonusOf(state: GameState, action: PendingAction, fragmentOf: FragmentLookup | undefined): number {
   if (action.holderId !== null || action.type !== 'haul_debris') return 0;
-  const id = action.payload['fragmentId'];
-  if (typeof id !== 'number') return 0;
-  const tracked = fragmentOf !== undefined ? fragmentOf(id) : state.logistics.fragments.find(f => f.fragment.id === id);
+  const tracked = resolveTrackedFragment(state, action, fragmentOf);
   return tracked !== undefined && trackedBuriesPlannedHole(state, tracked) ? BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS : 0;
 }
 
@@ -445,7 +443,7 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
  * planned (its drill order has not landed yet), or whose explosives are still in transit (#1895),
  * or a drill_hole order whose hole is buried under rubble (#1937; a drill already in progress continues).
  */
-export function isChargeHoleClaimable(state: GameState, action: PendingAction): boolean {
+export function isHoleOrderClaimable(state: GameState, action: PendingAction): boolean {
   if (action.type === 'drill_hole') return !isDrillHoleBuried(state, action);
   if (action.type !== 'charge_hole') return true;
   if (isChargeDeliveryPending(action, state.tickCount)) return false;
@@ -502,7 +500,7 @@ export function findStarvedActionForEmployee(state: GameState, employee: Employe
     a.requiredVehicleRole === null &&
     !isEvacuationHoldActive(state, a) &&
     isActionPastStuckBackoff(state, a) &&
-    isChargeHoleClaimable(state, a) &&
+    isHoleOrderClaimable(state, a) &&
     state.tickCount - a.queuedAtTick >= ACTION_STARVATION_TICK_THRESHOLD);
 
   return selectBestActionForEmployee(state, employee, candidates);
@@ -546,7 +544,7 @@ function selectWithinIndex(
   const urgency = oreHaulUrgency(state.contracts.available, state.contracts.active, state.collectedOre);
   const oreUrgent = urgency.size > 0 && ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS > 0;
   // A fragment burying a planned hole (#1937) is ranked first too, so thinning keeps it as its bin's representative.
-  const holesWait = isProgressionSite(state) && state.plannedDrillHoles.length > 0 && BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS > 0;
+  const holesWait = hasPlannedHolesOnSite(state) && BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS > 0;
   const isUrgent = oreUrgent || holesWait
     ? (a: PendingAction): boolean => (oreUrgent && demandBonusOf(state, a, fragmentOf, urgency) > 0)
       || (holesWait && buriedHoleBonusOf(state, a, fragmentOf) > 0)
