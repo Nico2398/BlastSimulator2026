@@ -955,10 +955,11 @@ describe('ChargeStep explosive stock (#1685)', () => {
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     withWarehouse(state, { krackle: 100 });
     step.update(state, 'sunny');
-    expect(paidFrom(step)).not.toContain('$0');
-    card(step, 'krackle').click();
-    step.update(state, 'sunny');
+    // Krackle is the stocked explosive, so it is preselected (#2016).
     expect(paidFrom(step)).toContain('$0');
+    card(step, 'boomite').click();
+    step.update(state, 'sunny');
+    expect(paidFrom(step)).not.toContain('$0');
   });
 
   it('Charge All line (button sub-label) shows net cash cost when stock covers the pattern', () => {
@@ -1195,7 +1196,7 @@ describe('ChargeStep initial explosive (#2016)', () => {
     const { step } = makeStep();
     const state = makeState();
     state.campaign.activeLevelId = 'dusty_hollow'; // pop_rock, boomite, krackle
-    withWarehouse(state, { dynatomics: 500, krackle: 80, pop_rock: 10 });
+    withWarehouse(state, { dynatomics: 300, krackle: 80, pop_rock: 10 }); // 500 kg warehouse capacity
     state.patternCharge = { explosiveId: 'dynatomics', amountKg: 4, stemmingM: 2 };
     step.update(state, 'sunny');
     expect(selectedIds(step)).toEqual(['krackle']);
