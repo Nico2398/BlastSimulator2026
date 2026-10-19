@@ -10,6 +10,7 @@ import type { ContractType } from './Contract.js';
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { recordOreDelivery } from './MineGrade.js';
+import { recordOreSale } from './OreSaturation.js';
 import { recordBoardOre } from './Board.js';
 import type { Building } from '../entities/Building.js';
 
@@ -74,7 +75,7 @@ export function deliverStoredOre(
 
   const result = deliverMaterials(contracts, contractId, kg, tick);
   contract.paidTotal = (contract.paidTotal ?? 0) + result.payment;
-  return { success: true, data: { kg, contractType: contract.type, ...result, fee: isPaidClearance(contract) } };
+  return { success: true, data: { kg, materialId: contract.materialId, contractType: contract.type, ...result, fee: isPaidClearance(contract) } };
 }
 
 /**
@@ -135,9 +136,12 @@ export function settleDelivery(
   tick: number,
   emitter?: EventEmitter,
 ): void {
-  // TODO: implement saturation recording and ore_glut emission (#1930).
-  void emitter;
   bookDeliveryCashflow(state, delivery.contractId, delivery, tick);
   recordOreDelivery(state.grade, delivery.contractType, delivery.kg);
   recordBoardOre(state.board, delivery.contractType, delivery.kg);
+  const oreId = delivery.materialId;
+  if (state.grade === undefined || delivery.contractType === 'rubble_disposal' || !oreId || !(delivery.kg > 0)) return;
+  state.saturation ??= {};
+  const sale = recordOreSale(state.saturation, oreId, delivery.kg, tick, state.grade.grade);
+  if (sale.crossed) emitter?.emit('progression:ore_glut', { oreId, saturation: sale.after });
 }

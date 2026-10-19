@@ -1,5 +1,6 @@
 // BlastSimulator2026 — Instant (non-timed) event effect handlers (#1414)
 
+import { saturationReader } from '../economy/OreSaturation.js';
 import type { Random } from '../math/Random.js';
 import type { EmployeeRole } from '../entities/Employee.js';
 import type { EventEffectSpec } from './EventEffectCatalog.js';
@@ -54,7 +55,7 @@ export function applyInstantEffect(
     }
     case 'special_contract':
       offerSpecialContract(
-        state.contracts, rng, resolveContractPriceMultiplier(state) * EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS, resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade,
+        state.contracts, rng, resolveContractPriceMultiplier(state) * EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS, resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade, saturationReader(state.saturation, state.tickCount),
       );
       return outcome();
     case 'cancel_contract': {

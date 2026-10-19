@@ -97,7 +97,7 @@ describe('economy.ts usage strings — English literal + fr divergence', () => {
     },
     {
       name: 'contract — unknown subcommand',
-      englishLiteral: 'Usage: contract (list|accept|decline|status|deliver|negotiate) [id] [amount:X]',
+      englishLiteral: 'Usage: contract (list|accept|decline|status|deliver|negotiate|market) [id] [amount:X]',
       run: (ctx) => contractCommand(ctx, ['bogus'], {}),
     },
     {

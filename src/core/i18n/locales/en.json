@@ -25,7 +25,7 @@
   "economy.contract.usage_deliver": "Usage: contract deliver <id> amount:<kg> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] [fillable:true] amount:<kg>",
   "economy.contract.none_fillable": "No fillable contract: every offer asks for more than is in storage.",
   "economy.contract.usage_negotiate": "Usage: contract negotiate <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] [fillable:true]",
-  "economy.contract.usage_combined": "Usage: contract (list|accept|decline|status|deliver|negotiate) [id] [amount:X]",
+  "economy.contract.usage_combined": "Usage: contract (list|accept|decline|status|deliver|negotiate|market) [id] [amount:X]",
   "economy.expenses": "Expenses",
   "economy.fragments.in_transit": "In transit",
   "economy.fragments.on_ground": "On ground",
@@ -4476,6 +4476,11 @@
   "notification.title.permit": "Permit",
   "notification.progression.applied": "Application received. Please allow 3–5 geological eras.",
   "notification.progression.approved": "Application approved: you now hold the {name}.",
+  "economy.contract.market_header": "Ore markets:",
+  "economy.contract.market_line": "  {ore}: {pct}% saturated | price {trend}% vs base ({from} -> {to}/kg)",
+  "economy.contract.market_none": "No ore markets to watch on this site.",
+  "notification.market.glut": "Analysts blame you for the {ore} glut.",
+  "notification.title.market": "Market",
   "permit.ack.success": "Approval letter filed under 'Framed'.",
   "permit.ack.nothing": "No approval letter is waiting. The Ministry has nothing to add."
 }

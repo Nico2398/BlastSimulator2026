@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Serialization / deserialization
 // Pure functions: GameState ↔ JSON string.
 
+import { sanitizeOreSaturation } from '../economy/OreSaturation.js';
 import { cancelLegacyUpgradeOrders } from './LegacyUpgradeOrders.js';
 import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
@@ -1025,6 +1026,10 @@ export function deserialize(json: string): GameState {
   const board = sanitizeBoardState(obj['board']);
   if (board) obj['board'] = board;
   else delete obj['board'];
+  // #1930: per-ore market saturation, only meaningful on a progression site.
+  const saturation = obj['grade'] ? sanitizeOreSaturation(obj['saturation']) : undefined;
+  if (saturation) obj['saturation'] = saturation;
+  else delete obj['saturation'];
 
   const restored = obj as unknown as GameState;
   // Capacity is derived from the warehouses, never trusted from the save (#1369).
