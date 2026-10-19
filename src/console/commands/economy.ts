@@ -33,6 +33,7 @@ import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
 import { resolveContractOres, resolveScriptedOreSale } from '../../core/campaign/Level.js';
+import { buyerTierNameKey } from '../../core/economy/BuyerTiers.js';
 
 // ── finances command ──
 
@@ -149,7 +150,7 @@ export function contractCommand(
 
   switch (sub) {
     case 'list': {
-      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state));
+      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade);
       ensureScriptedOreSale(state.contracts, resolveScriptedOreSale(state), resolveContractPriceMultiplier(state));
       if (state.contracts.available.length === 0) {
         return { success: true, output: t('ui.contracts.none') };
@@ -158,6 +159,7 @@ export function contractCommand(
       for (const c of state.contracts.available) {
         lines.push(
           `  [${c.id}] ${c.description} — ${c.quantityKg}kg @ $${c.pricePerKg.toFixed(2)}/kg` +
+          (c.buyerTier ? ` | buyer: ${t(buyerTierNameKey(c.buyerTier))}` : '') +
           ` | deadline: ${c.deadlineTicks} ticks | penalty: $${c.penaltyAmount}`,
         );
       }

@@ -54,7 +54,7 @@ export function applyInstantEffect(
     }
     case 'special_contract':
       offerSpecialContract(
-        state.contracts, rng, resolveContractPriceMultiplier(state) * EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS, resolveContractOres(state), stateRubbleStockKg(state),
+        state.contracts, rng, resolveContractPriceMultiplier(state) * EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS, resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade,
       );
       return outcome();
     case 'cancel_contract': {
