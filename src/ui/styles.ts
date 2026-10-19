@@ -71,6 +71,67 @@ const CSS = `
   pointer-events: all;
 }
 
+/* ─── Permit approval letter (#1926) ───
+   Stamp slams in with CSS only; reduced-motion shows it already placed. */
+.bs-permit-approval-letter {
+  position: relative;
+  width: 520px; max-width: 92vw; max-height: 86vh;
+  display: flex; flex-direction: column;
+  border-radius: 9px;
+  background: var(--bsx-panel);
+  border: 1px solid var(--bsx-hairline-strong);
+  box-shadow: 0 30px 80px rgba(0,0,0,.7);
+  overflow: hidden;
+}
+.bs-permit-approval-header {
+  padding: 18px 20px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  border-bottom: 1px solid var(--bsx-hairline);
+}
+.bs-permit-approval-body {
+  padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+  overflow-y: auto;
+}
+.bs-permit-approval-text {
+  margin: 0;
+  font: 400 12px/1.5 var(--bsx-font-ui);
+  color: var(--bsx-text-secondary);
+}
+.bs-permit-approval-grade {
+  font: 800 20px/1.2 var(--bsx-font-ui);
+  color: var(--bsx-text-primary);
+}
+.bs-permit-approval-lines {
+  margin: 0; padding-left: 18px;
+  display: flex; flex-direction: column; gap: 6px;
+  font: 400 12px/1.5 var(--bsx-font-ui);
+  color: var(--bsx-text-secondary);
+}
+.bs-permit-approval-dismiss { margin: 0 20px 20px; }
+/* Stamp sits in the letterhead's empty right side so it never covers body text. */
+.bs-permit-approval-stamp {
+  position: absolute;
+  top: 26px;
+  right: 22px;
+  padding: 4px 12px;
+  border: 3px solid var(--bsx-critical-text);
+  border-radius: 4px;
+  color: var(--bsx-critical-text);
+  font: 900 22px/1 var(--bsx-font-ui);
+  letter-spacing: .12em;
+  transform: rotate(-12deg);
+  pointer-events: none;
+  animation: bs-permit-stamp .5s cubic-bezier(.2,1.4,.4,1) .25s both;
+}
+@keyframes bs-permit-stamp {
+  0% { opacity: 0; transform: rotate(-12deg) scale(3); }
+  100% { opacity: .9; transform: rotate(-12deg) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bs-permit-approval-stamp { animation: none; opacity: .9; }
+}
+
 /* ─── Tutorial coach mark (redesign P10) ───
    Docked bottom-centre, never modal: the wrapper lets clicks through so the
    player can actually use the control the step is pointing at, and it sits

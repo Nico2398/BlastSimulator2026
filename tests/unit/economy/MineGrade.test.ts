@@ -11,6 +11,10 @@ import {
   blastPitDepthM,
   applyForGrade,
   advanceGradeApplication,
+  approvePendingApplication,
+  acknowledgeApproval,
+  registerUnlockLine,
+  unlockLinesFor,
   type GradeState,
   type GradeTargetKind,
 } from '../../../src/core/economy/MineGrade.js';
@@ -19,6 +23,12 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { createRunner } from '../../../src/console/createRunner.js';
 import { setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
 import { MINE_GRADES } from '../../../src/core/config/balance.js';
+// Importing PermitLimits registers its unlock line at module level (#1926).
+import { permitLimitsFor } from '../../../src/core/economy/PermitLimits.js';
+import { formatMoney } from '../../../src/core/economy/formatMoney.js';
+import { t, setLocale } from '../../../src/core/i18n/I18n.js';
+import en from '../../../src/core/i18n/locales/en.json';
+import fr from '../../../src/core/i18n/locales/fr.json';
 
 function progressionState(grade: Partial<GradeState> = {}): GameState {
   const state = createGame({ seed: 42 });
@@ -43,7 +53,7 @@ describe('createGradeState', () => {
   it('starts at grade 0 with nothing tracked and nothing pending', () => {
     expect(createGradeState()).toEqual({
       grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null,
-      strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0,
+      strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null,
     });
   });
 
@@ -430,7 +440,7 @@ describe('advanceGradeApplication', () => {
 describe('sanitizeGradeState', () => {
   const valid = (): GradeState => ({
     grade: 2, oreDeliveredKg: 1500.5, deepestPitM: 11, rockBrokenM3: 300, blastsFired: 4,
-    pending: { toGrade: 3, ticksLeft: 20 }, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0,
+    pending: { toGrade: 3, ticksLeft: 20 }, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null,
   });
 
   it('accepts a valid state, pending or not', () => {
@@ -476,5 +486,174 @@ describe('sanitizeGradeState', () => {
     const raw: Record<string, unknown> = { ...valid() };
     delete raw['rockBrokenM3'];
     expect(sanitizeGradeState(raw)).toBeUndefined();
+  });
+});
+
+
+describe('unseenApproval (#1926)', () => {
+  it('a fresh grade state has no unseen approval', () => {
+    expect(createGradeState().unseenApproval).toBeNull();
+  });
+
+  it('approving a pending application records the granted grade as unseen and emits the event', () => {
+    const g = createGradeState();
+    g.pending = { toGrade: 1, ticksLeft: 1 };
+    const emitter = new EventEmitter();
+    const seen: number[] = [];
+    emitter.on('progression:grade_approved', e => seen.push(e.grade));
+    expect(approvePendingApplication(g, emitter)).toBe(true);
+    expect(g.grade).toBe(1);
+    expect(g.unseenApproval).toBe(1);
+    expect(seen).toEqual([1]);
+  });
+
+  it('approving without a pending application leaves unseenApproval untouched', () => {
+    const g = createGradeState();
+    expect(approvePendingApplication(g)).toBe(false);
+    expect(g.unseenApproval).toBeNull();
+  });
+
+  it('advanceGradeApplication sets unseenApproval when the countdown completes', () => {
+    const state = progressionState({ pending: { toGrade: 2, ticksLeft: 1 } });
+    advanceGradeApplication(state, new EventEmitter());
+    expect(state.grade!.unseenApproval).toBe(2);
+  });
+
+  it('acknowledgeApproval clears a pending approval and reports true', () => {
+    const g = createGradeState();
+    g.unseenApproval = 3;
+    expect(acknowledgeApproval(g)).toBe(true);
+    expect(g.unseenApproval).toBeNull();
+  });
+
+  it('acknowledgeApproval reports false when nothing is pending, also when the field is absent', () => {
+    const g = createGradeState();
+    expect(acknowledgeApproval(g)).toBe(false);
+    delete g.unseenApproval;
+    expect(acknowledgeApproval(g)).toBe(false);
+  });
+
+  it('sanitizeGradeState keeps a well-formed unseenApproval', () => {
+    const raw = { ...createGradeState(), unseenApproval: 2 };
+    expect(sanitizeGradeState(raw)!.unseenApproval).toBe(2);
+  });
+
+  it.each([
+    ['a string', '2'],
+    ['a negative number', -1],
+    ['a fraction', 1.5],
+    ['NaN', NaN],
+    ['an object', {}],
+    ['undefined', undefined],
+  ])('sanitizeGradeState turns %s into null', (_n, bad) => {
+    const raw = { ...createGradeState(), unseenApproval: bad };
+    expect(sanitizeGradeState(raw)!.unseenApproval).toBeNull();
+  });
+
+  it('an old save lacking the field loads as null', () => {
+    const raw: Record<string, unknown> = { ...createGradeState() };
+    delete raw['unseenApproval'];
+    expect(sanitizeGradeState(raw)!.unseenApproval).toBeNull();
+  });
+});
+
+describe('applyForGrade emitter (#1926)', () => {
+  it('emits progression:grade_applied with target grade and fee on success', () => {
+    const state = readyForGrade1();
+    const emitter = new EventEmitter();
+    const seen: { toGrade: number; fee: number }[] = [];
+    emitter.on('progression:grade_applied', e => seen.push(e));
+    const res = applyForGrade(state, emitter);
+    expect(res.ok).toBe(true);
+    expect(seen).toEqual([{ toGrade: 1, fee: gradeDef(1).fee }]);
+  });
+
+  it('does not emit when the application is refused', () => {
+    const state = progressionState();
+    state.cash = 1_000_000;
+    const emitter = new EventEmitter();
+    let calls = 0;
+    emitter.on('progression:grade_applied', () => { calls++; });
+    expect(applyForGrade(state, emitter).ok).toBe(false);
+    expect(calls).toBe(0);
+  });
+
+  it('still works without an emitter', () => {
+    expect(applyForGrade(readyForGrade1()).ok).toBe(true);
+  });
+});
+
+describe('unlockLinesFor (#1926)', () => {
+  const EN_HINTS: Record<number, string> = {
+    1: 'Your pile of rubble is a logistics problem now.',
+    2: 'Deeper benches: keep the floor clear before you drill.',
+    3: 'Tall walls get ideas. Leave berms.',
+    4: 'Big trucks hate steep ramps. Think spiral.',
+    5: 'The whole planet is watching. Mostly the neighbours.',
+  };
+
+  it.each([1, 2, 3, 4, 5])('grade %i lists the permit limits, then flavour, then hint, in that order', (g) => {
+    const lines = unlockLinesFor(g);
+    expect(lines.length).toBeGreaterThanOrEqual(3);
+    const limits = permitLimitsFor(g);
+    expect(lines[0]!.params).toMatchObject({ maxChargeKg: limits.maxChargeKg, maxHoles: limits.maxHoles, fee: formatMoney(limits.fee) });
+    const keys = lines.map(l => l.key);
+    expect(keys.indexOf(`progression.unlock.flavour.${g}`)).toBe(1);
+    expect(keys.indexOf(`progression.unlock.hint.${g}`)).toBe(2);
+  });
+
+  it.each([1, 2, 3, 4, 5])('grade %i hint reads the issue text in English', (g) => {
+    setLocale('en');
+    expect(t(`progression.unlock.hint.${g}`)).toBe(EN_HINTS[g]);
+  });
+
+  it('every seeded line key resolves to real text in en and fr, not the raw key', () => {
+    for (const g of [1, 2, 3, 4, 5, 6, 9]) {
+      for (const line of unlockLinesFor(g)) {
+        for (const loc of [en, fr] as Record<string, string>[]) {
+          expect(loc[line.key], `${line.key}`).toBeTypeOf('string');
+        }
+      }
+    }
+  });
+
+  it('lines for different grades differ', () => {
+    expect(unlockLinesFor(1).map(l => l.key)).not.toEqual(unlockLinesFor(2).map(l => l.key));
+  });
+
+  it('endless classes get the limits line plus generic class flavour and hint', () => {
+    for (const g of [6, 7, 12]) {
+      const lines = unlockLinesFor(g);
+      const limits = permitLimitsFor(g);
+      expect(lines[0]!.params).toMatchObject({ maxChargeKg: limits.maxChargeKg, maxHoles: limits.maxHoles, fee: formatMoney(limits.fee) });
+      const keys = lines.map(l => l.key);
+      expect(keys).toContain('progression.unlock.flavour.class');
+      expect(keys).toContain('progression.unlock.hint.class');
+      expect(keys.some(k => /\.[1-5]$/.test(k))).toBe(false);
+    }
+  });
+
+  it.each([0, -1, -5])('grade %i has no lines', (g) => {
+    expect(unlockLinesFor(g)).toEqual([]);
+  });
+
+  it('a line registered later appears after the seeded ones, in registration order, only for its grade', () => {
+    const before = unlockLinesFor(2).map(l => l.key);
+    registerUnlockLine({ grade: 2, key: 'test.unlock.first', params: g => ({ grade: g }) });
+    registerUnlockLine({ grade: 2, key: 'test.unlock.second' });
+    registerUnlockLine({ grade: 3, key: 'test.unlock.other' });
+    const after = unlockLinesFor(2);
+    expect(after.map(l => l.key)).toEqual([...before, 'test.unlock.first', 'test.unlock.second']);
+    expect(after[after.length - 2]!.params).toEqual({ grade: 2 });
+    expect(after[after.length - 1]!.params).toEqual({});
+    expect(unlockLinesFor(3).map(l => l.key)).toContain('test.unlock.other');
+    expect(unlockLinesFor(1).map(l => l.key)).not.toContain('test.unlock.first');
+  });
+
+  it('a class line registered later appears for every endless class', () => {
+    registerUnlockLine({ grade: 'class', key: 'test.unlock.class' });
+    expect(unlockLinesFor(6).map(l => l.key)).toContain('test.unlock.class');
+    expect(unlockLinesFor(8).map(l => l.key)).toContain('test.unlock.class');
+    expect(unlockLinesFor(5).map(l => l.key)).not.toContain('test.unlock.class');
   });
 });

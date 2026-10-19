@@ -47,6 +47,8 @@ export interface GradeState {
   inspectionRolls?: number;
   /** Share of the blast charge cap the last blast used (#1927). */
   lastBlastChargeShare?: number;
+  /** Grade whose approval the player has not yet been shown (#1926); null/absent once acknowledged. */
+  unseenApproval?: number | null;
 }
 
 export interface GradeTargetStatus {
@@ -72,7 +74,7 @@ export function formatGradeAmount(n: number): string {
 
 /** Fresh grade state of a progression site: grade 0, nothing tracked. */
 export function createGradeState(): GradeState {
-  return { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0 };
+  return { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null };
 }
 
 function isCount(v: unknown): v is number {
@@ -91,12 +93,13 @@ export function sanitizeGradeState(raw: unknown): GradeState | undefined {
   if (!isWholeCount(grade) || !isCount(oreDeliveredKg) || !isCount(deepestPitM) || !isCount(rockBrokenM3) || !isWholeCount(blastsFired)) return undefined;
   const strikeTicks = Array.isArray(r['strikeTicks']) && r['strikeTicks'].every(isWholeCount) ? [...r['strikeTicks'] as number[]] : [];
   const inspectionRolls = isWholeCount(r['inspectionRolls']) ? r['inspectionRolls'] : 0;
+  const unseenApproval = isWholeCount(r['unseenApproval']) ? r['unseenApproval'] : null;
   const lastBlastChargeShare = typeof r['lastBlastChargeShare'] === 'number' && Number.isFinite(r['lastBlastChargeShare']) && r['lastBlastChargeShare'] >= 0 ? r['lastBlastChargeShare'] : 0;
-  if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks, inspectionRolls, lastBlastChargeShare };
+  if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks, inspectionRolls, lastBlastChargeShare, unseenApproval };
   if (typeof pending !== 'object' || Array.isArray(pending)) return undefined;
   const p = pending as Record<string, unknown>;
   if (!isWholeCount(p['toGrade']) || !isWholeCount(p['ticksLeft'])) return undefined;
-  return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] }, strikeTicks, inspectionRolls, lastBlastChargeShare };
+  return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] }, strikeTicks, inspectionRolls, lastBlastChargeShare, unseenApproval };
 }
 
 /** Definition of a grade: 0 is the start permit, 1-5 are named, above that endless classes. */
@@ -198,7 +201,7 @@ export function permitApplyBlocker(
 }
 
 /** Apply for the next grade: checks, books the fee, starts processing. */
-export function applyForGrade(state: GameState): GradeApplyResult {
+export function applyForGrade(state: GameState, emitter?: Pick<EventEmitter, 'emit'>): GradeApplyResult {
   const blocker = permitApplyBlocker(state);
   if (blocker) {
     return blocker.unmet.length > 0
@@ -210,6 +213,7 @@ export function applyForGrade(state: GameState): GradeApplyResult {
   const def = gradeDef(toGrade);
   deductExpense(state, def.fee, 'permits', `Permit fee: grade ${toGrade}`);
   g.pending = { toGrade, ticksLeft: flooredTicks(def.processingTicks + takePermitDelay(state.events.activeModifiers)) };
+  emitter?.emit('progression:grade_applied', { toGrade, fee: def.fee });
   return { ok: true, fee: def.fee, toGrade };
 }
 
@@ -235,10 +239,11 @@ export function shiftPendingApplication(g: GradeState, ticks: number): boolean {
 }
 
 /** Approves a pending application at once, granting the grade (emits only when an emitter is given); false without one (#1927). */
-export function approvePendingApplication(g: GradeState, emitter?: EventEmitter): boolean {
+export function approvePendingApplication(g: GradeState, emitter?: Pick<EventEmitter, 'emit'>): boolean {
   if (!g.pending) return false;
   g.grade = g.pending.toGrade;
   g.pending = null;
+  g.unseenApproval = g.grade;
   emitter?.emit('progression:grade_approved', { grade: g.grade });
   return true;
 }
@@ -247,4 +252,43 @@ export function approvePendingApplication(g: GradeState, emitter?: EventEmitter)
 export function recordBlastChargeShare(g: GradeState | undefined, planKg: number, maxChargeKg: number): void {
   if (!g || !(maxChargeKg > 0)) return;
   g.lastBlastChargeShare = planKg / maxChargeKg;
+}
+
+/** One line of the "what this grade unlocks" list: a locale key, optionally parameterised by the grade (#1926). */
+interface UnlockLine {
+  /** A specific grade, or 'class' for every endless class grade. */
+  grade: number | 'class';
+  key: string;
+  params?: (grade: number) => Record<string, string | number>;
+  /** Sorts ahead of non-leading lines of the same grade (permit limits come first). */
+  leading?: boolean;
+}
+
+const unlockLines: UnlockLine[] = [];
+
+/** Registers an unlock line (#1926). A `leading` line sorts ahead of the rest of its grade whatever the module load order. */
+export function registerUnlockLine(line: UnlockLine): void {
+  unlockLines.push(line);
+}
+
+/** Unlock lines that apply to a grade, in registration order (leading lines first), with params resolved (#1926). */
+export function unlockLinesFor(grade: number): { key: string; params: Record<string, string | number> }[] {
+  if (grade <= 0) return [];
+  const matching = unlockLines.filter(l => l.grade === grade || (l.grade === 'class' && grade > LAST_NAMED_GRADE));
+  const ordered = [...matching.filter(l => l.leading), ...matching.filter(l => !l.leading)];
+  return ordered.map(l => ({ key: l.key, params: l.params?.(grade) ?? {} }));
+}
+
+for (let grade = 1; grade <= LAST_NAMED_GRADE; grade++) {
+  registerUnlockLine({ grade, key: `progression.unlock.flavour.${grade}` });
+  registerUnlockLine({ grade, key: `progression.unlock.hint.${grade}` });
+}
+registerUnlockLine({ grade: 'class', key: 'progression.unlock.flavour.class' });
+registerUnlockLine({ grade: 'class', key: 'progression.unlock.hint.class' });
+
+/** Marks the pending approval as seen; false when there was none (#1926). */
+export function acknowledgeApproval(g: GradeState): boolean {
+  if (g.unseenApproval == null) return false;
+  g.unseenApproval = null;
+  return true;
 }
