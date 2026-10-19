@@ -2,7 +2,8 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import { LAST_NAMED_GRADE, type GradeState } from './MineGrade.js';
+import { LAST_NAMED_GRADE, registerUnlockLine, type GradeState } from './MineGrade.js';
+import { formatMoney } from './formatMoney.js';
 import { Random, rollSeed } from '../math/Random.js';
 import { chargeFine } from './Finance.js';
 import { isEventShielded, markShielded } from './BribeProtection.js';
@@ -46,6 +47,15 @@ export function permitLimitsFor(grade: number): PermitLimitConfig {
     maxHoles: Math.min(MAX_DRILL_GRID_HOLES, Math.round(top.maxHoles * PERMIT_CLASS_HOLES_FACTOR ** k)),
     fee: Math.round(top.fee * PERMIT_CLASS_FEE_FACTOR ** k),
   };
+}
+
+function limitsUnlockParams(grade: number): Record<string, string | number> {
+  const l = permitLimitsFor(grade);
+  return { maxChargeKg: l.maxChargeKg, maxHoles: l.maxHoles, fee: formatMoney(l.fee) };
+}
+const LIMIT_LINE_GRADES = [...Array.from({ length: LAST_NAMED_GRADE }, (_, i) => i + 1), 'class' as const];
+for (const grade of LIMIT_LINE_GRADES) {
+  registerUnlockLine({ grade, leading: true, key: 'progression.unlock.limits', params: limitsUnlockParams });
 }
 
 /** Compare a blast plan against the permit of `grade`. */

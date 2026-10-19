@@ -10,6 +10,7 @@ import { wireCrewNotifications } from './ui/notify/crewNotifications.js';
 import { wireLogisticsNotifications } from './ui/notify/logisticsNotifications.js';
 import { wireResearchNotifications } from './ui/notify/researchNotifications.js';
 import { wireCorruptionNotifications } from './ui/notify/corruptionNotifications.js';
+import { wireProgressionNotifications } from './ui/notify/progressionNotifications.js';
 import { SavesModal, autosaveLossText } from './ui/panels/SavesModal.js';
 import { buildStartLevelConfirm } from './ui/screens/startLevelConfirm.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
@@ -589,6 +590,7 @@ wireCrewNotifications(emitter, () => ctx.state, n => uiManager.notify(n));
 wireResearchNotifications(emitter, n => uiManager.notify(n));
 wireLogisticsNotifications(emitter, n => uiManager.notify(n));
 wireCorruptionNotifications(emitter, n => uiManager.notify(n));
+wireProgressionNotifications(emitter, n => uiManager.notify(n));
 
 let lastCommandOutput = '';
 const consoleLogs: string[] = [];
@@ -900,6 +902,7 @@ window.__gameState = () => {
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
     mineGrade: s.grade ? { grade: s.grade.grade, pendingTicksLeft: s.grade.pending?.ticksLeft ?? null } : null,
+    unseenApprovalGrade: s.grade?.unseenApproval ?? null,
     storedMassKg: s.logistics.storedMassKg,
     storedSpoilKg: totalSpoilKg(s.buildings.buildings),
     // Sum across every material key in state.collectedOre (kg) -- mirrors
