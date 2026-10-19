@@ -112,7 +112,7 @@ const CSS = `
 /* Stamp sits in the letterhead's empty right side so it never covers body text. */
 .bs-permit-approval-stamp {
   position: absolute;
-  top: 14px;
+  top: 26px;
   right: 22px;
   padding: 4px 12px;
   border: 3px solid var(--bsx-critical-text);
