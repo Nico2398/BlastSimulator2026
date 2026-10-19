@@ -1,5 +1,6 @@
 // ModelIds — asset naming derived from the core catalogs
 
+import { isVanityType } from '../../../../src/core/entities/BuildingVanity.js';
 import { describe, it, expect } from 'vitest';
 import { BUILDING_DEFS } from '../../../../src/core/entities/BuildingDefs.js';
 import { isSingleTierType } from '../../../../src/core/entities/Building.js';
@@ -40,7 +41,8 @@ describe('ModelIds', () => {
 
   it('emits only tiers 1..3 per building type, and only tier 1 for single-tier types', () => {
     const ids = new Set(allModelIds());
-    for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
+    // Vanity projects (#1947) have no model yet: they render as the stand-in.
+    for (const type of (Object.keys(BUILDING_DEFS) as BuildingType[]).filter(ty => !isVanityType(ty))) {
       const maxTier = isSingleTierType(type) ? 1 : 3;
       for (const tier of [1, 2, 3]) {
         expect(ids.has(buildingModelId(type, tier as 1 | 2 | 3)), `${type} t${tier}`).toBe(tier <= maxTier);

@@ -2,6 +2,7 @@
 
 import type { Building } from '../core/entities/Building.js';
 import { getDemolishCost, warehouseStockKg } from '../core/entities/Building.js';
+import { isVanityType } from '../core/entities/BuildingVanity.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import { t } from '../core/i18n/I18n.js';
 import type { LogisticsState } from '../core/economy/Logistics.js';
@@ -21,6 +22,7 @@ export function buildDemolishConfirm(b: Building, onConfirm: () => void, opts: {
       cost: formatMoney(getDemolishCost(b)),
     }),
   ];
+  if (isVanityType(b.type)) lines.push(t('ui.build.demolish_confirm_vanity'));
   const kg = warehouseStockKg(b);
   if (kg > 0) lines.push(t('ui.build.demolish_confirm_loses_explosives', { kg }));
   if ((opts.storedOreKg ?? 0) > 0) lines.push(t('ui.build.demolish_confirm_loses_ore', { kg: opts.storedOreKg! }));

@@ -966,3 +966,121 @@ describe('checkFootprintPlacement — names the blocker (#1830)', () => {
     expect(oob.errorKey).toBe('shell.placement.refused_out_of_bounds');
   });
 });
+
+// ── Vanity projects (#1947) ──
+
+import { touchesBuildingOfType, isCrewlessBuilding, isSingleTierType } from '../../../src/core/entities/Building.js';
+import { isVanityAvailable, isVanityType, VANITY_PROJECTS } from '../../../src/core/entities/BuildingVanity.js';
+import type { VanityType } from '../../../src/core/entities/BuildingVanity.js';
+
+describe('vanity availability (#1947)', () => {
+  it('a board level offers vanity at any grade, even undefined', () => {
+    expect(isVanityAvailable({ hasBoard: true, grade: undefined })).toBe(true);
+    expect(isVanityAvailable({ hasBoard: true, grade: 0 })).toBe(true);
+    expect(isVanityAvailable({ hasBoard: true, grade: 5 })).toBe(true);
+  });
+
+  it.each([4, 5])('a progression site at grade %i offers vanity', (grade) => {
+    expect(isVanityAvailable({ hasBoard: false, grade })).toBe(true);
+  });
+
+  it.each([0, 1, 2, 3])('a progression site at grade %i without a board does not', (grade) => {
+    expect(isVanityAvailable({ hasBoard: false, grade })).toBe(false);
+  });
+
+  it('a site with neither board nor grade does not', () => {
+    expect(isVanityAvailable({ hasBoard: false, grade: undefined })).toBe(false);
+  });
+
+  it('isVanityType is true for the four vanity types only', () => {
+    for (const t of ['ceo_statue', 'golf_course', 'executive_helipad', 'gold_tower'] as BuildingType[]) {
+      expect(isVanityType(t)).toBe(true);
+    }
+    for (const t of ['spoil_heap', 'living_quarters', 'management_office'] as BuildingType[]) {
+      expect(isVanityType(t)).toBe(false);
+    }
+  });
+
+  it('VANITY_PROJECTS carries the board confidence of each project', () => {
+    expect(VANITY_PROJECTS.ceo_statue.boardConfidence).toBe(10);
+    expect(VANITY_PROJECTS.golf_course.boardConfidence).toBe(20);
+    expect(VANITY_PROJECTS.executive_helipad.boardConfidence).toBe(30);
+    expect(VANITY_PROJECTS.gold_tower.boardConfidence).toBe(50);
+  });
+
+  it('only the golf course must touch a spoil heap', () => {
+    expect(VANITY_PROJECTS.golf_course.mustTouch).toBe('spoil_heap');
+    expect(VANITY_PROJECTS.ceo_statue.mustTouch).toBeUndefined();
+    expect(VANITY_PROJECTS.executive_helipad.mustTouch).toBeUndefined();
+    expect(VANITY_PROJECTS.gold_tower.mustTouch).toBeUndefined();
+  });
+});
+
+describe('touchesBuildingOfType (#1947)', () => {
+  // spoil heap footprint is read from its def so the test does not hard-code its size
+  const heap: FootprintOccupant = { type: 'spoil_heap', tier: 1, x: 10, z: 10 };
+  const heapCells = BUILDING_DEFS.spoil_heap[1].footprint;
+  const w = Math.max(...heapCells.map(c => c[0])) + 1;
+  const d = Math.max(...heapCells.map(c => c[1])) + 1;
+  const rectAt = (minX: number, minZ: number, size = 2) => ({ minX, minZ, maxX: minX + size, maxZ: minZ + size });
+
+  it('is true when the rect shares a side with the heap', () => {
+    expect(touchesBuildingOfType([heap], rectAt(10 + w, 10), 'spoil_heap')).toBe(true);
+    expect(touchesBuildingOfType([heap], rectAt(8, 10), 'spoil_heap')).toBe(true);
+    expect(touchesBuildingOfType([heap], rectAt(10, 10 + d), 'spoil_heap')).toBe(true);
+    expect(touchesBuildingOfType([heap], rectAt(10, 8), 'spoil_heap')).toBe(true);
+  });
+
+  it('is false when the rect only meets the heap at a corner', () => {
+    expect(touchesBuildingOfType([heap], rectAt(10 + w, 10 + d), 'spoil_heap')).toBe(false);
+    expect(touchesBuildingOfType([heap], rectAt(8, 8), 'spoil_heap')).toBe(false);
+  });
+
+  it('is false with a one-cell gap', () => {
+    expect(touchesBuildingOfType([heap], rectAt(10 + w + 1, 10), 'spoil_heap')).toBe(false);
+    expect(touchesBuildingOfType([heap], rectAt(7, 10), 'spoil_heap')).toBe(false);
+  });
+
+  it('is false with no occupants', () => {
+    expect(touchesBuildingOfType([], rectAt(10, 10), 'spoil_heap')).toBe(false);
+  });
+
+  it('ignores an adjacent building of another type', () => {
+    const office: FootprintOccupant = { type: 'management_office', tier: 1, x: 10, z: 10 };
+    expect(touchesBuildingOfType([office], rectAt(8, 10), 'spoil_heap')).toBe(false);
+  });
+});
+
+describe('vanity definitions (#1947)', () => {
+  const cases: Array<[VanityType, number, number, number, number]> = [
+    ['ceo_statue', 250000, 2, 2, 0],
+    ['golf_course', 600000, 6, 6, 20],
+    ['executive_helipad', 1200000, 4, 4, 0],
+    ['gold_tower', 5000000, 4, 4, 0],
+  ];
+
+  it.each(cases)('%s costs %i, is %ix%i, upkeep %i per tick', (type, cost, w, d, upkeep) => {
+    const def = getBuildingDef(type, 1);
+    expect(def.constructionCost).toBe(cost);
+    expect(def.operatingCostPerTick).toBe(upkeep);
+    expect(def.footprint).toHaveLength(w * d);
+    expect(Math.max(...def.footprint.map(c => c[0])) + 1).toBe(w);
+    expect(Math.max(...def.footprint.map(c => c[1])) + 1).toBe(d);
+  });
+
+  it.each(cases)('%s is crewless and single tier', (type) => {
+    expect(isCrewlessBuilding(type)).toBe(true);
+    expect(isSingleTierType(type)).toBe(true);
+    expect(getBuildingDef(type, 2)).toBe(getBuildingDef(type, 1));
+  });
+
+  it.each(cases)('%s has demolish cost 0 and demolishing frees the cells without refund', (type) => {
+    const state = createBuildingState();
+    state.buildings.push({ id: 1, type, tier: 1, x: 5, z: 5, hp: 100, active: true } as unknown as Building);
+    expect(getDemolishCost(state.buildings[0]!)).toBe(0);
+    const r = demolishBuilding(state, 1);
+    expect(r.success).toBe(true);
+    expect(state.buildings).toHaveLength(0);
+    expect(r).not.toHaveProperty('refund');
+  });
+});

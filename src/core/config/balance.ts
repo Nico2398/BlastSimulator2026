@@ -1907,6 +1907,11 @@ export const RESEARCH_TASK_DEFS: Record<BuildingType, { 2: ResearchTaskDef; 3: R
     2: { cost: 0, ticks: 0, conditions: [] },
     3: { cost: 0, ticks: 0, conditions: [] },
   },
+  // Vanity projects (#1947): single-tier, never researched.
+  ceo_statue: { 2: { cost: 0, ticks: 0, conditions: [] }, 3: { cost: 0, ticks: 0, conditions: [] } },
+  golf_course: { 2: { cost: 0, ticks: 0, conditions: [] }, 3: { cost: 0, ticks: 0, conditions: [] } },
+  executive_helipad: { 2: { cost: 0, ticks: 0, conditions: [] }, 3: { cost: 0, ticks: 0, conditions: [] } },
+  gold_tower: { 2: { cost: 0, ticks: 0, conditions: [] }, 3: { cost: 0, ticks: 0, conditions: [] } },
 };
 
 /** Research ticks consumed per game tick by a Research Center of each tier (#1936). */
@@ -3175,3 +3180,21 @@ export const BOARD_DIVIDEND_CASH_FLOOR = 100000;
 /** Targets of a board attached with the debug `board start` command when none are given. */
 export const BOARD_DEBUG_ORE_TARGET_T = 50;
 export const BOARD_DEBUG_PROFIT_TARGET = 20000;
+
+// ── Vanity projects (#1947) ──
+export const VANITY_MIN_GRADE = 4;
+export const VANITY_CEO_STATUE_COST = 250000;
+export const VANITY_GOLF_COURSE_COST = 600000;
+export const VANITY_EXECUTIVE_HELIPAD_COST = 1200000;
+export const VANITY_GOLD_TOWER_COST = 5000000;
+export const VANITY_CEO_STATUE_CONFIDENCE = 10;
+export const VANITY_GOLF_COURSE_CONFIDENCE = 20;
+export const VANITY_EXECUTIVE_HELIPAD_CONFIDENCE = 30;
+export const VANITY_GOLD_TOWER_CONFIDENCE = 50;
+export const VANITY_MORALE_ONCE = -2;
+export const VANITY_ECOLOGY_ONCE = 2;
+export const VANITY_HELIPAD_NUISANCE_ONCE = -3;
+export const VANITY_GOLD_TOWER_NUISANCE_ONCE = -5;
+export const VANITY_WELL_BEING_ONCE = -2;
+/** Golf course upkeep ($ per tick). */
+export const VANITY_GOLF_UPKEEP_PER_TICK = 20;

@@ -1,5 +1,6 @@
 import type { VehicleDef, VehicleRole } from '../core/entities/Vehicle.js';
 import { getFootprintSize, nonZeroScoreEffects, type BuildingDef, type BuildingType } from '../core/entities/Building.js';
+import { isVanityType, VANITY_PROJECTS } from '../core/entities/BuildingVanity.js';
 import { t } from '../core/i18n/I18n.js';
 import { DRILL_RIG_MAX_DEPTH_M } from '../core/config/balance.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
@@ -18,6 +19,10 @@ export const BUILDING_CAPACITY_UNIT_KEY: Record<BuildingType, string | null> = {
   explosive_warehouse: 'ui.build.unit.kg',
   freight_warehouse: 'ui.build.unit.kg',
   spoil_heap: null,
+  ceo_statue: null,
+  golf_course: null,
+  executive_helipad: null,
+  gold_tower: null,
 };
 
 /** i18n key of the work-capacity unit for roles whose capacity is not a kg payload. */
@@ -88,9 +93,25 @@ export function buildingScoreEffectLines(def: BuildingDef): string[] {
     t('ui.build.tip.score', { score: t(`score.${id}`), value: `${amount > 0 ? '+' : '-'}${num(Math.abs(amount))}` }));
 }
 
+/** Lines naming the one-off effects of a vanity project (board confidence, morale, scores); empty for any other type (#1947). */
+function vanityEffectLines(type: BuildingType): string[] {
+  if (!isVanityType(type)) return [];
+  const fx = VANITY_PROJECTS[type];
+  const signed = (n: number): string => `${n > 0 ? '+' : '-'}${Math.abs(n)}`;
+  const once = (score: string, n: number): string => t('ui.build.vanity.once', { score, value: signed(n) });
+  return [
+    t('ui.build.vanity.confidence', { value: signed(fx.boardConfidence) }),
+    ...(fx.moraleOnce !== undefined ? [once(t('ui.employees.morale'), fx.moraleOnce)] : []),
+    ...(fx.ecologyOnce !== undefined ? [once(t('score.ecology'), fx.ecologyOnce)] : []),
+    ...(fx.nuisanceOnce !== undefined ? [once(t('score.nuisance'), fx.nuisanceOnce)] : []),
+    ...(fx.wellBeingOnce !== undefined ? [once(t('score.wellBeing'), fx.wellBeingOnce)] : []),
+    ...(fx.mustTouch !== undefined ? [t('ui.build.vanity.must_touch', { target: t(`building.${fx.mustTouch}.name`) })] : []),
+  ];
+}
+
 /** Score effects of a building joined into one card string. */
 export function buildingCardEffects(def: BuildingDef): string {
-  return buildingScoreEffectLines(def).join(', ');
+  return [...buildingScoreEffectLines(def), ...vanityEffectLines(def.type)].join(', ');
 }
 
 /** Capacity of a vehicle role with its work unit, e.g. "2 holes/h". */
