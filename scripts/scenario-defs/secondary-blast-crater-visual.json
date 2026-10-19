@@ -1,0 +1,320 @@
+{
+  "name": "secondary-blast-crater-visual",
+  "description": "Explosive Warehouse crater (#1896), played through the UI: the player builds a warehouse, stocks 300 kg of boomite, orders, charges and fires a one-hole pattern beside it; the blast destroys the warehouse, its stock detonates and leaves a crater at its footprint. Screenshots frame the crater and the muck pile of crater fragments.",
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "crater",
+      "yaw": 90,
+      "pitch": 30
+    }
+  ],
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "description": "Sandbox full kit on desert_badlands seed 42.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "buildingCount": 2
+        }
+      },
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:1 cols:1 spacing:4 depth:6 diameter:0.089 start:36,30",
+      "description": "One hole first (the warehouse would otherwise occlude its tile); the warehouse is ordered beside it next.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 1
+        }
+      },
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 4
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "focusTile",
+          "x": 36,
+          "z": 30,
+          "distance": 20,
+          "pitch": 85,
+          "yaw": 270
+        },
+        {
+          "type": "dragTiles",
+          "x1": 36,
+          "z1": 30,
+          "x2": 36,
+          "z2": 30
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:holeCount equals:1 max_ticks:600",
+      "description": "The crew drills the hole.",
+      "timeout": 190,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 1,
+          "orderedHoleCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 1,
+          "maxTicks": 600,
+          "timeoutMs": 190000
+        }
+      ]
+    },
+    {
+      "command": "build explosive_warehouse at:37,30",
+      "description": "Order the tier-1 warehouse (2x2) beside the hole drilled at 36,30; its footprint lies inside the blast's cleared rock.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      },
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 37,
+          "z": 30
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:buildingCount equals:3 max_ticks:400",
+      "description": "The crew builds the warehouse.",
+      "timeout": 130,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 3,
+          "orderedBuildingCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 3,
+          "maxTicks": 400,
+          "timeoutMs": 130000
+        }
+      ]
+    },
+    {
+      "command": "buy explosive:boomite kg:305",
+      "description": "305 kg of boomite into stock; the 5 kg charge ordered below is drawn from it, leaving 300 kg.",
+      "role": "bootstrap",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy explosive:boomite kg:305"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "description": "5 kg from stock: no cash, no delivery wait.",
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:chargedCount equals:1 max_ticks:380",
+      "description": "The charge is loaded.",
+      "timeout": 130,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 1,
+          "orderedChargeCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 1,
+          "maxTicks": 380,
+          "timeoutMs": 130000
+        }
+      ]
+    },
+    {
+      "command": "blast detonate",
+      "description": "Fire the pattern. Its rock destroys the stocked warehouse; the 300 kg detonate and break their own crater at the footprint. The blast output carries the notice naming the warehouse, the kg and the crater.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "description": "The pattern fires; the warehouse is gone with the crater at its footprint.",
+      "timeout": 190,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "buildingCount": 2
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 190000
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "description": "Inspect the muck pile the crater added to the blast's.",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "focusTile",
+          "x": 38,
+          "z": 31,
+          "distance": 25,
+          "pitch": 50
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
+  ]
+}
