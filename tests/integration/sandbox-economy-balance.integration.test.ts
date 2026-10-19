@@ -228,23 +228,29 @@ describe('sandbox economy: richness is bounded across biome and depth', () => {
     expect(SANDBOX_MAX_RICHNESS_RATIO).toBe(10);
   });
 
-  // #1933: grade rises with depth, so value per m3 climbs band over band. Depth bands are the multiplier's:
-  // 0-10, 10-20, 20-35, 35-55 m. A biome with no ore in a deeper band at all is excluded for that band
-  // (its ores are not placed there), so the comparison runs on the bands that hold ore.
-  it('value per m3 rises strictly band over band (0-10, 10-20, 20-35, 35-55 m) in every biome with ore there', () => {
+  // #1933: grade rises with depth, so value per m3 climbs band over band (0-10, 10-20, 20-35, 35-55 m).
+  // Once a biome holds ore in any band, every later band must hold ore too and pay strictly more: a
+  // zero band after ore, or a flat/falling band, fails. Only a leading run of ore-free bands is skipped.
+  it('value per m3 rises strictly band over band (0-10, 10-20, 20-35, 35-55 m) wherever ore exists', () => {
     const edges = [0, 10, 20, 35, 55];
+    const label = (i: number) => `${edges[i]}-${edges[i + 1]} m`;
     let compared = 0;
+    const leadingBarren: string[] = [];
     for (const [biome, bands] of perBiome) {
       const means = edges.slice(0, -1).map((from, i) => {
         const slice = bands.slice(from / BAND_M, edges[i + 1]! / BAND_M);
         return slice.reduce((a, b) => a + b, 0) / slice.length;
       });
-      const withOre = means.map((v, i) => ({ v, i })).filter(b => b.v > 0);
-      for (let k = 1; k < withOre.length; k++) {
-        expect(withOre[k]!.v, `${biome} band ${edges[withOre[k]!.i]}-${edges[withOre[k]!.i + 1]} m vs ${edges[withOre[k - 1]!.i]}-${edges[withOre[k - 1]!.i + 1]} m`).toBeGreaterThan(withOre[k - 1]!.v);
+      const first = means.findIndex(v => v > 0);
+      if (first < 0) continue;
+      if (first > 0) leadingBarren.push(`${biome}: ${label(0)}..${label(first - 1)}`);
+      for (let k = first + 1; k < means.length; k++) {
+        expect(means[k]!, `${biome} band ${label(k)} vs ${label(k - 1)}`).toBeGreaterThan(means[k - 1]!);
         compared++;
       }
     }
+    // Every biome pays from the surface down, so no band may be skipped.
+    expect(leadingBarren, 'biomes whose shallow bands hold no ore').toEqual([]);
     expect(compared).toBeGreaterThan(0);
   });
 

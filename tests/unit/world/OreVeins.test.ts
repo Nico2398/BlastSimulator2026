@@ -6,6 +6,7 @@ import { getOre, getAllOres } from '../../../src/core/world/OreCatalog.js';
 import { ORE_RARITY_TIERS } from '../../helpers/oreRarity.js';
 import { SEEDS, BLOCK, MAX_DEPTH, sampleSite, blockIndexOf, shareBelow, richestDecileOverMedian, argmax, peakBlockByOre, type SiteOre } from '../../helpers/oreSite.js';
 import { ORE_DEPOSIT_RARITY_COVERAGE, ORE_DEPTH_MULTIPLIER_BANDS, ORE_DEPTH_BLEND_M } from '../../../src/core/config/balance.js';
+import { createHash } from 'node:crypto';
 import { createRunner } from '../../../src/console/createRunner.js';
 
 // cruite: dirtite 0.40 (depth 0-10), rustite 0.15 (depth 0-15). No blingite entry at all.
@@ -516,5 +517,38 @@ describe('ore depth multiplier in densitiesAt (#1933)', () => {
         else expect(b[i]!).toBeCloseTo(d * 0.2, 12);
       });
     }
+  });
+});
+
+describe('sandbox deposits above 10 m are byte-identical to main (#1933)', () => {
+  const ROCKS = ['cruite', 'sandite', 'molite', 'grumpite', 'clunkite', 'stubite', 'obstiite', 'gnarlite', 'absurdite', 'titanite'];
+
+  it('0-10 m densities, every rock, seeds 1 and 42, hash to the value captured on main before #1933', () => {
+    const lines: string[] = [];
+    let ore = 0;
+    for (const seed of [1, 42]) {
+      const sampler = new OreVeinSampler(seed, { deposits: true });
+      for (const rockId of ROCKS) for (let d = 0; d <= 10; d++) for (let x = 0; x < 24; x++) for (let z = 0; z < 24; z++) {
+        const dens = sampler.densitiesAt(x, 0, z, d, { rocks: [{ rockId, coefficient: 1 }] }, 1.0);
+        if (Object.keys(dens).length) ore++;
+        lines.push(JSON.stringify(dens));
+      }
+    }
+    expect(ore).toBe(4836);
+    expect(createHash('sha1').update(lines.join('\n')).digest('hex')).toBe('14cb47364f7c79a699f566b98f98c0d10ecb4cf8');
+  });
+
+  it('a deposit ore reads richer at 30 m than at 5 m in the same column and rock', () => {
+    const sampler = new OreVeinSampler(42, { deposits: true });
+    const comp: VoxelRockComposition = { rocks: [{ rockId: 'molite', coefficient: 1 }] };
+    let both = 0;
+    for (let x = 0; x < 60; x++) for (let z = 0; z < 60; z++) {
+      const shallow = sampler.densitiesAt(x, 0, z, 5, comp, 2.0)['blingite'];
+      const deep = sampler.densitiesAt(x, 0, z, 30, comp, 2.0)['blingite'];
+      if (shallow === undefined) continue;
+      both++;
+      expect(deep, `x${x} z${z}`).toBeGreaterThanOrEqual(shallow);
+    }
+    expect(both).toBeGreaterThan(20);
   });
 });

@@ -3107,12 +3107,12 @@ export const ORE_DEPTH_BLEND_M = 3;
 /**
  * Sandbox-only deep ore content (#1933). With ore deposits on, a (rock, ore) pair here replaces the
  * RockCatalog host probability, so deeper rock pays more without touching campaign rocks or Level 1's
- * contract ores. Every ore added has depthMin >= 15 (after SANDBOX_ORE_DEPTH_WINDOWS), so 0-10 m ore is unchanged.
+ * contract ores. A row only changes (rock, ore) pairs whose sandbox window starts at 15 m or deeper (sparkium 15, craktonite 28, absurdium 30), so ore at 0-10 m is identical to the catalog's.
  */
 export const SANDBOX_DEEP_ORE_AFFINITY: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   cruite: { sparkium: 0.22 },
   sandite: { sparkium: 0.22 },
-  molite: { rustite: 0.10, blingite: 0.05, dirtite: 0.05, gloomium: 0.22, craktonite: 0.20, absurdium: 0.38 },
+  molite: { craktonite: 0.20, absurdium: 0.38 },
   grumpite: { sparkium: 0.20 },
   clunkite: { sparkium: 0.12, craktonite: 0.10, absurdium: 0.50 },
   obstiite: { sparkium: 0, craktonite: 0.06, absurdium: 0.44 },
