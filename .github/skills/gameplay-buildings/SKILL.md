@@ -212,6 +212,15 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
     of the radius die (lawsuit pending, death count up); those further in are injured. Dead or already
     injured employees are skipped; occupants of a destroyed building or vehicle are injured.
   - Chain: another stocked warehouse destroyed by a detonation detonates once in turn (visited set).
+  - **Crater (#1896):** the detonation also breaks the ground where the warehouse stood, through the blast pipeline
+    (`secondaryCraterPlan` -> `executeBlastSteps`, fired by `carveSecondaryCraters`): one hole at the floored footprint centre,
+    `SECONDARY_BLAST_CRATER_HOLE_DEPTH_M` deep, charged with the whole stock (kg summed over all explosives, type = the one with
+    most stored kg), no stemming. Its rock becomes hauling fragments; buildings and crew on cleared ground are destroyed as in
+    the main blast; stocked warehouses it destroys chain, bounded by `SECONDARY_BLAST_CRATER_MAX_PASSES`.
+    Decisions: blast pipeline over a plain carve (fragments to haul, nav/render follow `terrain:updated` for free; reverse: a
+    direct voxel carve in `carveSecondaryCraters`); hole depth 3 m (`SECONDARY_BLAST_CRATER_HOLE_DEPTH_M`); heaviest explosive
+    sets the type (reverse: `secondaryCraterPlan`); crater fragments do not feed projection damage (the radius model already
+    covers it).
   - The blast report lists each detonation; the `blast` output carries one line per detonation.
   - **Demolition does not detonate**: `build destroy` of a stocked warehouse only reports the lost kg.
 - Well-being, Safety, Ecology score penalties applied

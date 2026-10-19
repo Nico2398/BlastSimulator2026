@@ -3,7 +3,7 @@
 import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGame, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
+import { requireGame, destroyEntitiesOnColumns, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
 import { executeBlastSteps, emitRegionInStrips, buildBlastReport, didNotBreakOut, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
 import { resolveMarketId } from '../../../core/campaign/Level.js';
 import { drain, type Steps } from '../../../core/engine/Steps.js';
@@ -14,12 +14,12 @@ import { addBlastFragments, reserveFragmentIds } from '../../../core/economy/Log
 import type { WarehouseLoss } from '../../../core/economy/FreightWarehouses.js';
 import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
 import { resolveSecondaryBlasts, type SecondaryBlastEvent } from '../../../core/entities/SecondaryBlast.js';
+import { carveSecondaryCraters, type SecondaryCraterReport } from './secondaryCrater.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
 import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
 import { releaseOccupantsOfRemovedBuildings, releaseOccupantsOfRemovedVehicles } from '../../../core/engine/Mount.js';
-import { processProjections, bookEmployeeDeath, type AccidentRecord } from '../../../core/entities/Damage.js';
+import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
 import { releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js';
-import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
 import { blastPitDepthM, recordBlastChargeShare, recordGradeBlast } from '../../../core/economy/MineGrade.js';
 import { preFireCheck, resolveOvershoot, type InspectionVerdict } from '../../../core/economy/PermitLimits.js';
@@ -209,23 +209,7 @@ export function* fireBlastSteps(
   const thisBlastAccidents: AccidentRecord[] = [];
 
   yield;
-  const blastedColumns = new Set(result.clearedColumns);
-  for (const emp of state.employees.employees) {
-    if (!emp.alive) continue;
-    if (!blastedColumns.has(`${Math.floor(emp.x)},${Math.floor(emp.z)}`)) continue;
-    const accident = bookEmployeeDeath(state.employees, state.damage, emp.id, state.tickCount);
-    state.damage.accidents.push(accident);
-    thisBlastAccidents.push(accident);
-  }
-  for (const veh of [...state.vehicles.vehicles]) {
-    if (!blastedColumns.has(`${Math.floor(veh.x)},${Math.floor(veh.z)}`)) continue;
-    destroyVehicle(state.vehicles, veh.id);
-    const accident: AccidentRecord = {
-      tick: state.tickCount, type: 'vehicle_destroyed', entityId: veh.id, fragmentId: -1, kineticEnergy: 0,
-    };
-    state.damage.accidents.push(accident);
-    thisBlastAccidents.push(accident);
-  }
+  thisBlastAccidents.push(...destroyEntitiesOnColumns(state, result.clearedColumns));
 
   // Rock that was thrown lands somewhere, and whatever is standing there pays
   // for it. Fragment positions are where the rock came to rest and its speed is
@@ -267,8 +251,15 @@ export function* fireBlastSteps(
     [...result.secondaryBlastEvents, ...projectionSecondaryEvents],
     state.buildings, state.vehicles, state.employees, state.damage, state.tickCount,
   );
+  // Each detonation breaks the ground where its warehouse stood (#1896). Warehouses the
+  // craters destroy in turn are appended to secondaryOutcomes; crater kills join this blast's list.
+  const craterByWarehouse = new Map<number, SecondaryCraterReport>();
+  for (const r of yield* carveSecondaryCraters(ctx, secondaryOutcomes, villages, wetHoleIds, thisBlastAccidents)) {
+    craterByWarehouse.set(r.warehouseId, r);
+  }
   const secondaryReports: SecondaryBlastReport[] = [];
   for (const outcome of secondaryOutcomes) {
+    const crater = craterByWarehouse.get(outcome.event.buildingId);
     thisBlastAccidents.push(...outcome.accidents);
     const destroyed = outcome.accidents.filter(a => a.type === 'building_destroyed');
     for (const a of destroyed) recordBuildingDestruction(state.scores, a.entityLabel === 'explosive_warehouse');
@@ -280,6 +271,8 @@ export function* fireBlastSteps(
       radiusM: outcome.radiusM,
       casualties: outcome.accidents.filter(a => a.type === 'injury' || a.type === 'death').length,
       destroyedIds: destroyed.map(a => a.entityId),
+      craterVoxels: crater?.craterVoxels ?? 0,
+      craterFragments: crater?.craterFragments ?? 0,
     });
   }
   if (secondaryOutcomes.length > 0) {
@@ -409,7 +402,7 @@ export function* fireBlastSteps(
         : []),
       ...stockLossLines,
       ...permitLines,
-      ...secondaryReports.map(r => t('mining.blast.secondary_blast', { kg: r.explosivesKg, id: r.buildingId, casualties: r.casualties })),
+      ...secondaryReports.map(r => t('mining.blast.secondary_blast', { kg: r.explosivesKg, id: r.buildingId, casualties: r.casualties, voxels: r.craterVoxels })),
     ].join('\n'),
   };
 }

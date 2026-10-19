@@ -3872,7 +3872,7 @@
   "ui.blast_workshop.report.oversized_hint": "{count} fragments are too large for standard haulers. A {vehicle} would turn them into money instead of scenery.",
   "ui.blast_workshop.report.wet_holes_fizzled": "Wet holes: {wet} ({fizzled} fizzled). Tubing or a water-resistant explosive prevents this.",
   "ui.blast_workshop.report.wet_holes_ok": "Wet holes: {wet}. No explosive failed.",
-  "ui.blast_workshop.report.secondary_blast": "Secondary blast: {kg} kg of stored explosives detonated in warehouse #{id}. Casualties: {casualties}.",
+  "ui.blast_workshop.report.secondary_blast": "Secondary blast: {kg} kg of stored explosives detonated in warehouse #{id} and blew a crater ({voxels} voxels). Casualties: {casualties}.",
   "shell.placement.outside_region": "Outside the highlighted area — click inside the blue outline.",
   "shell.placement.pick_first": "Click the highlighted area in the scene first.",
   "shell.placement.refused_out_of_bounds": "Out of bounds — the building would stick out of the site.",
@@ -3913,7 +3913,7 @@
   "mining.blast.no_breakout": "Blast failed to break out: the rock stayed sealed in the ground.",
   "mining.blast.rating_cap_no_breakout": "Rating capped (blast did not break out): base {base}",
   "mining.blast.rating_cap_oversize": "Rating capped (oversized fragments): base {base}",
-  "mining.blast.secondary_blast": "Secondary blast: {kg} kg of stored explosives detonated in warehouse #{id}. Casualties: {casualties}.",
+  "mining.blast.secondary_blast": "Secondary blast: {kg} kg of stored explosives detonated in warehouse #{id} and blew a crater ({voxels} voxels). Casualties: {casualties}.",
   "mining.blast.cancelled_drill_orders": "Drill orders cancelled by the blast: {count} hole(s) were not drilled yet.",
   "mining.blast.max_village_vibration": "Max village vibration: {value} mm/s",
   "mining.blast.preview_header": "=== BLAST PREVIEW ===",
@@ -4373,9 +4373,6 @@
   "ui.operations.work_queue_debris_collapse": "Hide orders",
   "ui.operations.work_queue_debris_page": "{from}–{to} of {total}",
   "ui.operations.work_queue_debris_prev": "Previous",
-  "ui.operations.work_queue_debris_next": "Next",
-  "ui.operations.work_queue_debris_cancel": "Cancel all",
-  "ui.operations.work_queue_debris_confirm_title": "Cancel debris orders?",
-  "ui.operations.work_queue_debris_confirm_body": "Cancel {count} orders: {label}? Loaded cargo is dropped back on the ground.",
-  "ui.operations.work_queue_debris_confirm_label": "Cancel orders"
+  "ui.operations.work_queue_debris_note": "Queued automatically for every fragment on the ground",
+  "ui.operations.work_queue_debris_next": "Next"
 }

@@ -3,18 +3,20 @@
 // gets its own sub-seeded 3D ridged field, rotated into a per-ore strike
 // direction and stretched along it (6.7x lower frequency along strike than
 // across it) so veins read as elongated seams rather than isotropic blobs.
+// With deposits on, hosting and windows come from SandboxDeepOre and density is graded by depth (#1933) before the site grade scale (#1932).
 // Gated by a per-ore depth window and weighted by how strongly the voxel's
 // actual rock blend hosts that ore — honours the composition weighting the
 // old scheme only approximated.
 
 import { createNoise3D, type NoiseFunction3D } from 'simplex-noise';
 import {
-  ORE_DEPOSIT_CORE_GAIN, ORE_GRADE_SCALE_DEFAULT, ORE_DEPOSIT_EDGE_WIDTH, ORE_DEPOSIT_FREQ, ORE_DEPOSIT_RARITY_COVERAGE,
+  ORE_DEPOSIT_CORE_GAIN, ORE_DEPTH_BLEND_M, ORE_DEPTH_MULTIPLIER_BANDS, ORE_GRADE_SCALE_DEFAULT, ORE_DEPOSIT_EDGE_WIDTH, ORE_DEPOSIT_FREQ, ORE_DEPOSIT_RARITY_COVERAGE,
 } from '../config/balance.js';
 import { Random } from '../math/Random.js';
 import { subSeed, cellRand } from '../math/Hash.js';
 import { getAllOres, type OreType } from './OreCatalog.js';
 import { getRock } from './RockCatalog.js';
+import { sandboxHostProbability, sandboxOreWindow } from './SandboxDeepOre.js';
 import type { VoxelRockComposition } from './VoxelGrid.js';
 
 /** Along-strike frequency; 6.7x lower than across-strike elongates veins along the strike axis. */
@@ -40,12 +42,12 @@ interface OreField {
 }
 
 /** Σ coefficient_i * rock_i.oreProbabilities[oreId] — how strongly this voxel's rock blend hosts oreId. */
-function hostRockAffinity(composition: VoxelRockComposition, oreId: string): number {
+function hostRockAffinity(composition: VoxelRockComposition, oreId: string, sandbox: boolean): number {
   let sum = 0;
   for (const part of composition.rocks) {
     const rock = getRock(part.rockId);
     if (!rock) continue;
-    sum += part.coefficient * (rock.oreProbabilities[oreId] ?? 0);
+    sum += part.coefficient * (sandbox ? sandboxHostProbability(part.rockId, oreId) : rock.oreProbabilities[oreId] ?? 0);
   }
   return sum;
 }
@@ -63,6 +65,30 @@ function depositLayer(seed: number, ore: OreType): NonNullable<OreField['deposit
   // Every catalog rarity has a coverage entry (unit-tested); a missing one would
   // read as cutoff 0, i.e. near-continuous veins, rather than crash the game.
   return { noise: createNoise3D(() => rng.next()), cutoff: ORE_DEPOSIT_RARITY_COVERAGE[ore.rarity] ?? 0 };
+}
+
+/**
+ * Ore grade multiplier for a depth below the natural surface in metres (#1933).
+ * Bands start at `fromDepth`; a smoothstep ramp of ORE_DEPTH_BLEND_M metres
+ * begins at each band boundary and rises to the next band's multiplier.
+ */
+export function oreDepthMultiplier(depth: number): number {
+  const bands = ORE_DEPTH_MULTIPLIER_BANDS;
+  let i = 0;
+  for (let b = 1; b < bands.length; b++) {
+    if (depth >= bands[b]!.fromDepth) i = b;
+  }
+  const band = bands[i]!;
+  if (i === 0) return band.multiplier;
+  const t = Math.min(1, (depth - band.fromDepth) / ORE_DEPTH_BLEND_M);
+  const previous = bands[i - 1]!.multiplier;
+  return previous + (band.multiplier - previous) * t * t * (3 - 2 * t);
+}
+
+/** Depth-graded stored density, clamped at 1 and re-rounded to 2 decimals; untouched at multiplier 1 (#1933). */
+function depthGraded(stored: number, depth: number): number {
+  const mult = oreDepthMultiplier(depth);
+  return mult === 1 ? stored : Math.round(Math.min(1, stored * mult) * 100) / 100;
 }
 
 /** Sampler options (#1682). */
@@ -99,13 +125,15 @@ export class OreVeinSampler {
     const result: Record<string, number> = {};
 
     for (const ore of getAllOres()) {
-      if (depth < ore.depthMin || depth > ore.depthMax) continue;
-
-      const affinity = hostRockAffinity(composition, ore.id);
-      if (affinity <= 0) continue;
-
       const field = this.fields.get(ore.id);
       if (!field) continue;
+      const sandbox = field.deposit !== undefined;
+      const [depthMin, depthMax] = sandbox ? sandboxOreWindow(ore) : [ore.depthMin, ore.depthMax];
+      if (depth < depthMin || depth > depthMax) continue;
+
+      const affinity = hostRockAffinity(composition, ore.id, sandbox);
+      if (affinity <= 0) continue;
+
       const gain = field.deposit
         ? depositGain(field.deposit.noise(x * ORE_DEPOSIT_FREQ, 0, z * ORE_DEPOSIT_FREQ), field.deposit.cutoff)
         : 1;
@@ -118,7 +146,9 @@ export class OreVeinSampler {
       if (n > threshold) {
         const density = Math.min(1, (n - threshold) * DENSITY_GAIN);
         if (density > MIN_STORED_DENSITY) {
-          const stored = Math.round(density * 100) / 100;
+          const rounded = Math.round(density * 100) / 100;
+          // Depth pays (#1933): sandbox deposits only, before the site grade scale.
+          const stored = field.deposit ? depthGraded(rounded, depth) : rounded;
           result[ore.id] = this.gradeScale === ORE_GRADE_SCALE_DEFAULT ? stored : stored * this.gradeScale;
         }
       }

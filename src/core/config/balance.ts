@@ -2279,6 +2279,12 @@ export const SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION = 0.6;
 /** Fraction of the radius within which people die (#1394). */
 export const SECONDARY_BLAST_DEATH_RADIUS_FRACTION = 0.5;
 
+/** Depth in metres of the single crater hole a secondary blast fires (#1896). */
+export const SECONDARY_BLAST_CRATER_HOLE_DEPTH_M = 3;
+
+/** Cap on blast passes carving one secondary crater (#1896). */
+export const SECONDARY_BLAST_CRATER_MAX_PASSES = 4;
+
 /** Offset added to the game seed to derive the weather cycle's PRNG seed (#1403). */
 export const WEATHER_RNG_SEED_OFFSET = 1000;
 
@@ -3103,6 +3109,46 @@ export const EVENT_BALANCE_REFERENCE_PERMIT_FEE = 20000;
 /** Ore grade scale lever (#1932): default and upper bound. */
 export const ORE_GRADE_SCALE_DEFAULT = 1;
 export const ORE_GRADE_SCALE_MAX = 1;
+
+/**
+ * Ore grade rises with depth below the natural surface (#1933). Each band
+ * applies its multiplier from `fromDepth` metres down.
+ */
+export const ORE_DEPTH_MULTIPLIER_BANDS: readonly {
+  readonly fromDepth: number;
+  readonly multiplier: number;
+}[] = [
+  { fromDepth: 0, multiplier: 1.0 },
+  { fromDepth: 10, multiplier: 1.4 },
+  { fromDepth: 20, multiplier: 1.8 },
+  { fromDepth: 35, multiplier: 2.2 },
+];
+
+/** Metres of smoothstep ramp from each band boundary to the next band (#1933). */
+export const ORE_DEPTH_BLEND_M = 3;
+
+/**
+ * Sandbox-only deep ore content (#1933). With ore deposits on, a (rock, ore) pair here replaces the
+ * RockCatalog host probability, so deeper rock pays more without touching campaign rocks or Level 1's
+ * contract ores. A row only changes (rock, ore) pairs whose sandbox window starts at 15 m or deeper (sparkium 15, craktonite 28, absurdium 30), so ore at 0-10 m is identical to the catalog's.
+ */
+export const SANDBOX_DEEP_ORE_AFFINITY: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  cruite: { sparkium: 0.22 },
+  sandite: { sparkium: 0.22 },
+  molite: { craktonite: 0.20, absurdium: 0.38 },
+  grumpite: { sparkium: 0.20 },
+  clunkite: { sparkium: 0.12, craktonite: 0.10, absurdium: 0.50 },
+  obstiite: { sparkium: 0, craktonite: 0.06, absurdium: 0.44 },
+  gnarlite: { sparkium: 0.17 },
+  absurdite: { sparkium: 0.15 },
+  titanite: { sparkium: 0.08, absurdium: 0.75 },
+};
+
+/** Sandbox-only depth windows [min, max] metres replacing the OreCatalog window: deep ores start deeper so deep bands out-earn mid ones. */
+export const SANDBOX_ORE_DEPTH_WINDOWS: Readonly<Record<string, readonly [number, number]>> = {
+  craktonite: [28, 45],
+  absurdium: [30, 55],
+};
 
 /** Board of directors (#1946). */
 export const BOARD_QUARTER_TICKS = 720;

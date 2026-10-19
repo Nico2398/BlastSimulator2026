@@ -28,7 +28,6 @@ import type { ShiftMode } from '../../core/entities/SitePolicy.js';
 import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 import type { GameConsoleFn } from '../gameConsole.js';
-import type { ConfirmModalConfig } from './ConfirmModal.js';
 import { isFailureBlock, isInTransitBlock, classifyQueuedBlock, buildBlockedOrderMessage } from '../notify/blockedOrders.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import {
@@ -79,7 +78,6 @@ export class OperationsPanel extends PanelBase {
   private activeShift: ShiftMode = 'shift_8h';
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
-  private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
   // Work queue (#1972): persistent sections so a debris change never rebuilds the player rows.
   private readonly playerEl = el('div', { attrs: { style: 'display:contents' } });
   private readonly debrisEl = el('div', { attrs: { style: 'display:contents' } });
@@ -88,19 +86,12 @@ export class OperationsPanel extends PanelBase {
   private debrisSig = '';
   private model: WorkQueueModel = { player: [], debris: [] };
   private lastState: GameState | null = null;
-  /** True while a group cancel runs its commands: each one re-updates the UI, and this panel repaints once at the end. */
-  private bulkCancelling = false;
   /** UI-only expansion state of the debris groups. */
   private readonly expanded = new Set<DebrisGroup['type']>();
   /** Clamped 0-based page per expanded group; clamped once per update, never by the render builders. */
   private readonly pages = new Map<DebrisGroup['type'], number>();
   /** Visible rows of each expanded group's current page, resolved once per update. */
   private readonly pageRows = new Map<DebrisGroup['type'], PendingAction[]>();
-
-  /** Routes the cancel-all-debris confirmation to a modal (#1972); unset means no confirmation is shown. */
-  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
-    this.onConfirmRequestCb = cb;
-  }
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-operations-panel'));
@@ -164,7 +155,6 @@ export class OperationsPanel extends PanelBase {
 
 
   update(state: GameState): void {
-    if (this.bulkCancelling) { this.lastState = state; return; }
     if (!this.policyDirty) {
       this.setActiveShift(state.sitePolicy.shiftMode);
       this.fatigueInput.value = String(state.sitePolicy.fatigueRestThreshold);
@@ -304,7 +294,7 @@ export class OperationsPanel extends PanelBase {
    */
   private makePlayerRows(state: GameState): HTMLElement[] {
     if (this.model.player.length === 0 && this.model.debris.length === 0) return [emptyState(t('ui.operations.work_queue_empty'))];
-    return this.model.player.map(a => this.makeWorkQueueRow(a, state));
+    return this.model.player.map(a => this.makeWorkQueueRow(a, state, true));
   }
 
   private makeDebrisGroups(state: GameState): HTMLElement[] {
@@ -334,14 +324,11 @@ export class OperationsPanel extends PanelBase {
     toggle.setAttribute('aria-expanded', String(open));
     toggle.style.cssText = SMALL_BTN_STYLE;
     toggle.addEventListener('click', () => this.toggleDebris(type));
-    const cancel = button('danger', t('ui.operations.work_queue_debris_cancel'));
-    cancel.dataset['cancelDebrisGroup'] = type;
-    cancel.style.cssText = `margin-left:auto;${SMALL_BTN_STYLE}`;
-    cancel.addEventListener('click', () => this.requestCancelGroup(type, label));
     summary.append(
       el('span', { text: t('ui.operations.work_queue_debris_title', { label, count: group.total }), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
       el('span', { text: parts.join(' · '), attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
-      el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' }, children: [toggle, cancel] }),
+      el('span', { text: t('ui.operations.work_queue_debris_note'), attrs: { 'data-debris-note': type, style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+      el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' }, children: [toggle] }),
     );
     wrap.append(summary);
 
@@ -349,7 +336,7 @@ export class OperationsPanel extends PanelBase {
       const rows = this.pageRows.get(type) ?? [];
       const page = this.pages.get(type) ?? 0;
       const pageCount = debrisPageCount(group.total);
-      for (const a of rows) wrap.append(this.makeWorkQueueRow(a, state));
+      for (const a of rows) wrap.append(this.makeWorkQueueRow(a, state, false));
       const prev = button('ghost', t('ui.operations.work_queue_debris_prev'), { disabled: page <= 0 });
       prev.dataset['debrisPage'] = 'prev';
       prev.addEventListener('click', () => this.setDebrisPage(type, page - 1));
@@ -389,35 +376,7 @@ export class OperationsPanel extends PanelBase {
     this.debrisEl.replaceChildren(...this.makeDebrisGroups(this.lastState));
   }
 
-  /** Snapshots the group's ids at click time; only a confirmed modal cancels them. */
-  private requestCancelGroup(type: DebrisGroup['type'], label: string): void {
-    const ids = [...(this.model.debris.find(g => g.type === type)?.ids ?? [])];
-    if (ids.length === 0 || !this.onConfirmRequestCb) return;
-    this.onConfirmRequestCb({
-      icon: 'trash',
-      title: t('ui.operations.work_queue_debris_confirm_title'),
-      body: t('ui.operations.work_queue_debris_confirm_body', { count: ids.length, label }),
-      confirmLabel: t('ui.operations.work_queue_debris_confirm_label'),
-      onConfirm: () => this.cancelOrders(ids),
-    });
-  }
-
-  /**
-   * Cancels up to thousands of orders. Measured in jsdom with the real console at 2,500 orders: ~6.3 s when
-   * this panel repaints after every command (~2.5 ms each, the commands themselves ~50 ms in total), so
-   * the panel skips its own repaints during the loop. Other panels still update per command (main.ts).
-   */
-  private cancelOrders(ids: readonly number[]): void {
-    this.bulkCancelling = true;
-    try {
-      for (const id of ids) this.gameConsole?.(cancelCommand(id));
-    } finally {
-      this.bulkCancelling = false;
-    }
-    if (this.lastState) this.update(this.lastState);
-  }
-
-  private makeWorkQueueRow(action: PendingAction, state: GameState): HTMLElement {
+  private makeWorkQueueRow(action: PendingAction, state: GameState, cancellable: boolean): HTMLElement {
     const holder = action.holderId !== null
       ? state.employees.employees.find(e => e.id === action.holderId)
       : undefined;
@@ -452,14 +411,14 @@ export class OperationsPanel extends PanelBase {
     );
 
     const footRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
-    const cancelBtn = button('danger', t('ui.operations.work_queue_cancel'));
-    cancelBtn.style.cssText = `margin-left:auto;${SMALL_BTN_STYLE}`;
-    cancelBtn.dataset['cancelAction'] = String(action.id);
-    cancelBtn.addEventListener('click', () => this.gameConsole?.(cancelCommand(action.id)));
-    footRow.append(
-      el('span', { text: holderText, attrs: { style: 'font:500 11px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
-      cancelBtn,
-    );
+    footRow.append(el('span', { text: holderText, attrs: { style: 'font:500 11px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }));
+    if (cancellable) {
+      const cancelBtn = button('danger', t('ui.operations.work_queue_cancel'));
+      cancelBtn.style.cssText = `margin-left:auto;${SMALL_BTN_STYLE}`;
+      cancelBtn.dataset['cancelAction'] = String(action.id);
+      cancelBtn.addEventListener('click', () => this.gameConsole?.(cancelCommand(action.id)));
+      footRow.append(cancelBtn);
+    }
 
     row.append(headRow);
     if (queuedBlocked) {
