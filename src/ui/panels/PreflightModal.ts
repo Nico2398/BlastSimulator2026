@@ -80,7 +80,7 @@ export class PreflightModal {
     const titleCol = el('div');
     titleCol.style.cssText = 'display:flex;flex-direction:column;gap:3px';
     titleCol.append(
-      this.locale.bindText(el('span', { attrs: { style: 'font:800 15px/1 var(--bsx-font-ui);letter-spacing:.1em' } }), 'ui.blast_workshop.preflight.title'),
+      this.locale.bindText(el('span', { attrs: { style: 'font:800 15px/1 var(--bsx-font-ui);letter-spacing:.1em;color:var(--bsx-text-primary)' } }), 'ui.blast_workshop.preflight.title'),
       this.locale.bindText(el('span', { attrs: { style: 'font:400 11px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }), 'ui.blast_workshop.preflight.subtitle'),
     );
     header.append(iconChip, titleCol);

@@ -58,7 +58,7 @@ export class ConfirmModal {
     header.style.cssText = 'padding:18px 20px 4px;display:flex;align-items:center;gap:11px';
     this.iconChip = el('div');
     this.iconChip.style.cssText = 'width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:rgba(255,91,76,.16);color:var(--bsx-critical-text);flex:0 0 auto';
-    this.titleEl = el('span', { attrs: { style: 'font:800 14px/1 var(--bsx-font-ui);letter-spacing:.06em' } });
+    this.titleEl = el('span', { attrs: { style: 'font:800 14px/1 var(--bsx-font-ui);letter-spacing:.06em;color:var(--bsx-text-primary)' } });
     header.append(this.iconChip, this.titleEl);
 
     this.bodyEl = el('div', { attrs: { style: 'padding:10px 20px 18px;font:400 12px/1.5 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } });
