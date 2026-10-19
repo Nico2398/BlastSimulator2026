@@ -1322,7 +1322,8 @@ describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
     panel.show();
     panel.update(runningState());
     const text = stripOf(panel)!.textContent ?? '';
-    expect(text).toContain(t('ui.contracts.active_summary', { count: 2, hours: 42 }));
+    expect(text).toContain(t('ui.contracts.active_summary', { count: 2 }));
+    expect(text).toContain(t('ui.contracts.active_deadline', { hours: 42 }));
     expect(text).toContain(formatMoney(5234));
   });
 
@@ -1429,14 +1430,129 @@ describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
       expect(fr).not.toBe(en);
       expect(fr).toContain('42');
       expect(fr).toContain(formatMoney(5234));
-      expect(fr).toContain(t('ui.contracts.active_summary', { count: 2, hours: 42 }));
+      expect(fr).toContain(t('ui.contracts.active_summary', { count: 2 }));
+      expect(fr).toContain(t('ui.contracts.active_deadline', { hours: 42 }));
     } finally {
       setLocale('en');
     }
   });
 
-  it('has an English active_summary key carrying count and hours', () => {
+  it('has English label and deadline keys with exact strings', () => {
     setLocale('en');
-    expect(t('ui.contracts.active_summary', { count: 3, hours: 17 })).toBe('Running · 3 · next deadline in 17h');
+    expect(t('ui.contracts.active_summary', { count: 3 })).toBe('Running · 3');
+    expect(t('ui.contracts.active_deadline', { hours: 17 })).toBe('Due in 17h');
+  });
+
+  it('has French label and deadline keys with exact strings', () => {
+    try {
+      setLocale('fr');
+      expect(t('ui.contracts.active_summary', { count: 3 })).toBe('En cours · 3');
+      expect(t('ui.contracts.active_deadline', { hours: 17 })).toBe('Échéance dans 17h');
+    } finally {
+      setLocale('en');
+    }
+  });
+
+  it('renders label, time and penalty as three ordered spans', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(runningState());
+    const kids = Array.from(stripOf(panel)!.children) as HTMLElement[];
+    expect(kids).toHaveLength(3);
+    expect(kids[0]!.classList.contains('bs-contract-active-summary-label')).toBe(true);
+    expect(kids[0]!.textContent).toBe(t('ui.contracts.active_summary', { count: 2 }));
+    expect(kids[1]!.classList.contains('bs-contract-active-summary-deadline')).toBe(true);
+    expect(kids[1]!.textContent).toBe(t('ui.contracts.active_deadline', { hours: 42 }));
+    expect(kids[2]!.textContent).toContain(formatMoney(5234));
+  });
+
+  it('omits the penalty span when only rubble contracts run, leaving label and time', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 9, type: 'rubble_disposal', materialId: '', penaltyAmount: 777 }));
+    panel.show();
+    panel.update(state);
+    expect(stripOf(panel)!.children).toHaveLength(2);
+  });
+
+  describe('long deadline (2151h) never truncates the time', () => {
+    function longState(): GameState {
+      const state = makeState();
+      state.tickCount = 0;
+      state.contracts.active.push(makeContract({ id: 31, acceptedAtTick: 0, deadlineTicks: 2151, penaltyAmount: 67518 }));
+      return state;
+    }
+
+    function check(timeText: string): void {
+      const { panel } = makePanel();
+      panel.show();
+      panel.update(longState());
+      const strip = stripOf(panel)!;
+      const label = strip.querySelector<HTMLElement>('.bs-contract-active-summary-label')!;
+      const time = strip.querySelector<HTMLElement>('.bs-contract-active-summary-deadline')!;
+      expect(label).not.toBeNull();
+      expect(time).not.toBeNull();
+      expect(time).not.toBe(label);
+      expect(label.contains(time)).toBe(false);
+      expect(time.textContent).toBe(timeText);
+      expect(time.textContent).toContain('2151h');
+      expect(label.textContent).not.toContain('2151');
+      expect(time.style.flexShrink).toBe('0');
+      expect(time.style.whiteSpace).toBe('nowrap');
+      expect(time.style.textOverflow).toBe('');
+      expect(label.style.textOverflow).toBe('ellipsis');
+      expect(label.style.minWidth).toBe('0px');
+      expect(label.style.overflow).toBe('hidden');
+      expect(label.style.whiteSpace).toBe('nowrap');
+      expect(strip.textContent).toContain(formatMoney(67518));
+    }
+
+    it('EN: time span is its own non-shrinking element', () => {
+      setLocale('en');
+      check('Due in 2151h');
+    });
+
+    it('FR: time span is its own non-shrinking element', () => {
+      try {
+        setLocale('fr');
+        check('Échéance dans 2151h');
+      } finally {
+        setLocale('en');
+      }
+    });
+  });
+
+  it('hourly refresh changes the time text and colour while the label and strip stay', () => {
+    const { panel } = makePanel();
+    const state = runningState();
+    panel.show();
+    panel.update(state);
+    const strip = stripOf(panel)!;
+    const label = strip.querySelector<HTMLElement>('.bs-contract-active-summary-label')!;
+    const time = strip.querySelector<HTMLElement>('.bs-contract-active-summary-deadline')!;
+    const labelText = label.textContent;
+    expect(time.textContent).toBe('Due in 42h');
+
+    state.tickCount += 5;
+    panel.update(state);
+
+    expect(stripOf(panel)).toBe(strip);
+    expect(strip.querySelector('.bs-contract-active-summary-label')).toBe(label);
+    expect(strip.querySelector('.bs-contract-active-summary-deadline')).toBe(time);
+    expect(label.textContent).toBe(labelText);
+    expect(time.textContent).toBe('Due in 37h');
+  });
+
+  it('hourly refresh recolours the time span as urgency rises', () => {
+    const { panel } = makePanel();
+    const state = runningState();
+    panel.show();
+    panel.update(state);
+    const time = stripOf(panel)!.querySelector<HTMLElement>('.bs-contract-active-summary-deadline')!;
+    const before = time.style.color;
+    state.tickCount = 50; // soonest contract: 2 of 52 ticks left
+    panel.update(state);
+    expect(time.style.color).not.toBe(before);
+    expect(time.style.color).toContain('critical');
   });
 });
