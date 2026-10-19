@@ -141,6 +141,9 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // ramp tool is off-target and inert to a real click (tutorialGuide.ts) —
   // no UI path reaches it while this tutorial runs.
   'build_ramp start:10,15 end:10,25',
+  // ramp-switchback.json (#1939): the Build panel's ramp tool picks one straight
+  // rectangle; a multi-leg path has no click path yet, so the order is a command.
+  'build_ramp path:15,15;15,27;25,27 depth:6 width:3',
   // level3-playthrough-ecology.json: `amount:12`/`amount:15` are outside
   // krackle's own [1, 10] kg range (ExplosiveCatalog.ts). The amount
   // stepper clamps to the selected product's range (Charge.ts), so no click

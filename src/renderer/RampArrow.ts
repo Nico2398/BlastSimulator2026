@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { rampWidthOf, type RampDef } from '../core/mining/Ramp.js';
 import { rampFootprint } from '../core/mining/RampWidening.js';
+import { RAMP_DIR_OFFSETS } from '../core/mining/RampPath.js';
 import type { RampFootprint } from '../core/state/GameState.js';
 import { markSceneOverlay } from './post/SceneOverlay.js';
 import { bilinearSurfaceHeight, type SurfaceHeightSampler } from './GroundTint.js';
@@ -51,17 +52,10 @@ interface RampArrowLayout {
   corridor: RampFootprint;
 }
 
-const DIR_STEP: Record<RampDef['direction'], { dx: number; dz: number }> = {
-  north: { dx: 0, dz: -1 },
-  south: { dx: 0, dz: 1 },
-  east: { dx: 1, dz: 0 },
-  west: { dx: -1, dz: 0 },
-};
-
 /** Where the arrow and corridor lie for `ramp`, in tiles; null for a ramp with nothing to carve. */
 export function rampArrowLayout(ramp: RampArrowSpec): RampArrowLayout | null {
   if (!(ramp.length >= 1)) return null;
-  const dir = DIR_STEP[ramp.direction];
+  const dir = RAMP_DIR_OFFSETS[ramp.direction];
   const tail = { x: ramp.originX, z: ramp.originZ };
   const tip = { x: tail.x + dir.dx * (ramp.length - 1), z: tail.z + dir.dz * (ramp.length - 1) };
   const corridor = rampFootprint(ramp, rampWidthOf(ramp));

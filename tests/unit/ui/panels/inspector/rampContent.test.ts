@@ -7,7 +7,7 @@ import { createGame } from '../../../../../src/core/state/GameState.js';
 import type { BuiltRamp, GameState, PlannedRamp } from '../../../../../src/core/state/GameState.js';
 import { computeRampCost } from '../../../../../src/core/mining/Ramp.js';
 import { formatMoney } from '../../../../../src/core/economy/formatMoney.js';
-import { setLocale } from '../../../../../src/core/i18n/I18n.js';
+import { setLocale, t } from '../../../../../src/core/i18n/I18n.js';
 
 const links = { select: () => {}, run: () => {}, confirm: () => {} } as InspectorLinks;
 
@@ -119,5 +119,55 @@ describe('ramp inspector', () => {
     expect(viewOf(stateWith(rampOf(5))).signature).not.toBe(base);
     expect(viewOf(stateWith(r, 10)).signature).not.toBe(base);
     expect(viewOf(stateWith(r, 1e6, [plannedWiden(r)])).signature).not.toBe(base);
+  });
+});
+
+describe('multi-leg ramp inspector (#1939)', () => {
+  function multiRamp(): BuiltRamp {
+    const def = {
+      originX: 20, originZ: 10, direction: 'south' as const, length: 22, targetDepth: 6, width: 3 as const,
+      legs: [{ direction: 'south' as const, length: 12 }, { direction: 'east' as const, length: 10 }],
+    };
+    return { id: 1, def, width: 3, footprint: { minX: 19, maxX: 29, minZ: 10, maxZ: 23 } };
+  }
+  function textOf(ramp: BuiltRamp): string {
+    const root = document.createElement('div');
+    root.append(...viewOf(stateWith(ramp)).sections);
+    return root.textContent ?? '';
+  }
+
+  it('shows a Legs row with the leg count and each leg length', () => {
+    setLocale('en');
+    const text = textOf(multiRamp());
+    expect(text).toContain(t('inspector.ramp.legs'));
+    expect(text).toContain('2');
+    expect(text).toContain('12');
+    expect(text).toContain('10');
+  });
+
+  it('shows the total length and the grade of the path', () => {
+    setLocale('en');
+    const text = textOf(multiRamp());
+    expect(text).toContain('22');
+    expect(text).toContain(t('inspector.ramp.grade'));
+    expect(text).toContain(String(Math.round((Math.atan(6 / 22) * 180) / Math.PI)));
+  });
+
+  it('shows the ordered grade when one was chosen', () => {
+    setLocale('en');
+    const ramp = multiRamp();
+    ramp.def = { ...ramp.def, gradeDegrees: 25 };
+    expect(textOf(ramp)).toContain('25');
+  });
+
+  it('a straight ramp shows no Legs row', () => {
+    setLocale('en');
+    expect(textOf(rampOf(3))).not.toContain(t('inspector.ramp.legs'));
+  });
+
+  it('does not offer a usable Widen action', () => {
+    const widen = viewOf(stateWith(multiRamp())).actions.find(a => a.action === 'widen');
+    expect(widen === undefined || widen.disabled === true).toBe(true);
+    if (widen) expect(widen.title).toBeTruthy();
   });
 });

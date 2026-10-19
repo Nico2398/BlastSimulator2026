@@ -2,6 +2,10 @@
 // Ramps provide vehicle access to lower pit levels by carving sloped passages.
 // Each ramp clears a diagonal column of voxels from surface to target depth.
 
+import {
+  RAMP_DIR_OFFSETS, findRampPathFault, rampLegsOf, rampPathCells, rampPathOf, rampTotalLength, rampWaypoints,
+  type RampDirection, type RampLeg,
+} from './RampPath.js';
 import { formatMoney } from '../economy/formatMoney.js';
 import {
   computeVoxelColumnSurfaceHeight, computeVoxelColumnSurfaceY, captureColumnTopsForCarve,
@@ -30,7 +34,7 @@ export function computeRampCost(length: number, width: number): number {
 
 // ── Types ──
 
-export type RampDirection = 'north' | 'south' | 'east' | 'west';
+export type { RampDirection };
 
 export interface RampDef {
   originX: number;
@@ -41,6 +45,10 @@ export interface RampDef {
   targetDepth: number;
   /** Corridor width in voxels; undefined means `RAMP_DEFAULT_WIDTH` (#1298). */
   width?: RampWidth;
+  /** Path legs; undefined means one leg of `direction`/`length` (#1939). */
+  legs?: RampLeg[];
+  /** Chosen grade in degrees; undefined means the straight line to `targetDepth` (#1939). */
+  gradeDegrees?: number;
 }
 
 export interface RampResult {
@@ -81,19 +89,37 @@ export function rampDefFromEndpoints(
   return { originX, originZ, direction, length, targetDepth };
 }
 
-// ── Direction offsets ──
+// ── Grade (#1939) ──
 
-const DIR_OFFSETS: Record<RampDirection, { dx: number; dz: number }> = {
-  north: { dx: 0, dz: -1 },
-  south: { dx: 0, dz: 1 },
-  east: { dx: 1, dz: 0 },
-  west: { dx: -1, dz: 0 },
-};
+const RAD_TO_DEG = 180 / Math.PI;
+/** Float slack on grade comparisons, in degrees. */
+const GRADE_TOLERANCE_DEGREES = 1e-9;
 
-/** The tile one step past the ramp's last carved column (origin + length along its direction). */
-export function rampEndTile(ramp: Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length'>): { x: number; z: number } {
-  const o = DIR_OFFSETS[ramp.direction];
-  return { x: ramp.originX + o.dx * ramp.length, z: ramp.originZ + o.dz * ramp.length };
+/** Grade range in degrees reachable over `totalLength` metres to `targetDepth`: straight line up to the cut limit. */
+export function rampGradeBoundsDegrees(totalLength: number, targetDepth: number): { min: number; max: number } {
+  return {
+    min: Math.atan(targetDepth / totalLength) * RAD_TO_DEG,
+    max: Math.atan(RAMP_CUT_SLOPE_RATIO) * RAD_TO_DEG,
+  };
+}
+
+/** Floor depth at path `step` of a `lineLength`-long ramp, optionally at a chosen grade. */
+export function rampFloorDepthAt(
+  step: number, lineLength: number, targetDepth: number, gradeDegrees?: number,
+): number {
+  if (gradeDegrees === undefined) return (step / lineLength) * targetDepth;
+  return Math.min(targetDepth, step * Math.tan(gradeDegrees / RAD_TO_DEG));
+}
+
+/** The tile one step past the ramp's last carved column: the last waypoint of its path. */
+export function rampEndTile(
+  ramp: Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length' | 'legs'>,
+): { x: number; z: number } {
+  if (ramp.legs === undefined) {
+    const o = RAMP_DIR_OFFSETS[ramp.direction];
+    return { x: ramp.originX + o.dx * ramp.length, z: ramp.originZ + o.dz * ramp.length };
+  }
+  return rampWaypoints(rampPathOf(ramp)).at(-1)!;
 }
 
 // ── Core function ──
@@ -189,6 +215,41 @@ export interface RampOrderValidation {
   messageParams?: Record<string, string | number>;
 }
 
+function refusal(
+  message: string, messageKey: string, messageParams: Record<string, string | number>,
+): RampOrderValidation {
+  return { success: false, message, cost: 0, messageKey, messageParams };
+}
+
+/** Refusal when `total` metres cannot reach `targetDepth` within the cut slope, else null. */
+function checkMinimumLength(targetDepth: number, total: number): RampOrderValidation | null {
+  const minLength = computeMinimumRampLength(targetDepth);
+  if (total >= minLength - RAMP_MIN_LENGTH_EPSILON) return null;
+  const displayMinLength = Math.ceil(minLength);
+  return refusal(
+    `Ramp too short: ${targetDepth}m of depth needs at least ${displayMinLength}m of length to stay within the ${NAV_MAX_SLOPE_DEGREES}° slope limit (got ${total}m).`,
+    'mining.build_ramp.slope_too_steep',
+    { depth: targetDepth, minLength: displayMinLength, length: total, maxDegrees: NAV_MAX_SLOPE_DEGREES },
+  );
+}
+
+/** Refusal when a chosen grade lies outside what `total` metres to `targetDepth` allows (#1939), else null. */
+function checkChosenGrade(grade: number, total: number, targetDepth: number): RampOrderValidation | null {
+  const bounds = rampGradeBoundsDegrees(total, targetDepth);
+  if (!Number.isFinite(grade) || grade <= 0) {
+    return refusal('Invalid grade.', 'mining.build_ramp.grade_invalid', {});
+  }
+  if (grade > bounds.max + GRADE_TOLERANCE_DEGREES) {
+    const max = Math.floor(bounds.max * 10) / 10;
+    return refusal(`Grade ${grade}° is over the ${max}° limit.`, 'mining.build_ramp.grade_too_steep', { grade, max });
+  }
+  if (grade < bounds.min - GRADE_TOLERANCE_DEGREES) {
+    const min = Math.ceil(bounds.min * 10) / 10;
+    return refusal(`Grade ${grade}° is under the ${min}° that ${total}m allows.`, 'mining.build_ramp.grade_too_gentle', { grade, min });
+  }
+  return null;
+}
+
 /**
  * Validate a ramp order against `cash` without carving anything — the
  * order-time check `buildRampCommand` runs before queuing excavation work.
@@ -213,7 +274,9 @@ export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidat
     };
   }
 
-  if (!Number.isFinite(ramp.length) || ramp.length < 1) {
+  const legs = rampLegsOf(ramp);
+  const total = rampTotalLength(legs);
+  if (!Number.isFinite(total) || total < 1 || legs.some(l => !Number.isFinite(l.length) || l.length < 1)) {
     return {
       success: false,
       message: 'Invalid ramp length: length must be a finite positive number.',
@@ -222,35 +285,31 @@ export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidat
     };
   }
 
-  if (ramp.length > MAX_RAMP_LENGTH) {
+  if (total > MAX_RAMP_LENGTH) {
     return {
       success: false,
-      message: `Ramp too long: ${ramp.length}m exceeds the ${MAX_RAMP_LENGTH}m limit per ramp.`,
+      message: `Ramp too long: ${total}m exceeds the ${MAX_RAMP_LENGTH}m limit per ramp.`,
       cost: 0,
       messageKey: 'mining.build_ramp.too_long',
-      messageParams: { length: ramp.length, limit: MAX_RAMP_LENGTH },
+      messageParams: { length: total, limit: MAX_RAMP_LENGTH },
     };
+  }
+
+  const fault = findRampPathFault(rampPathOf(ramp), rampWidthOf(ramp));
+  if (fault) {
+    return { success: false, message: 'Invalid ramp path: a leg is shorter than the ramp width or the legs cross.', cost: 0, messageKey: fault.key, messageParams: fault.params };
   }
 
   if (ramp.targetDepth <= 0) {
     return { success: false, message: 'Target depth must be positive', cost: 0 };
   }
 
-  const minLength = computeMinimumRampLength(ramp.targetDepth);
-  if (ramp.length < minLength - RAMP_MIN_LENGTH_EPSILON) {
-    const displayMinLength = Math.ceil(minLength);
-    return {
-      success: false,
-      message: `Ramp too short: ${ramp.targetDepth}m of depth needs at least ${displayMinLength}m of length to stay within the ${NAV_MAX_SLOPE_DEGREES}° slope limit (got ${ramp.length}m).`,
-      cost: 0,
-      messageKey: 'mining.build_ramp.slope_too_steep',
-      messageParams: {
-        depth: ramp.targetDepth, minLength: displayMinLength, length: ramp.length, maxDegrees: NAV_MAX_SLOPE_DEGREES,
-      },
-    };
-  }
+  const gradeRefusal = ramp.gradeDegrees === undefined
+    ? checkMinimumLength(ramp.targetDepth, total)
+    : checkChosenGrade(ramp.gradeDegrees, total, ramp.targetDepth);
+  if (gradeRefusal) return gradeRefusal;
 
-  const totalCost = computeRampCost(ramp.length, rampWidthOf(ramp));
+  const totalCost = computeRampCost(total, rampWidthOf(ramp));
 
   if (cash < totalCost) {
     return {
@@ -330,6 +389,8 @@ interface RampColumn {
   floorAdjustment: number;
   /** True when this column's existing terrain dips below the ramp's straight `floorY` line, requiring a fill rather than a cut (#1172). */
   isFillColumn: boolean;
+  /** Leg this column belongs to (#1939). */
+  legIndex: number;
 }
 
 /**
@@ -363,16 +424,6 @@ interface RampColumn {
  * and `targetY` still strictly decreases across them.
  */
 /**
- * Continuous dig depth at column `step` of `length` toward `targetDepth` —
- * no longer floored to a whole voxel (#1151), so `defineRampSegments`'s
- * Pass 1 can derive each column's exact continuous `floorY` and, from it,
- * the `floorAdjustment` its floor-row cell carries.
- */
-function computeRampColumnDepth(step: number, length: number, targetDepth: number): number {
-  return (step / length) * targetDepth;
-}
-
-/**
  * Shortest ramp length that reaches `targetDepth` without the floor's
  * rise-per-metre-of-run exceeding `RAMP_CUT_SLOPE_RATIO` (#1152).
  */
@@ -386,10 +437,9 @@ export function computeMinimumRampLength(targetDepth: number): number {
  * only the side strips beyond its half-width are emitted.
  */
 export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarvedWidth?: number): RampSegmentDef[] {
-  const offset = DIR_OFFSETS[ramp.direction];
-  const perpDx = offset.dz !== 0 ? 1 : 0;
-  const perpDz = offset.dx !== 0 ? 1 : 0;
-  const halfWidth = Math.floor(rampWidthOf(ramp) / 2);
+  const legs = rampLegsOf(ramp);
+  const total = rampTotalLength(legs);
+  const path = rampPathOf(ramp);
   const carvedHalf = alreadyCarvedWidth === undefined ? -1 : Math.floor(alreadyCarvedWidth / 2);
   const clearanceHeight = 3;
 
@@ -422,56 +472,86 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarved
   // widen order that column is already carved, but at step 0 the depth is 0,
   // so its surface is still the original ground the ramp was cut from.
   const columns: RampColumn[] = [];
-  let globalMinY = Infinity;
-  let globalMaxY = -Infinity;
 
   const originSurfaceY = computeColumnSurfaceY(grid, ramp.originX, ramp.originZ);
   // (#1852) A ramp ending on a dug floor is graded to meet it: the carved line
-  // uses the snapped depth, the player's ordered depth is untouched.
+  // uses the snapped depth, the player's ordered depth is untouched. A chosen
+  // grade (#1939) is the player's own line, so it is never snapped.
   const endTile = rampEndTile(ramp);
-  const lineDepth = snapRampDepthToEndFloor(
+  const lineDepth = ramp.gradeDegrees !== undefined ? ramp.targetDepth : snapRampDepthToEndFloor(
     originSurfaceY,
     computeColumnSurfaceY(grid, endTile.x, endTile.z),
     ramp.targetDepth,
-    ramp.length,
+    total,
   );
 
-  for (let step = 0; step < ramp.length; step++) {
-    const currentDepth = computeRampColumnDepth(step, ramp.length, lineDepth);
+  for (const cell of rampPathCells(path, rampWidthOf(ramp))) {
+    if (Math.abs(cell.lateral) <= carvedHalf) continue;
+    const currentDepth = rampFloorDepthAt(cell.step, total, lineDepth, ramp.gradeDegrees);
     const floorY = originSurfaceY - currentDepth;
     // Always in (0, 1] — see RampSegmentDef.cells' floorAdjustment doc.
     const floorAdjustment = 1 - (currentDepth - Math.floor(currentDepth));
-
-    for (let w = -halfWidth; w <= halfWidth; w++) {
-      if (Math.abs(w) <= carvedHalf) continue;
-      const cx = ramp.originX + offset.dx * step + perpDx * w;
-      const cz = ramp.originZ + offset.dz * step + perpDz * w;
-      const surfaceY = computeColumnSurfaceY(grid, cx, cz);
-      // Math.max(surfaceY, floorY): a column whose terrain dips below the
-      // straight floor line still needs ceilingY above floorY, or the dip's
-      // fill row (at/above floorY) falls outside [floorY, ceilingY) and Pass 2
-      // silently skips it (#1172). Existing (non-dip) columns always have
-      // surfaceY >= floorY, so this is a no-op there.
-      const ceilingY = Math.max(surfaceY, floorY) + clearanceHeight;
-      const isFillColumn = surfaceY < floorY - RAMP_FILL_EPSILON;
-
-      columns.push({ cx, cz, floorY, ceilingY, floorRowY: Math.ceil(floorY), floorAdjustment, isFillColumn });
-      globalMinY = Math.min(globalMinY, floorY);
-      globalMaxY = Math.max(globalMaxY, ceilingY - 1);
-    }
+    const surfaceY = computeColumnSurfaceY(grid, cell.x, cell.z);
+    // Math.max(surfaceY, floorY): a column whose terrain dips below the
+    // straight floor line still needs ceilingY above floorY, or the dip's
+    // fill row (at/above floorY) falls outside [floorY, ceilingY) and Pass 2
+    // silently skips it (#1172). Existing (non-dip) columns always have
+    // surfaceY >= floorY, so this is a no-op there.
+    const ceilingY = Math.max(surfaceY, floorY) + clearanceHeight;
+    const isFillColumn = surfaceY < floorY - RAMP_FILL_EPSILON;
+    columns.push({
+      cx: cell.x, cz: cell.z, floorY, ceilingY, floorRowY: Math.ceil(floorY), floorAdjustment, isFillColumn,
+      legIndex: cell.legIndex,
+    });
   }
 
-  // Pass 2 — one segment per y, top (globalMaxY) to bottom (globalMinY).
+  // Pass 2 — one leg at a time (a straight ramp is one), each leg top to bottom.
   const segments: RampSegmentDef[] = [];
+  for (let legIndex = 0; legIndex < legs.length; legIndex++) {
+    emitLegSegments(grid, columns.filter(c => c.legIndex === legIndex), segments, legs.length > 1);
+  }
+  return segments;
+}
+
+/**
+ * Anchor of a layer: its band centre, rounded. A multi-leg layer's band centre can
+ * fall off the corridor (the empty inside of a corner), so there it snaps to the
+ * nearest contributing column (#1939); a straight ramp keeps the rounded centre.
+ */
+function segmentAnchor(
+  contributing: readonly RampColumn[], centreX: number, centreZ: number, snap: boolean,
+): { targetX: number; targetZ: number } {
+  if (!snap) return { targetX: Math.round(centreX), targetZ: Math.round(centreZ) };
+  let best = contributing[0]!;
+  let bestDist = Infinity;
+  for (const col of contributing) {
+    const dist = (col.cx - centreX) ** 2 + (col.cz - centreZ) ** 2;
+    if (dist < bestDist) { bestDist = dist; best = col; }
+  }
+  return { targetX: best.cx, targetZ: best.cz };
+}
+
+/** Pass 2 for one leg's columns: one segment per y from its highest ceiling to its lowest floor, appended to `segments`. */
+function emitLegSegments(
+  grid: VoxelGrid, columns: readonly RampColumn[], segments: RampSegmentDef[], snapAnchor: boolean,
+): void {
+  let globalMinY = Infinity;
+  let globalMaxY = -Infinity;
+  for (const col of columns) {
+    globalMinY = Math.min(globalMinY, col.floorY);
+    globalMaxY = Math.max(globalMaxY, col.ceilingY - 1);
+  }
 
   for (let y = globalMaxY; y >= globalMinY; y--) {
     const cells: RampSegmentDef['cells'] = [];
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
     let bandMinX = Infinity, bandMaxX = -Infinity, bandMinZ = Infinity, bandMaxZ = -Infinity;
+    const contributing: RampColumn[] = [];
 
     for (const col of columns) {
       if (y < col.floorY || y >= col.ceilingY) continue;
 
+      contributing.push(col);
       bandMinX = Math.min(bandMinX, col.cx); bandMaxX = Math.max(bandMaxX, col.cx);
       bandMinZ = Math.min(bandMinZ, col.cz); bandMaxZ = Math.max(bandMaxZ, col.cz);
       const isFloorRow = y === col.floorRowY;
@@ -512,13 +592,10 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarved
       region: cells.length > 0 ? { minX, maxX, minY, maxY, minZ, maxZ } : null,
       // bandMinX/bandMaxX/bandMinZ/bandMaxZ are finite here — this y was
       // skipped above unless at least one column contributed.
-      targetX: Math.round((bandMinX + bandMaxX) / 2),
-      targetZ: Math.round((bandMinZ + bandMaxZ) / 2),
+      ...segmentAnchor(contributing, (bandMinX + bandMaxX) / 2, (bandMinZ + bandMaxZ) / 2, snapAnchor),
       targetY: y,
     });
   }
-
-  return segments;
 }
 
 /** The subset of {@link RampSegmentDef} {@link carveRampSegment} actually reads — it never touches `index`/`targetX`/`targetZ`/`targetY`, so callers that only have cells/region (e.g. a completed segment's own tracker) don't need to fabricate the rest. */
@@ -832,5 +909,5 @@ export function snapRampDepthToEndFloor(
 export function rampFootOffset(
   startGround: number, endGround: number, targetDepth: number, length: number,
 ): number {
-  return startGround - computeRampColumnDepth(length - 1, length, targetDepth) - endGround;
+  return startGround - rampFloorDepthAt(length - 1, length, targetDepth) - endGround;
 }

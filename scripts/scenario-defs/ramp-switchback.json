@@ -1,0 +1,209 @@
+{
+  "name": "ramp-switchback",
+  "description": "#1939: a two-leg ramp (switchback) ordered from the console, dug leg by leg into the pit, then a debris_hauler drives down it over the corner landing and back up.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "vehicleCount": 5,
+          "employeeCount": 5
+        },
+        "note": "Staffed site: drill_rig #1, debris_hauler #2, rock_digger #3, drivers #4/#5 with excavator licence."
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "description": "Crew the rock_digger #3 with excavator driver #4 so the ordered ramp is actually dug.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "build_ramp path:15,15;15,27;25,27 depth:6 width:3",
+      "description": "#1939: a two-leg switchback: 12m south from (15,15), then 10m east to (25,27) -- 22m total, 6m deep, default grade atan(6/22). The Build panel has no multi-leg path tool yet, so the order is a console command (exact-command allowlist entry in bootstrap-allowlist.ts).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build_ramp path:15,15;15,27;25,27 depth:6 width:3"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": -2200
+        },
+        "note": "22m x 3 wide x RAMP_COST_PER_METER_PER_WIDTH (100/3) = 2200; the corner is counted once."
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:800",
+      "timeout": 185,
+      "description": "Drain every queued dig_ramp_segment layer, leg by leg, until both legs and the corner landing are carved.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 800,
+          "timeoutMs": 180000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        },
+        "note": "Two-leg ramp fully dug."
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 90,
+      "description": "Player clicks the dug switchback in the scene (near top-down focus on leg one's midpoint (15,21), click at viewport centre). The inspector shows the multi-leg ramp: Legs, Length and Grade rows, and the Widen action (disabled for a multi-leg ramp).",
+      "interaction": [
+        {
+          "type": "focusTile",
+          "x": 15,
+          "z": 21,
+          "distance": 16,
+          "pitch": 80
+        },
+        {
+          "type": "click",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector [data-action=\"widen\"]",
+          "timeout": 60000
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        },
+        "note": "Multi-leg ramp selected; inspector lists Legs, Length, Grade."
+      }
+    },
+    {
+      "command": "vehicle driver 2 3",
+      "description": "Crew the debris_hauler #2 with driver #3 (the only truck-licensed driver; driver #4 stays on the rock_digger).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 3"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:200",
+      "timeout": 65,
+      "description": "Driver #3 finished boarding the debris_hauler.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 200,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle reposition 2 24 27",
+      "description": "Send the debris_hauler (#2) to the far end of the second leg: its route runs down leg one, over the corner landing and along leg two. reposition drafts an idle licensed driver.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 2 24 27"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 40",
+      "timeout": 60,
+      "description": "Let the hauler finish its drive down leg one, over the corner landing and along leg two to (24,27). A reposition has no state-dump field to poll for arrival (positions are not exported; pendingActionCount returns before the drive ends), so a bounded tick block is the only wait; verified via console `vehicle list`: the drive takes ~29 ticks.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ],
+        "note": "Hauler reached the bottom of the switchback."
+      }
+    },
+    {
+      "command": "vehicle reposition 2 15 13",
+      "description": "Drive the hauler back up to the surface above the ramp head.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 2 15 13"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 40",
+      "timeout": 60,
+      "description": "Let the hauler finish climbing leg two, the corner and leg one back to the surface at (15,13). A reposition has no state-dump field to poll for arrival (positions are not exported; pendingActionCount returns before the drive ends), so a bounded tick block is the only wait; verified via console `vehicle list`: the drive takes ~29 ticks.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ],
+        "note": "Hauler climbed the switchback back to the surface; stuckEmployeeCount stays 0."
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "stuckEmployeeCount": 0
+        },
+        "note": "Nobody stranded on the ramp."
+      }
+    }
+  ]
+}

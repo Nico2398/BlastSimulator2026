@@ -21,12 +21,13 @@ function tiersLine(tiers: readonly VehicleTier[]): string {
 /** The one-line title and detail line naming a built ramp; `opts` adds its grade and the vehicle tiers that climb it. */
 export function describeRamp(ramp: BuiltRamp, opts?: RampClimbText): { title: string; sub: string } {
   const base = t('shell.selection.ramp_sub', { id: ramp.id, width: ramp.width, length: ramp.def.length });
+  const legs = ramp.def.legs === undefined ? [] : [t('shell.selection.ramp_legs', { legs: ramp.def.legs.length })];
   const climb = opts === undefined ? [] : [
     t('shell.selection.ramp_grade', { grade: Math.round(opts.gradeDeg) }),
     tiersLine(opts.tiers),
   ];
   return {
     title: t('shell.selection.ramp_title', { width: ramp.width }),
-    sub: [base, ...climb].join(' · '),
+    sub: [base, ...legs, ...climb].join(' · '),
   };
 }
