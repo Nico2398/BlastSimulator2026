@@ -23,7 +23,7 @@ function clamp01(x: number): number {
 }
 
 /** Sales volume (kg) that fully saturates an ore's market at the given mine grade; 0 for an unknown ore. */
-function marketDepthKg(oreId: string, buyerGrade: number): number {
+export function marketDepthKg(oreId: string, buyerGrade: number): number {
   const base = (ORE_MARKET_DEPTH_KG as Record<string, number | undefined>)[oreId];
   if (base === undefined) return 0;
   const tiers = unlockedBuyerTiers(buyerGrade);
@@ -31,7 +31,7 @@ function marketDepthKg(oreId: string, buyerGrade: number): number {
 }
 
 /** Saturation of an entry at `tick`, after half-life decay. */
-function saturationAt(entry: OreSaturationEntry | undefined, tick: number): number {
+export function saturationAt(entry: OreSaturationEntry | undefined, tick: number): number {
   if (!entry) return 0;
   const elapsed = Math.max(0, tick - entry.tick);
   return entry.level * Math.pow(0.5, elapsed / ORE_SATURATION_HALF_LIFE_TICKS);
@@ -71,8 +71,8 @@ export function sanitizeOreSaturation(raw: unknown): OreSaturationState | undefi
     if (!v || typeof v !== 'object') continue;
     const { level, tick } = v as Record<string, unknown>;
     if (typeof level !== 'number' || !Number.isFinite(level)) continue;
-    if (typeof tick !== 'number' || !Number.isFinite(tick) || tick < 0) continue;
-    out[oreId] = { level: clamp01(level), tick };
+    if (typeof tick !== 'number' || !Number.isFinite(tick)) continue;
+    out[oreId] = { level: clamp01(level), tick: Math.max(0, tick) };
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }

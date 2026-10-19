@@ -4,6 +4,7 @@ import { createRunner } from '../../../src/console/createRunner.js';
 import { resolveContractOres } from '../../../src/core/campaign/Level.js';
 import { oreContractBasePrice } from '../../../src/core/economy/Market.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
+import { formatDollars } from '../../../src/core/economy/formatMoney.js';
 
 afterEach(() => setLocale('en'));
 
@@ -19,7 +20,7 @@ describe('contract market (#1930)', () => {
     expect(state.grade).toBeDefined();
     const r = runner.run('contract market');
     expect(r.success).toBe(true);
-    for (const ore of resolveContractOres(state)) expect(r.output).toContain(ore);
+    for (const ore of resolveContractOres(state)) expect(r.output).toContain(t(`ore.${ore}.name`));
     expect(r.output).toContain(t('economy.contract.market_header'));
     expect(r.output).toMatch(/0%/);
   });
@@ -27,19 +28,19 @@ describe('contract market (#1930)', () => {
   it('shows 50% saturated and a -25% trend after 10 t of dirtite', () => {
     const { runner, state } = sandbox();
     state.saturation = { dirtite: { level: 0.5, tick: state.tickCount } };
-    const line = runner.run('contract market').output.split('\n').find(l => l.includes('dirtite'))!;
+    const line = runner.run('contract market').output.split('\n').find(l => l.includes(t('ore.dirtite.name')))!;
     expect(line).toContain('50%');
     expect(line).toContain('-25%');
     const base = oreContractBasePrice('dirtite', state.contracts.market);
-    expect(line).toContain(`$${base.toFixed(2)}`);
-    expect(line).toContain(`$${(base * 0.75).toFixed(2)}`);
+    expect(line).toContain(formatDollars(base));
+    expect(line).toContain(formatDollars(base * 0.75));
   });
 
   it('decays: the printed saturation halves after 500 ticks', () => {
     const { runner, state } = sandbox();
     state.saturation = { dirtite: { level: 0.5, tick: state.tickCount } };
     state.tickCount += 500;
-    const line = runner.run('contract market').output.split('\n').find(l => l.includes('dirtite'))!;
+    const line = runner.run('contract market').output.split('\n').find(l => l.includes(t('ore.dirtite.name')))!;
     expect(line).toContain('25%');
   });
 
@@ -47,7 +48,7 @@ describe('contract market (#1930)', () => {
     const { runner, state } = sandbox();
     state.saturation = { dirtite: { level: 0.5, tick: state.tickCount } };
     const others = runner.run('contract market').output.split('\n')
-      .filter(l => /^\s+\w+:/.test(l) && !l.includes('dirtite'));
+      .filter(l => /^\s+\w+:/.test(l) && !l.includes(t('ore.dirtite.name')));
     for (const l of others) expect(l).toMatch(/0%/);
   });
 

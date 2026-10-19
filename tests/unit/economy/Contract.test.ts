@@ -1445,11 +1445,12 @@ describe('saturated ores on progression offers (#1930)', () => {
   });
 
   it('other ores are picked more often while one is saturated', () => {
-    const share = (reader: SaturationReader | undefined, ore: string) => {
-      const sales = saturatedBoards(7, 300, 0, reader).filter(c => c.type === 'ore_sale');
-      return sales.filter(c => c.materialId === ore).length / sales.length;
+    // Pooled over every other ore and many refreshes: one ore's share alone is too noisy to compare.
+    const othersShare = (reader: SaturationReader | undefined) => {
+      const sales = saturatedBoards(7, 1500, 0, reader).filter(c => c.type === 'ore_sale');
+      return sales.filter(c => c.materialId !== 'dirtite').length / sales.length;
     };
-    expect(share(satOf({ dirtite: 1 }), 'rustite')).toBeGreaterThan(share(undefined, 'rustite'));
+    expect(othersShare(satOf({ dirtite: 1 }))).toBeGreaterThan(othersShare(undefined));
   });
 
   it('only the saturated ore is discounted', () => {
