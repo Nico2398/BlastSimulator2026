@@ -70,6 +70,37 @@
       }
     },
     {
+      "command": "vehicle driver 2 3",
+      "description": "Crew the debris_hauler #2 with driver #3 (the only truck-licensed driver; driver #4 stays on the rock_digger).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 3"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:200",
+      "timeout": 65,
+      "description": "Driver #3 finished boarding the debris_hauler.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 200,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0
+        }
+      }
+    },
+    {
       "command": "vehicle reposition 2 24 27",
       "description": "Send the debris_hauler (#2) to the far end of the second leg: its route runs down leg one, over the corner landing and along leg two. reposition drafts an idle licensed driver.",
       "interaction": [
@@ -81,23 +112,20 @@
       "role": "bootstrap"
     },
     {
-      "command": "wait_until field:pendingActionCount equals:0 max_ticks:400",
-      "timeout": 125,
-      "description": "The hauler's drive down the ramp completed (pendingActionCount back to 0) -- it routed over the corner.",
+      "command": "tick 40",
+      "timeout": 60,
+      "description": "Let the hauler finish its drive down leg one, over the corner landing and along leg two to (24,27). A reposition has no state-dump field to poll for arrival (positions are not exported; pendingActionCount returns before the drive ends), so a bounded tick block is the only wait; verified via console `vehicle list`: the drive takes ~29 ticks.",
       "interaction": [
         {
-          "type": "waitUntil",
-          "field": "pendingActionCount",
-          "equals": 0,
-          "maxTicks": 400,
-          "timeoutMs": 120000
+          "type": "command",
+          "command": "tick 40"
         }
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "pendingActionCount": 0
-        },
+        "increased": [
+          "tickCount"
+        ],
         "note": "Hauler reached the bottom of the switchback."
       }
     },
@@ -113,23 +141,20 @@
       "role": "bootstrap"
     },
     {
-      "command": "wait_until field:pendingActionCount equals:0 max_ticks:400",
-      "timeout": 125,
-      "description": "The hauler's climb back up the ramp completed.",
+      "command": "tick 40",
+      "timeout": 60,
+      "description": "Let the hauler finish climbing leg two, the corner and leg one back to the surface at (15,13). A reposition has no state-dump field to poll for arrival (positions are not exported; pendingActionCount returns before the drive ends), so a bounded tick block is the only wait; verified via console `vehicle list`: the drive takes ~29 ticks.",
       "interaction": [
         {
-          "type": "waitUntil",
-          "field": "pendingActionCount",
-          "equals": 0,
-          "maxTicks": 400,
-          "timeoutMs": 120000
+          "type": "command",
+          "command": "tick 40"
         }
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "pendingActionCount": 0
-        },
+        "increased": [
+          "tickCount"
+        ],
         "note": "Hauler climbed the switchback back to the surface; stuckEmployeeCount stays 0."
       }
     },
