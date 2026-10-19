@@ -1375,7 +1375,7 @@ export const VEHICLE_SCRAP_RESIDUAL_FRACTION = 0.4;
 export const VEHICLE_MAX_TIER: VehicleTier = 3;
 
 /** Mine grade at which each vehicle tier becomes purchasable on progression sites (#1928). */
-export const VEHICLE_TIER_UNLOCK_GRADE: Readonly<Record<VehicleTier, number>> = { 1: 0, 2: 0, 3: 0 };
+export const VEHICLE_TIER_UNLOCK_GRADE: Readonly<Record<VehicleTier, number>> = { 1: 0, 2: 2, 3: 4 };
 
 /**
  * Base excavation voxels/tick for a tier-1 rock digger (#555 ramp

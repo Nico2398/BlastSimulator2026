@@ -1,22 +1,36 @@
 // Grade-gated vehicle tiers on progression sites (#1928).
 import type { VehicleTier } from '../entities/Vehicle.js';
+import { VEHICLE_TIER_UNLOCK_GRADE } from '../config/balance.js';
+import { gradeDef, registerUnlockLine } from './MineGrade.js';
+import { t } from '../i18n/I18n.js';
 
 /** Mine grade at which a vehicle tier unlocks. */
-export function requiredGradeForVehicleTier(_tier: VehicleTier): number {
-  return undefined as unknown as number; // TODO: implement
+function requiredGradeForVehicleTier(tier: VehicleTier): number {
+  return VEHICLE_TIER_UNLOCK_GRADE[tier];
 }
 
 /** Null when allowed (or grade is undefined: non-progression site); else the grade needed. */
-export function vehicleTierGate(_grade: number | undefined, _tier: VehicleTier): { needed: number } | null {
-  return undefined as unknown as null; // TODO: implement
+export function vehicleTierGate(grade: number | undefined, tier: VehicleTier): { needed: number } | null {
+  if (grade === undefined) return null;
+  const needed = requiredGradeForVehicleTier(tier);
+  return grade >= needed ? null : { needed };
+}
+
+function gradeName(grade: number): string {
+  const def = gradeDef(grade);
+  return t(def.nameKey, def.nameParams);
 }
 
 /** Refusal message for a gated purchase or upgrade. */
-export function vehicleTierRefusalText(_grade: number, _needed: number): string {
-  return undefined as unknown as string; // TODO: implement
+export function vehicleTierRefusalText(grade: number, needed: number): string {
+  return t('vehicle.tier_locked', { current: gradeName(grade), needed: gradeName(needed) });
 }
 
 /** Short lock label shown on gated UI controls. */
-export function vehicleTierLockLabel(_needed: number): string {
-  return undefined as unknown as string; // TODO: implement
+export function vehicleTierLockLabel(needed: number): string {
+  return t('ui.fleet.tier_locked', { grade: gradeName(needed) });
+}
+
+for (const grade of new Set(Object.values(VEHICLE_TIER_UNLOCK_GRADE))) {
+  if (grade > 0) registerUnlockLine({ grade, key: `progression.unlock.vehicle_tier.${grade}` });
 }

@@ -12,6 +12,7 @@ import { gradeDef, unlockLinesFor } from '../../core/economy/MineGrade.js';
 // Side-effect import: registers the permit-limits unlock line that unlockLinesFor lists,
 // so the letter shows it regardless of which module happened to load PermitLimits first.
 import '../../core/economy/PermitLimits.js';
+import '../../core/economy/VehicleTierGate.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 

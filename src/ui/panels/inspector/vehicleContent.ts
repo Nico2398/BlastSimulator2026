@@ -28,8 +28,8 @@ function sectionBuilders(v: Vehicle, state: GameState, links: InspectorLinks): A
 }
 
 /** Move Here, Upgrade (cost; disabled with the reason) and Scrap. */
-function actionsFor(v: Vehicle, cash: number): ActionSpec[] {
-  const upgrade = upgradeState(v, cash);
+function actionsFor(v: Vehicle, cash: number, grade?: number): ActionSpec[] {
+  const upgrade = upgradeState(v, cash, grade);
   const { cost } = upgrade;
   const reason = upgradeDisabledReason(upgrade) ?? undefined;
   return [
@@ -64,7 +64,7 @@ export const vehicleContent: KindContent = {
       status,
       signature: `${v.type}:${v.tier}:${vehicleDriverState(v, state.employees.employees).kind}`,
       get sections() { return [build()]; },
-      actions: actionsFor(v, state.cash),
+      actions: actionsFor(v, state.cash, state.grade?.grade),
       sync: root => {
         const body = root.querySelector<HTMLElement>('.bs-vehicle-detail');
         if (!body) return;
