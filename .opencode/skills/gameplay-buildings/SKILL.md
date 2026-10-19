@@ -238,6 +238,8 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
 | Research Center | Unlocks building tiers | Occupied during each research task |
 | Training Buildings | Grants skill qualifications | Prevents unqualified-task errors |
 
+Safety score settles at a target set by buildings' `scoreEffects.safety` (Management Office raises, Explosive Warehouse lowers); see Scores in `gameplay-game-design` (#1977).
+
 ## Types
 
 `src/core/entities/Building.ts` declares `BuildingType`, `BuildingTier` and `BuildingDef`, and is the only authority on their fields — costs, `footprint` and the approach `entryPoint`/`exitPoint` offsets, `capacity`, `maxHp`, `scoreEffects`. Read that file before writing against them.

@@ -702,6 +702,34 @@ describe('TopBar (redesign P1)', () => {
       }
     });
 
+    it('the SAFE tooltip names buildings and accidents, not equipment investment or PPE (#1977)', () => {
+      setLocale('en');
+      const { topBar, titles } = mount();
+      try {
+        const safe = titles()[1]!.toLowerCase();
+        expect(safe).toContain('building');
+        expect(safe).toContain('accident');
+        expect(safe).not.toContain('equipment investment');
+        expect(safe).not.toContain('ppe');
+      } finally {
+        topBar.dispose();
+      }
+    });
+
+    it('the SAFE tooltip in fr no longer cites equipment investment or EPI (#1977)', () => {
+      setLocale('fr');
+      const { topBar, titles } = mount();
+      try {
+        const safe = titles()[1]!.toLowerCase();
+        expect(safe).not.toContain('investissement en équipement');
+        expect(safe).not.toContain('epi');
+        expect(safe).toContain('accident');
+      } finally {
+        topBar.dispose();
+        setLocale('en');
+      }
+    });
+
     it('refreshLocale() switches titles to fr without a score change', () => {
       setLocale('en');
       const { topBar, titles } = mount();
