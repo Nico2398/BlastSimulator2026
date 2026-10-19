@@ -26,8 +26,8 @@ export function makeOreGrid(): VoxelGrid {
   return grid;
 }
 
-/** Survey covering columns min..max on both axes with a flat blingite reading down the window. */
-export function makeCoverageSurvey(min: number, max: number, id = 1): SurveyResult {
+/** Survey (disc centred on centerX/centerZ, #1967) covering columns min..max on both axes with a flat blingite reading down the window. */
+export function makeCoverageSurvey(min: number, max: number, id = 1, centerX = 20, centerZ = 20): SurveyResult {
   const estimates: Record<string, Record<string, number>> = {};
   const depthProfile: Record<string, Array<{ fromM: number; toM: number; ores: Record<string, number> }>> = {};
   const surfaceYs: Record<string, number> = {};
@@ -40,7 +40,7 @@ export function makeCoverageSurvey(min: number, max: number, id = 1): SurveyResu
     }
   }
   return {
-    id, method: 'seismic', centerX: 20, centerZ: 20, completedTick: 10, surveyorId: 1,
+    id, method: 'seismic', centerX, centerZ, completedTick: 10, surveyorId: 1,
     estimates, depthProfile, surfaceYs, confidence: 1.0,
   } as SurveyResult;
 }
@@ -50,6 +50,28 @@ export function addChargedPattern(state: GameState, counter: { nextHoleId: numbe
   for (const x of [12, 28]) {
     const hole = addHole(counter, state.drillHoles, x, 20, 8, 0.15);
     const res = createCharge('krackle', 8, 2, hole.depth);
+    if ('charge' in res) state.chargesByHole[hole.id] = res.charge;
+  }
+}
+
+/** Fresh seismic survey whose disc is centred on the blast but which recorded no ore column at all (#1967). */
+export function makeBarrenSurvey(id = 1, centerX = 20, centerZ = 20): SurveyResult {
+  return {
+    id, method: 'seismic', centerX, centerZ, completedTick: 10, surveyorId: 1,
+    estimates: {}, depthProfile: {}, surfaceYs: {}, confidence: 1.0,
+  } as SurveyResult;
+}
+
+/** The same two holes as `addChargedPattern`, drilled and not yet charged (#1967). */
+export function addDrilledPattern(state: GameState, counter: { nextHoleId: number }): void {
+  for (const x of [12, 28]) addHole(counter, state.drillHoles, x, 20, 8, 0.15);
+}
+
+/** The same two holes charged with the weakest load (pop_rock, minimum kg) too small to fragment molite: a field exists, nothing breaks (#1967). */
+export function addWeakChargedPattern(state: GameState, counter: { nextHoleId: number }): void {
+  for (const x of [12, 28]) {
+    const hole = addHole(counter, state.drillHoles, x, 20, 8, 0.15);
+    const res = createCharge('pop_rock', 0.5, 2, hole.depth);
     if ('charge' in res) state.chargesByHole[hole.id] = res.charge;
   }
 }

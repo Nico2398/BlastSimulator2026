@@ -162,7 +162,8 @@ export class PreflightModal {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
     const chargeKg = totalChargeKg(plan.holes, plan.charges);
-    const { value: estValue, coverage } = this.estimateMemo.get(state, plan, this.gridProvider());
+    const estimate = this.estimateMemo.get(state, plan, this.gridProvider());
+    const { value: estValue, coverage, brokenVoxels, charged, holeCoverage } = estimate;
 
     const wet = wetHoles(state);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
@@ -184,7 +185,7 @@ export class PreflightModal {
     const permit = permitPreview(state.grade, plan, state.tickCount);
 
     const signature = JSON.stringify({
-      permit, undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage,
+      permit, undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage, brokenVoxels, charged, holeCoverage,
       preview: state.lastBlastPreview, wetCount: wet.length, occupantCount,
       phase, protectedCount: protectedHoles.length, loadingCount, awaitingCount, earliestArrival, errorCount: validationErrors.length,
     });
@@ -195,7 +196,7 @@ export class PreflightModal {
     this.detonateBtn.disabled = validationErrors.length > 0;
     this.detonateBtn.style.cursor = validationErrors.length > 0 ? 'not-allowed' : 'pointer';
 
-    const oreView = oreEstimateView(coverage);
+    const oreView = oreEstimateView(estimate);
     this.statsEl.replaceChildren(statGrid([
       { key: t('ui.blast_workshop.preflight.stat_holes'), value: `${state.drillHoles.length}` },
       { key: t('ui.blast_workshop.preflight.stat_charge'), value: `${chargeKg.toFixed(1)} kg` },
