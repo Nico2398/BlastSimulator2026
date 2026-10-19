@@ -349,6 +349,33 @@
       ]
     },
     {
+      "command": "employee hire role:blaster",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel button[data-role=\"blaster\"][data-candidate-id]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel button[data-role=\"blaster\"][data-candidate-id]"
+        }
+      ],
+      "description": "#1977: spare blaster. Only the blaster holds blasting plus the truck licence, and a random 'employee leaves' event (AI Replacement's Automate Mine, drawn right after blast 1 in interaction mode) can take him: with nobody dual-qualified blast 2's charge order never loads and the wait stalls. A spare keeps the crew able to charge.",
+      "expect": {
+        "changedBy": {
+          "employeeCount": 1
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
       "command": "build_ramp start:12,34 end:34,34 depth:6",
       "interaction": [
         {
