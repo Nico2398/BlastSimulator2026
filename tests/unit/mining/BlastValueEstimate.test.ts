@@ -40,7 +40,7 @@ function makeGrid(oreDensities: Record<string, number> = { blingite: 0.9 }): Vox
 }
 
 function makeHole(id: string, x: number, z: number, depth = 8): DrillHole {
-  return { id, x, z, depth, diameter: 0.15 };
+  return { id, x, z, depth, diameter: 0.089 };
 }
 
 function chargedPlan(holes: DrillHole[], kg = 8, explosive = 'krackle'): BlastPlan {

@@ -553,7 +553,7 @@ describe('Survey system', () => {
     };
 
     const holeCounter = { nextHoleId: 1 };
-    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.089);
     const holeIds = holes.map(h => h.id);
     const depths: Record<string, number> = {};
     for (const h of holes) depths[h.id] = h.depth;
@@ -1051,7 +1051,7 @@ describe('Survey system — blast estimate vs actual ore (#1703)', () => {
     expect(runner.run(`sandbox start biome:${site.biome} seed:${site.seed}`).success).toBe(true);
     const grid = ctx.grid!;
     const counter = { nextHoleId: 1 };
-    const holes = createGridPlan(counter, { x: site.centre.x - 4, z: site.centre.z - 4 }, 3, 3, 4, 8, 0.15);
+    const holes = createGridPlan(counter, { x: site.centre.x - 4, z: site.centre.z - 4 }, 3, 3, 4, 8, 0.089);
     const depths: Record<string, number> = {};
     for (const h of holes) depths[h.id] = h.depth;
     const { charges } = batchCharge(holes.map(h => h.id), depths, site.explosive, site.kg, 2);

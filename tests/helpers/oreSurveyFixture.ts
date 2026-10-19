@@ -48,7 +48,7 @@ export function makeCoverageSurvey(min: number, max: number, id = 1, centerX = 2
 /** Two charged holes 16 m apart (x = 12 and x = 28), so a survey over x <= 20 covers about half the blast. */
 export function addChargedPattern(state: GameState, counter: { nextHoleId: number }): void {
   for (const x of [12, 28]) {
-    const hole = addHole(counter, state.drillHoles, x, 20, 8, 0.15);
+    const hole = addHole(counter, state.drillHoles, x, 20, 8, 0.089);
     const res = createCharge('krackle', 8, 2, hole.depth);
     if ('charge' in res) state.chargesByHole[hole.id] = res.charge;
   }
@@ -64,13 +64,13 @@ export function makeBarrenSurvey(id = 1, centerX = 20, centerZ = 20): SurveyResu
 
 /** The same two holes as `addChargedPattern`, drilled and not yet charged (#1967). */
 export function addDrilledPattern(state: GameState, counter: { nextHoleId: number }): void {
-  for (const x of [12, 28]) addHole(counter, state.drillHoles, x, 20, 8, 0.15);
+  for (const x of [12, 28]) addHole(counter, state.drillHoles, x, 20, 8, 0.089);
 }
 
 /** The same two holes charged with the weakest load (pop_rock, minimum kg) too small to fragment molite: a field exists, nothing breaks (#1967). */
 export function addWeakChargedPattern(state: GameState, counter: { nextHoleId: number }): void {
   for (const x of [12, 28]) {
-    const hole = addHole(counter, state.drillHoles, x, 20, 8, 0.15);
+    const hole = addHole(counter, state.drillHoles, x, 20, 8, 0.089);
     const res = createCharge('pop_rock', 0.5, 2, hole.depth);
     if ('charge' in res) state.chargesByHole[hole.id] = res.charge;
   }

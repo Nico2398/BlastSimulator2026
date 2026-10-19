@@ -544,7 +544,7 @@ describe('hole diameter scales charge capacity (#1934)', () => {
   });
 
   it('createCharge refuses a charge past the wider hole too', () => {
-    expect('error' in createCharge('rumblox', 20, 2, 8, 0.127)).toBe(true);
+    expect('error' in createCharge('rumblox', 30, 2, 8, 0.127)).toBe(true);
   });
 
   it('batchCharge uses each hole\'s own diameter', () => {

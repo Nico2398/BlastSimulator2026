@@ -11,6 +11,8 @@ function staffedGame() {
   const { runner, ctx } = createRunner();
   const run = (cmd: string) => runner.run(cmd);
   expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+  // Tier-2 / tier-3 rigs cost more than the starting cash.
+  ctx.state!.cash = 1_000_000;
   return { run, state: ctx.state! };
 }
 

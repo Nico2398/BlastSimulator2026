@@ -543,8 +543,9 @@ describe('drillDiameterRefusal (#1934)', () => {
     const refusal = drillDiameterRefusal(0.127, [rig(1)]);
     expect(refusal).not.toBeNull();
     expect(refusal!.key).toBe('mining.drill_plan.refused_diameter');
-    expect(refusal!.params.max).toBeCloseTo(0.089, 9);
-    expect(refusal!.params.diameter).toBeCloseTo(0.127, 9);
+    // Params are millimetres: the i18n text reads "{diameter} mm ... up to {reach} mm".
+    expect(refusal!.params.reach).toBe(89);
+    expect(refusal!.params.diameter).toBe(127);
   });
 
   it('accepts 127 mm with a tier-2 rig', () => {
