@@ -3,11 +3,18 @@
 
 import type { EventEmitter } from '../../core/state/EventEmitter.js';
 import type { NotifyInput } from './NotificationCenter.js';
+import { t } from '../../core/i18n/I18n.js';
+import { gradeDef } from '../../core/economy/MineGrade.js';
 
-/** Wires progression:grade_applied to `notify`. */
+/** Wires progression:grade_applied and progression:grade_approved to `notify`. */
 export function wireProgressionNotifications(
-  _emitter: Pick<EventEmitter, 'on'>,
-  _notify: (input: NotifyInput) => void,
+  emitter: Pick<EventEmitter, 'on'>,
+  notify: (input: NotifyInput) => void,
 ): void {
-  // TODO: implement
+  emitter.on('progression:grade_applied', () =>
+    notify({ severity: 'info', title: t('notification.title.permit'), body: t('notification.progression.applied') }));
+  emitter.on('progression:grade_approved', ({ grade }) => {
+    const def = gradeDef(grade);
+    notify({ severity: 'info', title: t('notification.title.permit'), body: t('notification.progression.approved', { name: t(def.nameKey, def.nameParams) }) });
+  });
 }

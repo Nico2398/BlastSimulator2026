@@ -19,6 +19,7 @@ import { FleetPanel } from './panels/FleetPanel.js';
 import { CrewPanel } from './panels/CrewPanel.js';
 import type { EmployeeRole } from '../core/entities/Employee.js';
 import { EventModal } from './panels/EventModal.js';
+import { PermitApprovalModal } from './panels/PermitApprovalModal.js';
 import { SurveyPanel } from './panels/SurveyPanel.js';
 import { ShadyPanel } from './panels/ShadyPanel.js';
 import { PermitPanel } from './panels/PermitPanel.js';
@@ -64,6 +65,7 @@ export class UIManager {
   private readonly fleetPanel: FleetPanel;
   private readonly crewPanel: CrewPanel;
   private readonly eventModal: EventModal;
+  private readonly permitApprovalModal: PermitApprovalModal;
   private readonly surveyPanel: SurveyPanel;
   private readonly shadyPanel: ShadyPanel;
   private readonly permitPanel: PermitPanel;
@@ -157,6 +159,8 @@ export class UIManager {
 
     // Event modal (redesign P8, supersedes EventDialog.ts), appended to container
     this.eventModal = new EventModal(container);
+    // Mounted after eventModal so the letter renders on top of it.
+    this.permitApprovalModal = new PermitApprovalModal(container);
 
     // MiniMap on right
     this.miniMap = new MiniMap(rightCol);
@@ -228,6 +232,7 @@ export class UIManager {
     this.fleetPanel.setGameConsole(fn);
     this.crewPanel.setGameConsole(fn);
     this.eventModal.setGameConsole(fn);
+    this.permitApprovalModal.setGameConsole(fn);
     this.surveyPanel.setGameConsole(fn);
     this.shadyPanel.setGameConsole(fn);
     this.permitPanel.setGameConsole(fn);
@@ -296,6 +301,10 @@ export class UIManager {
   showConfirm(config: ConfirmModalConfig): void { this.confirmModal.show(config); }
   get confirmOpen(): boolean { return this.confirmModal.visible; }
   /** True while an event modal is on screen. */
+  /** True while the grade-approval letter is on screen. */
+  get permitApprovalModalVisible(): boolean {
+    return this.permitApprovalModal.visible;
+  }
   get eventModalVisible(): boolean {
     return this.eventModal.visible;
   }
@@ -460,6 +469,7 @@ export class UIManager {
     this.settingsPanel.refreshLocale();
     this.miniMap.refreshLocale();
     this.eventModal.refreshLocale();
+    this.permitApprovalModal.refreshLocale();
   }
 
   /**
@@ -544,6 +554,11 @@ export class UIManager {
     if (this.eventModal.visible || (state.levelEndReason === null && !this.blastReportModal.visible && !this.blastReportModal.pending)) {
       this.eventModal.update(state);
     }
+    // Approval letter: same deferrals as eventModal (level end, blast report), plus an open event.
+    // Not in escLayers: Esc must not dismiss it, only its button acknowledges the approval.
+    if (this.permitApprovalModal.visible || (state.levelEndReason === null && !this.blastReportModal.visible && !this.blastReportModal.pending && !this.eventModal.visible)) {
+      this.permitApprovalModal.update(state);
+    }
   }
 
   showPanel(name: PanelName): void {
@@ -612,6 +627,7 @@ export class UIManager {
     this.fleetPanel.dispose();
     this.crewPanel.dispose();
     this.eventModal.dispose();
+    this.permitApprovalModal.dispose();
     this.surveyPanel.dispose();
     this.shadyPanel.dispose();
     this.permitPanel.dispose();

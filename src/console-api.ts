@@ -164,6 +164,8 @@ export interface SerializableGameState {
   muckPile: MuckPileSummary | null;
   /** Mine-grade permit state (#1921); null on a site with no permit ladder. */
   mineGrade: { grade: number; pendingTicksLeft: number | null } | null;
+  /** Grade whose approval letter is undismissed; null when none (#1926). */
+  unseenApprovalGrade: number | null;
   /** Mass (kg) currently held in warehouse storage (LogisticsState.storedMassKg). */
   storedMassKg: number;
   /** Barren rock (kg) dumped on spoil heaps (sum of Building.storedSpoilKg, #1530); never counted in storedMassKg. */
@@ -267,6 +269,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
     mineGrade: s.grade ? { grade: s.grade.grade, pendingTicksLeft: s.grade.pending?.ticksLeft ?? null } : null,
+    unseenApprovalGrade: s.grade?.unseenApproval ?? null,
     storedMassKg: s.logistics.storedMassKg,
     storedSpoilKg: totalSpoilKg(s.buildings.buildings),
     collectedOreTotal: totalCollectedOreKg(s.collectedOre),

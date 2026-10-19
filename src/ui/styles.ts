@@ -71,6 +71,30 @@ const CSS = `
   pointer-events: all;
 }
 
+/* ─── Permit approval letter (#1926) ───
+   Stamp slams in with CSS only; reduced-motion shows it already placed. */
+.bs-permit-approval-stamp {
+  position: absolute;
+  top: 70px;
+  right: 22px;
+  padding: 4px 12px;
+  border: 3px solid var(--bsx-critical-text);
+  border-radius: 4px;
+  color: var(--bsx-critical-text);
+  font: 900 22px/1 var(--bsx-font-ui);
+  letter-spacing: .12em;
+  transform: rotate(-12deg);
+  pointer-events: none;
+  animation: bs-permit-stamp .5s cubic-bezier(.2,1.4,.4,1) .25s both;
+}
+@keyframes bs-permit-stamp {
+  0% { opacity: 0; transform: rotate(-12deg) scale(3); }
+  100% { opacity: .9; transform: rotate(-12deg) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bs-permit-approval-stamp { animation: none; opacity: .9; }
+}
+
 /* ─── Tutorial coach mark (redesign P10) ───
    Docked bottom-centre, never modal: the wrapper lets clicks through so the
    player can actually use the control the step is pointing at, and it sits

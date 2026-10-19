@@ -439,7 +439,7 @@ describe('advanceGradeApplication', () => {
 describe('sanitizeGradeState', () => {
   const valid = (): GradeState => ({
     grade: 2, oreDeliveredKg: 1500.5, deepestPitM: 11, rockBrokenM3: 300, blastsFired: 4,
-    pending: { toGrade: 3, ticksLeft: 20 }, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0,
+    pending: { toGrade: 3, ticksLeft: 20 }, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null,
   });
 
   it('accepts a valid state, pending or not', () => {
