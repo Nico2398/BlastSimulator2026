@@ -162,6 +162,52 @@ describe('drill_hole depth gates the rig tier (#1714)', () => {
     });
   });
 
+  describe('minVehicleTierFor with payload.diameter (#1934)', () => {
+    it('an 8 m, 127 mm drill_hole needs tier 2', () => {
+      expect(minVehicleTierFor({ type: 'drill_hole', payload: { depth: 8, diameter: 0.127 } })).toBe(2);
+    });
+
+    it('a 165 mm hole needs tier 3', () => {
+      expect(minVehicleTierFor({ type: 'drill_hole', payload: { depth: 8, diameter: 0.165 } })).toBe(3);
+    });
+
+    it('the stricter of depth and diameter wins: 30 m at 89 mm is still tier 3, 20 m at 165 mm tier 3', () => {
+      expect(minVehicleTierFor({ type: 'drill_hole', payload: { depth: 30, diameter: 0.089 } })).toBe(3);
+      expect(minVehicleTierFor({ type: 'drill_hole', payload: { depth: 20, diameter: 0.165 } })).toBe(3);
+      expect(minVehicleTierFor({ type: 'drill_hole', payload: { depth: 20, diameter: 0.127 } })).toBe(2);
+    });
+
+    it('no diameter keeps the depth-only result', () => {
+      expect(minVehicleTierFor({ type: 'drill_hole', payload: { depth: 8 } })).toBe(1);
+      expect(minVehicleTierFor({ type: 'drill_hole', payload: { depth: 8, diameter: 0.089 } })).toBe(1);
+    });
+
+    it('rejection: a non-drill action ignores diameter', () => {
+      expect(minVehicleTierFor({ type: 'charge_hole', payload: { diameter: 0.165 } })).toBe(1);
+    });
+
+    it('reservation picks the tier-2 rig over a nearer tier-1 rig for a 127 mm hole', () => {
+      const { state, employee } = setup(3);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      const { vehicle: t2 } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20, 2);
+      const action = makeAction(state, {
+        id: 1, type: 'drill_hole', requiredVehicleRole: 'drill_rig', payload: { depth: 8, diameter: 0.127 },
+      });
+      const found = findVehicleForClaim(state, action, employee);
+      expect(found.ok).toBe(true);
+      if (found.ok) expect(found.vehicle?.id).toBe(t2.id);
+    });
+
+    it('a 127 mm hole is not assigned when only a tier-1 rig is owned', () => {
+      const { state, employee } = setup(3);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      const action = makeAction(state, {
+        id: 1, type: 'drill_hole', requiredVehicleRole: 'drill_rig', payload: { depth: 8, diameter: 0.127 },
+      });
+      expect(findVehicleForClaim(state, action, employee)).toEqual({ ok: false });
+    });
+  });
+
   describe('lowestFleetTier with minTier', () => {
     it('ignores vehicles below minTier', () => {
       const { state } = setup(3);
