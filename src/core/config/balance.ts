@@ -7,6 +7,7 @@ import type { ResearchCondition } from '../entities/BuildingResearch.js';
 import type { VehicleRole, VehicleTask, VehicleTier } from '../entities/Vehicle.js';
 import type { EmployeeRole, SkillCategory, NeedKey } from '../entities/Employee.js';
 import type { ActionType } from '../state/GameState.js';
+import type { BoardConfig } from '../economy/Board.js';
 
 // ─── Time ───────────────────────────────────────────────────────────────────────
 
@@ -3316,3 +3317,16 @@ export const WALL_SLUMP_ROCK_DENSITY_KG_M3 = 2500;
 export const WALL_SLOPE_WALK_MAX_M = 256;
 /** Margin (m) around the toe columns inside which a slump hurts buildings, vehicles and employees. */
 export const WALL_SLUMP_TOE_ZONE_MARGIN_M = 1;
+
+// ── Shareholder Summit ──
+// Placeholder values (#1949): the implementer tunes them with the progression probe.
+
+export const SHAREHOLDER_SUMMIT_STARTING_SITE: StartingSiteComposition = DIGGER_STARTING_SITE;
+export const SHAREHOLDER_SUMMIT_STARTING_CASH = 0;
+export const SHAREHOLDER_SUMMIT_PROFIT_TARGET = 0;
+export const SHAREHOLDER_SUMMIT_BOARD: BoardConfig = {
+  quarterTicks: 0,
+  oreTargetT: 0,
+  profitTarget: 0,
+  growth: 0,
+};
