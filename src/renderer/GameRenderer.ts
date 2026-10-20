@@ -16,6 +16,7 @@ import type { MiningContext } from '../console/commands/mining.js';
 import type { LandscapeHandle } from '../console/commands/world.js';
 import { onGroundFragmentData, type LogisticsState } from '../core/economy/Logistics.js';
 import type { GameState } from '../core/state/GameState.js';
+import type { WallFace } from '../core/mining/WallStability.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
 import type { SceneManager } from './SceneManager.js';
@@ -51,7 +52,7 @@ import type { EmployeePictograms } from './EmployeePictograms.js';
 import type { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import type { SurveyConfidenceOverlayOptions } from './SurveyConfidenceOverlay.js';
 
-import { syncGameRendererEntities, syncSurveyOverlay, buildSurveyOverlayOptions } from './GameRendererSync.js';
+import { syncGameRendererEntities, syncSurveyOverlay, buildSurveyOverlayOptions, buildWallOverlayFaces, syncWallOverlay } from './GameRendererSync.js';
 import {
   rebuildTerrain, remeshTerrainRegion, stepTerrainRemesh, finishTerrainRemesh, siteBoundsChanged, playableCut,
   landscapeEdgeHeightSampler, rebuildBorderWall, getTerrainSurfaceY, getSmoothTerrainSurfaceY,
@@ -144,6 +145,11 @@ export class GameRenderer {
    * unchanged until the player hides it.
    */
   private surveyOverlayPreference = true;
+
+  /** Player-facing visibility preference for the wall stability overlay (#1943); off until toggled. */
+  private wallOverlayPreference = false;
+  /** Faces the overlay shows, rebuilt only when the terrain or the game bound to it changes. */
+  private wallOverlayCache: { state: GameState; gridId: number; revision: number; faces: WallFace[]; planKey: string } | null = null;
 
   // Track rendered entity IDs to detect additions
   private renderedBuildingIds = new Set<number>();
@@ -348,6 +354,7 @@ export class GameRenderer {
       getTerrainSurfaceY: (x, z) => this.getTerrainSurfaceY(x, z),
       syncSurveyOverlay: options => this.syncSurveyOverlay(options),
     });
+    this.refreshWallOverlay();
     this.lastGhostRevision = result.lastGhostRevision;
     this.lastSyncedTerrainRevision = result.lastSyncedTerrainRevision;
     // syncGameRendererEntities() only returns lastWeather when a skybox received it.
@@ -544,6 +551,31 @@ export class GameRenderer {
     this.surveyOverlayPreference = visible;
     if (!this.lastState) return;
     this.syncSurveyOverlay(buildSurveyOverlayOptions(this.lastState, this.lastGrid));
+  }
+
+  /** Player-facing visibility preference for the wall stability overlay (#1943). */
+  get wallOverlayVisible(): boolean {
+    return this.wallOverlayPreference;
+  }
+
+  /** Set the wall overlay preference and re-sync it against the last known state. */
+  setWallOverlayVisible(visible: boolean): void {
+    this.wallOverlayPreference = visible;
+    this.refreshWallOverlay();
+  }
+
+  private refreshWallOverlay(): void {
+    const state = this.lastState, grid = this.lastGrid;
+    if (!this.wallOverlayPreference || !state || !grid) {
+      syncWallOverlay(this.terrain, [], false);
+      return;
+    }
+    const planKey = JSON.stringify([state.drillHoles, state.chargesByHole]);
+    const cache = this.wallOverlayCache;
+    if (!cache || cache.state !== state || cache.gridId !== grid.id || cache.revision !== grid.editRevision || cache.planKey !== planKey) {
+      this.wallOverlayCache = { state, gridId: grid.id, revision: grid.editRevision, planKey, faces: buildWallOverlayFaces(state, grid) };
+    }
+    syncWallOverlay(this.terrain, this.wallOverlayCache!.faces, true);
   }
 
   /**

@@ -7,20 +7,12 @@
 
 import * as THREE from 'three';
 import { SURVEY_OVERLAY_VALUE_FLOOR, SURVEY_OVERLAY_VALUE_CEIL, SURVEY_OVERLAY_QUAD_OPACITY_BASE } from '../core/config/balance.js';
-import { GroundTintLayer, FallbackSurfaceSampler, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
+import { GroundTintLayer, FallbackSurfaceSampler, OVERLAY_Y_OFFSET, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
 
 // ---------- Constants ----------
 
 /** Opacity multiplier for stale (expired) survey points. */
 const STALE_OPACITY = 0.6;
-
-/**
- * Z-fighting offset above terrain surface — this overlay's GroundTintLayer
- * epsilon. A flat-ground baseline only: GroundTintLayer scales it up by the
- * local terrain slope (`slopeScaledEpsilon`) so steep, blast-carved faces
- * still clear the terrain mesh.
- */
-const OVERLAY_Y_OFFSET = 0.05;
 
 // ---------- Types ----------
 

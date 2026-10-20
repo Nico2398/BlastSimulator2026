@@ -18,7 +18,7 @@ import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import { applyWallSlumps } from '../../src/console/commands/mining/wallSlump.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { drain } from '../../src/core/engine/Steps.js';
-import { findOverheightFaces, runWallStability } from '../../src/core/mining/WallStability.js';
+import { findOverheightFaces, runWallStability, gridSurface } from '../../src/core/mining/WallStability.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
 import { setLocale, t } from '../../src/core/i18n/I18n.js';
@@ -51,7 +51,7 @@ describe('standard opening never slumps (#1941)', () => {
           expect(result).not.toBeNull();
           // Hard-rock biomes (tropical_karst, volcanic_flats) barely break under this charge: an empty
           // crater is trivially stable, so the check is "no overheight face", not "rock was cleared".
-          expect(findOverheightFaces(grid, result!.clearedRegion)).toEqual([]);
+          expect(findOverheightFaces(gridSurface(grid), result!.clearedRegion)).toEqual([]);
           expect(runWallStability(grid, result!.clearedRegion)).toEqual([]);
         });
       }
@@ -167,13 +167,13 @@ describe('post-blast stability hook (#1941)', () => {
     });
     expect(rig.slumps).toEqual([]);
     // Control: the wall is really over its limit, so only the site switch kept it standing.
-    expect(findOverheightFaces(rig.grid, { minX: rig.pit.minX - 2, maxX: rig.pit.maxX + 2, minZ: rig.pit.minZ - 2, maxZ: rig.pit.maxZ + 2 }).length).toBeGreaterThan(0);
+    expect(findOverheightFaces(gridSurface(rig.grid), { minX: rig.pit.minX - 2, maxX: rig.pit.maxX + 2, minZ: rig.pit.minZ - 2, maxZ: rig.pit.maxZ + 2 }).length).toBeGreaterThan(0);
   });
 
   it('non-progression new_game: the same overheight wall never slumps', () => {
     const rig = blastBesidePit('new_game seed:42 size:64 staffed:true');
     expect(rig.slumps).toEqual([]);
-    expect(findOverheightFaces(rig.grid, { minX: rig.pit.minX - 2, maxX: rig.pit.maxX + 2, minZ: rig.pit.minZ - 2, maxZ: rig.pit.maxZ + 2 }).length).toBeGreaterThan(0);
+    expect(findOverheightFaces(gridSurface(rig.grid), { minX: rig.pit.minX - 2, maxX: rig.pit.maxX + 2, minZ: rig.pit.minZ - 2, maxZ: rig.pit.maxZ + 2 }).length).toBeGreaterThan(0);
   });
 
   it('campaign level dusty_hollow: the same overheight wall never slumps', () => {

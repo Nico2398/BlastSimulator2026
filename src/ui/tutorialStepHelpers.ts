@@ -402,6 +402,9 @@ export function createEvacuateZoneStep(): TutorialStep {
 /** Selector for the Survey panel's own confidence-overlay toggle button (#496). */
 export const SURVEY_OVERLAY_TOGGLE_TARGET = '#bs-survey-panel [data-role="overlay-toggle"]';
 
+/** The wall stability overlay's toggle in the Survey panel header (#1943). */
+export const WALL_OVERLAY_TOGGLE_TARGET = '#bs-survey-panel [data-role="wall-overlay-toggle"]';
+
 /**
  * Whether the survey confidence overlay (#496) is currently toggled on, read
  * off the Survey panel's own toggle button — the same `aria-pressed` state

@@ -30,6 +30,9 @@ import { assembleBlastPlan, validateBlastPlan } from '../../../core/mining/Blast
 import { chargeKgPerMetre } from '../../../core/mining/HoleDiameter.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
+import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
+import { WallWarningMemo } from '../wallWarningMemo.js';
+import { wallWarningText } from '../wallWarningText.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 
 
@@ -62,8 +65,11 @@ export class PreviewStep {
   private readonly runBtn: HTMLButtonElement;
   private readonly reasonEl: HTMLElement;
   private readonly boreEl: HTMLElement;
+  private readonly wallWarningsEl: HTMLElement;
 
   private gameConsole?: GameConsoleFn;
+  private gridProvider: () => VoxelGrid | null = () => null;
+  private readonly wallMemo = new WallWarningMemo();
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
@@ -98,6 +104,9 @@ export class PreviewStep {
     this.boreEl = el('div', { attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
     this.boreEl.dataset['info'] = 'plan-bore';
 
+    // Predicted over-height faces (#1943): a warning, never a gate; empty off progression sites.
+    this.wallWarningsEl = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' } });
+
     const callout = el('div');
     callout.style.cssText = 'display:flex;align-items:center;gap:7px;padding:9px 11px;border-radius:5px;background:rgba(169,140,255,.08);border:1px solid rgba(169,140,255,.24)';
     const calloutIcon = el('div', { attrs: { style: 'color:var(--bsx-ore)' }, children: [iconEl('eye', 14)] });
@@ -107,13 +116,16 @@ export class PreviewStep {
     );
     callout.append(calloutIcon, calloutText);
 
-    this.el.append(suiteHeader, this.tierListEl, predictedHeader, this.predictedListEl, this.boreEl, this.runBtn, this.reasonEl, callout);
+    this.el.append(suiteHeader, this.tierListEl, predictedHeader, this.predictedListEl, this.boreEl, this.wallWarningsEl, this.runBtn, this.reasonEl, callout);
     container.appendChild(this.el);
   }
 
   get root(): HTMLElement { return this.el; }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+
+  /** Supplies the voxel grid the wall-slump prediction reads (#1943). */
+  setGridProvider(fn: () => VoxelGrid | null): void { this.gridProvider = fn; }
 
   /** Distinct hole diameters of the plan with their charge capacity, so the preview names what it simulates (#1934). */
   private boreText(state: GameState): string {
@@ -129,14 +141,21 @@ export class PreviewStep {
     const canAnalyze = state.drillHoles.length > 0 && errors.length === 0;
 
     const boreText = this.boreText(state);
+    const wallFaces = this.wallMemo.get(state, plan, this.gridProvider());
     const signature = JSON.stringify({
       tier: state.softwareTier, cash: state.cash, preview: state.lastBlastPreview,
       holeCount: state.drillHoles.length, canAnalyze, bore: boreText,
+      walls: wallFaces.map(w => wallWarningText(w)),
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
     this.boreEl.textContent = boreText;
+    this.wallWarningsEl.replaceChildren(...wallFaces.map(w => {
+      const line = reasonLine(wallWarningText(w));
+      line.dataset['role'] = 'preview-wall-warning';
+      return line;
+    }));
     this.renderTierList(state.softwareTier, state.cash);
     this.renderPredicted(state.lastBlastPreview, state.drillHoles.length);
 

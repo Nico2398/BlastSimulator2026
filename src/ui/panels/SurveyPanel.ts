@@ -60,6 +60,10 @@ export class SurveyPanel extends PanelBase {
   private readonly resultsEl: HTMLElement;
   private gameConsole?: GameConsoleFn;
   private readonly overlayToggleBtn: HTMLButtonElement;
+  private readonly wallToggleBtn: HTMLButtonElement;
+  /** Wall stability overlay preference (#1943), mirrored from GameRenderer via UIManager; off by default. */
+  private wallOverlayVisible = false;
+  private onToggleWallOverlayCb?: (visible: boolean) => void;
   /** Player-facing visibility preference for the survey confidence overlay (#496), mirrored from GameRenderer via UIManager. */
   private overlayVisible = true;
   private onToggleOverlayCb?: (visible: boolean) => void;
@@ -89,10 +93,14 @@ export class SurveyPanel extends PanelBase {
     this.overlayToggleBtn.setAttribute('data-role', 'overlay-toggle');
     this.locale.bindTitle(this.overlayToggleBtn, 'ui.survey.overlay_toggle_tip');
 
+    this.wallToggleBtn = panelHeaderButton('warn', () => this.handleWallToggleClick());
+    this.wallToggleBtn.setAttribute('data-role', 'wall-overlay-toggle');
+    this.locale.bindTitle(this.wallToggleBtn, 'ui.survey.wall_overlay_toggle_tip');
+
     const { header, titleEl } = panelHeader({
       icon: 'survey',
       accent: 'info',
-      extras: [this.overlayToggleBtn],
+      extras: [this.overlayToggleBtn, this.wallToggleBtn],
       onClose: () => this.onCloseCb?.(),
     });
     this.locale.bindText(titleEl, 'ui.survey.title');
@@ -141,6 +149,7 @@ export class SurveyPanel extends PanelBase {
 
     this.buildMethodList();
     this.syncOverlayButton();
+    paintToggleButton(this.wallToggleBtn, this.wallOverlayVisible);
   }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
@@ -233,6 +242,20 @@ export class SurveyPanel extends PanelBase {
       this.lastResultCount = done;
       this.renderResults(state.surveyResults, state.tickCount, resolveMarketId(state));
     }
+  }
+
+  /** Register the callback fired when the player clicks the wall stability overlay toggle (#1943). */
+  setWallOverlayToggleHandler(cb: (visible: boolean) => void): void { this.onToggleWallOverlayCb = cb; }
+
+  /** External sync path (shortcut flow): reflect the wall overlay preference without firing the handler. */
+  setWallOverlayVisible(visible: boolean): void {
+    this.wallOverlayVisible = visible;
+    paintToggleButton(this.wallToggleBtn, visible);
+  }
+
+  private handleWallToggleClick(): void {
+    this.setWallOverlayVisible(!this.wallOverlayVisible);
+    this.onToggleWallOverlayCb?.(this.wallOverlayVisible);
   }
 
   /** Overlay-toggle button click (#496): delegate to the same set-and-repaint path the external sync uses, then notify. */
