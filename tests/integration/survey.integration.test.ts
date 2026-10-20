@@ -1045,10 +1045,10 @@ describe('Survey system — blast estimate vs actual ore (#1703)', () => {
     { biome: 'alpine_granite', centre: { x: 36, z: 32 }, explosive: 'shatternite', kg: 4, seed: 7 },
   ];
 
-  /** Fresh sandbox, the site seed, plus the 3x3 / spacing 4 / depth 8 pattern centred on the site. */
+  /** Fresh sandbox at full ore grade (ore_grade:1: survey accuracy is under test, and the 0.05 estimate rounding swamps the sandbox default 0.08, #1944), the site seed, plus the 3x3 / spacing 4 / depth 8 pattern centred on the site. */
   function setup(site: Site) {
     const { runner, ctx } = createRunner();
-    expect(runner.run(`sandbox start biome:${site.biome} seed:${site.seed}`).success).toBe(true);
+    expect(runner.run(`sandbox start biome:${site.biome} seed:${site.seed} ore_grade:1`).success).toBe(true);
     const grid = ctx.grid!;
     const counter = { nextHoleId: 1 };
     const holes = createGridPlan(counter, { x: site.centre.x - 4, z: site.centre.z - 4 }, 3, 3, 4, 8, 0.089);

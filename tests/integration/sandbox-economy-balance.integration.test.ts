@@ -35,6 +35,12 @@ import { FORBIDDEN_COMMAND, playContracts, playTick, clearBlastZone, type Run } 
 const DESERT = 'desert_badlands';
 const ABSORB_DAYS = 5;
 const BOARD_SEEDS = 20;
+/**
+ * The contract / demand-weighted hauling tests (#1789, #1817, #1828) need a deep stock of ore to
+ * exercise the board and the haul ranking, so they keep the site's full ore grade; the sandbox
+ * default SANDBOX_ORE_GRADE_SCALE (#1944) is pitched for a thin opening and is pinned by the tests below.
+ */
+const FULL_ORE_GRADE = 'ore_grade:1';
 
 function startSandbox(biome: string, seed: number, kit = 'digger', extra = ''): { run: Run; ctx: GameContext } {
   const { runner, ctx } = createRunner();
@@ -61,8 +67,8 @@ function flattestPad(grid: VoxelGrid, depthM: number): { x0: number; z0: number 
   return best;
 }
 
-/** The ordinary 3x3 bench shot (6 m holes, 4 m spacing, 2 m stemming, krackle 6 kg unless a tougher biome needs more) fired through executeBlast on the sandbox's market. */
-function fireReferenceShot(ctx: GameContext, holeDepth = 6, explosive = 'krackle', chargeKg = 6): BlastResult {
+/** The ordinary 3x3 bench shot (5 m holes, 4 m spacing, 2 m stemming, krackle 4 kg: the probe opening SHOT, #1944, unless a tougher biome needs more) fired through executeBlast on the sandbox's market. */
+function fireReferenceShot(ctx: GameContext, holeDepth = 5, explosive = 'krackle', chargeKg = 4): BlastResult {
   const grid = ctx.grid!;
   const pad = flattestPad(grid, holeDepth);
   const holes = createGridPlan({ nextHoleId: 1 }, { x: pad.x0 + 1, z: pad.z0 + 1 }, 3, 3, 4, holeDepth, 0.15);
@@ -147,14 +153,15 @@ describe('sandbox economy: contract board offer volume against a shot', () => {
   }
   const boards = Array.from({ length: BOARD_SEEDS }, (_, i) => offersOver(1000 + i));
 
-  it('the reference shot yields a few hundred tonnes of ore', () => {
-    expect(totalOreKg).toBeGreaterThan(100_000);
+  // Re-measured at SANDBOX_ORE_GRADE_SCALE 0.08 (#1944): the 3x3 depth-5 shot holds 17.5 t of ore (was 340 t at scale 1).
+  it('the reference shot yields about twenty tonnes of ore', () => {
+    expect(totalOreKg).toBeGreaterThan(10_000);
   });
 
-  // The shot's 340 t is ground truth, but the opening kit hauls ~30 kg of ore a tick into a 25 t warehouse
+  // The shot's ore mass is ground truth, but the opening kit hauls ~30 kg of ore a tick into a 25 t warehouse
   // (balance.ts PRODUCTION_ORE_SALE_QTY_KG), so offers are sized to what it can fill; the relationship
   // asserted is against the legacy board, which could not match even that (no 5-day absorption of the shot is asserted).
-  it('ore-sale offer volume for the shot\'s own ores over 5 game days is at least 3x the legacy board\'s (offers are sized to the kit\'s hauling, not the shot\'s 340 t)', () => {
+  it('ore-sale offer volume for the shot\'s own ores over 5 game days is at least 3x the legacy board\'s (offers are sized to the kit\'s hauling, not the shot\'s own mass)', () => {
     const forShot = (b: ReturnType<typeof offersOver>) => sum(b.filter(c => c.type === 'ore_sale' && oreKg[c.materialId] !== undefined).map(c => c.quantityKg));
     const production = sum(boards.map(forShot));
     const legacy = sum(Array.from({ length: BOARD_SEEDS }, (_, i) => forShot(offersOver(1000 + i, 'legacy'))));
@@ -346,8 +353,8 @@ describe('sandbox economy: richness is bounded across biome and depth', () => {
  * log, an elapsed-tick clock, and `playUntil` stepping contracts and ticks up to `horizon`.
  * `afterTick` runs once per played step (for per-step bookkeeping).
  */
-function startPlayLoop(kit: string, horizon: number, afterTick: (elapsed: number) => void = () => {}) {
-  const { run, ctx } = startSandbox(DESERT, 42, kit);
+function startPlayLoop(kit: string, horizon: number, afterTick: (elapsed: number) => void = () => {}, extra = '') {
+  const { run, ctx } = startSandbox(DESERT, 42, kit, extra);
   run('time resume');
   const state = ctx.state!;
   const commands: string[] = [];
@@ -444,14 +451,14 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
 describe('sandbox economy: the standard opening on every starting kit (#1891)', () => {
   const HORIZON = 2000;
   const BUILD = 'living_quarters at:30,48 tier:1';
-  const SHOT_START = '36,32';
+  const SHOT_START = '36,30';
   /** The ramp the digger kit's rock digger carves into the first crater (#1874); same line as the solvent-sandbox test. */
   const DIGGER_RAMP = 'start:12,34 end:34,34 depth:6';
   /**
    * The full kit's cash at tick 2000 on the scripted opening: today's run, #1747.
-   * Measured on current main behaviour (seed 42, desert_badlands).
+   * Re-measured for the calibrated sandbox (#1944: scale 0.08, 3x3 depth 5, 6 kg, shot at 36,30): 792,241.1 (seed 42, desert_badlands).
    */
-  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 681_127;
+  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 792_241;
 
   interface OpeningTrace {
     endedAtTick: number | null;
@@ -485,10 +492,10 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
 
     trace.buildOk = logged(`build ${BUILD}`).success;
     expect(trace.buildOk, 'living quarters placed').toBe(true);
-    expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
+    expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:5 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    stock('krackle', 72);
-    logged('charge hole:* explosive:krackle amount:8 stemming:2');
+    stock('krackle', 54);
+    logged('charge hole:* explosive:krackle amount:6 stemming:2');
     playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     if (!over()) {
@@ -504,12 +511,14 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
 
   it('the full kit starts with strictly more cash than the digger kit', () => {
     expect(SANDBOX_STARTING_CASH.full).toBeGreaterThan(SANDBOX_STARTING_CASH.digger);
-    expect(SANDBOX_STARTING_CASH.digger).toBe(210_000);
-    expect(SANDBOX_STARTING_CASH.full).toBe(250_000);
+    expect(SANDBOX_STARTING_CASH.digger).toBe(330_000);
+    expect(SANDBOX_STARTING_CASH.full).toBe(370_000);
   });
 
+  // At the calibrated ore scale (#1944) the digger kit has too little reachable ore to pay its crew without the
+  // ramp its rock digger carves (#1874): half the 18 t shot sits below the rim. So the digger opening includes the ramp.
   it.each(['digger', 'full'] as const)('%s kit: survives to tick 2000 solvent, and ends richer than at the first blast', (kit) => {
-    const t = playOpening(kit);
+    const t = playOpening(kit, kit === 'digger' ? DIGGER_RAMP : undefined);
     expect(t.endedAtTick, `level ended at tick ${t.endedAtTick}: ${t.endReason}`).toBeNull();
     expect(t.brokeBeforeSaleAtTick, 'cash hit zero before the first ore sale completed').toBeNull();
     expect(t.cashAtFirstBlast, 'a blast was fired').not.toBeNull();
@@ -550,7 +559,7 @@ describe('sandbox economy: a supply contract can be filled (#1789)', () => {
   const SHOT_START = '36,32';
 
   it('full: the first dirtite supply offer is accepted, completes without penalty, and sales go on', () => {
-    const { state, commands, logged, over, playUntil, stock } = startPlayLoop('full', HORIZON);
+    const { state, commands, logged, over, playUntil, stock } = startPlayLoop('full', HORIZON, () => {}, FULL_ORE_GRADE);
     const supplyId = { current: null as number | null };
     const settled = () => supplyId.current !== null && state.contracts.completedHistory.some((c) => c.id === supplyId.current);
     /** Like a player: accept the first dirtite supply offer the moment it is on the board. */
@@ -608,7 +617,7 @@ describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => 
       rustitePeak = Math.max(rustitePeak, stockKg('rustite'));
       if (filledAt === null && stockKg() >= WAREHOUSE_FILLED_KG) filledAt = elapsed;
       if (filledAt !== null) rustitePeakAfterFill = Math.max(rustitePeakAfterFill, stockKg('rustite'));
-    });
+    }, FULL_ORE_GRADE);
 
     expect(logged(`build ${BUILD}`).success).toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
@@ -671,7 +680,7 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
     const { state, commands, logged, over, playUntil, stock } = startPlayLoop('full', HORIZON, () => {
       if ((state.collectedOre['rustite'] ?? 0) > 1) lastRustiteStockTick = state.tickCount;
       acceptSmallRustite(logged);
-    });
+    }, FULL_ORE_GRADE);
 
     expect(logged(`build ${BUILD}`).success).toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);

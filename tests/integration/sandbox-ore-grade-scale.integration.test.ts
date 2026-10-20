@@ -49,7 +49,7 @@ describe('ore grade scale: standard opening blast (#1932)', () => {
   let base: ReturnType<typeof openingBlast>;
   let scaled: ReturnType<typeof openingBlast>;
   beforeAll(() => {
-    base = openingBlast('');
+    base = openingBlast(' ore_grade:1');
     scaled = openingBlast(` ore_grade:${SCALE}`);
   }, 600_000);
 

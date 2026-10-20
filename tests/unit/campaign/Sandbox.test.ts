@@ -37,8 +37,8 @@ const LEVEL_FIELDS_SHARED_ACROSS_KITS = [
 
 describe('SANDBOX_KITS (#1891)', () => {
   it('maps each named kit to its documented starting cash', () => {
-    expect(SANDBOX_KITS.digger.startingCash).toBe(210_000);
-    expect(SANDBOX_KITS.full.startingCash).toBe(250_000);
+    expect(SANDBOX_KITS.digger.startingCash).toBe(330_000);
+    expect(SANDBOX_KITS.full.startingCash).toBe(370_000);
   });
 
   it('carries the kit id and order consistently', () => {
@@ -427,16 +427,16 @@ describe('sandbox starting site per kit (#1671, #1891)', () => {
     ].sort());
   });
 
-  it('keeps cash at 210k digger / 250k full alongside the kit', () => {
-    expect(sandboxLevelDef(clampSandboxConfig({ kit: 'digger' })).startingCash).toBe(210_000);
-    expect(sandboxLevelDef(clampSandboxConfig({ kit: 'full' })).startingCash).toBe(250_000);
+  it('keeps cash at 330k digger / 370k full alongside the kit', () => {
+    expect(sandboxLevelDef(clampSandboxConfig({ kit: 'digger' })).startingCash).toBe(330_000);
+    expect(sandboxLevelDef(clampSandboxConfig({ kit: 'full' })).startingCash).toBe(370_000);
   });
 
   it('SANDBOX_STARTING_SITES and SANDBOX_STARTING_CASH are keyed by kit (#1891)', () => {
     expect(Object.keys(SANDBOX_STARTING_SITES).sort()).toEqual(['digger', 'full']);
     expect(Object.keys(SANDBOX_STARTING_CASH).sort()).toEqual(['digger', 'full']);
-    expect(SANDBOX_STARTING_CASH.digger).toBe(210_000);
-    expect(SANDBOX_STARTING_CASH.full).toBe(250_000);
+    expect(SANDBOX_STARTING_CASH.digger).toBe(330_000);
+    expect(SANDBOX_STARTING_CASH.full).toBe(370_000);
   });
 
   it('digger kit includes a rock digger and a driver holding driving.excavator (#1874)', () => {
@@ -631,7 +631,6 @@ import {
   DEFAULT_PIT_MASK,
   SANDBOX_FLAT_PAD_TARGET,
 } from '../../../src/core/config/balance.js';
-import { getAllLevels } from '../../../src/core/campaign/Level.js';
 import { generateTerrain, buildTerrainContext } from '../../../src/core/world/TerrainGen.js';
 import { computeVoxelColumnSurfaceY, CompositionPalette } from '../../../src/core/world/VoxelGrid.js';
 import { sandboxTerrainConfig, flatPadShare } from '../../helpers/sandboxSite.js';
