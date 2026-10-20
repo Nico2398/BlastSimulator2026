@@ -49,7 +49,7 @@ function tickWithVerdict(from: number, overshoot: number, inspected: boolean): n
   throw new Error('no tick found');
 }
 
-const OVERSHOOT = 0.125; // 90 kg against the 80 kg grade-0 limit
+const OVERSHOOT = 0.125; // 45 kg against the 40 kg grade-0 limit
 
 function txOf(state: GameState, category: string) {
   return state.finances.transactions.filter(x => x.category === category);
@@ -59,7 +59,7 @@ describe('blast on a progression site, within the permit (#1923)', () => {
   beforeAll(() => setLocale('en'));
 
   it('pays only the notification fee, under permits', () => {
-    const { run, state } = loadedSite(8); // 72 kg, 9 holes: the standard opening
+    const { run, state } = loadedSite(4); // 36 kg, 9 holes: the standard opening
     const cash = state.cash;
     const r = run('blast');
     expect(r.success, r.output).toBe(true);
@@ -71,7 +71,7 @@ describe('blast on a progression site, within the permit (#1923)', () => {
   });
 
   it('rolls no inspection and adds no fine or strike', () => {
-    const { run, state } = loadedSite(8);
+    const { run, state } = loadedSite(4);
     run('blast');
     expect(txOf(state, 'fines')).toHaveLength(0);
     expect(state.grade!.strikeTicks ?? []).toEqual([]);
@@ -79,14 +79,14 @@ describe('blast on a progression site, within the permit (#1923)', () => {
   });
 
   it('reports the fee in the blast output and no inspection chance', () => {
-    const { run } = loadedSite(8);
+    const { run } = loadedSite(4);
     const r = run('blast');
     expect(r.output).toContain(formatMoney(FEE));
     expect(r.output).not.toMatch(/chance/i);
   });
 
   it('fires no inspection event on the bus', () => {
-    const { run, ctx } = loadedSite(8);
+    const { run, ctx } = loadedSite(4);
     let seen = 0;
     ctx.emitter.on('progression:blast_inspected', () => { seen++; });
     run('blast');
@@ -94,7 +94,7 @@ describe('blast on a progression site, within the permit (#1923)', () => {
   });
 
   it('a refused blast (nothing charged) does not charge the fee', () => {
-    const { run, state } = loadedSite(8);
+    const { run, state } = loadedSite(4);
     run('blast');
     const cash = state.cash;
     const r = run('blast');
@@ -107,15 +107,15 @@ describe('blast on a progression site, within the permit (#1923)', () => {
 describe('blast on a progression site, over the permit (#1923)', () => {
   beforeAll(() => setLocale('en'));
 
-  it('the loaded 3x3 at 10 kg is 90 kg, 12.5% over', () => {
-    const { state } = loadedSite(10);
+  it('the loaded 3x3 at 5 kg is 45 kg, 12.5% over', () => {
+    const { state } = loadedSite(5);
     const kg = Object.values(state.chargesByHole).reduce((sum, c) => sum + c.amountKg, 0);
-    expect(kg).toBe(90);
+    expect(kg).toBe(45);
     expect(OVERSHOOT).toBeCloseTo(0.125, 10);
   });
 
   it('still fires, and pays the fee, when the seeded roll spares it', () => {
-    const { run, state } = loadedSite(10);
+    const { run, state } = loadedSite(5);
     state.tickCount = tickWithVerdict(state.tickCount, OVERSHOOT, false);
     const cash = state.cash;
     const r = run('blast');
@@ -127,7 +127,7 @@ describe('blast on a progression site, over the permit (#1923)', () => {
   });
 
   it('when the seeded roll catches it: fine under fines, neighbours -5, one strike', () => {
-    const { run, state } = loadedSite(10);
+    const { run, state } = loadedSite(5);
     const tick = tickWithVerdict(state.tickCount, OVERSHOOT, true);
     state.tickCount = tick;
     const cash = state.cash;
@@ -145,11 +145,11 @@ describe('blast on a progression site, over the permit (#1923)', () => {
   });
 
   it('the same seed and tick give the same verdict every time', () => {
-    const first = loadedSite(10);
+    const first = loadedSite(5);
     const tick = tickWithVerdict(first.state.tickCount, OVERSHOOT, true);
     first.state.tickCount = tick;
     first.run('blast');
-    const second = loadedSite(10);
+    const second = loadedSite(5);
     second.state.tickCount = tick;
     second.run('blast');
     expect(second.state.grade!.strikeTicks).toEqual(first.state.grade!.strikeTicks);
@@ -158,7 +158,7 @@ describe('blast on a progression site, over the permit (#1923)', () => {
 
   it('the blast output never shows the inspection chance', () => {
     for (const inspected of [true, false]) {
-      const { run, state } = loadedSite(10);
+      const { run, state } = loadedSite(5);
       state.tickCount = tickWithVerdict(state.tickCount, OVERSHOOT, inspected);
       const r = run('blast');
       expect(r.output).not.toMatch(/chance/i);
@@ -168,7 +168,7 @@ describe('blast on a progression site, over the permit (#1923)', () => {
   });
 
   it('emits progression:blast_inspected with the overshoot, the verdict, the fine and the strikes', () => {
-    const { run, state, ctx } = loadedSite(10);
+    const { run, state, ctx } = loadedSite(5);
     state.tickCount = tickWithVerdict(state.tickCount, OVERSHOOT, true);
     const seen: Array<{ overshoot: number; caught: boolean; fine: number; strikes: number; suspended: boolean }> = [];
     ctx.emitter.on('progression:blast_inspected', e => seen.push(e));
@@ -182,7 +182,7 @@ describe('blast on a progression site, over the permit (#1923)', () => {
   });
 
   it('a bribed inspector shields the overshoot: no roll, no fine, no strike', () => {
-    const { run, state } = loadedSite(10);
+    const { run, state } = loadedSite(5);
     const tick = tickWithVerdict(state.tickCount, OVERSHOOT, true);
     state.tickCount = tick;
     state.corruption.protections.push({ target: 'inspector', expiresAtTick: tick + 200, dismissalsLeft: 0, shielded: false });
@@ -197,7 +197,7 @@ describe('blast on a progression site, over the permit (#1923)', () => {
   });
 
   it('a third strike inside 2000 ticks suspends the permit and the next shot is refused', () => {
-    const { run, state } = loadedSite(10);
+    const { run, state } = loadedSite(5);
     const tick = tickWithVerdict(state.tickCount, OVERSHOOT, true);
     state.tickCount = tick;
     state.grade!.strikeTicks = [tick - 100, tick - 500];
@@ -213,7 +213,7 @@ describe('blast on a progression site, over the permit (#1923)', () => {
   });
 
   it('strikes older than the window do not suspend', () => {
-    const { run, state } = loadedSite(10);
+    const { run, state } = loadedSite(5);
     const tick = tickWithVerdict(state.tickCount + 3000, OVERSHOOT, true);
     state.tickCount = tick;
     state.grade!.strikeTicks = [tick - 2000, tick - 2600];
@@ -223,7 +223,7 @@ describe('blast on a progression site, over the permit (#1923)', () => {
   });
 
   it('a refusal under suspension charges no fee', () => {
-    const { run, state } = loadedSite(10);
+    const { run, state } = loadedSite(5);
     state.events.activeModifiers.push({
       id: 900, kind: 'blast_ban', sourceEventId: 'permit', role: null, targetId: null, category: null,
       magnitude: 1, startTick: state.tickCount, endTick: state.tickCount + 72,
@@ -254,7 +254,7 @@ describe('blast detonate reaches the same check once the danger zone clears (#19
   }
 
   it('an in-limit pattern pays the fee once', () => {
-    const site = loadedSite(8);
+    const site = loadedSite(4);
     detonate(site);
     const permits = txOf(site.state, 'permits');
     expect(permits).toHaveLength(1);
@@ -262,14 +262,14 @@ describe('blast detonate reaches the same check once the danger zone clears (#19
   });
 
   it('an over-limit pattern rolls the verdict on the auto-fire', () => {
-    const site = loadedSite(10);
+    const site = loadedSite(5);
     detonate(site);
     expect(txOf(site.state, 'permits')).toHaveLength(1);
     expect(site.state.grade!.inspectionRolls).toBe(1);
   });
 
   it('a suspension refuses the arm', () => {
-    const site = loadedSite(10);
+    const site = loadedSite(5);
     const { state, run } = site;
     state.events.activeModifiers.push({
       id: 901, kind: 'blast_ban', sourceEventId: 'permit', role: null, targetId: null, category: null,
@@ -291,7 +291,7 @@ describe('blast off a progression site is unchanged (#1923)', () => {
   }
 
   it('an over-limit pattern pays no fee, takes no roll, no fine and no strike', () => {
-    const { run, state, ctx } = nonProgressionSite(10);
+    const { run, state, ctx } = nonProgressionSite(5);
     let seen = 0;
     ctx.emitter.on('progression:blast_inspected', () => { seen++; });
     const cash = state.cash;
@@ -332,7 +332,7 @@ describe('permit status shows limits, fee and strikes (#1923)', () => {
     const { run } = sandbox();
     const r = run('permit status');
     expect(r.success).toBe(true);
-    expect(r.output).toContain('80');
+    expect(r.output).toContain('40');
     expect(r.output).toMatch(/\b9\b/);
     expect(r.output).toContain(formatMoney(FEE));
   });
@@ -360,7 +360,7 @@ describe('permit status shows limits, fee and strikes (#1923)', () => {
     const { run, state } = sandbox();
     state.grade!.grade = 1;
     const r = run('permit status');
-    expect(r.output).toContain('250');
+    expect(r.output).toContain('120');
     expect(r.output).toContain(formatMoney(1_000));
   });
 

@@ -467,25 +467,25 @@ describe('BlastFooter — permit usage (#1925)', () => {
 
   it('shows kg and holes against the grade-0 limits', () => {
     const { footer } = makeFooter();
-    footer.update(permitState(9, 8));
+    footer.update(permitState(9, 4));
     expect(visible(usage(footer))).toBe(true);
-    expect(usage(footer)!.textContent).toContain('72 / 80 kg');
+    expect(usage(footer)!.textContent).toContain('36 / 40 kg');
     expect(usage(footer)!.textContent).toContain('9 / 9 holes');
-    expect(usage(footer)!.querySelector('[data-role="permit-kg"]')!.textContent).toBe('72 / 80 kg');
+    expect(usage(footer)!.querySelector('[data-role="permit-kg"]')!.textContent).toBe('36 / 40 kg');
     expect(usage(footer)!.querySelector('[data-role="permit-holes"]')!.textContent).toBe('9 / 9 holes');
     expect(visible(warning(footer))).toBe(false);
   });
 
   it('is not amber and shows no warning within the limit', () => {
     const { footer } = makeFooter();
-    footer.update(permitState(9, 8));
+    footer.update(permitState(9, 4));
     expect(usage(footer)!.dataset['over']).not.toBe('true');
   });
 
   it('turns to a warning style and shows the warning line when over the kg limit', () => {
     const { footer } = makeFooter();
-    footer.update(permitState(9, 10));
-    expect(usage(footer)!.textContent).toContain('90 / 80 kg');
+    footer.update(permitState(9, 5));
+    expect(usage(footer)!.textContent).toContain('45 / 40 kg');
     expect(usage(footer)!.dataset['over']).toBe('true');
     expect(visible(warning(footer))).toBe(true);
     expect(warning(footer)!.textContent!.length).toBeGreaterThan(0);
@@ -500,7 +500,7 @@ describe('BlastFooter — permit usage (#1925)', () => {
 
   it('FIRE stays enabled and clickable while over the limit', () => {
     const { footer, fireRequested } = makeFooter();
-    footer.update(permitState(9, 10));
+    footer.update(permitState(9, 5));
     const fireBtn = footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement;
     expect(fireBtn.disabled).toBe(false);
     fireBtn.click();
@@ -509,29 +509,29 @@ describe('BlastFooter — permit usage (#1925)', () => {
 
   it('updates when the plan moves from within to over the limit', () => {
     const { footer } = makeFooter();
-    const state = permitState(9, 8);
+    const state = permitState(9, 4);
     footer.update(state);
     expect(visible(warning(footer))).toBe(false);
     for (const id of Object.keys(state.chargesByHole)) {
-      const r = createCharge('krackle', 10, 2, state.drillHoles.find(h => String(h.id) === id)!.depth);
+      const r = createCharge('krackle', 5, 2, state.drillHoles.find(h => String(h.id) === id)!.depth);
       if ('charge' in r) state.chargesByHole[id] = r.charge;
     }
     footer.update(state);
-    expect(usage(footer)!.textContent).toContain('90 / 80 kg');
+    expect(usage(footer)!.textContent).toContain('45 / 40 kg');
     expect(visible(warning(footer))).toBe(true);
   });
 
   it('shows no permit row on a non-progression site, even over what a limit would be', () => {
     const { footer } = makeFooter();
-    footer.update(permitState(9, 10, false));
+    footer.update(permitState(9, 5, false));
     expect(visible(usage(footer))).toBe(false);
     expect(visible(warning(footer))).toBe(false);
-    expect(footer.root.textContent).not.toContain('/ 80 kg');
+    expect(footer.root.textContent).not.toContain('/ 40 kg');
   });
 
   it('never renders an inspection chance or overshoot', () => {
     const { footer } = makeFooter();
-    footer.update(permitState(12, 10));
+    footer.update(permitState(12, 5));
     const text = footer.root.textContent!.toLowerCase();
     expect(text).not.toContain('chance');
     expect(text).not.toContain('overshoot');

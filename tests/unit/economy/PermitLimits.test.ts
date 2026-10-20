@@ -48,8 +48,8 @@ function findTick(overshoot: number, wantInspected: boolean, salt = 0): number {
 
 describe('permitLimitsFor', () => {
   it.each([
-    [0, 80, 9, 250],
-    [1, 250, 16, 1_000],
+    [0, 40, 9, 250],
+    [1, 120, 16, 1_000],
     [2, 800, 36, 3_000],
     [3, 2_500, 81, 8_000],
     [4, 8_000, 196, 20_000],
@@ -114,26 +114,26 @@ describe('permitLimitsFor', () => {
 });
 
 describe('preFireCheck', () => {
-  it('the standard opening (9 holes at 8 kg = 72 kg) is within the grade-0 permit', () => {
-    const c = preFireCheck(0, charges(9, 8), 9);
+  it('the standard opening (9 holes at 4 kg = 36 kg) is within the grade-0 permit', () => {
+    const c = preFireCheck(0, charges(9, 4), 9);
     expect(c.over).toBe(false);
     expect(c.overshoot).toBe(0);
-    expect(c.planKg).toBe(72);
+    expect(c.planKg).toBe(36);
     expect(c.planHoles).toBe(9);
     expect(c.fee).toBe(250);
-    expect(c.limits).toEqual({ maxChargeKg: 80, maxHoles: 9, fee: 250 });
+    expect(c.limits).toEqual({ maxChargeKg: 40, maxHoles: 9, fee: 250 });
   });
 
   it('exactly at both limits is not over', () => {
-    const c = preFireCheck(0, charges(8, 10), 9);
-    expect(c.planKg).toBe(80);
+    const c = preFireCheck(0, charges(8, 5), 9);
+    expect(c.planKg).toBe(40);
     expect(c.over).toBe(false);
     expect(c.overshoot).toBe(0);
   });
 
-  it('a 3x3 at 10 kg per hole (90 kg) is over by 12.5%', () => {
-    const c = preFireCheck(0, charges(9, 10), 9);
-    expect(c.planKg).toBe(90);
+  it('a 3x3 at 5 kg per hole (45 kg) is over by 12.5%', () => {
+    const c = preFireCheck(0, charges(9, 5), 9);
+    expect(c.planKg).toBe(45);
     expect(c.over).toBe(true);
     expect(c.overshoot).toBeCloseTo(0.125, 10);
   });
@@ -145,8 +145,8 @@ describe('preFireCheck', () => {
   });
 
   it('the larger of the two shares counts', () => {
-    // 90 kg is 12.5% over, 18 holes is 100% over.
-    const c = preFireCheck(0, charges(9, 10), 18);
+    // 45 kg is 12.5% over, 18 holes is 100% over.
+    const c = preFireCheck(0, charges(9, 5), 18);
     expect(c.overshoot).toBeCloseTo(1, 10);
   });
 
@@ -165,7 +165,7 @@ describe('preFireCheck', () => {
   });
 
   it('a higher grade admits the same plan and charges its own fee', () => {
-    const c = preFireCheck(1, charges(9, 10), 9);
+    const c = preFireCheck(1, charges(9, 5), 9);
     expect(c.over).toBe(false);
     expect(c.fee).toBe(1_000);
     expect(c.limits).toEqual(permitLimitsFor(1));
@@ -276,7 +276,7 @@ describe('liveStrikes', () => {
 
 describe('resolveOvershoot', () => {
   const overshoot = 0.125;
-  const check = () => preFireCheck(0, charges(9, 10), 9);
+  const check = () => preFireCheck(0, charges(9, 5), 9);
 
   it('a caught blast pays the fine under fines, loses 5 neighbour points and takes a strike', () => {
     const tick = findTick(overshoot, true);
@@ -356,7 +356,7 @@ describe('resolveOvershoot', () => {
   });
 
   it('a larger overshoot costs a larger fine', () => {
-    const big = preFireCheck(0, charges(9, 10), 18); // 100% over
+    const big = preFireCheck(0, charges(8, 10), 18); // 100% over
     const tick = findTick(1, true);
     const { state, g, emitter } = site(tick);
     const v = resolveOvershoot(state, g, big, emitter);
