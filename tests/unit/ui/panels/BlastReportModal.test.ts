@@ -892,7 +892,9 @@ describe('BlastReportModal', () => {
 
       const { modal: modal2, setPlayback: sp2 } = makeModal();
       const state2 = makeState();
-      state2.lastBlastReport = makeReport({ accidents: undefined });
+      const report2 = makeReport();
+      delete (report2 as Partial<BlastReport>).accidents;
+      state2.lastBlastReport = report2;
       expect(() => openReport(modal2, state2, sp2)).not.toThrow();
       expect(modal2.root.textContent).not.toContain('was destroyed');
     });
