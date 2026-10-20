@@ -91,6 +91,8 @@ export const ORE_SATURATION_HALF_LIFE_TICKS = 500;
 export const ORE_SATURATION_MAX_DISCOUNT = 0.5;
 /** Saturation level at which the glut toast fires (#1930). */
 export const ORE_SATURATION_TOAST_LEVEL = 0.5;
+/** Saturation at or below which an ore reads as a hungry market. */
+export const MARKET_HUNGRY_SATURATION = 0.1;
 /** Base market depth (kg) per ore: sales volume that fully saturates it at the local tier (#1930). */
 export const ORE_MARKET_DEPTH_KG: Record<keyof typeof ORE_PRICES, number> = {
   dirtite: 20_000, rustite: 15_000, blingite: 10_000, gloomium: 8_000,

@@ -31,7 +31,7 @@ import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
 import { resolveContractOres, resolveScriptedOreSale } from '../../core/campaign/Level.js';
-import { saturationReader, oreSaturationTrend } from '../../core/economy/OreSaturation.js';
+import { saturationReader, oreSaturationTrend, formatTrendPct } from '../../core/economy/OreSaturation.js';
 import { oreContractBasePrice } from '../../core/economy/Market.js';
 import { buyerTierNameKey } from '../../core/economy/BuyerTiers.js';
 
@@ -175,7 +175,7 @@ export function contractCommand(
         const base = oreContractBasePrice(ore, state.contracts.market);
         const trend = oreSaturationTrend(ore, sat, base);
         lines.push(t('economy.contract.market_line', {
-          ore: t(`ore.${ore}.name`), pct: Math.round(sat * 100), trend: `${trend.pct > 0 ? '+' : ''}${trend.pct}`,
+          ore: t(`ore.${ore}.name`), pct: Math.round(sat * 100), trend: formatTrendPct(trend.pct),
           from: formatDollars(base), to: formatDollars(trend.price),
         }));
       }
