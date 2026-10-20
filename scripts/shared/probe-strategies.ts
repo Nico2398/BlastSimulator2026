@@ -415,6 +415,9 @@ function runReinvest(s: ProbeSession): void {
 const STRATEGIES: Record<StrategyId, StrategyFn> = {
   opening: (s) => { runOpening(s); playOut(s); },
   reinvest: runReinvest,
+  // TODO(#1945): ladder and stay_g1 delegate to reinvest until their tests dictate behaviour.
+  ladder: runReinvest,
+  stay_g1: runReinvest,
 };
 
 // ── Run loop ──

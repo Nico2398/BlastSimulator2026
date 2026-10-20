@@ -23,6 +23,12 @@ interface ProbeMetrics {
   ticksHaulWaitedOnFullStorage: number;
   boulderSoldShare: number | null;
   gradeReachedTick: Record<number, number>;
+  /** Cash at the tick each grade was first reached, by grade. */
+  gradeCashAt?: Record<number, number>;
+  /** Tick the ladder bought its catalog target, null if never. */
+  catalogBoughtTick?: number | null;
+  /** Share of boulder ore that ended up sold, null when unmeasured. */
+  boulderOreSoldShare?: number | null;
   affordableTick: {
     warehouseT2: number | null;
     researchCenter: number | null;
@@ -180,6 +186,9 @@ export class MetricsObserver {
       ticksHaulWaitedOnFullStorage: this.haulWaitTicks,
       boulderSoldShare: this.boulderShare(),
       gradeReachedTick: { ...this.gradeReachedTick },
+      gradeCashAt: {},
+      catalogBoughtTick: null,
+      boulderOreSoldShare: null,
       affordableTick: { ...this.affordableTick },
     };
   }
