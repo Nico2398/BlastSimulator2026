@@ -655,7 +655,7 @@ export function resolveReservationHolder(
   return holder && holder.alive ? holder : undefined;
 }
 
-/** One active action reconcileVehicleReservations found needing interruption — its reserved vehicle vanished before the holder started their work timer. The caller (ArrivalGate.ts) performs the actual interruptActiveAction call, since that lives in TaskDispatch.ts and this module cannot import it without a cycle. */
+/** One action reconcileVehicleReservations found needing interruption — its reserved vehicle vanished before the holder started their work timer. `actionId` may name the holder's active action or a queued-ahead one (#2017). The caller (ArrivalGate.ts) performs the actual interruptActiveAction call, since that lives in TaskDispatch.ts and this module cannot import it without a cycle. */
 export interface VehicleGoneInterruption {
   employee: Employee;
   actionId: number;
@@ -788,6 +788,8 @@ export function reconcileVehicleReservations(state: GameState): VehicleGoneInter
   // (c): a vehicle-gated action still claimed, still pre-work-timer, whose
   // reserved vehicle no longer exists at all — can't be caught by iterating
   // vehicles (there's nothing left to iterate), so walk actions instead.
+  // The reported action may be a non-active, queued-ahead one in the holder's
+  // taskQueue (#2017); interruptActiveAction releases just that action.
   const interruptions: VehicleGoneInterruption[] = [];
   for (const action of state.pendingActions) {
     if (action.requiredVehicleRole === null) continue;

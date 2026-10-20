@@ -4,13 +4,16 @@ import { addHole } from '../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../src/core/mining/ChargePlan.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 
-/** Empty the site's buildings, then drill and charge the 3x3 grid. */
+/**
+ * Empty the site's buildings, then drill and charge the 3x3 grid. Shatternite 15 kg in
+ * 0.15 m holes reaches ~4.4 m (#2030), so the warehouse 4 m out is in range.
+ */
 export function addReachPattern(state: GameState, counter: { nextHoleId: number }): void {
   state.buildings.buildings = [];
   for (const x of [12, 16, 20]) {
     for (const z of [44, 48, 52]) {
       const hole = addHole(counter, state.drillHoles, x, z, 8, 0.15);
-      const res = createCharge('boomite', 5, 2, hole.depth);
+      const res = createCharge('shatternite', 15, 2, hole.depth, hole.diameter);
       if ('charge' in res) state.chargesByHole[hole.id] = res.charge;
     }
   }

@@ -170,7 +170,7 @@ export class PreflightModal {
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
     const occupantCount = zone ? countZoneOccupants(zone, state.vehicles, state.employees) : 0;
     const protectedHoles = checkProtectedPositions(state.drillHoles, state.buildings.buildings);
-    const buildingsAtRisk = buildingsInBlastReach(state.drillHoles, state.buildings.buildings);
+    const buildingsAtRisk = buildingsInBlastReach(state.drillHoles, state.chargesByHole, state.buildings.buildings);
     const loadingHoleIds = new Set(Object.keys(state.plannedChargesByHole));
     const deliveryArrivals = chargeDeliveryArrivalByHole(state);
     const validationErrors = validateBlastPlan(plan, loadingHoleIds, deliveryArrivals);
