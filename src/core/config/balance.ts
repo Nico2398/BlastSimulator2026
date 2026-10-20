@@ -2287,6 +2287,9 @@ export const AUDIO_DEFAULT_VOLUMES: Record<'master' | 'effects' | 'ambient' | 'u
  * scaled unit in total) cost an ordinary blast ~1-3 points and an
  * oversized one ~5.
  */
+/** Vibration (mm/s) below which a village is not counted as shaken by a blast (#1968). */
+export const VILLAGE_VIBRATION_FLOOR_MM_S = 1;
+
 export const VILLAGE_VIBRATION_SCORE_GAIN = 15000;
 
 /** Neighbour-relations points lost per projected fragment (#1343). */

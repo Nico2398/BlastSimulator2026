@@ -92,6 +92,11 @@ export class TerrainEdits {
   private readonly columnMap = new Map<string, Column>();
   private readonly fractures = new Map<string, FractureEntry>();
 
+  /** Independent deep copy: mutating the clone never touches this record. */
+  clone(): TerrainEdits {
+    throw new Error('not implemented');
+  }
+
   static empty(): TerrainEdits {
     return new TerrainEdits();
   }

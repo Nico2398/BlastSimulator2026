@@ -5,7 +5,9 @@
 import { formatMoney } from '../economy/formatMoney.js';
 import type { BlastPlan } from './BlastPlan.js';
 import { type VoxelGrid, clampToGridColumn } from '../world/VoxelGrid.js';
-import type { VillagePosition } from './BlastExecution.js';
+import type { VillagePosition, BlastRating } from './BlastExecution.js';
+import type { MarketId } from '../economy/Market.js';
+import { dryRunBlast, type BlastForecast } from './BlastDryRun.js';
 import { vec3, length } from '../math/Vec3.js';
 import {
   VOXEL_SIZE_CM,
@@ -96,7 +98,16 @@ export interface BlastPreviewSummary {
   tier: number;
   energy: { affectedVoxels: number; minEnergy: number; maxEnergy: number } | null;
   fragments: { fractured: number; cracked: number; unaffected: number; avgFragmentSizeCm: number } | null;
-  projections: { projectionZoneVoxels: number; collapseFragments: number } | null;
+  projections: {
+    projectionZoneVoxels: number;
+    collapseFragments: number;
+    /** Dry-run forecast fields (#1968); absent until the preview runs a dry-run blast. */
+    predictedRating?: BlastRating;
+    thrownFragments?: number;
+    totalFragments?: number;
+    thrownShare?: number;
+    furthestThrowM?: number;
+  } | null;
   vibrations: { maxVibration: number; affectedVillages: number } | null;
 }
 
@@ -202,6 +213,21 @@ export function previewFragments(
 }
 
 /** Preview projection zones. Requires software tier >= 3. */
+/** Dry-run the whole blast on a forked grid. Requires software tier >= 3; null below it. */
+export function previewBlastOutcome(
+  plan: BlastPlan,
+  grid: VoxelGrid,
+  softwareTier: number,
+  villages: readonly VillagePosition[],
+  groundFactor: number,
+  wetHoleIds: ReadonlySet<string>,
+  marketId?: MarketId,
+): BlastForecast | null {
+  void dryRunBlast;
+  void plan; void grid; void softwareTier; void villages; void groundFactor; void wetHoleIds; void marketId;
+  throw new Error('not implemented');
+}
+
 export function previewProjections(
   plan: BlastPlan,
   grid: VoxelGrid,

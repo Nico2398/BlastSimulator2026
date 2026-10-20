@@ -831,7 +831,7 @@ function calculateOreValue(oreDensities: Record<string, number>, voxelSize: numb
  * Rating is primarily safety-driven (projections, vibrations).
  * Fragmentation quality is secondary — real blasts always produce a size distribution.
  */
-function calculateRating(
+export function calculateRating(
   projections: number,
   maxThrowDistance: number,
   cleared: number,

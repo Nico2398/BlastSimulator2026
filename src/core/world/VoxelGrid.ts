@@ -524,6 +524,11 @@ export class VoxelGrid {
 
   // ── Chunk source (materialize-on-read) (#1183) ──
 
+  /** Read-only view of the attached chunk source, or null when none is attached. */
+  getChunkSource(): VoxelChunkSource | null {
+    return null; // TODO: implement
+  }
+
   /** Attach the generator + edit-record source new/dropped chunk slabs materialize from. */
   attachChunkSource(source: VoxelChunkSource): void {
     this.chunkSource = source;
