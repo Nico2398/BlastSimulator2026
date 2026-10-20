@@ -79,7 +79,7 @@ export class FireStep {
 
     const occupantKeys = zone ? this.occupantKeys(state, zone) : [];
     const permit = state.drillHoles.length === 0 ? null : permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount);
-    const atRisk = buildingsInBlastReach(state.drillHoles, state.buildings.buildings);
+    const atRisk = buildingsInBlastReach(state.drillHoles, state.chargesByHole, state.buildings.buildings);
     const signature = JSON.stringify({ zone, occupants: occupantKeys, wetCount: wet.length, permit, atRisk });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
