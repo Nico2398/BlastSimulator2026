@@ -142,7 +142,7 @@ describe('validateBlastPlan delivery wait (#1966)', () => {
 
 // ── #2021: pre-flight warning for buildings inside the blast's reach ─────────
 
-type TestBuilding = Parameters<typeof buildingsInBlastReach>[1][number];
+type TestBuilding = Parameters<typeof buildingsInBlastReach>[2][number];
 
 function bld(id: number, type: TestBuilding['type'], x: number, z: number, storedExplosives?: Record<string, number>): TestBuilding {
   return { id, type, tier: 1, x, z, ...(storedExplosives ? { storedExplosives } : {}) };
