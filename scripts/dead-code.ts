@@ -58,6 +58,9 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Ramp tool (#1942): the unit-tested contracts of the per-leg arrow layout and the tier-check line; production composes them inside buildRampArrow / describeRampPlan.
+  'src/renderer/RampArrow.ts:rampLegSpecs',
+  'src/ui/describeRamp.ts:rampTierCheckLine',
   // Contracts market strip (#1931): unit-tested contracts; production composes them inside makeMarketStrip.
   // Progression probe reload gate (#1974): the unit-tested contract; production uses it inside the reinvest strategy.
   'scripts/shared/probe-strategies.ts:RELOAD_FRACTION',

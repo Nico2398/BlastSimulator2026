@@ -1413,6 +1413,10 @@ export function isRampWidth(n: number): n is RampWidth {
 }
 /** Width of a ramp when none is chosen — the pre-#1298 fixed width. */
 export const RAMP_DEFAULT_WIDTH: RampWidth = 3;
+/** Ramp tool (#1942): depth the depth stepper starts at, the deepest it goes, and the degrees one grade press moves. */
+export const RAMP_DEFAULT_DEPTH_M = 8;
+export const RAMP_MAX_DEPTH_M = 40;
+export const RAMP_GRADE_STEP_DEGREES = 1;
 /** Ramp cost per meter of length per voxel of width; the default width costs the pre-#1298 flat $100/m. */
 export const RAMP_COST_PER_METER_PER_WIDTH = 100 / 3;
 

@@ -3,6 +3,8 @@
 import { t } from '../core/i18n/I18n.js';
 import type { BuiltRamp } from '../core/state/GameState.js';
 import type { VehicleTier } from '../core/entities/Vehicle.js';
+import { VEHICLE_TIER_LIST, slopeDegreesForTier } from '../core/nav/ClimbLimit.js';
+import { formatMoney } from '../core/economy/formatMoney.js';
 
 /** Climb facts for a ramp, from core's `describeRampClimb`, which already lists every tier off a progression site (#1938). */
 interface RampClimbText {
@@ -30,4 +32,21 @@ export function describeRamp(ramp: BuiltRamp, opts?: RampClimbText): { title: st
     title: t('shell.selection.ramp_title', { width: ramp.width }),
     sub: [base, ...legs, ...climb].join(' · '),
   };
+}
+
+/** One line naming which vehicle tiers climb the planned grade, e.g. "T1 ✓ T2 ✓ T3 ✗ (max 18°)"; no limit when every tier climbs. */
+export function rampTierCheckLine(tiers: readonly VehicleTier[]): string {
+  const checks = VEHICLE_TIER_LIST.map(tier => `T${tier} ${tiers.includes(tier) ? '✓' : '✗'}`).join(' ');
+  const failing = VEHICLE_TIER_LIST.find(tier => !tiers.includes(tier));
+  if (failing === undefined) return checks;
+  return t('ui.build.ramp_tiers_check', { checks, max: t('ui.build.ramp_tiers_max', { deg: slopeDegreesForTier(failing) }) });
+}
+
+/** Readout lines for the ramp param strip while a plan is being drawn; the tier line only when `tiers` is given. */
+export function describeRampPlan(p: { length: number; legs: number; cost: number; gradeDeg: number; tiers: VehicleTier[] | null }): string[] {
+  const lines = [t('ui.build.ramp_readout', {
+    length: p.length, legs: p.legs, cost: formatMoney(p.cost), grade: Math.round(p.gradeDeg * 10) / 10,
+  })];
+  if (p.tiers !== null) lines.push(rampTierCheckLine(p.tiers));
+  return lines;
 }
