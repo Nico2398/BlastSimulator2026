@@ -1565,7 +1565,7 @@ describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
 // ── Market strip, buyer badges and locked tiers on progression sites (#1931) ──
 
 describe('ContractsPanel — market strip (progression)', () => {
-  const STRIP = '#bs-contract-market';
+  const STRIP = '[id="bs-contract-market"]';
 
   function progressionState(grade = 0): GameState {
     const state = makeState();

@@ -37,7 +37,8 @@ export function makeBuyerBadge(tier: BuyerTierId): HTMLElement {
 }
 
 export function lockedBuyerTiers(grade: number): readonly BuyerTier[] {
-  return BUYER_TIERS.filter(b => b.unlockGrade > grade);
+  const g = Math.max(0, grade);
+  return BUYER_TIERS.filter(b => b.unlockGrade > g);
 }
 
 export function marketTooltipKey(sat: number): string {
@@ -54,7 +55,7 @@ function makeOreRow(oreId: string, sat: number, basePrice: number): HTMLElement 
   const { pct } = oreSaturationTrend(oreId, sat, basePrice);
   const signed = pct > 0 ? `+${pct}` : `${pct === 0 ? 0 : pct}`;
   const trendColor = pct < 0 ? 'var(--bsx-critical-text)' : pct > 0 ? 'var(--bsx-positive)' : 'var(--bsx-text-micro)';
-  const satBox = el('div', { className: 'bs-market-sat', children: [progressBar(sat * 100, sat >= ORE_SATURATION_TOAST_LEVEL ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)')] });
+  const satBox = el('div', { className: 'bs-market-sat', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '1', 'aria-valuenow': String(sat) }, children: [progressBar(sat * 100, sat >= ORE_SATURATION_TOAST_LEVEL ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)')] });
   satBox.style.cssText = 'flex:1;min-width:40px';
   return el('div', {
     className: 'bs-market-row',
@@ -80,12 +81,12 @@ export function makeMarketStrip(input: MarketStripInput): HTMLElement {
     ...rows,
   ];
   if (locked.length > 0) {
-    const text = locked.map(b => {
+    const list = locked.map(b => {
       const def = gradeDef(b.unlockGrade);
       return t('ui.contracts.locked_tier', { buyer: t(b.nameKey), grade: t(def.nameKey, def.nameParams) });
     }).join(' · ');
     kids.push(el('div', {
-      className: 'bs-market-locked', text, attrs: { title: t('ui.contracts.locked_tiers_title'), style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+      className: 'bs-market-locked', text: `${t('ui.contracts.locked_tiers_title')}: ${list}`, attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
       children: [iconEl('lock', 10)],
     }));
   }
