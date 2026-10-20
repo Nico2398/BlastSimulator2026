@@ -146,6 +146,14 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // ramp-switchback.json (#1939): the Build panel's ramp tool picks one straight
   // rectangle; a multi-leg path has no click path yet, so the order is a command.
   'build_ramp path:15,15;15,27;25,27 depth:6 width:3',
+  // ramp-spiral-pit.json (#1940): the spiral order has no click path yet (the ramp tool
+  // picks one rectangle); the drill/charge/blast of the pit is setup scaffolding
+  // for the pit the spiral winds down, not the thing under test.
+  'ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw preview',
+  'ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw',
+  'drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:14,14',
+  'charge hole:* explosive:boomite amount:5 stemming:2',
+  'blast detonate',
   // level3-playthrough-ecology.json: `amount:12`/`amount:15` are outside
   // krackle's own [1, 10] kg range (ExplosiveCatalog.ts). The amount
   // stepper clamps to the selected product's range (Charge.ts), so no click

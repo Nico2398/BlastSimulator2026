@@ -103,6 +103,11 @@ export function rampGradeBoundsDegrees(totalLength: number, targetDepth: number)
   };
 }
 
+/** Whole metres of road a `gradeDegrees` grade needs to drop `depth` metres. */
+export function rampLengthForGrade(depth: number, gradeDegrees: number): number {
+  return Math.ceil(depth / Math.tan(gradeDegrees / RAD_TO_DEG));
+}
+
 /** Floor depth at path `step` of a `lineLength`-long ramp, optionally at a chosen grade. */
 export function rampFloorDepthAt(
   step: number, lineLength: number, targetDepth: number, gradeDegrees?: number,

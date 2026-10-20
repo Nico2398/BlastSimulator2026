@@ -52,6 +52,7 @@ export const COMMAND_CUES: Readonly<Record<string, VerbRule>> = {
   drill_plan: { subs: { grid: ORDER, add: ORDER, clear: BACK, remove: BACK, show: null }, otherwise: null },
   charge: { subs: { show: null }, otherwise: ORDER },
   build_ramp: CANCELLABLE_ORDER,
+  ramp: { subs: { spiral: ORDER }, otherwise: null },
   widen_ramp: CANCELLABLE_ORDER,
   level_ground: CANCELLABLE_ORDER,
   drain_hole: { otherwise: ORDER },

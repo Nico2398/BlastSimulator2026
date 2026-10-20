@@ -23,6 +23,7 @@ import {
   blastPreviewCommand,
   buySoftwareCommand,
   buildRampCommand,
+  rampCommand,
   widenRampCommand,
   levelGroundCommand,
   weatherCommand,
@@ -219,6 +220,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('build_ramp', 'Build ramp (origin:X,Z direction:south length:10 | path:X,Z;X,Z;… depth:M width:3|5|7 [grade:DEG])', (args, named) =>
     buildRampCommand(ctx, args, named),
+  );
+  runner.register('ramp', 'Spiral ramp (spiral from:X,Z depth:M grade:DEG width:3|5|7 [dir:cw|ccw] [preview])', (args, named) =>
+    rampCommand(ctx, args, named),
   );
   runner.register('widen_ramp', 'Widen a built ramp (id:N width:5)', (args, named) =>
     widenRampCommand(ctx, args, named),

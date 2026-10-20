@@ -88,6 +88,7 @@ describe('success cues', () => {
     ['level_ground cancel 3', 'ui_back'],
     ['build_ramp origin:1,2 direction:south', 'order_queued'],
     ['build_ramp cancel 1', 'ui_back'],
+    ['ramp spiral from:1,2 depth:10 grade:10 width:5', 'order_queued'],
     ['widen_ramp id:1 width:5', 'order_queued'],
     ['research queue type:office tier:2', 'order_queued'],
     ['drain_hole hole:*', 'order_queued'],

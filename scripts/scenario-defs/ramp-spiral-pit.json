@@ -1,0 +1,266 @@
+{
+  "name": "ramp-spiral-pit",
+  "description": "#1940: blast one pit, order a spiral haul road round it with one `ramp spiral` command, dig it, and send a debris_hauler down and back up. Arrival is not asserted (the state dump exports no vehicle position); the checks are the built multi-leg ramp and nobody left stuck.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:2000000 staffed:true",
+      "description": "Staffed site: drill_rig #1, debris_hauler #2, rock_digger #3, drivers #4/#5.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:2000000 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "vehicleCount": 5,
+          "employeeCount": 5
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "description": "Crew the rock_digger #3 with excavator driver #4 so rubble and the ramp are dug.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 2 3",
+      "description": "Crew the debris_hauler #2 with driver #3.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 3"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:14,14",
+      "description": "A 3x3 grid at 3 m spacing, 6 m deep: the one pit blast opens a pit about 9 m across.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:14,14"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:800",
+      "timeout": 245,
+      "description": "Every hole drilled.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 800,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "description": "Load every hole.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 245,
+      "description": "Every charge loaded.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast detonate",
+      "description": "Detonate; the crew evacuates first.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast detonate"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "deathCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "timeout": 245,
+      "description": "The sequence evacuates the crew and fires; the pattern is spent and the pit is open. Its rubble is left lying: the haulers cannot reach it before the road exists.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "deathCount": 0
+        }
+      }
+    },
+    {
+      "command": "ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw preview",
+      "description": "#1940: preview the spiral proposal around the pit. The preview prints legs, length and cost and changes nothing; no UI exposes the spiral yet (exact-command allowlist entry in bootstrap-allowlist.ts).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw preview"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw",
+      "description": "#1940: order the spiral round the pit (target depth 8 m, below the 6 m blast) from the rim tile just north of it. Cash drops by the proposal cost and ramp segments are queued.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:1500",
+      "timeout": 245,
+      "description": "Drain every queued dig_ramp_segment layer, leg by leg, until the whole spiral is carved.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0,
+          "builtRampCount": 1
+        },
+        "note": "One multi-leg spiral built."
+      }
+    },
+    {
+      "command": "vehicle reposition 2 15 25",
+      "description": "Order the hauler to the far end of the spiral; its route is the spiral road.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 2 15 25"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 120",
+      "timeout": 120,
+      "description": "Give the hauler time to travel. A reposition has no state-dump field to poll for arrival (positions are not exported), so arrival is not asserted; a bounded tick block is the only wait.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 120"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "vehicle reposition 2 17 6",
+      "description": "Order the hauler back to the rim.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 2 17 6"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 120",
+      "timeout": 120,
+      "description": "Give the hauler time to return (arrival unasserted, as above).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 120"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "state full",
+      "description": "No employee is stuck after the trips (the nearest check available without a position field).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "stuckEmployeeCount": 0
+        }
+      }
+    }
+  ]
+}
