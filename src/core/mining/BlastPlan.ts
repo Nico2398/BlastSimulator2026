@@ -3,7 +3,9 @@
 
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
-import { isBuildingFootprintCell, type FootprintOccupant } from '../entities/Building.js';
+import { DRILL_GRID_DEFAULT_SPACING_M } from '../config/balance.js';
+import { computeDangerZone } from '../entities/Zone.js';
+import { getBuildingDef, isBuildingFootprintCell, warehouseStockKg, type Building, type BuildingType, type FootprintOccupant } from '../entities/Building.js';
 
 export interface BlastPlan {
   holes: DrillHole[];
@@ -105,4 +107,67 @@ export function partitionByFootprint<T extends { x: number; z: number }>(
 ): { clear: T[]; skipped: number } {
   const covered = coveredByFootprint(cells.map((c, i) => ({ id: String(i), x: c.x, z: c.z })), occupants);
   return { clear: cells.filter((_, i) => !covered.has(String(i))), skipped: covered.size };
+}
+
+/** A building inside a planned blast's reach, with the explosive stock it holds (#2021). */
+export interface BuildingAtRisk {
+  buildingId: number;
+  type: BuildingType;
+  x: number;
+  z: number;
+  stockKg: number;
+}
+
+const SPACING_EPSILON = 1e-6;
+
+/** Smallest gap between distinct values, or null with fewer than two. */
+function smallestGap(values: number[]): number | null {
+  const sorted = [...new Set(values)].sort((a, b) => a - b);
+  let best: number | null = null;
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = sorted[i]! - sorted[i - 1]!;
+    if (gap > SPACING_EPSILON && (best === null || gap < best)) best = gap;
+  }
+  return best;
+}
+
+/** Hole-grid pitch: larger of the smallest x gap and smallest z gap; default spacing when undetermined. */
+export function holePatternSpacing(holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z'>>): number {
+  const gx = smallestGap(holes.map(h => h.x));
+  const gz = smallestGap(holes.map(h => h.z));
+  if (gx === null && gz === null) return DRILL_GRID_DEFAULT_SPACING_M;
+  return Math.max(gx ?? 0, gz ?? 0);
+}
+
+/**
+ * Buildings within reach of the planned holes (#2021), shown as pre-flight warnings.
+ *
+ * Tier-0 prediction rule: a building is at risk when any footprint cell lies inside the
+ * holes' bounding box grown by `marginM` (default: the hole-pattern spacing). Holes are
+ * floored to their grid cell first. The rule is deliberately conservative: it can flag a
+ * building in the margin that would survive the blast, but never misses one inside the
+ * box. `marginM` is the lever for tuning how far past the pattern the warning reaches.
+ */
+export function buildingsInBlastReach(
+  holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z'>>,
+  buildings: ReadonlyArray<Pick<Building, 'id' | 'type' | 'tier' | 'x' | 'z' | 'storedExplosives'>>,
+  marginM: number = holePatternSpacing(holes),
+): BuildingAtRisk[] {
+  if (buildings.length === 0) return [];
+  const reach = computeDangerZone(holes.map(h => ({ x: Math.floor(h.x), z: Math.floor(h.z) })), marginM);
+  if (reach === null) return [];
+  const result: BuildingAtRisk[] = [];
+  for (const b of buildings) {
+    const inReach = getBuildingDef(b.type, b.tier).footprint.some(([dx, dz]) => {
+      const cx = b.x + dx;
+      const cz = b.z + dz;
+      return cx >= reach.x1 && cx <= reach.x2 && cz >= reach.z1 && cz <= reach.z2;
+    });
+    if (!inReach) continue;
+    result.push({
+      buildingId: b.id, type: b.type, x: b.x, z: b.z,
+      stockKg: b.type === 'explosive_warehouse' ? warehouseStockKg(b) : 0,
+    });
+  }
+  return result.sort((a, c) => a.buildingId - c.buildingId);
 }

@@ -3846,6 +3846,8 @@
   "ui.blast_workshop.preflight.predicted_locked_projections": "projections — T3",
   "ui.blast_workshop.preflight.no_preview": "Run Analysis in the Preview step to see predictions here.",
   "ui.blast_workshop.preflight.warn_protected": "{count} hole(s), including {hole}, sit directly on a building's footprint.",
+  "ui.blast_workshop.preflight.warn_building": "{building} is inside the blast area and will be destroyed.",
+  "ui.blast_workshop.preflight.warn_building_stocked": "{building} ({kg} kg stocked) is inside the blast area: it will be destroyed and its stock will detonate as a secondary blast.",
   "ui.blast_workshop.preflight.warn_charge_loading": "{count} hole(s) are still being charged. Wait for loading to finish before blasting.",
   "ui.blast_workshop.preflight.warn_charge_awaiting_delivery": "{count} hole(s) are waiting for explosives to arrive {when} (in {duration}). Detonation is blocked until they are charged.",
   "ui.blast_workshop.preflight.warn_undrilled": "{count} hole(s) not drilled yet. Blasting now cancels their drill orders.",

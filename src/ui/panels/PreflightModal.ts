@@ -20,7 +20,7 @@ import { el, statGrid } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { assembleBlastPlan, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
+import { assembleBlastPlan, buildingsInBlastReach, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { totalChargeKg } from '../../core/mining/BlastCalc.js';
 import { oreEstimateView, oreValueColor, oreValueText } from './oreEstimateDisplay.js';
 import { OreEstimateMemo } from './oreEstimateMemo.js';
@@ -29,6 +29,7 @@ import { wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
 import { detonationPhase, type DetonationPhase } from '../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
+import { buildingRiskText } from './buildingRiskText.js';
 import { permitPreview } from './permitPreview.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
@@ -36,7 +37,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
-interface Warning { ok: boolean; text: string }
+interface Warning { ok: boolean; text: string; role?: string; buildingType?: string }
 
 export class PreflightModal {
   private readonly overlay: HTMLElement;
@@ -169,6 +170,7 @@ export class PreflightModal {
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
     const occupantCount = zone ? countZoneOccupants(zone, state.vehicles, state.employees) : 0;
     const protectedHoles = checkProtectedPositions(state.drillHoles, state.buildings.buildings);
+    const buildingsAtRisk = buildingsInBlastReach(state.drillHoles, state.buildings.buildings);
     const loadingHoleIds = new Set(Object.keys(state.plannedChargesByHole));
     const deliveryArrivals = chargeDeliveryArrivalByHole(state);
     const validationErrors = validateBlastPlan(plan, loadingHoleIds, deliveryArrivals);
@@ -187,7 +189,7 @@ export class PreflightModal {
     const signature = JSON.stringify({
       permit, undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage, brokenVoxels, charged, holeCoverage,
       preview: state.lastBlastPreview, wetCount: wet.length, occupantCount,
-      phase, protectedCount: protectedHoles.length, loadingCount, awaitingCount, earliestArrival, errorCount: validationErrors.length,
+      phase, protectedCount: protectedHoles.length, buildingsAtRisk, loadingCount, awaitingCount, earliestArrival, errorCount: validationErrors.length,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -216,6 +218,7 @@ export class PreflightModal {
       ...(protectedHoles.length > 0
         ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_protected', { count: protectedHoles.length, hole: protectedHoles[0]!.holeId }) }]
         : []),
+      ...buildingsAtRisk.map(b => ({ ok: false, text: buildingRiskText(b), role: 'preflight-building-risk', buildingType: b.type })),
       ...(loadingCount > 0
         ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_charge_loading', { count: loadingCount }) }]
         : []),
@@ -288,6 +291,8 @@ export class PreflightModal {
       el('div', { attrs: { style: `color:${w.ok ? 'var(--bsx-positive)' : 'var(--bsx-amber)'};padding-top:1px` }, children: [iconEl(w.ok ? 'check' : 'warn', 13)] }),
       el('span', { text: w.text, attrs: { style: 'font:400 12px/1.45 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
     );
+    if (w.role) row.dataset['role'] = w.role;
+    if (w.buildingType) row.dataset['buildingType'] = w.buildingType;
     return row;
   }
 

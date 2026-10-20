@@ -12,6 +12,7 @@ import { addChargedPattern, addDrilledPattern, addWeakChargedPattern, makeBarren
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import { dispatchChargeAction } from '../../../../src/core/mining/ChargeOrder.js';
 import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
+import { addReachBuildings, addReachPattern } from '../../../helpers/blastReachFixture.js';
 import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -751,5 +752,90 @@ describe('PreflightModal — permit lines (#1925)', () => {
     const text = modal.root.textContent!.toLowerCase();
     expect(text).not.toContain('chance');
     expect(text).not.toContain('overshoot');
+  });
+});
+
+// ── #2021: buildings inside the blast area are warned about ─────────────────
+
+describe('PreflightModal — buildings in blast reach (#2021)', () => {
+  afterEach(() => setLocale('en'));
+
+  function reachState(): GameState {
+    const state = makeState();
+    addReachPattern(state, holeCounter);
+    addReachBuildings(state);
+    return state;
+  }
+
+  it('lists a warning row per building at risk, and not the quarters', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(reachState(), 'sunny');
+    const text = modal.root.textContent ?? '';
+    expect(text).toContain('Management Office is inside the blast area and will be destroyed.');
+    expect(text).toContain('Freight Warehouse is inside the blast area and will be destroyed.');
+    expect(text).toContain('Explosive Warehouse (228 kg stocked) is inside the blast area');
+    expect(text).not.toContain('Living Quarters is inside the blast area');
+    expect(text.match(/is inside the blast area/g)).toHaveLength(3);
+  });
+
+  it('the stocked warehouse row names its kg and the secondary blast', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(reachState(), 'sunny');
+    expect(modal.root.textContent).toContain('228 kg');
+    expect(modal.root.textContent).toContain('secondary blast');
+  });
+
+  it('shows no building row when nothing is in reach', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const state = makeState();
+    addReachPattern(state, holeCounter);
+    modal.update(state, 'sunny');
+    expect(modal.root.textContent).not.toContain('inside the blast area');
+  });
+
+  it('shows no building row when the only building is far from the holes', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const state = makeState();
+    addReachPattern(state, holeCounter);
+    placeBuilding(state.buildings, 'living_quarters', 30, 48, 64, 64);
+    modal.update(state, 'sunny');
+    expect(modal.root.textContent).not.toContain('inside the blast area');
+  });
+
+  it('is a warning, not a gate: Detonate stays enabled and dispatches', () => {
+    const { modal, gameConsole } = makeModal();
+    modal.show();
+    modal.update(reachState(), 'sunny');
+    const btn = modal.root.querySelector('[data-action="preflight-detonate"]') as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    btn.click();
+    expect(gameConsole).toHaveBeenCalledWith('blast detonate');
+  });
+
+  it('building rows come after the protected-holes row', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const state = reachState();
+    placeBuilding(state.buildings, 'living_quarters', 12, 44, 64, 64); // on a hole footprint
+    modal.update(state, 'sunny');
+    const text = modal.root.textContent ?? '';
+    const protectedAt = text.indexOf('sit directly on a building');
+    expect(protectedAt).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf('is inside the blast area')).toBeGreaterThan(protectedAt);
+  });
+
+  it('renders French rows under the fr locale', () => {
+    const { modal } = makeModal();
+    modal.show();
+    setLocale('fr');
+    modal.update(reachState(), 'sunny');
+    const text = modal.root.textContent ?? '';
+    expect(text).toContain('228');
+    expect(text).not.toContain('is inside the blast area');
+    expect(text).not.toContain('ui.blast_workshop.preflight.warn_building');
   });
 });
