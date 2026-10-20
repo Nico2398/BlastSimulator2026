@@ -11,9 +11,11 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { isInZone, computeDangerZone } from '../../../src/core/entities/Zone.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { BLAST_DANGER_MARGIN_M, DETONATION_REEVACUATE_INTERVAL_TICKS } from '../../../src/core/config/balance.js';
 import {
-  armDetonation, cancelDetonation, detonationPhase, tickDetonation,
+  BLAST_DANGER_MARGIN_M, DETONATION_REEVACUATE_INTERVAL_TICKS, DETONATION_STUCK_WALKER_FAILURE_TICKS,
+} from '../../../src/core/config/balance.js';
+import {
+  armDetonation, cancelDetonation, detonationPhase, tickDetonation, isStuckWalker,
 } from '../../../src/core/engine/DetonationSequence.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -278,5 +280,130 @@ describe('tickDetonation', () => {
     armDetonation(state);
     cancelDetonation(state);
     expect(tickDetonation(state)).toEqual({ kind: 'idle' });
+  });
+});
+
+/** Arm a detonation with employees at the given cells; arming orders each of them out (destination set). */
+function armWithWalkers(positions: Array<[number, number]>) {
+  const state = chargedState();
+  const emps = positions.map(([x, z]) => addWorker(state, x, z));
+  armDetonation(state);
+  return { state, emps };
+}
+
+describe('isStuckWalker (#1990)', () => {
+  it('is true when isMoveStuck is set', () => {
+    expect(isStuckWalker({ isMoveStuck: true, moveConsecutiveFailures: 0 })).toBe(true);
+  });
+
+  it('is true at the failure bound without the stuck flag', () => {
+    expect(isStuckWalker({ isMoveStuck: false, moveConsecutiveFailures: DETONATION_STUCK_WALKER_FAILURE_TICKS })).toBe(true);
+  });
+
+  it('is false one failure below the bound (boundary)', () => {
+    expect(isStuckWalker({ isMoveStuck: false, moveConsecutiveFailures: DETONATION_STUCK_WALKER_FAILURE_TICKS - 1 })).toBe(false);
+  });
+
+  it('is false for a walker with no failures', () => {
+    expect(isStuckWalker({ isMoveStuck: false, moveConsecutiveFailures: 0 })).toBe(false);
+  });
+});
+
+describe('detonationPhase with a stuck walker (#1990)', () => {
+  it('names an in-zone employee flagged isMoveStuck as stranded', () => {
+    const { state, emps } = armWithWalkers([[22, 22]]);
+    emps[0].isMoveStuck = true;
+    expect(detonationPhase(state)).toEqual({ kind: 'stranded', names: [emps[0].name] });
+  });
+
+  it('names an in-zone employee at the failure bound even when isMoveStuck is false', () => {
+    const { state, emps } = armWithWalkers([[22, 22]]);
+    emps[0].isMoveStuck = false;
+    emps[0].moveConsecutiveFailures = DETONATION_STUCK_WALKER_FAILURE_TICKS;
+    expect(detonationPhase(state)).toEqual({ kind: 'stranded', names: [emps[0].name] });
+  });
+
+  it('counts an employee below the failure bound and not stuck as still evacuating', () => {
+    const { state, emps } = armWithWalkers([[22, 22]]);
+    emps[0].moveConsecutiveFailures = DETONATION_STUCK_WALKER_FAILURE_TICKS - 1;
+    expect(detonationPhase(state)).toEqual({ kind: 'evacuating', remaining: 1 });
+  });
+
+  it('counts an employee still walking out (destination set, no failures) as left, not stranded', () => {
+    const { state, emps } = armWithWalkers([[22, 22]]);
+    expect(emps[0].destinationX).not.toBeNull();
+    expect(detonationPhase(state)).toEqual({ kind: 'evacuating', remaining: 1 });
+  });
+
+  it('stuck + walking: still evacuating with both counted', () => {
+    const { state, emps } = armWithWalkers([[22, 22], [25, 25]]);
+    emps[0].isMoveStuck = true;
+    expect(detonationPhase(state)).toEqual({ kind: 'evacuating', remaining: 2 });
+  });
+
+  it('once the walker leaves, the phase is stranded naming only the stuck one', () => {
+    const { state, emps } = armWithWalkers([[22, 22], [25, 25]]);
+    emps[0].isMoveStuck = true;
+    emps[1].x = 70; emps[1].z = 70;
+    expect(detonationPhase(state)).toEqual({ kind: 'stranded', names: [emps[0].name] });
+  });
+
+  it('ignores a stuck employee outside the zone', () => {
+    const { state, emps } = armWithWalkers([[22, 22], [70, 70]]);
+    emps[1].isMoveStuck = true;
+    expect(detonationPhase(state)).toEqual({ kind: 'evacuating', remaining: 1 });
+  });
+
+  it('ignores a dead stuck employee inside the zone', () => {
+    const { state, emps } = armWithWalkers([[22, 22], [25, 25]]);
+    emps[0].isMoveStuck = true;
+    emps[0].alive = false;
+    expect(detonationPhase(state)).toEqual({ kind: 'evacuating', remaining: 1 });
+  });
+
+  it('is ready once the zone is clear, stuck flags notwithstanding', () => {
+    const { state, emps } = armWithWalkers([[22, 22]]);
+    emps[0].isMoveStuck = true;
+    emps[0].x = 70; emps[0].z = 70;
+    expect(detonationPhase(state)).toEqual({ kind: 'ready' });
+  });
+});
+
+describe('tickDetonation with a stuck walker (#1990)', () => {
+  it('latches a stuck in-zone employee into pending.strandedEmployeeIds on the re-evacuation tick', () => {
+    const { state, emps } = armWithWalkers([[22, 22]]);
+    emps[0].isMoveStuck = true;
+    state.tickCount = DETONATION_REEVACUATE_INTERVAL_TICKS;
+    const phase = tickDetonation(state);
+    expect(state.pendingDetonation!.strandedEmployeeIds).toContain(emps[0].id);
+    expect(phase).toEqual({ kind: 'stranded', names: [emps[0].name] });
+  });
+
+  it('stays stranded after the stuck counters reset on a later tick', () => {
+    const { state, emps } = armWithWalkers([[22, 22]]);
+    emps[0].isMoveStuck = true;
+    state.tickCount = DETONATION_REEVACUATE_INTERVAL_TICKS;
+    tickDetonation(state);
+    emps[0].isMoveStuck = false;
+    emps[0].moveConsecutiveFailures = 0;
+    state.tickCount += 1;
+    expect(tickDetonation(state)).toEqual({ kind: 'stranded', names: [emps[0].name] });
+  });
+
+  it('does not latch a stuck employee who is outside the zone or dead', () => {
+    const { state, emps } = armWithWalkers([[22, 22], [70, 70], [25, 25]]);
+    emps[1].isMoveStuck = true;
+    emps[2].isMoveStuck = true;
+    emps[2].alive = false;
+    state.tickCount = DETONATION_REEVACUATE_INTERVAL_TICKS;
+    tickDetonation(state);
+    expect(state.pendingDetonation!.strandedEmployeeIds).toEqual([]);
+  });
+
+  it('moves to ready when the zone clears, as before', () => {
+    const { state, emps } = armWithWalkers([[22, 22]]);
+    emps[0].isMoveStuck = true;
+    emps[0].x = 70; emps[0].z = 70;
+    expect(tickDetonation(state)).toEqual({ kind: 'ready' });
   });
 });
