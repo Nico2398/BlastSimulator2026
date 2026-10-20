@@ -572,11 +572,13 @@ describe('createGameForLevel — shareholder summit rules (#1949)', () => {
     expect(summit().contracts.market).toBe('production');
   });
 
-  it('opens with the level cash, its free crew and a tier-1 freight warehouse', () => {
+  it('opens with the level cash, its free crew and a tier-1 freight warehouse in its starting site', () => {
     const state = summit();
     expect(state.cash).toBe(getLevel('shareholder_summit')!.startingCash);
     expect(state.employees.employees).toHaveLength(4);
-    expect(state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.tier === 1)).toBe(true);
+    // Buildings are placed on real ground at world generation (start_level), not by createGameForLevel.
+    expect(getLevel('shareholder_summit')!.startingSite!.buildings)
+      .toContainEqual({ type: 'freight_warehouse', tier: 1 });
   });
 
   it.each(['tutorial_pit', 'dusty_hollow', 'grumpstone_ridge', 'treranium_depths'])('earlier level %s has no board, no grade ladder and no production market', id => {

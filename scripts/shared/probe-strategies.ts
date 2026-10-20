@@ -67,6 +67,7 @@ import { gradeDef } from '../../src/core/economy/MineGrade.js';
 import { tierSlopeRatio } from '../../src/core/nav/ClimbLimit.js';
 import { fleetBestRigLimit } from '../../src/core/mining/RigLimits.js';
 import { explosiveHoleLimits, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
+import { getLevel } from '../../src/core/campaign/Level.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
 import {
@@ -231,7 +232,17 @@ interface Shot {
 }
 
 /** Explosive of every shot: the run's own (hard rock needs more than SHOT's krackle), else SHOT's. */
-const shotExplosive = (s: ProbeSession): string => s.config.explosive ?? SHOT.explosive;
+const shotExplosive = (s: ProbeSession): string => s.config.explosive ?? (hardRockLevel(s) ? HARD_ROCK_EXPLOSIVE : SHOT.explosive);
+
+/** Explosive a campaign level of this difficulty tier or above is shot with: krackle breaks nothing in its hard rock at the grade-0 charge cap. */
+const HARD_ROCK_MIN_DIFFICULTY_TIER = 4;
+const HARD_ROCK_EXPLOSIVE = 'dynatomics';
+
+function hardRockLevel(s: ProbeSession): boolean {
+  const id = s.engine.ctx.campaignProfile.campaign.activeLevelId;
+  const level = id ? getLevel(id) : undefined;
+  return (level?.difficultyTier ?? 0) >= HARD_ROCK_MIN_DIFFICULTY_TIER && (level?.availableExplosives.includes(HARD_ROCK_EXPLOSIVE) ?? false);
+}
 
 /** One shot's pattern, charge and (optionally) hole diameter; `SHOT` is the opening's. */
 interface ShotSpec {

@@ -245,11 +245,11 @@ describe('LevelEndScreen', () => {
     let nextId: string | null = null;
     screen.setOnContinue(id => { nextId = id; });
     screen.update(stateAtLevelEnd(THREE_STAR, 'treranium_depths'));
-    const text = container.querySelector('#bs-level-end-screen')!.textContent!;
-    expect(text).toContain('CONTINUE TO');
-    expect(text).not.toContain('BACK TO PORTFOLIO');
     const continueBtn = Array.from(container.querySelectorAll('#bs-level-end-screen button'))
       .find(b => b.textContent?.includes('CONTINUE TO')) as HTMLButtonElement;
+    // The defeat panel's own back button always carries the portfolio label; the win button must not.
+    expect(continueBtn).toBeDefined();
+    expect(continueBtn.textContent).not.toContain('BACK TO PORTFOLIO');
     continueBtn.click();
     expect(nextId).toBe('shareholder_summit');
     screen.dispose();
