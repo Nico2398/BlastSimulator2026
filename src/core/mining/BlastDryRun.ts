@@ -15,7 +15,7 @@ export interface BlastForecast {
   clearedVoxels: number;
 }
 
-/** Runs the blast on a fork of `grid`; null when the plan is invalid. Never mutates `grid`. */
+/** Runs the blast on a fork of `grid`; null when the plan is invalid or has no holes. Never mutates `grid`. */
 export function dryRunBlast(
   plan: BlastPlan,
   grid: VoxelGrid,
@@ -24,6 +24,7 @@ export function dryRunBlast(
   wetHoleIds: ReadonlySet<string>,
   marketId?: MarketId,
 ): BlastForecast | null {
+  if (plan.holes.length === 0) return null; // nothing to fire: executeBlast accepts an empty plan, a forecast would be meaningless
   // No emitter and no building state: the fork's blast is silent and spares every building.
   const result = executeBlast(
     plan, forkVoxelGrid(grid), villages, groundFactor, undefined, undefined, wetHoleIds, marketId,

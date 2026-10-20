@@ -49,7 +49,8 @@ describe.each([
     const fork = forkVoxelGrid(grid);
     fork.clearVoxel(5, 3, 5);
     fork.clearVoxel(6, 4, 5);
-    expect(fork.getVoxel(5, 3, 5)).toBeUndefined();
+    expect(fork.getVoxel(5, 3, 5)?.density).toBe(0);
+    expect(grid.getVoxel(5, 3, 5)?.density).toBeGreaterThan(0);
     expect(snapshot(grid, size, height)).toBe(before);
     expect(editLog(grid)).toBe(logBefore);
     expect(editLog(fork)).not.toBe(logBefore);
