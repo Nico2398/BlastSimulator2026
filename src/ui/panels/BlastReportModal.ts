@@ -25,7 +25,7 @@ import { el, statGrid } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { ACCIDENT_STYLE, accidentText } from '../accidentLookup.js';
+import { ACCIDENT_STYLE, accidentText, buildingLabelText } from '../accidentLookup.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { BlastReport, BlastRating } from '../../core/mining/BlastExecution.js';
 import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../core/config/balance.js';
@@ -246,7 +246,8 @@ export class BlastReportModal {
     for (const a of report.accidents ?? []) {
       if (a.type !== 'building_destroyed' || seenBuildingIds.has(a.entityId)) continue;
       seenBuildingIds.add(a.entityId);
-      const type = a.entityLabel ? t(`building.${a.entityLabel}.name`) : t('ui.operations.incident_unknown_building');
+      const type = buildingLabelText(a);
+      // fragmentId -1 marks a secondary-blast crater record (no flying rock).
       const key = a.fragmentId >= 0
         ? 'ui.blast_workshop.report.building_destroyed_flying_rock'
         : 'ui.blast_workshop.report.building_destroyed';

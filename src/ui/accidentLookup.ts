@@ -31,6 +31,11 @@ export const ACCIDENT_STYLE: Record<AccidentRecord['type'], AccidentStyle> = {
   vehicle_destroyed: { icon: 'vehicle', critical: true },
 };
 
+/** Localized building name from an accident's entityLabel snapshot, or the unknown-building fallback. */
+export function buildingLabelText(a: AccidentRecord): string {
+  return a.entityLabel ? t(`building.${a.entityLabel}.name`) : t('ui.operations.incident_unknown_building');
+}
+
 /**
  * Resolves an accident's display text: an employee's real name for
  * death/injury (employees stay in their array with alive:false so a live
@@ -50,12 +55,12 @@ export function accidentText(a: AccidentRecord, state: GameState): string {
     }
     case 'building_damage':
     case 'building_destroyed': {
-      const building = a.entityLabel ? t(`building.${a.entityLabel}.name`) : t('ui.operations.incident_unknown_building');
+      const building = buildingLabelText(a);
       return t(a.type === 'building_destroyed' ? 'ui.operations.incident_building_destroyed' : 'ui.operations.incident_building_damage', { building });
     }
     case 'seismic_damage':
     case 'seismic_destroyed': {
-      const building = a.entityLabel ? t(`building.${a.entityLabel}.name`) : t('ui.operations.incident_unknown_building');
+      const building = buildingLabelText(a);
       return t(a.type === 'seismic_destroyed' ? 'ui.operations.incident_seismic_destroyed' : 'ui.operations.incident_seismic_damage', { building });
     }
     case 'vehicle_damage':
