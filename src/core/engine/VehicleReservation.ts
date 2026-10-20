@@ -655,7 +655,7 @@ export function resolveReservationHolder(
   return holder && holder.alive ? holder : undefined;
 }
 
-/** One active action reconcileVehicleReservations found needing interruption — its reserved vehicle vanished before the holder started their work timer. The caller (ArrivalGate.ts) performs the actual interruptActiveAction call, since that lives in TaskDispatch.ts and this module cannot import it without a cycle. */
+/** One action reconcileVehicleReservations found needing interruption — its reserved vehicle vanished before the holder started their work timer. `actionId` may name the holder's active action or a queued-ahead one (#2017). The caller (ArrivalGate.ts) performs the actual interruptActiveAction call, since that lives in TaskDispatch.ts and this module cannot import it without a cycle. */
 export interface VehicleGoneInterruption {
   employee: Employee;
   actionId: number;
