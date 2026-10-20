@@ -27,6 +27,17 @@
 //            f. `permit apply` once `permit status` shows every target met
 //               (nextGradeTargets in src/core/economy/MineGrade.ts)
 //            Calibration tasks extend this list; keep each rule one short block.
+//
+//   ladder   The full-ladder player (#1945). The reinvest opening, then every interval:
+//            a. contracts, and `permit apply` the moment shouldApplyPermit allows it
+//            b. a limit-sized blast for the current grade (limitSizedShot), at the widest hole the
+//               best drill rig bores (pickDiameter); while a depth target is open it deepens the
+//               crater, insetting the footprint by a berm once the pit is taller than the stability limit
+//            c. Research Center, tier-2 Freight Warehouse, second hauler (as reinvest)
+//            d. tier-2/3 equipment (nextBuy over LADDER_EQUIPMENT) once the dealer's grade gate and
+//               mayBuyVehicleTier allow; a gentle ramp is dug first when the existing one is too steep
+//            e. a rock_fragmenter as soon as boulders lie on the ground
+//   stay_g1  ladder that never applies for a permit past grade 1.
 //            A buy rule that cannot act (unaffordable, cooling down, failed) falls through to the
 //            next. Deposits are ranked on ground-truth ore, not a survey.
 
@@ -38,9 +49,22 @@ import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { nextGradeTargets } from '../../src/core/economy/MineGrade.js';
+import { getExplosivesFreeCapacity } from '../../src/core/entities/BuildingWarehouse.js';
 import { getBuildingDef, getUpgradeCost } from '../../src/core/entities/Building.js';
-import { getVehicleDefByTier } from '../../src/core/entities/Vehicle.js';
-import { HIRING_COSTS } from '../../src/core/config/balance.js';
+import { getAllVehicleRoles, getVehicleDefByTier } from '../../src/core/entities/Vehicle.js';
+import {
+  DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS, VEHICLE_TIER_MAX_SLOPE_DEGREES,
+  WALL_BERM_MIN_WIDTH_M, WALL_SAFE_FACE_HEIGHT_M_BY_TIER,
+} from '../../src/core/config/balance.js';
+import { gradeDef } from '../../src/core/economy/MineGrade.js';
+import { fleetBestRigLimit } from '../../src/core/mining/RigLimits.js';
+import { explosiveHoleLimits, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
+import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
+import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
+import {
+  limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
+  type BuyRule, type LadderShot, type PermitLimit,
+} from './probe-ladder.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
@@ -88,6 +112,8 @@ const BUILDING_SCAN_EDGE = 8;
 const RAMP_END_GAP = 1;
 const RAMP_MAX_LENGTH = 34;
 const RAMP_MAX_SLOPE = 0.45;
+/** Tiles kept free between a fresh shot and an earlier one, so a berm stands between their craters. */
+const BERM_GAP = WALL_BERM_MIN_WIDTH_M;
 
 /** Internal unwind signal: the run ended for `reason`; 'horizon' is the normal end. */
 class ProbeStop extends Error {
@@ -121,19 +147,19 @@ interface Pattern { x: number; z: number }
  * no ore anywhere ranks by flattest footprint instead. Ground truth stands in
  * for the survey a player would read; the probe does not model surveying.
  */
-function rankDeposits(grid: VoxelGrid): Array<Pattern & { ore: number; spread: number }> {
+function rankDeposits(grid: VoxelGrid, span = SHOT_SPAN, depth: number = SHOT.depth): Array<Pattern & { ore: number; spread: number }> {
   const out: Array<Pattern & { ore: number; spread: number }> = [];
   const lo = BUILDING_SCAN_EDGE;
-  for (let x = lo; x <= grid.sizeX - lo - SHOT_SPAN; x += DEPOSIT_SCAN_STEP) {
-    for (let z = lo; z <= grid.sizeZ - lo - SHOT_SPAN; z += DEPOSIT_SCAN_STEP) {
+  for (let x = lo; x <= grid.sizeX - lo - span; x += DEPOSIT_SCAN_STEP) {
+    for (let z = lo; z <= grid.sizeZ - lo - span; z += DEPOSIT_SCAN_STEP) {
       let ore = 0, low = Infinity, high = -Infinity;
-      for (let dx = 0; dx <= SHOT_SPAN; dx++) {
-        for (let dz = 0; dz <= SHOT_SPAN; dz++) {
+      for (let dx = 0; dx <= span; dx++) {
+        for (let dz = 0; dz <= span; dz++) {
           const top = computeVoxelColumnSurfaceY(grid, x + dx, z + dz);
           if (top === null) continue;
           low = Math.min(low, top);
           high = Math.max(high, top);
-          for (let d = 0; d < SHOT.depth; d++) {
+          for (let d = 0; d < depth; d++) {
             const ores = grid.oresAt(x + dx, top - d, z + dz);
             if (ores) for (const v of Object.values(ores)) ore += v;
           }
@@ -191,8 +217,24 @@ function placeBuilding(s: ProbeSession, type: string, near: Pattern, avoid: Patt
 
 interface Shot {
   at: Pattern;
+  /** Footprint side in tiles, first hole to last. */
+  span: number;
   startedTick: number;
 }
+
+/** One shot's pattern, charge and (optionally) hole diameter; `SHOT` is the opening's. */
+interface ShotSpec {
+  rows: number;
+  cols: number;
+  spacing: number;
+  depth: number;
+  explosive: string;
+  kg: number;
+  stemming: number;
+  diameterM?: number;
+}
+
+const spanOf = (spec: Pick<ShotSpec, 'cols' | 'spacing'>): number => (spec.cols - 1) * spec.spacing;
 
 /**
  * Order the drill pattern on the best deposit `drill_plan` accepts, stock the explosive warehouse
@@ -200,21 +242,30 @@ interface Shot {
  * which the opening crew cannot afford on payroll; the stock is paid for, not granted. Holes drilled
  * after the charge order are charged automatically. Null when no deposit or no stock is available.
  */
-function overlapsShot(c: Pattern, o: Pattern): boolean {
-  return Math.abs(c.x - o.x) <= SHOT_SPAN && Math.abs(c.z - o.z) <= SHOT_SPAN;
+/** Footprints (each `span` wide, default SHOT_SPAN) share a tile, with `gap` tiles of berm kept between. */
+function overlapsShot(c: Pattern & { span?: number }, o: Pattern & { span?: number }, gap = 0): boolean {
+  return c.x <= o.x + (o.span ?? SHOT_SPAN) + gap && o.x <= c.x + (c.span ?? SHOT_SPAN) + gap
+    && c.z <= o.z + (o.span ?? SHOT_SPAN) + gap && o.z <= c.z + (c.span ?? SHOT_SPAN) + gap;
 }
 
-function orderShot(s: ProbeSession, earlier: readonly Pattern[] = []): Shot | null {
-  const ranked = rankDeposits(s.grid)
-    .filter(c => !earlier.some(o => overlapsShot(c, o)))
-    .slice(0, DEPOSIT_CANDIDATES_TRIED);
-  for (const c of ranked) {
-    const cmd = `drill_plan grid rows:${SHOT.rows} cols:${SHOT.cols} spacing:${SHOT.spacing} depth:${SHOT.depth} start:${c.x},${c.z}`;
+/** Order `spec` at `at`, or on the best free deposit when `at` is not given. */
+function orderShot(s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = SHOT, at?: Pattern): Shot | null {
+  const span = spanOf(spec);
+  const candidates = at
+    ? [at]
+    : rankDeposits(s.grid, span, spec.depth)
+      .filter(c => !earlier.some(o => overlapsShot({ ...c, span }, o, earlier.length > 0 ? BERM_GAP : 0)))
+      .slice(0, DEPOSIT_CANDIDATES_TRIED);
+  // The stock buy takes whole kg; round up so the pattern's charge is covered.
+  const totalKg = Math.ceil(spec.rows * spec.cols * spec.kg);
+  const diameter = spec.diameterM === undefined ? '' : ` diameter:${spec.diameterM}`;
+  for (const c of candidates) {
+    const cmd = `drill_plan grid rows:${spec.rows} cols:${spec.cols} spacing:${spec.spacing} depth:${spec.depth} start:${c.x},${c.z}${diameter}`;
     if (!s.run(cmd).success) continue;
-    if (!stockWarehouse(s.run, s.state, SHOT.explosive, SHOT_EXPLOSIVE_KG).success) return null;
-    const charge = `charge hole:* explosive:${SHOT.explosive} amount:${SHOT.kg} stemming:${SHOT.stemming}`;
+    if (!stockWarehouse(s.run, s.state, spec.explosive, totalKg).success) return null;
+    const charge = `charge hole:* explosive:${spec.explosive} amount:${spec.kg} stemming:${spec.stemming}`;
     if (!s.run(charge).success) return null;
-    return { at: { x: c.x, z: c.z }, startedTick: s.state.tickCount };
+    return { at: { x: c.x, z: c.z }, span, startedTick: s.state.tickCount };
   }
   return null;
 }
@@ -234,33 +285,37 @@ function fireShot(s: ProbeSession): boolean {
 
 // ── Ramp ──
 
-/** Order a ramp from the open ground into the crater the shot at `at` made; true when one was accepted. */
-function orderRamp(s: ProbeSession, at: Pattern): boolean {
+/**
+ * Order a ramp from the open ground into the crater the shot at `at` (`span` wide) made, no steeper than
+ * `maxSlope` rise per tile; the ramp's slope ratio when one was accepted, else null.
+ */
+function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = RAMP_MAX_SLOPE): number | null {
   const { grid } = s;
-  const mid = SHOT_SPAN / 2;
+  const mid = span / 2;
   const centre = { x: at.x + mid, z: at.z + mid };
   const floor = getSmoothTerrainSurfaceY(grid, centre.x, centre.z);
   const lanes = [
     { dx: -1, dz: 0, end: { x: at.x - RAMP_END_GAP, z: centre.z } },
-    { dx: 1, dz: 0, end: { x: at.x + SHOT_SPAN + RAMP_END_GAP, z: centre.z } },
+    { dx: 1, dz: 0, end: { x: at.x + span + RAMP_END_GAP, z: centre.z } },
     { dx: 0, dz: -1, end: { x: centre.x, z: at.z - RAMP_END_GAP } },
-    { dx: 0, dz: 1, end: { x: centre.x, z: at.z + SHOT_SPAN + RAMP_END_GAP } },
+    { dx: 0, dz: 1, end: { x: centre.x, z: at.z + span + RAMP_END_GAP } },
   ];
   for (let length = 8; length <= RAMP_MAX_LENGTH; length++) {
     for (const lane of lanes) {
       const start = { x: lane.end.x - lane.dx * length, z: lane.end.z - lane.dz * length };
       if (start.x < 1 || start.z < 1 || start.x >= grid.sizeX - 1 || start.z >= grid.sizeZ - 1) continue;
       const depth = Math.round(getSmoothTerrainSurfaceY(grid, start.x, start.z) - floor);
-      if (depth < 1 || depth / length > RAMP_MAX_SLOPE) continue;
-      if (s.run(`build_ramp start:${start.x},${start.z} end:${lane.end.x},${lane.end.z} depth:${depth}`).success) return true;
+      if (depth < 1 || depth / length > maxSlope) continue;
+      if (s.run(`build_ramp start:${start.x},${start.z} end:${lane.end.x},${lane.end.z} depth:${depth}`).success) return depth / length;
     }
   }
-  return false;
+  return null;
 }
 
 // ── Opening ──
 
-function runOpening(s: ProbeSession): Pattern {
+/** The opening's shot site and the slope ratio of the ramp it dug. */
+function runOpening(s: ProbeSession): { at: Pattern; rampSlope: number } {
   const fail = (step: string): never => { throw new ProbeStop(`opening_failed:${step}`); };
 
   const ranked = rankDeposits(s.grid)[0];
@@ -272,10 +327,11 @@ function runOpening(s: ProbeSession): Pattern {
   s.waitFor('shot', () => shotReady(s.state));
   if (!fireShot(s)) fail('blast');
   s.tick(); // the blast resolves on the next command
-  if (!orderRamp(s, shot.at)) fail('ramp');
+  const rampSlope = orderRamp(s, shot.at);
+  if (rampSlope === null) return fail('ramp');
   s.waitFor('ramp', () => !s.state.pendingActions.some(a => a.type === 'dig_ramp_segment'));
   playContracts(s.run, s.state);
-  return shot.at;
+  return { at: shot.at, rampSlope };
 }
 
 /** Idle play: tick to the horizon, passing the contract board every interval. */
@@ -294,7 +350,7 @@ function playOut(s: ProbeSession, onInterval?: () => void): never {
 interface ReinvestMemory {
   shot: Shot | null;
   /** Origins of every shot fired so far; later footprints keep SHOT_SPAN clear of them. */
-  origins: Pattern[];
+  origins: Array<Pattern & { span?: number }>;
   /** Haulable ore (kg) measured after the last blast resolved; the reload gate's yardstick. */
   lastYieldKg: number;
   /**
@@ -339,7 +395,15 @@ function gradeNeedsBlast(s: ProbeSession): boolean {
   return nextGradeTargets(s.state).some(t => t.kind === 'blasts' && !t.met);
 }
 
-function reinvestShot(s: ProbeSession, m: ReinvestMemory): void {
+/** What a policy fires next: the cash one shot needs and how to order it (null when it could not). */
+interface ShotPlan {
+  /** Fire even when the grade needs no blast and ground ore is plentiful (a policy's own reason to blast). */
+  wanted?: boolean;
+  cost: number;
+  order: () => Shot | null;
+}
+
+function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan): void {
   if (m.yieldPending) { // the blast resolved on the first command after it fired
     m.lastYieldKg = haulableOreOnGroundKg(s.state);
     m.yieldPending = false;
@@ -348,15 +412,15 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory): void {
   if (!shot) {
     const idle = s.state.plannedDrillHoles.length === 0 && Object.keys(s.state.plannedChargesByHole).length === 0
       && s.state.drillHoles.length === 0;
-    const shotCost = SHOT_EXPLOSIVE_KG + RE_FIRE_CASH_CUSHION;
-    if (idle && spendable(s) >= shotCost && (gradeNeedsBlast(s) || shouldReload(haulableOreOnGroundKg(s.state), m.lastYieldKg))) {
-      m.shot = orderShotOnce(s, m);
+    const next = plan?.() ?? { cost: SHOT_EXPLOSIVE_KG + RE_FIRE_CASH_CUSHION, order: () => orderShotOnce(s, m) };
+    if (idle && spendable(s) >= next.cost && (next.wanted === true || gradeNeedsBlast(s) || shouldReload(haulableOreOnGroundKg(s.state), m.lastYieldKg))) {
+      m.shot = next.order();
     }
     return;
   }
   if (shotReady(s.state)) {
     if (fireShot(s)) {
-      m.origins.push(shot.at);
+      m.origins.push({ ...shot.at, span: shot.span });
       m.yieldPending = true;
     }
     m.shot = null;
@@ -400,7 +464,7 @@ function reinvestPermit(s: ProbeSession): void {
 }
 
 function runReinvest(s: ProbeSession): void {
-  const first = runOpening(s);
+  const first = runOpening(s).at;
   const m: ReinvestMemory = {
     shot: null, origins: [first], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {},
@@ -412,12 +476,185 @@ function runReinvest(s: ProbeSession): void {
   });
 }
 
+
+// ── Ladder ──
+
+/** Cash the ladder keeps back from every purchase and permit fee: payroll and upkeep keep running. */
+const LADDER_CASH_RESERVE = 5_000;
+/** Deepest hole the ladder drills (m), kept under the softest rock's safe face height (#1941). */
+const LADDER_HOLE_DEPTH_M = 10;
+/** Shrink factors tried when a limit-sized pattern fits no free site, widest first. */
+const LADDER_SHRINK_STEPS = [1, 0.75, 0.5, 0.25] as const;
+const LADDER_RAMP_RETRY_KEY = 'gentle_ramp';
+const SOFTEST_SAFE_FACE_M = WALL_SAFE_FACE_HEIGHT_M_BY_TIER[1]!;
+const slopeRatioOf = (tier: VehicleTier): number => Math.tan(VEHICLE_TIER_MAX_SLOPE_DEGREES[tier] * Math.PI / 180);
+
+/** Tier 2 and 3 of every vehicle role, cheapest first within a tier: what the dealer sells above tier 1. */
+const LADDER_EQUIPMENT: readonly (BuyRule & { role: VehicleRole; tier: VehicleTier })[] = ([2, 3] as const).flatMap(
+  tier => getAllVehicleRoles().map(role => ({
+    id: `${role}:${tier}`, role, tier,
+    cost: getVehicleDefByTier(role, tier).purchaseCost + HIRING_COSTS.driver,
+  })),
+);
+
+interface LadderMemory extends ReinvestMemory {
+  /** Footprint of the last fired shot; the next bench and the gentle ramp work from it. */
+  crater: Pattern & { span: number };
+  /** Slope ratio of the best ramp dug so far. */
+  rampSlope: number;
+  /** A gentle ramp ordered but not yet finished, and its slope ratio. */
+  rampPending: number | null;
+  /** Never apply for a permit past this grade (stay_g1); null for no cap. */
+  maxGrade: number | null;
+}
+
+const gradeOf = (s: ProbeSession): number => s.state.grade?.grade ?? 0;
+
+function depthTargetOpen(s: ProbeSession): boolean {
+  return nextGradeTargets(s.state).some(t => t.kind === 'depth_m' && !t.met);
+}
+
+/**
+ * The shot to fire next for the current grade: limit-sized, at the widest hole the best rig bores.
+ * Deepens the crater while a depth target is open, leaving a berm inside the crater rim once the pit
+ * stands taller than the stability limit; else takes a fresh site. Cut to what the explosive warehouse
+ * has room for and, if no site takes it, shrunk step by step.
+ */
+function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
+  const { state } = s;
+  const vehicles = state.vehicles.vehicles;
+  const depth = Math.min(fleetBestRigLimit(DRILL_RIG_MAX_DEPTH_M, vehicles), LADDER_HOLE_DEPTH_M);
+  const rigDiameterM = fleetBestRigLimit(DRILL_RIG_MAX_DIAMETER_M, vehicles);
+  const base: LadderShot = {
+    rows: 3, cols: 3, spacing: SHOT.spacing, depth, kgPerHole: SHOT.kg, stemming: SHOT.stemming, diameterM: pickDiameter(rigDiameterM),
+  };
+  const limit: PermitLimit = PERMIT_LIMITS[Math.min(gradeOf(s), 5)]!;
+  const sized = limitSizedShot(limit, base, rigDiameterM);
+  const explosive = getExplosive(SHOT.explosive)!;
+  const kg = Math.floor(Math.min(
+    sized.kgPerHole, explosiveHoleLimits(explosive, sized.diameterM).maxKg,
+    maxFittingChargeKg(depth, sized.stemming, sized.diameterM),
+  ) * 10) / 10;
+
+  const deepen = depthTargetOpen(s);
+  const inset = deepen && shouldBench(state.grade?.deepestPitM ?? 0, SOFTEST_SAFE_FACE_M) ? BERM_GAP : 0;
+  const crater = m.crater;
+  const siteSide = Math.floor((Math.min(s.grid.sizeX, s.grid.sizeZ) - 2 * BUILDING_SCAN_EDGE - 1) / sized.spacing) + 1;
+  const craterSide = Math.floor((crater.span - 2 * inset) / sized.spacing) + 1;
+  const wanted = Math.max(1, Math.min(sized.rows, deepen ? craterSide : siteSide));
+  const free = getExplosivesFreeCapacity(state.buildings);
+  const side = Math.max(0, Math.min(wanted, Math.floor(Math.sqrt(free / (kg + 0.1)))));
+  const specFor = (n: number): ShotSpec => ({
+    rows: n, cols: n, spacing: sized.spacing, depth, explosive: SHOT.explosive, kg, stemming: sized.stemming, diameterM: sized.diameterM,
+  });
+  const hauling = state.pendingActions.some(a => a.type === 'haul_debris');
+  return {
+    // Blast again while a depth target is open, or when the crew has nothing left to haul (idle crew, no income).
+    wanted: deepen || !hauling,
+    cost: side === 0 ? Infinity : side * side * kg * explosive.costPerKg + RE_FIRE_CASH_CUSHION,
+    order: () => {
+      let ordered: Shot | null = null;
+      tryOnce(s, m, 'shot', () => {
+        for (const step of LADDER_SHRINK_STEPS) {
+          const n = Math.max(1, Math.round(side * step));
+          const at = deepen ? { x: crater.x + inset, z: crater.z + inset } : undefined;
+          ordered = orderShot(s, m.origins, specFor(n), at);
+          if (ordered !== null) return true;
+        }
+        return false;
+      });
+      return ordered;
+    },
+  };
+}
+
+/** Research (once) and order the next tier of the first `type` building. */
+function upgradeBuilding(s: ProbeSession, m: ReinvestMemory, type: string): boolean {
+  const b = s.state.buildings.buildings.find(x => x.type === type);
+  if (!b || b.tier >= 3 || s.state.plannedBuildings.some(p => p.buildingId === b.id)) return false;
+  if (!s.state.buildings.buildings.some(x => x.type === 'research_center')) return false;
+  const tier = b.tier + 1;
+  if (!s.run(`research queue type:${type} tier:${tier}`).success && tier > 2) return false;
+  return tryOnce(s, m, `upgrade_${type}`, () => s.run(`build upgrade ${b.id}`).success);
+}
+
+/** Tier-2/3 vehicles the dealer's grade gate and the ramp's slope allow, bought in catalog order. */
+function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
+  const grade = gradeOf(s);
+  if (m.rampPending !== null && !s.state.pendingActions.some(a => a.type === 'dig_ramp_segment')) {
+    m.rampSlope = Math.min(m.rampSlope, m.rampPending);
+    m.rampPending = null;
+  }
+  const reachable = ([3, 2] as const).find(t => mayBuyVehicleTier(t, grade, 0));
+  if (reachable !== undefined && m.rampSlope > slopeRatioOf(reachable) && m.rampPending === null) {
+    tryOnce(s, m, LADDER_RAMP_RETRY_KEY, () => {
+      const slope = orderRamp(s, m.crater, m.crater.span, slopeRatioOf(reachable));
+      if (slope !== null) m.rampPending = slope;
+      return slope !== null;
+    });
+  }
+  const owned = new Set<string>();
+  for (const v of s.state.vehicles.vehicles) for (let t = 2; t <= v.tier; t++) owned.add(`${v.type}:${t}`);
+  const buyable = LADDER_EQUIPMENT.filter(r => mayBuyVehicleTier(r.tier, grade, m.rampSlope));
+  const rule = nextBuy(s.state.cash, LADDER_CASH_RESERVE, buyable, owned);
+  const pick = LADDER_EQUIPMENT.find(r => r.id === rule?.id);
+  if (!pick) return;
+  tryOnce(s, m, `buy_${pick.id}`, () => {
+    if (!s.run(`vehicle buy ${pick.role} tier:${pick.tier}`).success) return false;
+    s.run('employee hire role:driver');
+    return true;
+  });
+}
+
+/** A fragmenter as soon as boulders lie on the ground and none is owned. */
+function ladderFragmenter(s: ProbeSession, m: ReinvestMemory): void {
+  const { state } = s;
+  if (state.vehicles.vehicles.some(v => v.type === 'rock_fragmenter')) return;
+  if (!state.logistics.fragments.some(f => f.state === 'on_ground' && isOversized(f.fragment.volume))) return;
+  const cost = getVehicleDefByTier('rock_fragmenter', 1).purchaseCost + HIRING_COSTS.driver;
+  if (state.cash - LADDER_CASH_RESERVE < cost) return;
+  tryOnce(s, m, 'fragmenter', () => {
+    if (!s.run('vehicle buy rock_fragmenter').success) return false;
+    s.run('employee hire role:driver');
+    return true;
+  });
+}
+
+function ladderPermit(s: ProbeSession, m: LadderMemory): void {
+  const g = s.state.grade;
+  if (!g || (m.maxGrade !== null && g.grade >= m.maxGrade)) return;
+  const targets = nextGradeTargets(s.state);
+  const fee = gradeDef(g.grade + 1).fee;
+  if (shouldApplyPermit(targets.length > 0 && targets.every(t => t.met), g.pending !== null, s.state.cash, fee, LADDER_CASH_RESERVE)) {
+    s.run('permit apply');
+  }
+}
+
+function runLadder(s: ProbeSession, maxGrade: number | null): void {
+  const opened = runOpening(s);
+  const m: LadderMemory = {
+    shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
+    researchOrdered: false, retryAt: {},
+    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.rampSlope, rampPending: null, maxGrade,
+  };
+  playOut(s, () => {
+    ladderPermit(s, m);
+    reinvestShot(s, m, () => ladderPlan(s, m));
+    const last = m.origins[m.origins.length - 1]!;
+    if (last.x !== m.crater.x || last.z !== m.crater.z) m.crater = { x: last.x, z: last.z, span: last.span ?? SHOT_SPAN };
+    reinvestBuy(s, m);
+    ladderFragmenter(s, m);
+    ladderEquipment(s, m);
+    const need = ladderPlan(s, m);
+    if (!Number.isFinite(need.cost)) upgradeBuilding(s, m, 'explosive_warehouse');
+  });
+}
+
 const STRATEGIES: Record<StrategyId, StrategyFn> = {
   opening: (s) => { runOpening(s); playOut(s); },
   reinvest: runReinvest,
-  // TODO(#1945): ladder and stay_g1 delegate to reinvest until their tests dictate behaviour.
-  ladder: runReinvest,
-  stay_g1: runReinvest,
+  ladder: (s) => runLadder(s, null),
+  stay_g1: (s) => runLadder(s, 1),
 };
 
 // ── Run loop ──

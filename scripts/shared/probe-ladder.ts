@@ -1,6 +1,12 @@
 // BlastSimulator2026 — Progression probe: pure helpers for the ladder strategy and grade-window verdicts (#1945)
 
 import type { VehicleTier } from '../../src/core/entities/Vehicle.js';
+import {
+  DRILL_HOLE_DIAMETER_OPTIONS_M,
+  DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M,
+  VEHICLE_TIER_MAX_SLOPE_DEGREES,
+  VEHICLE_TIER_UNLOCK_GRADE,
+} from '../../src/core/config/balance.js';
 
 export interface PermitLimit { maxChargeKg: number; maxHoles: number }
 
@@ -31,51 +37,61 @@ export const GRADE_TARGET_WINDOWS: Readonly<Record<number, readonly [number, num
   5: [30000, 45000],
 };
 
+/** Per-hole charge is kept to this resolution (kg) so the console command parses it back exactly. */
+const KG_RESOLUTION = 10;
+/** Smallest per-hole charge (kg) a shot is sized for; a limit too small for it shrinks the grid. */
+const MIN_KG_PER_HOLE = 1;
+
 /** Largest square grid and per-hole charge within `limit`, never exceeding either. */
-export function limitSizedShot(_limit: PermitLimit, base: LadderShot, _maxDiameterM: number): LadderShot {
-  // TODO: implement
-  return base;
+export function limitSizedShot(limit: PermitLimit, base: LadderShot, maxDiameterM: number): LadderShot {
+  const holes = Math.max(1, Math.min(limit.maxHoles, Math.floor(limit.maxChargeKg / MIN_KG_PER_HOLE)));
+  const side = Math.max(1, Math.floor(Math.sqrt(holes)));
+  const perHole = Math.floor((limit.maxChargeKg / (side * side)) * KG_RESOLUTION) / KG_RESOLUTION;
+  return { ...base, rows: side, cols: side, kgPerHole: perHole, diameterM: pickDiameter(maxDiameterM) };
 }
 
 /** Widest hole diameter not above the rig cap; the smallest option if none fits. */
-export function pickDiameter(_rigMaxDiameterM: number): number {
-  // TODO: implement
-  return 0;
+export function pickDiameter(rigMaxDiameterM: number): number {
+  const options = [...DRILL_HOLE_DIAMETER_OPTIONS_M].sort((a, b) => a - b);
+  const fitting = options.filter(o => o <= rigMaxDiameterM + DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M);
+  return fitting.length > 0 ? fitting[fitting.length - 1]! : options[0]!;
 }
 
 /** Tier unlocked by grade, and for tier 2/3 a ramp at or under the slope limit exists. */
-export function mayBuyVehicleTier(_tier: VehicleTier, _mineGrade: number, _rampSlopeRatio: number | null): boolean {
-  // TODO: implement
-  return false;
+export function mayBuyVehicleTier(tier: VehicleTier, mineGrade: number, rampSlopeRatio: number | null): boolean {
+  if (mineGrade < VEHICLE_TIER_UNLOCK_GRADE[tier]) return false;
+  if (tier === 1) return true;
+  return rampSlopeRatio !== null && rampSlopeRatio <= Math.tan(VEHICLE_TIER_MAX_SLOPE_DEGREES[tier] * Math.PI / 180);
 }
 
 /** First affordable catalog entry not owned, keeping `reserve` cash back; null if none. */
 export function nextBuy(
-  _cash: number, _reserve: number, _catalog: readonly BuyRule[], _owned: ReadonlySet<string>,
+  cash: number, reserve: number, catalog: readonly BuyRule[], owned: ReadonlySet<string>,
 ): BuyRule | null {
-  // TODO: implement
-  return null;
+  return catalog.find(r => !owned.has(r.id) && r.cost <= cash - reserve) ?? null;
 }
 
 /** True when the pit wall is taller than the stability limit. */
-export function shouldBench(_wallHeightM: number, _stabilityLimitM: number): boolean {
-  // TODO: implement
-  return false;
+export function shouldBench(wallHeightM: number, stabilityLimitM: number): boolean {
+  return wallHeightM > stabilityLimitM;
 }
 
 /** True when the grade targets are met, no application is pending and the fee fits above the reserve. */
 export function shouldApplyPermit(
-  _targetsMet: boolean, _pending: boolean, _cash: number, _fee: number, _reserve: number,
+  targetsMet: boolean, pending: boolean, cash: number, fee: number, reserve: number,
 ): boolean {
-  // TODO: implement
-  return false;
+  return targetsMet && !pending && cash >= fee + reserve;
 }
 
 /** One verdict per window; a grade absent from `reached` is 'missed' with a null tick. */
 export function gradeVerdicts(
-  _reached: Readonly<Record<number, number>>,
-  _windows: Readonly<Record<number, readonly [number, number]>>,
+  reached: Readonly<Record<number, number>>,
+  windows: Readonly<Record<number, readonly [number, number]>>,
 ): GradeVerdict[] {
-  // TODO: implement
-  return [];
+  return Object.keys(windows).map(Number).sort((a, b) => a - b).map((grade): GradeVerdict => {
+    const window = windows[grade]!;
+    const tick = reached[grade] ?? null;
+    if (tick === null) return { grade, tick, window, status: 'missed' };
+    return { grade, tick, window, status: tick < window[0] ? 'early' : tick > window[1] ? 'late' : 'in' };
+  });
 }

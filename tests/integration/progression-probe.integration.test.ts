@@ -27,6 +27,8 @@ function expectFiniteOrAllowedNull(r: RunResult, horizon: number): void {
         (m !== null && Number(m[1]) > horizon) ||
         path === 'firstBlastSoldShareAt6000' ||
         path === 'boulderSoldShare' ||
+        path === 'boulderOreSoldShare' ||
+        path === 'catalogBoughtTick' ||
         path === 'bankruptTick' ||
         path === 'warehouseFullTick' ||
         path.startsWith('affordableTick.');
