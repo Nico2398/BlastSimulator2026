@@ -2540,6 +2540,12 @@ export const HOLE_DRAIN_POROSITY_LIMIT = 0.15;
 /** Ticks between re-issued evacuation orders while a detonation is armed (#1362). */
 export const DETONATION_REEVACUATE_INTERVAL_TICKS = 10;
 
+/**
+ * Consecutive failed move ticks after which an in-zone evacuating employee counts as stranded (#1990).
+ * moveConsecutiveFailures was observed cycling 10-20 across re-orders, so the count is read directly.
+ */
+export const DETONATION_STUCK_WALKER_FAILURE_TICKS = 10;
+
 /** Base ticks to repair one hp of a damaged vehicle (before proficiency scaling). */
 export const REPAIR_BASE_TICKS_PER_HP = 0.5;
 

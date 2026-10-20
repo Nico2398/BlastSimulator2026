@@ -3,6 +3,7 @@
 // re-ordered out on an interval, and the caller fires once the zone is clear.
 
 import type { GameState } from '../state/GameState.js';
+import type { Employee } from '../entities/Employee.js';
 import { computeDangerZone, defineZone, isDangerZoneClear, isInZone } from '../entities/Zone.js';
 import { evacuateZone } from './Evacuation.js';
 import { isActive } from '../events/ActiveModifiers.js';
@@ -32,6 +33,13 @@ function orderEvacuation(state: GameState): { employees: number[]; vehicles: num
   defineZone(state.zone, zone);
   const result = evacuateZone(state, state.zone.activeZone!);
   return { employees: result.strandedEmployeeIds, vehicles: result.strandedVehicleIds };
+}
+
+/** True when an evacuating employee cannot walk out of the zone (stuck flag or repeated move failures). */
+export function isStuckWalker(emp: Pick<Employee, 'isMoveStuck' | 'moveConsecutiveFailures'>): boolean {
+  void emp;
+  // TODO: implement
+  return false;
 }
 
 /** True when any drilled hole has a charge loaded or still loading. */
