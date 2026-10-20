@@ -77,6 +77,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   rubbleDisposalOffered: { type: 'boolean', description: 'At least one rubble_disposal offer is present in the pool — the condition to wait on before opening the Contracts panel for its Accept button, since the pool re-rolls its contents every refresh' },
   supplyOffered: { type: 'boolean', description: 'A supply (bulk) offer is present in the pool at any material and quantity (#1895) — the condition to wait on before opening the Contracts panel for its Accept button, since the pool re-rolls its contents every refresh' },
   blastBanned: { type: 'boolean', description: 'An event blasting ban is in force (blast_ban modifier) — the condition to wait on to be false before a blast, which is refused while it holds' },
+  wallSlumpCount: { type: 'number', description: 'Wall slumps so far on this run: faces taller than their rock holds that fell into the pit (progression sites)' },
   blingiteSaleOffered: { type: 'boolean', description: 'An ore_sale offer for blingite is present in the pool at any quantity (#1586) — the wait before accepting a sale the tutorial pit cannot fill yet' },
   fillableSaleOffered: { type: 'boolean', description: 'The pool holds an ore_sale or rubble_disposal offer the site can fill in full right now (ore against collected ore, rubble against barren stock) — the free-play condition to wait on before clicking Accept' },
   deathCount: { type: 'number', description: 'Employees killed so far (state.damage.deathCount)' },

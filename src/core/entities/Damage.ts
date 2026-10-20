@@ -52,10 +52,12 @@ export interface DamageState {
   deathCount: number;
   /** Total number of blasts detonated in this session. */
   blastCount: number;
+  /** Wall slumps so far on this run (#1941). */
+  wallSlumpCount: number;
 }
 
 export function createDamageState(): DamageState {
-  return { accidents: [], lawsuitPending: false, deathCount: 0, blastCount: 0 };
+  return { accidents: [], lawsuitPending: false, deathCount: 0, blastCount: 0, wallSlumpCount: 0 };
 }
 
 // ── Processing ──

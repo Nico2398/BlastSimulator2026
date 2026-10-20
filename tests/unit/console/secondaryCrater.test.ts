@@ -24,7 +24,8 @@ vi.mock('../../../src/core/entities/Building.js', () => ({
 vi.mock('../../../src/core/scores/ScoreManager.js', () => ({
   recordBuildingDestruction: (...args: unknown[]) => recordBuildingDestruction(...args),
 }));
-vi.mock('../../../src/console/commands/buildingHelpers.js', () => ({
+vi.mock('../../../src/console/commands/buildingHelpers.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/console/commands/buildingHelpers.js')>()),
   emitFootprintOccupancyChanged: (...args: unknown[]) => emitFootprintOccupancyChanged(...args),
 }));
 vi.mock('../../../src/console/commands/mining/shared.js', () => ({

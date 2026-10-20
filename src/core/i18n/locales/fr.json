@@ -3942,6 +3942,7 @@
   "mining.blast.no_breakout": "Le tir n'a pas débouché : la roche est restée scellée dans le sol.",
   "mining.blast.rating_cap_no_breakout": "Note plafonnée (le tir n'a pas débouché) : note de base {base}",
   "mining.blast.rating_cap_oversize": "Note plafonnée (blocs hors gabarit) : note de base {base}",
+  "mining.blast.wall_slump": "Éboulement de paroi en ({x}, {z}) : {volume} m³ de paroi sont tombés au fond de la fosse.",
   "mining.blast.secondary_blast": "Explosion secondaire : {kg} kg d'explosifs stockés ont détoné dans l'entrepôt #{id} et creusé un cratère ({voxels} voxels). Victimes : {casualties}.",
   "mining.blast.cancelled_drill_orders": "Ordres de forage annulés par le tir : {count} trou(s) n'étaient pas encore forés.",
   "mining.blast.max_village_vibration": "Vibration maximale au village : {value} mm/s",
@@ -4514,6 +4515,8 @@
   "economy.contract.market_line": "  {ore} : {pct} % saturé | prix {trend} % par rapport à la base ({from} -> {to}/kg)",
   "economy.contract.market_none": "Aucun marché de minerai à surveiller sur ce site.",
   "notification.market.glut": "Les analystes vous reprochent la surabondance de {ore}.",
+  "notification.wall_slump.body": "Éboulement de paroi en ({x}, {z}). L'expert en géologie vous avait prévenu.",
+  "notification.wall_slump.title": "Éboulement",
   "notification.title.market": "Marché",
   "permit.ack.success": "Lettre d'approbation classée sous « Encadrées ».",
   "permit.ack.nothing": "Aucune lettre d'approbation en attente. Le Ministère n'a rien à ajouter."
