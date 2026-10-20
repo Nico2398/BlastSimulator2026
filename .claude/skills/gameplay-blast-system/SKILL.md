@@ -369,3 +369,13 @@ A charge order records `fromStockKg` (the part drawn from warehouse stock at ord
 ## BURIED HOLES (#1937)
 
 Progression sites only (`isProgressionSite`; other sites are unchanged). A planned drill hole (`state.plannedDrillHoles`) is **buried** while any `on_ground` fragment covers its cell. A fragment covers cells from `position - halfExtents` to `position + halfExtents`, rounded with `Math.round` (the nav grid's convention), inclusive in x and z; a fragment without `halfExtents` covers one cell. `in_transit` and `stored` fragments never bury. `src/core/mining/BuriedHoles.ts` indexes covered cells once per tick (`buildBuriedCellIndex`, cache keyed on state, tick and fragment count) and answers per hole in O(1) (`buriedHolesOf`, `isHoleBuried`, `fragmentBuriesPlannedHole`). A buried hole's `drill_hole` order stays pending (not claimable, `isHoleOrderClaimable`) with `blockedReason` `buried_under_rubble`, cleared once the rubble is hauled away; a drill already in progress continues. A `haul_debris` of a fragment burying a planned hole gets `BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS` (64, `balance.ts`) off its sort key like the ore demand bonus (ranking only; set to 0 to reverse). The console `drill_plan show` tags such holes "buried"; the Blast Workshop Drill step shows "N planned (M buried)" and a warning "Buried" chip on their rows.
+
+## Pre-Flight building reach (#2030)
+
+`buildingsInBlastReach` (`BlastPlan.ts`) warns of buildings the planned holes may hit (#2021 rows). Its default margin is charge-derived, not the hole spacing:
+
+- `holeBlastReachM(charge, depth) = BLAST_REACH_M_PER_SQRT_ENERGY * sqrt(computeInitialEnergy(charge, depth))` (`balance.ts`, 0.045 m per sqrt energy unit). Stemming efficiency and explosive energy are inside `computeInitialEnergy`; an undefined charge, unknown explosive or 0 kg gives 0.
+- Margin = max reach over all holes (simplification: one margin for the whole pattern, not per hole); an uncharged hole contributes 0. An explicit `marginM` overrides.
+- The margin grows the holes' bounding box (`computeDangerZone`); a footprint cell at distance D from the box edge is flagged when D <= reach (whole cell, inclusive edge).
+- Reference (3x3 grid, 4 m spacing, 8 m deep, 2.4 m stemming): Krackle 8 kg ~2.55 m, Shatternite 11 kg ~3.95 m, Dynatomics 11 kg ~5.38 m.
+- Flying rock (#1968) is not modelled; the reach covers breakage only.

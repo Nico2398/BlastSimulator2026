@@ -3,7 +3,8 @@
 
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
-import { DRILL_GRID_DEFAULT_SPACING_M } from '../config/balance.js';
+import { computeInitialEnergy } from './BlastCalc.js';
+import { DRILL_GRID_DEFAULT_SPACING_M, BLAST_REACH_M_PER_SQRT_ENERGY } from '../config/balance.js';
 import { computeDangerZone } from '../entities/Zone.js';
 import { getBuildingDef, isBuildingFootprintCell, warehouseStockKg, type Building, type BuildingType, type FootprintOccupant } from '../entities/Building.js';
 
@@ -143,25 +144,25 @@ export function holePatternSpacing(holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z
  * Metres a hole's charge reaches for the pre-flight building warning (#2030):
  * BLAST_REACH_M_PER_SQRT_ENERGY * sqrt(initial energy). Stub.
  */
-export function holeBlastReachM(_charge: HoleCharge | undefined, _holeDepth: number): number {
-  // TODO: implement
-  return 0;
+export function holeBlastReachM(charge: HoleCharge | undefined, holeDepth: number): number {
+  if (!charge) return 0;
+  return BLAST_REACH_M_PER_SQRT_ENERGY * Math.sqrt(computeInitialEnergy(charge, holeDepth));
 }
 
 /**
  * Buildings within reach of the planned holes (#2021), shown as pre-flight warnings.
  *
  * Tier-0 prediction rule: a building is at risk when any footprint cell lies inside the
- * holes' bounding box grown by `marginM` (default: the hole-pattern spacing). Holes are
+ * holes' bounding box grown by `marginM` (default: the largest charge reach over the holes, uncharged = 0). Holes are
  * floored to their grid cell first. The rule is deliberately conservative: it can flag a
  * building in the margin that would survive the blast, but never misses one inside the
  * box. `marginM` is the lever for tuning how far past the pattern the warning reaches.
  */
 export function buildingsInBlastReach(
   holes: ReadonlyArray<Pick<DrillHole, 'id' | 'x' | 'z' | 'depth'>>,
-  _charges: Readonly<Record<string, HoleCharge>>,
+  charges: Readonly<Record<string, HoleCharge>>,
   buildings: ReadonlyArray<Pick<Building, 'id' | 'type' | 'tier' | 'x' | 'z' | 'storedExplosives'>>,
-  marginM: number = holePatternSpacing(holes),
+  marginM: number = Math.max(0, ...holes.map(h => holeBlastReachM(charges[h.id], h.depth))),
 ): BuildingAtRisk[] {
   if (buildings.length === 0) return [];
   const reach = computeDangerZone(holes.map(h => ({ x: Math.floor(h.x), z: Math.floor(h.z) })), marginM);
