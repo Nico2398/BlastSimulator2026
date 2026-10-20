@@ -3180,6 +3180,11 @@ export const EVENT_BALANCE_REFERENCE_PERMIT_FEE = 20000;
 /** Ore grade scale lever (#1932): default and upper bound. */
 export const ORE_GRADE_SCALE_DEFAULT = 1;
 export const ORE_GRADE_SCALE_MAX = 1;
+/**
+ * Sandbox's ore grade scale (#1944): thins ore so a standard shot yields far
+ * less than ~2000 t. Must lie in (0, ORE_GRADE_SCALE_MAX]. Placeholder value.
+ */
+export const SANDBOX_ORE_GRADE_SCALE = ORE_GRADE_SCALE_DEFAULT;
 
 /**
  * Ore grade rises with depth below the natural surface (#1933). Each band

@@ -71,7 +71,7 @@ const PLACEMENT_RETRY_TICKS = 200;
 /** Cash above the reserve a re-fire keeps for drilling and charging, on top of the explosive. */
 const RE_FIRE_CASH_CUSHION = 5_000;
 
-const SHOT = { rows: 3, cols: 3, spacing: 4, depth: 8, explosive: 'krackle', kg: 8, stemming: 2.5 } as const;
+export const SHOT = { rows: 3, cols: 3, spacing: 4, depth: 8, explosive: 'krackle', kg: 8, stemming: 2.5 } as const;
 /** Footprint side of the shot in tiles, first hole to last. */
 const SHOT_SPAN = (SHOT.cols - 1) * SHOT.spacing;
 /** Explosive one shot consumes, in kg. */
