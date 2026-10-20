@@ -574,7 +574,7 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
   it('no barren trip starts while a reachable ore haul with warehouse room is open, and barren stays a small share of the tonnage', () => {
     const { runner, ctx } = createRunner();
     const run: Run = (c) => runner.run(c);
-    expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42')).toMatchObject({ success: true });
+    expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42 ore_grade:1')).toMatchObject({ success: true });
     run('time resume');
     const state = ctx.state!;
     const commands: string[] = [];

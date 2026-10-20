@@ -15,13 +15,13 @@ function plan(holes: number, kgPerHole: number) {
 
 describe('permitPreview', () => {
   it('returns null when the mine has no grade (non-progression site)', () => {
-    expect(permitPreview(undefined, plan(3, 10), 0)).toBeNull();
+    expect(permitPreview(undefined, plan(3, 5), 0)).toBeNull();
   });
 
   it('within limit: shows used / limit kg and holes at grade 0 and is not over', () => {
-    const p = permitPreview(createGradeState(), plan(9, 8), 0)!;
+    const p = permitPreview(createGradeState(), plan(9, 4), 0)!;
     expect(p.over).toBe(false);
-    expect(p.kgText).toContain('72 / 80 kg');
+    expect(p.kgText).toContain('36 / 40 kg');
     expect(p.holesText).toContain('9 / 9 holes');
   });
 
@@ -32,9 +32,9 @@ describe('permitPreview', () => {
   });
 
   it('over by kg only', () => {
-    const p = permitPreview(createGradeState(), plan(9, 10), 0)!;
+    const p = permitPreview(createGradeState(), plan(9, 5), 0)!;
     expect(p.over).toBe(true);
-    expect(p.kgText).toContain('90 / 80 kg');
+    expect(p.kgText).toContain('45 / 40 kg');
     expect(p.holesText).toContain('9 / 9 holes');
     expect(p.warningText.length).toBeGreaterThan(0);
   });
@@ -43,13 +43,13 @@ describe('permitPreview', () => {
     const p = permitPreview(createGradeState(), plan(10, 1), 0)!;
     expect(p.over).toBe(true);
     expect(p.holesText).toContain('10 / 9 holes');
-    expect(p.kgText).toContain('10 / 80 kg');
+    expect(p.kgText).toContain('10 / 40 kg');
   });
 
   it('over by both', () => {
-    const p = permitPreview(createGradeState(), plan(12, 10), 0)!;
+    const p = permitPreview(createGradeState(), plan(12, 5), 0)!;
     expect(p.over).toBe(true);
-    expect(p.kgText).toContain('120 / 80 kg');
+    expect(p.kgText).toContain('60 / 40 kg');
     expect(p.holesText).toContain('12 / 9 holes');
   });
 
@@ -83,7 +83,7 @@ describe('permitPreview', () => {
   });
 
   it('never exposes the overshoot or an inspection chance', () => {
-    const p = permitPreview(createGradeState(), plan(12, 10), 0)!;
+    const p = permitPreview(createGradeState(), plan(12, 5), 0)!;
     const json = JSON.stringify(p).toLowerCase();
     expect(Object.keys(p)).not.toContain('overshoot');
     expect(Object.keys(p).join(' ').toLowerCase()).not.toContain('chance');

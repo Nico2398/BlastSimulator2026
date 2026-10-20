@@ -17,6 +17,7 @@ import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 const SEED = 42;
+// Hauled tonnage is the subject, so the site keeps its full ore grade (ore_grade:1); the sandbox default 0.08 (#1944) thins the ore this test counts.
 // Ore on the desert seed 42 site sits in discrete deposits (#1682); (30,-4) is
 // barren, so a shot there can never feed storage or the ore tally. This one
 // opens the deposit centred near (40,33).
@@ -50,7 +51,7 @@ const oreKg = (state: GameState): number =>
 function openingKitHaul(side: 'west' | 'east') {
   const { runner, ctx } = createRunner();
   const run = (c: string) => runner.run(c);
-  expect(run(`sandbox start biome:desert_badlands difficulty:normal seed:${SEED}`)).toMatchObject({ success: true });
+  expect(run(`sandbox start biome:desert_badlands difficulty:normal seed:${SEED} ore_grade:1`)).toMatchObject({ success: true });
   const state = ctx.state!;
   state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
   refresh(state);

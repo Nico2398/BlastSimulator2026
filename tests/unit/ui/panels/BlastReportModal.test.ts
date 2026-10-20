@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { BlastReportModal } from '../../../../src/ui/panels/BlastReportModal.js';
 import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../../../src/core/config/balance.js';
 import type { BlastPlaybackSnapshot } from '../../../../src/core/mining/BlastPlayback.js';
@@ -763,16 +764,148 @@ describe('BlastReportModal', () => {
       expect(modal.root.textContent).toContain('A worker was injured by flying rock');
     });
 
-    it('does not render a note-card for a building accident — destroyedBuildings has its own dedicated card, and OperationsPanel covers the full incident history', () => {
+    it('renders a destroyed-building card for a flying-rock building_destroyed accident (#2029)', () => {
       const { modal, setPlayback } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport({
-        accidents: [makeAccident({ type: 'building_destroyed', entityId: 3, entityLabel: 'living_quarters' })],
+        accidents: [makeAccident({ type: 'building_destroyed', entityId: 3, entityLabel: 'living_quarters', fragmentId: 7 })],
       });
 
       openReport(modal, state, setPlayback);
 
-      expect(modal.root.textContent).not.toContain('Living Quarters was destroyed');
+      expect(modal.root.textContent).toContain('Living Quarters #3 was destroyed by flying rock.');
+    });
+
+    it('shows a plain destroyed card for a secondary-blast crater building_destroyed accident (fragmentId -1) (#2029)', () => {
+      const { modal, setPlayback } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({
+        accidents: [makeAccident({ type: 'building_destroyed', entityId: 3, entityLabel: 'living_quarters', fragmentId: -1 })],
+      });
+
+      openReport(modal, state, setPlayback);
+
+      expect(modal.root.textContent).toContain('Living Quarters #3 was destroyed');
+      expect(modal.root.textContent).not.toContain('by flying rock');
+    });
+
+    it('shows 3 destroyed cards for 1 destroyedBuildings entry plus 2 building_destroyed accidents (#2029)', () => {
+      const { modal, setPlayback } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({
+        destroyedBuildings: [{ buildingId: 3, type: 'freight_warehouse', x: 5, z: 5 }],
+        accidents: [
+          makeAccident({ type: 'building_destroyed', entityId: 4, entityLabel: 'living_quarters', fragmentId: 7 }),
+          makeAccident({ type: 'building_destroyed', entityId: 5, entityLabel: 'living_quarters', fragmentId: 8 }),
+        ],
+      });
+
+      openReport(modal, state, setPlayback);
+
+      const text = modal.root.textContent ?? '';
+      expect(text).toContain('Freight Warehouse #3');
+      expect(text).toContain('Living Quarters #4 was destroyed by flying rock.');
+      expect(text).toContain('Living Quarters #5 was destroyed by flying rock.');
+      expect(text.match(/was destroyed/g)?.length).toBe(3);
+    });
+
+    it('dedupes a building in both lists to one card with the cleared-rock text (#2029)', () => {
+      const { modal, setPlayback } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({
+        destroyedBuildings: [{ buildingId: 3, type: 'living_quarters', x: 5, z: 5 }],
+        accidents: [makeAccident({ type: 'building_destroyed', entityId: 3, entityLabel: 'living_quarters', fragmentId: 7 })],
+      });
+
+      openReport(modal, state, setPlayback);
+
+      const text = modal.root.textContent ?? '';
+      expect(text.match(/Living Quarters #3/g)?.length).toBe(1);
+      expect(text).not.toContain('by flying rock');
+    });
+
+    it('dedupes repeated building_destroyed accidents for the same building id (#2029)', () => {
+      const { modal, setPlayback } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({
+        accidents: [
+          makeAccident({ type: 'building_destroyed', entityId: 3, entityLabel: 'living_quarters', fragmentId: 7 }),
+          makeAccident({ type: 'building_destroyed', entityId: 3, entityLabel: 'living_quarters', fragmentId: 9 }),
+        ],
+      });
+
+      openReport(modal, state, setPlayback);
+
+      expect((modal.root.textContent ?? '').match(/Living Quarters #3/g)?.length).toBe(1);
+    });
+
+    it('renders no card for a building_damage accident (#2029)', () => {
+      const { modal, setPlayback } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({
+        accidents: [makeAccident({ type: 'building_damage', entityId: 3, entityLabel: 'living_quarters' })],
+      });
+
+      openReport(modal, state, setPlayback);
+
+      expect(modal.root.textContent).not.toContain('Living Quarters');
+      expect(modal.root.textContent).not.toContain('was destroyed');
+    });
+
+    it('keeps the secondary-blast card text and also gives a destroyed warehouse its own card (#2029)', () => {
+      const { modal, setPlayback } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({
+        destroyedBuildings: [{ buildingId: 3, type: 'freight_warehouse', x: 5, z: 5 }],
+        secondaryBlasts: [{
+          buildingId: 3, x: 5, z: 5, explosivesKg: 100, radiusM: 4, casualties: 0,
+          destroyedIds: [3], craterVoxels: 12, craterFragments: 5,
+        }],
+      });
+
+      openReport(modal, state, setPlayback);
+
+      expect(modal.root.textContent).toContain('Secondary blast: 100 kg of stored explosives detonated in warehouse #3');
+      expect(modal.root.textContent).toContain('Freight Warehouse #3 was destroyed');
+    });
+
+    it('falls back to the unknown-building name when entityLabel is unset (#2029)', () => {
+      const { modal, setPlayback } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({
+        accidents: [makeAccident({ type: 'building_destroyed', entityId: 8, fragmentId: 7 })],
+      });
+
+      openReport(modal, state, setPlayback);
+
+      expect(modal.root.textContent).toContain(`${t('ui.operations.incident_unknown_building')} #8 was destroyed by flying rock.`);
+    });
+
+    it('does not throw when accidents is undefined or holds an id-less building_destroyed entry (#2029)', () => {
+      const { modal, setPlayback } = makeModal();
+      const state = makeState();
+      const bad = makeAccident({ type: 'building_destroyed', fragmentId: 7 });
+      delete (bad as Partial<AccidentRecord>).entityId;
+      state.lastBlastReport = makeReport({ accidents: [bad] });
+
+      expect(() => openReport(modal, state, setPlayback)).not.toThrow();
+
+      const { modal: modal2, setPlayback: sp2 } = makeModal();
+      const state2 = makeState();
+      const report2 = makeReport();
+      delete (report2 as Partial<BlastReport>).accidents;
+      state2.lastBlastReport = report2;
+      expect(() => openReport(modal2, state2, sp2)).not.toThrow();
+      expect(modal2.root.textContent).not.toContain('was destroyed');
+    });
+
+    it('has the flying-rock destroyed key in en and fr with distinct text (#2029)', () => {
+      const key = 'ui.blast_workshop.report.building_destroyed_flying_rock';
+      const dir = 'src/core/i18n/locales';
+      const en = JSON.parse(readFileSync(`${dir}/en.json`, 'utf8')) as Record<string, string>;
+      const fr = JSON.parse(readFileSync(`${dir}/fr.json`, 'utf8')) as Record<string, string>;
+      expect(en[key]).toBe('{type} #{id} was destroyed by flying rock.');
+      expect(fr[key]).toBe('{type} #{id} a été détruit par des projections de roche.');
     });
 
     it('renders one note-card per accident when several land on the same blast', () => {

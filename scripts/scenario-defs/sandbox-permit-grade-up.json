@@ -3,12 +3,12 @@
   "description": "Mine grades (#1921): a sandbox site starts at grade 0, refuses an application before its targets are met, then after 5 t of ore delivered and 2 blasts fired, `permit apply` books the $20,000 fee and 48 ticks later the site is a Hobby Quarry (grade 1). The state dump's `mineGrade` field carries the grade.",
   "steps": [
     {
-      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 ore_grade:1",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 ore_grade:1"
         }
       ],
       "description": "Progression site: the sandbox opens with a permit ladder at grade 0.",
