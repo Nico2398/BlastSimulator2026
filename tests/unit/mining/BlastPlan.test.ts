@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { validateBlastPlan, assembleBlastPlan, coveredByFootprint, holePatternSpacing, buildingsInBlastReach, checkProtectedPositions } from '../../../src/core/mining/BlastPlan.js';
+import { validateBlastPlan, assembleBlastPlan, coveredByFootprint, holePatternSpacing, buildingsInBlastReach, holeBlastReachM, checkProtectedPositions } from '../../../src/core/mining/BlastPlan.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { getBuildingDef } from '../../../src/core/entities/Building.js';
-import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
+import { batchCharge, type HoleCharge } from '../../../src/core/mining/ChargePlan.js';
+import { computeInitialEnergy } from '../../../src/core/mining/BlastCalc.js';
+import { BLAST_REACH_M_PER_SQRT_ENERGY } from '../../../src/core/config/balance.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -140,15 +142,24 @@ describe('validateBlastPlan delivery wait (#1966)', () => {
 
 // ── #2021: pre-flight warning for buildings inside the blast's reach ─────────
 
-type TestBuilding = Parameters<typeof buildingsInBlastReach>[1][number];
+type TestBuilding = Parameters<typeof buildingsInBlastReach>[2][number];
 
 function bld(id: number, type: TestBuilding['type'], x: number, z: number, storedExplosives?: Record<string, number>): TestBuilding {
   return { id, type, tier: 1, x, z, ...(storedExplosives ? { storedExplosives } : {}) };
 }
 
-function gridHoles(x0: number, z0: number, n: number, spacing: number): Array<{ id: string; x: number; z: number }> {
-  const out: Array<{ id: string; x: number; z: number }> = [];
-  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) out.push({ id: `h${out.length + 1}`, x: x0 + i * spacing, z: z0 + j * spacing });
+function gridHoles(x0: number, z0: number, n: number, spacing: number): Array<{ id: string; x: number; z: number; depth: number }> {
+  const out: Array<{ id: string; x: number; z: number; depth: number }> = [];
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) out.push({ id: `h${out.length + 1}`, x: x0 + i * spacing, z: z0 + j * spacing, depth: 8 });
+  return out;
+}
+
+/** Stemming of 30% of an 8 m hole: full stemming efficiency, so energy = energyPerKg * kg. */
+const FULL_STEMMING_M = 2.4;
+
+function chargeAll(holes: ReadonlyArray<{ id: string }>, explosiveId: string, amountKg: number, stemmingM = FULL_STEMMING_M): Record<string, HoleCharge> {
+  const out: Record<string, HoleCharge> = {};
+  for (const h of holes) out[h.id] = { explosiveId, amountKg, stemmingM };
   return out;
 }
 
@@ -191,6 +202,8 @@ describe('holePatternSpacing (#2021)', () => {
 
 describe('buildingsInBlastReach (#2021)', () => {
   const holes = gridHoles(12, 44, 3, 4); // x 12/16/20, z 44/48/52
+  const strong = chargeAll(holes, 'dynatomics', 11); // reach ~5.4 m
+  const none: Record<string, HoleCharge> = {};
 
   it('reports the issue layout: office, freight and explosive warehouse, not the quarters', () => {
     const buildings = [
@@ -199,30 +212,30 @@ describe('buildingsInBlastReach (#2021)', () => {
       bld(3, 'management_office', 14, 48),
       bld(4, 'freight_warehouse', 14, 40),
     ];
-    const result = buildingsInBlastReach(holes, buildings);
+    const result = buildingsInBlastReach(holes, strong, buildings);
     expect(result.map(r => r.type)).toEqual(['explosive_warehouse', 'management_office', 'freight_warehouse']);
     expect(result.map(r => r.buildingId)).toEqual([2, 3, 4]);
     expect(result.some(r => r.type === 'living_quarters')).toBe(false);
   });
 
   it('carries id, type, position and stockKg', () => {
-    const result = buildingsInBlastReach(holes, [bld(5, 'management_office', 14, 48)]);
+    const result = buildingsInBlastReach(holes, strong, [bld(5, 'management_office', 14, 48)]);
     expect(result).toEqual([{ buildingId: 5, type: 'management_office', x: 14, z: 48, stockKg: 0 }]);
   });
 
   it('reports the stocked explosive warehouse stock summed over explosives', () => {
-    const result = buildingsInBlastReach(holes, [bld(2, 'explosive_warehouse', 22, 48, { krackle: 200, boomite: 28 })]);
+    const result = buildingsInBlastReach(holes, strong, [bld(2, 'explosive_warehouse', 22, 48, { krackle: 200, boomite: 28 })]);
     expect(result[0]!.stockKg).toBe(228);
   });
 
   it('reports 0 stock for an empty explosive warehouse', () => {
-    const result = buildingsInBlastReach(holes, [bld(2, 'explosive_warehouse', 22, 48)]);
+    const result = buildingsInBlastReach(holes, strong, [bld(2, 'explosive_warehouse', 22, 48)]);
     expect(result).toHaveLength(1);
     expect(result[0]!.stockKg).toBe(0);
   });
 
   it('orders results by buildingId regardless of input order', () => {
-    const result = buildingsInBlastReach(holes, [
+    const result = buildingsInBlastReach(holes, strong, [
       bld(9, 'freight_warehouse', 14, 40),
       bld(3, 'management_office', 14, 48),
       bld(6, 'explosive_warehouse', 22, 48),
@@ -231,11 +244,11 @@ describe('buildingsInBlastReach (#2021)', () => {
   });
 
   it('returns none for an empty site', () => {
-    expect(buildingsInBlastReach(holes, [])).toEqual([]);
+    expect(buildingsInBlastReach(holes, strong, [])).toEqual([]);
   });
 
   it('returns none when there are no holes', () => {
-    expect(buildingsInBlastReach([], [bld(1, 'management_office', 14, 48)])).toEqual([]);
+    expect(buildingsInBlastReach([], {}, [bld(1, 'management_office', 14, 48)])).toEqual([]);
   });
 
   it('includes a cell exactly at maxX + margin and excludes the next cell out', () => {
@@ -244,25 +257,25 @@ describe('buildingsInBlastReach (#2021)', () => {
     const minDz = Math.min(...fp.map(f => f[1]));
     const zIn = 48 - minDz;
     // bbox x 12..20 grown by explicit margin 4 -> 24 inclusive
-    const edgeIn = buildingsInBlastReach(holes, [bld(1, 'freight_warehouse', 24 - minDx, zIn)], 4);
-    const edgeOut = buildingsInBlastReach(holes, [bld(1, 'freight_warehouse', 25 - minDx, zIn)], 4);
+    const edgeIn = buildingsInBlastReach(holes, none, [bld(1, 'freight_warehouse', 24 - minDx, zIn)], 4);
+    const edgeOut = buildingsInBlastReach(holes, none, [bld(1, 'freight_warehouse', 25 - minDx, zIn)], 4);
     expect(edgeIn).toHaveLength(1);
     expect(edgeOut).toEqual([]);
   });
 
-  it('defaults the margin to the hole pattern spacing', () => {
-    const fp = getBuildingDef('freight_warehouse', 1).footprint;
-    const minDx = Math.min(...fp.map(f => f[0]));
-    const minDz = Math.min(...fp.map(f => f[1]));
-    const zIn = 48 - minDz;
-    expect(buildingsInBlastReach(holes, [bld(1, 'freight_warehouse', 24 - minDx, zIn)])).toHaveLength(1);
-    expect(buildingsInBlastReach(holes, [bld(1, 'freight_warehouse', 25 - minDx, zIn)])).toEqual([]);
+  it('an explicit margin overrides the charge-derived reach, in both directions', () => {
+    const office = bld(1, 'management_office', 24, 48); // nearest cell 4 m from the bbox edge
+    expect(buildingsInBlastReach(holes, strong, [office])).toHaveLength(1);
+    expect(buildingsInBlastReach(holes, strong, [office], 3)).toEqual([]);
+    const weak = chargeAll(holes, 'krackle', 8);
+    expect(buildingsInBlastReach(holes, weak, [office])).toEqual([]);
+    expect(buildingsInBlastReach(holes, weak, [office], 4)).toHaveLength(1);
   });
 
   it('a wider explicit margin reaches the quarters 10 m away', () => {
     const quarters = bld(1, 'living_quarters', 30, 48);
-    expect(buildingsInBlastReach(holes, [quarters])).toEqual([]);
-    expect(buildingsInBlastReach(holes, [quarters], 12).map(r => r.type)).toEqual(['living_quarters']);
+    expect(buildingsInBlastReach(holes, strong, [quarters])).toEqual([]);
+    expect(buildingsInBlastReach(holes, strong, [quarters], 12).map(r => r.type)).toEqual(['living_quarters']);
   });
 
   it('counts a building whose footprint only partly enters the box', () => {
@@ -270,7 +283,7 @@ describe('buildingsInBlastReach (#2021)', () => {
     const maxDx = Math.max(...fp.map(f => f[0]));
     // anchor left of the box so only the far cells reach in (needs a multi-cell footprint)
     const x = 8 - maxDx;
-    const result = buildingsInBlastReach(holes, [bld(1, 'management_office', x, 48)], 4);
+    const result = buildingsInBlastReach(holes, none, [bld(1, 'management_office', x, 48)], 4);
     expect(result).toHaveLength(1);
   });
 
@@ -278,6 +291,143 @@ describe('buildingsInBlastReach (#2021)', () => {
     const office = bld(1, 'management_office', 12, 44);
     const occupants = [{ type: office.type, tier: office.tier, x: office.x, z: office.z }];
     expect(checkProtectedPositions(holes, occupants).length).toBeGreaterThan(0);
-    expect(buildingsInBlastReach(holes, [office]).map(r => r.buildingId)).toEqual([1]);
+    expect(buildingsInBlastReach(holes, none, [office]).map(r => r.buildingId)).toEqual([1]);
+  });
+});
+
+// ── #2030: the warning reach follows the charge ──────────────────────────────
+
+describe('holeBlastReachM (#2030)', () => {
+  const krackle = (kg: number): HoleCharge => ({ explosiveId: 'krackle', amountKg: kg, stemmingM: FULL_STEMMING_M });
+
+  it('equals the scale constant times sqrt of the initial energy', () => {
+    const c = krackle(8);
+    expect(holeBlastReachM(c, 8)).toBeCloseTo(BLAST_REACH_M_PER_SQRT_ENERGY * Math.sqrt(computeInitialEnergy(c, 8)), 9);
+    expect(holeBlastReachM(c, 8)).toBeGreaterThan(0);
+  });
+
+  it('grows with the kilograms loaded', () => {
+    const reaches = [2, 4, 8, 11].map(kg => holeBlastReachM(krackle(kg), 8));
+    for (let i = 1; i < reaches.length; i++) expect(reaches[i]!).toBeGreaterThan(reaches[i - 1]!);
+  });
+
+  it('grows with the explosive energy at equal kg', () => {
+    const ids = ['pop_rock', 'boomite', 'krackle', 'shatternite', 'dynatomics'];
+    const reaches = ids.map(id => holeBlastReachM({ explosiveId: id, amountKg: 8, stemmingM: FULL_STEMMING_M }, 8));
+    for (let i = 1; i < reaches.length; i++) expect(reaches[i]!).toBeGreaterThan(reaches[i - 1]!);
+  });
+
+  it('shrinks when stemming is poor, matching computeInitialEnergy', () => {
+    const tight = holeBlastReachM(krackle(8), 8);
+    const loose = holeBlastReachM({ ...krackle(8), stemmingM: 0.5 }, 8);
+    expect(loose).toBeLessThan(tight);
+    expect(loose).toBeCloseTo(BLAST_REACH_M_PER_SQRT_ENERGY * Math.sqrt(computeInitialEnergy({ ...krackle(8), stemmingM: 0.5 }, 8)), 9);
+  });
+
+  it('is 0 for an undefined charge', () => {
+    expect(holeBlastReachM(undefined, 8)).toBe(0);
+  });
+
+  it('is 0 for an unknown explosive', () => {
+    expect(holeBlastReachM({ explosiveId: 'no_such_explosive', amountKg: 8, stemmingM: 2 }, 8)).toBe(0);
+  });
+
+  it('is 0 for zero kg', () => {
+    expect(holeBlastReachM(krackle(0), 8)).toBe(0);
+  });
+});
+
+describe('buildingsInBlastReach follows the charge (#2030)', () => {
+  // holes x 36/40/44, z 32/36/40, 8 m deep; an office is 2x2 anchored at its min corner
+  const holes = gridHoles(36, 32, 3, 4);
+  const eastOffice = (d: number) => bld(1, 'management_office', 44 + d, 36);
+  const southOffice = (d: number) => bld(1, 'management_office', 40, 40 + d);
+  const flagged = (explosive: string, kg: number, office: TestBuilding) =>
+    buildingsInBlastReach(holes, chargeAll(holes, explosive, kg), [office]).length === 1;
+
+  it('Krackle 8 kg flags an office 1 m and 2 m east', () => {
+    expect(flagged('krackle', 8, eastOffice(1))).toBe(true);
+    expect(flagged('krackle', 8, eastOffice(2))).toBe(true);
+  });
+
+  it('Krackle 8 kg does not flag an office 3 m, 4 m or 5 m east', () => {
+    for (const d of [3, 4, 5]) expect(flagged('krackle', 8, eastOffice(d))).toBe(false);
+  });
+
+  it('Krackle 8 kg matches on the south side', () => {
+    expect(flagged('krackle', 8, southOffice(2))).toBe(true);
+    expect(flagged('krackle', 8, southOffice(3))).toBe(false);
+    expect(flagged('krackle', 8, southOffice(4))).toBe(false);
+  });
+
+  it('Shatternite 11 kg flags an office 3 m out but not 4 m or 5 m', () => {
+    expect(flagged('shatternite', 11, eastOffice(2))).toBe(true);
+    expect(flagged('shatternite', 11, eastOffice(3))).toBe(true);
+    expect(flagged('shatternite', 11, eastOffice(4))).toBe(false);
+    expect(flagged('shatternite', 11, eastOffice(5))).toBe(false);
+  });
+
+  it('Dynatomics 11 kg flags an office 2 to 5 m out but not 6 m', () => {
+    for (const d of [2, 3, 4, 5]) expect(flagged('dynatomics', 11, eastOffice(d))).toBe(true);
+    expect(flagged('dynatomics', 11, eastOffice(6))).toBe(false);
+  });
+
+  it('Dynatomics 11 kg flags an office 5 m south', () => {
+    expect(flagged('dynatomics', 11, southOffice(5))).toBe(true);
+  });
+
+  it('reach scales with the charge: the same office is flagged by a stronger charge only', () => {
+    const office = eastOffice(3);
+    expect(flagged('krackle', 8, office)).toBe(false);
+    expect(flagged('shatternite', 11, office)).toBe(true);
+  });
+
+  it('uncharged holes have zero reach: only buildings on the pattern box are flagged', () => {
+    expect(buildingsInBlastReach(holes, {}, [eastOffice(1)])).toEqual([]);
+    expect(buildingsInBlastReach(holes, {}, [bld(1, 'management_office', 40, 36)]).map(r => r.buildingId)).toEqual([1]);
+  });
+
+  it('the margin is the maximum over holes: one strong charged hole widens the whole box', () => {
+    const charges: Record<string, HoleCharge> = {
+      [holes[0]!.id]: { explosiveId: 'dynatomics', amountKg: 11, stemmingM: FULL_STEMMING_M },
+      [holes[1]!.id]: { explosiveId: 'krackle', amountKg: 2, stemmingM: FULL_STEMMING_M },
+    };
+    expect(buildingsInBlastReach(holes, charges, [eastOffice(5)])).toHaveLength(1);
+    expect(buildingsInBlastReach(holes, charges, [eastOffice(6)])).toEqual([]);
+  });
+
+  it('a weak charge on every hole does not shrink below the strong one', () => {
+    const charges = chargeAll(holes, 'krackle', 8);
+    charges[holes[8]!.id] = { explosiveId: 'dynatomics', amountKg: 11, stemmingM: FULL_STEMMING_M };
+    expect(buildingsInBlastReach(holes, charges, [eastOffice(5)])).toHaveLength(1);
+  });
+
+  it('flags nothing on an empty site', () => {
+    expect(buildingsInBlastReach(holes, chargeAll(holes, 'dynatomics', 11), [])).toEqual([]);
+  });
+
+  it('returns [] when there are no holes, whatever the charges', () => {
+    expect(buildingsInBlastReach([], chargeAll(holes, 'dynatomics', 11), [eastOffice(1)])).toEqual([]);
+  });
+
+  it('reproduces #2021: warehouse, office and freight warehouse flagged, quarters not, sorted, stock kept', () => {
+    const repro = gridHoles(12, 44, 3, 4);
+    const charges = chargeAll(repro, 'dynatomics', 11);
+    const result = buildingsInBlastReach(repro, charges, [
+      bld(4, 'freight_warehouse', 14, 40),
+      bld(1, 'living_quarters', 30, 48),
+      bld(3, 'management_office', 14, 48),
+      bld(2, 'explosive_warehouse', 22, 48, { krackle: 200, boomite: 28 }),
+    ]);
+    expect(result.map(r => r.buildingId)).toEqual([2, 3, 4]);
+    expect(result.map(r => r.type)).toEqual(['explosive_warehouse', 'management_office', 'freight_warehouse']);
+    expect(result[0]!.stockKg).toBe(228);
+    expect(result[1]!.stockKg).toBe(0);
+  });
+
+  it('an explicit marginM still overrides the charge-derived reach', () => {
+    const charges = chargeAll(holes, 'krackle', 8);
+    expect(buildingsInBlastReach(holes, charges, [eastOffice(5)], 5)).toHaveLength(1);
+    expect(buildingsInBlastReach(holes, chargeAll(holes, 'dynatomics', 11), [eastOffice(2)], 1)).toEqual([]);
   });
 });
