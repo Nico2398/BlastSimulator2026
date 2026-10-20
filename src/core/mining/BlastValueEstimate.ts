@@ -5,7 +5,7 @@
 // The grid supplies rock geometry only (what breaks), never ore content.
 
 import { oreValuePerKg, type MarketId } from '../economy/Market.js';
-import type { BlastPlan } from './BlastPlan.js';
+import { hasChargedHole, type BlastPlan } from './BlastPlan.js';
 import type { SurveyResult } from './SurveyCalc.js';
 import { freshSurveys, isColumnInSurveyDisc } from './SurveyStaleness.js';
 import { findSurveyForColumn, oresSurveyedAt } from './SurveyColumn.js';
@@ -77,7 +77,7 @@ export function estimateBlastOre(
   const holeCoverage = plan.holes.length === 0
     ? 0
     : plan.holes.filter(h => inDisc(h.x, h.z)).length / plan.holes.length;
-  const charged = plan.holes.some(h => plan.charges[h.id] !== undefined);
+  const charged = hasChargedHole(plan);
   const field = charged ? buildPlanEnergyField(plan, grid, wetHoleIds) : null;
   if (!field) return { ...NO_ORE_ESTIMATE, holeCoverage };
   const { fragmented } = identifyFragmentedVoxels(field, grid, false);

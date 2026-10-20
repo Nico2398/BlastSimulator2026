@@ -8,7 +8,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { computeVoxelColumnSurfaceY, SURFACE_BAND_HALF } from '../world/VoxelGrid.js';
 import { getSafeFaceHeightM } from '../world/RockCatalog.js';
 import type { BlastRegion } from './BlastExecution.js';
-import type { BlastPlan } from './BlastPlan.js';
+import { hasChargedHole, type BlastPlan } from './BlastPlan.js';
 import { buildPlanEnergyField } from './BlastExecution.js';
 import { identifyFragmentedVoxels } from './VoxelFragmentation.js';
 import {
@@ -69,6 +69,11 @@ export function gridSurface(grid: VoxelGrid): WallSurface {
   };
 }
 
+/** Top voxel row of a built grid's column, or null outside the grid. */
+function gridTopAt(grid: VoxelGrid, x: number, z: number): number | null {
+  return gridSurface(grid).topAt(x, z);
+}
+
 /** A face the preview predicts, with the rock that limits it and its height over safe height. */
 export interface PredictedFace {
   face: WallFace;
@@ -84,10 +89,6 @@ const DIRECTIONS: ReadonlyArray<{ dx: number; dz: number }> = [
 /** Tolerance so a ratio that is 0.8 on paper (9.6 / 12) is not lost to float rounding. */
 export const WALL_RATIO_EPSILON = 1e-9;
 const SOFTEST_SAFE_M = Math.min(...Object.values(WALL_SAFE_FACE_HEIGHT_M_BY_TIER));
-
-function topAt(grid: VoxelGrid, x: number, z: number): number | null {
-  return grid.containsColumn(x, z) ? computeVoxelColumnSurfaceY(grid, x, z) : null;
-}
 
 /** Safe height and rock id of the weakest rock among the wall voxels of columns `cols` (rows toeY+1..top). */
 function weakestRock(surface: WallSurface, cols: ReadonlyArray<{ x: number; z: number; top: number }>, toeY: number): { safeM: number; rockId: string } {
@@ -194,7 +195,7 @@ export function findFacesAtRisk(surface: WallSurface, region: BlastRegion, minRa
  * removed, over the region executeBlast reports as cleared — the same scan the slump pass runs.
  */
 export function predictWallFaces(plan: BlastPlan, grid: VoxelGrid, wetHoleIds?: ReadonlySet<string>): PredictedFace[] {
-  if (!plan.holes.some(h => plan.charges[h.id] !== undefined)) return [];
+  if (!hasChargedHole(plan)) return [];
   const field = buildPlanEnergyField(plan, grid, wetHoleIds);
   if (!field) return [];
   const { fragmented } = identifyFragmentedVoxels(field, grid, false);
@@ -230,7 +231,7 @@ interface Removed { compId: number; ores: Record<string, number> | undefined }
 
 /** Remove material above `cutY` from the column; returns the solid voxels taken, bottom-up. */
 function takeAbove(grid: VoxelGrid, x: number, z: number, cutY: number, taken: Removed[]): { minY: number; maxY: number } | null {
-  const top = topAt(grid, x, z);
+  const top = gridTopAt(grid, x, z);
   if (top === null || top <= cutY) return null;
   for (let y = cutY + 1; y <= top; y++) {
     taken.push({ compId: grid.palette.intern(grid.compositionAt(x, y, z)), ores: grid.oresAt(x, y, z) });
@@ -245,7 +246,7 @@ function pileColumns(grid: VoxelGrid, toe: { x: number; z: number }, toeY: numbe
   const out: Array<{ x: number; z: number; top: number; d: number }> = [];
   for (let x = toe.x - r; x <= toe.x + r; x++) {
     for (let z = toe.z - r; z <= toe.z + r; z++) {
-      const top = topAt(grid, x, z);
+      const top = gridTopAt(grid, x, z);
       const isToe = x === toe.x && z === toe.z;
       if (top === null || top < toeY || (isToe ? top >= toeY + WALL_SLUMP_PILE_MAX_HEIGHT_M : top !== toeY)) continue;
       out.push({ x, z, top, d: isToe ? -1 : Math.max(Math.abs(x - toe.x), Math.abs(z - toe.z)) });
@@ -281,7 +282,7 @@ export function applySlump(grid: VoxelGrid, face: WallFace): SlumpReport | null 
   for (let k = WALL_SLUMP_DEPTH_M - 1; k >= 1; k--) path.push({ x: face.crest.x - dx * k, z: face.crest.z - dz * k });
   for (let k = 0; k < WALL_SLOPE_WALK_MAX_M; k++) {
     const x = face.crest.x + dx * k, z = face.crest.z + dz * k;
-    const top = topAt(grid, x, z);
+    const top = gridTopAt(grid, x, z);
     if (top === null) break;
     if (k > 0 && top <= face.toeY) { toe = { x, z }; break; }
     path.push({ x, z });
@@ -300,7 +301,7 @@ export function applySlump(grid: VoxelGrid, face: WallFace): SlumpReport | null 
   let rest = taken;
   const candidates = pileColumns(grid, toe, face.toeY);
   if (candidates.length === 0 || candidates[0]!.d !== -1) {
-    candidates.unshift({ x: toe.x, z: toe.z, top: topAt(grid, toe.x, toe.z) ?? face.toeY, d: -1 });
+    candidates.unshift({ x: toe.x, z: toe.z, top: gridTopAt(grid, toe.x, toe.z) ?? face.toeY, d: -1 });
   }
   for (const col of candidates) {
     if (rest.length === 0) break;
@@ -312,7 +313,7 @@ export function applySlump(grid: VoxelGrid, face: WallFace): SlumpReport | null 
     touch(col.x, col.z, col.top, newTop + SURFACE_BAND_HALF);
   }
   if (rest.length > 0) { // no floor left: never lose volume, stack the remainder on the toe
-    const top = topAt(grid, toe.x, toe.z) ?? face.toeY;
+    const top = gridTopAt(grid, toe.x, toe.z) ?? face.toeY;
     const newTop = stack(grid, toe.x, toe.z, top, rest);
     touch(toe.x, toe.z, top, newTop + SURFACE_BAND_HALF);
   }

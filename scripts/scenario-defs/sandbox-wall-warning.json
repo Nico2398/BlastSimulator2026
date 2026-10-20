@@ -472,7 +472,7 @@
     {
       "command": "blast_preview",
       "role": "player",
-      "description": "Preview step lists the wall warning for the planned 13 m face in soft rock (safe 12 m): it will slump. The run-analysis control stays usable: the warning is not a gate.",
+      "description": "Preview step lists the wall warning for the planned 13 m face in soft rock (safe 12 m): it may slump. The run-analysis control stays usable: the warning is not a gate.",
       "interaction": [
         {
           "type": "ensurePanel",

@@ -13,6 +13,11 @@ export interface BlastPlan {
   charges: Record<string, HoleCharge>;
 }
 
+/** True when at least one hole of the plan carries a charge. */
+export function hasChargedHole(plan: BlastPlan): boolean {
+  return plan.holes.some(h => plan.charges[h.id] !== undefined);
+}
+
 export interface ValidationError {
   holeId: string;
   issue: string;

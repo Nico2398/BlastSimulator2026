@@ -4,7 +4,7 @@
 
 import { isProgressionSite, type GameState } from '../../core/state/GameState.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
-import type { BlastPlan } from '../../core/mining/BlastPlan.js';
+import { hasChargedHole, type BlastPlan } from '../../core/mining/BlastPlan.js';
 import { predictWallFaces, type PredictedFace } from '../../core/mining/WallStability.js';
 import { wetHoleIdsFor } from '../../core/mining/WetHoles.js';
 
@@ -15,7 +15,7 @@ export class WallWarningMemo {
 
   /** Predicted faces for `plan`; recomputed only when holes, charges, wet holes or terrain changed. */
   get(state: GameState, plan: BlastPlan, grid: VoxelGrid | null): PredictedFace[] {
-    if (!grid || !isProgressionSite(state) || !plan.holes.some(h => plan.charges[h.id] !== undefined)) return [];
+    if (!grid || !isProgressionSite(state) || !hasChargedHole(plan)) return [];
     const wet = wetHoleIdsFor(state);
     const key = JSON.stringify([plan.holes, plan.charges, [...wet].sort(), grid.editRevision]);
     if (grid === this.grid && key === this.key) return this.faces;

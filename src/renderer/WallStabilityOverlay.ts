@@ -5,16 +5,13 @@
 import type * as THREE from 'three';
 import { WALL_WARN_RATIO, WALL_OVERLAY_OPACITY, WALL_OVERLAY_MAX_FACE_CELLS } from '../core/config/balance.js';
 import { WALL_RATIO_EPSILON, type WallFace } from '../core/mining/WallStability.js';
-import { GroundTintLayer, type GroundTintPatch } from './GroundTint.js';
+import { GroundTintLayer, OVERLAY_Y_OFFSET, type GroundTintPatch } from './GroundTint.js';
 
-/** Tint of a face by its height against its safe height; null when it needs none. */
 type WallFaceTint = 'amber' | 'red';
 
 const TINT_COLOR: Record<WallFaceTint, number> = { amber: 0xffb000, red: 0xff2a1a };
 
-/** Epsilon above the sampled surface; GroundTintLayer scales it up on steep faces. */
-const OVERLAY_Y_OFFSET = 0.05;
-
+/** Tint of a face by its height against its safe height; null when it needs none. */
 export function wallFaceTint(heightM: number, safeM: number): WallFaceTint | null {
   const ratio = heightM / safeM;
   if (ratio >= 1 - WALL_RATIO_EPSILON) return 'red';
