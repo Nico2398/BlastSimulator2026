@@ -1,6 +1,6 @@
 {
   "name": "sandbox-wall-slump",
-  "description": "Wall stability (#1941): on a progression site a face taller than the rock's safe height slumps after a blast. Two 7 m benches blasted straight down (14 m wall in soft desert rock, safe height 12 m) slump and raise wallSlumpCount; the same depth with a 4 m berm left on the floor (second bench is one hole mid-crater) does not.",
+  "description": "Wall stability (#1941): on a progression site a face taller than the rock's safe height slumps after a blast. Two 5 wide ramp trenches make a 9 m wide, 7 m deep first bench (rows 24 to 32) in soft desert rock (safe height 12 m). Site B: a second bench blasted in the middle of that bench leaves a berm of at least 3 m on every side, so the 14 m drop is split into short faces and nothing slumps. Site A: a second bench blasted against the bench edge leaves no berm, a 13 m straight wall stands, and it slumps and raises wallSlumpCount.",
   "steps": [
     {
       "command": "sandbox start biome:desert_badlands kit:full seed:42",
@@ -104,183 +104,9 @@
       "role": "player"
     },
     {
-      "command": "drill_plan add x:36 z:31 depth:7 diameter:89",
+      "command": "build_ramp start:20,26 end:42,26 depth:7 width:5",
       "role": "player",
-      "description": "Bench 1 (site A): 7 m hole at 36,31.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "ensureStep",
-          "step": 1
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-inspector [data-panel-close]",
-          "timeoutMs": 0
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 7
-        },
-        {
-          "type": "focusTile",
-          "x": 36,
-          "z": 31
-        },
-        {
-          "type": "pickTile",
-          "x": 36,
-          "z": 31
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "orderedHoleCount"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
-      "role": "setup",
-      "description": "Holes drilled.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedHoleCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 300000
-        }
-      ],
-      "timeout": 330,
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 0
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2.5",
-      "role": "player",
-      "description": "Load the holes.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "ensureStep",
-          "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 2.5
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "orderedChargeCount"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
-      "role": "setup",
-      "description": "Charges loaded.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3400,
-          "timeoutMs": 300000
-        }
-      ],
-      "timeout": 330,
-      "expect": {
-        "equals": {
-          "orderedChargeCount": 0
-        }
-      }
-    },
-    {
-      "command": "blast detonate",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "ensureStep",
-          "step": 4
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        }
-      ],
-      "description": "Fire the bench.",
-      "timeout": 90,
-      "role": "player"
-    },
-    {
-      "command": "wait_until field:holeCount equals:0 max_ticks:600",
-      "role": "setup",
-      "description": "Blast resolved.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "holeCount",
-          "equals": 0,
-          "maxTicks": 600,
-          "timeoutMs": 300000
-        }
-      ],
-      "timeout": 330,
-      "expect": {
-        "equals": {
-          "holeCount": 0
-        }
-      }
-    },
-    {
-      "command": "build_ramp start:2,31 end:29,31 depth:7",
-      "role": "player",
-      "description": "Ramp into the first crater so haulers and the rig reach the floor.",
+      "description": "First bench: a 5 wide trench, 7 m deep at its lower end.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -288,8 +114,8 @@
           "timeoutMs": 0
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
+          "type": "ensurePanel",
+          "panel": "build"
         },
         {
           "type": "clickSelector",
@@ -305,18 +131,23 @@
           "value": 7
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"width\"]",
+          "value": 5
+        },
+        {
           "type": "focusTile",
-          "x": 15,
-          "z": 31,
+          "x": 31,
+          "z": 26,
           "distance": 30,
           "pitch": 75
         },
         {
           "type": "dragTiles",
-          "x1": 2,
-          "z1": 31,
-          "x2": 29,
-          "z2": 31
+          "x1": 20,
+          "z1": 26,
+          "x2": 42,
+          "z2": 26
         },
         {
           "type": "clickSelector",
@@ -335,7 +166,7 @@
     {
       "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:1500",
       "role": "setup",
-      "description": "Ramp dug.",
+      "description": "First trench dug.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -353,466 +184,9 @@
       }
     },
     {
-      "command": "drill_plan add x:36 z:31 depth:7 diameter:89",
+      "command": "build_ramp start:20,30 end:42,30 depth:7 width:5",
       "role": "player",
-      "description": "Bench 2 straight down, no berm: 7 m hole at 36,31.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "ensureStep",
-          "step": 1
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-inspector [data-panel-close]",
-          "timeoutMs": 0
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 7
-        },
-        {
-          "type": "focusTile",
-          "x": 36,
-          "z": 31
-        },
-        {
-          "type": "pickTile",
-          "x": 36,
-          "z": 31
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "orderedHoleCount"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:4000",
-      "role": "setup",
-      "description": "Haulers clear rubble; holes drilled.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedHoleCount",
-          "equals": 0,
-          "maxTicks": 4000,
-          "timeoutMs": 600000
-        }
-      ],
-      "timeout": 630,
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 0
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2.5",
-      "role": "player",
-      "description": "Load the second bench.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "ensureStep",
-          "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 2.5
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "orderedChargeCount"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
-      "role": "setup",
-      "description": "Charges loaded.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3400,
-          "timeoutMs": 300000
-        }
-      ],
-      "timeout": 330,
-      "expect": {
-        "equals": {
-          "orderedChargeCount": 0
-        }
-      }
-    },
-    {
-      "command": "blast detonate",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "ensureStep",
-          "step": 4
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        }
-      ],
-      "description": "Fire the second bench.",
-      "timeout": 90,
-      "role": "player",
-      "expect": {
-        "increased": [
-          "wallSlumpCount"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:holeCount equals:0 max_ticks:600",
-      "role": "setup",
-      "description": "Blast resolved.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "holeCount",
-          "equals": 0,
-          "maxTicks": 600,
-          "timeoutMs": 300000
-        }
-      ],
-      "timeout": 330,
-      "expect": {
-        "equals": {
-          "holeCount": 0
-        }
-      }
-    },
-    {
-      "command": "drill_plan add x:32 z:52 depth:7 diameter:89",
-      "role": "player",
-      "description": "Bench 1 (site B): 7 m hole at 32,52.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "ensureStep",
-          "step": 1
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-inspector [data-panel-close]",
-          "timeoutMs": 0
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 7
-        },
-        {
-          "type": "focusTile",
-          "x": 32,
-          "z": 52
-        },
-        {
-          "type": "pickTile",
-          "x": 32,
-          "z": 52
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "orderedHoleCount"
-        ]
-      }
-    },
-    {
-      "command": "drill_plan add x:36 z:52 depth:7 diameter:89",
-      "role": "player",
-      "description": "Bench 1 (site B): 7 m hole at 36,52.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "ensureStep",
-          "step": 1
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-inspector [data-panel-close]",
-          "timeoutMs": 0
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 7
-        },
-        {
-          "type": "focusTile",
-          "x": 36,
-          "z": 52
-        },
-        {
-          "type": "pickTile",
-          "x": 36,
-          "z": 52
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "orderedHoleCount"
-        ]
-      }
-    },
-    {
-      "command": "drill_plan add x:40 z:52 depth:7 diameter:89",
-      "role": "player",
-      "description": "Bench 1 (site B): 7 m hole at 40,52.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "ensureStep",
-          "step": 1
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-inspector [data-panel-close]",
-          "timeoutMs": 0
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 7
-        },
-        {
-          "type": "focusTile",
-          "x": 40,
-          "z": 52
-        },
-        {
-          "type": "pickTile",
-          "x": 40,
-          "z": 52
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "orderedHoleCount"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
-      "role": "setup",
-      "description": "Holes drilled.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedHoleCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 300000
-        }
-      ],
-      "timeout": 330,
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 0
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2.5",
-      "role": "player",
-      "description": "Load the holes.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "ensureStep",
-          "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 2.5
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "orderedChargeCount"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
-      "role": "setup",
-      "description": "Charges loaded.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3400,
-          "timeoutMs": 300000
-        }
-      ],
-      "timeout": 330,
-      "expect": {
-        "equals": {
-          "orderedChargeCount": 0
-        }
-      }
-    },
-    {
-      "command": "blast detonate",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "ensureStep",
-          "step": 4
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        }
-      ],
-      "description": "Fire the bench.",
-      "timeout": 90,
-      "role": "player"
-    },
-    {
-      "command": "wait_until field:holeCount equals:0 max_ticks:600",
-      "role": "setup",
-      "description": "Blast resolved.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "holeCount",
-          "equals": 0,
-          "maxTicks": 600,
-          "timeoutMs": 300000
-        }
-      ],
-      "timeout": 330,
-      "expect": {
-        "equals": {
-          "holeCount": 0
-        }
-      }
-    },
-    {
-      "command": "build_ramp start:2,52 end:29,52 depth:7",
-      "role": "player",
-      "description": "Ramp into the second site's crater.",
+      "description": "First bench: a second 5 wide trench alongside it, overlapping by one row, makes the bench 9 m wide (rows 24 to 32).",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -820,8 +194,8 @@
           "timeoutMs": 0
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
+          "type": "ensurePanel",
+          "panel": "build"
         },
         {
           "type": "clickSelector",
@@ -837,18 +211,23 @@
           "value": 7
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"width\"]",
+          "value": 5
+        },
+        {
           "type": "focusTile",
-          "x": 15,
-          "z": 52,
+          "x": 31,
+          "z": 30,
           "distance": 30,
           "pitch": 75
         },
         {
           "type": "dragTiles",
-          "x1": 2,
-          "z1": 52,
-          "x2": 29,
-          "z2": 52
+          "x1": 20,
+          "z1": 30,
+          "x2": 42,
+          "z2": 30
         },
         {
           "type": "clickSelector",
@@ -867,7 +246,7 @@
     {
       "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:1500",
       "role": "setup",
-      "description": "Ramp dug.",
+      "description": "Second trench dug; the bench floor is a 9 m wide step.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -885,9 +264,25 @@
       }
     },
     {
-      "command": "drill_plan add x:36 z:52 depth:7 diameter:89",
+      "command": "weather set sunny",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set sunny"
+        }
+      ],
+      "description": "Dry weather: a shower between drilling and firing would fizzle the boomite in a wet hole and blast no crater.",
+      "expect": {
+        "equals": {
+          "weather": "sunny"
+        }
+      }
+    },
+    {
+      "command": "drill_plan add x:36 z:28 depth:8 diameter:89",
       "role": "player",
-      "description": "Bench 2 with a 4 m berm: one hole mid-crater: 7 m hole at 36,52.",
+      "description": "Site B, second bench in the middle of the 9 m wide bench: 8 m hole at 36,28, a 3 m berm left on every side.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -913,17 +308,17 @@
         {
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 7
+          "value": 8
         },
         {
           "type": "focusTile",
           "x": 36,
-          "z": 52
+          "z": 28
         },
         {
           "type": "pickTile",
           "x": 36,
-          "z": 52
+          "z": 28
         },
         {
           "type": "clickSelector",
@@ -937,19 +332,19 @@
       }
     },
     {
-      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:4000",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
       "role": "setup",
-      "description": "Haulers clear rubble; holes drilled.",
+      "description": "Hole drilled.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedHoleCount",
           "equals": 0,
-          "maxTicks": 4000,
-          "timeoutMs": 600000
+          "maxTicks": 3000,
+          "timeoutMs": 300000
         }
       ],
-      "timeout": 630,
+      "timeout": 330,
       "expect": {
         "equals": {
           "orderedHoleCount": 0
@@ -957,9 +352,9 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2.5",
+      "command": "charge hole:* explosive:boomite amount:8 stemming:2.5",
       "role": "player",
-      "description": "Load the second bench.",
+      "description": "Load the hole.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -972,7 +367,7 @@
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
+          "value": 8
         },
         {
           "type": "setStepper",
@@ -993,7 +388,7 @@
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
       "role": "setup",
-      "description": "Charges loaded.",
+      "description": "Charge loaded.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -1034,19 +429,207 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
-      "description": "Fire the second bench.",
+      "description": "Fire the second bench of site B.",
       "timeout": 90,
-      "role": "player",
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "role": "setup",
+      "description": "Blast resolved: the crater floor is 14 m under the rim, but the 3 m berm splits the wall into two short faces, so nothing slumps.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
       "expect": {
+        "equals": {
+          "holeCount": 0
+        },
         "changedBy": {
           "wallSlumpCount": 0
         }
       }
     },
     {
+      "command": "weather set sunny",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set sunny"
+        }
+      ],
+      "description": "Dry weather again for the second shot.",
+      "expect": {
+        "equals": {
+          "weather": "sunny"
+        }
+      }
+    },
+    {
+      "command": "drill_plan add x:33 z:24 depth:8 diameter:89",
+      "role": "player",
+      "description": "Site A, second bench against the bench edge: 8 m hole at 33,24, so the crater reaches the original rim with no berm.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 8
+        },
+        {
+          "type": "focusTile",
+          "x": 33,
+          "z": 24
+        },
+        {
+          "type": "pickTile",
+          "x": 33,
+          "z": 24
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
+      "role": "setup",
+      "description": "Hole drilled.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:8 stemming:2.5",
+      "role": "player",
+      "description": "Load the hole.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 8
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2.5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "role": "setup",
+      "description": "Charge loaded.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast detonate",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "description": "Fire the second bench of site A.",
+      "timeout": 90,
+      "role": "player"
+    },
+    {
       "command": "wait_until field:holeCount equals:0 max_ticks:600",
       "role": "setup",
-      "description": "Blast resolved.",
+      "description": "Blast resolved: a straight 13 m wall from the rim to the crater floor stands over the soft rock's 12 m safe height, so it slumps.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -1060,7 +643,10 @@
       "expect": {
         "equals": {
           "holeCount": 0
-        }
+        },
+        "increased": [
+          "wallSlumpCount"
+        ]
       }
     }
   ]
