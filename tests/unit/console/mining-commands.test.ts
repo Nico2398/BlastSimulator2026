@@ -758,6 +758,44 @@ describe('blast_preview — state.lastBlastPreview', () => {
     expect(preview.projections).not.toBeNull();
   });
 
+  it('tier 2 — average fragment size is printed in cm, not m³ (#1968)', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 2);
+
+    const result = blastPreviewCommand(ctx, [], {});
+
+    const cm = ctx.state!.lastBlastPreview!.fragments!.avgFragmentSizeCm;
+    expect(result.output).toContain(`Average fragment size: ${cm.toFixed(0)} cm`);
+    expect(result.output).not.toContain('m³');
+  });
+
+  it('tier 3 — projections carry the dry-run forecast (#1968)', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 3);
+
+    blastPreviewCommand(ctx, [], {});
+
+    const p = ctx.state!.lastBlastPreview!.projections!;
+    expect(['perfect', 'good', 'mediocre', 'bad', 'catastrophic']).toContain(p.predictedRating);
+    expect(p.totalFragments!).toBeGreaterThan(0);
+    expect(p.thrownFragments!).toBeLessThanOrEqual(p.totalFragments!);
+    expect(p.thrownShare!).toBeGreaterThanOrEqual(0);
+    expect(p.furthestThrowM!).toBeGreaterThanOrEqual(0);
+  });
+
+  it('tier 4 — villages report the measured count and the count above the vibration floor (#1968)', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 4);
+
+    const result = blastPreviewCommand(ctx, [], {});
+
+    const measured = ctx.playableArea!.villages().length;
+    expect(result.output).toContain(`${measured} measured`);
+    const above = /(\d+) above/.exec(result.output);
+    expect(above).not.toBeNull();
+    expect(Number(above![1])).toBeLessThanOrEqual(measured);
+  });
+
   it('a later run overwrites the earlier snapshot rather than merging it', () => {
     const ctx = makeMiningContext();
     makePlan(ctx, 1);

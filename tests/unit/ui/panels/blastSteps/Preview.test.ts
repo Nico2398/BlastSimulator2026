@@ -185,3 +185,52 @@ describe('PreviewStep — bore line (#1934)', () => {
     expect(step.root.querySelector('[data-info="plan-bore"]')!.textContent).toBe('');
   });
 });
+
+describe('PreviewStep — blast outcome rows (#1968)', () => {
+  function withForecast(tier: number): GameState {
+    const state = chargedPlan();
+    state.softwareTier = tier;
+    state.lastBlastPreview = {
+      tier,
+      energy: { affectedVoxels: 42, minEnergy: 1.5, maxEnergy: 9.25 },
+      fragments: { fractured: 77, cracked: 3, unaffected: 1, avgFragmentSizeCm: 55.4 },
+      projections: tier >= 3
+        ? {
+          projectionZoneVoxels: 5, collapseFragments: 2,
+          predictedRating: 'bad', thrownFragments: 25, totalFragments: 100, thrownShare: 0.25, furthestThrowM: 14,
+        }
+        : null,
+      vibrations: null,
+    };
+    return state;
+  }
+
+  it('shows predicted rating, thrown share and furthest throw at T3', () => {
+    const { step } = makeStep();
+    step.update(withForecast(3));
+    const text = step.root.textContent!;
+    expect(text).toContain(t('ui.blast_workshop.preview.row_predicted_rating'));
+    expect(text).toContain(t('blast.rating.bad'));
+    expect(text).toContain(t('ui.blast_workshop.preview.row_thrown_share'));
+    expect(text).toContain('25%');
+    expect(text).toContain(t('ui.blast_workshop.preview.row_furthest_throw'));
+    expect(text).toMatch(/14(\.0)? m/);
+  });
+
+  it('keeps the three rows locked below T3 and leaks no forecast value', () => {
+    const { step } = makeStep();
+    step.update(withForecast(2));
+    const text = step.root.textContent!;
+    expect(text).toContain(t('ui.blast_workshop.preview.row_predicted_rating'));
+    expect(text).toContain('Requires T3');
+    expect(text).not.toContain('25%');
+  });
+
+  it('relabels the fragments row as voxels cleared', () => {
+    const { step } = makeStep();
+    step.update(withForecast(3));
+    expect(t('ui.blast_workshop.preview.row_fragments')).not.toBe('Fragments');
+    expect(t('ui.blast_workshop.preview.row_fragments').toLowerCase()).toContain('voxel');
+    expect(step.root.textContent).toContain(t('ui.blast_workshop.preview.row_fragments'));
+  });
+});
