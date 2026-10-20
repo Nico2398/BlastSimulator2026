@@ -5,7 +5,7 @@
 import type { BlastRating } from './BlastExecution.js';
 import { BLAST_FIZZLE_SHARE_FAILURE, BLAST_FIZZLE_SHARE_PARTIAL, BLAST_OVERSIZE_SHARE_CAP } from '../config/balance.js';
 
-export type BlastRatingCap = 'death' | 'casualty_or_destruction' | 'wet_holes' | 'oversize' | 'fizzled_failure' | 'fizzled_partial' | 'no_breakout';
+export type BlastRatingCap = 'death' | 'casualty_or_destruction' | 'wet_holes' | 'oversize' | 'fizzled_failure' | 'fizzled_partial' | 'no_breakout' | 'sealed_failure' | 'sealed_partial';
 
 export interface RatingCapFacts {
   deaths: number;
@@ -16,6 +16,8 @@ export interface RatingCapFacts {
   chargedHoleCount: number;
   oversizedFragments: number;
   fragmentCount: number;
+  /** Fragments that broke but stayed sealed under intact rock (#2003). */
+  sealedFragmentCount?: number;
   /** True when the blast never broke out of its sealed void (#1724). */
   noBreakout: boolean;
 }
@@ -75,4 +77,11 @@ export function oversizeShare(oversized: number, total: number): number {
 /** Fraction (0..1) of charged holes that fizzled; 0 when no holes were charged. */
 export function fizzleShare(fizzled: number, charged: number): number {
   return share(fizzled, charged);
+}
+
+/** Fraction (0..1) of broken rock that stayed sealed; 0 when nothing broke. */
+export function sealedShare(sealed: number, total: number): number {
+  // TODO: implement
+  void sealed; void total;
+  return 0;
 }

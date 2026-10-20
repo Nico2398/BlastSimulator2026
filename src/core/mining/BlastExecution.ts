@@ -133,6 +133,12 @@ export interface BlastResult {
   clearedColumns: string[];
   /** True when some cleared voxel reached its column's pre-blast top; false when everything it broke stayed sealed under intact rock (#1724). */
   brokeOut: boolean;
+  /** Ore value in fragments that broke but stayed sealed under intact rock (#2003). */
+  sealedOreValue?: number;
+  /** Fragments that broke but stayed sealed (#2003). */
+  sealedFragmentCount?: number;
+  /** Oversized fragments that are reachable, not sealed (#2003). */
+  reachableOversizedFragments?: number;
 }
 
 /**
@@ -181,6 +187,12 @@ export interface BlastReport {
   secondaryBlasts?: SecondaryBlastReport[];
   /** False when the blast cleared rock but never broke out of its sealed void (#1724). Optional: absent = true (pre-existing fixtures). */
   brokeOut?: boolean;
+  /** Ore value left sealed under intact rock (#2003). Optional: absent = 0. */
+  sealedOreValue?: number;
+  /** Fragments left sealed (#2003). Optional: absent = 0. */
+  sealedFragments?: number;
+  /** Oversized fragments that are reachable (#2003). Optional: absent = oversizedFragments. */
+  reachableOversizedFragments?: number;
 }
 
 /** One secondary detonation as shown in the blast report (#1394). */
@@ -217,6 +229,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     oversizedFragments: result.oversizedFragments,
     fragmentCount: result.fragmentCount,
     noBreakout: didNotBreakOut(result),
+    sealedFragmentCount: result.sealedFragmentCount ?? 0,
   });
   return {
     tick,
@@ -576,6 +589,9 @@ export function* executeBlastSteps(
     secondaryBlastEvents,
     clearedColumns: [...new Set(toClear.map(c => `${c.x},${c.z}`))],
     brokeOut,
+    sealedOreValue: 0,
+    sealedFragmentCount: 0,
+    reachableOversizedFragments: 0,
     maxThrowDistance,
     projectileCount,
     flights,

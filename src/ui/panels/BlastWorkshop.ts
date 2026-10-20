@@ -118,6 +118,7 @@ export class BlastWorkshop extends PanelBase {
   setGridProvider(fn: () => VoxelGrid | null): void {
     this.footer.setGridProvider(fn);
     this.previewStep.setGridProvider(fn);
+    this.fireStep.setGridProvider(fn);
   }
 
   setGameConsole(fn: GameConsoleFn): void {

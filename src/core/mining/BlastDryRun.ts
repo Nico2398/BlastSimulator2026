@@ -38,6 +38,7 @@ export function dryRunBlast(
     oversizedFragments: result.oversizedFragments,
     fragmentCount: result.fragmentCount,
     noBreakout: didNotBreakOut(result),
+    sealedFragmentCount: result.sealedFragmentCount ?? 0,
   });
   return {
     rating,

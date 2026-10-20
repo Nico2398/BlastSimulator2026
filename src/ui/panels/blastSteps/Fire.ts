@@ -25,6 +25,7 @@ import { buildingRiskText } from '../buildingRiskText.js';
 import { vehicleDriverId } from '../../../core/entities/Vehicle.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
+import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
 import { permitPreview, type PermitPreview } from '../permitPreview.js';
 
 
@@ -42,8 +43,12 @@ export class FireStep {
   private readonly zoneListEl: HTMLElement;
   private readonly checklistEl: HTMLElement;
 
+  protected gridProvider: () => VoxelGrid | null = () => null;
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
+
+  /** Supplies the voxel grid the breakout warning predicts against (#2003). */
+  setGridProvider(fn: () => VoxelGrid | null): void { this.gridProvider = fn; }
 
   constructor(container: HTMLElement) {
     this.el = el('div');
