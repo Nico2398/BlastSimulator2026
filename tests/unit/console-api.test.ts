@@ -392,15 +392,15 @@ describe('console-api', () => {
       expect(serializeGameState(ctx)!.muckPile).toBeNull();
       ctx.grid = grid;
 
-      state.grade = null as unknown as typeof state.grade;
+      state.grade = null as unknown as NonNullable<typeof state.grade>;
       expect(serializeGameState(ctx)!.mineGrade).toBeNull();
       expect(serializeGameState(ctx)!.unseenApprovalGrade).toBeNull();
 
-      state.grade = { grade: 2, pending: { ticksLeft: 7 }, unseenApproval: 3 } as unknown as typeof state.grade;
+      state.grade = { grade: 2, pending: { ticksLeft: 7 }, unseenApproval: 3 } as unknown as NonNullable<typeof state.grade>;
       expect(serializeGameState(ctx)!.mineGrade).toEqual({ grade: 2, pendingTicksLeft: 7 });
       expect(serializeGameState(ctx)!.unseenApprovalGrade).toBe(3);
 
-      state.grade = { grade: 1, pending: null, unseenApproval: null } as unknown as typeof state.grade;
+      state.grade = { grade: 1, pending: null, unseenApproval: null } as unknown as NonNullable<typeof state.grade>;
       expect(serializeGameState(ctx)!.mineGrade).toEqual({ grade: 1, pendingTicksLeft: null });
     });
 
