@@ -21,6 +21,7 @@ import {
   stemmingFactor,
 } from './BlastCalc.js';
 import { buildPlanEnergyField, maxVillageVibration } from './BlastExecution.js';
+import { identifyFragmentedVoxels } from './VoxelFragmentation.js';
 import { effectiveAt } from './EnergyPropagation.js';
 import { computeFragmentVelocity, throwFractionForBlowout } from './FragmentVelocity.js';
 import {
@@ -101,12 +102,12 @@ export interface BlastPreviewSummary {
   projections: {
     projectionZoneVoxels: number;
     collapseFragments: number;
-    /** Dry-run forecast fields (#1968); absent until the preview runs a dry-run blast. */
-    predictedRating?: BlastRating;
-    thrownFragments?: number;
-    totalFragments?: number;
-    thrownShare?: number;
-    furthestThrowM?: number;
+    /** Dry-run forecast fields (#1968); from the dry-run blast. */
+    predictedRating: BlastRating;
+    thrownFragments: number;
+    totalFragments: number;
+    thrownShare: number;
+    furthestThrowM: number;
   } | null;
   vibrations: { maxVibration: number; affectedVillages: number } | null;
 }
@@ -204,15 +205,17 @@ export function previewFragments(
     }
   });
 
+  // The blast breaks more than the energy test alone (undermined burden, graded floor, rock left
+  // unsupported), so the count of voxels it will clear comes from the same pass executeBlast runs.
+  const cleared = identifyFragmentedVoxels(field, grid, false).fragmented.length;
   return {
-    fracturedCount: fractured,
+    fracturedCount: cleared,
     crackedCount: cracked,
     unaffectedCount: unaffected,
     avgFragmentSize: fractured > 0 ? totalFragSize / fractured : 1,
   };
 }
 
-/** Preview projection zones. Requires software tier >= 3. */
 /** Dry-run the whole blast on a forked grid. Requires software tier >= 3; null below it. */
 export function previewBlastOutcome(
   plan: BlastPlan,
@@ -223,11 +226,11 @@ export function previewBlastOutcome(
   wetHoleIds: ReadonlySet<string>,
   marketId?: MarketId,
 ): BlastForecast | null {
-  void dryRunBlast;
-  void plan; void grid; void softwareTier; void villages; void groundFactor; void wetHoleIds; void marketId;
-  throw new Error('not implemented');
+  if (softwareTier < 3) return null;
+  return dryRunBlast(plan, grid, villages, groundFactor, wetHoleIds, marketId);
 }
 
+/** Preview projection zones. Requires software tier >= 3. */
 export function previewProjections(
   plan: BlastPlan,
   grid: VoxelGrid,

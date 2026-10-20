@@ -84,6 +84,14 @@ function cloneBoundary(boundary: EditBoundary): EditBoundary {
     : { density: boundary.density, composition: boundary.composition };
 }
 
+function cloneSegment(seg: EditSegment): EditSegment {
+  const copy: EditSegment = { ...seg };
+  if (seg.ores) copy.ores = { ...seg.ores };
+  if (seg.bottomBoundary) copy.bottomBoundary = cloneBoundary(seg.bottomBoundary);
+  if (seg.topBoundary) copy.topBoundary = cloneBoundary(seg.topBoundary);
+  return copy;
+}
+
 /**
  * Per-column log of dig/add edits plus a sparse per-voxel fracture-modifier
  * log, both recorded relative to a grid's generated baseline.
@@ -94,7 +102,12 @@ export class TerrainEdits {
 
   /** Independent deep copy: mutating the clone never touches this record. */
   clone(): TerrainEdits {
-    throw new Error('not implemented');
+    const copy = new TerrainEdits();
+    for (const [key, col] of this.columnMap) {
+      copy.columnMap.set(key, { x: col.x, z: col.z, segments: col.segments.map(cloneSegment) });
+    }
+    for (const [key, f] of this.fractures) copy.fractures.set(key, { ...f });
+    return copy;
   }
 
   static empty(): TerrainEdits {

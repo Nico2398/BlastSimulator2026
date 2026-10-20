@@ -21,6 +21,8 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { assembleBlastPlan, buildingsInBlastReach, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
+import { isHazardRating } from '../../core/mining/BlastDryRun.js';
+import type { BlastPreviewSummary } from '../../core/mining/Software.js';
 import { totalChargeKg } from '../../core/mining/BlastCalc.js';
 import { oreEstimateView, oreValueColor, oreValueText } from './oreEstimateDisplay.js';
 import { OreEstimateMemo } from './oreEstimateMemo.js';
@@ -48,6 +50,21 @@ function dryWarning(wetCount: number, rainExposedCount: number): Warning {
     return { ok: false, text: t('ui.blast_workshop.preflight.warn_rain_risk', { count: rainExposedCount }), role: 'preflight-rain-risk' };
   }
   return { ok: true, text: t('ui.blast_workshop.preflight.ok_dry') };
+}
+
+/** Warning row when the analysis forecasts a hazardous blast (bad or catastrophic); never gates firing. */
+function predictedRatingWarning(preview: BlastPreviewSummary | null): Warning[] {
+  const projections = preview?.projections;
+  if (!projections || !isHazardRating(projections.predictedRating)) return [];
+  return [{
+    ok: false,
+    role: 'preflight-predicted-rating',
+    text: t('ui.blast_workshop.preflight.warn_predicted_rating', {
+      rating: t(`blast.rating.${projections.predictedRating}`),
+      share: Math.round(projections.thrownShare * 100),
+      metres: Math.round(projections.furthestThrowM),
+    }),
+  }];
 }
 
 /** Title and body of the waiting panel for each non-idle detonation phase. */
@@ -276,6 +293,7 @@ export class PreflightModal {
         ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_undrilled', { count: undrilledCount }) }]
         : []),
       ...wallFaces.map(w => ({ ok: false, text: wallWarningText(w, 'ui.blast_workshop.preflight.warn_wall_slump'), role: 'preflight-wall-warning' })),
+      ...predictedRatingWarning(state.lastBlastPreview),
       dryWarning(wet.length, rainExposed.length),
       occupantCount > 0
         ? { ok: false, text: t('ui.blast_workshop.preflight.warn_zone', { count: occupantCount }) }
@@ -313,7 +331,16 @@ export class PreflightModal {
     line.style.cssText = 'display:flex;gap:16px;font:500 12px/1 var(--bsx-font-mono);color:var(--bsx-text-secondary)';
     line.append(el('span', { text: t('ui.blast_workshop.preflight.predicted_voxels', { count: preview.energy.affectedVoxels }) }));
     if (!preview.fragments) line.appendChild(el('span', { text: t('ui.blast_workshop.preflight.predicted_locked_fragments'), attrs: { style: 'color:var(--bsx-text-micro)' } }));
-    if (!preview.projections) line.appendChild(el('span', { text: t('ui.blast_workshop.preflight.predicted_locked_projections'), attrs: { style: 'color:var(--bsx-text-micro)' } }));
+    const projections = preview.projections;
+    if (!projections) {
+      line.appendChild(el('span', { text: t('ui.blast_workshop.preflight.predicted_locked_projections'), attrs: { style: 'color:var(--bsx-text-micro)' } }));
+    } else {
+      line.append(
+        el('span', { text: t('ui.blast_workshop.preflight.predicted_rating', { rating: t(`blast.rating.${projections.predictedRating}`) }) }),
+        el('span', { text: t('ui.blast_workshop.preflight.predicted_thrown_share', { share: Math.round(projections.thrownShare * 100) }) }),
+        el('span', { text: t('ui.blast_workshop.preflight.predicted_furthest_throw', { metres: Math.round(projections.furthestThrowM) }) }),
+      );
+    }
     this.predictedEl.replaceChildren(label, line);
   }
 

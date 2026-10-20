@@ -3,7 +3,8 @@
 import type { MarketId } from '../economy/Market.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { BlastPlan } from './BlastPlan.js';
-import type { BlastRating, VillagePosition } from './BlastExecution.js';
+import { executeBlast, type BlastRating, type VillagePosition } from './BlastExecution.js';
+import { forkVoxelGrid } from '../world/VoxelGridFork.js';
 
 export interface BlastForecast {
   rating: BlastRating;
@@ -23,12 +24,22 @@ export function dryRunBlast(
   wetHoleIds: ReadonlySet<string>,
   marketId?: MarketId,
 ): BlastForecast | null {
-  void plan; void grid; void villages; void groundFactor; void wetHoleIds; void marketId;
-  throw new Error('not implemented');
+  // No emitter and no building state: the fork's blast is silent and spares every building.
+  const result = executeBlast(
+    plan, forkVoxelGrid(grid), villages, groundFactor, undefined, undefined, wetHoleIds, marketId,
+  );
+  if (!result) return null;
+  return {
+    rating: result.rating,
+    fragmentCount: result.fragmentCount,
+    projectionCount: result.projectionCount,
+    thrownShare: result.fragmentCount > 0 ? result.projectionCount / result.fragmentCount : 0,
+    furthestThrowM: result.maxThrowDistance,
+    clearedVoxels: result.clearedVoxels,
+  };
 }
 
 /** True for ratings that count as a hazard: 'bad' or 'catastrophic'. */
 export function isHazardRating(rating: BlastRating): boolean {
-  void rating;
-  throw new Error('not implemented');
+  return rating === 'bad' || rating === 'catastrophic';
 }
