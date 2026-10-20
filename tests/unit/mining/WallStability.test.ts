@@ -129,7 +129,7 @@ describe('findOverheightFaces', () => {
     expect(findOverheightFaces(buildGrid(height, 'cruite'), WHOLE)).toEqual([]);
   });
 
-  it('a berm splits the face but each half still slumps when it is over its own limit', () => {
+  it('a berm splits the face: only the half over its own limit is reported', () => {
     // Upper face 20 m (over 12), lower face 8 m.
     const height = (x: number) => (x <= 10 ? 28 : x <= 13 ? 8 : 0);
     const faces = findOverheightFaces(buildGrid(height, 'cruite'), WHOLE).filter(f => f.crest.z === 20);
@@ -205,7 +205,7 @@ describe('applySlump', () => {
     const grid = buildGrid(cliff(20, 0), 'molite'); // tier 2 (safe 15)
     const report = applySlump(grid, findOverheightFaces(grid, WHOLE).find(f => f.crest.z === 20)!);
     expect(report).not.toBeNull();
-    const [tx, tz] = report!.toeColumns[0]!.split(',').map(Number) as [number, number];
+    const { x: tx, z: tz } = report!.toeColumns[0]!;
     const top = computeVoxelColumnSurfaceY(grid, tx, tz)!;
     expect(grid.dominantRockAt(tx, top, tz)).toBe('molite');
   });
@@ -214,8 +214,7 @@ describe('applySlump', () => {
     const grid = buildGrid(cliff(20, 0));
     const report = applySlump(grid, firstFace(grid))!;
     expect(report.toeColumns.length).toBeGreaterThan(0);
-    for (const key of report.toeColumns) {
-      const [x, z] = key.split(',').map(Number) as [number, number];
+    for (const { x, z } of report.toeColumns) {
       expect(x).toBeGreaterThanOrEqual(20); // pit side only
       const top = computeVoxelColumnSurfaceY(grid, x, z)!;
       expect(top).toBeGreaterThan(0); // raised above the old floor
@@ -226,8 +225,8 @@ describe('applySlump', () => {
   it('the toe columns are the damage zone and include the column at the foot of the face', () => {
     const grid = buildGrid(cliff(20, 0));
     const report = applySlump(grid, firstFace(grid))!;
-    expect(report.toeColumns).toContain('20,20');
-    expect(report.toeColumns.every(k => Number(k.split(',')[0]) >= 20)).toBe(true);
+    expect(report.toeColumns).toContainEqual({ x: 20, z: 20 });
+    expect(report.toeColumns.every(c => c.x >= 20)).toBe(true);
   });
 
   it('the report region covers the crest and the toe', () => {
@@ -313,11 +312,16 @@ describe('runWallStability', () => {
     for (const z of [0, 10, 20, 39]) expect(profile(a, z)).toEqual(profile(b, z));
   });
 
-  it('repeating the pass on the same grid is stable: a second run with no change in faces is no worse', () => {
+  it('repeating the pass is one pass without cascade: the first fixes its faces, a second run still conserves volume', () => {
+    // The slump pass does not iterate to a fixed point (the fill can leave a new face), so a second run
+    // may report more; what must hold is that every report moves rock and none is lost.
     const grid = buildGrid(cliff(20, 0));
-    runWallStability(grid, WHOLE);
+    const first = runWallStability(grid, WHOLE);
+    expect(first.length).toBeGreaterThan(0);
     const volume = solidVolume(grid);
-    runWallStability(grid, WHOLE);
+    const second = runWallStability(grid, WHOLE);
+    for (const r of second) expect(r.volumeM3).toBeGreaterThan(0);
+    expect(second.length).toBeLessThanOrEqual(first.length);
     expect(solidVolume(grid)).toBeCloseTo(volume, 6);
   });
 

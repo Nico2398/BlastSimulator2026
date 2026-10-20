@@ -4504,7 +4504,7 @@
   "economy.contract.market_line": "  {ore} : {pct} % saturé | prix {trend} % par rapport à la base ({from} -> {to}/kg)",
   "economy.contract.market_none": "Aucun marché de minerai à surveiller sur ce site.",
   "notification.market.glut": "Les analystes vous reprochent la surabondance de {ore}.",
-  "notification.wall_slump.body": "Éboulement de paroi en ({x}, {z}). Le prospecteur vous avait prévenu.",
+  "notification.wall_slump.body": "Éboulement de paroi en ({x}, {z}). L'expert en géologie vous avait prévenu.",
   "notification.wall_slump.title": "Éboulement",
   "notification.title.market": "Marché",
   "permit.ack.success": "Lettre d'approbation classée sous « Encadrées ».",

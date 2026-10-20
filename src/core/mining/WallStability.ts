@@ -15,6 +15,7 @@ import {
   WALL_STABILITY_REGION_MARGIN_M,
   WALL_SLUMP_PILE_MAX_HEIGHT_M,
   WALL_SLUMP_PILE_SEARCH_RADIUS_M,
+  WALL_SLOPE_WALK_MAX_M,
 } from '../config/balance.js';
 
 /** A continuous drop between neighbouring columns, ended by a berm. */
@@ -34,8 +35,10 @@ export interface SlumpReport {
   crest: { x: number; z: number };
   toe: { x: number; z: number };
   volumeM3: number;
-  /** Column keys ("x,z") that received fill at the toe. */
-  toeColumns: string[];
+  /** Floor height (top voxel row) of the toe the spill landed on. */
+  toeY: number;
+  /** Columns that received fill at the toe. */
+  toeColumns: Array<{ x: number; z: number }>;
   /** Voxel-space footprint touched by the slump. */
   region: BlastRegion;
   /** Voxel rows touched, for the terrain:updated region. */
@@ -180,7 +183,7 @@ export function applySlump(grid: VoxelGrid, face: WallFace): SlumpReport | null 
   let toe = { x: face.crest.x, z: face.crest.z };
   const path: Array<{ x: number; z: number }> = [];
   for (let k = WALL_SLUMP_DEPTH_M - 1; k >= 1; k--) path.push({ x: face.crest.x - dx * k, z: face.crest.z - dz * k });
-  for (let k = 0; k < 256; k++) {
+  for (let k = 0; k < WALL_SLOPE_WALK_MAX_M; k++) {
     const x = face.crest.x + dx * k, z = face.crest.z + dz * k;
     const top = topAt(grid, x, z);
     if (top === null) break;
@@ -197,7 +200,7 @@ export function applySlump(grid: VoxelGrid, face: WallFace): SlumpReport | null 
   if (taken.length === 0) return null;
 
   // The cut face is whole rock (density 1) and the piles end in whole voxels: no band regrade needed.
-  const toeColumns: string[] = [];
+  const toeColumns: Array<{ x: number; z: number }> = [];
   let rest = taken;
   const candidates = pileColumns(grid, toe, face.toeY);
   if (candidates.length === 0 || candidates[0]!.d !== -1) {
@@ -209,7 +212,7 @@ export function applySlump(grid: VoxelGrid, face: WallFace): SlumpReport | null 
     const batch = rest.slice(0, room);
     rest = rest.slice(room);
     const newTop = stack(grid, col.x, col.z, col.top, batch);
-    toeColumns.push(`${col.x},${col.z}`);
+    toeColumns.push({ x: col.x, z: col.z });
     touch(col.x, col.z, col.top, newTop + SURFACE_BAND_HALF);
   }
   if (rest.length > 0) { // no floor left: never lose volume, stack the remainder on the toe
@@ -222,6 +225,7 @@ export function applySlump(grid: VoxelGrid, face: WallFace): SlumpReport | null 
     crest: { ...face.crest },
     toe,
     volumeM3: taken.length,
+    toeY: face.toeY,
     toeColumns,
     region: { minX, maxX, minZ, maxZ },
     minY,

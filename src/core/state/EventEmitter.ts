@@ -17,9 +17,9 @@ export interface GameEventMap {
   'blast:ended': undefined;
   'fragment:created': { count: number };
   'time:tick': { dt: number };
-  /** A mine-grade application finished processing (#1921). */
   /** A wall slumped after a blast on a progression site (#1941). */
   'mining:wall_slump': { x: number; z: number; volumeM3: number };
+  /** A mine-grade application finished processing (#1921). */
   'progression:grade_approved': { grade: number };
   /** A mine-grade application was filed and its fee booked (#1926). */
   'progression:ore_glut': { oreId: string; saturation: number };

@@ -3,7 +3,7 @@
 import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGame, destroyEntitiesOnColumns, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
+import { requireGame, releaseAfterAccidents, destroyEntitiesOnColumns, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
 import { executeBlastSteps, emitRegionInStrips, buildBlastReport, didNotBreakOut, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
 import { resolveMarketId } from '../../../core/campaign/Level.js';
 import { drain, type Steps } from '../../../core/engine/Steps.js';
@@ -15,11 +15,9 @@ import type { WarehouseLoss } from '../../../core/economy/FreightWarehouses.js';
 import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
 import { resolveSecondaryBlasts, type SecondaryBlastEvent } from '../../../core/entities/SecondaryBlast.js';
 import { carveSecondaryCraters, type SecondaryCraterReport } from './secondaryCrater.js';
-import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
-import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
-import { releaseOccupantsOfRemovedBuildings, releaseOccupantsOfRemovedVehicles } from '../../../core/engine/Mount.js';
+import { emitFootprintOccupancyChanged, snapshotBuildingFootprints, type BuildingFootprint } from '../buildingHelpers.js';
+import { releaseOccupantsOfRemovedBuildings } from '../../../core/engine/Mount.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
-import { releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
 import { blastPitDepthM, recordBlastChargeShare, recordGradeBlast } from '../../../core/economy/MineGrade.js';
 import { preFireCheck, resolveOvershoot, type InspectionVerdict } from '../../../core/economy/PermitLimits.js';
@@ -243,12 +241,9 @@ export function* fireBlastSteps(
   // Stocked explosive warehouses destroyed by the blast or by flying rock
   // detonate in turn (#1394). resolveSecondaryBlasts records its accidents on
   // state.damage itself; they are added to this blast's own list here.
-  const destroyedFootprints = new Map<number, { x: number; z: number; sizeX: number; sizeZ: number }>();
-  if (result.secondaryBlastEvents.length + projectionSecondaryEvents.length > 0) {
-    for (const b of state.buildings.buildings) {
-      destroyedFootprints.set(b.id, { x: b.x, z: b.z, ...getDefSize(getBuildingDef(b.type, b.tier)) });
-    }
-  }
+  const destroyedFootprints = result.secondaryBlastEvents.length + projectionSecondaryEvents.length > 0
+    ? snapshotBuildingFootprints(state.buildings)
+    : new Map<number, BuildingFootprint>();
   const secondaryOutcomes = resolveSecondaryBlasts(
     [...result.secondaryBlastEvents, ...projectionSecondaryEvents],
     state.buildings, state.vehicles, state.employees, state.damage, state.tickCount,
@@ -284,16 +279,12 @@ export function* fireBlastSteps(
 
   // One release after both destruction paths (cleared columns above, flying
   // rock in processProjections) so no rider stays mounted on a removed vehicle.
-  releaseOccupantsOfRemovedVehicles(state, ctx.emitter);
-
   // Every employee this blast killed (exact-hit above, or attenuated via
   // processProjections just above) may still have a PendingAction targeting
   // or held by them — release it back to the pool now, before dispatch's
   // next tick ever sees it, or it stalls forever pointed at a corpse (#557
   // audit; see releaseDeadEmployeeActions' own doc comment).
-  for (const accident of thisBlastAccidents) {
-    if (accident.type === 'death') releaseDeadEmployeeActions(state, accident.entityId);
-  }
+  releaseAfterAccidents(state, ctx.emitter, thisBlastAccidents);
 
   // Track blast in damage state and level stats
   state.damage.blastCount++;

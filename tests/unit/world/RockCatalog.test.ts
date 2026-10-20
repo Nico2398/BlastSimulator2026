@@ -132,6 +132,12 @@ describe('oresYieldedByRocks (#1364)', () => {
       expect(getSafeFaceHeightM('titanite')).toBe(30);
     });
 
+    it('getSafeFaceHeightM treats an unknown or empty rock id as the softest tier', () => {
+      const softest = WALL_SAFE_FACE_HEIGHT_M_BY_TIER[1];
+      expect(getSafeFaceHeightM('no_such_rock')).toBe(softest);
+      expect(getSafeFaceHeightM('')).toBe(softest);
+    });
+
     it('getSafeFaceHeightM agrees with the catalog for every rock', () => {
       for (const rock of getAllRocks()) expect(getSafeFaceHeightM(rock.id), rock.id).toBe(rock.safeFaceHeightM);
     });

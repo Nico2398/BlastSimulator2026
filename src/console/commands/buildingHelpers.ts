@@ -9,6 +9,7 @@
 // sites (`siteBounds(ctx)`) need no edits.
 
 import { siteBoundsForGrid, emitFootprintRegionChanged } from '../../core/engine/BuildingTaskHelpers.js';
+import { getBuildingDef, getDefSize, type BuildingState } from '../../core/entities/Building.js';
 import type { GameContext } from './world.js';
 
 export {
@@ -35,4 +36,17 @@ export function emitFootprintOccupancyChanged(
 ): void {
   if (!ctx.grid) return;
   emitFootprintRegionChanged(ctx.emitter, ctx.grid, x, z, sizeX, sizeZ);
+}
+
+/** A building's footprint as it stood when the snapshot was taken. */
+export interface BuildingFootprint { x: number; z: number; sizeX: number; sizeZ: number }
+
+/**
+ * Footprints of every standing building, by id. Taken before a destruction
+ * path runs: once a building is removed its footprint can no longer be read,
+ * yet the cleared ground must still be announced to navigation.
+ */
+export function snapshotBuildingFootprints(buildings: BuildingState): Map<number, BuildingFootprint> {
+  return new Map(buildings.buildings.map(b =>
+    [b.id, { x: b.x, z: b.z, ...getDefSize(getBuildingDef(b.type, b.tier)) }] as const));
 }

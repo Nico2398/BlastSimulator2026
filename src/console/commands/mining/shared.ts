@@ -2,7 +2,8 @@
 
 import type { CommandResult } from '../../ConsoleRunner.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { cancelAction } from '../../../core/engine/TaskDispatch.js';
+import { cancelAction, releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js';
+import { releaseOccupantsOfRemovedVehicles } from '../../../core/engine/Mount.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../../core/mining/BlastPlan.js';
 import type { BlastPlan, ValidationError } from '../../../core/mining/BlastPlan.js';
@@ -16,6 +17,18 @@ import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
 import { bookEmployeeDeath, type AccidentRecord } from '../../../core/entities/Damage.js';
 import { destroyVehicle } from '../../../core/entities/Vehicle.js';
+
+/**
+ * Settle the entities a destruction path killed or removed: riders of removed vehicles
+ * dismount, and the pending actions of dead employees return to the pool before dispatch
+ * sees them (releaseDeadEmployeeActions' own doc comment).
+ */
+export function releaseAfterAccidents(state: GameState, emitter: MiningContext['emitter'], accidents: readonly AccidentRecord[]): void {
+  releaseOccupantsOfRemovedVehicles(state, emitter);
+  for (const a of accidents) {
+    if (a.type === 'death') releaseDeadEmployeeActions(state, a.entityId);
+  }
+}
 
 export function requireGame(ctx: MiningContext): string | null {
   if (!ctx.state || !ctx.grid) return t('console.no_game_loaded');

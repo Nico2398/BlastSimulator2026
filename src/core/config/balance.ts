@@ -3286,3 +3286,7 @@ export const WALL_SLUMP_PILE_MAX_HEIGHT_M = 3;
 export const WALL_SLUMP_PILE_SEARCH_RADIUS_M = 6;
 /** Bulk density (kg/m³) of slumped rock, for the toe-zone impact mass. */
 export const WALL_SLUMP_ROCK_DENSITY_KG_M3 = 2500;
+/** Longest slope (m) walked from a crest to find its toe; bounds the walk well past any playable site's width. */
+export const WALL_SLOPE_WALK_MAX_M = 256;
+/** Margin (m) around the toe columns inside which a slump hurts buildings, vehicles and employees. */
+export const WALL_SLUMP_TOE_ZONE_MARGIN_M = 1;

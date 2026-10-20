@@ -15,6 +15,9 @@ import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../src/core/mining/BlastExecution.js';
+import { applyWallSlumps } from '../../src/console/commands/mining/wallSlump.js';
+import { placeBuilding } from '../../src/core/entities/Building.js';
+import { drain } from '../../src/core/engine/Steps.js';
 import { findOverheightFaces, runWallStability } from '../../src/core/mining/WallStability.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
@@ -48,7 +51,6 @@ describe('standard opening never slumps (#1941)', () => {
           expect(result).not.toBeNull();
           // Hard-rock biomes (tropical_karst, volcanic_flats) barely break under this charge: an empty
           // crater is trivially stable, so the check is "no overheight face", not "rock was cleared".
-          expect(result!.clearedVoxels).toBeGreaterThanOrEqual(0);
           expect(findOverheightFaces(grid, result!.clearedRegion)).toEqual([]);
           expect(runWallStability(grid, result!.clearedRegion)).toEqual([]);
         });
@@ -82,6 +84,21 @@ function refresh(state: GameState): void {
   for (const e of state.employees.employees) e.fatigue = 100;
 }
 
+/** Dig the 35 m pit beside where the standard opening goes; returns its footprint. */
+function carvePit(grid: VoxelGrid): Rig['pit'] {
+  const ox = Math.floor(grid.sizeX / 2) - 4;
+  const oz = Math.floor(grid.sizeZ / 2) - 4;
+  const pit = { minX: ox + 12, maxX: ox + 21, minZ: oz - 4, maxZ: oz + 12 };
+  for (let z = pit.minZ; z <= pit.maxZ; z++) {
+    for (let x = pit.minX; x <= pit.maxX; x++) {
+      const top = computeVoxelColumnSurfaceY(grid, x, z);
+      if (top === null) continue;
+      for (let y = top - PIT_DEPTH_M + 1; y <= top; y++) grid.clearVoxel(x, y, z);
+    }
+  }
+  return pit;
+}
+
 /**
  * Start `startCmd`, dig a 35 m pit beside where the standard opening goes, drill/charge/fire it and
  * wait for the report. The pit wall is far over any safe height, so on a progression site the
@@ -104,14 +121,7 @@ function blastBesidePit(startCmd: string, mutate?: (state: GameState) => void): 
 
   const ox = Math.floor(grid.sizeX / 2) - 4;
   const oz = Math.floor(grid.sizeZ / 2) - 4;
-  const pit = { minX: ox + 12, maxX: ox + 21, minZ: oz - 4, maxZ: oz + 12 };
-  for (let z = pit.minZ; z <= pit.maxZ; z++) {
-    for (let x = pit.minX; x <= pit.maxX; x++) {
-      const top = computeVoxelColumnSurfaceY(grid, x, z);
-      if (top === null) continue;
-      for (let y = top - PIT_DEPTH_M + 1; y <= top; y++) grid.clearVoxel(x, y, z);
-    }
-  }
+  const pit = carvePit(grid);
 
   expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${ox},${oz}`)).toMatchObject({ success: true });
   for (let i = 0; i < 800 && state.plannedDrillHoles.length > 0; i++) { refresh(state); run('tick 1'); }
@@ -170,6 +180,59 @@ describe('post-blast stability hook (#1941)', () => {
     const rig = blastBesidePit('campaign start level:dusty_hollow staffed:true');
     expect(rig.state.grade).toBeUndefined();
     expect(rig.slumps).toEqual([]);
+  });
+});
+
+// ── Toe-zone damage ──
+
+describe('slump damage is confined to the toe zone (#1941)', () => {
+  const START = 'sandbox start biome:desert_badlands kit:full seed:42 staffed:true';
+
+  function pitRig() {
+    const { runner, ctx } = createRunner();
+    expect(runner.run(START)).toMatchObject({ success: true });
+    const pit = carvePit(ctx.grid!);
+    return { ctx, pit };
+  }
+
+  it('an employee, vehicle and building in the toe zone are hurt; ones just behind the crest are not', () => {
+    // A twin run (same seed, same pit) tells where the first slump's toe and crest are.
+    const twin = pitRig();
+    const [first] = runWallStability(twin.ctx.grid!, twin.pit);
+    expect(first).toBeDefined();
+    const dx = Math.sign(first!.toe.x - first!.crest.x), dz = Math.sign(first!.toe.z - first!.crest.z);
+    const inToe = first!.toeColumns[0]!;
+    const safe = { x: first!.crest.x - 2 * dx, z: first!.crest.z - 2 * dz };
+
+    const { ctx, pit } = pitRig();
+    const state = ctx.state!;
+    // The kit has no buildings: place two on open ground, then move them into the scenario.
+    for (const [bx, bz] of [[2, 2], [2, 12]] as const) {
+      const placed = placeBuilding(state.buildings, 'management_office', bx, bz, ctx.grid!.sizeX, ctx.grid!.sizeZ);
+      expect(placed.success).toBe(true);
+    }
+    const [empIn, empOut] = state.employees.employees;
+    const [vehIn, vehOut] = state.vehicles.vehicles;
+    const [bldIn, bldOut] = state.buildings.buildings;
+    expect([empIn, empOut, vehIn, vehOut, bldIn, bldOut].every(e => e !== undefined)).toBe(true);
+    empIn!.x = inToe.x + 0.5; empIn!.z = inToe.z + 0.5;
+    empOut!.x = safe.x + 0.5; empOut!.z = safe.z + 0.5;
+    vehIn!.x = inToe.x + 0.5; vehIn!.z = inToe.z + 0.5;
+    vehOut!.x = safe.x + 0.5; vehOut!.z = safe.z + 0.5;
+    bldIn!.x = inToe.x; bldIn!.z = inToe.z;
+    bldOut!.x = safe.x; bldOut!.z = safe.z;
+    const hp = { vehIn: vehIn!.hp, vehOut: vehOut!.hp, bldIn: bldIn!.hp, bldOut: bldOut!.hp };
+
+    drain(applyWallSlumps(ctx, pit));
+
+    expect(state.damage.wallSlumpCount).toBeGreaterThan(0);
+    expect(empIn!.injured || !empIn!.alive).toBe(true);
+    expect(empOut!.injured).toBe(false);
+    expect(empOut!.alive).toBe(true);
+    expect(state.vehicles.vehicles.find(v => v.id === vehIn!.id)?.hp ?? 0).toBeLessThan(hp.vehIn);
+    expect(state.vehicles.vehicles.find(v => v.id === vehOut!.id)?.hp).toBe(hp.vehOut);
+    expect(state.buildings.buildings.find(b => b.id === bldIn!.id)?.hp ?? 0).toBeLessThan(hp.bldIn);
+    expect(state.buildings.buildings.find(b => b.id === bldOut!.id)?.hp).toBe(hp.bldOut);
   });
 });
 
