@@ -288,7 +288,9 @@ function armWithWalkers(positions: Array<[number, number]>) {
   const state = chargedState();
   const emps = positions.map(([x, z]) => addWorker(state, x, z));
   armDetonation(state);
-  return { state, emps };
+  // Callers pass at most three positions and only index ones they passed; a tuple type drops the undefined from indexed access.
+  type Worker = ReturnType<typeof addWorker>;
+  return { state, emps: emps as [Worker, Worker, Worker] };
 }
 
 describe('isStuckWalker (#1990)', () => {
