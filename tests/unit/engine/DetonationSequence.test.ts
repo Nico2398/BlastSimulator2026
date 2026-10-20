@@ -10,6 +10,7 @@ import { createCharge } from '../../../src/core/mining/ChargePlan.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { isInZone, computeDangerZone } from '../../../src/core/entities/Zone.js';
+import { setHoleWater } from '../../helpers/holeWater.js';
 import { Random } from '../../../src/core/math/Random.js';
 import {
   BLAST_DANGER_MARGIN_M, DETONATION_REEVACUATE_INTERVAL_TICKS, DETONATION_STUCK_WALKER_FAILURE_TICKS,
@@ -407,5 +408,125 @@ describe('tickDetonation with a stuck walker (#1990)', () => {
     emps[0].isMoveStuck = true;
     emps[0].x = 70; emps[0].z = 70;
     expect(tickDetonation(state)).toEqual({ kind: 'ready' });
+  });
+});
+
+describe('held phase: wet water-sensitive charges (#1957)', () => {
+  function addSecondHole(state: GameState, x: number, z: number, explosiveId: string) {
+    const hole = addHole(holeCounter, state.drillHoles, x, z, 8, 0.15);
+    const c = createCharge(explosiveId, 5, 2, hole.depth);
+    if ('charge' in c) state.chargesByHole[hole.id] = c.charge;
+    return hole;
+  }
+
+  it('is held, naming the fizzling holes, when the zone is clear and a sensitive charge sits in a wet hole', () => {
+    const state = chargedState();
+    setHoleWater(state, state.drillHoles.map(h => h.id));
+    armDetonation(state);
+    expect(detonationPhase(state)).toEqual({ kind: 'held', fizzleHoleIds: state.drillHoles.map(h => h.id) });
+  });
+
+  it('lists only the fizzling holes, sorted', () => {
+    const state = chargedState();
+    const dry = addSecondHole(state, 24, 20, 'boomite');
+    const resistant = addSecondHole(state, 22, 24, 'krackle');
+    const wetSensitive = addSecondHole(state, 26, 24, 'boomite');
+    setHoleWater(state, [state.drillHoles[0]!.id, resistant.id, wetSensitive.id]);
+    armDetonation(state);
+    const phase = detonationPhase(state);
+    expect(phase).toEqual({
+      kind: 'held',
+      fizzleHoleIds: [state.drillHoles[0]!.id, wetSensitive.id].sort(),
+    });
+    expect(dry.id).not.toBe(wetSensitive.id);
+  });
+
+  it('is ready when the zone is clear and the holes are dry', () => {
+    const state = chargedState();
+    armDetonation(state);
+    expect(detonationPhase(state)).toEqual({ kind: 'ready' });
+  });
+
+  it('is ready when the only wet holes carry a water-resistant charge', () => {
+    const state = createGame({ seed: 42 });
+    state.navGrid = flatWalkableGrid(80);
+    const hole = addSecondHole(state, 20, 20, 'krackle');
+    setHoleWater(state, [hole.id]);
+    armDetonation(state);
+    expect(detonationPhase(state)).toEqual({ kind: 'ready' });
+  });
+
+  it('a tubed hole that is already wet still holds the shot until drained', () => {
+    const state = chargedState();
+    const id = state.drillHoles[0]!.id;
+    state.tubingState.installedHoles = new Set([id]);
+    setHoleWater(state, [id]);
+    armDetonation(state);
+    expect(detonationPhase(state).kind).toBe('held');
+  });
+
+  it('a tubed and drained hole is ready', () => {
+    const state = chargedState();
+    state.tubingState.installedHoles = new Set([state.drillHoles[0]!.id]);
+    armDetonation(state);
+    expect(detonationPhase(state)).toEqual({ kind: 'ready' });
+  });
+
+  it('evacuating takes precedence over held', () => {
+    const state = chargedState();
+    addWorker(state, 22, 22);
+    setHoleWater(state, state.drillHoles.map(h => h.id));
+    armDetonation(state);
+    expect(detonationPhase(state).kind).toBe('evacuating');
+  });
+
+  it('stranded takes precedence over held', () => {
+    const state = chargedState(false);
+    addWorker(state, 22, 22);
+    setHoleWater(state, state.drillHoles.map(h => h.id));
+    armDetonation(state);
+    expect(detonationPhase(state).kind).toBe('stranded');
+  });
+
+  it('evacuating -> held once the zone empties with wet holes, then back to ready after a drain, without re-arming', () => {
+    const state = chargedState();
+    const emp = addWorker(state, 22, 22);
+    const id = state.drillHoles[0]!.id;
+    setHoleWater(state, [id]);
+    armDetonation(state);
+    expect(tickDetonation(state).kind).toBe('evacuating');
+    emp.x = 70; emp.z = 70;
+    expect(tickDetonation(state)).toEqual({ kind: 'held', fizzleHoleIds: [id] });
+    const pending = state.pendingDetonation;
+    state.holeWater = {};
+    expect(tickDetonation(state)).toEqual({ kind: 'ready' });
+    expect(state.pendingDetonation).toBe(pending);
+  });
+
+  it('tickDetonation passes held through and keeps pendingDetonation armed', () => {
+    const state = chargedState();
+    const id = state.drillHoles[0]!.id;
+    setHoleWater(state, [id]);
+    armDetonation(state);
+    for (let i = 0; i < 3; i++) {
+      state.tickCount++;
+      expect(tickDetonation(state)).toEqual({ kind: 'held', fizzleHoleIds: [id] });
+      expect(state.pendingDetonation).not.toBeNull();
+    }
+  });
+
+  it('cancelDetonation clears a held sequence', () => {
+    const state = chargedState();
+    setHoleWater(state, state.drillHoles.map(h => h.id));
+    armDetonation(state);
+    expect(detonationPhase(state).kind).toBe('held');
+    expect(cancelDetonation(state)).toBe(true);
+    expect(detonationPhase(state)).toEqual({ kind: 'idle' });
+  });
+
+  it('is idle, not held, when nothing is armed', () => {
+    const state = chargedState();
+    setHoleWater(state, state.drillHoles.map(h => h.id));
+    expect(detonationPhase(state)).toEqual({ kind: 'idle' });
   });
 });

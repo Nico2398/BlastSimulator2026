@@ -17,7 +17,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import { el, scrollBoundedSection } from '../../dom.js';
 import { iconEl, type IconName } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
-import { wetHoles } from '../../../core/mining/WetHoles.js';
+import { rainExposedHoles, wetHoles } from '../../../core/mining/WetHoles.js';
 import { computeDangerZone, isInZone, type ZoneBounds } from '../../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
 import { buildingsInBlastReach, type BuildingAtRisk } from '../../../core/mining/BlastPlan.js';
@@ -76,11 +76,12 @@ export class FireStep {
   update(state: GameState, _weather?: WeatherState): void {
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
     const wet = wetHoles(state);
+    const exposed = rainExposedHoles(state);
 
     const occupantKeys = zone ? this.occupantKeys(state, zone) : [];
     const permit = state.drillHoles.length === 0 ? null : permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount);
     const atRisk = buildingsInBlastReach(state.drillHoles, state.chargesByHole, state.buildings.buildings);
-    const signature = JSON.stringify({ zone, occupants: occupantKeys, wetCount: wet.length, permit, atRisk });
+    const signature = JSON.stringify({ zone, occupants: occupantKeys, wetCount: wet.length, exposedCount: exposed.length, permit, atRisk });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
@@ -89,7 +90,7 @@ export class FireStep {
 
     const occupants = zone ? this.occupants(state, zone) : [];
     this.renderZoneList(occupants, zone !== null);
-    this.renderChecklist(state.drillHoles.length, wet.length, occupants, permit, atRisk);
+    this.renderChecklist(state.drillHoles.length, wet.length, exposed.length, occupants, permit, atRisk);
   }
 
   refreshLocale(): void {
@@ -164,13 +165,15 @@ export class FireStep {
     return row;
   }
 
-  private renderChecklist(holeCount: number, wetCount: number, occupants: Occupant[], permit: PermitPreview | null, atRisk: BuildingAtRisk[]): void {
+  private renderChecklist(holeCount: number, wetCount: number, exposedCount: number, occupants: Occupant[], permit: PermitPreview | null, atRisk: BuildingAtRisk[]): void {
     const dryOk = wetCount === 0;
     const occupantCount = occupants.length;
     const strandedCount = occupants.filter(o => o.strandedNoDriver).length;
     const zoneOk = occupantCount === 0;
     this.checklistEl.replaceChildren(
-      this.makeCheckRow(dryOk, dryOk ? t('ui.blast_workshop.fire.check_dry', { count: holeCount }) : t('ui.blast_workshop.fire.check_wet', { count: wetCount })),
+      !dryOk || exposedCount === 0
+        ? this.makeCheckRow(dryOk, dryOk ? t('ui.blast_workshop.fire.check_dry', { count: holeCount }) : t('ui.blast_workshop.fire.check_wet', { count: wetCount }))
+        : this.makeRainRiskRow(exposedCount),
       this.makeCheckRow(zoneOk, zoneOk
         ? t('ui.blast_workshop.fire.check_zone_clear')
         : strandedCount > 0
@@ -179,6 +182,12 @@ export class FireStep {
       ...atRisk.map(b => this.makeBuildingRiskRow(b)),
       ...(permit ? [this.makePermitRow(permit)] : []),
     );
+  }
+
+  private makeRainRiskRow(count: number): HTMLElement {
+    const row = this.makeCheckRow(false, t('ui.blast_workshop.fire.check_rain_risk', { count }));
+    row.dataset['role'] = 'rain-risk-check';
+    return row;
   }
 
   private makeBuildingRiskRow(b: BuildingAtRisk): HTMLElement {

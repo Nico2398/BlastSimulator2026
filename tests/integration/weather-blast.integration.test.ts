@@ -7,10 +7,13 @@ import { tickResolvingEvents } from './helpers.js';
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
+import { detonationPhase } from '../../src/core/engine/DetonationSequence.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { forecast, createWeatherCycle } from '../../src/core/weather/WeatherCycle.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
+import { computeVoxelColumnSurfaceHeight } from '../../src/core/world/VoxelGrid.js';
+import { setHoleWater } from '../helpers/holeWater.js';
 import { TICKS_PER_DAY, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /**
@@ -339,5 +342,224 @@ describe('weather follows the level biome (#1688)', () => {
       return ctx.state!.weather.history.join(',');
     };
     expect(run('desert_badlands')).not.toBe(run('tropical_karst'));
+  });
+});
+
+describe('a wet water-sensitive shot is held, not fired on its own (#1957)', () => {
+  /** Charged, crew-cleared pattern in sunny weather; optionally tubed. Holes start dry. */
+  function chargedSite(explosiveId: string, tube = false) {
+    const game = createRunner();
+    game.runner.run('new_game seed:42 staffed:true');
+    game.runner.run('weather set sunny');
+    game.runner.run('drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12');
+    driveDrillPlanToCompletion(game.runner, game.ctx);
+    if (tube) {
+      expect(game.runner.run(`buy amount:${game.ctx.state!.drillHoles.length}`).success).toBe(true);
+      for (const hole of game.ctx.state!.drillHoles) {
+        expect(game.runner.run(`install_tubing hole:${hole.id}`).success).toBe(true);
+      }
+    }
+    game.runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
+    driveChargePlanToCompletion(game.runner, game.ctx);
+    clearPatternOfCrew(game.runner, game.ctx);
+    // The whole danger zone (pattern + margin), not just the pattern: park crew and fleet in the far corner.
+    for (const e of game.ctx.state!.employees.employees) { e.x = 60; e.z = 60; e.destinationX = null; e.destinationZ = null; }
+    for (const v of game.ctx.state!.vehicles.vehicles) { v.x = 60; v.z = 60; }
+    game.runner.run('weather set sunny');
+    game.ctx.state!.holeWater = {};
+    keepFunded(game.ctx);
+    return game;
+  }
+  const holeIds = (game: ReturnType<typeof chargedSite>) => Object.keys(game.ctx.state!.chargesByHole).sort();
+  const wetAll = (game: ReturnType<typeof chargedSite>) => setHoleWater(game.ctx.state!, holeIds(game), 0.9);
+
+  it('blast detonate on a clear zone with wet sensitive charges succeeds with the held line and does not fire', () => {
+    const game = chargedSite('boomite');
+    const ids = holeIds(game);
+    wetAll(game);
+    const res = game.runner.run('blast detonate');
+    expect(res.success, res.output).toBe(true);
+    expect(res.output).toContain(String(ids.length));
+    for (const id of ids) expect(res.output).toContain(id);
+    expect(res.output).not.toBe('mining.blast.detonation_held');
+    expect(game.ctx.state!.pendingDetonation).not.toBeNull();
+    expect(game.ctx.state!.lastBlastReport).toBeFalsy();
+  });
+
+  it('tick stops the batch with the held line instead of firing: no report, no spend, still armed', () => {
+    const game = chargedSite('boomite');
+    const ids = holeIds(game);
+    wetAll(game);
+    game.runner.run('blast detonate');
+    const res = game.runner.run('tick 5');
+    expect(res.success, res.output).toBe(true);
+    expect(res.output).not.toContain(t('mining.blast.detonation_auto_fired'));
+    expect(res.output).not.toBe('tick.detonation_held');
+    expect(res.output).toContain(String(ids.length));
+    for (const id of ids) expect(res.output).toContain(id);
+    expect(game.ctx.state!.lastBlastReport).toBeFalsy();
+    expect(game.ctx.state!.pendingDetonation).not.toBeNull();
+  });
+
+  it('the tick batch stops early at the hold (fewer ticks advanced than asked)', () => {
+    const game = chargedSite('boomite');
+    wetAll(game);
+    game.runner.run('blast detonate');
+    const before = game.ctx.state!.tickCount;
+    game.runner.run('tick 20');
+    expect(game.ctx.state!.tickCount - before).toBeLessThan(20);
+  });
+
+  it('blast after the hold fires, and the wet sensitive holes fizzle', () => {
+    const game = chargedSite('boomite');
+    const ids = holeIds(game);
+    wetAll(game);
+    game.runner.run('blast detonate');
+    game.runner.run('tick 3');
+    const res = game.runner.run('blast');
+    expect(res.success, res.output).toBe(true);
+    expect(game.ctx.state!.pendingDetonation).toBeNull();
+    expect(game.ctx.state!.lastBlastReport!.fizzledHoleIds).toEqual(ids);
+  });
+
+  it('draining the holes while held releases the hold: the shot fires on its own, nothing fizzles', () => {
+    const game = chargedSite('boomite');
+    wetAll(game);
+    game.runner.run('blast detonate');
+    game.runner.run('tick 2');
+    game.ctx.state!.holeWater = {};
+    game.runner.run('weather set sunny');
+    const res = game.runner.run('tick 5');
+    expect(res.output).toContain(t('mining.blast.detonation_auto_fired'));
+    expect(game.ctx.state!.lastBlastReport!.fizzledHoleIds ?? []).toEqual([]);
+  });
+
+  it('cancelling a held shot clears it and fires nothing', () => {
+    const game = chargedSite('boomite');
+    wetAll(game);
+    game.runner.run('blast detonate');
+    expect(game.runner.run('blast cancel').success).toBe(true);
+    expect(game.ctx.state!.pendingDetonation).toBeNull();
+    const res = game.runner.run('tick 3');
+    expect(res.output).not.toContain(t('mining.blast.detonation_auto_fired'));
+    expect(game.ctx.state!.lastBlastReport).toBeFalsy();
+  });
+
+  it('water-resistant krackle in wet holes fires on its own as before', () => {
+    const game = chargedSite('krackle');
+    wetAll(game);
+    const res = game.runner.run('blast detonate');
+    expect(res.success, res.output).toBe(true);
+    expect(game.ctx.state!.lastBlastReport!.fizzledHoleIds ?? []).toEqual([]);
+    expect(game.ctx.state!.pendingDetonation).toBeNull();
+  });
+
+  it('tubed and dry boomite fires inside blast detonate itself, no fizzle', () => {
+    const game = chargedSite('boomite', true);
+    const res = game.runner.run('blast detonate');
+    expect(res.success, res.output).toBe(true);
+    expect(game.ctx.state!.pendingDetonation).toBeNull();
+    expect(game.ctx.state!.lastBlastReport).toBeTruthy();
+    expect(game.ctx.state!.lastBlastReport!.fizzledHoleIds ?? []).toEqual([]);
+  });
+
+  it('dry untubed boomite on a clear zone still fires at once', () => {
+    const game = chargedSite('boomite');
+    const res = game.runner.run('blast detonate');
+    expect(res.success, res.output).toBe(true);
+    expect(game.ctx.state!.lastBlastReport).toBeTruthy();
+  });
+
+  it('blast status names the hold while held', () => {
+    const game = chargedSite('boomite');
+    wetAll(game);
+    game.runner.run('blast detonate');
+    const res = game.runner.run('blast status');
+    expect(res.success).toBe(true);
+    expect(res.output.length).toBeGreaterThan(0);
+    for (const id of holeIds(game)) expect(res.output).toContain(id);
+  });
+});
+
+describe('a real-rain shot is held or fires by itself depending on tubing (#1957)', () => {
+  const site = () => {
+    const game = createRunner();
+    game.runner.run('new_game seed:42 staffed:true');
+    game.runner.run('weather set sunny');
+    return game;
+  };
+  /** Pattern surface heights: a drop means voxels were cleared. */
+  const surfaceTotal = (game: ReturnType<typeof createRunner>): number => {
+    let total = 0;
+    for (let x = 8; x <= 28; x++) for (let z = 8; z <= 28; z++) total += computeVoxelColumnSurfaceHeight(game.ctx.grid!, x, z);
+    return total;
+  };
+  /** Parks one crew member inside the pattern so DETONATE has to evacuate before the zone reads clear. */
+  const putCrewInZone = (game: ReturnType<typeof createRunner>): void => {
+    for (const e of game.ctx.state!.employees.employees) { e.x = 60; e.z = 60; e.destinationX = null; e.destinationZ = null; }
+    for (const v of game.ctx.state!.vehicles.vehicles) { v.x = 60; v.z = 60; }
+    const crew = game.ctx.state!.employees.employees[0]!;
+    crew.x = 14; crew.z = 14; crew.destinationX = null; crew.destinationZ = null;
+  };
+  const tickInRain = (game: ReturnType<typeof createRunner>, until: () => boolean, maxTicks = 80): void => {
+    for (let i = 0; i < maxTicks && !until(); i++) {
+      game.runner.run('weather set light_rain');
+      for (const emp of game.ctx.state!.employees.employees) emp.fatigue = 100;
+      keepFunded(game.ctx);
+      tickResolvingEvents(cmd => game.runner.run(cmd));
+    }
+  };
+  const prepare = (explosiveId: string, tube: boolean) => {
+    const game = site();
+    game.runner.run('drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12');
+    driveDrillPlanToCompletion(game.runner, game.ctx);
+    if (tube) {
+      expect(game.runner.run(`buy amount:${game.ctx.state!.drillHoles.length}`).success).toBe(true);
+      for (const hole of game.ctx.state!.drillHoles) expect(game.runner.run(`install_tubing hole:${hole.id}`).success).toBe(true);
+    }
+    game.runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
+    driveChargePlanToCompletion(game.runner, game.ctx);
+    clearPatternOfCrew(game.runner, game.ctx);
+    keepFunded(game.ctx);
+    return game;
+  };
+
+  it('untubed boomite: rain refloods the drained holes while the zone clears, so the shot is held with nothing spent or cleared', () => {
+    const game = prepare('boomite', false);
+    const state = game.ctx.state!;
+    applyWeather(game.runner, game.ctx, 'light_rain');
+    // Real rock is often too porous to drain; pin tight-rock water so the drain succeeds, then let the rain refill it.
+    setHoleWater(state, Object.keys(state.chargesByHole), 0.9, 0.03);
+    const drained = game.runner.run('drain_hole hole:*');
+    expect(drained.success, drained.output).toBe(true);
+    putCrewInZone(game);
+    const surfaceBefore = surfaceTotal(game);
+    const detonated = game.runner.run('blast detonate');
+    expect(detonated.success, detonated.output).toBe(true);
+    expect(state.pendingDetonation).not.toBeNull();
+    const transactionsBefore = state.finances.transactions.length;
+    tickInRain(game, () => detonationPhase(state).kind === 'held');
+    expect(detonationPhase(state).kind).toBe('held');
+    // No blast income (ore sale) and no charge purchase: only routine wage-type bookkeeping may post while held.
+    const posted = state.finances.transactions.slice(transactionsBefore);
+    expect(posted.filter(tx => tx.type === 'income' || tx.category === 'explosives')).toEqual([]);
+    expect(state.lastBlastReport).toBeFalsy();
+    expect(surfaceTotal(game)).toBe(surfaceBefore);
+    expect(state.pendingDetonation).not.toBeNull();
+  });
+
+  it('tubed boomite in rain: the shot fires on its own via tick once the zone clears, no fizzle', () => {
+    const game = prepare('boomite', true);
+    const state = game.ctx.state!;
+    applyWeather(game.runner, game.ctx, 'light_rain');
+    putCrewInZone(game);
+    const detonated = game.runner.run('blast detonate');
+    expect(detonated.success, detonated.output).toBe(true);
+    expect(state.lastBlastReport).toBeFalsy();
+    expect(state.pendingDetonation).not.toBeNull();
+    tickInRain(game, () => state.pendingDetonation === null);
+    expect(state.pendingDetonation).toBeNull();
+    expect(state.lastBlastReport).toBeTruthy();
+    expect(state.lastBlastReport!.fizzledHoleIds ?? []).toEqual([]);
   });
 });

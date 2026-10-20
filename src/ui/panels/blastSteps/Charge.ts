@@ -25,7 +25,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import { el, stepper, sectionHeader, reasonLine, button, scrollBoundedSection } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
-import { ChargeHoleList, holeChargeSignature, drainReasonText, type HoleDrainView } from './ChargeHoleList.js';
+import { ChargeHoleList, holeChargeSignature, drainReasonText, drainRainReasonText, type HoleDrainView } from './ChargeHoleList.js';
 import { ChargeStockBlock, buildStockView, deliveryTransitText } from './ChargeStock.js';
 import { chargeFitsHole, maxFittingChargeKg, maxChargeKgForHole, explosiveHoleLimits, weakHoleSummary, type WeakHoleSummary } from '../../../core/mining/ChargePlan.js';
 import { getRock } from '../../../core/world/RockCatalog.js';
@@ -33,7 +33,7 @@ import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../cor
 import { getExplosivesStockByType } from '../../../core/entities/Building.js';
 import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 import { chargeKgPerMetre } from '../../../core/mining/HoleDiameter.js';
-import { wetHoles } from '../../../core/mining/WetHoles.js';
+import { rainExposedHoles, wetHoles } from '../../../core/mining/WetHoles.js';
 import { drainBlockReason } from '../../../core/mining/HoleDrain.js';
 import { TUBING_COST, hasTubing } from '../../../core/mining/Tubing.js';
 import { MIN_STEMMING_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, HOLE_DRAIN_COST_PER_HOLE, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../core/config/balance.js';
@@ -226,11 +226,13 @@ export class ChargeStep {
     const tubedSet = new Set(tubed);
     const untubed = holes.filter(h => !tubedSet.has(h.id)).map(h => h.id);
     const wetSet = new Set(wet);
+    const exposedSet = new Set(rainExposedHoles(state));
     const drainViews: Record<string, HoleDrainView> = {};
     for (const h of holes) {
       drainViews[h.id] = {
         wet: wetSet.has(h.id),
         block: drainBlockReason(state.holeWater[h.id], tubedSet.has(h.id), state.cash),
+        rainExposed: exposedSet.has(h.id),
       };
     }
 
@@ -257,6 +259,7 @@ export class ChargeStep {
       // Water levels (as percent) so the panel repaints while water fades, plus drain affordability.
       water: holes.map(h => Math.round((state.holeWater[h.id]?.level ?? 0) * 100)),
       drainBlocks: holes.map(h => drainViews[h.id]!.block),
+      rainExposed: [...exposedSet],
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -418,7 +421,10 @@ export class ChargeStep {
       onClick: () => this.runAndNotify('drain_hole hole:*'),
     });
     btn.disabled = reason !== null;
-    this.drainEl.replaceChildren(btn, ...(reason !== null ? [reasonLine(reason)] : []));
+    const rainExposed = reason === null && wetIds.some(id => views[id]?.rainExposed === true);
+    const rainLine = rainExposed ? reasonLine(drainRainReasonText()) : null;
+    if (rainLine) rainLine.dataset['role'] = 'drain-rain-reason';
+    this.drainEl.replaceChildren(btn, ...(reason !== null ? [reasonLine(reason)] : []), ...(rainLine ? [rainLine] : []));
   }
 
   private renderTubingCard(untubedIds: string[], wetUntubed: number, settled: boolean, inventory: number): void {

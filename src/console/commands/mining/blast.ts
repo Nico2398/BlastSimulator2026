@@ -71,6 +71,7 @@ function phaseLine(phase: DetonationPhase): string {
   switch (phase.kind) {
     case 'idle': return t('mining.blast.detonation_idle');
     case 'ready': return t('mining.blast.detonation_armed', { remaining: 0 });
+    case 'held': return t('mining.blast.detonation_held', { count: phase.fizzleHoleIds.length, holes: phase.fizzleHoleIds.join(', ') });
     case 'evacuating': return t('mining.blast.detonation_armed', { remaining: phase.remaining });
     case 'stranded': return t('mining.blast.detonation_stranded', { names: phase.names.join(', ') });
   }

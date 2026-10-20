@@ -7,6 +7,8 @@ import { getExplosive, getAllExplosives } from '../../../../../src/core/world/Ex
 import type { DrillHole } from '../../../../../src/core/mining/DrillPlan.js';
 import type { ColumnRock } from '../../../../../src/core/mining/ExplosiveRockFit.js';
 import { wetAllHoles, setHoleWater } from '../../../../helpers/holeWater.js';
+import { drainRainReasonText } from '../../../../../src/ui/panels/blastSteps/ChargeHoleList.js';
+import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
 import { TUBING_COST } from '../../../../../src/core/mining/Tubing.js';
 import { placeBuilding, storeExplosives } from '../../../../../src/core/entities/Building.js';
@@ -1279,5 +1281,94 @@ describe('ChargeStep initial explosive (#2016)', () => {
     expect(step.root.querySelector('[data-field="amount"] .bsx-stepper-value')!.textContent).toBe(`${maxKg} kg`);
     chargeAllBtn(step).click();
     expect(gameConsole.mock.calls[0]![0]).toContain(`amount:${maxKg}kg`);
+  });
+});
+
+describe('ChargeStep — drain reason while it rains (#1957)', () => {
+  const drainAll = (step: ChargeStep) => step.root.querySelector('[data-action="drain-holes"]') as HTMLButtonElement;
+  const drainRow = (step: ChargeStep, id: string) =>
+    step.root.querySelector(`[data-hole="${id}"] [data-action="drain-hole"]`) as HTMLButtonElement;
+  const RAIN_LINE = '[data-role="drain-rain-reason"]';
+
+  function chargedWetState(explosiveId: string, weather: 'light_rain' | 'sunny', porosity = 0.03) {
+    const state = makeState();
+    state.cash = 1000;
+    const h = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    const c = createCharge(explosiveId, 5, 2, h.depth);
+    if ('charge' in c) state.chargesByHole[h.id] = c.charge;
+    state.holeWater[h.id] = { level: 0.9, porosity };
+    state.weather.current = weather;
+    return { state, h };
+  }
+
+  it('drainRainReasonText is the localized rain reason', () => {
+    expect(drainRainReasonText()).toBe(t('ui.blast_workshop.charge.drain_rain_reason'));
+    expect(drainRainReasonText()).not.toBe('');
+  });
+
+  it('shows the rain reason line beside an enabled drain-all when a wet hole is rain-exposed', () => {
+    const { step } = makeStep();
+    const { state } = chargedWetState('boomite', 'light_rain');
+    step.update(state, 'light_rain');
+
+    expect(drainAll(step).disabled).toBe(false);
+    const line = step.root.querySelector(RAIN_LINE);
+    expect(line).not.toBeNull();
+    expect(line!.textContent).toBe(drainRainReasonText());
+  });
+
+  it('the per-hole drain button carries the rain text as title and the row is marked rainExposed', () => {
+    const { step } = makeStep();
+    const { state, h } = chargedWetState('boomite', 'light_rain');
+    step.update(state, 'light_rain');
+
+    expect(drainRow(step, h.id).disabled).toBe(false);
+    expect(drainRow(step, h.id).title).toBe(drainRainReasonText());
+    expect((step.root.querySelector(`[data-hole="${h.id}"]`) as HTMLElement).dataset['rainExposed']).toBe('true');
+  });
+
+  it('shows no rain line when sunny', () => {
+    const { step } = makeStep();
+    const { state, h } = chargedWetState('boomite', 'sunny');
+    step.update(state, 'sunny');
+
+    expect(drainAll(step).disabled).toBe(false);
+    expect(step.root.querySelector(RAIN_LINE)).toBeNull();
+    expect(drainRow(step, h.id).title).not.toBe(drainRainReasonText());
+  });
+
+  it('shows no rain line for a water-resistant charge in rain', () => {
+    const { step } = makeStep();
+    const { state } = chargedWetState('krackle', 'light_rain');
+    step.update(state, 'light_rain');
+    expect(step.root.querySelector(RAIN_LINE)).toBeNull();
+  });
+
+  it('shows no rain line for a tubed hole in rain', () => {
+    const { step } = makeStep();
+    const { state, h } = chargedWetState('boomite', 'light_rain');
+    state.tubingState.installedHoles.add(h.id);
+    step.update(state, 'light_rain');
+    expect(step.root.querySelector(RAIN_LINE)).toBeNull();
+  });
+
+  it('a porous untubed block keeps the porous reason, not the rain reason', () => {
+    const { step } = makeStep();
+    const { state } = chargedWetState('boomite', 'light_rain', 0.35);
+    step.update(state, 'light_rain');
+
+    expect(drainAll(step).disabled).toBe(true);
+    expect(step.root.textContent).toContain(t('ui.blast_workshop.charge.drain_porous_reason'));
+    expect(step.root.querySelector(RAIN_LINE)).toBeNull();
+  });
+
+  it('repaints the rain line when the weather clears', () => {
+    const { step } = makeStep();
+    const { state } = chargedWetState('boomite', 'light_rain');
+    step.update(state, 'light_rain');
+    expect(step.root.querySelector(RAIN_LINE)).not.toBeNull();
+    state.weather.current = 'sunny';
+    step.update(state, 'sunny');
+    expect(step.root.querySelector(RAIN_LINE)).toBeNull();
   });
 });

@@ -5,6 +5,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import { computeDangerZone, defineZone, isDangerZoneClear, isInZone } from '../entities/Zone.js';
+import { fizzlingHoles } from '../mining/WetHoles.js';
 import { evacuateZone } from './Evacuation.js';
 import { isActive } from '../events/ActiveModifiers.js';
 import { t } from '../i18n/I18n.js';
@@ -26,7 +27,8 @@ export type DetonationPhase =
   | { kind: 'idle' }
   | { kind: 'evacuating'; remaining: number }
   | { kind: 'stranded'; names: string[] }
-  | { kind: 'ready' };
+  | { kind: 'ready' }
+  | { kind: 'held'; fizzleHoleIds: string[] };
 
 type DetonationResult<T> = { success: true; data: T } | { success: false; error: string };
 
@@ -78,14 +80,24 @@ export function cancelDetonation(state: GameState): boolean {
   return wasArmed;
 }
 
-/** Pure read of the current phase. */
+/** Zone is clear: 'held' while a water-sensitive charge sits in a flooded hole (it would fizzle), else 'ready'. */
+function readyOrHeld(state: GameState): DetonationPhase {
+  const fizzleHoleIds = fizzlingHoles(state);
+  return fizzleHoleIds.length > 0 ? { kind: 'held', fizzleHoleIds } : { kind: 'ready' };
+}
+
+/**
+ * Pure read of the current phase. Once the zone is clear the phase is 'ready', or 'held' while
+ * fizzling holes exist (#1957): the pending detonation stays armed and nothing auto-fires until
+ * the player cancels or fires anyway. Evacuating/stranded take precedence over held.
+ */
 export function detonationPhase(state: GameState): DetonationPhase {
   const pending = state.pendingDetonation;
   if (pending === null) return { kind: 'idle' };
-  if (isDangerZoneClear(state.drillHoles, state.vehicles, state.employees)) return { kind: 'ready' };
+  if (isDangerZoneClear(state.drillHoles, state.vehicles, state.employees)) return readyOrHeld(state);
 
   const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
-  if (zone === null) return { kind: 'ready' };
+  if (zone === null) return readyOrHeld(state);
   const strandedEmps = new Set(pending.strandedEmployeeIds);
   const strandedVehs = new Set(pending.strandedVehicleIds);
   let remaining = 0;

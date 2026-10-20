@@ -4519,5 +4519,12 @@
   "notification.wall_slump.title": "Collapse",
   "notification.title.market": "Market",
   "permit.ack.success": "Approval letter filed under 'Framed'.",
-  "permit.ack.nothing": "No approval letter is waiting. The Ministry has nothing to add."
+  "permit.ack.nothing": "No approval letter is waiting. The Ministry has nothing to add.",
+  "mining.blast.detonation_held": "Zone clear, but {count} water-sensitive charges sit in flooded holes ({holes}) and would fizzle. The shot is held. Blast anyway or cancel.",
+  "tick.detonation_held": "Zone clear, but {count} water-sensitive charges sit in flooded holes ({holes}) and would fizzle. The shot is held. Blast anyway or cancel.",
+  "ui.blast_workshop.preflight.held_title": "Shot held: holes are flooded",
+  "ui.blast_workshop.preflight.held_body": "Zone clear, but {count} water-sensitive charges sit in flooded holes ({holes}) and would fizzle. The shot is held. Blast anyway or cancel.",
+  "ui.blast_workshop.preflight.warn_rain_risk": "{count} holes hold a water-sensitive charge without tubing. Rain will fill them before the zone clears. Tubing or a water-resistant explosive prevents it.",
+  "ui.blast_workshop.fire.check_rain_risk": "{count} holes hold a water-sensitive charge without tubing. Rain will fill them before the zone clears. Tubing or a water-resistant explosive prevents it.",
+  "ui.blast_workshop.charge.drain_rain_reason": "Rain refills this hole before the shot fires. Tube it or use a water-resistant explosive."
 }
