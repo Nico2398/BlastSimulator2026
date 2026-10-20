@@ -1,0 +1,477 @@
+{
+  "name": "sandbox-contracts-market-strip",
+  "description": "Contracts market strip (#1931): on a sandbox progression site a player delivers dirtite after the first blast, opens Contracts and reads the market strip: dirtite row with a negative price trend and a saturation bar, plus the locked buyer tiers with the grade each needs. No console command in any player step.",
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+        }
+      ],
+      "description": "Progression site: the sandbox opens with a permit ladder at grade 0.",
+      "expect": {
+        "equals": {
+          "mineGrade": {
+            "grade": 0,
+            "pendingTicksLeft": null
+          }
+        }
+      }
+    },
+    {
+      "command": "build explosive_warehouse at:8,8",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 8,
+          "z": 8
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Stock explosives up front: the crew idles on payroll during a 400-tick delivery wait, which the starting cash cannot pay for twice.",
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:400",
+      "role": "setup",
+      "description": "The explosive warehouse is built.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedBuildingCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "buy explosive:boomite kg:100",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        }
+      ],
+      "description": "Buy enough krackle for both blasts into the warehouse stock.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:36,30",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 4
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "dragTiles",
+          "x1": 36,
+          "z1": 30,
+          "x2": 45,
+          "z2": 39
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Blast 1: order the pattern.",
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:1500",
+      "role": "setup",
+      "description": "Blast 1: the driller lands every ordered hole.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 6
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "Blast 1: order the charges (from stock, no delivery wait).",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "role": "setup",
+      "description": "Blast 1: the blaster loads every charge.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast detonate",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "description": "Blast 1: arm the sequence; the crew evacuates the pattern before it fires, so nobody is lost.",
+      "timeout": 90,
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "role": "setup",
+      "description": "Blast 1: the sequence evacuates the pattern and fires; the holes are consumed.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "timeout": 60,
+      "description": "Dismiss the blast report once the sequence has fired.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ]
+    },
+    {
+      "command": "build_ramp start:12,34 end:34,34 depth:6",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "focusTile",
+          "x": 23,
+          "z": 34,
+          "distance": 30,
+          "pitch": 75
+        },
+        {
+          "type": "dragTiles",
+          "x1": 12,
+          "z1": 34,
+          "x2": 34,
+          "z2": 34
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Ramp into the crater right after blast 1 so the digger and hauler move its ore while blast 2 is prepared (payroll runs every tick; the starting cash cannot afford a serial run).",
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:800",
+      "role": "setup",
+      "description": "The digger finishes the ramp before blast 2's pattern is ordered: holes ordered while the ramp is open are unreachable ghosts for the driller.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 800,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:1200",
+      "role": "setup",
+      "description": "Ore from blast 1 is hauled to storage and a lot the stored ore can fill is on offer.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "fillableOreSaleOffered",
+          "equals": true,
+          "maxTicks": 1200,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "fillableOreSaleOffered": true
+        }
+      }
+    },
+    {
+      "command": "contract accept type:ore_sale material:dirtite fillable:true",
+      "role": "player",
+      "description": "Open Contracts and accept a fillable dirtite ore sale.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      }
+    },
+    {
+      "command": "contract deliver type:ore_sale material:dirtite fillable:true amount:5000",
+      "role": "player",
+      "description": "Deliver the dirtite: the sale floods the dirtite market and saturation rises.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel .bs-contract-amount",
+          "value": "5000"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "description": "The market strip heads the Contracts panel with a dirtite row.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-market .bs-market-row[data-ore=\"dirtite\"]"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "description": "Dirtite's trend reads negative after the sale (data-trend-pct starts with a minus sign).",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-market .bs-market-row[data-ore=\"dirtite\"] .bs-market-trend[data-trend-pct^=\"-\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-market .bs-market-row[data-ore=\"dirtite\"] .bs-market-sat"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "description": "At grade 0 the national and global buyer tiers are listed as locked with the grade they need.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-market .bs-market-locked"
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    }
+  ]
+}

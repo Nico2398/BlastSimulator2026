@@ -12,6 +12,10 @@ import { addFreightWarehouseToState } from '../../../helpers/freightWarehouse.js
 import type { Contract } from '../../../../src/core/economy/Contract.js';
 import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
 import { placeBuilding } from '../../../../src/core/entities/Building.js';
+import { createGradeState, gradeDef } from '../../../../src/core/economy/MineGrade.js';
+import { BUYER_TIERS, buyerTierNameKey } from '../../../../src/core/economy/BuyerTiers.js';
+import { oreSaturationTrend } from '../../../../src/core/economy/OreSaturation.js';
+import { resolveContractOres } from '../../../../src/core/campaign/Level.js';
 
 function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -1554,5 +1558,334 @@ describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
     panel.update(state);
     expect(time.style.color).not.toBe(before);
     expect(time.style.color).toContain('critical');
+  });
+});
+
+
+// ── Market strip, buyer badges and locked tiers on progression sites (#1931) ──
+
+describe('ContractsPanel — market strip (progression)', () => {
+  const STRIP = '#bs-contract-market';
+
+  function progressionState(grade = 0): GameState {
+    const state = makeState();
+    state.grade = { ...createGradeState(), grade };
+    state.tickCount = 100;
+    return state;
+  }
+
+  function render(state: GameState): { panel: ContractsPanel } {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(state);
+    return { panel };
+  }
+
+  const rowOf = (panel: ContractsPanel, ore: string): HTMLElement =>
+    panel.root.querySelector<HTMLElement>(`${STRIP} .bs-market-row[data-ore="${ore}"]`)!;
+
+  /** Saturate `ore` to `level` as of the state's current tick. */
+  const saturate = (state: GameState, ore: string, level: number): void => {
+    state.saturation = { ...(state.saturation ?? {}), [ore]: { level, tick: state.tickCount } };
+  };
+
+  describe('buyer badge', () => {
+    it.each(BUYER_TIERS.map(b => b.id))('offer card shows the %s badge with the buyer name', (id) => {
+      const state = progressionState();
+      state.contracts.available.push(makeContract({ id: 3, buyerTier: id }));
+      const { panel } = render(state);
+      const badge = panel.root.querySelector<HTMLElement>(
+        `[data-contract-id="3"] .bs-contract-buyer-badge[data-buyer-tier="${id}"]`,
+      );
+      expect(badge).not.toBeNull();
+      expect(badge!.textContent).toBe(t(buyerTierNameKey(id)));
+    });
+
+    it('gives each tier a badge of its own look', () => {
+      const state = progressionState();
+      BUYER_TIERS.forEach((b, i) => state.contracts.available.push(makeContract({ id: i + 1, buyerTier: b.id })));
+      const { panel } = render(state);
+      const styles = BUYER_TIERS.map(b => panel.root.querySelector<HTMLElement>(
+        `.bs-contract-buyer-badge[data-buyer-tier="${b.id}"]`,
+      )!.getAttribute('style'));
+      expect(new Set(styles).size).toBe(BUYER_TIERS.length);
+    });
+
+    it('an offer without a buyer tier (rubble clearance) carries no badge', () => {
+      const state = progressionState();
+      state.contracts.available.push(makeContract({ id: 4, type: 'rubble_disposal', materialId: '' }));
+      const { panel } = render(state);
+      expect(panel.root.querySelector('.bs-contract-buyer-badge')).toBeNull();
+    });
+
+    it('a non-progression site shows no badge even on a tiered offer', () => {
+      const state = makeState();
+      state.contracts.available.push(makeContract({ id: 3, buyerTier: 'regional' }));
+      const { panel } = render(state);
+      expect(panel.root.querySelector('.bs-contract-buyer-badge')).toBeNull();
+    });
+  });
+
+  describe('strip layout', () => {
+    it('sits first in the panel body', () => {
+      const { panel } = render(progressionState());
+      expect(getBodyEl(panel).firstElementChild!.id).toBe('bs-contract-market');
+    });
+
+    it('has one row per ore the site yields, in site order', () => {
+      const state = progressionState();
+      const { panel } = render(state);
+      const rows = Array.from(panel.root.querySelectorAll<HTMLElement>(`${STRIP} .bs-market-row`));
+      expect(rows.map(r => r.dataset['ore'])).toEqual([...resolveContractOres(state)]);
+      expect(rows.length).toBeGreaterThan(0);
+    });
+
+    it('titles the strip', () => {
+      const { panel } = render(progressionState());
+      expect(panel.root.querySelector(STRIP)!.textContent).toContain(t('ui.contracts.market_title'));
+    });
+
+    it('each row has a trend and a saturation bar', () => {
+      const state = progressionState();
+      const { panel } = render(state);
+      for (const ore of resolveContractOres(state)) {
+        expect(rowOf(panel, ore).querySelector('.bs-market-trend[data-trend-pct]')).not.toBeNull();
+        expect(rowOf(panel, ore).querySelector('.bs-market-sat')).not.toBeNull();
+      }
+    });
+
+    it('does not move the existing sections out of order', () => {
+      const { panel } = render(progressionState());
+      const kids = Array.from(getBodyEl(panel).children) as HTMLElement[];
+      const pos = (key: string) => kids.findIndex(k => k.dataset['scrollKey'] === key);
+      expect(pos('available')).toBeLessThan(pos('active'));
+      expect(pos('active')).toBeLessThan(pos('closed'));
+    });
+  });
+
+  describe('trend from saturation', () => {
+    it('reads -20 at saturation 0.4, matching oreSaturationTrend', () => {
+      const state = progressionState();
+      saturate(state, 'dirtite', 0.4);
+      const { panel } = render(state);
+      const trend = rowOf(panel, 'dirtite').querySelector<HTMLElement>('.bs-market-trend')!;
+      expect(oreSaturationTrend('dirtite', 0.4, 1).pct).toBe(-20);
+      expect(trend.dataset['trendPct']).toBe('-20');
+      expect(trend.textContent).toContain('20');
+    });
+
+    it('prints the trend through the market_trend key', () => {
+      const state = progressionState();
+      saturate(state, 'dirtite', 0.4);
+      const { panel } = render(state);
+      const trend = rowOf(panel, 'dirtite').querySelector<HTMLElement>('.bs-market-trend')!;
+      expect(trend.textContent).toContain(t('ui.contracts.market_trend', { pct: -20 }));
+    });
+
+    it('an unsold ore reads 0', () => {
+      const { panel } = render(progressionState());
+      const trend = rowOf(panel, 'dirtite').querySelector<HTMLElement>('.bs-market-trend')!;
+      expect(trend.dataset['trendPct']).toBe('0');
+    });
+
+    it('decays: a stale entry reads the decayed saturation, not the stored level', () => {
+      const state = progressionState();
+      state.saturation = { dirtite: { level: 0.4, tick: 100 - 500 } }; // one half-life ago -> 0.2
+      const { panel } = render(state);
+      expect(rowOf(panel, 'dirtite').querySelector<HTMLElement>('.bs-market-trend')!.dataset['trendPct'])
+        .toBe(String(oreSaturationTrend('dirtite', 0.2, 1).pct));
+    });
+
+    it('saturates one ore without touching the others', () => {
+      const state = progressionState();
+      saturate(state, 'dirtite', 0.6);
+      const { panel } = render(state);
+      for (const ore of resolveContractOres(state).filter(o => o !== 'dirtite')) {
+        expect(rowOf(panel, ore).querySelector<HTMLElement>('.bs-market-trend')!.dataset['trendPct']).toBe('0');
+      }
+      expect(rowOf(panel, 'dirtite').querySelector<HTMLElement>('.bs-market-trend')!.dataset['trendPct']).toBe('-30');
+    });
+
+    it('never prints negative zero (a sub-percent discount)', () => {
+      const state = progressionState();
+      saturate(state, 'dirtite', 0.005); // factor 0.9975 -> Math.round(-0.25) is -0
+      const { panel } = render(state);
+      const trend = rowOf(panel, 'dirtite').querySelector<HTMLElement>('.bs-market-trend')!;
+      expect(trend.dataset['trendPct']).toBe('0');
+      expect(trend.textContent).not.toMatch(/-0(?!\d)/);
+      expect(panel.root.querySelector(STRIP)!.textContent).not.toMatch(/-0%/);
+    });
+
+    it('carries the saturation bar as a progress element', () => {
+      const state = progressionState();
+      saturate(state, 'dirtite', 0.4);
+      const { panel } = render(state);
+      const bar = rowOf(panel, 'dirtite').querySelector<HTMLElement>('.bs-market-sat')!;
+      const value = bar instanceof HTMLProgressElement ? bar.value : Number(bar.getAttribute('aria-valuenow'));
+      expect(value).toBeCloseTo(0.4, 2);
+    });
+  });
+
+  describe('tooltip in the game voice', () => {
+    const titleAt = (level: number): string => {
+      const state = progressionState();
+      saturate(state, 'dirtite', level);
+      return rowOf(render(state).panel, 'dirtite').title;
+    };
+
+    it('has the exact English lines', () => {
+      setLocale('en');
+      expect(t('ui.contracts.market_tip_flooded')).toBe('Market flooded. The GRX blames you.');
+      expect(t('ui.contracts.market_tip_hungry')).toBe('Buyers are hungry.');
+      expect(t('ui.contracts.market_tip_steady')).not.toBe('ui.contracts.market_tip_steady');
+    });
+
+    it('flooded at 0.5 (boundary) and above', () => {
+      expect(titleAt(0.5)).toBe(t('ui.contracts.market_tip_flooded'));
+      expect(titleAt(1)).toBe(t('ui.contracts.market_tip_flooded'));
+    });
+
+    it('hungry at 0.1 (boundary) and below, and when unsold', () => {
+      expect(titleAt(0.1)).toBe(t('ui.contracts.market_tip_hungry'));
+      expect(titleAt(0)).toBe(t('ui.contracts.market_tip_hungry'));
+    });
+
+    it('steady in between', () => {
+      expect(titleAt(0.3)).toBe(t('ui.contracts.market_tip_steady'));
+      expect(titleAt(0.49)).toBe(t('ui.contracts.market_tip_steady'));
+      expect(titleAt(0.11)).toBe(t('ui.contracts.market_tip_steady'));
+    });
+  });
+
+  describe('locked tiers row', () => {
+    const lockedLine = (id: 'regional' | 'national' | 'global'): string => {
+      const tier = BUYER_TIERS.find(b => b.id === id)!;
+      const def = gradeDef(tier.unlockGrade);
+      return t('ui.contracts.locked_tier', { buyer: t(tier.nameKey), grade: t(def.nameKey, def.nameParams) });
+    };
+    const lockedText = (grade: number): string | null => {
+      const { panel } = render(progressionState(grade));
+      return panel.root.querySelector(`${STRIP} .bs-market-locked`)?.textContent ?? null;
+    };
+
+    it('names the national board and the grade it needs', () => {
+      setLocale('en');
+      const text = lockedText(0)!;
+      expect(text).toContain('National Ore Railway Board: needs Industrial Pit');
+      expect(text).toContain(lockedLine('national'));
+    });
+
+    it('at grade 0 lists regional, national and global', () => {
+      const text = lockedText(0)!;
+      for (const id of ['regional', 'national', 'global'] as const) expect(text).toContain(lockedLine(id));
+      expect(text).toContain(t('ui.contracts.locked_tiers_title'));
+    });
+
+    it('at grade 1 the regional buyer is no longer locked', () => {
+      const text = lockedText(1)!;
+      expect(text).not.toContain(lockedLine('regional'));
+      expect(text).toContain(lockedLine('national'));
+      expect(text).toContain(lockedLine('global'));
+    });
+
+    it('at grade 3 only global is left', () => {
+      const text = lockedText(3)!;
+      expect(text).not.toContain(lockedLine('national'));
+      expect(text).toContain(lockedLine('global'));
+    });
+
+    it('is absent once every tier is unlocked (grade 5)', () => {
+      expect(lockedText(5)).toBeNull();
+    });
+
+    it('updates when the permit grade rises', () => {
+      const { panel } = makePanel();
+      const state = progressionState(0);
+      panel.show();
+      panel.update(state);
+      state.grade!.grade = 5;
+      panel.update(state);
+      expect(panel.root.querySelector('.bs-market-locked')).toBeNull();
+    });
+  });
+
+  describe('non-progression site', () => {
+    it('has no strip, no locked row and no badge', () => {
+      const state = makeState();
+      state.saturation = { dirtite: { level: 0.4, tick: state.tickCount } };
+      state.contracts.available.push(makeContract({ id: 1, buyerTier: 'local' }));
+      const { panel } = render(state);
+      expect(panel.root.querySelector('#bs-contract-market')).toBeNull();
+      expect(panel.root.querySelector('.bs-market-locked')).toBeNull();
+      expect(panel.root.querySelector('.bs-market-row')).toBeNull();
+      expect(panel.root.querySelector('.bs-contract-buyer-badge')).toBeNull();
+    });
+
+    it('keeps the storage strip first in the body', () => {
+      const { panel } = render(makeState());
+      expect(getBodyEl(panel).firstElementChild!.querySelector('[data-action="goto-ops"]')).not.toBeNull();
+    });
+  });
+
+  describe('re-rendering', () => {
+    it('a sale changes the shown percentage and rebuilds the strip', () => {
+      const { panel } = makePanel();
+      const state = progressionState();
+      saturate(state, 'dirtite', 0.4);
+      panel.show();
+      panel.update(state);
+      const before = panel.root.querySelector(STRIP);
+
+      saturate(state, 'dirtite', 0.6);
+      panel.update(state);
+
+      expect(panel.root.querySelector(STRIP)).not.toBe(before);
+      expect(rowOf(panel, 'dirtite').querySelector<HTMLElement>('.bs-market-trend')!.dataset['trendPct']).toBe('-30');
+    });
+
+    it('decay alone, within the same whole percent, does not re-render', () => {
+      const { panel } = makePanel();
+      const state = progressionState();
+      saturate(state, 'dirtite', 0.4);
+      panel.show();
+      panel.update(state);
+      const before = panel.root.querySelector(STRIP);
+      const row = rowOf(panel, 'dirtite');
+
+      state.tickCount += 1; // 0.4 * 0.5^(1/500) -> still -20%
+      panel.update(state);
+
+      expect(panel.root.querySelector(STRIP)).toBe(before);
+      expect(rowOf(panel, 'dirtite')).toBe(row);
+    });
+
+    it('decay across a whole percent does re-render', () => {
+      const { panel } = makePanel();
+      const state = progressionState();
+      saturate(state, 'dirtite', 0.4);
+      panel.show();
+      panel.update(state);
+
+      state.tickCount += 500; // one half-life -> 0.2 -> -10%
+      panel.update(state);
+
+      expect(rowOf(panel, 'dirtite').querySelector<HTMLElement>('.bs-market-trend')!.dataset['trendPct']).toBe('-10');
+    });
+
+    it('refreshLocale re-renders the strip in French', () => {
+      const { panel } = makePanel();
+      const state = progressionState();
+      panel.show();
+      panel.update(state);
+      const en = panel.root.querySelector(STRIP)!.textContent;
+      try {
+        setLocale('fr');
+        panel.refreshLocale();
+        panel.update(state);
+        expect(panel.root.querySelector(STRIP)!.textContent).not.toBe(en);
+      } finally {
+        setLocale('en');
+      }
+    });
   });
 });
