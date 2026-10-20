@@ -63,9 +63,7 @@ export function classifyWetChargedHoles(
   wetHoleIds: ReadonlySet<string>,
 ): WetBlastHoles {
   const wet = [...wetHoleIds].filter(id => charges[id] !== undefined).sort();
-  const fizzled = wet.filter(id => {
-    return isWaterSensitiveCharge(charges[id]!);
-  });
+  const fizzled = wet.filter(id => isWaterSensitiveCharge(charges[id]!));
   return { wet, fizzled, chargedCount: Object.keys(charges).length };
 }
 

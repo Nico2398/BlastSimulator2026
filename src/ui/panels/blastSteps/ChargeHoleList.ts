@@ -31,7 +31,7 @@ export interface HoleDrainView {
   rainExposed?: boolean;
 }
 
-/** Localized reason a rain-exposed hole cannot be drained. */
+/** Localized rain advisory for a rain-exposed hole's drain control; the control stays enabled. */
 export function drainRainReasonText(): string {
   return t('ui.blast_workshop.charge.drain_rain_reason');
 }
