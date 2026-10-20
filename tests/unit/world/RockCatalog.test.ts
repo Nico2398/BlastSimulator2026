@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getRock, getAllRocks, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
+import { getRock, getAllRocks, oresYieldedByRocks, getSafeFaceHeightM } from '../../../src/core/world/RockCatalog.js';
+import { WALL_SAFE_FACE_HEIGHT_M_BY_TIER } from '../../../src/core/config/balance.js';
 import { getAllOres } from '../../../src/core/world/OreCatalog.js';
 
 describe('RockCatalog', () => {
@@ -95,5 +96,44 @@ describe('oresYieldedByRocks (#1364)', () => {
   it('with every rock, yields every ore any rock can host', () => {
     const expected = new Set(getAllRocks().flatMap(r => Object.entries(r.oreProbabilities).filter(([, p]) => p > 0).map(([id]) => id)));
     expect(new Set(oresYieldedByRocks(getAllRocks().map(r => r.id)))).toEqual(expected);
+  });
+
+  describe('safe face height (#1941)', () => {
+    it('every rock has a positive safeFaceHeightM matching its hardness tier', () => {
+      for (const rock of getAllRocks()) {
+        expect(rock.safeFaceHeightM, rock.id).toBe(WALL_SAFE_FACE_HEIGHT_M_BY_TIER[rock.hardnessTier]);
+        expect(rock.safeFaceHeightM, rock.id).toBeGreaterThan(0);
+      }
+    });
+
+    it('tier table is 12 / 15 / 20 / 25 / 30 m', () => {
+      expect([1, 2, 3, 4, 5].map(t => WALL_SAFE_FACE_HEIGHT_M_BY_TIER[t])).toEqual([12, 15, 20, 25, 30]);
+    });
+
+    it('harder tiers never hold a lower face (monotone in tier)', () => {
+      const rocks = [...getAllRocks()].sort((a, b) => a.hardnessTier - b.hardnessTier);
+      for (let i = 1; i < rocks.length; i++) {
+        expect(rocks[i]!.safeFaceHeightM).toBeGreaterThanOrEqual(rocks[i - 1]!.safeFaceHeightM);
+      }
+    });
+
+    it('rocks of the same tier share one height', () => {
+      for (let tier = 1; tier <= 5; tier++) {
+        const heights = new Set(getAllRocks().filter(r => r.hardnessTier === tier).map(r => r.safeFaceHeightM));
+        expect(heights.size, `tier ${tier}`).toBe(1);
+      }
+    });
+
+    it('getSafeFaceHeightM reads the rock by id', () => {
+      expect(getSafeFaceHeightM('cruite')).toBe(12);
+      expect(getSafeFaceHeightM('molite')).toBe(15);
+      expect(getSafeFaceHeightM('clunkite')).toBe(20);
+      expect(getSafeFaceHeightM('obstiite')).toBe(25);
+      expect(getSafeFaceHeightM('titanite')).toBe(30);
+    });
+
+    it('getSafeFaceHeightM agrees with the catalog for every rock', () => {
+      for (const rock of getAllRocks()) expect(getSafeFaceHeightM(rock.id), rock.id).toBe(rock.safeFaceHeightM);
+    });
   });
 });
