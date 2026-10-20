@@ -53,22 +53,35 @@ const fail = (reasonKey: string, params?: Record<string, string | number>): Fail
 interface Tile { x: number; z: number }
 interface PitBounds { minX: number; maxX: number; minZ: number; maxZ: number }
 
-/** True when `(x, z)` is claimed and at least the crater drop below `ground`. */
+/**
+ * `tile` sits in a closed depression: every cardinal ray meets ground a crater drop above `height`
+ * within the pit span, before leaving the claimed area.
+ */
+function enclosedByHigherGround(surface: SpiralSurface, tile: Tile, height: number): boolean {
+  return NEIGHBOUR_OFFSETS_4.every(([dx, dz]) => {
+    for (let k = 1; k <= RAMP_SPIRAL_MAX_PIT_SPAN_M; k++) {
+      const x = tile.x + dx * k;
+      const z = tile.z + dz * k;
+      if (!surface.contains(x, z)) return false;
+      if (surface.heightAt(x, z) >= height + RAMP_CRATER_MIN_DROP_M) return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * True when `(x, z)` is claimed, at least the crater drop below `ground`, and in a closed
+ * depression. The enclosure test keeps downhill ground on a slope from reading as pit.
+ */
 function isVoid(surface: SpiralSurface, x: number, z: number, ground: number): boolean {
-  return surface.contains(x, z) && surface.heightAt(x, z) <= ground - RAMP_CRATER_MIN_DROP_M;
+  if (!surface.contains(x, z)) return false;
+  const height = surface.heightAt(x, z);
+  return height <= ground - RAMP_CRATER_MIN_DROP_M && enclosedByHigherGround(surface, { x, z }, height);
 }
 
 /** The start sits at the bottom of a hollow: every cardinal ray meets ground a crater drop higher. */
 function startInHollow(surface: SpiralSurface, start: Tile, ground: number): boolean {
-  return NEIGHBOUR_OFFSETS_4.every(([dx, dz]) => {
-    for (let k = 1; k <= RAMP_SPIRAL_MAX_PIT_SPAN_M; k++) {
-      const x = start.x + dx * k;
-      const z = start.z + dz * k;
-      if (!surface.contains(x, z)) return false;
-      if (surface.heightAt(x, z) >= ground + RAMP_CRATER_MIN_DROP_M) return true;
-    }
-    return false;
-  });
+  return enclosedByHigherGround(surface, start, ground);
 }
 
 /** Any void tile within the pit span of `start`. */

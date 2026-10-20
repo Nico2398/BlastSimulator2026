@@ -36,6 +36,7 @@ import { hireEmployee, assignSkill } from '../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { reserveVehicle } from '../../src/core/engine/VehicleReservation.js';
 import { vehicleDriverId, getVehicleReservation } from '../../src/core/entities/Vehicle.js';
+import { tickArrivalGate } from '../../src/core/engine/ArrivalGate.js';
 import { forceShiftRestIfNeeded } from '../../src/core/engine/ForceShiftRest.js';
 import { Random } from '../../src/core/math/Random.js';
 import { WORK_DURATION_TICKS } from '../../src/core/config/balance.js';
@@ -178,6 +179,74 @@ describe('Vehicle reservation survives a forced-rest promotion (#1115)', () => {
       // The acceptance shape: no I5/I4 violations survive at all — the fix
       // releases the reservation before the rest starts, so it never has a
       // chance to sit stale through it.
+      expectNoWorldInvariantViolations(ctx.state!);
+    },
+  );
+
+  // #2017: reconcileVehicleReservations' branch (c) names ANY vehicle-gated
+  // action whose holder has taskTicksRemaining === null and no reserved
+  // vehicle — including a reserve-ahead entry in the holder's taskQueue,
+  // which is not the holder's active action. ArrivalGate then called
+  // interruptActiveAction(emp, queuedId), which assumed the id was the active
+  // action and wiped the REAL active haul's fields, orphaning it (assigned,
+  // holder = driver, hauler still reserved) -> I5.
+  it(
+    'a queued-ahead haul with no vehicle reservation is released alone; the driver\'s real active haul is not orphaned (#2017)',
+    () => {
+      vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+      vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+      const vehicleA = ctx.state!.vehicles.vehicles[0]!;
+      const vehicleB = ctx.state!.vehicles.vehicles[1]!;
+
+      const { employee: driver } = hireEmployee(ctx.state!.employees, 'driller', new Random(1), vehicleA.x, vehicleA.z);
+      assignSkill(ctx.state!.employees, driver.id, 'driving.truck', 1);
+
+      const makeHaul = (id: number, v: { x: number; z: number }): PendingAction => ({
+        id,
+        type: 'haul_debris',
+        requiredSkill: null,
+        requiredVehicleRole: 'debris_hauler',
+        targetX: v.x,
+        targetZ: v.z,
+        targetY: 0,
+        payload: {},
+        targetEmployeeId: null,
+        status: 'assigned',
+        holderId: driver.id,
+        queuedAtTick: 0,
+      });
+      const active = makeHaul(9101, vehicleA);
+      const queued = makeHaul(9102, vehicleB);
+      ctx.state!.pendingActions.push(active, queued);
+
+      // Active haul: mid-drive on A, driver mounted, timer not yet seeded.
+      vehicleA.occupantIds = [driver.id];
+      driver.locomotion = { kind: 'mounted', vehicleId: vehicleA.id };
+      driver.activeActionId = active.id;
+      driver.taskTicksRemaining = null;
+      reserveVehicle(ctx.state!.vehicles, vehicleA.id, active.id);
+
+      // Second haul reserved ahead in the taskQueue: assigned/held by the
+      // driver but NO vehicle reservation. Stale 'rest' pendingActionType is
+      // the shape the live failure left behind.
+      driver.taskQueue = [queued.id];
+      driver.pendingActionType = 'rest';
+      expect(getVehicleReservation(ctx.state!.vehicles, vehicleB.id)).toBeNull();
+
+      tickArrivalGate(ctx.state!);
+
+      // Real active haul still validly held with A reserved for it.
+      expect(driver.activeActionId).toBe(active.id);
+      expect(active.holderId).toBe(driver.id);
+      expect(active.status).toBe('assigned');
+      expect(getVehicleReservation(ctx.state!.vehicles, vehicleA.id)).toBe(active.id);
+
+      // Queued-ahead entry released alone.
+      expect(queued.status).toBe('queued');
+      expect(queued.holderId).toBeNull();
+      expect(driver.taskQueue).not.toContain(queued.id);
+      expect(getVehicleReservation(ctx.state!.vehicles, vehicleB.id)).toBeNull();
+
       expectNoWorldInvariantViolations(ctx.state!);
     },
   );

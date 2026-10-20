@@ -171,8 +171,8 @@ export function tickArrivalGate(state: GameState, grid?: VoxelGrid): ArrivalGate
   // to emit here, now emitted by the effect handlers themselves
   // (ArrivalEffects.ts).
 
-  // reconcileVehicleReservations only reports which active actions need
-  // interrupting (their reserved vehicle vanished underneath them) rather
+  // reconcileVehicleReservations only reports which actions need
+  // interrupting (the id may name a queued-ahead action, #2017; their reserved vehicle vanished underneath them) rather
   // than interrupting them itself — that call lives in TaskDispatch.ts,
   // which VehicleReservation.ts cannot import without a cycle (TaskDispatch.ts
   // imports releaseVehicleReservation from VehicleReservation.ts).
