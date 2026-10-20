@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EvacuationSiren, evacuationRemaining } from '../../../../src/audio/director/EvacuationSiren.js';
+import { detonationPhase } from '../../../../src/core/engine/DetonationSequence.js';
 import { SIREN_CONFIG } from '../../../../src/core/config/audio/game.js';
 import { addEmployee, makeHarness, makeState, type Harness } from './helpers.js';
 
@@ -206,6 +207,15 @@ describe('evacuationRemaining', () => {
     const stuck = addEmployee(state, 50, 50);
     state.pendingDetonation!.strandedEmployeeIds.push(stuck.id);
     expect(evacuationRemaining(state)).toBe(1);
+  });
+
+  it('is zero while the shot is held for wet water-sensitive charges (#1957)', () => {
+    const state = armedState();
+    addEmployee(state, 5000, 5000);
+    state.chargesByHole['H1'] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    state.holeWater['H1'] = { level: 0.9, porosity: 0.03 };
+    expect(detonationPhase(state).kind).toBe('held');
+    expect(evacuationRemaining(state)).toBe(0);
   });
 
   it('is zero once the zone is clear', () => {

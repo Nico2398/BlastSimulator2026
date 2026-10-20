@@ -839,3 +839,123 @@ describe('PreflightModal — buildings in blast reach (#2021)', () => {
     expect(text).not.toContain('ui.blast_workshop.preflight.warn_building');
   });
 });
+
+// ── #1957: held phase and rain risk ─────────────────────────────────────────
+
+describe('PreflightModal — held shot and rain risk (#1957)', () => {
+  const FIRE_ANYWAY = '[data-action="preflight-fire-anyway"]';
+  const CANCEL_DET = '[data-action="preflight-cancel-detonation"]';
+  const WAITING = '[data-role="preflight-waiting"]';
+  const RAIN_ROW = '[data-role="preflight-rain-risk"]';
+
+  function heldState(): GameState {
+    const state = chargedPlan();
+    wetAllHoles(state);
+    state.pendingDetonation = { armedTick: 0, strandedEmployeeIds: [], strandedVehicleIds: [], lastEvacuationTick: 0 };
+    return state;
+  }
+
+  it('held phase shows the waiting panel with data-phase="held" and the held body naming the count and holes', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const state = heldState();
+    modal.update(state, 'sunny');
+
+    const el = modal.root.querySelector(WAITING) as HTMLElement;
+    expect(el).not.toBeNull();
+    expect(el.dataset['phase']).toBe('held');
+    const ids = state.drillHoles.map(h => h.id);
+    expect(el.textContent).toContain(t('ui.blast_workshop.preflight.held_body', { count: ids.length, holes: ids.join(', ') }));
+  });
+
+  it('held phase keeps Cancel and Blast anyway enabled', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(heldState(), 'sunny');
+    expect((modal.root.querySelector(FIRE_ANYWAY) as HTMLButtonElement).disabled).toBe(false);
+    expect((modal.root.querySelector(CANCEL_DET) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('held phase does not auto-hide the modal across updates', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const state = heldState();
+    modal.update(state, 'sunny');
+    modal.update(state, 'sunny');
+    expect(modal.visible).toBe(true);
+  });
+
+  it('Blast anyway in the held phase dispatches a bare blast', () => {
+    const { modal, gameConsole } = makeModal();
+    modal.show();
+    modal.update(heldState(), 'sunny');
+    (modal.root.querySelector(FIRE_ANYWAY) as HTMLButtonElement).click();
+    expect(gameConsole).toHaveBeenCalledWith('blast');
+  });
+
+  it('held body is not the evacuating body', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(heldState(), 'sunny');
+    expect(modal.root.textContent).not.toContain(t('ui.blast_workshop.preflight.detonating_remaining', { count: 0 }));
+  });
+
+  it('shows the rain-risk row instead of ok_dry when rain falls on untubed sensitive charges and no hole is wet', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const state = chargedPlan();
+    state.weather.current = 'light_rain';
+    modal.update(state, 'light_rain');
+
+    const row = modal.root.querySelector(RAIN_ROW);
+    expect(row).not.toBeNull();
+    expect(row!.textContent).toContain(t('ui.blast_workshop.preflight.warn_rain_risk', { count: 1 }));
+    expect(modal.root.textContent).not.toContain(t('ui.blast_workshop.preflight.ok_dry'));
+  });
+
+  it('wet holes show warn_wet, not the rain-risk row', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const state = chargedPlan();
+    state.weather.current = 'light_rain';
+    wetAllHoles(state);
+    modal.update(state, 'light_rain');
+
+    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.warn_wet', { count: 1 }));
+    expect(modal.root.querySelector(RAIN_ROW)).toBeNull();
+  });
+
+  it('a tubed hole in rain still shows ok_dry', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const state = chargedPlan();
+    state.tubingState.installedHoles = new Set(state.drillHoles.map(h => h.id));
+    state.weather.current = 'storm';
+    modal.update(state, 'storm');
+
+    expect(modal.root.querySelector(RAIN_ROW)).toBeNull();
+    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.ok_dry'));
+  });
+
+  it('sunny weather shows ok_dry and no rain row', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(chargedPlan(), 'sunny');
+    expect(modal.root.querySelector(RAIN_ROW)).toBeNull();
+    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.ok_dry'));
+  });
+
+  it('en.json and fr.json define the new keys with different text', () => {
+    const read = (l: string): Record<string, string> => JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8'));
+    for (const key of [
+      'ui.blast_workshop.preflight.held_body',
+      'ui.blast_workshop.preflight.warn_rain_risk',
+      'mining.blast.detonation_held',
+      'tick.detonation_held',
+    ]) {
+      expect(read('en')[key], `en ${key}`).toBeTruthy();
+      expect(read('fr')[key], `fr ${key}`).toBeTruthy();
+      expect(read('en')[key], key).not.toBe(read('fr')[key]);
+    }
+  });
+});

@@ -1,0 +1,377 @@
+{
+  "name": "wet-shot-held-visual",
+  "description": "#1957: Obliviax charged on tropical karst in light rain. The Charge step's Drain carries the rain reason, the Fire step warns the dry holes will take on water, and DETONATE holds in the evacuation modal once rain refills the holes instead of firing a fizzle on its own; Blast anyway fires. Player clicks only.",
+  "steps": [
+    {
+      "command": "sandbox start biome:tropical_karst kit:full seed:31337 staffed:true",
+      "timeout": 60,
+      "description": "Tropical karst sandbox with the staffed roster (#1957): its rock needs a tier-4 water-sensitive explosive (Obliviax).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:tropical_karst kit:full seed:31337 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "mineType": "tropical_karst"
+        }
+      }
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "time speed 8",
+      "description": "Speed up the drilling and charging waits.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 8"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:15,15 diameter:0.089",
+      "timeout": 60,
+      "description": "Order a 3x3 grid by dragging (15,15)-(19,19) at 2 m spacing.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 2
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 19,
+          "z2": 19
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 9,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:900",
+      "timeout": 330,
+      "description": "The driller lands all nine holes.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 900,
+          "timeoutMs": 300000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:obliviax amount:5 stemming:2",
+      "timeout": 60,
+      "description": "Charge every hole with Obliviax (water-sensitive).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"obliviax\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 410,
+      "description": "The blaster loads every charge.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 380000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "weather set light_rain",
+      "description": "Light rain falls on the untubed holes. Bootstrap: weather has no UI control.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set light_rain"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:wetHoleCount equals:9 max_ticks:200",
+      "timeout": 150,
+      "description": "Rain fills every bare hole (about three ticks).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 9,
+          "maxTicks": 200,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 9
+        }
+      }
+    },
+    {
+      "command": "time pause",
+      "description": "Freeze the clock so the drained holes stay dry while the Fire step is read.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time pause"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "drain_hole hole:*",
+      "timeout": 60,
+      "description": "Charge step in rain: the Drain control carries the reason line that the water comes back before the shot fires. Click Drain.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"drain-holes\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-role=\"drain-rain-reason\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"drain-holes\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "wetHoleCount"
+        ],
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "description": "Fire step with the holes dry and rain still falling: the rain-risk warning row replaces the dry check.",
+      "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-role=\"rain-risk-check\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0,
+          "chargedCount": 9
+        }
+      }
+    },
+    {
+      "command": "time resume",
+      "description": "Let the clock run again so the rain refills the holes during the evacuation.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "weather set light_rain",
+      "description": "Keep the rain falling through the evacuation.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set light_rain"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "blast detonate",
+      "timeout": 330,
+      "description": "DETONATE arms the shot and evacuates. Rain refills the holes; once the zone is clear the sequence holds: the modal stays open in the held phase with Cancel and Blast anyway.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-role=\"preflight-waiting\"][data-phase=\"held\"]",
+          "timeout": 300000
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "[data-action=\"preflight-fire-anyway\"]"
+      }
+    },
+    {
+      "command": "blast",
+      "timeout": 90,
+      "description": "Blast anyway fires as today: the charges fizzle and the report's wet-holes note lists them.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "description": "Close the blast report.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    }
+  ]
+}
