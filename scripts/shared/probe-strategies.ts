@@ -230,6 +230,9 @@ interface Shot {
   startedTick: number;
 }
 
+/** Explosive of every shot: the run's own (hard rock needs more than SHOT's krackle), else SHOT's. */
+const shotExplosive = (s: ProbeSession): string => s.config.explosive ?? SHOT.explosive;
+
 /** One shot's pattern, charge and (optionally) hole diameter; `SHOT` is the opening's. */
 interface ShotSpec {
   rows: number;
@@ -257,7 +260,7 @@ function overlapsShot(c: Pattern & { span?: number }, o: Pattern & { span?: numb
 }
 
 /** Order `spec` at `at`, or on the best free deposit when `at` is not given. */
-function orderShot(s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = SHOT, at?: Pattern): Shot | null {
+function orderShot(s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = { ...SHOT, explosive: shotExplosive(s) }, at?: Pattern): Shot | null {
   const span = spanOf(spec);
   const candidates = at
     ? [at]
@@ -562,7 +565,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   };
   const limit: PermitLimit = PERMIT_LIMITS[Math.min(gradeOf(s), 5)]!;
   const sized = limitSizedShot(limit, base, rigDiameterM);
-  const explosive = getExplosive(SHOT.explosive)!;
+  const explosive = getExplosive(shotExplosive(s))!;
   /** Heaviest hole charge that stays inside the permit's total charge for an n x n pattern, the explosive's and the hole's own limits. */
   const kgFor = (n: number): number => floorToKgResolution(Math.min(
     limit.maxChargeKg / (n * n), explosiveHoleLimits(explosive, sized.diameterM).maxKg,
@@ -582,7 +585,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   while (side > 0 && side * side * (kgFor(side) + 0.1) > free) side--;
   const kg = kgFor(Math.max(side, 1));
   const specFor = (n: number): ShotSpec => ({
-    rows: n, cols: n, spacing: sized.spacing, depth, explosive: SHOT.explosive, kg: kgFor(n), stemming: sized.stemming, diameterM: sized.diameterM,
+    rows: n, cols: n, spacing: sized.spacing, depth, explosive: shotExplosive(s), kg: kgFor(n), stemming: sized.stemming, diameterM: sized.diameterM,
   });
   const hauling = state.pendingActions.some(a => a.type === 'haul_debris');
   return {

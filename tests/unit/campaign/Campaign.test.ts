@@ -148,6 +148,14 @@ describe('campaign completion excludes the tutorial (#1320)', () => {
     expect(isCampaignComplete(c)).toBe(true);
   });
 
+  it('completing treranium_depths unlocks shareholder_summit, locked until then', () => {
+    const c = createCampaignState();
+    expect(c.levels['shareholder_summit']!.unlocked).toBe(false);
+    win(c, 'treranium_depths');
+    expect(c.levels['shareholder_summit']!.unlocked).toBe(true);
+    expect(c.campaignComplete).toBe(false);
+  });
+
   it('two real levels do not complete the campaign', () => {
     const c = createCampaignState();
     win(c, 'dusty_hollow');

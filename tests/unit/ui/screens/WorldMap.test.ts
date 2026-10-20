@@ -46,6 +46,8 @@ describe('WorldMap', () => {
     expect(text).toContain('Grumpstone Ridge');
     expect(text).toContain('Treranium Depths');
     expect(text).toContain('Shareholder Summit');
+    expect(text).toContain(t('level.shareholder_summit.desc'));
+    expect(text).toContain('VOLCANIC');
     expect(text).not.toContain('Tutorial Pit');
     expect(map.visible).toBe(true);
     map.dispose();

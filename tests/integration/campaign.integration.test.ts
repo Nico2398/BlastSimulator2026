@@ -154,10 +154,14 @@ describe('Campaign', () => {
     expect(all[3]!.startingCash).toBe(125000);
     expect(all[3]!.unlockThreshold).toBe(800000);
 
+    expect(all[4]!.id).toBe('shareholder_summit');
+    expect(all[4]!.difficultyTier).toBe(4);
+
     // Verify progressive difficulty
     expect(all[0]!.unlockThreshold).toBeLessThan(all[1]!.unlockThreshold);
     expect(all[1]!.unlockThreshold).toBeLessThan(all[2]!.unlockThreshold);
     expect(all[2]!.unlockThreshold).toBeLessThan(all[3]!.unlockThreshold);
+    expect(all[3]!.unlockThreshold).toBeLessThan(all[4]!.unlockThreshold);
     expect(all[0]!.eventFreqMultiplier).toBeLessThan(all[1]!.eventFreqMultiplier!);
     expect(all[1]!.eventFreqMultiplier).toBeLessThan(all[2]!.eventFreqMultiplier!);
     expect(all[2]!.eventFreqMultiplier).toBeLessThan(all[3]!.eventFreqMultiplier!);
@@ -212,6 +216,7 @@ describe('Campaign', () => {
     recordProfit(campaign, 'grumpstone_ridge', 250000);
 
     expect(campaign.levels['treranium_depths']!.unlocked).toBe(true);
+    expect(campaign.levels['shareholder_summit']!.unlocked).toBe(false);
 
     // Complete treranium_depths — shareholder_summit unlocks, campaign not yet complete
     recordProfit(campaign, 'treranium_depths', 800000);

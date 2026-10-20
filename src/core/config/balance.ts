@@ -3318,15 +3318,34 @@ export const WALL_SLOPE_WALK_MAX_M = 256;
 /** Margin (m) around the toe columns inside which a slump hurts buildings, vehicles and employees. */
 export const WALL_SLUMP_TOE_ZONE_MARGIN_M = 1;
 
-// ── Shareholder Summit ──
-// Placeholder values (#1949): the implementer tunes them with the progression probe.
+// ── Shareholder Summit (#1949) ──
+// Measured with the #1945 probe (`ladder`, campaign start, dynatomics shots, seed 4001 volcanic_flats, tier-1 digger
+// kit) and an idle run. Calibration is PARTIAL: see .claude/skills/gameplay-game-design/SKILL.md (Shareholder Summit).
 
+/** Digger kit plus the tier-1 freight warehouse and spoil heap it already carries; hard volcanic rock is reached with the level's own explosives. */
 export const SHAREHOLDER_SUMMIT_STARTING_SITE: StartingSiteComposition = DIGGER_STARTING_SITE;
-export const SHAREHOLDER_SUMMIT_STARTING_CASH = 0;
-export const SHAREHOLDER_SUMMIT_PROFIT_TARGET = 0;
+/**
+ * Idle payroll is ~290 $/tick: an idle run misses both Q1 targets (60 - 50 = 10 confidence) and is fired at the 2nd
+ * review (tick 3000) with ~$137k left, measured, so it is fired before it can go bankrupt. $1M also carries a played
+ * run through hard rock's slow first sale (ore first lands ~tick 1200).
+ */
+export const SHAREHOLDER_SUMMIT_STARTING_CASH = 1_000_000;
+/**
+ * Operating profit that completes the level. Measured: the ladder's operating profit peaks near $0.1M by tick
+ * 3000 and goes negative after (grade 1 only by tick 10000, payroll > ore income on hard rock), so $1.5M is
+ * reachable only by a player who climbs the permit ladder; the probe ladder does NOT win it (open, see skill).
+ */
+export const SHAREHOLDER_SUMMIT_PROFIT_TARGET = 1_500_000;
+/**
+ * Quarter = 1500 ticks: hard rock's first ore lands ~tick 1200, so a shorter quarter would fire a competent
+ * run at its first review. Q1 ore 2.5 t (ladder delivered 2.6 t by tick 1500), growth 1.25 per quarter: the
+ * ladder's measured ore per quarter (2.6, 5.6, 4.5, 5.0, 4.4 t) meets Q1-Q4 (2.5, 3.1, 3.9, 4.9) and misses Q5 (6.1).
+ * Profit target is small: the ladder's Q1 profit is negative (payroll before the first sale) so Q1 profit is missed
+ * by any run that spends on the opening, but Q2 (+$0.2M) meets it.
+ */
 export const SHAREHOLDER_SUMMIT_BOARD: BoardConfig = {
-  quarterTicks: 0,
-  oreTargetT: 0,
-  profitTarget: 0,
-  growth: 0,
+  quarterTicks: 1500,
+  oreTargetT: 2.5,
+  profitTarget: 50_000,
+  growth: 1.25,
 };

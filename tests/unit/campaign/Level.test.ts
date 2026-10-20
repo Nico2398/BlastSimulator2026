@@ -45,11 +45,13 @@ describe('Level definition system (7.1)', () => {
     expect(levels[1]!.eventFreqMultiplier).toBeGreaterThanOrEqual(levels[0]!.eventFreqMultiplier);
     expect(levels[2]!.eventFreqMultiplier).toBeGreaterThan(levels[1]!.eventFreqMultiplier);
     expect(levels[3]!.eventFreqMultiplier).toBeGreaterThan(levels[2]!.eventFreqMultiplier);
+    expect(levels[4]!.eventFreqMultiplier).toBeGreaterThanOrEqual(levels[3]!.eventFreqMultiplier);
 
     // Score decay should increase across tiers
     expect(levels[1]!.scoreDecayRate).toBeGreaterThan(levels[0]!.scoreDecayRate);
     expect(levels[2]!.scoreDecayRate).toBeGreaterThan(levels[1]!.scoreDecayRate);
     expect(levels[3]!.scoreDecayRate).toBeGreaterThan(levels[2]!.scoreDecayRate);
+    expect(levels[4]!.scoreDecayRate).toBeGreaterThanOrEqual(levels[3]!.scoreDecayRate);
 
     // Difficulty tier
     expect(levels[0]!.difficultyTier).toBe(0);
@@ -64,6 +66,7 @@ describe('Level definition system (7.1)', () => {
     expect(levels[0]!.unlockThreshold).toBeLessThan(levels[1]!.unlockThreshold);
     expect(levels[1]!.unlockThreshold).toBeLessThan(levels[2]!.unlockThreshold);
     expect(levels[2]!.unlockThreshold).toBeLessThan(levels[3]!.unlockThreshold);
+    expect(levels[3]!.unlockThreshold).toBeLessThan(levels[4]!.unlockThreshold);
   });
 
   it('treranium_depths includes all explosive types, dusty_hollow only starter explosives', () => {
@@ -397,6 +400,12 @@ describe('Dusty Hollow opens staffed and equipped (#1363)', () => {
           .toEqual([{ type: 'freight_warehouse', tier: 1 }, { type: 'spoil_heap', tier: 1 }]);
         continue;
       }
+      if (level.id === 'shareholder_summit') {
+        expect(level.startingSite!.vehicles.map((v) => v.role).sort())
+          .toEqual(['charging_truck', 'debris_hauler', 'drill_rig', 'rock_digger']);
+        expect(level.startingSite!.buildings).toEqual([{ type: 'freight_warehouse', tier: 1 }, { type: 'spoil_heap', tier: 1 }]);
+        continue;
+      }
       if (level.id === 'tutorial_pit') {
         expect(level.startingSite!.employees).toEqual([]);
         expect(level.startingSite!.vehicles).toEqual([]);
@@ -405,6 +414,17 @@ describe('Dusty Hollow opens staffed and equipped (#1363)', () => {
       }
       expect(level.startingSite, level.id).toBeUndefined();
     }
+  });
+
+  it('shareholder_summit runs the progression ruleset on volcanic flats behind a board (#1949)', () => {
+    const level = getLevel('shareholder_summit')!;
+    expect(level.biome).toBe('volcanic_flats');
+    expect(resolveGeneratedBiome(level.terrainSeed, level.gridX, level.gridZ, level.climateBias).id).toBe('volcanic_flats');
+    expect(level).toMatchObject({ difficultyTier: 4, progression: true, market: 'production', oreDeposits: true, mixedRockHardness: true });
+    expect(level.board).toBeDefined();
+    expect(level.board!.quarterTicks).toBeGreaterThan(0);
+    expect(level.startingCash).toBeGreaterThan(0);
+    expect(level.nameKey).toBe('level.shareholder_summit.name');
   });
 
   it('keeps the $50k starting cash: staffing is free', () => {

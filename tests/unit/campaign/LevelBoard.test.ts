@@ -78,3 +78,20 @@ describe('createGameForLevel — board (#1946)', () => {
     }
   });
 });
+
+describe('createGameForLevel — progression ruleset (#1949)', () => {
+  it('applies the level market and creates the grade state when the level opts in', () => {
+    const campaign = createCampaignState();
+    campaign.levels['shareholder_summit']!.unlocked = true;
+    const state = createGameForLevel(campaign, 'shareholder_summit')!;
+    expect(state.contracts.market).toBe('production');
+    expect(state.grade?.grade).toBe(0);
+    expect(state.board).toBeDefined();
+  });
+
+  it('leaves earlier levels on the legacy market with no grade', () => {
+    const state = createGameForLevel(createCampaignState(), 'dusty_hollow')!;
+    expect(state.contracts.market).toBeUndefined();
+    expect(state.grade).toBeUndefined();
+  });
+});

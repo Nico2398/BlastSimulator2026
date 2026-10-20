@@ -11,6 +11,8 @@ export interface ProbeRunConfig {
   kit: SandboxKitId;
   strategy: StrategyId;
   horizon: number;
+  /** Explosive id for every shot; absent = the probe's reference krackle. */
+  explosive?: string;
 }
 
 export interface ProbeOptions {
