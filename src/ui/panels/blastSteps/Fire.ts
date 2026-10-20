@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Blast Workshop: Fire step (redesign P4)
-// Danger-zone occupant list and a 2-item pre-flight checklist (DETONATE clears
-// the zone itself, #1362). The FIRE button itself stays in the
+// Danger-zone occupant list and a pre-flight checklist (dry holes, zone,
+// buildings at risk #2021, permit). DETONATE clears the zone itself (#1362).
+// The FIRE button itself stays in the
 // always-visible sticky footer (blastFooter.ts) — it now opens
 // PreflightModal rather than firing directly (see that file's header).
 //
@@ -19,6 +20,8 @@ import { LocaleTextRegistry } from '../../localeText.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { computeDangerZone, isInZone, type ZoneBounds } from '../../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
+import { buildingsInBlastReach, type BuildingAtRisk } from '../../../core/mining/BlastPlan.js';
+import { buildingRiskText } from '../buildingRiskText.js';
 import { vehicleDriverId } from '../../../core/entities/Vehicle.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
@@ -76,7 +79,8 @@ export class FireStep {
 
     const occupantKeys = zone ? this.occupantKeys(state, zone) : [];
     const permit = state.drillHoles.length === 0 ? null : permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount);
-    const signature = JSON.stringify({ zone, occupants: occupantKeys, wetCount: wet.length, permit });
+    const atRisk = buildingsInBlastReach(state.drillHoles, state.buildings.buildings);
+    const signature = JSON.stringify({ zone, occupants: occupantKeys, wetCount: wet.length, permit, atRisk });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
@@ -85,7 +89,7 @@ export class FireStep {
 
     const occupants = zone ? this.occupants(state, zone) : [];
     this.renderZoneList(occupants, zone !== null);
-    this.renderChecklist(state.drillHoles.length, wet.length, occupants, permit);
+    this.renderChecklist(state.drillHoles.length, wet.length, occupants, permit, atRisk);
   }
 
   refreshLocale(): void {
@@ -160,7 +164,7 @@ export class FireStep {
     return row;
   }
 
-  private renderChecklist(holeCount: number, wetCount: number, occupants: Occupant[], permit: PermitPreview | null): void {
+  private renderChecklist(holeCount: number, wetCount: number, occupants: Occupant[], permit: PermitPreview | null, atRisk: BuildingAtRisk[]): void {
     const dryOk = wetCount === 0;
     const occupantCount = occupants.length;
     const strandedCount = occupants.filter(o => o.strandedNoDriver).length;
@@ -172,8 +176,16 @@ export class FireStep {
         : strandedCount > 0
           ? t('ui.blast_workshop.fire.check_zone_occupied_stranded', { count: occupantCount, strandedCount })
           : t('ui.blast_workshop.fire.check_zone_occupied', { count: occupantCount })),
+      ...atRisk.map(b => this.makeBuildingRiskRow(b)),
       ...(permit ? [this.makePermitRow(permit)] : []),
     );
+  }
+
+  private makeBuildingRiskRow(b: BuildingAtRisk): HTMLElement {
+    const row = this.makeCheckRow(false, buildingRiskText(b));
+    row.dataset['role'] = 'building-risk';
+    row.dataset['buildingType'] = b.type;
+    return row;
   }
 
   /** Warns, never blocks: FIRE stays enabled when the plan is over the permit. */

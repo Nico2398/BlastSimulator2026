@@ -1,0 +1,565 @@
+{
+  "name": "preflight-building-warning-visual",
+  "description": "#2021: a 3x3 pattern drilled around the player's Management Office, Freight Warehouse and stocked Explosive Warehouse (228 kg) lists each building in the Blast step checklist and the Pre-Flight Check (quarters 10 m away is not listed); the warning does not gate firing.",
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [
+        20,
+        48
+      ],
+      "distance": 30
+    }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42 size:64 staffed:true cash:500000",
+      "timeout": 30,
+      "description": "Setup: staffed site with room for the issue #2021 layout.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:64 staffed:true cash:500000"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "build management_office at:14,48",
+      "timeout": 60,
+      "description": "Player builds a management_office at 14,48 (issue #2021 layout).",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 14,
+          "z": 48
+        },
+        {
+          "type": "pickTile",
+          "x": 14,
+          "z": 48
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedBuildingCount"
+        ]
+      }
+    },
+    {
+      "command": "build freight_warehouse at:22,40",
+      "timeout": 60,
+      "description": "Player builds a freight_warehouse at 22,40 (issue #2021 layout).",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 22,
+          "z": 40
+        },
+        {
+          "type": "pickTile",
+          "x": 22,
+          "z": 40
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedBuildingCount"
+        ]
+      }
+    },
+    {
+      "command": "build explosive_warehouse at:22,48",
+      "timeout": 60,
+      "description": "Player builds a explosive_warehouse at 22,48 (issue #2021 layout).",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 22,
+          "z": 48
+        },
+        {
+          "type": "pickTile",
+          "x": 22,
+          "z": 48
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedBuildingCount"
+        ]
+      }
+    },
+    {
+      "command": "build living_quarters at:30,48",
+      "timeout": 60,
+      "description": "Player builds a living_quarters at 30,48 (issue #2021 layout).",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 30,
+          "z": 48
+        },
+        {
+          "type": "pickTile",
+          "x": 30,
+          "z": 48
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedBuildingCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:1500",
+      "timeout": 330,
+      "description": "Drain the four construction orders before drilling.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedBuildingCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 325000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "buy explosive:krackle kg:300",
+      "timeout": 90,
+      "description": "Player buys 6 x 50 kg Krackle into the new warehouse; charging 9 holes x 8 kg = 72 kg later leaves 228 kg stocked.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:12,44",
+      "timeout": 60,
+      "description": "Player drags the 3x3 pattern over x 12/16/20, z 44/48/52. No hole sits on a footprint, so the Drill step accepts all nine.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 4
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 8
+        },
+        {
+          "type": "focusTile",
+          "x": 16,
+          "z": 48,
+          "distance": 30
+        },
+        {
+          "type": "dragTiles",
+          "x1": 12,
+          "z1": 44,
+          "x2": 20,
+          "z2": 52
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 9
+        }
+      }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
+      "timeout": 330,
+      "description": "Drain the drill orders.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 325000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:8 stemming:2",
+      "timeout": 60,
+      "description": "Player charges all nine holes with 8 kg Krackle (72 kg total).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 8
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 330,
+      "description": "Drain the charge orders.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 325000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 90,
+      "description": "Blast step checklist (Fire.ts) lists one row per building at risk: office, freight warehouse, stocked explosive warehouse (228 kg, secondary blast); not the quarters 10 m away. Detonate stays usable.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"explosive_warehouse\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "note": "Quarters row absence is not expressible: expect.blocked needs the element in the DOM. Verified by the screenshot and unit tests.",
+        "usable": "#bs-blast-panel [data-action=\"execute\"]",
+        "textEquals": {
+          "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"management_office\"]": "Management Office is inside the blast area and will be destroyed.",
+          "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"freight_warehouse\"]": "Freight Warehouse is inside the blast area and will be destroyed.",
+          "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"explosive_warehouse\"]": "Explosive Warehouse (228 kg stocked) is inside the blast area: it will be destroyed and its stock will detonate as a secondary blast."
+        }
+      }
+    },
+    {
+      "command": "blast detonate",
+      "timeout": 60,
+      "description": "Pre-Flight Check lists the same three rows with the warehouse's 228 kg; the detonate button stays usable (warning, not a gate).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-role=\"preflight-building-risk\"][data-building-type=\"explosive_warehouse\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "[data-action=\"preflight-detonate\"]",
+        "textEquals": {
+          ".bs-confirm-overlay [data-role=\"preflight-building-risk\"][data-building-type=\"management_office\"]": "Management Office is inside the blast area and will be destroyed.",
+          ".bs-confirm-overlay [data-role=\"preflight-building-risk\"][data-building-type=\"freight_warehouse\"]": "Freight Warehouse is inside the blast area and will be destroyed.",
+          ".bs-confirm-overlay [data-role=\"preflight-building-risk\"][data-building-type=\"explosive_warehouse\"]": "Explosive Warehouse (228 kg stocked) is inside the blast area: it will be destroyed and its stock will detonate as a secondary blast."
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "timeout": 60,
+      "description": "Player fires anyway; the warning changed no outcome and the report opens.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    }
+  ]
+}
