@@ -17,6 +17,9 @@ function makeResult(seed: number, over: Partial<RunResult['metrics']> = {}): Run
       ticksHaulWaitedOnFullStorage: 17,
       boulderSoldShare: null,
       gradeReachedTick: { 1: 0, 2: 2500 },
+      gradeCashAt: { 1: 90000, 2: 80000 },
+      catalogBoughtTick: null,
+      boulderOreSoldShare: null,
       affordableTick: { warehouseT2: 1500, researchCenter: null, secondHauler: 2000 },
       ...over,
     },
@@ -85,5 +88,28 @@ describe('probe-report toJson', () => {
 
   it('is deterministic', () => {
     expect(toJson(results, PROBE_DEFAULTS)).toBe(toJson(results, PROBE_DEFAULTS));
+  });
+});
+
+describe('probe-report toJson extended metrics (#1945)', () => {
+  const extended = makeResult(42, {
+    cashAt: { 1000: 1, 3000: 2, 6000: 3, 10000: 4, 15000: 5, 25000: 6, 40000: 7, 50000: null },
+    gradeCashAt: { 1: 100, 2: 200 },
+    catalogBoughtTick: 4200,
+    boulderOreSoldShare: 0.5,
+  });
+  const opts = PROBE_DEFAULTS;
+
+  it('carries gradeCashAt, catalogBoughtTick, boulderOreSoldShare and the extended cashAt keys', () => {
+    const parsed = JSON.parse(toJson([extended], opts));
+    const m = parsed.results[0].metrics;
+    expect(m.gradeCashAt).toEqual({ 1: 100, 2: 200 });
+    expect(m.catalogBoughtTick).toBe(4200);
+    expect(m.boulderOreSoldShare).toBe(0.5);
+    for (const t of ['15000', '25000', '40000', '50000']) expect(m.cashAt).toHaveProperty(t);
+  });
+
+  it('serializes deterministically', () => {
+    expect(toJson([extended], opts)).toBe(toJson([extended], opts));
   });
 });

@@ -2,6 +2,7 @@
 
 import type { ProbeOptions } from './probe-config.js';
 import { CASH_SAMPLE_TICKS, type RunResult } from './probe-metrics.js';
+import { GRADE_TARGET_WINDOWS, gradeVerdicts, type GradeVerdict } from './probe-ladder.js';
 
 type Cell = number | string | null;
 
@@ -22,11 +23,16 @@ function grades(r: RunResult): string {
   return entries.length === 0 ? NONE : entries.map(([g, t]) => `g${g}@${t}`).join(' ');
 }
 
+function gradeCash(r: RunResult): string {
+  const entries = Object.entries(r.metrics.gradeCashAt).sort(([a], [b]) => Number(a) - Number(b));
+  return entries.length === 0 ? NONE : entries.map(([g, c]) => `g${g}:${Math.round(c)}`).join(' ');
+}
+
 const HEADERS = [
   'seed', 'biome', 'kit', 'strategy',
   ...CASH_SAMPLE_TICKS.map(t => `cash@${t}`),
   'low cash', 'low tick', 'bankrupt', 'firstBlastSold@6000', 'blasts',
-  'warehouseFull tick', 'haulWait ticks', 'boulderSold', 'grades',
+  'warehouseFull tick', 'haulWait ticks', 'boulderSold', 'boulderOreSold', 'grades', 'grade cash', 'catalog bought',
   'affordable warehouseT2', 'affordable researchCenter', 'affordable secondHauler', 'end',
 ];
 
@@ -37,7 +43,7 @@ function row(r: RunResult): string[] {
     ...CASH_SAMPLE_TICKS.map(t => cell(m.cashAt[t] ?? null)),
     cell(m.lowPointCash), cell(m.lowPointTick), cell(m.bankruptTick),
     share(m.firstBlastSoldShareAt6000), cell(m.blastsFired),
-    cell(m.warehouseFullTick), cell(m.ticksHaulWaitedOnFullStorage), share(m.boulderSoldShare), grades(r),
+    cell(m.warehouseFullTick), cell(m.ticksHaulWaitedOnFullStorage), share(m.boulderSoldShare), share(m.boulderOreSoldShare), grades(r), gradeCash(r), cell(m.catalogBoughtTick),
     cell(m.affordableTick.warehouseT2), cell(m.affordableTick.researchCenter), cell(m.affordableTick.secondHauler),
     r.endReason ?? `t${r.endTick}`,
   ];
@@ -64,7 +70,8 @@ function medianRow(runs: RunResult[]): string[] {
     cell(med(runs, r => r.metrics.bankruptTick)),
     share(med(runs, r => r.metrics.firstBlastSoldShareAt6000)), cell(med(runs, r => r.metrics.blastsFired)),
     cell(med(runs, r => r.metrics.warehouseFullTick)), cell(med(runs, r => r.metrics.ticksHaulWaitedOnFullStorage)),
-    share(med(runs, r => r.metrics.boulderSoldShare)), NONE,
+    share(med(runs, r => r.metrics.boulderSoldShare)), share(med(runs, r => r.metrics.boulderOreSoldShare)), NONE, NONE,
+    cell(med(runs, r => r.metrics.catalogBoughtTick)),
     cell(med(runs, r => r.metrics.affordableTick.warehouseT2)),
     cell(med(runs, r => r.metrics.affordableTick.researchCenter)),
     cell(med(runs, r => r.metrics.affordableTick.secondHauler)), NONE,
@@ -84,6 +91,40 @@ export function formatTable(results: readonly RunResult[]): string {
   }
   for (const runs of groups.values()) {
     if (runs.length > 1) lines.push(line(medianRow(runs)));
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Per (biome, kit, strategy) group and grade: runs that reached it, median tick and cash at that
+ * tick, and the verdict of the median tick against GRADE_TARGET_WINDOWS (grades without a window
+ * report no verdict). A grade no run reached is listed 'missed'.
+ */
+export function formatGradeSummary(results: readonly RunResult[]): string {
+  const headers = ['biome', 'kit', 'strategy', 'grade', 'reached', 'median tick', 'median cash', 'window', 'verdict'];
+  const lines = [line(headers), line(headers.map(() => '---'))];
+  const groups = new Map<string, RunResult[]>();
+  for (const r of results) {
+    const key = `${r.config.biome}|${r.config.kit}|${r.config.strategy}`;
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+  for (const runs of groups.values()) {
+    const first = runs[0]!.config;
+    const grades = new Set<number>(Object.keys(GRADE_TARGET_WINDOWS).map(Number));
+    for (const r of runs) for (const g of Object.keys(r.metrics.gradeReachedTick)) grades.add(Number(g));
+    for (const grade of [...grades].sort((a, b) => a - b)) {
+      const reached = runs.filter(r => r.metrics.gradeReachedTick[grade] !== undefined);
+      const tick = median(reached.map(r => r.metrics.gradeReachedTick[grade]!));
+      const cash = median(reached.map(r => r.metrics.gradeCashAt[grade]).filter((c): c is number => c !== undefined));
+      const window = GRADE_TARGET_WINDOWS[grade];
+      const verdict: GradeVerdict['status'] | typeof NONE = window
+        ? gradeVerdicts(tick === null ? {} : { [grade]: tick }, { [grade]: window })[0]!.status
+        : NONE;
+      lines.push(line([
+        first.biome, first.kit, first.strategy, String(grade), `${reached.length}/${runs.length}`,
+        cell(tick), cell(cash), window ? `${window[0]}-${window[1]}` : NONE, verdict,
+      ]));
+    }
   }
   return lines.join('\n');
 }

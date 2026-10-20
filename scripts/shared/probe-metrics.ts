@@ -4,13 +4,13 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import type { BlastReport, FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { accumulateOreMass } from '../../src/core/mining/BlastOreReport.js';
-import { getBuildingDef, getUpgradeCost } from '../../src/core/entities/Building.js';
-import { getVehicleDefByTier } from '../../src/core/entities/Vehicle.js';
+import { BUILDING_TIERS, getAllBuildingTypes, getBuildingDef, getUpgradeCost, isSingleTierType } from '../../src/core/entities/Building.js';
+import { getAllVehicleRoles, getVehicleDefByTier } from '../../src/core/entities/Vehicle.js';
 import { HIRING_COSTS } from '../../src/core/config/balance.js';
 import type { ProbeRunConfig } from './probe-config.js';
 
 /** Ticks at which cash is sampled for the report. */
-export const CASH_SAMPLE_TICKS = [1000, 3000, 6000, 10000] as const;
+export const CASH_SAMPLE_TICKS = [1000, 3000, 6000, 10000, 15000, 25000, 40000, 50000] as const;
 
 interface ProbeMetrics {
   cashAt: Record<number, number | null>;
@@ -23,6 +23,12 @@ interface ProbeMetrics {
   ticksHaulWaitedOnFullStorage: number;
   boulderSoldShare: number | null;
   gradeReachedTick: Record<number, number>;
+  /** Cash at the tick each grade was first reached, by grade. */
+  gradeCashAt: Record<number, number>;
+  /** First tick every building type is owned at its max purchasable tier and every vehicle role at tier 3; null if never. */
+  catalogBoughtTick: number | null;
+  /** Share of boulder-origin ore that was delivered or sold (no longer in the world), null without boulder ore. */
+  boulderOreSoldShare: number | null;
   affordableTick: {
     warehouseT2: number | null;
     researchCenter: number | null;
@@ -36,6 +42,24 @@ export interface RunResult {
   endTick: number;
   endReason: string | null;
 }
+
+/** Ticks between catalog-ownership checks: owning the whole catalog is read, not tracked per purchase. */
+const CATALOG_CHECK_INTERVAL_TICKS = 50;
+const MAX_VEHICLE_TIER = 3;
+
+/** True when every building type is owned at its max purchasable tier and every vehicle role at tier 3. */
+function ownsWholeCatalog(state: GameState): boolean {
+  const buildings = state.buildings?.buildings ?? []; // partial states (unit fixtures) carry no buildings
+  const vehicles = state.vehicles?.vehicles ?? [];
+  const topBuildingTier = BUILDING_TIERS[BUILDING_TIERS.length - 1]!;
+  return getAllBuildingTypes().every(type => {
+    const need = isSingleTierType(type) ? 1 : topBuildingTier;
+    return buildings.some(b => b.type === type && b.tier >= need);
+  }) && getAllVehicleRoles().every(role => vehicles.some(v => v.type === role && v.tier >= MAX_VEHICLE_TIER));
+}
+
+/** A fragment's lineage key: its origin, shared by the pieces a split leaves (the id for a hand-built fragment without one). */
+const originKey = (f: Pick<FragmentData, 'id' | 'origin'>): string => (f.origin ? `${f.origin.x},${f.origin.y},${f.origin.z}` : `id${f.id}`);
 
 /** Ticks between boulder re-scans: the only O(fragments) work the observer does outside a blast. */
 const BOULDER_SCAN_INTERVAL_TICKS = 50;
@@ -82,6 +106,10 @@ export class MetricsObserver {
   /** Ore kg of each boulder still lying on the ground, by fragment id. */
   private readonly boulderOreKg = new Map<number, number>();
   private boulderTotalKg = 0;
+  /** Ore kg of every boulder seen at a blast, by origin key: a split's pieces keep their parent's origin. */
+  private readonly boulderOriginOreKg = new Map<string, number>();
+  private catalogBoughtTick: number | null = null;
+  private readonly gradeCashAt: Record<number, number> = {};
   private lastState: GameState | null = null;
   private readonly gradeReachedTick: Record<number, number> = {};
   private grade = 0;
@@ -115,6 +143,9 @@ export class MetricsObserver {
       this.soldAt6000Kg = this.soldAtSecondBlastKg ?? state.grade?.oreDeliveredKg ?? null;
     }
     if (t > 0 && t % BOULDER_SCAN_INTERVAL_TICKS === 0) this.pruneBoulders(state);
+    if (this.catalogBoughtTick === null && t % CATALOG_CHECK_INTERVAL_TICKS === 0 && ownsWholeCatalog(state)) {
+      this.catalogBoughtTick = t;
+    }
   }
 
   private observeBlast(state: GameState): void {
@@ -131,6 +162,7 @@ export class MetricsObserver {
       if (f.state !== 'on_ground' || !isOversized(f.fragment.volume) || this.boulderOreKg.has(f.fragment.id)) continue;
       const kg = fragmentOreKg([f.fragment]);
       if (kg <= 0) continue;
+      this.boulderOriginOreKg.set(originKey(f.fragment), kg);
       this.boulderOreKg.set(f.fragment.id, kg);
       this.boulderTotalKg += kg;
     }
@@ -150,7 +182,10 @@ export class MetricsObserver {
   private observeProgress(state: GameState): void {
     const t = state.tickCount;
     const grade = state.grade?.grade ?? 0;
-    for (; this.grade < grade; this.grade++) this.gradeReachedTick[this.grade + 1] = t;
+    for (; this.grade < grade; this.grade++) {
+      this.gradeReachedTick[this.grade + 1] = t;
+      this.gradeCashAt[this.grade + 1] = state.cash;
+    }
     for (const key of Object.keys(this.costs) as Array<keyof typeof this.costs>) {
       if (this.affordableTick[key] === null && state.cash >= this.costs[key]) this.affordableTick[key] = t;
     }
@@ -180,6 +215,9 @@ export class MetricsObserver {
       ticksHaulWaitedOnFullStorage: this.haulWaitTicks,
       boulderSoldShare: this.boulderShare(),
       gradeReachedTick: { ...this.gradeReachedTick },
+      gradeCashAt: { ...this.gradeCashAt },
+      catalogBoughtTick: this.catalogBoughtTick,
+      boulderOreSoldShare: this.boulderOreSoldShare(),
       affordableTick: { ...this.affordableTick },
     };
   }
@@ -187,6 +225,22 @@ export class MetricsObserver {
   private soldShare(): number | null {
     if (this.soldAt6000Kg === null || !this.firstBlastOreKg) return null;
     return Math.min(1, this.soldAt6000Kg / this.firstBlastOreKg);
+  }
+
+  /**
+   * Boulder-origin ore no longer in the world (delivered or sold) over all boulder ore seen at blasts.
+   * Pieces of a split keep their parent's origin and ore density, so the ore still in the world is
+   * the sum over fragments carrying a tracked origin. One fragment scan, at finalize.
+   */
+  private boulderOreSoldShare(): number | null {
+    const state = this.lastState;
+    let total = 0;
+    for (const kg of this.boulderOriginOreKg.values()) total += kg;
+    if (!state || total <= 0) return null;
+    const remaining = fragmentOreKg(state.logistics.fragments
+      .filter(f => this.boulderOriginOreKg.has(originKey(f.fragment)))
+      .map(f => f.fragment));
+    return Math.max(0, Math.min(1, 1 - remaining / total));
   }
 
   private boulderShare(): number | null {
