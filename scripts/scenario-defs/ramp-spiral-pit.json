@@ -1,0 +1,385 @@
+{
+  "name": "ramp-spiral-pit",
+  "description": "#1940: blast and clear two stacked benches into a pit, order a spiral haul road to the lower floor with one `ramp spiral` command, dig it, and drive a debris_hauler from the rim to the floor and back on it.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:400000 staffed:true",
+      "description": "Staffed site: drill_rig #1, debris_hauler #2, rock_digger #3, drivers #4/#5.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:400000 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "vehicleCount": 5,
+          "employeeCount": 5
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "description": "Crew the rock_digger #3 with excavator driver #4 so rubble and the ramp are dug.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:14,14",
+      "description": "Bench 1: a 4x4 grid at 3 m spacing, 6 m deep, drilled over the same footprint so the second bench stacks on the first pit.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:14,14"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:800",
+      "timeout": 245,
+      "description": "Bench 1: every hole drilled.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 800,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "description": "Bench 1: load every hole.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 245,
+      "description": "Bench 1: every charge loaded.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "description": "Bench 1: fire the blast.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        },
+        "note": "A fired blast clears the plan."
+      }
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:3000",
+      "timeout": 245,
+      "description": "Bench 1: crew finished clearing the rubble, leaving a bare pit floor.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:14,14",
+      "description": "Bench 2: a 4x4 grid at 3 m spacing, 6 m deep, drilled over the same footprint so the second bench stacks on the first pit.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:14,14"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:800",
+      "timeout": 245,
+      "description": "Bench 2: every hole drilled.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 800,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "description": "Bench 2: load every hole.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 245,
+      "description": "Bench 2: every charge loaded.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "description": "Bench 2: fire the blast.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        },
+        "note": "A fired blast clears the plan."
+      }
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:3000",
+      "timeout": 245,
+      "description": "Bench 2: crew finished clearing the rubble, leaving a bare pit floor.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0
+        }
+      }
+    },
+    {
+      "command": "ramp spiral from:11,19 depth:8 grade:15 width:3 dir:cw preview",
+      "description": "#1940: preview the spiral proposal around the two-bench pit. The preview prints legs, length and cost and changes nothing; no UI exposes the spiral yet (exact-command allowlist entry in bootstrap-allowlist.ts).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "ramp spiral from:11,19 depth:8 grade:15 width:3 dir:cw preview"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "ramp spiral from:11,19 depth:8 grade:15 width:3 dir:cw",
+      "description": "#1940: order the spiral to the lower floor. Cash drops by the proposal cost and ramp segments are queued.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "ramp spiral from:11,19 depth:8 grade:15 width:3 dir:cw"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:1500",
+      "timeout": 245,
+      "description": "Drain every queued dig_ramp_segment layer, leg by leg, until the whole spiral is carved.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0,
+          "builtRampCount": 1
+        },
+        "note": "One multi-leg spiral built."
+      }
+    },
+    {
+      "command": "vehicle driver 2 3",
+      "description": "Crew the debris_hauler #2 with driver #3.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 3"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:200",
+      "timeout": 65,
+      "description": "Driver #3 finished boarding the debris_hauler.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 200,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle reposition 2 18 18",
+      "description": "Send the hauler from the rim to the pit floor: its route is the spiral.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 2 18 18"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 120",
+      "timeout": 120,
+      "description": "Let the hauler wind down the spiral to the floor. A reposition has no state-dump field to poll for arrival (positions are not exported), so a bounded tick block is the only wait.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 120"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "vehicle reposition 2 10 19",
+      "description": "Drive the hauler back up the spiral to the rim.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 2 10 19"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 120",
+      "timeout": 120,
+      "description": "Let the hauler climb back to the rim (same unpollable arrival as the descent).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 120"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "state full",
+      "description": "Nobody stranded on the spiral.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "stuckEmployeeCount": 0
+        }
+      }
+    }
+  ]
+}
