@@ -54,6 +54,12 @@ export type PlacementChangeHandler = () => void;
 /** 220ms amber sweep on confirm (design doc §01, state 6) before the tool disarms itself. */
 const CONFIRM_FLASH_MS = 220;
 
+/** True when `target` is a field the player types into, where Backspace edits text rather than the path. */
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  const el = target as { tagName?: string; isContentEditable?: boolean } | null;
+  return el?.isContentEditable === true || el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA';
+}
+
 export class PlacementController {
   private readonly canvas: HTMLCanvasElement;
   private readonly camera: THREE.Camera;
@@ -524,7 +530,7 @@ export class PlacementController {
       this.cancel();
     }
     else if (e.key === 'Enter' && this.phase === 'selected') this.confirm();
-    else if (e.key === 'Backspace' && this.shape === 'path' && this.points.length > 0) {
+    else if (e.key === 'Backspace' && this.shape === 'path' && this.points.length > 0 && !isTextEntryTarget(e.target)) {
       e.preventDefault();
       this.popWaypoint();
     }

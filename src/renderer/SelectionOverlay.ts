@@ -17,8 +17,8 @@ import * as THREE from 'three';
 import { GroundTintLayer, buildConformingRing, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
 import type { RampWidth } from '../core/config/balance.js';
 import { buildRampArrow, RAMP_ARROW_COLOR } from './RampArrow.js';
-import { rampDefFromEndpoints } from '../core/mining/Ramp.js';
-import { rampTotalLength, type RampLeg } from '../core/mining/RampPath.js';
+import { rampDefFromEndpoints, rampDefFromLegs } from '../core/mining/Ramp.js';
+import type { RampLeg } from '../core/mining/RampPath.js';
 
 const COLOR_SELECTION = 0xffc840;
 const COLOR_PINNED = 0x7ab8ff;
@@ -247,10 +247,9 @@ export class SelectionOverlay {
    * anchor tile.
    */
   private buildLine(u: OverlayLineUpdate): void {
-    const base = u.legs && u.legs.legs.length > 0
-      ? { originX: u.legs.originX, originZ: u.legs.originZ, direction: u.legs.legs[0]!.direction, length: rampTotalLength(u.legs.legs), legs: u.legs.legs }
-      : rampDefFromEndpoints(u.x1, u.z1, u.x2, u.z2, 0);
-    const ramp = { ...base, ...(u.width !== undefined && { width: u.width }) };
+    const ramp = u.legs && u.legs.legs.length > 0
+      ? rampDefFromLegs({ x: u.legs.originX, z: u.legs.originZ }, u.legs.legs, 0, u.width)
+      : { ...rampDefFromEndpoints(u.x1, u.z1, u.x2, u.z2, 0), ...(u.width !== undefined && { width: u.width }) };
     const arrow = buildRampArrow(ramp, this.sampler, { color: u.refused ? COLOR_BLOCKED : RAMP_ARROW_COLOR });
     this.group.add(arrow ?? this.makeHoleMarker(u.x1, u.z1));
   }

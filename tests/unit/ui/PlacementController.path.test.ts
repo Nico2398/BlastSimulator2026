@@ -116,6 +116,16 @@ describe("PlacementController 'path' shape (#1942)", () => {
     expect(controller.waypoints).toEqual([{ x: 5, z: 5 }]);
   });
 
+  it('Backspace typed in a text field leaves the path alone', () => {
+    click(5, 5);
+    click(5, 20);
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
+    input.remove();
+    expect(controller.waypoints).toEqual([{ x: 5, z: 5 }, { x: 5, z: 20 }]);
+  });
+
   it('notifies the change handler when a corner is added and when one is undone', () => {
     const onChange = vi.fn();
     controller.setChangeHandler(onChange);

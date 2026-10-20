@@ -336,9 +336,12 @@ export function firstOccupiedPathTile(
   return cells.find(c => isOccupied(c.x, c.z)) ?? null;
 }
 
+/** True when a displacement runs further along z than x (ties go to z): the one axis rule ramps and drags share. */
+export function isZDominant(dx: number, dz: number): boolean {
+  return Math.abs(dz) >= Math.abs(dx);
+}
+
 /** Snaps `to` onto the cardinal axis of `from` it is furthest along (ties go to z, as `rampDefFromEndpoints`). */
 export function snapToCardinal(from: { x: number; z: number }, to: { x: number; z: number }): { x: number; z: number } {
-  const dx = to.x - from.x;
-  const dz = to.z - from.z;
-  return Math.abs(dz) >= Math.abs(dx) ? { x: from.x, z: to.z } : { x: to.x, z: from.z };
+  return isZDominant(to.x - from.x, to.z - from.z) ? { x: from.x, z: to.z } : { x: to.x, z: from.z };
 }

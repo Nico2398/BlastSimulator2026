@@ -11,7 +11,8 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../src/ui/scene/PlacementController.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
-import { rampGradeBoundsDegrees, validateRampOrder, type RampDef } from '../../../src/core/mining/Ramp.js';
+import { rampFootLine } from '../../../src/ui/rampFootLine.js';
+import { rampFloorDepthAt, rampGradeBoundsDegrees, validateRampOrder, type RampDef } from '../../../src/core/mining/Ramp.js';
 import { climbTiersFor, plannedRampGradeDegrees } from '../../../src/core/mining/RampGrade.js';
 import { proposeRampSpiral, type SpiralSurface } from '../../../src/core/mining/RampSpiral.js';
 import { t } from '../../../src/core/i18n/I18n.js';
@@ -74,7 +75,9 @@ function makeState(over: { cash?: number; progression?: boolean } = {}): GameSta
   return s;
 }
 
-function setup(opts: { cash?: number; progression?: boolean; surface?: SpiralSurface | null; hasConsole?: boolean } = {}) {
+function setup(opts: {
+  cash?: number; progression?: boolean; surface?: SpiralSurface | null; hasConsole?: boolean; sampler?: (x: number, z: number) => number;
+} = {}) {
   const k = makeMockKit();
   const gameConsole = vi.fn<[string], CommandResult>().mockReturnValue({ success: true, output: '' });
   const setStatus = vi.fn();
@@ -82,11 +85,11 @@ function setup(opts: { cash?: number; progression?: boolean; surface?: SpiralSur
   const surface = opts.surface === undefined ? makePitSurface() : opts.surface;
   const tool = new RampTool({
     kit: k.kit, getState: () => state, console: opts.hasConsole === false ? undefined : gameConsole, setStatus,
-    sampler: null, spiralSurface: () => surface,
+    sampler: opts.sampler ?? null, spiralSurface: () => surface,
   });
   tool.arm();
   const shown = () => k.strip.show.mock.calls.at(-1)![0] as {
-    fields: StripField[]; actions?: StripAction[]; readout?: string[]; confirmEnabled: boolean; confirmDisabledReason?: string;
+    fields: StripField[]; subtitle?: string; actions?: StripAction[]; readout?: string[]; confirmEnabled: boolean; confirmDisabledReason?: string;
   };
   const field = (key: string) => shown().fields.find(f => f.key === key)!;
   const action = (key: string) => shown().actions?.find(a => a.key === key);
@@ -297,6 +300,61 @@ describe('RampTool: grade stepper', () => {
   });
 });
 
+describe('RampTool: grade control, min end and pure display', () => {
+  it('clamps at the gentlest grade when stepping down from the shown value', () => {
+    const s = setup();
+    s.controller.simulateWaypoints([A, B, C]);
+    for (let i = 0; i < 40; i++) s.field('grade').onDec();
+    const min = rampGradeBoundsDegrees(22, 8).min;
+    const lo = Math.ceil(min * 10) / 10;
+    expect(s.field('grade').value).toBeCloseTo(lo, 5);
+    expect(s.field('grade').value).toBeGreaterThanOrEqual(min);
+  });
+
+  it('rendering never changes the chosen grade: a stale choice is shown clamped, then restored when the range allows', () => {
+    const s = setup();
+    s.controller.simulateWaypoints([A, B, C]);
+    for (let i = 0; i < 40; i++) s.field('grade').onInc();
+    const steep = s.field('grade').value;
+    s.field('depth').onDec();
+    s.field('depth').onDec();
+    expect(s.field('grade').value).toBeLessThanOrEqual(steep);
+    s.field('depth').onInc();
+    s.field('depth').onInc();
+    expect(s.field('grade').value).toBeCloseTo(steep, 5);
+  });
+});
+
+describe('RampTool: auto spiral grade', () => {
+  /** The grade the order carries after pressing Spiral without touching the grade stepper. */
+  function autoSpiral(depth: number) {
+    const s = setup();
+    s.controller.simulateWaypoints([RIM]);
+    while (s.field('depth').value < depth) s.field('depth').onInc();
+    s.action('ramp-spiral')!.onClick();
+    return s;
+  }
+
+  it('the shown grade, the proposal and the ordered grade are one number', () => {
+    const s = autoSpiral(20);
+    const shown = s.field('grade').value;
+    s.controller.simulateConfirm();
+    const m = /grade:([\d.]+)/.exec(s.gameConsole.mock.calls[0]![0]);
+    expect(Number(m![1])).toBeCloseTo(shown, 5);
+    const r = proposeRampSpiral({ fromX: RIM.x, fromZ: RIM.z, depth: 20, gradeDegrees: shown, width: 3, dir: 'cw' }, s.surface!);
+    expect(r.success).toBe(true);
+  });
+
+  it('steepens past the gentlest grade when the pit does not fit it, and shows that grade', () => {
+    const s = autoSpiral(20);
+    const lo = Math.ceil(rampGradeBoundsDegrees(1000, 20).min * 10) / 10;
+    const gentlest = proposeRampSpiral({ fromX: RIM.x, fromZ: RIM.z, depth: 20, gradeDegrees: lo, width: 3, dir: 'cw' }, s.surface!);
+    expect(gentlest.success).toBe(false);
+    expect(s.field('grade').value).toBeGreaterThan(lo);
+    expect(s.shown().confirmEnabled).toBe(true);
+  });
+});
+
 describe('RampTool: live readout', () => {
   it('matches describeRampPlan fed by the core cost and planned grade', () => {
     const s = setup();
@@ -366,6 +424,23 @@ describe('RampTool: live readout', () => {
     const after = s.shown().readout!.join('\n');
     expect(after).not.toBe(before);
     expect(after).toContain(describeRampPlan({ length: 22, legs: 2, cost: 0, gradeDeg: g, tiers: climbTiersFor(g, true) }).at(-1)!);
+  });
+});
+
+describe('RampTool: foot line over a multi-leg path', () => {
+  it('samples the last leg\'s start tile and the end tile, with the floor still to drop over that leg only', () => {
+    const calls: Array<[number, number]> = [];
+    const sampler = (x: number, z: number): number => { calls.push([x, z]); return x === 25 && z === 27 ? 6 : 10; };
+    const s = setup({ sampler });
+    s.controller.simulateWaypoints([A, B, C]);
+    expect(calls).toContainEqual([B.x, B.z]);
+    expect(calls).toContainEqual([C.x, C.z]);
+    const def = SWITCHBACK_DEF;
+    const total = 22;
+    const dropBefore = rampFloorDepthAt(total - 10, total, def.targetDepth, undefined);
+    const expected = rampFootLine(10, 6, def.targetDepth - dropBefore, 10);
+    expect(s.shown().subtitle).toBe(expected);
+    expect(expected).not.toBe('');
   });
 });
 
