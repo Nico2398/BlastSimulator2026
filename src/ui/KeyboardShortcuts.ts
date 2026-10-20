@@ -3,7 +3,7 @@
 // Shortcuts panel shown in Settings/Help.
 
 import type { PanelName } from './UIManager.js';
-import { SURVEY_OVERLAY_TOGGLE_TARGET, PAUSE_TOGGLE_SELECTOR } from './tutorialStepHelpers.js';
+import { SURVEY_OVERLAY_TOGGLE_TARGET, WALL_OVERLAY_TOGGLE_TARGET, PAUSE_TOGGLE_SELECTOR } from './tutorialStepHelpers.js';
 
 export type GameConsoleFn = (cmd: string) => string;
 
@@ -22,6 +22,7 @@ export interface ShortcutCallbacks {
   onToggleNavGrid?: () => void;
   /** Toggle the survey confidence overlay's player-facing visibility. */
   onToggleSurveyOverlay?: () => void;
+  onToggleWallOverlay?: () => void;
 }
 
 interface ShortcutOptions {
@@ -49,6 +50,7 @@ const SPEED_KEYS: Readonly<Record<string, number>> = {
 const SHORTCUT_CONTROLS: Readonly<Record<string, string>> = {
   Space: PAUSE_TOGGLE_SELECTOR,
   KeyO: SURVEY_OVERLAY_TOGGLE_TARGET,
+  KeyW: WALL_OVERLAY_TOGGLE_TARGET,
   ...Object.fromEntries(
     Object.entries(SPEED_KEYS).map(([code, speed]) => [code, `button[data-speed="${speed}"]`]),
   ),
@@ -93,6 +95,7 @@ export class KeyboardShortcuts {
         case 'KeyS': callbacks.togglePanel('survey'); break;
         case 'KeyN': callbacks.onToggleNavGrid?.(); break;
         case 'KeyO': callbacks.onToggleSurveyOverlay?.(); break;
+        case 'KeyW': callbacks.onToggleWallOverlay?.(); break;
         case 'F5':
           e.preventDefault();
           callbacks.quickSave();

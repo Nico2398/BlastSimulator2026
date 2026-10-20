@@ -411,7 +411,7 @@ describe('SurveyPanel', () => {
     // The header's first button is now the overlay-visibility toggle (#496)
     // — skip it and click the first button that isn't it.
     const closeBtn = [...panel.root.querySelectorAll('button')]
-      .find(b => b.getAttribute('data-role') !== 'overlay-toggle')!;
+      .find(b => !['overlay-toggle', 'wall-overlay-toggle'].includes(b.getAttribute('data-role') ?? ''))!;
     closeBtn.click();
     expect(closed).toBe(true);
   });

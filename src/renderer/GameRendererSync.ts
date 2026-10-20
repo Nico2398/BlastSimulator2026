@@ -3,7 +3,7 @@
 // syncSurveyOverlay() — the console-driven "reflect current MiningContext onto
 // the already-built scene" step shared by syncFromContext() and finishLevelLoad().
 
-import type { GameState } from '../core/state/GameState.js';
+import { isProgressionSite, type GameState } from '../core/state/GameState.js';
 import { firstEmptyLayerAboveGround, type VoxelGrid } from '../core/world/VoxelGrid.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
 import type { ZoneBounds } from '../core/entities/Zone.js';
@@ -28,7 +28,8 @@ import { resolveMarketId } from '../core/campaign/Level.js';
 import { columnOreValuePerM3 } from '../core/mining/BlastValueEstimate.js';
 import { isSurveyStale } from '../core/mining/SurveyStaleness.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
-import type { WallFace } from '../core/mining/WallStability.js';
+import { findFacesAtRisk, gridSurface, type WallFace } from '../core/mining/WallStability.js';
+import { WALL_WARN_RATIO } from '../core/config/balance.js';
 
 /**
  * Every GameRenderer field syncGameRendererEntities() reads or writes,
@@ -305,9 +306,19 @@ export function syncSurveyOverlay(
 }
 
 /**
- * Faces the armed blast plan is predicted to leave tall, for the wall overlay (#1943).
- * Empty when no plan is armed or no grid exists.
+ * Wall faces at or above WALL_WARN_RATIO of their safe height over the whole site, for the wall overlay (#1943).
+ * Empty off progression sites (no wall rule there) and without a grid.
  */
-export function buildWallOverlayFaces(_state: GameState, _grid: VoxelGrid | null): WallFace[] {
-  return []; // TODO: implement
+export function buildWallOverlayFaces(state: GameState, grid: VoxelGrid | null): WallFace[] {
+  if (!isProgressionSite(state) || !grid || grid.sizeX <= 0 || grid.sizeZ <= 0) return [];
+  const region = { minX: grid.minX, maxX: grid.maxX - 1, minZ: grid.minZ, maxZ: grid.maxZ - 1 };
+  return findFacesAtRisk(gridSurface(grid), region, WALL_WARN_RATIO).map(p => p.face);
+}
+
+/** Show the wall overlay with `faces` when the player has it on; hide it otherwise. */
+export function syncWallOverlay(terrain: TerrainMesh | null, faces: ReadonlyArray<WallFace>, visibilityPreference: boolean): void {
+  if (!terrain) return;
+  const overlay = terrain.getWallOverlay();
+  if (visibilityPreference && faces.length > 0) overlay.show(faces);
+  else overlay.hide();
 }

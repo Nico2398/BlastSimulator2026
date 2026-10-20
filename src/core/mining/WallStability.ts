@@ -9,6 +9,8 @@ import { computeVoxelColumnSurfaceY, SURFACE_BAND_HALF } from '../world/VoxelGri
 import { getSafeFaceHeightM } from '../world/RockCatalog.js';
 import type { BlastRegion } from './BlastExecution.js';
 import type { BlastPlan } from './BlastPlan.js';
+import { buildPlanEnergyField } from './BlastExecution.js';
+import { identifyFragmentedVoxels } from './VoxelFragmentation.js';
 import {
   WALL_SAFE_FACE_HEIGHT_M_BY_TIER,
   WALL_BERM_MIN_WIDTH_M,
@@ -17,6 +19,7 @@ import {
   WALL_SLUMP_PILE_MAX_HEIGHT_M,
   WALL_SLUMP_PILE_SEARCH_RADIUS_M,
   WALL_SLOPE_WALK_MAX_M,
+  WALL_WARN_RATIO,
 } from '../config/balance.js';
 
 /** A continuous drop between neighbouring columns, ended by a berm. */
@@ -59,8 +62,11 @@ export interface WallSurface {
 }
 
 /** WallSurface over a built grid. */
-export function gridSurface(_grid: VoxelGrid): WallSurface {
-  return undefined as unknown as WallSurface; // TODO: implement
+export function gridSurface(grid: VoxelGrid): WallSurface {
+  return {
+    topAt: (x, z) => (grid.containsColumn(x, z) ? computeVoxelColumnSurfaceY(grid, x, z) : null),
+    rockAt: (x, y, z) => grid.dominantRockAt(x, y, z),
+  };
 }
 
 /** A face the preview predicts, with the rock that limits it and its height over safe height. */
@@ -72,16 +78,6 @@ export interface PredictedFace {
   ratio: number;
 }
 
-/** Faces within `region` whose height is at least `minRatio` of their safe height (default WALL_WARN_RATIO). */
-export function findFacesAtRisk(_surface: WallSurface, _region: BlastRegion, _minRatio?: number): PredictedFace[] {
-  return []; // TODO: implement
-}
-
-/** Faces the armed plan would leave at or over the warning ratio once it fires. */
-export function predictWallFaces(_plan: BlastPlan, _grid: VoxelGrid, _wetHoleIds?: ReadonlySet<string>): PredictedFace[] {
-  return []; // TODO: implement
-}
-
 const DIRECTIONS: ReadonlyArray<{ dx: number; dz: number }> = [
   { dx: 1, dz: 0 }, { dx: -1, dz: 0 }, { dx: 0, dz: 1 }, { dx: 0, dz: -1 },
 ];
@@ -91,30 +87,40 @@ function topAt(grid: VoxelGrid, x: number, z: number): number | null {
   return grid.containsColumn(x, z) ? computeVoxelColumnSurfaceY(grid, x, z) : null;
 }
 
-/** Safe height of the weakest rock among the wall voxels of columns `cols` (rows toeY+1..top). */
-function weakestSafeM(grid: VoxelGrid, cols: ReadonlyArray<{ x: number; z: number; top: number }>, toeY: number): number {
+/** Safe height and rock id of the weakest rock among the wall voxels of columns `cols` (rows toeY+1..top). */
+function weakestRock(surface: WallSurface, cols: ReadonlyArray<{ x: number; z: number; top: number }>, toeY: number): { safeM: number; rockId: string } {
   let safe = Infinity;
+  let weakest = '';
   for (const { x, z, top } of cols) {
     for (let y = toeY + 1; y <= top; y++) {
-      const rockId = grid.dominantRockAt(x, y, z);
+      const rockId = surface.rockAt(x, y, z);
       if (rockId === '') continue;
-      safe = Math.min(safe, getSafeFaceHeightM(rockId));
-      if (safe <= SOFTEST_SAFE_M) return safe;
+      const rockSafe = getSafeFaceHeightM(rockId);
+      if (rockSafe < safe) { safe = rockSafe; weakest = rockId; }
+      if (safe <= SOFTEST_SAFE_M) return { safeM: safe, rockId: weakest };
     }
   }
-  return Number.isFinite(safe) ? safe : getSafeFaceHeightM('');
+  return Number.isFinite(safe) ? { safeM: safe, rockId: weakest } : { safeM: getSafeFaceHeightM(''), rockId: '' };
 }
 
-/** Faces within `region` (grown by the scan margin) taller than their safe height. */
-export function findOverheightFaces(grid: VoxelGrid, region: BlastRegion): WallFace[] {
+/**
+ * Faces within `region` (grown by the scan margin) that `accept` keeps, in crest order.
+ * `minRatio` only prunes: faces lower than that share of the softest safe height are never measured.
+ */
+function scanFaces(
+  surface: WallSurface,
+  region: BlastRegion,
+  minRatio: number,
+  accept: (heightM: number, safeM: number) => boolean,
+): PredictedFace[] {
   if (region.maxX < region.minX || region.maxZ < region.minZ) return [];
   const m = WALL_STABILITY_REGION_MARGIN_M;
   const minX = region.minX - m, maxX = region.maxX + m, minZ = region.minZ - m, maxZ = region.maxZ + m;
-  const faces: WallFace[] = [];
+  const faces: PredictedFace[] = [];
   // Column tops of the scanned window, read once for all four directions.
   const width = maxX - minX + 1;
   const tops: Array<number | null> = [];
-  for (let z = minZ; z <= maxZ; z++) for (let x = minX; x <= maxX; x++) tops.push(topAt(grid, x, z));
+  for (let z = minZ; z <= maxZ; z++) for (let x = minX; x <= maxX; x++) tops.push(surface.topAt(x, z));
 
   for (const { dx, dz } of DIRECTIONS) {
     // One scan line per row (dx != 0) or column (dz != 0), walked crest-to-toe.
@@ -137,10 +143,13 @@ export function findOverheightFaces(grid: VoxelGrid, region: BlastRegion): WallF
         if (crestIdx >= 0 && landIdx > crestIdx) {
           const crest = cols[crestIdx]!, toe = cols[landIdx]!;
           const heightM = crest.top - toe.top;
-          if (heightM > SOFTEST_SAFE_M) {
-            const safeM = weakestSafeM(grid, cols.slice(crestIdx, landIdx).filter(c => c !== null), toe.top);
-            if (heightM > safeM) {
-              faces.push({ crest: { x: crest.x, z: crest.z }, dir: { dx, dz }, crestY: crest.top, toeY: toe.top, heightM, safeM });
+          if (heightM >= minRatio * SOFTEST_SAFE_M) {
+            const { safeM, rockId } = weakestRock(surface, cols.slice(crestIdx, landIdx).filter(c => c !== null), toe.top);
+            if (accept(heightM, safeM)) {
+              faces.push({
+                face: { crest: { x: crest.x, z: crest.z }, dir: { dx, dz }, crestY: crest.top, toeY: toe.top, heightM, safeM },
+                rockId, ratio: heightM / safeM,
+              });
             }
           }
         }
@@ -163,7 +172,56 @@ export function findOverheightFaces(grid: VoxelGrid, region: BlastRegion): WallF
     }
   }
   return faces.sort((p, q) =>
-    p.crest.x - q.crest.x || p.crest.z - q.crest.z || p.dir.dx - q.dir.dx || p.dir.dz - q.dir.dz);
+    p.face.crest.x - q.face.crest.x || p.face.crest.z - q.face.crest.z
+    || p.face.dir.dx - q.face.dir.dx || p.face.dir.dz - q.face.dir.dz);
+}
+
+/** Faces within `region` (grown by the scan margin) taller than their safe height. */
+export function findOverheightFaces(surface: WallSurface, region: BlastRegion): WallFace[] {
+  return scanFaces(surface, region, 1, (heightM, safeM) => heightM > safeM).map(p => p.face);
+}
+
+/** Faces within `region` whose height is at least `minRatio` of their safe height (default WALL_WARN_RATIO). */
+export function findFacesAtRisk(surface: WallSurface, region: BlastRegion, minRatio: number = WALL_WARN_RATIO): PredictedFace[] {
+  return scanFaces(surface, region, minRatio, (heightM, safeM) => heightM >= minRatio * safeM);
+}
+
+/**
+ * Faces the armed plan leaves at or over their safe height once it fires (#1943). Runs the blast's own
+ * propagation and fragmentation read-only, then scans a view of the terrain with the broken voxels
+ * removed, over the region executeBlast reports as cleared — the same scan the slump pass runs.
+ */
+export function predictWallFaces(plan: BlastPlan, grid: VoxelGrid, wetHoleIds?: ReadonlySet<string>): PredictedFace[] {
+  if (!plan.holes.some(h => plan.charges[h.id] !== undefined)) return [];
+  const field = buildPlanEnergyField(plan, grid, wetHoleIds);
+  if (!field) return [];
+  const { fragmented } = identifyFragmentedVoxels(field, grid, false);
+  if (fragmented.length === 0) return [];
+
+  const colKey = (x: number, z: number): number => (z - grid.minZ) * grid.sizeX + (x - grid.minX);
+  const removed = new Map<number, Set<number>>(); // column index -> removed rows
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const { x, y, z } of fragmented) {
+    const col = colKey(x, z);
+    let rows = removed.get(col);
+    if (!rows) removed.set(col, rows = new Set());
+    rows.add(y);
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+  }
+  const base = gridSurface(grid);
+  const floorY = field.box.minY - 1;
+  const isGone = (x: number, y: number, z: number): boolean => removed.get(colKey(x, z))?.has(y) === true;
+  const after: WallSurface = {
+    topAt: (x, z) => {
+      let top = base.topAt(x, z);
+      if (top === null || !removed.has(colKey(x, z))) return top;
+      // Rows below the field box were never at risk of breaking: the first one is the floor.
+      while (top > floorY && (isGone(x, top, z) || !grid.isSolidAt(x, top, z))) top--;
+      return top;
+    },
+    rockAt: (x, y, z) => (isGone(x, y, z) ? '' : base.rockAt(x, y, z)),
+  };
+  return findFacesAtRisk(after, { minX, maxX, minZ, maxZ }, 1);
 }
 
 interface Removed { compId: number; ores: Record<string, number> | undefined }
@@ -272,7 +330,7 @@ export function applySlump(grid: VoxelGrid, face: WallFace): SlumpReport | null 
 /** Find and slump every overheight face around a blast's cleared region. */
 export function runWallStability(grid: VoxelGrid, clearedRegion: BlastRegion): SlumpReport[] {
   const reports: SlumpReport[] = [];
-  for (const face of findOverheightFaces(grid, clearedRegion)) {
+  for (const face of findOverheightFaces(gridSurface(grid), clearedRegion)) {
     const report = applySlump(grid, face);
     if (report) reports.push(report);
   }
