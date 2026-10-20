@@ -53,10 +53,9 @@ import {
 import { isVanityType, isVanityAvailableIn } from '../core/entities/BuildingVanity.js';
 import { VANITY_MIN_GRADE } from '../core/config/balance.js';
 import { placementRefusalReason, hoverRefusal, claimRefusalText, type PlacementKit } from './scene/PlacementKit.js';
-import type { TileRegion } from './tutorialPickerRegion.js';
-import { rampDefFromEndpoints, rampEndTile, validateRampOrder } from '../core/mining/Ramp.js';
-import { rampFootLine } from './rampFootLine.js';
-import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, getResearchTaskDef, type RampWidth } from '../core/config/balance.js';
+import { RampTool } from './RampTool.js';
+import type { SpiralSurface } from '../core/mining/RampSpiral.js';
+import { getResearchTaskDef } from '../core/config/balance.js';
 import { researchCostFor } from '../core/events/ActiveModifiers.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import type { GameConsoleFn } from './gameConsole.js';
@@ -95,8 +94,9 @@ export class BuildMenu extends PanelBase {
   private surfaceHeightSampler: ((x: number, z: number) => number) | null = null;
   /** Non-mutating claim preview for a footprint rect (#1396); unset skips the claim check. */
   private claimAreaPreview: ((rect: Rect) => ClaimRefusalReason | null) | null = null;
-  private rampDepth = 8;
-  private rampWidth: RampWidth = RAMP_DEFAULT_WIDTH;
+  /** Spiral terrain seam (#1942); unset while no grid is available. */
+  private spiralSurfaceProvider: (() => SpiralSurface | null) | null = null;
+  private rampTool: { tool: RampTool; kit: PlacementKit; console: GameConsoleFn | undefined } | null = null;
   private gameConsole?: GameConsoleFn;
   /** Latest state, for tier-unlock checks before arming the placement tool. */
   private lastState: GameState | null = null;
@@ -186,6 +186,25 @@ export class BuildMenu extends PanelBase {
   }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+  setSpiralSurfaceProvider(fn: () => SpiralSurface | null): void { this.spiralSurfaceProvider = fn; }
+
+  /** The ramp tool for the current kit and console, kept so depth and width survive re-arming. */
+  private rampToolFor(): RampTool | null {
+    const kit = this.placementKit;
+    if (!kit) return null;
+    if (this.rampTool?.kit !== kit || this.rampTool.console !== this.gameConsole) {
+      const tool = new RampTool({
+        kit,
+        getState: () => this.lastState,
+        console: this.gameConsole,
+        setStatus: (text) => this.setStatus(text),
+        sampler: (x, z) => this.surfaceHeightSampler?.(x, z) ?? NaN,
+        spiralSurface: () => this.spiralSurfaceProvider?.() ?? null,
+      });
+      this.rampTool = { tool, kit, console: this.gameConsole };
+    }
+    return this.rampTool.tool;
+  }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
   /** Register the non-mutating claim preview for a footprint rect, used to show a refused ghost before Confirm (#1396). */
   setClaimAreaPreview(
@@ -427,7 +446,7 @@ export class BuildMenu extends PanelBase {
     const rampBtn = el('button', { className: 'bsx-btn bsx-btn-primary bs-build-ramp-btn' });
     rampBtn.style.cssText = 'width:100%';
     this.locale.bindText(rampBtn, 'ui.build.ramp');
-    rampBtn.addEventListener('click', () => this.armRampTool());
+    rampBtn.addEventListener('click', () => this.rampToolFor()?.arm());
 
     const levelGroundBtn = el('button', { className: 'bsx-btn bsx-btn-primary bs-build-level-ground-btn' });
     levelGroundBtn.style.cssText = 'width:100%';
@@ -516,89 +535,6 @@ export class BuildMenu extends PanelBase {
     });
     controller.setChangeHandler(refresh);
     controller.arm({ shape: 'rect' });
-    refresh();
-  }
-
-  /**
-   * Arm-time only (#1210): when the step pins the drag to a fixed exact
-   * region, clamp the depth field DOWN (never up) to the deepest depth that
-   * region's own fixed line still geometrically validates for. Cash is
-   * forced to `Infinity` so only geometry (the slope/length gate), never
-   * affordability, drives the clamp. Purely geometric — works for any
-   * exact-pinned region, not just the tutorial's 12-tile box-cut strip.
-   */
-  private clampDepthToExactRegion(region: TileRegion): void {
-    const rampDef = rampDefFromEndpoints(region.x1, region.z1, region.x2, region.z2, this.rampDepth);
-    let depth = this.rampDepth;
-    while (depth > 1 && !validateRampOrder({ ...rampDef, targetDepth: depth }, Infinity).success) {
-      depth--;
-    }
-    this.rampDepth = depth;
-  }
-
-  /** Moves the ramp width one option up or down `RAMP_WIDTH_OPTIONS`, clamped at both ends. */
-  private stepRampWidth(delta: 1 | -1): void {
-    const i = RAMP_WIDTH_OPTIONS.indexOf(this.rampWidth) + delta;
-    this.rampWidth = RAMP_WIDTH_OPTIONS[Math.min(RAMP_WIDTH_OPTIONS.length - 1, Math.max(0, i))]!;
-  }
-
-  /** Ramps are a line drag (start → end), not a rectangle — the width is chosen on the param strip. */
-  private armRampTool(): void {
-    const kit = this.placementKit;
-    if (!kit) return;
-    const { controller, overlay, strip } = kit;
-    if (controller.isArmed) { controller.cancel(); return; }
-
-    const refresh = (): void => {
-      if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
-      const sel = controller.selection;
-      // One source of truth (#1210): the same RampDef + validateRampOrder call
-      // the console command runs decides the UI gate here, so the two can
-      // never disagree again about a length/depth/cash combination.
-      const rampDef = sel ? { ...rampDefFromEndpoints(sel.x1, sel.z1, sel.x2, sel.z2, this.rampDepth), width: this.rampWidth } : null;
-      const validation = rampDef ? validateRampOrder(rampDef, this.lastState?.cash ?? 0) : null;
-      const confirmEnabled = controller.canConfirm && (validation?.success ?? false);
-      // The preview turns red live, mid-drag included, whenever this ramp would be refused (#1211).
-      overlay.update(sel ? { shape: 'line', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2, width: this.rampWidth, refused: !confirmEnabled } : null);
-      let confirmDisabledReason: string | undefined;
-      if (!controller.canConfirm) {
-        confirmDisabledReason = placementRefusalReason(controller);
-      } else if (validation && !validation.success) {
-        confirmDisabledReason = validation.messageKey ? t(validation.messageKey, validation.messageParams) : validation.message;
-      }
-      const sampler = this.surfaceHeightSampler;
-      const endTile = rampDef ? rampEndTile(rampDef) : null;
-      const footLine = sel && rampDef && endTile && sampler
-        ? rampFootLine(sampler(sel.x1, sel.z1), sampler(endTile.x, endTile.z), this.rampDepth, rampDef.length)
-        : '';
-      strip.show({
-        icon: 'down',
-        title: t('ui.build.ramp'),
-        subtitle: footLine,
-        fields: [
-          { key: 'depth', label: t('ui.build.ramp_depth'), value: this.rampDepth, format: v => `${v}m`, onDec: () => { this.rampDepth = Math.max(1, this.rampDepth - 1); refresh(); }, onInc: () => { this.rampDepth = Math.min(40, this.rampDepth + 1); refresh(); } },
-          { key: 'width', label: t('ui.build.ramp_width'), value: this.rampWidth, format: v => `${v}m`, onDec: () => { this.stepRampWidth(-1); refresh(); }, onInc: () => { this.stepRampWidth(1); refresh(); } },
-        ],
-        result: rampDef ? `${rampDef.length} ${t('ui.tile_select.tiles')}` : '—',
-        confirmEnabled,
-        confirmDisabledReason,
-        instruction: t('ui.build.ramp_instruction'),
-      });
-    };
-
-    controller.setConfirmHandler((sel) => {
-      const cmd = this.gameConsole?.(`build_ramp start:${sel.x1},${sel.z1} end:${sel.x2},${sel.z2} depth:${this.rampDepth} width:${this.rampWidth}`);
-      if (!cmd?.success) {
-        this.setStatus(cmd?.output ?? '');
-        return false;
-      }
-      this.setStatus(t('ui.build.ramp_ordered'));
-      overlay.flashConfirm();
-      return true;
-    });
-    controller.setChangeHandler(refresh);
-    controller.arm({ shape: 'line' });
-    if (controller.activeRegion?.exact) this.clampDepthToExactRegion(controller.activeRegion);
     refresh();
   }
 

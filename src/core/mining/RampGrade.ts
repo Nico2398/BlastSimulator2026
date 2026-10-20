@@ -3,9 +3,10 @@
 import type { NavGrid } from '../nav/NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { GRADE_EPSILON_DEGREES, VEHICLE_TIER_LIST, slopeDegreesForRatio, tiersThatClimb } from '../nav/ClimbLimit.js';
-import { rampCenterline, rampPathOf } from './RampPath.js';
+import { rampCenterline, rampPathOf, rampTotalLength } from './RampPath.js';
 import type { BuiltRamp, GameState } from '../state/GameState.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
+import { rampGradeBoundsDegrees, type RampDef } from './Ramp.js';
 
 /** Steepest grade (degrees) between consecutive tiles of a multi-leg ramp's centreline; the corner's inside and the bounding box's empty corner are not the path. */
 function steepestAlongCenterline(navGrid: NavGrid, ramp: BuiltRamp): number {
@@ -66,5 +67,17 @@ export function describeRampClimb(
   navGrid: NavGrid, ramp: BuiltRamp, progression: boolean,
 ): { gradeDeg: number; tiers: VehicleTier[] } {
   const gradeDeg = rampSteepestGradeDegrees(navGrid, ramp);
-  return { gradeDeg, tiers: progression ? tiersThatClimb(gradeDeg) : [...VEHICLE_TIER_LIST] };
+  return { gradeDeg, tiers: climbTiersFor(gradeDeg, progression) };
+}
+
+/** Vehicle tiers that climb a `gradeDeg` ramp; off a progression site every tier does. */
+export function climbTiersFor(gradeDeg: number, progression: boolean): VehicleTier[] {
+  return progression ? tiersThatClimb(gradeDeg) : [...VEHICLE_TIER_LIST];
+}
+
+/** Grade in degrees the order will be cut at: its chosen grade, else the straight line to `targetDepth`. */
+export function plannedRampGradeDegrees(def: Pick<RampDef, 'length' | 'legs' | 'targetDepth' | 'gradeDegrees'>): number {
+  if (def.gradeDegrees !== undefined) return def.gradeDegrees;
+  const total = def.legs ? rampTotalLength(def.legs) : def.length;
+  return rampGradeBoundsDegrees(total, def.targetDepth).min;
 }

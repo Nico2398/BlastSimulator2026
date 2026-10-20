@@ -6,7 +6,7 @@ import {
   buildRamp,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
   computeRampSegmentCarveTarget, carveRampSegmentSlice, computeMinimumRampLength, isRampCellPending,
-  rampDefFromEndpoints, snapRampDepthToEndFloor, rampFootOffset, rampGradeBoundsDegrees, rampFloorDepthAt,
+  rampDefFromEndpoints, rampDefFromLegs, snapRampDepthToEndFloor, rampFootOffset, rampGradeBoundsDegrees, rampFloorDepthAt,
   type RampDef, type RampDirection, type RampSegmentDef,
 } from '../../../src/core/mining/Ramp.js';
 import { rampCenterline, rampPathCells } from '../../../src/core/mining/RampPath.js';
@@ -2296,5 +2296,22 @@ describe('columns with a partial top voxel below the floor line, #2001', () => {
       setVoxelColumnSurfaceHeight(grid, 3, 3, 5, compId);
       expect(isRampCellPending(grid, { x: 3, y: 5, z: 3, fillTarget: 5 })).toBe(false);
     });
+  });
+});
+
+describe('rampDefFromLegs (#1942)', () => {
+  it('a single leg is an ordinary straight def with no legs field', () => {
+    const def = rampDefFromLegs({ x: 3, z: 4 }, [{ direction: 'south', length: 9 }], 6, 5);
+    expect(def).toEqual({ originX: 3, originZ: 4, direction: 'south', length: 9, targetDepth: 6, width: 5 });
+  });
+
+  it('several legs carry a copy of the legs and their summed length', () => {
+    const legs = [{ direction: 'south' as const, length: 12 }, { direction: 'east' as const, length: 10 }];
+    const def = rampDefFromLegs({ x: 15, z: 15 }, legs, 8);
+    expect(def.length).toBe(22);
+    expect(def.direction).toBe('south');
+    expect(def.legs).toEqual(legs);
+    expect(def.legs).not.toBe(legs);
+    expect('width' in def).toBe(false);
   });
 });

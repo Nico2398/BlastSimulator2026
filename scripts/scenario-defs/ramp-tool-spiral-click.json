@@ -1,0 +1,250 @@
+{
+  "name": "ramp-tool-spiral-click",
+  "description": "#1942: blast one pit, then a player orders a spiral haul road round it by clicking only: Ramp, a pit-rim tile, the Spiral button, Confirm. The spiral is dug into one built multi-leg ramp.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:2000000 staffed:true",
+      "description": "Staffed site: drill_rig #1, debris_hauler #2, rock_digger #3, drivers #4/#5.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:2000000 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "vehicleCount": 5,
+          "employeeCount": 5
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "description": "Crew the rock_digger #3 with excavator driver #4 so rubble and the ramp are dug.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 2 3",
+      "description": "Crew the debris_hauler #2 with driver #3.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 3"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:14,14",
+      "description": "A 3x3 grid at 3 m spacing, 6 m deep: the one pit blast opens a pit about 9 m across.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:14,14"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:800",
+      "timeout": 245,
+      "description": "Every hole drilled.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 800,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "description": "Load every hole.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 245,
+      "description": "Every charge loaded.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast detonate",
+      "description": "Detonate; the crew evacuates first.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast detonate"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "deathCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "timeout": 245,
+      "description": "The sequence evacuates the crew and fires; the pattern is spent and the pit is open. Its rubble is left lying: the haulers cannot reach it before the road exists.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "deathCount": 0
+        }
+      }
+    },
+    {
+      "command": "ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw",
+      "timeout": 90,
+      "description": "#1942: player arms the ramp tool, clicks the pit-rim tile (17,11) just north of the blasted pit, then clicks the Spiral button that appears for a single click on a rim, and presses Confirm. The tool previews the spiral proposal as a ghost and Confirm orders it. No console command stands in for a click; the command-mode equivalent is the ramp spiral order the tool issues.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 17,
+          "z": 11
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-param-strip [data-action=\"ramp-spiral\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-action=\"ramp-spiral\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount"
+        ],
+        "note": "Spiral ordered by clicks: cash charged and ramp segments queued. Exact geometry and cost are asserted by unit tests."
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:1500",
+      "timeout": 245,
+      "description": "Drain every queued dig_ramp_segment layer until the whole spiral is carved.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0,
+          "builtRampCount": 1
+        },
+        "note": "One multi-leg spiral built from the player's clicks."
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "stuckEmployeeCount": 0
+        }
+      }
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [
+        15,
+        15
+      ],
+      "distance": 30
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80,
+      "target": [
+        15,
+        15
+      ],
+      "distance": 30
+    }
+  ]
+}
