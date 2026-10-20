@@ -152,7 +152,7 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
    footprint on unlevelled ground too) levels the footprint down to its lowest column
    (`levelGroundRect`, `LevelGround.ts`), so a standing building always sits on flat ground
 3. **Protected voxels:** voxels beneath building cannot be drilled or blasted (blocked with error)
-4. **Blast destruction:** if blast reaches voxels beneath building → building destroyed instantly
+4. **Blast destruction:** if blast reaches voxels beneath building → building destroyed instantly (pre-flight warning reach is charge-derived: `gameplay-blast-system` "Pre-Flight building reach")
 5. **No overlap:** buildings cannot overlap each other
 5b. **Reserved terrain** (#1390): a footprint may not cover a built or planned ramp corridor, nor an ordered or drilled hole (`terrainReservations`, `PlacementReservations.ts`); order, move and upgrade are refused with a localized reason. Edge-adjacent is allowed.
 5c. **Cutoff warning** (#1391): a placement, move or upgrade that would strand ground from the crew warns, never refuses. `computePlacementCutoff` (`PlacementCutoff.ts`) floods from the crew (alive employees) before and after the footprint blocks (a move or upgrade also frees its old footprint), and counts cells reachable now but not after, excluding the footprint itself. Fewer than `PLACEMENT_CUTOFF_MIN_CELLS` cut cells, or no crew, means no warning. Reported: distinct `benchLevel`s cut, drill holes (drilled and planned), queued orders. `BuildMenu` shows the line and a "Place anyway?" confirm modal (`placementCutoffConfirm.ts`); confirming places. Console commands skip the check. The verdict is memoized per footprint and nav revision.
