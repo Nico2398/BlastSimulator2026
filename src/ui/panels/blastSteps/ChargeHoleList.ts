@@ -27,6 +27,13 @@ import type { DrainBlock } from '../../../core/mining/HoleDrain.js';
 export interface HoleDrainView {
   wet: boolean;
   block: DrainBlock | null;
+  /** Charged untubed hole with a water-sensitive charge while rain falls. */
+  rainExposed?: boolean;
+}
+
+/** Localized reason a rain-exposed hole cannot be drained. */
+export function drainRainReasonText(): string {
+  return '';
 }
 
 /** Localized reason a drain control is disabled. */

@@ -29,6 +29,7 @@ export function evacuationRemaining(state: GameState): number | null {
     case 'evacuating': return phase.remaining;
     case 'stranded': return phase.names.length;
     case 'ready': return 0;
+    case 'held': return 0; // TODO: implement
     case 'idle': return null;
   }
 }

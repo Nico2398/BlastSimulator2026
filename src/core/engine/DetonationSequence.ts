@@ -26,7 +26,8 @@ export type DetonationPhase =
   | { kind: 'idle' }
   | { kind: 'evacuating'; remaining: number }
   | { kind: 'stranded'; names: string[] }
-  | { kind: 'ready' };
+  | { kind: 'ready' }
+  | { kind: 'held'; fizzleHoleIds: string[] };
 
 type DetonationResult<T> = { success: true; data: T } | { success: false; error: string };
 

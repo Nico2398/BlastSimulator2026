@@ -63,3 +63,19 @@ export function classifyWetChargedHoles(
   });
   return { wet, fizzled, chargedCount: Object.keys(charges).length };
 }
+
+/** Charged holes whose water-sensitive charge would fizzle now (wet + sensitive), sorted. Equals classifyWetChargedHoles(...).fizzled. */
+export function fizzlingHoles(
+  state: Pick<GameState, 'drillHoles' | 'holeWater' | 'chargesByHole'>,
+): string[] {
+  void state;
+  return []; // TODO: implement
+}
+
+/** Charged untubed holes with a water-sensitive charge while rain falls (wet or dry); [] when not raining, sorted. */
+export function rainExposedHoles(
+  state: Pick<GameState, 'drillHoles' | 'chargesByHole' | 'tubingState' | 'weather'>,
+): string[] {
+  void state;
+  return []; // TODO: implement
+}
