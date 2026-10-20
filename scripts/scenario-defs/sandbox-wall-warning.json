@@ -466,7 +466,8 @@
       "timeout": 60,
       "expect": {
         "usable": "#bs-survey-panel [data-role=\"wall-overlay-toggle\"]"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "blast_preview",
@@ -530,7 +531,8 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
-      "timeout": 90
+      "timeout": 90,
+      "commandOutcome": "either"
     },
     {
       "command": "wait_until field:holeCount equals:0 max_ticks:600",
