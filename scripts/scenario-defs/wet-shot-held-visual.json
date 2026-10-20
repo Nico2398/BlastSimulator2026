@@ -318,9 +318,16 @@
           "selector": "[data-action=\"preflight-detonate\"]"
         },
         {
+          "type": "waitUntil",
+          "field": "dangerZoneClear",
+          "equals": true,
+          "maxTicks": 1500,
+          "timeoutMs": 300000
+        },
+        {
           "type": "waitForSelector",
           "selector": "[data-role=\"preflight-waiting\"][data-phase=\"held\"]",
-          "timeout": 300000
+          "timeout": 60000
         },
         {
           "type": "screenshot"
