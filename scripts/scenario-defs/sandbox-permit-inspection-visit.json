@@ -3,12 +3,12 @@
   "description": "Permit events (#1927): with a grade-1 application pending, the inspector's visit fires (raised with the `event fire` test hook) and the player clicks 'The expediting stamp'. The grade is approved at once, 25% of the fee ($5,000) is booked under permits and corruption rises. Setup is the grade-up scenario's, through `permit apply`.",
   "steps": [
     {
-      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 ore_grade:1",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 ore_grade:1"
         }
       ],
       "description": "Progression site: the sandbox opens with a permit ladder at grade 0.",
