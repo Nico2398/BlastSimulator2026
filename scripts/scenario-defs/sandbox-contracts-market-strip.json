@@ -469,6 +469,19 @@
           "selector": "#bs-contract-market .bs-market-locked"
         },
         {
+          "type": "mousemove",
+          "x": 190,
+          "y": 300
+        },
+        {
+          "type": "wheel",
+          "deltaX": 0,
+          "deltaY": -6000
+        },
+        {
+          "type": "screenshot"
+        },
+        {
           "type": "screenshot"
         }
       ]
