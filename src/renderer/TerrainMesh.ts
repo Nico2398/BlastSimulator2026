@@ -22,6 +22,7 @@ import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { EDGE_TABLE, TRI_TABLE } from './MarchingCubesTables.js';
 import { TerrainMaterial } from './terrain/TerrainMaterial.js';
 import { SurveyConfidenceOverlay } from './SurveyConfidenceOverlay.js';
+import { WallStabilityOverlay } from './WallStabilityOverlay.js';
 
 // The density field moved to terrain/TerrainField.ts (#1603); its public samplers stay importable from here.
 export { densityGradientNormal, virtualEdgeDensity, type EdgeHeightSampler } from './terrain/TerrainField.js';
@@ -129,6 +130,7 @@ export class TerrainMesh {
   private grid: VoxelGrid;
   private readonly material: TerrainMaterial;
   private surveyOverlay: SurveyConfidenceOverlay | null = null;
+  private wallOverlay: WallStabilityOverlay | null = null;
 
   /** Packed signed chunk coordinate -> its Mesh, or null for a built-but-empty chunk (no triangles). */
   private readonly chunks = new Map<number, THREE.Mesh | null>();
@@ -341,6 +343,8 @@ export class TerrainMesh {
     this.material.dispose();
     this.surveyOverlay?.dispose();
     this.surveyOverlay = null;
+    this.wallOverlay?.dispose();
+    this.wallOverlay = null;
   }
 
   /**
@@ -363,6 +367,14 @@ export class TerrainMesh {
       this.surveyOverlay = new SurveyConfidenceOverlay(this.scene, (x, z) => getSmoothTerrainSurfaceY(this.grid, x, z));
     }
     return this.surveyOverlay;
+  }
+
+  /** Get or lazily create the wall-stability overlay (#1943); conforms to the smoothed surface like the survey overlay. */
+  getWallOverlay(): WallStabilityOverlay {
+    if (!this.wallOverlay) {
+      this.wallOverlay = new WallStabilityOverlay(this.scene, (x, z) => getSmoothTerrainSurfaceY(this.grid, x, z));
+    }
+    return this.wallOverlay;
   }
 
   /** The Mesh for one chunk, or null if it's empty/unbuilt — diagnostics and dirty-set tests. */

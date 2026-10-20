@@ -98,6 +98,9 @@ export interface GroundTintPatch {
 /** Metres above the sampled surface a ground tint patch is drawn, to avoid z-fighting with the terrain mesh. */
 export const GROUND_TINT_Y_EPSILON = 0.03;
 
+/** Flat-ground epsilon shared by the geology-view overlays (survey confidence, wall stability); the layer scales it up on steep faces. */
+export const OVERLAY_Y_OFFSET = 0.05;
+
 /** World-unit half-step used to central-difference the height sampler when estimating local slope. */
 const SLOPE_SAMPLE_STEP = 0.1;
 

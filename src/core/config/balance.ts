@@ -3317,6 +3317,12 @@ export const WALL_SLUMP_ROCK_DENSITY_KG_M3 = 2500;
 export const WALL_SLOPE_WALK_MAX_M = 256;
 /** Margin (m) around the toe columns inside which a slump hurts buildings, vehicles and employees. */
 export const WALL_SLUMP_TOE_ZONE_MARGIN_M = 1;
+/** Face height / safe height at which the preview starts warning (amber); above 1 it is red. */
+export const WALL_WARN_RATIO = 0.8;
+/** Opacity of the wall-stability overlay tint. */
+export const WALL_OVERLAY_OPACITY = 0.55;
+/** Most cells walked from a face's crest toward its toe when painting the wall overlay. */
+export const WALL_OVERLAY_MAX_FACE_CELLS = 24;
 
 // ── Shareholder Summit (#1949) ──
 // Measured with the #1945 probe (`ladder`, campaign start, dynatomics shots, seed 4001 volcanic_flats, tier-1 digger

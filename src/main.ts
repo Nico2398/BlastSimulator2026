@@ -242,6 +242,10 @@ function applySurveyOverlayVisible(visible: boolean): void {
 uiManager.setSurveyOverlayToggleHandler(applySurveyOverlayVisible);
 uiManager.setSurveyOverlayVisible(gameRenderer.surveyOverlayVisible);
 
+// Wall stability overlay toggle (#1943): same wiring, off until the player turns it on.
+uiManager.setWallOverlayToggleHandler(visible => gameRenderer.setWallOverlayVisible(visible));
+uiManager.setWallOverlayVisible(gameRenderer.wallOverlayVisible);
+
 // --- Persistence ---
 // IndexedDB construction never throws; failures surface when it opens, so probe it
 // and fall back to a session-only in-memory backend (#1325).
@@ -1013,6 +1017,7 @@ window.__debugGridInfo = () => {
     pictogramCount: gameRenderer.pictogramCount,
     ghostPreviewsInState: ctx.state?.ghostPreviews.length ?? -1,
     surveyOverlayVisible: gameRenderer.surveyOverlayVisible,
+    wallOverlayVisible: gameRenderer.wallOverlayVisible,
     lastGhostRevisionSynced: gameRenderer.lastGhostRevisionSynced,
     terrainMeshRevisionCount: gameRenderer.terrainMeshRevisionCount,
     lastTerrainRevisionSynced: gameRenderer.lastTerrainRevisionSynced,
@@ -1456,6 +1461,11 @@ new KeyboardShortcuts({
     const visible = !gameRenderer.surveyOverlayVisible;
     applySurveyOverlayVisible(visible);
     uiManager.setSurveyOverlayVisible(visible);
+  },
+  onToggleWallOverlay: () => {
+    const visible = !gameRenderer.wallOverlayVisible;
+    gameRenderer.setWallOverlayVisible(visible);
+    uiManager.setWallOverlayVisible(visible);
   },
 }, { isSuppressed: fullScreenMenuUp, isControlLive });
 

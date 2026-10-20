@@ -4529,5 +4529,9 @@
   "ui.blast_workshop.preflight.held_body": "Zone clear, but {count} water-sensitive charges sit in flooded holes ({holes}) and would fizzle. The shot is held. Blast anyway or cancel.",
   "ui.blast_workshop.preflight.warn_rain_risk": "{count} holes hold a water-sensitive charge without tubing. Rain will fill them before the zone clears. Tubing or a water-resistant explosive prevents it.",
   "ui.blast_workshop.fire.check_rain_risk": "{count} holes hold a water-sensitive charge without tubing. Rain will fill them before the zone clears. Tubing or a water-resistant explosive prevents it.",
-  "ui.blast_workshop.charge.drain_rain_reason": "Rain refills this hole before the shot fires. Tube it or use a water-resistant explosive."
+  "ui.blast_workshop.charge.drain_rain_reason": "Rain refills this hole before the shot fires. Tube it or use a water-resistant explosive.",
+  "ui.blast_workshop.preview.wall_warning": "This shot leaves a {height} m face in {rock} (safe: {safe} m). It may slump.",
+  "ui.blast_workshop.preflight.warn_wall_slump": "This shot leaves a {height} m face in {rock} (safe: {safe} m). It may slump.",
+  "ui.survey.wall_overlay_toggle_tip": "Toggle wall stability overlay — W",
+  "shortcuts.wall_overlay": "W: Toggle Wall Stability Overlay"
 }

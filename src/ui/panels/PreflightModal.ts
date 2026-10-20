@@ -24,6 +24,8 @@ import { assembleBlastPlan, buildingsInBlastReach, checkProtectedPositions, vali
 import { totalChargeKg } from '../../core/mining/BlastCalc.js';
 import { oreEstimateView, oreValueColor, oreValueText } from './oreEstimateDisplay.js';
 import { OreEstimateMemo } from './oreEstimateMemo.js';
+import { WallWarningMemo } from './wallWarningMemo.js';
+import { wallWarningText } from './wallWarningText.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 import { rainExposedHoles, wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
@@ -93,6 +95,7 @@ export class PreflightModal {
   private awaitingDetonation = false;
   private gridProvider: () => VoxelGrid | null = () => null;
   private readonly estimateMemo = new OreEstimateMemo();
+  private readonly wallMemo = new WallWarningMemo();
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
@@ -201,6 +204,7 @@ export class PreflightModal {
     const estimate = this.estimateMemo.get(state, plan, this.gridProvider());
     const { value: estValue, coverage, brokenVoxels, charged, holeCoverage } = estimate;
 
+    const wallFaces = this.wallMemo.get(state, plan, this.gridProvider());
     const wet = wetHoles(state);
     const rainExposed = rainExposedHoles(state);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
@@ -225,7 +229,7 @@ export class PreflightModal {
     const signature = JSON.stringify({
       permit, undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage, brokenVoxels, charged, holeCoverage,
       preview: state.lastBlastPreview, wetCount: wet.length, rainExposedCount: rainExposed.length, occupantCount,
-      phase, protectedCount: protectedHoles.length, buildingsAtRisk, loadingCount, awaitingCount, earliestArrival, errorCount: validationErrors.length,
+      walls: wallFaces.map(w => wallWarningText(w)), phase, protectedCount: protectedHoles.length, buildingsAtRisk, loadingCount, awaitingCount, earliestArrival, errorCount: validationErrors.length,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -271,6 +275,7 @@ export class PreflightModal {
       ...(undrilledCount > 0
         ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_undrilled', { count: undrilledCount }) }]
         : []),
+      ...wallFaces.map(w => ({ ok: false, text: wallWarningText(w, 'ui.blast_workshop.preflight.warn_wall_slump'), role: 'preflight-wall-warning' })),
       dryWarning(wet.length, rainExposed.length),
       occupantCount > 0
         ? { ok: false, text: t('ui.blast_workshop.preflight.warn_zone', { count: occupantCount }) }

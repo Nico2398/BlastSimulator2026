@@ -296,6 +296,16 @@ export class UIManager {
     this.surveyPanel.setOverlayVisible(visible);
   }
 
+  /** Wire the wall stability overlay's visibility toggle (#1943) — SurveyPanel's button drives this. */
+  setWallOverlayToggleHandler(cb: (visible: boolean) => void): void {
+    this.surveyPanel.setWallOverlayToggleHandler(cb);
+  }
+
+  /** Reflect the wall stability overlay's visibility preference in SurveyPanel's toggle button (#1943). */
+  setWallOverlayVisible(visible: boolean): void {
+    this.surveyPanel.setWallOverlayVisible(visible);
+  }
+
   setSpeedChangeHandler(cb: (speed: number) => void): void {
     this.onSpeedChangeCb = cb;
   }
