@@ -4,7 +4,7 @@
 
 import type * as THREE from 'three';
 import { WALL_WARN_RATIO, WALL_OVERLAY_OPACITY, WALL_OVERLAY_MAX_FACE_CELLS } from '../core/config/balance.js';
-import type { WallFace } from '../core/mining/WallStability.js';
+import { WALL_RATIO_EPSILON, type WallFace } from '../core/mining/WallStability.js';
 import { GroundTintLayer, type GroundTintPatch } from './GroundTint.js';
 
 /** Tint of a face by its height against its safe height; null when it needs none. */
@@ -17,8 +17,8 @@ const OVERLAY_Y_OFFSET = 0.05;
 
 export function wallFaceTint(heightM: number, safeM: number): WallFaceTint | null {
   const ratio = heightM / safeM;
-  if (ratio >= 1) return 'red';
-  return ratio >= WALL_WARN_RATIO ? 'amber' : null;
+  if (ratio >= 1 - WALL_RATIO_EPSILON) return 'red';
+  return ratio >= WALL_WARN_RATIO - WALL_RATIO_EPSILON ? 'amber' : null;
 }
 
 export class WallStabilityOverlay {

@@ -81,6 +81,8 @@ export interface PredictedFace {
 const DIRECTIONS: ReadonlyArray<{ dx: number; dz: number }> = [
   { dx: 1, dz: 0 }, { dx: -1, dz: 0 }, { dx: 0, dz: 1 }, { dx: 0, dz: -1 },
 ];
+/** Tolerance so a ratio that is 0.8 on paper (9.6 / 12) is not lost to float rounding. */
+export const WALL_RATIO_EPSILON = 1e-9;
 const SOFTEST_SAFE_M = Math.min(...Object.values(WALL_SAFE_FACE_HEIGHT_M_BY_TIER));
 
 function topAt(grid: VoxelGrid, x: number, z: number): number | null {
@@ -143,7 +145,7 @@ function scanFaces(
         if (crestIdx >= 0 && landIdx > crestIdx) {
           const crest = cols[crestIdx]!, toe = cols[landIdx]!;
           const heightM = crest.top - toe.top;
-          if (heightM >= minRatio * SOFTEST_SAFE_M) {
+          if (heightM / SOFTEST_SAFE_M >= minRatio - WALL_RATIO_EPSILON) {
             const { safeM, rockId } = weakestRock(surface, cols.slice(crestIdx, landIdx).filter(c => c !== null), toe.top);
             if (accept(heightM, safeM)) {
               faces.push({
@@ -183,11 +185,11 @@ export function findOverheightFaces(surface: WallSurface, region: BlastRegion): 
 
 /** Faces within `region` whose height is at least `minRatio` of their safe height (default WALL_WARN_RATIO). */
 export function findFacesAtRisk(surface: WallSurface, region: BlastRegion, minRatio: number = WALL_WARN_RATIO): PredictedFace[] {
-  return scanFaces(surface, region, minRatio, (heightM, safeM) => heightM >= minRatio * safeM);
+  return scanFaces(surface, region, minRatio, (heightM, safeM) => heightM / safeM >= minRatio - WALL_RATIO_EPSILON);
 }
 
 /**
- * Faces the armed plan leaves at or over their safe height once it fires (#1943). Runs the blast's own
+ * Faces the armed plan leaves at or above WALL_WARN_RATIO of their safe height once it fires (#1943). Runs the blast's own
  * propagation and fragmentation read-only, then scans a view of the terrain with the broken voxels
  * removed, over the region executeBlast reports as cleared — the same scan the slump pass runs.
  */
@@ -221,7 +223,7 @@ export function predictWallFaces(plan: BlastPlan, grid: VoxelGrid, wetHoleIds?: 
     },
     rockAt: (x, y, z) => (isGone(x, y, z) ? '' : base.rockAt(x, y, z)),
   };
-  return findFacesAtRisk(after, { minX, maxX, minZ, maxZ }, 1);
+  return findFacesAtRisk(after, { minX, maxX, minZ, maxZ });
 }
 
 interface Removed { compId: number; ores: Record<string, number> | undefined }

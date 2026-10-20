@@ -149,7 +149,7 @@ export class GameRenderer {
   /** Player-facing visibility preference for the wall stability overlay (#1943); off until toggled. */
   private wallOverlayPreference = false;
   /** Faces the overlay shows, rebuilt only when the terrain or the game bound to it changes. */
-  private wallOverlayCache: { state: GameState; gridId: number; revision: number; faces: WallFace[] } | null = null;
+  private wallOverlayCache: { state: GameState; gridId: number; revision: number; faces: WallFace[]; planKey: string } | null = null;
 
   // Track rendered entity IDs to detect additions
   private renderedBuildingIds = new Set<number>();
@@ -570,9 +570,10 @@ export class GameRenderer {
       syncWallOverlay(this.terrain, [], false);
       return;
     }
+    const planKey = JSON.stringify([state.drillHoles, state.chargesByHole]);
     const cache = this.wallOverlayCache;
-    if (!cache || cache.state !== state || cache.gridId !== grid.id || cache.revision !== grid.editRevision) {
-      this.wallOverlayCache = { state, gridId: grid.id, revision: grid.editRevision, faces: buildWallOverlayFaces(state, grid) };
+    if (!cache || cache.state !== state || cache.gridId !== grid.id || cache.revision !== grid.editRevision || cache.planKey !== planKey) {
+      this.wallOverlayCache = { state, gridId: grid.id, revision: grid.editRevision, planKey, faces: buildWallOverlayFaces(state, grid) };
     }
     syncWallOverlay(this.terrain, this.wallOverlayCache!.faces, true);
   }
