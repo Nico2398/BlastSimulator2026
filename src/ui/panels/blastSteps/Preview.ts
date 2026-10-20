@@ -30,6 +30,7 @@ import { assembleBlastPlan, validateBlastPlan } from '../../../core/mining/Blast
 import { chargeKgPerMetre } from '../../../core/mining/HoleDiameter.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
+import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 
 
@@ -114,6 +115,11 @@ export class PreviewStep {
   get root(): HTMLElement { return this.el; }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+
+  /** Supplies the voxel grid the wall-slump prediction reads (#1943). */
+  setGridProvider(_fn: () => VoxelGrid | null): void {
+    // TODO: implement
+  }
 
   /** Distinct hole diameters of the plan with their charge capacity, so the preview names what it simulates (#1934). */
   private boreText(state: GameState): string {
