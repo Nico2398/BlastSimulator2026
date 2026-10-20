@@ -3942,6 +3942,7 @@
   "mining.blast.no_breakout": "Blast failed to break out: the rock stayed sealed in the ground.",
   "mining.blast.rating_cap_no_breakout": "Rating capped (blast did not break out): base {base}",
   "mining.blast.rating_cap_oversize": "Rating capped (oversized fragments): base {base}",
+  "mining.blast.wall_slump": "Wall slump at ({x}, {z}): {volume} m³ of wall came down on the pit floor.",
   "mining.blast.secondary_blast": "Secondary blast: {kg} kg of stored explosives detonated in warehouse #{id} and blew a crater ({voxels} voxels). Casualties: {casualties}.",
   "mining.blast.cancelled_drill_orders": "Drill orders cancelled by the blast: {count} hole(s) were not drilled yet.",
   "mining.blast.max_village_vibration": "Max village vibration: {value} mm/s",
@@ -4514,6 +4515,8 @@
   "economy.contract.market_line": "  {ore}: {pct}% saturated | price {trend}% vs base ({from} -> {to}/kg)",
   "economy.contract.market_none": "No ore markets to watch on this site.",
   "notification.market.glut": "Analysts blame you for the {ore} glut.",
+  "notification.wall_slump.body": "Wall slump at ({x}, {z}). The geologist did warn you.",
+  "notification.wall_slump.title": "Collapse",
   "notification.title.market": "Market",
   "permit.ack.success": "Approval letter filed under 'Framed'.",
   "permit.ack.nothing": "No approval letter is waiting. The Ministry has nothing to add."

@@ -6,10 +6,9 @@ import { resolveSecondaryBlasts, type SecondaryBlastEvent, type SecondaryBlastOu
 import { executeBlastSteps, type VillagePosition } from '../../../core/mining/BlastExecution.js';
 import { resolveMarketId } from '../../../core/campaign/Level.js';
 import { addBlastFragments, reserveFragmentIds } from '../../../core/economy/Logistics.js';
-import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
 import type { AccidentRecord } from '../../../core/entities/Damage.js';
 import { recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
-import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
+import { emitFootprintOccupancyChanged, snapshotBuildingFootprints } from '../buildingHelpers.js';
 import { destroyEntitiesOnColumns } from './shared.js';
 import { SECONDARY_BLAST_CRATER_MAX_PASSES } from '../../../core/config/balance.js';
 
@@ -43,8 +42,7 @@ export function* carveSecondaryCraters(
   for (let pass = 0; pass < SECONDARY_BLAST_CRATER_MAX_PASSES && pending.length > 0; pass++) {
     const craterEvents: SecondaryBlastEvent[] = [];
     // Footprints as they stand before this pass's craters remove any building.
-    const footprints = new Map(state.buildings.buildings.map(b =>
-      [b.id, { x: b.x, z: b.z, ...getDefSize(getBuildingDef(b.type, b.tier)) }] as const));
+    const footprints = snapshotBuildingFootprints(state.buildings);
     for (const outcome of pending) {
       const warehouseId = outcome.event.buildingId;
       if (visited.has(warehouseId)) continue;

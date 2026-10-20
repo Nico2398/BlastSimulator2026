@@ -685,6 +685,7 @@ function startBenchSession(biome: string, seed: number): BenchSession {
   const run = (c: string) => runner.run(c);
   expect(run(`sandbox start biome:${biome} difficulty:normal seed:${seed} staffed:true`)).toMatchObject({ success: true });
   const state = ctx.state!;
+  delete state.grade; // a 16 m two-bench pit would slump (#1941); the bench breakout geometry is under test
   state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
   const grid = ctx.grid!;
   const tickWhile = (until: () => boolean, max: number): void => {

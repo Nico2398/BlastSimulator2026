@@ -58,6 +58,10 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Wall stability (#1941): the unit-tested pass contracts; production composes them inside runWallStability.
+  'src/core/mining/WallStability.ts:WallFace',
+  'src/core/mining/WallStability.ts:applySlump',
+  'src/core/mining/WallStability.ts:findOverheightFaces',
   // Ramp tool (#1942): the unit-tested contracts of the per-leg arrow layout and the tier-check line; production composes them inside buildRampArrow / describeRampPlan.
   'src/renderer/RampArrow.ts:rampLegSpecs',
   'src/ui/describeRamp.ts:rampTierCheckLine',
