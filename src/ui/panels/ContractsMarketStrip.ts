@@ -1,6 +1,6 @@
 // Contracts panel market strip (#1931): per-ore price trend and saturation, locked buyer tiers, buyer badge.
 import { BUYER_TIERS, buyerTierNameKey, type BuyerTier, type BuyerTierId } from '../../core/economy/BuyerTiers.js';
-import { oreSaturationTrend, type SaturationReader } from '../../core/economy/OreSaturation.js';
+import { formatTrendPct, oreSaturationTrend, type SaturationReader } from '../../core/economy/OreSaturation.js';
 import { gradeDef } from '../../core/economy/MineGrade.js';
 import { MARKET_HUNGRY_SATURATION, ORE_SATURATION_TOAST_LEVEL } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -53,7 +53,7 @@ function trendArrow(pct: number): string {
 
 function makeOreRow(oreId: string, sat: number, basePrice: number): HTMLElement {
   const { pct } = oreSaturationTrend(oreId, sat, basePrice);
-  const signed = pct > 0 ? `+${pct}` : `${pct === 0 ? 0 : pct}`;
+  const signed = formatTrendPct(pct);
   const trendColor = pct < 0 ? 'var(--bsx-critical-text)' : pct > 0 ? 'var(--bsx-positive)' : 'var(--bsx-text-micro)';
   const satBox = el('div', { className: 'bs-market-sat', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '1', 'aria-valuenow': String(sat) }, children: [progressBar(sat * 100, sat >= ORE_SATURATION_TOAST_LEVEL ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)')] });
   satBox.style.cssText = 'flex:1;min-width:40px';
@@ -86,7 +86,7 @@ export function makeMarketStrip(input: MarketStripInput): HTMLElement {
       return t('ui.contracts.locked_tier', { buyer: t(b.nameKey), grade: t(def.nameKey, def.nameParams) });
     }).join(' · ');
     kids.push(el('div', {
-      className: 'bs-market-locked', text: `${t('ui.contracts.locked_tiers_title')}: ${list}`, attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+      className: 'bs-market-locked', text: t('ui.contracts.locked_tiers', { list }), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
       children: [iconEl('lock', 10)],
     }));
   }

@@ -29,7 +29,7 @@ import { formatMoney, formatPricePerKg, insufficientFundsText, wholeKg } from '.
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { getProfitShortfall } from '../../core/campaign/LevelObjective.js';
 import { getOre } from '../../core/world/OreCatalog.js';
-import { makeBuyerBadge, makeMarketStrip } from './ContractsMarketStrip.js';
+import { makeBuyerBadge, makeMarketStrip, type MarketStripInput } from './ContractsMarketStrip.js';
 import { saturationReader } from '../../core/economy/OreSaturation.js';
 import { oreContractBasePrice } from '../../core/economy/Market.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -143,6 +143,7 @@ export class ContractsPanel extends PanelBase {
 
 
   update(state: GameState): void {
+    const market = this.marketInput(state, resolveContractOres(state));
     const signature = JSON.stringify({
       stored: Math.round(state.logistics.storedMassKg), spoil: Math.round(totalSpoilKg(state.buildings.buildings)), storedTenths: deliverableAmountKg(stateRubbleStockKg(state)), cap: state.logistics.storageCapacityKg,
       ore: state.collectedOre, oreTenths: Object.values(state.collectedOre).map(deliverableAmountKg),
@@ -151,9 +152,9 @@ export class ContractsPanel extends PanelBase {
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
       managerLevel: bestAvailableManagerLevel(state.employees.employees),
-      market: state.grade === undefined ? undefined : {
-        grade: state.grade.grade,
-        sat: resolveContractOres(state).map(o => Math.round(saturationReader(state.saturation, state.tickCount)(o) * 100)),
+      market: market && {
+        grade: market.grade,
+        sat: market.ores.map(o => Math.round(market.saturation(o) * 100)),
         tiers: state.contracts.available.map(c => c.buyerTier ?? ''),
       },
     });
@@ -239,13 +240,19 @@ export class ContractsPanel extends PanelBase {
 
   // ── Storage strip ──
 
-  private makeMarketSection(state: GameState, ores: readonly string[]): HTMLElement | null {
-    if (state.grade === undefined || ores.length === 0) return null;
-    return makeMarketStrip({
+  /** Market strip input; null before mine grades exist (no market yet). */
+  private marketInput(state: GameState, ores: readonly string[]): MarketStripInput | null {
+    if (state.grade === undefined) return null;
+    return {
       grade: state.grade.grade, ores,
       saturation: saturationReader(state.saturation, state.tickCount),
       basePrice: ore => oreContractBasePrice(ore, state.contracts.market),
-    });
+    };
+  }
+
+  private makeMarketSection(state: GameState, ores: readonly string[]): HTMLElement | null {
+    const input = this.marketInput(state, ores);
+    return input && ores.length > 0 ? makeMarketStrip(input) : null;
   }
 
   private makeStorageStrip(state: GameState): HTMLElement {

@@ -2462,7 +2462,7 @@
   "ui.contracts.market_tip_hungry": "Buyers are hungry.",
   "ui.contracts.market_tip_steady": "The market shrugs.",
   "ui.contracts.locked_tier": "{buyer}: needs {grade}",
-  "ui.contracts.locked_tiers_title": "Locked buyers",
+  "ui.contracts.locked_tiers": "Locked buyers: {list}",
   "ui.contracts.buyer_badge_aria": "Buyer: {buyer}",
   "ui.contracts.storage": "Storage",
   "ui.contracts.storage_value": "{used} / {cap} kg",

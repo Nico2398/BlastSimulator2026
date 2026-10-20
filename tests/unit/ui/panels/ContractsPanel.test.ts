@@ -1778,7 +1778,7 @@ describe('ContractsPanel — market strip (progression)', () => {
     it('at grade 0 lists regional, national and global', () => {
       const text = lockedText(0)!;
       for (const id of ['regional', 'national', 'global'] as const) expect(text).toContain(lockedLine(id));
-      expect(text).toContain(t('ui.contracts.locked_tiers_title'));
+      expect(text).toContain(t('ui.contracts.locked_tiers', { list: '' }).trim());
     });
 
     it('at grade 1 the regional buyer is no longer locked', () => {
