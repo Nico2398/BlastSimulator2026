@@ -321,7 +321,7 @@ export class PreflightModal {
       ? t('ui.blast_workshop.preflight.stranded_names', { names: phase.names.join(', ') })
       : t('ui.blast_workshop.preflight.detonating_remaining', { count: phase.kind === 'evacuating' ? phase.remaining : 0 });
     this.waitingEl.replaceChildren(
-      el('span', { text: t('ui.blast_workshop.preflight.detonating_title'), attrs: { style: 'font:800 12px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-critical-text)' } }),
+      el('span', { text: t(phase.kind === 'held' ? 'ui.blast_workshop.preflight.held_title' : 'ui.blast_workshop.preflight.detonating_title'), attrs: { style: 'font:800 12px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-critical-text)' } }),
       el('span', { text: body, attrs: { style: 'font:400 12px/1.45 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
     );
   }

@@ -868,6 +868,15 @@ describe('PreflightModal — held shot and rain risk (#1957)', () => {
     expect(el.textContent).toContain(t('ui.blast_workshop.preflight.held_body', { count: ids.length, holes: ids.join(', ') }));
   });
 
+  it('held phase shows the held title, not the evacuating title', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(heldState(), 'sunny');
+    const text = (modal.root.querySelector(WAITING) as HTMLElement).textContent ?? '';
+    expect(text).toContain(t('ui.blast_workshop.preflight.held_title'));
+    expect(text).not.toContain(t('ui.blast_workshop.preflight.detonating_title'));
+  });
+
   it('held phase keeps Cancel and Blast anyway enabled', () => {
     const { modal } = makeModal();
     modal.show();
@@ -949,6 +958,7 @@ describe('PreflightModal — held shot and rain risk (#1957)', () => {
     const read = (l: string): Record<string, string> => JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8'));
     for (const key of [
       'ui.blast_workshop.preflight.held_body',
+      'ui.blast_workshop.preflight.held_title',
       'ui.blast_workshop.preflight.warn_rain_risk',
       'mining.blast.detonation_held',
       'tick.detonation_held',

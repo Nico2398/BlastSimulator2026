@@ -4522,6 +4522,7 @@
   "permit.ack.nothing": "Aucune lettre d'approbation en attente. Le Ministère n'a rien à ajouter.",
   "mining.blast.detonation_held": "Zone dégagée, mais {count} charges sensibles à l'eau reposent dans des trous inondés ({holes}) et rateraient. Le tir est retenu. Tirer quand même ou annuler.",
   "tick.detonation_held": "Zone dégagée, mais {count} charges sensibles à l'eau reposent dans des trous inondés ({holes}) et rateraient. Le tir est retenu. Tirer quand même ou annuler.",
+  "ui.blast_workshop.preflight.held_title": "Tir retenu : trous inondés",
   "ui.blast_workshop.preflight.held_body": "Zone dégagée, mais {count} charges sensibles à l'eau reposent dans des trous inondés ({holes}) et rateraient. Le tir est retenu. Tirer quand même ou annuler.",
   "ui.blast_workshop.preflight.warn_rain_risk": "{count} trous contiennent une charge sensible à l'eau sans tubage. La pluie les remplira avant que la zone soit dégagée. Un tubage ou un explosif résistant à l'eau l'évite.",
   "ui.blast_workshop.fire.check_rain_risk": "{count} trous contiennent une charge sensible à l'eau sans tubage. La pluie les remplira avant que la zone soit dégagée. Un tubage ou un explosif résistant à l'eau l'évite.",
