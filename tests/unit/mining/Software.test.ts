@@ -15,7 +15,7 @@ import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { vec3 } from '../../../src/core/math/Vec3.js';
-import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
+import { executeBlast, buildBlastReport } from '../../../src/core/mining/BlastExecution.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
 import { readFileSync } from 'node:fs';
 
@@ -285,7 +285,7 @@ describe('Software — previewBlastOutcome (#1968)', () => {
     const a = makeTestPlan();
     const b = makeTestPlan();
     const forecast = previewBlastOutcome(a.plan, a.grid, 3, [], 1, new Set())!;
-    expect(forecast.rating).toBe(executeBlast(b.plan, b.grid, [], 1)!.rating);
+    expect(forecast.rating).toBe(buildBlastReport(executeBlast(b.plan, b.grid, [], 1)!, 0, 0).rating);
   });
 });
 

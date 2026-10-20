@@ -3,7 +3,8 @@
 import type { MarketId } from '../economy/Market.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { BlastPlan } from './BlastPlan.js';
-import { executeBlast, type BlastRating, type VillagePosition } from './BlastExecution.js';
+import { executeBlast, didNotBreakOut, type BlastRating, type VillagePosition } from './BlastExecution.js';
+import { applyRatingCaps } from './BlastRatingCaps.js';
 import { forkVoxelGrid } from '../world/VoxelGridFork.js';
 
 export interface BlastForecast {
@@ -30,8 +31,16 @@ export function dryRunBlast(
     plan, forkVoxelGrid(grid), villages, groundFactor, undefined, undefined, wetHoleIds, marketId,
   );
   if (!result) return null;
+  // Same caps as the real report; casualty, building and fizzle facts need state the fork lacks, so they stay 0.
+  const { rating } = applyRatingCaps(result.rating, {
+    deaths: 0, injuries: 0, destroyedBuildings: 0,
+    wetHoleCount: 0, fizzledHoleCount: 0, chargedHoleCount: 0,
+    oversizedFragments: result.oversizedFragments,
+    fragmentCount: result.fragmentCount,
+    noBreakout: didNotBreakOut(result),
+  });
   return {
-    rating: result.rating,
+    rating,
     fragmentCount: result.fragmentCount,
     projectionCount: result.projectionCount,
     thrownShare: result.fragmentCount > 0 ? result.projectionCount / result.fragmentCount : 0,

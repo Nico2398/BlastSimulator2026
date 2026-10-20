@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { dryRunBlast, isHazardRating } from '../../../src/core/mining/BlastDryRun.js';
-import { executeBlast, type BlastRating } from '../../../src/core/mining/BlastExecution.js';
+import { executeBlast, buildBlastReport, type BlastRating } from '../../../src/core/mining/BlastExecution.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
@@ -70,7 +70,7 @@ describe('dryRunBlast', () => {
     const plan = standardShot().plan;
     const forecast = dryRunBlast(plan, buildWallGrid({ plateauTop: 20 }), [], GROUND, NO_WET)!;
     const real = executeBlast(plan, buildWallGrid({ plateauTop: 20 }), [], GROUND)!;
-    expect(forecast.rating).toBe(real.rating);
+    expect(forecast.rating).toBe(buildBlastReport(real, 0, 0).rating);
     expect(forecast.projectionCount).toBe(0);
     expect(forecast.thrownShare).toBe(0);
     expect(forecast.furthestThrowM).toBe(0);
@@ -81,12 +81,23 @@ describe('dryRunBlast', () => {
     const b = craterGrid();
     const forecast = dryRunBlast(a.second, a.grid, [], GROUND, NO_WET)!;
     const real = executeBlast(b.second, b.grid, [], GROUND)!;
-    expect(forecast.rating).toBe(real.rating);
+    expect(forecast.rating).toBe(buildBlastReport(real, 0, 0).rating);
     expect(forecast.projectionCount).toBe(real.projectionCount);
     expect(forecast.fragmentCount).toBe(real.fragmentCount);
     expect(Math.abs(forecast.furthestThrowM - real.maxThrowDistance)).toBeLessThanOrEqual(0.5);
     const share = real.fragmentCount > 0 ? real.projectionCount / real.fragmentCount : 0;
     expect(forecast.thrownShare).toBeCloseTo(share, 6);
+  });
+
+  it('applies the oversize rating cap: forecast equals the report rating, below the base rating', () => {
+    const plan = standardShot().plan;
+    const real = executeBlast(plan, buildWallGrid({ plateauTop: 20 }), [], GROUND)!;
+    const report = buildBlastReport(real, 0, 0);
+    expect(report.ratingCap).toBe('oversize');
+    expect(real.rating).toBe('perfect');
+    const forecast = dryRunBlast(plan, buildWallGrid({ plateauTop: 20 }), [], GROUND, NO_WET)!;
+    expect(forecast.rating).toBe('good');
+    expect(forecast.rating).toBe(report.rating);
   });
 
   it('clearedVoxels equals executeBlast clearedVoxels', () => {
@@ -100,7 +111,7 @@ describe('dryRunBlast', () => {
     const plan = standardShot().plan;
     const forecast = dryRunBlast(plan, buildWallGrid({ plateauTop: 20 }), villages, GROUND, NO_WET)!;
     const real = executeBlast(plan, buildWallGrid({ plateauTop: 20 }), villages, GROUND)!;
-    expect(forecast.rating).toBe(real.rating);
+    expect(forecast.rating).toBe(buildBlastReport(real, 0, 0).rating);
   });
 });
 
