@@ -1,6 +1,6 @@
 {
   "name": "sandbox-permit-preflight-warning",
-  "description": "Permit preview (#1925): a player plans a 3x3 at 10 kg (90 kg, over the 80 kg grade-0 limit) in the workshop, sees the permit usage and warning in the footer and the fee, strikes and warning in the preflight, and fires anyway (the limit is soft).",
+  "description": "Permit preview (#1925): a player plans a 3x3 at 10 kg (90 kg, over the 40 kg grade-0 limit) in the workshop, sees the permit usage and warning in the footer and the fee, strikes and warning in the preflight, and fires anyway (the limit is soft).",
   "steps": [
     {
       "command": "sandbox start biome:desert_badlands kit:full seed:42",
@@ -11,7 +11,7 @@
           "command": "sandbox start biome:desert_badlands kit:full seed:42"
         }
       ],
-      "description": "Progression site at grade 0: the Backyard Dig Permit allows 80 kg and 9 holes per blast.",
+      "description": "Progression site at grade 0: the Backyard Dig Permit allows 40 kg and 9 holes per blast.",
       "expect": {
         "equals": {
           "mineGrade": {
@@ -30,7 +30,7 @@
           "command": "permit status"
         }
       ],
-      "description": "Grade 0 permit: limits 80 kg / 9 holes and the $250 notification fee are listed."
+      "description": "Grade 0 permit: limits 40 kg / 9 holes and the $250 notification fee are listed."
     },
     {
       "command": "build explosive_warehouse at:8,8",
@@ -242,7 +242,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Charge every hole with 10 kg: 90 kg in all against the 80 kg limit.",
+      "description": "Charge every hole with 10 kg: 90 kg in all against the 40 kg limit.",
       "expect": {
         "increased": [
           "orderedChargeCount"
@@ -285,7 +285,7 @@
       "command": "state",
       "role": "player",
       "timeout": 90,
-      "description": "Footer shows 90 / 80 kg and 9 / 9 holes in the warning style with the satirical warning line; FIRE stays usable.",
+      "description": "Footer shows 90 / 40 kg and 9 / 9 holes in the warning style with the satirical warning line; FIRE stays usable.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -303,7 +303,7 @@
           "type": "assert",
           "selector": "#bs-blast-panel [data-role=\"permit-usage\"] [data-role=\"permit-kg\"]",
           "property": "textContent",
-          "expectedValue": "90 / 80 kg"
+          "expectedValue": "90 / 40 kg"
         },
         {
           "type": "assert",
