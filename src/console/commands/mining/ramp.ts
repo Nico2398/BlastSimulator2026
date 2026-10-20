@@ -8,9 +8,11 @@ import {
   validateRampOrder, defineRampSegments, rampDefFromEndpoints, rampWidthOf,
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
+import { proposeRampSpiral, type RampSpiralProposal, type RampSpiralResult, type SpiralDir, type SpiralRequest, type SpiralSurface } from '../../../core/mining/RampSpiral.js';
 import { queueRampOrder } from '../../../core/mining/RampOrder.js';
 import type { RampPathCell } from '../../../core/mining/RampPath.js';
 import { rampPathCells, legsFromWaypoints, firstOccupiedPathTile, rampPathOf, rampTotalLength } from '../../../core/mining/RampPath.js';
+import { computeVoxelColumnSurfaceHeight } from '../../../core/world/VoxelGrid.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { isBuildingFootprintCell } from '../../../core/entities/Building.js';
 import { rampFootprint, orderRampWiden, validateWidenRamp, type WidenFailure } from '../../../core/mining/RampWidening.js';
@@ -33,6 +35,8 @@ export function buildRampCommand(
 ): CommandResult {
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
+
+  if (args[0] === 'spiral') return spiralRampCommand(ctx, args.slice(1), named);
 
   if (args[0] === 'cancel') {
     const rampId = parseInt(args[1] ?? named['id'] ?? '', 10);
@@ -74,6 +78,11 @@ export function buildRampCommand(
   }
   if (grade !== undefined) rampDef.gradeDegrees = grade;
 
+  return orderRampDef(ctx, rampDef);
+}
+
+/** Validates, claims and queues the ordered `rampDef` (straight or multi-leg); the shared tail of every ramp order form. */
+function orderRampDef(ctx: MiningContext, rampDef: RampDef): CommandResult {
   const { direction, length } = rampDef;
 
   // validateRampOrder runs first, before rampFootprint/cellsInRect build any
@@ -114,6 +123,57 @@ export function buildRampCommand(
     success: true,
     output: t('mining.build_ramp.ordered', { length, direction, segments: segments.length }),
   };
+}
+
+/** Parses `x,z` into two finite numbers; null otherwise. */
+function parseTile(raw: string | undefined): { x: number; z: number } | null {
+  const parts = (raw ?? '').split(',').map(p => p.trim());
+  if (parts.length !== 2 || parts.some(p => p === '' || !Number.isFinite(Number(p)))) return null;
+  return { x: Number(parts[0]), z: Number(parts[1]) };
+}
+
+/** `ramp spiral from:<x>,<z> depth:<m> grade:<deg> width:<3|5|7> [dir:cw|ccw] [preview]` (#1940). */
+function spiralRampCommand(
+  ctx: MiningContext, args: string[], named: Record<string, string>,
+): CommandResult {
+  const from = parseTile(named['from']);
+  const depth = Number(named['depth'] ?? '');
+  const grade = Number(named['grade'] ?? '');
+  const width = Number(named['width'] ?? '');
+  if (from === null || !Number.isFinite(depth) || !Number.isFinite(grade) || !isRampWidth(width)) {
+    return { success: false, output: t('mining.ramp_spiral.usage') };
+  }
+  const rawDir = named['dir'] ?? 'cw';
+  if (rawDir !== 'cw' && rawDir !== 'ccw') return { success: false, output: t('mining.ramp_spiral.bad_dir') };
+  const dir: SpiralDir = rawDir;
+  const grid = ctx.grid!;
+  const area = ctx.playableArea;
+  const request: SpiralRequest = { fromX: from.x, fromZ: from.z, depth, gradeDegrees: grade, width, dir };
+  const surface: SpiralSurface = {
+    heightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
+    contains: (x, z) => area?.contains(x, z) ?? grid.containsColumn(x, z),
+  };
+  const result: RampSpiralResult = proposeRampSpiral(request, surface);
+  if (!result.success) return { success: false, output: t(result.reasonKey, result.params) };
+  const p: RampSpiralProposal = result.proposal;
+
+  if (args.includes('preview')) {
+    return {
+      success: true,
+      output: t('mining.ramp_spiral.preview', {
+        legs: p.legs.map(l => `${l.direction} ${l.length}`).join(', '),
+        length: p.totalLength, cost: formatMoney(p.cost), laps: p.laps, grade: p.gradeDegrees,
+      }),
+    };
+  }
+  const def: RampDef = {
+    originX: p.originX, originZ: p.originZ, direction: p.legs[0]!.direction, length: p.totalLength,
+    targetDepth: p.depth, width, gradeDegrees: p.gradeDegrees,
+  };
+  if (p.legs.length > 1) def.legs = p.legs;
+  const ordered = orderRampDef(ctx, def);
+  if (!ordered.success) return ordered;
+  return { success: true, output: t('mining.ramp_spiral.ordered', { length: p.totalLength, laps: p.laps, legs: p.legs.length }) };
 }
 
 const PATH_CONFLICTS = ['start', 'end', 'origin', 'direction', 'length'] as const;
