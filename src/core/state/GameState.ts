@@ -11,6 +11,7 @@ import type { RampFootprint } from '../mining/RampPath.js';
 import type { TutorialProgress } from './TutorialProgress.js';
 import type { GradeState } from '../economy/MineGrade.js';
 import type { BoardState } from '../economy/Board.js';
+import type { OreSaturationState } from '../economy/OreSaturation.js';
 import type { PendingDetonation } from '../engine/DetonationSequence.js';
 import type { AgentOccupancy } from '../nav/AgentOccupancy.js';
 import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
@@ -396,6 +397,8 @@ export interface GameState {
   grade?: GradeState;
   /** Board of directors; present only when the level opts in (#1946). */
   board?: BoardState;
+  /** Per-ore market saturation from the player's sales; absent until the first sale (#1930). */
+  saturation?: OreSaturationState;
 
   /** Mine type preset ID used for this game. */
   mineType: string;

@@ -243,7 +243,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('finances', 'Show balance and transactions', (args, named) =>
     financesCommand(ctx, args, named),
   );
-  runner.register('contract', 'Contracts (list|accept|status|deliver|negotiate)', (args, named) =>
+  runner.register('contract', 'Contracts (list|accept|status|deliver|negotiate|market)', (args, named) =>
     contractCommand(ctx, args, named),
   );
   runner.register('board', 'Board of directors (status|start)', (args, named) =>

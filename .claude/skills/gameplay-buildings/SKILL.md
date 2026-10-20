@@ -178,7 +178,7 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
   `storage_full`. With heaps placed but none having room for the fragment they are blocked as
   `spoil_heap_full` ("build another heap or take a rubble contract"); the rock stays in the pit.
   `releaseBarrenStoredFragments` moves a stored barren fragment to a heap only when one has room for all of it;
-  otherwise it stays stored. A rubble contract (or `drawSpoilKg`) frees room and hauls resume. Rubble-disposal contracts take barren rock only: heap stock first, then barren stored fragments; ore-bearing stock is never consumed (#1871).
+  otherwise it stays stored. Barren overflow (#2018, `barrenOverflowKg`) means no single heap has room for the smallest stored barren fragment (heaps fill in whole fragments, so residual room does not hide it) and barren is at least `BARREN_OVERFLOW_STORED_SHARE` of storage. A rubble contract (or `drawSpoilKg`) frees room and hauls resume. Rubble-disposal contracts take barren rock only: heap stock first, then barren stored fragments; ore-bearing stock is never consumed (#1871).
 - **Starting heap (#1574):** Dusty Hollow (`DUSTY_HOLLOW_STARTING_SITE`) and the tutorial
   (`TUTORIAL_STARTING_SITE`) open with one free, active heap placed at tick 0, so the first blast's
   barren rock has a dump and no "place a spoil heap" notice appears. Later levels still build their own.

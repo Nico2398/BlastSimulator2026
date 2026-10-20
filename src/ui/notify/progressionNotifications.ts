@@ -17,4 +17,6 @@ export function wireProgressionNotifications(
     const def = gradeDef(grade);
     notify({ severity: 'info', title: t('notification.title.permit'), body: t('notification.progression.approved', { name: t(def.nameKey, def.nameParams) }) });
   });
+  emitter.on('progression:ore_glut', ({ oreId }) =>
+    notify({ severity: 'info', title: t('notification.title.market'), body: t('notification.market.glut', { ore: t(`ore.${oreId}.name`) }) }));
 }

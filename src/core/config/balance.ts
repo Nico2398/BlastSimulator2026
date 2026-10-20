@@ -85,6 +85,20 @@ export const ORE_PRICES = {
   treranium: 2500,
 } as const;
 
+/** Half-life (ticks) of an ore's market saturation (#1930). */
+export const ORE_SATURATION_HALF_LIFE_TICKS = 500;
+/** Price discount at full saturation (#1930). */
+export const ORE_SATURATION_MAX_DISCOUNT = 0.5;
+/** Saturation level at which the glut toast fires (#1930). */
+export const ORE_SATURATION_TOAST_LEVEL = 0.5;
+/** Base market depth (kg) per ore: sales volume that fully saturates it at the local tier (#1930). */
+export const ORE_MARKET_DEPTH_KG: Record<keyof typeof ORE_PRICES, number> = {
+  dirtite: 20_000, rustite: 15_000, blingite: 10_000, gloomium: 8_000,
+  sparkium: 6_000, craktonite: 4_000, absurdium: 3_000, treranium: 2_000,
+};
+/** Market depth multiplier per buyer tier (#1930). */
+export const ORE_DEPTH_TIER_MULT = { local: 1, regional: 2, national: 5, global: 12 } as const;
+
 /** Rubble disposal price range per kg ($) used when generating contract offers. */
 export const RUBBLE_DISPOSAL_PRICE_RANGE = { min: 0.5, max: 2.0 } as const;
 
@@ -3238,3 +3252,5 @@ export const VANITY_GOLD_TOWER_NUISANCE_ONCE = -5;
 export const VANITY_WELL_BEING_ONCE = -2;
 /** Golf course upkeep ($ per tick). */
 export const VANITY_GOLF_UPKEEP_PER_TICK = 20;
+/** Share of stored mass that must be barren, with every spoil heap full or absent, for a storage-full block to read as barren overflow. */
+export const BARREN_OVERFLOW_STORED_SHARE = 0.5;

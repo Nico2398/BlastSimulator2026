@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Contract system
 // Contracts define material delivery requirements with deadlines, payments, and penalties.
 
+import { saturationFactor, type SaturationReader } from './OreSaturation.js';
 import { oreContractBasePrice, resolveMarket, type MarketId, type MarketRange } from './Market.js';
 import { Random } from '../math/Random.js';
 import { buyerDeadlineRange, buyerPriceFactor, buyerSupplyQtyRange, pickBuyerTier, type BuyerTier, type BuyerTierId } from './BuyerTiers.js';
@@ -127,6 +128,8 @@ export function generateContracts(
   rubbleStockKg: number,
   /** Mine grade selecting the unlocked buyer tiers (#1929). */
   buyerGrade?: number,
+  /** Per-ore market saturation reading, discounting oversold ores (#1930). */
+  saturation?: SaturationReader,
 ): void {
   // Only refresh if enough time has passed
   if (currentTick - state.lastRefreshTick < CONTRACT_REFRESH_INTERVAL && state.available.length > 0) return;
@@ -137,7 +140,7 @@ export function generateContracts(
 
   // A refresh may add fewer offers than CONTRACTS_PER_REFRESH: a rubble-only site with too little barren rock offers nothing.
   for (let i = 0; i < CONTRACTS_PER_REFRESH; i++) {
-    const offer = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg, buyerGrade);
+    const offer = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg, buyerGrade, saturation);
     if (offer) state.available.push(offer);
   }
   state.lastRefreshTick = currentTick;
@@ -145,9 +148,9 @@ export function generateContracts(
 
 /** Puts one extra offer on the board outside the refresh cycle (an event's special contract); the oldest offer makes room when full. */
 export function offerSpecialContract(
-  state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number, buyerGrade?: number,
+  state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number, buyerGrade?: number, saturation?: SaturationReader,
 ): Contract | null {
-  const contract = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg, buyerGrade);
+  const contract = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg, buyerGrade, saturation);
   if (!contract) return null;
   if (state.available.length >= MAX_AVAILABLE_CONTRACTS) state.available.shift();
   state.available.push(contract);
@@ -166,23 +169,40 @@ function commonOres(ores: readonly string[], market: MarketId | undefined): stri
  * barren rock for the smallest rubble offer). A rubble offer is sized to `rubbleStockKg`
  * (#1892); when the stock is under the market's smallest rubble quantity the roll becomes an ore sale.
  */
-function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number, buyerGrade?: number): Contract | null {
+function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number, buyerGrade?: number, saturation?: SaturationReader): Contract | null {
   const profile = resolveMarket(state.market);
   const typeRoll = rng.nextFloat(0, 1);
   // A site whose rocks yield no ore has nothing to sell or supply: rubble only.
   const rubbleOnly = availableOres.length === 0;
-  if (!rubbleOnly && typeRoll < 0.5) return generateOreSaleOffer(state, rng, priceMultiplier, availableOres, buyerGrade);
-  if (rubbleOnly || typeRoll < 0.8) return generateRubbleOffer(state, rng, priceMultiplier, availableOres, rubbleStockKg, buyerGrade);
+  if (!rubbleOnly && typeRoll < 0.5) return generateOreSaleOffer(state, rng, priceMultiplier, availableOres, buyerGrade, saturation);
+  if (rubbleOnly || typeRoll < 0.8) return generateRubbleOffer(state, rng, priceMultiplier, availableOres, rubbleStockKg, buyerGrade, saturation);
 
   // Supply contract (larger quantity, lower price, longer deadline)
   const market = state.market;
   const buyer = tieredBuyer(state, rng, buyerGrade);
-  const materialId = rng.pick(commonOres(availableOres, market)); // Only the site's cheapest ores for supply
+  const supplyOres = commonOres(availableOres, market); // Only the site's cheapest ores for supply
+  const materialId = pickOre(rng, supplyOres, buyer ? saturation : undefined);
   if (buyer) {
-    return rollTieredOffer(state, rng, priceMultiplier, buyer, 'supply', materialId, `Supply ${materialId} (bulk)`, buyerSupplyQtyRange(buyer, profile.supplyQtyKg));
+    return rollTieredOffer(state, rng, priceMultiplier, buyer, 'supply', materialId, `Supply ${materialId} (bulk)`, buyerSupplyQtyRange(buyer, profile.supplyQtyKg), saturation);
   }
   const basePricePerKg = oreContractBasePrice(materialId, market) * rng.nextFloat(profile.supplyPriceFactor.min, profile.supplyPriceFactor.max);
   return rollOffer(state, rng, priceMultiplier, 'supply', materialId, `Supply ${materialId} (bulk)`, basePricePerKg, profile.supplyQtyKg, profile.supplyDeadlineTicks, profile.qtyStepKg);
+}
+
+/**
+ * Pick an ore; a saturation reader weights each ore by its price factor so glutted ores come up
+ * less. Without one, or with every weight 1, it is the plain `rng.pick` (same draws).
+ */
+function pickOre(rng: Random, ores: readonly string[], saturation: SaturationReader | undefined): string {
+  if (!saturation) return rng.pick(ores);
+  const weights = ores.map(o => saturationFactor(saturation(o)));
+  if (weights.every(w => w === 1)) return rng.pick(ores);
+  let roll = rng.nextFloat(0, 1) * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < ores.length; i++) {
+    roll -= weights[i]!;
+    if (roll < 0) return ores[i]!;
+  }
+  return ores[ores.length - 1]!;
 }
 
 /** The buyer tier posting a progression-site offer (one draw); undefined on the legacy market or without a grade. */
@@ -198,22 +218,23 @@ function tieredBuyer(state: ContractState, rng: Random, buyerGrade: number | und
 function rollTieredOffer(
   state: ContractState, rng: Random, priceMultiplier: number, buyer: BuyerTier,
   type: 'ore_sale' | 'supply', materialId: string, description: string, qtyRange: MarketRange,
+  saturation?: SaturationReader,
 ): Contract {
-  const base = oreContractBasePrice(materialId, state.market) * buyerPriceFactor(buyer, type, rng);
+  const base = oreContractBasePrice(materialId, state.market) * buyerPriceFactor(buyer, type, rng) * saturationFactor(saturation?.(materialId) ?? 0);
   const offer = rollOffer(state, rng, priceMultiplier, type, materialId, description, base, qtyRange, buyerDeadlineRange(qtyRange.max, buyer.refHaulKgPerTick), buyer.stepKg);
   offer.buyerTier = buyer.id;
   return offer;
 }
 
 /** An ore-sale offer for one of the site's ores. */
-function generateOreSaleOffer(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], buyerGrade?: number): Contract {
+function generateOreSaleOffer(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], buyerGrade?: number, saturation?: SaturationReader): Contract {
   const market = state.market;
   const profile = resolveMarket(market);
   const buyer = tieredBuyer(state, rng, buyerGrade);
-  const materialId = rng.pick(availableOres);
+  const materialId = pickOre(rng, availableOres, buyer ? saturation : undefined);
   const description = `Deliver ${materialId} ore`;
   if (buyer) {
-    return rollTieredOffer(state, rng, priceMultiplier, buyer, 'ore_sale', materialId, description, buyer.oreSaleQtyKg);
+    return rollTieredOffer(state, rng, priceMultiplier, buyer, 'ore_sale', materialId, description, buyer.oreSaleQtyKg, saturation);
   }
   const basePricePerKg = oreContractBasePrice(materialId, market) * rng.nextFloat(profile.oreSalePriceFactor.min, profile.oreSalePriceFactor.max);
   return rollOffer(state, rng, priceMultiplier, 'ore_sale', materialId, description, basePricePerKg, profile.oreSaleQtyKg, LEGACY_OFFER_DEADLINE_TICKS, profile.qtyStepKg);
@@ -245,7 +266,7 @@ function rollOffer(
  * Stock under the market minimum re-rolls as an ore sale; a rubble-only site then has no offer (null).
  */
 function generateRubbleOffer(
-  state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number, buyerGrade?: number,
+  state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number, buyerGrade?: number, saturation?: SaturationReader,
 ): Contract | null {
   const profile = resolveMarket(state.market);
   const paid = rng.chance(RUBBLE_PAID_OFFER_CHANCE);
@@ -257,7 +278,7 @@ function generateRubbleOffer(
   if (quantityKg < range.min) {
     if (availableOres.length === 0) return null;
     rng.nextFloat(0, 1); // keeps the RNG stream of the earlier fallback (it re-rolled the offer type), so recorded scenario timelines hold
-    return generateOreSaleOffer(state, rng, priceMultiplier, availableOres, buyerGrade);
+    return generateOreSaleOffer(state, rng, priceMultiplier, availableOres, buyerGrade, saturation);
   }
   const deadlineTicks = rng.nextInt(LEGACY_OFFER_DEADLINE_TICKS.min, LEGACY_OFFER_DEADLINE_TICKS.max);
   const fee = paid ? rng.nextFloat(profile.rubbleFeePerKg.min, profile.rubbleFeePerKg.max) : 0;
