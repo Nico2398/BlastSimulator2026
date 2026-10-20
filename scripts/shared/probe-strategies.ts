@@ -9,7 +9,7 @@
 //
 //   opening  The standard opening, then idle play to the horizon:
 //            1. tier-1 Living Quarters on the first spot the placement rules accept
-//            2. one 3x3 Krackle 8 kg shot (spacing 4, depth 8) on the best deposit
+//            2. one 3x3 Krackle 4 kg shot (spacing 4, depth 5; 36 kg, inside the grade-0 limit, #1944) on the best deposit
 //            3. a ramp into the crater, then the crew hauls on its own
 //            4. accept and fill every contract the stock already covers
 //
@@ -71,7 +71,7 @@ const PLACEMENT_RETRY_TICKS = 200;
 /** Cash above the reserve a re-fire keeps for drilling and charging, on top of the explosive. */
 const RE_FIRE_CASH_CUSHION = 5_000;
 
-const SHOT = { rows: 3, cols: 3, spacing: 4, depth: 8, explosive: 'krackle', kg: 8, stemming: 2.5 } as const;
+export const SHOT = { rows: 3, cols: 3, spacing: 4, depth: 5, explosive: 'krackle', kg: 4, stemming: 2.5 } as const;
 /** Footprint side of the shot in tiles, first hole to last. */
 const SHOT_SPAN = (SHOT.cols - 1) * SHOT.spacing;
 /** Explosive one shot consumes, in kg. */

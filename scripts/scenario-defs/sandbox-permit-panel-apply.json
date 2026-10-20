@@ -3,12 +3,12 @@
   "description": "Permits panel (#1924): on a sandbox site the player opens Permits from the tool rail and finds Apply disabled while the grade-1 targets are unmet, then after 5 t of ore delivered and 2 blasts fired, clicks Apply in the panel (no `permit apply` console command in any player step); the $20,000 fee is booked, and 48 ticks later the site is a Hobby Quarry (grade 1).",
   "steps": [
     {
-      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 ore_grade:1",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 ore_grade:1"
         }
       ],
       "description": "Progression site: the sandbox opens with a permit ladder at grade 0.",

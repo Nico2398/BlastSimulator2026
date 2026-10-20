@@ -1724,19 +1724,19 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxKitId, StartingSiteC
  * Opening cash per sandbox kit (#1747, #1891). The richer kit starts with more
  * cash. The retired 195k hard tier (same kit as digger, less cash) is gone.
  *
- * Bisected (#1747) on the standard opening (desert_badlands, seed 42, no cash
- * injection, contracts accepted once stock covers them): tier-1 living_quarters
- * at (30,48), then one 3x3 Krackle 8 kg pattern (spacing 4, depth 8, start
- * 36,32), charge, clear zone, blast (~t562), haul, sell. Payroll and upkeep
- * drain cash until the first sale, whose low point is linear in the start:
- * the digger kit (#1874) bottoms at (start - 181.5k), so the minimum
- * positive-cash start is ~181.6k (170k fails with a -11.5k low, 185k passes).
- * Digger keeps ~15% margin at 210k. Full keeps 250k (low $36.9k, cash 681,127
- * at t2000). The old 150k / 120k went bankrupt at ~t609 / ~t582.
+ * Re-calibrated (#1944) with the progression probe (`npm run probe:progression`, reinvest
+ * strategy, desert_badlands and green_foothills, seeds 42/7/13). The opening is the
+ * 3x3 Krackle 4 kg pattern (spacing 4, depth 5, 36 kg, inside the grade-0 limit) after a
+ * tier-1 Living Quarters. Payroll and upkeep drain cash until the first sale, so the early
+ * trough is linear in the start: the digger kit bottoms ~260-275k under its start
+ * (~t450-490), the full kit ~280-305k, measured at the thin ore grade scale. 330k / 370k
+ * keep that trough at or above ~15% of the start (digger ~55k at the worst seed). Full stays
+ * above digger. Bisected earlier (#1747): the old 150k / 120k went bankrupt at ~t609 / ~t582.
+ * Rerun and numbers: docs/plans/issue-1944-sandbox-yield.md.
  */
 export const SANDBOX_STARTING_CASH: Readonly<Record<SandboxKitId, number>> = {
-  digger: 210_000,
-  full: 250_000,
+  digger: 330_000,
+  full: 370_000,
 };
 
 /**
@@ -2888,7 +2888,7 @@ export const LEGACY_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
 /**
  * Ore sale prices (dollars/kg) in the production market; also what the blast report,
  * survey estimates and panels value ore at there. Rarity-ordered like ORE_PRICES.
- * The ladder is flat (21 to 336, 16x) against the catalog's 1000x: measured on
+ * The ladder is flat (105 to 1,680, 16x) against the catalog's 1000x: measured on
  * desert/red canyon/alpine/green/tropical/volcanic sandboxes (seeds 42/7/123, 8 m blocks,
  * depth 0-55 m) the richest block pays 3.7x the richest desert surface block per m3,
  * inside SANDBOX_MAX_RICHNESS_RATIO. The absolute level is set by what the opening kit can
@@ -2898,16 +2898,19 @@ export const LEGACY_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
  * bankruptcy line before 150k of starting cash burns out. At this level the kit's steady
  * income is ~2-2.5x crew cost and the whole reference shot is worth ~2.3x the crew over
  * SANDBOX_REFERENCE_SHOT_CYCLE_TICKS (target 1.5-3x).
+ * #1944: the sandbox ore grade scale (0.08) thins ore ~12x, so prices were raised 5x (the old
+ * 21-336 ladder above is the pre-#1944 pitch); the quoted figures predate it. Probe numbers:
+ * docs/plans/issue-1944-sandbox-yield.md.
  */
 export const PRODUCTION_ORE_PRICES: Record<string, number> = {
-  dirtite: 21,
-  rustite: 38.5,
-  blingite: 59.5,
-  gloomium: 84,
-  sparkium: 119,
-  craktonite: 168,
-  absurdium: 234.5,
-  treranium: 336,
+  dirtite: 105,
+  rustite: 192.5,
+  blingite: 297.5,
+  gloomium: 420,
+  sparkium: 595,
+  craktonite: 840,
+  absurdium: 1172.5,
+  treranium: 1680,
 };
 
 /**
@@ -3001,10 +3004,11 @@ export const SANDBOX_MARKET: 'legacy' | 'production' = 'production';
 export const SANDBOX_REFERENCE_CREW_COST_PER_TICK = 250;
 /**
  * Ticks from first drill order to the whole shot's ore delivered for the ordinary 3x3 desert
- * seed 42 shot, opening kit (#1681, #1719): ~360 to drill, charge and fire plus ~340 t of ore
- * at the kit's measured ~31 kg/tick = ~11,300.
+ * seed 42 shot, opening kit (#1681, #1719, #1944): ~300 to drill, charge and fire plus the
+ * shot's ~20 t of ore (ore grade scale 0.08, depth 5) at the kit's measured ~7.6 kg of ore a
+ * tick (76% of a shot delivered in 2,000 ticks) = ~2,900. Estimated from the delivered share, not timed.
  */
-export const SANDBOX_REFERENCE_SHOT_CYCLE_TICKS = 11_300;
+export const SANDBOX_REFERENCE_SHOT_CYCLE_TICKS = 2_900;
 /** Richest biome/depth may pay at most this multiple of desert surface rock per m3. */
 export const SANDBOX_MAX_RICHNESS_RATIO = 10;
 
@@ -3140,8 +3144,8 @@ export interface PermitLimitConfig {
 }
 /** Per-blast limits of grades 0-5, keyed by grade number. */
 export const PERMIT_LIMITS: Readonly<Record<number, PermitLimitConfig>> = {
-  0: { maxChargeKg: 80, maxHoles: 9, fee: 250 },
-  1: { maxChargeKg: 250, maxHoles: 16, fee: 1_000 },
+  0: { maxChargeKg: 40, maxHoles: 9, fee: 250 },
+  1: { maxChargeKg: 120, maxHoles: 16, fee: 1_000 },
   2: { maxChargeKg: 800, maxHoles: 36, fee: 3_000 },
   3: { maxChargeKg: 2_500, maxHoles: 81, fee: 8_000 },
   4: { maxChargeKg: 8_000, maxHoles: 196, fee: 20_000 },
@@ -3189,6 +3193,13 @@ export const EVENT_BALANCE_REFERENCE_PERMIT_FEE = 20000;
 /** Ore grade scale lever (#1932): default and upper bound. */
 export const ORE_GRADE_SCALE_DEFAULT = 1;
 export const ORE_GRADE_SCALE_MAX = 1;
+/**
+ * Sandbox's ore grade scale (#1944): thins ore so a standard grade-0 shot (3x3, depth 5)
+ * holds ~20 t of ore, about what the opening kit hauls and sells in ~2,000 ticks, instead
+ * of a glut. Must lie in (0, ORE_GRADE_SCALE_MAX]. Prices are pitched for it
+ * (PRODUCTION_ORE_PRICES).
+ */
+export const SANDBOX_ORE_GRADE_SCALE = 0.08;
 
 /**
  * Ore grade rises with depth below the natural surface (#1933). Each band

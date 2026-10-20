@@ -31,25 +31,25 @@ function loadedSite(kgPerHole: number) {
 
 describe('blast records the charge share (#1927)', () => {
   it('starts at 0 before any blast', () => {
-    const { state } = loadedSite(8);
+    const { state } = loadedSite(4);
     expect(state.grade!.lastBlastChargeShare).toBe(0);
   });
 
-  it('within the limit: 72 kg against the 80 kg grade-0 cap is 0.9', () => {
-    const { run, state } = loadedSite(8);
+  it('within the limit: 36 kg against the 40 kg grade-0 cap is 0.9', () => {
+    const { run, state } = loadedSite(4);
     expect(run('blast').success).toBe(true);
     expect(state.grade!.lastBlastChargeShare).toBeCloseTo(0.9, 5);
   });
 
-  it('over the limit: 90 kg against 80 kg is 1.125', () => {
-    const { run, state } = loadedSite(10);
+  it('over the limit: 45 kg against 40 kg is 1.125', () => {
+    const { run, state } = loadedSite(5);
     expect(run('blast').success).toBe(true);
     expect(state.grade!.lastBlastChargeShare).toBeCloseTo(1.125, 5);
   });
 
   it('feeds the event context after the blast', async () => {
     const { buildTickEventContext } = await import('../../../src/core/engine/TickEventContext.js');
-    const { run, state } = loadedSite(8);
+    const { run, state } = loadedSite(4);
     run('blast');
     const ctx = buildTickEventContext(state);
     expect(ctx.hasProgression).toBe(true);
@@ -61,7 +61,7 @@ describe('blast records the charge share (#1927)', () => {
 describe('applicationPending in the event context (#1927)', () => {
   it('is true while an application is being processed', async () => {
     const { buildTickEventContext } = await import('../../../src/core/engine/TickEventContext.js');
-    const { state } = loadedSite(8);
+    const { state } = loadedSite(4);
     state.grade!.pending = { toGrade: 1, ticksLeft: 30 };
     expect(buildTickEventContext(state).applicationPending).toBe(true);
   });
