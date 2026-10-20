@@ -406,6 +406,26 @@
       }
     },
     {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:200",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 200,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait for the hole to run dry: a wet hole fizzles the boomite and blasts no crater, and when the rain lands relative to the shot differs between command and interaction mode.",
+      "timeout": 130,
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    },
+    {
       "command": "blast detonate",
       "interaction": [
         {
@@ -453,22 +473,6 @@
         },
         "changedBy": {
           "wallSlumpCount": 0
-        }
-      }
-    },
-    {
-      "command": "weather set sunny",
-      "role": "bootstrap",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "weather set sunny"
-        }
-      ],
-      "description": "Dry weather again for the second shot.",
-      "expect": {
-        "equals": {
-          "weather": "sunny"
         }
       }
     },
@@ -595,6 +599,42 @@
       "expect": {
         "equals": {
           "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "weather set sunny",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set sunny"
+        }
+      ],
+      "description": "Dry weather for the second shot, set right before firing: a shower in the ticks between drilling and firing would fizzle the boomite in a wet hole and blast no crater (interaction mode reaches the shot a few ticks later than command mode, enough for the weather to turn).",
+      "expect": {
+        "equals": {
+          "weather": "sunny"
+        }
+      }
+    },
+    {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:200",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 200,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait for the hole to run dry: a wet hole fizzles the boomite and blasts no crater, and when the rain lands relative to the shot differs between command and interaction mode.",
+      "timeout": 130,
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
         }
       }
     },
