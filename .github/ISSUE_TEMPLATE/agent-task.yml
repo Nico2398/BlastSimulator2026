@@ -61,8 +61,10 @@ body:
         persistence (TickEventContext, GameLoop, src/core/state) — clashes with
         every core area below · tasks: task dispatch and lifecycle · movement:
         itineraries, locomotion, mounting · crew: employees, needs, shifts ·
-        site: buildings, vehicles, zones, damage · nav: src/core/nav,
-        src/core/mining · economy:
+        site: buildings, vehicles, zones, damage · nav: pathfinding,
+        src/core/nav · blast: drilling, charging, firing, fragments, blast
+        software · terrain: ramps, levelling, wall stability · survey: rock
+        surveys · economy:
         src/core/economy, campaign, scores · world: src/core/world, weather,
         events · ui: the shared UI base (UIManager, PanelBase, dom,
         styles, tokens) — clashes with every UI area below · hud: shell, notify,
@@ -83,6 +85,9 @@ body:
         - scope:crew
         - scope:site
         - scope:nav
+        - scope:blast
+        - scope:terrain
+        - scope:survey
         - scope:economy
         - scope:world
         - scope:ui

@@ -25,7 +25,7 @@ import { el, statGrid } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { ACCIDENT_STYLE, accidentText } from '../accidentLookup.js';
+import { ACCIDENT_STYLE, accidentText, buildingLabelText } from '../accidentLookup.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { BlastReport, BlastRating } from '../../core/mining/BlastExecution.js';
 import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../core/config/balance.js';
@@ -42,10 +42,10 @@ const RATING_COLOR: Record<BlastRating, string> = {
 
 /**
  * Accident types rendered as their own casualty note-card on the blast
- * report (#557) — building_damage/destroyed are deliberately excluded:
- * those are already covered by report.destroyedBuildings' own dedicated
- * card just below, and OperationsPanel's incident log covers every
- * AccidentRecord type generically for the full history. Icon and text
+ * report (#557). building_damage is deliberately omitted; building_destroyed
+ * gets a dedicated card built with the destroyed-building cards, deduped
+ * against report.destroyedBuildings. OperationsPanel's incident log covers
+ * every AccidentRecord type generically for the full history. Icon and text
  * come from accidentLookup.ts, shared with OperationsPanel.
  */
 const REPORT_ACCIDENT_TYPES = new Set<AccidentRecord['type']>(['death', 'injury', 'vehicle_destroyed', 'vehicle_damage']);
@@ -237,9 +237,22 @@ export class BlastReportModal {
     if (oreReport && oreReport.estimatedYieldKg > 0) {
       notes.push(this.makeOreCard(oreReport));
     }
+    const seenBuildingIds = new Set<number>();
     for (const b of report.destroyedBuildings) {
+      seenBuildingIds.add(b.buildingId);
       notes.push(this.makeNoteCard('build', 'rgba(255,91,76,', 'var(--bsx-critical-text)',
         t('ui.blast_workshop.report.building_destroyed', { type: t(`building.${b.type}.name`), id: b.buildingId })));
+    }
+    for (const a of report.accidents ?? []) {
+      if (a.type !== 'building_destroyed' || seenBuildingIds.has(a.entityId)) continue;
+      seenBuildingIds.add(a.entityId);
+      const type = buildingLabelText(a);
+      // fragmentId -1 marks a secondary-blast crater record (no flying rock).
+      const key = a.fragmentId >= 0
+        ? 'ui.blast_workshop.report.building_destroyed_flying_rock'
+        : 'ui.blast_workshop.report.building_destroyed';
+      notes.push(this.makeNoteCard('build', 'rgba(255,91,76,', 'var(--bsx-critical-text)',
+        t(key, { type, id: a.entityId })));
     }
     for (const a of report.accidents ?? []) {
       if (!REPORT_ACCIDENT_TYPES.has(a.type)) continue;

@@ -3896,6 +3896,7 @@
   "ui.blast_workshop.report.ore_report": "Ore Report",
   "ui.blast_workshop.report.ore_detail": "{actual} kg recovered against an estimate of {estimate} kg. {breakdown}",
   "ui.blast_workshop.report.building_destroyed": "{type} #{id} was destroyed.",
+  "ui.blast_workshop.report.building_destroyed_flying_rock": "{type} #{id} was destroyed by flying rock.",
   "ui.blast_workshop.report.oversized_hint": "{count} fragments are too large for standard haulers. A {vehicle} would turn them into money instead of scenery.",
   "ui.blast_workshop.report.wet_holes_fizzled": "Wet holes: {wet} ({fizzled} fizzled). Tubing or a water-resistant explosive prevents this.",
   "ui.blast_workshop.report.wet_holes_ok": "Wet holes: {wet}. No explosive failed.",
