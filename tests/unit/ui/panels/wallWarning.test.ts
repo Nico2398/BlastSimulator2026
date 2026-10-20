@@ -91,4 +91,30 @@ describe('wallWarningText', () => {
     expect(text).toContain('Molite');
     expect(text).toContain('15');
   });
+
+  it('falls back to the raw rock id when the catalog does not know it', () => {
+    setLocale('en');
+    const [p] = predictWallFaces(standardShot().plan, buildWallGrid({ plateauTop: 25 }));
+    const text = wallWarningText({ ...p!, rockId: 'no_such_rock' });
+    expect(text).toContain('no_such_rock');
+    expect(text).not.toContain('{');
+  });
+
+  it('uses the caller key when one is passed and the default otherwise', () => {
+    setLocale('en');
+    const [p] = predictWallFaces(standardShot().plan, buildWallGrid({ plateauTop: 25 }));
+    const def = wallWarningText(p!);
+    expect(wallWarningText(p!, 'ui.blast_workshop.preview.wall_warning')).toBe(def);
+    const custom = wallWarningText(p!, 'no.such.key');
+    expect(custom).not.toBe(def);
+  });
+
+  it('rounds fractional heights', () => {
+    setLocale('en');
+    const [p] = predictWallFaces(standardShot().plan, buildWallGrid({ plateauTop: 25 }));
+    const text = wallWarningText({ ...p!, face: { ...p!.face, heightM: 13.4, safeM: 11.6 } });
+    expect(text).toContain('13');
+    expect(text).toContain('12');
+    expect(text).not.toContain('13.4');
+  });
 });
