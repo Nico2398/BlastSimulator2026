@@ -205,6 +205,13 @@ expose it as `muckPile`, so a browser harness and a headless run read the same n
 - **Standing on the blast** is fatal regardless of the charge — the ground is simply gone.
   `blastCommand` kills employees and destroys vehicles on any cleared column. Evacuating the zone
   first (`Zone.ts`) is the point of the safety drill.
+- **Stuck walker counts as stranded (#1990):** an armed blast never waits on an in-zone employee who
+  cannot move. `isStuckWalker` (`DetonationSequence.ts`) = `isMoveStuck` or `moveConsecutiveFailures >=
+  DETONATION_STUCK_WALKER_FAILURE_TICKS` (10). `detonationPhase` lists such an employee among the
+  stranded names (all stranded, none walking -> `stranded`; mixed stays `evacuating`), and
+  `tickDetonation` latches them into `strandedEmployeeIds` every tick so a counter reset by re-evacuation
+  cannot revert the verdict. Employees only; vehicles keep the #1746/#1781 rescue logic. Fire anyway and
+  Cancel unchanged.
 - **Landing impacts** go through `Damage.processProjections`, keyed on where fragments came to rest
   and how fast they were going.
 - **Buildings** are destroyed when a cleared voxel falls under their footprint.
