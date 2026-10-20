@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../../src/console/createRunner.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
 import { rampLegsOf, rampTotalLength } from '../../../src/core/mining/RampPath.js';
 import {
@@ -78,11 +79,10 @@ describe('ramp spiral ... preview', () => {
     expect(r.success).toBe(true);
     expect(r.output).not.toMatch(/^mining\./);
     expect(snapshot(ctx)).toEqual(before);
-    // total length of a 20 m drop at 15 degrees is at least 74 m
-    const lengths = r.output.match(/\d+/g)!.map(Number);
-    expect(lengths.some(n => n >= 74)).toBe(true);
-    // cost shown for the length ordered
-    expect(r.output).toMatch(/\d/);
+    // a 20 m drop at 15 degrees needs at least 74 m of road, and the preview prices exactly that length
+    const total = Number(/(\d+) m total/.exec(r.output)![1]);
+    expect(total).toBeGreaterThanOrEqual(74);
+    expect(r.output).toContain(formatMoney(computeRampCost(total, 3)));
   });
 
   it('lists every leg with its direction', () => {
@@ -98,7 +98,7 @@ describe('ramp spiral ... preview', () => {
     const preview = run(a, `${BASE} preview`);
     run(b, BASE);
     const total = rampTotalLength(rampLegsOf(b.state!.plannedRamps[0]!.def));
-    expect(preview.output).toContain(String(Math.round(total)));
+    expect(Number(/(\d+) m total/.exec(preview.output)![1])).toBe(total);
   });
 
   it('works for ccw as well as cw', () => {

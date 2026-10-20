@@ -10,7 +10,7 @@ import {
 } from '../../../core/mining/Ramp.js';
 import { proposeRampSpiral, type RampSpiralProposal, type RampSpiralResult, type SpiralDir, type SpiralRequest, type SpiralSurface } from '../../../core/mining/RampSpiral.js';
 import { queueRampOrder } from '../../../core/mining/RampOrder.js';
-import type { RampPathCell } from '../../../core/mining/RampPath.js';
+import type { RampLeg, RampPathCell } from '../../../core/mining/RampPath.js';
 import { rampPathCells, legsFromWaypoints, firstOccupiedPathTile, rampPathOf, rampTotalLength } from '../../../core/mining/RampPath.js';
 import { computeVoxelColumnSurfaceHeight } from '../../../core/world/VoxelGrid.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
@@ -172,11 +172,8 @@ function spiralRampCommand(
       }),
     };
   }
-  const def: RampDef = {
-    originX: p.originX, originZ: p.originZ, direction: p.legs[0]!.direction, length: p.totalLength,
-    targetDepth: p.depth, width, gradeDegrees: p.gradeDegrees,
-  };
-  if (p.legs.length > 1) def.legs = p.legs;
+  const def = rampDefFromLegs({ x: p.originX, z: p.originZ }, p.legs, p.depth, width);
+  def.gradeDegrees = p.gradeDegrees;
   const ordered = orderRampDef(ctx, def);
   if (!ordered.success) return ordered;
   return { success: true, output: t('mining.ramp_spiral.ordered', { length: p.totalLength, laps: p.laps, legs: p.legs.length }) };
@@ -188,11 +185,22 @@ const PATH_CONFLICTS = ['start', 'end', 'origin', 'direction', 'length'] as cons
 function parseWaypoints(raw: string): { x: number; z: number }[] | null {
   const out: { x: number; z: number }[] = [];
   for (const piece of raw.split(';')) {
-    const parts = piece.split(',').map(p => p.trim());
-    if (parts.length !== 2 || parts.some(p => p === '' || !Number.isFinite(Number(p)))) return null;
-    out.push({ x: Number(parts[0]), z: Number(parts[1]) });
+    const tile = parseTile(piece);
+    if (tile === null) return null;
+    out.push(tile);
   }
   return out;
+}
+
+/** The ordered `RampDef` for `legs` from `origin`; a single leg is an ordinary straight ramp (#1939, #1940). */
+function rampDefFromLegs(
+  origin: { x: number; z: number }, legs: RampLeg[], targetDepth: number, width: RampWidth,
+): RampDef {
+  const def: RampDef = {
+    originX: origin.x, originZ: origin.z, direction: legs[0]!.direction, length: rampTotalLength(legs), targetDepth, width,
+  };
+  if (legs.length > 1) def.legs = legs;
+  return def;
 }
 
 /** The `path:` form (#1939): waypoints to a def; a two-waypoint path is an ordinary straight ramp. */
@@ -207,11 +215,7 @@ function rampDefFromPath(
   const result = legsFromWaypoints(waypoints);
   if (!result.success) return { success: false, output: t(result.reasonKey, result.params) };
   const { originX, originZ, legs } = result;
-  const def: RampDef = {
-    originX, originZ, direction: legs[0]!.direction, length: rampTotalLength(legs), targetDepth: depth, width,
-  };
-  if (legs.length > 1) def.legs = legs;
-  return { success: true, def };
+  return { success: true, def: rampDefFromLegs({ x: originX, z: originZ }, legs, depth, width) };
 }
 
 /** Refusal text when a corridor tile of a multi-leg ramp lies on a built or planned building, else null. */

@@ -23,10 +23,7 @@ import {
   NAV_CLEARANCE_MAX_CELLS,
 } from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
-import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
-
-/** Cardinal offsets for 4-directional neighbor checks. */
-const CARDINAL_OFFSETS: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+import { NEIGHBOUR_OFFSETS_4, NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 
 /**
  * True when stepping between two cells whose column heights sit at `fromY`
@@ -626,7 +623,7 @@ export class NavGrid {
     if (Number.isNaN(surfaceY)) return 'void';
     if (drillHoles.some(h => Math.floor(h.x) === x && Math.floor(h.z) === z)) return 'drill_hole';
     if (buildings.some(b => isBuildingFootprintCell(b, x, z))) return 'blocked';
-    for (const [dx, dz] of CARDINAL_OFFSETS) {
+    for (const [dx, dz] of NEIGHBOUR_OFFSETS_4) {
       const neighborSurfaceY = NavGrid.computeSurfaceY(voxelGrid, x + dx, z + dz);
       if (Number.isNaN(neighborSurfaceY)) continue;
       const delta = Math.abs(surfaceY - neighborSurfaceY);

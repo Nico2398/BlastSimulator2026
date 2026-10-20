@@ -6,8 +6,8 @@ import {
   proposeRampSpiral, type SpiralRequest, type SpiralSurface, type RampSpiralProposal, type RampSpiralResult, type SpiralDir,
 } from '../../../src/core/mining/RampSpiral.js';
 import { findRampPathFault, rampPathCells, rampTotalLength, type RampDirection } from '../../../src/core/mining/RampPath.js';
-import { computeRampCost } from '../../../src/core/mining/Ramp.js';
-import { RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth } from '../../../src/core/config/balance.js';
+import { computeRampCost, rampLengthForGrade } from '../../../src/core/mining/Ramp.js';
+import { MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M, RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth } from '../../../src/core/config/balance.js';
 
 interface Pit { x0: number; z0: number; w: number; h: number; depth: number }
 
@@ -69,7 +69,7 @@ describe('proposeRampSpiral: square pit', () => {
     expect(p.legs.length).toBeGreaterThanOrEqual(2);
     expect(p.gradeDegrees).toBeCloseTo(15, 6);
     expect(p.depth).toBe(20);
-    expect(p.laps).toBeGreaterThan(0);
+    expect(p.laps).toBe(1);
   });
 
   it('covers at least the run the grade needs to drop the depth', () => {
@@ -213,11 +213,10 @@ describe('proposeRampSpiral: stays inside the claimed area', () => {
     const tight = { min: 8, max: 52 };
     const surface = makeSurface(SQUARE, tight);
     const r = proposeRampSpiral(req(SQUARE), surface);
-    if (r.success) {
-      for (const c of cellsOf(r.proposal, 3)) expect(surface.contains(c.x, c.z)).toBe(true);
-    } else {
-      expect(r.reasonKey.length).toBeGreaterThan(0);
-    }
+    // The 8 m band round the 30 m pit holds the whole ring at width 3, so the order succeeds.
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    for (const c of cellsOf(r.proposal, 3)) expect(surface.contains(c.x, c.z)).toBe(true);
   });
 
   it('refuses rather than leaving the area when the rim band is cut off', () => {
@@ -226,6 +225,8 @@ describe('proposeRampSpiral: stays inside the claimed area', () => {
     const surface = makeSurface(SQUARE, area);
     const r = proposeRampSpiral(req(SQUARE, { fromX: SQUARE.x0 - 1 }), surface);
     expect(r.success).toBe(false);
+    if (r.success) return;
+    expect(r.reasonKey).toBe('mining.ramp_spiral.too_short');
   });
 });
 
@@ -236,7 +237,7 @@ describe('proposeRampSpiral: refusals', () => {
     const r = proposeRampSpiral(req(TINY), makeSurface(TINY));
     expect(r.success).toBe(false);
     if (r.success) return;
-    expect(r.reasonKey.endsWith('too_short')).toBe(true);
+    expect(r.reasonKey).toBe('mining.ramp_spiral.too_short');
     const { needed, offered } = r.params ?? {};
     expect(typeof needed).toBe('number');
     expect(typeof offered).toBe('number');
@@ -244,11 +245,11 @@ describe('proposeRampSpiral: refusals', () => {
     expect(needed as number).toBeGreaterThanOrEqual(Math.floor(20 / Math.tan((15 * Math.PI) / 180)));
   });
 
-  it('refuses a pit that fits a shallow grade but not a gentle one', () => {
+  it('refuses a gentle 4 degree grade the pit wall cannot hold but accepts a steeper 25 degree one', () => {
     const shallowNeed = proposeRampSpiral(req(SQUARE, { gradeDegrees: 4 }), makeSurface(SQUARE));
     expect(shallowNeed.success).toBe(false);
     if (shallowNeed.success) return;
-    expect(shallowNeed.reasonKey.endsWith('too_short')).toBe(true);
+    expect(shallowNeed.reasonKey).toBe('mining.ramp_spiral.too_short');
     const steeper = proposeRampSpiral(req(SQUARE, { gradeDegrees: 25 }), makeSurface(SQUARE));
     expect(steeper.success).toBe(true);
   });
@@ -264,17 +265,14 @@ describe('proposeRampSpiral: refusals', () => {
     const r = proposeRampSpiral(req(SQUARE, { fromX: 2, fromZ: 2 }), makeSurface(SQUARE));
     expect(r.success).toBe(false);
     if (r.success) return;
-    expect(r.reasonKey.length).toBeGreaterThan(0);
-    expect(r.reasonKey).not.toBe('not_implemented');
-    expect(r.reasonKey.endsWith('too_short')).toBe(false);
+    expect(r.reasonKey).toBe('mining.ramp_spiral.not_on_rim');
   });
 
-  it('refuses a start tile inside the void with a named reason', () => {
+  it('refuses a start tile inside the void with start_in_void', () => {
     const r = proposeRampSpiral(req(SQUARE, { fromX: 30, fromZ: 30 }), makeSurface(SQUARE));
     expect(r.success).toBe(false);
     if (r.success) return;
-    expect(r.reasonKey).not.toBe('not_implemented');
-    expect(r.reasonKey.endsWith('too_short')).toBe(false);
+    expect(r.reasonKey).toBe('mining.ramp_spiral.start_in_void');
   });
 
   it('refuses flat ground (no pit anywhere)', () => {
@@ -282,21 +280,40 @@ describe('proposeRampSpiral: refusals', () => {
     const r = proposeRampSpiral(req(SQUARE), flat);
     expect(r.success).toBe(false);
     if (r.success) return;
-    expect(r.reasonKey).not.toBe('not_implemented');
-    expect(r.reasonKey.endsWith('too_short')).toBe(false);
+    expect(r.reasonKey).toBe('mining.ramp_spiral.no_pit');
+    expect(r.params).toEqual({ depth: RAMP_CRATER_MIN_DROP_M });
   });
 
   it('refuses a start tile outside the claimed area', () => {
     const r = proposeRampSpiral(req(SQUARE, { fromX: -5, fromZ: 30 }), makeSurface(SQUARE));
+    expect(r).toEqual({ success: false, reasonKey: 'mining.ramp_spiral.outside_area' });
+  });
+
+  it('refuses a zero depth with bad_depth', () => {
+    const r = proposeRampSpiral(req(SQUARE, { depth: 0 }), makeSurface(SQUARE));
+    expect(r).toEqual({ success: false, reasonKey: 'mining.ramp_spiral.bad_depth' });
+  });
+
+  it('refuses a non-positive grade with grade_invalid', () => {
+    const r = proposeRampSpiral(req(SQUARE, { gradeDegrees: 0 }), makeSurface(SQUARE));
+    expect(r).toEqual({ success: false, reasonKey: 'mining.build_ramp.grade_invalid' });
+  });
+
+  it('refuses a grade over the cut-slope limit with grade_too_steep and the limit', () => {
+    const r = proposeRampSpiral(req(SQUARE, { gradeDegrees: 80 }), makeSurface(SQUARE));
     expect(r.success).toBe(false);
+    if (r.success) return;
+    expect(r.reasonKey).toBe('mining.build_ramp.grade_too_steep');
+    expect(r.params).toMatchObject({ grade: 80 });
+    expect(r.params!.max as number).toBeLessThan(80);
   });
 
-  it('refuses a zero depth', () => {
-    expect(proposeRampSpiral(req(SQUARE, { depth: 0 }), makeSurface(SQUARE)).success).toBe(false);
-  });
-
-  it('refuses a non-positive grade', () => {
-    expect(proposeRampSpiral(req(SQUARE, { gradeDegrees: 0 }), makeSurface(SQUARE)).success).toBe(false);
+  it('refuses a road longer than the longest ramp with too_long, not too_short', () => {
+    const r = proposeRampSpiral(req(SQUARE, { depth: 200, gradeDegrees: 10 }), makeSurface(SQUARE));
+    expect(r.success).toBe(false);
+    if (r.success) return;
+    expect(r.reasonKey).toBe('mining.ramp_spiral.too_long');
+    expect(r.params).toEqual({ needed: rampLengthForGrade(200, 10), max: MAX_RAMP_LENGTH });
   });
 });
 

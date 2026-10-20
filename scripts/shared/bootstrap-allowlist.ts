@@ -182,7 +182,7 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // step its own panel-open click would leave the panel open and then
   // CLOSE it when the charge step's click ran next.
   'drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6',
-  'drill_plan grid origin:10,10 rows:3 cols:3 spacing:3 depth:6',
+  'drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6',
   // rock-fragmenter-breaking.json: fragment #0 is oversized, so
   // `findReachableGroundFragment`'s eligibility cache excludes it outright
   // and `.bs-vehicle-haul-btn` never renders for it — no control exists to

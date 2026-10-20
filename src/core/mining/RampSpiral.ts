@@ -1,12 +1,12 @@
 // BlastSimulator2026 — Spiral ramp proposal (#1940)
-// Pure planner: proposes a stack of straight legs that spirals down a pit wall.
+// Pure planner: proposes a ring of straight legs that winds once down a pit wall.
 // Reads terrain only through the narrow SpiralSurface seam; no GameState.
 
 import {
-  MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M, RAMP_SPIRAL_LAP_GAP_WIDTHS, RAMP_SPIRAL_MAX_LAPS, RAMP_SPIRAL_MAX_PIT_SPAN_M,
-  RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth,
+  MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M, RAMP_SPIRAL_CLOSING_RUN_WIDTHS, RAMP_SPIRAL_MAX_PIT_SPAN_M, RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth,
 } from '../config/balance.js';
-import { computeRampCost, rampGradeBoundsDegrees } from './Ramp.js';
+import { NEIGHBOUR_OFFSETS_4, NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
+import { computeRampCost, rampGradeBoundsDegrees, rampLengthForGrade } from './Ramp.js';
 import { RAMP_DIR_OFFSETS, findRampPathFault, type RampDirection, type RampLeg } from './RampPath.js';
 
 export type SpiralDir = 'cw' | 'ccw';
@@ -33,6 +33,7 @@ export interface RampSpiralProposal {
   legs: RampLeg[];
   totalLength: number;
   cost: number;
+  /** Always 1: the road is a single ring round the pit. */
   laps: number;
   gradeDegrees: number;
   depth: number;
@@ -42,7 +43,6 @@ export type RampSpiralResult =
   | { success: true; proposal: RampSpiralProposal }
   | { success: false; reasonKey: string; params?: Record<string, string | number> };
 
-const RAD_TO_DEG = 180 / Math.PI;
 const KEY = 'mining.ramp_spiral.';
 
 type Fail = Extract<RampSpiralResult, { success: false }>;
@@ -52,11 +52,6 @@ const fail = (reasonKey: string, params?: Record<string, string | number>): Fail
 interface Tile { x: number; z: number }
 interface PitBounds { minX: number; maxX: number; minZ: number; maxZ: number }
 
-const NEIGHBOURS_4: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-const NEIGHBOURS_8: readonly (readonly [number, number])[] = [
-  ...NEIGHBOURS_4, [1, 1], [1, -1], [-1, 1], [-1, -1],
-];
-
 /** True when `(x, z)` is claimed and at least the crater drop below `ground`. */
 function isVoid(surface: SpiralSurface, x: number, z: number, ground: number): boolean {
   return surface.contains(x, z) && surface.heightAt(x, z) <= ground - RAMP_CRATER_MIN_DROP_M;
@@ -64,7 +59,7 @@ function isVoid(surface: SpiralSurface, x: number, z: number, ground: number): b
 
 /** The start sits at the bottom of a hollow: every cardinal ray meets ground a crater drop higher. */
 function startInHollow(surface: SpiralSurface, start: Tile, ground: number): boolean {
-  return NEIGHBOURS_4.every(([dx, dz]) => {
+  return NEIGHBOUR_OFFSETS_4.every(([dx, dz]) => {
     for (let k = 1; k <= RAMP_SPIRAL_MAX_PIT_SPAN_M; k++) {
       const x = start.x + dx * k;
       const z = start.z + dz * k;
@@ -94,7 +89,7 @@ function floodPit(surface: SpiralSurface, seeds: Tile[], ground: number): PitBou
     b.minX = Math.min(b.minX, x); b.maxX = Math.max(b.maxX, x);
     b.minZ = Math.min(b.minZ, z); b.maxZ = Math.max(b.maxZ, z);
     if (b.maxX - b.minX + 1 > RAMP_SPIRAL_MAX_PIT_SPAN_M || b.maxZ - b.minZ + 1 > RAMP_SPIRAL_MAX_PIT_SPAN_M) return null;
-    for (const [dx, dz] of NEIGHBOURS_4) {
+    for (const [dx, dz] of NEIGHBOUR_OFFSETS_4) {
       const n = { x: x + dx, z: z + dz };
       const key = `${n.x},${n.z}`;
       if (seen.has(key) || !isVoid(surface, n.x, n.z, ground)) continue;
@@ -105,42 +100,25 @@ function floodPit(surface: SpiralSurface, seeds: Tile[], ground: number): PitBou
   return b;
 }
 
-/** One side of the rectangular ring, in travel order: the line it lies on and where it runs. */
+/** One side of the rectangular ring, in travel order: its two corners and the way it runs. */
 interface RingEdge {
-  /** Runs along x (a top or bottom side). */
-  horizontal: boolean;
-  /** Line coordinate at lap 0 (z for horizontal, x for vertical). */
-  line: number;
-  /** +1 / -1: which way successive laps move the line. */
-  outward: 1 | -1;
   from: Tile;
   to: Tile;
   direction: RampDirection;
 }
 
-/** The four sides of ring 0 (centreline rectangle) in the travel order of `dir`. */
+/** The four sides of the centreline rectangle in the travel order of `dir`. */
 function ringEdges(L: number, R: number, T: number, B: number, dir: SpiralDir): RingEdge[] {
   const nw = { x: L, z: T }; const ne = { x: R, z: T };
   const se = { x: R, z: B }; const sw = { x: L, z: B };
-  const top = (from: Tile, to: Tile, direction: RampDirection): RingEdge => ({ horizontal: true, line: T, outward: -1, from, to, direction });
-  const bottom = (from: Tile, to: Tile, direction: RampDirection): RingEdge => ({ horizontal: true, line: B, outward: 1, from, to, direction });
-  const right = (from: Tile, to: Tile, direction: RampDirection): RingEdge => ({ horizontal: false, line: R, outward: 1, from, to, direction });
-  const left = (from: Tile, to: Tile, direction: RampDirection): RingEdge => ({ horizontal: false, line: L, outward: -1, from, to, direction });
   return dir === 'cw'
-    ? [top(nw, ne, 'east'), right(ne, se, 'south'), bottom(se, sw, 'west'), left(sw, nw, 'north')]
-    : [top(ne, nw, 'west'), left(nw, sw, 'south'), bottom(sw, se, 'east'), right(se, ne, 'north')];
+    ? [{ from: nw, to: ne, direction: 'east' }, { from: ne, to: se, direction: 'south' },
+       { from: se, to: sw, direction: 'west' }, { from: sw, to: nw, direction: 'north' }]
+    : [{ from: ne, to: nw, direction: 'west' }, { from: nw, to: sw, direction: 'south' },
+       { from: sw, to: se, direction: 'east' }, { from: se, to: ne, direction: 'north' }];
 }
 
-const lineAt = (e: RingEdge, lap: number, spacing: number): number => e.line + e.outward * lap * spacing;
-
-/** Corner of two consecutive sides, each at its own lap. */
-function cornerOf(a: RingEdge, lapA: number, b: RingEdge, lapB: number, spacing: number): Tile {
-  const la = lineAt(a, lapA, spacing);
-  const lb = lineAt(b, lapB, spacing);
-  return a.horizontal ? { x: lb, z: la } : { x: la, z: lb };
-}
-
-/** Index of the side of ring 0 nearest `start`, and the point on it to begin from (clear of the previous side and of the next corner). */
+/** Index of the side of the ring nearest `start`, and the point on it to begin from (clear of the previous side and of the next corner). */
 function startOnRing(edges: RingEdge[], start: Tile, width: number): { index: number; point: Tile } {
   let best = { index: 0, point: edges[0]!.from, dist: Infinity };
   edges.forEach((e, index) => {
@@ -180,7 +158,8 @@ function containedSteps(surface: SpiralSurface, at: Tile, direction: RampDirecti
 /**
  * Proposes a spiral haul road down the inside of a pit's rim.
  * The pit is the flood-filled region at least `RAMP_CRATER_MIN_DROP_M` below the start's ground;
- * the road runs as concentric rectangular rings around its bounding box, each lap one ring further out.
+ * the road runs once round the rectangular ring circling its bounding box, and refuses when that lap
+ * cannot fit the length the grade needs.
  */
 export function proposeRampSpiral(req: SpiralRequest, surface: SpiralSurface): RampSpiralResult {
   const { depth, gradeDegrees, width, dir } = req;
@@ -193,49 +172,51 @@ export function proposeRampSpiral(req: SpiralRequest, surface: SpiralSurface): R
 
   const ground = surface.heightAt(start.x, start.z);
   if (startInHollow(surface, start, ground)) return fail(`${KEY}start_in_void`);
-  const seeds = NEIGHBOURS_8.map(([dx, dz]) => ({ x: start.x + dx, z: start.z + dz }))
+  const seeds = NEIGHBOUR_OFFSETS_8.map(([dx, dz]) => ({ x: start.x + dx, z: start.z + dz }))
     .filter(t => isVoid(surface, t.x, t.z, ground));
-  if (seeds.length === 0) return fail(voidNearby(surface, start, ground) ? `${KEY}not_on_rim` : `${KEY}no_pit`);
-  const pit = floodPit(surface, seeds, ground);
-  if (pit === null) return fail(`${KEY}no_pit`);
+  if (seeds.length === 0 && voidNearby(surface, start, ground)) return fail(`${KEY}not_on_rim`);
+  const pit = seeds.length === 0 ? null : floodPit(surface, seeds, ground);
+  if (pit === null) return fail(`${KEY}no_pit`, { depth: RAMP_CRATER_MIN_DROP_M });
 
-  const needed = Math.ceil(depth / Math.tan(gradeDegrees / RAD_TO_DEG));
-  if (needed > MAX_RAMP_LENGTH) return fail(`${KEY}too_short`, { needed, offered: MAX_RAMP_LENGTH });
+  const needed = rampLengthForGrade(depth, gradeDegrees);
+  if (needed > MAX_RAMP_LENGTH) return fail(`${KEY}too_long`, { needed, max: MAX_RAMP_LENGTH });
 
   const half = Math.floor(width / 2);
   const inset = RAMP_SPIRAL_RIM_GAP_WIDTHS * width + half;
-  const spacing = width + RAMP_SPIRAL_LAP_GAP_WIDTHS * width;
   const edges = ringEdges(pit.minX - inset, pit.maxX + inset, pit.minZ - inset, pit.maxZ + inset, dir);
   const first = startOnRing(edges, start, width);
 
   const legs: RampLeg[] = [];
   let total = 0;
   let here = first.point;
-  // A lap is one leg per side of the ring; the road ends before it would re-cross where it began.
-  const maxLegs = 4 * RAMP_SPIRAL_MAX_LAPS;
-  for (let i = 0; ; i++) {
-    if (i >= maxLegs) return fail(`${KEY}too_short`, { needed, offered: total });
-    const a = edges[(first.index + i) % 4]!;
-    const b = edges[(first.index + i + 1) % 4]!;
-    const next = cornerOf(a, Math.floor(i / 4), b, Math.floor((i + 1) / 4), spacing);
-    const length = Math.abs(next.x - here.x) + Math.abs(next.z - here.z);
+  // One leg per side of the ring, ending at its corner; the road stops before it would re-cross where it began.
+  // The closing side may run on past its corner, clear of the first side, to gain the last few metres.
+  const closingRun = RAMP_SPIRAL_CLOSING_RUN_WIDTHS * width;
+  for (let i = 0; i < edges.length; i++) {
+    const a = edges[(first.index + i) % edges.length]!;
+    const runOn = i === edges.length - 1 ? closingRun : 0;
+    const length = Math.abs(a.to.x - here.x) + Math.abs(a.to.z - here.z) + runOn;
     const take = Math.min(length, Math.max(width, needed - total));
     const ok = containedSteps(surface, here, a.direction, take, width, i > 0);
     if (ok < take) return fail(`${KEY}too_short`, { needed, offered: total + ok });
     legs.push({ direction: a.direction, length: take });
     total += take;
-    if (total >= needed) break;
-    here = next;
+    if (total >= needed) return finishRoad(first.point, legs, total, req);
+    here = a.to;
   }
+  return fail(`${KEY}too_short`, { needed, offered: total });
+}
 
-  const origin = first.point;
+/** Validates the finished ring road against self-crossing and wraps it as a proposal. */
+function finishRoad(origin: Tile, legs: RampLeg[], total: number, req: SpiralRequest): RampSpiralResult {
+  const { width, gradeDegrees, depth } = req;
   const fault = findRampPathFault({ originX: origin.x, originZ: origin.z, legs }, width);
   if (fault) return fail(fault.key, fault.params);
   return {
     success: true,
     proposal: {
       originX: origin.x, originZ: origin.z, legs, totalLength: total,
-      cost: computeRampCost(total, width), laps: Math.ceil(legs.length / 4), gradeDegrees, depth,
+      cost: computeRampCost(total, width), laps: 1, gradeDegrees, depth,
     },
   };
 }

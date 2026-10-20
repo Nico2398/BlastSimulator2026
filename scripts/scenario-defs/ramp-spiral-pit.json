@@ -1,6 +1,6 @@
 {
   "name": "ramp-spiral-pit",
-  "description": "#1940: blast a pit, order a spiral haul road down its wall with one `ramp spiral` command, dig it, and drive a debris_hauler from the rim to the foot of the spiral and back on it.",
+  "description": "#1940: blast one pit, order a spiral haul road round it with one `ramp spiral` command, dig it, and send a debris_hauler down and back up. Arrival is not asserted (the state dump exports no vehicle position); the checks are the built multi-leg ramp and nobody left stuck.",
   "steps": [
     {
       "command": "new_game seed:42 cash:2000000 staffed:true",
@@ -44,7 +44,7 @@
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:14,14",
-      "description": "A 3x3 grid at 3 m spacing, 6 m deep: the blast opens a pit about 9 m across.",
+      "description": "A 3x3 grid at 3 m spacing, 6 m deep: the one pit blast opens a pit about 9 m across.",
       "interaction": [
         {
           "type": "command",
@@ -154,7 +154,7 @@
     },
     {
       "command": "ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw",
-      "description": "#1940: order the spiral down the pit wall from the rim tile just north of it. Cash drops by the proposal cost and ramp segments are queued.",
+      "description": "#1940: order the spiral round the pit (target depth 8 m, below the 6 m blast) from the rim tile just north of it. Cash drops by the proposal cost and ramp segments are queued.",
       "interaction": [
         {
           "type": "command",
@@ -192,7 +192,7 @@
     },
     {
       "command": "vehicle reposition 2 15 25",
-      "description": "Send the hauler from the rim to the foot of the spiral: its route is the spiral.",
+      "description": "Order the hauler to the far end of the spiral; its route is the spiral road.",
       "interaction": [
         {
           "type": "command",
@@ -204,7 +204,7 @@
     {
       "command": "tick 120",
       "timeout": 120,
-      "description": "Let the hauler wind down the spiral to the floor. A reposition has no state-dump field to poll for arrival (positions are not exported), so a bounded tick block is the only wait.",
+      "description": "Give the hauler time to travel. A reposition has no state-dump field to poll for arrival (positions are not exported), so arrival is not asserted; a bounded tick block is the only wait.",
       "interaction": [
         {
           "type": "command",
@@ -220,7 +220,7 @@
     },
     {
       "command": "vehicle reposition 2 17 6",
-      "description": "Drive the hauler back up the spiral to the rim.",
+      "description": "Order the hauler back to the rim.",
       "interaction": [
         {
           "type": "command",
@@ -232,7 +232,7 @@
     {
       "command": "tick 120",
       "timeout": 120,
-      "description": "Let the hauler climb back to the rim (same unpollable arrival as the descent).",
+      "description": "Give the hauler time to return (arrival unasserted, as above).",
       "interaction": [
         {
           "type": "command",
@@ -248,7 +248,7 @@
     },
     {
       "command": "state full",
-      "description": "Nobody stranded on the spiral.",
+      "description": "No employee is stuck after the trips (the nearest check available without a position field).",
       "interaction": [
         {
           "type": "command",
