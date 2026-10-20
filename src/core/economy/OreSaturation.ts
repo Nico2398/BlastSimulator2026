@@ -77,6 +77,11 @@ export function sanitizeOreSaturation(raw: unknown): OreSaturationState | undefi
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/** Percent with an explicit plus sign when positive ("+12", "0", "-20"). */
+export function formatTrendPct(pct: number): string {
+  return pct > 0 ? `+${pct}` : `${pct === 0 ? 0 : pct}`;
+}
+
 /** Price trend of an ore for display: percent change from base and the discounted price. */
 export function oreSaturationTrend(_oreId: string, saturation: number, basePrice: number): { pct: number; price: number } {
   const factor = saturationFactor(saturation);

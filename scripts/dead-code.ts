@@ -58,6 +58,7 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Contracts market strip (#1931): unit-tested contracts; production composes them inside makeMarketStrip.
   // Progression probe reload gate (#1974): the unit-tested contract; production uses it inside the reinvest strategy.
   'scripts/shared/probe-strategies.ts:RELOAD_FRACTION',
   'scripts/shared/probe-strategies.ts:shouldReload',
