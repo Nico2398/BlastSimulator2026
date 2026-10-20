@@ -3,7 +3,7 @@
 // Reads terrain only through the narrow SpiralSurface seam; no GameState.
 
 import {
-  MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M, RAMP_SPIRAL_LAP_GAP_WIDTHS, RAMP_SPIRAL_MAX_PIT_SPAN_M,
+  MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M, RAMP_SPIRAL_LAP_GAP_WIDTHS, RAMP_SPIRAL_MAX_LAPS, RAMP_SPIRAL_MAX_PIT_SPAN_M,
   RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth,
 } from '../config/balance.js';
 import { computeRampCost, rampGradeBoundsDegrees } from './Ramp.js';
@@ -211,7 +211,10 @@ export function proposeRampSpiral(req: SpiralRequest, surface: SpiralSurface): R
   const legs: RampLeg[] = [];
   let total = 0;
   let here = first.point;
+  // A lap is one leg per side of the ring; the road ends before it would re-cross where it began.
+  const maxLegs = 4 * RAMP_SPIRAL_MAX_LAPS;
   for (let i = 0; ; i++) {
+    if (i >= maxLegs) return fail(`${KEY}too_short`, { needed, offered: total });
     const a = edges[(first.index + i) % 4]!;
     const b = edges[(first.index + i + 1) % 4]!;
     const next = cornerOf(a, Math.floor(i / 4), b, Math.floor((i + 1) / 4), spacing);

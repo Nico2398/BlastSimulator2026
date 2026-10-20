@@ -36,8 +36,6 @@ export function buildRampCommand(
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
-  if (args[0] === 'spiral') return spiralRampCommand(ctx, args.slice(1), named);
-
   if (args[0] === 'cancel') {
     const rampId = parseInt(args[1] ?? named['id'] ?? '', 10);
     if (isNaN(rampId)) return { success: false, output: t('mining.build_ramp.cancel_usage') };
@@ -130,6 +128,14 @@ function parseTile(raw: string | undefined): { x: number; z: number } | null {
   const parts = (raw ?? '').split(',').map(p => p.trim());
   if (parts.length !== 2 || parts.some(p => p === '' || !Number.isFinite(Number(p)))) return null;
   return { x: Number(parts[0]), z: Number(parts[1]) };
+}
+
+/** `ramp <form>`: `spiral` is the only form so far (#1940). */
+export function rampCommand(ctx: MiningContext, args: string[], named: Record<string, string>): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+  if (args[0] !== 'spiral') return { success: false, output: t('mining.ramp_spiral.usage') };
+  return spiralRampCommand(ctx, args.slice(1), named);
 }
 
 /** `ramp spiral from:<x>,<z> depth:<m> grade:<deg> width:<3|5|7> [dir:cw|ccw] [preview]` (#1940). */

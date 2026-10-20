@@ -129,10 +129,11 @@ describe('proposeRampSpiral: square pit', () => {
     expect(p.cost).toBeCloseTo(computeRampCost(p.totalLength, width), 6);
   });
 
-  it('winds more than one lap when the depth needs more than a perimeter', () => {
+  it('winds a full lap round the rim when the depth needs most of a perimeter', () => {
     const p = ok(SQUARE, { depth: 30 });
     expect(p.totalLength).toBeGreaterThanOrEqual(30 / Math.tan((15 * Math.PI) / 180) - 1e-6);
-    expect(p.laps).toBeGreaterThan(1);
+    expect(p.legs.length).toBeGreaterThanOrEqual(4);
+    expect(p.laps).toBe(1);
     expect(findRampPathFault({ originX: p.originX, originZ: p.originZ, legs: p.legs }, 3)).toBeNull();
   });
 
@@ -176,10 +177,11 @@ describe('proposeRampSpiral: turning direction', () => {
     for (const t of turnsOf(p)) expect(t.to).toBe(CCW_NEXT[t.from]);
   });
 
-  it('cw and ccw differ in their first turn', () => {
+  it('cw and ccw head opposite ways from a west-rim start', () => {
     const cw = ok(SQUARE, { dir: 'cw' });
     const ccw = ok(SQUARE, { dir: 'ccw' });
-    expect(cw.legs[1]!.direction).not.toBe(ccw.legs[1]!.direction);
+    expect(cw.legs[0]!.direction).toBe('north');
+    expect(ccw.legs[0]!.direction).toBe('south');
   });
 
   it.each(['cw', 'ccw'] as SpiralDir[])('%s keeps clear of the void, inside the area, without crossing itself', (dir) => {

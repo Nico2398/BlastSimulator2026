@@ -1418,6 +1418,8 @@ export const RAMP_COST_PER_METER_PER_WIDTH = 100 / 3;
 export const RAMP_SPIRAL_RIM_GAP_WIDTHS = 1;
 /** Spiral ramp (#1940): gap kept between successive laps, in ramp widths. */
 export const RAMP_SPIRAL_LAP_GAP_WIDTHS = 1;
+/** Spiral ramp (#1940): laps of the rim a spiral may wind; a pit that needs more wall than this refuses. */
+export const RAMP_SPIRAL_MAX_LAPS = 1;
 /** Spiral ramp (#1940): widest pit (meters) a spiral proposal will be planned for. */
 export const RAMP_SPIRAL_MAX_PIT_SPAN_M = 120;
 
