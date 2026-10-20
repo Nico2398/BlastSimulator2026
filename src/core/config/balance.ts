@@ -3263,3 +3263,15 @@ export const VANITY_WELL_BEING_ONCE = -2;
 export const VANITY_GOLF_UPKEEP_PER_TICK = 20;
 /** Share of stored mass that must be barren, with every spoil heap full or absent, for a storage-full block to read as barren overflow. */
 export const BARREN_OVERFLOW_STORED_SHARE = 0.5;
+
+// --- Wall stability (#1941) ---
+/** Safe continuous face height (m) by rock hardness tier. */
+export const WALL_SAFE_FACE_HEIGHT_M_BY_TIER: Readonly<Record<number, number>> = { 1: 12, 2: 15, 3: 20, 4: 25, 5: 30 };
+/** A flat step at least this wide (m) ends one face and starts the next. */
+export const WALL_BERM_MIN_WIDTH_M = 3;
+/** Horizontal depth (m) behind the crest edge that slumps. */
+export const WALL_SLUMP_DEPTH_M = 2;
+/** Margin (m) around a blast's cleared region scanned by the stability pass. */
+export const WALL_STABILITY_REGION_MARGIN_M = 8;
+/** Speed (m/s) used for blast-like damage to things in the toe zone. */
+export const WALL_SLUMP_IMPACT_SPEED_MS = 10;
