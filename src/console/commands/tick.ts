@@ -153,10 +153,16 @@ export function tickCommand(
 
     // Armed detonation (#1362): fire once the zone is clear, once, and stop the batch.
     // Sliced over the next frames when the caller asks (#1603); its lines come with it.
-    if (state.pendingDetonation !== null && tickDetonation(state).kind === 'ready') {
+    // A held shot (water-sensitive charges in flooded holes) never fires on its own (#1957).
+    const phase = state.pendingDetonation !== null ? tickDetonation(state) : null;
+    if (phase?.kind === 'ready') {
       const fire = autoFireSteps(ctx, state.tickCount);
       if (ctx.sliceBlasts === true) ctx.blastJob = fire;
       else lines.push(drain(fire).output);
+      break;
+    }
+    if (phase?.kind === 'held') {
+      lines.push(`[tick ${state.tickCount}] ${t('tick.detonation_held', { count: phase.fizzleHoleIds.length, holes: phase.fizzleHoleIds.join(', ') })}`);
       break;
     }
 

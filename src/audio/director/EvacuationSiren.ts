@@ -29,7 +29,7 @@ export function evacuationRemaining(state: GameState): number | null {
     case 'evacuating': return phase.remaining;
     case 'stranded': return phase.names.length;
     case 'ready': return 0;
-    case 'held': return 0; // TODO: implement
+    case 'held': return 0; // zone is clear; the shot waits on the player (#1957)
     case 'idle': return null;
   }
 }

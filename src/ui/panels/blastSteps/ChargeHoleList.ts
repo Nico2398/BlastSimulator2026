@@ -33,7 +33,7 @@ export interface HoleDrainView {
 
 /** Localized reason a rain-exposed hole cannot be drained. */
 export function drainRainReasonText(): string {
-  return '';
+  return t('ui.blast_workshop.charge.drain_rain_reason');
 }
 
 /** Localized reason a drain control is disabled. */
@@ -151,6 +151,8 @@ export class ChargeHoleList {
     drainBtn.dataset['action'] = 'drain-hole';
     drainBtn.disabled = drain === undefined || drain.block !== null;
     if (drain?.block) drainBtn.title = drainReasonText(drainBlock);
+    else if (drain?.block === null && drain.rainExposed) drainBtn.title = drainRainReasonText();
+    row.dataset['rainExposed'] = String(drain?.rainExposed === true);
     drainBtn.addEventListener('click', () => this.onDrain(hole.id));
     row.dataset['wet'] = String(drain?.wet ?? false);
 
