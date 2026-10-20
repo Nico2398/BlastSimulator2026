@@ -36,6 +36,10 @@ export interface ParamStripConfig {
    * knew about reached the screen as nothing at all.
    */
   confirmDisabledReason?: string | undefined;
+  /** Extra readout lines shown beside RESULT (e.g. ramp length, grade). */
+  readout?: string[];
+  /** Extra buttons on the strip (e.g. undo last leg). */
+  actions?: { key: string; label: string; onClick: () => void; disabled?: boolean }[];
   /** Chip text above the strip while armed, e.g. "Drag across the bench to lay out drill holes". */
   instruction: string;
 }

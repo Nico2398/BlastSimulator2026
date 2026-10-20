@@ -335,3 +335,9 @@ export function firstOccupiedPathTile(
 ): RampPathCell | null {
   return cells.find(c => isOccupied(c.x, c.z)) ?? null;
 }
+
+/** Snaps `to` onto the cardinal axis of `from` it is furthest along (ties go to z, as `rampDefFromEndpoints`). */
+export function snapToCardinal(from: { x: number; z: number }, to: { x: number; z: number }): { x: number; z: number } {
+  void from; void to;
+  throw new Error('not implemented');
+}

@@ -19,7 +19,10 @@ import type { ClaimRefusalReason } from '../../core/world/PlayableArea.js';
 /** Right-click drift tolerance (px) while the tutorial guides a placement. */
 export const GUIDED_RIGHT_CLICK_TOLERANCE_PX = 40;
 
-export type PlacementShape = 'rect' | 'line' | 'point';
+export type PlacementShape = 'rect' | 'line' | 'point' | 'path';
+
+/** A grid tile. */
+export interface Tile { x: number; z: number }
 export type PlacementPhase = 'idle' | 'armed' | 'hovering' | 'dragging' | 'selected' | 'confirmed';
 
 export interface PlacementSelection {
@@ -129,6 +132,10 @@ export class PlacementController {
 
   get currentPhase(): PlacementPhase { return this.phase; }
   get currentShape(): PlacementShape { return this.shape; }
+  /** Corner tiles of the path being drawn in 'path' shape, in order. */
+  get waypoints(): readonly Tile[] { return []; }
+  /** Drops the last waypoint of the path being drawn. */
+  popWaypoint(): void { /* TODO: implement */ }
   /** True through the whole armed lifecycle, including the 220ms confirm flash — camera remap and ScenePicking suppression only release at disarm(). */
   get isArmed(): boolean { return this.phase !== 'idle'; }
   get hoveredTile(): { x: number; z: number } | null { return this.hoverTile; }

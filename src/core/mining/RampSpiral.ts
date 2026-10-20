@@ -7,6 +7,7 @@ import {
 } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_4, NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { computeRampCost, rampGradeBoundsDegrees, rampLengthForGrade } from './Ramp.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { RAMP_DIR_OFFSETS, findRampPathFault, type RampDirection, type RampLeg } from './RampPath.js';
 
 export type SpiralDir = 'cw' | 'ccw';
@@ -219,4 +220,16 @@ function finishRoad(origin: Tile, legs: RampLeg[], total: number, req: SpiralReq
       cost: computeRampCost(total, width), laps: 1, gradeDegrees, depth,
     },
   };
+}
+
+/** Builds the terrain seam from a voxel grid and the optional playable-area membership test. */
+export function spiralSurfaceFrom(grid: VoxelGrid, area: { contains(x: number, z: number): boolean } | null): SpiralSurface {
+  void grid; void area;
+  throw new Error('not implemented');
+}
+
+/** Whether `tile` lies on the pit rim: inside the pit with a neighbour outside it. */
+export function isPitRim(surface: SpiralSurface, tile: { x: number; z: number }): boolean {
+  void surface; void tile;
+  throw new Error('not implemented');
 }

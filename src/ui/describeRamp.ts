@@ -31,3 +31,15 @@ export function describeRamp(ramp: BuiltRamp, opts?: RampClimbText): { title: st
     sub: [base, ...legs, ...climb].join(' · '),
   };
 }
+
+/** One line naming which vehicle tiers climb the planned grade. */
+export function rampTierCheckLine(tiers: readonly VehicleTier[]): string {
+  void tiers;
+  throw new Error('not implemented');
+}
+
+/** Readout lines for the ramp param strip while a plan is being drawn. */
+export function describeRampPlan(p: { length: number; legs: number; cost: number; gradeDeg: number; tiers: VehicleTier[] | null }): string[] {
+  void p;
+  throw new Error('not implemented');
+}
