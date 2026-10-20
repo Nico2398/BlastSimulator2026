@@ -18,7 +18,7 @@
 import * as THREE from 'three';
 import { rampWidthOf, type RampDef } from '../core/mining/Ramp.js';
 import { rampFootprint } from '../core/mining/RampWidening.js';
-import { RAMP_DIR_OFFSETS } from '../core/mining/RampPath.js';
+import { RAMP_DIR_OFFSETS, rampLegsOf, rampPathOf, rampWaypoints } from '../core/mining/RampPath.js';
 import type { RampFootprint } from '../core/state/GameState.js';
 import { markSceneOverlay } from './post/SceneOverlay.js';
 import { bilinearSurfaceHeight, type SurfaceHeightSampler } from './GroundTint.js';
@@ -39,7 +39,18 @@ const UNDERLAY_MARGIN = 0.14;
 /** Shaft is subdivided at this spacing so it follows the ground along a long ramp. */
 const SHAFT_STEP = 0.5;
 
-type RampArrowSpec = Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length' | 'width'>;
+type LegArrowSpec = Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length' | 'width'>;
+type RampArrowSpec = LegArrowSpec & Pick<RampDef, 'legs'>;
+
+/** One straight arrow per leg; leg k's origin is the corner tile where it starts. A straight ramp is its own single leg. */
+export function rampLegSpecs(def: RampArrowSpec): LegArrowSpec[] {
+  if (def.legs === undefined) return [def];
+  const corners = rampWaypoints(rampPathOf(def));
+  const width = def.width === undefined ? {} : { width: def.width };
+  return rampLegsOf(def).map((leg, k) => ({
+    originX: corners[k]!.x, originZ: corners[k]!.z, direction: leg.direction, length: leg.length, ...width,
+  }));
+}
 
 interface RampArrowLayout {
   /** Upper-end tile — the ramp's origin. */
@@ -53,7 +64,7 @@ interface RampArrowLayout {
 }
 
 /** Where the arrow and corridor lie for `ramp`, in tiles; null for a ramp with nothing to carve. */
-export function rampArrowLayout(ramp: RampArrowSpec): RampArrowLayout | null {
+export function rampArrowLayout(ramp: LegArrowSpec): RampArrowLayout | null {
   if (!(ramp.length >= 1)) return null;
   const dir = RAMP_DIR_OFFSETS[ramp.direction];
   const tail = { x: ramp.originX, z: ramp.originZ };
@@ -74,17 +85,18 @@ interface RampArrowOptions {
 export function buildRampArrow(
   ramp: RampArrowSpec, sampler: SurfaceHeightSampler, options: RampArrowOptions = {},
 ): THREE.Group | null {
-  const layout = rampArrowLayout(ramp);
-  if (!layout) return null;
+  const layouts = rampLegSpecs(ramp).map(rampArrowLayout);
+  if (layouts.some(l => l === null)) return null;
   const color = options.color ?? RAMP_ARROW_COLOR;
-
   const group = new THREE.Group();
   group.name = 'ramp-arrow';
   markSceneOverlay(group);
-  group.add(buildCorridorOutline(layout, sampler, color));
-  const floor = corridorFloorSampler(layout.corridor, sampler);
-  group.add(buildArrowMesh(layout, floor, UNDERLAY_MARGIN, UNDERLAY_COLOR, 0.75, 0));
-  group.add(buildArrowMesh(layout, floor, 0, color, 1, 1));
+  for (const layout of layouts) {
+    group.add(buildCorridorOutline(layout!, sampler, color));
+    const floor = corridorFloorSampler(layout!.corridor, sampler);
+    group.add(buildArrowMesh(layout!, floor, UNDERLAY_MARGIN, UNDERLAY_COLOR, 0.75, 0));
+    group.add(buildArrowMesh(layout!, floor, 0, color, 1, 1));
+  }
   return group;
 }
 

@@ -8,11 +8,10 @@ import {
   validateRampOrder, defineRampSegments, rampDefFromEndpoints, rampWidthOf,
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
-import { proposeRampSpiral, type RampSpiralProposal, type RampSpiralResult, type SpiralDir, type SpiralRequest, type SpiralSurface } from '../../../core/mining/RampSpiral.js';
+import { proposeRampSpiral, spiralSurfaceFrom, type RampSpiralProposal, type RampSpiralResult, type SpiralDir, type SpiralRequest } from '../../../core/mining/RampSpiral.js';
 import { queueRampOrder } from '../../../core/mining/RampOrder.js';
 import type { RampLeg, RampPathCell } from '../../../core/mining/RampPath.js';
 import { rampPathCells, legsFromWaypoints, firstOccupiedPathTile, rampPathOf, rampTotalLength } from '../../../core/mining/RampPath.js';
-import { computeVoxelColumnSurfaceHeight } from '../../../core/world/VoxelGrid.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { isBuildingFootprintCell } from '../../../core/entities/Building.js';
 import { rampFootprint, orderRampWiden, validateWidenRamp, type WidenFailure } from '../../../core/mining/RampWidening.js';
@@ -155,11 +154,7 @@ function spiralRampCommand(
   const grid = ctx.grid!;
   const area = ctx.playableArea;
   const request: SpiralRequest = { fromX: from.x, fromZ: from.z, depth, gradeDegrees: grade, width, dir };
-  const surface: SpiralSurface = {
-    heightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
-    contains: (x, z) => area?.contains(x, z) ?? grid.containsColumn(x, z),
-  };
-  const result: RampSpiralResult = proposeRampSpiral(request, surface);
+  const result: RampSpiralResult = proposeRampSpiral(request, spiralSurfaceFrom(grid, area));
   if (!result.success) return { success: false, output: t(result.reasonKey, result.params) };
   const p: RampSpiralProposal = result.proposal;
 

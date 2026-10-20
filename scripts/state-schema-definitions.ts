@@ -45,6 +45,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   chargeOrderBlockedReason: { type: 'string', optional: true, description: 'blockedReason of the outstanding charge_hole action, null when none or not blocked (#1649)' },
   orderedRampSegmentCount: { type: 'number', description: 'Segments ordered but not yet dug across all in-flight ramps (state.plannedRamps, #555)' },
   builtRampCount: { type: 'number', description: 'Finished ramps (state.builtRamps.length, #1298)' },
+  rampLegCount: { type: 'number', description: 'Legs of the first built ramp, 0 when none is built (#1942)' },
   builtRampWidth: { type: 'number', description: 'Width in voxels of the first built ramp, 0 when none is built (#1298)' },
   orderedBuildingCount: { type: 'number', description: 'Buildings ordered but not yet built (state.plannedBuildings.length, #556)' },
   chargedCount: { type: 'number' },

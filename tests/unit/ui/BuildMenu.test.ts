@@ -206,6 +206,11 @@ function makeMockKit(options?: { activeRegion?: TileRegion | null }) {
     get selection() { return selection; },
     get activeRegion() { return activeRegion; },
     get hoveredTile() { return hoveredTile; },
+    // A drag A->B leaves the two endpoints as waypoints (#1942).
+    get waypoints() {
+      return selection ? [{ x: selection.x1, z: selection.z1 }, { x: selection.x2, z: selection.z2 }] : [];
+    },
+    popWaypoint: vi.fn(),
     // Mirrors PlacementController.previewOrigin (#1594): an exact region's pin
     // while the hover is inside its live margin, else the raw hovered tile.
     get previewOrigin() {
@@ -478,7 +483,7 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     it('no surface sampler registered: no foot line and the strip still renders', () => {
       const { shown } = armRampOver(null);
       expect(shown().subtitle).toBe('');
-      expect(shown().fields.map((f: { key: string }) => f.key)).toEqual(['depth', 'width']);
+      expect(shown().fields.map((f: { key: string }) => f.key)).toEqual(['depth', 'width', 'grade']);
     });
 
     it('stepping the depth to a miss swaps the snapped line for the miss line live', () => {

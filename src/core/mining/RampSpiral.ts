@@ -7,6 +7,7 @@ import {
 } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_4, NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { computeRampCost, rampGradeBoundsDegrees, rampLengthForGrade } from './Ramp.js';
+import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../world/VoxelGrid.js';
 import { RAMP_DIR_OFFSETS, findRampPathFault, type RampDirection, type RampLeg } from './RampPath.js';
 
 export type SpiralDir = 'cw' | 'ccw';
@@ -219,4 +220,21 @@ function finishRoad(origin: Tile, legs: RampLeg[], total: number, req: SpiralReq
       cost: computeRampCost(total, width), laps: 1, gradeDegrees, depth,
     },
   };
+}
+
+/** Builds the terrain seam from a voxel grid and the optional playable-area membership test. */
+export function spiralSurfaceFrom(grid: VoxelGrid, area: { contains(x: number, z: number): boolean } | null): SpiralSurface {
+  return {
+    heightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
+    contains: (x, z) => area?.contains(x, z) ?? grid.containsColumn(x, z),
+  };
+}
+
+/** Whether `tile` lies on the pit rim: not at the bottom of a hollow, with a void neighbour. */
+export function isPitRim(surface: SpiralSurface, tile: { x: number; z: number }): boolean {
+  const start = { x: Math.floor(tile.x), z: Math.floor(tile.z) };
+  if (!surface.contains(start.x, start.z)) return false;
+  const ground = surface.heightAt(start.x, start.z);
+  if (startInHollow(surface, start, ground)) return false;
+  return NEIGHBOUR_OFFSETS_8.some(([dx, dz]) => isVoid(surface, start.x + dx, start.z + dz, ground));
 }
