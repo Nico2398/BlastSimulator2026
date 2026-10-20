@@ -25,7 +25,7 @@ import { totalChargeKg } from '../../core/mining/BlastCalc.js';
 import { oreEstimateView, oreValueColor, oreValueText } from './oreEstimateDisplay.js';
 import { OreEstimateMemo } from './oreEstimateMemo.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
-import { wetHoles } from '../../core/mining/WetHoles.js';
+import { rainExposedHoles, wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
 import { detonationPhase, type DetonationPhase } from '../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
@@ -38,6 +38,41 @@ import type { GameConsoleFn } from '../gameConsole.js';
 
 
 interface Warning { ok: boolean; text: string; role?: string; buildingType?: string }
+
+/** The dry-charges row: wet beats rain risk beats all-clear. */
+function dryWarning(wetCount: number, rainExposedCount: number): Warning {
+  if (wetCount > 0) return { ok: false, text: t('ui.blast_workshop.preflight.warn_wet', { count: wetCount }) };
+  if (rainExposedCount > 0) {
+    return { ok: false, text: t('ui.blast_workshop.preflight.warn_rain_risk', { count: rainExposedCount }), role: 'preflight-rain-risk' };
+  }
+  return { ok: true, text: t('ui.blast_workshop.preflight.ok_dry') };
+}
+
+/** Title and body of the waiting panel for each non-idle detonation phase. */
+function waitingText(phase: Exclude<DetonationPhase, { kind: 'idle' }>): { title: string; body: string } {
+  switch (phase.kind) {
+    case 'held':
+      return {
+        title: t('ui.blast_workshop.preflight.held_title'),
+        body: t('ui.blast_workshop.preflight.held_body', { count: phase.fizzleHoleIds.length, holes: phase.fizzleHoleIds.join(', ') }),
+      };
+    case 'stranded':
+      return {
+        title: t('ui.blast_workshop.preflight.detonating_title'),
+        body: t('ui.blast_workshop.preflight.stranded_names', { names: phase.names.join(', ') }),
+      };
+    case 'evacuating':
+      return {
+        title: t('ui.blast_workshop.preflight.detonating_title'),
+        body: t('ui.blast_workshop.preflight.detonating_remaining', { count: phase.remaining }),
+      };
+    case 'ready':
+      return {
+        title: t('ui.blast_workshop.preflight.detonating_title'),
+        body: t('ui.blast_workshop.preflight.detonating_remaining', { count: 0 }),
+      };
+  }
+}
 
 export class PreflightModal {
   private readonly overlay: HTMLElement;
@@ -167,6 +202,7 @@ export class PreflightModal {
     const { value: estValue, coverage, brokenVoxels, charged, holeCoverage } = estimate;
 
     const wet = wetHoles(state);
+    const rainExposed = rainExposedHoles(state);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
     const occupantCount = zone ? countZoneOccupants(zone, state.vehicles, state.employees) : 0;
     const protectedHoles = checkProtectedPositions(state.drillHoles, state.buildings.buildings);
@@ -188,7 +224,7 @@ export class PreflightModal {
 
     const signature = JSON.stringify({
       permit, undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage, brokenVoxels, charged, holeCoverage,
-      preview: state.lastBlastPreview, wetCount: wet.length, occupantCount,
+      preview: state.lastBlastPreview, wetCount: wet.length, rainExposedCount: rainExposed.length, occupantCount,
       phase, protectedCount: protectedHoles.length, buildingsAtRisk, loadingCount, awaitingCount, earliestArrival, errorCount: validationErrors.length,
     });
     if (signature === this.lastSignature) return;
@@ -235,9 +271,7 @@ export class PreflightModal {
       ...(undrilledCount > 0
         ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_undrilled', { count: undrilledCount }) }]
         : []),
-      wet.length > 0
-        ? { ok: false, text: t('ui.blast_workshop.preflight.warn_wet', { count: wet.length }) }
-        : { ok: true, text: t('ui.blast_workshop.preflight.ok_dry') },
+      dryWarning(wet.length, rainExposed.length),
       occupantCount > 0
         ? { ok: false, text: t('ui.blast_workshop.preflight.warn_zone', { count: occupantCount }) }
         : { ok: true, text: t('ui.blast_workshop.preflight.ok_zone') },
@@ -312,11 +346,9 @@ export class PreflightModal {
     this.waitingEl.style.display = waiting ? 'flex' : 'none';
     if (!waiting) { this.waitingEl.replaceChildren(); delete this.waitingEl.dataset['phase']; return; }
     this.waitingEl.dataset['phase'] = phase.kind;
-    const body = phase.kind === 'stranded'
-      ? t('ui.blast_workshop.preflight.stranded_names', { names: phase.names.join(', ') })
-      : t('ui.blast_workshop.preflight.detonating_remaining', { count: phase.kind === 'evacuating' ? phase.remaining : 0 });
+    const { title, body } = waitingText(phase);
     this.waitingEl.replaceChildren(
-      el('span', { text: t('ui.blast_workshop.preflight.detonating_title'), attrs: { style: 'font:800 12px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-critical-text)' } }),
+      el('span', { text: title, attrs: { style: 'font:800 12px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-critical-text)' } }),
       el('span', { text: body, attrs: { style: 'font:400 12px/1.45 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
     );
   }

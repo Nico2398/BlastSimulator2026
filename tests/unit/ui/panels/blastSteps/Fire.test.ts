@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { FireStep } from '../../../../../src/ui/panels/blastSteps/Fire.js';
 import { wetAllHoles } from '../../../../helpers/holeWater.js';
 import { readFileSync } from 'node:fs';
+import { t } from '../../../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
@@ -346,5 +347,101 @@ describe('FireStep — buildings in blast reach (#2021)', () => {
     addReachBuildings(state);
     step.update(state, 'sunny');
     expect(step.root.textContent).not.toContain('inside the blast area');
+  });
+});
+
+describe('FireStep rain warning (#1957)', () => {
+  const RAIN_ROW = '[data-role="rain-risk-check"]';
+
+  function chargedState(explosiveId: string, holes = 2): GameState {
+    const state = makeState();
+    for (let i = 0; i < holes; i++) {
+      const hole = addHole(holeCounter, state.drillHoles, 20 + i * 3, 20, 8, 0.15);
+      const c = createCharge(explosiveId, 5, 2, hole.depth);
+      if ('charge' in c) state.chargesByHole[hole.id] = c.charge;
+    }
+    return state;
+  }
+
+  it('rain + untubed sensitive charge + dry holes: warns with the rain-risk row instead of the dry check', () => {
+    const { step } = makeStep();
+    const state = chargedState('boomite', 2);
+    state.weather.current = 'light_rain';
+    step.update(state, 'light_rain');
+
+    const row = step.root.querySelector(RAIN_ROW);
+    expect(row).not.toBeNull();
+    expect(row!.textContent).toContain(t('ui.blast_workshop.fire.check_rain_risk', { count: 2 }));
+    expect(step.root.textContent).not.toContain(t('ui.blast_workshop.fire.check_dry', { count: 2 }));
+  });
+
+  it('counts only the exposed holes', () => {
+    const { step } = makeStep();
+    const state = chargedState('boomite', 3);
+    state.tubingState.installedHoles = new Set([state.drillHoles[0]!.id]);
+    state.weather.current = 'storm';
+    step.update(state, 'storm');
+    expect(step.root.querySelector(RAIN_ROW)!.textContent).toContain(t('ui.blast_workshop.fire.check_rain_risk', { count: 2 }));
+  });
+
+  it('wet holes still show the wet check, not the rain-risk row', () => {
+    const { step } = makeStep();
+    const state = chargedState('boomite', 2);
+    state.weather.current = 'light_rain';
+    wetAllHoles(state);
+    step.update(state, 'light_rain');
+
+    expect(step.root.textContent).toContain(t('ui.blast_workshop.fire.check_wet', { count: 2 }));
+    expect(step.root.querySelector(RAIN_ROW)).toBeNull();
+  });
+
+  it('a tubed charge in rain still reads dry', () => {
+    const { step } = makeStep();
+    const state = chargedState('boomite', 2);
+    state.tubingState.installedHoles = new Set(state.drillHoles.map(h => h.id));
+    state.weather.current = 'light_rain';
+    step.update(state, 'light_rain');
+
+    expect(step.root.querySelector(RAIN_ROW)).toBeNull();
+    expect(step.root.textContent).toContain(t('ui.blast_workshop.fire.check_dry', { count: 2 }));
+  });
+
+  it('a water-resistant charge in rain still reads dry', () => {
+    const { step } = makeStep();
+    const state = chargedState('krackle', 2);
+    state.weather.current = 'heavy_rain';
+    step.update(state, 'heavy_rain');
+
+    expect(step.root.querySelector(RAIN_ROW)).toBeNull();
+    expect(step.root.textContent).toContain(t('ui.blast_workshop.fire.check_dry', { count: 2 }));
+  });
+
+  it('sunny weather with sensitive charges reads dry, no rain row', () => {
+    const { step } = makeStep();
+    const state = chargedState('boomite', 2);
+    step.update(state, 'sunny');
+    expect(step.root.querySelector(RAIN_ROW)).toBeNull();
+    expect(step.root.textContent).toContain(t('ui.blast_workshop.fire.check_dry', { count: 2 }));
+  });
+
+  it('the warning appears when rain starts and goes away when it stops (repaints)', () => {
+    const { step } = makeStep();
+    const state = chargedState('boomite', 1);
+    step.update(state, 'sunny');
+    expect(step.root.querySelector(RAIN_ROW)).toBeNull();
+    state.weather.current = 'light_rain';
+    step.update(state, 'light_rain');
+    expect(step.root.querySelector(RAIN_ROW)).not.toBeNull();
+    state.weather.current = 'sunny';
+    step.update(state, 'sunny');
+    expect(step.root.querySelector(RAIN_ROW)).toBeNull();
+  });
+
+  it('en.json and fr.json define the rain-risk line with different text', () => {
+    const read = (l: string): Record<string, string> => JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8'));
+    const key = 'ui.blast_workshop.fire.check_rain_risk';
+    expect(read('en')[key]).toBeTruthy();
+    expect(read('fr')[key]).toBeTruthy();
+    expect(read('en')[key]).not.toBe(read('fr')[key]);
   });
 });

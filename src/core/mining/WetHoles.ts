@@ -32,14 +32,14 @@ export function tickHoleWater(
 }
 
 /** IDs of drill holes whose water level is past the wet threshold. */
-export function wetHoles(state: GameState): string[] {
+export function wetHoles(state: Pick<GameState, 'drillHoles' | 'holeWater'>): string[] {
   return state.drillHoles
     .filter(hole => isHoleFlooded(state.holeWater[hole.id]?.level ?? 0))
     .map(hole => hole.id);
 }
 
 /** Ids of wet holes as a set, for callers that test membership (previews, execution). */
-export function wetHoleIdsFor(state: GameState): Set<string> {
+export function wetHoleIdsFor(state: Pick<GameState, 'drillHoles' | 'holeWater'>): Set<string> {
   return new Set(wetHoles(state));
 }
 
@@ -51,15 +51,39 @@ export interface WetBlastHoles {
   chargedCount: number;
 }
 
+/** True when the charge's explosive is known and would fizzle in a wet hole. Unknown explosive => false. */
+function isWaterSensitiveCharge(charge: HoleCharge): boolean {
+  const explosive = getExplosive(charge.explosiveId);
+  return explosive !== undefined && waterEffect(true, explosive.waterSensitive, false) < 1;
+}
+
 /** Split a blast's charges into wet holes and the ones whose water-sensitive explosive fizzles. Unknown explosive => not fizzled. */
 export function classifyWetChargedHoles(
   charges: Readonly<Record<string, HoleCharge>>,
   wetHoleIds: ReadonlySet<string>,
 ): WetBlastHoles {
   const wet = [...wetHoleIds].filter(id => charges[id] !== undefined).sort();
-  const fizzled = wet.filter(id => {
-    const explosive = getExplosive(charges[id]!.explosiveId);
-    return explosive !== undefined && waterEffect(true, explosive.waterSensitive, false) < 1;
-  });
+  const fizzled = wet.filter(id => isWaterSensitiveCharge(charges[id]!));
   return { wet, fizzled, chargedCount: Object.keys(charges).length };
+}
+
+/** Charged holes whose water-sensitive charge would fizzle now (wet + sensitive), sorted. Equals classifyWetChargedHoles(...).fizzled. */
+export function fizzlingHoles(
+  state: Pick<GameState, 'drillHoles' | 'holeWater' | 'chargesByHole'>,
+): string[] {
+  return classifyWetChargedHoles(state.chargesByHole, wetHoleIdsFor(state)).fizzled;
+}
+
+/** Charged untubed holes with a water-sensitive charge while rain falls (wet or dry); [] when not raining, sorted. */
+export function rainExposedHoles(
+  state: Pick<GameState, 'drillHoles' | 'chargesByHole' | 'tubingState' | 'weather'>,
+): string[] {
+  if (rainIntensity(state.weather.current) <= 0) return [];
+  return state.drillHoles
+    .filter(h => {
+      const charge = state.chargesByHole[h.id];
+      return charge !== undefined && !hasTubing(state.tubingState, h.id) && isWaterSensitiveCharge(charge);
+    })
+    .map(h => h.id)
+    .sort();
 }

@@ -27,6 +27,13 @@ import type { DrainBlock } from '../../../core/mining/HoleDrain.js';
 export interface HoleDrainView {
   wet: boolean;
   block: DrainBlock | null;
+  /** Charged untubed hole with a water-sensitive charge while rain falls. */
+  rainExposed?: boolean;
+}
+
+/** Localized rain advisory for a rain-exposed hole's drain control; the control stays enabled. */
+export function drainRainReasonText(): string {
+  return t('ui.blast_workshop.charge.drain_rain_reason');
 }
 
 /** Localized reason a drain control is disabled. */
@@ -144,6 +151,8 @@ export class ChargeHoleList {
     drainBtn.dataset['action'] = 'drain-hole';
     drainBtn.disabled = drain === undefined || drain.block !== null;
     if (drain?.block) drainBtn.title = drainReasonText(drainBlock);
+    else if (drain?.block === null && drain.rainExposed) drainBtn.title = drainRainReasonText();
+    row.dataset['rainExposed'] = String(drain?.rainExposed === true);
     drainBtn.addEventListener('click', () => this.onDrain(hole.id));
     row.dataset['wet'] = String(drain?.wet ?? false);
 

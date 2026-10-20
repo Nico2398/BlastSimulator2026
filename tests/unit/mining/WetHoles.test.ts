@@ -7,6 +7,8 @@ import {
   wetHoleIdsFor,
   tickHoleWater,
   classifyWetChargedHoles,
+  fizzlingHoles,
+  rainExposedHoles,
 } from '../../../src/core/mining/WetHoles.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import { HOLE_WET_THRESHOLD } from '../../../src/core/config/balance.js';
@@ -240,5 +242,133 @@ describe('classifyWetChargedHoles (#1348)', () => {
     );
     expect(r.chargedCount).toBe(4);
     expect(r.fizzled).toEqual(['H1']);
+  });
+});
+
+describe('fizzlingHoles (#1957)', () => {
+  const charge = (explosiveId: string) => ({ explosiveId, amountKg: 8, stemmingM: 2 });
+
+  it('lists charged wet holes with a water-sensitive charge, sorted', () => {
+    const state = stateWith(['H3', 'H1', 'H2']);
+    state.chargesByHole = { H3: charge('boomite'), H1: charge('boomite'), H2: charge('boomite') };
+    setHoleWater(state, ['H3', 'H1'], 0.9);
+    expect(fizzlingHoles(state)).toEqual(['H1', 'H3']);
+  });
+
+  it('agrees with classifyWetChargedHoles(...).fizzled', () => {
+    const state = stateWith(['H1', 'H2', 'H3']);
+    state.chargesByHole = { H1: charge('boomite'), H2: charge('krackle'), H3: charge('obliviax') };
+    setHoleWater(state, ['H1', 'H2', 'H3'], 0.9);
+    expect(fizzlingHoles(state)).toEqual(classifyWetChargedHoles(state.chargesByHole, wetHoleIdsFor(state)).fizzled);
+    expect(fizzlingHoles(state)).toEqual(['H1', 'H3']);
+  });
+
+  it('ignores dry holes', () => {
+    const state = stateWith(['H1', 'H2']);
+    state.chargesByHole = { H1: charge('boomite'), H2: charge('boomite') };
+    setHoleWater(state, ['H1'], HOLE_WET_THRESHOLD - 0.1);
+    expect(fizzlingHoles(state)).toEqual([]);
+  });
+
+  it('ignores wet holes without a charge', () => {
+    const state = stateWith(['H1', 'H2']);
+    state.chargesByHole = { H1: charge('boomite') };
+    setHoleWater(state, ['H1', 'H2'], 0.9);
+    expect(fizzlingHoles(state)).toEqual(['H1']);
+  });
+
+  it('ignores water-resistant charges (krackle)', () => {
+    const state = stateWith(['H1']);
+    state.chargesByHole = { H1: charge('krackle') };
+    setHoleWater(state, ['H1'], 0.9);
+    expect(fizzlingHoles(state)).toEqual([]);
+  });
+
+  it('ignores an unknown explosive without throwing', () => {
+    const state = stateWith(['H1']);
+    state.chargesByHole = { H1: charge('no_such_explosive') };
+    setHoleWater(state, ['H1'], 0.9);
+    expect(fizzlingHoles(state)).toEqual([]);
+  });
+
+  it('tubing does not mask water already in the hole', () => {
+    const state = stateWith(['H1']);
+    state.chargesByHole = { H1: charge('boomite') };
+    state.tubingState.installedHoles = new Set(['H1']);
+    setHoleWater(state, ['H1'], 0.9);
+    expect(fizzlingHoles(state)).toEqual(['H1']);
+  });
+
+  it('is empty with no holes or no charges', () => {
+    expect(fizzlingHoles(stateWith([]))).toEqual([]);
+    const state = stateWith(['H1']);
+    setHoleWater(state, ['H1'], 0.9);
+    expect(fizzlingHoles(state)).toEqual([]);
+  });
+});
+
+describe('rainExposedHoles (#1957)', () => {
+  const charge = (explosiveId: string) => ({ explosiveId, amountKg: 8, stemmingM: 2 });
+
+  it('is empty when it is not raining, however sensitive the charges', () => {
+    const state = stateWith(['H1', 'H2']);
+    state.chargesByHole = { H1: charge('boomite'), H2: charge('obliviax') };
+    for (const w of ['sunny', 'cloudy'] as const) {
+      state.weather.current = w;
+      expect(rainExposedHoles(state)).toEqual([]);
+    }
+  });
+
+  it('lists charged untubed water-sensitive holes in light rain, dry or wet, sorted', () => {
+    const state = stateWith(['H3', 'H1', 'H2']);
+    state.chargesByHole = { H3: charge('boomite'), H1: charge('boomite'), H2: charge('obliviax') };
+    setHoleWater(state, ['H2'], 0.9);
+    state.weather.current = 'light_rain';
+    expect(rainExposedHoles(state)).toEqual(['H1', 'H2', 'H3']);
+  });
+
+  it('counts every rain state: heavy rain and storm too', () => {
+    const state = stateWith(['H1']);
+    state.chargesByHole = { H1: charge('boomite') };
+    for (const w of ['light_rain', 'heavy_rain', 'storm'] as const) {
+      state.weather.current = w;
+      expect(rainExposedHoles(state), w).toEqual(['H1']);
+    }
+  });
+
+  it('excludes tubed holes', () => {
+    const state = stateWith(['H1', 'H2']);
+    state.chargesByHole = { H1: charge('boomite'), H2: charge('boomite') };
+    state.tubingState.installedHoles = new Set(['H1']);
+    state.weather.current = 'storm';
+    expect(rainExposedHoles(state)).toEqual(['H2']);
+  });
+
+  it('excludes uncharged holes', () => {
+    const state = stateWith(['H1', 'H2']);
+    state.chargesByHole = { H1: charge('boomite') };
+    state.weather.current = 'light_rain';
+    expect(rainExposedHoles(state)).toEqual(['H1']);
+  });
+
+  it('excludes water-resistant charges (krackle)', () => {
+    const state = stateWith(['H1']);
+    state.chargesByHole = { H1: charge('krackle') };
+    state.weather.current = 'storm';
+    expect(rainExposedHoles(state)).toEqual([]);
+  });
+
+  it('excludes an unknown explosive without throwing', () => {
+    const state = stateWith(['H1']);
+    state.chargesByHole = { H1: charge('no_such_explosive') };
+    state.weather.current = 'storm';
+    expect(() => rainExposedHoles(state)).not.toThrow();
+    expect(rainExposedHoles(state)).toEqual([]);
+  });
+
+  it('is empty with no holes', () => {
+    const state = stateWith([]);
+    state.weather.current = 'storm';
+    expect(rainExposedHoles(state)).toEqual([]);
   });
 });

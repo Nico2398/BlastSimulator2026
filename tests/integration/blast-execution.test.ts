@@ -404,7 +404,7 @@ describe('Blast execution — #1346', () => {
 describe('Blast execution — DETONATE flow (#1362)', () => {
   const SAFE_XZ = 44; // well outside the 3x3/spacing:3 pattern's padded danger zone
 
-  /** Staffed game with a drilled and fully charged 3x3 pattern, nobody yet moved. */
+  /** Staffed game with a drilled and fully charged 3x3 pattern, nobody yet moved. Water-resistant krackle, so rain-wet holes never hold the shot (#1957). */
   function setupCharged() {
     const engine = createRunner();
     const { runner, ctx } = engine;
@@ -414,7 +414,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     const state = () => ctx.state!;
     const topUp = () => { state().cash = Math.max(state().cash, 100000); for (const e of state().employees.employees) e.fatigue = 100; };
     for (let i = 0; i < 600 && state().plannedDrillHoles.length > 0; i++) { topUp(); tickResolvingEvents(run); }
-    expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
+    expect(run('charge hole:* explosive:krackle amount:8 stemming:2').success).toBe(true);
     for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 2000 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); tickResolvingEvents(run); }
     expect(state().drillHoles.length).toBeGreaterThan(0);
     expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
