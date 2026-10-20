@@ -8,7 +8,11 @@ import { computeDangerZone, defineZone, isDangerZoneClear, isInZone } from '../e
 import { evacuateZone } from './Evacuation.js';
 import { isActive } from '../events/ActiveModifiers.js';
 import { t } from '../i18n/I18n.js';
-import { BLAST_DANGER_MARGIN_M, DETONATION_REEVACUATE_INTERVAL_TICKS } from '../config/balance.js';
+import {
+  BLAST_DANGER_MARGIN_M,
+  DETONATION_REEVACUATE_INTERVAL_TICKS,
+  DETONATION_STUCK_WALKER_FAILURE_TICKS,
+} from '../config/balance.js';
 
 /** Armed-detonation record held on GameState while the site is being cleared. */
 export interface PendingDetonation {
@@ -37,9 +41,7 @@ function orderEvacuation(state: GameState): { employees: number[]; vehicles: num
 
 /** True when an evacuating employee cannot walk out of the zone (stuck flag or repeated move failures). */
 export function isStuckWalker(emp: Pick<Employee, 'isMoveStuck' | 'moveConsecutiveFailures'>): boolean {
-  void emp;
-  // TODO: implement
-  return false;
+  return emp.isMoveStuck || emp.moveConsecutiveFailures >= DETONATION_STUCK_WALKER_FAILURE_TICKS;
 }
 
 /** True when any drilled hole has a charge loaded or still loading. */
@@ -90,7 +92,7 @@ export function detonationPhase(state: GameState): DetonationPhase {
   const names: string[] = [];
   for (const emp of state.employees.employees) {
     if (!emp.alive || !isInZone(emp.x, emp.z, zone)) continue;
-    if (strandedEmps.has(emp.id)) names.push(emp.name);
+    if (strandedEmps.has(emp.id) || isStuckWalker(emp)) names.push(emp.name);
     else remaining++;
   }
   for (const v of state.vehicles.vehicles) {
@@ -102,6 +104,18 @@ export function detonationPhase(state: GameState): DetonationPhase {
   return { kind: 'evacuating', remaining: remaining + names.length };
 }
 
+/** Every tick: add in-zone alive stuck walkers to the stranded set, so the verdict survives a counter reset. */
+function latchStuckWalkers(state: GameState, pending: PendingDetonation): void {
+  const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
+  if (zone === null) return;
+  for (const emp of state.employees.employees) {
+    if (emp.alive && isInZone(emp.x, emp.z, zone) && isStuckWalker(emp)
+      && !pending.strandedEmployeeIds.includes(emp.id)) {
+      pending.strandedEmployeeIds.push(emp.id);
+    }
+  }
+}
+
 /** Advance the sequence one tick and return the resulting phase. */
 export function tickDetonation(state: GameState): DetonationPhase {
   const pending = state.pendingDetonation;
@@ -110,6 +124,7 @@ export function tickDetonation(state: GameState): DetonationPhase {
     state.pendingDetonation = null;
     return { kind: 'idle' };
   }
+  latchStuckWalkers(state, pending);
   if (state.tickCount - pending.lastEvacuationTick >= DETONATION_REEVACUATE_INTERVAL_TICKS
     && !isDangerZoneClear(state.drillHoles, state.vehicles, state.employees)) {
     const stranded = orderEvacuation(state);
