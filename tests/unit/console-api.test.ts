@@ -368,6 +368,42 @@ describe('console-api', () => {
       expect(serializeGameState(runner.ctx as MiningContext)!.maxBuildingTier).toBe(2);
     });
 
+    it('reports rampLegCount: 0 with no ramp, 1 for a straight ramp, N for a multi-leg ramp (#1942)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = runner.ctx.state!;
+      expect(serializeGameState(runner.ctx as MiningContext)!.rampLegCount).toBe(0);
+
+      const straight = { width: 3, def: { originX: 0, originZ: 0, direction: 'east', length: 5 } };
+      state.builtRamps = [straight] as unknown as typeof state.builtRamps;
+      expect(serializeGameState(runner.ctx as MiningContext)!.rampLegCount).toBe(1);
+
+      const legs = [{ direction: 'east', length: 3 }, { direction: 'south', length: 2 }, { direction: 'west', length: 4 }];
+      const multi = { width: 3, def: { ...straight.def, legs } };
+      state.builtRamps = [multi] as unknown as typeof state.builtRamps;
+      expect(serializeGameState(runner.ctx as MiningContext)!.rampLegCount).toBe(3);
+    });
+
+    it('reports muckPile null without a grid, and mineGrade null / pending-tick state from state.grade', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const ctx = runner.ctx as MiningContext;
+      const state = ctx.state!;
+      const grid = ctx.grid;
+      ctx.grid = null as unknown as typeof ctx.grid;
+      expect(serializeGameState(ctx)!.muckPile).toBeNull();
+      ctx.grid = grid;
+
+      state.grade = null as unknown as typeof state.grade;
+      expect(serializeGameState(ctx)!.mineGrade).toBeNull();
+      expect(serializeGameState(ctx)!.unseenApprovalGrade).toBeNull();
+
+      state.grade = { grade: 2, pending: { ticksLeft: 7 }, unseenApproval: 3 } as unknown as typeof state.grade;
+      expect(serializeGameState(ctx)!.mineGrade).toEqual({ grade: 2, pendingTicksLeft: 7 });
+      expect(serializeGameState(ctx)!.unseenApprovalGrade).toBe(3);
+
+      state.grade = { grade: 1, pending: null, unseenApproval: null } as unknown as typeof state.grade;
+      expect(serializeGameState(ctx)!.mineGrade).toEqual({ grade: 1, pendingTicksLeft: null });
+    });
+
     it('reports zero activeContractCount for a fresh game with no contracts accepted', () => {
       runner.runner.run('new_game mine_type:desert seed:42');
       const state = serializeGameState(runner.ctx as MiningContext)!;
