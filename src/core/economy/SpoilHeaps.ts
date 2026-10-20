@@ -3,7 +3,8 @@
 
 import type { Building } from '../entities/Building.js';
 import { spoilHeapRoomKg } from '../entities/Building.js';
-import { ORE_GRADE_SCALE_DEFAULT, SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../config/balance.js';
+import { ORE_GRADE_SCALE_DEFAULT, SPOIL_BARREN_ORE_FRACTION_THRESHOLD, BARREN_OVERFLOW_STORED_SHARE } from '../config/balance.js';
+import { warehouseUsedKgMap } from './FreightWarehouses.js';
 import { oreGradeScaleOf, scaledGradeThreshold } from './OreGrade.js';
 
 /** Where a hauled fragment is delivered. */
@@ -76,6 +77,43 @@ export function stateRubbleStockKg(
   return rubbleStockKg(state.logistics.fragments, state.buildings.buildings, oreGradeScaleOf(state.world));
 }
 
+type HeapLike = Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number };
+
+/** True when a spoil heap's room, net of `reservedKg` (in-transit mass promised per building id), holds `amountKg`. */
+function heapFits(b: HeapLike, amountKg: number, reservedKg: ReadonlyMap<number, number>): boolean {
+  return b.type === 'spoil_heap' && spoilHeapRoomKg(b) - (b.id === undefined ? 0 : reservedKg.get(b.id) ?? 0) >= amountKg;
+}
+
+/**
+ * Barren kg held in storage when barren rock is at least BARREN_OVERFLOW_STORED_SHARE of the stored mass,
+ * storedMassKg > 0 and no heap has room for any stored barren fragment; otherwise 0. Heaps fill in whole
+ * fragments, so the test is the smallest stored barren fragment against each heap's net room (heapFits,
+ * the same predicate creditSpoilHeaps uses when releaseBarrenStoredFragments moves rock).
+ */
+export function barrenOverflowKg(
+  fragments: readonly StoredFragmentLike[],
+  storedMassKg: number,
+  buildings: readonly HeapLike[],
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
+  reservedKg: ReadonlyMap<number, number> = new Map(),
+): number {
+  if (storedMassKg <= 0) return 0;
+  const barren = barrenStoredMassKg(fragments, gradeScale);
+  if (barren < BARREN_OVERFLOW_STORED_SHARE * storedMassKg) return 0;
+  let smallest = Infinity;
+  for (const f of fragments) {
+    if (isStoredBarren(f, gradeScale)) smallest = Math.min(smallest, f.fragment.mass);
+  }
+  return buildings.some(b => heapFits(b, smallest, reservedKg)) ? 0 : barren;
+}
+
+/** barrenOverflowKg for any state slice carrying logistics and buildings (GameState fits); in-flight hauls reserve heap room. */
+export function stateBarrenOverflowKg(
+  state: { logistics: { fragments: readonly (StoredFragmentLike & { warehouseId?: number | null })[]; storedMassKg: number }; buildings: { buildings: readonly HeapLike[] }; world?: { oreGradeScale?: number } | null },
+): number {
+  return barrenOverflowKg(state.logistics.fragments, state.logistics.storedMassKg, state.buildings.buildings, oreGradeScaleOf(state.world), warehouseUsedKgMap(state.logistics));
+}
+
 /** Remove up to `amountKg` of barren rock from the heaps, in building order; returns the kg removed. */
 export function drawSpoilKg(buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[], amountKg: number): number {
   let remaining = amountKg;
@@ -101,13 +139,11 @@ export function creditSpoilKg(heap: Pick<Building, 'storedSpoilKg'>, amountKg: n
  * Returns false, crediting nothing, when no heap has that much room.
  */
 export function creditSpoilHeaps(
-  buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
+  buildings: readonly HeapLike[],
   amountKg: number,
   reservedKg: ReadonlyMap<number, number> = new Map(),
 ): boolean {
-  const heap = buildings.find(b =>
-    b.type === 'spoil_heap'
-    && spoilHeapRoomKg(b) - (b.id === undefined ? 0 : reservedKg.get(b.id) ?? 0) >= amountKg);
+  const heap = buildings.find(b => heapFits(b, amountKg, reservedKg));
   if (!heap) return false;
   creditSpoilKg(heap, amountKg);
   return true;

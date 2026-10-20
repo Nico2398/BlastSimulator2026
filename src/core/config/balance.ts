@@ -3238,3 +3238,5 @@ export const VANITY_GOLD_TOWER_NUISANCE_ONCE = -5;
 export const VANITY_WELL_BEING_ONCE = -2;
 /** Golf course upkeep ($ per tick). */
 export const VANITY_GOLF_UPKEEP_PER_TICK = 20;
+/** Share of stored mass that must be barren, with every spoil heap full or absent, for a storage-full block to read as barren overflow. */
+export const BARREN_OVERFLOW_STORED_SHARE = 0.5;
