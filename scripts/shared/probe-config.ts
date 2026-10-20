@@ -3,7 +3,7 @@
 import type { SandboxKitId } from '../../src/core/config/balance.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
 
-export type StrategyId = 'opening' | 'reinvest';
+export type StrategyId = 'opening' | 'reinvest' | 'ladder' | 'stay_g1';
 
 export interface ProbeRunConfig {
   seed: number;
@@ -40,7 +40,7 @@ const QUICK_BIOME = 'desert_badlands';
 const QUICK_KIT: SandboxKitId = 'digger';
 
 const KIT_IDS: readonly SandboxKitId[] = ['digger', 'full'];
-const STRATEGY_IDS: readonly StrategyId[] = ['opening', 'reinvest'];
+const STRATEGY_IDS: readonly StrategyId[] = ['opening', 'reinvest', 'ladder', 'stay_g1'];
 
 function parseList(flag: string, raw: string | undefined): string[] {
   if (raw === undefined || raw.startsWith('--')) throw new Error(`${flag} needs a value`);
