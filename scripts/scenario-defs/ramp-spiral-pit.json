@@ -1,14 +1,14 @@
 {
   "name": "ramp-spiral-pit",
-  "description": "#1940: blast and clear two stacked benches into a pit, order a spiral haul road to the lower floor with one `ramp spiral` command, dig it, and drive a debris_hauler from the rim to the floor and back on it.",
+  "description": "#1940: blast a pit, order a spiral haul road down its wall with one `ramp spiral` command, dig it, and drive a debris_hauler from the rim to the foot of the spiral and back on it.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:400000 staffed:true",
+      "command": "new_game seed:42 cash:2000000 staffed:true",
       "description": "Staffed site: drill_rig #1, debris_hauler #2, rock_digger #3, drivers #4/#5.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:400000 staffed:true"
+          "command": "new_game seed:42 cash:2000000 staffed:true"
         }
       ],
       "role": "setup",
@@ -32,12 +32,23 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:14,14",
-      "description": "Bench 1: a 4x4 grid at 3 m spacing, 6 m deep, drilled over the same footprint so the second bench stacks on the first pit.",
+      "command": "vehicle driver 2 3",
+      "description": "Crew the debris_hauler #2 with driver #3.",
       "interaction": [
         {
           "type": "command",
-          "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:14,14"
+          "command": "vehicle driver 2 3"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:14,14",
+      "description": "A 3x3 grid at 3 m spacing, 6 m deep: the blast opens a pit about 9 m across.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:14,14"
         }
       ],
       "role": "bootstrap"
@@ -45,7 +56,7 @@
     {
       "command": "wait_until field:orderedHoleCount equals:0 max_ticks:800",
       "timeout": 245,
-      "description": "Bench 1: every hole drilled.",
+      "description": "Every hole drilled.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -64,7 +75,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "description": "Bench 1: load every hole.",
+      "description": "Load every hole.",
       "interaction": [
         {
           "type": "command",
@@ -76,7 +87,7 @@
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
       "timeout": 245,
-      "description": "Bench 1: every charge loaded.",
+      "description": "Every charge loaded.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -94,159 +105,60 @@
       }
     },
     {
-      "command": "blast",
-      "description": "Bench 1: fire the blast.",
+      "command": "blast detonate",
+      "description": "Detonate; the crew evacuates first.",
       "interaction": [
         {
           "type": "command",
-          "command": "blast"
+          "command": "blast detonate"
         }
       ],
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "holeCount": 0
-        },
-        "note": "A fired blast clears the plan."
+          "deathCount": 0
+        }
       }
     },
     {
-      "command": "wait_until field:pendingActionCount equals:0 max_ticks:3000",
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
       "timeout": 245,
-      "description": "Bench 1: crew finished clearing the rubble, leaving a bare pit floor.",
+      "description": "The sequence evacuates the crew and fires; the pattern is spent and the pit is open. Its rubble is left lying: the haulers cannot reach it before the road exists.",
       "interaction": [
         {
           "type": "waitUntil",
-          "field": "pendingActionCount",
+          "field": "holeCount",
           "equals": 0,
-          "maxTicks": 3000,
+          "maxTicks": 600,
           "timeoutMs": 240000
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "pendingActionCount": 0
+          "holeCount": 0,
+          "deathCount": 0
         }
       }
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:14,14",
-      "description": "Bench 2: a 4x4 grid at 3 m spacing, 6 m deep, drilled over the same footprint so the second bench stacks on the first pit.",
+      "command": "ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw preview",
+      "description": "#1940: preview the spiral proposal around the pit. The preview prints legs, length and cost and changes nothing; no UI exposes the spiral yet (exact-command allowlist entry in bootstrap-allowlist.ts).",
       "interaction": [
         {
           "type": "command",
-          "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:14,14"
+          "command": "ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw preview"
         }
       ],
       "role": "bootstrap"
     },
     {
-      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:800",
-      "timeout": 245,
-      "description": "Bench 2: every hole drilled.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedHoleCount",
-          "equals": 0,
-          "maxTicks": 800,
-          "timeoutMs": 240000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 0
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "description": "Bench 2: load every hole.",
+      "command": "ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw",
+      "description": "#1940: order the spiral down the pit wall from the rim tile just north of it. Cash drops by the proposal cost and ramp segments are queued.",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
-        }
-      ],
-      "role": "bootstrap"
-    },
-    {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
-      "timeout": 245,
-      "description": "Bench 2: every charge loaded.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3400,
-          "timeoutMs": 240000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "orderedChargeCount": 0
-        }
-      }
-    },
-    {
-      "command": "blast",
-      "description": "Bench 2: fire the blast.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "holeCount": 0
-        },
-        "note": "A fired blast clears the plan."
-      }
-    },
-    {
-      "command": "wait_until field:pendingActionCount equals:0 max_ticks:3000",
-      "timeout": 245,
-      "description": "Bench 2: crew finished clearing the rubble, leaving a bare pit floor.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "pendingActionCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 240000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "pendingActionCount": 0
-        }
-      }
-    },
-    {
-      "command": "ramp spiral from:11,19 depth:8 grade:15 width:3 dir:cw preview",
-      "description": "#1940: preview the spiral proposal around the two-bench pit. The preview prints legs, length and cost and changes nothing; no UI exposes the spiral yet (exact-command allowlist entry in bootstrap-allowlist.ts).",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "ramp spiral from:11,19 depth:8 grade:15 width:3 dir:cw preview"
-        }
-      ],
-      "role": "bootstrap"
-    },
-    {
-      "command": "ramp spiral from:11,19 depth:8 grade:15 width:3 dir:cw",
-      "description": "#1940: order the spiral to the lower floor. Cash drops by the proposal cost and ramp segments are queued.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "ramp spiral from:11,19 depth:8 grade:15 width:3 dir:cw"
+          "command": "ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw"
         }
       ],
       "role": "bootstrap",
@@ -279,43 +191,12 @@
       }
     },
     {
-      "command": "vehicle driver 2 3",
-      "description": "Crew the debris_hauler #2 with driver #3.",
+      "command": "vehicle reposition 2 15 25",
+      "description": "Send the hauler from the rim to the foot of the spiral: its route is the spiral.",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 2 3"
-        }
-      ],
-      "role": "bootstrap"
-    },
-    {
-      "command": "wait_until field:pendingActionCount equals:0 max_ticks:200",
-      "timeout": 65,
-      "description": "Driver #3 finished boarding the debris_hauler.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "pendingActionCount",
-          "equals": 0,
-          "maxTicks": 200,
-          "timeoutMs": 60000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "pendingActionCount": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle reposition 2 18 18",
-      "description": "Send the hauler from the rim to the pit floor: its route is the spiral.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle reposition 2 18 18"
+          "command": "vehicle reposition 2 15 25"
         }
       ],
       "role": "bootstrap"
@@ -338,12 +219,12 @@
       }
     },
     {
-      "command": "vehicle reposition 2 10 19",
+      "command": "vehicle reposition 2 17 6",
       "description": "Drive the hauler back up the spiral to the rim.",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle reposition 2 10 19"
+          "command": "vehicle reposition 2 17 6"
         }
       ],
       "role": "bootstrap"
