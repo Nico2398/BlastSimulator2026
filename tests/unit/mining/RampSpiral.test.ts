@@ -57,6 +57,19 @@ function cellsOf(p: RampSpiralProposal, width: RampWidth) {
   return rampPathCells({ originX: p.originX, originZ: p.originZ, legs: p.legs }, width);
 }
 
+/** A plane falling `slopePerTile` m per tile towards +x, with the pit rectangle sunk `pit.depth` below it. */
+function makeSlopedSurface(pit: Pit, slopePerTile: number, area = AREA): SpiralSurface {
+  return {
+    heightAt(x: number, z: number): number {
+      const inPit = x >= pit.x0 && x < pit.x0 + pit.w && z >= pit.z0 && z < pit.z0 + pit.h;
+      return -slopePerTile * x - (inPit ? pit.depth : 0);
+    },
+    contains(x: number, z: number): boolean {
+      return x >= area.min && x < area.max && z >= area.min && z < area.max;
+    },
+  };
+}
+
 /** Clockwise (viewed from above, +z south) successor of each heading. */
 const CW_NEXT: Record<RampDirection, RampDirection> = { east: 'south', south: 'west', west: 'north', north: 'east' };
 const CCW_NEXT: Record<RampDirection, RampDirection> = { east: 'north', north: 'west', west: 'south', south: 'east' };
@@ -401,5 +414,60 @@ describe('spiralSurfaceFrom (#1942)', () => {
     const surface = spiralSurfaceFrom(grid, { contains: (x, z) => x >= 5 && z >= 5 });
     expect(surface.contains(6, 6)).toBe(true);
     expect(surface.contains(2, 6)).toBe(false);
+  });
+});
+
+// #2028: on sloped ground "RAMP_CRATER_MIN_DROP_M below the start" also matches the open downhill slope,
+// so the flood fill leaked away from the pit. Pit: 30 wide, 20 deep; slope 0.2 m/tile drops 6 m across it,
+// so the far rim still stands well over RAMP_CRATER_MIN_DROP_M above the pit floor.
+describe('proposeRampSpiral: sloped terrain (#2028)', () => {
+  const SLOPE = 0.2;
+  const surface = makeSlopedSurface(SQUARE, SLOPE);
+  const midZ = SQUARE.z0 + Math.floor(SQUARE.h / 2);
+  const reach = RAMP_SPIRAL_RIM_GAP_WIDTHS * 3 + 3 + 1;
+
+  it('from the uphill rim, proposes a spiral hugging the pit rectangle, not the slope below it', () => {
+    const r = proposeRampSpiral({ fromX: SQUARE.x0 - 1, fromZ: midZ, depth: 20, gradeDegrees: 15, width: 3, dir: 'cw' }, surface);
+    if (!r.success) throw new Error(`expected success, got ${r.reasonKey}`);
+    const cells = cellsOf(r.proposal, 3);
+    expect(cells.length).toBeGreaterThan(0);
+    for (const c of cells) {
+      expect(voidDistance(SQUARE, c.x, c.z)).toBeLessThanOrEqual(reach);
+      expect(c.x).toBeLessThanOrEqual(SQUARE.x0 + SQUARE.w - 1 + reach);
+    }
+    expect(r.proposal.totalLength).toBeGreaterThanOrEqual(20 / Math.tan((15 * Math.PI) / 180) - 1e-6);
+  });
+
+  it('from the downhill rim, does not regress to a refusal with nothing offered', () => {
+    const r = proposeRampSpiral({ fromX: SQUARE.x0 + SQUARE.w, fromZ: midZ, depth: 20, gradeDegrees: 15, width: 3, dir: 'cw' }, surface);
+    if (r.success) expect(r.proposal.legs.length).toBeGreaterThanOrEqual(2);
+    else {
+      expect(r.reasonKey).toMatch(/too_short$/);
+      expect(r.params?.offered as number).toBeGreaterThan(0);
+    }
+  });
+
+  it('refuses a plain incline with no pit, without hanging', () => {
+    const incline = makeSlopedSurface({ x0: 0, z0: 0, w: 0, h: 0, depth: 0 }, SLOPE);
+    for (const x of [5, 20, 40]) {
+      const r = proposeRampSpiral({ fromX: x, fromZ: 30, depth: 20, gradeDegrees: 15, width: 3, dir: 'cw' }, incline);
+      expect(r.success).toBe(false);
+      if (!r.success) expect(r.reasonKey).toMatch(/(no_pit|not_on_rim)$/);
+    }
+  });
+
+  it('isPitRim: true on the uphill rim tile', () => {
+    expect(isPitRim(surface, { x: SQUARE.x0 - 1, z: midZ })).toBe(true);
+  });
+
+  it('isPitRim: false two or more columns uphill of the pit', () => {
+    expect(isPitRim(surface, { x: SQUARE.x0 - 2, z: midZ })).toBe(false);
+    expect(isPitRim(surface, { x: SQUARE.x0 - 6, z: midZ })).toBe(false);
+  });
+
+  it('isPitRim: false on a downhill slope tile with no pit nearby', () => {
+    const incline = makeSlopedSurface({ x0: 0, z0: 0, w: 0, h: 0, depth: 0 }, SLOPE);
+    expect(isPitRim(incline, { x: 40, z: 30 })).toBe(false);
+    expect(isPitRim(surface, { x: 55, z: midZ })).toBe(false);
   });
 });
