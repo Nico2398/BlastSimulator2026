@@ -19,4 +19,6 @@ export function wireProgressionNotifications(
   });
   emitter.on('progression:ore_glut', ({ oreId }) =>
     notify({ severity: 'info', title: t('notification.title.market'), body: t('notification.market.glut', { ore: t(`ore.${oreId}.name`) }) }));
+  emitter.on('mining:wall_slump', ({ x, z }) =>
+    notify({ severity: 'warn', title: t('notification.wall_slump.title'), body: t('notification.wall_slump.body', { x, z }) }));
 }

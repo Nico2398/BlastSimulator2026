@@ -3265,7 +3265,12 @@ export const VANITY_GOLF_UPKEEP_PER_TICK = 20;
 export const BARREN_OVERFLOW_STORED_SHARE = 0.5;
 
 // --- Wall stability (#1941) ---
-/** Safe continuous face height (m) by rock hardness tier. */
+/**
+ * Safe continuous face height (m) by rock hardness tier.
+ * Measured (#1941): the standard opening (3x3 holes, 8 m, 4 m spacing, floor up to 4 m deeper) leaves
+ * a tallest face of 10 m (desert_badlands, red_canyon; seeds 42/7/13), under the softest tier's 12 m.
+ * Biomes whose rock barely breaks (alpine_granite, tropical_karst, volcanic_flats) leave 0-2 m.
+ */
 export const WALL_SAFE_FACE_HEIGHT_M_BY_TIER: Readonly<Record<number, number>> = { 1: 12, 2: 15, 3: 20, 4: 25, 5: 30 };
 /** A flat step at least this wide (m) ends one face and starts the next. */
 export const WALL_BERM_MIN_WIDTH_M = 3;
@@ -3275,3 +3280,9 @@ export const WALL_SLUMP_DEPTH_M = 2;
 export const WALL_STABILITY_REGION_MARGIN_M = 8;
 /** Speed (m/s) used for blast-like damage to things in the toe zone. */
 export const WALL_SLUMP_IMPACT_SPEED_MS = 10;
+/** Tallest pile (m) one slump stacks on a single floor column before spreading to the next. */
+export const WALL_SLUMP_PILE_MAX_HEIGHT_M = 3;
+/** Chebyshev radius (m) around the toe searched for floor columns to receive spill. */
+export const WALL_SLUMP_PILE_SEARCH_RADIUS_M = 6;
+/** Bulk density (kg/m³) of slumped rock, for the toe-zone impact mass. */
+export const WALL_SLUMP_ROCK_DENSITY_KG_M3 = 2500;

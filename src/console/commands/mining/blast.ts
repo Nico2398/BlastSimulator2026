@@ -28,6 +28,8 @@ import { recordBlastResult, snapshotStats, updateDepth } from '../../../core/cam
 import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { markSurveysStaleByBlast } from '../../../core/mining/SurveyStaleness.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
+import { applyWallSlumps } from './wallSlump.js';
+import { isProgressionSite } from '../../../core/state/GameState.js';
 import { warmOrderReachability } from '../../../core/engine/OrderReachability.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
 import { computeDangerZone } from '../../../core/entities/Zone.js';
@@ -362,6 +364,11 @@ export function* fireBlastSteps(
     }
   }
 
+  // Walls the blast left taller than their rock holds slump into the pit (#1941), progression sites only.
+  const slumpLines = isProgressionSite(state) && result.clearedVoxels > 0
+    ? yield* applyWallSlumps(ctx, result.clearedRegion)
+    : [];
+
   // The blast reshaped the nav grid: label it now, in slices of their own,
   // rather than in the next tick alongside thousands of new haul orders (#1603).
   yield;
@@ -401,6 +408,7 @@ export function* fireBlastSteps(
         ? [`Buildings destroyed: ${result.destroyedBuildings.map(b => `${b.type} #${b.buildingId}`).join(', ')}`]
         : []),
       ...stockLossLines,
+      ...slumpLines,
       ...permitLines,
       ...secondaryReports.map(r => t('mining.blast.secondary_blast', { kg: r.explosivesKg, id: r.buildingId, casualties: r.casualties, voxels: r.craterVoxels })),
     ].join('\n'),

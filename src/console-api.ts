@@ -131,6 +131,8 @@ export interface SerializableGameState {
   supplyOffered: boolean;
   /** An event's blasting ban is in force (#1414): `blast` is refused until it lapses, so a scenario waits for `false` before firing instead of padding ticks. */
   blastBanned: boolean;
+  /** Wall slumps so far on this run (#1941): faces taller than their rock's safe height that fell into the pit. */
+  wallSlumpCount: number;
   /** An `ore_sale` for blingite is on the board at any quantity (`hasOreSaleOffer`, #1586): the wait before accepting a sale storage cannot fill yet. */
   blingiteSaleOffered: boolean;
   /**
@@ -249,6 +251,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
     supplyOffered: hasSupplyOffer(s.contracts.available),
     blastBanned: isActive(s.events.activeModifiers, 'blast_ban', s.tickCount),
+    wallSlumpCount: s.damage.wallSlumpCount ?? 0,
     blingiteSaleOffered: hasOreSaleOffer(s.contracts.available, 'blingite'),
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
