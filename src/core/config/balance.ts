@@ -887,6 +887,11 @@ export const VOXEL_SIZE_CM = 100;
 export const BLAST_DANGER_MARGIN_M = 15;
 
 /**
+ * Metres of pre-flight building-warning reach per sqrt(initial hole energy) (#2030).
+ */
+export const BLAST_REACH_M_PER_SQRT_ENERGY = 0.045;
+
+/**
  * Metres a vehicle or employee must be moved beyond the zone boundary to
  * count as evacuated (Evacuation.ts findSafeEvacuationCell). Placeholder —
  * tuned by implementer/tests (#557).

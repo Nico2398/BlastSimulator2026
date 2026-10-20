@@ -140,6 +140,15 @@ export function holePatternSpacing(holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z
 }
 
 /**
+ * Metres a hole's charge reaches for the pre-flight building warning (#2030):
+ * BLAST_REACH_M_PER_SQRT_ENERGY * sqrt(initial energy). Stub.
+ */
+export function holeBlastReachM(_charge: HoleCharge | undefined, _holeDepth: number): number {
+  // TODO: implement
+  return 0;
+}
+
+/**
  * Buildings within reach of the planned holes (#2021), shown as pre-flight warnings.
  *
  * Tier-0 prediction rule: a building is at risk when any footprint cell lies inside the
@@ -149,7 +158,8 @@ export function holePatternSpacing(holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z
  * box. `marginM` is the lever for tuning how far past the pattern the warning reaches.
  */
 export function buildingsInBlastReach(
-  holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z'>>,
+  holes: ReadonlyArray<Pick<DrillHole, 'id' | 'x' | 'z' | 'depth'>>,
+  _charges: Readonly<Record<string, HoleCharge>>,
   buildings: ReadonlyArray<Pick<Building, 'id' | 'type' | 'tier' | 'x' | 'z' | 'storedExplosives'>>,
   marginM: number = holePatternSpacing(holes),
 ): BuildingAtRisk[] {
