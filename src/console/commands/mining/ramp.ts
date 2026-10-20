@@ -8,9 +8,11 @@ import {
   validateRampOrder, defineRampSegments, rampDefFromEndpoints, rampWidthOf,
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
+import { proposeRampSpiral, type RampSpiralProposal, type RampSpiralResult, type SpiralDir, type SpiralRequest, type SpiralSurface } from '../../../core/mining/RampSpiral.js';
 import { queueRampOrder } from '../../../core/mining/RampOrder.js';
-import type { RampPathCell } from '../../../core/mining/RampPath.js';
+import type { RampLeg, RampPathCell } from '../../../core/mining/RampPath.js';
 import { rampPathCells, legsFromWaypoints, firstOccupiedPathTile, rampPathOf, rampTotalLength } from '../../../core/mining/RampPath.js';
+import { computeVoxelColumnSurfaceHeight } from '../../../core/world/VoxelGrid.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { isBuildingFootprintCell } from '../../../core/entities/Building.js';
 import { rampFootprint, orderRampWiden, validateWidenRamp, type WidenFailure } from '../../../core/mining/RampWidening.js';
@@ -74,6 +76,11 @@ export function buildRampCommand(
   }
   if (grade !== undefined) rampDef.gradeDegrees = grade;
 
+  return orderRampDef(ctx, rampDef);
+}
+
+/** Validates, claims and queues the ordered `rampDef` (straight or multi-leg); the shared tail of every ramp order form. */
+function orderRampDef(ctx: MiningContext, rampDef: RampDef): CommandResult {
   const { direction, length } = rampDef;
 
   // validateRampOrder runs first, before rampFootprint/cellsInRect build any
@@ -116,17 +123,84 @@ export function buildRampCommand(
   };
 }
 
+/** Parses `x,z` into two finite numbers; null otherwise. */
+function parseTile(raw: string | undefined): { x: number; z: number } | null {
+  const parts = (raw ?? '').split(',').map(p => p.trim());
+  if (parts.length !== 2 || parts.some(p => p === '' || !Number.isFinite(Number(p)))) return null;
+  return { x: Number(parts[0]), z: Number(parts[1]) };
+}
+
+/** `ramp <form>`: `spiral` is the only form so far (#1940). */
+export function rampCommand(ctx: MiningContext, args: string[], named: Record<string, string>): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+  if (args[0] !== 'spiral') return { success: false, output: t('mining.ramp_spiral.usage') };
+  return spiralRampCommand(ctx, args.slice(1), named);
+}
+
+/** `ramp spiral from:<x>,<z> depth:<m> grade:<deg> width:<3|5|7> [dir:cw|ccw] [preview]` (#1940). */
+function spiralRampCommand(
+  ctx: MiningContext, args: string[], named: Record<string, string>,
+): CommandResult {
+  const from = parseTile(named['from']);
+  const depth = Number(named['depth'] ?? '');
+  const grade = Number(named['grade'] ?? '');
+  const width = Number(named['width'] ?? '');
+  if (from === null || !Number.isFinite(depth) || !Number.isFinite(grade) || !isRampWidth(width)) {
+    return { success: false, output: t('mining.ramp_spiral.usage') };
+  }
+  const rawDir = named['dir'] ?? 'cw';
+  if (rawDir !== 'cw' && rawDir !== 'ccw') return { success: false, output: t('mining.ramp_spiral.bad_dir') };
+  const dir: SpiralDir = rawDir;
+  const grid = ctx.grid!;
+  const area = ctx.playableArea;
+  const request: SpiralRequest = { fromX: from.x, fromZ: from.z, depth, gradeDegrees: grade, width, dir };
+  const surface: SpiralSurface = {
+    heightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
+    contains: (x, z) => area?.contains(x, z) ?? grid.containsColumn(x, z),
+  };
+  const result: RampSpiralResult = proposeRampSpiral(request, surface);
+  if (!result.success) return { success: false, output: t(result.reasonKey, result.params) };
+  const p: RampSpiralProposal = result.proposal;
+
+  if (args.includes('preview')) {
+    return {
+      success: true,
+      output: t('mining.ramp_spiral.preview', {
+        legs: p.legs.map(l => `${l.direction} ${l.length}`).join(', '),
+        length: p.totalLength, cost: formatMoney(p.cost), laps: p.laps, grade: p.gradeDegrees,
+      }),
+    };
+  }
+  const def = rampDefFromLegs({ x: p.originX, z: p.originZ }, p.legs, p.depth, width);
+  def.gradeDegrees = p.gradeDegrees;
+  const ordered = orderRampDef(ctx, def);
+  if (!ordered.success) return ordered;
+  return { success: true, output: t('mining.ramp_spiral.ordered', { length: p.totalLength, laps: p.laps, legs: p.legs.length }) };
+}
+
 const PATH_CONFLICTS = ['start', 'end', 'origin', 'direction', 'length'] as const;
 
 /** Parses `x,z;x,z;…` into waypoints; null when any piece is not two finite numbers. */
 function parseWaypoints(raw: string): { x: number; z: number }[] | null {
   const out: { x: number; z: number }[] = [];
   for (const piece of raw.split(';')) {
-    const parts = piece.split(',').map(p => p.trim());
-    if (parts.length !== 2 || parts.some(p => p === '' || !Number.isFinite(Number(p)))) return null;
-    out.push({ x: Number(parts[0]), z: Number(parts[1]) });
+    const tile = parseTile(piece);
+    if (tile === null) return null;
+    out.push(tile);
   }
   return out;
+}
+
+/** The ordered `RampDef` for `legs` from `origin`; a single leg is an ordinary straight ramp (#1939, #1940). */
+function rampDefFromLegs(
+  origin: { x: number; z: number }, legs: RampLeg[], targetDepth: number, width: RampWidth,
+): RampDef {
+  const def: RampDef = {
+    originX: origin.x, originZ: origin.z, direction: legs[0]!.direction, length: rampTotalLength(legs), targetDepth, width,
+  };
+  if (legs.length > 1) def.legs = legs;
+  return def;
 }
 
 /** The `path:` form (#1939): waypoints to a def; a two-waypoint path is an ordinary straight ramp. */
@@ -141,11 +215,7 @@ function rampDefFromPath(
   const result = legsFromWaypoints(waypoints);
   if (!result.success) return { success: false, output: t(result.reasonKey, result.params) };
   const { originX, originZ, legs } = result;
-  const def: RampDef = {
-    originX, originZ, direction: legs[0]!.direction, length: rampTotalLength(legs), targetDepth: depth, width,
-  };
-  if (legs.length > 1) def.legs = legs;
-  return { success: true, def };
+  return { success: true, def: rampDefFromLegs({ x: originX, z: originZ }, legs, depth, width) };
 }
 
 /** Refusal text when a corridor tile of a multi-leg ramp lies on a built or planned building, else null. */

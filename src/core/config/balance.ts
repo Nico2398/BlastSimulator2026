@@ -1416,6 +1416,13 @@ export const RAMP_DEFAULT_WIDTH: RampWidth = 3;
 /** Ramp cost per meter of length per voxel of width; the default width costs the pre-#1298 flat $100/m. */
 export const RAMP_COST_PER_METER_PER_WIDTH = 100 / 3;
 
+/** Spiral ramp (#1940): gap kept between the ramp and the pit rim, in ramp widths. */
+export const RAMP_SPIRAL_RIM_GAP_WIDTHS = 1;
+/** Spiral ramp (#1940): how far the closing side may run on past the ring's last corner, in ramp widths. */
+export const RAMP_SPIRAL_CLOSING_RUN_WIDTHS = 2;
+/** Spiral ramp (#1940): widest pit (meters) a spiral proposal will be planned for. */
+export const RAMP_SPIRAL_MAX_PIT_SPAN_M = 120;
+
 /** Cost per voxel levelled, in game dollars (#1009, mirrors the ramp cost in balance above). */
 export const LEVEL_GROUND_COST_PER_VOXEL = 12;
 

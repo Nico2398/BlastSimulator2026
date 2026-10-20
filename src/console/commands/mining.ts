@@ -13,7 +13,7 @@ export { chargeCommand } from './mining/charge.js';
 export { blastCommand } from './mining/blast.js';
 export { blastPlanCommand, previewCommand, blastPreviewCommand, buySoftwareCommand } from './mining/blastPlan.js';
 export type { RampSegmentActionPayload } from './mining/ramp.js';
-export { buildRampCommand, cancelRampCommand, widenRampCommand } from './mining/ramp.js';
+export { buildRampCommand, rampCommand, cancelRampCommand, widenRampCommand } from './mining/ramp.js';
 export type { LevelGroundActionPayload } from './mining/level.js';
 export { levelGroundCommand, cancelLevelGroundCommand } from './mining/level.js';
 export { weatherCommand, tubingCommand, buyCommand, drainHoleCommand } from './mining/weatherTubing.js';
