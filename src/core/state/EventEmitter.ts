@@ -20,6 +20,7 @@ export interface GameEventMap {
   /** A mine-grade application finished processing (#1921). */
   'progression:grade_approved': { grade: number };
   /** A mine-grade application was filed and its fee booked (#1926). */
+  'progression:ore_glut': { oreId: string; saturation: number };
   'progression:grade_applied': { toGrade: number; fee: number };
   'progression:blast_inspected': { overshoot: number; caught: boolean; fine: number; strikes: number; suspended: boolean };
 

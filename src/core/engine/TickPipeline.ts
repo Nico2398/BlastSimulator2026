@@ -54,8 +54,9 @@ import { syncRepairDispatch } from '../economy/RepairDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
 import { isHiringPoolDue, refreshHiringPool } from '../entities/HiringPool.js';
 import { checkDeadlines, ensureScriptedOreSale, generateContracts } from '../economy/Contract.js';
-import { recordOreDelivery, advanceGradeApplication } from '../economy/MineGrade.js';
-import { autoDeliverContracts, bookDeliveryCashflow } from '../economy/ContractFulfilment.js';
+import { advanceGradeApplication } from '../economy/MineGrade.js';
+import { saturationReader } from '../economy/OreSaturation.js';
+import { autoDeliverContracts, settleDelivery } from '../economy/ContractFulfilment.js';
 import { updateScores, clampScore, type ScoreInputs } from '../scores/ScoreManager.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
@@ -73,7 +74,7 @@ import { settleAwaitingFundsCharges } from '../mining/ChargeOrder.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
 import { releaseOccupantsOfRemovedBuildings, releaseOccupantsOfRemovedVehicles, flushUnannouncedLeaves } from './Mount.js';
-import { recordBoardOre, runBoardReview, type BoardReview } from '../economy/Board.js';
+import { runBoardReview, type BoardReview } from '../economy/Board.js';
 
 /** One need/traffic-jam event that fired and auto-paused the tick loop. */
 export interface FiredEventReport {
@@ -216,9 +217,7 @@ export function runTick(
   // can still fill pays out and completes before the penalty is assessed.
   const contractsDelivered = autoDeliverContracts(state.contracts, state.logistics, state.collectedOre, state.tickCount, state.buildings.buildings, oreGradeScaleOf(state.world));
   for (const delivery of contractsDelivered) {
-    bookDeliveryCashflow(state, delivery.contractId, delivery, state.tickCount);
-    recordOreDelivery(state.grade, delivery.contractType, delivery.kg);
-    recordBoardOre(state.board, delivery.contractType, delivery.kg);
+    settleDelivery(state, delivery, state.tickCount, emitter);
   }
   // 3b. Pending mine-grade application (#1921)
   advanceGradeApplication(state, emitter);
@@ -231,7 +230,7 @@ export function runTick(
 
   // 4. Auto-refresh available contracts on schedule
   if (state.tickCount % CONTRACT_REFRESH_INTERVAL === 0) {
-    generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade);
+    generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade, saturationReader(state.saturation, state.tickCount));
     ensureScriptedOreSale(state.contracts, resolveScriptedOreSale(state), resolveContractPriceMultiplier(state));
   }
 

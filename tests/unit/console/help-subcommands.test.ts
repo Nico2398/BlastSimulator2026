@@ -86,4 +86,10 @@ describe('help lists real subcommands (#1402)', () => {
     for (const sub of ['status', 'apply']) expect(line).toContain(sub);
     expect(groupTokens(line).sort()).toEqual(['apply', 'status']);
   });
+
+  it('contract line lists market (#1930)', () => {
+    const line = helpLine('contract');
+    expect(line).toContain('Contracts (list|accept|status|deliver|negotiate|market)');
+    expect(groupTokens(line)).toContain('market');
+  });
 });

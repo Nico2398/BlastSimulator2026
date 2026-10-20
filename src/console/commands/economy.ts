@@ -21,9 +21,7 @@ import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js'
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { FRAGMENT_SPLIT_EPSILON_KG } from '../../core/config/balance.js';
 import { negotiateContractAtTick, negotiationRefusalReason } from '../../core/economy/Negotiation.js';
-import { recordOreDelivery } from '../../core/economy/MineGrade.js';
-import { recordBoardOre } from '../../core/economy/Board.js';
-import { deliverStoredOre, bookDeliveryCashflow } from '../../core/economy/ContractFulfilment.js';
+import { deliverStoredOre, settleDelivery } from '../../core/economy/ContractFulfilment.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
 import { stateRubbleStockKg, type StoredFragmentLike } from '../../core/economy/SpoilHeaps.js';
 import { oreGradeScaleOf } from '../../core/economy/OreGrade.js';
@@ -33,6 +31,8 @@ import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
 import { resolveContractOres, resolveScriptedOreSale } from '../../core/campaign/Level.js';
+import { saturationReader, oreSaturationTrend } from '../../core/economy/OreSaturation.js';
+import { oreContractBasePrice } from '../../core/economy/Market.js';
 import { buyerTierNameKey } from '../../core/economy/BuyerTiers.js';
 
 // ── finances command ──
@@ -150,7 +150,7 @@ export function contractCommand(
 
   switch (sub) {
     case 'list': {
-      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade);
+      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade, saturationReader(state.saturation, state.tickCount));
       ensureScriptedOreSale(state.contracts, resolveScriptedOreSale(state), resolveContractPriceMultiplier(state));
       if (state.contracts.available.length === 0) {
         return { success: true, output: t('ui.contracts.none') };
@@ -162,6 +162,22 @@ export function contractCommand(
           (c.buyerTier ? ` | buyer: ${t(buyerTierNameKey(c.buyerTier))}` : '') +
           ` | deadline: ${c.deadlineTicks} ticks | penalty: $${c.penaltyAmount}`,
         );
+      }
+      return { success: true, output: lines.join('\n') };
+    }
+
+    case 'market': {
+      if (state.grade === undefined) return { success: true, output: t('economy.contract.market_none') };
+      const read = saturationReader(state.saturation, state.tickCount);
+      const lines = [t('economy.contract.market_header')];
+      for (const ore of resolveContractOres(state)) {
+        const sat = read(ore);
+        const base = oreContractBasePrice(ore, state.contracts.market);
+        const trend = oreSaturationTrend(ore, sat, base);
+        lines.push(t('economy.contract.market_line', {
+          ore: t(`ore.${ore}.name`), pct: Math.round(sat * 100), trend: `${trend.pct > 0 ? '+' : ''}${trend.pct}`,
+          from: formatDollars(base), to: formatDollars(trend.price),
+        }));
       }
       return { success: true, output: lines.join('\n') };
     }
@@ -226,9 +242,7 @@ export function contractCommand(
       const delivery = deliverStoredOre(state.contracts, state.logistics, state.collectedOre, id, amount, state.tickCount, state.buildings.buildings, oreGradeScaleOf(state.world));
       if (!delivery.success) return { success: false, output: delivery.error };
       const result = delivery.data;
-      bookDeliveryCashflow(state, id, result, state.tickCount);
-      recordOreDelivery(state.grade, result.contractType, result.kg);
-      recordBoardOre(state.board, result.contractType, result.kg);
+      settleDelivery(state, { contractId: id, ...result }, state.tickCount, ctx.emitter);
       const msg = result.completed
         ? `Contract #${id} COMPLETED! Payment: $${result.payment.toFixed(2)}` +
           (result.bonus > 0 ? ` + early bonus: $${result.bonus.toFixed(2)}` : '')

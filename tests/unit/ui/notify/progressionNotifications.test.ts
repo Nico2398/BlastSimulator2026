@@ -78,4 +78,25 @@ describe('wireProgressionNotifications (#1926)', () => {
     emitter.fire('progression:grade_applied', { toGrade: 1, fee: 20_000 });
     expect(text(notified[1]!)).not.toBe(text(notified[0]!));
   });
+
+  it('ore_glut notifies once, naming the ore (#1930)', () => {
+    expect(emitter.has('progression:ore_glut')).toBe(true);
+    emitter.fire('progression:ore_glut', { oreId: 'dirtite', saturation: 0.5 });
+    expect(notified).toHaveLength(1);
+    expect(notified[0]!.body).toBe(t('notification.market.glut', { ore: t('ore.dirtite.name') }));
+    expect(notified[0]!.title).toBe(t('notification.title.market'));
+    expect(text(notified[0]!)).not.toMatch(/\{\w+\}|notification\./);
+  });
+
+  it('ore_glut text reads as the analysts line in English', () => {
+    emitter.fire('progression:ore_glut', { oreId: 'dirtite', saturation: 0.6 });
+    expect(notified[0]!.body).toMatch(/^Analysts blame you for the .+ glut\.$/);
+  });
+
+  it('ore_glut follows the active locale', () => {
+    emitter.fire('progression:ore_glut', { oreId: 'dirtite', saturation: 0.5 });
+    setLocale('fr');
+    emitter.fire('progression:ore_glut', { oreId: 'dirtite', saturation: 0.5 });
+    expect(notified[1]!.body).not.toBe(notified[0]!.body);
+  });
 });

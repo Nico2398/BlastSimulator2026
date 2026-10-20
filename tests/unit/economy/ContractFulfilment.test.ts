@@ -448,3 +448,115 @@ describe('bookDeliveryCashflow (#1892)', () => {
     expect(a.finances.transactions).toEqual([]);
   });
 });
+
+// ── settleDelivery: ore saturation (#1930) ──────────────────────────────────
+
+import { createGame } from '../../../src/core/state/GameState.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { settleDelivery, type AutoDelivery } from '../../../src/core/economy/ContractFulfilment.js';
+import { saturationAt } from '../../../src/core/economy/OreSaturation.js';
+
+function delivery(overrides: Partial<AutoDelivery> = {}): AutoDelivery {
+  return {
+    contractId: 1, kg: 10_000, materialId: 'dirtite', contractType: 'ore_sale',
+    payment: 100, bonus: 0, completed: false, fee: false, ...overrides,
+  };
+}
+
+function progressionGame() {
+  const state = createGame({ seed: 42 });
+  state.grade = createGradeState();
+  return state;
+}
+
+function glutEvents(emitter: EventEmitter): { oreId: string; saturation: number }[] {
+  const seen: { oreId: string; saturation: number }[] = [];
+  emitter.on('progression:ore_glut', p => seen.push(p));
+  return seen;
+}
+
+describe('deliverStoredOre carries the material (#1930)', () => {
+  it('reports the ore delivered', () => {
+    const contracts = stateWith(contract({ materialId: 'blingite' }));
+    const { logistics, collectedOre } = stockWith(300);
+    const r = deliverStoredOre(contracts, logistics, collectedOre, 1, 50, 10, []);
+    expect(r.success && r.data.materialId).toBe('blingite');
+  });
+
+  it('autoDeliverContracts tags each delivery with its material', () => {
+    const contracts = stateWith(contract({ materialId: 'blingite' }));
+    const { logistics, collectedOre } = stockWith(300);
+    const out = autoDeliverContracts(contracts, logistics, collectedOre, 10, []);
+    expect(out[0]!.materialId).toBe('blingite');
+  });
+});
+
+describe('settleDelivery saturation (#1930)', () => {
+  it('records an ore_sale delivery, creating the state lazily', () => {
+    const state = progressionGame();
+    expect(state.saturation).toBeUndefined();
+    settleDelivery(state, delivery(), 40);
+    expect(saturationAt(state.saturation!['dirtite'], 40)).toBeCloseTo(0.5, 9);
+  });
+
+  it('records a supply delivery', () => {
+    const state = progressionGame();
+    settleDelivery(state, delivery({ contractType: 'supply', kg: 4_000 }), 5);
+    expect(saturationAt(state.saturation!['dirtite'], 5)).toBeCloseTo(0.2, 9);
+  });
+
+  it('ignores rubble disposal', () => {
+    const state = progressionGame();
+    settleDelivery(state, delivery({ contractType: 'rubble_disposal', materialId: '', kg: 50_000 }), 5);
+    expect(state.saturation).toBeUndefined();
+  });
+
+  it('records nothing without a grade state (non-progression site)', () => {
+    const state = createGame({ seed: 42 });
+    settleDelivery(state, delivery(), 5);
+    expect(state.saturation).toBeUndefined();
+  });
+
+  it('uses the grade for market depth', () => {
+    const state = progressionGame();
+    state.grade!.grade = 1;
+    settleDelivery(state, delivery(), 0);
+    expect(state.saturation!['dirtite']!.level).toBeCloseTo(0.25, 9);
+  });
+
+  it('still books cashflow and ore counters', () => {
+    const state = progressionGame();
+    const cash = state.cash;
+    settleDelivery(state, delivery({ payment: 250 }), 5);
+    expect(state.cash).toBe(cash + 250);
+    expect(state.grade!.oreDeliveredKg).toBe(10_000);
+  });
+
+  it('emits progression:ore_glut once when crossing 50%', () => {
+    const state = progressionGame();
+    const emitter = new EventEmitter();
+    const seen = glutEvents(emitter);
+    settleDelivery(state, delivery({ kg: 8_000 }), 0, emitter);
+    expect(seen).toHaveLength(0);
+    settleDelivery(state, delivery({ kg: 4_000 }), 0, emitter);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.oreId).toBe('dirtite');
+    expect(seen[0]!.saturation).toBeCloseTo(0.6, 9);
+    settleDelivery(state, delivery({ kg: 1_000 }), 0, emitter);
+    expect(seen).toHaveLength(1);
+  });
+
+  it('emits nothing on a non-progression site or for rubble', () => {
+    const emitter = new EventEmitter();
+    const seen = glutEvents(emitter);
+    settleDelivery(createGame({ seed: 42 }), delivery({ kg: 50_000 }), 0, emitter);
+    settleDelivery(progressionGame(), delivery({ contractType: 'rubble_disposal', materialId: '', kg: 50_000 }), 0, emitter);
+    expect(seen).toHaveLength(0);
+  });
+
+  it('works without an emitter', () => {
+    const state = progressionGame();
+    expect(() => settleDelivery(state, delivery({ kg: 50_000 }), 0)).not.toThrow();
+  });
+});

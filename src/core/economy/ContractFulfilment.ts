@@ -7,6 +7,11 @@ import { addExpense, addIncome, type FinanceState } from './Finance.js';
 import { consumeStoredOre, type LogisticsState } from './Logistics.js';
 import { rubbleStockKg } from './SpoilHeaps.js';
 import type { ContractType } from './Contract.js';
+import type { GameState } from '../state/GameState.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
+import { recordOreDelivery } from './MineGrade.js';
+import { recordOreSale } from './OreSaturation.js';
+import { recordBoardOre } from './Board.js';
 import type { Building } from '../entities/Building.js';
 
 /** The slice of a building a rubble delivery reads and draws down: its spoil heap stock. */
@@ -17,6 +22,8 @@ type DeliveryResult<T> = { success: true; data: T } | { success: false; error: s
 /** What one delivery to one contract produced. */
 interface DeliveryOutcome {
   kg: number;
+  /** Ore delivered ('' for rubble); keys the per-ore market saturation (#1930). */
+  materialId?: string;
   /** Type of the contract delivered to: mine grades count ore_sale and supply kg only (#1921). */
   contractType: ContractType;
   payment: number;
@@ -27,7 +34,7 @@ interface DeliveryOutcome {
 }
 
 /** One automatic delivery, tagged with its contract. */
-interface AutoDelivery extends DeliveryOutcome {
+export interface AutoDelivery extends DeliveryOutcome {
   contractId: number;
 }
 
@@ -68,7 +75,7 @@ export function deliverStoredOre(
 
   const result = deliverMaterials(contracts, contractId, kg, tick);
   contract.paidTotal = (contract.paidTotal ?? 0) + result.payment;
-  return { success: true, data: { kg, contractType: contract.type, ...result, fee: isPaidClearance(contract) } };
+  return { success: true, data: { kg, materialId: contract.materialId, contractType: contract.type, ...result, fee: isPaidClearance(contract) } };
 }
 
 /**
@@ -117,4 +124,24 @@ export function bookDeliveryCashflow(
     account.cash += outcome.bonus;
     addIncome(account.finances, outcome.bonus, 'bonus', `Contract #${contractId} early bonus`, tick);
   }
+}
+
+/**
+ * Settle one delivery: book cashflow, count it toward mine grade and board ore, and record the
+ * ore's market saturation (#1930). The one place every delivery path calls.
+ */
+export function settleDelivery(
+  state: GameState,
+  delivery: AutoDelivery,
+  tick: number,
+  emitter?: EventEmitter,
+): void {
+  bookDeliveryCashflow(state, delivery.contractId, delivery, tick);
+  recordOreDelivery(state.grade, delivery.contractType, delivery.kg);
+  recordBoardOre(state.board, delivery.contractType, delivery.kg);
+  const oreId = delivery.materialId;
+  if (state.grade === undefined || delivery.contractType === 'rubble_disposal' || !oreId || !(delivery.kg > 0)) return;
+  state.saturation ??= {};
+  const sale = recordOreSale(state.saturation, oreId, delivery.kg, tick, state.grade.grade);
+  if (sale.crossed) emitter?.emit('progression:ore_glut', { oreId, saturation: sale.after });
 }
