@@ -103,3 +103,22 @@ describe('probe-config expandMatrix', () => {
     expect(expandMatrix({ ...PROBE_DEFAULTS, seeds: [] })).toEqual([]);
   });
 });
+
+describe('probe-config ladder strategies (#1945)', () => {
+  it('accepts ladder and stay_g1', () => {
+    expect(parseArgs(['--strategy', 'ladder,stay_g1']).strategies).toEqual(['ladder', 'stay_g1']);
+  });
+
+  it('rejects an unknown strategy naming the value', () => {
+    expect(() => parseArgs(['--strategy', 'ladder,warp'])).toThrow(/warp/);
+  });
+
+  it('accepts a long horizon', () => {
+    expect(parseArgs(['--horizon', '50000']).horizon).toBe(50000);
+  });
+
+  it('keeps the defaults for strategies and horizon', () => {
+    expect(PROBE_DEFAULTS.strategies).toEqual(['opening', 'reinvest']);
+    expect(PROBE_DEFAULTS.horizon).toBe(10000);
+  });
+});

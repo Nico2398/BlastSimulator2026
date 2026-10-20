@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MetricsObserver, fragmentOreKg } from '../../../scripts/shared/probe-metrics.js';
+import { CASH_SAMPLE_TICKS, MetricsObserver, fragmentOreKg } from '../../../scripts/shared/probe-metrics.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
 const small = { id: 1, volume: 0.1, oreDensities: { iron: 0.5 } };
@@ -80,5 +80,40 @@ describe('MetricsObserver', () => {
     expect(m.firstBlastSoldShareAt6000).toBeNull();
     expect(m.boulderSoldShare).toBeNull();
     expect(m.blastsFired).toBe(0);
+  });
+});
+
+describe('extended metrics (#1945)', () => {
+  it('samples cash at the extended ticks', () => {
+    expect([...CASH_SAMPLE_TICKS]).toEqual([1000, 3000, 6000, 10000, 15000, 25000, 40000, 50000]);
+    const obs = new MetricsObserver();
+    obs.onTick(synthetic({ tick: 1000 }));
+    const m = obs.finalize();
+    for (const t of [15000, 25000, 40000, 50000]) expect(m.cashAt).toHaveProperty(String(t), null);
+  });
+
+  it('records the cash held when each grade was first reached', () => {
+    const obs = new MetricsObserver();
+    const at = (tick: number, grade: number, cash: number) => {
+      const s = synthetic({ tick }) as unknown as { grade: { grade: number }; cash: number };
+      s.grade.grade = grade;
+      s.cash = cash;
+      obs.onTick(s as unknown as GameState);
+    };
+    at(10, 0, 500);
+    at(20, 1, 777);
+    at(30, 1, 999);
+    at(40, 2, 1234);
+    const m = obs.finalize();
+    expect(m.gradeCashAt).toEqual({ 1: 777, 2: 1234 });
+    expect(m.gradeReachedTick).toEqual({ 1: 20, 2: 40 });
+  });
+
+  it('leaves catalogBoughtTick null and boulderOreSoldShare null without a ladder or boulders', () => {
+    const obs = new MetricsObserver();
+    obs.onTick(synthetic({ tick: 5 }));
+    const m = obs.finalize();
+    expect(m.catalogBoughtTick).toBeNull();
+    expect(m.boulderOreSoldShare).toBeNull();
   });
 });
