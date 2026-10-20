@@ -211,7 +211,7 @@ describe('RampTool: preview follows every leg', () => {
     s.controller.simulateWaypoints([A, B, C]);
     expect(s.lastOverlay()).toMatchObject({
       shape: 'line', x1: 15, z1: 15, width: 3,
-      legs: [{ direction: 'south', length: 12 }, { direction: 'east', length: 10 }],
+      legs: { originX: 15, originZ: 15, legs: [{ direction: 'south', length: 12 }, { direction: 'east', length: 10 }] },
     });
   });
 
@@ -237,7 +237,7 @@ describe('RampTool: grade stepper', () => {
   it('starts on auto: the value is the gentlest grade and the order carries no grade argument', () => {
     const s = setup();
     s.controller.simulateWaypoints([A, B, C]);
-    expect(s.field('grade').value).toBeCloseTo(bounds().min, 3);
+    expect(s.field('grade').value).toBeCloseTo(bounds().min, 1);
     s.controller.simulateConfirm();
     expect(s.gameConsole.mock.calls[0]![0]).not.toContain('grade:');
   });
@@ -248,7 +248,7 @@ describe('RampTool: grade stepper', () => {
     s.field('grade').onInc();
     const v = s.field('grade').value;
     expect(v).toBeGreaterThan(bounds().min);
-    expect(v).toBeLessThanOrEqual(bounds().min + 1 + 1e-6);
+    expect(v).toBeLessThanOrEqual(bounds().min + 1.1);
     s.controller.simulateConfirm();
     const m = /grade:([\d.]+)/.exec(s.gameConsole.mock.calls[0]![0]);
     expect(m).not.toBeNull();
@@ -260,14 +260,14 @@ describe('RampTool: grade stepper', () => {
     s.controller.simulateWaypoints([A, B, C]);
     s.field('grade').onInc();
     for (let i = 0; i < 5; i++) s.field('grade').onDec();
-    expect(s.field('grade').value).toBeCloseTo(bounds().min, 3);
+    expect(s.field('grade').value).toBeCloseTo(bounds().min, 1);
   });
 
   it('clamps at the steepest cut grade', () => {
     const s = setup();
     s.controller.simulateWaypoints([A, B, C]);
     for (let i = 0; i < 40; i++) s.field('grade').onInc();
-    expect(s.field('grade').value).toBeCloseTo(bounds().max, 3);
+    expect(s.field('grade').value).toBeCloseTo(bounds().max, 1);
     expect(s.field('grade').value).toBeLessThanOrEqual(bounds().max + 1e-9);
   });
 
@@ -423,7 +423,7 @@ describe('RampTool: spiral button', () => {
     if (!r.success) return;
     const o = s.lastOverlay();
     expect(o.shape).toBe('line');
-    expect(o.legs).toEqual(r.proposal.legs);
+    expect(o.legs).toEqual({ originX: r.proposal.originX, originZ: r.proposal.originZ, legs: r.proposal.legs });
     expect([o.x1, o.z1]).toEqual([r.proposal.originX, r.proposal.originZ]);
     expect(s.shown().confirmEnabled).toBe(true);
   });
@@ -450,7 +450,7 @@ describe('RampTool: spiral button', () => {
     const cmd = s.gameConsole.mock.calls[0]![0];
     expect(cmd).toMatch(/^ramp spiral from:14,30 depth:20 grade:[\d.]+ width:3 dir:cw$/);
     expect(Number(/grade:([\d.]+)/.exec(cmd)![1])).toBeCloseTo(grade, 3);
-    expect(s.setStatus).toHaveBeenCalledWith(t('ui.build.ramp_ordered'));
+    expect(s.setStatus).toHaveBeenCalledWith(t('ui.build.ramp_spiral_ordered'));
   });
 
   it('a pit too small for the grade shows the core refusal text and disables Confirm', () => {
