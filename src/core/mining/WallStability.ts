@@ -8,6 +8,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { computeVoxelColumnSurfaceY, SURFACE_BAND_HALF } from '../world/VoxelGrid.js';
 import { getSafeFaceHeightM } from '../world/RockCatalog.js';
 import type { BlastRegion } from './BlastExecution.js';
+import type { BlastPlan } from './BlastPlan.js';
 import {
   WALL_SAFE_FACE_HEIGHT_M_BY_TIER,
   WALL_BERM_MIN_WIDTH_M,
@@ -44,6 +45,41 @@ export interface SlumpReport {
   /** Voxel rows touched, for the terrain:updated region. */
   minY: number;
   maxY: number;
+}
+
+/**
+ * Read-only terrain view the face scan walks. The built grid and a predicted post-blast
+ * surface both satisfy it, so the scan serves the slump pass and the preview alike.
+ */
+export interface WallSurface {
+  /** Top voxel row of the column, or null outside the grid. */
+  topAt(x: number, z: number): number | null;
+  /** Dominant rock id of a voxel ('' when empty). */
+  rockAt(x: number, y: number, z: number): string;
+}
+
+/** WallSurface over a built grid. */
+export function gridSurface(_grid: VoxelGrid): WallSurface {
+  return undefined as unknown as WallSurface; // TODO: implement
+}
+
+/** A face the preview predicts, with the rock that limits it and its height over safe height. */
+export interface PredictedFace {
+  face: WallFace;
+  /** Rock id of the weakest wall voxel. */
+  rockId: string;
+  /** face.heightM / face.safeM. */
+  ratio: number;
+}
+
+/** Faces within `region` whose height is at least `minRatio` of their safe height (default WALL_WARN_RATIO). */
+export function findFacesAtRisk(_surface: WallSurface, _region: BlastRegion, _minRatio?: number): PredictedFace[] {
+  return []; // TODO: implement
+}
+
+/** Faces the armed plan would leave at or over the warning ratio once it fires. */
+export function predictWallFaces(_plan: BlastPlan, _grid: VoxelGrid, _wetHoleIds?: ReadonlySet<string>): PredictedFace[] {
+  return []; // TODO: implement
 }
 
 const DIRECTIONS: ReadonlyArray<{ dx: number; dz: number }> = [

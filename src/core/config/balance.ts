@@ -3316,3 +3316,5 @@ export const WALL_SLUMP_ROCK_DENSITY_KG_M3 = 2500;
 export const WALL_SLOPE_WALK_MAX_M = 256;
 /** Margin (m) around the toe columns inside which a slump hurts buildings, vehicles and employees. */
 export const WALL_SLUMP_TOE_ZONE_MARGIN_M = 1;
+/** Face height / safe height at which the preview starts warning (amber); above 1 it is red. */
+export const WALL_WARN_RATIO = 0.8;

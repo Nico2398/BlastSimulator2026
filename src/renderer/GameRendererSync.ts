@@ -28,6 +28,7 @@ import { resolveMarketId } from '../core/campaign/Level.js';
 import { columnOreValuePerM3 } from '../core/mining/BlastValueEstimate.js';
 import { isSurveyStale } from '../core/mining/SurveyStaleness.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
+import type { WallFace } from '../core/mining/WallStability.js';
 
 /**
  * Every GameRenderer field syncGameRendererEntities() reads or writes,
@@ -301,4 +302,12 @@ export function syncSurveyOverlay(
   } else {
     overlay.hide();
   }
+}
+
+/**
+ * Faces the armed blast plan is predicted to leave tall, for the wall overlay (#1943).
+ * Empty when no plan is armed or no grid exists.
+ */
+export function buildWallOverlayFaces(_state: GameState, _grid: VoxelGrid | null): WallFace[] {
+  return []; // TODO: implement
 }
