@@ -303,7 +303,7 @@
     {
       "command": "blast detonate",
       "timeout": 330,
-      "description": "DETONATE arms the shot and evacuates. Rain refills the holes; once the zone is clear the sequence holds: the modal stays open in the held phase with Cancel and Blast anyway.",
+      "description": "DETONATE arms the shot and the crew evacuates.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -316,14 +316,35 @@
         {
           "type": "clickSelector",
           "selector": "[data-action=\"preflight-detonate\"]"
-        },
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:dangerZoneClear equals:true max_ticks:1500",
+      "timeout": 330,
+      "description": "Evacuation completes; rain refills the holes meanwhile.",
+      "interaction": [
         {
           "type": "waitUntil",
           "field": "dangerZoneClear",
           "equals": true,
           "maxTicks": 1500,
           "timeoutMs": 300000
-        },
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "dangerZoneClear": true
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 90,
+      "description": "Zone clear with water-sensitive charges in flooded holes: the modal stays open in the held phase with Cancel and Blast anyway.",
+      "interaction": [
         {
           "type": "waitForSelector",
           "selector": "[data-role=\"preflight-waiting\"][data-phase=\"held\"]",
