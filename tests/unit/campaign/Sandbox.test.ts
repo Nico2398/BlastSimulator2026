@@ -20,10 +20,10 @@ import {
   resolveSandboxKitId,
 } from '../../../src/core/campaign/Sandbox.js';
 import { isValidOreGradeScale } from '../../../src/core/economy/OreGrade.js';
-import { getLevel } from '../../../src/core/campaign/Level.js';
+import { getLevel, getAllLevels } from '../../../src/core/campaign/Level.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
-import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE } from '../../../src/core/config/balance.js';
+import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE, SANDBOX_ORE_GRADE_SCALE, ORE_GRADE_SCALE_DEFAULT } from '../../../src/core/config/balance.js';
 import { resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
 import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 
@@ -734,5 +734,28 @@ describe('sandbox market (#1681)', () => {
     expect(resolveMarketId(state)).toBe('production');
     delete state.contracts.market;
     expect(resolveMarketId(state)).toBe('legacy');
+  });
+});
+
+describe('sandbox ore grade scale (#1944)', () => {
+  it('sandboxLevelDef carries SANDBOX_ORE_GRADE_SCALE for every kit', () => {
+    for (const kit of SANDBOX_KIT_ORDER) {
+      expect(sandboxLevelDef(clampSandboxConfig({ kit })).oreGradeScale, kit).toBe(SANDBOX_ORE_GRADE_SCALE);
+    }
+  });
+
+  it('SANDBOX_ORE_GRADE_SCALE is positive and strictly thinner than the default', () => {
+    expect(SANDBOX_ORE_GRADE_SCALE).toBeGreaterThan(0);
+    expect(SANDBOX_ORE_GRADE_SCALE).toBeLessThan(ORE_GRADE_SCALE_DEFAULT);
+  });
+
+  it('SANDBOX_ORE_GRADE_SCALE is a valid scale', () => {
+    expect(isValidOreGradeScale(SANDBOX_ORE_GRADE_SCALE)).toBe(true);
+  });
+
+  it('campaign levels leave oreGradeScale undefined', () => {
+    const campaign = getAllLevels().filter(l => l.id !== SANDBOX_LEVEL_ID);
+    expect(campaign.length).toBeGreaterThan(0);
+    for (const level of campaign) expect(level.oreGradeScale, level.id).toBeUndefined();
   });
 });
