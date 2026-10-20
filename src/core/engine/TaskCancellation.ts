@@ -214,6 +214,12 @@ function refundOrderStock(state: GameState, action: PendingAction): { restockedK
  * omits this option and keeps the pin's existing retry-same-employee semantics
  * unchanged — appropriate for their softer, first-strike interruptions of a
  * destination that may still resolve.
+ *
+ * `actionId` is normally the employee's active action, but callers fed by
+ * reconcileVehicleReservations may pass a reserved-ahead action that only sits
+ * in `employee.taskQueue` (#2017). That id is dropped from the queue and
+ * released to the open pool; the employee's real active action, walk fields
+ * and interruptedActionPayload are left untouched.
  */
 /**
  * True when a different alive, uninjured, genuinely idle employee (not mid-
@@ -267,6 +273,18 @@ export function interruptActiveAction(
   actionId: number | null,
   options?: { forceOpenPool?: boolean },
 ): void {
+  if (
+    actionId !== null
+    && actionId !== employee.activeActionId
+    && employee.taskQueue.includes(actionId)
+  ) {
+    // #2017: queued-ahead action, not the active one — release only it.
+    employee.taskQueue = employee.taskQueue.filter(id => id !== actionId);
+    const queued = state.pendingActions.find(a => a.id === actionId);
+    if (queued) releaseActionToOpenPool(state, queued);
+    return;
+  }
+
   if (actionId !== null) {
     const action = state.pendingActions.find(a => a.id === actionId);
     if (action) {

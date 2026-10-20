@@ -788,6 +788,8 @@ export function reconcileVehicleReservations(state: GameState): VehicleGoneInter
   // (c): a vehicle-gated action still claimed, still pre-work-timer, whose
   // reserved vehicle no longer exists at all — can't be caught by iterating
   // vehicles (there's nothing left to iterate), so walk actions instead.
+  // The reported action may be a non-active, queued-ahead one in the holder's
+  // taskQueue (#2017); interruptActiveAction releases just that action.
   const interruptions: VehicleGoneInterruption[] = [];
   for (const action of state.pendingActions) {
     if (action.requiredVehicleRole === null) continue;
