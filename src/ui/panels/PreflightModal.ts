@@ -21,7 +21,7 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { assembleBlastPlan, buildingsInBlastReach, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
-import { isHazardRating } from '../../core/mining/BlastDryRun.js';
+import { isHazardRating } from '../../core/mining/BlastRatingCaps.js';
 import type { BlastPreviewSummary } from '../../core/mining/Software.js';
 import { totalChargeKg } from '../../core/mining/BlastCalc.js';
 import { oreEstimateView, oreValueColor, oreValueText } from './oreEstimateDisplay.js';

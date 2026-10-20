@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { dryRunBlast, isHazardRating } from '../../../src/core/mining/BlastDryRun.js';
+import { dryRunBlast } from '../../../src/core/mining/BlastDryRun.js';
+import { isHazardRating } from '../../../src/core/mining/BlastRatingCaps.js';
 import { executeBlast, buildBlastReport, type BlastRating } from '../../../src/core/mining/BlastExecution.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
@@ -9,7 +10,7 @@ import { buildWallGrid, standardShot } from '../../helpers/wallWarningFixture.js
 import { vec3 } from '../../../src/core/math/Vec3.js';
 import type { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); });
 
 const GROUND = 1;
 const NO_WET: ReadonlySet<string> = new Set();

@@ -21,10 +21,10 @@ function open(tier: number, rating: BlastRating | null): PreflightModal {
     tier,
     energy: { affectedVoxels: 10, minEnergy: 1, maxEnergy: 5 },
     fragments: tier >= 2 ? { fractured: 5, cracked: 1, unaffected: 0, avgFragmentSizeCm: 40 } : null,
-    projections: tier >= 3
+    projections: tier >= 3 && rating
       ? {
         projectionZoneVoxels: 1, collapseFragments: 0,
-        ...(rating ? { predictedRating: rating, thrownFragments: 3, totalFragments: 10, thrownShare: 0.3, furthestThrowM: 13 } : {}),
+        predictedRating: rating, thrownFragments: 3, totalFragments: 10, thrownShare: 0.3, furthestThrowM: 13,
       }
       : null,
     vibrations: null,
@@ -59,6 +59,14 @@ describe('PreflightModal predicted rating row', () => {
     const modal = open(3, 'catastrophic');
     const btn = modal.root.querySelector('[data-action="preflight-detonate"]') as HTMLButtonElement;
     const quiet = open(3, 'good').root.querySelector('[data-action="preflight-detonate"]') as HTMLButtonElement;
-    expect(btn.disabled).toBe(quiet.disabled);
+    expect(btn.disabled).toBe(false);
+    expect(quiet.disabled).toBe(false);
+  });
+
+  it('predicted line shows rating, thrown share and furthest throw', () => {
+    const text = open(3, 'good').root.textContent!;
+    expect(text).toContain(t('ui.blast_workshop.preflight.predicted_rating', { rating: t('blast.rating.good') }));
+    expect(text).toContain(t('ui.blast_workshop.preflight.predicted_thrown_share', { share: 30 }));
+    expect(text).toContain(t('ui.blast_workshop.preflight.predicted_furthest_throw', { metres: 13 }));
   });
 });

@@ -222,8 +222,10 @@ describe('PreviewStep — blast outcome rows (#1968)', () => {
     step.update(withForecast(2));
     const text = step.root.textContent!;
     expect(text).toContain(t('ui.blast_workshop.preview.row_predicted_rating'));
-    expect(text).toContain('Requires T3');
+    expect(text.split('Requires T3').length - 1).toBe(3);
     expect(text).not.toContain('25%');
+    expect(text).not.toContain(t('blast.rating.bad'));
+    expect(text).not.toMatch(/14 m/);
   });
 
   it('relabels the fragments row as voxels cleared', () => {

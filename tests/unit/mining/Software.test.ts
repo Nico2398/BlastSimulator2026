@@ -17,6 +17,7 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { vec3 } from '../../../src/core/math/Vec3.js';
 import { executeBlast, buildBlastReport } from '../../../src/core/mining/BlastExecution.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
+import { buildWallGrid, standardShot } from '../../helpers/wallWarningFixture.js';
 import { readFileSync } from 'node:fs';
 
 const holeCounter = { nextHoleId: 1 };
@@ -295,6 +296,14 @@ describe('Software — previewFragments vs the real blast (#1968)', () => {
     const b = makeTestPlan();
     const preview = previewFragments(a.plan, a.grid, 2)!;
     expect(preview.fracturedCount).toBe(executeBlast(b.plan, b.grid, [], 1)!.clearedVoxels);
+  });
+
+  it('fracturedCount equals clearedVoxels on the wall/crater fixture', () => {
+    const plan = standardShot().plan;
+    const preview = previewFragments(plan, buildWallGrid({ plateauTop: 20 }), 2)!;
+    const real = executeBlast(plan, buildWallGrid({ plateauTop: 20 }), [], 1)!;
+    expect(real.clearedVoxels).toBeGreaterThan(0);
+    expect(preview.fracturedCount).toBe(real.clearedVoxels);
   });
 });
 

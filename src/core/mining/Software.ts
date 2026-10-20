@@ -109,6 +109,7 @@ export interface BlastPreviewSummary {
     thrownShare: number;
     furthestThrowM: number;
   } | null;
+  /** affectedVillages = villages measured (all level villages), not only those above the felt floor. */
   vibrations: { maxVibration: number; affectedVillages: number } | null;
 }
 
@@ -174,7 +175,11 @@ export function previewEnergy(
   return { energyMap, maxEnergy, minEnergy: minEnergy === Infinity ? 0 : minEnergy };
 }
 
-/** Preview fragmentation quality. Requires software tier >= 2. */
+/**
+ * Preview fragmentation quality. Requires software tier >= 2.
+ * `fracturedCount` is the blast's cleared-voxel count (the same pass executeBlast runs), not the
+ * energy-test count; `avgFragmentSize` still averages the energy-test fractured voxels.
+ */
 export function previewFragments(
   plan: BlastPlan,
   grid: VoxelGrid,

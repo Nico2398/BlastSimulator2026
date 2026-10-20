@@ -210,8 +210,6 @@ export function blastPreviewCommand(
     lines.push('--- Vibrations ---');
     lines.push(`  Max vibration: ${vibrationPreview.maxVibration.toFixed(4)}`);
     const felt = vibrationPreview.villages.filter(v => v.vibration >= VILLAGE_VIBRATION_FLOOR_MM_S).length;
-    lines.push(`  Villages measured: ${vibrationPreview.villages.length}`);
-    lines.push(`  Villages felt (>= floor): ${felt}`);
     lines.push(`  Affected villages: ${vibrationPreview.villages.length} measured, ${felt} above ${VILLAGE_VIBRATION_FLOOR_MM_S} mm/s`);
   } else {
     lines.push('--- Vibrations --- [Requires software tier 4]');

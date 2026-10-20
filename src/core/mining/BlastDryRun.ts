@@ -49,7 +49,3 @@ export function dryRunBlast(
   };
 }
 
-/** True for ratings that count as a hazard: 'bad' or 'catastrophic'. */
-export function isHazardRating(rating: BlastRating): boolean {
-  return rating === 'bad' || rating === 'catastrophic';
-}
