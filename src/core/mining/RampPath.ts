@@ -338,6 +338,7 @@ export function firstOccupiedPathTile(
 
 /** Snaps `to` onto the cardinal axis of `from` it is furthest along (ties go to z, as `rampDefFromEndpoints`). */
 export function snapToCardinal(from: { x: number; z: number }, to: { x: number; z: number }): { x: number; z: number } {
-  void from; void to;
-  throw new Error('not implemented');
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  return Math.abs(dz) >= Math.abs(dx) ? { x: from.x, z: to.z } : { x: to.x, z: from.z };
 }

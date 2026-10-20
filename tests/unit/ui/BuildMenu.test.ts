@@ -483,7 +483,7 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     it('no surface sampler registered: no foot line and the strip still renders', () => {
       const { shown } = armRampOver(null);
       expect(shown().subtitle).toBe('');
-      expect(shown().fields.map((f: { key: string }) => f.key)).toEqual(['depth', 'width']);
+      expect(shown().fields.map((f: { key: string }) => f.key)).toEqual(['depth', 'width', 'grade']);
     });
 
     it('stepping the depth to a miss swaps the snapped line for the miss line live', () => {

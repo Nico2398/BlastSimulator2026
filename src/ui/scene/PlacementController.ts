@@ -15,6 +15,7 @@ import {
   getPickerRegion, regionAccepts, regionContains, liveArea, type TileRegion,
 } from '../tutorialPickerRegion.js';
 import type { ClaimRefusalReason } from '../../core/world/PlayableArea.js';
+import { snapToCardinal } from '../../core/mining/RampPath.js';
 
 /** Right-click drift tolerance (px) while the tutorial guides a placement. */
 export const GUIDED_RIGHT_CLICK_TOLERANCE_PX = 40;
@@ -22,7 +23,7 @@ export const GUIDED_RIGHT_CLICK_TOLERANCE_PX = 40;
 export type PlacementShape = 'rect' | 'line' | 'point' | 'path';
 
 /** A grid tile. */
-export interface Tile { x: number; z: number }
+interface Tile { x: number; z: number }
 export type PlacementPhase = 'idle' | 'armed' | 'hovering' | 'dragging' | 'selected' | 'confirmed';
 
 export interface PlacementSelection {
@@ -67,6 +68,10 @@ export class PlacementController {
   private hoverTile: { x: number; z: number } | null = null;
   private anchor: { x: number; z: number } | null = null;
   private current: { x: number; z: number } | null = null;
+  /** Corner tiles of the 'path' shape, first click first; later ones are snapped onto the previous one's axis. */
+  private points: Tile[] = [];
+  /** The pointer went down on the path's first waypoint and has not come up: releasing elsewhere adds the second. */
+  private draggingFirstWaypoint = false;
 
   /** Tile the pointer is over that the active region refuses, or null. Drives the red cell and the strip's reason line. */
   private blockedTile: { x: number; z: number } | null = null;
@@ -133,9 +138,23 @@ export class PlacementController {
   get currentPhase(): PlacementPhase { return this.phase; }
   get currentShape(): PlacementShape { return this.shape; }
   /** Corner tiles of the path being drawn in 'path' shape, in order. */
-  get waypoints(): readonly Tile[] { return []; }
-  /** Drops the last waypoint of the path being drawn. */
-  popWaypoint(): void { /* TODO: implement */ }
+  get waypoints(): readonly Tile[] { return this.points; }
+  /** Drops the last waypoint of the path being drawn; with none left the tool is back to waiting for a first click. */
+  popWaypoint(): void {
+    if (this.shape !== 'path' || this.points.length === 0) return;
+    this.points = this.points.slice(0, -1);
+    const first = this.points[0];
+    if (first === undefined) {
+      this.anchor = null;
+      this.current = null;
+      this.phase = 'armed';
+    } else {
+      this.anchor = first;
+      this.current = this.points[this.points.length - 1]!;
+      this.phase = 'selected';
+    }
+    this.notify();
+  }
   /** True through the whole armed lifecycle, including the 220ms confirm flash — camera remap and ScenePicking suppression only release at disarm(). */
   get isArmed(): boolean { return this.phase !== 'idle'; }
   get hoveredTile(): { x: number; z: number } | null { return this.hoverTile; }
@@ -180,6 +199,10 @@ export class PlacementController {
       return { x1: r.x1, z1: r.z1, x2: r.x2, z2: r.z2 };
     }
     const cur = this.current ?? this.anchor;
+    if (this.shape === 'path') {
+      const last = this.phase === 'dragging' && this.points.length === 1 ? snapToCardinal(this.anchor, cur) : cur;
+      return { x1: this.anchor.x, z1: this.anchor.z, x2: last.x, z2: last.z };
+    }
     if (this.shape === 'rect') {
       return {
         x1: Math.min(this.anchor.x, cur.x), z1: Math.min(this.anchor.z, cur.z),
@@ -208,6 +231,8 @@ export class PlacementController {
     this.claimRefusalReason = null;
     this.footprintCheck = null;
     this.footprintCheckFailed = false;
+    this.points = [];
+    this.draggingFirstWaypoint = false;
     // A guided step drops the pre-fill entirely. The survey panel pre-fills the
     // middle of the map, which sits outside every guided region — so the strip
     // opened showing a tile the step would never accept and a Confirm that was
@@ -235,6 +260,8 @@ export class PlacementController {
     this.footprintCheckFailed = false;
     this.anchor = null;
     this.current = null;
+    this.points = [];
+    this.draggingFirstWaypoint = false;
     this.region = null;
     this.cameraController.setArmedRemap(false);
     this.onArmedStateHandler?.(false);
@@ -295,6 +322,11 @@ export class PlacementController {
     this.footprintCheckFailed = footprintCheckFailed;
     this.anchor = { x: x1, z: z1 };
     this.current = { x: x2, z: z2 };
+    if (this.shape === 'path') {
+      const end = snapToCardinal(this.anchor, this.current);
+      this.points = end.x === x1 && end.z === z1 ? [this.anchor] : [this.anchor, end];
+      this.current = this.points[this.points.length - 1]!;
+    }
     this.phase = 'selected';
     this.notify();
   }
@@ -404,10 +436,35 @@ export class PlacementController {
       return;
     }
 
+    if (this.shape === 'path') {
+      this.pathMouseDown(tile);
+      return;
+    }
+
     // From 'selected', a fresh mousedown anywhere starts a new rectangle/line rather than editing the old one.
     this.anchor = tile;
     this.current = tile;
     this.phase = 'dragging';
+    this.notify();
+  }
+
+  /** A click in 'path' shape: the first tile starts the path (and a drag from it ends it), each later one adds a corner snapped to the previous axis. */
+  private pathMouseDown(tile: Tile): void {
+    const last = this.points[this.points.length - 1];
+    if (last === undefined) {
+      this.points = [tile];
+      this.anchor = tile;
+      this.current = tile;
+      this.draggingFirstWaypoint = true;
+      this.phase = 'dragging';
+      this.notify();
+      return;
+    }
+    const next = snapToCardinal(last, tile);
+    if (next.x === last.x && next.z === last.z) return;
+    this.points = [...this.points, next];
+    this.current = next;
+    this.phase = 'selected';
     this.notify();
   }
 
@@ -433,7 +490,15 @@ export class PlacementController {
     if (e.button !== 0) return;
     if (this.phase !== 'dragging') return;
     const tile = this.tileUnderCursor(e);
-    if (tile) this.current = tile;
+    if (this.shape === 'path') {
+      const first = this.points[0];
+      if (this.draggingFirstWaypoint && this.points.length === 1 && first !== undefined && tile) {
+        const end = snapToCardinal(first, tile);
+        if (end.x !== first.x || end.z !== first.z) this.points = [first, end];
+      }
+      this.draggingFirstWaypoint = false;
+      this.current = this.points[this.points.length - 1] ?? null;
+    } else if (tile) this.current = tile;
     this.phase = 'selected';
     this.notify();
   }
@@ -459,6 +524,10 @@ export class PlacementController {
       this.cancel();
     }
     else if (e.key === 'Enter' && this.phase === 'selected') this.confirm();
+    else if (e.key === 'Backspace' && this.shape === 'path' && this.points.length > 0) {
+      e.preventDefault();
+      this.popWaypoint();
+    }
   }
 
   private notify(): void {

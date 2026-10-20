@@ -4,7 +4,7 @@
 // Mirrors BuildMenu.test.ts's makeMockKit(), extended with the 'path' shape's waypoints. The tool only
 // collects clicks: every length, cost, grade and refusal asserted here comes from the core helpers.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { RampTool } from '../../../src/ui/RampTool.js';
 import { describeRampPlan } from '../../../src/ui/describeRamp.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';

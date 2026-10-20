@@ -36,9 +36,9 @@ export interface ParamStripConfig {
    * knew about reached the screen as nothing at all.
    */
   confirmDisabledReason?: string | undefined;
-  /** Extra readout lines shown beside RESULT (e.g. ramp length, grade). */
+  /** Extra readout lines shown above the bar, under the refusal reason (e.g. ramp length, grade, climbing tiers). */
   readout?: string[];
-  /** Extra buttons on the strip (e.g. undo last leg). */
+  /** Extra buttons on the strip, before Confirm (e.g. undo last leg); each carries data-action=key. */
   actions?: { key: string; label: string; onClick: () => void; disabled?: boolean }[];
   /** Chip text above the strip while armed, e.g. "Drag across the bench to lay out drill holes". */
   instruction: string;
@@ -49,6 +49,7 @@ export class ParamStrip {
   private readonly chip: HTMLElement;
   private readonly bar: HTMLElement;
   private readonly reasonEl: HTMLElement;
+  private readonly readoutEl: HTMLElement;
   private onConfirmHandler: (() => void) | null = null;
   private onCancelHandler: (() => void) | null = null;
   private lastSignature = '';
@@ -90,11 +91,18 @@ export class ParamStrip {
       'max-width:520px', 'text-align:center', 'pointer-events:none',
     ].join(';');
 
+    this.readoutEl = el('div', { attrs: { id: 'bs-param-strip-readout' } });
+    this.readoutEl.style.cssText = [
+      'display:none', 'flex-direction:column', 'align-items:center', 'gap:2px', 'padding:5px 12px', 'border-radius:5px',
+      'background:rgba(9,12,16,.9)', 'border:1px solid rgba(255,200,64,.3)',
+      'color:var(--bsx-text-primary,#e6e9ee)', 'font:600 11px/1.3 var(--bsx-font-mono)', 'pointer-events:none',
+    ].join(';');
+
     // Above the bar, not below it: the strip is bottom-docked and the tutorial
     // coach card sits directly under it, so a line appended below is drawn
     // half-behind the card — which is how a reason that exists can still fail
     // to reach the player.
-    this.root.append(this.chip, this.reasonEl, this.bar);
+    this.root.append(this.chip, this.readoutEl, this.reasonEl, this.bar);
     container.appendChild(this.root);
   }
 
@@ -108,6 +116,7 @@ export class ParamStrip {
       fields: config.fields.map(f => [f.key, f.value]),
       result: config.result, warn: config.resultWarn, confirm: config.confirmEnabled,
       reason: config.confirmDisabledReason, instr: config.instruction,
+      readout: config.readout, actions: config.actions?.map(a => [a.key, a.label, a.disabled]),
     });
     if (sig === this.lastSignature) return;
     this.lastSignature = sig;
@@ -175,9 +184,16 @@ export class ParamStrip {
     });
     confirmBtn.id = 'bs-tile-select-confirm'; // preserved id — every scenario def targeting the old 2D picker's Confirm keeps resolving
     const escBtn = button('ghost', t('shell.placement.esc'), { dataAction: 'cancel', onClick: () => this.onCancelHandler?.() });
-    actions.append(confirmBtn, escBtn);
+    const extraBtns = (config.actions ?? []).map(a => button('ghost', a.label, {
+      dataAction: a.key, onClick: a.onClick, ...(a.disabled ? { disabled: true } : {}),
+    }));
+    actions.append(...extraBtns, confirmBtn, escBtn);
 
     this.bar.replaceChildren(titleBlock, ...fieldEls, resultBlock, actions);
+
+    const lines = config.readout ?? [];
+    this.readoutEl.replaceChildren(...lines.map(text => el('span', { text })));
+    this.readoutEl.style.display = lines.length > 0 ? 'flex' : 'none';
 
     const reason = !config.confirmEnabled ? config.confirmDisabledReason : undefined;
     this.reasonEl.textContent = reason ?? '';

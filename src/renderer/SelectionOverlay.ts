@@ -18,7 +18,7 @@ import { GroundTintLayer, buildConformingRing, type GroundTintPatch, type Surfac
 import type { RampWidth } from '../core/config/balance.js';
 import { buildRampArrow, RAMP_ARROW_COLOR } from './RampArrow.js';
 import { rampDefFromEndpoints } from '../core/mining/Ramp.js';
-import type { RampDirection } from '../core/mining/RampPath.js';
+import { rampTotalLength, type RampLeg } from '../core/mining/RampPath.js';
 
 const COLOR_SELECTION = 0xffc840;
 const COLOR_PINNED = 0x7ab8ff;
@@ -61,8 +61,8 @@ export interface OverlayLineUpdate {
   width?: RampWidth;
   /** The order would be refused — the ramp previews in the refusal colour. */
   refused?: boolean;
-  /** Multi-leg path: the preview follows every leg from (x1, z1) instead of the straight drag. */
-  legs?: ReadonlyArray<{ direction: RampDirection; length: number }>;
+  /** A multi-leg path to draw instead of the straight line; the legs start at (originX, originZ). */
+  legs?: { originX: number; originZ: number; legs: RampLeg[] };
 }
 
 export interface OverlayPointUpdate {
@@ -247,7 +247,10 @@ export class SelectionOverlay {
    * anchor tile.
    */
   private buildLine(u: OverlayLineUpdate): void {
-    const ramp = { ...rampDefFromEndpoints(u.x1, u.z1, u.x2, u.z2, 0), ...(u.width !== undefined && { width: u.width }) };
+    const base = u.legs && u.legs.legs.length > 0
+      ? { originX: u.legs.originX, originZ: u.legs.originZ, direction: u.legs.legs[0]!.direction, length: rampTotalLength(u.legs.legs), legs: u.legs.legs }
+      : rampDefFromEndpoints(u.x1, u.z1, u.x2, u.z2, 0);
+    const ramp = { ...base, ...(u.width !== undefined && { width: u.width }) };
     const arrow = buildRampArrow(ramp, this.sampler, { color: u.refused ? COLOR_BLOCKED : RAMP_ARROW_COLOR });
     this.group.add(arrow ?? this.makeHoleMarker(u.x1, u.z1));
   }
