@@ -739,6 +739,21 @@ describe('running several issues at once', () => {
       expect(rules.claimsConflict(claim('panels'), claim('crew'))).toBe(false);
     });
 
+    // 20 Oct 2026: `src/core/mining` sat inside `scope:nav`, so a live
+    // wall-stability run kept a ramp fix, an explosives-supply fix and two blast
+    // fixes waiting with no file in common. Its three areas share no parent.
+    it('runs the mining areas beside each other and beside `scope:nav`', () => {
+      const claim = (scope: string) => rules.scopeClaim({ labels: [`scope:${scope}`] });
+      const mining = ['blast', 'terrain', 'survey'];
+      for (const a of mining) {
+        expect(rules.claimsConflict(claim(a), claim(a))).toBe(true);
+        expect(rules.claimsConflict(claim(a), claim('nav'))).toBe(false);
+        expect(rules.SCOPE_PARENTS, a).not.toHaveProperty(a);
+        for (const b of mining) if (a !== b) expect(rules.claimsConflict(claim(a), claim(b))).toBe(false);
+      }
+      expect(rules.isWideClaim(claim('blast'))).toBe(false);
+    });
+
     it('calls a claim wide when it runs alone or declares a parent scope', () => {
       const wide = (...labels: string[]) => rules.isWideClaim(rules.scopeClaim({ labels }));
       expect(wide('scope:global')).toBe(true);
@@ -996,7 +1011,7 @@ describe('which scopes a live run holds', () => {
     expect(holders.nav).toBe(1283);
     expect(holders.pipeline).toBe(1283);
     expect(free(holders)).toEqual([
-      'economy', 'world', 'ui', 'hud', 'panels', 'workshop', 'scene', 'tutorial', 'screens',
+      'blast', 'terrain', 'survey', 'economy', 'world', 'ui', 'hud', 'panels', 'workshop', 'scene', 'tutorial', 'screens',
       'renderer', 'console', 'scenarios',
     ]);
   });

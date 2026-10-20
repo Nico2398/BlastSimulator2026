@@ -73,13 +73,13 @@ const DEFAULT_MAX_PARALLEL_RUNS = 1;
  * any two adjacent PRs. A scope is a hint that makes collisions rare, never a
  * guarantee that makes them impossible.
  *
- * Coarse on purpose, with one exception. A finer grid invites mislabelling, and
+ * Coarse on purpose, with a few exceptions. A finer grid invites mislabelling, and
  * a wrong label costs a conflict round. Files every area touches — `balance.ts`,
  * the locale files, `main.ts`, `GameState.ts`, `TickPipeline.ts` — belong to no scope; the gate is
  * what handles them. A change that genuinely spans many areas says so with
  * `scope:global`, which runs alone.
  *
- * The exceptions are `src/ui` and the simulation core. On 4 Oct 2026 more than
+ * The exceptions are `src/ui`, the simulation core and `src/core/mining`. On 4 Oct 2026 more than
  * half of the 65 `ready` issues carried `scope:ui`, so one live UI run kept
  * every other UI issue waiting and `AGENTIC_MAX_PARALLEL_RUNS=4` ran one
  * session; on 5 Oct, 15 of the 29 `ready` issues carried `scope:engine` and the
@@ -88,6 +88,14 @@ const DEFAULT_MAX_PARALLEL_RUNS = 1;
  * shared base of its areas, and it clashes with every one of them. A change
  * across several areas lists them rather than taking the parent: a parent is a
  * wide claim and holds its place while it waits.
+ *
+ * `src/core/mining` was one scope with `src/core/nav`, as `nav`. On 20 Oct
+ * 2026 six of the eleven `ready` issues carried it — blast bugs, a ramp flood
+ * fill, an explosives supply — and one live wall-stability run kept all six
+ * waiting although four of them shared no file with it. Mining is split by the
+ * three things it holds: the blast pipeline (`blast`), the shaping of the
+ * ground (`terrain`) and surveys (`survey`). They share no base worth a parent
+ * scope, so none of them has one, and `nav` keeps only `src/core/nav`.
  *
  * Every `ready` issue declares at least one scope: it is part of the
  * Definition of Ready (`readinessVerdict` below, `agentic-issue-creation`).
@@ -102,7 +110,10 @@ const SCOPES = Object.freeze({
   movement: 'Journeys: Itinerary, PlanItinerary, Locomotion, Mount, MoveTo, EntityMovementTick',
   crew: 'Employees, needs and shifts: entities/Employee*, SitePolicy, Need*, Rest*, ShiftCycle',
   site: 'Site property: entities/Building*, Zone, Vehicle*, Damage',
-  nav: 'Terrain surface and pathfinding: src/core/nav, src/core/mining',
+  nav: 'Pathfinding and the walkable surface: src/core/nav',
+  blast: 'Blast pipeline: mining/Blast*, Drill*, Charge*, Fragment*, Software*, WetHoles, DetonationSequence',
+  terrain: 'Terrain shaping: mining/Ramp*, RampSpiral, LevelGround, WorkTarget, WallStability',
+  survey: 'Rock surveys: mining/Survey*, SeismicSurveyDamage',
   economy: 'Money and progression: src/core/economy, campaign, scores',
   world: 'World generation and events: src/core/world, weather, events',
   ui: 'Shared UI base: UIManager, PanelBase, dom, styles, tokens, icons',
