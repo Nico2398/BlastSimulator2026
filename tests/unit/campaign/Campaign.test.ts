@@ -14,6 +14,7 @@ import {
 import { getAllLevels, getLevel } from '../../../src/core/campaign/Level.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import { createGame } from '../../../src/core/state/GameState.js';
+import { parseCampaignProfile } from '../../../src/persistence/CampaignProfile.js';
 // LevelProgress is part of campaign state — no extra imports needed
 
 describe('Campaign state and progression (7.2)', () => {
@@ -106,7 +107,7 @@ describe('Campaign state and progression (7.2)', () => {
 });
 
 describe('campaign completion excludes the tutorial (#1320)', () => {
-  const REAL = ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths'];
+  const REAL = ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths', 'shareholder_summit'];
 
   function win(c: ReturnType<typeof createCampaignState>, id: string): void {
     recordProfit(c, id, getLevel(id)!.unlockThreshold);
@@ -121,19 +122,30 @@ describe('campaign completion excludes the tutorial (#1320)', () => {
     expect(isCampaignLevel({ difficultyTier: 0 })).toBe(false);
   });
 
-  it('isFinalCampaignLevel is true only for treranium_depths', () => {
-    expect(isFinalCampaignLevel('treranium_depths')).toBe(true);
+  it('isFinalCampaignLevel is true only for shareholder_summit (#1949)', () => {
+    expect(isFinalCampaignLevel('shareholder_summit')).toBe(true);
+    expect(isFinalCampaignLevel('treranium_depths')).toBe(false);
     expect(isFinalCampaignLevel('dusty_hollow')).toBe(false);
     expect(isFinalCampaignLevel('grumpstone_ridge')).toBe(false);
     expect(isFinalCampaignLevel('tutorial_pit')).toBe(false);
     expect(isFinalCampaignLevel('nowhere')).toBe(false);
   });
 
-  it('completing the 3 real levels (tutorial untouched) sets campaignComplete', () => {
+  it('completing the 4 real levels (tutorial untouched) sets campaignComplete', () => {
     const c = createCampaignState();
     for (const id of REAL) win(c, id);
     expect(getLevelProgress(c, 'tutorial_pit')?.completed).toBe(false);
     expect(c.campaignComplete).toBe(true);
+  });
+
+  it('the first three real levels do not complete the campaign: the summit is still open (#1949)', () => {
+    const c = createCampaignState();
+    for (const id of ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths']) win(c, id);
+    expect(c.campaignComplete).toBe(false);
+    expect(isCampaignComplete(c)).toBe(false);
+    win(c, 'shareholder_summit');
+    expect(c.campaignComplete).toBe(true);
+    expect(isCampaignComplete(c)).toBe(true);
   });
 
   it('two real levels do not complete the campaign', () => {
@@ -149,11 +161,11 @@ describe('campaign completion excludes the tutorial (#1320)', () => {
     expect(c.campaignComplete).toBe(false);
   });
 
-  it('tutorial plus all 3 real levels completes, in any order', () => {
+  it('tutorial plus all 4 real levels completes, in any order', () => {
     const orders = [
       ['tutorial_pit', ...REAL],
       [...REAL, 'tutorial_pit'],
-      ['grumpstone_ridge', 'tutorial_pit', 'treranium_depths', 'dusty_hollow'],
+      ['shareholder_summit', 'grumpstone_ridge', 'tutorial_pit', 'treranium_depths', 'dusty_hollow'],
     ];
     for (const order of orders) {
       const c = createCampaignState();
@@ -175,7 +187,7 @@ describe('campaign completion excludes the tutorial (#1320)', () => {
     for (const id of REAL) c.levels[id]!.completed = true;
     c.campaignComplete = false; // stale
     expect(isCampaignComplete(c)).toBe(true);
-    c.levels['treranium_depths']!.completed = false;
+    c.levels['shareholder_summit']!.completed = false;
     c.campaignComplete = true; // stale the other way
     expect(isCampaignComplete(c)).toBe(false);
   });
@@ -273,5 +285,89 @@ describe('best stars (#1311)', () => {
     const restored = deserialize(serialize(state));
     expect(restored.campaign.levels['dusty_hollow']!.bestStars).toBe(3);
     expect(getBestStars(restored.campaign.levels['dusty_hollow'])).toBe(3);
+  });
+});
+
+describe('shareholder summit unlock chain and persistence (#1949)', () => {
+  it('starts locked on a fresh campaign', () => {
+    const c = createCampaignState();
+    expect(c.levels['shareholder_summit']).toBeDefined();
+    expect(c.levels['shareholder_summit']!.unlocked).toBe(false);
+    expect(c.levels['shareholder_summit']!.completed).toBe(false);
+    expect(startLevel(c, 'shareholder_summit')).toBe(false);
+    expect(c.activeLevelId).toBeNull();
+  });
+
+  it('completing treranium_depths unlocks shareholder_summit', () => {
+    const c = createCampaignState();
+    recordProfit(c, 'dusty_hollow', getLevel('dusty_hollow')!.unlockThreshold);
+    recordProfit(c, 'grumpstone_ridge', getLevel('grumpstone_ridge')!.unlockThreshold);
+    expect(getLevelProgress(c, 'shareholder_summit')?.unlocked).toBe(false);
+    const threshold = getLevel('treranium_depths')!.unlockThreshold;
+    expect(recordProfit(c, 'treranium_depths', threshold - 1)).toBe(false);
+    expect(getLevelProgress(c, 'shareholder_summit')?.unlocked).toBe(false);
+    expect(recordProfit(c, 'treranium_depths', 1)).toBe(true);
+    expect(getLevelProgress(c, 'shareholder_summit')?.unlocked).toBe(true);
+    expect(startLevel(c, 'shareholder_summit')).toBe(true);
+    expect(c.activeLevelId).toBe('shareholder_summit');
+  });
+
+  it('completing the summit is reported as a fresh completion and ends the campaign', () => {
+    const c = createCampaignState();
+    for (const id of ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths']) recordProfit(c, id, getLevel(id)!.unlockThreshold);
+    expect(recordProfit(c, 'shareholder_summit', getLevel('shareholder_summit')!.unlockThreshold)).toBe(true);
+    expect(c.campaignComplete).toBe(true);
+    // replay: no second completion
+    expect(recordProfit(c, 'shareholder_summit', 1)).toBe(false);
+    expect(c.campaignComplete).toBe(true);
+  });
+
+  it('records stars for the summit like any other level', () => {
+    const c = createCampaignState();
+    recordStars(c, 'shareholder_summit', 2);
+    recordStars(c, 'shareholder_summit', 1);
+    expect(c.levels['shareholder_summit']!.bestStars).toBe(2);
+    recordStars(c, 'shareholder_summit', 9);
+    expect(c.levels['shareholder_summit']!.bestStars).toBe(3);
+    expect(getBestStars(c.levels['shareholder_summit'])).toBe(3);
+  });
+
+  it('an old profile with only the four older level entries loads with the summit locked', () => {
+    const entry = (completed: boolean) => ({ levelId: '', unlocked: true, completed, cumulativeProfit: 0, bestSessionProfit: 0 });
+    const profile = parseCampaignProfile({
+      version: 1,
+      campaign: {
+        levels: {
+          tutorial_pit: entry(true), dusty_hollow: entry(true), grumpstone_ridge: entry(true), treranium_depths: entry(false),
+        },
+        activeLevelId: null,
+        campaignComplete: false,
+      },
+      bestStars: {},
+    });
+    const summit = profile.campaign.levels['shareholder_summit'];
+    expect(summit).toBeDefined();
+    expect(summit!.unlocked).toBe(false);
+    expect(summit!.completed).toBe(false);
+    expect(isCampaignComplete(profile.campaign)).toBe(false);
+  });
+
+  it('an old profile that had completed treranium_depths unlocks the summit but does not complete it', () => {
+    const done = { unlocked: true, completed: true, cumulativeProfit: 1e7, bestSessionProfit: 1e7 };
+    const profile = parseCampaignProfile({
+      version: 1,
+      campaign: { levels: { dusty_hollow: done, grumpstone_ridge: done, treranium_depths: done }, activeLevelId: null, campaignComplete: false },
+      bestStars: {},
+    });
+    expect(profile.campaign.levels['shareholder_summit']!.unlocked).toBe(true);
+    expect(profile.campaign.levels['shareholder_summit']!.completed).toBe(false);
+    expect(isCampaignComplete(profile.campaign)).toBe(false);
+  });
+
+  it('a summit completion survives a save round trip', () => {
+    const state = createGame({ seed: 42 });
+    recordProfit(state.campaign, 'shareholder_summit', getLevel('shareholder_summit')!.unlockThreshold);
+    const restored = deserialize(serialize(state));
+    expect(getLevelProgress(restored.campaign, 'shareholder_summit')?.completed).toBe(true);
   });
 });

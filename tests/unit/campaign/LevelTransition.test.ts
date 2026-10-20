@@ -542,3 +542,54 @@ describe('convertWinToFreePlay — board of directors (#1946)', () => {
     expect('board' in s).toBe(false);
   });
 });
+
+describe('createGameForLevel — shareholder summit rules (#1949)', () => {
+  function summit() {
+    const campaign = createCampaignState();
+    campaign.levels['shareholder_summit']!.unlocked = true;
+    return createGameForLevel(campaign, 'shareholder_summit')!;
+  }
+
+  it('opens with a board at quarter 1 and starting confidence 60', () => {
+    const state = summit();
+    expect(state).not.toBeNull();
+    expect(state.board).toBeDefined();
+    expect(state.board!.quarter).toBe(1);
+    expect(state.board!.confidence).toBe(60);
+    expect(state.board!.config).toMatchObject({
+      oreTargetT: getLevel('shareholder_summit')!.board!.oreTargetT,
+      profitTarget: getLevel('shareholder_summit')!.board!.profitTarget,
+    });
+  });
+
+  it('runs the progression ladder at grade 0', () => {
+    const state = summit();
+    expect(state.grade).toBeDefined();
+    expect(state.grade!.grade).toBe(0);
+  });
+
+  it('prices ore on the production market', () => {
+    expect(summit().contracts.market).toBe('production');
+  });
+
+  it('opens with the level cash, its free crew and a tier-1 freight warehouse', () => {
+    const state = summit();
+    expect(state.cash).toBe(getLevel('shareholder_summit')!.startingCash);
+    expect(state.employees.employees).toHaveLength(4);
+    expect(state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.tier === 1)).toBe(true);
+  });
+
+  it.each(['tutorial_pit', 'dusty_hollow', 'grumpstone_ridge', 'treranium_depths'])('earlier level %s has no board, no grade ladder and no production market', id => {
+    const campaign = createCampaignState();
+    campaign.levels[id]!.unlocked = true;
+    const state = createGameForLevel(campaign, id)!;
+    expect(state.board).toBeUndefined();
+    expect(state.grade).toBeUndefined();
+    expect(state.contracts.market ?? 'legacy').toBe('legacy');
+  });
+
+  it('is refused while locked', () => {
+    // createGameForLevel itself is unlock-agnostic only for known ids; startLevel is the gate.
+    expect(startLevel(createCampaignState(), 'shareholder_summit')).toBe(false);
+  });
+});

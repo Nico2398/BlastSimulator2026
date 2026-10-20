@@ -7,7 +7,11 @@ import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js'
 import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
 import { getAllOres } from '../../../src/core/world/OreCatalog.js';
 import { sandboxLevelDef, SANDBOX_DEFAULTS, SANDBOX_LEVEL_ID } from '../../../src/core/campaign/Sandbox.js';
-import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE } from '../../../src/core/config/balance.js';
+import {
+  TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE,
+  SANDBOX_ORE_GRADE_SCALE, SHAREHOLDER_SUMMIT_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_CASH,
+  SHAREHOLDER_SUMMIT_PROFIT_TARGET, SHAREHOLDER_SUMMIT_BOARD,
+} from '../../../src/core/config/balance.js';
 
 describe('Level definition system (7.1)', () => {
   it('getLevel("dusty_hollow") returns valid level data with all required fields', () => {
@@ -31,9 +35,10 @@ describe('Level definition system (7.1)', () => {
     expect(level!.difficultyTier).toBe(1);
   });
 
-  it('all 4 levels are defined with progressive difficulty', () => {
+  it('all 5 levels are defined with progressive difficulty', () => {
     const levels = getAllLevels();
-    expect(levels).toHaveLength(4);
+    expect(levels).toHaveLength(5);
+    expect(levels[4]!.id).toBe('shareholder_summit');
 
     // Event frequency should increase or stay same across tiers
     expect(levels[0]!.eventFreqMultiplier).toBe(0);
@@ -51,6 +56,7 @@ describe('Level definition system (7.1)', () => {
     expect(levels[1]!.difficultyTier).toBe(1);
     expect(levels[2]!.difficultyTier).toBe(2);
     expect(levels[3]!.difficultyTier).toBe(3);
+    expect(levels[4]!.difficultyTier).toBe(4);
   });
 
   it('level unlock thresholds increase with difficulty', () => {
@@ -84,8 +90,12 @@ describe('Level definition system (7.1)', () => {
     expect(level1.mixedRockHardness).toBe(false);
   });
 
-  it('authored campaign levels keep legacy veins: oreDeposits is undefined (#1682)', () => {
+  it('authored campaign levels keep legacy veins: oreDeposits is undefined, except the shareholder summit (#1682, #1949)', () => {
     for (const level of getAllLevels()) {
+      if (level.id === 'shareholder_summit') {
+        expect(level.oreDeposits, level.id).toBe(true);
+        continue;
+      }
       expect(level.oreDeposits, level.id).toBeUndefined();
     }
   });
@@ -163,6 +173,7 @@ describe('Level definition system (7.1)', () => {
     expect(getLevel('dusty_hollow')!.datum).toBe(22);
     expect(getLevel('grumpstone_ridge')!.datum).toBe(30);
     expect(getLevel('treranium_depths')!.datum).toBe(35);
+    expect(getLevel('shareholder_summit')!.datum).toBeGreaterThan(0);
   });
 
   it('tutorial_pit only has basic explosives', () => {
@@ -371,9 +382,13 @@ describe('Dusty Hollow opens staffed and equipped (#1363)', () => {
     ]);
   });
 
-  it('every level declares a starting site; levels 2 and 3 open with the digger kit (#1672); the tutorial opens with just a spoil heap (#1574)', () => {
+  it('every level declares a starting site; levels 2, 3 and the summit open with the digger kit (#1672, #1949); the tutorial opens with just a spoil heap (#1574)', () => {
     for (const level of getAllLevels()) {
       if (level.id === 'dusty_hollow') continue;
+      if (level.id === 'shareholder_summit') {
+        expect(level.startingSite, level.id).toBe(SHAREHOLDER_SUMMIT_STARTING_SITE);
+        continue;
+      }
       if (level.id === 'grumpstone_ridge' || level.id === 'treranium_depths') {
         expect(level.startingSite!.vehicles.map((v) => v.role).sort(), level.id)
           .toEqual(['charging_truck', 'debris_hauler', 'drill_rig', 'rock_digger']);
@@ -473,5 +488,101 @@ describe('scripted hiring and ore sale (#1600)', () => {
   it('the tutorial script has one candidate per hiring role with unique ids', () => {
     expect(TUTORIAL_HIRING_SCRIPT.map(c => c.role).sort()).toEqual(['blaster', 'driller', 'driver', 'manager', 'surveyor']);
     expect(new Set(TUTORIAL_HIRING_SCRIPT.map(c => c.id)).size).toBe(TUTORIAL_HIRING_SCRIPT.length);
+  });
+});
+
+describe('Shareholder Summit level (#1949)', () => {
+  const level = () => getLevel('shareholder_summit')!;
+
+  it('is the last level and the only tier-4 level', () => {
+    const all = getAllLevels();
+    expect(all[all.length - 1]!.id).toBe('shareholder_summit');
+    expect(all.filter(l => l.difficultyTier === 4).map(l => l.id)).toEqual(['shareholder_summit']);
+    expect(level().difficultyTier).toBe(4);
+  });
+
+  it('carries its i18n keys and the volcanic_flats biome', () => {
+    expect(level().id).toBe('shareholder_summit');
+    expect(level().nameKey).toBe('level.shareholder_summit.name');
+    expect(level().descKey).toBe('level.shareholder_summit.desc');
+    expect(level().biome).toBe('volcanic_flats');
+    expect(getBiome(level().biome)).toBeDefined();
+  });
+
+  it('opts in to progression, the production market and ore deposits', () => {
+    expect(level().progression).toBe(true);
+    expect(level().market).toBe('production');
+    expect(level().oreDeposits).toBe(true);
+    expect(level().oreGradeScale).toBe(SANDBOX_ORE_GRADE_SCALE);
+  });
+
+  it('wires its balance constants into the definition', () => {
+    expect(level().startingCash).toBe(SHAREHOLDER_SUMMIT_STARTING_CASH);
+    expect(level().unlockThreshold).toBe(SHAREHOLDER_SUMMIT_PROFIT_TARGET);
+    expect(level().board).toEqual(SHAREHOLDER_SUMMIT_BOARD);
+  });
+
+  it('balance constants are tuned: positive cash, profit target and board targets', () => {
+    expect(SHAREHOLDER_SUMMIT_STARTING_CASH).toBeGreaterThan(0);
+    expect(SHAREHOLDER_SUMMIT_PROFIT_TARGET).toBeGreaterThan(0);
+    expect(SHAREHOLDER_SUMMIT_BOARD.quarterTicks).toBeGreaterThan(0);
+    expect(SHAREHOLDER_SUMMIT_BOARD.oreTargetT).toBeGreaterThan(0);
+    expect(SHAREHOLDER_SUMMIT_BOARD.profitTarget).toBeGreaterThan(0);
+    expect(SHAREHOLDER_SUMMIT_BOARD.growth ?? 1).toBeGreaterThan(0);
+  });
+
+  it('opens with the digger composition plus a tier-1 freight warehouse and no extra buildings', () => {
+    const site = level().startingSite!;
+    expect(site).toBe(SHAREHOLDER_SUMMIT_STARTING_SITE);
+    expect(site.vehicles.map(v => v.role).sort()).toEqual(['charging_truck', 'debris_hauler', 'drill_rig', 'rock_digger']);
+    expect(site.employees).toHaveLength(4);
+    expect(site.buildings).toContainEqual({ type: 'freight_warehouse', tier: 1 });
+  });
+
+  it('has cash, a profit target and at least treranium_depths\' explosive roster', () => {
+    expect(level().unlockThreshold).toBeGreaterThan(0);
+    expect(level().startingCash).toBeGreaterThan(0);
+    expect(level().availableExplosives.length).toBeGreaterThanOrEqual(getLevel('treranium_depths')!.availableExplosives.length);
+  });
+
+  it('sets a positive grid, datum and seed distinct from the earlier levels', () => {
+    expect(level().gridX).toBeGreaterThan(0);
+    expect(level().gridZ).toBeGreaterThan(0);
+    expect(level().datum).toBeGreaterThan(0);
+    const others = getAllLevels().filter(l => l.id !== 'shareholder_summit').map(l => l.terrainSeed);
+    expect(others).not.toContain(level().terrainSeed);
+  });
+
+  it('terrain generated for the level resolves to volcanic_flats', () => {
+    const l = level();
+    expect(resolveGeneratedBiome(l.terrainSeed, l.gridX, l.gridZ, l.climateBias).id).toBe('volcanic_flats');
+  });
+
+  it('contract ores cover the ores generated into the grid (drift lock)', () => {
+    const l = level();
+    const state = createGame({ seed: l.terrainSeed, mineType: l.biome });
+    state.world = createWorldState(l.gridX, l.datum, l.gridZ, false);
+    state.world.mixedRockHardness = l.mixedRockHardness;
+    state.campaign.activeLevelId = l.id;
+    const offered = new Set(resolveContractOres(state));
+    expect(offered.size).toBeGreaterThan(0);
+    const generated = resolveGeneratedBiome(l.terrainSeed, l.gridX, l.gridZ, l.climateBias);
+    const yieldable = new Set(oresYieldedByRocks(generated.dominantRocks));
+    for (const ore of offered) expect(yieldable.has(ore)).toBe(true);
+  });
+
+  it('is not a pinned-weather, scripted level', () => {
+    expect(level().fixedWeather).toBeUndefined();
+    expect(level().hiringScript).toBeUndefined();
+    expect(level().scriptedOreSale).toBeUndefined();
+  });
+
+  it('only the summit sets progression, market or a board among the authored levels', () => {
+    for (const l of getAllLevels()) {
+      if (l.id === 'shareholder_summit') continue;
+      expect(l.progression, l.id).toBeUndefined();
+      expect(l.market, l.id).toBeUndefined();
+      expect(l.board, l.id).toBeUndefined();
+    }
   });
 });

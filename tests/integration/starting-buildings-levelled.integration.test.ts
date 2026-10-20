@@ -17,6 +17,7 @@ function startLevel(levelId: string) {
   recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
   recordProfit(ctx.campaignProfile.campaign, 'dusty_hollow', 80000);
   recordProfit(ctx.campaignProfile.campaign, 'grumpstone_ridge', 250000);
+  recordProfit(ctx.campaignProfile.campaign, 'treranium_depths', 800000); // unlocks shareholder_summit (#1949)
   const result = runner.run(`campaign start level:${levelId}`);
   expect(result.success, result.output).toBe(true);
   return { grid: ctx.grid!, state: ctx.state! };
@@ -27,6 +28,7 @@ describe('starting buildings are levelled (#1583)', () => {
     const ids = LEVELS_WITH_SITE.map((l) => l.id);
     expect(ids).toContain('tutorial_pit');
     expect(ids).toContain('dusty_hollow');
+    expect(ids).toContain('shareholder_summit');
   });
 
   for (const level of LEVELS_WITH_SITE) {

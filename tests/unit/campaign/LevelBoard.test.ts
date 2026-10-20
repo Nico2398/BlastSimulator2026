@@ -66,10 +66,14 @@ describe('createGameForLevel — board (#1946)', () => {
     expect('board' in state).toBe(false);
   });
 
-  it('no shipped level defines a board', () => {
+  it('only the shareholder summit among the shipped levels defines a board (#1949)', () => {
     const real = createCampaignState();
     for (const id of Object.keys(real.levels)) {
       if (id === FIXTURE_ID) continue;
+      if (id === 'shareholder_summit') {
+        expect(getLevel(id)?.board, id).toBeDefined();
+        continue;
+      }
       expect(getLevel(id)?.board, id).toBeUndefined();
     }
   });

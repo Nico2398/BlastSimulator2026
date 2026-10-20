@@ -16,6 +16,7 @@ function makeCampaign(overrides: Partial<CampaignState['levels']> = {}): Campaig
       dusty_hollow: { levelId: 'dusty_hollow', unlocked: true, completed: true, cumulativeProfit: 160000, bestSessionProfit: 160000, bestStars: 3 }, // stored 3 stars
       grumpstone_ridge: { levelId: 'grumpstone_ridge', unlocked: true, completed: false, cumulativeProfit: 0, bestSessionProfit: 0 },
       treranium_depths: { levelId: 'treranium_depths', unlocked: false, completed: false, cumulativeProfit: 0, bestSessionProfit: 0 },
+      shareholder_summit: { levelId: 'shareholder_summit', unlocked: false, completed: false, cumulativeProfit: 0, bestSessionProfit: 0 },
       ...overrides,
     },
     activeLevelId: null,
@@ -37,13 +38,14 @@ describe('WorldMap', () => {
     container.remove();
   });
 
-  it('show() renders all 3 real campaign levels, excluding the tutorial', () => {
+  it('show() renders all 4 real campaign levels, excluding the tutorial', () => {
     const { container, map } = mount();
     map.show(makeCampaign());
     const text = container.textContent ?? '';
     expect(text).toContain('Dusty Hollow');
     expect(text).toContain('Grumpstone Ridge');
     expect(text).toContain('Treranium Depths');
+    expect(text).toContain('Shareholder Summit');
     expect(text).not.toContain('Tutorial Pit');
     expect(map.visible).toBe(true);
     map.dispose();
@@ -93,6 +95,63 @@ describe('WorldMap', () => {
     });
   });
 
+  describe('shareholder_summit card (#1949)', () => {
+    const card = (c: HTMLElement) => c.querySelector('#bs-world-map [data-level="shareholder_summit"]');
+
+    it('has a card with the satirical blurb', () => {
+      const { container, map } = mount();
+      map.show(makeCampaign());
+      expect(card(container)).not.toBeNull();
+      expect(card(container)!.textContent).toContain(
+        'The mine went public. Congratulations: you now work for people who have never seen a rock.',
+      );
+      map.dispose();
+    });
+
+    it('shows the volcanic category label, not the mountain fallback', () => {
+      const { container, map } = mount();
+      map.show(makeCampaign());
+      const volcanic = t('ui.portfolio.biome.volcanic');
+      expect(volcanic).not.toBe('ui.portfolio.biome.volcanic');
+      expect(card(container)!.textContent).toContain(volcanic);
+      expect(card(container)!.textContent).not.toContain(t('ui.portfolio.biome.mountain'));
+      map.dispose();
+    });
+
+    it('is locked until treranium_depths is completed: no start button, lock names Treranium Depths and its threshold', () => {
+      const { container, map } = mount();
+      map.show(makeCampaign());
+      expect(card(container)!.querySelector('[data-action="start-level"]')).toBeNull();
+      const lock = card(container)!.querySelector('[data-role="lock"]');
+      expect(lock).not.toBeNull();
+      expect(lock!.textContent).toContain('Treranium Depths');
+      expect(lock!.textContent).toContain('$800,000');
+      map.dispose();
+    });
+
+    it('offers a start button routed to its own id once unlocked', () => {
+      const { container, map } = mount();
+      const cb = vi.fn();
+      map.setOnStartLevel(cb);
+      map.show(makeCampaign({
+        treranium_depths: { levelId: 'treranium_depths', unlocked: true, completed: true, cumulativeProfit: 800000, bestSessionProfit: 800000, bestStars: 1 },
+        shareholder_summit: { levelId: 'shareholder_summit', unlocked: true, completed: false, cumulativeProfit: 0, bestSessionProfit: 0 },
+      }));
+      container.querySelector<HTMLButtonElement>('#bs-world-map [data-level="shareholder_summit"] [data-action="start-level"]')!.click();
+      expect(cb).toHaveBeenCalledWith('shareholder_summit');
+      map.dispose();
+    });
+
+    it('renders the French name and blurb', () => {
+      setLocale('fr');
+      const { container, map } = mount();
+      map.show(makeCampaign());
+      expect(card(container)!.textContent).toContain('Sommet des actionnaires');
+      expect(card(container)!.textContent).not.toContain('The mine went public');
+      map.dispose();
+    });
+  });
+
   it('locked-level requirement text in French does not leak the standalone English word "on"', () => {
     setLocale('fr');
     const { container, map } = mount();
@@ -107,19 +166,19 @@ describe('WorldMap', () => {
     const { container, map } = mount();
     map.show(makeCampaign());
     const stars = container.querySelectorAll('#bs-world-map bs-icon[name="star"]');
-    // 3 levels x 3 stars each = 9 star icons total across all cards.
-    expect(stars.length).toBe(9);
+    // 4 levels x 3 stars each = 12 star icons total across all cards.
+    expect(stars.length).toBe(12);
     const earned = Array.from(stars).filter(s => (s as HTMLElement).style.color === 'var(--bsx-amber)');
-    // dusty_hollow completed at 2x threshold -> 3 stars; the other two are not completed -> 0 stars each.
+    // dusty_hollow completed at 2x threshold -> 3 stars; the other three are not completed -> 0 stars each.
     expect(earned.length).toBe(3);
     map.dispose();
   });
 
-  it('campaign star progress aggregates real per-level stars (3 earned out of 9 possible)', () => {
+  it('campaign star progress aggregates real per-level stars (3 earned out of 12 possible)', () => {
     const { container, map } = mount();
     map.show(makeCampaign());
     const text = container.textContent ?? '';
-    expect(text).toContain('3 / 9');
+    expect(text).toContain('3 / 12');
     map.dispose();
   });
 
@@ -153,7 +212,7 @@ describe('WorldMap', () => {
         dusty_hollow: { levelId: 'dusty_hollow', unlocked: true, completed: true, cumulativeProfit: 1, bestSessionProfit: 1, bestStars: 2 },
         grumpstone_ridge: { levelId: 'grumpstone_ridge', unlocked: true, completed: true, cumulativeProfit: 1, bestSessionProfit: 1, bestStars: 3 },
       }));
-      expect(container.textContent).toContain('5 / 9');
+      expect(container.textContent).toContain('5 / 12');
       map.dispose();
     });
 
@@ -163,7 +222,7 @@ describe('WorldMap', () => {
         dusty_hollow: { levelId: 'dusty_hollow', unlocked: true, completed: true, cumulativeProfit: 999999, bestSessionProfit: 999999 },
       }));
       expect(earnedByLevel(container, 'dusty_hollow')).toBe(1);
-      expect(container.textContent).toContain('1 / 9');
+      expect(container.textContent).toContain('1 / 12');
       map.dispose();
     });
 

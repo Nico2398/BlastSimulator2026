@@ -47,7 +47,7 @@ function stateAtDefeat(reason: DefeatReason, levelId = 'dusty_hollow'): GameStat
   return s;
 }
 
-// dusty_hollow's unlockThreshold is 80000; treranium_depths is the last level.
+// dusty_hollow's unlockThreshold is 80000; shareholder_summit is the last level.
 const THREE_STAR: Partial<LevelStats> = { totalWealth: 100000, casualties: 0, bestEcology: 75, finalEcology: 75 };
 const ONE_STAR: Partial<LevelStats> = { totalWealth: 1000, casualties: 2, bestEcology: 10, finalEcology: 10 };
 
@@ -207,7 +207,7 @@ describe('LevelEndScreen', () => {
 
   it('shows BACK TO PORTFOLIO instead of CONTINUE on the last level', () => {
     const { container, screen } = mount();
-    screen.update(stateAtLevelEnd(THREE_STAR, 'treranium_depths'));
+    screen.update(stateAtLevelEnd(THREE_STAR, 'shareholder_summit'));
     const text = container.querySelector('#bs-level-end-screen')!.textContent!;
     expect(text).toContain('BACK TO PORTFOLIO');
     expect(text).not.toContain('CONTINUE TO');
@@ -240,11 +240,26 @@ describe('LevelEndScreen', () => {
     screen.dispose();
   });
 
+  it('treranium_depths is no longer the last level: continue routes to shareholder_summit (#1949)', () => {
+    const { container, screen } = mount();
+    let nextId: string | null = null;
+    screen.setOnContinue(id => { nextId = id; });
+    screen.update(stateAtLevelEnd(THREE_STAR, 'treranium_depths'));
+    const text = container.querySelector('#bs-level-end-screen')!.textContent!;
+    expect(text).toContain('CONTINUE TO');
+    expect(text).not.toContain('BACK TO PORTFOLIO');
+    const continueBtn = Array.from(container.querySelectorAll('#bs-level-end-screen button'))
+      .find(b => b.textContent?.includes('CONTINUE TO')) as HTMLButtonElement;
+    continueBtn.click();
+    expect(nextId).toBe('shareholder_summit');
+    screen.dispose();
+  });
+
   it('on the last level, the same button routes to onBackToPortfolio instead', () => {
     const { container, screen } = mount();
     let backCalled = false;
     screen.setOnBackToPortfolio(() => { backCalled = true; });
-    screen.update(stateAtLevelEnd(THREE_STAR, 'treranium_depths'));
+    screen.update(stateAtLevelEnd(THREE_STAR, 'shareholder_summit'));
 
     const backBtn = Array.from(container.querySelectorAll('#bs-level-end-screen button'))
       .find(b => b.textContent?.includes('BACK TO PORTFOLIO')) as HTMLButtonElement;
@@ -548,9 +563,9 @@ describe('LevelEndScreen', () => {
       expect(t('ui.level_end.campaign_complete.body')).not.toBe('ui.level_end.campaign_complete.body');
     });
 
-    it('victory on treranium_depths with campaignComplete shows headline and body', () => {
+    it('victory on shareholder_summit with campaignComplete shows headline and body (#1949)', () => {
       const { container, screen } = mount();
-      screen.update(finale('treranium_depths', true));
+      screen.update(finale('shareholder_summit', true));
       const text = rootText(container);
       expect(text).toContain(t('ui.level_end.campaign_complete.headline'));
       expect(text).toContain(t('ui.level_end.campaign_complete.body'));
@@ -558,23 +573,23 @@ describe('LevelEndScreen', () => {
       screen.dispose();
     });
 
-    it('treranium_depths victory without campaignComplete shows no finale text', () => {
+    it('shareholder_summit victory without campaignComplete shows no finale text', () => {
       const { container, screen } = mount();
-      screen.update(finale('treranium_depths', false));
+      screen.update(finale('shareholder_summit', false));
       expect(rootText(container)).not.toContain(t('ui.level_end.campaign_complete.headline'));
       screen.dispose();
     });
 
-    it('shows the finale when the stored flag is false but all 3 real levels are completed', () => {
+    it('shows the finale when the stored flag is false but all 4 real levels are completed', () => {
       const { container, screen } = mount();
-      const s = finale('treranium_depths', false);
-      for (const id of ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths']) s.campaign.levels[id]!.completed = true;
+      const s = finale('shareholder_summit', false);
+      for (const id of ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths', 'shareholder_summit']) s.campaign.levels[id]!.completed = true;
       screen.update(s);
       expect(rootText(container)).toContain(t('ui.level_end.campaign_complete.headline'));
       screen.dispose();
     });
 
-    it.each(['dusty_hollow', 'grumpstone_ridge', 'tutorial_pit'])('victory on %s shows no finale text', id => {
+    it.each(['dusty_hollow', 'grumpstone_ridge', 'treranium_depths', 'tutorial_pit'])('victory on %s shows no finale text (the final level moved, #1949)', id => {
       const { container, screen } = mount();
       screen.update(finale(id, true));
       expect(rootText(container)).not.toContain(t('ui.level_end.campaign_complete.headline'));
@@ -584,13 +599,13 @@ describe('LevelEndScreen', () => {
 
     it('finale text clears after a defeat render and after a non-final victory', () => {
       const { container, screen } = mount();
-      screen.update(finale('treranium_depths', true));
+      screen.update(finale('shareholder_summit', true));
       expect(rootText(container)).toContain(t('ui.level_end.campaign_complete.headline'));
-      const mid = finale('treranium_depths', true);
+      const mid = finale('shareholder_summit', true);
       mid.levelEnded = false;
       mid.levelEndReason = null;
       screen.update(mid);
-      const d = stateAtDefeat('bankruptcy', 'treranium_depths');
+      const d = stateAtDefeat('bankruptcy', 'shareholder_summit');
       d.campaign.campaignComplete = true;
       screen.update(d);
       expect(rootText(container)).not.toContain(t('ui.level_end.campaign_complete.headline'));
@@ -603,7 +618,7 @@ describe('LevelEndScreen', () => {
 
     it('refreshLocale switches the finale text to French', () => {
       const { container, screen } = mount();
-      screen.update(finale('treranium_depths', true));
+      screen.update(finale('shareholder_summit', true));
       const enHeadline = t('ui.level_end.campaign_complete.headline');
       setLocale('fr');
       const frHeadline = t('ui.level_end.campaign_complete.headline');
@@ -873,7 +888,7 @@ describe('LevelEndScreen keep playing (#1647)', () => {
   it.each([
     ['campaign win', () => stateAtLevelEnd(ONE_STAR, 'dusty_hollow')],
     ['tutorial win', () => stateAtLevelEnd(ONE_STAR, 'tutorial_pit')],
-    ['last-level win', () => stateAtLevelEnd(ONE_STAR, 'treranium_depths')],
+    ['last-level win', () => stateAtLevelEnd(ONE_STAR, 'shareholder_summit')],
     ['three-star win', () => stateAtLevelEnd(THREE_STAR, 'dusty_hollow')],
   ])('victory layout (%s) offers keep-playing', (_n, make) => {
     const { container, screen } = mount();

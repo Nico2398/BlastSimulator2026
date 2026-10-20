@@ -814,15 +814,21 @@ function createSession(config: ProbeRunConfig, observer: MetricsObserver): Probe
   return session;
 }
 
-/** One headless playthrough. Never throws on a failed step: the reason lands in `endReason`. */
-export function runProbe(config: ProbeRunConfig): RunResult {
+/**
+ * One headless playthrough. Never throws on a failed step: the reason lands in `endReason`.
+ * `start` replaces the default `sandbox start` opening (a campaign level's run, #1949); it returns
+ * false when the game did not start.
+ */
+export function runProbe(config: ProbeRunConfig, start?: (engine: RunnerWithContext) => boolean): RunResult {
   const started = Date.now();
   const observer = new MetricsObserver();
   const session = createSession(config, observer);
   let endReason: string | null = null;
   try {
-    const start = runCommand(session.engine, `sandbox start biome:${config.biome} kit:${config.kit} seed:${config.seed}`);
-    if (!start.success) throw new ProbeStop('opening_failed:sandbox_start');
+    const opened = start
+      ? start(session.engine)
+      : runCommand(session.engine, `sandbox start biome:${config.biome} kit:${config.kit} seed:${config.seed}`).success;
+    if (!opened) throw new ProbeStop('opening_failed:sandbox_start');
     STRATEGIES[config.strategy](session);
   } catch (err) {
     if (!(err instanceof ProbeStop)) throw err;
