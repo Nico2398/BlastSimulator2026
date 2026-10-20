@@ -142,7 +142,8 @@ export function holePatternSpacing(holes: ReadonlyArray<Pick<DrillHole, 'x' | 'z
 
 /**
  * Metres a hole's charge reaches for the pre-flight building warning (#2030):
- * BLAST_REACH_M_PER_SQRT_ENERGY * sqrt(initial energy). Stub.
+ * BLAST_REACH_M_PER_SQRT_ENERGY * sqrt(initial energy). Uncharged holes reach 0.
+ * Flooding is ignored, which keeps the estimate conservative.
  */
 export function holeBlastReachM(charge: HoleCharge | undefined, holeDepth: number): number {
   if (!charge) return 0;
@@ -153,16 +154,16 @@ export function holeBlastReachM(charge: HoleCharge | undefined, holeDepth: numbe
  * Buildings within reach of the planned holes (#2021), shown as pre-flight warnings.
  *
  * Tier-0 prediction rule: a building is at risk when any footprint cell lies inside the
- * holes' bounding box grown by `marginM` (default: the largest charge reach over the holes, uncharged = 0). Holes are
- * floored to their grid cell first. The rule is deliberately conservative: it can flag a
- * building in the margin that would survive the blast, but never misses one inside the
- * box. `marginM` is the lever for tuning how far past the pattern the warning reaches.
+ * holes' bounding box grown by `marginM`. The default margin is the largest charge reach
+ * over the holes (uncharged = 0); an explicit `marginM` overrides it. Holes are floored to
+ * their grid cell first. The rule is deliberately conservative: it can flag a building in
+ * the margin that would survive the blast, but never misses one inside the box.
  */
 export function buildingsInBlastReach(
   holes: ReadonlyArray<Pick<DrillHole, 'id' | 'x' | 'z' | 'depth'>>,
   charges: Readonly<Record<string, HoleCharge>>,
   buildings: ReadonlyArray<Pick<Building, 'id' | 'type' | 'tier' | 'x' | 'z' | 'storedExplosives'>>,
-  marginM: number = Math.max(0, ...holes.map(h => holeBlastReachM(charges[h.id], h.depth))),
+  marginM: number = holes.reduce((max, h) => Math.max(max, holeBlastReachM(charges[h.id], h.depth)), 0),
 ): BuildingAtRisk[] {
   if (buildings.length === 0) return [];
   const reach = computeDangerZone(holes.map(h => ({ x: Math.floor(h.x), z: Math.floor(h.z) })), marginM);
