@@ -1115,3 +1115,96 @@ describe('releaseInjuredEmployeesQueues sweep (#1381)', () => {
     expect(a.taskQueue).toEqual([]);
   });
 });
+
+// ── interruptActiveAction with a queued-ahead id (#2017) ────────────────────
+//
+// reconcileVehicleReservations can name a reserve-ahead action (sitting in
+// the holder's taskQueue, no vehicle reservation) and ArrivalGate then calls
+// interruptActiveAction with that id. The id is NOT the employee's active
+// action, so the call must release only that queued entry and leave the real
+// active action's fields alone.
+
+describe('interruptActiveAction — id is queued ahead, not the active action (#2017)', () => {
+  function setup() {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    const { employee: emp } = hireEmployee(state.employees, 'driller', new Random(SEED), 0, 0);
+    const active = makeAction({ id: 700, type: 'haul_debris', requiredVehicleRole: 'debris_hauler', holderId: emp.id, status: 'assigned' });
+    const queued = makeAction({ id: 701, type: 'haul_debris', requiredVehicleRole: 'debris_hauler', holderId: emp.id, status: 'assigned' });
+    state.pendingActions.push(active, queued);
+    state.ghostPreviews.push({ id: queued.id, type: 'haul_debris', targetX: 0, targetZ: 0, targetY: 0, claimed: true });
+    emp.activeActionId = active.id;
+    emp.taskTicksRemaining = null;
+    emp.pendingActionType = 'haul_debris';
+    emp.itinerary = { legs: [], goal: { kind: 'work', actionId: 700 }, workTicks: 0, estTotalTicks: 5 } as unknown as typeof emp.itinerary;
+    emp.taskQueue = [queued.id];
+    return { state, emp, active, queued };
+  }
+
+  it('releases only the queued action: queued, holder null, off taskQueue, ghost unclaimed', () => {
+    const { state, emp, active, queued } = setup();
+    const revision = state.ghostPreviewsRevision;
+
+    interruptActiveAction(state, emp, queued.id);
+
+    expect(queued.status).toBe('queued');
+    expect(queued.holderId).toBeNull();
+    expect(emp.taskQueue).not.toContain(queued.id);
+    expect(state.ghostPreviews.find(g => g.id === queued.id)!.claimed).toBe(false);
+    expect(state.ghostPreviewsRevision).toBeGreaterThan(revision);
+    // the real active action is untouched
+    expect(active.status).toBe('assigned');
+    expect(active.holderId).toBe(emp.id);
+  });
+
+  it('leaves the active fields and interruptedActionPayload untouched', () => {
+    const { state, emp, active, queued } = setup();
+    const itinerary = emp.itinerary;
+    queued.payload = { marker: 'queued' };
+
+    interruptActiveAction(state, emp, queued.id);
+
+    expect(emp.activeActionId).toBe(active.id);
+    expect(emp.itinerary).toBe(itinerary);
+    expect(emp.itinerary).not.toBeNull();
+    expect(emp.pendingActionType).toBe('haul_debris');
+    expect(emp.interruptedActionPayload).toBeNull();
+  });
+
+  it('keeps the active action\'s vehicle reservation while the queued one holds none', () => {
+    const { state, emp, active, queued } = setup();
+    const { vehicle: v } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    reserveVehicle(state.vehicles, v.id, active.id);
+
+    interruptActiveAction(state, emp, queued.id);
+
+    expect(getVehicleReservation(state.vehicles, v.id)).toBe(active.id);
+    expect(getVehicleReservation(state.vehicles, v.id)).not.toBe(queued.id);
+  });
+
+  it('still wipes the active fields when the id IS the active action', () => {
+    const { state, emp, active, queued } = setup();
+
+    interruptActiveAction(state, emp, active.id);
+
+    expect(active.status).toBe('queued');
+    expect(active.holderId).toBeNull();
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.itinerary).toBeNull();
+    // the queued entry is not the target, so it stays queued-ahead
+    expect(emp.taskQueue).toContain(queued.id);
+  });
+
+  it('takes the old path for an id in neither taskQueue nor active: releases it and clears walk fields', () => {
+    const { state, emp } = setup();
+    const stray = makeAction({ id: 702, holderId: emp.id, status: 'assigned' });
+    state.pendingActions.push(stray);
+
+    interruptActiveAction(state, emp, stray.id);
+
+    expect(stray.status).toBe('queued');
+    expect(stray.holderId).toBeNull();
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.itinerary).toBeNull();
+  });
+});

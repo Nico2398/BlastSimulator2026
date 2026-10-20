@@ -120,6 +120,52 @@ function refundOrderStock(state: GameState, action: PendingAction): { restockedK
 }
 
 /**
+ * True when a different alive, uninjured, genuinely idle employee (not mid-
+ * task, not mid-rest, not walking anywhere) is currently closer — by real
+ * pathfinding, via PlanItinerary.ts's own `estimateLegDistance` at
+ * `'exact'` fidelity, the project's single distance oracle — to `action`'s
+ * target than `pinnedEmployee` is right now. `avoidVehicles` is derived from
+ * the target cell's own occupancy (`!isDestinationOccupied`), mirroring how
+ * `buildFootOnlyItinerary` (PlanItinerary.ts) computes it for a real foot
+ * leg. Used only to decide whether releasing a #556 walk-only pin (see
+ * interruptActiveAction's own doc comment) is actually worth doing: a closer
+ * idle employee could finish the remaining walk faster than the pinned one's
+ * own repeatedly-interrupted crawl; with nobody closer, releasing would just
+ * hand the action to "whichever employee is idle first" again with no
+ * benefit — exactly the relay #556 fixed in the first place.
+ *
+ * Exact fidelity (real A* via findExactPath, not the cheap octile estimate)
+ * is required here, not optional (#954/#1113 fix): once fragments/parked
+ * vehicles can block a straight line, a nominally-closer candidate can have a
+ * far longer REAL routed distance than a nominally-farther one with a clear
+ * route. A dense post-blast fragment field once made the straight-line
+ * heuristic judge the same fragment-boxed-in candidate "closer" release after
+ * release, each release discarding whichever employee currently held the
+ * walk-only pin (#556/#867) and restarting the walk on someone else who then
+ * got displaced the same way — a livelock that starved
+ * tutorial-playthrough.json's ore-hauling task indefinitely. A `null`
+ * (unreachable) result from `estimateLegDistance` maps to `Infinity`: an
+ * unreachable candidate must never look closer than a reachable one, and an
+ * unreachable pinned employee must never block a reachable candidate from
+ * taking over.
+ */
+function hasCloserIdleCandidate(state: GameState, pinnedEmployee: Employee, action: PendingAction): boolean {
+  const avoidVehicles = !isDestinationOccupied(state, action.targetX, action.targetZ);
+  const ownDistance = estimateLegDistance(
+    state, 'exact', pinnedEmployee.id, pinnedEmployee.x, pinnedEmployee.z, action.targetX, action.targetZ, avoidVehicles,
+  ) ?? Infinity;
+  return state.employees.employees.some(other =>
+    other.id !== pinnedEmployee.id
+    && other.alive
+    && !other.injured
+    && other.activeActionId === null
+    && other.restTicksRemaining === null
+    && other.pendingDriverVehicleId === null
+    && (estimateLegDistance(state, 'exact', other.id, other.x, other.z, action.targetX, action.targetZ, avoidVehicles) ?? Infinity) < ownDistance,
+  );
+}
+
+/**
  * Release `employee`'s ONE active PendingAction (`actionId`, the value of
  * `employee.activeActionId` before a needs-driven interruption — collapse,
  * fatigue forcing a rest — preempted it) back to the pool instead of
@@ -214,59 +260,31 @@ function refundOrderStock(state: GameState, action: PendingAction): { restockedK
  * omits this option and keeps the pin's existing retry-same-employee semantics
  * unchanged — appropriate for their softer, first-strike interruptions of a
  * destination that may still resolve.
- */
-/**
- * True when a different alive, uninjured, genuinely idle employee (not mid-
- * task, not mid-rest, not walking anywhere) is currently closer — by real
- * pathfinding, via PlanItinerary.ts's own `estimateLegDistance` at
- * `'exact'` fidelity, the project's single distance oracle — to `action`'s
- * target than `pinnedEmployee` is right now. `avoidVehicles` is derived from
- * the target cell's own occupancy (`!isDestinationOccupied`), mirroring how
- * `buildFootOnlyItinerary` (PlanItinerary.ts) computes it for a real foot
- * leg. Used only to decide whether releasing a #556 walk-only pin (see
- * interruptActiveAction's own doc comment) is actually worth doing: a closer
- * idle employee could finish the remaining walk faster than the pinned one's
- * own repeatedly-interrupted crawl; with nobody closer, releasing would just
- * hand the action to "whichever employee is idle first" again with no
- * benefit — exactly the relay #556 fixed in the first place.
  *
- * Exact fidelity (real A* via findExactPath, not the cheap octile estimate)
- * is required here, not optional (#954/#1113 fix): once fragments/parked
- * vehicles can block a straight line, a nominally-closer candidate can have a
- * far longer REAL routed distance than a nominally-farther one with a clear
- * route. A dense post-blast fragment field once made the straight-line
- * heuristic judge the same fragment-boxed-in candidate "closer" release after
- * release, each release discarding whichever employee currently held the
- * walk-only pin (#556/#867) and restarting the walk on someone else who then
- * got displaced the same way — a livelock that starved
- * tutorial-playthrough.json's ore-hauling task indefinitely. A `null`
- * (unreachable) result from `estimateLegDistance` maps to `Infinity`: an
- * unreachable candidate must never look closer than a reachable one, and an
- * unreachable pinned employee must never block a reachable candidate from
- * taking over.
+ * `actionId` is normally the employee's active action, but callers fed by
+ * reconcileVehicleReservations may pass a reserved-ahead action that only sits
+ * in `employee.taskQueue` (#2017). That id is dropped from the queue and
+ * released to the open pool; the employee's real active action, walk fields
+ * and interruptedActionPayload are left untouched.
  */
-function hasCloserIdleCandidate(state: GameState, pinnedEmployee: Employee, action: PendingAction): boolean {
-  const avoidVehicles = !isDestinationOccupied(state, action.targetX, action.targetZ);
-  const ownDistance = estimateLegDistance(
-    state, 'exact', pinnedEmployee.id, pinnedEmployee.x, pinnedEmployee.z, action.targetX, action.targetZ, avoidVehicles,
-  ) ?? Infinity;
-  return state.employees.employees.some(other =>
-    other.id !== pinnedEmployee.id
-    && other.alive
-    && !other.injured
-    && other.activeActionId === null
-    && other.restTicksRemaining === null
-    && other.pendingDriverVehicleId === null
-    && (estimateLegDistance(state, 'exact', other.id, other.x, other.z, action.targetX, action.targetZ, avoidVehicles) ?? Infinity) < ownDistance,
-  );
-}
-
 export function interruptActiveAction(
   state: GameState,
   employee: Employee,
   actionId: number | null,
   options?: { forceOpenPool?: boolean },
 ): void {
+  if (
+    actionId !== null
+    && actionId !== employee.activeActionId
+    && employee.taskQueue.includes(actionId)
+  ) {
+    // #2017: queued-ahead action, not the active one — release only it.
+    employee.taskQueue = employee.taskQueue.filter(id => id !== actionId);
+    const queued = state.pendingActions.find(a => a.id === actionId);
+    if (queued) releaseActionToOpenPool(state, queued);
+    return;
+  }
+
   if (actionId !== null) {
     const action = state.pendingActions.find(a => a.id === actionId);
     if (action) {
