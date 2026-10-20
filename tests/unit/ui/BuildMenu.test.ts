@@ -206,6 +206,11 @@ function makeMockKit(options?: { activeRegion?: TileRegion | null }) {
     get selection() { return selection; },
     get activeRegion() { return activeRegion; },
     get hoveredTile() { return hoveredTile; },
+    // A drag A->B leaves the two endpoints as waypoints (#1942).
+    get waypoints() {
+      return selection ? [{ x: selection.x1, z: selection.z1 }, { x: selection.x2, z: selection.z2 }] : [];
+    },
+    popWaypoint: vi.fn(),
     // Mirrors PlacementController.previewOrigin (#1594): an exact region's pin
     // while the hover is inside its live margin, else the raw hovered tile.
     get previewOrigin() {

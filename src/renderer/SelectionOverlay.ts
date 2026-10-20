@@ -18,6 +18,7 @@ import { GroundTintLayer, buildConformingRing, type GroundTintPatch, type Surfac
 import type { RampWidth } from '../core/config/balance.js';
 import { buildRampArrow, RAMP_ARROW_COLOR } from './RampArrow.js';
 import { rampDefFromEndpoints } from '../core/mining/Ramp.js';
+import type { RampDirection } from '../core/mining/RampPath.js';
 
 const COLOR_SELECTION = 0xffc840;
 const COLOR_PINNED = 0x7ab8ff;
@@ -60,6 +61,8 @@ export interface OverlayLineUpdate {
   width?: RampWidth;
   /** The order would be refused — the ramp previews in the refusal colour. */
   refused?: boolean;
+  /** Multi-leg path: the preview follows every leg from (x1, z1) instead of the straight drag. */
+  legs?: ReadonlyArray<{ direction: RampDirection; length: number }>;
 }
 
 export interface OverlayPointUpdate {

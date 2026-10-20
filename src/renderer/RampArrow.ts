@@ -41,6 +41,12 @@ const SHAFT_STEP = 0.5;
 
 type RampArrowSpec = Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length' | 'width'>;
 
+/** One straight arrow spec per leg of `def`, each starting at the leg's own first tile. */
+export function rampLegSpecs(def: Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length' | 'width' | 'legs'>): RampArrowSpec[] {
+  void def;
+  throw new Error('not implemented');
+}
+
 interface RampArrowLayout {
   /** Upper-end tile — the ramp's origin. */
   tail: { x: number; z: number };

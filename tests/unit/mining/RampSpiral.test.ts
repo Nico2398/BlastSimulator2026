@@ -340,3 +340,66 @@ describe('proposeRampSpiral: purity', () => {
     expect(surface.calls).toBeGreaterThan(0);
   });
 });
+
+// ── #1942: rim detection and the terrain seam shared by the console and the ramp tool ──
+
+import { isPitRim, spiralSurfaceFrom } from '../../../src/core/mining/RampSpiral.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { makeFlatGrid } from '../../helpers/unqualifiedWorld.js';
+
+describe('isPitRim (#1942)', () => {
+  const surface = makeSurface(SQUARE);
+
+  it('a tile beside the pit wall is on the rim', () => {
+    expect(isPitRim(surface, { x: SQUARE.x0 - 1, z: SQUARE.z0 + 10 })).toBe(true);
+  });
+
+  it('a diagonal neighbour of the pit counts: the corner tile is on the rim', () => {
+    expect(isPitRim(surface, { x: SQUARE.x0 - 1, z: SQUARE.z0 - 1 })).toBe(true);
+  });
+
+  it('a tile two columns from the pit is not on the rim', () => {
+    expect(isPitRim(surface, { x: SQUARE.x0 - 2, z: SQUARE.z0 + 10 })).toBe(false);
+  });
+
+  it('a tile on far flat ground is not on the rim', () => {
+    expect(isPitRim(surface, { x: 2, z: 2 })).toBe(false);
+  });
+
+  it('a tile inside the pit (the hollow) is not on the rim', () => {
+    expect(isPitRim(surface, { x: SQUARE.x0 + 10, z: SQUARE.z0 + 10 })).toBe(false);
+    expect(isPitRim(surface, { x: SQUARE.x0, z: SQUARE.z0 + 10 })).toBe(false);
+  });
+
+  it('works on every side of the pit', () => {
+    const m = SQUARE.x0 + 10;
+    expect(isPitRim(surface, { x: SQUARE.x0 + SQUARE.w, z: m })).toBe(true);
+    expect(isPitRim(surface, { x: m, z: SQUARE.z0 - 1 })).toBe(true);
+    expect(isPitRim(surface, { x: m, z: SQUARE.z0 + SQUARE.h })).toBe(true);
+  });
+});
+
+describe('spiralSurfaceFrom (#1942)', () => {
+  it('reads heights from the voxel grid columns', () => {
+    const grid = makeFlatGrid(10, 10, 5);
+    const surface = spiralSurfaceFrom(grid, null);
+    expect(surface.heightAt(3, 4)).toBeGreaterThan(4);
+    expect(surface.heightAt(3, 4)).toBeLessThan(7);
+  });
+
+  it('without a playable area, membership is the grid columns', () => {
+    const grid = new VoxelGrid(10, 10);
+    const surface = spiralSurfaceFrom(grid, null);
+    expect(surface.contains(0, 0)).toBe(true);
+    expect(surface.contains(9, 9)).toBe(true);
+    expect(surface.contains(10, 0)).toBe(false);
+    expect(surface.contains(-1, 5)).toBe(false);
+  });
+
+  it('with a playable area, membership is the area', () => {
+    const grid = new VoxelGrid(10, 10);
+    const surface = spiralSurfaceFrom(grid, { contains: (x, z) => x >= 5 && z >= 5 });
+    expect(surface.contains(6, 6)).toBe(true);
+    expect(surface.contains(2, 6)).toBe(false);
+  });
+});

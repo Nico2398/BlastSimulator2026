@@ -1,0 +1,151 @@
+{
+  "name": "ramp-tool-switchback-click",
+  "description": "#1942: a player draws a two-leg switchback into the ground with the Build panel's ramp tool by clicking only: Ramp, depth stepper, start tile, corner tile, end tile, Confirm. The order is charged and queued, then dug leg by leg until one built ramp with two legs exists. Contract for console-api state: rampLegCount (leg count of the first built ramp, 0 when none; a straight ramp is 1).",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "builtRampCount": 0,
+          "rampLegCount": 0
+        },
+        "note": "Staffed site, no ramps yet."
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "description": "Crew the rock_digger #3 with excavator driver #4 so the ordered ramp is actually dug.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "build_ramp path:15,15;15,27;25,27 depth:6 width:3",
+      "timeout": 90,
+      "description": "#1942: player arms the ramp tool, sets depth 6, clicks the start (15,15), the corner (15,27) and the end (25,27) tile, and presses Confirm. Three clicks make a two-leg switchback: 12 m south then 10 m east, 22 m in all. No console command stands in for a click. The command-mode equivalent is the path: form the tool sends.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 15
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 27
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 27
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount"
+        ],
+        "changedBy": {
+          "cash": -2200
+        },
+        "note": "22 m x 3 wide x RAMP_COST_PER_METER_PER_WIDTH (100/3) = 2200; the corner is counted once."
+      }
+    },
+    {
+      "command": "wait_until field:builtRampCount equals:1 max_ticks:1200",
+      "timeout": 245,
+      "description": "Wait for every dig_ramp_segment of both legs to land; the finished ramp is recorded as one BuiltRamp with two legs. Condition-based wait, never a tick pad.",
+      "interaction": [
+        {
+          "type": "cameraFocus",
+          "x": 20,
+          "z": 21,
+          "distance": 24
+        },
+        {
+          "type": "waitUntil",
+          "field": "builtRampCount",
+          "equals": 1,
+          "maxTicks": 1200,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "builtRampCount": 1,
+          "rampLegCount": 2,
+          "orderedRampSegmentCount": 0
+        },
+        "note": "One built ramp of two legs: the player-drawn switchback was dug. rampLegCount is the leg count of the first built ramp (0 when none)."
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [
+        20,
+        21
+      ],
+      "distance": 24
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80,
+      "target": [
+        20,
+        21
+      ],
+      "distance": 24
+    }
+  ]
+}

@@ -180,3 +180,77 @@ describe('ParamStrip', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });
+
+// ── #1942: readout lines and extra action buttons ──
+describe('ParamStrip readout and actions (#1942)', () => {
+  let container: HTMLElement;
+  let strip: ParamStrip;
+  beforeEach(() => {
+    document.body.replaceChildren();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    strip = new ParamStrip(container);
+  });
+  const bar = () => container.querySelector('#bs-param-strip-bar') as HTMLElement;
+  const confirm = () => container.querySelector('#bs-tile-select-confirm') as HTMLButtonElement;
+
+  it('renders every readout line', () => {
+    strip.show(makeConfig({ readout: ['22 m · 2 legs', 'T1 ✓ T2 ✓ T3 ✗ (max 18°)'] }));
+    expect(container.textContent).toContain('22 m · 2 legs');
+    expect(container.textContent).toContain('T1 ✓ T2 ✓ T3 ✗ (max 18°)');
+  });
+
+  it('renders readout lines above the bar', () => {
+    strip.show(makeConfig({ readout: ['READOUT-LINE'] }));
+    const line = [...container.querySelectorAll('*')].find(e => e.children.length === 0 && e.textContent === 'READOUT-LINE')!;
+    expect(line).toBeDefined();
+    expect(bar().contains(line)).toBe(false);
+    expect(bar().compareDocumentPosition(line) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  });
+
+  it('renders no readout for an empty or absent list', () => {
+    strip.show(makeConfig({ readout: [] }));
+    const emptyHtml = container.innerHTML;
+    strip.show(makeConfig());
+    expect(container.innerHTML).toBe(emptyHtml);
+  });
+
+  it('renders an action as a button with data-action before Confirm, and clicking fires it', () => {
+    const onClick = vi.fn();
+    strip.show(makeConfig({ actions: [{ key: 'ramp-spiral', label: 'Spiral', onClick }] }));
+    const btn = bar().querySelector<HTMLButtonElement>('[data-action="ramp-spiral"]')!;
+    expect(btn.textContent).toContain('Spiral');
+    expect(btn.compareDocumentPosition(confirm()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    btn.click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('a disabled action cannot be clicked', () => {
+    const onClick = vi.fn();
+    strip.show(makeConfig({ actions: [{ key: 'undo', label: 'Undo', onClick, disabled: true }] }));
+    const btn = bar().querySelector<HTMLButtonElement>('[data-action="undo"]')!;
+    expect(btn.disabled).toBe(true);
+    btn.click();
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('renders no action buttons by default', () => {
+    strip.show(makeConfig());
+    expect(bar().querySelectorAll('[data-action]:not([data-action="confirm"]):not([data-action="cancel"])')).toHaveLength(0);
+  });
+
+  it('rebuilds when a readout line changes', () => {
+    strip.show(makeConfig({ readout: ['READOUT-A'] }));
+    strip.show(makeConfig({ readout: ['READOUT-B'] }));
+    expect(container.textContent).toContain('READOUT-B');
+    expect(container.textContent).not.toContain('READOUT-A');
+  });
+
+  it('rebuilds when the set of actions changes', () => {
+    strip.show(makeConfig());
+    strip.show(makeConfig({ actions: [{ key: 'ramp-spiral', label: 'Spiral', onClick: vi.fn() }] }));
+    expect(bar().querySelector('[data-action="ramp-spiral"]')).not.toBeNull();
+    strip.show(makeConfig());
+    expect(bar().querySelector('[data-action="ramp-spiral"]')).toBeNull();
+  });
+});
