@@ -19,6 +19,8 @@ import { el, fieldStyle, card, sectionHeader, emptyState, chip, button, panelRoo
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
+import { barrenStoredMassKg, stateBarrenOverflowKg } from '../../core/economy/SpoilHeaps.js';
+import { oreGradeScaleOf } from '../../core/economy/OreGrade.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import { oreValuePerKg } from '../../core/economy/Market.js';
@@ -181,6 +183,9 @@ export class OperationsPanel extends PanelBase {
       // Feeds "Unclaimed Work": counts queued orders the work queue rows leave out (rest).
       unclaimed: countQueuedByBlock(state.pendingActions),
       blockedReasons: countQueuedBlockedReasons(state.pendingActions),
+      // Feeds the barren-overflow note: it changes when a heap fills or empties, not only with the queue.
+      barrenOverflow: Math.round(stateBarrenOverflowKg(state)),
+      barrenStored: Math.round(barrenStoredMassKg(state.logistics.fragments, oreGradeScaleOf(state.world))),
     }) + `#${playerSig}#${debrisSig}`;
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -264,24 +269,26 @@ export class OperationsPanel extends PanelBase {
     const noteParts: string[] = [];
     if (open > 0 || blocked + stranded === 0) noteParts.push(t('ui.operations.unclaimed_work_note'));
     if (blocked > 0) {
-      const reasons = describeBlockedReasons(countQueuedBlockedReasons(state.pendingActions));
+      const counts = countQueuedBlockedReasons(state.pendingActions);
+      const reasons = describeBlockedReasons(counts, undefined, (counts.storage_full ?? 0) > 0 ? stateBarrenOverflowKg(state) : 0);
       noteParts.push(t('ui.operations.unclaimed_work_note_blocked', { reasons: reasons.join('; ') }));
     }
     if (stranded > 0) noteParts.push(t('ui.operations.unclaimed_work_note_stranded', { stranded }));
     const unclaimedNote = noteParts.join(' ');
 
+    const barrenKg = barrenStoredMassKg(state.logistics.fragments, oreGradeScaleOf(state.world));
     const wrap = el('div');
     wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
     wrap.append(
       this.makeLogisticsRow(t('ui.operations.on_ground'), t('ui.operations.fragment_count', { count: counts.onGround }), t('ui.operations.mass_kg', { kg: Math.round(onGroundKg).toLocaleString('en-US') })),
       this.makeLogisticsRow(t('ui.operations.in_transit'), t('ui.operations.fragment_count', { count: counts.inTransit }), t('ui.operations.mass_kg', { kg: Math.round(inTransitKg).toLocaleString('en-US') })),
-      this.makeLogisticsRow(t('ui.operations.stored'), `${Math.round(state.logistics.storedMassKg).toLocaleString('en-US')} / ${cap.toLocaleString('en-US')} kg`, t('ui.operations.storage_pct', { pct: storedPct })),
+      this.makeLogisticsRow(t('ui.operations.stored'), `${Math.round(state.logistics.storedMassKg).toLocaleString('en-US')} / ${cap.toLocaleString('en-US')} kg`, t('ui.operations.storage_pct', { pct: storedPct }), barrenKg > 0 ? t('ui.operations.stored_barren', { kg: Math.round(barrenKg).toLocaleString('en-US') }) : undefined),
       this.makeLogisticsRow(t('ui.operations.unclaimed_work'), t('ui.operations.unclaimed_work_count', { count: open }), unclaimedNote),
     );
     return wrap;
   }
 
-  private makeLogisticsRow(label: string, value: string, note: string): HTMLElement {
+  private makeLogisticsRow(label: string, value: string, note: string, subNote?: string): HTMLElement {
     const row = el('div');
     row.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:10px 11px;border-radius:5px;background:var(--bsx-well)';
     const head = el('div');
@@ -290,7 +297,9 @@ export class OperationsPanel extends PanelBase {
       el('span', { text: label, attrs: { style: 'font:500 11px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
       el('span', { text: value, attrs: { style: 'margin-left:auto;font:600 12px/1 var(--bsx-font-mono)' } }),
     );
-    row.append(head, el('span', { text: note, attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }));
+    const noteStyle = 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)';
+    row.append(head, el('span', { text: note, attrs: { style: noteStyle } }));
+    if (subNote !== undefined) row.append(el('span', { text: subNote, attrs: { style: noteStyle } }));
     return row;
   }
 

@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD, SPOIL_HEAP_CAPACITY_KG } from '../../../src/core/config/balance.js';
 import {
-  creditSpoilHeaps, creditSpoilKg, spoilHeapRoomKg, totalSpoilRoomKg, drawSpoilKg, barrenStoredMassKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg,
+  creditSpoilHeaps, creditSpoilKg, spoilHeapRoomKg, totalSpoilRoomKg, drawSpoilKg, barrenStoredMassKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg, barrenOverflowKg, stateBarrenOverflowKg,
 } from '../../../src/core/economy/SpoilHeaps.js';
 import { addBlastFragments, createLogisticsState, deliverToSpoilHeap } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
@@ -469,5 +469,77 @@ describe('drawSpoilKg frees room (#1892)', () => {
     drawSpoilKg(heaps, 8_000);
     expect(totalSpoilRoomKg(heaps)).toBe(8_000);
     expect(creditSpoilHeaps(heaps, 8_000)).toBe(true);
+  });
+});
+
+describe('barrenOverflowKg / stateBarrenOverflowKg (#2018)', () => {
+  const ore = { blingite: 0.5 };
+  const full = () => [pile(SPOIL_HEAP_CAPACITY_KG)];
+
+  it('a heap whose room is reserved by in-flight hauls does not count as room', () => {
+    const heap = { ...pile(SPOIL_HEAP_CAPACITY_KG - 3_000), id: 7 };
+    const frags = [frag(48_000), frag(3_000), frag(2_000, ore)];
+    expect(barrenOverflowKg(frags, 53_000, [heap], 1, new Map())).toBe(0);
+    expect(barrenOverflowKg(frags, 53_000, [heap], 1, new Map([[7, 1]]))).toBe(51_000);
+  });
+
+  it('returns the barren kg when barren is most of storage and every heap is full', () => {
+    expect(barrenOverflowKg([frag(48_000), frag(2_000, ore)], 50_000, full())).toBe(48_000);
+  });
+
+  it('returns the barren kg with no heap at all', () => {
+    expect(barrenOverflowKg([frag(30_000), frag(10_000, ore)], 40_000, [])).toBe(30_000);
+  });
+
+  it('counts exactly half as overflow (boundary, inclusive)', () => {
+    expect(barrenOverflowKg([frag(25_000), frag(25_000, ore)], 50_000, full())).toBe(25_000);
+  });
+
+  it('is 0 just under half', () => {
+    expect(barrenOverflowKg([frag(24_999), frag(25_001, ore)], 50_000, full())).toBe(0);
+  });
+
+  it('is 0 when a heap still has room', () => {
+    expect(barrenOverflowKg([frag(48_000), frag(2_000, ore)], 50_000, [pile(SPOIL_HEAP_CAPACITY_KG - 48_000), pile(SPOIL_HEAP_CAPACITY_KG)])).toBe(0);
+  });
+
+  it('residual room below the smallest barren fragment still overflows; room at it does not', () => {
+    const frags = [frag(3_000), frag(45_000), frag(2_000, ore)];
+    expect(barrenOverflowKg(frags, 50_000, [pile(SPOIL_HEAP_CAPACITY_KG - 2_999)])).toBe(48_000);
+    expect(barrenOverflowKg(frags, 50_000, [pile(SPOIL_HEAP_CAPACITY_KG - 3_000)])).toBe(0);
+  });
+
+  it('is 0 when nothing is stored', () => {
+    expect(barrenOverflowKg([], 0, full())).toBe(0);
+    expect(barrenOverflowKg([frag(100)], 0, full())).toBe(0);
+  });
+
+  it('is 0 when the warehouse is full of ore', () => {
+    expect(barrenOverflowKg([frag(1_000), frag(49_000, ore)], 50_000, full())).toBe(0);
+  });
+
+  it('ignores fragments that are not stored', () => {
+    expect(barrenOverflowKg([frag(40_000, {}, 'on_ground'), frag(5_000, {}, 'in_transit'), frag(10_000, ore)], 10_000, full())).toBe(0);
+    expect(barrenOverflowKg([frag(40_000, {}, 'on_ground'), frag(6_000), frag(4_000, ore)], 10_000, full())).toBe(6_000);
+  });
+
+  it('reads the grade scale: a fragment barren at scale 1 is ore at scale 0.5', () => {
+    const scaled = frag(10_000, { blingite: 0.015 });
+    expect(barrenOverflowKg([scaled], 10_000, full())).toBe(10_000);
+    expect(barrenOverflowKg([scaled], 10_000, full(), 1)).toBe(10_000);
+    expect(barrenOverflowKg([scaled], 10_000, full(), 0.5)).toBe(0);
+  });
+
+  it('state variant reads logistics, buildings and the world grade scale', () => {
+    const state = {
+      logistics: { fragments: [frag(48_000), frag(2_000, ore)], storedMassKg: 50_000 },
+      buildings: { buildings: full() },
+      world: null,
+    };
+    expect(stateBarrenOverflowKg(state)).toBe(48_000);
+    expect(stateBarrenOverflowKg({ ...state, buildings: { buildings: [pile(0)] } })).toBe(0);
+    const scaled = { ...state, logistics: { fragments: [frag(10_000, { blingite: 0.015 })], storedMassKg: 10_000 } };
+    expect(stateBarrenOverflowKg(scaled)).toBe(10_000);
+    expect(stateBarrenOverflowKg({ ...scaled, world: { oreGradeScale: 0.5 } })).toBe(0);
   });
 });

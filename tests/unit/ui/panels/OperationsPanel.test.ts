@@ -4,6 +4,8 @@ import { OperationsPanel, countQueuedByBlock } from '../../../../src/ui/panels/O
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { buildBlockedOrderMessage } from '../../../../src/ui/notify/blockedOrders.js';
+import { placeBuilding } from '../../../../src/core/entities/Building.js';
+import { SPOIL_HEAP_CAPACITY_KG } from '../../../../src/core/config/balance.js';
 import type { GameState, PendingAction, BlockedOrderReason } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { AccidentRecord } from '../../../../src/core/entities/Damage.js';
@@ -1194,5 +1196,83 @@ describe('OperationsPanel — grouped debris queue, review fixes (#1972)', () =>
       expect(bigMs).toBeLessThan(Math.max(smallMs, 0.2) * 100);
       expect(bigMs).toBeLessThan(100);
     });
+  });
+});
+
+// ── Barren overflow in storage (#2018) ──
+
+describe('OperationsPanel — barren rock filling storage (#2018)', () => {
+  const BARREN_LINE = /barren rock waiting for a spoil heap/;
+
+  function storeFragment(state: GameState, mass: number, oreDensities: Record<string, number> = {}): void {
+    state.logistics.fragments.push({ state: 'stored', fragment: { mass, oreDensities } } as never);
+    state.logistics.storedMassKg += mass;
+  }
+
+  function addHeap(state: GameState, storedKg: number): void {
+    const r = placeBuilding(state.buildings, 'spoil_heap', 10 + state.buildings.buildings.length * 10, 12, 64, 64);
+    if (!r.success) throw new Error(`setup: ${r.error}`);
+    state.buildings.buildings[state.buildings.buildings.length - 1]!.storedSpoilKg = storedKg;
+  }
+
+  function render(state: GameState): string {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(state);
+    return panel.root.textContent ?? '';
+  }
+
+  const storageOrders = () => [blockedFixture(1, 'storage_full'), blockedFixture(2, 'storage_full')];
+
+  it('Stored row shows the barren sub-line with kg when barren rock is stored', () => {
+    const state = makeState();
+    storeFragment(state, 12_000);
+    storeFragment(state, 3_000, { blingite: 0.5 });
+    const text = render(state);
+    expect(text).toMatch(/12,000 kg barren rock waiting for a spoil heap/);
+  });
+
+  it('Stored row has no barren sub-line when only ore is stored', () => {
+    const state = makeState();
+    storeFragment(state, 3_000, { blingite: 0.5 });
+    expect(render(state)).not.toMatch(BARREN_LINE);
+  });
+
+  it('Stored row has no barren sub-line for a fresh game', () => {
+    expect(render(makeState())).not.toMatch(BARREN_LINE);
+  });
+
+  it('Unclaimed note uses the barren phrase with a full heap, mostly-barren storage and storage_full orders', () => {
+    const state = makeState();
+    addHeap(state, SPOIL_HEAP_CAPACITY_KG);
+    storeFragment(state, 48_000);
+    storeFragment(state, 2_000, { blingite: 0.5 });
+    state.pendingActions.push(...storageOrders());
+    const text = render(state);
+    expect(text).toContain('rubble contract');
+    expect(text).toContain('another heap');
+    expect(text).not.toContain('sell ore or build a Freight Warehouse');
+  });
+
+  it('Unclaimed note keeps the plain phrase when the warehouse is full of ore', () => {
+    const state = makeState();
+    addHeap(state, SPOIL_HEAP_CAPACITY_KG);
+    storeFragment(state, 2_000);
+    storeFragment(state, 48_000, { blingite: 0.5 });
+    state.pendingActions.push(...storageOrders());
+    const text = render(state);
+    expect(text).toContain('sell ore or build a Freight Warehouse');
+    expect(text).not.toContain('rubble contract');
+  });
+
+  it('Unclaimed note keeps the plain phrase when a heap has room', () => {
+    const state = makeState();
+    addHeap(state, 0);
+    storeFragment(state, 48_000);
+    storeFragment(state, 2_000, { blingite: 0.5 });
+    state.pendingActions.push(...storageOrders());
+    const text = render(state);
+    expect(text).toContain('sell ore or build a Freight Warehouse');
+    expect(text).not.toContain('rubble contract');
   });
 });

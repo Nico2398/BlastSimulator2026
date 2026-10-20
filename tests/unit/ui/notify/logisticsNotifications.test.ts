@@ -110,4 +110,34 @@ describe('BLOCKED pip tooltip names the reason (#2008)', () => {
     const pip = pipFor(['storage_full', 'no_licensed_driver', 'target_unreachable', 'no_spoil_heap', 'spoil_heap_full']);
     expect(pip.tip!.split('\n')).toHaveLength(3);
   });
+
+  describe('barren overflow wording (#2018)', () => {
+    function overflowState(heapFull: boolean) {
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      state.pendingActions.push(order(1, 'storage_full'));
+      state.logistics.fragments.push({
+        fragment: { id: 1, mass: 48_000, oreDensities: {} } as never,
+        state: 'stored', vehicleId: null, warehouseId: 1,
+      });
+      state.logistics.storedMassKg = 50_000;
+      state.buildings.buildings.push({
+        id: 9, type: 'spoil_heap', tier: 1, storedSpoilKg: heapFull ? 1e9 : 0,
+      } as never);
+      return state;
+    }
+    const tipOf = (state: ReturnType<typeof overflowState>) =>
+      new NotificationCenter().update(state).find(p => p.kind === 'orders')!.tip;
+
+    it('storage_full orders with barren overflow use the barren phrase', () => {
+      setLocale('en');
+      expect(tipOf(overflowState(true))).toBe(
+        t('notification.blocked_phrase.storage_full_barren', { count: 1, kg: '48,000' }),
+      );
+    });
+
+    it('a heap with room keeps the plain storage phrase', () => {
+      setLocale('en');
+      expect(tipOf(overflowState(false))).not.toContain('barren');
+    });
+  });
 });

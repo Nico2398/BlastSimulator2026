@@ -51,10 +51,10 @@ export function warehouseReservedKg(l: LogisticsState, warehouseId: number): num
 }
 
 /** Mass (kg) stored or in transit per warehouse id, in one pass over the fragments. */
-export function warehouseUsedKgMap(l: LogisticsState): Map<number, number> {
+export function warehouseUsedKgMap(l: { fragments: readonly { state: string; warehouseId?: number | null; fragment: { mass: number } }[] }): Map<number, number> {
   const used = new Map<number, number>();
   for (const f of l.fragments) {
-    if (f.warehouseId === null || f.state === 'on_ground') continue;
+    if (f.warehouseId == null || f.state === 'on_ground') continue;
     used.set(f.warehouseId, (used.get(f.warehouseId) ?? 0) + f.fragment.mass);
   }
   return used;
