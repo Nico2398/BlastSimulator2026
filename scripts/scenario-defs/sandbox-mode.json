@@ -299,7 +299,7 @@
       ],
       "expect": {
         "equals": {
-          "cash": 250000,
+          "cash": 370000,
           "seed": 31337,
           "worldSizeX": 64,
           "worldSizeZ": 64,

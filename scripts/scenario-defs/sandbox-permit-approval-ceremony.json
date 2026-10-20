@@ -3,12 +3,12 @@
   "description": "Approval ceremony (#1926): on a sandbox site the player applies for grade 1 from the Permits panel; when the Ministry approves, the game pauses behind a stamped letter naming the new grade with its unlock list, and the player dismisses it with one click (no `permit ack` console command in a player step), which clears the pending approval and resumes the clock.",
   "steps": [
     {
-      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 ore_grade:1",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 ore_grade:1"
         }
       ],
       "description": "Progression site: the sandbox opens with a permit ladder at grade 0.",

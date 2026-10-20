@@ -1,6 +1,6 @@
 {
   "name": "sandbox-permit-overshoot",
-  "description": "Permit limits (#1923): a sandbox 3x3 at 10 kg per hole (90 kg, over the 80 kg grade-0 limit) pays the $250 notification fee and rolls a seeded inspection; after `corrupt target:inspector` the same overshoot is never inspected.",
+  "description": "Permit limits (#1923): a sandbox 3x3 at 10 kg per hole (90 kg, over the 40 kg grade-0 limit) pays the $250 notification fee and rolls a seeded inspection; after `corrupt target:inspector` the same overshoot is never inspected.",
   "steps": [
     {
       "command": "sandbox start biome:desert_badlands kit:full seed:42",
@@ -11,7 +11,7 @@
           "command": "sandbox start biome:desert_badlands kit:full seed:42"
         }
       ],
-      "description": "Progression site at grade 0: the Backyard Dig Permit allows 80 kg and 9 holes per blast.",
+      "description": "Progression site at grade 0: the Backyard Dig Permit allows 40 kg and 9 holes per blast.",
       "expect": {
         "equals": {
           "mineGrade": {
@@ -30,7 +30,7 @@
           "command": "permit status"
         }
       ],
-      "description": "Grade 0 permit: limits 80 kg / 9 holes and the $250 notification fee are listed, no inspection chance."
+      "description": "Grade 0 permit: limits 40 kg / 9 holes and the $250 notification fee are listed, no inspection chance."
     },
     {
       "command": "build explosive_warehouse at:8,8",
@@ -242,7 +242,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Blast 1: order 10 kg per hole, 90 kg in all against the 80 kg limit.",
+      "description": "Blast 1: order 10 kg per hole, 90 kg in all against the 40 kg limit.",
       "expect": {
         "increased": [
           "orderedChargeCount"

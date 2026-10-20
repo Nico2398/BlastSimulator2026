@@ -20,10 +20,10 @@ import {
   resolveSandboxKitId,
 } from '../../../src/core/campaign/Sandbox.js';
 import { isValidOreGradeScale } from '../../../src/core/economy/OreGrade.js';
-import { getLevel } from '../../../src/core/campaign/Level.js';
+import { getLevel, getAllLevels } from '../../../src/core/campaign/Level.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
-import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE } from '../../../src/core/config/balance.js';
+import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE, SANDBOX_ORE_GRADE_SCALE, ORE_GRADE_SCALE_DEFAULT } from '../../../src/core/config/balance.js';
 import { resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
 import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 
@@ -37,8 +37,8 @@ const LEVEL_FIELDS_SHARED_ACROSS_KITS = [
 
 describe('SANDBOX_KITS (#1891)', () => {
   it('maps each named kit to its documented starting cash', () => {
-    expect(SANDBOX_KITS.digger.startingCash).toBe(210_000);
-    expect(SANDBOX_KITS.full.startingCash).toBe(250_000);
+    expect(SANDBOX_KITS.digger.startingCash).toBe(330_000);
+    expect(SANDBOX_KITS.full.startingCash).toBe(370_000);
   });
 
   it('carries the kit id and order consistently', () => {
@@ -427,16 +427,16 @@ describe('sandbox starting site per kit (#1671, #1891)', () => {
     ].sort());
   });
 
-  it('keeps cash at 210k digger / 250k full alongside the kit', () => {
-    expect(sandboxLevelDef(clampSandboxConfig({ kit: 'digger' })).startingCash).toBe(210_000);
-    expect(sandboxLevelDef(clampSandboxConfig({ kit: 'full' })).startingCash).toBe(250_000);
+  it('keeps cash at 330k digger / 370k full alongside the kit', () => {
+    expect(sandboxLevelDef(clampSandboxConfig({ kit: 'digger' })).startingCash).toBe(330_000);
+    expect(sandboxLevelDef(clampSandboxConfig({ kit: 'full' })).startingCash).toBe(370_000);
   });
 
   it('SANDBOX_STARTING_SITES and SANDBOX_STARTING_CASH are keyed by kit (#1891)', () => {
     expect(Object.keys(SANDBOX_STARTING_SITES).sort()).toEqual(['digger', 'full']);
     expect(Object.keys(SANDBOX_STARTING_CASH).sort()).toEqual(['digger', 'full']);
-    expect(SANDBOX_STARTING_CASH.digger).toBe(210_000);
-    expect(SANDBOX_STARTING_CASH.full).toBe(250_000);
+    expect(SANDBOX_STARTING_CASH.digger).toBe(330_000);
+    expect(SANDBOX_STARTING_CASH.full).toBe(370_000);
   });
 
   it('digger kit includes a rock digger and a driver holding driving.excavator (#1874)', () => {
@@ -631,7 +631,6 @@ import {
   DEFAULT_PIT_MASK,
   SANDBOX_FLAT_PAD_TARGET,
 } from '../../../src/core/config/balance.js';
-import { getAllLevels } from '../../../src/core/campaign/Level.js';
 import { generateTerrain, buildTerrainContext } from '../../../src/core/world/TerrainGen.js';
 import { computeVoxelColumnSurfaceY, CompositionPalette } from '../../../src/core/world/VoxelGrid.js';
 import { sandboxTerrainConfig, flatPadShare } from '../../helpers/sandboxSite.js';
@@ -734,5 +733,28 @@ describe('sandbox market (#1681)', () => {
     expect(resolveMarketId(state)).toBe('production');
     delete state.contracts.market;
     expect(resolveMarketId(state)).toBe('legacy');
+  });
+});
+
+describe('sandbox ore grade scale (#1944)', () => {
+  it('sandboxLevelDef carries SANDBOX_ORE_GRADE_SCALE for every kit', () => {
+    for (const kit of SANDBOX_KIT_ORDER) {
+      expect(sandboxLevelDef(clampSandboxConfig({ kit })).oreGradeScale, kit).toBe(SANDBOX_ORE_GRADE_SCALE);
+    }
+  });
+
+  it('SANDBOX_ORE_GRADE_SCALE is positive and strictly thinner than the default', () => {
+    expect(SANDBOX_ORE_GRADE_SCALE).toBeGreaterThan(0);
+    expect(SANDBOX_ORE_GRADE_SCALE).toBeLessThan(ORE_GRADE_SCALE_DEFAULT);
+  });
+
+  it('SANDBOX_ORE_GRADE_SCALE is a valid scale', () => {
+    expect(isValidOreGradeScale(SANDBOX_ORE_GRADE_SCALE)).toBe(true);
+  });
+
+  it('campaign levels leave oreGradeScale undefined', () => {
+    const campaign = getAllLevels().filter(l => l.id !== SANDBOX_LEVEL_ID);
+    expect(campaign.length).toBeGreaterThan(0);
+    for (const level of campaign) expect(level.oreGradeScale, level.id).toBeUndefined();
   });
 });

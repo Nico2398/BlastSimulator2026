@@ -23,7 +23,7 @@ import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { resolveGeneratedBiome } from '../../src/core/world/TerrainGen.js';
 import { resolveContractOres } from '../../src/core/campaign/Level.js';
 import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
-import { SANDBOX_PIT_MASK, SANDBOX_FLAT_PAD_SIZE, SURVEY_DEPTH_BELOW_SURFACE } from '../../src/core/config/balance.js';
+import { SANDBOX_PIT_MASK, SANDBOX_ORE_GRADE_SCALE, SANDBOX_FLAT_PAD_SIZE, SURVEY_DEPTH_BELOW_SURFACE } from '../../src/core/config/balance.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
@@ -652,10 +652,13 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
 });
 
 // #1677: the opening-site survey finds ore in the two biomes whose ore used to be locked out.
+// Pins ore_grade:1 (the biome's own ore, #1944): the sandbox default 0.08 thins a core column below the
+// survey's 0.05 rounding, so a blind core sample can read barren there. Recorded in
+// docs/plans/issue-1944-sandbox-yield.md as a player-facing finding.
 describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start survey finds ore (#1677)', (biome) => {
   it.each(['aerial', 'core_sample'] as const)('%s survey at the start reports ore', (method) => {
     const { runner, ctx } = createRunner();
-    expect(runner.run(`sandbox start biome:${biome} kit:digger seed:42 staffed:true`).success).toBe(true);
+    expect(runner.run(`sandbox start biome:${biome} kit:digger seed:42 staffed:true ore_grade:1`).success).toBe(true);
     runner.run('time resume');
     const state = ctx.state!;
     // The free kit has no surveyor: hire one and grant geology, as a player would via the roster.
@@ -837,10 +840,10 @@ describe('sandbox start ore_grade lever (#1932)', () => {
     expect(ctx.state!.world!.oreGradeScale).toBe(1);
   });
 
-  it('the default sandbox pins no scale', () => {
+  it('the default sandbox pins the calibrated SANDBOX_ORE_GRADE_SCALE (#1944)', () => {
     const { runner, ctx } = fresh();
     expect(runner.run('sandbox start biome:desert_badlands seed:42').success).toBe(true);
-    expect(ctx.state!.world!.oreGradeScale).toBeUndefined();
+    expect(ctx.state!.world!.oreGradeScale).toBe(SANDBOX_ORE_GRADE_SCALE);
   });
 
   it.each(['0', 'abc', '1.5', '-0.3'])('ore_grade:%s is refused with the sandbox.invalid_ore_grade copy', (bad) => {
