@@ -1,5 +1,6 @@
 import { MaterialRecipe } from './SurfaceMaterialCatalog.js';
 import { getAllOres } from './OreCatalog.js';
+import { WALL_SAFE_FACE_HEIGHT_M_BY_TIER } from '../config/balance.js';
 
 // BlastSimulator2026 — Rock type catalog
 // 10 fictional rock types spanning hardness tiers 1–5.
@@ -11,6 +12,8 @@ export interface RockType {
   readonly descKey: string;
   /** Hardness tier 1 (softest) to 5 (hardest). */
   readonly hardnessTier: number;
+  /** Tallest continuous face (m) this rock holds before it slumps (#1941). */
+  readonly safeFaceHeightM: number;
   /**
    * Energy this rock absorbs per voxel before it overflows to its neighbours,
    * in game energy units. Doubles as the fracture threshold: a voxel breaks
@@ -59,12 +62,18 @@ export interface RockType {
 // harder rocks (tier 5) → lower freq (more uniform).
 // Level bias: softer rocks → lower bias (rarer); harder → higher bias (more common).
 
+/** Safe face height (m) of a hardness tier; an unknown tier is treated as the softest. */
+function safeFaceHeightForTier(tier: number): number {
+  return WALL_SAFE_FACE_HEIGHT_M_BY_TIER[tier] ?? WALL_SAFE_FACE_HEIGHT_M_BY_TIER[1]!;
+}
+
 const ROCKS: readonly RockType[] = [
   {
     id: 'cruite',
     nameKey: 'rock.cruite.name',
     descKey: 'rock.cruite.desc',
     hardnessTier: 1,
+    safeFaceHeightM: safeFaceHeightForTier(1),
     energyAbsorption: 200,
     density: 2100,
     porosity: 0.35,
@@ -91,6 +100,7 @@ const ROCKS: readonly RockType[] = [
     nameKey: 'rock.sandite.name',
     descKey: 'rock.sandite.desc',
     hardnessTier: 1,
+    safeFaceHeightM: safeFaceHeightForTier(1),
     energyAbsorption: 250,
     density: 2200,
     porosity: 0.30,
@@ -111,6 +121,7 @@ const ROCKS: readonly RockType[] = [
     nameKey: 'rock.molite.name',
     descKey: 'rock.molite.desc',
     hardnessTier: 2,
+    safeFaceHeightM: safeFaceHeightForTier(2),
     energyAbsorption: 500,
     density: 2400,
     porosity: 0.20,
@@ -131,6 +142,7 @@ const ROCKS: readonly RockType[] = [
     nameKey: 'rock.grumpite.name',
     descKey: 'rock.grumpite.desc',
     hardnessTier: 2,
+    safeFaceHeightM: safeFaceHeightForTier(2),
     energyAbsorption: 600,
     density: 2550,
     porosity: 0.18,
@@ -151,6 +163,7 @@ const ROCKS: readonly RockType[] = [
     nameKey: 'rock.clunkite.name',
     descKey: 'rock.clunkite.desc',
     hardnessTier: 3,
+    safeFaceHeightM: safeFaceHeightForTier(3),
     energyAbsorption: 1100,
     density: 2650,
     porosity: 0.12,
@@ -171,6 +184,7 @@ const ROCKS: readonly RockType[] = [
     nameKey: 'rock.stubite.name',
     descKey: 'rock.stubite.desc',
     hardnessTier: 3,
+    safeFaceHeightM: safeFaceHeightForTier(3),
     energyAbsorption: 1300,
     density: 2700,
     porosity: 0.10,
@@ -191,6 +205,7 @@ const ROCKS: readonly RockType[] = [
     nameKey: 'rock.obstiite.name',
     descKey: 'rock.obstiite.desc',
     hardnessTier: 4,
+    safeFaceHeightM: safeFaceHeightForTier(4),
     energyAbsorption: 2200,
     density: 2800,
     porosity: 0.06,
@@ -211,6 +226,7 @@ const ROCKS: readonly RockType[] = [
     nameKey: 'rock.gnarlite.name',
     descKey: 'rock.gnarlite.desc',
     hardnessTier: 4,
+    safeFaceHeightM: safeFaceHeightForTier(4),
     energyAbsorption: 2600,
     density: 2900,
     porosity: 0.05,
@@ -231,6 +247,7 @@ const ROCKS: readonly RockType[] = [
     nameKey: 'rock.absurdite.name',
     descKey: 'rock.absurdite.desc',
     hardnessTier: 5,
+    safeFaceHeightM: safeFaceHeightForTier(5),
     energyAbsorption: 3500,
     density: 3100,
     porosity: 0.03,
@@ -251,6 +268,7 @@ const ROCKS: readonly RockType[] = [
     nameKey: 'rock.titanite.name',
     descKey: 'rock.titanite.desc',
     hardnessTier: 5,
+    safeFaceHeightM: safeFaceHeightForTier(5),
     energyAbsorption: 4000,
     density: 3300,
     porosity: 0.02,
@@ -303,4 +321,9 @@ export function oresYieldedByRocks(rockIds: readonly string[]): string[] {
  */
 export function rockIndexOf(id: string): number {
   return ROCKS.findIndex(r => r.id === id);
+}
+
+/** Safe face height in metres for a rock id (#1941). */
+export function getSafeFaceHeightM(rockId: string): number {
+  return getRock(rockId)?.safeFaceHeightM ?? safeFaceHeightForTier(1);
 }

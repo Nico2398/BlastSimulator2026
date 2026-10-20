@@ -876,6 +876,7 @@ window.__gameState = () => {
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
     supplyOffered: hasSupplyOffer(s.contracts.available),
     blastBanned: isActive(s.events.activeModifiers, 'blast_ban', s.tickCount), // mirrors serializeGameState
+    wallSlumpCount: s.damage.wallSlumpCount ?? 0, // mirrors serializeGameState (#1941)
     blingiteSaleOffered: hasOreSaleOffer(s.contracts.available, 'blingite'),
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
