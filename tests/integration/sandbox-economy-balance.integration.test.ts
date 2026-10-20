@@ -420,8 +420,8 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
     if (!over()) {
       expect(logged(`drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:${SECOND_SHOT}`).success).toBe(true);
       playUntil(800, () => state.plannedDrillHoles.length === 0);
-        // A player pays for and builds the warehouse (#1963): no free placeBuilding.
-        expect(stockWarehouse(logged, state, 'krackle', 24).success).toBe(true);
+      // A player pays for and builds the warehouse (#1963): no free placeBuilding.
+      expect(stockWarehouse(logged, state, 'krackle', 24).success).toBe(true);
       logged('charge hole:* explosive:krackle amount:6 stemming:2');
       playUntil(CHARGE_WAIT_TICKS, () => Object.keys(state.plannedChargesByHole).length === 0);
       expect(Object.keys(state.plannedChargesByHole), `second pattern still uncharged ${CHARGE_WAIT_TICKS} ticks after ordering`).toEqual([]);
@@ -726,11 +726,13 @@ describe('sandbox economy: the kit-only opening, no explosive warehouse (#1963)'
    * Ticks played after the sequence starts. The cash low points of the kit-only opening sit at t1024-t1144 on the
    * ten runs measured on main 02137db after #1944 (issue #1963), so 1,500 ticks covers the risk window with the
    * first sales (t944-t1074) and the recovery behind them. The horizon is this run's choice, bounded for ten runs.
+   * The sweep pins solvency (the level never ends) and a completed ore sale by then, not a cash level.
    */
   const HORIZON = 1500;
   const BUILD = 'living_quarters at:30,48 tier:1';
   /** The #1944 reference shot on the deposit: 3x3 x 5 m, Krackle 4 kg (36 kg), inside the grade-0 permit (40 kg, 9 holes). Measured at 36,32. */
   const SHOT_START = '36,32';
+  /** Ramp of the sequence measured in issue #1963 (main 02137db). */
   const RAMP = 'start:40,12 end:40,31 depth:5';
   const KITS = ['digger', 'full'] as const;
   /** The five seeds of the measurement table in the issue (desert_badlands). */
@@ -747,7 +749,8 @@ describe('sandbox economy: the kit-only opening, no explosive warehouse (#1963)'
     expect(drill.success, `drill_plan: ${drill.output}`).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
     // The kit owns no explosive warehouse and this test builds none: the order waits EXPLOSIVE_DELIVERY_TICKS (#1895).
-    logged('charge hole:* explosive:krackle amount:4 stemming:2');
+    const charge = logged('charge hole:* explosive:krackle amount:4 stemming:2');
+    expect(charge.success, `charge (${label()}): ${charge.output}`).toBe(true);
     playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     const blast = logged('blast');
