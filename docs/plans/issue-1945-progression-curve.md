@@ -37,7 +37,7 @@ Per grade (what the run showed; grades 3-5 were never reached, so those rows are
 | --- | --- | --- | --- | --- | --- |
 | 1 | 3x3 Krackle 4 kg, depth 5 (opening) then 4x4 7.5 kg depth 10 at the grade-1 limit | kit fleet, 5-6 crew | 2nd blast and 5 t delivered | digger 978, full 1088 | 635,743 / 593,425 |
 | 2 | 4x4 120 kg (grade-1 limit), 10 m holes, 89 mm | kit fleet + fragmenter + licensed driver, 6 crew | ore delivered 30 t (~9 kg/tick delivered) and pit 10 m (needs the first crater cleared and a ramp to its floor) | digger 3762 (full: not reached) | 2,884,758 |
-| 3 | not run | not run | ore 150 t at ~9 kg/tick delivered is ~16,700 ticks after grade 2; depth 20 m needs a tier-2 rig, its licence and a ramp longer than the policy digs | - | - |
+| 3 | not run | not run | ore 150 t (cumulative: `oreDeliveredKg` never resets) at ~9 kg/tick delivered is ~t16,700 absolute, ~12,900 ticks after grade 2 (t3762); depth 20 m needs a tier-2 rig, its licence and a ramp longer than the policy digs | - | - |
 | 4 | not run | - | - | - | - |
 | 5 | not run | - | - | - | - |
 
@@ -49,7 +49,7 @@ Per grade (what the run showed; grades 3-5 were never reached, so those rows are
 | grade 4 at t15,000-25,000 | not run | MISSED, not measured |
 | grade 5 at t30,000-45,000 | not run | MISSED, not measured |
 | catalog never fully bought | no run bought the whole catalog (`catalogBoughtTick` null in all three) | held, trivially (no tier-2/3 purchase was reached either) |
-| >= 60% of boulder ore sells with a fragmenter | full kit ladder 68%, stay_g1 58%; digger ladder (bought fragmenter) 52% | full ladder met; stay_g1 58% missed by 2 points; digger 52% missed by 8 points |
+| >= 60% of boulder ore sells with a fragmenter (metric `boulderOreSoldShare`) | full kit ladder 68%, stay_g1 58%; digger ladder (bought fragmenter) 52% | full ladder met; stay_g1 58% missed by 2 points; digger 52% missed by 8 points |
 | fragmenter run ahead of no-fragmenter run at t10000 | full ladder 8,487,902 vs digger ladder 7,440,251 | met, but the kits differ in more than the fragmenter |
 | ladder ahead of stay_g1 at t10000 | 8,487,902 vs 8,487,902 | MISSED by 0: the full-kit ladder never leaves grade 1 (safety 38 of 40 at every interval it checked), so it plays the same game as stay_g1 |
 
@@ -61,9 +61,9 @@ Per grade (what the run showed; grades 3-5 were never reached, so those rows are
 
 ## Why the run stops at grade 2 (measured, not tuned)
 
-1. Deepening needs the crater clear and a ramp to its floor. Shots fired into a crater still holding rubble leave holes `buried_under_rubble`; deeper craters leave haul orders `debris_out_of_reach` and a worker who cannot leave the blast zone. Ramps dug per crater (tried) made it worse: income stalled and the run went bankrupt at t7389 to t10869 on both kits. That variant is not committed.
-2. Safety 38 to 40 on the full kit: the grade-2 target (40) was met only on an interval boundary for the digger kit; a Management Office (safety equipment) lifted it to 67 in a trial but that variant also went bankrupt (item 1) and is not committed.
-3. Delivered ore is about 9 kg/tick, so the grade-3 target (150 t) is ~16,700 ticks after grade 2 at the current rate; reaching t8,000-14,000 needs either about a 2.5x delivery rate or a lower grade-3 ore target (first lever in the issue's order: `MINE_GRADES`). Not changed, because no run reached grade 3 to confirm the other grade-3 targets (depth 20, neighbours 35, no death in 1,000) would then bind later.
+1. Deepening needs the crater clear and a ramp to its floor. Shots fired into a crater still holding rubble leave holes `buried_under_rubble`; deeper craters leave haul orders `debris_out_of_reach` and a worker who cannot leave the blast zone. Ramps dug per crater (tried) made it worse: income stalled and the run went bankrupt at t7389 to t10869 on both kits. `ladderCraterRamp` in `scripts/shared/probe-strategies.ts` is that per-crater ramp and IS committed: seeded with `rampedOrigins: 1` it skips only the opening crater and orders a ramp into every later crater. The measured figures in this document were not re-measured with it active, so they are not evidence for or against it; the bankruptcies above came from the variant tried before it was committed.
+2. Safety 38 to 40 on the full kit: the grade-2 target (40) was met only on an interval boundary for the digger kit; the safety figures (38 to 40, 67) are read from console output, not a probe metric; a Management Office (safety equipment) lifted it to 67 in a trial but that variant also went bankrupt (item 1) and is not committed.
+3. Delivered ore is about 9 kg/tick, so the grade-3 target (150 t) is ~t16,700 absolute (cumulative ore, ~12,900 ticks after grade 2) at the current rate; reaching grade 3 by t14,000 needs ~10.7 kg/tick (1.2x), by t8,000 ~18.8 kg/tick (2.1x), or a lower grade-3 ore target (first lever in the issue's order: `MINE_GRADES`). Not changed, because no run reached grade 3 to confirm the other grade-3 targets (depth 20, neighbours 35, no death in 1,000) would then bind later.
 
 ## Balance constants
 

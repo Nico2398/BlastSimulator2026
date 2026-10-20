@@ -60,16 +60,17 @@ import { computeVehicleUpgradeCost } from '../../src/core/entities/VehicleUpgrad
 import { ROLE_LICENCE_REQUIRED, canDriveTier, countLicenceHolders, licenceLevelOfSkill } from '../../src/core/entities/VehicleDriverAssignment.js';
 import { isEnrolledInTraining } from '../../src/core/entities/EmployeeTraining.js';
 import {
-  DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS, VEHICLE_TIER_MAX_SLOPE_DEGREES,
+  DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS,
   WALL_BERM_MIN_WIDTH_M, WALL_SAFE_FACE_HEIGHT_M_BY_TIER,
 } from '../../src/core/config/balance.js';
 import { gradeDef } from '../../src/core/economy/MineGrade.js';
+import { tierSlopeRatio } from '../../src/core/nav/ClimbLimit.js';
 import { fleetBestRigLimit } from '../../src/core/mining/RigLimits.js';
 import { explosiveHoleLimits, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
 import {
-  limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
+  floorToKgResolution, limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
   type BuyRule, type LadderShot, type PermitLimit,
 } from './probe-ladder.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
@@ -509,7 +510,6 @@ const LADDER_HOLE_DEPTH_M = 10;
 const LADDER_SHRINK_STEPS = [1, 0.75, 0.5, 0.25] as const;
 const LADDER_RAMP_RETRY_KEY = 'gentle_ramp';
 const SOFTEST_SAFE_FACE_M = WALL_SAFE_FACE_HEIGHT_M_BY_TIER[1]!;
-const slopeRatioOf = (tier: VehicleTier): number => Math.tan(VEHICLE_TIER_MAX_SLOPE_DEGREES[tier] * Math.PI / 180);
 
 /** Roles the ladder upgrades in place, in priority order: depth (rig), haul capacity, ramp digging. */
 const LADDER_UPGRADE_ROLES: readonly VehicleRole[] = ['drill_rig', 'debris_hauler', 'rock_digger'];
@@ -564,10 +564,10 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const sized = limitSizedShot(limit, base, rigDiameterM);
   const explosive = getExplosive(SHOT.explosive)!;
   /** Heaviest hole charge that stays inside the permit's total charge for an n x n pattern, the explosive's and the hole's own limits. */
-  const kgFor = (n: number): number => Math.floor(Math.min(
+  const kgFor = (n: number): number => floorToKgResolution(Math.min(
     limit.maxChargeKg / (n * n), explosiveHoleLimits(explosive, sized.diameterM).maxKg,
     maxFittingChargeKg(depth, sized.stemming, sized.diameterM),
-  ) * 10) / 10;
+  ));
 
   // Deepen the latest crater whose rubble is cleared (holes under rubble never finish); none clear: a fresh site meanwhile.
   const crater = [...m.origins].reverse().map(o => ({ x: o.x, z: o.z, span: o.span ?? SHOT_SPAN }))
@@ -642,7 +642,7 @@ function earnLicence(s: ProbeSession, m: ReinvestMemory, role: VehicleRole, tier
     && licenceLevelOfSkill(e.qualifications, skill) < tier);
   let trainee = idle;
   if (!trainee) {
-    if (spendable(s) < HIRING_COSTS[trainRole] + 5_000 || (m.retryAt[`hire_${skill}`] ?? 0) > state.tickCount) return false;
+    if (spendable(s) < HIRING_COSTS[trainRole] + LADDER_CASH_RESERVE || (m.retryAt[`hire_${skill}`] ?? 0) > state.tickCount) return false;
     m.retryAt[`hire_${skill}`] = state.tickCount + LADDER_HIRE_COOLDOWN_TICKS;
     if (!s.run(`employee hire role:${trainRole}`).success) return false;
     trainee = state.employees.employees.filter(e => e.alive && e.role === trainRole).sort((x, y) => y.id - x.id)[0];
@@ -664,9 +664,9 @@ function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
     m.rampPending = null;
   }
   const reachable = ([3, 2] as const).find(t => mayBuyVehicleTier(t, grade, 0));
-  if (reachable !== undefined && m.rampSlope > slopeRatioOf(reachable) && m.rampPending === null) {
+  if (reachable !== undefined && m.rampSlope > tierSlopeRatio(reachable) && m.rampPending === null) {
     tryOnce(s, m, LADDER_RAMP_RETRY_KEY, () => {
-      const slope = orderRamp(s, m.crater, m.crater.span, slopeRatioOf(reachable));
+      const slope = orderRamp(s, m.crater, m.crater.span, tierSlopeRatio(reachable));
       if (slope !== null) m.rampPending = slope;
       return slope !== null;
     });

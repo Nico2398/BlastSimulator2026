@@ -4,9 +4,9 @@ import type { VehicleTier } from '../../src/core/entities/Vehicle.js';
 import {
   DRILL_HOLE_DIAMETER_OPTIONS_M,
   DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M,
-  VEHICLE_TIER_MAX_SLOPE_DEGREES,
   VEHICLE_TIER_UNLOCK_GRADE,
 } from '../../src/core/config/balance.js';
+import { tierSlopeRatio } from '../../src/core/nav/ClimbLimit.js';
 
 export interface PermitLimit { maxChargeKg: number; maxHoles: number }
 
@@ -42,11 +42,16 @@ const KG_RESOLUTION = 10;
 /** Smallest per-hole charge (kg) a shot is sized for; a limit too small for it shrinks the grid. */
 const MIN_KG_PER_HOLE = 1;
 
+/** Floors a per-hole charge to KG_RESOLUTION so the console command parses it back exactly. */
+export function floorToKgResolution(kg: number): number {
+  return Math.floor(kg * KG_RESOLUTION) / KG_RESOLUTION;
+}
+
 /** Largest square grid and per-hole charge within `limit`, never exceeding either. */
 export function limitSizedShot(limit: PermitLimit, base: LadderShot, maxDiameterM: number): LadderShot {
   const holes = Math.max(1, Math.min(limit.maxHoles, Math.floor(limit.maxChargeKg / MIN_KG_PER_HOLE)));
   const side = Math.max(1, Math.floor(Math.sqrt(holes)));
-  const perHole = Math.floor((limit.maxChargeKg / (side * side)) * KG_RESOLUTION) / KG_RESOLUTION;
+  const perHole = floorToKgResolution(limit.maxChargeKg / (side * side));
   return { ...base, rows: side, cols: side, kgPerHole: perHole, diameterM: pickDiameter(maxDiameterM) };
 }
 
@@ -61,7 +66,7 @@ export function pickDiameter(rigMaxDiameterM: number): number {
 export function mayBuyVehicleTier(tier: VehicleTier, mineGrade: number, rampSlopeRatio: number | null): boolean {
   if (mineGrade < VEHICLE_TIER_UNLOCK_GRADE[tier]) return false;
   if (tier === 1) return true;
-  return rampSlopeRatio !== null && rampSlopeRatio <= Math.tan(VEHICLE_TIER_MAX_SLOPE_DEGREES[tier] * Math.PI / 180);
+  return rampSlopeRatio !== null && rampSlopeRatio <= tierSlopeRatio(tier);
 }
 
 /** First affordable catalog entry not owned, keeping `reserve` cash back; null if none. */
