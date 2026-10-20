@@ -5,7 +5,9 @@
 import { formatMoney } from '../economy/formatMoney.js';
 import type { BlastPlan } from './BlastPlan.js';
 import { type VoxelGrid, clampToGridColumn } from '../world/VoxelGrid.js';
-import type { VillagePosition } from './BlastExecution.js';
+import type { VillagePosition, BlastRating } from './BlastExecution.js';
+import type { MarketId } from '../economy/Market.js';
+import { dryRunBlast, type BlastForecast } from './BlastDryRun.js';
 import { vec3, length } from '../math/Vec3.js';
 import {
   VOXEL_SIZE_CM,
@@ -19,6 +21,7 @@ import {
   stemmingFactor,
 } from './BlastCalc.js';
 import { buildPlanEnergyField, maxVillageVibration } from './BlastExecution.js';
+import { identifyFragmentedVoxels } from './VoxelFragmentation.js';
 import { effectiveAt } from './EnergyPropagation.js';
 import { computeFragmentVelocity, throwFractionForBlowout } from './FragmentVelocity.js';
 import {
@@ -96,7 +99,17 @@ export interface BlastPreviewSummary {
   tier: number;
   energy: { affectedVoxels: number; minEnergy: number; maxEnergy: number } | null;
   fragments: { fractured: number; cracked: number; unaffected: number; avgFragmentSizeCm: number } | null;
-  projections: { projectionZoneVoxels: number; collapseFragments: number } | null;
+  projections: {
+    projectionZoneVoxels: number;
+    collapseFragments: number;
+    /** Dry-run forecast fields (#1968); from the dry-run blast. */
+    predictedRating: BlastRating;
+    thrownFragments: number;
+    totalFragments: number;
+    thrownShare: number;
+    furthestThrowM: number;
+  } | null;
+  /** affectedVillages = villages measured (all level villages), not only those above the felt floor. */
   vibrations: { maxVibration: number; affectedVillages: number } | null;
 }
 
@@ -162,7 +175,11 @@ export function previewEnergy(
   return { energyMap, maxEnergy, minEnergy: minEnergy === Infinity ? 0 : minEnergy };
 }
 
-/** Preview fragmentation quality. Requires software tier >= 2. */
+/**
+ * Preview fragmentation quality. Requires software tier >= 2.
+ * `fracturedCount` is the blast's cleared-voxel count (the same pass executeBlast runs), not the
+ * energy-test count; `avgFragmentSize` still averages the energy-test fractured voxels.
+ */
 export function previewFragments(
   plan: BlastPlan,
   grid: VoxelGrid,
@@ -193,12 +210,29 @@ export function previewFragments(
     }
   });
 
+  // The blast breaks more than the energy test alone (undermined burden, graded floor, rock left
+  // unsupported), so the count of voxels it will clear comes from the same pass executeBlast runs.
+  const cleared = identifyFragmentedVoxels(field, grid, false).fragmented.length;
   return {
-    fracturedCount: fractured,
+    fracturedCount: cleared,
     crackedCount: cracked,
     unaffectedCount: unaffected,
     avgFragmentSize: fractured > 0 ? totalFragSize / fractured : 1,
   };
+}
+
+/** Dry-run the whole blast on a forked grid. Requires software tier >= 3; null below it. */
+export function previewBlastOutcome(
+  plan: BlastPlan,
+  grid: VoxelGrid,
+  softwareTier: number,
+  villages: readonly VillagePosition[],
+  groundFactor: number,
+  wetHoleIds: ReadonlySet<string>,
+  marketId?: MarketId,
+): BlastForecast | null {
+  if (softwareTier < 3) return null;
+  return dryRunBlast(plan, grid, villages, groundFactor, wetHoleIds, marketId);
 }
 
 /** Preview projection zones. Requires software tier >= 3. */

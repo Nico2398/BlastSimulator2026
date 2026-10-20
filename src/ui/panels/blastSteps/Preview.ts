@@ -54,7 +54,9 @@ const PREDICTED_ROWS: PredictedRow[] = [
   { labelKey: 'ui.blast_workshop.preview.row_energy_range', requiredTier: 1, value: p => `${p.energy!.minEnergy.toFixed(1)}–${p.energy!.maxEnergy.toFixed(1)}` },
   { labelKey: 'ui.blast_workshop.preview.row_fragments', requiredTier: 2, value: p => `${p.fragments!.fractured}` },
   { labelKey: 'ui.blast_workshop.preview.row_avg_size', requiredTier: 2, value: p => `${p.fragments!.avgFragmentSizeCm.toFixed(0)} cm` },
-  { labelKey: 'ui.blast_workshop.preview.row_projection_zone', requiredTier: 3, value: p => `${p.projections!.projectionZoneVoxels} voxels` },
+  { labelKey: 'ui.blast_workshop.preview.row_predicted_rating', requiredTier: 3, value: p => t(`blast.rating.${p.projections!.predictedRating}`) },
+  { labelKey: 'ui.blast_workshop.preview.row_thrown_share', requiredTier: 3, value: p => `${Math.round(p.projections!.thrownShare * 100)}%` },
+  { labelKey: 'ui.blast_workshop.preview.row_furthest_throw', requiredTier: 3, value: p => `${Math.round(p.projections!.furthestThrowM)} m` },
   { labelKey: 'ui.blast_workshop.preview.row_vibration', requiredTier: 4, value: p => `${p.vibrations!.maxVibration.toFixed(2)} mm/s` },
 ];
 

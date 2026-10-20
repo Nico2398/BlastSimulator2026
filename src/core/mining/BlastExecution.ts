@@ -57,7 +57,7 @@ import {
 // ── Config ──
 
 /** Default ground factor for vibration. */
-const DEFAULT_GROUND_FACTOR = 1.0;
+export const DEFAULT_GROUND_FACTOR = 1.0;
 
 // ── Fragment Data ──
 

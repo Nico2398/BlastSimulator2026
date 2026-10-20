@@ -362,8 +362,8 @@ export class VoxelGrid {
    * caller keeps the same starting site, at the same coordinates, whether or
    * not its size divides by CHUNK_SIZE.
    */
-  constructor(sizeX: number, sizeZ: number) {
-    this.edits = new TerrainEdits();
+  constructor(sizeX: number, sizeZ: number, edits?: TerrainEdits) {
+    this.edits = edits ?? new TerrainEdits();
     if (sizeX <= 0 || sizeZ <= 0) return;
 
     for (let cz = 0; cz < Math.ceil(sizeZ / CHUNK_SIZE); cz++) {
@@ -523,6 +523,11 @@ export class VoxelGrid {
   }
 
   // ── Chunk source (materialize-on-read) (#1183) ──
+
+  /** Read-only view of the attached chunk source, or null when none is attached. */
+  getChunkSource(): VoxelChunkSource | null {
+    return this.chunkSource;
+  }
 
   /** Attach the generator + edit-record source new/dropped chunk slabs materialize from. */
   attachChunkSource(source: VoxelChunkSource): void {

@@ -7,13 +7,15 @@ import { requireGame, requireGameWithSub, assembleCurrentBlastPlan, assembleVali
 import {
   previewEnergy,
   previewFragments,
+  previewBlastOutcome,
   previewProjections,
   previewVibrations,
   purchaseSoftware,
 } from '../../../core/mining/Software.js';
-import { averageVibrationMod } from '../../../core/mining/BlastExecution.js';
+import { averageVibrationMod, DEFAULT_GROUND_FACTOR } from '../../../core/mining/BlastExecution.js';
+import { resolveMarketId } from '../../../core/campaign/Level.js';
 import type { BlastPlan } from '../../../core/mining/BlastPlan.js';
-import { VOXEL_SIZE_CM } from '../../../core/config/balance.js';
+import { VOXEL_SIZE_CM, VILLAGE_VIBRATION_FLOOR_MM_S } from '../../../core/config/balance.js';
 import { queueSavedBlastPlan } from './savedPlanQueue.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 
@@ -129,7 +131,12 @@ export function blastPreviewCommand(
   const energyPreview = previewEnergy(plan, ctx.grid!, tier, wetHoleIds);
   const fragmentPreview = previewFragments(plan, ctx.grid!, tier, wetHoleIds);
   const projectionPreview = previewProjections(plan, ctx.grid!, tier, wetHoleIds);
-  const vibrationPreview = previewVibrations(plan, levelVillagePositions(ctx), tier, vibrationFactor(ctx, plan));
+  const villages = levelVillagePositions(ctx);
+  const vibrationPreview = previewVibrations(plan, villages, tier, vibrationFactor(ctx, plan));
+  // T3+: dry-run the blast itself on a forked grid, so the forecast is what the blast will do.
+  const forecast = previewBlastOutcome(
+    plan, ctx.grid!, tier, villages, DEFAULT_GROUND_FACTOR, wetHoleIds, resolveMarketId(ctx.state!),
+  );
 
   ctx.state!.lastBlastPreview = {
     tier,
@@ -142,10 +149,15 @@ export function blastPreviewCommand(
         avgFragmentSizeCm: fragmentPreview.avgFragmentSize * VOXEL_SIZE_CM,
       }
       : null,
-    projections: projectionPreview
+    projections: projectionPreview && forecast
       ? {
         projectionZoneVoxels: projectionPreview.projectionZoneCount,
         collapseFragments: Math.max(0, (fragmentPreview?.fracturedCount ?? 0) + (fragmentPreview?.crackedCount ?? 0) - projectionPreview.projectionZoneCount),
+        predictedRating: forecast.rating,
+        thrownFragments: forecast.projectionCount,
+        totalFragments: forecast.fragmentCount,
+        thrownShare: forecast.thrownShare,
+        furthestThrowM: forecast.furthestThrowM,
       }
       : null,
     vibrations: vibrationPreview
@@ -171,13 +183,13 @@ export function blastPreviewCommand(
     lines.push(`  Fractured: ${fragmentPreview.fracturedCount}`);
     lines.push(`  Cracked: ${fragmentPreview.crackedCount}`);
     lines.push(`  Unaffected: ${fragmentPreview.unaffectedCount}`);
-    lines.push(`  Average fragment size: ${fragmentPreview.avgFragmentSize.toFixed(3)} m³`);
+    lines.push(`  Average fragment size: ${(fragmentPreview.avgFragmentSize * VOXEL_SIZE_CM).toFixed(0)} cm`);
   } else {
     lines.push('--- Fragmentation --- [Requires software tier 2]');
   }
 
   lines.push('');
-  if (projectionPreview) {
+  if (projectionPreview && forecast) {
     const fractured = fragmentPreview?.fracturedCount ?? 0;
     const cracked = fragmentPreview?.crackedCount ?? 0;
     // Fragments that are fractured/cracked but NOT projected outward collapse in place
@@ -186,6 +198,9 @@ export function blastPreviewCommand(
     lines.push(`  Projection zone voxels: ${projectionPreview.projectionZoneCount}`);
     lines.push(`  Projected fragments: ${projectionPreview.projectionZoneCount}`);
     lines.push(`  Collapse fragments: ${collapseCount}`);
+    lines.push(`  Predicted rating: ${t(`blast.rating.${forecast.rating}`)}`);
+    lines.push(`  Thrown share: ${Math.round(forecast.thrownShare * 100)}% (${forecast.projectionCount} of ${forecast.fragmentCount} fragments)`);
+    lines.push(`  Furthest throw: ${forecast.furthestThrowM.toFixed(0)} m`);
   } else {
     lines.push('--- Projections --- [Requires software tier 3]');
   }
@@ -194,7 +209,8 @@ export function blastPreviewCommand(
   if (vibrationPreview) {
     lines.push('--- Vibrations ---');
     lines.push(`  Max vibration: ${vibrationPreview.maxVibration.toFixed(4)}`);
-    lines.push(`  Affected villages: ${vibrationPreview.villages.length}`);
+    const felt = vibrationPreview.villages.filter(v => v.vibration >= VILLAGE_VIBRATION_FLOOR_MM_S).length;
+    lines.push(`  Affected villages: ${vibrationPreview.villages.length} measured, ${felt} above ${VILLAGE_VIBRATION_FLOOR_MM_S} mm/s`);
   } else {
     lines.push('--- Vibrations --- [Requires software tier 4]');
   }
