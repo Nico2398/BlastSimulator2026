@@ -3,7 +3,7 @@
 // Each ramp clears a diagonal column of voxels from surface to target depth.
 
 import {
-  RAMP_DIR_OFFSETS, findRampPathFault, rampLegsOf, rampPathCells, rampPathOf, rampTotalLength, rampWaypoints,
+  RAMP_DIR_OFFSETS, findRampPathFault, isZDominant, rampLegsOf, rampPathCells, rampPathOf, rampTotalLength, rampWaypoints,
   type RampDirection, type RampLeg,
 } from './RampPath.js';
 import { formatMoney } from '../economy/formatMoney.js';
@@ -79,7 +79,7 @@ export function rampDefFromEndpoints(
   const dz = endZ - originZ;
   let direction: RampDirection;
   let length: number;
-  if (Math.abs(dz) >= Math.abs(dx)) {
+  if (isZDominant(dx, dz)) {
     direction = dz >= 0 ? 'south' : 'north';
     length = Math.abs(Math.round(dz));
   } else {
@@ -87,6 +87,18 @@ export function rampDefFromEndpoints(
     length = Math.abs(Math.round(dx));
   }
   return { originX, originZ, direction, length, targetDepth };
+}
+
+/** The `RampDef` for `legs` from `origin`; a single leg is an ordinary straight ramp. `width` is set only when given. */
+export function rampDefFromLegs(
+  origin: { x: number; z: number }, legs: readonly RampLeg[], targetDepth: number, width?: RampWidth,
+): RampDef {
+  const def: RampDef = {
+    originX: origin.x, originZ: origin.z, direction: legs[0]!.direction, length: rampTotalLength(legs), targetDepth,
+  };
+  if (width !== undefined) def.width = width;
+  if (legs.length > 1) def.legs = legs.map(l => ({ ...l }));
+  return def;
 }
 
 // ── Grade (#1939) ──
