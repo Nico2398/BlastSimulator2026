@@ -129,3 +129,11 @@ the #1677 biome survey check (`sandbox.integration`).
   ~1950 (or ends below its first-blast cash). The integration opening therefore fires 6 kg a hole (54 kg, 35% over the
   permit) at (36,30) and, for the digger, builds the ramp its rock digger carves (#1874). The same stalled-hauling defect is
   recorded above under "Why the misses stay".
+
+## Scenario pins (rescue pass)
+
+The four `sandbox-permit-*` scenarios that script a grade-up (`approval-ceremony`, `grade-up`, `inspection-visit`,
+`panel-apply`) test the permit flow, not the economy. At the 0.08 default their scripted deliveries cannot reach grade 1's
+5 t ore target, so they now start with `ore_grade:1`, the same treatment the scale-independent integration tests above got.
+`sandbox-mode`'s `tropical_karst` full-kit cash pin moves 250,000 to 370,000 with `SANDBOX_STARTING_CASH`. `npm run scenarios`:
+227/227.
