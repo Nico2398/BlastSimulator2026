@@ -5,7 +5,8 @@
 // sandbox at Normal (opening kit only) stays solvent with growing cash.
 
 import { describe, it, expect } from 'vitest';
-import { placeBuilding } from '../../src/core/entities/Building.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
@@ -30,7 +31,7 @@ import {
   SANDBOX_REFERENCE_CREW_COST_PER_TICK,
   SANDBOX_REFERENCE_SHOT_CYCLE_TICKS,
   TICKS_PER_DAY, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
-import { FORBIDDEN_COMMAND, playContracts, playTick, clearBlastZone, type Run } from '../helpers/playthrough.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from '../helpers/playthrough.js';
 
 const DESERT = 'desert_badlands';
 const ABSORB_DAYS = 5;
@@ -353,8 +354,8 @@ describe('sandbox economy: richness is bounded across biome and depth', () => {
  * log, an elapsed-tick clock, and `playUntil` stepping contracts and ticks up to `horizon`.
  * `afterTick` runs once per played step (for per-step bookkeeping).
  */
-function startPlayLoop(kit: string, horizon: number, afterTick: (elapsed: number) => void = () => {}, extra = '') {
-  const { run, ctx } = startSandbox(DESERT, 42, kit, extra);
+function startPlayLoop(kit: string, horizon: number, afterTick: (elapsed: number) => void = () => {}, extra = '', seed = 42) {
+  const { run, ctx } = startSandbox(DESERT, seed, kit, extra);
   run('time resume');
   const state = ctx.state!;
   const commands: string[] = [];
@@ -364,18 +365,7 @@ function startPlayLoop(kit: string, horizon: number, afterTick: (elapsed: number
   const over = () => state.levelEnded || elapsed() >= horizon;
   const play = () => { playContracts(logged, state); playTick(logged, state); afterTick(elapsed()); };
   const playUntil = (max: number, done: () => boolean) => { for (let i = 0; i < max && !over() && !done(); i++) play(); };
-  /**
-   * A competent player stocks an explosive warehouse before ordering a pattern: stock-covered orders skip
-   * the cash-bought delivery wait, which would idle the crew on payroll (#1895). The kits carry none, so the
-   * first call stands one up in the west corner, clear of the shots, the ramp and the bunkhouse.
-   */
-  const stock = (explosive: string, kg: number) => {
-    if (!state.buildings.buildings.some(b => b.type === 'explosive_warehouse')) {
-      placeBuilding(state.buildings, 'explosive_warehouse', 2, 2, ctx.grid!.sizeX, ctx.grid!.sizeZ, 1);
-    }
-    expect(logged(`buy explosive:${explosive} kg:${kg}`).success).toBe(true);
-  };
-  return { state, commands, logged, elapsed, over, playUntil, stock };
+  return { state, commands, logged, elapsed, over, playUntil };
 }
 
 describe('sandbox economy: reference shot vs crew cost', () => {
@@ -406,7 +396,7 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
 
   it('Normal, opening kit only, fires two blasts and grows cash from tick 1000 to tick 2000', () => {
     let cashAtMid: number | null = null;
-    const { state, commands, logged, over, playUntil, stock } = startPlayLoop('digger', HORIZON, (elapsed) => {
+    const { state, commands, logged, over, playUntil } = startPlayLoop('digger', HORIZON, (elapsed) => {
       if (cashAtMid === null && elapsed >= MIDPOINT) cashAtMid = state.cash;
     });
     const filled = () => state.contracts.completedHistory.filter(c => c.completed).length;
@@ -414,7 +404,8 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
     // Shot 1: 3x3, drilled, charged and fired by the opening crew.
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${FIRST_SHOT}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    stock('krackle', 54);
+    // A player pays for and builds the warehouse (#1963): no free placeBuilding.
+    expect(stockWarehouse(logged, state, 'krackle', 54).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:6 stemming:2');
     playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
@@ -429,7 +420,8 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
     if (!over()) {
       expect(logged(`drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:${SECOND_SHOT}`).success).toBe(true);
       playUntil(800, () => state.plannedDrillHoles.length === 0);
-        stock('krackle', 24);
+        // A player pays for and builds the warehouse (#1963): no free placeBuilding.
+        expect(stockWarehouse(logged, state, 'krackle', 24).success).toBe(true);
       logged('charge hole:* explosive:krackle amount:6 stemming:2');
       playUntil(CHARGE_WAIT_TICKS, () => Object.keys(state.plannedChargesByHole).length === 0);
       expect(Object.keys(state.plannedChargesByHole), `second pattern still uncharged ${CHARGE_WAIT_TICKS} ticks after ordering`).toEqual([]);
@@ -458,9 +450,11 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
   const DIGGER_RAMP = 'start:12,34 end:34,34 depth:6';
   /**
    * The full kit's cash at tick 2000 on the scripted opening: today's run, #1747.
-   * Re-measured for the calibrated sandbox (#1944: scale 0.08, 3x3 depth 5, 6 kg, shot at 36,30): 792,241.1 (seed 42, desert_badlands).
+   * Re-measured for the calibrated sandbox (#1944: scale 0.08, 3x3 depth 5, 6 kg, shot at 36,30): 792,241.1 (seed 42, desert_badlands),
+   * with a free explosive warehouse. Re-measured again once the warehouse is paid for and built by the crew through
+   * stockWarehouse (#1963, $20,000 and its build time before the order): 740,314.4. Floor is that measurement, rounded down.
    */
-  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 792_241;
+  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 740_314;
 
   interface OpeningTrace {
     endedAtTick: number | null;
@@ -483,7 +477,7 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
       brokeBeforeSaleAtTick: null, commands: [], buildOk: false, rampOk: null,
     };
     const saleDone = () => state.contracts.completedHistory.some(c => c.type === 'ore_sale' && c.completed);
-    const { state, commands, logged, over, playUntil, stock } = startPlayLoop(kit, HORIZON, (elapsed) => {
+    const { state, commands, logged, over, playUntil } = startPlayLoop(kit, HORIZON, (elapsed) => {
       if (trace.brokeBeforeSaleAtTick === null && !saleDone() && state.cash <= 0) trace.brokeBeforeSaleAtTick = elapsed;
       if (trace.endedAtTick === null && state.levelEnded) {
         trace.endedAtTick = elapsed;
@@ -496,7 +490,8 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
     expect(trace.buildOk, 'living quarters placed').toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:5 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    stock('krackle', 54);
+    // A player pays for and builds the warehouse (#1963): no free placeBuilding.
+    expect(stockWarehouse(logged, state, 'krackle', 54).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:6 stemming:2');
     playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
@@ -561,7 +556,7 @@ describe('sandbox economy: a supply contract can be filled (#1789)', () => {
   const SHOT_START = '36,32';
 
   it('full: the first dirtite supply offer is accepted, completes without penalty, and sales go on', () => {
-    const { state, commands, logged, over, playUntil, stock } = startPlayLoop('full', HORIZON, () => {}, FULL_ORE_GRADE);
+    const { state, commands, logged, over, playUntil } = startPlayLoop('full', HORIZON, () => {}, FULL_ORE_GRADE);
     const supplyId = { current: null as number | null };
     const settled = () => supplyId.current !== null && state.contracts.completedHistory.some((c) => c.id === supplyId.current);
     /** Like a player: accept the first dirtite supply offer the moment it is on the board. */
@@ -575,7 +570,8 @@ describe('sandbox economy: a supply contract can be filled (#1789)', () => {
     expect(logged(`build ${BUILD}`).success).toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    stock('krackle', 72);
+    // A player pays for and builds the warehouse (#1963): no free placeBuilding.
+    expect(stockWarehouse(logged, state, 'krackle', 72).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:8 stemming:2');
     playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
@@ -614,7 +610,7 @@ describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => 
     const stockKg = (ore?: string) => ore === undefined
       ? Object.values(state.collectedOre).reduce((a, b) => a + b, 0)
       : state.collectedOre[ore] ?? 0;
-    const { state, commands, logged, over, playUntil, stock } = startPlayLoop('full', HORIZON, (elapsed) => {
+    const { state, commands, logged, over, playUntil } = startPlayLoop('full', HORIZON, (elapsed) => {
       totalPeak = Math.max(totalPeak, stockKg());
       rustitePeak = Math.max(rustitePeak, stockKg('rustite'));
       if (filledAt === null && stockKg() >= WAREHOUSE_FILLED_KG) filledAt = elapsed;
@@ -624,7 +620,8 @@ describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => 
     expect(logged(`build ${BUILD}`).success).toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    stock('krackle', 72);
+    // A player pays for and builds the warehouse (#1963): no free placeBuilding.
+    expect(stockWarehouse(logged, state, 'krackle', 72).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:8 stemming:2');
     playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
@@ -679,7 +676,7 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
     // Last tick rustite sat in the warehouse: once the reachable rustite is all hauled and sold nothing can fill a later offer,
     // so contracts accepted after it expire for want of ore, whatever the haul ranking does.
     let lastRustiteStockTick = 0;
-    const { state, commands, logged, over, playUntil, stock } = startPlayLoop('full', HORIZON, () => {
+    const { state, commands, logged, over, playUntil } = startPlayLoop('full', HORIZON, () => {
       if ((state.collectedOre['rustite'] ?? 0) > 1) lastRustiteStockTick = state.tickCount;
       acceptSmallRustite(logged);
     }, FULL_ORE_GRADE);
@@ -687,7 +684,8 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
     expect(logged(`build ${BUILD}`).success).toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    stock('krackle', 72);
+    // A player pays for and builds the warehouse (#1963): no free placeBuilding.
+    expect(stockWarehouse(logged, state, 'krackle', 72).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:8 stemming:2');
     playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
@@ -721,4 +719,55 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
     expect(highGradeRustiteKg, `reachable high-grade rustite still on the ground: ${Math.round(highGradeRustiteKg / 1000)} t`).toBeLessThan(HIGH_GRADE_GROUND_CEILING_KG);
     expect(commands.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 900_000);
+});
+
+describe('sandbox economy: the kit-only opening, no explosive warehouse (#1963)', () => {
+  /**
+   * Ticks played after the sequence starts. The cash low points of the kit-only opening sit at t1024-t1144 on the
+   * ten runs measured on main 02137db after #1944 (issue #1963), so 1,500 ticks covers the risk window with the
+   * first sales (t944-t1074) and the recovery behind them. The horizon is this run's choice, bounded for ten runs.
+   */
+  const HORIZON = 1500;
+  const BUILD = 'living_quarters at:30,48 tier:1';
+  /** The #1944 reference shot on the deposit: 3x3 x 5 m, Krackle 4 kg (36 kg), inside the grade-0 permit (40 kg, 9 holes). Measured at 36,32. */
+  const SHOT_START = '36,32';
+  const RAMP = 'start:40,12 end:40,31 depth:5';
+  const KITS = ['digger', 'full'] as const;
+  /** The five seeds of the measurement table in the issue (desert_badlands). */
+  const SEEDS = [42, 7, 13, 21, 2] as const;
+  const cases = KITS.flatMap((kit) => SEEDS.map((seed) => [kit, seed] as const));
+
+  it.each(cases)('%s kit, seed %i: completes an ore sale and never ends the level by the horizon', (kit, seed) => {
+    const { state, commands, logged, elapsed, playUntil } = startPlayLoop(kit, HORIZON, () => {}, '', seed);
+    const label = () => `${kit} seed ${seed}: levelEndReason=${String(state.levelEndReason)} cash=${Math.round(state.cash)} t${elapsed()}`;
+
+    const build = logged(`build ${BUILD}`);
+    expect(build.success, `build: ${build.output}`).toBe(true);
+    const drill = logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:5 start:${SHOT_START}`);
+    expect(drill.success, `drill_plan: ${drill.output}`).toBe(true);
+    playUntil(800, () => state.plannedDrillHoles.length === 0);
+    // The kit owns no explosive warehouse and this test builds none: the order waits EXPLOSIVE_DELIVERY_TICKS (#1895).
+    logged('charge hole:* explosive:krackle amount:4 stemming:2');
+    playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    clearBlastZone(logged, state);
+    const blast = logged('blast');
+    expect(blast.success, `blast (${label()}): ${blast.output}`).toBe(true);
+    const ramp = logged(`build_ramp ${RAMP}`);
+    expect(ramp.success, `build_ramp (${label()}): ${ramp.output}`).toBe(true);
+    playUntil(HORIZON, () => false);
+
+    expect(state.contracts.completedHistory.some((c) => c.type === 'ore_sale' && c.completed), `no ore sale completed (${label()})`).toBe(true);
+    expect(state.levelEnded, `level ended (${label()})`).toBe(false);
+    expect(elapsed(), `horizon not reached (${label()})`).toBeGreaterThanOrEqual(HORIZON);
+    expect(commands.some((c) => c.startsWith('build explosive_warehouse')), 'no explosive warehouse ordered').toBe(false);
+    expect(state.buildings.buildings.some((b) => b.type === 'explosive_warehouse'), `an explosive warehouse exists (${label()})`).toBe(false);
+    expect(commands.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+  }, 600_000);
+
+  it('no test in this file places a building with the free-placement helper (the free warehouse is gone)', () => {
+    const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+    // Spelled in two halves so this guard's own source does not contain the word it forbids.
+    expect(code).not.toContain(['place', 'Building'].join(''));
+  });
 });
