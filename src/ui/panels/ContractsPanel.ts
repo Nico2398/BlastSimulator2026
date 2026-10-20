@@ -29,6 +29,9 @@ import { formatMoney, formatPricePerKg, insufficientFundsText, wholeKg } from '.
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { getProfitShortfall } from '../../core/campaign/LevelObjective.js';
 import { getOre } from '../../core/world/OreCatalog.js';
+import { makeBuyerBadge, makeMarketStrip } from './ContractsMarketStrip.js';
+import { saturationReader } from '../../core/economy/OreSaturation.js';
+import { oreContractBasePrice } from '../../core/economy/Market.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { negotiationRefusalReason } from '../../core/economy/Negotiation.js';
@@ -148,6 +151,11 @@ export class ContractsPanel extends PanelBase {
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
       managerLevel: bestAvailableManagerLevel(state.employees.employees),
+      market: state.grade === undefined ? undefined : {
+        grade: state.grade.grade,
+        sat: resolveContractOres(state).map(o => Math.round(saturationReader(state.saturation, state.tickCount)(o) * 100)),
+        tiers: state.contracts.available.map(c => c.buyerTier ?? ''),
+      },
     });
     if (signature === this.lastSignature) {
       this.refreshDynamic(state);
@@ -172,6 +180,7 @@ export class ContractsPanel extends PanelBase {
     const siteOres = resolveContractOres(state);
     const activeHeader = sectionHeader(t('ui.contracts.active_count', { count: state.contracts.active.length }));
     const sections: (HTMLElement | null)[] = [
+      this.makeMarketSection(state, siteOres),
       this.makeStorageStrip(state),
       this.makeActiveSummaryStrip(state, activeHeader),
       sectionHeader(t('ui.contracts.available_count', { count: state.contracts.available.length })),
@@ -229,6 +238,15 @@ export class ContractsPanel extends PanelBase {
   }
 
   // ── Storage strip ──
+
+  private makeMarketSection(state: GameState, ores: readonly string[]): HTMLElement | null {
+    if (state.grade === undefined || ores.length === 0) return null;
+    return makeMarketStrip({
+      grade: state.grade.grade, ores,
+      saturation: saturationReader(state.saturation, state.tickCount),
+      basePrice: ore => oreContractBasePrice(ore, state.contracts.market),
+    });
+  }
 
   private makeStorageStrip(state: GameState): HTMLElement {
     const used = Math.round(state.logistics.storedMassKg);
@@ -446,7 +464,9 @@ export class ContractsPanel extends PanelBase {
       el('span', { text: t(DESC_KEY[c.type], { material: this.materialLabel(c.materialId) }), attrs: { style: 'font:600 12px/1.2 var(--bsx-font-ui)' } }),
       el('span', { text: t(`ui.contracts.type_${c.type}`), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
     );
-    headRow.append(iconBox, titleCol, el('span', { text: `#${c.id}`, attrs: { style: 'margin-left:auto;font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }));
+    const idSpan = el('span', { text: `#${c.id}`, attrs: { style: 'margin-left:auto;font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } });
+    headRow.append(iconBox, titleCol, idSpan);
+    if (c.buyerTier && state.grade !== undefined) headRow.insertBefore(makeBuyerBadge(c.buyerTier), idSpan);
 
     const statRow = el('div');
     statRow.style.cssText = 'display:flex;border-radius:4px;background:var(--bsx-well);overflow:hidden';
