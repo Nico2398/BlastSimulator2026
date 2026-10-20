@@ -278,22 +278,22 @@ describe('FireStep — within-permit checklist (#1925)', () => {
 
   it('shows a Within permit row as ok within the limit', () => {
     const { step } = makeStep();
-    step.update(permitState(9, 8), 'sunny');
+    step.update(permitState(9, 4), 'sunny');
     expect(row(step)).not.toBeNull();
     expect(row(step)!.dataset['ok']).toBe('true');
-    expect(row(step)!.textContent).toContain('72 / 80 kg');
+    expect(row(step)!.textContent).toContain('36 / 40 kg');
   });
 
   it('shows the row as a warning when over the limit', () => {
     const { step } = makeStep();
-    step.update(permitState(9, 10), 'sunny');
+    step.update(permitState(9, 5), 'sunny');
     expect(row(step)).not.toBeNull();
     expect(row(step)!.dataset['ok']).toBe('false');
   });
 
   it('is absent on a non-progression site', () => {
     const { step } = makeStep();
-    step.update(permitState(9, 10, false), 'sunny');
+    step.update(permitState(9, 5, false), 'sunny');
     expect(row(step)).toBeNull();
     expect(step.root.textContent).not.toContain('permit');
   });
@@ -308,7 +308,7 @@ describe('FireStep — within-permit checklist (#1925)', () => {
 
   it('never renders an inspection chance or overshoot', () => {
     const { step } = makeStep();
-    step.update(permitState(12, 10), 'sunny');
+    step.update(permitState(12, 5), 'sunny');
     const text = step.root.textContent!.toLowerCase();
     expect(text).not.toContain('chance');
     expect(text).not.toContain('overshoot');

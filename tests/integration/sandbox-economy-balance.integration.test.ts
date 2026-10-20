@@ -452,6 +452,8 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
   const HORIZON = 2000;
   const BUILD = 'living_quarters at:30,48 tier:1';
   const SHOT_START = '36,30';
+  // 6 kg a hole (54 kg) sits over the 40 kg grade-0 permit on purpose: the digger kit has no fragmenter, and the permit-sized
+  // 4 kg / 4.4 kg shots leave about half the fragments oversized, so it could not haul enough to pay its crew (#1944 plan doc).
   /** The ramp the digger kit's rock digger carves into the first crater (#1874); same line as the solvent-sandbox test. */
   const DIGGER_RAMP = 'start:12,34 end:34,34 depth:6';
   /**

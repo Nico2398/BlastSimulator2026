@@ -99,5 +99,33 @@ lowest cash and its tick, bankruptcy tick, first grade tick.
 - **Late bankruptcies** (t4339-t8449) follow cash that peaked at 1-2M: the reinvest policy spends down
   to its reserve and payroll outruns sales when hauling stalls.
 
-Sandbox integration pins (`sandbox-economy-balance`, `sandbox-ecology`, `sandbox-opening-kit-haul`) were not
-re-measured in this step; they are updated separately.
+## Pins re-measured (fixer step)
+
+Integration and unit pins moved with the calibration. Nothing was loosened; every figure was re-measured.
+
+| Pin | Before | After |
+|---|---|---|
+| Kit starting cash (`Sandbox.test`, `sandbox-i18n-guards`, economy balance) | 210k / 250k | 330k / 370k |
+| Grade-0 permit pins (`PermitLimits`, permit console tests, blast footer / preview / preflight) | 80 kg, 72 kg opening, 90 kg = +12.5% | 40 kg, 36 kg opening, 45 kg = +12.5% (per-hole kg halved so every overshoot ratio is unchanged); grade 1: 120 kg |
+| Reference shot ore (`sandbox-economy-balance`) | > 100 t (shot held 340 t) | > 10 t (shot holds 17.5 t, depth 5, krackle 4 kg) |
+| Reference shot value vs crew cost | 1.5-3x at depth 6 / 6 kg | 1.5-3x at depth 5 / 4 kg (the probe SHOT) |
+| Full-kit cash at tick 2000 (opening, `FULL_KIT_CASH_AT_HORIZON_FLOOR`) | 681,127 | 792,241 |
+| Default sandbox scale (`sandbox.integration`) | unpinned (undefined) | `SANDBOX_ORE_GRADE_SCALE` (0.08) |
+| Ore grade scale test (`sandbox-ore-grade-scale`) | default vs `ore_grade:0.2` = a fifth | `ore_grade:1` vs `ore_grade:0.2` = a fifth (the default is now 0.08, so the base case is pinned explicitly) |
+
+Tests of scale-independent behaviour now pass `ore_grade:1` so they still check the same thing: survey estimate accuracy
+(`survey.integration`), hauled tonnage past the old stuck baseline (`sandbox-opening-kit-haul`), spoil heap haul order
+(`spoil-heap-hauling`), the supply / rustite contract and demand-weighted haul tests (`sandbox-economy-balance`), and
+the #1677 biome survey check (`sandbox.integration`).
+
+## Findings the re-measurement surfaced (not fixed here)
+
+- **Survey rounds thin ore away at 0.08.** The survey reports densities in 0.05 steps. At scale 0.08 a seismic estimate of
+  the opening shot's ore value is off by 69-148% (tolerance 35%), the ore report sits below the Barren threshold, and a core
+  sample of the richest column on `tropical_karst` / `volcanic_flats` can read zero ore. A player surveying the sandbox gets
+  little signal. A scale near 0.12-0.15 or finer survey rounding would fix it; neither is cheap to re-calibrate, so it stays.
+- **Permit-sized shot is not enough for the digger kit.** At 4-4.4 kg a hole (36-40 kg, within the 40 kg grade-0 permit) about half
+  the fragments are oversized; the digger kit has no rock fragmenter, hauls ~1.3 t of the shot's 17 t and goes bankrupt by tick
+  ~1950 (or ends below its first-blast cash). The integration opening therefore fires 6 kg a hole (54 kg, 35% over the
+  permit) at (36,30) and, for the digger, builds the ramp its rock digger carves (#1874). The same stalled-hauling defect is
+  recorded above under "Why the misses stay".
