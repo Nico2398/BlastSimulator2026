@@ -815,6 +815,12 @@ export const BLAST_FIZZLE_SHARE_FAILURE = 0.75;
 /** Share of charged holes that may fizzle before the rating is capped to 'mediocre' (#1675). */
 export const BLAST_FIZZLE_SHARE_PARTIAL = 0.25;
 
+/** Share of the blast's broken rock that may stay sealed under intact cap before the rating is capped to 'bad' (#2003). */
+export const BLAST_SEALED_SHARE_FAILURE = 0.75;
+
+/** Share of the blast's broken rock that may stay sealed before the rating is capped to 'mediocre' (#2003). */
+export const BLAST_SEALED_SHARE_PARTIAL = 0.25;
+
 /** Minimum fragment render height (voxels) above the grid floor. */
 export const FRAGMENT_MIN_RENDER_Y = 0.05;
 

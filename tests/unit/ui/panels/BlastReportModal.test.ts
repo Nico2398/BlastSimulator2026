@@ -6,6 +6,7 @@ import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../
 import type { BlastPlaybackSnapshot } from '../../../../src/core/mining/BlastPlayback.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
+import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
 
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { BlastReport } from '../../../../src/core/mining/BlastExecution.js';
@@ -1002,4 +1003,62 @@ describe('BlastReportModal rating cap note (#1349)', () => {
 
     expect(modal.root.querySelector('[data-info="report-spent-from-stock"]')).toBeNull();
   });
+});
+
+describe('BlastReportModal sealed rock (#2003)', () => {
+  const SEALED = '[data-info="report-sealed"]';
+  const open = (overrides: Partial<BlastReport>) => {
+    const { modal, setPlayback } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport(overrides);
+    openReport(modal, state, setPlayback);
+    return modal;
+  };
+
+  it('shows a sealed line with the sealed ore value and fragment count', () => {
+    const modal = open({ totalOreValue: 0, sealedOreValue: 1528275, sealedFragments: 1219 });
+    const line = modal.root.querySelector(SEALED);
+    expect(line).not.toBeNull();
+    expect(line!.textContent).toContain(`$${formatMoney(1528275)}`);
+  });
+
+  it('keeps Ore Value at the broken-out amount, not the sealed one', () => {
+    const modal = open({ totalOreValue: 0, sealedOreValue: 1528275, sealedFragments: 1219 });
+    const text = modal.root.textContent ?? '';
+    const oreIdx = text.indexOf(t('ui.blast_workshop.report.stat_ore_value'));
+    expect(oreIdx).toBeGreaterThanOrEqual(0);
+    expect(text.slice(oreIdx, oreIdx + 40)).toContain('$0');
+  });
+
+  it('shows no sealed line when nothing is sealed', () => {
+    expect(open({ sealedOreValue: 0, sealedFragments: 0 }).root.querySelector(SEALED)).toBeNull();
+  });
+
+  it('shows no sealed line on an old report without the new fields', () => {
+    expect(open({}).root.querySelector(SEALED)).toBeNull();
+  });
+
+  it('shows no oversize hint when every oversize fragment is sealed', () => {
+    const modal = open({ oversizedFragments: 475, reachableOversizedFragments: 0, sealedFragments: 475, sealedOreValue: 10 });
+    expect(modal.root.textContent).not.toContain('too large for standard haulers');
+  });
+
+  it('counts only reachable fragments in the oversize hint', () => {
+    const modal = open({ oversizedFragments: 9, reachableOversizedFragments: 4 });
+    expect(modal.root.textContent).toContain('4 fragments are too large for standard haulers');
+  });
+
+  it('an old report without reachableOversizedFragments falls back to oversizedFragments', () => {
+    const modal = open({ oversizedFragments: 6 });
+    expect(modal.root.textContent).toContain('6 fragments are too large for standard haulers');
+  });
+
+  for (const cap of ['sealed_failure', 'sealed_partial'] as const) {
+    it(`renders the ${cap} cap note`, () => {
+      const modal = open({ ratingCap: cap });
+      const text = t(`ui.blast_workshop.report.rating_cap_${cap}`);
+      expect(text).not.toBe(`ui.blast_workshop.report.rating_cap_${cap}`);
+      expect(modal.root.textContent).toContain(text);
+    });
+  }
 });

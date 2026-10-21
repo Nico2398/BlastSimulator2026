@@ -3,11 +3,12 @@
 // Pure function operating on GameState + VoxelGrid, no side effects.
 
 import { oreValuePerKg, type MarketId } from '../economy/Market.js';
+import { isFragmentSealed } from '../economy/SealedFragments.js';
 import type { Vec3 } from '../math/Vec3.js';
 import type { Village } from '../world/Structures.js';
 import { length as vecLength, vec3 } from '../math/Vec3.js';
 import type { WetBlastHoles } from './WetHoles.js';
-import { applyRatingCaps, type BlastRatingCap } from './BlastRatingCaps.js';
+import { applyRatingCaps, type BlastRatingCap, type RatingCapFacts } from './BlastRatingCaps.js';
 import type { DrillHole } from './DrillPlan.js';
 // HoleCharge used via plan.charges values
 import type { BlastPlan } from './BlastPlan.js';
@@ -115,6 +116,7 @@ export interface BlastResult {
   maxProjectionSpeed: number;
   vibrationAtVillages: VillageVibration[];
   totalRockVolume: number;
+  /** Value of ore in the rock that broke out and can be reached; ore left sealed is `sealedOreValue` (#2003). */
   totalOreValue: number;
   rating: BlastRating;
   crackedVoxels: number;
@@ -133,6 +135,12 @@ export interface BlastResult {
   clearedColumns: string[];
   /** True when some cleared voxel reached its column's pre-blast top; false when everything it broke stayed sealed under intact rock (#1724). */
   brokeOut: boolean;
+  /** Ore value in fragments that broke but stayed sealed under intact rock (#2003). */
+  sealedOreValue?: number;
+  /** Fragments that broke but stayed sealed (#2003). */
+  sealedFragmentCount?: number;
+  /** Oversized fragments that are reachable, not sealed (#2003). */
+  reachableOversizedFragments?: number;
 }
 
 /**
@@ -162,7 +170,7 @@ export interface BlastReport {
    * so the report modal, console and rating agree.
    */
   maxProjectionDistanceM: number;
-  /** Total value of ore actually recovered, per BlastCalc's pricing. */
+  /** Value of ore in the rock that broke out and can be reached, per BlastCalc's pricing; sealed ore is `sealedOreValue` (#2003). */
   totalOreValue: number;
   /** Cash paid for the charges of this blast (list price of the kg not drawn from stock; summed before the plan was cleared). */
   spent: number;
@@ -181,6 +189,12 @@ export interface BlastReport {
   secondaryBlasts?: SecondaryBlastReport[];
   /** False when the blast cleared rock but never broke out of its sealed void (#1724). Optional: absent = true (pre-existing fixtures). */
   brokeOut?: boolean;
+  /** Ore value left sealed under intact rock (#2003). Optional: absent = 0. */
+  sealedOreValue?: number;
+  /** Fragments left sealed (#2003). Optional: absent = 0. */
+  sealedFragments?: number;
+  /** Oversized fragments that are reachable (#2003). Optional: absent = oversizedFragments. */
+  reachableOversizedFragments?: number;
 }
 
 /** One secondary detonation as shown in the blast report (#1394). */
@@ -203,6 +217,21 @@ export function didNotBreakOut(result: Pick<BlastResult, 'clearedVoxels' | 'brok
   return result.clearedVoxels > 0 && result.brokeOut === false;
 }
 
+/** The rating-cap facts every blast result carries; the caller adds the casualty, building and wet-hole facts. */
+export function ratingFactsFrom(result: BlastResult): Pick<RatingCapFacts, 'oversizedFragments' | 'fragmentCount' | 'noBreakout' | 'sealedFragmentCount'> {
+  return {
+    oversizedFragments: result.oversizedFragments,
+    fragmentCount: result.fragmentCount,
+    noBreakout: didNotBreakOut(result),
+    sealedFragmentCount: result.sealedFragmentCount ?? 0,
+  };
+}
+
+/** Oversized fragments a fragmenter can reach; falls back to all of them for reports that predate the sealed split (#2003). */
+export function reachableOversized(r: { oversizedFragments: number; reachableOversizedFragments?: number }): number {
+  return r.reachableOversizedFragments ?? r.oversizedFragments;
+}
+
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
 export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [], chargedCount: 0 }, secondaryBlasts: SecondaryBlastReport[] = [], spentFromStock = 0): BlastReport {
   const destroyedIds = new Set<number>(result.destroyedBuildings.map(b => b.buildingId));
@@ -214,9 +243,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     wetHoleCount: wetHoles.wet.length,
     fizzledHoleCount: wetHoles.fizzled.length,
     chargedHoleCount: wetHoles.chargedCount,
-    oversizedFragments: result.oversizedFragments,
-    fragmentCount: result.fragmentCount,
-    noBreakout: didNotBreakOut(result),
+    ...ratingFactsFrom(result),
   });
   return {
     tick,
@@ -230,6 +257,9 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     projectionCount: result.projectionCount,
     maxProjectionDistanceM: result.maxThrowDistance,
     totalOreValue: result.totalOreValue,
+    sealedOreValue: result.sealedOreValue ?? 0,
+    sealedFragments: result.sealedFragmentCount ?? 0,
+    reachableOversizedFragments: reachableOversized(result),
     spent,
     ...(spentFromStock > 0 ? { spentFromStock } : {}),
     brokeOut: result.brokeOut,
@@ -449,6 +479,27 @@ export function* executeBlastSteps(
     maxThrowDistance = resolved.maxThrowDistance;
   }
 
+  // 4d. Split what landed into reachable rock and rock buried under intact ground (#2003),
+  //     by the same test the haul dispatch uses. Ore follows the fragments' own ore content,
+  //     scaled so broken-out + sealed always sums to the ore the removed ground held.
+  yield;
+  let sealedFragmentCount = 0;
+  let reachableOversizedFragments = 0;
+  let sealedFragmentOre = 0;
+  let allFragmentOre = 0;
+  for (const f of fragments) {
+    const ore = calculateOreValue(f.oreDensities, VoxelGrid.CELL_SIZE, marketId) * (f.volume / VoxelGrid.CELL_SIZE ** 3);
+    allFragmentOre += ore;
+    if (isFragmentSealed(grid, f.position)) {
+      sealedFragmentCount++;
+      sealedFragmentOre += ore;
+    } else if (f.volume > OVERSIZED_FRAGMENT_THRESHOLD) {
+      reachableOversizedFragments++;
+    }
+  }
+  const sealedOreValue = allFragmentOre > 0 ? totalOreValue * (sealedFragmentOre / allFragmentOre) : 0;
+  const brokenOutOreValue = totalOreValue - sealedOreValue;
+
   yield;
   // 4b. Compute cleared region AABB from toClear for navmesh dirty-region
   //     update. One pass with running bounds — a reduce allocating an object
@@ -567,7 +618,7 @@ export function* executeBlastSteps(
     maxProjectionSpeed,
     vibrationAtVillages,
     totalRockVolume,
-    totalOreValue,
+    totalOreValue: brokenOutOreValue,
     rating,
     crackedVoxels,
     clearedVoxels,
@@ -576,6 +627,9 @@ export function* executeBlastSteps(
     secondaryBlastEvents,
     clearedColumns: [...new Set(toClear.map(c => `${c.x},${c.z}`))],
     brokeOut,
+    sealedOreValue,
+    sealedFragmentCount,
+    reachableOversizedFragments,
     maxThrowDistance,
     projectileCount,
     flights,
