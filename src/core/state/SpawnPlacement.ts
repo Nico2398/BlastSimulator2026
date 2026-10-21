@@ -4,10 +4,10 @@
 // GameState it is handed.
 
 import { NavGrid, type NavCell } from '../nav/NavGrid.js';
-import { findNearestNavigableCell, countLegalStepNeighbours, computeClimbComponents } from '../nav/NavGridReachability.js';
+import { findNearestNavigableCell, countLegalStepNeighbours, computeClimbComponents, type ClimbComponents } from '../nav/NavGridReachability.js';
 import { findPath } from '../nav/Pathfinding.js';
 import { routeInflation, isRouteAcceptable } from './SpawnRoute.js';
-import { isFlatParkingCell, rallyConnectedCells, isStandable as isSpawnable, cellKey as key, chebyshev } from './RallyPoint.js';
+import { isFlatParkingCell, rallyConnectedCells, siteCentre, isStandable as isSpawnable, cellKey as key, chebyshev } from './RallyPoint.js';
 import {
   CREW_SPAWN_VEHICLE_SEPARATION,
   CREW_SPAWN_SEARCH_LIMIT_FACTOR,
@@ -17,9 +17,9 @@ import {
   CREW_SPAWN_VEHICLE_ROUTE_SLACK,
   CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS,
   NAV_CLEARANCE_VEHICLE_CELLS,
+  NAV_MAX_SLOPE_RATIO,
   RALLY_POINT_VEHICLE_STANDOFF,
 } from '../config/balance.js';
-import { NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { slowestVehicleTierSlopeRatio, tierSlopeRatio } from '../nav/ClimbLimit.js';
 import { isLicensedForRole } from '../engine/VehicleReservation.js';
 import type { GameState } from './GameState.js';
@@ -287,12 +287,9 @@ export function relocateVehiclesOffNarrowGround(
   // Unless that component is itself cut off from the site's middle (a thin
   // diagonal ridge on a steep rim, #1680): then no roomier cell exists on it,
   // and the vehicle may move to the site's main ground instead.
-  let components: ReturnType<typeof computeClimbComponents> | null = null; // built on the first narrow vehicle
-  const centre = findNearestNavigableCell(
-    navGrid,
-    navGrid.originX + Math.floor(navGrid.width / 2),
-    navGrid.originZ + Math.floor(navGrid.height / 2),
-  );
+  let components: ClimbComponents | null = null; // built on the first narrow vehicle
+  const middle = siteCentre(navGrid);
+  const centre = findNearestNavigableCell(navGrid, middle.x, middle.z);
   const reachable = (a: Cell, b: Cell): boolean =>
     (components ??= computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, slopeRatio)).canReach(a.x, a.z, b.x, b.z);
   // Every vehicle that can reach the site's middle at all can drive there

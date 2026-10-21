@@ -5,7 +5,7 @@ import { refreshOrderReachability } from '../../core/engine/OrderReachability.js
 import { backfillGhostBuildings } from '../../core/engine/TaskDispatch.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
 import { placeStartingCrew, relocateVehiclesOffNarrowGround, meanPosition } from '../../core/state/SpawnPlacement.js';
-import { ensureRallyPoint, type RallyPointOptions } from '../../core/state/RallyPoint.js';
+import { ensureRallyPoint, siteCentre, type RallyPointOptions } from '../../core/state/RallyPoint.js';
 import { placeStartingBuildings, drivableApproachFilter, allDrivableFrom } from '../../core/state/StartingBuildings.js';
 import { refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
@@ -20,7 +20,7 @@ import { getDominantRockId, computeVoxelColumnSurfaceY, computeColumnRangeY } fr
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
-import { DEFAULT_GRID_SIZE,  type StartingBuildingSlot, type PitMaskShape } from '../../core/config/balance.js';
+import { DEFAULT_GRID_SIZE, type StartingBuildingSlot, type PitMaskShape } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, type CampaignProfile } from '../../persistence/CampaignProfile.js';
@@ -225,6 +225,30 @@ function gridDirtyRegion(grid: VoxelGrid): {
   );
 }
 
+type RegenerateParams = Omit<GenerationFields, 'climateBias'> & {
+  seed: number; climateBias: readonly [number, number];
+  /**
+   * True only where this grid is a game's first (`new_game`, a campaign
+   * level start, `sandbox`): the starting crew is then laid out on real
+   * ground through `placeStartingCrew` (#1166). A save load reaches the
+   * same function with crew positions that are the save's own — mid-shift,
+   * mid-route, wherever the player left them — and must never be regrouped.
+   */
+  startingCrew?: boolean;
+  /** With `startingCrew`: no starting vehicle may block another's way to the site's middle (the sandbox, #1680). */
+  fleetMustStayMobile?: boolean;
+  /** Buildings to place near the crew on a game's first grid (#1363). */
+  startingBuildings?: readonly StartingBuildingSlot[];
+  /**
+   * With `startingCrew`: where the level wants its rally point. The flag
+   * goes on the flat ground nearest it; omitted, nearest the starting crew,
+   * or the site centre for a game with no crew.
+   */
+  rallyPoint?: { x: number; z: number };
+  /** With `startingBuildings`: where their placement search starts; omitted, the flag itself (they keep their clearance from it). */
+  startingBuildingsNear?: { x: number; z: number };
+};
+
 /**
  * Regenerate `ctx.grid` and its dependent navgrid for `ctx.state`. The
  * VoxelGrid is not part of the serialized GameState (see the WorldState
@@ -234,35 +258,24 @@ function gridDirtyRegion(grid: VoxelGrid): {
  * (`newGameCommand`, `campaignStartCommand`, `loadCommand`, and the
  * Save/Load UI's load handler in main.ts) stay in sync (#408).
  */
-export function regenerateGrid(
-  ctx: GameContext,
-  params: Omit<GenerationFields, 'climateBias'> & {
-    seed: number; climateBias: readonly [number, number];
-    /**
-     * True only where this grid is a game's first (`new_game`, a campaign
-     * level start, `sandbox`): the starting crew is then laid out on real
-     * ground through `placeStartingCrew` (#1166). A save load reaches the
-     * same function with crew positions that are the save's own — mid-shift,
-     * mid-route, wherever the player left them — and must never be regrouped.
-     */
-    startingCrew?: boolean;
-    /** With `startingCrew`: no starting vehicle may block another's way to the site's middle (the sandbox, #1680). */
-    fleetMustStayMobile?: boolean;
-    /** Buildings to place near the crew on a game's first grid (#1363). */
-    startingBuildings?: readonly StartingBuildingSlot[];
-    /**
-     * With `startingCrew`: where the level wants its rally point. The flag
-     * goes on the flat ground nearest it; omitted, nearest the starting crew,
-     * or the site centre for a game with no crew.
-     */
-    rallyPoint?: { x: number; z: number };
-    /** With `startingBuildings`: where their placement search starts; omitted, the flag itself (they keep their clearance from it). */
-    startingBuildingsNear?: { x: number; z: number };
-    /** Set by `regenerateGrid` itself on its one retry (#2044); callers leave it out. */
-    placementRetried?: boolean;
-  },
-): void {
+export function regenerateGrid(ctx: GameContext, params: RegenerateParams): void {
   if (!ctx.state) return;
+  const retryAround = generateGridWithBuildings(ctx, params, true);
+  // The levelled pads walled a building off from the site (#2044): the first placement was
+  // judged on terrain the buildings then changed. Place once more around the flag the built-up
+  // ground settled on, which is where the main ground is.
+  if (retryAround) generateGridWithBuildings(ctx, { ...params, rallyPoint: { ...retryAround }, startingBuildingsNear: { ...retryAround } }, false);
+  finishGrid(ctx, params);
+}
+
+/**
+ * Builds the terrain, navgrid, rally point and a level's opening buildings.
+ * Returns the settled rally point when the buildings left one walled off from
+ * the site and `allowRetry` is set: the buildings are then rolled back and the
+ * caller regenerates around that point.
+ */
+function generateGridWithBuildings(ctx: GameContext, params: RegenerateParams, allowRetry: boolean): { x: number; z: number } | null {
+  if (!ctx.state) return null;
   const { seed, climateBias, sizeX, datum, sizeZ, mixedRockHardness, oreDeposits, pitMask, oreGradeScale } = params;
   const config: TerrainConfig = {
     sizeX, datum, sizeZ, seed, climateBias,
@@ -327,23 +340,27 @@ export function regenerateGrid(
         // A building can plug the one gentle way off the flag's plateau (#2044): pick the flag again on the built-up ground.
         delete ctx.state.rallyPoint;
         const settled = ensureRallyPoint(ctx.state, flag, rallyOptions);
-        // The levelled pads can still wall a building off from the site (#2044): the first
-        // placement was judged on terrain the buildings then changed. Place once more around the
-        // flag the built-up ground settled on, which is where the main ground is.
+        // The levelled pads can still wall a building off from the site (#2044): roll back and let the caller retry.
         const navGrid = ctx.state.navGrid;
-        if (!params.placementRetried && settled && navGrid) {
-          const target = findNearestNavigableCell(navGrid, navGrid.originX + Math.floor(navGrid.width / 2), navGrid.originZ + Math.floor(navGrid.height / 2));
+        if (allowRetry && settled && navGrid) {
+          const middle = siteCentre(navGrid);
+          const target = findNearestNavigableCell(navGrid, middle.x, middle.z);
           if (!allDrivableFrom(navGrid, ctx.state.buildings.buildings, params.vehicleSlopeRatio, target)) {
             ctx.state.buildings = buildingsBefore;
             refreshLogisticsCapacity(ctx.state);
             delete ctx.state.rallyPoint;
-            regenerateGrid(ctx, { ...params, rallyPoint: { ...settled }, startingBuildingsNear: { ...settled }, placementRetried: true });
-            return;
+            return settled;
           }
         }
       }
     }
   }
+  return null;
+}
+
+/** Lays the starting crew out on the grid `generateGridWithBuildings` built, then publishes it. */
+function finishGrid(ctx: GameContext, params: RegenerateParams): void {
+  if (!ctx.state || !ctx.grid) return;
   // The whole crew gathers on one patch of mutually climb-connected ground
   // around the flag (#1166); the navgrid is then rebuilt because the vehicles
   // carried their own `vehicleOccupied` cells with them. Everywhere else — a

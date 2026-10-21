@@ -54,7 +54,7 @@ export function isStandable(cell: NavCell | undefined): cell is NavCell {
 }
 
 /** The site's middle, in cells — what the crew's route out of the rally area is measured against. */
-function siteCentre(navGrid: NavGrid): Cell {
+export function siteCentre(navGrid: NavGrid): Cell {
   return {
     x: navGrid.originX + Math.floor(navGrid.width / 2),
     z: navGrid.originZ + Math.floor(navGrid.height / 2),

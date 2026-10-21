@@ -6,7 +6,9 @@ import { getSurfaceY } from '../entities/BuildingPlacement.js';
 import { siteBoundsForGrid, levelBuildingFootprint } from '../engine/BuildingTaskHelpers.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import {
+  BUILDING_APPROACH_RADIUS,
   BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD,
+  NAV_CLEARANCE_VEHICLE_CELLS,
   RALLY_POINT_BUILDING_CLEARANCE,
   STARTING_SITE_STAFFED_COMPOSITION,
   type StartingBuildingSlot,
@@ -15,13 +17,7 @@ import {
 import type { Rect } from '../world/WorldGen.js';
 import { ringCells } from './SpawnPlacement.js';
 import type { NavGrid } from '../nav/NavGrid.js';
-import { computeClimbComponents } from '../nav/NavGridReachability.js';
-import { NAV_CLEARANCE_VEHICLE_CELLS } from '../config/balance.js';
-
-/** Cells around a building's corner within which a vehicle must be able to stand and drive off (#2044). */
-const BUILDING_APPROACH_RADIUS = 3;
-
-type ClimbComponents = ReturnType<typeof computeClimbComponents>;
+import { computeClimbComponents, type ClimbComponents } from '../nav/NavGridReachability.js';
 
 function hasApproachTo(navGrid: NavGrid, components: ClimbComponents, x: number, z: number, target: { x: number; z: number }): boolean {
   for (let dz = -BUILDING_APPROACH_RADIUS; dz <= BUILDING_APPROACH_RADIUS; dz++) {
