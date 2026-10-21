@@ -18,6 +18,7 @@ const BIOME_STYLE: Record<string, { gradient: string; categoryKey: string }> = {
   desert_badlands: { gradient: 'linear-gradient(160deg,#c08a3e,#7d5423)', categoryKey: 'ui.portfolio.biome.desert' },
   alpine_granite: { gradient: 'linear-gradient(160deg,#5f6d7a,#2f3a45)', categoryKey: 'ui.portfolio.biome.mountain' },
   tropical_karst: { gradient: 'linear-gradient(160deg,#3f7a52,#1d3c2a)', categoryKey: 'ui.portfolio.biome.tropical' },
+  volcanic_flats: { gradient: 'linear-gradient(160deg,#6b4a42,#2a2323)', categoryKey: 'ui.portfolio.biome.volcanic' },
 };
 const DEFAULT_BIOME_STYLE = { gradient: 'linear-gradient(160deg,#5f6d7a,#2f3a45)', categoryKey: 'ui.portfolio.biome.mountain' };
 

@@ -22,6 +22,7 @@ describe('loadingSiteInfo briefing', () => {
       desert_badlands: 'ui.portfolio.biome.desert',
       alpine_granite: 'ui.portfolio.biome.mountain',
       tropical_karst: 'ui.portfolio.biome.tropical',
+      volcanic_flats: 'ui.portfolio.biome.volcanic',
     };
     for (const level of getAllLevels()) {
       const info = buildLoadingSiteInfo(level);

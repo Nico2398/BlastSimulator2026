@@ -1,0 +1,155 @@
+{
+  "name": "campaign-shareholder-summit-start",
+  "description": "Issue #1949: after Treranium Depths is won, the Shareholder Summit is offered by the level-end Continue button; the player starts it and sees the board chip in the top bar and the Permits entry in the tool rail, which opens the permit ladder at grade 0 (a progression site). The Portfolio then lists the Shareholder Summit card as startable. Setup force-wins Treranium Depths (console-only debug); everything else is a real click.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "role": "setup",
+      "description": "Bootstrap a running game so the campaign debug commands have a state to act on.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ]
+    },
+    {
+      "command": "campaign complete level:treranium_depths",
+      "role": "setup",
+      "description": "Debug force-win (console-only): Treranium Depths completed, which unlocks the Shareholder Summit (#1949).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign complete level:treranium_depths"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "observe",
+      "description": "Gate: the level-end screen offers CONTINUE (to the Shareholder Summit) since Treranium Depths is no longer the last level.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-level-end-screen [data-action=\"continue\"]"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-level-end-screen [data-action=\"continue\"]",
+        "equals": {
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        }
+      }
+    },
+    {
+      "command": "campaign start level:shareholder_summit",
+      "role": "player",
+      "description": "Player clicks CONTINUE on the level-end screen; the Shareholder Summit loads and its board chip shows in the top bar.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-level-end-screen [data-action=\"continue\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-saveload-btn",
+          "timeoutMs": 60000
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-hud-top [data-action=\"open-board\"]"
+        }
+      ],
+      "timeout": 120,
+      "expect": {
+        "usable": "#bs-saveload-btn",
+        "equals": {
+          "levelEnded": false,
+          "mineGrade": {
+            "grade": 0,
+            "pendingTicksLeft": null
+          }
+        },
+        "note": "a board level: the chip is in the top bar; the ladder starts at grade 0"
+      }
+    },
+    {
+      "command": "permit status",
+      "role": "player",
+      "description": "Player opens Permits from the tool rail: the permit ladder panel is there on the progression site, Apply present.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"permits\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-action=\"permit-apply\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "mineGrade": {
+            "grade": 0,
+            "pendingTicksLeft": null
+          }
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "description": "Player opens the Portfolio from the live site: the Shareholder Summit card is there with a Start button. Inert paired `state`.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": ".bs-return-map"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-world-map [data-level=\"shareholder_summit\"] [data-action=\"start-level\"]"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-world-map [data-level=\"shareholder_summit\"] [data-action=\"start-level\"]",
+        "changedBy": {
+          "tickCount": 0,
+          "cash": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "description": "Player returns to the site; the map closes and the simulation is untouched. Inert paired `state`.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-world-map-back-to-site"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-world-map-back-to-site",
+          "property": "offsetParent",
+          "expectedValue": null
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-world-map-back-to-site",
+        "changedBy": {
+          "tickCount": 0,
+          "cash": 0
+        }
+      },
+      "commandOutcome": "either"
+    }
+  ]
+}

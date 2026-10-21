@@ -104,9 +104,10 @@ export function parseCampaignProfile(raw: unknown): CampaignProfile {
         entry.bestSessionProfit = Math.max(0, finiteOr(s['bestSessionProfit'], 0));
       }
     }
-    profile.campaign.campaignComplete = (camp as { campaignComplete?: unknown }).campaignComplete === true;
   }
   unlockSuccessorsOfCompleted(profile.campaign);
+  // Derived, never trusted: a save from before a level was appended stores true with that level still unplayed.
+  profile.campaign.campaignComplete = isCampaignComplete(profile.campaign);
   const stars = data.bestStars;
   if (typeof stars === 'object' && stars !== null && !Array.isArray(stars)) {
     for (const [id, v] of Object.entries(stars)) recordBestStars(profile, id, clampStars(v));

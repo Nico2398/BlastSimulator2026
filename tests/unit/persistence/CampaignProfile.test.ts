@@ -267,3 +267,26 @@ describe('hasCampaignProgress', () => {
     expect(hasCampaignProgress(p)).toBe(false);
   });
 });
+
+describe('parseCampaignProfile with a save from before the shareholder summit (#1949)', () => {
+  function oldSave(treraniumDone: boolean): unknown {
+    const levels: Record<string, unknown> = {};
+    for (const id of ['tutorial_pit', 'dusty_hollow', 'grumpstone_ridge', 'treranium_depths']) {
+      const done = id !== 'tutorial_pit' && (id !== 'treranium_depths' || treraniumDone);
+      levels[id] = { levelId: id, unlocked: true, completed: done, cumulativeProfit: done ? 1e6 : 0, bestSessionProfit: done ? 1e6 : 0 };
+    }
+    return { version: 1, campaign: { levels, activeLevelId: null, campaignComplete: treraniumDone }, bestStars: {} };
+  }
+
+  it('unlocks the summit when Treranium was completed, and no longer reports the campaign complete', () => {
+    const c = parseCampaignProfile(oldSave(true)).campaign;
+    expect(c.levels['shareholder_summit']!.unlocked).toBe(true);
+    expect(c.levels['shareholder_summit']!.completed).toBe(false);
+    expect(c.campaignComplete).toBe(false);
+  });
+
+  it('keeps the summit locked while Treranium is not completed', () => {
+    const c = parseCampaignProfile(oldSave(false)).campaign;
+    expect(c.levels['shareholder_summit']!.unlocked).toBe(false);
+  });
+});

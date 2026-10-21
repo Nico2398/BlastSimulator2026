@@ -66,11 +66,32 @@ describe('createGameForLevel — board (#1946)', () => {
     expect('board' in state).toBe(false);
   });
 
-  it('no shipped level defines a board', () => {
+  it('only the shareholder summit among the shipped levels defines a board (#1949)', () => {
     const real = createCampaignState();
     for (const id of Object.keys(real.levels)) {
       if (id === FIXTURE_ID) continue;
+      if (id === 'shareholder_summit') {
+        expect(getLevel(id)?.board, id).toBeDefined();
+        continue;
+      }
       expect(getLevel(id)?.board, id).toBeUndefined();
     }
+  });
+});
+
+describe('createGameForLevel — progression ruleset (#1949)', () => {
+  it('applies the level market and creates the grade state when the level opts in', () => {
+    const campaign = createCampaignState();
+    campaign.levels['shareholder_summit']!.unlocked = true;
+    const state = createGameForLevel(campaign, 'shareholder_summit')!;
+    expect(state.contracts.market).toBe('production');
+    expect(state.grade?.grade).toBe(0);
+    expect(state.board).toBeDefined();
+  });
+
+  it('leaves earlier levels on the legacy market with no grade', () => {
+    const state = createGameForLevel(createCampaignState(), 'dusty_hollow')!;
+    expect(state.contracts.market).toBeUndefined();
+    expect(state.grade).toBeUndefined();
   });
 });

@@ -717,10 +717,13 @@ describe('sandbox market (#1681)', () => {
     }
   });
 
-  it('campaign levels leave the market unset (legacy)', async () => {
+  it('campaign levels leave the market unset (legacy), except the shareholder summit (#1949)', async () => {
     const { getAllLevels, resolveMarketId } = await import('../../../src/core/campaign/Level.js');
     const { createGame } = await import('../../../src/core/state/GameState.js');
-    for (const level of getAllLevels()) expect(level.market, level.id).toBeUndefined();
+    for (const level of getAllLevels()) {
+      if (level.id === 'shareholder_summit') expect(level.market).toBe('production');
+      else expect(level.market, level.id).toBeUndefined();
+    }
     const state = createGame({ seed: 42 });
     expect(resolveMarketId(state)).toBe('legacy');
   });
@@ -752,9 +755,12 @@ describe('sandbox ore grade scale (#1944)', () => {
     expect(isValidOreGradeScale(SANDBOX_ORE_GRADE_SCALE)).toBe(true);
   });
 
-  it('campaign levels leave oreGradeScale undefined', () => {
+  it('campaign levels leave oreGradeScale undefined, except the shareholder summit (#1949)', () => {
     const campaign = getAllLevels().filter(l => l.id !== SANDBOX_LEVEL_ID);
     expect(campaign.length).toBeGreaterThan(0);
-    for (const level of campaign) expect(level.oreGradeScale, level.id).toBeUndefined();
+    for (const level of campaign) {
+      if (level.id === 'shareholder_summit') expect(level.oreGradeScale).toBe(0.08);
+      else expect(level.oreGradeScale, level.id).toBeUndefined();
+    }
   });
 });

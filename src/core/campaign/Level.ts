@@ -6,7 +6,7 @@ import type { GameState } from '../state/GameState.js';
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, TUTORIAL_STARTING_SITE, TUTORIAL_RALLY_POINT, TUTORIAL_STARTING_BUILDINGS_NEAR, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition, type PitMaskShape } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_CASH, SHAREHOLDER_SUMMIT_PROFIT_TARGET, SHAREHOLDER_SUMMIT_BOARD, SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER, SANDBOX_MARKET, SANDBOX_ORE_GRADE_SCALE, TUTORIAL_STARTING_SITE, TUTORIAL_RALLY_POINT, TUTORIAL_STARTING_BUILDINGS_NEAR, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition, type PitMaskShape } from '../config/balance.js';
 import type { BoardConfig } from '../economy/Board.js';
 import type { MarketId } from '../economy/Market.js';
 import { getBiome } from '../world/BiomeCatalog.js';
@@ -80,7 +80,7 @@ export interface LevelDef {
   pitMask?: PitMaskShape;
   /** Ore grade scale lever (#1932); absent = default. */
   oreGradeScale?: number;
-  /** Difficulty tier: 0 (tutorial) – 3 (hardest). Used for display and ordering. */
+  /** Difficulty tier: 0 (tutorial) – 4 (hardest). Used for display and ordering. */
   difficultyTier: number;
   /** Fixed hiring pool; omitted = seeded random candidates (#1600). */
   hiringScript?: readonly ScriptedCandidate[];
@@ -270,6 +270,42 @@ const LEVELS: readonly LevelDef[] = [
     mixedRockHardness: true,       // Hard+soft interleaved — unpredictable projections
     difficultyTier: 3,
     startingSite: TRERANIUM_DEPTHS_STARTING_SITE,
+  },
+  {
+    // ────────────────────────────────────────────────────────
+    // Level 4 — Shareholder Summit (#1949)
+    // The finale: the mine went public. Hard volcanic rock, a board of directors
+    // with quarterly targets, and the first campaign level on the progression
+    // ruleset (mine grades, buyer tiers, production market, ore deposits).
+    // Opens with the digger kit plus a tier-1 freight warehouse (SHAREHOLDER_SUMMIT_STARTING_SITE).
+    // ────────────────────────────────────────────────────────
+    id: 'shareholder_summit',
+    nameKey: 'level.shareholder_summit.name',
+    descKey: 'level.shareholder_summit.desc',
+    biome: 'volcanic_flats',
+    climateBias: [0.1, -0.8],     // volcanic_flats' own climate centre: seed 4001 lands there unbiased
+    terrainSeed: 4001,
+    gridX: 160,
+    datum: 35,
+    gridZ: 160,
+    startingCash: SHAREHOLDER_SUMMIT_STARTING_CASH,
+    availableExplosives: [
+      'pop_rock', 'boomite', 'krackle',
+      'big_bada_boom', 'shatternite', 'rumblox',
+      'obliviax', 'dynatomics',
+    ],
+    unlockThreshold: SHAREHOLDER_SUMMIT_PROFIT_TARGET,
+    eventFreqMultiplier: 2.0,
+    contractPriceMultiplier: SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER,
+    scoreDecayRate: 0.08,
+    mixedRockHardness: true,
+    difficultyTier: 4,
+    oreDeposits: true,
+    oreGradeScale: SANDBOX_ORE_GRADE_SCALE,
+    market: SANDBOX_MARKET,
+    progression: true,
+    board: SHAREHOLDER_SUMMIT_BOARD,
+    startingSite: SHAREHOLDER_SUMMIT_STARTING_SITE,
   },
 ];
 

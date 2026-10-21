@@ -88,6 +88,10 @@ describe('Campaign', () => {
     expect(campaign.levels['treranium_depths']).toBeDefined();
     expect(campaign.levels['treranium_depths']!.unlocked).toBe(false);
 
+    // shareholder_summit (tier 4) should be locked (#1949)
+    expect(campaign.levels['shareholder_summit']).toBeDefined();
+    expect(campaign.levels['shareholder_summit']!.unlocked).toBe(false);
+
     // No active level, campaign not complete
     expect(campaign.activeLevelId).toBeNull();
     expect(campaign.campaignComplete).toBe(false);
@@ -120,12 +124,14 @@ describe('Campaign', () => {
     expect(level!.availableExplosives).toContain('krackle');
   });
 
-  // ── 3. getAllLevels returns all 4 ──────────────────────────────────────────
+  // ── 3. getAllLevels returns all 5 ──────────────────────────────────────────
 
-  it('getAllLevels returns all 4 levels in order', () => {
+  it('getAllLevels returns all 5 levels in order', () => {
     const all = getAllLevels();
 
-    expect(all).toHaveLength(4);
+    expect(all).toHaveLength(5);
+    expect(all[4]!.id).toBe('shareholder_summit');
+    expect(all[4]!.difficultyTier).toBe(4);
 
     // Order must be by difficulty tier
     expect(all[0]!.id).toBe('tutorial_pit');
@@ -148,10 +154,14 @@ describe('Campaign', () => {
     expect(all[3]!.startingCash).toBe(125000);
     expect(all[3]!.unlockThreshold).toBe(800000);
 
+    expect(all[4]!.id).toBe('shareholder_summit');
+    expect(all[4]!.difficultyTier).toBe(4);
+
     // Verify progressive difficulty
     expect(all[0]!.unlockThreshold).toBeLessThan(all[1]!.unlockThreshold);
     expect(all[1]!.unlockThreshold).toBeLessThan(all[2]!.unlockThreshold);
     expect(all[2]!.unlockThreshold).toBeLessThan(all[3]!.unlockThreshold);
+    expect(all[3]!.unlockThreshold).toBeLessThan(all[4]!.unlockThreshold);
     expect(all[0]!.eventFreqMultiplier).toBeLessThan(all[1]!.eventFreqMultiplier!);
     expect(all[1]!.eventFreqMultiplier).toBeLessThan(all[2]!.eventFreqMultiplier!);
     expect(all[2]!.eventFreqMultiplier).toBeLessThan(all[3]!.eventFreqMultiplier!);
@@ -206,9 +216,16 @@ describe('Campaign', () => {
     recordProfit(campaign, 'grumpstone_ridge', 250000);
 
     expect(campaign.levels['treranium_depths']!.unlocked).toBe(true);
+    expect(campaign.levels['shareholder_summit']!.unlocked).toBe(false);
 
-    // Complete treranium_depths — campaign complete
+    // Complete treranium_depths — shareholder_summit unlocks, campaign not yet complete
     recordProfit(campaign, 'treranium_depths', 800000);
+
+    expect(campaign.levels['shareholder_summit']!.unlocked).toBe(true);
+    expect(campaign.campaignComplete).toBe(false);
+
+    // Complete shareholder_summit — campaign complete (#1949)
+    recordProfit(campaign, 'shareholder_summit', getLevel('shareholder_summit')!.unlockThreshold);
 
     expect(campaign.campaignComplete).toBe(true);
   });
@@ -554,6 +571,7 @@ describe('Campaign', () => {
     expect(status.output).toContain('dusty_hollow');
     expect(status.output).toContain('grumpstone_ridge');
     expect(status.output).toContain('treranium_depths');
+    expect(status.output).toContain('shareholder_summit');
     expect(status.output).toContain('(world map)');
 
     // Start a level and check status again
@@ -688,7 +706,7 @@ describe('Campaign', () => {
 });
 
 describe('campaign status finale line (#1320)', () => {
-  const REAL = ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths'];
+  const REAL = ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths', 'shareholder_summit'];
 
   it('status_complete key resolves and carries CAMPAIGN COMPLETE', () => {
     expect(t('campaign.status_complete')).toContain('CAMPAIGN COMPLETE');
@@ -705,13 +723,19 @@ describe('campaign status finale line (#1320)', () => {
     expect(campaignStatusCommand(ctx, [], {}).output).not.toContain('CAMPAIGN COMPLETE');
   });
 
+  it('status has no complete line after three real levels: the summit is still open (#1949)', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32 });
+    for (const id of REAL.slice(0, 3)) campaignCompleteCommand(ctx, [], { level: id });
+    expect(campaignStatusCommand(ctx, [], {}).output).not.toContain('CAMPAIGN COMPLETE');
+  });
+
   it('status has no complete line after two real levels', () => {
     const ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32 });
     for (const id of REAL.slice(0, 2)) campaignCompleteCommand(ctx, [], { level: id });
     expect(campaignStatusCommand(ctx, [], {}).output).not.toContain('CAMPAIGN COMPLETE');
   });
 
-  it('status prints the complete line after the 3 real levels, tutorial untouched', () => {
+  it('status prints the complete line after the 4 real levels, tutorial untouched', () => {
     const ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32 });
     for (const id of REAL) campaignCompleteCommand(ctx, [], { level: id });
     expect(ctx.state!.campaign.levels['tutorial_pit']!.completed).toBe(false);
