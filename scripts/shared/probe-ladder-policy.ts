@@ -42,7 +42,7 @@ export function decideLadderSafety(input: LadderSafetyInput): LadderSafetyDecisi
 
 /** First grade at which the ladder gates its next shot on the rubble already in the pit. */
 export const LADDER_GATE_MIN_GRADE = 2;
-/** Rubble (kg) left in the pit at or above which the next shot is held. Measured: a limit-sized shot buries the pit in millions of kg. */
+/** Rubble (kg) left in the pit strictly above which the next shot is held. Measured: a limit-sized shot buries the pit in millions of kg. */
 export const LADDER_GATE_RUBBLE_KG = 500_000;
 /** Ticks of payroll cash the ladder keeps before it fires again. Payroll runs roughly 700 a tick; a stalled income must outlast it. */
 export const LADDER_GATE_RUNWAY_TICKS = 1_500;

@@ -54,6 +54,7 @@ import { computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY } from '../../src/
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { nextGradeTargets } from '../../src/core/economy/MineGrade.js';
 import { getExplosivesFreeCapacity } from '../../src/core/entities/BuildingWarehouse.js';
+import { onGroundMassKg } from '../../src/core/economy/Logistics.js';
 import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
 import { getBuildingDef, getUpgradeCost } from '../../src/core/entities/Building.js';
 import { getVehicleDefByTier, getVehicleReservation, vehicleDriverId } from '../../src/core/entities/Vehicle.js';
@@ -410,6 +411,8 @@ interface ReinvestMemory {
   yieldPending: boolean;
   researchOrdered: boolean;
   retryAt: Record<string, number>;
+  /** Tick at which the current unfinished, unordered pattern was first seen; unset while none stands. */
+  stalePatternSinceTick?: number;
 }
 
 function spendable(s: ProbeSession): number {
@@ -473,11 +476,11 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan)
     const idle = s.state.plannedDrillHoles.length === 0 && Object.keys(s.state.plannedChargesByHole).length === 0
       && s.state.drillHoles.length === 0;
     if (plan) { // a pattern nobody orders anymore that stays unfinished for a whole step budget is stuck
-      if (idle) delete m.retryAt['stalePattern'];
-      else if (m.retryAt['stalePattern'] === undefined) m.retryAt['stalePattern'] = s.state.tickCount;
-      else if (s.state.tickCount - m.retryAt['stalePattern'] > OPENING_STEP_MAX_TICKS) {
+      if (idle) delete m.stalePatternSinceTick;
+      else if (m.stalePatternSinceTick === undefined) m.stalePatternSinceTick = s.state.tickCount;
+      else if (s.state.tickCount - m.stalePatternSinceTick > OPENING_STEP_MAX_TICKS) {
         abandonPattern(s);
-        delete m.retryAt['stalePattern'];
+        delete m.stalePatternSinceTick;
       }
     }
     const next = plan?.() ?? { cost: SHOT_EXPLOSIVE_KG + RE_FIRE_CASH_CUSHION, order: () => orderShotOnce(s, m) };
@@ -845,13 +848,6 @@ function ladderPermit(s: ProbeSession, m: LadderMemory): void {
   }
 }
 
-/** Rock mass (kg) lying in the pit, hauled or not. */
-function rubbleOnGroundKg(state: GameState): number {
-  let kg = 0;
-  for (const f of state.logistics.fragments) if (f.state === 'on_ground') kg += f.fragment.mass;
-  return kg;
-}
-
 /** Rock mass (kg) a hauler can still reach: on the ground with a haul order not blocked as out of reach. Rubble no ramp reaches stays put and must not hold shots forever. */
 function reachableRubbleKg(state: GameState): number {
   const reachable = new Set<number>();
@@ -866,9 +862,13 @@ function reachableRubbleKg(state: GameState): number {
 /** The ladder's shot plan, held (unaffordable) while the pit is buried or payroll runway is short. */
 function gatedLadderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const plan = ladderPlan(s, m);
+  const rubbleKg = reachableRubbleKg(s.state);
+  // No reachable rubble means no hauling work and no income: holding on the payroll runway alone would
+  // starve the idle-crew recovery shot while payroll drains, so the gate only applies with rubble to clear.
+  if (rubbleKg === 0) return plan;
   const hold = decideLadderShotGate({
     grade: gradeOf(s),
-    rubbleKg: reachableRubbleKg(s.state),
+    rubbleKg,
     cash: s.state.cash,
     payrollPerTick: getOperatingCostPerHour(s.state).payroll,
   }) === 'hold';
@@ -879,7 +879,7 @@ function gatedLadderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
 function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
   const haulers = s.state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length;
   const cost = getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver;
-  if (haulers >= LADDER_MAX_HAULERS || s.state.cash - cost < LADDER_UPGRADE_RESERVE || rubbleOnGroundKg(s.state) === 0) return;
+  if (haulers >= LADDER_MAX_HAULERS || s.state.cash - cost < LADDER_UPGRADE_RESERVE || onGroundMassKg(s.state.logistics) === 0) return;
   tryOnce(s, m, 'hauler', () => buyHauler(s));
 }
 
