@@ -29,13 +29,16 @@ export interface LadderSafetyInput {
 export type LadderSafetyDecision = 'build_office' | 'upgrade_office' | 'neighbours' | 'none';
 
 /** Whether the ladder should order a ramp into the cleared, deepened crater now. */
-export function decideLadderRamp(_input: LadderRampInput): LadderRampDecision {
-  // TODO: implement
-  return 'skip';
+export function decideLadderRamp(input: LadderRampInput): LadderRampDecision {
+  const clear = input.rubbleKg === 0 && !input.pendingHaul;
+  const deeper = input.floorDepthM > input.rampedFloorM;
+  const affordable = input.cash - input.rampCost >= input.reserve;
+  return clear && input.deepenTargetOpen && deeper && affordable ? 'order' : 'skip';
 }
 
 /** Which safety/neighbour action, if any, the ladder takes this tick. */
-export function decideLadderSafety(_input: LadderSafetyInput): LadderSafetyDecision {
-  // TODO: implement
-  return 'none';
+export function decideLadderSafety(input: LadderSafetyInput): LadderSafetyDecision {
+  if (!input.safetyTargetOpen && !input.neighboursBelowTarget) return 'none';
+  if (input.safetyTargetOpen && input.canAfford) return input.officeBuilt ? 'upgrade_office' : 'build_office';
+  return input.neighboursBelowTarget ? 'neighbours' : 'none';
 }
