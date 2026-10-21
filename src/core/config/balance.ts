@@ -1302,6 +1302,12 @@ export const NAV_MAX_SLOPE_DEGREES = 30;
  */
 export const NAV_MAX_SLOPE_RATIO = Math.tan(NAV_MAX_SLOPE_DEGREES * Math.PI / 180);
 
+/** The one steepest slope (degrees) any vehicle climbs on a progression site (#2045). */
+export const VEHICLE_MAX_SLOPE_DEGREES = 20;
+
+/** tan(VEHICLE_MAX_SLOPE_DEGREES): rise per metre of run (#2045). */
+export const VEHICLE_MAX_SLOPE_RATIO = Math.tan(VEHICLE_MAX_SLOPE_DEGREES * Math.PI / 180);
+
 /** Steepest slope (degrees) each vehicle tier climbs on a progression site (#1938). Tier 1 keeps the global limit. */
 export const VEHICLE_TIER_MAX_SLOPE_DEGREES: Record<VehicleTier, number> = {
   1: NAV_MAX_SLOPE_DEGREES,
@@ -1331,7 +1337,7 @@ export const NAV_RAMP_MIN_SLOPE_DELTA = NAV_MAX_SLOPE_RATIO * 0.95;
 /** Fraction of NAV_MAX_SLOPE_RATIO a freshly-cut ramp's floor is graded to — strictly
  * under 1 so the finished floor always tests as legally climbable with headroom for
  * float rounding across the ramp's full length (#1152). */
-const RAMP_CUT_SLOPE_MARGIN = 0.98;
+export const RAMP_CUT_SLOPE_MARGIN = 0.98;
 
 /** The actual rise-per-metre-of-run a ramp's floor is cut at (#1152). */
 export const RAMP_CUT_SLOPE_RATIO = NAV_MAX_SLOPE_RATIO * RAMP_CUT_SLOPE_MARGIN;

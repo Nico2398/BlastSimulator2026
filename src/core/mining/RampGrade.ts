@@ -70,6 +70,17 @@ export function describeRampClimb(
   return { gradeDeg, tiers: climbTiersFor(gradeDeg, progression) };
 }
 
+/** One ramp's grade against the single vehicle slope limit (#2045). */
+export type RampClimb = { gradeDeg: number; climbable: boolean; maxDeg: number };
+
+/** Ramp grade against the one vehicle slope limit; null without a nav grid. Replaces `describeRampClimb` once callers move (#2045). */
+export function describeRampClimbability(
+  navGrid: NavGrid, ramp: BuiltRamp, progression: boolean,
+): RampClimb | null {
+  void navGrid; void ramp; void progression;
+  return null; // TODO: implement
+}
+
 /** Vehicle tiers that climb a `gradeDeg` ramp; off a progression site every tier does. */
 export function climbTiersFor(gradeDeg: number, progression: boolean): VehicleTier[] {
   return progression ? tiersThatClimb(gradeDeg) : [...VEHICLE_TIER_LIST];

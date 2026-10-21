@@ -49,6 +49,8 @@ export interface RampDef {
   legs?: RampLeg[];
   /** Chosen grade in degrees; undefined means the straight line to `targetDepth` (#1939). */
   gradeDegrees?: number;
+  /** Rise per metre of run the floor was cut at; undefined means the global cut ratio (#2045). */
+  cutSlopeRatio?: number;
 }
 
 export interface RampResult {
@@ -441,6 +443,12 @@ interface RampColumn {
  * so `index` still increases 0..N-1 with no gaps across emitted segments,
  * and `targetY` still strictly decreases across them.
  */
+/** Rise per metre of run a ramp floor is cut at on a progression or sandbox site (#2045). */
+export function rampCutSlopeRatio(progression: boolean): number {
+  void progression;
+  return RAMP_CUT_SLOPE_RATIO; // TODO: implement
+}
+
 /**
  * Shortest ramp length that reaches `targetDepth` without the floor's
  * rise-per-metre-of-run exceeding `RAMP_CUT_SLOPE_RATIO` (#1152).

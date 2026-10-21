@@ -55,6 +55,12 @@ export function isStepClimbable(fromY: number | undefined, toY: number | undefin
   return Math.abs(fromY - toY) <= maxSlopeRatio * run + NAV_SLOPE_EPSILON;
 }
 
+/** Horizontal run (m) a step of (dx, dz) must travel to climb at no more than `maxSlopeRatio` (#2045). */
+export function stepClimbRun(dx: number, dz: number, maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO): number {
+  void maxSlopeRatio;
+  return Math.hypot(dx, dz); // TODO: implement
+}
+
 export type NavCellType = 'walkable' | 'blocked' | 'drill_hole' | 'ramp' | 'void';
 
 export interface NavCell {
