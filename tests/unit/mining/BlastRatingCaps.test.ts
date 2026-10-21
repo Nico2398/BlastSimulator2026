@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { applyRatingCaps, fizzleShare, oversizeShare, type RatingCapFacts } from '../../../src/core/mining/BlastRatingCaps.js';
+import { applyRatingCaps, fizzleShare, oversizeShare, sealedShare, type RatingCapFacts } from '../../../src/core/mining/BlastRatingCaps.js';
 import { buildBlastReport, type BlastResult, type BlastRating } from '../../../src/core/mining/BlastExecution.js';
 import type { AccidentRecord } from '../../../src/core/entities/Damage.js';
-import { BLAST_FIZZLE_SHARE_FAILURE, BLAST_FIZZLE_SHARE_PARTIAL, BLAST_OVERSIZE_SHARE_CAP } from '../../../src/core/config/balance.js';
+import { BLAST_SEALED_SHARE_FAILURE, BLAST_SEALED_SHARE_PARTIAL, BLAST_FIZZLE_SHARE_FAILURE, BLAST_FIZZLE_SHARE_PARTIAL, BLAST_OVERSIZE_SHARE_CAP } from '../../../src/core/config/balance.js';
 
 const NONE: RatingCapFacts = {
   deaths: 0, injuries: 0, destroyedBuildings: 0, wetHoleCount: 0, fizzledHoleCount: 0, chargedHoleCount: 0,
@@ -323,5 +323,67 @@ describe('buildBlastReport no breakout (#1724)', () => {
     const { brokeOut: _omit, ...rest } = sealed();
     const r = buildBlastReport(rest as BlastResult, 0, 0);
     expect(r.ratingCap).toBeUndefined();
+  });
+});
+
+describe('sealedShare (#2003)', () => {
+  it('is the sealed fraction of all fragments', () => {
+    expect(sealedShare(1, 4)).toBe(0.25);
+    expect(sealedShare(3, 4)).toBe(0.75);
+  });
+  it('is 0 with no fragments, never NaN', () => {
+    expect(sealedShare(0, 0)).toBe(0);
+    expect(Number.isNaN(sealedShare(5, 0))).toBe(false);
+  });
+  it('is 1 when everything is sealed', () => {
+    expect(sealedShare(9, 9)).toBe(1);
+  });
+});
+
+describe('applyRatingCaps sealed share (#2003)', () => {
+  const sealed = (n: number, o: Partial<RatingCapFacts> = {}) => facts({ fragmentCount: 100, sealedFragmentCount: n, ...o });
+
+  it('thresholds are 0.75 and 0.25', () => {
+    expect(BLAST_SEALED_SHARE_FAILURE).toBe(0.75);
+    expect(BLAST_SEALED_SHARE_PARTIAL).toBe(0.25);
+  });
+  it('just under the partial threshold leaves the rating alone', () => {
+    expect(applyRatingCaps('perfect', sealed(24))).toEqual({ rating: 'perfect', cap: null });
+  });
+  it('exactly at the partial threshold caps at mediocre', () => {
+    expect(applyRatingCaps('perfect', sealed(25))).toEqual({ rating: 'mediocre', cap: 'sealed_partial' });
+  });
+  it('a third sealed (the 10 m Krackle row) caps a good blast at mediocre', () => {
+    expect(applyRatingCaps('good', sealed(32))).toEqual({ rating: 'mediocre', cap: 'sealed_partial' });
+  });
+  it('just under the failure threshold still caps at mediocre', () => {
+    expect(applyRatingCaps('perfect', sealed(74))).toEqual({ rating: 'mediocre', cap: 'sealed_partial' });
+  });
+  it('exactly at the failure threshold caps at bad', () => {
+    expect(applyRatingCaps('perfect', sealed(75))).toEqual({ rating: 'bad', cap: 'sealed_failure' });
+  });
+  it('81 percent sealed (the 20 m Dynatomics row) caps perfect at bad', () => {
+    expect(applyRatingCaps('perfect', sealed(81))).toEqual({ rating: 'bad', cap: 'sealed_failure' });
+  });
+  it('a small sealed share (11 of 1526) changes nothing', () => {
+    expect(applyRatingCaps('good', facts({ fragmentCount: 1526, sealedFragmentCount: 11 }))).toEqual({ rating: 'good', cap: null });
+  });
+  it('partial cap leaves a mediocre or worse base alone', () => {
+    expect(applyRatingCaps('mediocre', sealed(30))).toEqual({ rating: 'mediocre', cap: null });
+    expect(applyRatingCaps('bad', sealed(30))).toEqual({ rating: 'bad', cap: null });
+  });
+  it('caps only lower: catastrophic stays catastrophic', () => {
+    expect(applyRatingCaps('catastrophic', sealed(90))).toEqual({ rating: 'catastrophic', cap: null });
+  });
+  it('no_breakout still caps at bad, with or without a sealed count', () => {
+    expect(applyRatingCaps('perfect', facts({ noBreakout: true }))).toEqual({ rating: 'bad', cap: 'no_breakout' });
+    expect(applyRatingCaps('good', facts({ noBreakout: true, fragmentCount: 100, sealedFragmentCount: 10 })))
+      .toEqual({ rating: 'bad', cap: 'no_breakout' });
+  });
+  it('death still wins over a sealed failure', () => {
+    expect(applyRatingCaps('perfect', sealed(90, { deaths: 1 }))).toEqual({ rating: 'catastrophic', cap: 'death' });
+  });
+  it('an absent sealedFragmentCount counts as none sealed', () => {
+    expect(applyRatingCaps('perfect', facts())).toEqual({ rating: 'perfect', cap: null });
   });
 });

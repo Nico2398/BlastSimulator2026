@@ -63,6 +63,8 @@ const LIVE_EXPORTS = new Set<string>([
   'src/core/mining/WallStability.ts:applySlump',
   'src/core/mining/WallStability.ts:findOverheightFaces',
   'src/core/mining/WallStability.ts:WallSurface',
+  // Breakout warning (#2003): the unit-tested text contract; production reaches it through breakoutWarningFor.
+  'src/ui/panels/breakoutWarningText.ts:breakoutWarningText',
   // Wall overlay (#1943): the unit-tested tint rule; production applies it inside WallStabilityOverlay.show.
   'src/renderer/WallStabilityOverlay.ts:wallFaceTint',
   // Ramp tool (#1942): the unit-tested contracts of the per-leg arrow layout and the tier-check line; production composes them inside buildRampArrow / describeRampPlan.

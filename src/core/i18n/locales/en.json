@@ -4539,5 +4539,17 @@
   "ui.blast_workshop.preview.wall_warning": "This shot leaves a {height} m face in {rock} (safe: {safe} m). It may slump.",
   "ui.blast_workshop.preflight.warn_wall_slump": "This shot leaves a {height} m face in {rock} (safe: {safe} m). It may slump.",
   "ui.survey.wall_overlay_toggle_tip": "Toggle wall stability overlay — W",
-  "shortcuts.wall_overlay": "W: Toggle Wall Stability Overlay"
+  "shortcuts.wall_overlay": "W: Toggle Wall Stability Overlay",
+  "ui.blast_workshop.preflight.warn_breakout_none": "{count} of {total} holes are too deep: more than {max} m of rock stays above the charge, so this shot will not break out and the rock stays sealed in the ground. Drill shorter holes or load an explosive that fills more of the hole.",
+  "ui.blast_workshop.preflight.warn_breakout_partial": "About {percent}% of the rock this shot breaks stays sealed in the ground under intact cap ({count} of {total} holes too deep). Drill shorter holes or load an explosive that fills more of the hole.",
+  "ui.blast_workshop.fire.check_breakout_none": "{count} of {total} holes are too deep: the shot will not break out and the rock stays sealed. Use shorter holes or an explosive that fills more of the hole.",
+  "ui.blast_workshop.fire.check_breakout_partial": "About {percent}% of the broken rock stays sealed in the ground ({count} of {total} holes too deep). Use shorter holes or an explosive that fills more of the hole.",
+  "ui.blast_workshop.report.rating_cap_sealed_failure": "Rating capped at Bad: most of the broken rock stayed sealed under the ground.",
+  "ui.blast_workshop.report.rating_cap_sealed_partial": "Rating capped at Mediocre: part of the broken rock stayed sealed under the ground.",
+  "ui.blast_workshop.report.stat_sealed_value": "Sealed underground",
+  "ui.blast_workshop.report.sealed_hint": "${value} of ore broke but stayed sealed under intact ground. No hauler can reach it, but a later shot that breaks the cap can still free it.",
+  "mining.blast.rating_cap_sealed_failure": "Rating capped (most broken rock stayed sealed): base {base}",
+  "mining.blast.rating_cap_sealed_partial": "Rating capped (part of the broken rock stayed sealed): base {base}",
+  "mining.blast.sealed_ore_value": "Sealed ore value: ${value} (a later shot breaking the cap can still free it)",
+  "mining.blast.sealed_fragments": "Sealed fragments: {count} of {total}"
 }

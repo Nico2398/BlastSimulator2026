@@ -125,9 +125,11 @@ describe('sandbox economy: value consistency', () => {
     const result = fireReferenceShot(ctx, 6, explosive, chargeKg);
     const kg = oreKgByType(result);
     const expected = sum(Object.entries(kg).map(([ore, k]) => k * oreValuePerKg(ore, 'production')));
+    // oreKgByType counts every fragment; the report splits it into broken-out and sealed (#2003).
+    const reported = result.totalOreValue + (result.sealedOreValue ?? 0);
     expect(result.totalOreValue).toBeGreaterThan(0);
-    expect(result.totalOreValue / expected).toBeGreaterThan(0.95);
-    expect(result.totalOreValue / expected).toBeLessThan(1.05);
+    expect(reported / expected).toBeGreaterThan(0.95);
+    expect(reported / expected).toBeLessThan(1.05);
   });
 });
 
