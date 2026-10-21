@@ -27,13 +27,12 @@ export interface BreakoutPrediction {
 
 /** True when the broken voxel at (x, y, z) stays sealed under an intact cap (#2053). */
 export function isVoxelSealed(
-  _p: Pick<BreakoutPrediction, 'sealedKeys'>,
-  _x: number,
-  _y: number,
-  _z: number,
+  p: Pick<BreakoutPrediction, 'sealedKeys'>,
+  x: number,
+  y: number,
+  z: number,
 ): boolean {
-  // TODO: implement
-  return false;
+  return p.sealedKeys.has(`${x},${y},${z}`);
 }
 
 /** Predicts the breakout of `plan` on `grid`; null when no hole is charged. Never mutates `grid`. */
@@ -68,10 +67,14 @@ export function predictBreakout(
 
   // A broken voxel is sealed when intact rock still sits above it in its column.
   let sealedVoxels = 0;
+  const sealedKeys = new Set<string>();
   const sealedColumns = new Set<string>();
   for (const [key, { x, z, rows }] of columns) {
     const top = intactTop(x, z);
-    const sealedHere = rows.filter(y => y < top).length;
+    let sealedHere = 0;
+    for (const y of rows) {
+      if (y < top) { sealedHere++; sealedKeys.add(`${x},${y},${z}`); }
+    }
     if (sealedHere > 0) { sealedVoxels += sealedHere; sealedColumns.add(key); }
   }
 
@@ -85,8 +88,8 @@ export function predictBreakout(
     sealedShare: sealedShare(sealedVoxels, fragmented.length),
     tooDeepHoleIds,
     chargedHoleCount: charged.length,
-    fragmented: [], // TODO: implement
-    sealedKeys: new Set<string>(), // TODO: implement
+    fragmented,
+    sealedKeys,
   };
 }
 
