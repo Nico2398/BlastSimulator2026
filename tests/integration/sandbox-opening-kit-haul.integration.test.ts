@@ -88,6 +88,8 @@ function openingKitHaul(side: 'west' | 'east') {
   // Ramp depth is measured from the start surface and must land on the crater
   // floor (~9.5 m): the west start sits near 16.5 m, the east one near 13.4 m (floor 10.5).
   const ramp = RAMP_ORDER[side];
+  const firstTile = RAMP_GEOMETRY[side].first;
+  const groundAtFirstTile = ctx.state!.navGrid!.cellAt(firstTile.x, firstTile.z)!.surfaceY!;
   expect(run(`build_ramp ${ramp}`)).toMatchObject({ success: true });
   const stuck = new Map<number, number>();
   let maxStuck = 0;
@@ -107,7 +109,7 @@ function openingKitHaul(side: 'west' | 'east') {
   tickWhile(run, state, () => false, HAUL_WINDOW_TICKS, sample);
   const hauledOreKg = oreKg(state) - baseline;
   const storedKg = state.logistics.storedMassKg - storedBefore;
-  return { state, grid: ctx.grid!, haulableOreKg, rampTicks, maxStuck, hauledOreKg, storedKg, haulable };
+  return { state, grid: ctx.grid!, groundAtFirstTile, haulableOreKg, rampTicks, maxStuck, hauledOreKg, storedKg, haulable };
 }
 
 describe.each(['west', 'east'] as const)('opening kit: blast, ramp from the %s, haul (#1719)', (side) => {
@@ -143,12 +145,13 @@ describe.each(['west', 'east'] as const)('opening kit: blast, ramp from the %s, 
   });
 
   // #2043: the ramp's top joins the continuous ground, so a vehicle limited to the ramp's own grade can use it.
-  it('the step from the rim tile behind the ramp top onto the first ramp tile is a sliver, enterable at 30 degrees', () => {
+  it('the first ramp tile keeps the ground height it had before the ramp (no lip), and the step from the rim tile behind it is enterable at 30 degrees', () => {
     const nav = result.state.navGrid!;
     const g = RAMP_GEOMETRY[side];
     const behind = nav.cellAt(g.behind.x, g.behind.z)!.surfaceY!;
     const first = nav.cellAt(g.first.x, g.first.z)!.surfaceY!;
-    expect(Math.abs(behind - first), `lip ${behind} -> ${first}`).toBeLessThanOrEqual(0.1);
+    // The step from the rim tile is the terrain's own gradient there (0.1 m west, 0.35 m east), not a ramp-made lip.
+    expect(Math.abs(first - result.groundAtFirstTile), `first ramp tile moved ${result.groundAtFirstTile} -> ${first}`).toBeLessThanOrEqual(1e-6);
     expect(isStepClimbable(behind, first, 1, NAV_MAX_SLOPE_RATIO)).toBe(true);
   });
 
