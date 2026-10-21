@@ -7,9 +7,6 @@ import {
 } from '../../../scripts/shared/probe-ladder-policy';
 
 const rampBase: LadderRampInput = {
-  rubbleKg: 0,
-  pendingHaul: false,
-  deepenTargetOpen: true,
   floorDepthM: 10,
   rampedFloorM: 5,
   cash: 10000,
@@ -18,20 +15,8 @@ const rampBase: LadderRampInput = {
 };
 
 describe('decideLadderRamp', () => {
-  it('orders when every condition holds', () => {
+  it('orders when the floor is deeper and the reserve survives', () => {
     expect(decideLadderRamp(rampBase)).toBe('order');
-  });
-
-  it('skips while rubble remains', () => {
-    expect(decideLadderRamp({ ...rampBase, rubbleKg: 1 })).toBe('skip');
-  });
-
-  it('skips while a haul is pending', () => {
-    expect(decideLadderRamp({ ...rampBase, pendingHaul: true })).toBe('skip');
-  });
-
-  it('skips when no deepen target is open', () => {
-    expect(decideLadderRamp({ ...rampBase, deepenTargetOpen: false })).toBe('skip');
   });
 
   it('skips when the floor is no deeper than the last ramped floor', () => {

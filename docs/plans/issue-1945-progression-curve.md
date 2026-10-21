@@ -82,9 +82,9 @@ No constant changed. Nothing in `src/core/config/balance.ts` moved, so no sandbo
 Seed 42, desert_badlands, probe code only (`scripts/shared/probe-strategies.ts`, `scripts/shared/probe-ladder-policy.ts`);
 `src/` and every balance constant are unchanged, so no sandbox or campaign pin moved and none was re-measured.
 
-Policy added to `ladder`: `decideLadderRamp` (a ramp once per new pit floor, only into a cleared crater, `rampedFloorM`,
-cash reserve kept; rubble counted as cleared once deliveries stall 750 ticks, since rubble the haulers cannot reach is what
-the ramp is for), `decideLadderSafety` (Management Office built/upgraded while a safety target is open),
+Policy added to `ladder`: `decideLadderRamp` (a ramp once per new pit floor, `rampedFloorM`, cash reserve kept; ordered as soon as the yield is
+measured, never gated on the rubble being cleared or a depth target being open: the ramp is how haulers reach the rubble, and a gate on
+a clear crater stalled the Shareholder Summit competent run into a firing), `decideLadderSafety` (Management Office built/upgraded while a safety target is open),
 a deepen only into a crater with no rubble and no pending haul over its footprint, and a refire of a charged pattern
 whose shot was abandoned (see below).
 

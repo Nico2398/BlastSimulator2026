@@ -1,12 +1,6 @@
 /** Pure decisions for the probe `ladder` strategy: narrow inputs, no session or game state. */
 
 export interface LadderRampInput {
-  /** Fragment mass still lying on the crater footprint. */
-  rubbleKg: number;
-  /** A haul is still pending. */
-  pendingHaul: boolean;
-  /** A depth target of the next grade is open. */
-  deepenTargetOpen: boolean;
   /** Current pit floor depth in metres. */
   floorDepthM: number;
   /** Floor depth at which a ramp was last ordered. */
@@ -28,12 +22,15 @@ export interface LadderSafetyInput {
 
 type LadderSafetyDecision = 'build_office' | 'upgrade_office' | 'neighbours' | 'none';
 
-/** Whether the ladder should order a ramp into the cleared, deepened crater now. */
+/**
+ * Whether the ladder should order a ramp into the latest crater now: once per new pit floor, cash reserve kept.
+ * Rubble is deliberately not a condition: the ramp is how haulers reach it (a gate on a clear crater stalled the
+ * Shareholder Summit competent run into a firing).
+ */
 export function decideLadderRamp(input: LadderRampInput): LadderRampDecision {
-  const clear = input.rubbleKg === 0 && !input.pendingHaul;
   const deeper = input.floorDepthM > input.rampedFloorM;
   const affordable = input.cash - input.rampCost >= input.reserve;
-  return clear && input.deepenTargetOpen && deeper && affordable ? 'order' : 'skip';
+  return deeper && affordable ? 'order' : 'skip';
 }
 
 /** Which safety/neighbour action, if any, the ladder takes this tick. */

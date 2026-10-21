@@ -564,9 +564,6 @@ interface LadderMemory extends ReinvestMemory {
   rampPending: number | null;
   /** Floor depth (m) at which a ramp was last ordered; 0 before any. */
   rampedFloorM: number;
-  /** Delivered ore (kg) at the last change, and the tick it changed: hauling that stopped for a while means the rubble left is out of reach. */
-  oreSeenKg: number;
-  oreSeenTick: number;
   /** Never apply for a permit past this grade (stay_g1); null for no cap. */
   maxGrade: number | null;
 }
@@ -776,26 +773,14 @@ function ladderSpoil(s: ProbeSession, m: ReinvestMemory): void {
 /** Estimated cash a ramp dig costs (crew time and spoil); the ramp is ordered only when the reserve survives it. */
 const LADDER_RAMP_COST = 20_000;
 
-/** Ticks without a delivery after which the rubble still lying in the pit counts as out of reach of the haulers. */
-const LADDER_HAUL_STALL_TICKS = 750;
-
-/** True once delivered ore has not grown for LADDER_HAUL_STALL_TICKS. */
-function haulStalled(s: ProbeSession, m: LadderMemory): boolean {
-  const ore = s.state.grade?.oreDeliveredKg ?? 0;
-  if (ore !== m.oreSeenKg) { m.oreSeenKg = ore; m.oreSeenTick = s.state.tickCount; }
-  return s.state.tickCount - m.oreSeenTick >= LADDER_HAUL_STALL_TICKS;
-}
-
-/** One ramp per new pit floor, into the latest crater once it is cleared: never a ramp into every crater. */
+/**
+ * One ramp per new pit floor, into the latest crater as soon as its yield is measured. Never gated on the rubble
+ * being cleared: the ramp is what lets the haulers reach that rubble, so waiting for it stalls income (#2041).
+ */
 function ladderCraterRamp(s: ProbeSession, m: LadderMemory): void {
-  // Rubble the haulers can no longer reach (deliveries stopped) is what the ramp is for: it counts as cleared.
-  const stalled = haulStalled(s, m);
   if (m.yieldPending || m.shot !== null || s.state.pendingActions.some(a => a.type === 'dig_ramp_segment')) return;
   const floorDepthM = s.state.grade?.deepestPitM ?? 0;
   const decision = decideLadderRamp({
-    rubbleKg: stalled ? 0 : craterRubble(s.state, m.crater),
-    pendingHaul: !stalled && craterHaulPending(s.state, m.crater),
-    deepenTargetOpen: depthTargetOpen(s),
     floorDepthM, rampedFloorM: m.rampedFloorM,
     cash: s.state.cash, rampCost: LADDER_RAMP_COST, reserve: LADDER_UPGRADE_RESERVE,
   });
@@ -841,7 +826,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {},
-    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.rampSlope, rampPending: null, rampedFloorM: 0, oreSeenKg: 0, oreSeenTick: 0, maxGrade,
+    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.rampSlope, rampPending: null, rampedFloorM: 0, maxGrade,
   };
   playOut(s, () => {
     ladderPermit(s, m);
