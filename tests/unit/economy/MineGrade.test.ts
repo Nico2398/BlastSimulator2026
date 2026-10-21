@@ -587,8 +587,8 @@ describe('unlockLinesFor (#1926)', () => {
   const EN_HINTS: Record<number, string> = {
     1: 'Your pile of rubble is a logistics problem now.',
     2: 'Deeper benches: keep the floor clear before you drill.',
-    3: 'Tall walls get ideas. Leave berms.',
-    4: 'Big trucks hate steep ramps. Think spiral.',
+    3: 'Deep pits need long roads: think spiral.',
+    4: 'Tall walls get ideas. Leave berms.',
     5: 'The whole planet is watching. Mostly the neighbours.',
   };
 
@@ -605,6 +605,16 @@ describe('unlockLinesFor (#1926)', () => {
   it.each([1, 2, 3, 4, 5])('grade %i hint reads the issue text in English', (g) => {
     setLocale('en');
     expect(t(`progression.unlock.hint.${g}`)).toBe(EN_HINTS[g]);
+  });
+
+  it('grade 3 hint is the depth hint in French and grade 4 keeps the berm text (#2045)', () => {
+    expect(fr['progression.unlock.hint.3']).toBe('Les fosses profondes veulent de longues routes : pensez en spirale.');
+    expect(fr['progression.unlock.hint.4']).not.toBe(fr['progression.unlock.hint.3']);
+    expect(en['progression.unlock.hint.4']).toBe('Tall walls get ideas. Leave berms.');
+  });
+
+  it('no unlock hint mentions steep ramps or big trucks any more (#2045)', () => {
+    for (const g of [1, 2, 3, 4, 5]) expect((en as Record<string, string>)[`progression.unlock.hint.${g}`]).not.toMatch(/steep|trucks/i);
   });
 
   it('every seeded line key resolves to real text in en and fr, not the raw key', () => {

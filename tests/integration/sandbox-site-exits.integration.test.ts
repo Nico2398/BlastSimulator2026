@@ -14,7 +14,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import { claimForAction } from '../../src/console/commands/siteExpansion.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
-import { DEFAULT_GRID_SIZE, NAV_CLEARANCE_VEHICLE_CELLS, VEHICLE_TIER_MAX_SLOPE_DEGREES } from '../../src/core/config/balance.js';
+import { DEFAULT_GRID_SIZE, NAV_CLEARANCE_VEHICLE_CELLS, VEHICLE_MAX_SLOPE_DEGREES } from '../../src/core/config/balance.js';
 import { computeClimbComponents, findNearestNavigableCell } from '../../src/core/nav/NavGridReachability.js';
 import { slopeRatioForDegrees } from '../../src/core/nav/ClimbLimit.js';
 
@@ -94,7 +94,7 @@ describe('sandbox starting site is one drivable area reaching the first blast (#
       expect(state.grade, 'sandbox runs as a progression site').toBeDefined();
       const navGrid = state.navGrid!;
       const target = findNearestNavigableCell(navGrid, navGrid.originX + Math.floor(navGrid.width / 2), navGrid.originZ + Math.floor(navGrid.height / 2));
-      const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, slopeRatioForDegrees(Math.min(...Object.values(VEHICLE_TIER_MAX_SLOPE_DEGREES))));
+      const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, slopeRatioForDegrees(VEHICLE_MAX_SLOPE_DEGREES));
 
       expect(state.vehicles.vehicles.length, 'digger kit starts with a fleet').toBeGreaterThan(0);
       for (const v of state.vehicles.vehicles) {

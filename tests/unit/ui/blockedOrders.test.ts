@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// BlastSimulator2026 — blocked-order wording and classification branches (#1938)
+// BlastSimulator2026 — blocked-order wording and classification branches (#1938, #2045)
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { buildBlockedOrderMessage, isFailureBlock, isInTransitBlock, classifyQueuedBlock } from '../../../src/ui/notify/blockedOrders.js';
@@ -18,23 +18,35 @@ function action(over: Partial<PendingAction>): PendingAction {
 afterEach(() => setLocale('en'));
 
 describe('buildBlockedOrderMessage', () => {
-  it('target_unreachable with detail and role param translates the role', () => {
+  it('target_unreachable with a ramp detail reads one sentence naming the ramp, grade and limit', () => {
     const msg = buildBlockedOrderMessage(action({
       blockedReason: 'target_unreachable',
-      blockedDetail: { key: 'order.blocked.ramp_too_steep', params: { id: 4, grade: 12.5, tier: 1, role: 'rock_digger', max: 10 } },
+      blockedDetail: { key: 'order.blocked.ramp_too_steep', params: { id: 3, grade: 26, max: 20 } },
     }));
-    expect(msg).toContain('Ramp #4');
-    expect(msg).toContain('Rock Digger');
+    expect(msg).toContain('Ramp #3 is 26°: too steep for vehicles (max 20°).');
     expect(msg).not.toContain('order.blocked');
   });
 
-  it('target_unreachable with detail but no role passes params through', () => {
+  it('the ramp sentence names no tier and no role', () => {
     const msg = buildBlockedOrderMessage(action({
       blockedReason: 'target_unreachable',
-      blockedDetail: { key: 'order.blocked.ramp_too_steep', params: { id: 9, grade: 3, tier: 2, max: 8 } },
+      blockedDetail: { key: 'order.blocked.ramp_too_steep', params: { id: 9, grade: 3, max: 8 } },
     }));
     expect(msg).toContain('Ramp #9');
-    expect(msg).toContain('tier-2');
+    expect(msg).not.toMatch(/tier/i);
+    expect(msg).not.toContain('Rock Digger');
+  });
+
+  it('the ramp sentence speaks French without tier wording', () => {
+    setLocale('fr');
+    const msg = buildBlockedOrderMessage(action({
+      blockedReason: 'target_unreachable',
+      blockedDetail: { key: 'order.blocked.ramp_too_steep', params: { id: 3, grade: 26, max: 20 } },
+    }));
+    expect(msg).toContain('26');
+    expect(msg).toContain('20');
+    expect(msg).not.toContain('{');
+    expect(msg).not.toMatch(/niveau/i);
   });
 
   it('target_unreachable without detail falls back to the generic text', () => {

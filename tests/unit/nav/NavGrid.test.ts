@@ -8,7 +8,7 @@
 //   BlastResult      (§15):    clearedRegion returned by executeBlast
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { NavGrid, isStepClimbable, hasClearance, type NavCellType, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid, isStepClimbable, stepClimbRun, hasClearance, type NavCellType, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import {
   VoxelGrid,
@@ -2602,5 +2602,45 @@ describe('NavGrid.patchNavGrid — equals a fresh buildNavGrid of the same voxel
     setVoxelColumnSurfaceHeight(grid, 4, 4, BASE_HEIGHT - 2 * IN_BAND_RAMP_DELTA, compId);
     NavGrid.patchNavGrid(nav, grid, [], [], { minX: 4, maxX: 4, minZ: 4, maxZ: 4 });
     expect(firstDifferenceFromFreshBuild(nav, grid)).toBeNull();
+  });
+});
+
+describe('stepClimbRun (#2045)', () => {
+  const limited = Math.tan(20 * Math.PI / 180);
+  const NAV = Math.tan(30 * Math.PI / 180);
+
+  it('a limit below the walking limit measures a diagonal step by its larger axis, so no shortcut', () => {
+    expect(stepClimbRun(1, 1, limited)).toBe(1);
+    expect(stepClimbRun(-1, 1, limited)).toBe(1);
+    expect(stepClimbRun(2, 1, limited)).toBe(2);
+  });
+
+  it('a cardinal step is its own length at any limit', () => {
+    expect(stepClimbRun(1, 0, limited)).toBe(1);
+    expect(stepClimbRun(0, -1, limited)).toBe(1);
+    expect(stepClimbRun(1, 0, NAV)).toBe(1);
+  });
+
+  it('the walking limit keeps the Euclidean run', () => {
+    expect(stepClimbRun(1, 1, NAV)).toBeCloseTo(Math.SQRT2, 12);
+    expect(stepClimbRun(3, 4, NAV)).toBeCloseTo(5, 12);
+  });
+
+  it('the default limit is the walking limit', () => {
+    expect(stepClimbRun(1, 1)).toBeCloseTo(Math.SQRT2, 12);
+  });
+
+  it('a looser-than-walking limit keeps the Euclidean run', () => {
+    expect(stepClimbRun(1, 1, Math.tan(35 * Math.PI / 180))).toBeCloseTo(Math.SQRT2, 12);
+  });
+
+  it('a zero step has zero run', () => {
+    expect(stepClimbRun(0, 0, limited)).toBe(0);
+  });
+
+  it('a diagonal rise of tan(25) is refused at 20 degrees once measured by stepClimbRun', () => {
+    const rise = Math.tan(25 * Math.PI / 180);
+    expect(isStepClimbable(0, rise, stepClimbRun(1, 1, limited), limited)).toBe(false);
+    expect(isStepClimbable(0, rise, stepClimbRun(1, 1, NAV), NAV)).toBe(true);
   });
 });

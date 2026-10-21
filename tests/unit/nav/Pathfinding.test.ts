@@ -2277,6 +2277,56 @@ describe('findPath — maxSlopeRatio per-agent climb limit (#1938)', () => {
   });
 });
 
+describe('findPath — no diagonal shortcut up a ramp for a limited request (#2045)', () => {
+  const tanDeg = (d: number): number => Math.tan(d * Math.PI / 180);
+  const LIMIT = tanDeg(20);
+  const LENGTH = 14;
+
+  /** A ramp `width` wide rising along +x at `gradeDeg` per metre; every cell is walkable. */
+  function rampGrid(width: number, gradeDeg: number): NavGrid {
+    const grid = makeFlatGrid(LENGTH, width, 'walkable');
+    for (let z = 0; z < width; z++) {
+      for (let x = 0; x < LENGTH; x++) setCell(grid, x, z, 'walkable', { surfaceY: x * tanDeg(gradeDeg), climbY: x * tanDeg(gradeDeg) });
+    }
+    return grid;
+  }
+  const climb = (grid: NavGrid, width: number, extra: { maxSlopeRatio?: number } = {}) =>
+    findPath(grid, { agentId: 1, fromX: 0, fromZ: Math.floor(width / 2), toX: LENGTH - 1, toZ: Math.floor(width / 2), avoidVehicles: false, ...extra });
+
+  for (const width of [3, 5, 7]) {
+    for (const grade of [21, 24, 27]) {
+      it(`a 20 degree request cannot climb a ${width}-wide ${grade} degree ramp by zigzag`, () => {
+        expect(climb(rampGrid(width, grade), width, { maxSlopeRatio: LIMIT }).found).toBe(false);
+      });
+    }
+
+    it(`a 20 degree request climbs a ${width}-wide 20 degree ramp`, () => {
+      const result = climb(rampGrid(width, 20), width, { maxSlopeRatio: LIMIT });
+      expect(result.found).toBe(true);
+      expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: LENGTH - 1, z: Math.floor(width / 2) });
+    });
+
+    it(`walking (default limit) still climbs a ${width}-wide ramp up to 30 degrees`, () => {
+      for (const grade of [21, 27, 30]) expect(climb(rampGrid(width, grade), width).found).toBe(true);
+    });
+  }
+
+  it('findExactPath refuses the zigzag too', () => {
+    const grid = rampGrid(5, 25);
+    expect(findExactPath(grid, { agentId: 1, fromX: 0, fromZ: 2, toX: LENGTH - 1, toZ: 2, avoidVehicles: false, maxSlopeRatio: LIMIT }).found).toBe(false);
+  });
+
+  it('a gentle 15 degree ramp is climbed at 20 degrees', () => {
+    expect(climb(rampGrid(3, 15), 3, { maxSlopeRatio: LIMIT }).found).toBe(true);
+  });
+
+  it('a downhill zigzag is refused symmetrically', () => {
+    const grid = rampGrid(3, 25);
+    const down = findPath(grid, { agentId: 1, fromX: LENGTH - 1, fromZ: 1, toX: 0, toZ: 1, avoidVehicles: false, maxSlopeRatio: LIMIT });
+    expect(down.found).toBe(false);
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Ramp-based multi-level routing engaged — branch coverage for the fallback
 // ═══════════════════════════════════════════════════════════════════════════════
