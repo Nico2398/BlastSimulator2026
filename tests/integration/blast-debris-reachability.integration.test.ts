@@ -555,7 +555,11 @@ describe('A 3 m pattern on desert seed 42 leaves no one-voxel pocket and no stra
 
 const PATTERN_START_X = 28;
 const PATTERN_START_Z = 18;
-const RAMP_COMMAND = 'build_ramp start:32,46 end:32,27 depth:8';
+// Depth 9, not 8: the ramp line now starts on the rim's continuous ground (16.26, #2043) rather than the integer top
+// voxel (16), so the whole line sits 0.26 m higher. The shot floors the crater to 8.5 and clips the ramp's lowest
+// cells to it, leaving the first untouched ramp cell (z=30) standing above the crater floor: 9.50 at depth 8, a 1 m
+// wall past what a diagonal step climbs (tan 30 * sqrt 2 = 0.82); 8.66 at depth 9, a 0.16 m step.
+const RAMP_COMMAND = 'build_ramp start:32,46 end:32,27 depth:9';
 /** The pillar cells that stood at full height with the ramp dug first: between the north and middle hole rows. */
 const PILLAR_CELLS: Array<[number, number]> = [];
 for (const z of [20, 21]) for (const x of [30, 31, 33, 34]) PILLAR_CELLS.push([x, z]);

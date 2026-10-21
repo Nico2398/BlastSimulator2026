@@ -39,3 +39,14 @@ export function decideLadderSafety(input: LadderSafetyInput): LadderSafetyDecisi
   if (input.safetyTargetOpen && input.canAfford) return input.officeBuilt ? 'upgrade_office' : 'build_office';
   return input.neighboursBelowTarget ? 'neighbours' : 'none';
 }
+
+/**
+ * The event option the ladder answers with: the first one that does not put a new hire on the payroll, else
+ * the first. An offered "manager" costs a salary for the rest of the run (~7% of a quarter's income each), which
+ * the fixed headcount of a competent mine does not carry; whether the scripted run met the Shareholder Summit
+ * profit target used to hang on how many of those offers the event stream happened to make (#2043).
+ */
+export function decideLadderEventOption(optionHires: readonly boolean[]): number {
+  const free = optionHires.indexOf(false);
+  return free === -1 ? 0 : free;
+}

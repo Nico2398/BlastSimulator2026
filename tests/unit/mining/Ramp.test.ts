@@ -9,7 +9,7 @@ import {
   rampDefFromEndpoints, rampDefFromLegs, snapRampDepthToEndFloor, rampFootOffset, rampGradeBoundsDegrees, rampFloorDepthAt,
   type RampDef, type RampDirection, type RampSegmentDef,
 } from '../../../src/core/mining/Ramp.js';
-import { rampCenterline, rampPathCells } from '../../../src/core/mining/RampPath.js';
+import { rampCenterline, rampPathCells, RAMP_DIR_OFFSETS } from '../../../src/core/mining/RampPath.js';
 import { RAMP_COST_PER_METER_PER_WIDTH } from '../../../src/core/config/balance.js';
 import { isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import {
@@ -85,15 +85,14 @@ describe('Ramp building', () => {
     expect(result.success).toBe(true);
     expect(result.voxelsCleared).toBeGreaterThan(0);
 
-    // The origin (step 0) has zero continuous depth by design — a ramp
-    // starts flush with the existing surface, not a voxel below it — so its
-    // floor-row cell is re-banded back to that same continuous height
-    // (#1151) rather than left as a hard, fully-cleared voxel: exactly 0.5,
-    // the crossing density at an integer surface height
-    // (VoxelGrid.surfaceDensityAt). It is still "solid" by the >=0.5
-    // walkability threshold, correctly reproducing "no drop here".
+    // The origin (step 0) has zero continuous depth by design — a ramp starts
+    // flush with the ground behind it. Since #2043 that ground is the
+    // continuous height the terrain mesh draws (top voxel + 0.5), so the
+    // origin column is left exactly as it was: the top voxel stays hard
+    // (density 1) and the column height is unchanged, no lip, no step down.
     const startVoxel = grid.getVoxel(10, surfaceY, 10);
-    expect(startVoxel?.density).toBe(0.5);
+    expect(startVoxel?.density).toBe(1);
+    expect(computeVoxelColumnSurfaceHeight(grid, 10, 10)).toBeCloseTo(surfaceY + 0.5, 6);
   });
 
   it('ramp connects surface level to a lower elevation', () => {
@@ -114,11 +113,11 @@ describe('Ramp building', () => {
 
     expect(result.success).toBe(true);
 
-    // At the start (step 0): zero continuous depth by design, so the
-    // floor-row cell is re-banded back to the original surface height
-    // (#1151) rather than fully cleared — exactly 0.5, still "solid" by the
-    // >=0.5 walkability threshold.
-    expect(grid.getVoxel(10, originSurfaceY, 5)?.density).toBe(0.5);
+    // At the start (step 0): zero continuous depth by design, so the origin
+    // column keeps the ground height behind it (#2043): hard top voxel, height
+    // top + 0.5, no lip.
+    expect(grid.getVoxel(10, originSurfaceY, 5)?.density).toBe(1);
+    expect(computeVoxelColumnSurfaceHeight(grid, 10, 5)).toBeCloseTo(originSurfaceY + 0.5, 6);
 
     // At the last step (17 of 18): depth 10 * 17/18 ≈ 9.44, floor ≈
     // originSurfaceY(14) - 9.44 ≈ 4.56 — well below y=9, so y=9 is cleared.
@@ -299,7 +298,10 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
     // residual crossing density in (0, 0.5], never a hard 0.
     for (const segment of carved) {
       for (const cell of segment.cells) {
-        if (cell.floorAdjustment !== undefined) {
+        if (cell.floorAdjustment !== undefined && cell.z === ramp.originZ) {
+          // Flush start (#2043): air at the ground behind the ramp, nothing to clear or band.
+          expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+        } else if (cell.floorAdjustment !== undefined) {
           expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
           expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeLessThanOrEqual(0.5);
         } else {
@@ -308,9 +310,15 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
       }
     }
 
-    // Every not-yet-applied segment's cells remain solid.
+    // Every not-yet-applied segment's cells remain solid — except the flush
+    // start (#2043): step 0 sits at the ground behind it, so its floor-row cell
+    // is air and carries no work (not pending).
     for (const segment of uncarved) {
       for (const cell of segment.cells) {
+        if (!isRampCellPending(grid, cell)) {
+          expect(cell.z, 'only the flush start column has a no-work cell').toBe(ramp.originZ);
+          continue;
+        }
         expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
       }
     }
@@ -341,9 +349,9 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
 
     // Layer-based grouping (#925): the topmost layer(s) are pure clearance
     // headroom above the (flat) surface and carve zero voxels — pick the
-    // first layer that actually has solid cells rather than assuming
-    // segments[0] does.
-    const segment = segments.find(s => s.cells.length > 0)!;
+    // first layer that actually has work (a pending cell; the flush start's
+    // air floor-row cell has none, #2043) rather than assuming segments[0] does.
+    const segment = segments.find(s => s.cells.some(c => isRampCellPending(grid, c)))!;
     expect(segment).toBeDefined();
     const firstCarve = carveRampSegment(grid, segment);
     expect(firstCarve.voxelsCleared).toBeGreaterThan(0);
@@ -514,7 +522,10 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
     expect(Number.isFinite(emptyLayer!.targetX)).toBe(true);
     expect(Number.isFinite(emptyLayer!.targetZ)).toBe(true);
     expect(Number.isFinite(emptyLayer!.targetY)).toBe(true);
-    expect(emptyLayer!.targetY).toBe(surfaceY + 2);
+    // The ramp starts flush with the ground at surfaceY + 0.5 (#2043), so its
+    // clearance ceiling is half a metre higher and the topmost (empty) layer is
+    // one row above the one cleared above.
+    expect(emptyLayer!.targetY).toBe(surfaceY + 3);
     // The anchor X/Z must still land within the ramp's own footprint, not
     // some arbitrary/default coordinate.
     expect(emptyLayer!.targetX).toBeGreaterThanOrEqual(ramp.originX - halfWidth);
@@ -537,7 +548,9 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
     expect(buildResult.voxelsCleared).toBeGreaterThan(0);
 
     const segments = defineRampSegments(gridSegmented, ramp);
-    const totalCells = segments.reduce((sum, s) => sum + s.cells.length, 0);
+    // Cells that carry work: the flush start's floor-row cells sit on air at
+    // the ground height behind the ramp (#2043) and clear nothing.
+    const totalCells = segments.reduce((sum, s) => sum + s.cells.filter(c => isRampCellPending(gridSegmented, c)).length, 0);
     expect(totalCells).toBe(buildResult.voxelsCleared);
   });
 
@@ -609,14 +622,19 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
     // Hand-traced (clearanceHeight=3, RAMP length 8 / targetDepth 6, so the
     // #1152 straight-line floor is f(step) = 20 - 0.75*step):
     //
-    //   step 0-1  floor 20.00/19.25  local surface 20 → ceiling 23        → y 20,21,22
-    //   step 2-4  floor 18.50..17.00 local surface  0 → floor > surface+3,
+    // Since #2043 the line is anchored on the continuous ground (top voxel 20
+    // draws at 20.5), so every floor sits half a metre above the figures
+    // this was first traced with (f(step) = 20.5 - 0.75*step):
+    //
+    //   step 0-1  floor 20.50/19.75  local surface 20 → ceiling 23.5 (the
+    //             start floor is above the top voxel index)             → y 20..23
+    //   step 2-4  floor 19.00..17.50 local surface  0 → floor > surface+3,
     //             a fill column (#1172): ceiling = max(surface, floor) + 3
     //             → y up to floor+3, contributing at its own floorRowY
-    //             (19, 18 or 17) with a fillTarget cell instead of a gap.
-    //   step 5-7  floor 16.25..14.75 local surface 15 → ceiling 18        → y 15,16,17
+    //             (19, 18 or 18) with a fillTarget cell instead of a gap.
+    //   step 5-7  floor 16.75..15.25 local surface 15 → ceiling 18        → y 16,17
     //
-    // globalMinY=14.75, globalMaxY=22 → every candidate y in 22..15 (8
+    // globalMinY=15.25, globalMaxY=22.5 → every candidate y in 23..16 (8
     // values) now has a contributor — the canyon's own fill cells replace
     // what used to be the zero-contributor gap at y=18,19 (#1172 FILL
     // decision: a dip below the floor line is raised to it, not skipped).
@@ -624,8 +642,8 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
     expect(segments.some(s => s.targetY === 18)).toBe(true);
     expect(segments.some(s => s.targetY === 19)).toBe(true);
     expect(segments.some(s => s.cells.some(c => c.fillTarget !== undefined))).toBe(true);
-    expect(segments.some(s => s.targetY >= 20 && s.targetY <= 22)).toBe(true);
-    expect(segments.some(s => s.targetY >= 15 && s.targetY <= 17)).toBe(true);
+    expect(segments.some(s => s.targetY >= 20 && s.targetY <= 23)).toBe(true);
+    expect(segments.some(s => s.targetY >= 16 && s.targetY <= 17)).toBe(true);
   });
 
   // ── #1152: floor is a pure constant-slope line anchored to the ramp's own
@@ -759,7 +777,9 @@ describe('defineRampSegments — constant-slope floor geometry (#1152)', () => {
    * elevation (ORIGIN_SURFACE_Y) — the formula #1152 requires, independent of
    * whatever the local column's own raw surface happens to read. */
   function expectedFloorHeight(step: number): number {
-    return ORIGIN_SURFACE_Y - (step / LENGTH) * TARGET_DEPTH;
+    // ORIGIN_SURFACE_Y is the top voxel index; the continuous ground a flat
+    // solid top voxel draws, and the ramp anchors on (#2043), is half a metre above it.
+    return ORIGIN_SURFACE_Y + 0.5 - (step / LENGTH) * TARGET_DEPTH;
   }
 
   it('follows a straight line anchored to the ramp\'s start elevation across a mid-ramp bump, ignoring the bump\'s own local surface entirely', () => {
@@ -863,7 +883,9 @@ describe('Ramp — fill across terrain dips (#1172)', () => {
   const DIP_ROCK_ID = 'sandite';
 
   function expectedFloorHeight(step: number): number {
-    return ORIGIN_SURFACE_Y - (step / LENGTH) * TARGET_DEPTH;
+    // ORIGIN_SURFACE_Y is the top voxel index; the continuous ground a flat
+    // solid top voxel draws, and the ramp anchors on (#2043), is half a metre above it.
+    return ORIGIN_SURFACE_Y + 0.5 - (step / LENGTH) * TARGET_DEPTH;
   }
 
   /** steps 8-10: 5m below the surrounding flat terrain. */
@@ -1114,7 +1136,8 @@ describe('Ramp — fill across terrain dips (#1172)', () => {
     const originX = 20;
     const originZ = 20;
     const deepDipStep = 10;
-    const lineAtDip = originSurfaceY - (deepDipStep / length) * targetDepth;
+    // Ramp anchors on the origin's continuous ground, half a metre above its top voxel index (#2043).
+    const lineAtDip = originSurfaceY + 0.5 - (deepDipStep / length) * targetDepth;
     // 8m below the line — far past SURFACE_BAND_HALF (1 voxel).
     const deepDipGround = lineAtDip - 8;
 
@@ -1832,6 +1855,8 @@ describe('defineRampSegments — ramp into a crater snaps to the end floor (#185
   const ORIGIN_Z = 5;
   const LENGTH = 20;
   const START_SURFACE = 15;
+  /** Continuous ground height of a flat solid top voxel at index `top` (#2043): the ramp anchors here, not on the integer index. */
+  const START_GROUND = START_SURFACE + 0.5;
 
   /** Flat ground at START_SURFACE for z < craterFromZ, `craterSurface` from there on. */
   function makeCraterGrid(craterFromZ: number, craterSurface: number): VoxelGrid {
@@ -1862,8 +1887,8 @@ describe('defineRampSegments — ramp into a crater snaps to the end floor (#185
   const ramp = (targetDepth: number): RampDef => ({ originX: ORIGIN_X, originZ: ORIGIN_Z, direction: 'south', length: LENGTH, targetDepth });
 
   it('a crater floor 1.6 m above the planned foot: the foot meets the floor and every adjacent step is within the slope cap', () => {
-    const craterSurface = 9; // end tile (z=25) in the crater; planned foot 15 - 8*19/20 = 7.4, 1.6 under it
-    const grid = makeCraterGrid(20, craterSurface);
+    const craterSurface = 9.5; // end tile (z=25) in the crater (top voxel 9, ground 9.5); planned foot 15.5 - 8*19/20 = 7.9, 1.6 under it
+    const grid = makeCraterGrid(20, 9);
 
     const floors = floorByZ(defineRampSegments(grid, ramp(8)));
 
@@ -1879,34 +1904,34 @@ describe('defineRampSegments — ramp into a crater snaps to the end floor (#185
     }
   });
 
-  it('the snapped line is the straight line of depth startGround - endGround (15 - 9 = 6)', () => {
+  it('the snapped line is the straight line of depth startGround - endGround (15.5 - 9.5 = 6)', () => {
     const floors = floorByZ(defineRampSegments(makeCraterGrid(20, 9), ramp(8)));
     for (let step = 0; step < LENGTH; step++) {
-      expect(floors.get(ORIGIN_Z + step)!, `step ${step}`).toBeCloseTo(START_SURFACE - (step / LENGTH) * 6, 6);
+      expect(floors.get(ORIGIN_Z + step)!, `step ${step}`).toBeCloseTo(START_GROUND - (step / LENGTH) * 6, 6);
     }
   });
 
   it('a ramp ending on intact ground keeps its own depth, step for step', () => {
     const floors = floorByZ(defineRampSegments(makeCraterGrid(40, START_SURFACE), ramp(8)));
     for (let step = 0; step < LENGTH; step++) {
-      expect(floors.get(ORIGIN_Z + step)!, `step ${step}`).toBeCloseTo(START_SURFACE - (step / LENGTH) * 8, 6);
+      expect(floors.get(ORIGIN_Z + step)!, `step ${step}`).toBeCloseTo(START_GROUND - (step / LENGTH) * 8, 6);
     }
   });
 
   it('an end tile only 1 m lower (not a crater) keeps the planned depth', () => {
     const floors = floorByZ(defineRampSegments(makeCraterGrid(20, START_SURFACE - 1), ramp(8)));
-    expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_SURFACE - (19 / LENGTH) * 8, 6);
+    expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_GROUND - (19 / LENGTH) * 8, 6);
   });
 
   it('an end tile higher than the start keeps the planned depth', () => {
     const floors = floorByZ(defineRampSegments(makeCraterGrid(20, START_SURFACE + 3), ramp(8)));
-    expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_SURFACE - (19 / LENGTH) * 8, 6);
+    expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_GROUND - (19 / LENGTH) * 8, 6);
   });
 
   it('a crater floor beyond the snap reach of the foot keeps the planned depth', () => {
-    // floor 15 - 11 = 4: foot 7.4 is 3.4 above it, past RAMP_FLOOR_SNAP_REACH_M
+    // floor 15.5 - 11.5 = 4.5 (top voxel 4): foot 7.9 is 3.4 above it, past RAMP_FLOOR_SNAP_REACH_M
     const floors = floorByZ(defineRampSegments(makeCraterGrid(20, 4), ramp(8)));
-    expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_SURFACE - (19 / LENGTH) * 8, 6);
+    expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_GROUND - (19 / LENGTH) * 8, 6);
   });
 });
 
@@ -2155,9 +2180,9 @@ describe('columns with a partial top voxel below the floor line, #2001', () => {
   const RAMP: RampDef = { originX: ORIGIN_X, originZ: ORIGIN_Z, direction: 'south', length: LENGTH, targetDepth: DEPTH, width: WIDTH };
   const PATH = { originX: ORIGIN_X, originZ: ORIGIN_Z, legs: [{ direction: 'south' as const, length: LENGTH }] };
 
-  /** The ramp's floor line starts at the origin's integer surface voxel. */
+  /** The ramp's floor line starts at the origin's continuous ground height: half a metre above the flat grid's top voxel index (#2043). */
   function baseHeight(): number {
-    return SURFACE;
+    return SURFACE + 0.5;
   }
 
   /** Partial-top columns: a 2x2 block at steps 2..3 plus a few others. */
@@ -2313,5 +2338,146 @@ describe('rampDefFromLegs (#1942)', () => {
     expect(def.legs).toEqual(legs);
     expect(def.legs).not.toBe(legs);
     expect('width' in def).toBe(false);
+  });
+});
+
+describe('ramp top joins the continuous ground of the origin column, #2043', () => {
+  const SIZE = 60;
+  const OX = 30;
+  const OZ = 20;
+
+  /** Flat ground whose continuous height sits between voxel levels. */
+  function makeGroundAt(height: number): VoxelGrid {
+    const grid = makeElevatedGrid(SIZE, SIZE, Math.floor(height) - 2);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
+    for (let z = 0; z < SIZE; z++) for (let x = 0; x < SIZE; x++) setVoxelColumnSurfaceHeight(grid, x, z, height, compId);
+    return grid;
+  }
+
+  const gradeRatio = (def: RampDef): number => {
+    const legs = def.legs ?? [{ direction: def.direction, length: def.length }];
+    const total = legs.reduce((a, l) => a + l.length, 0);
+    return def.gradeDegrees !== undefined ? Math.tan((def.gradeDegrees * Math.PI) / 180) : def.targetDepth / total;
+  };
+
+  function carve(grid: VoxelGrid, def: RampDef, carvedWidth?: number): void {
+    for (const s of defineRampSegments(grid, def, carvedWidth)) carveRampSegment(grid, s);
+  }
+
+  /** Asserts: first carved cell floor == origin continuous height, and behind -> first is climbable at the ramp's own grade. */
+  function expectTopJoinsGround(def: RampDef, height: number): void {
+    const grid = makeGroundAt(height);
+    const before = computeVoxelColumnSurfaceHeight(grid, def.originX, def.originZ);
+    const path = rampCenterline({ originX: def.originX, originZ: def.originZ, legs: def.legs ?? [{ direction: def.direction, length: def.length }] });
+    const first = path[0]!;
+    const next = path[1]!;
+    const off = RAMP_DIR_OFFSETS[(def.legs ?? [{ direction: def.direction }])[0]!.direction];
+    const behindX = first.x - off.dx;
+    const behindZ = first.z - off.dz;
+    const behind = computeVoxelColumnSurfaceHeight(grid, behindX, behindZ);
+    carve(grid, def);
+    const top = computeVoxelColumnSurfaceHeight(grid, first.x, first.z);
+    expect(top, `first ramp cell floor vs origin ground ${before}`).toBeCloseTo(before, 3);
+    const ratio = gradeRatio(def);
+    expect(Math.abs(behind - top), `lip ${behind} -> ${top}`).toBeLessThanOrEqual(ratio + 1e-6);
+    expect(isStepClimbable(behind, top, 1, ratio)).toBe(true);
+    // The first step down the ramp is itself within grade.
+    const second = computeVoxelColumnSurfaceHeight(grid, next.x, next.z);
+    expect(isStepClimbable(top, second, 1, ratio + 0.05)).toBe(true);
+    // The lip is a defect on the continuous height: no more than a sliver of rise at the top.
+    expect(behind - top).toBeLessThan(0.1);
+  }
+
+  const STRAIGHT: RampDef = { originX: OX, originZ: OZ, direction: 'south', length: 24, targetDepth: 6, width: 3 };
+
+  describe.each([16, 16.05, 16.3, 16.5, 16.8, 16.95])('straight ramp on ground of height %s', (height) => {
+    it('top joins the ground and the step onto the ramp is within its grade', () => {
+      expectTopJoinsGround(STRAIGHT, height);
+    });
+  });
+
+  it('a ramp heading east joins ground at a fractional height', () => {
+    expectTopJoinsGround({ ...STRAIGHT, direction: 'east' }, 16.8);
+  });
+
+  it('a ramp heading north joins ground at a fractional height', () => {
+    expectTopJoinsGround({ ...STRAIGHT, direction: 'north', originZ: 40 }, 16.8);
+  });
+
+  it('every footprint column at step 0 joins the ground, not just the axis', () => {
+    const grid = makeGroundAt(16.8);
+    carve(grid, STRAIGHT);
+    for (const x of [OX - 1, OX, OX + 1]) {
+      expect(computeVoxelColumnSurfaceHeight(grid, x, OZ), `column ${x},${OZ}`).toBeCloseTo(16.8, 3);
+    }
+  });
+
+  describe('multi-leg ramp (#1939)', () => {
+    const MULTI_DEF: RampDef = {
+      originX: OX, originZ: OZ, direction: 'south', length: 22, targetDepth: 6, width: 3,
+      legs: [{ direction: 'south', length: 12 }, { direction: 'east', length: 10 }],
+    };
+    it.each([16.05, 16.8])('top joins ground of height %s', (height) => {
+      expectTopJoinsGround(MULTI_DEF, height);
+    });
+  });
+
+  describe('spiral-shaped ramp with a chosen grade (#1940, #1939)', () => {
+    const SPIRAL_DEF: RampDef = {
+      originX: 20, originZ: 20, direction: 'east', length: 40, targetDepth: 4, width: 3, gradeDegrees: 12,
+      legs: [
+        { direction: 'east', length: 12 }, { direction: 'south', length: 10 },
+        { direction: 'west', length: 12 }, { direction: 'north', length: 6 },
+      ],
+    };
+    it.each([16.05, 16.8])('top joins ground of height %s at the ramp grade', (height) => {
+      expectTopJoinsGround(SPIRAL_DEF, height);
+    });
+  });
+
+  describe('gradeDegrees ramp (#1939)', () => {
+    it.each([10, 15, 25])('a %s degree ramp joins ground at a fractional height', (deg) => {
+      expectTopJoinsGround({ ...STRAIGHT, length: 40, targetDepth: 6, gradeDegrees: deg }, 16.8);
+    });
+  });
+
+  describe('widening an already-carved ramp (#1298)', () => {
+    function axisHeights(grid: VoxelGrid): number[] {
+      return Array.from({ length: STRAIGHT.length }, (_, s) => computeVoxelColumnSurfaceHeight(grid, OX, OZ + s));
+    }
+
+    it('does not re-lower the corridor or move the top of the carved axis', () => {
+      const grid = makeGroundAt(16.8);
+      carve(grid, STRAIGHT);
+      const axisBefore = axisHeights(grid);
+      expect(axisBefore[0]).toBeCloseTo(16.8, 3);
+      carve(grid, { ...STRAIGHT, width: 5 }, 3);
+      const axisAfter = axisHeights(grid);
+      axisAfter.forEach((h, s) => expect(h, `axis step ${s}`).toBeCloseTo(axisBefore[s]!, 3));
+    });
+
+    it('new side strips meet the ground without a lip at the top', () => {
+      const grid = makeGroundAt(16.8);
+      carve(grid, STRAIGHT);
+      carve(grid, { ...STRAIGHT, width: 5 }, 3);
+      const ratio = gradeRatio(STRAIGHT);
+      for (const x of [OX - 2, OX + 2]) {
+        const top = computeVoxelColumnSurfaceHeight(grid, x, OZ);
+        const behind = computeVoxelColumnSurfaceHeight(grid, x, OZ - 1);
+        expect(top, `strip ${x} top`).toBeCloseTo(16.8, 3);
+        expect(isStepClimbable(behind, top, 1, ratio)).toBe(true);
+        expect(behind - top).toBeLessThan(0.1);
+      }
+    });
+
+    it('widened strips follow the axis line down the ramp', () => {
+      const grid = makeGroundAt(16.8);
+      carve(grid, STRAIGHT);
+      carve(grid, { ...STRAIGHT, width: 5 }, 3);
+      for (let s = 0; s < STRAIGHT.length; s++) {
+        const axis = computeVoxelColumnSurfaceHeight(grid, OX, OZ + s);
+        expect(computeVoxelColumnSurfaceHeight(grid, OX + 2, OZ + s), `step ${s}`).toBeCloseTo(axis, 1);
+      }
+    });
   });
 });

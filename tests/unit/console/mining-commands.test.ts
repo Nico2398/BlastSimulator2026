@@ -21,6 +21,7 @@ import * as EventEngineModule from '../../../src/core/events/EventEngine.js';
 import * as BlastExecutionModule from '../../../src/core/mining/BlastExecution.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { carveRampSegment } from '../../../src/core/mining/Ramp.js';
+import { computeVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
 import { TUBING_COST } from '../../../src/core/mining/Tubing.js';
 import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../src/core/config/balance.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
@@ -1912,8 +1913,13 @@ describe('dig_ramp_segment completion via tickCommand (#695 coverage gap)', () =
     // its width band's per-column surface heights vary independently of the
     // centre-line depth the floor adjustment is computed from — the residual
     // isn't tightly bounded to (0, 0.5] the way a flat fixture's is.
+    // A fill cell (#1172) — a width-band column whose ground dips below the
+    // line, which the continuous anchor (#2043) can produce here — is raised
+    // to its fillTarget rather than cleared.
     for (const cell of segmentCells) {
-      if (cell.floorAdjustment !== undefined) {
+      if (cell.fillTarget !== undefined) {
+        expect(computeVoxelColumnSurfaceHeight(ctx.grid!, cell.x, cell.z)).toBeCloseTo(cell.fillTarget, 2);
+      } else if (cell.floorAdjustment !== undefined) {
         expect(ctx.grid!.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
         expect(ctx.grid!.densityAt(cell.x, cell.y, cell.z)).toBeLessThan(1);
       } else {

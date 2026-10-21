@@ -477,9 +477,9 @@
       }
     },
     {
-      "command": "drill_plan add x:33 z:24 depth:8 diameter:89",
+      "command": "drill_plan add x:39 z:24 depth:7 diameter:89",
       "role": "player",
-      "description": "Site A, second bench against the bench edge: 8 m hole at 33,24, so the crater reaches the original rim with no berm.",
+      "description": "Site A, second bench against the bench edge: 7 m hole at 39,24, so the crater reaches the original rim with no berm.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -505,16 +505,16 @@
         {
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 8
+          "value": 7
         },
         {
           "type": "focusTile",
-          "x": 33,
+          "x": 39,
           "z": 24
         },
         {
           "type": "pickTile",
-          "x": 33,
+          "x": 39,
           "z": 24
         },
         {

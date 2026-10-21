@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  decideLadderEventOption,
   decideLadderRamp,
   decideLadderSafety,
   type LadderRampInput,
@@ -74,5 +75,20 @@ describe('decideLadderSafety', () => {
     expect(
       decideLadderSafety({ ...safetyBase, safetyTargetOpen: true, canAfford: false }),
     ).toBe('none');
+  });
+});
+
+describe('decideLadderEventOption', () => {
+  it('skips an option that hires', () => {
+    expect(decideLadderEventOption([true, false, false])).toBe(1);
+  });
+
+  it('keeps the first option when it hires nobody', () => {
+    expect(decideLadderEventOption([false, true])).toBe(0);
+  });
+
+  it('falls back to the first option when every option hires', () => {
+    expect(decideLadderEventOption([true, true])).toBe(0);
+    expect(decideLadderEventOption([])).toBe(0);
   });
 });
