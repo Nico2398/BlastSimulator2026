@@ -4,6 +4,7 @@ import {
   previewEnergy,
   previewFragments,
   previewProjections,
+  previewBlastOutcome,
   previewVibrations,
   previewHoleDetails,
   MAX_SOFTWARE_TIER,
@@ -14,8 +15,10 @@ import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { vec3 } from '../../../src/core/math/Vec3.js';
-import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
+import { executeBlast, buildBlastReport } from '../../../src/core/mining/BlastExecution.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
+import { buildWallGrid, standardShot } from '../../helpers/wallWarningFixture.js';
+import { readFileSync } from 'node:fs';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -252,5 +255,65 @@ describe('Software — wet-hole modelling (#1347)', () => {
     const { grid, plan } = planWith('big_bada_boom');
     expect(previewFragments(plan, grid, 2, new Set(['no-such-hole'])))
       .toEqual(previewFragments(plan, grid, 2));
+  });
+});
+
+describe('Software — previewBlastOutcome (#1968)', () => {
+  it.each([0, 1, 2])('is null at tier %i', (tier) => {
+    const { grid, plan } = makeTestPlan();
+    expect(previewBlastOutcome(plan, grid, tier, [], 1, new Set())).toBeNull();
+  });
+
+  it.each([3, 4])('forecasts rating and counts at tier %i', (tier) => {
+    const { grid, plan } = makeTestPlan();
+    const forecast = previewBlastOutcome(plan, grid, tier, [], 1, new Set());
+    expect(forecast).not.toBeNull();
+    expect(['perfect', 'good', 'mediocre', 'bad', 'catastrophic']).toContain(forecast!.rating);
+    expect(forecast!.fragmentCount).toBeGreaterThan(0);
+    expect(forecast!.thrownShare).toBeGreaterThanOrEqual(0);
+    expect(forecast!.thrownShare).toBeLessThanOrEqual(1);
+  });
+
+  it('does not mutate the grid it previews', () => {
+    const { grid, plan } = makeTestPlan();
+    const before = JSON.stringify(grid.edits.columns());
+    previewBlastOutcome(plan, grid, 3, [], 1, new Set());
+    expect(JSON.stringify(grid.edits.columns())).toBe(before);
+    expect(grid.getVoxel(10, 8, 10)).toBeDefined();
+  });
+
+  it('matches the real blast rating', () => {
+    const a = makeTestPlan();
+    const b = makeTestPlan();
+    const forecast = previewBlastOutcome(a.plan, a.grid, 3, [], 1, new Set())!;
+    expect(forecast.rating).toBe(buildBlastReport(executeBlast(b.plan, b.grid, [], 1)!, 0, 0).rating);
+  });
+});
+
+describe('Software — previewFragments vs the real blast (#1968)', () => {
+  it('fracturedCount equals executeBlast clearedVoxels', () => {
+    const a = makeTestPlan();
+    const b = makeTestPlan();
+    const preview = previewFragments(a.plan, a.grid, 2)!;
+    expect(preview.fracturedCount).toBe(executeBlast(b.plan, b.grid, [], 1)!.clearedVoxels);
+  });
+
+  it('fracturedCount equals clearedVoxels on the wall/crater fixture', () => {
+    const plan = standardShot().plan;
+    const preview = previewFragments(plan, buildWallGrid({ plateauTop: 20 }), 2)!;
+    const real = executeBlast(plan, buildWallGrid({ plateauTop: 20 }), [], 1)!;
+    expect(real.clearedVoxels).toBeGreaterThan(0);
+    expect(preview.fracturedCount).toBe(real.clearedVoxels);
+  });
+});
+
+describe('Software — rating logic is not duplicated (#1968)', () => {
+  it.each(['Software.ts', 'SoftwarePreview.ts', 'BlastDryRun.ts'])('%s does not use THROW_DISTANCE_*', (file) => {
+    const src = readFileSync(`src/core/mining/${file}`, 'utf8');
+    expect(src).not.toMatch(/THROW_DISTANCE_/);
+  });
+
+  it('BlastExecution remains the one place the throw thresholds are applied', () => {
+    expect(readFileSync('src/core/mining/BlastExecution.ts', 'utf8')).toMatch(/THROW_DISTANCE_BAD/);
   });
 });
