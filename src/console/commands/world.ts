@@ -6,7 +6,7 @@ import { backfillGhostBuildings } from '../../core/engine/TaskDispatch.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
 import { placeStartingCrew, relocateVehiclesOffNarrowGround, meanPosition } from '../../core/state/SpawnPlacement.js';
 import { ensureRallyPoint, type RallyPointOptions } from '../../core/state/RallyPoint.js';
-import { placeStartingBuildings } from '../../core/state/StartingBuildings.js';
+import { placeStartingBuildings, drivableApproachFilter, allDrivableFrom } from '../../core/state/StartingBuildings.js';
 import { refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
 import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, requireValidPitMask, requireValidOreGradeScale, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
@@ -20,12 +20,13 @@ import { getDominantRockId, computeVoxelColumnSurfaceY, computeColumnRangeY } fr
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
-import { DEFAULT_GRID_SIZE, type StartingBuildingSlot, type PitMaskShape } from '../../core/config/balance.js';
+import { DEFAULT_GRID_SIZE,  type StartingBuildingSlot, type PitMaskShape } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, type CampaignProfile } from '../../persistence/CampaignProfile.js';
 import { getLevel } from '../../core/campaign/Level.js';
 import { isCampaignLevel } from '../../core/campaign/Campaign.js';
+import { findNearestNavigableCell } from '../../core/nav/NavGridReachability.js';
 import { regionForColumns, buildingFootprintOccupants, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
 /**
@@ -257,6 +258,8 @@ export function regenerateGrid(
     rallyPoint?: { x: number; z: number };
     /** With `startingBuildings`: where their placement search starts; omitted, the flag itself (they keep their clearance from it). */
     startingBuildingsNear?: { x: number; z: number };
+    /** Set by `regenerateGrid` itself on its one retry (#2044); callers leave it out. */
+    placementRetried?: boolean;
   },
 ): void {
   if (!ctx.state) return;
@@ -315,13 +318,29 @@ export function regenerateGrid(
   const flag = ctx.state.rallyPoint;
   if (params.startingCrew && params.startingBuildings && params.startingBuildings.length > 0 && flag) {
     const near = params.startingBuildingsNear ?? flag;
-    if (placeStartingBuildings(ctx.state.buildings, ctx.grid, params.startingBuildings, near, flag) > 0) {
+    const buildingsBefore = structuredClone(ctx.state.buildings);
+    if (placeStartingBuildings(ctx.state.buildings, ctx.grid, params.startingBuildings, near, flag,
+      params.vehicleSlopeRatio !== undefined && ctx.state.navGrid ? drivableApproachFilter(ctx.state.navGrid, params.vehicleSlopeRatio, flag) : undefined) > 0) {
       refreshLogisticsCapacity(ctx.state);
       buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
       if (params.vehicleSlopeRatio !== undefined) {
         // A building can plug the one gentle way off the flag's plateau (#2044): pick the flag again on the built-up ground.
         delete ctx.state.rallyPoint;
-        ensureRallyPoint(ctx.state, flag, rallyOptions);
+        const settled = ensureRallyPoint(ctx.state, flag, rallyOptions);
+        // The levelled pads can still wall a building off from the site (#2044): the first
+        // placement was judged on terrain the buildings then changed. Place once more around the
+        // flag the built-up ground settled on, which is where the main ground is.
+        const navGrid = ctx.state.navGrid;
+        if (!params.placementRetried && settled && navGrid) {
+          const target = findNearestNavigableCell(navGrid, navGrid.originX + Math.floor(navGrid.width / 2), navGrid.originZ + Math.floor(navGrid.height / 2));
+          if (!allDrivableFrom(navGrid, ctx.state.buildings.buildings, params.vehicleSlopeRatio, target)) {
+            ctx.state.buildings = buildingsBefore;
+            refreshLogisticsCapacity(ctx.state);
+            delete ctx.state.rallyPoint;
+            regenerateGrid(ctx, { ...params, rallyPoint: { ...settled }, startingBuildingsNear: { ...settled }, placementRetried: true });
+            return;
+          }
+        }
       }
     }
   }
