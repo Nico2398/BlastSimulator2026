@@ -82,3 +82,32 @@ export function decideLadderEventOption(optionHires: readonly boolean[]): number
   const free = optionHires.indexOf(false);
   return free === -1 ? 0 : free;
 }
+
+export interface LadderReachInput {
+  /** Depth (m) of the latest crater floor below the rim. */
+  craterFloorDepthM: number;
+  /** Horizontal run (m) from the crater rim to the ramp. */
+  craterRimToRampM: number;
+  /** Rise over run of the finished ramp; Infinity when none is finished. */
+  rampSlopeRatio: number;
+  /** Steepest slope ratio the fleet climbs. */
+  fleetClimbRatio: number;
+  affordableTier2Upgrade: boolean;
+}
+
+export type LadderReachDecision = 'fire' | 'ramp_first' | 'upgrade_first' | 'shrink';
+
+/** Whether the ladder fires at full depth, builds a ramp or upgrades the fleet first, or shrinks the shot to what haulers reach. */
+export function decideLadderReach(_input: LadderReachInput): LadderReachDecision {
+  throw new Error('not implemented');
+}
+
+/** Deepest shot (m) haulers can still reach by the ramp; monotonic in the ramp run, never above holeDepthM. */
+export function reachableShotDepthM(
+  _rampSlopeRatio: number,
+  _rampRunM: number,
+  _fleetClimbRatio: number,
+  _holeDepthM: number,
+): number {
+  throw new Error('not implemented');
+}
