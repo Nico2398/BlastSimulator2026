@@ -46,7 +46,7 @@ export class FireStep {
   private readonly zoneListEl: HTMLElement;
   private readonly checklistEl: HTMLElement;
 
-  protected gridProvider: () => VoxelGrid | null = () => null;
+  private gridProvider: () => VoxelGrid | null = () => null;
   private readonly breakoutMemo = new BreakoutWarningMemo();
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
@@ -186,35 +186,23 @@ export class FireStep {
     this.checklistEl.replaceChildren(
       !dryOk || exposedCount === 0
         ? this.makeCheckRow(dryOk, dryOk ? t('ui.blast_workshop.fire.check_dry', { count: holeCount }) : t('ui.blast_workshop.fire.check_wet', { count: wetCount }))
-        : this.makeRainRiskRow(exposedCount),
+        : this.makeWarnRow(t('ui.blast_workshop.fire.check_rain_risk', { count: exposedCount }), 'rain-risk-check'),
       this.makeCheckRow(zoneOk, zoneOk
         ? t('ui.blast_workshop.fire.check_zone_clear')
         : strandedCount > 0
           ? t('ui.blast_workshop.fire.check_zone_occupied_stranded', { count: occupantCount, strandedCount })
           : t('ui.blast_workshop.fire.check_zone_occupied', { count: occupantCount })),
-      ...(breakoutText ? [this.makeBreakoutRow(breakoutText)] : []),
-      ...atRisk.map(b => this.makeBuildingRiskRow(b)),
+      ...(breakoutText ? [this.makeWarnRow(breakoutText, 'breakout-check')] : []),
+      ...atRisk.map(b => this.makeWarnRow(buildingRiskText(b), 'building-risk', { buildingType: b.type })),
       ...(permit ? [this.makePermitRow(permit)] : []),
     );
   }
 
-  private makeRainRiskRow(count: number): HTMLElement {
-    const row = this.makeCheckRow(false, t('ui.blast_workshop.fire.check_rain_risk', { count }));
-    row.dataset['role'] = 'rain-risk-check';
-    return row;
-  }
-
-  /** Warns, never blocks: the shot may leave its rock sealed under intact ground (#2003). */
-  private makeBreakoutRow(text: string): HTMLElement {
+  /** An unticked checklist row tagged for tests and scenarios; warns, never blocks the shot. */
+  private makeWarnRow(text: string, role: string, extra: Record<string, string> = {}): HTMLElement {
     const row = this.makeCheckRow(false, text);
-    row.dataset['role'] = 'breakout-check';
-    return row;
-  }
-
-  private makeBuildingRiskRow(b: BuildingAtRisk): HTMLElement {
-    const row = this.makeCheckRow(false, buildingRiskText(b));
-    row.dataset['role'] = 'building-risk';
-    row.dataset['buildingType'] = b.type;
+    row.dataset['role'] = role;
+    Object.assign(row.dataset, extra);
     return row;
   }
 

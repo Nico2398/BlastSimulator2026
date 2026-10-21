@@ -15,7 +15,8 @@ import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
 import { chunkIndexOf } from '../../../src/core/world/VoxelGrid.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
-import { GRAVITY } from '../../../src/core/config/balance.js';
+import { oreValuePerKg } from '../../../src/core/economy/Market.js';
+import { GRAVITY, ORE_DENSITY_KG_M3 } from '../../../src/core/config/balance.js';
 import { advance } from '../../../src/core/engine/Steps.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -746,6 +747,9 @@ describe('executeBlast — sealed vs broken-out ore (#2003)', () => {
     const holes = createGridPlan(holeCounter, { x: 15, z: 15 }, 1, 1, 4, 28, 0.089);
     const { charges } = batchCharge([holes[0]!.id], { [holes[0]!.id]: holes[0]!.depth }, 'boomite', 2, 2);
     const result = executeBlast(assembleBlastPlan(holes, charges), grid, [])!;
-    expect(result.totalOreValue + result.sealedOreValue!).toBeGreaterThan(0);
+    // Uniform ore: every cleared voxel holds the same value, so the sum is cleared voxels x one voxel's worth.
+    const voxelValue = VoxelGrid.CELL_SIZE ** 3 * 0.2 * ORE_DENSITY_KG_M3 * oreValuePerKg('blingite');
+    expect(result.clearedVoxels).toBeGreaterThan(0);
+    expect(result.totalOreValue + result.sealedOreValue!).toBeCloseTo(result.clearedVoxels * voxelValue, 4);
   });
 });

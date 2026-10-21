@@ -4544,7 +4544,7 @@
   "ui.blast_workshop.report.rating_cap_sealed_failure": "Note plafonnée à Mauvais : l'essentiel de la roche abattue est resté scellé sous terre.",
   "ui.blast_workshop.report.rating_cap_sealed_partial": "Note plafonnée à Médiocre : une partie de la roche abattue est restée scellée sous terre.",
   "ui.blast_workshop.report.stat_sealed_value": "Scellé sous terre",
-  "ui.blast_workshop.report.sealed_hint": "{value} $ de minerai ont été abattus mais restent scellés sous un sol intact. Aucun engin ne peut l'atteindre, mais un tir ultérieur qui perce le toit peut encore le libérer.",
+  "ui.blast_workshop.report.sealed_hint": "Du minerai d'une valeur de {value} $ a été abattu mais reste scellé sous un sol intact. Aucun engin ne peut l'atteindre, mais un tir ultérieur qui perce le toit peut encore le libérer.",
   "mining.blast.rating_cap_sealed_failure": "Note plafonnée (l'essentiel de la roche abattue est resté scellé) : note de base {base}",
   "mining.blast.rating_cap_sealed_partial": "Note plafonnée (une partie de la roche abattue est restée scellée) : note de base {base}",
   "mining.blast.sealed_ore_value": "Valeur du minerai scellé : {value} $ (un tir ultérieur qui perce le toit peut encore le libérer)",

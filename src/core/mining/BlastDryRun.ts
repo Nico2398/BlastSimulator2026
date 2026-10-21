@@ -3,7 +3,7 @@
 import type { MarketId } from '../economy/Market.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { BlastPlan } from './BlastPlan.js';
-import { executeBlast, didNotBreakOut, type BlastRating, type VillagePosition } from './BlastExecution.js';
+import { executeBlast, ratingFactsFrom, type BlastRating, type VillagePosition } from './BlastExecution.js';
 import { applyRatingCaps } from './BlastRatingCaps.js';
 import { forkVoxelGrid } from '../world/VoxelGridFork.js';
 
@@ -35,10 +35,7 @@ export function dryRunBlast(
   const { rating } = applyRatingCaps(result.rating, {
     deaths: 0, injuries: 0, destroyedBuildings: 0,
     wetHoleCount: 0, fizzledHoleCount: 0, chargedHoleCount: 0,
-    oversizedFragments: result.oversizedFragments,
-    fragmentCount: result.fragmentCount,
-    noBreakout: didNotBreakOut(result),
-    sealedFragmentCount: result.sealedFragmentCount ?? 0,
+    ...ratingFactsFrom(result),
   });
   return {
     rating,

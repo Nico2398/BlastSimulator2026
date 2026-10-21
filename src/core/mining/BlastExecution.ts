@@ -8,7 +8,7 @@ import type { Vec3 } from '../math/Vec3.js';
 import type { Village } from '../world/Structures.js';
 import { length as vecLength, vec3 } from '../math/Vec3.js';
 import type { WetBlastHoles } from './WetHoles.js';
-import { applyRatingCaps, type BlastRatingCap } from './BlastRatingCaps.js';
+import { applyRatingCaps, type BlastRatingCap, type RatingCapFacts } from './BlastRatingCaps.js';
 import type { DrillHole } from './DrillPlan.js';
 // HoleCharge used via plan.charges values
 import type { BlastPlan } from './BlastPlan.js';
@@ -116,6 +116,7 @@ export interface BlastResult {
   maxProjectionSpeed: number;
   vibrationAtVillages: VillageVibration[];
   totalRockVolume: number;
+  /** Value of ore in the rock that broke out and can be reached; ore left sealed is `sealedOreValue` (#2003). */
   totalOreValue: number;
   rating: BlastRating;
   crackedVoxels: number;
@@ -169,7 +170,7 @@ export interface BlastReport {
    * so the report modal, console and rating agree.
    */
   maxProjectionDistanceM: number;
-  /** Total value of ore actually recovered, per BlastCalc's pricing. */
+  /** Value of ore in the rock that broke out and can be reached, per BlastCalc's pricing; sealed ore is `sealedOreValue` (#2003). */
   totalOreValue: number;
   /** Cash paid for the charges of this blast (list price of the kg not drawn from stock; summed before the plan was cleared). */
   spent: number;
@@ -216,6 +217,21 @@ export function didNotBreakOut(result: Pick<BlastResult, 'clearedVoxels' | 'brok
   return result.clearedVoxels > 0 && result.brokeOut === false;
 }
 
+/** The rating-cap facts every blast result carries; the caller adds the casualty, building and wet-hole facts. */
+export function ratingFactsFrom(result: BlastResult): Pick<RatingCapFacts, 'oversizedFragments' | 'fragmentCount' | 'noBreakout' | 'sealedFragmentCount'> {
+  return {
+    oversizedFragments: result.oversizedFragments,
+    fragmentCount: result.fragmentCount,
+    noBreakout: didNotBreakOut(result),
+    sealedFragmentCount: result.sealedFragmentCount ?? 0,
+  };
+}
+
+/** Oversized fragments a fragmenter can reach; falls back to all of them for reports that predate the sealed split (#2003). */
+export function reachableOversized(r: { oversizedFragments: number; reachableOversizedFragments?: number }): number {
+  return r.reachableOversizedFragments ?? r.oversizedFragments;
+}
+
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
 export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [], chargedCount: 0 }, secondaryBlasts: SecondaryBlastReport[] = [], spentFromStock = 0): BlastReport {
   const destroyedIds = new Set<number>(result.destroyedBuildings.map(b => b.buildingId));
@@ -227,10 +243,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     wetHoleCount: wetHoles.wet.length,
     fizzledHoleCount: wetHoles.fizzled.length,
     chargedHoleCount: wetHoles.chargedCount,
-    oversizedFragments: result.oversizedFragments,
-    fragmentCount: result.fragmentCount,
-    noBreakout: didNotBreakOut(result),
-    sealedFragmentCount: result.sealedFragmentCount ?? 0,
+    ...ratingFactsFrom(result),
   });
   return {
     tick,
@@ -246,7 +259,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     totalOreValue: result.totalOreValue,
     sealedOreValue: result.sealedOreValue ?? 0,
     sealedFragments: result.sealedFragmentCount ?? 0,
-    reachableOversizedFragments: result.reachableOversizedFragments ?? result.oversizedFragments,
+    reachableOversizedFragments: reachableOversized(result),
     spent,
     ...(spentFromStock > 0 ? { spentFromStock } : {}),
     brokeOut: result.brokeOut,

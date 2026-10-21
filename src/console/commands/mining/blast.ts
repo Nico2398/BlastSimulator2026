@@ -4,7 +4,7 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, releaseAfterAccidents, destroyEntitiesOnColumns, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
-import { executeBlastSteps, emitRegionInStrips, buildBlastReport, didNotBreakOut, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
+import { executeBlastSteps, emitRegionInStrips, buildBlastReport, didNotBreakOut, reachableOversized, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
 import { resolveMarketId } from '../../../core/campaign/Level.js';
 import { drain, type Steps } from '../../../core/engine/Steps.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
@@ -380,7 +380,7 @@ export function* fireBlastSteps(
       `Cracked voxels: ${result.crackedVoxels}`,
       `Fragments: ${result.fragmentCount}`,
       `Average fragment size: ${result.averageFragmentSize.toFixed(3)} m³`,
-      `Oversized fragments: ${report.reachableOversizedFragments ?? result.oversizedFragments}`,
+      `Oversized fragments: ${reachableOversized(report)}`,
       `Projections: ${result.projectionCount}`,
       ...(result.vibrationAtVillages.length > 0
         ? [t('mining.blast.max_village_vibration', { value: villageVibration.toFixed(4) })]

@@ -1,6 +1,9 @@
 // BlastSimulator2026 — Predicts how much of a planned blast breaks out vs stays sealed (#2003)
 // Runs the same read-only energy pass and fragmentation as the executor (liftUnderminedBurden
 // included), so the prediction and `executeBlast`'s `brokeOut` agree.
+// Approximation: the pre-blast `sealedShare` counts voxels, while the post-blast rating cap
+// (BlastRatingCaps) counts fragments. The two thresholds are shared (BLAST_SEALED_SHARE_*), so
+// the warning tracks the cap closely without fragmenting rock just to predict.
 import { hasChargedHole, type BlastPlan } from './BlastPlan.js';
 import { buildPlanEnergyField } from './BlastExecution.js';
 import { identifyFragmentedVoxels } from './VoxelFragmentation.js';

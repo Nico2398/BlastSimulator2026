@@ -27,7 +27,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { ACCIDENT_STYLE, accidentText, buildingLabelText } from '../accidentLookup.js';
 import type { GameState } from '../../core/state/GameState.js';
-import type { BlastReport, BlastRating } from '../../core/mining/BlastExecution.js';
+import { reachableOversized, type BlastReport, type BlastRating } from '../../core/mining/BlastExecution.js';
 import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../core/config/balance.js';
 import { IDLE_BLAST_PLAYBACK, isBlastReportDue, type BlastPlaybackSnapshot } from '../../core/mining/BlastPlayback.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
@@ -211,7 +211,7 @@ export class BlastReportModal {
   dispose(): void { this.overlay.remove(); }
 
   private render(report: BlastReport, state: GameState): void {
-    const reachableOversized = report.reachableOversizedFragments ?? report.oversizedFragments;
+    const reachableCount = reachableOversized(report);
     const sealedOre = report.sealedOreValue ?? 0;
     this.ratingEl.textContent = t(`ui.blast_workshop.report.rating_${report.rating}`);
     this.ratingEl.style.color = RATING_COLOR[report.rating];
@@ -220,7 +220,7 @@ export class BlastReportModal {
       { key: t('ui.blast_workshop.report.stat_cleared'), value: `${report.clearedVoxels}` },
       { key: t('ui.blast_workshop.report.stat_cracked'), value: `${report.crackedVoxels}` },
       { key: t('ui.blast_workshop.report.stat_fragments'), value: `${report.fragmentCount}` },
-      { key: t('ui.blast_workshop.report.stat_oversized'), value: `${reachableOversized}`, ...(reachableOversized > 0 ? { color: 'var(--bsx-amber)' } : {}) },
+      { key: t('ui.blast_workshop.report.stat_oversized'), value: `${reachableCount}`, ...(reachableCount > 0 ? { color: 'var(--bsx-amber)' } : {}) },
       { key: t('ui.blast_workshop.report.stat_volume'), value: `${report.totalRockVolume.toFixed(0)} m³` },
       { key: t('ui.blast_workshop.report.stat_projections'), value: `${report.projectionCount} · ${report.maxProjectionDistanceM.toFixed(0)} m`, ...(report.projectionCount > 0 ? { color: 'var(--bsx-critical-text)' } : {}) },
       { key: t('ui.blast_workshop.report.stat_spent'), value: `$${formatMoney(report.spent)}`, color: 'var(--bsx-critical-text)', info: 'report-spent' },
@@ -274,9 +274,9 @@ export class BlastReportModal {
       notes.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',
         t('ui.blast_workshop.report.sealed_hint', { value: formatMoney(sealedOre) })));
     }
-    if (reachableOversized > 0) {
+    if (reachableCount > 0) {
       notes.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',
-        t('ui.blast_workshop.report.oversized_hint', { count: reachableOversized, vehicle: t('vehicle_type.rock_fragmenter') })));
+        t('ui.blast_workshop.report.oversized_hint', { count: reachableCount, vehicle: t('vehicle_type.rock_fragmenter') })));
     }
     if (report.wetHoleIds?.length) {
       const fizzled = report.fizzledHoleIds?.length ?? 0;

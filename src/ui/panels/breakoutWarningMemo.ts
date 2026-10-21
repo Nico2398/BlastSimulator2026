@@ -7,21 +7,15 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { hasChargedHole, type BlastPlan } from '../../core/mining/BlastPlan.js';
 import { predictBreakout, type BreakoutPrediction } from '../../core/mining/BreakoutPrediction.js';
 import { wetHoleIdsFor } from '../../core/mining/WetHoles.js';
+import { PlanKeyedMemo, planInputsKey } from './planKeyedMemo.js';
 
 export class BreakoutWarningMemo {
-  private key = '';
-  private grid: VoxelGrid | null = null;
-  private prediction: BreakoutPrediction | null = null;
+  private readonly memo = new PlanKeyedMemo<BreakoutPrediction | null>();
 
   /** Prediction for `plan`; recomputed only when holes, charges, wet holes or terrain changed. */
   get(state: GameState, plan: BlastPlan, grid: VoxelGrid | null): BreakoutPrediction | null {
     if (!grid || !hasChargedHole(plan)) return null;
     const wet = wetHoleIdsFor(state);
-    const key = JSON.stringify([plan.holes, plan.charges, [...wet].sort(), grid.editRevision]);
-    if (grid === this.grid && key === this.key) return this.prediction;
-    this.grid = grid;
-    this.key = key;
-    this.prediction = predictBreakout(plan, grid, wet);
-    return this.prediction;
+    return this.memo.get(grid, planInputsKey(plan, wet, grid), () => predictBreakout(plan, grid, wet));
   }
 }

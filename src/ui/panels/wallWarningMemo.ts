@@ -7,21 +7,15 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { hasChargedHole, type BlastPlan } from '../../core/mining/BlastPlan.js';
 import { predictWallFaces, type PredictedFace } from '../../core/mining/WallStability.js';
 import { wetHoleIdsFor } from '../../core/mining/WetHoles.js';
+import { PlanKeyedMemo, planInputsKey } from './planKeyedMemo.js';
 
 export class WallWarningMemo {
-  private key = '';
-  private grid: VoxelGrid | null = null;
-  private faces: PredictedFace[] = [];
+  private readonly memo = new PlanKeyedMemo<PredictedFace[]>();
 
   /** Predicted faces for `plan`; recomputed only when holes, charges, wet holes or terrain changed. */
   get(state: GameState, plan: BlastPlan, grid: VoxelGrid | null): PredictedFace[] {
     if (!grid || !isProgressionSite(state) || !hasChargedHole(plan)) return [];
     const wet = wetHoleIdsFor(state);
-    const key = JSON.stringify([plan.holes, plan.charges, [...wet].sort(), grid.editRevision]);
-    if (grid === this.grid && key === this.key) return this.faces;
-    this.grid = grid;
-    this.key = key;
-    this.faces = predictWallFaces(plan, grid, wet);
-    return this.faces;
+    return this.memo.get(grid, planInputsKey(plan, wet, grid), () => predictWallFaces(plan, grid, wet));
   }
 }
