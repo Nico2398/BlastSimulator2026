@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   findPath, findExactPath, octileHeuristic, getBenchLevel, findRampConnections, isImpassable,
-  isDiagonalCornerClear, directLineWalk,
+  isDiagonalCornerClear, directLineWalk, pathCrossesFragmentOccupancy, findFootPathWithVehicleFallback,
 } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell, type NavCellType, isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import {
@@ -2458,5 +2458,149 @@ describe('computeClearancePocket — bounded on a grid that is entirely clearanc
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 19, toZ: 19, avoidVehicles: false, requiredClearance: 3 });
     expect(typeof result.found).toBe('boolean');
     expect(result.waypoints.length === 0).toBe(!result.found);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Ramp routing through corner-blocked diagonal ramps, ties and chained hops
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Ordinary A* walks across ramp cells like any terrain, so the ramp search runs
+// only when no ordinary route exists. A ramp touching its two levels on a
+// diagonal whose corner cells are void is such a case: A* refuses to cut that
+// corner (isDiagonalCornerClear), while a ramp hop steps from the entrance onto
+// the ramp and off to the exit. Large campaign maps reach these paths (#1949).
+
+/** An all-void grid; callers carve walkable cells (with their bench level) and ramps into it. */
+function makeVoidGrid(width: number, height: number): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) row.push(makeCell('void', 0));
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells, 10);
+}
+
+/**
+ * 7x7: level 0 where x + z <= 3, level 1 where x + z >= 7, void between, and two
+ * diagonal-only ramps at (4,1) and (1,4) mirrored about the x = z diagonal, so the
+ * routes from (0,0) to (6,6) through either ramp cost exactly the same.
+ */
+function makeMirroredRampGrid(): NavGrid {
+  const grid = makeVoidGrid(7, 7);
+  for (let z = 0; z < 7; z++) {
+    for (let x = 0; x < 7; x++) {
+      if (x + z <= 3) grid.cells[z]![x] = makeCell('walkable', 0);
+      else if (x + z >= 7) grid.cells[z]![x] = makeCell('walkable', 1);
+    }
+  }
+  grid.cells[1]![4] = makeCell('ramp', 0);
+  grid.cells[4]![1] = makeCell('ramp', 0);
+  return grid;
+}
+
+/**
+ * 8x7 staircase of diagonal/cardinal-only ramps: level 0 at (0,0), ramp (1,1),
+ * level 1 at (2,2)-(3,2), ramp (4,3), level 2 at (4,4), (4,5), (5,5); plus an
+ * isolated level-2 cell at (7,0) that no ramp reaches.
+ */
+function makeRampStaircaseGrid(): NavGrid {
+  const grid = makeVoidGrid(8, 7);
+  grid.cells[0]![0] = makeCell('walkable', 0);
+  grid.cells[1]![1] = makeCell('ramp', 0);
+  grid.cells[2]![2] = makeCell('walkable', 1);
+  grid.cells[2]![3] = makeCell('walkable', 1);
+  grid.cells[3]![4] = makeCell('ramp', 0);
+  grid.cells[4]![4] = makeCell('walkable', 2);
+  grid.cells[5]![4] = makeCell('walkable', 2);
+  grid.cells[5]![5] = makeCell('walkable', 2);
+  grid.cells[0]![7] = makeCell('walkable', 2);
+  return grid;
+}
+
+describe('findPath — ramp routing when ordinary A* finds no route', () => {
+  it('crosses a ramp whose two levels touch it only on corner-blocked diagonals', () => {
+    const grid = makeVoidGrid(5, 5);
+    for (const [x, z] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) grid.cells[z]![x] = makeCell('walkable', 0);
+    for (const [x, z] of [[3, 3], [4, 3], [3, 4], [4, 4]] as const) grid.cells[z]![x] = makeCell('walkable', 1);
+    grid.cells[2]![2] = makeCell('ramp', 0);
+
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 4, toZ: 4, avoidVehicles: false });
+
+    expect(result.found).toBe(true);
+    expect(result.waypoints).toContainEqual({ x: 2, z: 2 });
+    expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: 4, z: 4 });
+    // Two diagonal steps through the start level, onto and off the ramp, and through the goal level.
+    expect(result.totalCost).toBeCloseTo(Math.SQRT2 * (1 + 1.8 + 1 + 1), 6);
+  });
+
+  it('breaks an exact cost tie between two ramps on the ramp position, not on scan order', () => {
+    // (4,1) is scanned first (row z=1) but (1,4) has the smaller position key, so it must win.
+    const result = findPath(makeMirroredRampGrid(), { agentId: 1, fromX: 0, fromZ: 0, toX: 6, toZ: 6, avoidVehicles: false });
+
+    expect(result.found).toBe(true);
+    expect(result.waypoints).toContainEqual({ x: 1, z: 4 });
+    expect(result.waypoints).not.toContainEqual({ x: 4, z: 1 });
+  });
+
+  it('skips a ramp whose far side cannot reach the goal and uses the one that can', () => {
+    const grid = makeMirroredRampGrid();
+    // Wall off (5,2), the level-1 landing of the (4,1) ramp, from the rest of level 1.
+    for (const [x, z] of [[6, 1], [6, 2], [4, 3], [5, 3], [6, 3]] as const) grid.cells[z]![x] = makeCell('void', 0);
+
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 6, toZ: 6, avoidVehicles: false });
+
+    expect(result.found).toBe(true);
+    expect(result.waypoints).toContainEqual({ x: 1, z: 4 });
+  });
+
+  it('chains two ramp hops when no single ramp joins the start and goal levels', () => {
+    const result = findPath(makeRampStaircaseGrid(), { agentId: 1, fromX: 0, fromZ: 0, toX: 5, toZ: 5, avoidVehicles: false });
+
+    expect(result.found).toBe(true);
+    expect(result.waypoints).toContainEqual({ x: 1, z: 1 });
+    expect(result.waypoints).toContainEqual({ x: 4, z: 3 });
+    expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: 5, z: 5 });
+  });
+
+  it('reports no route when the chained hops land on a pocket of the goal level the goal is not in', () => {
+    const result = findPath(makeRampStaircaseGrid(), { agentId: 1, fromX: 0, fromZ: 0, toX: 7, toZ: 0, avoidVehicles: false });
+
+    expect(result).toEqual({ found: false, waypoints: [], totalCost: 0 });
+  });
+});
+
+describe('pathCrossesFragmentOccupancy', () => {
+  it('is true when a waypoint sits on fragment debris', () => {
+    const grid = makeFlatGrid(3, 1);
+    setCell(grid, 1, 0, 'walkable', { fragmentOccupancy: 1 });
+    expect(pathCrossesFragmentOccupancy(grid, [{ x: 0, z: 0 }, { x: 1, z: 0 }])).toBe(true);
+  });
+
+  it('is false for a clear route and for waypoints off the grid', () => {
+    const grid = makeFlatGrid(3, 1);
+    expect(pathCrossesFragmentOccupancy(grid, [{ x: 0, z: 0 }, { x: 2, z: 0 }])).toBe(false);
+    expect(pathCrossesFragmentOccupancy(grid, [{ x: -5, z: 9 }])).toBe(false);
+  });
+});
+
+describe('findFootPathWithVehicleFallback', () => {
+  const request = { agentId: 1, fromX: 0, fromZ: 0, toX: 2, toZ: 0, avoidVehicles: true };
+
+  it('takes the relaxed route across a vehicle-only blockage', () => {
+    const grid = makeFlatGrid(3, 1);
+    setCell(grid, 1, 0, 'walkable', { vehicleOccupied: true });
+    const result = findFootPathWithVehicleFallback(grid, request, true);
+    expect(result.found).toBe(true);
+    expect(result.crossedVehicles).toBe(true);
+  });
+
+  it('rejects the relaxed route when it would cross fragment debris', () => {
+    const grid = makeFlatGrid(3, 1);
+    setCell(grid, 1, 0, 'walkable', { vehicleOccupied: true, fragmentOccupancy: 1 });
+    const result = findFootPathWithVehicleFallback(grid, request, false);
+    expect(result.found).toBe(false);
+    expect(result.crossedVehicles).toBe(false);
   });
 });
