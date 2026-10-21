@@ -19,7 +19,7 @@
       }
     },
     {
-      "command": "drill_plan add x:24 z:32 depth:12 diameter:89",
+      "command": "drill_plan add x:36 z:32 depth:12 diameter:89",
       "role": "player",
       "interaction": [
         {
@@ -50,12 +50,12 @@
         },
         {
           "type": "focusTile",
-          "x": 24,
+          "x": 36,
           "z": 32
         },
         {
           "type": "pickTile",
-          "x": 24,
+          "x": 36,
           "z": 32
         },
         {
@@ -155,8 +155,8 @@
       "role": "player",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "type": "ensurePanel",
+          "panel": "blast"
         },
         {
           "type": "waitForSelector",
@@ -198,6 +198,41 @@
       "description": "FIRE opens the Pre-Flight Check, which carries the same warning; DETONATE is not gated by it.",
       "expect": {
         "usable": "[data-action=\"preflight-detonate\"]"
+      }
+    },
+    {
+      "command": "blast",
+      "timeout": 120,
+      "role": "player",
+      "description": "DETONATE fires despite the warning; the Blast Report shows the broken-out Ore Value and a separate Sealed underground figure.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 8000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 90000
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-info=\"report-sealed\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "[data-action=\"report-close\"]",
+        "equals": {
+          "holeCount": 0
+        }
       }
     }
   ]
