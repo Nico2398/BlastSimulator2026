@@ -147,6 +147,8 @@ export interface SerializableGameState {
   deathCount: number;
   /** Fleet-wide count of driver-boarding events (state.vehicles.driverBoardingCount). */
   vehicleBoardingCount: number;
+  /** Board confidence (state.board.confidence), 0 when no board is attached. */
+  boardConfidence: number;
   /** At least one vehicle carries cargo right now (state.vehicles.vehicles[].cargo): the condition-based wait before reading a loaded hauler's inspector (#1761). */
   vehicleLoaded: boolean;
   levelEnded: boolean;
@@ -259,6 +261,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
     vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,
+    boardConfidence: s.board?.confidence ?? 0,
     vehicleLoaded: s.vehicles.vehicles.some(v => v.cargo.length > 0),
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,

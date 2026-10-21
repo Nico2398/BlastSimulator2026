@@ -9,7 +9,6 @@ import { takePermitDelay } from '../events/ActiveModifiers.js';
 import { parseColumnKey } from '../mining/SurveyColumn.js';
 import {
   MINE_GRADES,
-  VANITY_MIN_GRADE,
   MINE_GRADE_CLASS_ORE_FACTOR,
   MINE_GRADE_CLASS_ROCK_BASE_M3,
   MINE_GRADE_CLASS_ROCK_FACTOR,
@@ -284,7 +283,6 @@ for (let grade = 1; grade <= LAST_NAMED_GRADE; grade++) {
   registerUnlockLine({ grade, key: `progression.unlock.flavour.${grade}` });
   registerUnlockLine({ grade, key: `progression.unlock.hint.${grade}` });
 }
-registerUnlockLine({ grade: VANITY_MIN_GRADE, key: 'progression.unlock.vanity' });
 registerUnlockLine({ grade: 'class', key: 'progression.unlock.flavour.class' });
 registerUnlockLine({ grade: 'class', key: 'progression.unlock.hint.class' });
 
