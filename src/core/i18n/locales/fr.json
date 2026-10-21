@@ -4536,5 +4536,17 @@
   "ui.blast_workshop.preview.wall_warning": "Ce tir laisse un front de {height} m dans {rock} (sûr : {safe} m). Il risque de s'effondrer.",
   "ui.blast_workshop.preflight.warn_wall_slump": "Ce tir laisse un front de {height} m dans {rock} (sûr : {safe} m). Il risque de s'effondrer.",
   "ui.survey.wall_overlay_toggle_tip": "Basculer la surcouche de stabilité des parois — W",
-  "shortcuts.wall_overlay": "W : Afficher/masquer la stabilité des parois"
+  "shortcuts.wall_overlay": "W : Afficher/masquer la stabilité des parois",
+  "ui.blast_workshop.preflight.warn_breakout_none": "{count} trous sur {total} sont trop profonds : plus de {max} m de roche reste au-dessus de la charge, le tir ne débouchera pas et la roche restera scellée dans le sol. Forez des trous plus courts ou chargez un explosif qui remplit davantage le trou.",
+  "ui.blast_workshop.preflight.warn_breakout_partial": "Environ {percent} % de la roche abattue par ce tir reste scellée dans le sol sous un toit intact ({count} trous sur {total} trop profonds). Forez des trous plus courts ou chargez un explosif qui remplit davantage le trou.",
+  "ui.blast_workshop.fire.check_breakout_none": "{count} trous sur {total} sont trop profonds : le tir ne débouchera pas et la roche restera scellée. Utilisez des trous plus courts ou un explosif qui remplit davantage le trou.",
+  "ui.blast_workshop.fire.check_breakout_partial": "Environ {percent} % de la roche abattue reste scellée dans le sol ({count} trous sur {total} trop profonds). Utilisez des trous plus courts ou un explosif qui remplit davantage le trou.",
+  "ui.blast_workshop.report.rating_cap_sealed_failure": "Note plafonnée à Mauvais : l'essentiel de la roche abattue est resté scellé sous terre.",
+  "ui.blast_workshop.report.rating_cap_sealed_partial": "Note plafonnée à Médiocre : une partie de la roche abattue est restée scellée sous terre.",
+  "ui.blast_workshop.report.stat_sealed_value": "Scellé sous terre",
+  "ui.blast_workshop.report.sealed_hint": "{value} $ de minerai ont été abattus mais restent scellés sous un sol intact. Aucun engin ne peut l'atteindre, mais un tir ultérieur qui perce le toit peut encore le libérer.",
+  "mining.blast.rating_cap_sealed_failure": "Note plafonnée (l'essentiel de la roche abattue est resté scellé) : note de base {base}",
+  "mining.blast.rating_cap_sealed_partial": "Note plafonnée (une partie de la roche abattue est restée scellée) : note de base {base}",
+  "mining.blast.sealed_ore_value": "Valeur du minerai scellé : {value} $ (un tir ultérieur qui perce le toit peut encore le libérer)",
+  "mining.blast.sealed_fragments": "Fragments scellés : {count} sur {total}"
 }

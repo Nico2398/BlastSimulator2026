@@ -26,6 +26,9 @@ import { vehicleDriverId } from '../../../core/entities/Vehicle.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
+import { BreakoutWarningMemo } from '../breakoutWarningMemo.js';
+import { breakoutWarningFor } from '../breakoutWarningText.js';
+import { assembleBlastPlan } from '../../../core/mining/BlastPlan.js';
 import { permitPreview, type PermitPreview } from '../permitPreview.js';
 
 
@@ -44,6 +47,7 @@ export class FireStep {
   private readonly checklistEl: HTMLElement;
 
   protected gridProvider: () => VoxelGrid | null = () => null;
+  private readonly breakoutMemo = new BreakoutWarningMemo();
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
@@ -86,7 +90,11 @@ export class FireStep {
     const occupantKeys = zone ? this.occupantKeys(state, zone) : [];
     const permit = state.drillHoles.length === 0 ? null : permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount);
     const atRisk = buildingsInBlastReach(state.drillHoles, state.chargesByHole, state.buildings.buildings);
-    const signature = JSON.stringify({ zone, occupants: occupantKeys, wetCount: wet.length, exposedCount: exposed.length, permit, atRisk });
+    const breakoutText = state.drillHoles.length === 0 ? null : breakoutWarningFor(
+      this.breakoutMemo.get(state, assembleBlastPlan(state.drillHoles, state.chargesByHole), this.gridProvider()),
+      { none: 'ui.blast_workshop.fire.check_breakout_none', partial: 'ui.blast_workshop.fire.check_breakout_partial' },
+    );
+    const signature = JSON.stringify({ breakoutText, zone, occupants: occupantKeys, wetCount: wet.length, exposedCount: exposed.length, permit, atRisk });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
@@ -95,7 +103,7 @@ export class FireStep {
 
     const occupants = zone ? this.occupants(state, zone) : [];
     this.renderZoneList(occupants, zone !== null);
-    this.renderChecklist(state.drillHoles.length, wet.length, exposed.length, occupants, permit, atRisk);
+    this.renderChecklist(state.drillHoles.length, wet.length, exposed.length, occupants, permit, atRisk, breakoutText);
   }
 
   refreshLocale(): void {
@@ -170,7 +178,7 @@ export class FireStep {
     return row;
   }
 
-  private renderChecklist(holeCount: number, wetCount: number, exposedCount: number, occupants: Occupant[], permit: PermitPreview | null, atRisk: BuildingAtRisk[]): void {
+  private renderChecklist(holeCount: number, wetCount: number, exposedCount: number, occupants: Occupant[], permit: PermitPreview | null, atRisk: BuildingAtRisk[], breakoutText: string | null): void {
     const dryOk = wetCount === 0;
     const occupantCount = occupants.length;
     const strandedCount = occupants.filter(o => o.strandedNoDriver).length;
@@ -184,6 +192,7 @@ export class FireStep {
         : strandedCount > 0
           ? t('ui.blast_workshop.fire.check_zone_occupied_stranded', { count: occupantCount, strandedCount })
           : t('ui.blast_workshop.fire.check_zone_occupied', { count: occupantCount })),
+      ...(breakoutText ? [this.makeBreakoutRow(breakoutText)] : []),
       ...atRisk.map(b => this.makeBuildingRiskRow(b)),
       ...(permit ? [this.makePermitRow(permit)] : []),
     );
@@ -192,6 +201,13 @@ export class FireStep {
   private makeRainRiskRow(count: number): HTMLElement {
     const row = this.makeCheckRow(false, t('ui.blast_workshop.fire.check_rain_risk', { count }));
     row.dataset['role'] = 'rain-risk-check';
+    return row;
+  }
+
+  /** Warns, never blocks: the shot may leave its rock sealed under intact ground (#2003). */
+  private makeBreakoutRow(text: string): HTMLElement {
+    const row = this.makeCheckRow(false, text);
+    row.dataset['role'] = 'breakout-check';
     return row;
   }
 

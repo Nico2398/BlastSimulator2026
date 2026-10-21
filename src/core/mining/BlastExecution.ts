@@ -3,6 +3,7 @@
 // Pure function operating on GameState + VoxelGrid, no side effects.
 
 import { oreValuePerKg, type MarketId } from '../economy/Market.js';
+import { isFragmentSealed } from '../economy/SealedFragments.js';
 import type { Vec3 } from '../math/Vec3.js';
 import type { Village } from '../world/Structures.js';
 import { length as vecLength, vec3 } from '../math/Vec3.js';
@@ -243,6 +244,9 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     projectionCount: result.projectionCount,
     maxProjectionDistanceM: result.maxThrowDistance,
     totalOreValue: result.totalOreValue,
+    sealedOreValue: result.sealedOreValue ?? 0,
+    sealedFragments: result.sealedFragmentCount ?? 0,
+    reachableOversizedFragments: result.reachableOversizedFragments ?? result.oversizedFragments,
     spent,
     ...(spentFromStock > 0 ? { spentFromStock } : {}),
     brokeOut: result.brokeOut,
@@ -462,6 +466,27 @@ export function* executeBlastSteps(
     maxThrowDistance = resolved.maxThrowDistance;
   }
 
+  // 4d. Split what landed into reachable rock and rock buried under intact ground (#2003),
+  //     by the same test the haul dispatch uses. Ore follows the fragments' own ore content,
+  //     scaled so broken-out + sealed always sums to the ore the removed ground held.
+  yield;
+  let sealedFragmentCount = 0;
+  let reachableOversizedFragments = 0;
+  let sealedFragmentOre = 0;
+  let allFragmentOre = 0;
+  for (const f of fragments) {
+    const ore = calculateOreValue(f.oreDensities, VoxelGrid.CELL_SIZE, marketId) * (f.volume / VoxelGrid.CELL_SIZE ** 3);
+    allFragmentOre += ore;
+    if (isFragmentSealed(grid, f.position)) {
+      sealedFragmentCount++;
+      sealedFragmentOre += ore;
+    } else if (f.volume > OVERSIZED_FRAGMENT_THRESHOLD) {
+      reachableOversizedFragments++;
+    }
+  }
+  const sealedOreValue = allFragmentOre > 0 ? totalOreValue * (sealedFragmentOre / allFragmentOre) : 0;
+  const brokenOutOreValue = totalOreValue - sealedOreValue;
+
   yield;
   // 4b. Compute cleared region AABB from toClear for navmesh dirty-region
   //     update. One pass with running bounds — a reduce allocating an object
@@ -580,7 +605,7 @@ export function* executeBlastSteps(
     maxProjectionSpeed,
     vibrationAtVillages,
     totalRockVolume,
-    totalOreValue,
+    totalOreValue: brokenOutOreValue,
     rating,
     crackedVoxels,
     clearedVoxels,
@@ -589,9 +614,9 @@ export function* executeBlastSteps(
     secondaryBlastEvents,
     clearedColumns: [...new Set(toClear.map(c => `${c.x},${c.z}`))],
     brokeOut,
-    sealedOreValue: 0,
-    sealedFragmentCount: 0,
-    reachableOversizedFragments: 0,
+    sealedOreValue,
+    sealedFragmentCount,
+    reachableOversizedFragments,
     maxThrowDistance,
     projectileCount,
     flights,
