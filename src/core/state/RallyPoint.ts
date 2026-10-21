@@ -93,10 +93,10 @@ export function rallyAreaHeightSpread(navGrid: NavGrid, x: number, z: number, ra
  * `preferred` first. When no flat area exists at all, the flattest one on the
  * main ground wins, so a rugged site still gets the best ground it has.
  */
-export function chooseRallyPoint(navGrid: NavGrid, preferred: { x: number; z: number }, _options: RallyPointOptions = {}): RallyPoint {
-  const centre = siteCentre(navGrid);
+export function chooseRallyPoint(navGrid: NavGrid, preferred: { x: number; z: number }, options: RallyPointOptions = {}): RallyPoint {
+  const centre = options.mustReach ?? siteCentre(navGrid);
   const main = findNearestNavigableCell(navGrid, centre.x, centre.z);
-  const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS);
+  const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, options.maxSlopeRatio);
   const target = { x: Math.round(preferred.x), z: Math.round(preferred.z) };
 
   const candidates: Array<Cell & { spread: number; distSq: number }> = [];
@@ -108,7 +108,11 @@ export function chooseRallyPoint(navGrid: NavGrid, preferred: { x: number; z: nu
       candidates.push({ x, z, spread, distSq: (x - target.x) ** 2 + (z - target.z) ** 2 });
     }
   }
-  if (candidates.length === 0) return findNearestNavigableCell(navGrid, target.x, target.z);
+  if (candidates.length === 0) {
+    // No flat ground meets the constraint: choose as an unconstrained site would.
+    if (options.maxSlopeRatio !== undefined || options.mustReach !== undefined) return chooseRallyPoint(navGrid, preferred);
+    return findNearestNavigableCell(navGrid, target.x, target.z);
+  }
 
   // Nearest first; z then x break ties so the pick never depends on scan order.
   candidates.sort((a, b) => a.distSq - b.distSq || a.z - b.z || a.x - b.x);

@@ -235,7 +235,7 @@ function fixUnreachableVehicles(navGrid: NavGrid, employees: Employee[], vehicle
  * each other's way: the rig queues behind the truck it must drive past and
  * the pit is never reached. `vehicleOccupied` is marked for the search only.
  */
-function canDriveAroundVehicles(navGrid: NavGrid, from: Cell, to: Cell, blockers: ReadonlyArray<Cell>): boolean {
+function canDriveAroundVehicles(navGrid: NavGrid, from: Cell, to: Cell, blockers: ReadonlyArray<Cell>, maxSlopeRatio: number): boolean {
   const marked = blockers
     .filter(b => b.x !== to.x || b.z !== to.z) // a vehicle parked on the goal does not wall it off
     .map(b => navGrid.cellAt(b.x, b.z))
@@ -248,6 +248,7 @@ function canDriveAroundVehicles(navGrid: NavGrid, from: Cell, to: Cell, blockers
       toX: to.x, toZ: to.z,
       avoidVehicles: true,
       requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS,
+      maxSlopeRatio,
     }).found;
   } finally {
     for (const cell of marked) cell.vehicleOccupied = false;
@@ -278,6 +279,7 @@ export function relocateVehiclesOffNarrowGround(
   if (!navGrid) return false;
   const employees = state.employees.employees;
   const vehicles = state.vehicles.vehicles;
+  const slopeRatio = options.vehicleSlopeRatio ?? NAV_MAX_SLOPE_RATIO;
   const open = (c: Cell): number => countLegalStepNeighbours(navGrid, c.x, c.z, NAV_CLEARANCE_VEHICLE_CELLS);
   // The new cell must stay on the vehicle's own climb component: a roomier
   // cell in a cut-off pocket would strand the vehicle from every order.
@@ -291,12 +293,12 @@ export function relocateVehiclesOffNarrowGround(
     navGrid.originZ + Math.floor(navGrid.height / 2),
   );
   const reachable = (a: Cell, b: Cell): boolean =>
-    (components ??= computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS)).canReach(a.x, a.z, b.x, b.z);
+    (components ??= computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, slopeRatio)).canReach(a.x, a.z, b.x, b.z);
   // Every vehicle that can reach the site's middle at all can drive there
   // around the rest of the fleet (#1680).
   const fleetCanDrive = (cells: ReadonlyArray<Cell>): boolean => options.fleetMustStayMobile !== true || cells.every((cell, i) =>
     !reachable(cell, centre)
-    || canDriveAroundVehicles(navGrid, cell, centre, cells.filter((_, j) => j !== i)));
+    || canDriveAroundVehicles(navGrid, cell, centre, cells.filter((_, j) => j !== i), slopeRatio));
   const occupied = new Set<string>([
     ...employees.map(e => key({ x: Math.round(e.x), z: Math.round(e.z) })),
     ...vehicles.map(v => key({ x: Math.round(v.x), z: Math.round(v.z) })),
@@ -306,7 +308,9 @@ export function relocateVehiclesOffNarrowGround(
   for (const vehicle of vehicles) {
     const from = { x: Math.round(vehicle.x), z: Math.round(vehicle.z) };
     const others = vehicles.filter(o => o !== vehicle).map(o => ({ x: Math.round(o.x), z: Math.round(o.z) }));
-    if (open(from) >= CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS && fleetCanDrive([from, ...others])) continue;
+    // At a stated vehicle limit a vehicle cut off from the site's middle must move (#2044).
+    const cutOff = options.vehicleSlopeRatio !== undefined && !reachable(from, centre);
+    if (!cutOff && open(from) >= CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS && fleetCanDrive([from, ...others])) continue;
     let target: Cell | null = null;
     for (let radius = 1; radius <= CREW_SPAWN_SEARCH_RADIUS && target === null; radius++) {
       target = [...ringCells(from, radius)].find(c =>
@@ -476,9 +480,4 @@ export function placeStartingCrew(state: GameState): boolean {
   const vehicleMoved = fixUnreachableVehicles(navGrid, employees, vehicles);
 
   return crewMoved || vehicleMoved;
-}
-
-/** Steepest rise/run every vehicle of the fleet climbs: the minimum of their limits (#2044). */
-export function fleetSlopeRatio(_vehicles: ReadonlyArray<Pick<Vehicle, 'tier'>>, _progression: boolean): number {
-  return NAV_MAX_SLOPE_RATIO; // TODO: implement
 }

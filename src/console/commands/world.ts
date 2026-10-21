@@ -5,7 +5,7 @@ import { refreshOrderReachability } from '../../core/engine/OrderReachability.js
 import { backfillGhostBuildings } from '../../core/engine/TaskDispatch.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
 import { placeStartingCrew, relocateVehiclesOffNarrowGround, meanPosition } from '../../core/state/SpawnPlacement.js';
-import { ensureRallyPoint } from '../../core/state/RallyPoint.js';
+import { ensureRallyPoint, type RallyPointOptions } from '../../core/state/RallyPoint.js';
 import { placeStartingBuildings } from '../../core/state/StartingBuildings.js';
 import { refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
@@ -297,10 +297,14 @@ export function regenerateGrid(
   // On a game's first grid the rally point is chosen on flat ground near where
   // the level wanted its crew; a save from before the flag existed gets one
   // here too. Every later hire and purchase spawns around it.
+  const rallyOptions: RallyPointOptions = {
+    ...(params.vehicleSlopeRatio !== undefined ? { maxSlopeRatio: params.vehicleSlopeRatio } : {}),
+    ...(params.mustReach ? { mustReach: params.mustReach } : {}),
+  };
   if (params.startingCrew) {
     const crew = [...ctx.state.employees.employees, ...ctx.state.vehicles.vehicles];
     delete ctx.state.rallyPoint;
-    ensureRallyPoint(ctx.state, params.rallyPoint ?? (crew.length > 0 ? meanPosition(crew) : undefined));
+    ensureRallyPoint(ctx.state, params.rallyPoint ?? (crew.length > 0 ? meanPosition(crew) : undefined), rallyOptions);
   } else {
     ensureRallyPoint(ctx.state);
   }
@@ -314,6 +318,11 @@ export function regenerateGrid(
     if (placeStartingBuildings(ctx.state.buildings, ctx.grid, params.startingBuildings, near, flag) > 0) {
       refreshLogisticsCapacity(ctx.state);
       buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
+      if (params.vehicleSlopeRatio !== undefined) {
+        // A building can plug the one gentle way off the flag's plateau (#2044): pick the flag again on the built-up ground.
+        delete ctx.state.rallyPoint;
+        ensureRallyPoint(ctx.state, flag, rallyOptions);
+      }
     }
   }
   // The whole crew gathers on one patch of mutually climb-connected ground
@@ -324,7 +333,10 @@ export function regenerateGrid(
     buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   }
   snapAgentsToNavigableGround(ctx.state);
-  if (params.startingCrew && relocateVehiclesOffNarrowGround(ctx.state, { fleetMustStayMobile: params.fleetMustStayMobile === true })) {
+  if (params.startingCrew && relocateVehiclesOffNarrowGround(ctx.state, {
+    fleetMustStayMobile: params.fleetMustStayMobile === true,
+    ...(params.vehicleSlopeRatio !== undefined ? { vehicleSlopeRatio: params.vehicleSlopeRatio } : {}),
+  })) {
     buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   }
   refreshOrderReachability(ctx.state);
