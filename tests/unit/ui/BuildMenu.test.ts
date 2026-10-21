@@ -2062,7 +2062,7 @@ describe('BuildMenu — Vanity section (#1947)', () => {
   it('with a board and cash the statue buy button is enabled; no locked label remains', async () => {
     menu.update(await withBoard(stateAt(1)));
     expect(buy('ceo_statue').disabled).toBe(false);
-    expect(row('ceo_statue').querySelector('.bs-build-locked')?.textContent ?? '').toBe('');
+    expect(row('ceo_statue').querySelector('.bs-build-locked')).toBeNull();
   });
 
   it('with a board and short cash the statue buy button stays disabled until affordable', async () => {

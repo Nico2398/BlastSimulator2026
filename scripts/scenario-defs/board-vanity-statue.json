@@ -1,6 +1,6 @@
 {
   "name": "board-vanity-statue",
-  "description": "Vanity projects need a board (#2052): on a grade-5 sandbox with no board the Build menu has no Vanity section and `build ceo_statue` is refused with cash untouched. Once a board is attached (`board start`), the player builds the CEO Statue from the Vanity section: exactly $250,000 is charged, board confidence rises and average crew morale dips once (mandatory saluting).",
+  "description": "Vanity projects need a board (#2052): on a grade-5 sandbox with no board the Build menu has no Vanity section and cash is untouched. Once a board is attached (`board start`), the player builds the CEO Statue from the Vanity section: exactly $250,000 is charged, board confidence rises and average crew morale dips once (mandatory saluting).",
   "steps": [
     {
       "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true grade:5",
@@ -43,7 +43,7 @@
           "selector": "#bs-build-panel"
         }
       ],
-      "description": "Grade 5, no board: the player opens the Build menu and it offers no Vanity section at all (absent, not locked); cash untouched. Console refusal of `build ceo_statue` is covered by unit tests; here only the menu is read.",
+      "description": "Grade 5, no board: the player opens the Build menu and it offers no Vanity section at all (absent, not locked); cash untouched. Only the menu is read here; console refusal of `build ceo_statue` is covered by tests/integration/vanity-build.integration.test.ts.",
       "expect": {
         "changedBy": {
           "cash": 0

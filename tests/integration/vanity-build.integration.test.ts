@@ -63,7 +63,10 @@ describe('vanity build availability (#2052)', () => {
 
   it('is accepted with a board at grade 5 too', () => {
     const { run, state } = site(5);
+    const cash = state.cash;
     expect(run('build ceo_statue at:10,10')).toMatchObject({ success: true });
+    expect(state.cash).toBe(cash - 250_000);
+    expect(ofType(state, 'ceo_statue')).toHaveLength(1);
   });
 
   it('a board raises confidence when the CEO statue is built', () => {
