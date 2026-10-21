@@ -1277,14 +1277,11 @@ export const ACTION_STUCK_BACKOFF_TICKS = 60;
 export const NAV_BENCH_HEIGHT = 5;
 
 /**
- * Max slope, in degrees, an agent can step between adjacent NavGrid cells —
- * replaces `NAV_MAX_CLIMB_HEIGHT` (#1151). The old rule admitted a step of up
- * to 3 metres over a 1-metre cardinal run — arctan(3/1) ≈ 71° — purely
- * because 3 voxels happened to be shorter than that; nothing about 71° was a
- * deliberate slope decision. 30° makes the rule legible on its own terms:
- * gentler than this and a worker walks it, steeper and it has to be cut into
- * a ramp. One constant, applied identically to every agent kind — workers
- * and vehicles alike, no per-agent-kind variant.
+ * Max slope, in degrees, a walking agent steps between adjacent NavGrid cells,
+ * and the limit every vehicle keeps off progression sites (campaign, tutorial)
+ * (#1151). Gentler than this and a worker walks it, steeper and it has to be
+ * cut into a ramp. Vehicles on progression sites climb the lower
+ * `VEHICLE_MAX_SLOPE_DEGREES` instead (#2045).
  *
  * Measured reachability cost of the 30° cutoff (#1147 flood fill,
  * NEIGHBOUR_OFFSETS_8, seed 42, 64m sites): desert_badlands 100%,
@@ -1307,13 +1304,6 @@ export const VEHICLE_MAX_SLOPE_DEGREES = 20;
 
 /** tan(VEHICLE_MAX_SLOPE_DEGREES): rise per metre of run (#2045). */
 export const VEHICLE_MAX_SLOPE_RATIO = Math.tan(VEHICLE_MAX_SLOPE_DEGREES * Math.PI / 180);
-
-/** Steepest slope (degrees) each vehicle tier climbs on a progression site (#1938). Tier 1 keeps the global limit. */
-export const VEHICLE_TIER_MAX_SLOPE_DEGREES: Record<VehicleTier, number> = {
-  1: NAV_MAX_SLOPE_DEGREES,
-  2: 24,
-  3: 18,
-};
 
 /**
  * Anti-noise floor, in metres, below which a graded cardinal-neighbour
@@ -1436,7 +1426,7 @@ export function isRampWidth(n: number): n is RampWidth {
 export const RAMP_DEFAULT_WIDTH: RampWidth = 3;
 /** Ramp tool (#1942): depth the depth stepper starts at, the deepest it goes, and the degrees one grade press moves. */
 export const RAMP_DEFAULT_DEPTH_M = 8;
-export const RAMP_MAX_DEPTH_M = 40;
+export const RAMP_MAX_DEPTH_M = 55;
 export const RAMP_GRADE_STEP_DEGREES = 1;
 /** Ramp cost per meter of length per voxel of width; the default width costs the pre-#1298 flat $100/m. */
 export const RAMP_COST_PER_METER_PER_WIDTH = 100 / 3;

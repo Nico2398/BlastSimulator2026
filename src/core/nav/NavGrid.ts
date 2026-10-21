@@ -57,8 +57,11 @@ export function isStepClimbable(fromY: number | undefined, toY: number | undefin
 
 /** Horizontal run (m) a step of (dx, dz) must travel to climb at no more than `maxSlopeRatio` (#2045). */
 export function stepClimbRun(dx: number, dz: number, maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO): number {
-  void maxSlopeRatio;
-  return Math.hypot(dx, dz); // TODO: implement
+  // Below the walking limit the rise gate would let a diagonal step zigzag up a ramp
+  // steeper than the axis limit (rise/run with run up to √2), so the run is the
+  // longer axis: no diagonal shortcut for a limited request.
+  if (maxSlopeRatio < NAV_MAX_SLOPE_RATIO) return Math.max(Math.abs(dx), Math.abs(dz));
+  return Math.hypot(dx, dz);
 }
 
 export type NavCellType = 'walkable' | 'blocked' | 'drill_hole' | 'ramp' | 'void';

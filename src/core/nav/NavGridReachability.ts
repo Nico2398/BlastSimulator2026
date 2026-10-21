@@ -7,7 +7,7 @@
 // so `NavGrid.findNearestReachableCell` etc. remain the public entry points.
 
 import type { NavGrid, NavCell } from './NavGrid.js';
-import { isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
+import { isStepClimbable, stepClimbRun, isCellOccupied, hasClearance } from './NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 import { NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { isDiagonalCornerClear } from './Pathfinding.js';
@@ -605,7 +605,7 @@ function isLegalStep(
   const dx = nx - x;
   const dz = nz - z;
   if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(navGrid, x, z, nx, nz)) return false;
-  if (climbAware && !isStepClimbable(from?.surfaceY, to.surfaceY, Math.hypot(dx, dz), maxSlopeRatio)) return false;
+  if (climbAware && !isStepClimbable(from?.surfaceY, to.surfaceY, stepClimbRun(dx, dz, maxSlopeRatio), maxSlopeRatio)) return false;
   return hasClearance(to, requiredClearance);
 }
 

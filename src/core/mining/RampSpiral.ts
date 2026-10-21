@@ -20,6 +20,8 @@ export interface SpiralRequest {
   gradeDegrees: number;
   width: RampWidth;
   dir: SpiralDir;
+  /** Rise per metre of run the road is cut at; undefined means the global cut ratio (#2045). */
+  cutSlopeRatio?: number;
 }
 
 /** Terrain seam: surface height and pit-membership queries. */
@@ -181,7 +183,7 @@ export function proposeRampSpiral(req: SpiralRequest, surface: SpiralSurface): R
   if (!surface.contains(start.x, start.z)) return fail(`${KEY}outside_area`);
   if (!Number.isFinite(depth) || depth <= 0) return fail(`${KEY}bad_depth`);
   if (!Number.isFinite(gradeDegrees) || gradeDegrees <= 0) return fail('mining.build_ramp.grade_invalid');
-  const maxGrade = Math.floor(rampGradeBoundsDegrees(1, depth).max * 10) / 10;
+  const maxGrade = Math.floor(rampGradeBoundsDegrees(1, depth, req.cutSlopeRatio).max * 10) / 10;
   if (gradeDegrees > maxGrade) return fail('mining.build_ramp.grade_too_steep', { grade: gradeDegrees, max: maxGrade });
 
   const ground = surface.heightAt(start.x, start.z);

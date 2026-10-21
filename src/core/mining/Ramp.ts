@@ -15,7 +15,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import {
-  MAX_RAMP_LENGTH, NAV_MAX_SLOPE_DEGREES, RAMP_FLOOR_SNAP_REACH_M, RAMP_CRATER_MIN_DROP_M, RAMP_CUT_SLOPE_RATIO,
+  MAX_RAMP_LENGTH, RAMP_FLOOR_SNAP_REACH_M, RAMP_CRATER_MIN_DROP_M, RAMP_CUT_SLOPE_RATIO, RAMP_CUT_SLOPE_MARGIN, NAV_MAX_SLOPE_RATIO, VEHICLE_MAX_SLOPE_RATIO,
   RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH,
   RAMP_COST_PER_METER_PER_WIDTH, isRampWidth, type RampWidth,
 } from '../config/balance.js';
@@ -75,7 +75,7 @@ export interface RampResult {
  * (#1210 — UI/core disagreement on the derived length/direction).
  */
 export function rampDefFromEndpoints(
-  originX: number, originZ: number, endX: number, endZ: number, targetDepth: number,
+  originX: number, originZ: number, endX: number, endZ: number, targetDepth: number, cutSlopeRatio?: number,
 ): RampDef {
   const dx = endX - originX;
   const dz = endZ - originZ;
@@ -88,32 +88,47 @@ export function rampDefFromEndpoints(
     direction = dx >= 0 ? 'east' : 'west';
     length = Math.abs(Math.round(dx));
   }
-  return { originX, originZ, direction, length, targetDepth };
+  const def: RampDef = { originX, originZ, direction, length, targetDepth };
+  if (cutSlopeRatio !== undefined) def.cutSlopeRatio = cutSlopeRatio;
+  return def;
 }
 
 /** The `RampDef` for `legs` from `origin`; a single leg is an ordinary straight ramp. `width` is set only when given. */
 export function rampDefFromLegs(
-  origin: { x: number; z: number }, legs: readonly RampLeg[], targetDepth: number, width?: RampWidth,
+  origin: { x: number; z: number }, legs: readonly RampLeg[], targetDepth: number, width?: RampWidth, cutSlopeRatio?: number,
 ): RampDef {
   const def: RampDef = {
     originX: origin.x, originZ: origin.z, direction: legs[0]!.direction, length: rampTotalLength(legs), targetDepth,
   };
   if (width !== undefined) def.width = width;
+  if (cutSlopeRatio !== undefined) def.cutSlopeRatio = cutSlopeRatio;
   if (legs.length > 1) def.legs = legs.map(l => ({ ...l }));
   return def;
 }
 
 // ── Grade (#1939) ──
 
+/** Rise per metre of run a freshly cut ramp floor tops out at: just under the vehicle limit of the site (#2045). */
+export function rampCutSlopeRatio(progression: boolean): number {
+  return (progression ? VEHICLE_MAX_SLOPE_RATIO : NAV_MAX_SLOPE_RATIO) * RAMP_CUT_SLOPE_MARGIN;
+}
+
+/** The cut ratio `ramp` was ordered at; saves from before #2045 carry none and keep the global one. */
+function cutRatioOf(ramp: Pick<RampDef, 'cutSlopeRatio'>): number {
+  return ramp.cutSlopeRatio ?? RAMP_CUT_SLOPE_RATIO;
+}
+
 const RAD_TO_DEG = 180 / Math.PI;
 /** Float slack on grade comparisons, in degrees. */
 const GRADE_TOLERANCE_DEGREES = 1e-9;
 
 /** Grade range in degrees reachable over `totalLength` metres to `targetDepth`: straight line up to the cut limit. */
-export function rampGradeBoundsDegrees(totalLength: number, targetDepth: number): { min: number; max: number } {
+export function rampGradeBoundsDegrees(
+  totalLength: number, targetDepth: number, cutRatio: number = RAMP_CUT_SLOPE_RATIO,
+): { min: number; max: number } {
   return {
     min: Math.atan(targetDepth / totalLength) * RAD_TO_DEG,
-    max: Math.atan(RAMP_CUT_SLOPE_RATIO) * RAD_TO_DEG,
+    max: Math.atan(cutRatio) * RAD_TO_DEG,
   };
 }
 
@@ -241,20 +256,21 @@ function refusal(
 }
 
 /** Refusal when `total` metres cannot reach `targetDepth` within the cut slope, else null. */
-function checkMinimumLength(targetDepth: number, total: number): RampOrderValidation | null {
-  const minLength = computeMinimumRampLength(targetDepth);
+function checkMinimumLength(targetDepth: number, total: number, cutRatio: number): RampOrderValidation | null {
+  const minLength = computeMinimumRampLength(targetDepth, cutRatio);
   if (total >= minLength - RAMP_MIN_LENGTH_EPSILON) return null;
   const displayMinLength = Math.ceil(minLength);
+  const maxDegrees = Math.round(Math.atan(cutRatio) * RAD_TO_DEG * 10) / 10;
   return refusal(
-    `Ramp too short: ${targetDepth}m of depth needs at least ${displayMinLength}m of length to stay within the ${NAV_MAX_SLOPE_DEGREES}° slope limit (got ${total}m).`,
+    `Ramp too short: ${targetDepth}m of depth needs at least ${displayMinLength}m of length to stay within the ${maxDegrees}° slope limit (got ${total}m).`,
     'mining.build_ramp.slope_too_steep',
-    { depth: targetDepth, minLength: displayMinLength, length: total, maxDegrees: NAV_MAX_SLOPE_DEGREES },
+    { depth: targetDepth, minLength: displayMinLength, length: total, maxDegrees },
   );
 }
 
 /** Refusal when a chosen grade lies outside what `total` metres to `targetDepth` allows (#1939), else null. */
-function checkChosenGrade(grade: number, total: number, targetDepth: number): RampOrderValidation | null {
-  const bounds = rampGradeBoundsDegrees(total, targetDepth);
+function checkChosenGrade(grade: number, total: number, targetDepth: number, cutRatio: number): RampOrderValidation | null {
+  const bounds = rampGradeBoundsDegrees(total, targetDepth, cutRatio);
   if (!Number.isFinite(grade) || grade <= 0) {
     return refusal('Invalid grade.', 'mining.build_ramp.grade_invalid', {});
   }
@@ -324,8 +340,8 @@ export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidat
   }
 
   const gradeRefusal = ramp.gradeDegrees === undefined
-    ? checkMinimumLength(ramp.targetDepth, total)
-    : checkChosenGrade(ramp.gradeDegrees, total, ramp.targetDepth);
+    ? checkMinimumLength(ramp.targetDepth, total, cutRatioOf(ramp))
+    : checkChosenGrade(ramp.gradeDegrees, total, ramp.targetDepth, cutRatioOf(ramp));
   if (gradeRefusal) return gradeRefusal;
 
   const totalCost = computeRampCost(total, rampWidthOf(ramp));
@@ -443,19 +459,13 @@ interface RampColumn {
  * so `index` still increases 0..N-1 with no gaps across emitted segments,
  * and `targetY` still strictly decreases across them.
  */
-/** Rise per metre of run a ramp floor is cut at on a progression or sandbox site (#2045). */
-export function rampCutSlopeRatio(progression: boolean): number {
-  void progression;
-  return RAMP_CUT_SLOPE_RATIO; // TODO: implement
-}
-
 /**
  * Shortest ramp length that reaches `targetDepth` without the floor's
  * rise-per-metre-of-run exceeding `RAMP_CUT_SLOPE_RATIO` (#1152).
  */
-export function computeMinimumRampLength(targetDepth: number): number {
+export function computeMinimumRampLength(targetDepth: number, cutRatio: number = RAMP_CUT_SLOPE_RATIO): number {
   if (targetDepth <= 0) return 0;
-  return targetDepth / RAMP_CUT_SLOPE_RATIO;
+  return targetDepth / cutRatio;
 }
 
 /**
@@ -516,6 +526,7 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarved
     continuousGround(endTile.x, endTile.z),
     ramp.targetDepth,
     total,
+    cutRatioOf(ramp),
   );
 
   for (const cell of rampPathCells(path, rampWidthOf(ramp))) {
@@ -954,12 +965,12 @@ export function rampEndFloorDrop(startGround: number, endGround: number): number
  * within `RAMP_FLOOR_SNAP_REACH_M` and the snapped depth fits `length`; else `targetDepth`.
  */
 export function snapRampDepthToEndFloor(
-  startGround: number, endGround: number, targetDepth: number, length: number,
+  startGround: number, endGround: number, targetDepth: number, length: number, cutRatio?: number,
 ): number {
   const drop = rampEndFloorDrop(startGround, endGround);
   if (drop === null) return targetDepth;
   if (Math.abs(rampFootOffset(startGround, endGround, targetDepth, length)) > RAMP_FLOOR_SNAP_REACH_M) return targetDepth;
-  if (computeMinimumRampLength(drop) > length + RAMP_MIN_LENGTH_EPSILON) return targetDepth;
+  if (computeMinimumRampLength(drop, cutRatio) > length + RAMP_MIN_LENGTH_EPSILON) return targetDepth;
   return drop;
 }
 

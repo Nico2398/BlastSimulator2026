@@ -437,7 +437,7 @@ function buildDriveLeg(
 ): Leg | null {
   const dist = estimateLegDistance(
     state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false,
-    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(vehicle, isProgressionSite(state)),
+    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(isProgressionSite(state)),
   );
   const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, fromX, fromZ, toX, toZ);
   if (effectiveDist === null) return null;
@@ -753,7 +753,7 @@ export function buildTransportRideItinerary(
 
   const alight = resolveRideAlightPoint(
     state, fidelity, employee.id, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ,
-    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(vehicle, isProgressionSite(state)),
+    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(isProgressionSite(state)),
   );
   if (alight === null) return null;
 

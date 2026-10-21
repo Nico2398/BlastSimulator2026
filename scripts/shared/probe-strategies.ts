@@ -36,9 +36,9 @@
 //            c. Research Center, tier-2 Freight Warehouse, second hauler (as reinvest); a replacement for any
 //               core role nobody alive holds; another spoil heap while ecology sags
 //            d. frugal equipment: `vehicle upgrade` in place (rig, hauler, digger; no new driver on payroll) once the
-//               dealer's grade gate and mayBuyVehicleTier allow, cash stays above LADDER_UPGRADE_RESERVE and a
+//               dealer's grade gate allows, cash stays above LADDER_UPGRADE_RESERVE and a
 //               licensed driver exists. The licence is earned as a player does: a Driving Center of the needed
-//               tier, then `employee train` of a fresh hire (earnLicence); a gentle ramp is dug first when needed
+//               tier, then `employee train` of a fresh hire (earnLicence)
 //            e. a rock_fragmenter as soon as boulders lie on the ground, plus its licence course (earnLicence)
 //            A charged pattern whose evacuation strands someone is disarmed (`blast cancel`) and retried.
 //   stay_g1  ladder that never applies for a permit past grade 1.
@@ -66,8 +66,8 @@ import {
   WALL_BERM_MIN_WIDTH_M, WALL_SAFE_FACE_HEIGHT_M_BY_TIER,
 } from '../../src/core/config/balance.js';
 import { gradeDef } from '../../src/core/economy/MineGrade.js';
-import { tierSlopeRatio } from '../../src/core/nav/ClimbLimit.js';
 import { fleetBestRigLimit } from '../../src/core/mining/RigLimits.js';
+import { rampCutSlopeRatio } from '../../src/core/mining/Ramp.js';
 import { explosiveHoleLimits, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
 import { getEventById } from '../../src/core/events/EventPool.js';
@@ -124,10 +124,9 @@ const DEPOSIT_SCAN_STEP = 2;
 const BUILDING_KEEP_OUT = 10;
 const BUILDING_SCAN_STEP = 4;
 const BUILDING_SCAN_EDGE = 8;
-/** Ramp: tiles between the pattern edge and the ramp's lower end, longest ramp tried, steepest rise per tile. */
+/** Ramp: tiles between the pattern edge and the ramp's lower end, longest ramp tried. */
 const RAMP_END_GAP = 1;
 const RAMP_MAX_LENGTH = 34;
-const RAMP_MAX_SLOPE = 0.45;
 /** Tiles kept free between a fresh shot and an earlier one, so a berm stands between their craters. */
 const BERM_GAP = WALL_BERM_MIN_WIDTH_M;
 
@@ -337,9 +336,9 @@ function fireShot(s: ProbeSession): boolean {
 
 /**
  * Order a ramp from the open ground into the crater the shot at `at` (`span` wide) made, no steeper than
- * `maxSlope` rise per tile; the ramp's slope ratio when one was accepted, else null.
+ * the vehicle cut ratio, the steepest the ramp tool accepts; the ramp's slope ratio when one was accepted, else null.
  */
-function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = RAMP_MAX_SLOPE): number | null {
+function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = rampCutSlopeRatio(true)): number | null {
   const { grid } = s;
   const mid = span / 2;
   const centre = { x: at.x + mid, z: at.z + mid };
@@ -364,8 +363,8 @@ function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = RA
 
 // ── Opening ──
 
-/** The opening's shot site and the slope ratio of the ramp it dug. */
-function runOpening(s: ProbeSession): { at: Pattern; rampSlope: number } {
+/** The opening's shot site; its ramp is dug and finished. */
+function runOpening(s: ProbeSession): { at: Pattern } {
   const fail = (step: string): never => { throw new ProbeStop(`opening_failed:${step}`); };
 
   const ranked = rankDeposits(s.grid)[0];
@@ -377,11 +376,10 @@ function runOpening(s: ProbeSession): { at: Pattern; rampSlope: number } {
   s.waitFor('shot', () => shotReady(s.state));
   if (!fireShot(s)) fail('blast');
   s.tick(); // the blast resolves on the next command
-  const rampSlope = orderRamp(s, shot.at);
-  if (rampSlope === null) return fail('ramp');
+  if (orderRamp(s, shot.at) === null) return fail('ramp');
   s.waitFor('ramp', () => !s.state.pendingActions.some(a => a.type === 'dig_ramp_segment'));
   playContracts(s.run, s.state);
-  return { at: shot.at, rampSlope };
+  return { at: shot.at };
 }
 
 /** Idle play: tick to the horizon, passing the contract board every interval. */
@@ -569,7 +567,6 @@ const LADDER_FRESH_SHOT_DEPTH_SLACK_M = 0.5;
 const LADDER_MAX_HAULERS = 6;
 /** Shrink factors tried when a limit-sized pattern fits no free site, widest first. */
 const LADDER_SHRINK_STEPS = [1, 0.75, 0.5, 0.25] as const;
-const LADDER_RAMP_RETRY_KEY = 'gentle_ramp';
 const SOFTEST_SAFE_FACE_M = WALL_SAFE_FACE_HEIGHT_M_BY_TIER[1]!;
 
 /** Roles the ladder upgrades in place, in priority order: depth (rig), haul capacity, ramp digging. */
@@ -582,12 +579,8 @@ const LADDER_HIRE_COOLDOWN_TICKS = 600;
 const trainRoleOf = (role: VehicleRole): 'driller' | 'driver' => (role === 'drill_rig' ? 'driller' : 'driver');
 
 interface LadderMemory extends ReinvestMemory {
-  /** Footprint of the last fired shot; the next bench and the gentle ramp work from it. */
+  /** Footprint of the last fired shot; the next bench and the crater ramp work from it. */
   crater: Pattern & { span: number };
-  /** Slope ratio of the best ramp dug so far. */
-  rampSlope: number;
-  /** A gentle ramp ordered but not yet finished, and its slope ratio. */
-  rampPending: number | null;
   /** Floor depth (m) at which a ramp was last ordered; 0 before any. */
   rampedFloorM: number;
   /** Never apply for a permit past this grade (stay_g1); null for no cap. */
@@ -723,24 +716,11 @@ function earnLicence(s: ProbeSession, m: ReinvestMemory, role: VehicleRole, tier
 }
 
 /**
- * Upgrade one vehicle in place (no new driver on payroll) when the dealer's grade gate and the ramp's slope
- * allow its next tier, a licensed driver exists and cash stays above LADDER_UPGRADE_RESERVE after it.
- * A gentle ramp is dug first when the existing one is too steep for the tier the grade unlocks.
+ * Upgrade one vehicle in place (no new driver on payroll) when the dealer's grade gate allows its next tier,
+ * a licensed driver exists and cash stays above LADDER_UPGRADE_RESERVE after it.
  */
 function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
   const grade = gradeOf(s);
-  if (m.rampPending !== null && !s.state.pendingActions.some(a => a.type === 'dig_ramp_segment')) {
-    m.rampSlope = Math.min(m.rampSlope, m.rampPending);
-    m.rampPending = null;
-  }
-  const reachable = ([3, 2] as const).find(t => mayBuyVehicleTier(t, grade, 0));
-  if (reachable !== undefined && m.rampSlope > tierSlopeRatio(reachable) && m.rampPending === null) {
-    tryOnce(s, m, LADDER_RAMP_RETRY_KEY, () => {
-      const slope = orderRamp(s, m.crater, m.crater.span, tierSlopeRatio(reachable));
-      if (slope !== null) m.rampPending = slope;
-      return slope !== null;
-    });
-  }
   const rules: (BuyRule & { vehicleId: number; role: VehicleRole; tier: VehicleTier })[] = [];
   for (const role of LADDER_UPGRADE_ROLES) {
     // An unreserved vehicle whose driver (if any) already holds the next tier's licence: a mid-task swap would strand its holder.
@@ -752,7 +732,7 @@ function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
       })
       .sort((a, b) => a.tier - b.tier)[0];
     const next = lowest ? ((lowest.tier + 1) as VehicleTier) : null;
-    if (!lowest || next === null || next > 3 || !mayBuyVehicleTier(next, grade, m.rampSlope)) continue;
+    if (!lowest || next === null || next > 3 || !mayBuyVehicleTier(next, grade)) continue;
     const cost = computeVehicleUpgradeCost(role, lowest.tier);
     if (cost !== null) rules.push({ id: `${lowest.id}`, vehicleId: lowest.id, role, tier: next, cost });
   }
@@ -888,7 +868,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {},
-    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.rampSlope, rampPending: null, rampedFloorM: 0, maxGrade,
+    crater: { ...opened.at, span: SHOT_SPAN }, rampedFloorM: 0, maxGrade,
   };
   playOut(s, () => {
     ladderPermit(s, m);

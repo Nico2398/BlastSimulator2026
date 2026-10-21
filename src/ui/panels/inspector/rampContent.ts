@@ -3,7 +3,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { computeRampCost, rampGradeBoundsDegrees } from '../../../core/mining/Ramp.js';
 import { nextRampWidth } from '../../../core/mining/RampWidening.js';
-import { describeRampClimb } from '../../../core/mining/RampGrade.js';
+import { describeRampClimbability } from '../../../core/mining/RampGrade.js';
 import type { RampLeg } from '../../../core/mining/RampPath.js';
 import { isProgressionSite, type BuiltRamp, type PlannedRamp } from '../../../core/state/GameState.js';
 import { describeRamp } from '../../describeRamp.js';
@@ -60,10 +60,8 @@ export const rampContent: KindContent = {
   view(entity, state) {
     const ramp = state.builtRamps.find(r => r.id === entity.id);
     if (!ramp) return null;
-    const progression = isProgressionSite(state);
-    const desc = describeRamp(ramp, state.navGrid === null ? undefined : {
-      ...describeRampClimb(state.navGrid, ramp, progression),
-    });
+    const climb = state.navGrid === null ? undefined : describeRampClimbability(state.navGrid, ramp, isProgressionSite(state));
+    const desc = describeRamp(ramp, climb);
     const widen = widenState(ramp, state.plannedRamps, state.cash);
     const actions: ActionSpec[] = widen.cost === null ? [] : [{
       action: 'widen', labelKey: 'inspector.ramp.widen', icon: 'up', variant: 'ghost',
@@ -76,7 +74,7 @@ export const rampContent: KindContent = {
       sub: `#${ramp.id} · ${kindLabel('ramp')}`,
       icon: 'layers',
       status: desc.sub,
-      signature: `${ramp.id}:${ramp.width}:${ramp.def.legs?.map(l => `${l.direction}${l.length}`).join('/') ?? ''}:${ramp.def.gradeDegrees ?? ''}:${widen.disabledReason ?? 'ready'}`,
+      signature: `${ramp.id}:${ramp.width}:${ramp.def.legs?.map(l => `${l.direction}${l.length}`).join('/') ?? ''}:${ramp.def.gradeDegrees ?? ''}:${climb?.climbable ?? ''}:${widen.disabledReason ?? 'ready'}`,
       get sections() {
         const body = el('div', { className: 'bs-ramp-detail' });
         const section = buildDimensions(ramp);

@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Pathfinding: A* route finding over the NavGrid
 // Part of the navmesh system.
 
-import { NavGrid, isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
+import { NavGrid, isStepClimbable, stepClimbRun, isCellOccupied, hasClearance } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
 import { pathfindingNodeBudget, pathfindingRetryNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 as NEIGHBOUR_OFFSETS } from './NeighbourOffsets.js';
@@ -501,7 +501,7 @@ export function directLineWalk(
     if (i > 0) {
       const stepDx = clampedX - prevX;
       const stepDz = clampedZ - prevZ;
-      if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, Math.hypot(stepDx, stepDz), maxSlopeRatio)) return null;
+      if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, stepClimbRun(stepDx, stepDz, maxSlopeRatio), maxSlopeRatio)) return null;
       const isDiagonal = stepDx !== 0 && stepDz !== 0;
       // Only a genuine single-cell diagonal move needs the corner check (#1197)
       // — a DDA step that jumps more than one cell (rounding artifact) is out
@@ -547,7 +547,7 @@ export function findRampConnections(grid: NavGrid, maxSlopeRatio: number = NAV_M
         const neighbor = grid.cellAt(nx, nz);
         if (!neighbor || neighbor.type === 'blocked' || neighbor.type === 'void') continue;
         // A cliff-adjacent ramp cell is no connection: the step must be walkable.
-        if (!isStepClimbable(cell.surfaceY, neighbor.surfaceY, Math.hypot(dx, dz), maxSlopeRatio)) continue;
+        if (!isStepClimbable(cell.surfaceY, neighbor.surfaceY, stepClimbRun(dx, dz, maxSlopeRatio), maxSlopeRatio)) continue;
 
         const level = neighbor.benchLevel;
         // Keep first neighbor per level for determinism
@@ -1061,7 +1061,7 @@ function findOrdinaryPath(
       if (!neighborCell || isImpassable(neighborCell, avoidVehicles, false, requiredClearance, skipClearance)) continue;
       if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(grid, cx, cz, nx, nz)) continue;
       const currentCell = grid.cellAt(cx, cz)!;
-      if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, Math.hypot(dx, dz), maxSlopeRatio)) continue;
+      if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, stepClimbRun(dx, dz, maxSlopeRatio), maxSlopeRatio)) continue;
 
       // Move cost
       const isDiagonal = dx !== 0 && dz !== 0;

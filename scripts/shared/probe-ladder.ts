@@ -6,7 +6,6 @@ import {
   DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M,
   VEHICLE_TIER_UNLOCK_GRADE,
 } from '../../src/core/config/balance.js';
-import { tierSlopeRatio } from '../../src/core/nav/ClimbLimit.js';
 
 export interface PermitLimit { maxChargeKg: number; maxHoles: number }
 
@@ -62,11 +61,9 @@ export function pickDiameter(rigMaxDiameterM: number): number {
   return fitting.length > 0 ? fitting[fitting.length - 1]! : options[0]!;
 }
 
-/** Tier unlocked by grade, and for tier 2/3 a ramp at or under the slope limit exists. */
-export function mayBuyVehicleTier(tier: VehicleTier, mineGrade: number, rampSlopeRatio: number | null): boolean {
-  if (mineGrade < VEHICLE_TIER_UNLOCK_GRADE[tier]) return false;
-  if (tier === 1) return true;
-  return rampSlopeRatio !== null && rampSlopeRatio <= tierSlopeRatio(tier);
+/** Tier unlocked by grade; every tier climbs the same 20° so no ramp gates it (#2045). */
+export function mayBuyVehicleTier(tier: VehicleTier, mineGrade: number): boolean {
+  return mineGrade >= VEHICLE_TIER_UNLOCK_GRADE[tier];
 }
 
 /** First affordable catalog entry not owned, keeping `reserve` cash back; null if none. */

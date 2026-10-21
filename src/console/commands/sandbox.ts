@@ -23,7 +23,7 @@ import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
-import { fleetSlopeRatio } from '../../core/state/SpawnPlacement.js';
+import { vehicleMaxSlopeRatio } from '../../core/entities/Vehicle.js';
 import { isStaffedComposition, resolveStartingSite } from '../../core/state/StartingBuildings.js';
 import { staffedSuffix, parseOptionalStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -143,8 +143,8 @@ export function sandboxCommand(
     ...(level.oreGradeScale !== undefined ? { oreGradeScale: level.oreGradeScale } : {}),
     startingCrew: true,
     fleetMustStayMobile: true,
-    // A fleet-independent plan: any tier a later purchase brings must also leave the spawn pad (#2044).
-    ...(level.progression ? { vehicleSlopeRatio: fleetSlopeRatio([], true) } : {}),
+    // Every vehicle climbs the one vehicle limit, so the spawn pad is planned for it (#2044, #2045).
+    ...(level.progression ? { vehicleSlopeRatio: vehicleMaxSlopeRatio(true) } : {}),
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   });
 

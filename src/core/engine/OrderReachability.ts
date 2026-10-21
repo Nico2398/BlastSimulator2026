@@ -32,8 +32,7 @@ import {
 } from '../nav/NavGridReachability.js';
 import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
 import { withDockingCells } from '../nav/DockingReach.js';
-import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
-import { slopeDegreesForTier, tierSlopeRatio } from '../nav/ClimbLimit.js';
+import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO, VEHICLE_MAX_SLOPE_RATIO, VEHICLE_MAX_SLOPE_DEGREES } from '../config/balance.js';
 import { steepestBlockingRamp } from '../mining/RampGrade.js';
 
 /** Identity of the actor pool able to serve an order (skill + vehicle role, or one named employee). */
@@ -141,20 +140,9 @@ function fillPool(
     const driverId = vehicleDriverId(v);
     return (driverId !== null && candidateIds.has(driverId)) || onFoot.has(Math.round(v.x), Math.round(v.z));
   });
-  // Vehicles climb at their tier's limit: one labelling per distinct limit, and the best climber decides (#1938).
-  const progression = isProgressionSite(state);
-  const byRatio = new Map<number, Vehicle[]>();
-  for (const v of usable) {
-    const ratio = uniformRatio ?? vehicleMaxSlopeRatio(v, progression);
-    const group = byRatio.get(ratio);
-    if (group === undefined) byRatio.set(ratio, [v]);
-    else group.push(v);
-  }
-  const perRatio = [...byRatio].map(([ratio, group]) =>
-    componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(group));
-  const vehicleReach: Pick<ReachableSet, 'has'> = perRatio.length === 1
-    ? perRatio[0]!
-    : { has: (x, z) => perRatio.some(reach => reach.has(x, z)) };
+  // Every vehicle climbs at the site's one vehicle limit (#2045).
+  const ratio = uniformRatio ?? vehicleMaxSlopeRatio(isProgressionSite(state));
+  const vehicleReach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(usable);
   // A clearance-1 approach cell beside a building is where a vehicle docks (#1840).
   // Role-agnostic: applies to every vehicle-gated order, not only demolition.
   return { hasActor: true, reachable: withDockingCells(cache.navGrid, vehicleReach, NAV_CLEARANCE_VEHICLE_CELLS) };
@@ -195,10 +183,7 @@ export function warmOrderReachability(state: GameState): void {
   const cache = cacheFor(state);
   if (cache === null) return;
   componentsOf(cache, NAV_CLEARANCE_EMPLOYEE_CELLS);
-  const progression = isProgressionSite(state);
-  for (const ratio of new Set(state.vehicles.vehicles.map(v => vehicleMaxSlopeRatio(v, progression)))) {
-    componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio);
-  }
+  componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, vehicleMaxSlopeRatio(isProgressionSite(state)));
 }
 
 export function buildOrderReachability(
@@ -319,27 +304,23 @@ function availabilityReason(
 }
 
 /**
- * Why a vehicle order is unreachable on a progression site, when a tier-1 climb limit would reach it:
- * names the steepest built ramp too steep for the best-climbing vehicle that could serve it (#1938).
+ * Why a vehicle order is unreachable on a progression site, when the walking climb limit would reach it:
+ * names the steepest built ramp too steep for vehicles (#1938, #2045).
  */
 function rampTooSteepDetail(
   state: GameState,
   action: PendingAction,
-  tier: VehicleTier,
-  reachAtFlatLimit: OrderReachability,
+  reachAtWalkingLimit: OrderReachability,
 ): PendingAction['blockedDetail'] | undefined {
-  const role = action.requiredVehicleRole;
-  if (role === null || !reachAtFlatLimit.canReach(orderActorKey(action), action.targetX, action.targetZ)) return undefined;
-  const blocking = steepestBlockingRamp(state, tierSlopeRatio(tier));
+  if (action.requiredVehicleRole === null || !reachAtWalkingLimit.canReach(orderActorKey(action), action.targetX, action.targetZ)) return undefined;
+  const blocking = steepestBlockingRamp(state, VEHICLE_MAX_SLOPE_RATIO);
   if (blocking === null) return undefined;
   return {
     key: 'order.blocked.ramp_too_steep',
     params: {
       id: blocking.ramp.id,
       grade: Math.round(blocking.gradeDeg * 10) / 10,
-      tier,
-      role,
-      max: slopeDegreesForTier(tier),
+      max: VEHICLE_MAX_SLOPE_DEGREES,
     },
   };
 }
@@ -383,10 +364,9 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
       action.blockedLicenceLevel = null;
       delete action.blockedDetail;
       const role = action.requiredVehicleRole;
-      const tier = role !== null && progression ? neededTierOf(role, orderTierFloor(action)) : null;
-      if (tier !== null) {
+      if (role !== null && progression) {
         reachAtFlatLimit ??= buildOrderReachability(state, targets, NAV_MAX_SLOPE_RATIO);
-        const detail = rampTooSteepDetail(state, action, tier, reachAtFlatLimit);
+        const detail = rampTooSteepDetail(state, action, reachAtFlatLimit);
         if (detail !== undefined) action.blockedDetail = detail;
       }
       continue;
