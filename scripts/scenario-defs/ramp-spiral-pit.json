@@ -191,12 +191,12 @@
       }
     },
     {
-      "command": "vehicle reposition 2 15 25",
-      "description": "Order the hauler to the far end of the spiral; its route is the spiral road.",
+      "command": "vehicle reposition 2 20 25",
+      "description": "Order the hauler down to the spiral's bottom leg; its route is the spiral road. 20,25 not the dead end 15,25: the rock_digger that dug the last segment parks idle at 16,25 with its driver beside it, and the 3-wide dead end leaves a hauler there no way past.",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle reposition 2 15 25"
+          "command": "vehicle reposition 2 20 25"
         }
       ],
       "role": "bootstrap"
@@ -219,12 +219,12 @@
       }
     },
     {
-      "command": "vehicle reposition 2 17 6",
-      "description": "Order the hauler back to the rim.",
+      "command": "vehicle reposition 2 1 10",
+      "description": "Order the hauler back up to its spawn on the plateau, through the ramp mouth (#2043: the top joins the ground behind it; 17,6 beside the mouth sits 1 m below the ramp edge, past the slope limit).",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle reposition 2 17 6"
+          "command": "vehicle reposition 2 1 10"
         }
       ],
       "role": "bootstrap"

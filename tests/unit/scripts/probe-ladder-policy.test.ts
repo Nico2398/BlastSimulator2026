@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  decideLadderEventOption,
   decideLadderRamp,
   decideLadderSafety,
   decideLadderShotGate,
@@ -166,5 +167,20 @@ describe('decideLadderShotGate', () => {
 
   it('passes grade 0 and below through', () => {
     expect(decideLadderShotGate({ ...gateBase, grade: 0, rubbleKg: LADDER_GATE_RUBBLE_KG + 1 })).toBe('fire');
+  });
+});
+
+describe('decideLadderEventOption', () => {
+  it('skips an option that hires', () => {
+    expect(decideLadderEventOption([true, false, false])).toBe(1);
+  });
+
+  it('keeps the first option when it hires nobody', () => {
+    expect(decideLadderEventOption([false, true])).toBe(0);
+  });
+
+  it('falls back to the first option when every option hires', () => {
+    expect(decideLadderEventOption([true, true])).toBe(0);
+    expect(decideLadderEventOption([])).toBe(0);
   });
 });

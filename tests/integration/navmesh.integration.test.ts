@@ -640,12 +640,15 @@ describe('NavMesh and pathfinding', () => {
     // its deepest column — every column's own headroom clearing reaches down
     // to just above its floor in an earlier, higher-y segment, so the
     // boundary is generally crossed there, not at the final layer). This
-    // ramp's depth (5m, exactly one bench) is tuned so its deepest column's
-    // own final descent — a fractional depth of 4.5m at step 9 of 10 — is
+    // ramp's depth (6m over 11 steps) is tuned so its deepest column's
+    // own final descent — a fractional depth of 5.45m at step 10 of 11 — is
     // itself what pushes its climbY from 18 (bench 0) to 17 (bench 1),
     // landing only once the last segment (the sole layer at y=18) carves.
+    // Retuned from 5m over 10 steps for #2043: the line now starts on the
+    // plateau's continuous ground (22.5, not the top voxel index 22), so that
+    // ramp's deepest floor (18.0) no longer crossed the bench boundary.
     const RAMP_TO_BENCH_BOUNDARY: RampDef = {
-      originX: 10, originZ: 5, direction: 'south', length: 10, targetDepth: 5,
+      originX: 10, originZ: 5, direction: 'south', length: 11, targetDepth: 6,
     };
     // The ramp's true deepest column (step length-1), read directly rather
     // than via `segments[last].cells[0]` — the final y-layer can be shared

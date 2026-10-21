@@ -69,13 +69,17 @@ import { tierSlopeRatio } from '../../src/core/nav/ClimbLimit.js';
 import { fleetBestRigLimit } from '../../src/core/mining/RigLimits.js';
 import { explosiveHoleLimits, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
+import { getEventById } from '../../src/core/events/EventPool.js';
+import type { EventConsequence } from '../../src/core/events/EventPool.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
 import {
   floorToKgResolution, limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
   type BuyRule, type LadderShot, type PermitLimit,
 } from './probe-ladder.js';
-import { decideLadderRamp, decideLadderSafety, decideLadderShotGate } from './probe-ladder-policy.js';
+import {
+  decideLadderEventOption, decideLadderRamp, decideLadderSafety, decideLadderShotGate,
+} from './probe-ladder-policy.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
@@ -913,6 +917,20 @@ const STRATEGIES: Record<StrategyId, StrategyFn> = {
 
 // ── Run loop ──
 
+/** True when choosing this outcome (or its fallback) puts a new employee on the payroll. */
+function addsHire(c: EventConsequence | undefined): boolean {
+  if (!c) return false;
+  return (c.effects ?? []).some(e => e.type === 'employee_joins') || addsHire(c.altConsequence);
+}
+
+/** Answer a pending event the ladder's way (see decideLadderEventOption); a no-op when none is pending. */
+function answerLadderEvent(run: Run, state: GameState): void {
+  const pending = state.events.pendingEvent;
+  const def = pending ? getEventById(pending.eventId) : undefined;
+  if (!def) return;
+  run(`event choose ${decideLadderEventOption(def.consequences.map(addsHire))}`);
+}
+
 function createSession(config: ProbeRunConfig, observer: MetricsObserver): ProbeSession {
   const engine = createGameEngine();
   let lastTick = 0;
@@ -927,7 +945,10 @@ function createSession(config: ProbeRunConfig, observer: MetricsObserver): Probe
       if (/^tick\b/.test(cmd)) afterTick();
       return result;
     },
-    tick: () => playTick(session.run, session.state),
+    tick: () => {
+      if (config.strategy === 'ladder' || config.strategy === 'stay_g1') answerLadderEvent(session.run, session.state);
+      playTick(session.run, session.state);
+    },
     waitFor: (step, done) => {
       const started = session.state.tickCount;
       while (!done()) {
