@@ -19,6 +19,21 @@ export interface BreakoutPrediction {
   /** Charged holes whose charge sits too deep to break out. */
   tooDeepHoleIds: string[];
   chargedHoleCount: number;
+  /** Every voxel the blast breaks (#2053). */
+  fragmented: ReadonlyArray<{ x: number; y: number; z: number }>;
+  /** Keys "x,y,z" of broken voxels that stay sealed under intact rock above them (#2053). */
+  sealedKeys: ReadonlySet<string>;
+}
+
+/** True when the broken voxel at (x, y, z) stays sealed under an intact cap (#2053). */
+export function isVoxelSealed(
+  _p: Pick<BreakoutPrediction, 'sealedKeys'>,
+  _x: number,
+  _y: number,
+  _z: number,
+): boolean {
+  // TODO: implement
+  return false;
 }
 
 /** Predicts the breakout of `plan` on `grid`; null when no hole is charged. Never mutates `grid`. */
@@ -70,6 +85,8 @@ export function predictBreakout(
     sealedShare: sealedShare(sealedVoxels, fragmented.length),
     tooDeepHoleIds,
     chargedHoleCount: charged.length,
+    fragmented: [], // TODO: implement
+    sealedKeys: new Set<string>(), // TODO: implement
   };
 }
 

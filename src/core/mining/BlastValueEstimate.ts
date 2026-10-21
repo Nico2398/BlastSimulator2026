@@ -33,8 +33,12 @@ export function columnOreValuePerM3(densities: Readonly<Record<string, number>>,
 
 /** Ore value of a blast plus how much of the broken volume surveys cover (#1960). */
 export interface BlastOreEstimate {
-  /** Estimated ore value, game dollars. */
+  /** Estimated ore value, game dollars; broken-out ore only. */
   value: number;
+  /** Estimated ore value ($) in rock that breaks but stays sealed under an intact cap (#2053). */
+  sealedValue: number;
+  /** Voxels that break but stay sealed under an intact cap (#2053). */
+  sealedVoxels: number;
   /** Share of broken voxels covered by a fresh survey, 0..1. */
   coverage: number;
   /** Voxels the blast breaks; 0 = nothing broken. */
@@ -46,7 +50,7 @@ export interface BlastOreEstimate {
 }
 
 /** Estimate for a blast with nothing to value: no field, no fresh survey, or nothing broken. */
-export const NO_ORE_ESTIMATE: BlastOreEstimate = Object.freeze({ value: 0, coverage: 0, brokenVoxels: 0, charged: false, holeCoverage: 0 });
+export const NO_ORE_ESTIMATE: BlastOreEstimate = Object.freeze({ value: 0, sealedValue: 0, sealedVoxels: 0, coverage: 0, brokenVoxels: 0, charged: false, holeCoverage: 0 });
 
 /**
  * Estimate the total ore value (game dollars) a blast plan will yield (#1703),
@@ -91,7 +95,7 @@ export function estimateBlastOre(
     const densities = oresSurveyedAt(survey, x, z, y);
     if (densities) value += columnOreValuePerM3(densities, marketId) * survey.confidence;
   }
-  return { value, coverage: covered / fragmented.length, brokenVoxels: fragmented.length, charged, holeCoverage };
+  return { value, sealedValue: 0, sealedVoxels: 0, coverage: covered / fragmented.length, brokenVoxels: fragmented.length, charged, holeCoverage };
 }
 
 /** Estimated ore value (game dollars) of a blast plan; see `estimateBlastOre` (#1703). */
