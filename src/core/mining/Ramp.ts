@@ -494,12 +494,11 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarved
   // (#2043) Anchor on the origin column's continuous ground height, the one the
   // terrain mesh draws, so the first ramp cell joins the ground behind it
   // instead of starting up to a metre below a partial top voxel.
-  const originHeight = computeVoxelColumnSurfaceHeight(grid, ramp.originX, ramp.originZ);
-  const originSurfaceY = Number.isFinite(originHeight) ? originHeight : computeColumnSurfaceY(grid, ramp.originX, ramp.originZ);
   const continuousGround = (x: number, z: number): number => {
     const h = computeVoxelColumnSurfaceHeight(grid, x, z);
     return Number.isFinite(h) ? h : computeColumnSurfaceY(grid, x, z);
   };
+  const originSurfaceY = continuousGround(ramp.originX, ramp.originZ);
   // (#1852) A ramp ending on a dug floor is graded to meet it: the carved line
   // uses the snapped depth, the player's ordered depth is untouched. A chosen
   // grade (#1939) is the player's own line, so it is never snapped.
@@ -574,7 +573,7 @@ function emitLegSegments(
     globalMaxY = Math.max(globalMaxY, col.ceilingY - 1);
   }
 
-  // Integer rows: the largest one below the (now possibly fractional) ceiling.
+  // Integer rows: from the ceiling of the (possibly fractional) highest top down to the lowest floor.
   for (let y = Math.ceil(globalMaxY); y >= globalMinY; y--) {
     const cells: RampSegmentDef['cells'] = [];
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;

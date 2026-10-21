@@ -183,7 +183,6 @@ describe.each(['west', 'east'] as const)('opening kit: blast, ramp from the %s, 
 // #2043: the ramp's top must join the ground for every terrain, not just the opening-kit site.
 describe('ramp top joins the ground across biomes and seeds (#2043)', () => {
   const SEEDS = [42, 7, 13, 101];
-  const GRADE_DEGREES = 15;
   const VEHICLE_LIMIT_DEGREES = 20;
   const MIN_DRIVEABLE_SHARE = 0.95;
   const RAMP: RampDef = { originX: 16, originZ: 34, direction: 'east', length: 30, targetDepth: 8, width: 3 };
@@ -211,7 +210,6 @@ describe('ramp top joins the ground across biomes and seeds (#2043)', () => {
         if (!ok) failures.push(`${biome.id}/${seed}`);
       }
     }
-    expect(GRADE_DEGREES).toBeLessThan(VEHICLE_LIMIT_DEGREES);
     expect((total - failures.length) / total, `undriveable: ${failures.join(', ')}`).toBeGreaterThanOrEqual(MIN_DRIVEABLE_SHARE);
   }, 300_000);
 });
