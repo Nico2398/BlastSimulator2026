@@ -1247,7 +1247,8 @@ describe('BuildMenu — catalog card text and tooltip (#1377)', () => {
 
   it('every catalog row has a .bs-build-desc span with the tier-1 line and a stats tooltip', () => {
     const rows = container.querySelectorAll<HTMLElement>('[data-build-type]');
-    expect(rows.length).toBe(13);
+    // 9 functional types; the 4 vanity types need a board (#2052) and the mock state has none.
+    expect(rows.length).toBe(9);
     for (const row of rows) {
       const type = row.dataset['buildType'] as BuildingType;
       const def = getBuildingDef(type, 1);
