@@ -175,6 +175,22 @@ thrown in from elsewhere still lands on top of the cap, and open columns resolve
 a blast that cleared rock but never broke out is reported (`mining.blast.no_breakout`,
 `BlastReport.brokeOut`) and capped to bad (`no_breakout`).
 
+**Breakout warning and sealed reporting (#2003).** `predictBreakout` (`BreakoutPrediction.ts`) runs the
+executor's read-only energy pass and fragmentation (`liftUnderminedBurden`, per-hole diameter via
+`chargeKgPerMetre`) on a charged plan and reports broken voxels, sealed voxels (intact rock still above
+in the column), `sealedShare`, `tooDeepHoleIds` and the charged hole count; it agrees with
+`executeBlast`'s `brokeOut`. `breakoutWarningKind`: `none` when every broken voxel stays sealed,
+`partial` when the sealed share reaches `BLAST_SEALED_SHARE_PARTIAL`. Both the Blast step
+(`breakout-check`) and the Pre-Flight modal (`preflight-breakout-warning`) show it at every software
+tier (a plan-against-ground check, not an analysis number); it never blocks firing, and advises
+shorter holes or an explosive that fills more of the hole, never wider holes. The thresholds
+(`BLAST_SEALED_SHARE_FAILURE` 0.75, `BLAST_SEALED_SHARE_PARTIAL` 0.25) are defaults chosen under
+`agentic-decision-autonomy`. After fragments land, `isFragmentSealed` splits the result:
+`BlastResult.totalOreValue` is broken-out ore only, `sealedOreValue` / `sealedFragmentCount` the rest,
+`reachableOversizedFragments` the oversize fragments not sealed. The report modal shows "Sealed
+underground" (a later shot breaking the cap can still free it) and limits the oversize hint to
+reachable fragments; the console report matches.
+
 Sealed rock gets no `haul_debris`/`fragment_debris` order (#1774) until its void opens to the surface (the column's top solid no longer above it); then it is ordinary debris.
 
 **Defaults break out (#1724).** `CHARGE_DEFAULT_AMOUNT_KG` (7) with `CHARGE_DEFAULT_STEMMING_M` (2.5)
@@ -241,6 +257,8 @@ Caps only lower; precedence, most severe first:
 | `fizzled_failure` | fizzled charges / charged holes >= `BLAST_FIZZLE_SHARE_FAILURE` (0.75; `fizzleShare`, 0 charged = 0) | bad |
 | `fizzled_partial` | same share >= `BLAST_FIZZLE_SHARE_PARTIAL` (0.25) | mediocre |
 | `no_breakout` | rock was cleared but no cleared voxel reached its column's pre-blast top (`BlastResult.brokeOut` false) | bad |
+| `sealed_failure` (#2003) | sealed fragments / fragments >= `BLAST_SEALED_SHARE_FAILURE` (0.75; `sealedShare`, 0 fragments = 0) | bad |
+| `sealed_partial` (#2003) | same share >= `BLAST_SEALED_SHARE_PARTIAL` (0.25) | mediocre |
 | `wet_holes` | wet holes with at least one fizzled charge (wet holes whose charges fired no longer cap) | good |
 | `oversize` | oversized fragments / fragments strictly above `BLAST_OVERSIZE_SHARE_CAP` (0.30, 0 fragments = 0 share) | good |
 

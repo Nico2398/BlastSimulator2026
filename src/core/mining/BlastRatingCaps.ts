@@ -3,9 +3,9 @@
  * Pure: takes plain facts, never GameState.
  */
 import type { BlastRating } from './BlastExecution.js';
-import { BLAST_FIZZLE_SHARE_FAILURE, BLAST_FIZZLE_SHARE_PARTIAL, BLAST_OVERSIZE_SHARE_CAP } from '../config/balance.js';
+import { BLAST_SEALED_SHARE_FAILURE, BLAST_SEALED_SHARE_PARTIAL, BLAST_FIZZLE_SHARE_FAILURE, BLAST_FIZZLE_SHARE_PARTIAL, BLAST_OVERSIZE_SHARE_CAP } from '../config/balance.js';
 
-export type BlastRatingCap = 'death' | 'casualty_or_destruction' | 'wet_holes' | 'oversize' | 'fizzled_failure' | 'fizzled_partial' | 'no_breakout';
+export type BlastRatingCap = 'death' | 'casualty_or_destruction' | 'wet_holes' | 'oversize' | 'fizzled_failure' | 'fizzled_partial' | 'no_breakout' | 'sealed_failure' | 'sealed_partial';
 
 export interface RatingCapFacts {
   deaths: number;
@@ -16,6 +16,8 @@ export interface RatingCapFacts {
   chargedHoleCount: number;
   oversizedFragments: number;
   fragmentCount: number;
+  /** Fragments that broke but stayed sealed under intact rock (#2003). */
+  sealedFragmentCount?: number;
   /** True when the blast never broke out of its sealed void (#1724). */
   noBreakout: boolean;
 }
@@ -41,6 +43,9 @@ const CAP_RULES: readonly CapRule[] = [
   { id: 'fizzled_partial', applies: f => fizzleShare(f.fizzledHoleCount, f.chargedHoleCount) >= BLAST_FIZZLE_SHARE_PARTIAL, ceiling: 'mediocre' },
   // Rock sealed under an intact cap: nothing opened, so the shot cannot rate above Bad (#1724).
   { id: 'no_breakout', applies: f => f.noBreakout, ceiling: 'bad' },
+  // Most of what broke stayed buried under intact ground: a partial breakout is not a clean shot (#2003).
+  { id: 'sealed_failure', applies: f => sealedShare(f.sealedFragmentCount ?? 0, f.fragmentCount) >= BLAST_SEALED_SHARE_FAILURE, ceiling: 'bad' },
+  { id: 'sealed_partial', applies: f => sealedShare(f.sealedFragmentCount ?? 0, f.fragmentCount) >= BLAST_SEALED_SHARE_PARTIAL, ceiling: 'mediocre' },
   { id: 'wet_holes', applies: f => f.wetHoleCount > 0 && f.fizzledHoleCount > 0, ceiling: 'good' },
   { id: 'oversize', applies: f => oversizeShare(f.oversizedFragments, f.fragmentCount) > BLAST_OVERSIZE_SHARE_CAP, ceiling: 'good' },
 ];
@@ -75,4 +80,9 @@ export function oversizeShare(oversized: number, total: number): number {
 /** Fraction (0..1) of charged holes that fizzled; 0 when no holes were charged. */
 export function fizzleShare(fizzled: number, charged: number): number {
   return share(fizzled, charged);
+}
+
+/** Fraction (0..1) of broken rock that stayed sealed; 0 when nothing broke. */
+export function sealedShare(sealed: number, total: number): number {
+  return share(sealed, total);
 }

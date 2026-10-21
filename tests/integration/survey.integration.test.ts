@@ -1095,8 +1095,10 @@ describe('Survey system — blast estimate vs actual ore (#1703)', () => {
           const estimate = estimateBlastOreValue(plan, surveys, grid);
           const { result } = blastAndReport(plan, grid, surveys);
 
-          expect(result.totalOreValue).toBeGreaterThan(0);
-          const ratio = estimate / result.totalOreValue;
+          // The estimate counts all broken rock; the report splits out sealed ore (#2003).
+          const actual = result.totalOreValue + (result.sealedOreValue ?? 0);
+          expect(actual).toBeGreaterThan(0);
+          const ratio = estimate / actual;
           expect(Math.abs(ratio - 1)).toBeLessThanOrEqual(BLAST_ESTIMATE_TOLERANCE);
         });
 
