@@ -39,3 +39,31 @@ export function decideLadderSafety(input: LadderSafetyInput): LadderSafetyDecisi
   if (input.safetyTargetOpen && input.canAfford) return input.officeBuilt ? 'upgrade_office' : 'build_office';
   return input.neighboursBelowTarget ? 'neighbours' : 'none';
 }
+
+/** First grade at which the ladder gates its next shot on the rubble already in the pit. */
+export const LADDER_GATE_MIN_GRADE = 2;
+/** Rubble (kg) left in the pit at or above which the next shot is held. Placeholder, tuned in implementation. */
+export const LADDER_GATE_RUBBLE_KG = 0;
+/** Ticks of payroll cash the ladder keeps before it fires again. Placeholder, tuned in implementation. */
+export const LADDER_GATE_RUNWAY_TICKS = 0;
+
+export interface LadderShotGateInput {
+  /** Current ladder grade. */
+  grade: number;
+  /** Rubble (kg) lying in the pit, not yet hauled out. */
+  rubbleKg: number;
+  cash: number;
+  /** Payroll cost per tick. */
+  payrollPerTick: number;
+}
+
+export type LadderShotGateDecision = 'fire' | 'hold';
+
+/**
+ * Whether the ladder fires its next shot or holds while haulers clear the pit. Applies from
+ * LADDER_GATE_MIN_GRADE only: firing limit-sized shots faster than the fleet hauls buries the pit and
+ * starves deliveries while payroll continues.
+ */
+export function decideLadderShotGate(_input: LadderShotGateInput): LadderShotGateDecision {
+  throw new Error('not implemented');
+}
