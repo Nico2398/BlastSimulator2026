@@ -441,6 +441,9 @@ export const RALLY_POINT_VEHICLE_STANDOFF = 2;
  */
 export const RALLY_POINT_BUILDING_CLEARANCE = 5;
 
+/** Cells around a starting building's corner within which a vehicle must be able to stand and drive off (#2044). */
+export const BUILDING_APPROACH_RADIUS = 3;
+
 /**
  * Render-only queue offsets for vehicles in the 'waiting' operational state
  * that share a contended target cell (#411 round 2). detectTrafficJam groups

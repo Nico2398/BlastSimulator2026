@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  slopeRatioForDegrees, slopeDegreesForTier, tierSlopeRatio, tiersThatClimb,
+  slopeRatioForDegrees, slopeDegreesForTier, tierSlopeRatio, tiersThatClimb, slowestVehicleTierSlopeRatio, VEHICLE_TIER_LIST,
 } from '../../../src/core/nav/ClimbLimit.js';
 import { NAV_MAX_SLOPE_RATIO, VEHICLE_TIER_MAX_SLOPE_DEGREES } from '../../../src/core/config/balance.js';
 
@@ -74,5 +74,25 @@ describe('tiersThatClimb', () => {
 
   it('a grade past 30 degrees is climbable by nobody', () => {
     expect(tiersThatClimb(31)).toEqual([]);
+  });
+});
+
+describe('slowestVehicleTierSlopeRatio (#2044)', () => {
+  it('is the smallest tier ratio, as a tangent of the smallest tier angle', () => {
+    const smallest = Math.min(...VEHICLE_TIER_LIST.map(slopeDegreesForTier));
+    expect(slowestVehicleTierSlopeRatio()).toBeCloseTo(slopeRatioForDegrees(smallest), 12);
+    expect(slowestVehicleTierSlopeRatio()).toBeCloseTo(Math.min(...VEHICLE_TIER_LIST.map(tierSlopeRatio)), 12);
+  });
+
+  it('is strictly below the walking limit, since some tier climbs less than walkers', () => {
+    expect(slowestVehicleTierSlopeRatio()).toBeLessThan(NAV_MAX_SLOPE_RATIO);
+  });
+
+  it('is climbable by every tier: no tier is limited below it', () => {
+    for (const tier of VEHICLE_TIER_LIST) expect(tierSlopeRatio(tier)).toBeGreaterThanOrEqual(slowestVehicleTierSlopeRatio() - 1e-12);
+  });
+
+  it('matches the VEHICLE_TIER_MAX_SLOPE_DEGREES minimum', () => {
+    expect(slowestVehicleTierSlopeRatio()).toBeCloseTo(slopeRatioForDegrees(Math.min(...Object.values(VEHICLE_TIER_MAX_SLOPE_DEGREES))), 12);
   });
 });

@@ -6,7 +6,9 @@ import { getSurfaceY } from '../entities/BuildingPlacement.js';
 import { siteBoundsForGrid, levelBuildingFootprint } from '../engine/BuildingTaskHelpers.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import {
+  BUILDING_APPROACH_RADIUS,
   BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD,
+  NAV_CLEARANCE_VEHICLE_CELLS,
   RALLY_POINT_BUILDING_CLEARANCE,
   STARTING_SITE_STAFFED_COMPOSITION,
   type StartingBuildingSlot,
@@ -14,6 +16,43 @@ import {
 } from '../config/balance.js';
 import type { Rect } from '../world/WorldGen.js';
 import { ringCells } from './SpawnPlacement.js';
+import type { NavGrid } from '../nav/NavGrid.js';
+import { computeClimbComponents, type ClimbComponents } from '../nav/NavGridReachability.js';
+
+function hasApproachTo(navGrid: NavGrid, components: ClimbComponents, x: number, z: number, target: { x: number; z: number }): boolean {
+  for (let dz = -BUILDING_APPROACH_RADIUS; dz <= BUILDING_APPROACH_RADIUS; dz++) {
+    for (let dx = -BUILDING_APPROACH_RADIUS; dx <= BUILDING_APPROACH_RADIUS; dx++) {
+      if (navGrid.containsCell(x + dx, z + dz) && components.canReach(x + dx, z + dz, target.x, target.z)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Accepts a building cell when ground within `BUILDING_APPROACH_RADIUS` of it
+ * drives to `target` at `maxSlopeRatio` on `navGrid` as it stands (#2044).
+ * Judged before the footprint is levelled, so it is a placement preference,
+ * not a guarantee; `allDrivableFrom` is the guarantee.
+ */
+export function drivableApproachFilter(
+  navGrid: NavGrid,
+  maxSlopeRatio: number,
+  target: { x: number; z: number },
+): (x: number, z: number) => boolean {
+  const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, maxSlopeRatio);
+  return (x, z) => hasApproachTo(navGrid, components, x, z, target);
+}
+
+/** Whether every one of `buildings` has ground within `BUILDING_APPROACH_RADIUS` that drives to `target` at `maxSlopeRatio` (#2044). */
+export function allDrivableFrom(
+  navGrid: NavGrid,
+  buildings: ReadonlyArray<{ x: number; z: number }>,
+  maxSlopeRatio: number,
+  target: { x: number; z: number },
+): boolean {
+  const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, maxSlopeRatio);
+  return buildings.every(b => hasApproachTo(navGrid, components, Math.round(b.x), Math.round(b.z), target));
+}
 
 /**
  * Resolves the tri-state `staffed` opt-in against a level's own site (#1363):
@@ -86,6 +125,9 @@ function largestTierSize(type: BuildingType): { sizeX: number; sizeZ: number } {
  * every placed building and every reservation, so a later slot never lands
  * where an earlier building's upgrade needs to expand (and vice versa). The
  * room rule is dropped before flatness, so a cramped site still places every slot.
+ *
+ * With `drivable` (#2044) a candidate must also pass it; every pass is tried
+ * with it before the same pass without it.
  */
 export function placeStartingBuildings(
   buildings: BuildingState,
@@ -93,6 +135,7 @@ export function placeStartingBuildings(
   slots: readonly StartingBuildingSlot[],
   near: { x: number; z: number },
   rallyPoint?: { x: number; z: number },
+  drivable?: (x: number, z: number) => boolean,
 ): number {
   const bounds = siteBoundsForGrid(grid);
   const cx = Math.round(near.x);
@@ -118,12 +161,14 @@ export function placeStartingBuildings(
         rect.maxX <= bounds.originX + bounds.width && rect.maxZ <= bounds.originZ + bounds.depth &&
         !taken.some(other => rectsOverlap(rect, other));
     };
-    const passes: ReadonlyArray<(x: number, z: number) => boolean> = [
+    const basePasses: ReadonlyArray<(x: number, z: number) => boolean> = [
       (x, z) => clearOfFlag(x, z) && flatSurroundings(x, z) && hasRoom(x, z),
       (x, z) => clearOfFlag(x, z) && flatSurroundings(x, z),
       clearOfFlag,
       () => true,
     ];
+    // With a drivability rule every pass is tried with it first (#2044).
+    const passes = drivable ? [...basePasses.map(p => (x: number, z: number) => drivable(x, z) && p(x, z)), ...basePasses] : basePasses;
 
     search: for (const accepts of passes) {
       for (let r = 0; r <= maxRadius; r++) {

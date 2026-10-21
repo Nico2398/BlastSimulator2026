@@ -22,6 +22,14 @@ import type { GameState, RallyPoint } from './GameState.js';
 
 interface Cell { x: number; z: number }
 
+/** Constraints on a rally point beyond flatness (#2044). Omitted fields leave the choice unchanged. */
+export interface RallyPointOptions {
+  /** Steepest rise/run the fleet that spawns at the flag can climb; the flag must sit on ground the slowest vehicle can leave. */
+  maxSlopeRatio?: number;
+  /** A cell the flag's ground must be climb-connected to (the pit floor, say), at `maxSlopeRatio`. */
+  mustReach?: Cell;
+}
+
 /** Who is being spawned: a vehicle needs room to drive and keeps its distance from the flag and the fleet. */
 type RallySpawnKind = 'employee' | 'vehicle';
 
@@ -46,7 +54,7 @@ export function isStandable(cell: NavCell | undefined): cell is NavCell {
 }
 
 /** The site's middle, in cells — what the crew's route out of the rally area is measured against. */
-function siteCentre(navGrid: NavGrid): Cell {
+export function siteCentre(navGrid: NavGrid): Cell {
   return {
     x: navGrid.originX + Math.floor(navGrid.width / 2),
     z: navGrid.originZ + Math.floor(navGrid.height / 2),
@@ -85,10 +93,10 @@ export function rallyAreaHeightSpread(navGrid: NavGrid, x: number, z: number, ra
  * `preferred` first. When no flat area exists at all, the flattest one on the
  * main ground wins, so a rugged site still gets the best ground it has.
  */
-export function chooseRallyPoint(navGrid: NavGrid, preferred: { x: number; z: number }): RallyPoint {
-  const centre = siteCentre(navGrid);
+export function chooseRallyPoint(navGrid: NavGrid, preferred: { x: number; z: number }, options: RallyPointOptions = {}): RallyPoint {
+  const centre = options.mustReach ?? siteCentre(navGrid);
   const main = findNearestNavigableCell(navGrid, centre.x, centre.z);
-  const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS);
+  const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, options.maxSlopeRatio);
   const target = { x: Math.round(preferred.x), z: Math.round(preferred.z) };
 
   const candidates: Array<Cell & { spread: number; distSq: number }> = [];
@@ -100,7 +108,11 @@ export function chooseRallyPoint(navGrid: NavGrid, preferred: { x: number; z: nu
       candidates.push({ x, z, spread, distSq: (x - target.x) ** 2 + (z - target.z) ** 2 });
     }
   }
-  if (candidates.length === 0) return findNearestNavigableCell(navGrid, target.x, target.z);
+  if (candidates.length === 0) {
+    // No flat ground meets the constraint: choose as an unconstrained site would.
+    if (options.maxSlopeRatio !== undefined || options.mustReach !== undefined) return chooseRallyPoint(navGrid, preferred);
+    return findNearestNavigableCell(navGrid, target.x, target.z);
+  }
 
   // Nearest first; z then x break ties so the pick never depends on scan order.
   candidates.sort((a, b) => a.distSq - b.distSq || a.z - b.z || a.x - b.x);
@@ -119,11 +131,11 @@ export function chooseRallyPoint(navGrid: NavGrid, preferred: { x: number; z: nu
  * The site's rally point, choosing and recording one when the state has none
  * (a fresh game, or a save from before the flag existed). Null without a grid.
  */
-export function ensureRallyPoint(state: Pick<GameState, 'navGrid' | 'rallyPoint'>, preferred?: { x: number; z: number }): RallyPoint | null {
+export function ensureRallyPoint(state: Pick<GameState, 'navGrid' | 'rallyPoint'>, preferred?: { x: number; z: number }, options: RallyPointOptions = {}): RallyPoint | null {
   if (state.rallyPoint) return state.rallyPoint;
   const navGrid = state.navGrid;
   if (!navGrid) return null;
-  state.rallyPoint = chooseRallyPoint(navGrid, preferred ?? siteCentre(navGrid));
+  state.rallyPoint = chooseRallyPoint(navGrid, preferred ?? siteCentre(navGrid), options);
   return state.rallyPoint;
 }
 

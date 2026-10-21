@@ -4,10 +4,12 @@ import {
   rallyAreaHeightSpread, chooseRallyPoint, ensureRallyPoint, rallyConnectedCells, isFlatParkingCell, rallySpawnCell,
 } from '../../../src/core/state/RallyPoint.js';
 import { placeStartingCrew } from '../../../src/core/state/SpawnPlacement.js';
+import { computeClimbComponents } from '../../../src/core/nav/NavGridReachability.js';
+import { slopeRatioForDegrees } from '../../../src/core/nav/ClimbLimit.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import {
-  CREW_SPAWN_VEHICLE_SEPARATION, RALLY_POINT_FLAT_RADIUS, RALLY_POINT_MAX_HEIGHT_SPREAD_M, RALLY_POINT_VEHICLE_STANDOFF,
+  CREW_SPAWN_VEHICLE_SEPARATION, RALLY_POINT_FLAT_RADIUS, RALLY_POINT_MAX_HEIGHT_SPREAD_M, RALLY_POINT_VEHICLE_STANDOFF, NAV_CLEARANCE_VEHICLE_CELLS,
 } from '../../../src/core/config/balance.js';
 
 function solidVoxel(): VoxelData {
@@ -197,5 +199,55 @@ describe('placeStartingCrew with a rally point', () => {
     for (const vehicle of state.vehicles.vehicles) {
       expect(chebyshev(vehicle, state.rallyPoint)).toBeGreaterThanOrEqual(RALLY_POINT_VEHICLE_STANDOFF);
     }
+  });
+});
+
+describe('rally point under a vehicle slope limit (#2044)', () => {
+  const limit = slopeRatioForDegrees(20);
+  const pit = { x: 24, z: 16 };
+
+  /** Flat site with a 0.55 m step across x = 15/16: walkable at 30 degrees, not at a 20 degree vehicle limit. */
+  function steppedSite(): ReturnType<typeof createGame> {
+    const state = siteOn(flat());
+    const navGrid = state.navGrid!;
+    for (let z = 0; z < 32; z++) for (let x = 16; x < 32; x++) navGrid.cellAt(x, z)!.surfaceY = (navGrid.cellAt(x, z)!.surfaceY ?? 0) + 0.55;
+    return state;
+  }
+
+  it('without options still picks the flat ground nearest the preferred spot, even past the step', () => {
+    const flag = chooseRallyPoint(steppedSite().navGrid!, { x: 6, z: 16 });
+    expect(flag.x).toBeLessThan(16);
+  });
+
+  it('maxSlopeRatio keeps the flag on ground that reaches the site middle at that ratio', () => {
+    const navGrid = steppedSite().navGrid!;
+    const flag = chooseRallyPoint(navGrid, { x: 6, z: 16 }, { maxSlopeRatio: limit });
+    expect(flag.x).toBeGreaterThanOrEqual(16);
+    expect(computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, limit).canReach(flag.x, flag.z, 16, 16)).toBe(true);
+  });
+
+  it('mustReach keeps the flag climb-connected to that cell at maxSlopeRatio', () => {
+    const navGrid = steppedSite().navGrid!;
+    const flag = chooseRallyPoint(navGrid, { x: 6, z: 16 }, { maxSlopeRatio: limit, mustReach: pit });
+    expect(computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, limit).canReach(flag.x, flag.z, pit.x, pit.z)).toBe(true);
+  });
+
+  it('a limit every step satisfies leaves the choice unchanged', () => {
+    const navGrid = steppedSite().navGrid!;
+    const plain = chooseRallyPoint(navGrid, { x: 6, z: 16 });
+    expect(chooseRallyPoint(navGrid, { x: 6, z: 16 }, { maxSlopeRatio: slopeRatioForDegrees(30), mustReach: pit })).toEqual(plain);
+  });
+
+  it('ensureRallyPoint passes the options through when it records a flag', () => {
+    const state = steppedSite();
+    const flag = ensureRallyPoint(state, { x: 6, z: 16 }, { maxSlopeRatio: limit, mustReach: pit });
+    expect(flag!.x).toBeGreaterThanOrEqual(16);
+    expect(state.rallyPoint).toEqual(flag);
+  });
+
+  it('ensureRallyPoint keeps an existing flag whatever the options say', () => {
+    const state = steppedSite();
+    state.rallyPoint = { x: 6, z: 16 };
+    expect(ensureRallyPoint(state, { x: 6, z: 16 }, { maxSlopeRatio: limit, mustReach: pit })).toEqual({ x: 6, z: 16 });
   });
 });
