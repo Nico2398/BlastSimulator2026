@@ -1,29 +1,29 @@
 {
-  "name": "sandbox-vanity-statue",
-  "description": "Vanity projects (#1947): at grade 3 the Build menu's Vanity section is locked and `build ceo_statue` is refused with cash untouched. At grade 4 (`sandbox start ... grade:4`) the player builds the CEO Statue from the Vanity section: exactly $250,000 is charged and average crew morale dips once (mandatory saluting).",
+  "name": "board-vanity-statue",
+  "description": "Vanity projects need a board (#2052): on a grade-5 sandbox with no board the Build menu has no Vanity section and cash is untouched. Once a board is attached (`board start`), the player builds the CEO Statue from the Vanity section: exactly $250,000 is charged, board confidence rises and average crew morale dips once (mandatory saluting).",
   "steps": [
     {
-      "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true grade:3",
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true grade:5",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true grade:3"
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true grade:5"
         }
       ],
-      "description": "Progression site opened at grade 3 (Quarry Licence), one short of the board's statue.",
+      "description": "Progression site opened at grade 5, the top of the ladder: no board attached.",
       "expect": {
         "equals": {
           "mineGrade": {
-            "grade": 3,
+            "grade": 5,
             "pendingTicksLeft": null
           }
         }
       }
     },
     {
-      "command": "build ceo_statue at:10,10",
-      "role": "guard",
+      "command": "state",
+      "role": "observe",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -35,36 +35,35 @@
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
         {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
           "type": "waitForSelector",
-          "selector": "#bs-build-panel [data-build-section=\"vanity\"]"
+          "selector": "#bs-build-panel"
         }
       ],
-      "description": "Grade 3: the Vanity section is listed but locked; the statue cannot be bought and the console refuses it too.",
-      "commandOutcome": "refused",
+      "description": "Grade 5, no board: the player opens the Build menu and it offers no Vanity section at all (absent, not locked); cash untouched. Only the menu is read here; console refusal of `build ceo_statue` is covered by tests/integration/vanity-build.integration.test.ts.",
       "expect": {
         "changedBy": {
           "cash": 0
         },
-        "blocked": "#bs-build-panel [data-build-section=\"vanity\"] [data-build-type=\"ceo_statue\"] .bs-build-buy-btn",
-        "note": "#1947 -- below grade 4 the Vanity section is locked with its grade."
+        "note": "#2052 -- no board, no Vanity section, at any grade. The section is absent from the DOM, which expect.blocked cannot assert (it refuses an absent selector), so the absence is read from the screenshot."
       }
     },
     {
-      "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true grade:4",
-      "role": "setup",
+      "command": "board start quarterTicks:720 ore:20 profit:5000",
+      "role": "bootstrap",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true grade:4"
+          "command": "board start quarterTicks:720 ore:20 profit:5000"
         }
       ],
-      "description": "Same site at grade 4 (Regional Licence): the board would like a statue.",
+      "description": "Attach a board of directors (console-only primitive, no UI equivalent): quarter 1, confidence 60.",
       "expect": {
         "equals": {
-          "mineGrade": {
-            "grade": 4,
-            "pendingTicksLeft": null
-          }
+          "levelEnded": false
         }
       }
     },
@@ -107,11 +106,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "Grade 4: build the CEO Statue from the Vanity section. It costs exactly $250,000 and the crew's average morale dips (mandatory saluting).",
+      "description": "With a board attached, the Vanity section appears: build the CEO Statue by clicking. It costs exactly $250,000, board confidence rises and the crew's average morale dips (mandatory saluting).",
       "expect": {
         "changedBy": {
           "cash": -250000
         },
+        "increased": [
+          "boardConfidence"
+        ],
         "decreased": [
           "averageMorale"
         ]
@@ -126,7 +128,7 @@
           "command": "state"
         }
       ],
-      "description": "Observe: the statue stands; the dip is a one-off, not a recurring drain (average morale is read once more after the build)."
+      "description": "Observe: the statue stands; the dip is a one-off, not a recurring drain."
     }
   ]
 }

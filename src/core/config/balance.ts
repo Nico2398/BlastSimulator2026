@@ -3284,7 +3284,6 @@ export const BOARD_DEBUG_ORE_TARGET_T = 50;
 export const BOARD_DEBUG_PROFIT_TARGET = 20000;
 
 // ── Vanity projects (#1947) ──
-export const VANITY_MIN_GRADE = 4;
 export const VANITY_CEO_STATUE_COST = 250000;
 export const VANITY_GOLF_COURSE_COST = 600000;
 export const VANITY_EXECUTIVE_HELIPAD_COST = 1200000;

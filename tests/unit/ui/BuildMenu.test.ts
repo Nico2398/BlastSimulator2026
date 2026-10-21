@@ -1247,7 +1247,8 @@ describe('BuildMenu — catalog card text and tooltip (#1377)', () => {
 
   it('every catalog row has a .bs-build-desc span with the tier-1 line and a stats tooltip', () => {
     const rows = container.querySelectorAll<HTMLElement>('[data-build-type]');
-    expect(rows.length).toBe(13);
+    // 9 functional types; the 4 vanity types need a board (#2052) and the mock state has none.
+    expect(rows.length).toBe(9);
     for (const row of rows) {
       const type = row.dataset['buildType'] as BuildingType;
       const def = getBuildingDef(type, 1);
@@ -2014,6 +2015,13 @@ describe('BuildMenu — Vanity section (#1947)', () => {
 
   const VANITY = ['ceo_statue', 'golf_course', 'executive_helipad', 'gold_tower'];
 
+  async function withBoard(s: GameState): Promise<GameState> {
+    const { createBoardState } = await import('../../../src/core/economy/Board.js');
+    s.board = createBoardState({ quarterTicks: 100, oreTargetT: 10, profitTarget: 1000 }, 0);
+    return s;
+  }
+
+  /** Board-less state; `grade` set unless undefined. */
   function stateAt(grade: number | undefined, cash = 10_000_000): GameState {
     const s = makeMockState({ cash });
     if (grade === undefined) delete s.grade;
@@ -2022,68 +2030,61 @@ describe('BuildMenu — Vanity section (#1947)', () => {
     return s;
   }
 
-  const section = () => container.querySelector<HTMLElement>('[data-build-section="vanity"]')!;
+  const sectionOrNull = () => container.querySelector<HTMLElement>('[data-build-section="vanity"]');
+  const section = () => sectionOrNull()!;
   const row = (type: string) => section().querySelector<HTMLElement>(`[data-build-type="${type}"]`)!;
   const buy = (type: string) => row(type).querySelector<HTMLButtonElement>('.bs-build-buy-btn')!;
-  const lockedText = (type: string) => row(type).querySelector<HTMLElement>('.bs-build-locked')!;
 
-  it('lists the four vanity rows in their own section', () => {
-    menu.update(stateAt(4));
-    const types = Array.from(section().querySelectorAll<HTMLElement>('[data-build-type]')).map((r) => r.dataset['buildType']);
-    expect(types).toEqual(VANITY);
+  it.each([1, 3, 4, 5, undefined])('without a board (grade %s) there is no Vanity section, label or row', (grade) => {
+    menu.update(stateAt(grade));
+    expect(sectionOrNull()).toBeNull();
+    expect(container.querySelector('#bs-build-vanity')).toBeNull();
+    for (const type of VANITY) {
+      expect(container.querySelector(`[data-build-type="${type}"]`), type).toBeNull();
+    }
+    expect(container.textContent).not.toContain(t('ui.build.vanity_section'));
   });
 
-  it('vanity types do not appear in the regular catalog section', () => {
-    menu.update(stateAt(4));
+  it('with a board the Vanity section lists the four vanity rows, label included', async () => {
+    menu.update(await withBoard(stateAt(1)));
+    const types = Array.from(section().querySelectorAll<HTMLElement>('[data-build-type]')).map((r) => r.dataset['buildType']);
+    expect(types).toEqual(VANITY);
+    expect(container.textContent).toContain(t('ui.build.vanity_section'));
+  });
+
+  it('vanity types do not appear in the regular catalog section', async () => {
+    menu.update(await withBoard(stateAt(4)));
     for (const type of VANITY) {
       expect(container.querySelectorAll(`[data-build-type="${type}"]`)).toHaveLength(1);
     }
   });
 
-  it('at grade 3 each row shows a locked label naming grade 4 and the buy button is disabled', () => {
-    menu.update(stateAt(3));
-    for (const type of VANITY) {
-      expect(lockedText(type).style.display).not.toBe('none');
-      expect(lockedText(type).textContent).toBe(t('ui.build.vanity.locked', { grade: 4 }));
-      expect(lockedText(type).textContent).toContain('4');
-      expect(buy(type).disabled).toBe(true);
-    }
-  });
-
-  it('at grade 4 with cash the statue buy button is enabled and the label is cleared', () => {
-    menu.update(stateAt(4));
+  it('with a board and cash the statue buy button is enabled; no locked label remains', async () => {
+    menu.update(await withBoard(stateAt(1)));
     expect(buy('ceo_statue').disabled).toBe(false);
-    expect(lockedText('ceo_statue').style.display).toBe('none');
-    expect(lockedText('ceo_statue').textContent).toBe('');
+    expect(row('ceo_statue').querySelector('.bs-build-locked')).toBeNull();
   });
 
-  it('at grade 4 without cash the statue buy button stays disabled', () => {
+  it('with a board and short cash the statue buy button stays disabled until affordable', async () => {
     const cost = getBuildingDef('ceo_statue', 1).constructionCost;
-    menu.update(stateAt(4, cost - 1));
+    menu.update(await withBoard(stateAt(1, cost - 1)));
     expect(buy('ceo_statue').disabled).toBe(true);
-    menu.update(stateAt(4, cost));
+    menu.update(await withBoard(stateAt(1, cost)));
     expect(buy('ceo_statue').disabled).toBe(false);
   });
 
-  it('a progression site dropping back below grade 4 re-locks the rows', () => {
-    menu.update(stateAt(4));
-    expect(buy('ceo_statue').disabled).toBe(false);
-    menu.update(stateAt(3));
-    expect(buy('ceo_statue').disabled).toBe(true);
-    expect(lockedText('ceo_statue').textContent).toBe(t('ui.build.vanity.locked', { grade: 4 }));
+  it('the section appears reactively when update() receives a state gaining a board', async () => {
+    menu.update(stateAt(5));
+    expect(sectionOrNull()).toBeNull();
+    menu.update(await withBoard(stateAt(5)));
+    expect(sectionOrNull()).not.toBeNull();
+    expect(section().querySelectorAll('[data-build-type]')).toHaveLength(4);
   });
 
-  it('a site with a board is available below grade 4', async () => {
-    const { createBoardState } = await import('../../../src/core/economy/Board.js');
-    const s = stateAt(1);
-    s.board = createBoardState({ quarterTicks: 100, oreTargetT: 10, profitTarget: 1000 }, 0);
-    menu.update(s);
-    expect(buy('ceo_statue').disabled).toBe(false);
-    expect(lockedText('ceo_statue').textContent).toBe('');
-  });
-
-  it('a site with neither grade state nor board keeps the rows locked', () => {
-    menu.update(stateAt(undefined));
-    expect(buy('ceo_statue').disabled).toBe(true);
+  it('the section disappears again when the board is gone', async () => {
+    menu.update(await withBoard(stateAt(5)));
+    expect(sectionOrNull()).not.toBeNull();
+    menu.update(stateAt(5));
+    expect(sectionOrNull()).toBeNull();
   });
 });

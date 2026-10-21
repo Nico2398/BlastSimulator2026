@@ -970,26 +970,28 @@ describe('checkFootprintPlacement — names the blocker (#1830)', () => {
 // ── Vanity projects (#1947) ──
 
 import { touchesBuildingOfType, isCrewlessBuilding, isSingleTierType } from '../../../src/core/entities/Building.js';
-import { isVanityAvailable, isVanityType, VANITY_PROJECTS } from '../../../src/core/entities/BuildingVanity.js';
+import { isVanityAvailableIn, isVanityType, VANITY_PROJECTS } from '../../../src/core/entities/BuildingVanity.js';
 import type { VanityType } from '../../../src/core/entities/BuildingVanity.js';
+import { createBoardState } from '../../../src/core/economy/Board.js';
 
 describe('vanity availability (#1947)', () => {
-  it('a board level offers vanity at any grade, even undefined', () => {
-    expect(isVanityAvailable({ hasBoard: true, grade: undefined })).toBe(true);
-    expect(isVanityAvailable({ hasBoard: true, grade: 0 })).toBe(true);
-    expect(isVanityAvailable({ hasBoard: true, grade: 5 })).toBe(true);
+  const boardState = createBoardState({ quarterTicks: 100, oreTargetT: 10, profitTarget: 1000 }, 0);
+
+  it('a state with a board offers vanity', () => {
+    expect(isVanityAvailableIn({ board: boardState })).toBe(true);
   });
 
-  it.each([4, 5])('a progression site at grade %i offers vanity', (grade) => {
-    expect(isVanityAvailable({ hasBoard: false, grade })).toBe(true);
+  it.each([undefined, 0, 1, 3, 4, 5])('a state with a board offers vanity at grade %s', (grade) => {
+    const state = { board: boardState, ...(grade === undefined ? {} : { grade: { grade } }) };
+    expect(isVanityAvailableIn(state as never)).toBe(true);
   });
 
-  it.each([0, 1, 2, 3])('a progression site at grade %i without a board does not', (grade) => {
-    expect(isVanityAvailable({ hasBoard: false, grade })).toBe(false);
+  it.each([0, 1, 3, 4, 5])('a board-less state at grade %i does not offer vanity', (grade) => {
+    expect(isVanityAvailableIn({ grade: { grade } } as never)).toBe(false);
   });
 
-  it('a site with neither board nor grade does not', () => {
-    expect(isVanityAvailable({ hasBoard: false, grade: undefined })).toBe(false);
+  it('a state with neither board nor grade does not offer vanity', () => {
+    expect(isVanityAvailableIn({} as never)).toBe(false);
   });
 
   it('isVanityType is true for the four vanity types only', () => {
