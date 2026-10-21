@@ -529,6 +529,8 @@ interface LadderMemory extends ReinvestMemory {
   rampPending: number | null;
   /** Origins (in firing order) already given a ramp into their crater. */
   rampedOrigins: number;
+  /** Floor depth (m) at which a ramp was last ordered; 0 before any. */
+  rampedFloorM: number;
   /** Never apply for a permit past this grade (stay_g1); null for no cap. */
   maxGrade: number | null;
 }
@@ -751,7 +753,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {},
-    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.rampSlope, rampPending: null, rampedOrigins: 1, maxGrade,
+    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.rampSlope, rampPending: null, rampedOrigins: 1, rampedFloorM: 0, maxGrade,
   };
   playOut(s, () => {
     ladderPermit(s, m);
