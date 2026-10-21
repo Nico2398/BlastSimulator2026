@@ -206,12 +206,12 @@ Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJE
 | Executive Helipad | $1,200,000 | 4x4 | +30 | neighbour relations -3 | - |
 | Gold-Plated HQ Tower | $5,000,000 | 4x4 | +50 | neighbour relations -5, well-being -2 | - |
 
-- **Availability** (`isVanityAvailable`): on any level with a board; on a progression site from grade 4 (`VANITY_MIN_GRADE`, unlock line "The board would like a statue."); otherwise none. A refused order mutates nothing.
+- **Availability** (`isVanityAvailableIn`): only where a board is attached (Shareholder Summit, or the debug `board start`); never in sandbox at any grade. Without a board the order is refused before any claim or charge, saying a board is needed (`entities.build_vanity_needs_board`), and mutates nothing. A vanity building already standing on a save with no board is kept (no demolition, refund unchanged).
 - **Board confidence** applies only where a board exists (`addBoardConfidence`, clamped 0..100).
 - **No refund**: demolish cost 0, nothing returned; the confirm modal says "Sunk cost, like the CEO's judgement."
-- **Build menu**: separate "Vanity" section after the regular rows (`data-build-section="vanity"`); locked rows show "Unlocks at grade 4" and disable Buy.
+- **Build menu**: separate "Vanity" section after the regular rows (`data-build-section="vanity"`), present in the DOM only while a board is attached (label, container and rows absent otherwise; re-evaluated on every update).
 - **Rendering**: one Blender model each (`building_<type>_t1`, `buildings_vanity.py`, #1948); the gold tower is the tallest building model.
-- **Console**: `sandbox start grade:N` starts a progression sandbox at grade N (scenarios reach grade 4 this way).
+- **Console**: `sandbox start grade:N` starts a progression sandbox at grade N.
 - **Decisions**: a "touch" means sharing an edge (diagonal-only or a one-cell gap does not count); neighbour relations are the `nuisance` score (high = good), so -N lowers it.
 
 ## Destruction Effects

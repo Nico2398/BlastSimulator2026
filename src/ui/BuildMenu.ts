@@ -51,7 +51,6 @@ import {
   rectOverlapsOccupants,
 } from '../core/entities/Building.js';
 import { isVanityType, isVanityAvailableIn } from '../core/entities/BuildingVanity.js';
-import { VANITY_MIN_GRADE } from '../core/config/balance.js';
 import { placementRefusalReason, hoverRefusal, claimRefusalText, type PlacementKit } from './scene/PlacementKit.js';
 import { RampTool } from './RampTool.js';
 import type { SpiralSurface } from '../core/mining/RampSpiral.js';
@@ -81,6 +80,8 @@ export class BuildMenu extends PanelBase {
   private readonly catalogEl: HTMLElement;
   /** Vanity projects (#1947): their own section after the regular rows. */
   private readonly vanityEl: HTMLElement;
+  /** Vanity label + rows; attached to the DOM only while a board sits. */
+  private readonly vanityWrapEl: HTMLElement;
   private readonly placedEl: HTMLElement;
   /** Construction-site rows (planned buildings, rebuilds included); the wrapper hides while empty. */
   private readonly siteWrapEl: HTMLElement;
@@ -155,6 +156,9 @@ export class BuildMenu extends PanelBase {
     this.vanityEl.dataset['buildSection'] = 'vanity';
     this.vanityEl.style.cssText = 'display:flex;flex-direction:column;gap:8px';
 
+    this.vanityWrapEl = el('div', { children: [this.sectionLabel('ui.build.vanity_section'), this.vanityEl] });
+    this.vanityWrapEl.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+
     this.placedEl = el('div');
     this.placedEl.id = 'bs-build-placed';
     this.placedEl.style.cssText = 'display:flex;flex-direction:column;gap:6px';
@@ -171,8 +175,6 @@ export class BuildMenu extends PanelBase {
 
     this.bodyEl.append(
       this.catalogEl,
-      this.sectionLabel('ui.build.vanity_section'),
-      this.vanityEl,
       this.makeTerrainSection(),
       this.sectionLabel('ui.build.placed_buildings'),
       this.placedEl,
@@ -240,9 +242,10 @@ export class BuildMenu extends PanelBase {
       this.lastCash = state.cash;
       this.refreshCatalogButtons(state.cash);
     }
-    const vanityAvailable = this.vanityAvailableIn(state);
+    const vanityAvailable = isVanityAvailableIn(state);
     if (vanityAvailable !== this.lastVanityAvailable) {
       this.lastVanityAvailable = vanityAvailable;
+      this.syncVanitySection(vanityAvailable);
       this.refreshCatalogButtons(state.cash);
     }
     const placedSig = state.buildings.buildings.map((b) => `${b.id}:${b.tier}`).join(',');
@@ -662,12 +665,7 @@ export class BuildMenu extends PanelBase {
     });
     this.underConstructionEls.set(type, constructionEl);
 
-    const lockedEl = el('span', {
-      className: 'bs-build-locked',
-      attrs: { style: 'font:600 9px/1.3 var(--bsx-font-mono);color:var(--bsx-amber);display:none' },
-    });
-
-    info.append(nameEl, costEl, descEl, effectsEl, lockedEl, constructionEl);
+    info.append(nameEl, costEl, descEl, effectsEl, constructionEl);
 
     // Tier selector
     const tierSel = el('select', { className: 'bs-build-tier-sel' });
@@ -786,13 +784,17 @@ export class BuildMenu extends PanelBase {
     for (const row of this.catalogRows()) this.syncCatalogRow(row, cash);
   }
 
-  private catalogRows(): HTMLElement[] {
-    return [...Array.from(this.catalogEl.children), ...Array.from(this.vanityEl.children)] as HTMLElement[];
+  /** Vanity section (label and rows) exists in the DOM only where a board sits. */
+  private syncVanitySection(available: boolean): void {
+    if (available) {
+      if (!this.vanityWrapEl.isConnected) this.catalogEl.after(this.vanityWrapEl);
+    } else {
+      this.vanityWrapEl.remove();
+    }
   }
 
-  /** Whether the Vanity section is buildable on this site (board level, or progression grade reached). */
-  private vanityAvailableIn(state: GameState): boolean {
-    return isVanityAvailableIn(state);
+  private catalogRows(): HTMLElement[] {
+    return [...Array.from(this.catalogEl.children), ...Array.from(this.vanityEl.children)] as HTMLElement[];
   }
 
   /** Sync one catalog row: buy-button state (when `cash` given) and research controls. */
@@ -801,15 +803,9 @@ export class BuildMenu extends PanelBase {
     if (!type) return;
     const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
     const locked = this.isTierLocked(type, tier);
-    const vanityLocked = isVanityType(type) && !(this.lastState && this.vanityAvailableIn(this.lastState));
-    const lockedEl = row.querySelector<HTMLElement>('.bs-build-locked');
-    if (lockedEl) {
-      lockedEl.style.display = vanityLocked ? '' : 'none';
-      lockedEl.textContent = vanityLocked ? t('ui.build.vanity.locked', { grade: VANITY_MIN_GRADE }) : '';
-    }
     if (cash !== undefined) {
       const btn = row.querySelector<HTMLButtonElement>('.bs-build-buy-btn');
-      if (btn) btn.disabled = cash < getBuildingDef(type, tier).constructionCost || locked || vanityLocked;
+      if (btn) btn.disabled = cash < getBuildingDef(type, tier).constructionCost || locked;
     }
     this.syncResearchControls(row, type, tier, locked);
   }

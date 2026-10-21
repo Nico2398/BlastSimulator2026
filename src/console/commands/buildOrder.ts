@@ -23,7 +23,6 @@ import {
 import type { GameState, PlannedBuilding } from '../../core/state/GameState.js';
 import { isVanityType, isVanityAvailableIn, VANITY_PROJECTS } from '../../core/entities/BuildingVanity.js';
 import { applyVanityCompletion } from '../../core/economy/VanityEffects.js';
-import { VANITY_MIN_GRADE } from '../../core/config/balance.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
@@ -104,7 +103,7 @@ export function orderBuildingCommand(
   }
 
   if (isVanityType(type) && !isVanityAvailableIn(state)) {
-    return { success: false, output: t('entities.build_vanity_locked', { type: buildingTypeName(type), grade: VANITY_MIN_GRADE }) };
+    return { success: false, output: t('entities.build_vanity_needs_board', { type: buildingTypeName(type) }) };
   }
 
   const def = getBuildingDef(type, tier);
