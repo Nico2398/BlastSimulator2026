@@ -11,6 +11,8 @@ import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import type { SurveyResult, SurveyMethod } from '../../../src/core/mining/SurveyCalc.js';
 import type { SurveyDepthBand } from '../../../src/core/mining/SurveyDepthProfile.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
+import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
+import { forkVoxelGrid } from '../../../src/core/world/VoxelGridFork.js';
 import { buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js';
 import { identifyFragmentedVoxels, isFragmented } from '../../../src/core/mining/VoxelFragmentation.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
@@ -497,7 +499,7 @@ describe('estimateBlastOre — value and survey coverage (#1960)', () => {
 
   it('coverage is 0 (not NaN) for an empty plan', () => {
     const r = estimateBlastOre(assembleBlastPlan([], {}), [makeSurvey()], grid);
-    expect(r).toEqual({ value: 0, coverage: 0, brokenVoxels: 0, charged: false, holeCoverage: 0 });
+    expect(r).toEqual({ value: 0, sealedValue: 0, sealedVoxels: 0, coverage: 0, brokenVoxels: 0, charged: false, holeCoverage: 0 });
   });
 
   it('coverage is 0 (not NaN) for uncharged holes, where nothing breaks', () => {
@@ -709,5 +711,79 @@ describe('estimateBlastOre — charged, brokenVoxels and holeCoverage (#1967)', 
   it('holeCoverage is 0 when the disc lies elsewhere', () => {
     const away = makeSurvey({ centerX: 0, centerZ: 0 });
     expect(estimateBlastOre({ holes: [HOLE], charges: {} }, [away], grid).holeCoverage).toBe(0);
+  });
+});
+
+describe('estimateBlastOre — sealed ore is excluded from value (#2053)', () => {
+  const DEEP = chargedPlan([makeHole('H1', 20, 20, 12)], 10);
+  const BANDS = [{ fromM: 0, toM: 25, ores: { blingite: 0.2 } }];
+
+  it('a deep charge that seals everything has value 0 and a positive sealedValue', () => {
+    const grid = makeGrid();
+    const est = estimateBlastOre(DEEP, [makeSurvey({ bands: BANDS })], grid);
+    expect(est.brokenVoxels).toBeGreaterThan(0);
+    expect(est.sealedVoxels).toBe(est.brokenVoxels);
+    expect(est.value).toBeCloseTo(0, 6);
+    expect(est.sealedValue).toBeGreaterThan(0);
+  });
+
+  it('value + sealedValue equals the old all-broken-voxels total', () => {
+    const grid = makeGrid();
+    const total = expectedValue(DEEP, grid, byDepth(BANDS));
+    const est = estimateBlastOre(DEEP, [makeSurvey({ bands: BANDS })], grid);
+    expect(est.value + est.sealedValue).toBeCloseTo(total, 4);
+  });
+
+  it('estimateBlastOreValue returns only the broken-out value', () => {
+    expect(estimateBlastOreValue(DEEP, [makeSurvey({ bands: BANDS })], makeGrid())).toBeCloseTo(0, 6);
+  });
+
+  it('a free-face plan seals nothing and keeps its full value', () => {
+    const grid = makeGrid();
+    const est = estimateBlastOre(PLAN, [makeSurvey({ bands: BANDS })], grid);
+    expect(est.sealedValue).toBe(0);
+    expect(est.sealedVoxels).toBe(0);
+    expect(est.value).toBeCloseTo(expectedValue(PLAN, grid, byDepth(BANDS)), 4);
+    expect(est.value).toBeGreaterThan(0);
+  });
+
+  it('a mixed plan splits value and sealedValue and still sums to the total', () => {
+    const grid = makeGrid();
+    const plan = chargedPlan([makeHole('H1', 14, 14, 8), makeHole('H2', 28, 28, 12)], 10);
+    const est = estimateBlastOre(plan, [makeSurvey({ bands: BANDS })], grid);
+    expect(est.value + est.sealedValue).toBeCloseTo(expectedValue(plan, grid, byDepth(BANDS)), 4);
+    expect(est.sealedVoxels).toBeLessThanOrEqual(est.brokenVoxels);
+  });
+
+  it('brokenVoxels and coverage still count sealed voxels', () => {
+    const est = estimateBlastOre(DEEP, [makeSurvey({ bands: BANDS })], makeGrid());
+    expect(est.brokenVoxels).toBeGreaterThan(0);
+    expect(est.coverage).toBe(1);
+    expect(est.charged).toBe(true);
+  });
+
+  it('stale surveys give 0 for both value and sealedValue', () => {
+    const stale = { ...makeSurvey({ bands: BANDS }), stale: true };
+    const est = estimateBlastOre(DEEP, [stale], makeGrid());
+    expect(est.value).toBe(0);
+    expect(est.sealedValue).toBe(0);
+  });
+
+  it('no-charge and no-survey estimates carry zero sealed figures', () => {
+    const uncharged = assembleBlastPlan([makeHole('H1', 20, 20, 8)], {});
+    expect(estimateBlastOre(uncharged, [makeSurvey()], makeGrid())).toMatchObject({ sealedValue: 0, sealedVoxels: 0 });
+    expect(estimateBlastOre(DEEP, [], makeGrid())).toMatchObject({ value: 0, sealedValue: 0 });
+  });
+
+  it('matches the fired blast report when the survey is exact (free-face and sealed plans)', () => {
+    const exactBands = [{ fromM: 0, toM: 25, ores: { blingite: 0.2 } }];
+    for (const plan of [PLAN, DEEP]) {
+      const grid = makeGrid({ blingite: 0.2 });
+      const est = estimateBlastOre(plan, [makeSurvey({ bands: exactBands, confidence: 1 })], grid);
+      const result = executeBlast(plan, forkVoxelGrid(grid), [], undefined)!;
+      expect(result).not.toBeNull();
+      expect(est.value).toBeCloseTo(result.totalOreValue, 2);
+      expect(est.sealedValue).toBeCloseTo(result.sealedOreValue ?? 0, 2);
+    }
   });
 });

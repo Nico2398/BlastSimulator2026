@@ -8,7 +8,7 @@ import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import type { BlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
-import { predictBreakout, breakoutWarningKind, type BreakoutPrediction } from '../../../src/core/mining/BreakoutPrediction.js';
+import { predictBreakout, breakoutWarningKind, isVoxelSealed, type BreakoutPrediction } from '../../../src/core/mining/BreakoutPrediction.js';
 import { forkVoxelGrid } from '../../../src/core/world/VoxelGridFork.js';
 import { BLAST_SEALED_SHARE_PARTIAL } from '../../../src/core/config/balance.js';
 import type { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
@@ -114,7 +114,7 @@ describe('predictBreakout', () => {
 });
 
 describe('breakoutWarningKind', () => {
-  const base: BreakoutPrediction = { brokenVoxels: 100, sealedVoxels: 0, sealedShare: 0, tooDeepHoleIds: [], chargedHoleCount: 9 };
+  const base: BreakoutPrediction = { brokenVoxels: 100, sealedVoxels: 0, sealedShare: 0, tooDeepHoleIds: [], chargedHoleCount: 9, fragmented: [], sealedKeys: new Set<string>() };
 
   it("is 'none' when nothing breaks out (all rock sealed)", () => {
     const { plan } = shot(12, 'krackle', 10);
@@ -145,5 +145,51 @@ describe('breakoutWarningKind', () => {
     expect(p.sealedShare).toBeGreaterThanOrEqual(BLAST_SEALED_SHARE_PARTIAL);
     expect(p.sealedShare).toBeLessThan(1);
     expect(breakoutWarningKind(p)).toBe('partial');
+  });
+});
+
+describe('predictBreakout fragmented and sealedKeys (#2053)', () => {
+  it('fragmented lists every broken voxel, one entry per voxel', () => {
+    const { plan } = shot(10, 'krackle', 10);
+    const p = predictBreakout(plan, grid)!;
+    expect(p.fragmented.length).toBe(p.brokenVoxels);
+    expect(new Set(p.fragmented.map(v => `${v.x},${v.y},${v.z}`)).size).toBe(p.brokenVoxels);
+  });
+
+  it('sealedKeys holds exactly sealedVoxels keys, all among the broken voxels', () => {
+    const { plan } = shot(10, 'krackle', 10);
+    const p = predictBreakout(plan, grid)!;
+    expect(p.sealedVoxels).toBeGreaterThan(0);
+    expect(p.sealedKeys.size).toBe(p.sealedVoxels);
+    const broken = new Set(p.fragmented.map(v => `${v.x},${v.y},${v.z}`));
+    for (const key of p.sealedKeys) expect(broken.has(key)).toBe(true);
+  });
+
+  it('a total seal marks every broken voxel sealed', () => {
+    const { plan } = shot(12, 'krackle', 10);
+    const p = predictBreakout(plan, grid)!;
+    expect(p.sealedKeys.size).toBe(p.brokenVoxels);
+    expect(p.fragmented.every(v => isVoxelSealed(p, v.x, v.y, v.z))).toBe(true);
+  });
+
+  it('a clean breakout seals few voxels, so most broken voxels read unsealed', () => {
+    const { plan } = shot(8, 'krackle', 8);
+    const p = predictBreakout(plan, grid)!;
+    expect(p.fragmented.length).toBeGreaterThan(0);
+    const unsealed = p.fragmented.filter(v => !isVoxelSealed(p, v.x, v.y, v.z)).length;
+    expect(unsealed).toBe(p.brokenVoxels - p.sealedVoxels);
+    expect(unsealed).toBeGreaterThan(p.brokenVoxels / 2);
+  });
+
+  it('isVoxelSealed is false for a voxel that did not break', () => {
+    const { plan } = shot(12, 'krackle', 10);
+    const p = predictBreakout(plan, grid)!;
+    expect(isVoxelSealed(p, 0, 0, 0)).toBe(false);
+  });
+
+  it('isVoxelSealed reads the key set', () => {
+    const p = { sealedKeys: new Set(['1,2,3']) };
+    expect(isVoxelSealed(p, 1, 2, 3)).toBe(true);
+    expect(isVoxelSealed(p, 3, 2, 1)).toBe(false);
   });
 });

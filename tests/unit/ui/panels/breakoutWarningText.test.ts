@@ -8,7 +8,7 @@ const NONE_KEY = 'ui.blast_workshop.preflight.warn_breakout_none';
 const PARTIAL_KEY = 'ui.blast_workshop.preflight.warn_breakout_partial';
 
 const prediction = (tooDeep: number): BreakoutPrediction => ({
-  brokenVoxels: 1000, sealedVoxels: 1000, sealedShare: 1, chargedHoleCount: 9,
+  brokenVoxels: 1000, sealedVoxels: 1000, sealedShare: 1, chargedHoleCount: 9, fragmented: [], sealedKeys: new Set<string>(),
   tooDeepHoleIds: Array.from({ length: tooDeep }, (_, i) => `H${i + 1}`),
 });
 

@@ -538,3 +538,89 @@ describe('BlastFooter — permit usage (#1925)', () => {
     expect(text).not.toMatch(/\d\s*%/);
   });
 });
+
+describe('BlastFooter sealed ore (#2053)', () => {
+  const SEALED_KEY = 'ui.blast_workshop.footer.sealed_value';
+  const sealedEl = (f: BlastFooter) => f.root.querySelector('[data-role="footer-sealed"]') as HTMLElement | null;
+  const isShown = (el: HTMLElement | null) => el !== null && el.style.display !== 'none' && (el.textContent ?? '') !== '';
+
+  function statValue(root: HTMLElement, labelKey: string): HTMLElement {
+    const label = [...root.querySelectorAll('span')].find(s => s.textContent === t(labelKey));
+    if (!label) throw new Error(`no stat label ${labelKey}`);
+    return label.nextElementSibling as HTMLElement;
+  }
+  const dollars = (el: HTMLElement) => Number((el.textContent ?? '').replace(/[^0-9.]/g, ''));
+
+  function setup(depth: number, kg: number) {
+    const { footer } = makeFooter();
+    const grid = makeOreGrid();
+    footer.setGridProvider(() => grid);
+    const state = makeState();
+    const hole = addHole(holeCounter, state.drillHoles, 20, 20, depth, 0.089);
+    const res = createCharge('krackle', kg, 2, hole.depth);
+    if ('charge' in res) state.chargesByHole[hole.id] = res.charge;
+    state.surveyResults.push(makeCoverageSurvey(0, 39));
+    footer.update(state);
+    return { footer, state, grid, hole };
+  }
+
+  it('a free-face plan shows EST. ORE VALUE and no sealed line', () => {
+    const { footer } = setup(8, 8);
+    expect(dollars(statValue(footer.root, 'ui.blast_workshop.footer.est_ore_value'))).toBeGreaterThan(0);
+    expect(isShown(sealedEl(footer))).toBe(false);
+  });
+
+  it('a fully sealed plan counts no ore in EST. ORE VALUE and shows the sealed line', () => {
+    const { footer } = setup(12, 10);
+    expect(dollars(statValue(footer.root, 'ui.blast_workshop.footer.est_ore_value'))).toBe(0);
+    expect(isShown(sealedEl(footer))).toBe(true);
+    expect(sealedEl(footer)!.textContent).toMatch(/\$\d/);
+  });
+
+  it('a fully sealed plan has a margin of minus the plan cost, never positive', () => {
+    const { footer } = setup(12, 10);
+    const margin = statValue(footer.root, 'ui.blast_workshop.footer.margin').textContent ?? '';
+    const cost = statValue(footer.root, 'ui.blast_workshop.footer.plan_cost').textContent ?? '';
+    expect(margin.startsWith('-')).toBe(true);
+    expect(margin.replace('-', '')).toBe(cost);
+  });
+
+  it('the sealed line uses the i18n text with the formatted figure', () => {
+    const { footer } = setup(12, 10);
+    const raw = t(SEALED_KEY, { value: 'ZZZ' });
+    const prefix = raw.slice(0, raw.indexOf('ZZZ'));
+    expect(sealedEl(footer)!.textContent!.startsWith(prefix)).toBe(true);
+  });
+
+  it('the sealed line appears when a deeper charge replaces a free-face one, and hides again', () => {
+    const { footer, state, hole } = setup(8, 8);
+    expect(isShown(sealedEl(footer))).toBe(false);
+    const deep = createCharge('krackle', 10, 2, 12);
+    state.drillHoles[0] = { ...hole, depth: 12 };
+    if ('charge' in deep) state.chargesByHole[hole.id] = deep.charge;
+    footer.update(state);
+    expect(isShown(sealedEl(footer))).toBe(true);
+    const shallow = createCharge('krackle', 8, 2, 8);
+    state.drillHoles[0] = { ...hole, depth: 8 };
+    if ('charge' in shallow) state.chargesByHole[hole.id] = shallow.charge;
+    footer.update(state);
+    expect(isShown(sealedEl(footer))).toBe(false);
+  });
+
+  it('no sealed line without a survey or without a grid', () => {
+    const { footer, state } = setup(12, 10);
+    state.surveyResults.length = 0;
+    footer.update(state);
+    expect(isShown(sealedEl(footer))).toBe(false);
+  });
+
+  it('re-renders the sealed line in French after setLocale + refreshLocale', () => {
+    const { footer, state } = setup(12, 10);
+    expect(sealedEl(footer)!.textContent).toContain('stays sealed');
+    setLocale('fr');
+    footer.refreshLocale();
+    footer.update(state);
+    expect(sealedEl(footer)!.textContent).toContain('scellé');
+    expect(sealedEl(footer)!.textContent).not.toContain('stays sealed');
+  });
+});
