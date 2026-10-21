@@ -57,7 +57,7 @@ export interface LadderShotGateInput {
   payrollPerTick: number;
 }
 
-export type LadderShotGateDecision = 'fire' | 'hold';
+type LadderShotGateDecision = 'fire' | 'hold';
 
 /**
  * Whether the ladder fires its next shot or holds while haulers clear the pit. Applies from
