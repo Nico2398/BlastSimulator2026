@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, buildGameNavGrid } from '../../../src/core/state/GameState.js';
-import { placeStartingCrew, isVehicleRouteAcceptable, relocateVehiclesOffNarrowGround } from '../../../src/core/state/SpawnPlacement.js';
+import { placeStartingCrew, isVehicleRouteAcceptable, relocateVehiclesOffNarrowGround, fleetSlopeRatio } from '../../../src/core/state/SpawnPlacement.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import { CREW_SPAWN_VEHICLE_SEPARATION, CREW_SPAWN_AGENT_SEPARATION, CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS, NAV_CLEARANCE_VEHICLE_CELLS } from '../../../src/core/config/balance.js';
 import { isLicensedForRole } from '../../../src/core/engine/VehicleReservation.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
+import { slopeRatioForDegrees, slowestVehicleTierSlopeRatio, tierSlopeRatio } from '../../../src/core/nav/ClimbLimit.js';
+import { NAV_MAX_SLOPE_RATIO } from '../../../src/core/config/balance.js';
 import { countLegalStepNeighbours, computeClimbComponents } from '../../../src/core/nav/NavGridReachability.js';
 
 function solidVoxel(): VoxelData {
@@ -510,5 +512,93 @@ describe('relocateVehiclesOffNarrowGround (#1648)', () => {
     const state = createGame({ seed: 42, staffed: true });
     state.navGrid = null;
     expect(relocateVehiclesOffNarrowGround(state)).toBe(false);
+  });
+});
+
+describe('fleetSlopeRatio (#2044)', () => {
+  it('is the walking limit off a progression site, whatever the tiers', () => {
+    expect(fleetSlopeRatio([{ tier: 3 }, { tier: 2 }], false)).toBe(NAV_MAX_SLOPE_RATIO);
+  });
+
+  it('is the lowest tier limit in the fleet on a progression site', () => {
+    expect(fleetSlopeRatio([{ tier: 1 }, { tier: 2 }], true)).toBeCloseTo(tierSlopeRatio(2), 12);
+    expect(fleetSlopeRatio([{ tier: 2 }, { tier: 3 }, { tier: 1 }], true)).toBeCloseTo(tierSlopeRatio(3), 12);
+  });
+
+  it('a lone tier-1 fleet keeps the walking limit', () => {
+    expect(fleetSlopeRatio([{ tier: 1 }], true)).toBeCloseTo(NAV_MAX_SLOPE_RATIO, 12);
+  });
+
+  it('an empty fleet on a progression site plans for the slowest tier a later purchase could bring', () => {
+    expect(fleetSlopeRatio([], true)).toBeCloseTo(slopeRatioForDegrees(18), 12);
+    expect(fleetSlopeRatio([], true)).toBeCloseTo(slowestVehicleTierSlopeRatio(), 12);
+  });
+
+  it('an empty fleet off a progression site is the walking limit', () => {
+    expect(fleetSlopeRatio([], false)).toBe(NAV_MAX_SLOPE_RATIO);
+  });
+});
+
+/**
+ * Flat 32x32 site whose columns x >= 16 stand `rise` metres higher: one step
+ * across x = 15/16. A cardinal rise of 0.55 m is 28.8 degrees (climbable at the
+ * 30 degree walking limit) and its diagonal, 0.55 over sqrt 2, still exceeds a 20 degree limit.
+ */
+function stepSite(rise: number): ReturnType<typeof createGame> {
+  const state = createGame({ seed: 42, staffed: true });
+  buildGameNavGrid(state, makeFlatGrid(32), [], []);
+  const navGrid = state.navGrid!;
+  for (let z = 0; z < 32; z++) {
+    for (let x = 16; x < 32; x++) navGrid.cellAt(x, z)!.surfaceY = (navGrid.cellAt(x, z)!.surfaceY ?? 0) + rise;
+  }
+  // Employees stay on the high side so only the fleet is under test.
+  state.employees.employees.forEach((e, i) => { e.x = 18 + (i % 4) * CREW_SPAWN_AGENT_SEPARATION; e.z = 27 - Math.floor(i / 4) * CREW_SPAWN_AGENT_SEPARATION; });
+  state.vehicles.vehicles.forEach((v, i) => { v.x = 18 + (i % 4) * CREW_SPAWN_VEHICLE_SEPARATION; v.z = 12 + Math.floor(i / 4) * CREW_SPAWN_VEHICLE_SEPARATION; });
+  return state;
+}
+
+describe('relocateVehiclesOffNarrowGround at a vehicle slope limit (#2044)', () => {
+  const limit = slopeRatioForDegrees(20);
+
+  it('the step is climbable at the walking limit and not at the vehicle limit (fixture sanity)', () => {
+    const navGrid = stepSite(0.55).navGrid!;
+    expect(computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS).canReach(8, 16, 24, 16)).toBe(true);
+    expect(computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, limit).canReach(8, 16, 24, 16)).toBe(false);
+  });
+
+  it('leaves a vehicle on the low side where it stands when judged at the walking limit', () => {
+    const state = stepSite(0.55);
+    const hauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+    hauler.x = 8; hauler.z = 16;
+
+    expect(relocateVehiclesOffNarrowGround(state, { fleetMustStayMobile: true })).toBe(false);
+    expect([hauler.x, hauler.z]).toEqual([8, 16]);
+  });
+
+  it('moves a vehicle cut off from the site middle at the vehicle limit onto ground that reaches it', () => {
+    const state = stepSite(0.55);
+    const hauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+    hauler.x = 8; hauler.z = 16;
+
+    expect(relocateVehiclesOffNarrowGround(state, { fleetMustStayMobile: true, vehicleSlopeRatio: limit })).toBe(true);
+    const components = computeClimbComponents(state.navGrid!, NAV_CLEARANCE_VEHICLE_CELLS, limit);
+    expect(components.canReach(hauler.x, hauler.z, 24, 16), `hauler ended at ${hauler.x},${hauler.z}`).toBe(true);
+  });
+
+  it('a vehicle already on the middle side of the step stays put at the vehicle limit', () => {
+    const state = stepSite(0.55);
+    const before = state.vehicles.vehicles.map(v => [v.x, v.z]);
+
+    expect(relocateVehiclesOffNarrowGround(state, { fleetMustStayMobile: true, vehicleSlopeRatio: limit })).toBe(false);
+    expect(state.vehicles.vehicles.map(v => [v.x, v.z])).toEqual(before);
+  });
+
+  it('a step the vehicle limit allows moves nobody', () => {
+    const state = stepSite(0.2);
+    const hauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+    hauler.x = 8; hauler.z = 16;
+
+    expect(relocateVehiclesOffNarrowGround(state, { fleetMustStayMobile: true, vehicleSlopeRatio: limit })).toBe(false);
+    expect([hauler.x, hauler.z]).toEqual([8, 16]);
   });
 });
