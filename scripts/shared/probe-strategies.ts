@@ -74,6 +74,7 @@ import {
   floorToKgResolution, limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
   type BuyRule, type LadderShot, type PermitLimit,
 } from './probe-ladder.js';
+import { decideLadderRamp, decideLadderSafety } from './probe-ladder-policy.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
@@ -299,6 +300,15 @@ function shotReady(state: GameState): boolean {
     && state.drillHoles.every(h => state.chargesByHole[h.id] !== undefined);
 }
 
+/** Footprint (origin and span) of the drilled pattern standing in the ground. */
+function patternFootprint(state: GameState): Pattern & { span: number } {
+  const xs = state.drillHoles.map(h => h.x);
+  const zs = state.drillHoles.map(h => h.z);
+  const x = Math.min(...xs);
+  const z = Math.min(...zs);
+  return { x, z, span: Math.max(Math.max(...xs) - x, Math.max(...zs) - z) + 1 };
+}
+
 /** Ticks an armed detonation may wait for the evacuation before it is disarmed. */
 const FIRE_EVACUATION_MAX_TICKS = 150;
 
@@ -443,6 +453,17 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan)
     m.yieldPending = false;
   }
   const shot = m.shot;
+  if (!shot && plan && shotReady(s.state) && s.state.pendingDetonation === null) {
+    // A pattern abandoned after a refused or cancelled detonation still stands charged: fire it, or it blocks every later shot and the hauling its zone holds.
+    const footprint = patternFootprint(s.state); // read before the blast consumes the holes
+    tryOnce(s, m, 'refire', () => {
+      if (!fireShot(s)) return false;
+      m.origins.push(footprint);
+      m.yieldPending = true;
+      return true;
+    });
+    return;
+  }
   if (!shot) {
     const idle = s.state.plannedDrillHoles.length === 0 && Object.keys(s.state.plannedChargesByHole).length === 0
       && s.state.drillHoles.length === 0;
@@ -541,8 +562,8 @@ interface LadderMemory extends ReinvestMemory {
   rampSlope: number;
   /** A gentle ramp ordered but not yet finished, and its slope ratio. */
   rampPending: number | null;
-  /** Origins (in firing order) already given a ramp into their crater. */
-  rampedOrigins: number;
+  /** Floor depth (m) at which a ramp was last ordered; 0 before any. */
+  rampedFloorM: number;
   /** Never apply for a permit past this grade (stay_g1); null for no cap. */
   maxGrade: number | null;
 }
@@ -558,6 +579,13 @@ function craterRubble(state: GameState, crater: Pattern & { span: number }): num
   return state.logistics.fragments.filter(f => f.state === 'on_ground'
     && f.fragment.position.x >= crater.x - 1 && f.fragment.position.x <= crater.x + crater.span + 1
     && f.fragment.position.z >= crater.z - 1 && f.fragment.position.z <= crater.z + crater.span + 1).length;
+}
+
+/** A haul still pending over a crater's footprint (and a tile around it). */
+function craterHaulPending(state: GameState, crater: Pattern & { span: number }): boolean {
+  return state.pendingActions.some(a => a.type === 'haul_debris'
+    && a.targetX >= crater.x - 1 && a.targetX <= crater.x + crater.span + 1
+    && a.targetZ >= crater.z - 1 && a.targetZ <= crater.z + crater.span + 1);
 }
 
 /**
@@ -584,8 +612,9 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   ));
 
   // Deepen the latest crater whose rubble is cleared (holes under rubble never finish); none clear: a fresh site meanwhile.
+  // Deepen the latest crater whose rubble is cleared (holes under rubble never finish); none clear: a fresh site meanwhile.
   const crater = [...m.origins].reverse().map(o => ({ x: o.x, z: o.z, span: o.span ?? SHOT_SPAN }))
-    .find(c => craterRubble(state, c) === 0);
+    .find(c => craterRubble(state, c) === 0 && !craterHaulPending(state, c));
   const deepen = depthTargetOpen(s) && crater !== undefined;
   const inset = deepen && shouldBench(state.grade?.deepestPitM ?? 0, SOFTEST_SAFE_FACE_M) ? BERM_GAP : 0;
   const siteSide = Math.floor((Math.min(s.grid.sizeX, s.grid.sizeZ) - 2 * BUILDING_SCAN_EDGE - 1) / sized.spacing) + 1;
@@ -741,13 +770,45 @@ function ladderSpoil(s: ProbeSession, m: ReinvestMemory): void {
   tryOnce(s, m, 'spoil_heap', () => placeBuilding(s, 'spoil_heap', rallyOf(s), null) !== null);
 }
 
-/** A ramp into each crater once it has resolved, so haulers reach the rubble a deeper pit holds. */
+/** Estimated cash a ramp dig costs (crew time and spoil); the ramp is ordered only when the reserve survives it. */
+const LADDER_RAMP_COST = 20_000;
+
+/**
+ * One ramp per new pit floor, into the latest crater as soon as its yield is measured. Never gated on the rubble
+ * being cleared: the ramp is what lets the haulers reach that rubble, so waiting for it stalls income (#2041).
+ */
 function ladderCraterRamp(s: ProbeSession, m: LadderMemory): void {
-  if (m.rampedOrigins >= m.origins.length || m.yieldPending || m.shot !== null
-    || s.state.pendingActions.some(a => a.type === 'dig_ramp_segment')) return;
-  const target = m.origins[m.rampedOrigins]!;
-  m.rampedOrigins++;
-  orderRamp(s, target, target.span ?? SHOT_SPAN);
+  if (m.yieldPending || m.shot !== null || s.state.pendingActions.some(a => a.type === 'dig_ramp_segment')) return;
+  const floorDepthM = s.state.grade?.deepestPitM ?? 0;
+  const decision = decideLadderRamp({
+    floorDepthM, rampedFloorM: m.rampedFloorM,
+    cash: s.state.cash, rampCost: LADDER_RAMP_COST, reserve: LADDER_UPGRADE_RESERVE,
+  });
+  if (decision === 'skip') return;
+  tryOnce(s, m, 'crater_ramp', () => {
+    const slope = orderRamp(s, m.crater, m.crater.span);
+    if (slope === null) return false;
+    m.rampedFloorM = floorDepthM;
+    return true;
+  });
+}
+
+/** Safety target of the next grade is open and a Management Office is how the ladder lifts the score. */
+function ladderSafety(s: ProbeSession, m: ReinvestMemory): void {
+  const targets = nextGradeTargets(s.state);
+  const office = s.state.buildings.buildings.find(b => b.type === 'management_office');
+  const nextTier = Math.min((office?.tier ?? 0) + 1, 3) as 1 | 2 | 3;
+  const decision = decideLadderSafety({
+    safetyTargetOpen: targets.some(t => t.kind === 'safety' && !t.met),
+    neighboursBelowTarget: targets.some(t => t.kind === 'neighbours' && !t.met),
+    officeBuilt: office !== undefined,
+    canAfford: s.state.cash - getBuildingDef('management_office', nextTier).constructionCost >= LADDER_UPGRADE_RESERVE,
+  });
+  if (decision === 'build_office' && !s.state.plannedBuildings.some(p => p.type === 'management_office')) {
+    tryOnce(s, m, 'management_office', () => placeBuilding(s, 'management_office', rallyOf(s), null) !== null);
+  } else if (decision === 'upgrade_office') {
+    upgradeBuilding(s, m, 'management_office');
+  }
 }
 
 function ladderPermit(s: ProbeSession, m: LadderMemory): void {
@@ -765,12 +826,13 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {},
-    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.rampSlope, rampPending: null, rampedOrigins: 1, maxGrade,
+    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.rampSlope, rampPending: null, rampedFloorM: 0, maxGrade,
   };
   playOut(s, () => {
     ladderPermit(s, m);
     ladderCrew(s, m);
     ladderSpoil(s, m);
+    ladderSafety(s, m);
     reinvestShot(s, m, () => ladderPlan(s, m));
     const last = m.origins[m.origins.length - 1]!;
     if (last.x !== m.crater.x || last.z !== m.crater.z) m.crater = { x: last.x, z: last.z, span: last.span ?? SHOT_SPAN };
