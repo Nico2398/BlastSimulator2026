@@ -1,0 +1,75 @@
+{
+  "name": "blast-breakout-warning",
+  "description": "Breakout warning (#2003): a 12 m x 10 kg Krackle pattern would never break out of the ground. The Blast step's Pre-Flight list and the Pre-Flight Check modal both carry the breakout warning row, and DETONATE stays usable (a warning, not a gate).",
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true",
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true" }
+      ],
+      "description": "Setup: a staffed progression sandbox site with the full kit (rig that reaches 12 m).",
+      "expect": { "equals": { "holeCount": 0 } }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:12 start:24,32",
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:12 start:24,32" }
+      ],
+      "description": "Order the deepest pattern the starting rig allows.",
+      "expect": { "increased": ["orderedHoleCount"] }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
+      "role": "setup",
+      "interaction": [
+        { "type": "waitUntil", "field": "orderedHoleCount", "equals": 0, "maxTicks": 3000, "timeoutMs": 200000 }
+      ],
+      "description": "Drain the drill orders.",
+      "expect": { "equals": { "holeCount": 9, "orderedHoleCount": 0 } }
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:10kg stemming:2.5m",
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "charge hole:* explosive:krackle amount:10kg stemming:2.5m" }
+      ],
+      "description": "Load the most Krackle a hole accepts.",
+      "expect": { "increased": ["orderedChargeCount"] }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:4500",
+      "role": "setup",
+      "interaction": [
+        { "type": "waitUntil", "field": "orderedChargeCount", "equals": 0, "maxTicks": 4500, "timeoutMs": 200000 }
+      ],
+      "description": "Drain the charge orders (delivery wait included).",
+      "expect": { "equals": { "chargedCount": 9, "orderedChargeCount": 0 } }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"blast\"]" },
+        { "type": "waitForSelector", "selector": "#bs-blast-panel [data-action=\"execute\"]" },
+        { "type": "ensureStep", "step": 4 },
+        { "type": "waitForSelector", "selector": "#bs-blast-panel [data-role=\"breakout-check\"]" },
+        { "type": "screenshot" }
+      ],
+      "description": "The Fire step's Pre-Flight list warns that the rock will stay in the ground, and FIRE is still usable.",
+      "expect": { "usable": "#bs-blast-panel [data-action=\"execute\"]" }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"execute\"]" },
+        { "type": "waitForSelector", "selector": "[data-role=\"preflight-breakout-warning\"]" },
+        { "type": "screenshot" }
+      ],
+      "description": "FIRE opens the Pre-Flight Check, which carries the same warning; DETONATE is not gated by it.",
+      "expect": { "usable": "[data-action=\"preflight-detonate\"]" }
+    }
+  ]
+}

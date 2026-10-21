@@ -670,3 +670,82 @@ describe('prefetchBlastZone (#1603)', () => {
     expect(grid.allocatedCyRange(1, 1)).toEqual(before);
   });
 });
+
+// ── Sealed rock is not broken-out ore (#2003) ──────────────────────────────
+
+describe('executeBlast — sealed vs broken-out ore (#2003)', () => {
+  /** One deep, weakly charged hole in ore-bearing rock: breaks rock at the bottom, never opens the cap. */
+  function sealedBlast() {
+    const grid = new VoxelGrid(40, 40);
+    fillRegion(grid, 'molite', 5, 25, 0, 30, 5, 25, 'blingite', 0.2);
+    const holes = createGridPlan(holeCounter, { x: 15, z: 15 }, 1, 1, 4, 28, 0.089);
+    const { charges } = batchCharge([holes[0]!.id], { [holes[0]!.id]: holes[0]!.depth }, 'boomite', 2, 2);
+    return executeBlast(assembleBlastPlan(holes, charges), grid, [])!;
+  }
+
+  /** The plain crater shot: breaks out, nothing stays under an intact cap. */
+  function breakoutBlast() {
+    const grid = new VoxelGrid(40, 40);
+    fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.089);
+    const depths: Record<string, number> = {};
+    for (const h of holes) depths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), depths, 'boomite', 8, 2);
+    return executeBlast(assembleBlastPlan(holes, charges), grid, [])!;
+  }
+
+  it('a no-breakout blast reports $0 broken-out ore value', () => {
+    const result = sealedBlast();
+    expect(result.brokeOut).toBe(false);
+    expect(result.totalOreValue).toBe(0);
+  });
+
+  it('a no-breakout blast reports its sealed ore value and fragments separately', () => {
+    const result = sealedBlast();
+    expect(result.sealedOreValue).toBeGreaterThan(0);
+    expect(result.sealedFragmentCount).toBeGreaterThan(0);
+    expect(result.sealedFragmentCount).toBe(result.fragmentCount);
+  });
+
+  it('a no-breakout blast has no reachable oversized fragments', () => {
+    const result = sealedBlast();
+    expect(result.reachableOversizedFragments).toBe(0);
+  });
+
+  it('the report carries the sealed amounts and zero reachable oversize', () => {
+    const report = buildBlastReport(sealedBlast(), 0, 0);
+    expect(report.sealedOreValue).toBeGreaterThan(0);
+    expect(report.sealedFragments).toBeGreaterThan(0);
+    expect(report.reachableOversizedFragments).toBe(0);
+    expect(report.totalOreValue).toBe(0);
+    expect(report.ratingCap).toBe('no_breakout');
+  });
+
+  it('a full breakout reports no sealed value or fragments', () => {
+    const result = breakoutBlast();
+    expect(result.brokeOut).toBe(true);
+    expect(result.sealedOreValue).toBe(0);
+    expect(result.sealedFragmentCount).toBe(0);
+    expect(result.totalOreValue).toBeGreaterThan(0);
+  });
+
+  it('a full breakout keeps every oversized fragment reachable', () => {
+    const result = breakoutBlast();
+    expect(result.reachableOversizedFragments).toBe(result.oversizedFragments);
+  });
+
+  it('reachable oversize never exceeds the oversize total', () => {
+    for (const r of [sealedBlast(), breakoutBlast()]) {
+      expect(r.reachableOversizedFragments!).toBeLessThanOrEqual(r.oversizedFragments);
+    }
+  });
+
+  it('broken-out plus sealed value is conserved across the split', () => {
+    const grid = new VoxelGrid(40, 40);
+    fillRegion(grid, 'molite', 5, 25, 0, 30, 5, 25, 'blingite', 0.2);
+    const holes = createGridPlan(holeCounter, { x: 15, z: 15 }, 1, 1, 4, 28, 0.089);
+    const { charges } = batchCharge([holes[0]!.id], { [holes[0]!.id]: holes[0]!.depth }, 'boomite', 2, 2);
+    const result = executeBlast(assembleBlastPlan(holes, charges), grid, [])!;
+    expect(result.totalOreValue + result.sealedOreValue!).toBeGreaterThan(0);
+  });
+});
