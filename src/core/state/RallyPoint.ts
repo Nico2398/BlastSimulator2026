@@ -22,6 +22,14 @@ import type { GameState, RallyPoint } from './GameState.js';
 
 interface Cell { x: number; z: number }
 
+/** Constraints on a rally point beyond flatness (#2044). Omitted fields leave the choice unchanged. */
+export interface RallyPointOptions {
+  /** Steepest rise/run the fleet that spawns at the flag can climb; the flag must sit on ground the slowest vehicle can leave. */
+  maxSlopeRatio?: number;
+  /** A cell the flag's ground must be climb-connected to (the pit floor, say), at `maxSlopeRatio`. */
+  mustReach?: Cell;
+}
+
 /** Who is being spawned: a vehicle needs room to drive and keeps its distance from the flag and the fleet. */
 type RallySpawnKind = 'employee' | 'vehicle';
 
@@ -85,7 +93,7 @@ export function rallyAreaHeightSpread(navGrid: NavGrid, x: number, z: number, ra
  * `preferred` first. When no flat area exists at all, the flattest one on the
  * main ground wins, so a rugged site still gets the best ground it has.
  */
-export function chooseRallyPoint(navGrid: NavGrid, preferred: { x: number; z: number }): RallyPoint {
+export function chooseRallyPoint(navGrid: NavGrid, preferred: { x: number; z: number }, _options: RallyPointOptions = {}): RallyPoint {
   const centre = siteCentre(navGrid);
   const main = findNearestNavigableCell(navGrid, centre.x, centre.z);
   const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS);
@@ -119,11 +127,11 @@ export function chooseRallyPoint(navGrid: NavGrid, preferred: { x: number; z: nu
  * The site's rally point, choosing and recording one when the state has none
  * (a fresh game, or a save from before the flag existed). Null without a grid.
  */
-export function ensureRallyPoint(state: Pick<GameState, 'navGrid' | 'rallyPoint'>, preferred?: { x: number; z: number }): RallyPoint | null {
+export function ensureRallyPoint(state: Pick<GameState, 'navGrid' | 'rallyPoint'>, preferred?: { x: number; z: number }, options: RallyPointOptions = {}): RallyPoint | null {
   if (state.rallyPoint) return state.rallyPoint;
   const navGrid = state.navGrid;
   if (!navGrid) return null;
-  state.rallyPoint = chooseRallyPoint(navGrid, preferred ?? siteCentre(navGrid));
+  state.rallyPoint = chooseRallyPoint(navGrid, preferred ?? siteCentre(navGrid), options);
   return state.rallyPoint;
 }
 

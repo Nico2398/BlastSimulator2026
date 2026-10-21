@@ -19,6 +19,7 @@ import {
   NAV_CLEARANCE_VEHICLE_CELLS,
   RALLY_POINT_VEHICLE_STANDOFF,
 } from '../config/balance.js';
+import { NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { isLicensedForRole } from '../engine/VehicleReservation.js';
 import type { GameState } from './GameState.js';
 import type { Employee } from '../entities/Employee.js';
@@ -269,7 +270,10 @@ function canDriveAroundVehicles(navGrid: NavGrid, from: Cell, to: Cell, blockers
  * is authored, and its first shot is aimed from where the rig stands.
  * Returns whether anything moved.
  */
-export function relocateVehiclesOffNarrowGround(state: GameState, options: { fleetMustStayMobile?: boolean } = {}): boolean {
+export function relocateVehiclesOffNarrowGround(
+  state: GameState,
+  options: { fleetMustStayMobile?: boolean; /** Steepest rise/run the fleet climbs (#2044); defaults to the walking limit. */ vehicleSlopeRatio?: number } = {},
+): boolean {
   const navGrid = state.navGrid;
   if (!navGrid) return false;
   const employees = state.employees.employees;
@@ -472,4 +476,9 @@ export function placeStartingCrew(state: GameState): boolean {
   const vehicleMoved = fixUnreachableVehicles(navGrid, employees, vehicles);
 
   return crewMoved || vehicleMoved;
+}
+
+/** Steepest rise/run every vehicle of the fleet climbs: the minimum of their limits (#2044). */
+export function fleetSlopeRatio(_vehicles: ReadonlyArray<Pick<Vehicle, 'tier'>>, _progression: boolean): number {
+  return NAV_MAX_SLOPE_RATIO; // TODO: implement
 }

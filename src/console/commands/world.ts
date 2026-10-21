@@ -104,7 +104,7 @@ function defaultDatumForSize(size: number): number {
 }
 
 /** Size, hardness and ore-mode fields terrain generation reads off a world. */
-interface GenerationFields { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; oreDeposits?: boolean; pitMask?: PitMaskShape; oreGradeScale?: number; climateBias?: [number, number] }
+interface GenerationFields { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; oreDeposits?: boolean; pitMask?: PitMaskShape; oreGradeScale?: number; climateBias?: [number, number]; vehicleSlopeRatio?: number; mustReach?: { x: number; z: number } }
 
 /**
  * The base (level-original) size + hardness fields generation reads off a

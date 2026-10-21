@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Per-vehicle-tier climb limits (#1938)
 
-import { VEHICLE_TIER_MAX_SLOPE_DEGREES } from '../config/balance.js';
+import { NAV_MAX_SLOPE_RATIO, VEHICLE_TIER_MAX_SLOPE_DEGREES } from '../config/balance.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 
 /** Float slack so a grade exactly at a tier's limit counts as climbable (matches isStepClimbable's epsilon spirit). */
@@ -32,4 +32,9 @@ export function tierSlopeRatio(tier: VehicleTier): number {
 /** Tiers able to climb a grade of `gradeDeg` degrees. */
 export function tiersThatClimb(gradeDeg: number): VehicleTier[] {
   return VEHICLE_TIER_LIST.filter(tier => gradeDeg <= slopeDegreesForTier(tier) + GRADE_EPSILON_DEGREES);
+}
+
+/** Steepest rise/run the least capable vehicle tier climbs: the grade every tier can leave a spawn on (#2044). */
+export function slowestVehicleTierSlopeRatio(): number {
+  return NAV_MAX_SLOPE_RATIO; // TODO: implement
 }
