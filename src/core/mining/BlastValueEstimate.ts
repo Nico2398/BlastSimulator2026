@@ -36,7 +36,7 @@ export interface BlastOreEstimate {
   value: number;
   /** Estimated ore value ($) in rock that breaks but stays sealed under an intact cap (#2053). */
   sealedValue: number;
-  /** Voxels that break but stay sealed under an intact cap (#2053). */
+  /** Voxels that break but stay sealed under an intact cap, counted regardless of survey coverage (#2053). */
   sealedVoxels: number;
   /** Share of broken voxels covered by a fresh survey, 0..1. */
   coverage: number;
@@ -58,8 +58,8 @@ export const NO_ORE_ESTIMATE: BlastOreEstimate = Object.freeze({ value: 0, seale
  * The broken volume comes from the blast's own propagation (`predictBreakout`,
  * the same energy field the preview and `executeBlast` use; wet holes in
  * `wetHoleIds` are treated as the blast would). Value of rock that breaks but
- * stays sealed under intact rock goes to `sealedValue`, not `value` (#2053). Each broken 1 m voxel is valued from the newest
- * fresh survey covering its column, read at the voxel's own depth
+ * stays sealed under intact rock goes to `sealedValue`, not `value` (#2053).
+ * Each broken 1 m voxel is valued from the newest fresh survey covering its column, read at the voxel's own depth
  * (`oresSurveyedAt`): ore a survey did not locate at that depth counts for
  * nothing, so an aerial reading values its top 2 m only. Value =
  * density x ORE_DENSITY_KG_M3 x oreValuePerKg(ore, marketId) x survey confidence.

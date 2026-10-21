@@ -1042,7 +1042,7 @@ describe('Survey system — blast estimate vs actual ore (#1703)', () => {
   const SITES: Site[] = [
     { biome: 'desert_badlands', centre: { x: 36, z: 32 }, explosive: 'boomite', kg: 8, seed: 42 },
     { biome: 'green_foothills', centre: { x: 32, z: 32 }, explosive: 'krackle', kg: 8, seed: 42 },
-    { biome: 'alpine_granite', centre: { x: 36, z: 32 }, explosive: 'shatternite', kg: 8, seed: 7 }, // 4 kg sealed all ore; the estimate now rates broken-out ore only (#2053),
+    { biome: 'alpine_granite', centre: { x: 36, z: 32 }, explosive: 'shatternite', kg: 8, seed: 7 }, // 4 kg sealed all ore; the estimate now rates broken-out ore only (#2053)
   ];
 
   /** Fresh sandbox at full ore grade (ore_grade:1: survey accuracy is under test, and the 0.05 estimate rounding swamps the sandbox default 0.08, #1944), the site seed, plus the 3x3 / spacing 4 / depth 8 pattern centred on the site. */

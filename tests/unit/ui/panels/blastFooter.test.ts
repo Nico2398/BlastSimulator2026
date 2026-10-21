@@ -612,6 +612,11 @@ describe('BlastFooter sealed ore (#2053)', () => {
     state.surveyResults.length = 0;
     footer.update(state);
     expect(isShown(sealedEl(footer))).toBe(false);
+
+    const noGrid = setup(12, 10);
+    noGrid.footer.setGridProvider(() => null);
+    noGrid.footer.update(noGrid.state);
+    expect(isShown(sealedEl(noGrid.footer))).toBe(false);
   });
 
   it('re-renders the sealed line in French after setLocale + refreshLocale', () => {

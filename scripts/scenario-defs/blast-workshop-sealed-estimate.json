@@ -1,6 +1,6 @@
 {
   "name": "blast-workshop-sealed-estimate",
-  "description": "Sealed ore estimate (#2053): after a survey, a 12 m x 10 kg Krackle hole breaks rock that stays sealed, so the Blast Workshop footer counts none of it in EST. ORE VALUE and shows a sealed-ore line. Swapping it for a shorter 8 m hole that breaks out hides the sealed line.",
+  "description": "Sealed ore estimate (#2053): after a survey, a 12 m x 10 kg Krackle hole breaks rock that stays sealed, so the Blast Workshop footer counts none of it in EST. ORE VALUE and shows a sealed-ore line. Swapping it for a shorter 6 m hole (7 kg) that breaks out hides the sealed line.",
   "steps": [
     {
       "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true",
