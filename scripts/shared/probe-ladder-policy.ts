@@ -17,7 +17,7 @@ export interface LadderRampInput {
   reserve: number;
 }
 
-export type LadderRampDecision = 'order' | 'skip';
+type LadderRampDecision = 'order' | 'skip';
 
 export interface LadderSafetyInput {
   safetyTargetOpen: boolean;
@@ -26,7 +26,7 @@ export interface LadderSafetyInput {
   canAfford: boolean;
 }
 
-export type LadderSafetyDecision = 'build_office' | 'upgrade_office' | 'neighbours' | 'none';
+type LadderSafetyDecision = 'build_office' | 'upgrade_office' | 'neighbours' | 'none';
 
 /** Whether the ladder should order a ramp into the cleared, deepened crater now. */
 export function decideLadderRamp(input: LadderRampInput): LadderRampDecision {
