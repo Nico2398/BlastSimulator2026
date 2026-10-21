@@ -304,7 +304,7 @@
       }
     },
     {
-      "command": "drill_plan add x:36 z:32 depth:8 diameter:89",
+      "command": "drill_plan add x:38 z:32 depth:6 diameter:89",
       "role": "player",
       "interaction": [
         {
@@ -331,16 +331,16 @@
         {
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 8
+          "value": 6
         },
         {
           "type": "focusTile",
-          "x": 36,
+          "x": 38,
           "z": 32
         },
         {
           "type": "pickTile",
-          "x": 36,
+          "x": 38,
           "z": 32
         },
         {
@@ -348,7 +348,7 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "Order a shorter 8 m hole at the same spot, which can break out through the free face.",
+      "description": "Order a shorter 6 m hole two tiles east, clear of the crew standing at the first hole, which can break out through the free face.",
       "expect": {
         "increased": [
           "orderedHoleCount"
@@ -377,6 +377,44 @@
       "timeout": 330
     },
     {
+      "command": "charge hole:* explosive:krackle amount:7 stemming:2.5",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 7
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2.5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "Charge the shorter hole with 7 kg of Krackle, the most a 6 m column fits.",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
       "command": "wait_until field:chargedCount equals:1 max_ticks:4500",
       "role": "setup",
       "timeout": 330,
@@ -389,7 +427,7 @@
           "timeoutMs": 300000
         }
       ],
-      "description": "The pattern charge (10 kg Krackle, 2.5 m stemming) is kept, so the new 8 m hole is charged automatically; wait for it to land.",
+      "description": "Wait for the charge to land on the 6 m hole.",
       "expect": {
         "equals": {
           "chargedCount": 1,
