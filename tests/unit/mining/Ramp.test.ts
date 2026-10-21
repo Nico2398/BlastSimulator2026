@@ -9,7 +9,7 @@ import {
   rampDefFromEndpoints, rampDefFromLegs, snapRampDepthToEndFloor, rampFootOffset, rampGradeBoundsDegrees, rampFloorDepthAt,
   type RampDef, type RampDirection, type RampSegmentDef,
 } from '../../../src/core/mining/Ramp.js';
-import { rampCenterline, rampPathCells } from '../../../src/core/mining/RampPath.js';
+import { rampCenterline, rampPathCells, RAMP_DIR_OFFSETS } from '../../../src/core/mining/RampPath.js';
 import { RAMP_COST_PER_METER_PER_WIDTH } from '../../../src/core/config/balance.js';
 import { isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import {
@@ -2313,5 +2313,146 @@ describe('rampDefFromLegs (#1942)', () => {
     expect(def.legs).toEqual(legs);
     expect(def.legs).not.toBe(legs);
     expect('width' in def).toBe(false);
+  });
+});
+
+describe('ramp top joins the continuous ground of the origin column, #2043', () => {
+  const SIZE = 60;
+  const OX = 30;
+  const OZ = 20;
+
+  /** Flat ground whose continuous height sits between voxel levels. */
+  function makeGroundAt(height: number): VoxelGrid {
+    const grid = makeElevatedGrid(SIZE, SIZE, Math.floor(height) - 2);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
+    for (let z = 0; z < SIZE; z++) for (let x = 0; x < SIZE; x++) setVoxelColumnSurfaceHeight(grid, x, z, height, compId);
+    return grid;
+  }
+
+  const gradeRatio = (def: RampDef): number => {
+    const legs = def.legs ?? [{ direction: def.direction, length: def.length }];
+    const total = legs.reduce((a, l) => a + l.length, 0);
+    return def.gradeDegrees !== undefined ? Math.tan((def.gradeDegrees * Math.PI) / 180) : def.targetDepth / total;
+  };
+
+  function carve(grid: VoxelGrid, def: RampDef, carvedWidth?: number): void {
+    for (const s of defineRampSegments(grid, def, carvedWidth)) carveRampSegment(grid, s);
+  }
+
+  /** Asserts: first carved cell floor == origin continuous height, and behind -> first is climbable at the ramp's own grade. */
+  function expectTopJoinsGround(def: RampDef, height: number): void {
+    const grid = makeGroundAt(height);
+    const before = computeVoxelColumnSurfaceHeight(grid, def.originX, def.originZ);
+    const path = rampCenterline({ originX: def.originX, originZ: def.originZ, legs: def.legs ?? [{ direction: def.direction, length: def.length }] });
+    const first = path[0]!;
+    const next = path[1]!;
+    const off = RAMP_DIR_OFFSETS[(def.legs ?? [{ direction: def.direction }])[0]!.direction];
+    const behindX = first.x - off.dx;
+    const behindZ = first.z - off.dz;
+    const behind = computeVoxelColumnSurfaceHeight(grid, behindX, behindZ);
+    carve(grid, def);
+    const top = computeVoxelColumnSurfaceHeight(grid, first.x, first.z);
+    expect(top, `first ramp cell floor vs origin ground ${before}`).toBeCloseTo(before, 3);
+    const ratio = gradeRatio(def);
+    expect(Math.abs(behind - top), `lip ${behind} -> ${top}`).toBeLessThanOrEqual(ratio + 1e-6);
+    expect(isStepClimbable(behind, top, 1, ratio)).toBe(true);
+    // The first step down the ramp is itself within grade.
+    const second = computeVoxelColumnSurfaceHeight(grid, next.x, next.z);
+    expect(isStepClimbable(top, second, 1, ratio + 0.05)).toBe(true);
+    // The lip is a defect on the continuous height: no more than a sliver of rise at the top.
+    expect(behind - top).toBeLessThan(0.1);
+  }
+
+  const STRAIGHT: RampDef = { originX: OX, originZ: OZ, direction: 'south', length: 24, targetDepth: 6, width: 3 };
+
+  describe.each([16, 16.05, 16.3, 16.5, 16.8, 16.95])('straight ramp on ground of height %s', (height) => {
+    it('top joins the ground and the step onto the ramp is within its grade', () => {
+      expectTopJoinsGround(STRAIGHT, height);
+    });
+  });
+
+  it('a ramp heading east joins ground at a fractional height', () => {
+    expectTopJoinsGround({ ...STRAIGHT, direction: 'east' }, 16.8);
+  });
+
+  it('a ramp heading north joins ground at a fractional height', () => {
+    expectTopJoinsGround({ ...STRAIGHT, direction: 'north', originZ: 40 }, 16.8);
+  });
+
+  it('every footprint column at step 0 joins the ground, not just the axis', () => {
+    const grid = makeGroundAt(16.8);
+    carve(grid, STRAIGHT);
+    for (const x of [OX - 1, OX, OX + 1]) {
+      expect(computeVoxelColumnSurfaceHeight(grid, x, OZ), `column ${x},${OZ}`).toBeCloseTo(16.8, 3);
+    }
+  });
+
+  describe('multi-leg ramp (#1939)', () => {
+    const MULTI_DEF: RampDef = {
+      originX: OX, originZ: OZ, direction: 'south', length: 22, targetDepth: 6, width: 3,
+      legs: [{ direction: 'south', length: 12 }, { direction: 'east', length: 10 }],
+    };
+    it.each([16.05, 16.8])('top joins ground of height %s', (height) => {
+      expectTopJoinsGround(MULTI_DEF, height);
+    });
+  });
+
+  describe('spiral-shaped ramp with a chosen grade (#1940, #1939)', () => {
+    const SPIRAL_DEF: RampDef = {
+      originX: 20, originZ: 20, direction: 'east', length: 40, targetDepth: 4, width: 3, gradeDegrees: 12,
+      legs: [
+        { direction: 'east', length: 12 }, { direction: 'south', length: 10 },
+        { direction: 'west', length: 12 }, { direction: 'north', length: 6 },
+      ],
+    };
+    it.each([16.05, 16.8])('top joins ground of height %s at the ramp grade', (height) => {
+      expectTopJoinsGround(SPIRAL_DEF, height);
+    });
+  });
+
+  describe('gradeDegrees ramp (#1939)', () => {
+    it.each([10, 15, 25])('a %s degree ramp joins ground at a fractional height', (deg) => {
+      expectTopJoinsGround({ ...STRAIGHT, length: 40, targetDepth: 6, gradeDegrees: deg }, 16.8);
+    });
+  });
+
+  describe('widening an already-carved ramp (#1298)', () => {
+    function axisHeights(grid: VoxelGrid): number[] {
+      return Array.from({ length: STRAIGHT.length }, (_, s) => computeVoxelColumnSurfaceHeight(grid, OX, OZ + s));
+    }
+
+    it('does not re-lower the corridor or move the top of the carved axis', () => {
+      const grid = makeGroundAt(16.8);
+      carve(grid, STRAIGHT);
+      const axisBefore = axisHeights(grid);
+      expect(axisBefore[0]).toBeCloseTo(16.8, 3);
+      carve(grid, { ...STRAIGHT, width: 5 }, 3);
+      const axisAfter = axisHeights(grid);
+      axisAfter.forEach((h, s) => expect(h, `axis step ${s}`).toBeCloseTo(axisBefore[s]!, 3));
+    });
+
+    it('new side strips meet the ground without a lip at the top', () => {
+      const grid = makeGroundAt(16.8);
+      carve(grid, STRAIGHT);
+      carve(grid, { ...STRAIGHT, width: 5 }, 3);
+      const ratio = gradeRatio(STRAIGHT);
+      for (const x of [OX - 2, OX + 2]) {
+        const top = computeVoxelColumnSurfaceHeight(grid, x, OZ);
+        const behind = computeVoxelColumnSurfaceHeight(grid, x, OZ - 1);
+        expect(top, `strip ${x} top`).toBeCloseTo(16.8, 3);
+        expect(isStepClimbable(behind, top, 1, ratio)).toBe(true);
+        expect(behind - top).toBeLessThan(0.1);
+      }
+    });
+
+    it('widened strips follow the axis line down the ramp', () => {
+      const grid = makeGroundAt(16.8);
+      carve(grid, STRAIGHT);
+      carve(grid, { ...STRAIGHT, width: 5 }, 3);
+      for (let s = 0; s < STRAIGHT.length; s++) {
+        const axis = computeVoxelColumnSurfaceHeight(grid, OX, OZ + s);
+        expect(computeVoxelColumnSurfaceHeight(grid, OX + 2, OZ + s), `step ${s}`).toBeCloseTo(axis, 1);
+      }
+    });
   });
 });
