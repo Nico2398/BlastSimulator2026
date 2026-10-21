@@ -1,0 +1,461 @@
+{
+  "name": "blast-workshop-sealed-estimate",
+  "description": "Sealed ore estimate (#2053): after a survey, a 12 m x 10 kg Krackle hole breaks rock that stays sealed, so the Blast Workshop footer counts none of it in EST. ORE VALUE and shows a sealed-ore line. Swapping it for a shorter 6 m hole (7 kg) that breaks out hides the sealed line.",
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true"
+        }
+      ],
+      "description": "Setup: staffed full-kit progression sandbox.",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "surveyCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel #bs-survey-hire"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "[data-hiring-role=\"surveyor\"] button[data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-hiring-role=\"surveyor\"] button[data-role=\"surveyor\"]"
+        }
+      ],
+      "description": "The staffed roster has no surveyor; hire one through the Survey panel's hire action.",
+      "expect": {
+        "changedBy": {
+          "employeeCount": 1
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "survey seismic x:36 z:32",
+      "role": "player",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 36,
+          "z": 32
+        },
+        {
+          "type": "pickTile",
+          "x": 36,
+          "z": 32
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Order a seismic survey over the blast site so the footer can price the rock.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:surveyCount equals:1 max_ticks:1500",
+      "role": "setup",
+      "timeout": 150,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "surveyCount",
+          "equals": 1,
+          "maxTicks": 1500,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait for the survey to complete.",
+      "expect": {
+        "equals": {
+          "surveyCount": 1
+        }
+      }
+    },
+    {
+      "command": "drill_plan add x:36 z:32 depth:12 diameter:89",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 12
+        },
+        {
+          "type": "focusTile",
+          "x": 36,
+          "z": 32
+        },
+        {
+          "type": "pickTile",
+          "x": 36,
+          "z": 32
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Order the deepest hole the starting rig allows (its charge will sit too deep to break out).",
+      "expect": {
+        "increased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "Drain the orderedHoleCount queue.",
+      "expect": {
+        "equals": {
+          "holeCount": 1,
+          "orderedHoleCount": 0
+        }
+      },
+      "timeout": 330
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:10 stemming:2.5",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 10
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2.5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "Load 10 kg of Krackle: far too little to break the 12 m column out.",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:4500",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 4500,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "Drain the orderedChargeCount queue.",
+      "expect": {
+        "equals": {
+          "chargedCount": 1,
+          "orderedChargeCount": 0
+        }
+      },
+      "timeout": 330
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel #bs-blast-fire"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-role=\"footer-sealed\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "description": "The footer's EST. ORE VALUE excludes the sealed ore and the sealed line is on screen.",
+      "expect": {
+        "usable": "#bs-blast-panel [data-role=\"footer-sealed\"]"
+      }
+    },
+    {
+      "command": "drill_plan remove hole:H1",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "description": "Remove the too-deep hole from the Drill step.",
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan add x:38 z:32 depth:6 diameter:89",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "focusTile",
+          "x": 38,
+          "z": 32
+        },
+        {
+          "type": "pickTile",
+          "x": 38,
+          "z": 32
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Order a shorter 6 m hole two tiles east, clear of the crew standing at the first hole, which can break out through the free face.",
+      "expect": {
+        "increased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "Drain the orderedHoleCount queue.",
+      "expect": {
+        "equals": {
+          "holeCount": 1,
+          "orderedHoleCount": 0
+        }
+      },
+      "timeout": 330
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:7 stemming:2.5",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 7
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2.5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "Charge the shorter hole with 7 kg of Krackle, the most a 6 m column fits.",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:chargedCount equals:1 max_ticks:4500",
+      "role": "setup",
+      "timeout": 330,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 1,
+          "maxTicks": 4500,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "Wait for the charge to land on the 6 m hole.",
+      "expect": {
+        "equals": {
+          "chargedCount": 1,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel #bs-blast-fire"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "description": "With a plan that breaks out, the sealed line is gone and FIRE is usable.",
+      "expect": {
+        "blocked": "#bs-blast-panel [data-role=\"footer-sealed\"]",
+        "usable": "#bs-blast-panel #bs-blast-fire"
+      }
+    }
+  ]
+}

@@ -29,6 +29,7 @@ export class BlastFooter {
   private readonly reasonEl: HTMLElement;
   private readonly hintEl: HTMLElement;
   private readonly permitEl: HTMLElement;
+  private readonly sealedEl: HTMLElement;
   private onFireRequested?: () => void;
   private gridProvider: () => VoxelGrid | null = () => null;
   private readonly estimateMemo = new OreEstimateMemo();
@@ -84,9 +85,11 @@ export class BlastFooter {
 
     this.hintEl = el('div', { attrs: { style: 'display:none;font:500 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' } });
 
+    this.sealedEl = el('div', { attrs: { 'data-role': 'footer-sealed', style: 'display:none;font:500 10px/1.4 var(--bsx-font-ui);color:var(--bsx-amber)' } });
+
     this.permitEl = el('div', { attrs: { 'data-role': 'permit-usage', style: 'display:none;flex-direction:column;gap:4px' } });
 
-    this.el.append(row, this.hintEl, this.permitEl, this.fireBtn, this.reasonEl);
+    this.el.append(row, this.hintEl, this.sealedEl, this.permitEl, this.fireBtn, this.reasonEl);
     container.appendChild(this.el);
   }
 
@@ -108,7 +111,7 @@ export class BlastFooter {
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
     const estimate = this.estimateMemo.get(state, plan, this.gridProvider());
     const estValue = estimate.value;
-    const { coverage, brokenVoxels, charged, holeCoverage } = estimate;
+    const { coverage, brokenVoxels, charged, holeCoverage, sealedValue } = estimate;
     const margin = estValue - planCost;
 
     // Undrilled (ordered, not yet landed) holes are a PreflightModal warning
@@ -126,7 +129,7 @@ export class BlastFooter {
         : null;
 
     const permit = permitPreview(state.grade, plan, state.tickCount);
-    const signature = JSON.stringify({ planCost, estValue, coverage, brokenVoxels, charged, holeCoverage, margin, fireOk, reason, permit });
+    const signature = JSON.stringify({ planCost, estValue, sealedValue, coverage, brokenVoxels, charged, holeCoverage, margin, fireOk, reason, permit });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
@@ -147,6 +150,13 @@ export class BlastFooter {
       this.marginEl.textContent = `${margin < 0 ? '-' : ''}$${formatMoney(Math.abs(margin))}`;
       this.marginEl.style.color = 'var(--bsx-positive)';
       this.hintEl.style.display = 'none';
+    }
+
+    if (sealedValue > 0) {
+      this.sealedEl.textContent = t('ui.blast_workshop.footer.sealed_value', { value: formatMoney(sealedValue) });
+      this.sealedEl.style.display = '';
+    } else {
+      this.sealedEl.style.display = 'none';
     }
 
     this.renderPermit(permit);
@@ -187,7 +197,7 @@ export class BlastFooter {
 
   refreshLocale(): void {
     this.locale.refresh();
-    this.lastSignature = ''; // forces the next update() to re-t() the fire-blocked reason line
+    this.lastSignature = ''; // forces the next update() to re-t() the fire-blocked reason and sealed lines
   }
 
   dispose(): void { this.el.remove(); }
