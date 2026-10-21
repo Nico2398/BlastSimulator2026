@@ -42,10 +42,10 @@ export function decideLadderSafety(input: LadderSafetyInput): LadderSafetyDecisi
 
 /** First grade at which the ladder gates its next shot on the rubble already in the pit. */
 export const LADDER_GATE_MIN_GRADE = 2;
-/** Rubble (kg) left in the pit at or above which the next shot is held. Placeholder, tuned in implementation. */
-export const LADDER_GATE_RUBBLE_KG = 0;
-/** Ticks of payroll cash the ladder keeps before it fires again. Placeholder, tuned in implementation. */
-export const LADDER_GATE_RUNWAY_TICKS = 0;
+/** Rubble (kg) left in the pit at or above which the next shot is held. Measured: a limit-sized shot buries the pit in millions of kg. */
+export const LADDER_GATE_RUBBLE_KG = 500_000;
+/** Ticks of payroll cash the ladder keeps before it fires again. Payroll runs roughly 700 a tick; a stalled income must outlast it. */
+export const LADDER_GATE_RUNWAY_TICKS = 1_500;
 
 export interface LadderShotGateInput {
   /** Current ladder grade. */
@@ -64,6 +64,10 @@ export type LadderShotGateDecision = 'fire' | 'hold';
  * LADDER_GATE_MIN_GRADE only: firing limit-sized shots faster than the fleet hauls buries the pit and
  * starves deliveries while payroll continues.
  */
-export function decideLadderShotGate(_input: LadderShotGateInput): LadderShotGateDecision {
-  throw new Error('not implemented');
+export function decideLadderShotGate(input: LadderShotGateInput): LadderShotGateDecision {
+  if (input.grade < LADDER_GATE_MIN_GRADE) return 'fire';
+  if (input.rubbleKg > LADDER_GATE_RUBBLE_KG) return 'hold';
+  // Payroll 0 is an infinite runway.
+  if (input.payrollPerTick > 0 && input.cash / input.payrollPerTick < LADDER_GATE_RUNWAY_TICKS) return 'hold';
+  return 'fire';
 }

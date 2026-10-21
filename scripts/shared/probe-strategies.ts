@@ -54,6 +54,7 @@ import { computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY } from '../../src/
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { nextGradeTargets } from '../../src/core/economy/MineGrade.js';
 import { getExplosivesFreeCapacity } from '../../src/core/entities/BuildingWarehouse.js';
+import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
 import { getBuildingDef, getUpgradeCost } from '../../src/core/entities/Building.js';
 import { getVehicleDefByTier, getVehicleReservation, vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { computeVehicleUpgradeCost } from '../../src/core/entities/VehicleUpgrade.js';
@@ -74,7 +75,7 @@ import {
   floorToKgResolution, limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
   type BuyRule, type LadderShot, type PermitLimit,
 } from './probe-ladder.js';
-import { decideLadderRamp, decideLadderSafety } from './probe-ladder-policy.js';
+import { decideLadderRamp, decideLadderSafety, decideLadderShotGate } from './probe-ladder-policy.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
@@ -467,6 +468,14 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan)
   if (!shot) {
     const idle = s.state.plannedDrillHoles.length === 0 && Object.keys(s.state.plannedChargesByHole).length === 0
       && s.state.drillHoles.length === 0;
+    if (plan) { // a pattern nobody orders anymore that stays unfinished for a whole step budget is stuck
+      if (idle) delete m.retryAt['stalePattern'];
+      else if (m.retryAt['stalePattern'] === undefined) m.retryAt['stalePattern'] = s.state.tickCount;
+      else if (s.state.tickCount - m.retryAt['stalePattern'] > OPENING_STEP_MAX_TICKS) {
+        abandonPattern(s);
+        delete m.retryAt['stalePattern'];
+      }
+    }
     const next = plan?.() ?? { cost: SHOT_EXPLOSIVE_KG + RE_FIRE_CASH_CUSHION, order: () => orderShotOnce(s, m) };
     if (idle && spendable(s) >= next.cost && (next.wanted === true || gradeNeedsBlast(s) || shouldReload(haulableOreOnGroundKg(s.state), m.lastYieldKg))) {
       m.shot = next.order();
@@ -486,6 +495,12 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan)
     m.shot = null;
     m.retryAt['shot'] = s.state.tickCount + PLACEMENT_RETRY_TICKS;
   }
+}
+
+/** Drop a half-drilled pattern no crew can finish (a hole beyond every hauler's reach); left standing it keeps the ladder from ordering any later shot. */
+function abandonPattern(s: ProbeSession): void {
+  s.run('drill_plan clear');
+  for (const h of [...s.state.drillHoles]) s.run(`drill_plan remove hole:${h.id}`);
 }
 
 /** Each rule returns only when it acted; an unaffordable, cooling-down or failed rule falls through. */
@@ -540,7 +555,11 @@ function runReinvest(s: ProbeSession): void {
 /** Cash the ladder keeps back from every purchase and permit fee: payroll and upkeep keep running. */
 const LADDER_CASH_RESERVE = 5_000;
 /** Deepest hole the ladder drills (m), kept under the softest rock's safe face height (#1941). */
-const LADDER_HOLE_DEPTH_M = 10;
+const LADDER_HOLE_DEPTH_M = 11;
+/** A pit this close under the hole depth counts as dug: deepening then waits for a cleared crater instead of a fresh site. */
+const LADDER_FRESH_SHOT_DEPTH_SLACK_M = 0.5;
+/** Haulers the ladder buys while cash is idle: rubble clears at the fleet's pace, and a buried pit stalls every later shot. */
+const LADDER_MAX_HAULERS = 6;
 /** Shrink factors tried when a limit-sized pattern fits no free site, widest first. */
 const LADDER_SHRINK_STEPS = [1, 0.75, 0.5, 0.25] as const;
 const LADDER_RAMP_RETRY_KEY = 'gentle_ramp';
@@ -627,10 +646,11 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const specFor = (n: number): ShotSpec => ({
     rows: n, cols: n, spacing: sized.spacing, depth, explosive: shotExplosive(s), kg: kgFor(n), stemming: sized.stemming, diameterM: sized.diameterM,
   });
-  const hauling = state.pendingActions.some(a => a.type === 'haul_debris');
+  // Orders no ramp reaches never get hauled: they are not work for the crew.
+  const hauling = state.pendingActions.some(a => a.type === 'haul_debris' && a.blockedReason === null);
   return {
-    // Blast again while a depth target is open, or when the crew has nothing left to haul (idle crew, no income).
-    wanted: depthTargetOpen(s) || !hauling,
+    // Blast again to deepen a cleared crater, to dig the first full-depth pit, or when the crew has nothing left to haul (idle crew, no income).
+    wanted: deepen || !hauling || (state.grade?.deepestPitM ?? 0) < LADDER_HOLE_DEPTH_M - LADDER_FRESH_SHOT_DEPTH_SLACK_M,
     cost: side === 0 ? Infinity : side * side * kg * explosive.costPerKg + RE_FIRE_CASH_CUSHION,
     order: () => {
       let ordered: Shot | null = null;
@@ -821,6 +841,44 @@ function ladderPermit(s: ProbeSession, m: LadderMemory): void {
   }
 }
 
+/** Rock mass (kg) lying in the pit, hauled or not. */
+function rubbleOnGroundKg(state: GameState): number {
+  let kg = 0;
+  for (const f of state.logistics.fragments) if (f.state === 'on_ground') kg += f.fragment.mass;
+  return kg;
+}
+
+/** Rock mass (kg) a hauler can still reach: on the ground with a haul order not blocked as out of reach. Rubble no ramp reaches stays put and must not hold shots forever. */
+function reachableRubbleKg(state: GameState): number {
+  const reachable = new Set<number>();
+  for (const a of state.pendingActions) {
+    if (a.type === 'haul_debris' && a.blockedReason === null) reachable.add((a.payload as { fragmentId: number }).fragmentId);
+  }
+  let kg = 0;
+  for (const f of state.logistics.fragments) if (f.state === 'on_ground' && reachable.has(f.fragment.id)) kg += f.fragment.mass;
+  return kg;
+}
+
+/** The ladder's shot plan, held (unaffordable) while the pit is buried or payroll runway is short. */
+function gatedLadderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
+  const plan = ladderPlan(s, m);
+  const hold = decideLadderShotGate({
+    grade: gradeOf(s),
+    rubbleKg: reachableRubbleKg(s.state),
+    cash: s.state.cash,
+    payrollPerTick: getOperatingCostPerHour(s.state).payroll,
+  }) === 'hold';
+  return hold ? { ...plan, cost: Infinity } : plan;
+}
+
+/** Another hauler (and its driver) while cash sits idle and the pit still holds rubble. */
+function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
+  const haulers = s.state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length;
+  const cost = getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver;
+  if (haulers >= LADDER_MAX_HAULERS || s.state.cash - cost < LADDER_UPGRADE_RESERVE || rubbleOnGroundKg(s.state) === 0) return;
+  tryOnce(s, m, 'hauler', () => buyHauler(s));
+}
+
 function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const opened = runOpening(s);
   const m: LadderMemory = {
@@ -833,11 +891,12 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     ladderCrew(s, m);
     ladderSpoil(s, m);
     ladderSafety(s, m);
-    reinvestShot(s, m, () => ladderPlan(s, m));
+    reinvestShot(s, m, () => gatedLadderPlan(s, m));
     const last = m.origins[m.origins.length - 1]!;
     if (last.x !== m.crater.x || last.z !== m.crater.z) m.crater = { x: last.x, z: last.z, span: last.span ?? SHOT_SPAN };
     ladderCraterRamp(s, m);
     reinvestBuy(s, m);
+    ladderHaulers(s, m);
     ladderFragmenter(s, m);
     ladderEquipment(s, m);
     const need = ladderPlan(s, m);

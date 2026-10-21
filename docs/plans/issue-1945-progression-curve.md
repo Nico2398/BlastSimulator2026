@@ -122,3 +122,38 @@ grade 3, and a blind retune of the ore targets would be unmeasured. Open policy 
    4.21 M and the digger kit lost grade 2. The committed policy deepens any clear crater and takes a fresh site otherwise.
 3. Depth: the 10 m hole cap yields a pit of 9.99 m, a hair under the grade-2 depth target; only a second bench past the ramp satisfies it.
 4. Neighbours (nuisance) has no probe action yet (`decideLadderSafety` returns `neighbours`, the ladder does nothing for it).
+
+## Update (#2054): survive-the-50k attempt (partial, MISSED)
+
+Seed 42, desert_badlands, full kit, `ladder`. Probe code only (`scripts/shared/probe-strategies.ts`, `probe-ladder-policy.ts`);
+no balance constant, `MINE_GRADES`, `BUYER_*`, fee or `PERMIT_LIMITS` value moved, so no sandbox or campaign pin moved and the
+grade table in `gameplay-game-design` is unchanged.
+
+Traced (cash, delivered ore, rubble kg, haulers, payroll, unmet targets every 500 ticks). Findings:
+
+1. At current `main` (`7810dff5` and later) the ladder does not reach grade 2 at all by t11,000 (the t4102 of #2041 is not reproducible): the grade-1
+   depth target stops at 9.9917 m of 10 (10 m holes), and the fresh shots fired meanwhile bury the map (13,321 fragments, 2,668 queued hauls at t4,500).
+2. Rubble is mostly unreachable: 6.99 M kg stays on the ground from t8,000 with only `debris_out_of_reach` orders, so an absolute rubble gate would hold forever.
+3. After grade 2 each fresh limit-sized crater lies beyond the tier-1 hauler's ramp reach: shots fire (`shot` true) but ore delivered stays flat
+   (109,350 kg from t7,500) while payroll (~720 per tick) drains ~830 per tick until bankruptcy.
+
+Changes: `decideLadderShotGate` (grade >= 2; holds above `LADDER_GATE_RUBBLE_KG` = 500,000 kg of reachable rubble or under
+`LADDER_GATE_RUNWAY_TICKS` = 1,500 ticks of payroll cash); reachable rubble counts only fragments with an unblocked haul order;
+ladder hole depth 11 m (inside the 12 m tier-1 safe face) so the first deep pit clears 10 m; fresh shots only for the first full-depth pit, a cleared crater
+or an idle crew; up to 6 haulers while cash is idle; a half-drilled pattern stuck for a step budget is dropped (`drill_plan clear` / `remove`).
+
+| run (50,000 horizon) | g1 | g2 | g3-5 | cash peak | end |
+| --- | --- | --- | --- | --- | --- |
+| `main` before | 1088 | not reached by t11,000 | no | 2.9 M @ t4,000 | trace stopped t11,000 alive |
+| after | 1088 | before t3,000 (pit 10.86 m) | no | 9.3 M @ t7,000 | bankrupt about t18,300, ore flat since t7,500 |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| survive 50,000 ticks | bankrupt about t18,300 | MISSED |
+| grade 3 at t8,000-14,000 | not reached (ore 109 t of 150 t, pit 10.86 m of 20 m) | MISSED |
+| grade 4 at t15,000-25,000 | not reached | MISSED |
+| grade 5 at t30,000-45,000 | not reached | MISSED |
+| ladder ahead of stay_g1 at t10,000 / fragmenter ahead / >= 60% boulder ore sold | not re-measured | MISSED, unmeasured |
+
+Remainder (needs its own run): deepening craters stay out of hauler reach. A ramp (or tier-2 hauler upgrade) into every new crater before its
+rubble is counted, or sizing shots to what the fleet hauls, must precede any `MINE_GRADES`/`BUYER_*` tuning.
