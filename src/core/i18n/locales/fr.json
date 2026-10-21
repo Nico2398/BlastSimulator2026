@@ -3832,6 +3832,7 @@
   "ui.blast_workshop.footer.margin_unknown": "— n.d.",
   "ui.blast_workshop.footer.survey_hint": "Ouvrez le panneau {survey} et sondez la zone pour chiffrer ce tir.",
   "ui.blast_workshop.footer.coverage_share": "{percent} % sondé",
+  "ui.blast_workshop.footer.sealed_value": "{value} $ de minerai se brise mais reste scellé sous la roche intacte ; non compté ci-dessus.",
   "ui.blast_workshop.footer.fire": "Blast",
   "ui.blast_workshop.footer.fire_reason_no_holes": "Aucun trou foré pour l'instant.",
   "ui.blast_workshop.footer.fire_reason_invalid": "{hole} : {issue}",

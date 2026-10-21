@@ -18,6 +18,7 @@ export class OreEstimateMemo {
     if (!grid) return NO_ORE_ESTIMATE;
     const wet = wetHoleIdsFor(state);
     const marketId = resolveMarketId(state);
+    // planInputsKey covers every input of the breakout prediction (holes, charges, wet, terrain), sealed split included (#2053).
     const key = JSON.stringify([
       planInputsKey(plan, wet, grid),
       state.surveyResults.map(s => [s.id, s.stale === true, s.completedTick]),
