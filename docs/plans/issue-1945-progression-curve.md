@@ -76,3 +76,49 @@ No constant changed. Nothing in `src/core/config/balance.ts` moved, so no sandbo
 1. Pit access policy: clear a crater before deepening, then dig a ramp (or the spiral, #1940) to its new floor; keep one working pit. This is what stops the run at grade 2.
 2. Safety and neighbour policy for grades 2 and 3 (Management Office, berms, barbecue events).
 3. Then run `full50k` above, tune in the issue's order: `MINE_GRADES` ore/depth targets, `BUYER_*`, fees, `PERMIT_LIMITS`, and re-measure the sandbox pins that move.
+
+## Update (#2041): pit-access policy, 50,000-tick probe
+
+Seed 42, desert_badlands, probe code only (`scripts/shared/probe-strategies.ts`, `scripts/shared/probe-ladder-policy.ts`);
+`src/` and every balance constant are unchanged, so no sandbox or campaign pin moved and none was re-measured.
+
+Policy added to `ladder`: `decideLadderRamp` (a ramp once per new pit floor, only into a cleared crater, `rampedFloorM`,
+cash reserve kept; rubble counted as cleared once deliveries stall 750 ticks, since rubble the haulers cannot reach is what
+the ramp is for), `decideLadderSafety` (Management Office built/upgraded while a safety target is open),
+a deepen only into a crater with no rubble and no pending haul over its footprint, and a refire of a charged pattern
+whose shot was abandoned (see below).
+
+Root cause found: an abandoned shot (refused or cancelled detonation, then the 3,000-tick timeout) left its holes charged and
+unfired. The blast zone then stayed "threatened", every haul over it kept `evacuationHold`, no later shot could start
+(`idle` false) and income stopped for thousands of ticks (full kit: stuck t4000-t10000 at pit 9.99 m). The ladder now fires
+such a pattern again (`reinvestShot`, ladder only).
+
+| run | g1 tick | g2 tick | g3 | cash@3000 | cash@6000 | cash@10000 | end |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder / full, 12,000 | 1088 | 4102 | not reached | 2,494,173 | 3,390,837 | 6,697,581 | t12000 alive |
+| stay_g1 / full, 12,000 | 1088 | n/a (capped) | n/a | 2,494,173 | 4,474,295 | 7,956,509 | t12000 alive |
+| ladder / digger, 12,000 | 978 | 3742 | not reached | 2,898,815 | 4,724,856 | 7,476,141 | t12000 alive |
+| ladder / full, 50,000 | 1088 | 4102 | not reached | 2,494,173 | 3,390,837 | 6,697,581 | bankrupt t22089 (cash@15000 6,145,920) |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| grade 3 at t8,000-14,000 | not reached (cumulative ore 117 t of 150 t at t16,250 in a trial; depth 12.1 m of 20 m) | MISSED, no value |
+| grade 4 at t15,000-25,000 | not reached | MISSED |
+| grade 5 at t30,000-45,000 | not reached | MISSED |
+| ladder ahead of stay_g1 at t10,000 | 6,697,581 vs 7,956,509 | MISSED: the ladder pays the grade-2 fee, upgrades and a larger crew |
+| fragmenter ahead of no-fragmenter at t10,000 | full ladder 6,697,581 vs digger ladder 7,476,141 | MISSED here (the kits differ in more than the fragmenter) |
+| >= 60% boulder ore sold | full ladder 56%, stay_g1 60%, digger ladder 56% | stay_g1 met; ladder missed by 4 points |
+| whole catalog never bought | `catalogBoughtTick` null in every run | held |
+
+Why no constant was tuned: the policy still does not play the ladder past grade 2. Delivered ore is about 7 to 9 kg/tick, so
+grade 5 (2,500 t, cumulative) is ~300,000 ticks away at that rate against a 30,000-45,000 target; no lever in the issue's order
+(`MINE_GRADES` ore/depth, `BUYER_*`, fees, `PERMIT_LIMITS`) was shown to close a gap of that size on a run that never reaches
+grade 3, and a blind retune of the ore targets would be unmeasured. Open policy defects (next run):
+
+1. After grade 2 the 800 kg shots bury the pit in rubble the two haulers do not clear; deliveries stop (ore flat t15,500-t17,500 in a trial)
+   while payroll keeps running, ending in bankruptcy at t22,089. A haul-capacity upgrade or a second hauler before the first deep shot, and a
+   payroll-aware stop on shooting, are the candidates.
+2. Trials that held fresh shots until the latest crater was cleared (one pit at a time, strictly) were worse: stay_g1 cash@10000 fell from 7.96 M to
+   4.21 M and the digger kit lost grade 2. The committed policy deepens any clear crater and takes a fresh site otherwise.
+3. Depth: the 10 m hole cap yields a pit of 9.99 m, a hair under the grade-2 depth target; only a second bench past the ramp satisfies it.
+4. Neighbours (nuisance) has no probe action yet (`decideLadderSafety` returns `neighbours`, the ladder does nothing for it).
