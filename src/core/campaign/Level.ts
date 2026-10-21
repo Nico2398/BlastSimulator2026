@@ -6,7 +6,7 @@ import type { GameState } from '../state/GameState.js';
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_CASH, SHAREHOLDER_SUMMIT_PROFIT_TARGET, SHAREHOLDER_SUMMIT_BOARD, SANDBOX_MARKET, SANDBOX_ORE_GRADE_SCALE, TUTORIAL_STARTING_SITE, TUTORIAL_RALLY_POINT, TUTORIAL_STARTING_BUILDINGS_NEAR, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition, type PitMaskShape } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_CASH, SHAREHOLDER_SUMMIT_PROFIT_TARGET, SHAREHOLDER_SUMMIT_BOARD, SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER, SANDBOX_MARKET, SANDBOX_ORE_GRADE_SCALE, TUTORIAL_STARTING_SITE, TUTORIAL_RALLY_POINT, TUTORIAL_STARTING_BUILDINGS_NEAR, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition, type PitMaskShape } from '../config/balance.js';
 import type { BoardConfig } from '../economy/Board.js';
 import type { MarketId } from '../economy/Market.js';
 import { getBiome } from '../world/BiomeCatalog.js';
@@ -296,7 +296,7 @@ const LEVELS: readonly LevelDef[] = [
     ],
     unlockThreshold: SHAREHOLDER_SUMMIT_PROFIT_TARGET,
     eventFreqMultiplier: 2.0,
-    contractPriceMultiplier: 0.85,
+    contractPriceMultiplier: SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER,
     scoreDecayRate: 0.08,
     mixedRockHardness: true,
     difficultyTier: 4,
