@@ -409,7 +409,7 @@ Truck-worked charging stalls (#1660), decisions taken:
 
 On progression sites (`state.grade !== undefined`) a vehicle climbs at most its tier's slope: tier 1 30°, tier 2 24°, tier 3 18° (`VEHICLE_TIER_MAX_SLOPE_DEGREES`), for every role. Walking and non-progression sites stay at 30°.
 
-- `vehicleMaxSlopeRatio(vehicle, progression)` (`Vehicle.ts`) is the one helper. `planItinerary` drive legs (`estimateLegDistance`'s `maxSlopeRatio`, ride alight point) and `Locomotion` drive legs (routes, reroutes, `advanceAlongPath`) both call it; foot legs always use 30°. Spawn and rally placement stay 30°.
+- `vehicleMaxSlopeRatio(vehicle, progression)` (`Vehicle.ts`) is the one helper. `planItinerary` drive legs (`estimateLegDistance`'s `maxSlopeRatio`, ride alight point) and `Locomotion` drive legs (routes, reroutes, `advanceAlongPath`) both call it; foot legs always use 30°. Spawn on a progression sandbox (#2044): the rally flag, every starting building and vehicle share one component driveable at the slowest tier (`slowestVehicleTierSlopeRatio`, 18°) that reaches the first-blast target; campaign levels keep 30° placement.
 - `PathRequest.maxSlopeRatio` carries it into `findPath`; reachability caches are keyed by clearance and ratio. `fillPool` groups usable vehicles by ratio and unions the per-ratio sets: the best climber decides.
 - A vehicle order unreachable on a progression site but reachable at 30° keeps `blockedReason: 'target_unreachable'` and gets `PendingAction.blockedDetail` (`order.blocked.ramp_too_steep`) naming the steepest blocking ramp: "Ramp #3 is 30°: too steep for a tier-3 hauler (max 18°)." The detail is cleared once the order is reachable.
 - The ramp inspector shows grade and the tiers that climb it (`describeRampClimb`, `RampGrade.ts`).

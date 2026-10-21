@@ -33,3 +33,8 @@ export function tierSlopeRatio(tier: VehicleTier): number {
 export function tiersThatClimb(gradeDeg: number): VehicleTier[] {
   return VEHICLE_TIER_LIST.filter(tier => gradeDeg <= slopeDegreesForTier(tier) + GRADE_EPSILON_DEGREES);
 }
+
+/** Steepest rise/run the least capable vehicle tier climbs: the grade every tier can leave a spawn on (#2044). */
+export function slowestVehicleTierSlopeRatio(): number {
+  return Math.min(...VEHICLE_TIER_LIST.map(tier => slopeRatioForDegrees(slopeDegreesForTier(tier))));
+}
