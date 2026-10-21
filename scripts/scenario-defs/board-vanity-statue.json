@@ -22,8 +22,8 @@
       }
     },
     {
-      "command": "build ceo_statue at:10,10",
-      "role": "guard",
+      "command": "state",
+      "role": "observe",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -43,14 +43,12 @@
           "selector": "#bs-build-panel"
         }
       ],
-      "description": "Grade 5, no board: the Build menu offers no Vanity section at all (absent, not locked) and the console refuses the statue with cash untouched.",
-      "commandOutcome": "refused",
+      "description": "Grade 5, no board: the player opens the Build menu and it offers no Vanity section at all (absent, not locked); cash untouched. Console refusal of `build ceo_statue` is covered by unit tests; here only the menu is read.",
       "expect": {
         "changedBy": {
           "cash": 0
         },
-        "blocked": "#bs-build-panel [data-build-section=\"vanity\"]",
-        "note": "#2052 -- no board, no Vanity section, at any grade."
+        "note": "#2052 -- no board, no Vanity section, at any grade. The section is absent from the DOM, which expect.blocked cannot assert (it refuses an absent selector), so the absence is read from the screenshot."
       }
     },
     {
