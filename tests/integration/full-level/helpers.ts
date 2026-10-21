@@ -39,11 +39,17 @@ function _unlockTreraniumDepths(campaign: any): void {
   recordProfit(campaign, 'grumpstone_ridge', 250000);
 }
 
+/** Complete treranium_depths to unlock shareholder_summit (#1949). Exported for tests that build their own context. */
+export function _unlockShareholderSummit(campaign: any): void {
+  _unlockTreraniumDepths(campaign);
+  recordProfit(campaign, 'treranium_depths', 800000);
+}
+
 /**
  * Levels that declare a free starting kit (#1363, #1672). Tests calibrated on a
  * bare opening keep one by default; `levelDefaultStart` opts into the kit.
  */
-const BARE_BY_DEFAULT_LEVELS: ReadonlySet<string> = new Set(['dusty_hollow', 'grumpstone_ridge', 'treranium_depths']);
+const BARE_BY_DEFAULT_LEVELS: ReadonlySet<string> = new Set(['dusty_hollow', 'grumpstone_ridge', 'treranium_depths', 'shareholder_summit']);
 
 /**
  * Create a GameContext with a fresh campaign started for the given level.
@@ -52,7 +58,7 @@ const BARE_BY_DEFAULT_LEVELS: ReadonlySet<string> = new Set(['dusty_hollow', 'gr
  * @param levelId The campaign level identifier (e.g. 'dusty_hollow').
  * @param opts `levelDefaultStart` opens the level exactly as a player's
  *   `campaign start` does. By default dusty_hollow, grumpstone_ridge and
- *   treranium_depths are started `staffed:false` (a bare site, #1363, #1672):
+ *   treranium_depths and shareholder_summit are started `staffed:false` (a bare site, #1363, #1672):
  *   the lose-condition tests were calibrated on one, and only a real
  *   playthrough wants the level's own crew, fleet and buildings.
  * @returns A fully initialised GameContext ready for test commands.
@@ -65,6 +71,8 @@ export function makeCampaignCtx(levelId: string, opts: { levelDefaultStart?: boo
     _unlockGrumpstoneRidge(ctx.campaignProfile.campaign);
   } else if (levelId === 'treranium_depths') {
     _unlockTreraniumDepths(ctx.campaignProfile.campaign);
+  } else if (levelId === 'shareholder_summit') {
+    _unlockShareholderSummit(ctx.campaignProfile.campaign);
   }
   // tutorial_pit is unlocked by default — no unlock needed
   const bare = BARE_BY_DEFAULT_LEVELS.has(levelId) && !opts.levelDefaultStart;

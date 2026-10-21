@@ -16,6 +16,7 @@ const BIOME_CATEGORY_KEY: Record<string, string> = {
   desert_badlands: 'ui.portfolio.biome.desert',
   alpine_granite: 'ui.portfolio.biome.mountain',
   tropical_karst: 'ui.portfolio.biome.tropical',
+  volcanic_flats: 'ui.portfolio.biome.volcanic',
 };
 const DEFAULT_BIOME_CATEGORY_KEY = 'ui.portfolio.biome.mountain';
 

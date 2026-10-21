@@ -7,6 +7,7 @@ import type { ResearchCondition } from '../entities/BuildingResearch.js';
 import type { VehicleRole, VehicleTask, VehicleTier } from '../entities/Vehicle.js';
 import type { EmployeeRole, SkillCategory, NeedKey } from '../entities/Employee.js';
 import type { ActionType } from '../state/GameState.js';
+import type { BoardConfig } from '../economy/Board.js';
 
 // ─── Time ───────────────────────────────────────────────────────────────────────
 
@@ -3331,3 +3332,38 @@ export const WALL_WARN_RATIO = 0.8;
 export const WALL_OVERLAY_OPACITY = 0.55;
 /** Most cells walked from a face's crest toward its toe when painting the wall overlay. */
 export const WALL_OVERLAY_MAX_FACE_CELLS = 24;
+
+// ── Shareholder Summit (#1949) ──
+// Measured with the #1945 probe (`ladder`, campaign start, dynatomics shots, seed 4001 volcanic_flats, tier-1 digger
+// kit) and an idle run. Measurements in .claude/skills/gameplay-game-design/SKILL.md (Shareholder Summit).
+
+/** Digger kit plus the tier-1 freight warehouse and spoil heap it already carries; hard volcanic rock is reached with the level's own explosives. */
+export const SHAREHOLDER_SUMMIT_STARTING_SITE: StartingSiteComposition = DIGGER_STARTING_SITE;
+/**
+ * Idle payroll is ~290 $/tick: an idle run misses both Q1 targets (60 - 50 = 10 confidence) and is fired at the 2nd
+ * review (tick 3000) before it can go bankrupt. $900k also carries a played run through hard rock's slow first
+ * sale (ore first lands ~tick 1000; the ladder's cash trough is ~$250k at tick 1500).
+ */
+export const SHAREHOLDER_SUMMIT_STARTING_CASH = 900_000;
+/**
+ * Every contract's price on the summit: investors pay a growth premium. Hard rock at the 0.08 ore grade scale yields
+ * ~3-5 t of ore a quarter against ~$290/tick of payroll; at Treranium's 0.85 the ladder only breaks even and goes
+ * bankrupt by tick 7500. Measured on the ladder (to $1.5M): 1.5 wins at tick 7931 (~5.3 quarters), 1.75 at 5551,
+ * 2.0 at 3621 (too easy).
+ */
+export const SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER = 1.5;
+/** Operating profit that completes the level; the ladder reaches it at tick 7931 (see the price multiplier). */
+export const SHAREHOLDER_SUMMIT_PROFIT_TARGET = 1_500_000;
+/**
+ * Quarter = 1500 ticks: hard rock's first ore lands ~tick 1000, so a shorter quarter would fire a competent
+ * run at its first review. Every run misses Q1 (no sale has settled yet, payroll before income: confidence 60 -> 10),
+ * so the ladder must meet Q2 onward. Q1 ore 1 t, growth 1.25 per quarter (Q5 2.4 t): the ladder delivers 3-5 t a
+ * quarter and meets Q2-Q5 (confidence 25, 40, 55, 70). A Q4/Q5 strain is deliberately absent: from confidence 10 after
+ * Q1, two single misses (-25 each) before Q5 fire the board, so a straining quarter would turn the win into a firing.
+ */
+export const SHAREHOLDER_SUMMIT_BOARD: BoardConfig = {
+  quarterTicks: 1500,
+  oreTargetT: 1,
+  profitTarget: 50_000,
+  growth: 1.25,
+};

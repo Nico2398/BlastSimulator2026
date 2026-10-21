@@ -67,6 +67,7 @@ import { gradeDef } from '../../src/core/economy/MineGrade.js';
 import { tierSlopeRatio } from '../../src/core/nav/ClimbLimit.js';
 import { fleetBestRigLimit } from '../../src/core/mining/RigLimits.js';
 import { explosiveHoleLimits, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
+import { getLevel } from '../../src/core/campaign/Level.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
 import {
@@ -231,6 +232,19 @@ interface Shot {
   startedTick: number;
 }
 
+/** Explosive of every shot: the run's own (hard rock needs more than SHOT's krackle), else SHOT's. */
+const shotExplosive = (s: ProbeSession): string => s.config.explosive ?? (hardRockLevel(s) ? HARD_ROCK_EXPLOSIVE : SHOT.explosive);
+
+/** Explosive a campaign level of this difficulty tier or above is shot with: krackle breaks nothing in its hard rock at the grade-0 charge cap. */
+const HARD_ROCK_MIN_DIFFICULTY_TIER = 4;
+const HARD_ROCK_EXPLOSIVE = 'dynatomics';
+
+function hardRockLevel(s: ProbeSession): boolean {
+  const id = s.engine.ctx.campaignProfile.campaign.activeLevelId;
+  const level = id ? getLevel(id) : undefined;
+  return (level?.difficultyTier ?? 0) >= HARD_ROCK_MIN_DIFFICULTY_TIER && (level?.availableExplosives.includes(HARD_ROCK_EXPLOSIVE) ?? false);
+}
+
 /** One shot's pattern, charge and (optionally) hole diameter; `SHOT` is the opening's. */
 interface ShotSpec {
   rows: number;
@@ -258,7 +272,7 @@ function overlapsShot(c: Pattern & { span?: number }, o: Pattern & { span?: numb
 }
 
 /** Order `spec` at `at`, or on the best free deposit when `at` is not given. */
-function orderShot(s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = SHOT, at?: Pattern): Shot | null {
+function orderShot(s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = { ...SHOT, explosive: shotExplosive(s) }, at?: Pattern): Shot | null {
   const span = spanOf(spec);
   const candidates = at
     ? [at]
@@ -593,7 +607,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   };
   const limit: PermitLimit = PERMIT_LIMITS[Math.min(gradeOf(s), 5)]!;
   const sized = limitSizedShot(limit, base, rigDiameterM);
-  const explosive = getExplosive(SHOT.explosive)!;
+  const explosive = getExplosive(shotExplosive(s))!;
   /** Heaviest hole charge that stays inside the permit's total charge for an n x n pattern, the explosive's and the hole's own limits. */
   const kgFor = (n: number): number => floorToKgResolution(Math.min(
     limit.maxChargeKg / (n * n), explosiveHoleLimits(explosive, sized.diameterM).maxKg,
@@ -614,7 +628,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   while (side > 0 && side * side * (kgFor(side) + 0.1) > free) side--;
   const kg = kgFor(Math.max(side, 1));
   const specFor = (n: number): ShotSpec => ({
-    rows: n, cols: n, spacing: sized.spacing, depth, explosive: SHOT.explosive, kg: kgFor(n), stemming: sized.stemming, diameterM: sized.diameterM,
+    rows: n, cols: n, spacing: sized.spacing, depth, explosive: shotExplosive(s), kg: kgFor(n), stemming: sized.stemming, diameterM: sized.diameterM,
   });
   const hauling = state.pendingActions.some(a => a.type === 'haul_debris');
   return {
@@ -891,15 +905,21 @@ function createSession(config: ProbeRunConfig, observer: MetricsObserver): Probe
   return session;
 }
 
-/** One headless playthrough. Never throws on a failed step: the reason lands in `endReason`. */
-export function runProbe(config: ProbeRunConfig): RunResult {
+/**
+ * One headless playthrough. Never throws on a failed step: the reason lands in `endReason`.
+ * `start` replaces the default `sandbox start` opening (a campaign level's run, #1949); it returns
+ * false when the game did not start.
+ */
+export function runProbe(config: ProbeRunConfig, start?: (engine: RunnerWithContext) => boolean): RunResult {
   const started = Date.now();
   const observer = new MetricsObserver();
   const session = createSession(config, observer);
   let endReason: string | null = null;
   try {
-    const start = runCommand(session.engine, `sandbox start biome:${config.biome} kit:${config.kit} seed:${config.seed}`);
-    if (!start.success) throw new ProbeStop('opening_failed:sandbox_start');
+    const opened = start
+      ? start(session.engine)
+      : runCommand(session.engine, `sandbox start biome:${config.biome} kit:${config.kit} seed:${config.seed}`).success;
+    if (!opened) throw new ProbeStop('opening_failed:sandbox_start');
     STRATEGIES[config.strategy](session);
   } catch (err) {
     if (!(err instanceof ProbeStop)) throw err;
