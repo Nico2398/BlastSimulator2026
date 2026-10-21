@@ -79,8 +79,8 @@ export function describeRampClimbability(
 }
 
 /** Grade in degrees the order will be cut at: its chosen grade, else the straight line to `targetDepth`. */
-export function plannedRampGradeDegrees(def: Pick<RampDef, 'length' | 'legs' | 'targetDepth' | 'gradeDegrees'>): number {
+export function plannedRampGradeDegrees(def: Pick<RampDef, 'length' | 'legs' | 'targetDepth' | 'gradeDegrees' | 'cutSlopeRatio'>): number {
   if (def.gradeDegrees !== undefined) return def.gradeDegrees;
   const total = def.legs ? rampTotalLength(def.legs) : def.length;
-  return rampGradeBoundsDegrees(total, def.targetDepth).min;
+  return rampGradeBoundsDegrees(total, def.targetDepth, def.cutSlopeRatio).min;
 }

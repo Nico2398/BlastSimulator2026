@@ -100,6 +100,12 @@ function setup(opts: {
 const A: Tile = { x: 15, z: 15 };
 const B: Tile = { x: 15, z: 27 };
 const C: Tile = { x: 25, z: 27 };
+// 12 + 13 m: long enough to drop 8 m under the 20 degree progression cut ceiling (22 m needs 20.0 degrees, over it).
+const C_LONG: Tile = { x: 28, z: 27 };
+const SWITCHBACK_LONG_DEF: RampDef = {
+  originX: 15, originZ: 15, direction: 'south', length: 25, targetDepth: 8, width: 3,
+  legs: [{ direction: 'south', length: 12 }, { direction: 'east', length: 13 }],
+};
 const SWITCHBACK_DEF: RampDef = {
   originX: 15, originZ: 15, direction: 'south', length: 22, targetDepth: 8, width: 3,
   legs: [{ direction: 'south', length: 12 }, { direction: 'east', length: 10 }],
@@ -428,11 +434,11 @@ describe('RampTool: live readout', () => {
 
   it('adds one climbable line on a progression site, naming the 20 degree limit', () => {
     const s = setup({ progression: true });
-    s.controller.simulateWaypoints([A, B, C]);
-    const g = plannedRampGradeDegrees({ ...SWITCHBACK_DEF, cutSlopeRatio: rampCutSlopeRatio(true) });
-    const v = validateRampOrder({ ...SWITCHBACK_DEF, cutSlopeRatio: rampCutSlopeRatio(true) }, s.state.cash);
+    s.controller.simulateWaypoints([A, B, C_LONG]);
+    const g = plannedRampGradeDegrees({ ...SWITCHBACK_LONG_DEF, cutSlopeRatio: rampCutSlopeRatio(true) });
+    const v = validateRampOrder({ ...SWITCHBACK_LONG_DEF, cutSlopeRatio: rampCutSlopeRatio(true) }, s.state.cash);
     expect(s.shown().readout).toEqual(describeRampPlan({
-      length: 22, legs: 2, cost: v.cost, gradeDeg: g, climb: { gradeDeg: g, climbable: g <= 20 + 1e-6, maxDeg: 20 },
+      length: 25, legs: 2, cost: v.cost, gradeDeg: g, climb: { gradeDeg: g, climbable: g <= 20 + 1e-6, maxDeg: 20 },
     }));
     expect(s.shown().readout!.join('\n')).not.toContain('T1');
   });
@@ -451,7 +457,7 @@ describe('RampTool: grade ceiling follows the vehicle limit (#2045)', () => {
 
   it('on a progression site the stepper stops under 20 degrees', () => {
     const s = setup({ progression: true });
-    s.controller.simulateWaypoints([A, B, C]);
+    s.controller.simulateWaypoints([A, B, C_LONG]);
     for (let i = 0; i < 60; i++) s.field('grade').onInc();
     expect(s.field('grade').value).toBeLessThanOrEqual(20);
     expect(s.field('grade').value).toBeCloseTo(ceiling(rampCutSlopeRatio(true)), 1);
@@ -459,9 +465,9 @@ describe('RampTool: grade ceiling follows the vehicle limit (#2045)', () => {
 
   it('on a progression site the ceiling is the core bound for the drawn length', () => {
     const s = setup({ progression: true });
-    s.controller.simulateWaypoints([A, B, C]);
+    s.controller.simulateWaypoints([A, B, C_LONG]);
     for (let i = 0; i < 60; i++) s.field('grade').onInc();
-    expect(s.field('grade').value).toBeLessThanOrEqual(rampGradeBoundsDegrees(22, 8, rampCutSlopeRatio(true)).max + 1e-9);
+    expect(s.field('grade').value).toBeLessThanOrEqual(rampGradeBoundsDegrees(25, 8, rampCutSlopeRatio(true)).max + 1e-9);
   });
 
   it('off a progression site the ceiling stays 29.5 degrees', () => {
@@ -473,10 +479,10 @@ describe('RampTool: grade ceiling follows the vehicle limit (#2045)', () => {
 
   it('a progression order at the ceiling is accepted by the core validator with the progression cut ratio', () => {
     const s = setup({ progression: true });
-    s.controller.simulateWaypoints([A, B, C]);
+    s.controller.simulateWaypoints([A, B, C_LONG]);
     for (let i = 0; i < 60; i++) s.field('grade').onInc();
     const g = s.field('grade').value;
-    expect(validateRampOrder({ ...SWITCHBACK_DEF, gradeDegrees: g, cutSlopeRatio: rampCutSlopeRatio(true) }, s.state.cash).success).toBe(true);
+    expect(validateRampOrder({ ...SWITCHBACK_LONG_DEF, gradeDegrees: g, cutSlopeRatio: rampCutSlopeRatio(true) }, s.state.cash).success).toBe(true);
     expect(s.shown().confirmEnabled).toBe(true);
   });
 
