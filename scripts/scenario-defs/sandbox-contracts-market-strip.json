@@ -361,13 +361,13 @@
       }
     },
     {
-      "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:1200",
+      "command": "wait_until field:fillableDirtiteSaleOffered equals:true max_ticks:1200",
       "role": "setup",
-      "description": "Ore from blast 1 is hauled to storage and a lot the stored ore can fill is on offer.",
+      "description": "Ore from blast 1 is hauled to storage and a dirtite lot the stored ore can fill is on offer.",
       "interaction": [
         {
           "type": "waitUntil",
-          "field": "fillableOreSaleOffered",
+          "field": "fillableDirtiteSaleOffered",
           "equals": true,
           "maxTicks": 1200,
           "timeoutMs": 300000
@@ -376,7 +376,7 @@
       "timeout": 330,
       "expect": {
         "equals": {
-          "fillableOreSaleOffered": true
+          "fillableDirtiteSaleOffered": true
         }
       }
     },

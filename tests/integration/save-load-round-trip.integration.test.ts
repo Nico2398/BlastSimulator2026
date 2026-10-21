@@ -21,8 +21,8 @@ import { clearBlastZone, playContracts, playTick, type Run, stockWarehouse } fro
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /** Ticks of the standard opening before the save (#1747's opening at the issue's repro point). */
-// 1300 not 1304: ore saturation (#1930) shifts sale timing, so tick 1304 lands mid-step of vehicle 2 where the live occupancy cell lags the rounded position.
-const SAVE_AT_TICK = 1300;
+// 1296 not 1304: ore saturation (#1930) and the continuous ramp anchor (#2043) shift haul timing, so ticks 1300-1304 land mid-step of vehicle 2 where the live occupancy cell lags the rounded position.
+const SAVE_AT_TICK = 1296;
 /** Ticks played after the save, in both the control run and the replay. The issue used 1000; 600 keeps the file near 60 s and the first divergence is at +10..+35. */
 const ROUND_TRIP_TICKS = 600;
 const SLOT = 'round-trip';
