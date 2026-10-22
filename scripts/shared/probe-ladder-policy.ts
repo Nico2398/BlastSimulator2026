@@ -259,7 +259,7 @@ export interface LadderShotJudgeInput {
 }
 
 interface LadderShotJudgment {
-  /** Whether a new shot was judged this call; when false the other fields carry the unchanged state. */
+  /** Whether a new shot was judged this call; when false only dudStreak is carried unchanged; lastShotFailed is false and callers ignore it. */
   judged: boolean;
   /** Whether the judged shot gained no pit depth and no new ore. */
   lastShotFailed: boolean;
