@@ -2,6 +2,15 @@ import { describe, it, expect } from 'vitest';
 import {
   decideLadderEventOption,
   decideLadderReach,
+  decideLadderDeepen,
+  decideFreshShotSite,
+  rampProtectionZones,
+  shotOverlapsProtectedRamp,
+  LADDER_RAMP_PROTECT_MARGIN_M,
+  type LadderDeepenInput,
+  type FreshSiteInput,
+  type ProtectedZone,
+  type RampFootprintInput,
   reachableShotDepthM,
   type LadderReachInput,
   decideLadderRamp,
@@ -191,7 +200,6 @@ describe('decideLadderEventOption', () => {
 const reachBase: LadderReachInput = {
   rampSlopeRatio: 0.3,
   fleetClimbRatio: 0.4,
-  affordableTier2Upgrade: false,
 };
 
 describe('decideLadderReach', () => {
@@ -200,36 +208,29 @@ describe('decideLadderReach', () => {
   });
 
   it('fires when ramp and fleet ratios are equal', () => {
-    expect(decideLadderReach({ ...reachBase, rampSlopeRatio: 0.4, fleetClimbRatio: 0.4 })).toBe('fire');
-  });
-
-  it('fires on a climbable ramp even when an upgrade is affordable', () => {
-    expect(decideLadderReach({ ...reachBase, affordableTier2Upgrade: true })).toBe('fire');
+    expect(decideLadderReach({ rampSlopeRatio: 0.4, fleetClimbRatio: 0.4 })).toBe('fire');
   });
 
   it('asks for a ramp first when none is finished', () => {
     expect(decideLadderReach({ ...reachBase, rampSlopeRatio: Infinity })).toBe('ramp_first');
-    expect(
-      decideLadderReach({ ...reachBase, rampSlopeRatio: Infinity, affordableTier2Upgrade: true }),
-    ).toBe('ramp_first');
   });
 
-  it('upgrades first when the ramp is too steep and an upgrade is affordable', () => {
-    expect(
-      decideLadderReach({ ...reachBase, rampSlopeRatio: 0.5, affordableTier2Upgrade: true }),
-    ).toBe('upgrade_first');
-  });
-
-  it('shrinks when the ramp is too steep and no upgrade is affordable', () => {
+  it('shrinks when the ramp is too steep for the fleet', () => {
     expect(decideLadderReach({ ...reachBase, rampSlopeRatio: 0.5 })).toBe('shrink');
   });
 
-  it('never fires on a ramp just above the fleet ratio without an affordable upgrade', () => {
-    expect(
-      decideLadderReach({ ...reachBase, rampSlopeRatio: 0.4001, fleetClimbRatio: 0.4 }),
-    ).not.toBe('fire');
+  it('never fires on a ramp just above the fleet ratio', () => {
+    expect(decideLadderReach({ rampSlopeRatio: 0.4001, fleetClimbRatio: 0.4 })).toBe('shrink');
   });
 
+  it('only ever answers fire, ramp_first or shrink', () => {
+    const allowed = ['fire', 'ramp_first', 'shrink'];
+    for (const rampSlopeRatio of [0, 0.1, 0.4, 0.9, Infinity]) {
+      for (const fleetClimbRatio of [0.1, 0.4, 0.9]) {
+        expect(allowed).toContain(decideLadderReach({ rampSlopeRatio, fleetClimbRatio }));
+      }
+    }
+  });
 });
 
 describe('reachableShotDepthM', () => {
@@ -272,5 +273,147 @@ describe('reachableShotDepthM', () => {
       expect(v).toBeLessThanOrEqual(12);
       prev = v;
     }
+  });
+});
+
+const deepenBase: LadderDeepenInput = {
+  orderedRubbleCount: 0,
+  orderlessRubbleCount: 0,
+  sealedRubbleCount: 0,
+  haulPending: false,
+};
+
+describe('decideLadderDeepen', () => {
+  it('deepens a clear crater', () => {
+    expect(decideLadderDeepen(deepenBase)).toBe('deepen');
+  });
+
+  it('deepens although sealed rubble remains: no hauler can reach it, waiting would stall forever', () => {
+    expect(decideLadderDeepen({ ...deepenBase, sealedRubbleCount: 40 })).toBe('deepen');
+  });
+
+  it('waits while ordered rubble remains', () => {
+    expect(decideLadderDeepen({ ...deepenBase, orderedRubbleCount: 1 })).toBe('wait');
+  });
+
+  it('waits while reachable orderless rubble remains', () => {
+    expect(decideLadderDeepen({ ...deepenBase, orderlessRubbleCount: 1 })).toBe('wait');
+  });
+
+  it('waits while a haul is pending', () => {
+    expect(decideLadderDeepen({ ...deepenBase, haulPending: true })).toBe('wait');
+  });
+
+  it('waits on a pending haul even with sealed rubble only', () => {
+    expect(decideLadderDeepen({ ...deepenBase, sealedRubbleCount: 5, haulPending: true })).toBe('wait');
+  });
+});
+
+const siteBase: FreshSiteInput = { oreKgUnderSite: 1000, siteOreKgFloor: 500, groundOreKgRemaining: 10_000 };
+
+describe('decideFreshShotSite', () => {
+  it('fires at a site holding more ore than the floor', () => {
+    expect(decideFreshShotSite(siteBase)).toBe('fire');
+  });
+
+  it('fires at a site holding exactly the floor', () => {
+    expect(decideFreshShotSite({ ...siteBase, oreKgUnderSite: 500 })).toBe('fire');
+  });
+
+  it('skips a site below the floor while ore remains elsewhere', () => {
+    expect(decideFreshShotSite({ ...siteBase, oreKgUnderSite: 499 })).toBe('skip');
+    expect(decideFreshShotSite({ ...siteBase, oreKgUnderSite: 0 })).toBe('skip');
+  });
+
+  it('fires at a barren site when no ore remains anywhere in the ground', () => {
+    expect(decideFreshShotSite({ ...siteBase, oreKgUnderSite: 0, groundOreKgRemaining: 0 })).toBe('fire');
+  });
+});
+
+describe('rampProtectionZones and shotOverlapsProtectedRamp', () => {
+  const MARGIN = 4;
+  // Ramp runs +x from (10,10) over 20 m, ending at x=30.
+  const ramp: RampFootprintInput = { x: 10, z: 10, runM: 20, dirX: 1, dirZ: 0 };
+  const site = (x: number, z: number, span = 4): ProtectedZone => ({ x, z, span });
+
+  it('margin constant is non-negative and finite', () => {
+    expect(Number.isFinite(LADDER_RAMP_PROTECT_MARGIN_M)).toBe(true);
+    expect(LADDER_RAMP_PROTECT_MARGIN_M).toBeGreaterThanOrEqual(0);
+  });
+
+  it('no ramps give no zones and no overlap', () => {
+    expect(rampProtectionZones([], MARGIN)).toEqual([]);
+    expect(shotOverlapsProtectedRamp(site(10, 10), [])).toBe(false);
+  });
+
+  it('a ramp yields at least one zone with positive span', () => {
+    const zones = rampProtectionZones([ramp], MARGIN);
+    expect(zones.length).toBeGreaterThan(0);
+    for (const z of zones) expect(z.span).toBeGreaterThan(0);
+  });
+
+  it('a site on the ramp corridor overlaps', () => {
+    const zones = rampProtectionZones([ramp], MARGIN);
+    expect(shotOverlapsProtectedRamp(site(18, 9), zones)).toBe(true);
+    expect(shotOverlapsProtectedRamp(site(11, 10), zones)).toBe(true);
+    expect(shotOverlapsProtectedRamp(site(28, 10), zones)).toBe(true);
+  });
+
+  it('a site just past the ramp end but within the margin overlaps', () => {
+    const zones = rampProtectionZones([ramp], MARGIN);
+    expect(shotOverlapsProtectedRamp(site(30 + MARGIN - 2, 10, 2), zones)).toBe(true);
+  });
+
+  it('a site far from the ramp does not overlap', () => {
+    const zones = rampProtectionZones([ramp], MARGIN);
+    expect(shotOverlapsProtectedRamp(site(10, 80), zones)).toBe(false);
+    expect(shotOverlapsProtectedRamp(site(30 + MARGIN + 20, 10), zones)).toBe(false);
+  });
+
+  it('protects the corridor, not a whole crater-sized square around the ramp', () => {
+    const zones = rampProtectionZones([ramp], MARGIN);
+    // 20 m across the corridor from its axis is well outside run-length 20 + margin 4 of lateral reach.
+    expect(shotOverlapsProtectedRamp(site(18, 10 + 20), zones)).toBe(false);
+    expect(shotOverlapsProtectedRamp(site(18, 10 - 24), zones)).toBe(false);
+  });
+
+  it('follows the ramp direction', () => {
+    const zones = rampProtectionZones([{ x: 10, z: 10, runM: 20, dirX: 0, dirZ: 1 }], MARGIN);
+    expect(shotOverlapsProtectedRamp(site(9, 28), zones)).toBe(true);
+    expect(shotOverlapsProtectedRamp(site(28, 9), zones)).toBe(false);
+  });
+
+  it('covers every ramp given', () => {
+    const second: RampFootprintInput = { x: 100, z: 100, runM: 10, dirX: 1, dirZ: 0 };
+    const zones = rampProtectionZones([ramp, second], MARGIN);
+    expect(shotOverlapsProtectedRamp(site(18, 9), zones)).toBe(true);
+    expect(shotOverlapsProtectedRamp(site(104, 99), zones)).toBe(true);
+    expect(shotOverlapsProtectedRamp(site(60, 60), zones)).toBe(false);
+  });
+
+  describe('shotOverlapsProtectedRamp on explicit zones', () => {
+    const zone: ProtectedZone = { x: 10, z: 10, span: 10 }; // covers [10,20] x [10,20]
+
+    it('overlaps when the footprints intersect', () => {
+      expect(shotOverlapsProtectedRamp({ x: 15, z: 15, span: 10 }, [zone])).toBe(true);
+      expect(shotOverlapsProtectedRamp({ x: 12, z: 12, span: 2 }, [zone])).toBe(true);
+    });
+
+    it('does not overlap beyond the zone', () => {
+      expect(shotOverlapsProtectedRamp({ x: 25, z: 10, span: 3 }, [zone])).toBe(false);
+      expect(shotOverlapsProtectedRamp({ x: 10, z: 25, span: 3 }, [zone])).toBe(false);
+      expect(shotOverlapsProtectedRamp({ x: 0, z: 0, span: 5 }, [zone])).toBe(false);
+    });
+
+    it('edges that merely touch are not an overlap', () => {
+      expect(shotOverlapsProtectedRamp({ x: 20, z: 10, span: 5 }, [zone])).toBe(false);
+      expect(shotOverlapsProtectedRamp({ x: 5, z: 10, span: 5 }, [zone])).toBe(false);
+      expect(shotOverlapsProtectedRamp({ x: 10, z: 20, span: 5 }, [zone])).toBe(false);
+    });
+
+    it('overlaps when any one of several zones is hit', () => {
+      const far: ProtectedZone = { x: 100, z: 100, span: 5 };
+      expect(shotOverlapsProtectedRamp({ x: 101, z: 101, span: 2 }, [zone, far])).toBe(true);
+    });
   });
 });
