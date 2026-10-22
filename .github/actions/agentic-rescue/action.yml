@@ -137,12 +137,81 @@ runs:
         RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
         PUSH_LOG=/tmp/agentic-rescue-push.log
 
+        # `git push` never reads GH_TOKEN. It authenticates with whatever the
+        # job's git configuration carries, and by the time this action runs the
+        # agent step has replaced that with its own GitHub App installation
+        # token. That token cannot push a `.github/workflows/` change under any
+        # configuration — `permissions:` has no `workflows` key to grant — so a
+        # branch that differs from main on a workflow file is rejected outright,
+        # which is how issue #404 lost a three-hour run. Pushing to an explicitly
+        # authenticated URL makes the PAT this action is handed the credential
+        # that is actually used. Actions masks the secret in the log.
+        REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+        push_branch() {
+          for attempt in 1 2 3 4; do
+            if git push "${REMOTE}" "refs/heads/${BRANCH}:refs/heads/${BRANCH}" >"${PUSH_LOG}" 2>&1; then
+              cat "${PUSH_LOG}"
+              return 0
+            fi
+            cat "${PUSH_LOG}"
+            if [ "${attempt}" = "4" ]; then
+              return 1
+            fi
+            sleep $(( 2 ** attempt ))
+          done
+        }
+
         # A PR from this branch that is open or already merged means the run
         # finished its job. Nothing to rescue, nothing to escalate, and re-opening
         # one would duplicate the deliverable. A *closed* PR is not that: the run
         # produced something and it was rejected, which still needs settling.
-        if [ "$(gh pr list --head "${BRANCH}" --state all --json state --jq '[.[] | select(.state != "CLOSED")] | length')" != "0" ]; then
+        #
+        # Except an open draft PR that still carries `paused`. That is the handover an
+        # earlier run left, which this run was told to resume and to un-pause
+        # when done — so the label still being there means this run did not
+        # finish. Issue #2045: its resume run hit the step timeout on PR #2065's
+        # branch, this check read the old PR as "the run finished", pushed
+        # nothing and labelled nothing, and the watchdog skipped the issue for
+        # the same PR. `in-progress` stayed with no run behind it and the queue
+        # stalled.
+        DELIVERED="$(gh pr list --head "${BRANCH}" --state all --json state --jq '[.[] | select(.state != "CLOSED")] | length')"
+        HANDOVER="$(gh pr list --head "${BRANCH}" --state open --json number,isDraft,labels --jq '[.[] | select(.isDraft and any(.labels[]; .name == "paused"))][0].number // empty')"
+        if [ "${DELIVERED}" != "0" ] && [ -z "${HANDOVER}" ]; then
           echo "PR already exists from ${BRANCH} — the run finished. Nothing to rescue."
+          exit 0
+        fi
+
+        if [ -n "${HANDOVER}" ]; then
+          echo "PR #${HANDOVER} from ${BRANCH} still carries \`paused\` — the resume run ended before finishing it."
+          # Save whatever the run committed on top of the handover first. The
+          # branch already has a PR, so a push is all it needs; a plain push,
+          # never a force, so a branch someone else moved is refused, not lost.
+          PUSHED=no
+          if git rev-parse --verify --quiet "${BRANCH}" >/dev/null && push_branch; then
+            PUSHED=yes
+          fi
+          if already_settled; then
+            echo "Nothing to report: the run settled its issue itself."
+            [ "${PUSHED}" = "yes" ] || exit 1
+            exit 0
+          fi
+          {
+            echo "🧯 **The run resuming PR #${HANDOVER} ended before finishing it.**"
+            echo
+            if [ "${PUSHED}" = "yes" ]; then
+              echo "Whatever it committed is pushed to \`${BRANCH}\`. PR #${HANDOVER} keeps its \`paused\` label, so it stays the handover for the next run."
+            else
+              echo "Its commits on \`${BRANCH}\` could not be pushed, so they die with the runner. PR #${HANDOVER} still holds the earlier handover."
+            fi
+            echo
+            echo "Runner logs: ${RUN_URL}"
+            echo
+            echo "Marking this \`blocked\` rather than leaving it \`in-progress\`: the session is over, and PR #${HANDOVER} would otherwise keep the watchdog from ever releasing the queue. Adding \`ready\` back resumes from the PR."
+          } > /tmp/agentic-rescue-body.md
+          gh issue comment "${ISSUE}" --body-file /tmp/agentic-rescue-body.md
+          escalate
+          [ "${PUSHED}" = "yes" ] || exit 1
           exit 0
         fi
 
@@ -198,31 +267,6 @@ runs:
         fi
 
         echo "Rescuing ${BRANCH} — the run ended before opening its PR."
-
-        # `git push` never reads GH_TOKEN. It authenticates with whatever the
-        # job's git configuration carries, and by the time this action runs the
-        # agent step has replaced that with its own GitHub App installation
-        # token. That token cannot push a `.github/workflows/` change under any
-        # configuration — `permissions:` has no `workflows` key to grant — so a
-        # branch that differs from main on a workflow file is rejected outright,
-        # which is how issue #404 lost a three-hour run. Pushing to an explicitly
-        # authenticated URL makes the PAT this action is handed the credential
-        # that is actually used. Actions masks the secret in the log.
-        REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-
-        push_branch() {
-          for attempt in 1 2 3 4; do
-            if git push "${REMOTE}" "refs/heads/${BRANCH}:refs/heads/${BRANCH}" >"${PUSH_LOG}" 2>&1; then
-              cat "${PUSH_LOG}"
-              return 0
-            fi
-            cat "${PUSH_LOG}"
-            if [ "${attempt}" = "4" ]; then
-              return 1
-            fi
-            sleep $(( 2 ** attempt ))
-          done
-        }
 
         # A push that cannot be retried into success still has to be reported.
         # This action exists so that a run ending early does not end silently,
