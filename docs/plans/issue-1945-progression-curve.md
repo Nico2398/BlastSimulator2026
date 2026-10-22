@@ -198,3 +198,16 @@ Root cause of the remaining bankruptcy (remainder, needs its own run):
 3. Ramp paths are unprotected from neighbouring blasts: a blast cut crater 1's ramp and trapped a hauler. Barring ramp paths from shot sites shrank
    the sites so grade 2 never came.
 4. The `upgrade_first` branch maps to "dig a ramp" because tier 2 reduces the climb ratio.
+
+## Update (#2062): probe-policy slice
+
+Landed (probe code only, `scripts/shared/probe-ladder-policy.ts` and `scripts/shared/probe-strategies.ts`):
+
+1. Deepen gate: `decideLadderDeepen` replaces the `craterRubble === 0` test. Sealed rubble no longer blocks deepening; ordered or reachable orderless rubble and a pending haul still do.
+2. Barren-site skip: `decideFreshShotSite` skips fresh sites over used-up ground while ore remains elsewhere.
+3. Ramp-corridor protection: `rampProtectionZones` / `shotOverlapsProtectedRamp` keep fresh shots off recorded ramp footprints, falling back when that would leave no site.
+4. `fleetClimbRatio` uses the slowest hauler tier.
+5. The `upgrade_first` branch of `decideLadderReach` is removed.
+
+NOT done in this slice: tuning of `MINE_GRADES`, `BUYER_*`, fees and `PERMIT_LIMITS`, and the 50,000-tick survival measurement. No new measurement is
+reported here. The remainder is filed as #2066.

@@ -79,8 +79,12 @@ import {
   type BuyRule, type LadderShot, type PermitLimit,
 } from './probe-ladder.js';
 import {
-  decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM, LADDER_GATE_MIN_GRADE, decideLadderSafety, decideLadderShotGate,
+  decideLadderDeepen, decideFreshShotSite, decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM,
+  LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
+  rampProtectionZones, shotOverlapsProtectedRamp,
+  type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
+import { sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
@@ -277,14 +281,31 @@ function overlapsShot(c: Pattern & { span?: number }, o: Pattern & { span?: numb
     && c.z <= o.z + (o.span ?? SHOT_SPAN) + gap && o.z <= c.z + (c.span ?? SHOT_SPAN) + gap;
 }
 
+/** Extra limits on a fresh shot site: ramp corridors kept clear, and used-up ground skipped. */
+export interface FreshSiteRules {
+  protectedZones: readonly ProtectedZone[];
+}
+
+/**
+ * Free deposits best first. With `rules`, sites on ore-less ground are skipped while ore remains elsewhere, and sites over a
+ * protected ramp corridor are skipped unless that would leave none (a ladder that finds no site stalls).
+ */
+export function freshSites(grid: VoxelGrid, span: number, depth: number, earlier: readonly (Pattern & { span?: number })[], rules?: FreshSiteRules): Pattern[] {
+  const free = rankDeposits(grid, span, depth)
+    .filter(c => !earlier.some(o => overlapsShot({ ...c, span }, o, earlier.length > 0 ? BERM_GAP : 0)));
+  if (!rules) return free;
+  const groundOreKgRemaining = free.reduce((sum, c) => sum + c.ore, 0);
+  const worthIt = free.filter(c => decideFreshShotSite({
+    oreKgUnderSite: c.ore, siteOreKgFloor: LADDER_SITE_ORE_FLOOR, groundOreKgRemaining,
+  }) === 'fire');
+  const clear = worthIt.filter(c => !shotOverlapsProtectedRamp({ x: c.x, z: c.z, span }, rules.protectedZones));
+  return clear.length > 0 ? clear : worthIt;
+}
+
 /** Order `spec` at `at`, or on the best free deposit when `at` is not given. */
-function orderShot(s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = { ...SHOT, explosive: shotExplosive(s) }, at?: Pattern): Shot | null {
+function orderShot(s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = { ...SHOT, explosive: shotExplosive(s) }, at?: Pattern, rules?: FreshSiteRules): Shot | null {
   const span = spanOf(spec);
-  const candidates = at
-    ? [at]
-    : rankDeposits(s.grid, span, spec.depth)
-      .filter(c => !earlier.some(o => overlapsShot({ ...c, span }, o, earlier.length > 0 ? BERM_GAP : 0)))
-      .slice(0, DEPOSIT_CANDIDATES_TRIED);
+  const candidates = at ? [at] : freshSites(s.grid, span, spec.depth, earlier, rules).slice(0, DEPOSIT_CANDIDATES_TRIED);
   // The stock buy takes whole kg; round up so the pattern's charge is covered.
   const totalKg = Math.ceil(spec.rows * spec.cols * spec.kg);
   const diameter = spec.diameterM === undefined ? '' : ` diameter:${spec.diameterM}`;
@@ -336,7 +357,7 @@ function fireShot(s: ProbeSession): boolean {
 // ── Ramp ──
 
 /** A ramp accepted by `build_ramp`: rise over run, and the horizontal run (m). */
-interface RampOrder { slope: number; runM: number }
+interface RampOrder extends RampFootprintInput { slope: number }
 
 /**
  * Order a ramp from the open ground into the crater the shot at `at` (`span` wide) made, no steeper than
@@ -359,7 +380,7 @@ function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = RA
       if (start.x < 1 || start.z < 1 || start.x >= grid.sizeX - 1 || start.z >= grid.sizeZ - 1) continue;
       const depth = Math.round(getSmoothTerrainSurfaceY(grid, start.x, start.z) - floor);
       if (depth < 1 || depth / length > maxSlope) continue;
-      if (s.run(`build_ramp start:${start.x},${start.z} end:${lane.end.x},${lane.end.z} depth:${depth}`).success) return { slope: depth / length, runM: length };
+      if (s.run(`build_ramp start:${start.x},${start.z} end:${lane.end.x},${lane.end.z} depth:${depth}`).success) return { slope: depth / length, x: start.x, z: start.z, runM: length, dirX: lane.dx, dirZ: lane.dz };
     }
   }
   return null;
@@ -634,13 +655,13 @@ interface LadderMemory extends ReinvestMemory {
 const craterKey = (c: Pattern): string => `${c.x},${c.z}`;
 
 /**
- * Slope ratio of the fleet's best hauler tier (tier 1 with none): the maximum tier, not `fleetSlopeRatio`'s minimum over
- * every vehicle. A slower hauler of a lower tier may still be unable to climb a ramp this value allows.
- * TODO(#2062): the remainder issue may switch this to the slowest hauler tier.
+ * Slope ratio every hauler climbs: the minimum over the haulers' tiers (tier 1 with none), as `fleetSlopeRatio` does over
+ * every vehicle. Not `fleetSlopeRatio(haulers, true)`: its empty-fleet fallback is the slowest tier of all, where the ladder's
+ * first hauler is tier 1. Tier 2 climbs less steeply than tier 1, so a ramp is only as steep as the slowest hauler allows.
  */
-function fleetClimbRatio(vehicles: readonly Vehicle[]): number {
-  const tiers = vehicles.filter(v => v.type === 'debris_hauler').map(v => v.tier);
-  return tierSlopeRatio(Math.max(1, ...tiers) as VehicleTier);
+export function fleetClimbRatio(vehicles: readonly Vehicle[]): number {
+  const ratios = vehicles.filter(v => v.type === 'debris_hauler').map(v => tierSlopeRatio(v.tier));
+  return ratios.length === 0 ? tierSlopeRatio(1) : Math.min(...ratios);
 }
 
 /** Remember the ramp dug into a crater. */
@@ -654,18 +675,39 @@ function depthTargetOpen(s: ProbeSession): boolean {
   return nextGradeTargets(s.state).some(t => t.kind === 'depth_m' && !t.met);
 }
 
-/** Fragments lying on the ground over a crater's footprint (and a tile around it). */
-function craterRubble(state: GameState, crater: Pattern & { span: number }): number {
-  return state.logistics.fragments.filter(f => f.state === 'on_ground'
-    && f.fragment.position.x >= crater.x - 1 && f.fragment.position.x <= crater.x + crater.span + 1
-    && f.fragment.position.z >= crater.z - 1 && f.fragment.position.z <= crater.z + crater.span + 1).length;
+/** Whether a position lies over a crater's footprint or the tile around it. */
+function inCraterFringe(x: number, z: number, crater: Pattern & { span: number }): boolean {
+  return x >= crater.x - 1 && x <= crater.x + crater.span + 1 && z >= crater.z - 1 && z <= crater.z + crater.span + 1;
+}
+
+interface CraterRubbleCounts {
+  ordered: number;
+  orderless: number;
+  sealed: number;
+}
+
+/** One pass over the crater's rubble: covered by a haul order, reachable without one, or sealed from every hauler. */
+export function craterRubbleCounts(state: GameState, crater: Pattern & { span: number }): CraterRubbleCounts {
+  const sealedIds = sealedFragmentIdsOf(state) ?? new Set<number>();
+  const orderedIds = new Set<number>();
+  for (const a of state.pendingActions) {
+    if (a.type === 'haul_debris') orderedIds.add((a.payload as { fragmentId: number }).fragmentId);
+  }
+  const counts: CraterRubbleCounts = { ordered: 0, orderless: 0, sealed: 0 };
+  for (const f of state.logistics.fragments) {
+    if (f.state !== 'on_ground' || !inCraterFringe(f.fragment.position.x, f.fragment.position.z, crater)) continue;
+    const id = f.fragment.id;
+    if (sealedIds.has(id)) counts.sealed++;
+    else if (orderedIds.has(id)) counts.ordered++;
+    else counts.orderless++;
+  }
+  return counts;
 }
 
 /** A haul still pending over a crater's footprint (and a tile around it). */
 function craterHaulPending(state: GameState, crater: Pattern & { span: number }): boolean {
   return state.pendingActions.some(a => a.type === 'haul_debris'
-    && a.targetX >= crater.x - 1 && a.targetX <= crater.x + crater.span + 1
-    && a.targetZ >= crater.z - 1 && a.targetZ <= crater.z + crater.span + 1);
+    && inCraterFringe(a.targetX, a.targetZ, crater));
 }
 
 /**
@@ -679,15 +721,20 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const vehicles = state.vehicles.vehicles;
   // Deepen the latest crater whose rubble is cleared (holes under rubble never finish); none clear: a fresh site meanwhile.
   const crater = [...m.origins].reverse().map(o => ({ x: o.x, z: o.z, span: o.span ?? SHOT_SPAN }))
-    .find(c => craterRubble(state, c) === 0 && !craterHaulPending(state, c));
+    .find(c => {
+      const counts = craterRubbleCounts(state, c);
+      return decideLadderDeepen({
+        orderedRubbleCount: counts.ordered, orderlessRubbleCount: counts.orderless,
+        sealedRubbleCount: counts.sealed, haulPending: craterHaulPending(state, c),
+      }) === 'deepen';
+    });
   const deepen = depthTargetOpen(s) && crater !== undefined;
   const holeDepth = Math.min(fleetBestRigLimit(DRILL_RIG_MAX_DEPTH_M, vehicles), LADDER_HOLE_DEPTH_M);
   // A ramp steeper than the fleet climbs reaches only so deep: shrink the holes to what the haulers still reach.
   const ramp = deepen && crater ? m.ramps[craterKey(crater)] : undefined;
   const climb = fleetClimbRatio(vehicles);
-  // TODO(#2062): upgrade_first is never reached here (affordableTier2Upgrade hard-coded false); wire it when the tier-2 climb decision lands.
   const shrunk = ramp !== undefined && decideLadderReach({
-    rampSlopeRatio: ramp.slope, fleetClimbRatio: climb, affordableTier2Upgrade: false,
+    rampSlopeRatio: ramp.slope, fleetClimbRatio: climb,
   }) === 'shrink';
   const depth = shrunk ? Math.max(1, Math.floor(reachableShotDepthM(ramp.runM, climb, holeDepth))) : holeDepth;
   const rigDiameterM = fleetBestRigLimit(DRILL_RIG_MAX_DIAMETER_M, vehicles);
@@ -715,6 +762,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const specFor = (n: number): ShotSpec => ({
     rows: n, cols: n, spacing: sized.spacing, depth, explosive: shotExplosive(s), kg: kgFor(n), stemming: sized.stemming, diameterM: sized.diameterM,
   });
+  const protectedZones = rampProtectionZones(Object.values(m.ramps), LADDER_RAMP_PROTECT_MARGIN_M);
   // Orders no ramp reaches never get hauled: they are not work for the crew.
   const hauling = state.pendingActions.some(a => a.type === 'haul_debris' && a.blockedReason === null);
   return {
@@ -727,7 +775,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
         for (const step of LADDER_SHRINK_STEPS) {
           const n = Math.max(1, Math.round(side * step));
           const at = deepen && crater ? { x: crater.x + inset, z: crater.z + inset } : undefined;
-          ordered = orderShot(s, [...m.origins, ...m.barred], specFor(n), at);
+          ordered = orderShot(s, [...m.origins, ...m.barred], specFor(n), at, { protectedZones });
           if (ordered !== null) return true;
         }
         return false;
@@ -881,7 +929,7 @@ function ladderCraterRamp(s: ProbeSession, m: LadderMemory): void {
   const own = m.ramps[craterKey(m.crater)];
   const reach = decideLadderReach({
     rampSlopeRatio: own?.slope ?? Infinity,
-    fleetClimbRatio: climb, affordableTier2Upgrade: s.state.cash - LADDER_UPGRADE_RESERVE >= (computeVehicleUpgradeCost('debris_hauler', 1) ?? Infinity),
+    fleetClimbRatio: climb,
   });
   const affordable = s.state.cash - LADDER_RAMP_COST >= LADDER_UPGRADE_RESERVE;
   const needsWayIn = reach !== 'fire' && gradeOf(s) >= LADDER_GATE_MIN_GRADE;
