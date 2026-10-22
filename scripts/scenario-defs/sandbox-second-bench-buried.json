@@ -159,9 +159,9 @@
       }
     },
     {
-      "command": "build_ramp start:29,31 end:35,31 depth:2",
+      "command": "build_ramp start:27,31 end:35,31 depth:2",
       "role": "player",
-      "description": "Dig a ramp into the bench so the haulers and the drill rig can reach the crater floor once it is blasted. 6 m long for a 2 m depth is 18.4 degrees, inside the 20 degree limit every vehicle shares (#2045); the ramp tool refuses anything steeper.",
+      "description": "Dig a ramp into the bench so the haulers and the drill rig can reach the crater floor once it is blasted. 8 m long for a 2 m depth is 14.0 degrees, inside the 20 degree limit every vehicle shares (#2045); the ramp tool refuses anything steeper.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -194,7 +194,7 @@
         },
         {
           "type": "dragTiles",
-          "x1": 29,
+          "x1": 27,
           "z1": 31,
           "x2": 35,
           "z2": 31

@@ -1,6 +1,6 @@
 {
   "name": "sandbox-steep-ramp-blocks-vehicles",
-  "description": "One 20 degree slope limit for every vehicle on a progression site (#2045). The ramp tool will not cut a ramp vehicles cannot drive: a 10 m ramp for a 5 m depth (26.6 degrees, which a vehicle could once climb by zigzagging) is refused, Confirm is disabled and nothing is ordered. A 6 m ramp for a 2 m depth (18.4 degrees) is accepted and dug; the first blast leaves rubble in the crater it serves, and the haulers carry it out up that ramp, so the hole planned under the rubble is drilled once it is cleared. The player then clicks the ramp: the inspector opens on it and offers Widen.",
+  "description": "One 20 degree slope limit for every vehicle on a progression site (#2045). The ramp tool will not cut a ramp vehicles cannot drive: a 10 m ramp for a 5 m depth (26.6 degrees, which a vehicle could once climb by zigzagging) is refused, Confirm is disabled and nothing is ordered. An 8 m ramp for a 2 m depth (14.0 degrees) is accepted and dug; the first blast leaves rubble in the crater it serves, and the haulers carry it out up that ramp, so the hole planned under the rubble is drilled once it is cleared. The player then clicks the ramp: the inspector opens on it and offers Widen.",
   "steps": [
     {
       "command": "sandbox start biome:desert_badlands kit:full seed:42",
@@ -214,9 +214,9 @@
       }
     },
     {
-      "command": "build_ramp start:29,31 end:35,31 depth:2",
+      "command": "build_ramp start:27,31 end:35,31 depth:2",
       "role": "player",
-      "description": "Dig the ramp the tool accepts: 6 m long for a 2 m depth is 18.4 degrees, under the 20 degree limit every vehicle shares, so the haulers can drive out of the crater it serves.",
+      "description": "Dig the ramp the tool accepts: 8 m long for a 2 m depth is 14.0 degrees, under the 20 degree limit every vehicle shares, so the haulers can drive out of the crater it serves.",
       "interaction": [
         {
           "type": "keypress",
@@ -253,7 +253,7 @@
         },
         {
           "type": "dragTiles",
-          "x1": 29,
+          "x1": 27,
           "z1": 31,
           "x2": 35,
           "z2": 31

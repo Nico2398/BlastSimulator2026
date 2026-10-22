@@ -73,7 +73,7 @@ import { getLevel } from '../../src/core/campaign/Level.js';
 import { getEventById } from '../../src/core/events/EventPool.js';
 import type { EventConsequence } from '../../src/core/events/EventPool.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
-import type { Vehicle, VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
+import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
 import {
   floorToKgResolution, limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
   type BuyRule, type LadderShot, type PermitLimit,
