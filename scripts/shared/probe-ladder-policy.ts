@@ -207,7 +207,7 @@ export interface LadderHoleDepthInput {
   currentCapM: number;
 }
 
-/** Hole depth (m) for the next ladder shot: shallow on a fresh site, down to the target when deepening, stepped down after a failure. */
+/** Hole depth (m) for the next ladder shot: the fresh-site depth, or on an open floor the remaining depth plus 1 m (capped at the fresh depth); after a failure, capped by the previous cap stepped down (never below the minimum); always within the rig's reach. */
 export function decideLadderHoleDepth(input: LadderHoleDepthInput): number {
   const base = input.floorOpen
     ? Math.min(LADDER_FRESH_HOLE_DEPTH_M, input.remainingDepthM + 1)

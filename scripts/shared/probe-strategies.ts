@@ -80,7 +80,8 @@ import {
 } from './probe-ladder.js';
 import {
   decideLadderDeepen, decideFreshShotSite, decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM,
-  LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_FRESH_HOLE_DEPTH_M, LADDER_HOLE_MIN_DEPTH_M, decideLadderHoleDepth, isDudShot, shouldBarCrater, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
+  LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_FRESH_HOLE_DEPTH_M, LADDER_HOLE_MIN_DEPTH_M,
+  decideLadderHoleDepth, isDudShot, shouldBarCrater, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
   rampProtectionZones, shotOverlapsProtectedRamp,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
@@ -652,11 +653,11 @@ interface LadderMemory extends ReinvestMemory {
   holeCapM: number;
   /** Whether the last resolved shot gained no pit depth and no new ore. */
   lastShotFailed: boolean;
-  /** Consecutive dud shots at the current crater site. */
+  /** Consecutive dud shots; reset by a productive shot or by barring a crater. */
   dudStreak: number;
   /** Shots (entries of `origins`) already judged by `trackLadderShot`. */
   judgedShots: number;
-  /** Pit depth and haulable ore just before the next shot fired. */
+  /** Pit depth and haulable ore baseline a shot's result is compared against; it follows the world until a shot fires. */
   before: { pitM: number; oreKg: number };
 }
 
@@ -728,7 +729,7 @@ export function craterRubbleCounts(state: GameState, crater: Pattern & { span: n
   for (const a of state.pendingActions) {
     if (a.type !== 'haul_debris' && a.type !== 'fragment_debris') continue;
     const id = (a.payload as { fragmentId: number }).fragmentId;
-    // An order a hauler cannot carry out (out of reach) never clears: its rubble is sealed, not waiting.
+    // A blocked order (blockedReason set, e.g. target out of reach) never clears: its rubble counts as sealed, not ordered.
     if (a.blockedReason) sealedIds.add(id);
     else orderedIds.add(id);
   }
@@ -760,7 +761,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const vehicles = state.vehicles.vehicles;
   // Deepen the latest crater whose rubble is cleared (holes under rubble never finish); none clear: a fresh site meanwhile.
   const crater = [...m.origins].reverse().map(o => ({ x: o.x, z: o.z, span: o.span ?? SHOT_SPAN }))
-    .filter(c => !m.barred.some(b => b.x === c.x && b.z === c.z))
+    .filter(c => !m.barred.some(b => craterKey(b) === craterKey(c)))
     .find(c => {
       const counts = craterRubbleCounts(state, c);
       return decideLadderDeepen({
@@ -812,7 +813,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   // Orders no ramp reaches never get hauled: they are not work for the crew.
   const hauling = state.pendingActions.some(a => a.type === 'haul_debris' && a.blockedReason === null);
   return {
-    // Blast again to deepen a cleared crater, to dig the first full-depth pit, or when the crew has nothing left to haul (idle crew, no income).
+    // Blast again to deepen a cleared crater, to dig the first fresh-depth pit, or when the crew has nothing left to haul (idle crew, no income).
     wanted: deepen || !hauling || (!m.lastShotFailed && pitM < LADDER_FRESH_HOLE_DEPTH_M - LADDER_FRESH_SHOT_DEPTH_SLACK_M),
     cost: side === 0 ? Infinity : side * side * kg * explosive.costPerKg + RE_FIRE_CASH_CUSHION,
     order: () => {

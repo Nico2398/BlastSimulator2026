@@ -22,6 +22,14 @@ import {
   type LadderRampInput,
   type LadderShotGateInput,
   type LadderSafetyInput,
+  decideLadderHoleDepth,
+  isDudShot,
+  shouldBarCrater,
+  LADDER_FRESH_HOLE_DEPTH_M,
+  LADDER_HOLE_MIN_DEPTH_M,
+  LADDER_HOLE_STEP_DOWN_M,
+  LADDER_DUD_SHOT_LIMIT,
+  type LadderHoleDepthInput,
 } from '../../../scripts/shared/probe-ladder-policy';
 
 const rampBase: LadderRampInput = {
@@ -417,17 +425,6 @@ describe('rampProtectionZones and shotOverlapsProtectedRamp', () => {
     });
   });
 });
-
-import {
-  decideLadderHoleDepth,
-  isDudShot,
-  shouldBarCrater,
-  LADDER_FRESH_HOLE_DEPTH_M,
-  LADDER_HOLE_MIN_DEPTH_M,
-  LADDER_HOLE_STEP_DOWN_M,
-  LADDER_DUD_SHOT_LIMIT,
-  type LadderHoleDepthInput,
-} from '../../../scripts/shared/probe-ladder-policy';
 
 const holeBase: LadderHoleDepthInput = {
   rigMaxDepthM: 11,
