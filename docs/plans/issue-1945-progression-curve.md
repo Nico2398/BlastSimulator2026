@@ -255,3 +255,33 @@ Root cause (measured by instrumenting a 4,000-tick run; instrumentation reverted
 
 Remainder (own run): make the ladder dig a way into each fresh crater without starving hauling (sequence the ramp between shots, or give ramp work its own
 crew), then tune `BUYER_*`, `MINE_GRADES` and `PERMIT_LIMITS` against the g3/g4/g5 windows and the 50,000-tick survival.
+
+### Follow-up (#2066): hole-depth fix, grade 2 reached (partial, MISSED)
+
+Instrumented 4,000-tick runs found the real stall: the ladder drilled 11 m holes (`LADDER_HOLE_DEPTH_M`) with a grade-1 charge (120 kg). Under that much cover
+the blast buries its rubble sealed and opens no crater (surface unchanged), so the pit stayed at 5.02 m and `orderRamp` found no depression to ramp into.
+Hole depth sweep, pit depth at t4,000-5,500: 5 m -> 6.5 m, 7 m -> 8.2 m, 9 m -> grade 2 at t2,282, 10 m -> stalls at 9.99 m (just under the 10 m target), 11 m -> 5.02 m.
+
+Probe changes (`scripts/shared/probe-strategies.ts`): `LADDER_HOLE_DEPTH_M` 11 -> 9; `needsWayIn` in `ladderCraterRamp` no longer waits for grade 2.
+No balance constant, sandbox pin or campaign pin changed (no balance tuning was reached).
+
+| run | g1 | g2 | g3-5 | cash@3k | cash@6k | cash@10k | boulder ore sold | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder, full, 14,000 horizon | 968 | 2372 | not reached | 4.24 M | 10.27 M | 14.45 M | 55% | t14,000, 6 blasts |
+| ladder, digger, 12,000 horizon | 948 | 3092 | not reached | 2.15 M | n/a | n/a | 0% | bankrupt t5,989 |
+| stay_g1, full, 10,000 horizon | 968 | capped | n/a | 4.77 M | 10.79 M | 14.01 M | 59% | t10,000 |
+| reinvest, full (unchanged policy) | 1178 | n/a | n/a | 2.83 M | 4.60 M | 6.65 M | 39% | t10,000 |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| grade 3 at t8,000-14,000 | not reached by t14,000 | MISSED |
+| grade 4 at t15,000-25,000 | not measured (horizon 14,000) | MISSED |
+| grade 5 at t30,000-45,000 | not measured | MISSED |
+| ladder ahead of stay_g1 at t10,000 | 14.45 M vs 14.01 M | MET |
+| full kit ahead of digger kit at t10,000 | 14.45 M vs bankrupt t5,989 | MET |
+| >= 60% boulder ore sold | 55% (ladder, whole run to t14,000); 82% at t4,000 | MISSED |
+| ladder survives 50,000 ticks | not measured: the 50,000-tick run did not finish in over 90 minutes of wall clock | UNKNOWN |
+
+Observations for the remainder: only 6 blasts in 14,000 ticks (each shot takes about 500 ticks to drill and charge), and a probe run past grade 2 becomes very slow
+(a 14,000-tick run took about 40 minutes), so the g3 gate and `BUYER_*` / `MINE_GRADES` / `PERMIT_LIMITS` tuning need a faster loop, or the ladder needs
+to fire more often once cash is idle. The digger ladder still goes bankrupt.

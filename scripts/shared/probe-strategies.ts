@@ -615,8 +615,11 @@ function runReinvest(s: ProbeSession): void {
 
 /** Cash the ladder keeps back from every purchase and permit fee: payroll and upkeep keep running. */
 const LADDER_CASH_RESERVE = 5_000;
-/** Deepest hole the ladder drills (m), kept under the softest rock's safe face height (#1941). */
-const LADDER_HOLE_DEPTH_M = 11;
+/**
+ * Deepest hole the ladder drills (m), kept under the softest rock's safe face height (#1941). Measured (#2066): a grade-1 charge
+ * under 10-11 m of cover buries its rubble sealed and the pit stays at 5 m (10 m holes stall at 9.99 m); 9 m opens the crater and deepens it.
+ */
+const LADDER_HOLE_DEPTH_M = 9;
 /** A pit this close under the hole depth counts as dug: deepening then waits for a cleared crater instead of a fresh site. */
 const LADDER_FRESH_SHOT_DEPTH_SLACK_M = 0.5;
 /** Haulers the ladder buys while cash is idle: rubble clears at the fleet's pace, and a buried pit stalls every later shot. */
@@ -932,7 +935,7 @@ function ladderCraterRamp(s: ProbeSession, m: LadderMemory): void {
     fleetClimbRatio: climb,
   });
   const affordable = s.state.cash - LADDER_RAMP_COST >= LADDER_UPGRADE_RESERVE;
-  const needsWayIn = reach !== 'fire' && gradeOf(s) >= LADDER_GATE_MIN_GRADE;
+  const needsWayIn = reach !== 'fire';
   if (deeper === 'skip' && (!needsWayIn || !affordable)) return;
   tryOnce(s, m, 'crater_ramp', () => {
     const ramp = orderRamp(s, m.crater, m.crater.span, Math.min(RAMP_MAX_SLOPE, climb));
