@@ -211,3 +211,47 @@ Landed (probe code only, `scripts/shared/probe-ladder-policy.ts` and `scripts/sh
 
 NOT done in this slice: tuning of `MINE_GRADES`, `BUYER_*`, fees and `PERMIT_LIMITS`, and the 50,000-tick survival measurement. No new measurement is
 reported here. The remainder is filed as #2066.
+
+## Update (#2066): measurement under the #2062 policy, no tuning landed (MISSED)
+
+Seed 42, desert_badlands, measured with `scripts/progression-probe.ts`:
+
+```
+npm run probe:progression -- --seed 42 --biome desert_badlands --kit full   --strategy ladder  --horizon 50000
+npm run probe:progression -- --seed 42 --biome desert_badlands --kit digger --strategy ladder  --horizon 12000
+npm run probe:progression -- --seed 42 --biome desert_badlands --kit full   --strategy stay_g1 --horizon 10000
+npm run probe:progression -- --seed 42 --biome desert_badlands --kit full   --strategy reinvest --horizon 10000
+```
+
+| run | g1 | g2-5 | cash@3k | cash@6k | cash@10k | cash@15k | boulder ore sold | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder, full kit | 968 | not reached | 4.84 M | 10.62 M | 7.51 M | 3.25 M | 75% | bankrupt t18,589 |
+| ladder, digger kit | 868 | not reached | 0.92 M | n/a | n/a | n/a | 0% | bankrupt t4,309 |
+| stay_g1, full kit | 968 | capped | 4.84 M | 10.62 M | 7.51 M | n/a | 75% | t10,000 |
+| reinvest, full kit | 1178 | n/a | 2.83 M | 4.60 M | 6.65 M | n/a | 39% | t10,000 |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| grade 3 at t8,000-14,000 | not reached | MISSED |
+| grade 4 at t15,000-25,000 | not reached | MISSED |
+| grade 5 at t30,000-45,000 | not reached | MISSED |
+| ladder ahead of stay_g1 at t10,000 | 7.51 M vs 7.51 M (identical: the ladder never leaves grade 1) | MISSED |
+| full kit ahead of digger kit at t10,000 | 7.51 M vs bankrupt at t4,309 | MET |
+| >= 60% boulder ore sold | 75% | MET |
+| ladder survives 50,000 ticks | bankrupt t18,589 | MISSED |
+
+No `MINE_GRADES`, `BUYER_*`, `PERMIT_LIMITS`, sandbox pin or campaign pin changed. Tuning was not attempted: the ladder never reaches grade 2, so no grade-3-to-5
+window can be measured, and retuning balance to route around a stalled probe policy would hide the defect.
+
+Root cause (measured by instrumenting a 4,000-tick run; instrumentation reverted):
+
+1. Grade 2 needs depth 10 m; the pit stays at 5.02 m for the whole run (ore 55-69 k kg and safety targets are met by t3,500, cash is 5-9 M and idle).
+2. `ladderCraterRamp` returns while `m.shot !== null`. With cash plentiful the next shot is ordered the tick after the last fires, so a shot is always pending
+   and no ramp is ever ordered after the opening crater's. `needsWayIn` is also gated to grade >= `LADDER_GATE_MIN_GRADE` (2), unreachable here.
+3. Deepening shots (`decideLadderDeepen`, sealed rubble ignored) then re-fire at a crater whose rubble is all sealed (365, then 660 fragments with no way in), adding sealed
+   rubble and no depth.
+4. `LADDER_SITE_ORE_FLOOR` (1 vs 20) and `LADDER_RAMP_PROTECT_MARGIN_M` (2 vs 6) changed nothing: depth 5.02 m in every combination at t3,500.
+5. Removing both ramp gates orders a ramp into the second crater but income collapsed (3 blasts, 9 k ore, bankrupt t2,505): the ramp work starves the hauling crew. Reverted.
+
+Remainder (own run): make the ladder dig a way into each fresh crater without starving hauling (sequence the ramp between shots, or give ramp work its own
+crew), then tune `BUYER_*`, `MINE_GRADES` and `PERMIT_LIMITS` against the g3/g4/g5 windows and the 50,000-tick survival.
