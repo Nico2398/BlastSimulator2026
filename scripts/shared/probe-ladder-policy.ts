@@ -188,13 +188,13 @@ export function shotOverlapsProtectedRamp(site: ProtectedZone, zones: readonly P
 /** Deepest hole (m) the ladder drills on a fresh site, where the floor is not yet open: deeper holes seal under the burden cap. */
 export const LADDER_FRESH_HOLE_DEPTH_M = 8;
 /** Metres the hole depth cap drops after a failed shot (no pit gain, no new ore). */
-export const LADDER_HOLE_STEP_DOWN_M = 2;
+const LADDER_HOLE_STEP_DOWN_M = 2;
 /** Shallowest hole (m) the step-down ever reaches. */
 export const LADDER_HOLE_MIN_DEPTH_M = 4;
 /** Consecutive dud shots after which the crater is barred from further shots. */
-export const LADDER_DUD_SHOT_LIMIT = 2;
+const LADDER_DUD_SHOT_LIMIT = 2;
 
-export interface LadderHoleDepthInput {
+interface LadderHoleDepthInput {
   /** Deepest hole the fleet's best drill rig can drill, in metres. */
   rigMaxDepthM: number;
   /** Depth (m) still to dig below the current floor, down to the target. */
@@ -207,10 +207,15 @@ export interface LadderHoleDepthInput {
   currentCapM: number;
 }
 
-/** Hole depth (m) for the next ladder shot. */
-export function decideLadderHoleDepth(_input: LadderHoleDepthInput): number {
-  // TODO: implement
-  return undefined as unknown as number;
+/** Hole depth (m) for the next ladder shot: shallow on a fresh site, down to the target when deepening, stepped down after a failure. */
+export function decideLadderHoleDepth(input: LadderHoleDepthInput): number {
+  const base = input.floorOpen
+    ? Math.min(LADDER_FRESH_HOLE_DEPTH_M, input.remainingDepthM + 1)
+    : LADDER_FRESH_HOLE_DEPTH_M;
+  const wanted = input.lastShotFailed
+    ? Math.min(base, Math.max(LADDER_HOLE_MIN_DEPTH_M, input.currentCapM - LADDER_HOLE_STEP_DOWN_M))
+    : base;
+  return Math.min(wanted, input.rigMaxDepthM);
 }
 
 export interface LadderShotOutcomeInput {
@@ -221,13 +226,11 @@ export interface LadderShotOutcomeInput {
 }
 
 /** Whether a fired shot did nothing useful: no columns cleared or no volume broken. */
-export function isDudShot(_input: LadderShotOutcomeInput): boolean {
-  // TODO: implement
-  return undefined as unknown as boolean;
+export function isDudShot(input: LadderShotOutcomeInput): boolean {
+  return input.columnsCleared === 0 || input.volumeM3 === 0;
 }
 
 /** Whether a crater with this many consecutive dud shots is barred from further shots. */
-export function shouldBarCrater(_consecutiveDuds: number): boolean {
-  // TODO: implement
-  return undefined as unknown as boolean;
+export function shouldBarCrater(consecutiveDuds: number): boolean {
+  return consecutiveDuds >= LADDER_DUD_SHOT_LIMIT;
 }
