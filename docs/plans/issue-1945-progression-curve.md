@@ -210,4 +210,4 @@ Landed (probe code only, `scripts/shared/probe-ladder-policy.ts` and `scripts/sh
 5. The `upgrade_first` branch of `decideLadderReach` is removed.
 
 NOT done in this slice: tuning of `MINE_GRADES`, `BUYER_*`, fees and `PERMIT_LIMITS`, and the 50,000-tick survival measurement. No new measurement is
-reported here. The remainder issue for both is to be filed.
+reported here. The remainder is filed as #2066.
