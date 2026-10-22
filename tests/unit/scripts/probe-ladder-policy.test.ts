@@ -22,6 +22,16 @@ import {
   type LadderRampInput,
   type LadderShotGateInput,
   type LadderSafetyInput,
+  decideLadderHoleDepth,
+  isDudShot,
+  shouldBarCrater,
+  judgeLadderShot,
+  LADDER_FRESH_HOLE_DEPTH_M,
+  LADDER_HOLE_MIN_DEPTH_M,
+  LADDER_HOLE_STEP_DOWN_M,
+  LADDER_DUD_SHOT_LIMIT,
+  type LadderHoleDepthInput,
+  type LadderShotJudgeInput,
 } from '../../../scripts/shared/probe-ladder-policy';
 
 const rampBase: LadderRampInput = {
@@ -415,5 +425,177 @@ describe('rampProtectionZones and shotOverlapsProtectedRamp', () => {
       const far: ProtectedZone = { x: 100, z: 100, span: 5 };
       expect(shotOverlapsProtectedRamp({ x: 101, z: 101, span: 2 }, [zone, far])).toBe(true);
     });
+  });
+});
+
+const holeBase: LadderHoleDepthInput = {
+  rigMaxDepthM: 11,
+  remainingDepthM: 20,
+  floorOpen: false,
+  lastShotFailed: false,
+  currentCapM: 8,
+};
+
+describe('decideLadderHoleDepth', () => {
+  it('constants hold the spec values', () => {
+    expect(LADDER_FRESH_HOLE_DEPTH_M).toBe(8);
+    expect(LADDER_HOLE_MIN_DEPTH_M).toBe(4);
+    expect(LADDER_HOLE_STEP_DOWN_M).toBe(2);
+    expect(LADDER_DUD_SHOT_LIMIT).toBe(2);
+  });
+
+  it('fresh site drills 8 m with a deep rig and ignores remaining depth', () => {
+    expect(decideLadderHoleDepth(holeBase)).toBe(8);
+    expect(decideLadderHoleDepth({ ...holeBase, remainingDepthM: 0.5 })).toBe(8);
+    expect(decideLadderHoleDepth({ ...holeBase, remainingDepthM: 100 })).toBe(8);
+  });
+
+  it('fresh site is clamped to a shallow rig', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, rigMaxDepthM: 6 })).toBe(6);
+  });
+
+  it('honours a campaign fresh depth of 11, clamped by rig max', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, freshHoleDepthM: 11 })).toBe(11);
+    expect(decideLadderHoleDepth({ ...holeBase, freshHoleDepthM: 11, rigMaxDepthM: 9 })).toBe(9);
+    expect(decideLadderHoleDepth({ ...holeBase, freshHoleDepthM: 11, floorOpen: true, remainingDepthM: 20 })).toBe(11);
+  });
+
+  it('deepen drills fresh depth when much remains, else remaining plus 1 m', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: 20 })).toBe(8);
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: 5 })).toBe(6);
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: 7 })).toBe(8);
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: 7.5 })).toBe(8);
+  });
+
+  it('deepen with remaining at or below zero is lifted to the 4 m floor', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: 0 })).toBe(4);
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: -3 })).toBe(4);
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: 2 })).toBe(4);
+  });
+
+  it('deepen is clamped to rig max', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, rigMaxDepthM: 6, remainingDepthM: 20 })).toBe(6);
+  });
+
+  it('never below 4 m unless the rig cannot drill that deep, then rig max', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, rigMaxDepthM: 3 })).toBe(3);
+    expect(decideLadderHoleDepth({ ...holeBase, rigMaxDepthM: 2, floorOpen: true, remainingDepthM: 5 })).toBe(2);
+    expect(decideLadderHoleDepth({ ...holeBase, rigMaxDepthM: 3, lastShotFailed: true, currentCapM: 4 })).toBe(3);
+  });
+
+  it('failed shot steps the cap down by 2', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 8 })).toBe(6);
+  });
+
+  it('repeated failures saturate at 4', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 6 })).toBe(4);
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 5 })).toBe(4);
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 4 })).toBe(4);
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 3 })).toBe(4);
+  });
+
+  it('failure step-down never exceeds the normal rule or rig max', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 11 })).toBe(8);
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 8, rigMaxDepthM: 5 })).toBe(5);
+    expect(decideLadderHoleDepth({
+      ...holeBase, floorOpen: true, remainingDepthM: 5, lastShotFailed: true, currentCapM: 8,
+    })).toBe(6);
+  });
+
+  it('rig max 6 clamps every path to 6', () => {
+    const rig = { ...holeBase, rigMaxDepthM: 6, currentCapM: 11 };
+    expect(decideLadderHoleDepth(rig)).toBe(6);
+    expect(decideLadderHoleDepth({ ...rig, floorOpen: true })).toBe(6);
+    expect(decideLadderHoleDepth({ ...rig, lastShotFailed: true })).toBe(6);
+  });
+});
+
+describe('isDudShot', () => {
+  it('true when no columns cleared', () => {
+    expect(isDudShot({ columnsCleared: 0, volumeM3: 50 })).toBe(true);
+  });
+  it('true when no volume broken', () => {
+    expect(isDudShot({ columnsCleared: 3, volumeM3: 0 })).toBe(true);
+  });
+  it('true when both zero', () => {
+    expect(isDudShot({ columnsCleared: 0, volumeM3: 0 })).toBe(true);
+  });
+  it('false when both positive', () => {
+    expect(isDudShot({ columnsCleared: 1, volumeM3: 0.1 })).toBe(false);
+  });
+});
+
+describe('shouldBarCrater', () => {
+  it('false for 0 and 1 duds', () => {
+    expect(shouldBarCrater(0)).toBe(false);
+    expect(shouldBarCrater(1)).toBe(false);
+  });
+  it('true at and above 2', () => {
+    expect(shouldBarCrater(2)).toBe(true);
+    expect(shouldBarCrater(5)).toBe(true);
+  });
+});
+
+const judgeBase: LadderShotJudgeInput = {
+  shotsFired: 2,
+  shotsJudged: 1,
+  yieldPending: false,
+  pitM: 5,
+  baselinePitM: 5,
+  oreKg: 100,
+  baselineOreKg: 100,
+  report: { columnsCleared: 3, volumeM3: 40 },
+  dudStreak: 0,
+};
+
+describe('judgeLadderShot', () => {
+  it('judges nothing when no new shot was fired, streak unchanged', () => {
+    const r = judgeLadderShot({ ...judgeBase, shotsFired: 1, shotsJudged: 1, dudStreak: 1 });
+    expect(r.judged).toBe(false);
+    expect(r.dudStreak).toBe(1);
+    expect(r.bar).toBe(false);
+  });
+
+  it('judges nothing while the yield is pending, streak unchanged', () => {
+    const r = judgeLadderShot({ ...judgeBase, yieldPending: true, dudStreak: 1 });
+    expect(r.judged).toBe(false);
+    expect(r.dudStreak).toBe(1);
+    expect(r.bar).toBe(false);
+  });
+
+  it('no pit gain and no new ore is a failed shot', () => {
+    expect(judgeLadderShot(judgeBase)).toMatchObject({ judged: true, lastShotFailed: true });
+  });
+
+  it('pit gain beyond 0.01 m is not a failure', () => {
+    expect(judgeLadderShot({ ...judgeBase, pitM: 6 }).lastShotFailed).toBe(false);
+  });
+
+  it('pit gain of exactly 0.01 m still counts as no gain', () => {
+    expect(judgeLadderShot({ ...judgeBase, pitM: 5.01 }).lastShotFailed).toBe(true);
+  });
+
+  it('new ore is not a failure', () => {
+    expect(judgeLadderShot({ ...judgeBase, oreKg: 101 }).lastShotFailed).toBe(false);
+  });
+
+  it('a dud shot extends the streak without barring below the limit', () => {
+    const r = judgeLadderShot({ ...judgeBase, report: { columnsCleared: 0, volumeM3: 0 }, dudStreak: 0 });
+    expect(r).toMatchObject({ judged: true, dudStreak: 1, bar: false });
+  });
+
+  it('the second consecutive dud bars the crater and resets the streak', () => {
+    const r = judgeLadderShot({ ...judgeBase, report: { columnsCleared: 0, volumeM3: 10 }, dudStreak: 1 });
+    expect(r).toMatchObject({ judged: true, dudStreak: 0, bar: true });
+  });
+
+  it('a productive shot resets the streak', () => {
+    const r = judgeLadderShot({ ...judgeBase, dudStreak: 1 });
+    expect(r).toMatchObject({ judged: true, dudStreak: 0, bar: false });
+  });
+
+  it('a null report is not a dud', () => {
+    const r = judgeLadderShot({ ...judgeBase, report: null, dudStreak: 1 });
+    expect(r).toMatchObject({ judged: true, dudStreak: 0, bar: false });
   });
 });
