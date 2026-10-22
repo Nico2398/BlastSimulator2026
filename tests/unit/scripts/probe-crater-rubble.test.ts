@@ -111,8 +111,9 @@ describe('fleetClimbRatio', () => {
 
   it('the slowest hauler tier decides, not the best', () => {
     const fleet = [vehicle(1, 'debris_hauler', 1), vehicle(2, 'debris_hauler', 2)];
-    expect(tierSlopeRatio(1)).toBeLessThan(tierSlopeRatio(2));
-    expect(fleetClimbRatio(fleet)).toBe(tierSlopeRatio(1));
+    // Tier 1 climbs 30deg, tier 2 only 24deg: the lower-tier-ratio hauler limits the fleet.
+    expect(tierSlopeRatio(2)).toBeLessThan(tierSlopeRatio(1));
+    expect(fleetClimbRatio(fleet)).toBe(tierSlopeRatio(2));
   });
 
   it('non-hauler tiers do not lower or raise the ratio', () => {
