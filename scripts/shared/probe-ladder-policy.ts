@@ -82,3 +82,33 @@ export function decideLadderEventOption(optionHires: readonly boolean[]): number
   const free = optionHires.indexOf(false);
   return free === -1 ? 0 : free;
 }
+
+export interface LadderReachInput {
+  /** Rise over run of the ordered ramp; Infinity when none is ordered. */
+  rampSlopeRatio: number;
+  /** Steepest slope ratio the fleet climbs. */
+  fleetClimbRatio: number;
+  affordableTier2Upgrade: boolean;
+}
+
+type LadderReachDecision = 'fire' | 'ramp_first' | 'upgrade_first' | 'shrink';
+
+/**
+ * Whether the ladder fires at full depth, builds a ramp or upgrades the fleet first, or shrinks the shot to what haulers reach.
+ * An ordered ramp the fleet climbs (equal counts) fires; no ramp asks for one; a ramp too steep for the fleet asks for the
+ * tier-2 upgrade only when it is affordable, else the shot shrinks: an unaffordable upgrade never fires.
+ */
+export function decideLadderReach(input: LadderReachInput): LadderReachDecision {
+  if (!Number.isFinite(input.rampSlopeRatio)) return 'ramp_first';
+  if (input.fleetClimbRatio >= input.rampSlopeRatio) return 'fire';
+  return input.affordableTier2Upgrade ? 'upgrade_first' : 'shrink';
+}
+
+/** Deepest shot (m) haulers can still reach by the ramp; monotonic in the ramp run, never above holeDepthM. */
+export function reachableShotDepthM(
+  rampRunM: number,
+  fleetClimbRatio: number,
+  holeDepthM: number,
+): number {
+  return Math.max(0, Math.min(holeDepthM, rampRunM * fleetClimbRatio));
+}
