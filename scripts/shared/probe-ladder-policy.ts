@@ -91,7 +91,7 @@ export interface LadderReachInput {
   affordableTier2Upgrade: boolean;
 }
 
-export type LadderReachDecision = 'fire' | 'ramp_first' | 'upgrade_first' | 'shrink';
+type LadderReachDecision = 'fire' | 'ramp_first' | 'upgrade_first' | 'shrink';
 
 /**
  * Whether the ladder fires at full depth, builds a ramp or upgrades the fleet first, or shrinks the shot to what haulers reach.
