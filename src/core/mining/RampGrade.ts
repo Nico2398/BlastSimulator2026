@@ -73,8 +73,9 @@ export function climbForGrade(gradeDeg: number, progression: boolean): RampClimb
 
 /** A built ramp's steepest grade against the vehicle slope limit. */
 export function describeRampClimbability(
-  navGrid: NavGrid, ramp: BuiltRamp, progression: boolean,
-): RampClimb {
+  navGrid: NavGrid | null, ramp: BuiltRamp, progression: boolean,
+): RampClimb | null {
+  if (navGrid === null) return null;
   return climbForGrade(rampSteepestGradeDegrees(navGrid, ramp), progression);
 }
 

@@ -962,7 +962,7 @@ describe('advanceAlongPath — waypoint skip takes no diagonal shortcut up a ram
 
   /** Agent stands in cell (1,0); the path's third waypoint (2,1) is a diagonal hop away. */
   const input = (gradeDeg: number, maxSlopeRatio?: number): AdvanceAlongPathInput => baseInput({
-    x: 1.0, z: 0.3, destinationX: 2, destinationZ: 1,
+    x: 1.0, z: 0.3, walkSpeed: 0.2, destinationX: 2, destinationZ: 1,
     path: { found: true, waypoints: [{ x: 0, z: 0 }, { x: 1, z: 0 }, { x: 2, z: 1 }] },
     navGrid: rampNav(gradeDeg),
     ...(maxSlopeRatio !== undefined && { maxSlopeRatio }),

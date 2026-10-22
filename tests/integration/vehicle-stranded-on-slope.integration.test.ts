@@ -153,7 +153,7 @@ function playRedCanyonOpening(): { run: Run; ctx: GameContext } {
   tickUntil(run, state(), EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state().plannedChargesByHole).length === 0);
   clearBlastZone(run, state());
   ok('blast detonate');
-  ok('build_ramp start:40,12 end:40,31 depth:8');
+  ok('build_ramp start:40,8 end:40,31 depth:8');
   return { run, ctx };
 }
 

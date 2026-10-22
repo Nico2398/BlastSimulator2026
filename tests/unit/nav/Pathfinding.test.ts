@@ -17,7 +17,7 @@ import {
   findPath, findExactPath, octileHeuristic, getBenchLevel, findRampConnections, isImpassable,
   isDiagonalCornerClear, directLineWalk, pathCrossesFragmentOccupancy, findFootPathWithVehicleFallback,
 } from '../../../src/core/nav/Pathfinding.js';
-import { NavGrid, type NavCell, type NavCellType, isStepClimbable } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid, type NavCell, type NavCellType, isStepClimbable, isGridStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import {
   NAV_MAX_SLOPE_RATIO, NAV_CLEARANCE_MAX_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS,
 } from '../../../src/core/config/balance.js';
@@ -2318,6 +2318,24 @@ describe('findPath — no diagonal shortcut up a ramp for a limited request (#20
 
   it('a gentle 15 degree ramp is climbed at 20 degrees', () => {
     expect(climb(rampGrid(3, 15), 3, { maxSlopeRatio: LIMIT }).found).toBe(true);
+  });
+
+  it('a 20 degree request still climbs terrain tilted 18 degrees along the diagonal (isGridStepClimbable)', () => {
+    // Each cardinal step rises tan(18)/sqrt(2); the diagonal step rises tan(18): fine for a 20 degree vehicle.
+    const grid = makeFlatGrid(LENGTH, LENGTH, 'walkable');
+    for (let z = 0; z < LENGTH; z++) {
+      for (let x = 0; x < LENGTH; x++) setCell(grid, x, z, 'walkable', { surfaceY: (x + z) * tanDeg(18) / Math.SQRT2 });
+    }
+    expect(isGridStepClimbable(grid, 0, 0, 1, 1, LIMIT)).toBe(true);
+    expect(findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: LENGTH - 1, toZ: LENGTH - 1, avoidVehicles: false, maxSlopeRatio: LIMIT }).found).toBe(true);
+  });
+
+  it('isGridStepClimbable refuses a diagonal across a 25 degree ramp but allows the cardinal 18 degree step', () => {
+    const steep = rampGrid(3, 25);
+    expect(isGridStepClimbable(steep, 0, 1, 1, 0, LIMIT)).toBe(false);
+    expect(isGridStepClimbable(steep, 0, 1, 1, 1, LIMIT)).toBe(false);
+    expect(isGridStepClimbable(steep, 0, 1, 1, 1)).toBe(true);
+    expect(isGridStepClimbable(rampGrid(3, 18), 0, 1, 1, 0, LIMIT)).toBe(true);
   });
 
   it('a downhill zigzag is refused symmetrically', () => {

@@ -60,7 +60,7 @@ export const rampContent: KindContent = {
   view(entity, state) {
     const ramp = state.builtRamps.find(r => r.id === entity.id);
     if (!ramp) return null;
-    const climb = state.navGrid === null ? undefined : describeRampClimbability(state.navGrid, ramp, isProgressionSite(state));
+    const climb = describeRampClimbability(state.navGrid, ramp, isProgressionSite(state)) ?? undefined;
     const desc = describeRamp(ramp, climb);
     const widen = widenState(ramp, state.plannedRamps, state.cash);
     const actions: ActionSpec[] = widen.cost === null ? [] : [{

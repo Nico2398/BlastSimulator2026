@@ -260,7 +260,8 @@ function checkMinimumLength(targetDepth: number, total: number, cutRatio: number
   const minLength = computeMinimumRampLength(targetDepth, cutRatio);
   if (total >= minLength - RAMP_MIN_LENGTH_EPSILON) return null;
   const displayMinLength = Math.ceil(minLength);
-  const maxDegrees = Math.round(Math.atan(cutRatio) * RAD_TO_DEG * 10) / 10;
+  // The limit the player is held to, not the 98% cut margin below it (the margin is internal float headroom).
+  const maxDegrees = Math.round(Math.atan(cutRatio / RAMP_CUT_SLOPE_MARGIN) * RAD_TO_DEG * 10) / 10;
   return refusal(
     `Ramp too short: ${targetDepth}m of depth needs at least ${displayMinLength}m of length to stay within the ${maxDegrees}° slope limit (got ${total}m).`,
     'mining.build_ramp.slope_too_steep',

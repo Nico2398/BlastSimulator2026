@@ -60,7 +60,7 @@ function blastAndRamp() {
     .filter(f => inCrater.has(`${Math.round(f.fragment.position.x)},${Math.round(f.fragment.position.z)}`))
     .map(f => f.fragment.id));
 
-  expect(run('build_ramp start:32,46 end:32,27 depth:8')).toMatchObject({ success: true });
+  expect(run('build_ramp start:32,50 end:32,27 depth:8')).toMatchObject({ success: true });
   tickWhile(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 3000);
   expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
   return { run, state, crater, craterFragmentIds };
