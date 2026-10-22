@@ -184,3 +184,90 @@ export function shotOverlapsProtectedRamp(site: ProtectedZone, zones: readonly P
   return zones.some(z => site.x < z.x + z.span && z.x < site.x + site.span
     && site.z < z.z + z.span && z.z < site.z + site.span);
 }
+
+/** Deepest hole (m) the ladder drills on a fresh site, where the floor is not yet open: deeper holes seal under the burden cap. */
+export const LADDER_FRESH_HOLE_DEPTH_M = 8;
+/** Metres the hole depth cap drops after a failed shot (no pit gain, no new ore). */
+export const LADDER_HOLE_STEP_DOWN_M = 2;
+/** Shallowest hole (m) the step-down ever reaches. */
+export const LADDER_HOLE_MIN_DEPTH_M = 4;
+/** Consecutive dud shots after which the crater is barred from further shots. */
+export const LADDER_DUD_SHOT_LIMIT = 2;
+
+export interface LadderHoleDepthInput {
+  /** Deepest hole the fleet's best drill rig can drill, in metres. */
+  rigMaxDepthM: number;
+  /** Depth (m) still to dig below the current floor, down to the target. */
+  remainingDepthM: number;
+  /** Whether the pit floor is already open (a cleared crater exists). */
+  floorOpen: boolean;
+  /** Whether the previous shot gained no pit depth and no new ore. */
+  lastShotFailed: boolean;
+  /** Hole depth cap (m) in force for the previous shot. */
+  currentCapM: number;
+  /** Fresh-site hole depth (m); defaults to LADDER_FRESH_HOLE_DEPTH_M. */
+  freshHoleDepthM?: number;
+}
+
+/** Hole depth (m) for the next ladder shot, within [min(LADDER_HOLE_MIN_DEPTH_M, rigMaxDepthM), rigMaxDepthM]; the minimum-depth floor lives here. */
+export function decideLadderHoleDepth(input: LadderHoleDepthInput): number {
+  void input;
+  throw new Error('not implemented');
+}
+
+export interface LadderShotOutcomeInput {
+  /** Columns the shot cleared. */
+  columnsCleared: number;
+  /** Rock volume (m3) the shot broke. */
+  volumeM3: number;
+}
+
+/** Whether a fired shot did nothing useful: no columns cleared or no volume broken. */
+export function isDudShot(input: LadderShotOutcomeInput): boolean {
+  void input;
+  throw new Error('not implemented');
+}
+
+/** Whether a crater with this many consecutive dud shots is barred from further shots. */
+export function shouldBarCrater(consecutiveDuds: number): boolean {
+  void consecutiveDuds;
+  throw new Error('not implemented');
+}
+
+export interface LadderShotJudgeInput {
+  /** Shots fired so far. */
+  shotsFired: number;
+  /** Shots already judged. */
+  shotsJudged: number;
+  /** Whether the latest shot's ore yield is still resolving. */
+  yieldPending: boolean;
+  /** Deepest pit (m) now. */
+  pitM: number;
+  /** Deepest pit (m) before the latest shot. */
+  baselinePitM: number;
+  /** Haulable ore (kg) now (the last resolved yield). */
+  oreKg: number;
+  /** Haulable ore (kg) before the latest shot. */
+  baselineOreKg: number;
+  /** Latest blast report outcome, or null when none exists. */
+  report: LadderShotOutcomeInput | null;
+  /** Consecutive duds so far at the current site. */
+  dudStreak: number;
+}
+
+export interface LadderShotJudgment {
+  /** Whether a new shot was judged this call; when false the other fields carry the unchanged state. */
+  judged: boolean;
+  /** Whether the judged shot gained no pit depth and no new ore. */
+  lastShotFailed: boolean;
+  /** Consecutive duds after this judgment (reset to 0 when barring). */
+  dudStreak: number;
+  /** Whether the site should now be barred. */
+  bar: boolean;
+}
+
+/** Judge the latest fired shot once its yield resolved: failure when no pit gain and no new ore; duds accumulate toward barring. */
+export function judgeLadderShot(input: LadderShotJudgeInput): LadderShotJudgment {
+  void input;
+  throw new Error('not implemented');
+}
