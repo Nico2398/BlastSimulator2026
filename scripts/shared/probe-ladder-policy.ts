@@ -188,13 +188,13 @@ export function shotOverlapsProtectedRamp(site: ProtectedZone, zones: readonly P
 /** Deepest hole (m) the ladder drills on a fresh site, where the floor is not yet open: deeper holes seal under the burden cap. */
 export const LADDER_FRESH_HOLE_DEPTH_M = 8;
 /** Metres the hole depth cap drops after a failed shot (no pit gain, no new ore). */
-const LADDER_HOLE_STEP_DOWN_M = 2;
+export const LADDER_HOLE_STEP_DOWN_M = 2;
 /** Shallowest hole (m) the step-down ever reaches. */
 export const LADDER_HOLE_MIN_DEPTH_M = 4;
 /** Consecutive dud shots after which the crater is barred from further shots. */
-const LADDER_DUD_SHOT_LIMIT = 2;
+export const LADDER_DUD_SHOT_LIMIT = 2;
 
-interface LadderHoleDepthInput {
+export interface LadderHoleDepthInput {
   /** Deepest hole the fleet's best drill rig can drill, in metres. */
   rigMaxDepthM: number;
   /** Depth (m) still to dig below the current floor, down to the target. */
@@ -218,7 +218,7 @@ export function decideLadderHoleDepth(input: LadderHoleDepthInput): number {
   return Math.min(wanted, input.rigMaxDepthM);
 }
 
-export interface LadderShotOutcomeInput {
+interface LadderShotOutcomeInput {
   /** Columns the shot cleared. */
   columnsCleared: number;
   /** Rock volume (m3) the shot broke. */
