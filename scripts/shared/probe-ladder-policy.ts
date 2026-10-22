@@ -184,3 +184,50 @@ export function shotOverlapsProtectedRamp(site: ProtectedZone, zones: readonly P
   return zones.some(z => site.x < z.x + z.span && z.x < site.x + site.span
     && site.z < z.z + z.span && z.z < site.z + site.span);
 }
+
+/** Deepest hole (m) the ladder drills on a fresh site, where the floor is not yet open: deeper holes seal under the burden cap. */
+export const LADDER_FRESH_HOLE_DEPTH_M = 8;
+/** Metres the hole depth cap drops after a failed shot (no pit gain, no new ore). */
+export const LADDER_HOLE_STEP_DOWN_M = 2;
+/** Shallowest hole (m) the step-down ever reaches. */
+export const LADDER_HOLE_MIN_DEPTH_M = 4;
+/** Consecutive dud shots after which the crater is barred from further shots. */
+export const LADDER_DUD_SHOT_LIMIT = 2;
+
+export interface LadderHoleDepthInput {
+  /** Deepest hole the fleet's best drill rig can drill, in metres. */
+  rigMaxDepthM: number;
+  /** Depth (m) still to dig below the current floor, down to the target. */
+  remainingDepthM: number;
+  /** Whether the pit floor is already open (a cleared crater exists). */
+  floorOpen: boolean;
+  /** Whether the previous shot gained no pit depth and no new ore. */
+  lastShotFailed: boolean;
+  /** Hole depth cap (m) in force for the previous shot. */
+  currentCapM: number;
+}
+
+/** Hole depth (m) for the next ladder shot. */
+export function decideLadderHoleDepth(_input: LadderHoleDepthInput): number {
+  // TODO: implement
+  return undefined as unknown as number;
+}
+
+export interface LadderShotOutcomeInput {
+  /** Columns the shot cleared. */
+  columnsCleared: number;
+  /** Rock volume (m3) the shot broke. */
+  volumeM3: number;
+}
+
+/** Whether a fired shot did nothing useful: no columns cleared or no volume broken. */
+export function isDudShot(_input: LadderShotOutcomeInput): boolean {
+  // TODO: implement
+  return undefined as unknown as boolean;
+}
+
+/** Whether a crater with this many consecutive dud shots is barred from further shots. */
+export function shouldBarCrater(_consecutiveDuds: number): boolean {
+  // TODO: implement
+  return undefined as unknown as boolean;
+}
