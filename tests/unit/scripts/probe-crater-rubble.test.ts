@@ -29,9 +29,11 @@ function withFragment(state: GameState, id: number, x: number, z: number, st: 'o
   state.logistics.fragments.push({ fragment: fragment(id, x, z), state: st, vehicleId: null, warehouseId: null });
 }
 
-function withOrder(state: GameState, fragmentId: number): void {
+function withOrder(
+  state: GameState, fragmentId: number, type: 'haul_debris' | 'fragment_debris' = 'haul_debris', blockedReason?: string,
+): void {
   state.pendingActions.push({
-    id: state.nextPendingActionId++, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+    id: state.nextPendingActionId++, type, ...(blockedReason ? { blockedReason } : {}), requiredSkill: null, requiredVehicleRole: 'debris_hauler',
     targetX: 12, targetZ: 12, targetY: 0, payload: { fragmentId }, targetEmployeeId: null,
   } as unknown as GameState['pendingActions'][number]);
 }
@@ -93,6 +95,56 @@ describe('craterRubbleCounts', () => {
     withFragment(state, 1, 12, 12);
     sealedIds = new Set([1]);
     expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1 });
+  });
+});
+
+describe('craterRubbleCounts blocked orders (#2062)', () => {
+  let state: GameState;
+  beforeEach(() => {
+    state = createGame({ seed: 42 });
+    sealedIds = undefined;
+  });
+
+  it('a fragment_debris order counts as ordered', () => {
+    withFragment(state, 1, 12, 12);
+    withOrder(state, 1, 'fragment_debris');
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 1, orderless: 0, sealed: 0 });
+  });
+
+  it('a blocked haul order counts as sealed, not ordered', () => {
+    withFragment(state, 1, 12, 12);
+    withOrder(state, 1, 'haul_debris', 'debris_out_of_reach');
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1 });
+  });
+
+  it('a blocked fragment_debris order counts as sealed', () => {
+    withFragment(state, 1, 12, 12);
+    withOrder(state, 1, 'fragment_debris', 'target_unreachable');
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1 });
+  });
+
+  it('an id both sealed and ordered counts once, as sealed', () => {
+    withFragment(state, 1, 12, 12);
+    withOrder(state, 1);
+    sealedIds = new Set([1]);
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1 });
+  });
+
+  it('an unblocked and a blocked order mix are classified per fragment', () => {
+    withFragment(state, 1, 12, 12);
+    withFragment(state, 2, 13, 13);
+    withOrder(state, 1);
+    withOrder(state, 2, 'haul_debris', 'debris_out_of_reach');
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 1, orderless: 0, sealed: 1 });
+  });
+
+  it('does not mutate the sealed set it was given', () => {
+    withFragment(state, 1, 12, 12);
+    withOrder(state, 1, 'haul_debris', 'debris_out_of_reach');
+    const given = new Set<number>([99]);
+    sealedIds = given;
+    craterRubbleCounts(state, crater);
+    expect([...given]).toEqual([99]);
   });
 });
 

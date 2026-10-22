@@ -290,3 +290,11 @@ No balance constant, sandbox pin or campaign pin changed (no balance tuning was 
 Observations for the remainder: only 6 blasts in 14,000 ticks (each shot takes about 500 ticks to drill and charge), and a probe run past grade 2 becomes very slow
 (a 14,000-tick run took about 40 minutes), so the g3 gate and `BUYER_*` / `MINE_GRADES` / `PERMIT_LIMITS` tuning need a faster loop, or the ladder needs
 to fire more often once cash is idle. The digger ladder still goes bankrupt.
+
+## 2026-10-22 record: ladder hole-depth policy (#2068)
+
+With the #2068 hole-depth policy (`decideLadderHoleDepth`, dud barring, blocked-order rubble counts; fresh cap 9 m sandbox / 11 m campaign kept),
+the 50,000-tick seed-42 desert_badlands full-kit ladder probe: g1@968, g2@2482, cash 10.54M @6000, 9.67M @10000, 6.13M @15000,
+bankrupt at t23799 (low cash -86,300), g3 (window 8000-14000) missed; boulder ore sold 45%.
+Shareholder Summit competent ladder (volcanic_flats, digger, seed 42) wins at tick 3461 (was 2981 on main).
+Remaining: survival to 50,000 and g3+ are tracked in #2072.
