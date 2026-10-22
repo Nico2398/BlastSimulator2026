@@ -243,7 +243,7 @@ npm run probe:progression -- --seed 42 --biome desert_badlands --kit full   --st
 No `MINE_GRADES`, `BUYER_*`, `PERMIT_LIMITS`, sandbox pin or campaign pin changed. Tuning was not attempted: the ladder never reaches grade 2, so no grade-3-to-5
 window can be measured, and retuning balance to route around a stalled probe policy would hide the defect.
 
-Root cause (measured by instrumenting a 4,000-tick run; instrumentation reverted):
+Root cause (measured by instrumenting a 4,000-tick run; instrumentation reverted). Diagnosis superseded by the follow-up below: the real stall was hole depth, not the ramp gate.
 
 1. Grade 2 needs depth 10 m; the pit stays at 5.02 m for the whole run (ore 55-69 k kg and safety targets are met by t3,500, cash is 5-9 M and idle).
 2. `ladderCraterRamp` returns while `m.shot !== null`. With cash plentiful the next shot is ordered the tick after the last fires, so a shot is always pending
@@ -253,7 +253,7 @@ Root cause (measured by instrumenting a 4,000-tick run; instrumentation reverted
 4. `LADDER_SITE_ORE_FLOOR` (1 vs 20) and `LADDER_RAMP_PROTECT_MARGIN_M` (2 vs 6) changed nothing: depth 5.02 m in every combination at t3,500.
 5. Removing both ramp gates orders a ramp into the second crater but income collapsed (3 blasts, 9 k ore, bankrupt t2,505): the ramp work starves the hauling crew. Reverted.
 
-Remainder (own run): make the ladder dig a way into each fresh crater without starving hauling (sequence the ramp between shots, or give ramp work its own
+Remainder (superseded by the follow-up below; the ramp-sequencing idea is not what unblocked grade 2): make the ladder dig a way into each fresh crater without starving hauling (sequence the ramp between shots, or give ramp work its own
 crew), then tune `BUYER_*`, `MINE_GRADES` and `PERMIT_LIMITS` against the g3/g4/g5 windows and the 50,000-tick survival.
 
 ### Follow-up (#2066): hole-depth fix, grade 2 reached (partial, MISSED)
@@ -262,7 +262,12 @@ Instrumented 4,000-tick runs found the real stall: the ladder drilled 11 m holes
 the blast buries its rubble sealed and opens no crater (surface unchanged), so the pit stayed at 5.02 m and `orderRamp` found no depression to ramp into.
 Hole depth sweep, pit depth at t4,000-5,500: 5 m -> 6.5 m, 7 m -> 8.2 m, 9 m -> grade 2 at t2,282, 10 m -> stalls at 9.99 m (just under the 10 m target), 11 m -> 5.02 m.
 
-Probe changes (`scripts/shared/probe-strategies.ts`): `LADDER_HOLE_DEPTH_M` 11 -> 9; `needsWayIn` in `ladderCraterRamp` no longer waits for grade 2.
+Probe changes (`scripts/shared/probe-strategies.ts`): the 9 m hole depth and the ungated way-in (`needsWayIn` in `ladderCraterRamp` no longer waits for
+grade 2) apply to sandbox probe runs only (`sandboxRun`: no active campaign level). `LADDER_HOLE_DEPTH_M` no longer exists; it is split into
+`LADDER_SANDBOX_HOLE_DEPTH_M` = 9 and `LADDER_CAMPAIGN_HOLE_DEPTH_M` = 11 (the old value), picked by `ladderHoleDepthM`. Campaign runs keep 11 m because the
+volcanic_flats Shareholder Summit ends in a worker revolt with 9 m holes.
+Boulder share: the earlier section above reports 75% (the ladder never left grade 1); this follow-up reports 55% over the whole 14,000-tick run, because the ladder now
+progresses and the share is measured across more of the run.
 No balance constant, sandbox pin or campaign pin changed (no balance tuning was reached).
 
 | run | g1 | g2 | g3-5 | cash@3k | cash@6k | cash@10k | boulder ore sold | end |

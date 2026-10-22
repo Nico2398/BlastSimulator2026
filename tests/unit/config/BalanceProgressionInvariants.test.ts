@@ -12,6 +12,7 @@ import {
   PERMIT_LIMITS,
   SANDBOX_ORE_GRADE_SCALE,
 } from '../../../src/core/config/balance.js';
+import { buyerDeadlineRange } from '../../../src/core/economy/BuyerTiers.js';
 import { SHOT } from '../../../scripts/shared/probe-strategies.js';
 import { GRADE_TARGET_WINDOWS, limitSizedShot } from '../../../scripts/shared/probe-ladder.js';
 
@@ -79,9 +80,9 @@ describe('progression balance invariants (#1945)', () => {
       for (const t of tiers) {
         const qtyMax = Math.max(BUYER_ORE_SALE_QTY_KG[t].max, PRODUCTION_SUPPLY_QTY_KG.max * BUYER_SUPPLY_QTY_FACTOR[t]);
         const rate = BUYER_REF_HAUL_KG_PER_TICK[t];
-        const deadlineMin = Math.ceil((qtyMax * BUYER_DEADLINE_MARGIN) / rate);
-        expect(qtyMax * BUYER_DEADLINE_MARGIN).toBeLessThanOrEqual(rate * deadlineMin);
-        expect(deadlineMin * BUYER_DEADLINE_SPAN_RATIO).toBeGreaterThan(deadlineMin);
+        const range = buyerDeadlineRange(qtyMax, rate);
+        expect(rate * range.min).toBeGreaterThanOrEqual(qtyMax * BUYER_DEADLINE_MARGIN);
+        expect(range.max).toBeGreaterThan(range.min);
       }
     });
 

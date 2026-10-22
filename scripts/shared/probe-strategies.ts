@@ -142,7 +142,7 @@ class ProbeStop extends Error {
   }
 }
 
-interface ProbeSession {
+export interface ProbeSession {
   config: ProbeRunConfig;
   engine: RunnerWithContext;
   state: GameState;
@@ -625,7 +625,7 @@ const LADDER_CAMPAIGN_HOLE_DEPTH_M = 11;
 const LADDER_SANDBOX_HOLE_DEPTH_M = 9;
 /** Sandbox run: no campaign level is active. */
 const sandboxRun = (s: ProbeSession): boolean => !s.engine.ctx.campaignProfile.campaign.activeLevelId;
-const ladderHoleDepthM = (s: ProbeSession): number => sandboxRun(s) ? LADDER_SANDBOX_HOLE_DEPTH_M : LADDER_CAMPAIGN_HOLE_DEPTH_M;
+export const ladderHoleDepthM = (s: ProbeSession): number => sandboxRun(s) ? LADDER_SANDBOX_HOLE_DEPTH_M : LADDER_CAMPAIGN_HOLE_DEPTH_M;
 /** A pit this close under the hole depth counts as dug: deepening then waits for a cleared crater instead of a fresh site. */
 const LADDER_FRESH_SHOT_DEPTH_SLACK_M = 0.5;
 /** Haulers the ladder buys while cash is idle: rubble clears at the fleet's pace, and a buried pit stalls every later shot. */
