@@ -142,7 +142,7 @@ class ProbeStop extends Error {
   }
 }
 
-interface ProbeSession {
+export interface ProbeSession {
   config: ProbeRunConfig;
   engine: RunnerWithContext;
   state: GameState;
@@ -615,8 +615,17 @@ function runReinvest(s: ProbeSession): void {
 
 /** Cash the ladder keeps back from every purchase and permit fee: payroll and upkeep keep running. */
 const LADDER_CASH_RESERVE = 5_000;
-/** Deepest hole the ladder drills (m), kept under the softest rock's safe face height (#1941). */
-const LADDER_HOLE_DEPTH_M = 11;
+/** Deepest hole the ladder drills in a campaign level (m), kept under the softest rock's safe face height (#1941). */
+const LADDER_CAMPAIGN_HOLE_DEPTH_M = 11;
+/**
+ * Deepest hole the sandbox ladder drills (m). Measured (#2066): a grade-1 charge under 10-11 m of cover buries its rubble
+ * sealed and the pit stays at 5 m (10 m holes stall at 9.99 m); 9 m opens the crater and deepens it. Campaign levels keep
+ * the old depth: the Shareholder Summit competent run (volcanic_flats) ends in a worker revolt with 9 m holes.
+ */
+const LADDER_SANDBOX_HOLE_DEPTH_M = 9;
+/** Sandbox run: no campaign level is active. */
+const sandboxRun = (s: ProbeSession): boolean => !s.engine.ctx.campaignProfile.campaign.activeLevelId;
+export const ladderHoleDepthM = (s: ProbeSession): number => sandboxRun(s) ? LADDER_SANDBOX_HOLE_DEPTH_M : LADDER_CAMPAIGN_HOLE_DEPTH_M;
 /** A pit this close under the hole depth counts as dug: deepening then waits for a cleared crater instead of a fresh site. */
 const LADDER_FRESH_SHOT_DEPTH_SLACK_M = 0.5;
 /** Haulers the ladder buys while cash is idle: rubble clears at the fleet's pace, and a buried pit stalls every later shot. */
@@ -729,7 +738,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
       }) === 'deepen';
     });
   const deepen = depthTargetOpen(s) && crater !== undefined;
-  const holeDepth = Math.min(fleetBestRigLimit(DRILL_RIG_MAX_DEPTH_M, vehicles), LADDER_HOLE_DEPTH_M);
+  const holeDepth = Math.min(fleetBestRigLimit(DRILL_RIG_MAX_DEPTH_M, vehicles), ladderHoleDepthM(s));
   // A ramp steeper than the fleet climbs reaches only so deep: shrink the holes to what the haulers still reach.
   const ramp = deepen && crater ? m.ramps[craterKey(crater)] : undefined;
   const climb = fleetClimbRatio(vehicles);
@@ -767,7 +776,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const hauling = state.pendingActions.some(a => a.type === 'haul_debris' && a.blockedReason === null);
   return {
     // Blast again to deepen a cleared crater, to dig the first full-depth pit, or when the crew has nothing left to haul (idle crew, no income).
-    wanted: deepen || !hauling || (state.grade?.deepestPitM ?? 0) < LADDER_HOLE_DEPTH_M - LADDER_FRESH_SHOT_DEPTH_SLACK_M,
+    wanted: deepen || !hauling || (state.grade?.deepestPitM ?? 0) < ladderHoleDepthM(s) - LADDER_FRESH_SHOT_DEPTH_SLACK_M,
     cost: side === 0 ? Infinity : side * side * kg * explosive.costPerKg + RE_FIRE_CASH_CUSHION,
     order: () => {
       let ordered: Shot | null = null;
@@ -932,7 +941,8 @@ function ladderCraterRamp(s: ProbeSession, m: LadderMemory): void {
     fleetClimbRatio: climb,
   });
   const affordable = s.state.cash - LADDER_RAMP_COST >= LADDER_UPGRADE_RESERVE;
-  const needsWayIn = reach !== 'fire' && gradeOf(s) >= LADDER_GATE_MIN_GRADE;
+  // Sandbox: wait for no grade (the way in lets grade 1 reach grade 2, #2066); campaign: only once the shot gate is live.
+  const needsWayIn = reach !== 'fire' && (sandboxRun(s) || gradeOf(s) >= LADDER_GATE_MIN_GRADE);
   if (deeper === 'skip' && (!needsWayIn || !affordable)) return;
   tryOnce(s, m, 'crater_ramp', () => {
     const ramp = orderRamp(s, m.crater, m.crater.span, Math.min(RAMP_MAX_SLOPE, climb));
