@@ -194,6 +194,9 @@ export const LADDER_HOLE_MIN_DEPTH_M = 4;
 /** Consecutive dud shots after which the crater is barred from further shots. */
 export const LADDER_DUD_SHOT_LIMIT = 2;
 
+/** Pit depth gain (m) at or under which a shot counts as having gained none. */
+const LADDER_PIT_GAIN_EPSILON_M = 0.01;
+
 export interface LadderHoleDepthInput {
   /** Deepest hole the fleet's best drill rig can drill, in metres. */
   rigMaxDepthM: number;
@@ -205,17 +208,16 @@ export interface LadderHoleDepthInput {
   lastShotFailed: boolean;
   /** Hole depth cap (m) in force for the previous shot. */
   currentCapM: number;
+  /** Fresh-site hole depth (m); defaults to LADDER_FRESH_HOLE_DEPTH_M. */
+  freshHoleDepthM?: number;
 }
 
-/** Hole depth (m) for the next ladder shot: the fresh-site depth, or on an open floor the remaining depth plus 1 m (capped at the fresh depth); after a failure, capped by the previous cap stepped down (never below the minimum); always within the rig's reach. */
+/** Hole depth (m) for the next ladder shot, within [min(LADDER_HOLE_MIN_DEPTH_M, rigMaxDepthM), rigMaxDepthM]; the minimum-depth floor lives here. */
 export function decideLadderHoleDepth(input: LadderHoleDepthInput): number {
-  const base = input.floorOpen
-    ? Math.min(LADDER_FRESH_HOLE_DEPTH_M, input.remainingDepthM + 1)
-    : LADDER_FRESH_HOLE_DEPTH_M;
-  const wanted = input.lastShotFailed
-    ? Math.min(base, Math.max(LADDER_HOLE_MIN_DEPTH_M, input.currentCapM - LADDER_HOLE_STEP_DOWN_M))
-    : base;
-  return Math.min(wanted, input.rigMaxDepthM);
+  const fresh = input.freshHoleDepthM ?? LADDER_FRESH_HOLE_DEPTH_M;
+  let base = input.floorOpen ? Math.min(fresh, input.remainingDepthM + 1) : fresh;
+  if (input.lastShotFailed) base = Math.min(base, Math.max(LADDER_HOLE_MIN_DEPTH_M, input.currentCapM - LADDER_HOLE_STEP_DOWN_M));
+  return Math.min(input.rigMaxDepthM, Math.max(LADDER_HOLE_MIN_DEPTH_M, base));
 }
 
 interface LadderShotOutcomeInput {
@@ -233,4 +235,47 @@ export function isDudShot(input: LadderShotOutcomeInput): boolean {
 /** Whether a crater with this many consecutive dud shots is barred from further shots. */
 export function shouldBarCrater(consecutiveDuds: number): boolean {
   return consecutiveDuds >= LADDER_DUD_SHOT_LIMIT;
+}
+
+export interface LadderShotJudgeInput {
+  /** Shots fired so far. */
+  shotsFired: number;
+  /** Shots already judged. */
+  shotsJudged: number;
+  /** Whether the latest shot's ore yield is still resolving. */
+  yieldPending: boolean;
+  /** Deepest pit (m) now. */
+  pitM: number;
+  /** Deepest pit (m) before the latest shot. */
+  baselinePitM: number;
+  /** Haulable ore (kg) now (the last resolved yield). */
+  oreKg: number;
+  /** Haulable ore (kg) before the latest shot. */
+  baselineOreKg: number;
+  /** Latest blast report outcome, or null when none exists. */
+  report: LadderShotOutcomeInput | null;
+  /** Consecutive duds so far at the current site. */
+  dudStreak: number;
+}
+
+interface LadderShotJudgment {
+  /** Whether a new shot was judged this call; when false only dudStreak is carried unchanged; lastShotFailed is false and callers ignore it. */
+  judged: boolean;
+  /** Whether the judged shot gained no pit depth and no new ore. */
+  lastShotFailed: boolean;
+  /** Consecutive duds after this judgment (reset to 0 when barring). */
+  dudStreak: number;
+  /** Whether the site should now be barred. */
+  bar: boolean;
+}
+
+/** Judge the latest fired shot once its yield resolved: failure when no pit gain and no new ore; duds accumulate toward barring. */
+export function judgeLadderShot(input: LadderShotJudgeInput): LadderShotJudgment {
+  if (input.shotsFired === input.shotsJudged || input.yieldPending) {
+    return { judged: false, lastShotFailed: false, dudStreak: input.dudStreak, bar: false };
+  }
+  const lastShotFailed = input.pitM <= input.baselinePitM + LADDER_PIT_GAIN_EPSILON_M && input.oreKg <= input.baselineOreKg;
+  const streak = input.report !== null && isDudShot(input.report) ? input.dudStreak + 1 : 0;
+  const bar = shouldBarCrater(streak);
+  return { judged: true, lastShotFailed, dudStreak: bar ? 0 : streak, bar };
 }

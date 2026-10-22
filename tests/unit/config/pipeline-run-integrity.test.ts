@@ -321,13 +321,34 @@ describe('an unfinished run releases the assignment chain', () => {
     expect(rescue).toContain('gh issue edit "${ISSUE}" --remove-label in-progress');
   });
 
-  // Four ways a run reaches the rescue step without a deliverable: no branch, an
-  // empty branch, a branch that could not be pushed, and a branch saved into a
-  // draft PR that nobody has reviewed. Every one of them has to settle the issue,
-  // because by then the session is over and nothing is left to wait for.
+  // Five ways a run reaches the rescue step without a deliverable: no branch, an
+  // empty branch, a branch that could not be pushed, a branch saved into a
+  // draft PR that nobody has reviewed, and a resume run that left its `paused`
+  // handover PR unfinished. Every one of them has to settle the issue, because
+  // by then the session is over and nothing is left to wait for.
   it('escalates on every outcome that is not a finished run', () => {
     const calls = rescue.match(/^\s+escalate$/gm) ?? [];
-    expect(calls.length).toBe(4);
+    expect(calls.length).toBe(5);
+  });
+
+  // Issue #2045: a resume run timed out on PR #2065's branch. The open PR read
+  // as "the run finished", so nothing was pushed or labelled, and the watchdog
+  // skipped the issue for the same PR — `in-progress` held the only slot with
+  // no run behind it.
+  it('treats a still-paused draft handover PR as an unfinished run', () => {
+    expect(rescue).toContain('select(.isDraft and any(.labels[]; .name == "paused"))');
+    const finished = rescue.indexOf('the run finished. Nothing to rescue');
+    const guard = rescue.lastIndexOf('[ -z "${HANDOVER}" ]', finished);
+    expect(guard, 'the finished exit is gated on there being no handover').toBeGreaterThan(-1);
+    const handover = rescue.slice(rescue.indexOf('if [ -n "${HANDOVER}" ]; then'));
+    const body = handover.slice(0, handover.indexOf('\n        fi\n'));
+    // Save the commits before anything is said, then settle the issue.
+    expect(body.indexOf('push_branch')).toBeGreaterThan(-1);
+    expect(body.indexOf('push_branch')).toBeLessThan(body.indexOf('already_settled'));
+    expect(body.indexOf('already_settled')).toBeLessThan(body.indexOf('gh issue comment'));
+    expect(body).toMatch(/^\s+escalate$/m);
+    // push_branch is defined before the first path that calls it.
+    expect(rescue.indexOf('push_branch() {')).toBeLessThan(rescue.indexOf('if [ -n "${HANDOVER}" ]; then'));
   });
 
   it('leaves a run that opened its own PR alone', () => {
@@ -350,12 +371,13 @@ describe('an unfinished run releases the assignment chain', () => {
   // The check gates what is *said*, not only what is labelled. Issue #707's run
   // escalated exactly as the skill asks, and the no-branch path still commented
   // that it had "concluded that no code change was needed without saying so" —
-  // one comment under where it said so. Both no-deliverable paths exit before
-  // their comment when the issue is already settled.
+  // one comment under where it said so. Both no-deliverable paths, and the
+  // unfinished-handover path, exit before their comment when the issue is
+  // already settled.
   it('stays silent rather than contradicting a run that settled its issue', () => {
     const exits = rescue.match(/if already_settled; then\n\s+echo "Nothing to report/g) ?? [];
-    expect(exits.length).toBe(2);
-    for (const marker of ['No ${BRANCH} on disk', 'has no commits beyond main']) {
+    expect(exits.length).toBe(3);
+    for (const marker of ['No ${BRANCH} on disk', 'has no commits beyond main', 'the resume run ended before finishing it']) {
       const at = rescue.indexOf(marker);
       expect(at, marker).toBeGreaterThan(-1);
       const after = rescue.slice(at);

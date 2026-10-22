@@ -80,9 +80,9 @@ import {
 } from './probe-ladder.js';
 import {
   decideLadderDeepen, decideFreshShotSite, decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM,
-  LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_FRESH_HOLE_DEPTH_M, LADDER_HOLE_MIN_DEPTH_M,
-  decideLadderHoleDepth, isDudShot, shouldBarCrater, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
+  LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
   rampProtectionZones, shotOverlapsProtectedRamp,
+  decideLadderHoleDepth, judgeLadderShot,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
 import { sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
@@ -143,7 +143,7 @@ class ProbeStop extends Error {
   }
 }
 
-interface ProbeSession {
+export interface ProbeSession {
   config: ProbeRunConfig;
   engine: RunnerWithContext;
   state: GameState;
@@ -616,7 +616,18 @@ function runReinvest(s: ProbeSession): void {
 
 /** Cash the ladder keeps back from every purchase and permit fee: payroll and upkeep keep running. */
 const LADDER_CASH_RESERVE = 5_000;
-/** A pit this close under the fresh hole depth counts as dug: deepening then waits for a cleared crater instead of a fresh site. */
+/** Deepest hole the ladder drills in a campaign level (m), kept under the softest rock's safe face height (#1941). */
+const LADDER_CAMPAIGN_HOLE_DEPTH_M = 11;
+/**
+ * Deepest hole the sandbox ladder drills (m). Measured (#2066): a grade-1 charge under 10-11 m of cover buries its rubble
+ * sealed and the pit stays at 5 m (10 m holes stall at 9.99 m); 9 m opens the crater and deepens it. Campaign levels keep
+ * the old depth: the Shareholder Summit competent run (volcanic_flats) ends in a worker revolt with 9 m holes.
+ */
+const LADDER_SANDBOX_HOLE_DEPTH_M = 9;
+/** Sandbox run: no campaign level is active. */
+const sandboxRun = (s: ProbeSession): boolean => !s.engine.ctx.campaignProfile.campaign.activeLevelId;
+export const ladderHoleDepthM = (s: ProbeSession): number => sandboxRun(s) ? LADDER_SANDBOX_HOLE_DEPTH_M : LADDER_CAMPAIGN_HOLE_DEPTH_M;
+/** A pit this close under the hole depth counts as dug: deepening then waits for a cleared crater instead of a fresh site. */
 const LADDER_FRESH_SHOT_DEPTH_SLACK_M = 0.5;
 /** Haulers the ladder buys while cash is idle: rubble clears at the fleet's pace, and a buried pit stalls every later shot. */
 const LADDER_MAX_HAULERS = 6;
@@ -651,19 +662,19 @@ interface LadderMemory extends ReinvestMemory {
   barred: Array<Pattern & { span: number }>;
   /** Hole depth cap (m) in force for the last shot. */
   holeCapM: number;
-  /** Whether the last resolved shot gained no pit depth and no new ore. */
+  /** Whether the last judged shot gained no pit depth and no new ore. */
   lastShotFailed: boolean;
   /** Consecutive dud shots; reset by a productive shot or by barring a crater. */
   dudStreak: number;
   /** Shots (entries of `origins`) already judged by `trackLadderShot`. */
   judgedShots: number;
-  /** Pit depth and haulable ore baseline a shot's result is compared against; it follows the world until a shot fires. */
+  /** Pit depth and haulable ore a shot's result is compared against; follows the world until a shot fires. */
   before: { pitM: number; oreKg: number };
 }
 
 /** Depth (m) the next grade asks for; 0 when it asks none. */
 function nextGradeDepthM(state: GameState): number {
-  return gradeDef((state.grade?.grade ?? 0) + 1).targets.find(t => t.kind === 'depth_m')?.value ?? 0;
+  return nextGradeTargets(state).find(t => t.kind === 'depth_m')?.needed ?? 0;
 }
 
 /**
@@ -672,20 +683,22 @@ function nextGradeDepthM(state: GameState): number {
  */
 function trackLadderShot(s: ProbeSession, m: LadderMemory): void {
   const pitM = s.state.grade?.deepestPitM ?? 0;
-  if (m.origins.length === m.judgedShots || m.yieldPending) {
+  const report = s.state.lastBlastReport;
+  const judgment = judgeLadderShot({
+    shotsFired: m.origins.length, shotsJudged: m.judgedShots, yieldPending: m.yieldPending,
+    pitM, baselinePitM: m.before.pitM, oreKg: m.lastYieldKg, baselineOreKg: m.before.oreKg,
+    report: report ? { columnsCleared: report.clearedVoxels, volumeM3: report.totalRockVolume } : null,
+    dudStreak: m.dudStreak,
+  });
+  if (!judgment.judged) {
     if (m.origins.length === m.judgedShots) m.before = { pitM, oreKg: m.lastYieldKg };
     return;
   }
   const site = m.origins[m.origins.length - 1]!;
   m.judgedShots = m.origins.length;
-  m.lastShotFailed = pitM <= m.before.pitM + 0.01 && m.lastYieldKg <= m.before.oreKg;
-  const report = s.state.lastBlastReport;
-  const dud = report !== null && isDudShot({ columnsCleared: report.clearedVoxels, volumeM3: report.totalRockVolume });
-  m.dudStreak = dud ? m.dudStreak + 1 : 0;
-  if (shouldBarCrater(m.dudStreak)) {
-    m.barred.push({ x: site.x, z: site.z, span: site.span ?? SHOT_SPAN });
-    m.dudStreak = 0;
-  }
+  m.lastShotFailed = judgment.lastShotFailed;
+  m.dudStreak = judgment.dudStreak;
+  if (judgment.bar) m.barred.push({ x: site.x, z: site.z, span: site.span ?? SHOT_SPAN });
 }
 
 const craterKey = (c: Pattern): string => `${c.x},${c.z}`;
@@ -771,12 +784,10 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
     });
   const deepen = depthTargetOpen(s) && crater !== undefined;
   const pitM = state.grade?.deepestPitM ?? 0;
-  const rigMaxDepthM = fleetBestRigLimit(DRILL_RIG_MAX_DEPTH_M, vehicles);
-  // A hole shallower than the minimum holds no charge once stemmed (stemming 2.5 m): never drill it.
-  const holeDepth = Math.min(rigMaxDepthM, Math.max(LADDER_HOLE_MIN_DEPTH_M, decideLadderHoleDepth({
-    rigMaxDepthM, remainingDepthM: nextGradeDepthM(state) - pitM,
-    floorOpen: deepen, lastShotFailed: m.lastShotFailed, currentCapM: m.holeCapM,
-  })));
+  const holeDepth = decideLadderHoleDepth({
+    rigMaxDepthM: fleetBestRigLimit(DRILL_RIG_MAX_DEPTH_M, vehicles), remainingDepthM: nextGradeDepthM(state) - pitM,
+    floorOpen: deepen, lastShotFailed: m.lastShotFailed, currentCapM: m.holeCapM, freshHoleDepthM: ladderHoleDepthM(s),
+  });
   // A ramp steeper than the fleet climbs reaches only so deep: shrink the holes to what the haulers still reach.
   const ramp = deepen && crater ? m.ramps[craterKey(crater)] : undefined;
   const climb = fleetClimbRatio(vehicles);
@@ -813,8 +824,8 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   // Orders no ramp reaches never get hauled: they are not work for the crew.
   const hauling = state.pendingActions.some(a => a.type === 'haul_debris' && a.blockedReason === null);
   return {
-    // Blast again to deepen a cleared crater, to dig the first fresh-depth pit, or when the crew has nothing left to haul (idle crew, no income).
-    wanted: deepen || !hauling || (!m.lastShotFailed && pitM < LADDER_FRESH_HOLE_DEPTH_M - LADDER_FRESH_SHOT_DEPTH_SLACK_M),
+    // Blast again to deepen a cleared crater, to dig the first full-depth pit, or when the crew has nothing left to haul (idle crew, no income).
+    wanted: deepen || !hauling || (!m.lastShotFailed && pitM < ladderHoleDepthM(s) - LADDER_FRESH_SHOT_DEPTH_SLACK_M),
     cost: side === 0 ? Infinity : side * side * kg * explosive.costPerKg + RE_FIRE_CASH_CUSHION,
     order: () => {
       let ordered: Shot | null = null;
@@ -980,7 +991,8 @@ function ladderCraterRamp(s: ProbeSession, m: LadderMemory): void {
     fleetClimbRatio: climb,
   });
   const affordable = s.state.cash - LADDER_RAMP_COST >= LADDER_UPGRADE_RESERVE;
-  const needsWayIn = reach !== 'fire' && gradeOf(s) >= LADDER_GATE_MIN_GRADE;
+  // Sandbox: wait for no grade (the way in lets grade 1 reach grade 2, #2066); campaign: only once the shot gate is live.
+  const needsWayIn = reach !== 'fire' && (sandboxRun(s) || gradeOf(s) >= LADDER_GATE_MIN_GRADE);
   if (deeper === 'skip' && (!needsWayIn || !affordable)) return;
   tryOnce(s, m, 'crater_ramp', () => {
     const ramp = orderRamp(s, m.crater, m.crater.span, Math.min(RAMP_MAX_SLOPE, climb));
@@ -1060,7 +1072,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {},
     crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.ramp.slope, ramps: {}, rampPending: null, rampedFloorM: 0, maxGrade, barred: [],
-    holeCapM: LADDER_FRESH_HOLE_DEPTH_M, lastShotFailed: false, dudStreak: 0, judgedShots: 1,
+    holeCapM: ladderHoleDepthM(s), lastShotFailed: false, dudStreak: 0, judgedShots: 1,
     before: { pitM: 0, oreKg: 0 },
   };
   recordRamp(m, opened.at, opened.ramp);
