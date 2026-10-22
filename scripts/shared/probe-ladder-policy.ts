@@ -194,6 +194,9 @@ export const LADDER_HOLE_MIN_DEPTH_M = 4;
 /** Consecutive dud shots after which the crater is barred from further shots. */
 export const LADDER_DUD_SHOT_LIMIT = 2;
 
+/** Pit depth gain (m) at or under which a shot counts as having gained none. */
+const LADDER_PIT_GAIN_EPSILON_M = 0.01;
+
 export interface LadderHoleDepthInput {
   /** Deepest hole the fleet's best drill rig can drill, in metres. */
   rigMaxDepthM: number;
@@ -211,8 +214,10 @@ export interface LadderHoleDepthInput {
 
 /** Hole depth (m) for the next ladder shot, within [min(LADDER_HOLE_MIN_DEPTH_M, rigMaxDepthM), rigMaxDepthM]; the minimum-depth floor lives here. */
 export function decideLadderHoleDepth(input: LadderHoleDepthInput): number {
-  void input;
-  throw new Error('not implemented');
+  const fresh = input.freshHoleDepthM ?? LADDER_FRESH_HOLE_DEPTH_M;
+  let base = input.floorOpen ? Math.min(fresh, input.remainingDepthM + 1) : fresh;
+  if (input.lastShotFailed) base = Math.min(base, Math.max(LADDER_HOLE_MIN_DEPTH_M, input.currentCapM - LADDER_HOLE_STEP_DOWN_M));
+  return Math.min(input.rigMaxDepthM, Math.max(LADDER_HOLE_MIN_DEPTH_M, base));
 }
 
 export interface LadderShotOutcomeInput {
@@ -224,14 +229,12 @@ export interface LadderShotOutcomeInput {
 
 /** Whether a fired shot did nothing useful: no columns cleared or no volume broken. */
 export function isDudShot(input: LadderShotOutcomeInput): boolean {
-  void input;
-  throw new Error('not implemented');
+  return input.columnsCleared === 0 || input.volumeM3 === 0;
 }
 
 /** Whether a crater with this many consecutive dud shots is barred from further shots. */
 export function shouldBarCrater(consecutiveDuds: number): boolean {
-  void consecutiveDuds;
-  throw new Error('not implemented');
+  return consecutiveDuds >= LADDER_DUD_SHOT_LIMIT;
 }
 
 export interface LadderShotJudgeInput {
@@ -268,6 +271,11 @@ export interface LadderShotJudgment {
 
 /** Judge the latest fired shot once its yield resolved: failure when no pit gain and no new ore; duds accumulate toward barring. */
 export function judgeLadderShot(input: LadderShotJudgeInput): LadderShotJudgment {
-  void input;
-  throw new Error('not implemented');
+  if (input.shotsFired === input.shotsJudged || input.yieldPending) {
+    return { judged: false, lastShotFailed: false, dudStreak: input.dudStreak, bar: false };
+  }
+  const lastShotFailed = input.pitM <= input.baselinePitM + LADDER_PIT_GAIN_EPSILON_M && input.oreKg <= input.baselineOreKg;
+  const streak = input.report !== null && isDudShot(input.report) ? input.dudStreak + 1 : 0;
+  const bar = shouldBarCrater(streak);
+  return { judged: true, lastShotFailed, dudStreak: bar ? 0 : streak, bar };
 }
