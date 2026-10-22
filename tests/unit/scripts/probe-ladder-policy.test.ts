@@ -417,3 +417,123 @@ describe('rampProtectionZones and shotOverlapsProtectedRamp', () => {
     });
   });
 });
+
+import {
+  decideLadderHoleDepth,
+  isDudShot,
+  shouldBarCrater,
+  LADDER_FRESH_HOLE_DEPTH_M,
+  LADDER_HOLE_MIN_DEPTH_M,
+  LADDER_HOLE_STEP_DOWN_M,
+  LADDER_DUD_SHOT_LIMIT,
+  type LadderHoleDepthInput,
+} from '../../../scripts/shared/probe-ladder-policy';
+
+const holeBase: LadderHoleDepthInput = {
+  rigMaxDepthM: 11,
+  remainingDepthM: 20,
+  floorOpen: false,
+  lastShotFailed: false,
+  currentCapM: 8,
+};
+
+describe('decideLadderHoleDepth', () => {
+  it('constants hold the spec values', () => {
+    expect(LADDER_FRESH_HOLE_DEPTH_M).toBe(8);
+    expect(LADDER_HOLE_MIN_DEPTH_M).toBe(4);
+    expect(LADDER_HOLE_STEP_DOWN_M).toBe(2);
+    expect(LADDER_DUD_SHOT_LIMIT).toBe(2);
+  });
+
+  it('fresh site drills 8 m with a deep rig', () => {
+    expect(decideLadderHoleDepth(holeBase)).toBe(8);
+  });
+
+  it('fresh site ignores remaining depth', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, remainingDepthM: 0.5 })).toBe(8);
+    expect(decideLadderHoleDepth({ ...holeBase, remainingDepthM: 100 })).toBe(8);
+  });
+
+  it('fresh site is clamped to a shallow rig', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, rigMaxDepthM: 6 })).toBe(6);
+  });
+
+  it('deepen drills 8 m when much remains', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: 20 })).toBe(8);
+  });
+
+  it('deepen drills remaining plus 1 m margin', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: 2 })).toBe(3);
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: 5 })).toBe(6);
+  });
+
+  it('deepen margin keeps hole at least as long as a tiny remainder', () => {
+    for (const remaining of [0.01, 0.5, 1]) {
+      const d = decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: remaining });
+      expect(d).toBeGreaterThanOrEqual(remaining + 1);
+    }
+  });
+
+  it('deepen at the 8 m boundary caps at 8', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: 7 })).toBe(8);
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, remainingDepthM: 7.5 })).toBe(8);
+  });
+
+  it('deepen is clamped to rig max', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, rigMaxDepthM: 6, remainingDepthM: 20 })).toBe(6);
+    expect(decideLadderHoleDepth({ ...holeBase, floorOpen: true, rigMaxDepthM: 2, remainingDepthM: 5 })).toBe(2);
+  });
+
+  it('failed shot steps the cap down by 2', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 8 })).toBe(6);
+  });
+
+  it('repeated failures floor at 4', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 6 })).toBe(4);
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 4 })).toBe(4);
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 3 })).toBe(4);
+  });
+
+  it('failure step-down never exceeds the normal rule or rig max', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 11 })).toBe(8);
+    expect(decideLadderHoleDepth({ ...holeBase, lastShotFailed: true, currentCapM: 8, rigMaxDepthM: 5 })).toBe(5);
+    expect(decideLadderHoleDepth({
+      ...holeBase, floorOpen: true, remainingDepthM: 2, lastShotFailed: true, currentCapM: 8,
+    })).toBe(3);
+  });
+
+  it('rig max 6 clamps every path to 6', () => {
+    const rig = { ...holeBase, rigMaxDepthM: 6, currentCapM: 11 };
+    expect(decideLadderHoleDepth(rig)).toBe(6);
+    expect(decideLadderHoleDepth({ ...rig, floorOpen: true })).toBe(6);
+    expect(decideLadderHoleDepth({ ...rig, lastShotFailed: true })).toBe(6);
+  });
+});
+
+describe('isDudShot', () => {
+  it('true when no columns cleared', () => {
+    expect(isDudShot({ columnsCleared: 0, volumeM3: 50 })).toBe(true);
+  });
+  it('true when no volume broken', () => {
+    expect(isDudShot({ columnsCleared: 3, volumeM3: 0 })).toBe(true);
+  });
+  it('true when both zero', () => {
+    expect(isDudShot({ columnsCleared: 0, volumeM3: 0 })).toBe(true);
+  });
+  it('false when both positive', () => {
+    expect(isDudShot({ columnsCleared: 1, volumeM3: 0.1 })).toBe(false);
+  });
+});
+
+describe('shouldBarCrater', () => {
+  it('false below the limit', () => {
+    expect(shouldBarCrater(0)).toBe(false);
+    expect(shouldBarCrater(LADDER_DUD_SHOT_LIMIT - 1)).toBe(false);
+  });
+  it('true at the limit', () => {
+    expect(shouldBarCrater(LADDER_DUD_SHOT_LIMIT)).toBe(true);
+  });
+  it('true above the limit', () => {
+    expect(shouldBarCrater(LADDER_DUD_SHOT_LIMIT + 3)).toBe(true);
+  });
+});
