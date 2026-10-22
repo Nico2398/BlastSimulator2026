@@ -83,23 +83,19 @@ export function decideLadderEventOption(optionHires: readonly boolean[]): number
   return free === -1 ? 0 : free;
 }
 
-interface LadderReachInput {
-  /** Depth (m) of the latest crater floor below the rim. */
-  craterFloorDepthM: number;
-  /** Horizontal run (m) from the crater rim to the ramp. */
-  craterRimToRampM: number;
-  /** Rise over run of the finished ramp; Infinity when none is finished. */
+export interface LadderReachInput {
+  /** Rise over run of the ordered ramp; Infinity when none is ordered. */
   rampSlopeRatio: number;
   /** Steepest slope ratio the fleet climbs. */
   fleetClimbRatio: number;
   affordableTier2Upgrade: boolean;
 }
 
-type LadderReachDecision = 'fire' | 'ramp_first' | 'upgrade_first' | 'shrink';
+export type LadderReachDecision = 'fire' | 'ramp_first' | 'upgrade_first' | 'shrink';
 
 /**
  * Whether the ladder fires at full depth, builds a ramp or upgrades the fleet first, or shrinks the shot to what haulers reach.
- * A finished ramp the fleet climbs (equal counts) fires; no ramp asks for one; a ramp too steep for the fleet asks for the
+ * An ordered ramp the fleet climbs (equal counts) fires; no ramp asks for one; a ramp too steep for the fleet asks for the
  * tier-2 upgrade only when it is affordable, else the shot shrinks: an unaffordable upgrade never fires.
  */
 export function decideLadderReach(input: LadderReachInput): LadderReachDecision {
@@ -110,7 +106,6 @@ export function decideLadderReach(input: LadderReachInput): LadderReachDecision 
 
 /** Deepest shot (m) haulers can still reach by the ramp; monotonic in the ramp run, never above holeDepthM. */
 export function reachableShotDepthM(
-  _rampSlopeRatio: number,
   rampRunM: number,
   fleetClimbRatio: number,
   holeDepthM: number,

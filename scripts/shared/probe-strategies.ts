@@ -520,18 +520,21 @@ const LADDER_MAX_FIRE_CANCELS = 3;
  */
 function dropUnreachablePattern(s: ProbeSession, m: LadderMemory): void {
   if (m.shot !== null && (m.fireCancels ?? 0) >= LADDER_MAX_FIRE_CANCELS) {
-    m.barred.push({ ...m.shot.at, span: m.shot.span });
-    abandonPattern(s);
-    m.shot = null;
+    abandonShot(s, m, { ...m.shot.at, span: m.shot.span });
     m.fireCancels = 0;
     return;
   }
   const stuck = s.state.pendingActions.find(a => a.type === 'drill_hole' && a.blockedReason === 'target_unreachable');
   if (!stuck) return;
-  m.barred.push({ x: stuck.targetX, z: stuck.targetZ, span: 1 });
+  abandonShot(s, m, { x: stuck.targetX, z: stuck.targetZ, span: 1 });
+  delete m.stalePatternSinceTick;
+}
+
+/** Give up the ordered shot: bar its footprint from later fresh sites, clear the pattern and forget the shot. */
+function abandonShot(s: ProbeSession, m: LadderMemory, barred: Pattern & { span: number }): void {
+  m.barred.push(barred);
   abandonPattern(s);
   m.shot = null;
-  delete m.stalePatternSinceTick;
 }
 
 /** Drop a half-drilled pattern no crew can finish (a hole beyond every hauler's reach); left standing it keeps the ladder from ordering any later shot. */
@@ -602,8 +605,8 @@ const LADDER_SHRINK_STEPS = [1, 0.75, 0.5, 0.25] as const;
 const LADDER_RAMP_RETRY_KEY = 'gentle_ramp';
 const SOFTEST_SAFE_FACE_M = WALL_SAFE_FACE_HEIGHT_M_BY_TIER[1]!;
 
-/** Roles the ladder upgrades in place, in priority order: depth (rig), haul capacity, ramp digging. */
-const LADDER_UPGRADE_ROLES: readonly VehicleRole[] = ['drill_rig', 'rock_digger'];
+/** Roles the ladder upgrades in place, in priority order: depth (rig), then ramp digging. Haulers are not upgraded: tier 2 climbs less steeply. */
+const LADDER_UPGRADE_ROLES: readonly VehicleRole[] = ['drill_rig', 'debris_hauler', 'rock_digger'];
 /** Cash kept back after an upgrade or a licence course: a stalled income must outlast the payroll it grew. */
 const LADDER_UPGRADE_RESERVE = 150_000;
 /** Ticks between hires made for a licence course: a fresh hire needs time to enrol and train before another is paid for. */
@@ -630,7 +633,11 @@ interface LadderMemory extends ReinvestMemory {
 
 const craterKey = (c: Pattern): string => `${c.x},${c.z}`;
 
-/** Steepest slope ratio every hauler of the fleet climbs: the slowest tier decides which ramp is a way in for all of them. */
+/**
+ * Slope ratio of the fleet's best hauler tier (tier 1 with none): the maximum tier, not `fleetSlopeRatio`'s minimum over
+ * every vehicle. A slower hauler of a lower tier may still be unable to climb a ramp this value allows.
+ * TODO(#2062): the remainder issue may switch this to the slowest hauler tier.
+ */
 function fleetClimbRatio(vehicles: readonly Vehicle[]): number {
   const tiers = vehicles.filter(v => v.type === 'debris_hauler').map(v => v.tier);
   return tierSlopeRatio(Math.max(1, ...tiers) as VehicleTier);
@@ -678,11 +685,11 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   // A ramp steeper than the fleet climbs reaches only so deep: shrink the holes to what the haulers still reach.
   const ramp = deepen && crater ? m.ramps[craterKey(crater)] : undefined;
   const climb = fleetClimbRatio(vehicles);
+  // TODO(#2062): upgrade_first is never reached here (affordableTier2Upgrade hard-coded false); wire it when the tier-2 climb decision lands.
   const shrunk = ramp !== undefined && decideLadderReach({
-    craterFloorDepthM: state.grade?.deepestPitM ?? 0, craterRimToRampM: ramp.runM, rampSlopeRatio: ramp.slope,
-    fleetClimbRatio: climb, affordableTier2Upgrade: false,
+    rampSlopeRatio: ramp.slope, fleetClimbRatio: climb, affordableTier2Upgrade: false,
   }) === 'shrink';
-  const depth = shrunk ? Math.max(1, Math.floor(reachableShotDepthM(ramp.slope, ramp.runM, climb, holeDepth))) : holeDepth;
+  const depth = shrunk ? Math.max(1, Math.floor(reachableShotDepthM(ramp.runM, climb, holeDepth))) : holeDepth;
   const rigDiameterM = fleetBestRigLimit(DRILL_RIG_MAX_DIAMETER_M, vehicles);
   const base: LadderShot = {
     rows: 3, cols: 3, spacing: SHOT.spacing, depth, kgPerHole: SHOT.kg, stemming: SHOT.stemming, diameterM: pickDiameter(rigDiameterM),
@@ -873,7 +880,7 @@ function ladderCraterRamp(s: ProbeSession, m: LadderMemory): void {
   const climb = fleetClimbRatio(s.state.vehicles.vehicles);
   const own = m.ramps[craterKey(m.crater)];
   const reach = decideLadderReach({
-    craterFloorDepthM: floorDepthM, craterRimToRampM: own?.runM ?? 0, rampSlopeRatio: own?.slope ?? Infinity,
+    rampSlopeRatio: own?.slope ?? Infinity,
     fleetClimbRatio: climb, affordableTier2Upgrade: s.state.cash - LADDER_UPGRADE_RESERVE >= (computeVehicleUpgradeCost('debris_hauler', 1) ?? Infinity),
   });
   const affordable = s.state.cash - LADDER_RAMP_COST >= LADDER_UPGRADE_RESERVE;

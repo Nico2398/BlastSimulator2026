@@ -142,7 +142,7 @@ Changes: `decideLadderShotGate` (grade >= 2; holds above `LADDER_GATE_RUBBLE_KG`
 ladder hole depth 11 m (inside the 12 m tier-1 safe face) so the first deep pit clears 10 m; fresh shots only for the first full-depth pit, a cleared crater
 or an idle crew; up to 6 haulers while cash is idle; a half-drilled pattern stuck for a step budget is dropped (`drill_plan clear` / `remove`).
 
-| run (50,000 horizon) | g1 | g2 | g3-5 | cash peak | end |
+| run (50,000 horizon) | g1 (ticks) | g2 (ticks) | g3-5 | cash peak | end |
 | --- | --- | --- | --- | --- | --- |
 | `main` before | 1088 | not reached by t11,000 | no | 2.9 M @ t4,000 | trace stopped t11,000 alive |
 | after | 1088 | before t3,000 (pit 10.86 m) | no | 9.3 M @ t7,000 | bankrupt about t18,300, ore flat since t7,500 |
@@ -185,8 +185,8 @@ Changes: `decideLadderReach` / `reachableShotDepthM` (`scripts/shared/probe-ladd
 | grade 4 at t15,000-25,000 | not reached | MISSED |
 | grade 5 at t30,000-45,000 | not reached | MISSED |
 | ladder ahead of stay_g1 at t10,000 | 7.18 M vs 8.31 M | MISSED |
-| fragmenter ahead of no-fragmenter at t10,000 | not met | MISSED |
-| >= 60% boulder ore sold | not met | MISSED |
+| fragmenter ahead of no-fragmenter at t10,000 | not measured | UNKNOWN |
+| >= 60% boulder ore sold | not measured | UNKNOWN |
 
 The ladder never reached grade 3; the values above are the closest measured.
 

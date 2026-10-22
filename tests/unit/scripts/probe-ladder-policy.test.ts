@@ -189,8 +189,6 @@ describe('decideLadderEventOption', () => {
 });
 
 const reachBase: LadderReachInput = {
-  craterFloorDepthM: 8,
-  craterRimToRampM: 20,
   rampSlopeRatio: 0.3,
   fleetClimbRatio: 0.4,
   affordableTier2Upgrade: false,
@@ -232,44 +230,34 @@ describe('decideLadderReach', () => {
     ).not.toBe('fire');
   });
 
-  it('handles a zero rim-to-ramp run by the ratios alone', () => {
-    expect(decideLadderReach({ ...reachBase, craterRimToRampM: 0 })).toBe('fire');
-    expect(decideLadderReach({ ...reachBase, craterRimToRampM: 0, rampSlopeRatio: 0.9 })).toBe('shrink');
-  });
 });
 
 describe('reachableShotDepthM', () => {
   it('is the ramp run times the climb ratio when below the hole depth', () => {
-    expect(reachableShotDepthM(0.3, 20, 0.25, 12)).toBeCloseTo(5);
+    expect(reachableShotDepthM(20, 0.25, 12)).toBeCloseTo(5);
   });
 
   it('is capped at the hole depth', () => {
-    expect(reachableShotDepthM(0.3, 100, 0.5, 12)).toBe(12);
+    expect(reachableShotDepthM(100, 0.5, 12)).toBe(12);
   });
 
   it('is 0 for a zero ramp run', () => {
-    expect(reachableShotDepthM(0.3, 0, 0.5, 12)).toBe(0);
+    expect(reachableShotDepthM(0, 0.5, 12)).toBe(0);
   });
 
   it('is never negative', () => {
-    expect(reachableShotDepthM(0.3, -5, 0.5, 12)).toBe(0);
-    expect(reachableShotDepthM(0.3, 20, -0.5, 12)).toBe(0);
+    expect(reachableShotDepthM(-5, 0.5, 12)).toBe(0);
+    expect(reachableShotDepthM(20, -0.5, 12)).toBe(0);
   });
 
   it('is 0 for a zero hole depth', () => {
-    expect(reachableShotDepthM(0.3, 20, 0.5, 0)).toBe(0);
-  });
-
-  it('stays finite and ignores an Infinity ramp slope', () => {
-    const v = reachableShotDepthM(Infinity, 20, 0.25, 12);
-    expect(Number.isFinite(v)).toBe(true);
-    expect(v).toBeCloseTo(5);
+    expect(reachableShotDepthM(20, 0.5, 0)).toBe(0);
   });
 
   it('is monotonic non-decreasing in the fleet climb ratio', () => {
     let prev = -1;
     for (let r = 0; r <= 1.5; r += 0.05) {
-      const v = reachableShotDepthM(0.3, 20, r, 12);
+      const v = reachableShotDepthM(20, r, 12);
       expect(v).toBeGreaterThanOrEqual(prev);
       expect(v).toBeLessThanOrEqual(12);
       prev = v;
@@ -279,7 +267,7 @@ describe('reachableShotDepthM', () => {
   it('is monotonic non-decreasing in the ramp run', () => {
     let prev = -1;
     for (let run = 0; run <= 100; run += 5) {
-      const v = reachableShotDepthM(0.3, run, 0.25, 12);
+      const v = reachableShotDepthM(run, 0.25, 12);
       expect(v).toBeGreaterThanOrEqual(prev);
       expect(v).toBeLessThanOrEqual(12);
       prev = v;
