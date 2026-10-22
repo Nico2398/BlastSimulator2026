@@ -638,7 +638,7 @@ const craterKey = (c: Pattern): string => `${c.x},${c.z}`;
  * every vehicle. A slower hauler of a lower tier may still be unable to climb a ramp this value allows.
  * TODO(#2062): the remainder issue may switch this to the slowest hauler tier.
  */
-function fleetClimbRatio(vehicles: readonly Vehicle[]): number {
+export function fleetClimbRatio(vehicles: readonly Vehicle[]): number {
   const tiers = vehicles.filter(v => v.type === 'debris_hauler').map(v => v.tier);
   return tierSlopeRatio(Math.max(1, ...tiers) as VehicleTier);
 }
@@ -659,6 +659,17 @@ function craterRubble(state: GameState, crater: Pattern & { span: number }): num
   return state.logistics.fragments.filter(f => f.state === 'on_ground'
     && f.fragment.position.x >= crater.x - 1 && f.fragment.position.x <= crater.x + crater.span + 1
     && f.fragment.position.z >= crater.z - 1 && f.fragment.position.z <= crater.z + crater.span + 1).length;
+}
+
+export interface CraterRubbleCounts {
+  ordered: number;
+  orderless: number;
+  sealed: number;
+}
+
+/** One pass over the crater's rubble: covered by a haul order, reachable without one, or sealed from every hauler. */
+export function craterRubbleCounts(_state: GameState, _crater: Pattern & { span: number }): CraterRubbleCounts {
+  return { ordered: 0, orderless: 0, sealed: 0 }; // TODO: implement
 }
 
 /** A haul still pending over a crater's footprint (and a tile around it). */
@@ -685,9 +696,8 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   // A ramp steeper than the fleet climbs reaches only so deep: shrink the holes to what the haulers still reach.
   const ramp = deepen && crater ? m.ramps[craterKey(crater)] : undefined;
   const climb = fleetClimbRatio(vehicles);
-  // TODO(#2062): upgrade_first is never reached here (affordableTier2Upgrade hard-coded false); wire it when the tier-2 climb decision lands.
   const shrunk = ramp !== undefined && decideLadderReach({
-    rampSlopeRatio: ramp.slope, fleetClimbRatio: climb, affordableTier2Upgrade: false,
+    rampSlopeRatio: ramp.slope, fleetClimbRatio: climb,
   }) === 'shrink';
   const depth = shrunk ? Math.max(1, Math.floor(reachableShotDepthM(ramp.runM, climb, holeDepth))) : holeDepth;
   const rigDiameterM = fleetBestRigLimit(DRILL_RIG_MAX_DIAMETER_M, vehicles);
@@ -881,7 +891,7 @@ function ladderCraterRamp(s: ProbeSession, m: LadderMemory): void {
   const own = m.ramps[craterKey(m.crater)];
   const reach = decideLadderReach({
     rampSlopeRatio: own?.slope ?? Infinity,
-    fleetClimbRatio: climb, affordableTier2Upgrade: s.state.cash - LADDER_UPGRADE_RESERVE >= (computeVehicleUpgradeCost('debris_hauler', 1) ?? Infinity),
+    fleetClimbRatio: climb,
   });
   const affordable = s.state.cash - LADDER_RAMP_COST >= LADDER_UPGRADE_RESERVE;
   const needsWayIn = reach !== 'fire' && gradeOf(s) >= LADDER_GATE_MIN_GRADE;

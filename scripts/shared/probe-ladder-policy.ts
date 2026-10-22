@@ -88,10 +88,9 @@ export interface LadderReachInput {
   rampSlopeRatio: number;
   /** Steepest slope ratio the fleet climbs. */
   fleetClimbRatio: number;
-  affordableTier2Upgrade: boolean;
 }
 
-type LadderReachDecision = 'fire' | 'ramp_first' | 'upgrade_first' | 'shrink';
+type LadderReachDecision = 'fire' | 'ramp_first' | 'shrink';
 
 /**
  * Whether the ladder fires at full depth, builds a ramp or upgrades the fleet first, or shrinks the shot to what haulers reach.
@@ -101,7 +100,7 @@ type LadderReachDecision = 'fire' | 'ramp_first' | 'upgrade_first' | 'shrink';
 export function decideLadderReach(input: LadderReachInput): LadderReachDecision {
   if (!Number.isFinite(input.rampSlopeRatio)) return 'ramp_first';
   if (input.fleetClimbRatio >= input.rampSlopeRatio) return 'fire';
-  return input.affordableTier2Upgrade ? 'upgrade_first' : 'shrink';
+  return 'shrink';
 }
 
 /** Deepest shot (m) haulers can still reach by the ramp; monotonic in the ramp run, never above holeDepthM. */
@@ -111,4 +110,60 @@ export function reachableShotDepthM(
   holeDepthM: number,
 ): number {
   return Math.max(0, Math.min(holeDepthM, rampRunM * fleetClimbRatio));
+}
+
+export interface LadderDeepenInput {
+  /** Rubble on the crater footprint that a haul order already covers. */
+  orderedRubbleCount: number;
+  /** Rubble with no haul order that a hauler can reach (sealed rubble excluded). */
+  orderlessRubbleCount: number;
+  /** Rubble no hauler can reach whatever is ordered. */
+  sealedRubbleCount: number;
+  haulPending: boolean;
+}
+
+/** Deepen when no ordered or reachable orderless rubble and no haul remains, whatever is sealed; else wait. */
+export function decideLadderDeepen(_input: LadderDeepenInput): 'deepen' | 'wait' {
+  return undefined as unknown as 'deepen' | 'wait'; // TODO: implement
+}
+
+export interface FreshSiteInput {
+  oreKgUnderSite: number;
+  siteOreKgFloor: number;
+  groundOreKgRemaining: number;
+}
+
+/** Skip a fresh site holding less ore than the floor while ore remains elsewhere in the ground. */
+export function decideFreshShotSite(_input: FreshSiteInput): 'fire' | 'skip' {
+  return undefined as unknown as 'fire' | 'skip'; // TODO: implement
+}
+
+/** Least ore (kg) under a fresh shot site worth firing at. */
+export const LADDER_SITE_ORE_KG_FLOOR = 0;
+
+/** Margin (m) around a ramp footprint that a fresh shot keeps clear of. */
+export const LADDER_RAMP_PROTECT_MARGIN_M = 0;
+
+export interface RampFootprintInput {
+  x: number;
+  z: number;
+  runM: number;
+  dirX: number;
+  dirZ: number;
+}
+
+export interface ProtectedZone {
+  x: number;
+  z: number;
+  span: number;
+}
+
+/** Square zones covering each ramp's run plus the margin. */
+export function rampProtectionZones(_ramps: readonly RampFootprintInput[], _marginM: number): ProtectedZone[] {
+  return []; // TODO: implement
+}
+
+/** Whether a shot footprint overlaps any protected zone. */
+export function shotOverlapsProtectedRamp(_site: ProtectedZone, _zones: readonly ProtectedZone[]): boolean {
+  return false; // TODO: implement
 }
