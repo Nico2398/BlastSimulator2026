@@ -157,3 +157,44 @@ or an idle crew; up to 6 haulers while cash is idle; a half-drilled pattern stuc
 
 Remainder (needs its own run): deepening craters stay out of hauler reach. A ramp (or tier-2 hauler upgrade) into every new crater before its
 rubble is counted, or sizing shots to what the fleet hauls, must precede any `MINE_GRADES`/`BUYER_*` tuning.
+
+## Update (#2060): ladder reach gate (partial, MISSED)
+
+Seed 42, desert_badlands, full kit, horizon 50,000, measured with `scripts/progression-probe.ts`. Probe code only; no balance constant, sandbox pin
+or campaign pin was touched, and the grade table in `gameplay-game-design` is unchanged.
+
+Changes: `decideLadderReach` / `reachableShotDepthM` (`scripts/shared/probe-ladder-policy.ts`) wired into `ladderCraterRamp` / `ladderPlan`.
+
+1. The ladder digs a ramp into each fresh crater from grade 2, capped at the fleet climb ratio.
+2. Deepening shot hole depth shrinks when the crater ramp is steeper than the fleet climbs.
+3. `debris_hauler` is no longer auto-upgraded to tier 2: tier 2 climbs 24 deg against 30 deg, and the fleet stood idle with 439 queued haul orders.
+4. A drill hole unreachable by the rig drops the pattern and bars the site.
+5. After 3 disarmed detonations the site is given up.
+
+| run (50,000 horizon) | g1 | g2 | g3-5 | cash@10k | cash@15k | cash@25k | end |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder before | n/a | n/a | no | n/a | n/a | n/a | bankrupt about t18,300 |
+| ladder after | 968 | 2812 | not reached | 7.18 M | 3.21 M | n/a | bankrupt t19,139, delivered ore flat after about t7,500 |
+| stay_g1 before | n/a | n/a (capped) | n/a | n/a | n/a | n/a | bankrupt t21,539 |
+| stay_g1 after | n/a | n/a (capped) | n/a | 8.31 M | 4.72 M | n/a | bankrupt t23,039 |
+| reinvest (unchanged) | 1178 | n/a | n/a | 6.65 M | 7.70 M | 3.10 M | bankrupt t31,779 |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| grade 3 at t8,000-14,000 | not reached | MISSED |
+| grade 4 at t15,000-25,000 | not reached | MISSED |
+| grade 5 at t30,000-45,000 | not reached | MISSED |
+| ladder ahead of stay_g1 at t10,000 | 7.18 M vs 8.31 M | MISSED |
+| fragmenter ahead of no-fragmenter at t10,000 | not met | MISSED |
+| >= 60% boulder ore sold | not met | MISSED |
+
+The ladder never reached grade 3; the values above are the closest measured.
+
+Root cause of the remaining bankruptcy (remainder, needs its own run):
+
+1. Orderless rubble: fragments sealed under intact ground (`sealedFragmentIdsOf` in `HaulDispatch`) never get a haul order, so `craterRubble === 0` never
+   holds and deepening never starts. Excluding them in `craterRubble` stalled grade 1 (pit stayed 5 m, 26 shots) and was reverted; deepening needs its own gate.
+2. Fresh shots on used-up ore ground hit barren 0-ore ground and add unhaulable rubble.
+3. Ramp paths are unprotected from neighbouring blasts: a blast cut crater 1's ramp and trapped a hauler. Barring ramp paths from shot sites shrank
+   the sites so grade 2 never came.
+4. The `upgrade_first` branch maps to "dig a ramp" because tier 2 reduces the climb ratio.
