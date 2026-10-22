@@ -80,7 +80,7 @@ import {
 } from './probe-ladder.js';
 import {
   decideLadderDeepen, decideFreshShotSite, decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM,
-  LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_SITE_ORE_KG_FLOOR, decideLadderSafety, decideLadderShotGate,
+  LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
   rampProtectionZones, shotOverlapsProtectedRamp,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
@@ -282,7 +282,7 @@ function overlapsShot(c: Pattern & { span?: number }, o: Pattern & { span?: numb
 }
 
 /** Extra limits on a fresh shot site: ramp corridors kept clear, and used-up ground skipped. */
-interface FreshSiteRules {
+export interface FreshSiteRules {
   protectedZones: readonly ProtectedZone[];
 }
 
@@ -290,13 +290,13 @@ interface FreshSiteRules {
  * Free deposits best first. With `rules`, sites on ore-less ground are skipped while ore remains elsewhere, and sites over a
  * protected ramp corridor are skipped unless that would leave none (a ladder that finds no site stalls).
  */
-function freshSites(grid: VoxelGrid, span: number, depth: number, earlier: readonly (Pattern & { span?: number })[], rules?: FreshSiteRules): Pattern[] {
+export function freshSites(grid: VoxelGrid, span: number, depth: number, earlier: readonly (Pattern & { span?: number })[], rules?: FreshSiteRules): Pattern[] {
   const free = rankDeposits(grid, span, depth)
     .filter(c => !earlier.some(o => overlapsShot({ ...c, span }, o, earlier.length > 0 ? BERM_GAP : 0)));
   if (!rules) return free;
   const groundOreKgRemaining = free.reduce((sum, c) => sum + c.ore, 0);
   const worthIt = free.filter(c => decideFreshShotSite({
-    oreKgUnderSite: c.ore, siteOreKgFloor: LADDER_SITE_ORE_KG_FLOOR, groundOreKgRemaining,
+    oreKgUnderSite: c.ore, siteOreKgFloor: LADDER_SITE_ORE_FLOOR, groundOreKgRemaining,
   }) === 'fire');
   const clear = worthIt.filter(c => !shotOverlapsProtectedRamp({ x: c.x, z: c.z, span }, rules.protectedZones));
   return clear.length > 0 ? clear : worthIt;
@@ -656,7 +656,8 @@ const craterKey = (c: Pattern): string => `${c.x},${c.z}`;
 
 /**
  * Slope ratio every hauler climbs: the minimum over the haulers' tiers (tier 1 with none), as `fleetSlopeRatio` does over
- * every vehicle. Tier 2 climbs less steeply than tier 1, so a ramp is only as steep as the slowest hauler allows.
+ * every vehicle. Not `fleetSlopeRatio(haulers, true)`: its empty-fleet fallback is the slowest tier of all, where the ladder's
+ * first hauler is tier 1. Tier 2 climbs less steeply than tier 1, so a ramp is only as steep as the slowest hauler allows.
  */
 export function fleetClimbRatio(vehicles: readonly Vehicle[]): number {
   const ratios = vehicles.filter(v => v.type === 'debris_hauler').map(v => tierSlopeRatio(v.tier));
@@ -706,8 +707,7 @@ export function craterRubbleCounts(state: GameState, crater: Pattern & { span: n
 /** A haul still pending over a crater's footprint (and a tile around it). */
 function craterHaulPending(state: GameState, crater: Pattern & { span: number }): boolean {
   return state.pendingActions.some(a => a.type === 'haul_debris'
-    && a.targetX >= crater.x - 1 && a.targetX <= crater.x + crater.span + 1
-    && a.targetZ >= crater.z - 1 && a.targetZ <= crater.z + crater.span + 1);
+    && inCraterFringe(a.targetX, a.targetZ, crater));
 }
 
 /**
