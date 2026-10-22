@@ -220,7 +220,7 @@ export function decideLadderHoleDepth(input: LadderHoleDepthInput): number {
   return Math.min(input.rigMaxDepthM, Math.max(LADDER_HOLE_MIN_DEPTH_M, base));
 }
 
-export interface LadderShotOutcomeInput {
+interface LadderShotOutcomeInput {
   /** Columns the shot cleared. */
   columnsCleared: number;
   /** Rock volume (m3) the shot broke. */
@@ -258,7 +258,7 @@ export interface LadderShotJudgeInput {
   dudStreak: number;
 }
 
-export interface LadderShotJudgment {
+interface LadderShotJudgment {
   /** Whether a new shot was judged this call; when false the other fields carry the unchanged state. */
   judged: boolean;
   /** Whether the judged shot gained no pit depth and no new ore. */
