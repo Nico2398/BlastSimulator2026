@@ -112,7 +112,7 @@ export function reachableShotDepthM(
   return Math.max(0, Math.min(holeDepthM, rampRunM * fleetClimbRatio));
 }
 
-export interface LadderDeepenInput {
+interface LadderDeepenInput {
   /** Rubble on the crater footprint that a haul order already covers. */
   orderedRubbleCount: number;
   /** Rubble with no haul order that a hauler can reach (sealed rubble excluded). */
@@ -123,26 +123,27 @@ export interface LadderDeepenInput {
 }
 
 /** Deepen when no ordered or reachable orderless rubble and no haul remains, whatever is sealed; else wait. */
-export function decideLadderDeepen(_input: LadderDeepenInput): 'deepen' | 'wait' {
-  return undefined as unknown as 'deepen' | 'wait'; // TODO: implement
+export function decideLadderDeepen(input: LadderDeepenInput): 'deepen' | 'wait' {
+  const clear = input.orderedRubbleCount === 0 && input.orderlessRubbleCount === 0;
+  return clear && !input.haulPending ? 'deepen' : 'wait';
 }
 
-export interface FreshSiteInput {
+interface FreshSiteInput {
   oreKgUnderSite: number;
   siteOreKgFloor: number;
   groundOreKgRemaining: number;
 }
 
 /** Skip a fresh site holding less ore than the floor while ore remains elsewhere in the ground. */
-export function decideFreshShotSite(_input: FreshSiteInput): 'fire' | 'skip' {
-  return undefined as unknown as 'fire' | 'skip'; // TODO: implement
+export function decideFreshShotSite(input: FreshSiteInput): 'fire' | 'skip' {
+  return input.oreKgUnderSite < input.siteOreKgFloor && input.groundOreKgRemaining > 0 ? 'skip' : 'fire';
 }
 
-/** Least ore (kg) under a fresh shot site worth firing at. */
-export const LADDER_SITE_ORE_KG_FLOOR = 0;
+/** Least ore under a fresh shot site worth firing at, in the units of `oreKgUnderSite` (used-up ground holds exactly 0). */
+export const LADDER_SITE_ORE_KG_FLOOR = 1;
 
 /** Margin (m) around a ramp footprint that a fresh shot keeps clear of. */
-export const LADDER_RAMP_PROTECT_MARGIN_M = 0;
+export const LADDER_RAMP_PROTECT_MARGIN_M = 2;
 
 export interface RampFootprintInput {
   x: number;
@@ -158,12 +159,24 @@ export interface ProtectedZone {
   span: number;
 }
 
-/** Square zones covering each ramp's run plus the margin. */
-export function rampProtectionZones(_ramps: readonly RampFootprintInput[], _marginM: number): ProtectedZone[] {
-  return []; // TODO: implement
+/**
+ * One corner-origin box per ramp, covering its run plus the margin each side along the corridor and centred
+ * across it. `x`,`z` is the ramp's start; `dirX`,`dirZ` its unit direction.
+ */
+export function rampProtectionZones(ramps: readonly RampFootprintInput[], marginM: number): ProtectedZone[] {
+  return ramps.map(r => {
+    const span = r.runM + 2 * marginM;
+    const endX = r.x + r.dirX * r.runM;
+    const endZ = r.z + r.dirZ * r.runM;
+    const alongX = r.dirX !== 0;
+    return alongX
+      ? { x: Math.min(r.x, endX) - marginM, z: r.z - span / 2, span }
+      : { x: r.x - span / 2, z: Math.min(r.z, endZ) - marginM, span };
+  });
 }
 
-/** Whether a shot footprint overlaps any protected zone. */
-export function shotOverlapsProtectedRamp(_site: ProtectedZone, _zones: readonly ProtectedZone[]): boolean {
-  return false; // TODO: implement
+/** Whether a shot footprint overlaps any protected zone; boxes that merely touch do not. */
+export function shotOverlapsProtectedRamp(site: ProtectedZone, zones: readonly ProtectedZone[]): boolean {
+  return zones.some(z => site.x < z.x + z.span && z.x < site.x + site.span
+    && site.z < z.z + z.span && z.z < site.z + site.span);
 }
