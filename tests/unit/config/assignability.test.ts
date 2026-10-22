@@ -904,6 +904,24 @@ describe('running several issues at once', () => {
     expect(result.reason).toContain('can start beside');
   });
 
+  // On 22 Oct 2026 #2066 (`scope:pipeline`) waited on live #2045 and held
+  // everything; #2068 behind it was never named in the assigner's log, so the
+  // queue read as if #2068 had been overlooked.
+  it('names every younger issue left waiting behind a hold on everything', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:pipeline'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:economy'] },
+    ]);
+    const log: string[] = [];
+    const result = await rules.selectNextAssignable(api, { maxParallel: 3, log: (m: string) => log.push(m) });
+    expect(result.issues).toEqual([]);
+    for (const n of [30, 35]) {
+      expect(log.some((line) => line.startsWith(`#${n}: waits`) && line.includes('#25'))).toBe(true);
+    }
+  });
+
   it('starts nothing beside a live run that claims the whole repository', async () => {
     const api = fakeApi([
       { number: 20, labels: ['in-progress'] },
