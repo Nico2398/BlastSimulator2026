@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, buildGameNavGrid } from '../../../src/core/state/GameState.js';
-import { placeStartingCrew, isVehicleRouteAcceptable, relocateVehiclesOffNarrowGround, fleetSlopeRatio } from '../../../src/core/state/SpawnPlacement.js';
+import { placeStartingCrew, isVehicleRouteAcceptable, relocateVehiclesOffNarrowGround } from '../../../src/core/state/SpawnPlacement.js';
+import * as spawnModule from '../../../src/core/state/SpawnPlacement.js';
+import { vehicleMaxSlopeRatio } from '../../../src/core/entities/Vehicle.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import { CREW_SPAWN_VEHICLE_SEPARATION, CREW_SPAWN_AGENT_SEPARATION, CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS, NAV_CLEARANCE_VEHICLE_CELLS } from '../../../src/core/config/balance.js';
 import { isLicensedForRole } from '../../../src/core/engine/VehicleReservation.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
-import { slopeRatioForDegrees, slowestVehicleTierSlopeRatio, tierSlopeRatio } from '../../../src/core/nav/ClimbLimit.js';
-import { NAV_MAX_SLOPE_RATIO } from '../../../src/core/config/balance.js';
+import { slopeRatioForDegrees } from '../../../src/core/nav/ClimbLimit.js';
 import { countLegalStepNeighbours, computeClimbComponents } from '../../../src/core/nav/NavGridReachability.js';
 
 function solidVoxel(): VoxelData {
@@ -515,27 +516,10 @@ describe('relocateVehiclesOffNarrowGround (#1648)', () => {
   });
 });
 
-describe('fleetSlopeRatio (#2044)', () => {
-  it('is the walking limit off a progression site, whatever the tiers', () => {
-    expect(fleetSlopeRatio([{ tier: 3 }, { tier: 2 }], false)).toBe(NAV_MAX_SLOPE_RATIO);
-  });
-
-  it('is the lowest tier limit in the fleet on a progression site', () => {
-    expect(fleetSlopeRatio([{ tier: 1 }, { tier: 2 }], true)).toBeCloseTo(tierSlopeRatio(2), 12);
-    expect(fleetSlopeRatio([{ tier: 2 }, { tier: 3 }, { tier: 1 }], true)).toBeCloseTo(tierSlopeRatio(3), 12);
-  });
-
-  it('a lone tier-1 fleet keeps the walking limit', () => {
-    expect(fleetSlopeRatio([{ tier: 1 }], true)).toBeCloseTo(NAV_MAX_SLOPE_RATIO, 12);
-  });
-
-  it('an empty fleet on a progression site plans for the slowest tier a later purchase could bring', () => {
-    expect(fleetSlopeRatio([], true)).toBeCloseTo(slopeRatioForDegrees(18), 12);
-    expect(fleetSlopeRatio([], true)).toBeCloseTo(slowestVehicleTierSlopeRatio(), 12);
-  });
-
-  it('an empty fleet off a progression site is the walking limit', () => {
-    expect(fleetSlopeRatio([], false)).toBe(NAV_MAX_SLOPE_RATIO);
+describe('spawn slope limit is the one vehicle limit (#2045)', () => {
+  it('fleetSlopeRatio is gone: every fleet plans for vehicleMaxSlopeRatio(true)', () => {
+    expect((spawnModule as Record<string, unknown>)['fleetSlopeRatio']).toBeUndefined();
+    expect(vehicleMaxSlopeRatio(true)).toBeCloseTo(slopeRatioForDegrees(20), 12);
   });
 });
 

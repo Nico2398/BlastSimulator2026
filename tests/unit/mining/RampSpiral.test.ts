@@ -471,3 +471,29 @@ describe('proposeRampSpiral: sloped terrain (#2028)', () => {
     expect(isPitRim(surface, { x: 55, z: midZ })).toBe(false);
   });
 });
+
+describe('proposeRampSpiral: cut ceiling follows the request (#2045)', () => {
+  const PROGRESSION = Math.tan(20 * Math.PI / 180) * 0.98;
+
+  it('a progression request refuses a 25 degree grade with the real ceiling under 20', () => {
+    const r = proposeRampSpiral(req(SQUARE, { gradeDegrees: 25, cutSlopeRatio: PROGRESSION }), makeSurface(SQUARE));
+    expect(r.success).toBe(false);
+    if (r.success) return;
+    expect(r.reasonKey).toBe('mining.build_ramp.grade_too_steep');
+    expect(r.params).toMatchObject({ grade: 25 });
+    expect(r.params!.max as number).toBeLessThan(20);
+    expect(r.params!.max as number).toBeGreaterThan(19);
+  });
+
+  it('a progression request accepts the ceiling grade itself', () => {
+    const ceiling = Math.floor(Math.atan(PROGRESSION) * 180 / Math.PI * 10) / 10;
+    const r = proposeRampSpiral(req(SQUARE, { gradeDegrees: ceiling, cutSlopeRatio: PROGRESSION }), makeSurface(SQUARE));
+    expect(r.success).toBe(true);
+  });
+
+  it('a request without a ratio keeps the old 29.5 degree ceiling', () => {
+    expect(proposeRampSpiral(req(SQUARE, { gradeDegrees: 25 }), makeSurface(SQUARE)).success).toBe(true);
+    const r = proposeRampSpiral(req(SQUARE, { gradeDegrees: 31 }), makeSurface(SQUARE));
+    expect(r.success).toBe(false);
+  });
+});

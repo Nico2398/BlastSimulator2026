@@ -289,3 +289,33 @@ describe('countLegalStepNeighbours (#1648)', () => {
     expect(countLegalStepNeighbours(grid, 5, 5, NAV_CLEARANCE_VEHICLE_CELLS)).toBe(7);
   });
 });
+
+describe('computeClimbReachableSet — no diagonal shortcut up a ramp for a limited mover (#2045)', () => {
+  const tanDeg = (d: number): number => Math.tan(d * Math.PI / 180);
+  const ramp = (gradeDeg: number): NavGrid => makeGrid((x, _z) => ({ surfaceY: x * tanDeg(gradeDeg), climbY: x * tanDeg(gradeDeg) }));
+
+  for (const grade of [21, 24, 27]) {
+    it(`a 20 degree mover at the foot of a ${grade} degree ramp reaches nothing up it`, () => {
+      const set = computeClimbReachableSet(ramp(grade), 0, 5, NAV_CLEARANCE_VEHICLE_CELLS, tanDeg(20));
+      expect(set.has(1, 5)).toBe(false);
+      expect(set.has(W - 1, 5)).toBe(false);
+    });
+  }
+
+  it('a 20 degree mover climbs a 20 degree ramp end to end', () => {
+    const set = computeClimbReachableSet(ramp(20), 0, 5, NAV_CLEARANCE_VEHICLE_CELLS, tanDeg(20));
+    expect(set.has(W - 1, 5)).toBe(true);
+  });
+
+  it('the default (walking) limit still climbs a 27 degree ramp', () => {
+    const set = computeClimbReachableSet(ramp(27), 0, 5);
+    expect(set.has(W - 1, 5)).toBe(true);
+  });
+
+  it('computeClimbComponents keeps the foot and the top apart for a limited mover on a 25 degree ramp', () => {
+    const comps = computeClimbComponents(ramp(25), NAV_CLEARANCE_VEHICLE_CELLS, tanDeg(20));
+    expect(comps.canReach(0, 5, W - 1, 5)).toBe(false);
+    const walking = computeClimbComponents(ramp(25), NAV_CLEARANCE_VEHICLE_CELLS);
+    expect(walking.canReach(0, 5, W - 1, 5)).toBe(true);
+  });
+});

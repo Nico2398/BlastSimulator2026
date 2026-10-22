@@ -36,9 +36,9 @@
 //            c. Research Center, tier-2 Freight Warehouse, second hauler (as reinvest); a replacement for any
 //               core role nobody alive holds; another spoil heap while ecology sags
 //            d. frugal equipment: `vehicle upgrade` in place (rig, hauler, digger; no new driver on payroll) once the
-//               dealer's grade gate and mayBuyVehicleTier allow, cash stays above LADDER_UPGRADE_RESERVE and a
+//               dealer's grade gate allows, cash stays above LADDER_UPGRADE_RESERVE and a
 //               licensed driver exists. The licence is earned as a player does: a Driving Center of the needed
-//               tier, then `employee train` of a fresh hire (earnLicence); a gentle ramp is dug first when needed
+//               tier, then `employee train` of a fresh hire (earnLicence)
 //            e. a rock_fragmenter as soon as boulders lie on the ground, plus its licence course (earnLicence)
 //            A charged pattern whose evacuation strands someone is disarmed (`blast cancel`) and retried.
 //   stay_g1  ladder that never applies for a permit past grade 1.
@@ -63,17 +63,17 @@ import { ROLE_LICENCE_REQUIRED, canDriveTier, countLicenceHolders, licenceLevelO
 import { isEnrolledInTraining } from '../../src/core/entities/EmployeeTraining.js';
 import {
   DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS,
-  WALL_BERM_MIN_WIDTH_M, WALL_SAFE_FACE_HEIGHT_M_BY_TIER,
+  VEHICLE_MAX_SLOPE_RATIO, WALL_BERM_MIN_WIDTH_M, WALL_SAFE_FACE_HEIGHT_M_BY_TIER,
 } from '../../src/core/config/balance.js';
 import { gradeDef } from '../../src/core/economy/MineGrade.js';
-import { tierSlopeRatio } from '../../src/core/nav/ClimbLimit.js';
 import { fleetBestRigLimit } from '../../src/core/mining/RigLimits.js';
+import { rampCutSlopeRatio } from '../../src/core/mining/Ramp.js';
 import { explosiveHoleLimits, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
 import { getEventById } from '../../src/core/events/EventPool.js';
 import type { EventConsequence } from '../../src/core/events/EventPool.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
-import type { Vehicle, VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
+import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
 import {
   floorToKgResolution, limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
   type BuyRule, type LadderShot, type PermitLimit,
@@ -124,10 +124,9 @@ const DEPOSIT_SCAN_STEP = 2;
 const BUILDING_KEEP_OUT = 10;
 const BUILDING_SCAN_STEP = 4;
 const BUILDING_SCAN_EDGE = 8;
-/** Ramp: tiles between the pattern edge and the ramp's lower end, longest ramp tried, steepest rise per tile. */
+/** Ramp: tiles between the pattern edge and the ramp's lower end, longest ramp tried. */
 const RAMP_END_GAP = 1;
 const RAMP_MAX_LENGTH = 34;
-const RAMP_MAX_SLOPE = 0.45;
 /** Tiles kept free between a fresh shot and an earlier one, so a berm stands between their craters. */
 const BERM_GAP = WALL_BERM_MIN_WIDTH_M;
 
@@ -340,9 +339,9 @@ interface RampOrder { slope: number; runM: number }
 
 /**
  * Order a ramp from the open ground into the crater the shot at `at` (`span` wide) made, no steeper than
- * `maxSlope` rise per tile; the ramp's slope ratio and run when one was accepted, else null.
+ * the vehicle cut ratio, the steepest the ramp tool accepts; the ramp's slope ratio and run when one was accepted, else null.
  */
-function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = RAMP_MAX_SLOPE): RampOrder | null {
+function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = rampCutSlopeRatio(true)): RampOrder | null {
   const { grid } = s;
   const mid = span / 2;
   const centre = { x: at.x + mid, z: at.z + mid };
@@ -602,10 +601,9 @@ const LADDER_FRESH_SHOT_DEPTH_SLACK_M = 0.5;
 const LADDER_MAX_HAULERS = 6;
 /** Shrink factors tried when a limit-sized pattern fits no free site, widest first. */
 const LADDER_SHRINK_STEPS = [1, 0.75, 0.5, 0.25] as const;
-const LADDER_RAMP_RETRY_KEY = 'gentle_ramp';
 const SOFTEST_SAFE_FACE_M = WALL_SAFE_FACE_HEIGHT_M_BY_TIER[1]!;
 
-/** Roles the ladder upgrades in place, in priority order: depth (rig), then ramp digging. Haulers are not upgraded: tier 2 climbs less steeply. */
+/** Roles the ladder upgrades in place, in priority order: depth (rig), haul capacity, ramp digging. */
 const LADDER_UPGRADE_ROLES: readonly VehicleRole[] = ['drill_rig', 'debris_hauler', 'rock_digger'];
 /** Cash kept back after an upgrade or a licence course: a stalled income must outlast the payroll it grew. */
 const LADDER_UPGRADE_RESERVE = 150_000;
@@ -615,14 +613,10 @@ const LADDER_HIRE_COOLDOWN_TICKS = 600;
 const trainRoleOf = (role: VehicleRole): 'driller' | 'driver' => (role === 'drill_rig' ? 'driller' : 'driver');
 
 interface LadderMemory extends ReinvestMemory {
-  /** Footprint of the last fired shot; the next bench and the gentle ramp work from it. */
+  /** Footprint of the last fired shot; the next bench and the crater ramp work from it. */
   crater: Pattern & { span: number };
-  /** Slope ratio of the best ramp dug so far. */
-  rampSlope: number;
   /** Ramp ordered into each crater, keyed by `craterKey`. */
   ramps: Record<string, RampOrder>;
-  /** A gentle ramp ordered but not yet finished, and its slope ratio. */
-  rampPending: number | null;
   /** Floor depth (m) at which a ramp was last ordered; 0 before any. */
   rampedFloorM: number;
   /** Never apply for a permit past this grade (stay_g1); null for no cap. */
@@ -633,15 +627,8 @@ interface LadderMemory extends ReinvestMemory {
 
 const craterKey = (c: Pattern): string => `${c.x},${c.z}`;
 
-/**
- * Slope ratio of the fleet's best hauler tier (tier 1 with none): the maximum tier, not `fleetSlopeRatio`'s minimum over
- * every vehicle. A slower hauler of a lower tier may still be unable to climb a ramp this value allows.
- * TODO(#2062): the remainder issue may switch this to the slowest hauler tier.
- */
-function fleetClimbRatio(vehicles: readonly Vehicle[]): number {
-  const tiers = vehicles.filter(v => v.type === 'debris_hauler').map(v => v.tier);
-  return tierSlopeRatio(Math.max(1, ...tiers) as VehicleTier);
-}
+/** Slope ratio every hauler climbs on a progression site: one limit for every tier (#2045). */
+const FLEET_CLIMB_RATIO = VEHICLE_MAX_SLOPE_RATIO;
 
 /** Remember the ramp dug into a crater. */
 function recordRamp(m: LadderMemory, crater: Pattern, ramp: RampOrder): void {
@@ -684,8 +671,8 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const holeDepth = Math.min(fleetBestRigLimit(DRILL_RIG_MAX_DEPTH_M, vehicles), LADDER_HOLE_DEPTH_M);
   // A ramp steeper than the fleet climbs reaches only so deep: shrink the holes to what the haulers still reach.
   const ramp = deepen && crater ? m.ramps[craterKey(crater)] : undefined;
-  const climb = fleetClimbRatio(vehicles);
-  // TODO(#2062): upgrade_first is never reached here (affordableTier2Upgrade hard-coded false); wire it when the tier-2 climb decision lands.
+  const climb = FLEET_CLIMB_RATIO;
+  // An upgrade never climbs steeper (#2045), so upgrade_first is never an answer here.
   const shrunk = ramp !== undefined && decideLadderReach({
     rampSlopeRatio: ramp.slope, fleetClimbRatio: climb, affordableTier2Upgrade: false,
   }) === 'shrink';
@@ -785,27 +772,11 @@ function earnLicence(s: ProbeSession, m: ReinvestMemory, role: VehicleRole, tier
 }
 
 /**
- * Upgrade one vehicle in place (no new driver on payroll) when the dealer's grade gate and the ramp's slope
- * allow its next tier, a licensed driver exists and cash stays above LADDER_UPGRADE_RESERVE after it.
- * A gentle ramp is dug first when the existing one is too steep for the tier the grade unlocks.
+ * Upgrade one vehicle in place (no new driver on payroll) when the dealer's grade gate allows its next tier,
+ * a licensed driver exists and cash stays above LADDER_UPGRADE_RESERVE after it.
  */
 function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
   const grade = gradeOf(s);
-  if (m.rampPending !== null && !s.state.pendingActions.some(a => a.type === 'dig_ramp_segment')) {
-    m.rampSlope = Math.min(m.rampSlope, m.rampPending);
-    m.rampPending = null;
-  }
-  const reachable = ([3, 2] as const).find(t => mayBuyVehicleTier(t, grade, 0));
-  if (reachable !== undefined && m.rampSlope > tierSlopeRatio(reachable) && m.rampPending === null) {
-    tryOnce(s, m, LADDER_RAMP_RETRY_KEY, () => {
-      const ramp = orderRamp(s, m.crater, m.crater.span, tierSlopeRatio(reachable));
-      if (ramp !== null) {
-        m.rampPending = ramp.slope;
-        recordRamp(m, m.crater, ramp);
-      }
-      return ramp !== null;
-    });
-  }
   const rules: (BuyRule & { vehicleId: number; role: VehicleRole; tier: VehicleTier })[] = [];
   for (const role of LADDER_UPGRADE_ROLES) {
     // An unreserved vehicle whose driver (if any) already holds the next tier's licence: a mid-task swap would strand its holder.
@@ -817,7 +788,7 @@ function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
       })
       .sort((a, b) => a.tier - b.tier)[0];
     const next = lowest ? ((lowest.tier + 1) as VehicleTier) : null;
-    if (!lowest || next === null || next > 3 || !mayBuyVehicleTier(next, grade, m.rampSlope)) continue;
+    if (!lowest || next === null || next > 3 || !mayBuyVehicleTier(next, grade)) continue;
     const cost = computeVehicleUpgradeCost(role, lowest.tier);
     if (cost !== null) rules.push({ id: `${lowest.id}`, vehicleId: lowest.id, role, tier: next, cost });
   }
@@ -877,17 +848,14 @@ function ladderCraterRamp(s: ProbeSession, m: LadderMemory): void {
     cash: s.state.cash, rampCost: LADDER_RAMP_COST, reserve: LADDER_UPGRADE_RESERVE,
   });
   // A fresh crater is no deeper than the pit already ramped, yet no ramp leads into it: its rubble stays out of every hauler's reach.
-  const climb = fleetClimbRatio(s.state.vehicles.vehicles);
+  const climb = FLEET_CLIMB_RATIO;
   const own = m.ramps[craterKey(m.crater)];
-  const reach = decideLadderReach({
-    rampSlopeRatio: own?.slope ?? Infinity,
-    fleetClimbRatio: climb, affordableTier2Upgrade: s.state.cash - LADDER_UPGRADE_RESERVE >= (computeVehicleUpgradeCost('debris_hauler', 1) ?? Infinity),
-  });
+  const reach = decideLadderReach({ rampSlopeRatio: own?.slope ?? Infinity, fleetClimbRatio: climb, affordableTier2Upgrade: false });
   const affordable = s.state.cash - LADDER_RAMP_COST >= LADDER_UPGRADE_RESERVE;
   const needsWayIn = reach !== 'fire' && gradeOf(s) >= LADDER_GATE_MIN_GRADE;
   if (deeper === 'skip' && (!needsWayIn || !affordable)) return;
   tryOnce(s, m, 'crater_ramp', () => {
-    const ramp = orderRamp(s, m.crater, m.crater.span, Math.min(RAMP_MAX_SLOPE, climb));
+    const ramp = orderRamp(s, m.crater, m.crater.span);
     if (ramp === null) return false;
     recordRamp(m, m.crater, ramp);
     m.rampedFloorM = Math.max(m.rampedFloorM, floorDepthM);
@@ -963,7 +931,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {},
-    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.ramp.slope, ramps: {}, rampPending: null, rampedFloorM: 0, maxGrade, barred: [],
+    crater: { ...opened.at, span: SHOT_SPAN }, ramps: {}, rampedFloorM: 0, maxGrade, barred: [],
   };
   recordRamp(m, opened.at, opened.ramp);
   playOut(s, () => {

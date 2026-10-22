@@ -20,7 +20,6 @@ import {
   NAV_MAX_SLOPE_RATIO,
   RALLY_POINT_VEHICLE_STANDOFF,
 } from '../config/balance.js';
-import { slowestVehicleTierSlopeRatio, tierSlopeRatio } from '../nav/ClimbLimit.js';
 import { isLicensedForRole } from '../engine/VehicleReservation.js';
 import type { GameState } from './GameState.js';
 import type { Employee } from '../entities/Employee.js';
@@ -478,16 +477,4 @@ export function placeStartingCrew(state: GameState): boolean {
   const vehicleMoved = fixUnreachableVehicles(navGrid, employees, vehicles);
 
   return crewMoved || vehicleMoved;
-}
-
-/**
- * Steepest rise/run every vehicle of the fleet climbs: the minimum of their
- * tier limits on a progression site (#2044). Off progression every vehicle
- * keeps the walking limit. An empty fleet plans for the slowest tier a later
- * purchase could bring.
- */
-export function fleetSlopeRatio(vehicles: ReadonlyArray<Pick<Vehicle, 'tier'>>, progression: boolean): number {
-  if (!progression) return NAV_MAX_SLOPE_RATIO;
-  if (vehicles.length === 0) return slowestVehicleTierSlopeRatio();
-  return Math.min(...vehicles.map(v => tierSlopeRatio(v.tier)));
 }

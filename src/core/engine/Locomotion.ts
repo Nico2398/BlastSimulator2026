@@ -834,7 +834,7 @@ type DriveLimits = Pick<PathRequest, 'requiredClearance' | 'maxSlopeRatio'>;
 function driveLimitsOf(state: GameState, vehicle: Vehicle): DriveLimits {
   return {
     requiredClearance: vehicleRequiredClearanceCells(vehicle),
-    maxSlopeRatio: vehicleMaxSlopeRatio(vehicle, isProgressionSite(state)),
+    maxSlopeRatio: vehicleMaxSlopeRatio(isProgressionSite(state)),
   };
 }
 

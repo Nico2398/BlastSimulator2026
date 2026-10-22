@@ -6,7 +6,7 @@
 // claimed, must read reachable on most of the ring and on every side.
 //
 // #2044: a progression sandbox also places its starting buildings and vehicles
-// in one area drivable at the slowest vehicle tier's slope limit, and that
+// in one area drivable at the single vehicle slope limit, and that
 // area reaches the first-blast target (the site centre's nearest navigable cell).
 
 import { describe, it, expect } from 'vitest';
@@ -14,7 +14,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import { claimForAction } from '../../src/console/commands/siteExpansion.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
-import { DEFAULT_GRID_SIZE, NAV_CLEARANCE_VEHICLE_CELLS, VEHICLE_TIER_MAX_SLOPE_DEGREES } from '../../src/core/config/balance.js';
+import { DEFAULT_GRID_SIZE, NAV_CLEARANCE_VEHICLE_CELLS, VEHICLE_MAX_SLOPE_DEGREES } from '../../src/core/config/balance.js';
 import { computeClimbComponents, findNearestNavigableCell } from '../../src/core/nav/NavGridReachability.js';
 import { slopeRatioForDegrees } from '../../src/core/nav/ClimbLimit.js';
 
@@ -22,7 +22,15 @@ const SITE = DEFAULT_GRID_SIZE;
 const OFFSETS = [6, 18, 30] as const;
 const PROBE_SPACING = 8;
 const SEEDS = [1, 7, 42, 103, 106] as const;
-const MIN_REACHABLE_SHARE = 0.6;
+// Ring probes are drill orders, so a rig must drive to them: at the single 20 degree
+// vehicle limit (#2045) the steep landscape past the envelope cuts off more of the
+// ring than the old 30 degree T1 limit did. Re-measured over 6 biomes x 5 seeds:
+// ring share was >= 0.80 at 30 degrees, is >= 0.378 at 20 degrees (worst: tropical_karst 7,
+// 59/156), and alpine_granite 103 / tropical_karst 103 have no east probe at all.
+// The site's own drivability (spawn -> first blast, #2044 below) is unchanged.
+const MIN_REACHABLE_SHARE = 0.35;
+/** Sides that must keep a reachable probe: three of four, since a 20 degree rig can be walled in on one. */
+const MIN_REACHABLE_SIDES = 3;
 
 type Side = 'N' | 'E' | 'S' | 'W';
 interface Probe { x: number; z: number; side: Side }
@@ -74,9 +82,8 @@ describe('sandbox site exits (#1734)', () => {
       const { total, reachable, sidesReachable } = measureRing(biome, seed);
       expect(total).toBeGreaterThan(100);
       expect(reachable / total, `${reachable}/${total} reachable`).toBeGreaterThanOrEqual(MIN_REACHABLE_SHARE);
-      for (const side of ['N', 'E', 'S', 'W'] as const) {
-        expect(sidesReachable[side], `side ${side} has no reachable probe`).toBeGreaterThanOrEqual(1);
-      }
+      const openSides = (['N', 'E', 'S', 'W'] as const).filter(side => sidesReachable[side] >= 1);
+      expect(openSides.length, `only sides ${openSides.join('')} have a reachable probe`).toBeGreaterThanOrEqual(MIN_REACHABLE_SIDES);
     }, 120000);
   });
 });
@@ -86,7 +93,7 @@ const BUILDING_APPROACH_RADIUS = 3;
 
 describe('sandbox starting site is one drivable area reaching the first blast (#2044)', () => {
   describe.each(getAllBiomes().map(b => b.id))('%s', (biome) => {
-    it.each(SEEDS)('seed %i: every starting vehicle and building shares a climb component with the site centre at the slowest tier limit', (seed) => {
+    it.each(SEEDS)('seed %i: every starting vehicle and building shares a climb component with the site centre at the vehicle limit', (seed) => {
       const { runner, ctx } = createRunner();
       const started = runner.run(`sandbox start biome:${biome} seed:${seed} kit:digger`);
       expect(started.success, started.output).toBe(true);
@@ -94,7 +101,7 @@ describe('sandbox starting site is one drivable area reaching the first blast (#
       expect(state.grade, 'sandbox runs as a progression site').toBeDefined();
       const navGrid = state.navGrid!;
       const target = findNearestNavigableCell(navGrid, navGrid.originX + Math.floor(navGrid.width / 2), navGrid.originZ + Math.floor(navGrid.height / 2));
-      const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, slopeRatioForDegrees(Math.min(...Object.values(VEHICLE_TIER_MAX_SLOPE_DEGREES))));
+      const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS, slopeRatioForDegrees(VEHICLE_MAX_SLOPE_DEGREES));
 
       expect(state.vehicles.vehicles.length, 'digger kit starts with a fleet').toBeGreaterThan(0);
       for (const v of state.vehicles.vehicles) {

@@ -1,11 +1,11 @@
-// BlastSimulator2026 — Ramp steepness against vehicle tier climb limits (#1938)
+// BlastSimulator2026 — Ramp steepness against the vehicle climb limit (#1938, #2045)
 
 import type { NavGrid } from '../nav/NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
-import { GRADE_EPSILON_DEGREES, VEHICLE_TIER_LIST, slopeDegreesForRatio, tiersThatClimb } from '../nav/ClimbLimit.js';
+import { GRADE_EPSILON_DEGREES, slopeDegreesForRatio } from '../nav/ClimbLimit.js';
 import { rampCenterline, rampPathOf, rampTotalLength } from './RampPath.js';
 import type { BuiltRamp, GameState } from '../state/GameState.js';
-import type { VehicleTier } from '../entities/Vehicle.js';
+import { vehicleMaxSlopeRatio } from '../entities/Vehicle.js';
 import { rampGradeBoundsDegrees, type RampDef } from './Ramp.js';
 
 /** Steepest grade (degrees) between consecutive tiles of a multi-leg ramp's centreline; the corner's inside and the bounding box's empty corner are not the path. */
@@ -62,22 +62,26 @@ export function steepestBlockingRamp(
   return worst;
 }
 
-/** Grade and the vehicle tiers that can climb the ramp; every tier climbs it off a progression site. */
-export function describeRampClimb(
-  navGrid: NavGrid, ramp: BuiltRamp, progression: boolean,
-): { gradeDeg: number; tiers: VehicleTier[] } {
-  const gradeDeg = rampSteepestGradeDegrees(navGrid, ramp);
-  return { gradeDeg, tiers: climbTiersFor(gradeDeg, progression) };
+/** One ramp's grade against the single vehicle slope limit (#2045). */
+export type RampClimb = { gradeDeg: number; climbable: boolean; maxDeg: number };
+
+/** A grade against the one vehicle slope limit (30° off a progression site). */
+export function climbForGrade(gradeDeg: number, progression: boolean): RampClimb {
+  const maxDeg = slopeDegreesForRatio(vehicleMaxSlopeRatio(progression));
+  return { gradeDeg, climbable: gradeDeg <= maxDeg + GRADE_EPSILON_DEGREES, maxDeg };
 }
 
-/** Vehicle tiers that climb a `gradeDeg` ramp; off a progression site every tier does. */
-export function climbTiersFor(gradeDeg: number, progression: boolean): VehicleTier[] {
-  return progression ? tiersThatClimb(gradeDeg) : [...VEHICLE_TIER_LIST];
+/** A built ramp's steepest grade against the vehicle slope limit. */
+export function describeRampClimbability(
+  navGrid: NavGrid | null, ramp: BuiltRamp, progression: boolean,
+): RampClimb | null {
+  if (navGrid === null) return null;
+  return climbForGrade(rampSteepestGradeDegrees(navGrid, ramp), progression);
 }
 
 /** Grade in degrees the order will be cut at: its chosen grade, else the straight line to `targetDepth`. */
-export function plannedRampGradeDegrees(def: Pick<RampDef, 'length' | 'legs' | 'targetDepth' | 'gradeDegrees'>): number {
+export function plannedRampGradeDegrees(def: Pick<RampDef, 'length' | 'legs' | 'targetDepth' | 'gradeDegrees' | 'cutSlopeRatio'>): number {
   if (def.gradeDegrees !== undefined) return def.gradeDegrees;
   const total = def.legs ? rampTotalLength(def.legs) : def.length;
-  return rampGradeBoundsDegrees(total, def.targetDepth).min;
+  return rampGradeBoundsDegrees(total, def.targetDepth, def.cutSlopeRatio).min;
 }
