@@ -3369,3 +3369,14 @@ export const SHAREHOLDER_SUMMIT_BOARD: BoardConfig = {
   profitTarget: 50_000,
   growth: 1.25,
 };
+
+// ── Crater access (#2082) ──
+
+/** Stranded orders (debris_out_of_reach / buried_under_rubble) on one floor before a ramp is ordered down to it. */
+export const CRATER_ACCESS_MIN_STRANDED_ORDERS = 3;
+/** Ticks of payroll that cash must still cover after paying for a crater access ramp. */
+export const CRATER_ACCESS_CASH_RESERVE_TICKS = 200;
+/** Ticks between stranded-floor rescans, so the per-tick cost stays flat. */
+export const CRATER_ACCESS_RECHECK_TICKS = 50;
+/** Fraction of the maximum nav grade a crater access ramp may use (1 = right at the limit; below 1 keeps margin). */
+export const CRATER_ACCESS_MAX_GRADE_MARGIN = 0.9;

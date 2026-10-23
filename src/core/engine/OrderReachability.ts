@@ -496,3 +496,9 @@ export function roleShortfall(
   if (!eligible.some(emp => licenceLevelOf(emp, role) > 0)) return 'no_licensed_driver';
   return null;
 }
+
+/** Targets of queued auto-debris / drill-hole orders blocked as debris_out_of_reach or buried_under_rubble (#2082). */
+export function strandedDebrisTargets(_state: GameState): ReadonlyArray<{ x: number; z: number; y: number }> {
+  // TODO: implement
+  return [];
+}
