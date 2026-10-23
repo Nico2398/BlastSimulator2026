@@ -279,3 +279,63 @@ export function judgeLadderShot(input: LadderShotJudgeInput): LadderShotJudgment
   const bar = shouldBarCrater(streak);
   return { judged: true, lastShotFailed, dudStreak: bar ? 0 : streak, bar };
 }
+
+/** Ticks a pattern may stay buried under rubble before the ladder drops it. */
+export const LADDER_BURIED_DROP_TICKS = 500;
+
+export interface BuriedPatternInput {
+  buriedHoleCount: number;
+  buriedSinceTick: number | null;
+  tick: number;
+}
+
+export interface BuriedPatternDecision {
+  action: 'wait' | 'drop';
+  buriedSinceTick: number | null;
+}
+
+/**
+ * Contract: no buried holes -> wait, buriedSinceTick null; first buried call -> wait,
+ * buriedSinceTick = tick; buried for >= LADDER_BURIED_DROP_TICKS -> drop, null; a count back to 0
+ * resets buriedSinceTick to null.
+ */
+export function decideBuriedPattern(_input: BuriedPatternInput): BuriedPatternDecision {
+  throw new Error('not implemented');
+}
+
+/** Sealed-rubble cell count at which the ladder shrinks its shot side. */
+export const LADDER_SEALED_SHRINK_COUNT = 100;
+/** Largest shot side at grade >= LADDER_GATE_MIN_GRADE. */
+export const LADDER_G2_MAX_SIDE = 4;
+
+export interface LadderShotSideInput {
+  limitSide: number;
+  grade: number;
+  lastShotFailed: boolean;
+  sealedRubbleCount: number;
+}
+
+/**
+ * Contract: grade < LADDER_GATE_MIN_GRADE returns limitSide; grade >= it caps at LADDER_G2_MAX_SIDE;
+ * lastShotFailed or sealedRubbleCount >= LADDER_SEALED_SHRINK_COUNT gives a side strictly smaller
+ * than the clean value, floor 1; non-increasing in sealedRubbleCount. Result is in [1, limitSide].
+ */
+export function decideLadderShotSide(_input: LadderShotSideInput): number {
+  throw new Error('not implemented');
+}
+
+/** Share of the best site's ore a site must hold to be worth a shot. */
+export const LADDER_SITE_ORE_SHARE = 0.25;
+
+export interface SiteOreInput {
+  oreKgUnderSite: number;
+  bestSiteOre: number;
+}
+
+/**
+ * Contract: bestSiteOre 0 -> true; otherwise oreKgUnderSite >= LADDER_SITE_ORE_SHARE * bestSiteOre
+ * and >= LADDER_SITE_ORE_FLOOR.
+ */
+export function siteHoldsOre(_input: SiteOreInput): boolean {
+  throw new Error('not implemented');
+}
