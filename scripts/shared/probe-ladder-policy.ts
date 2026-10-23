@@ -295,7 +295,6 @@ export interface LadderCrewSizeInput {
 
 /** Desired driller count: grows past `drillers` only while idle cash exceeds the reserve; never above `maxDrillers`, never below `drillers`. */
 export function decideLadderCrewSize(input: LadderCrewSizeInput): number {
-  // TODO: implement
-  void input;
-  return undefined as unknown as number;
+  if (input.drillers >= input.maxDrillers) return input.drillers;
+  return input.cash > input.reserve && input.idleTicks >= 1 ? input.drillers + 1 : input.drillers;
 }
