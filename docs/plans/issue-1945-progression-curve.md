@@ -322,3 +322,10 @@ Findings from instrumented runs (instrumentation removed):
    barred, buried or sealed and `freshSites` returns no candidate (origins plus bars cover the map): the ladder fires 5 to 8 shots in 28,000 ticks and bleeds payroll.
 3. Open: deepening existing craters is the only way left to gain depth; it needs a crater with no ordered rubble, and sealed rubble plus bars exclude every one.
 
+
+## 2026-10-23 note: evacuation cancelled by rubble-boxed walker (#2077)
+
+An armed detonation was cancelled "cannot leave the blast zone" when an in-zone employee was boxed in by rubble (`fragmentOccupancy > 0` on the neighbour cells).
+`findSafeEvacuationCell` proved reachability with a relaxed `findPath`, but `Locomotion.planPath` used `findFootPathWithVehicleFallback`, whose fallback rejects
+relaxed routes crossing fragment cells (#954/#1090), so the walker stuck and the phase read 'stranded'. `Zone.clearZone` now passes `crossFragments: true`; the flag is stamped on the leg
+(`Leg.crossesFragments`) so the cost estimate and the executor agree. Every other caller keeps the fragment guard; blocked/void rings stay stranded.
