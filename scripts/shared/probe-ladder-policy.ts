@@ -306,8 +306,6 @@ export function decideBuriedPattern(input: BuriedPatternInput): BuriedPatternDec
   return { action: 'wait', buriedSinceTick: since };
 }
 
-/** Sealed-rubble cell count at which the ladder shrinks its shot side. */
-export const LADDER_SEALED_SHRINK_COUNT = 100;
 interface LadderShotSideInput {
   limitSide: number;
   grade: number;

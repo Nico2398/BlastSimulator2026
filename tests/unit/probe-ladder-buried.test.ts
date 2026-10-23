@@ -4,8 +4,6 @@ import {
   decideLadderShotSide,
   siteHoldsOre,
   LADDER_BURIED_DROP_TICKS,
-  LADDER_G2_MAX_SIDE,
-  LADDER_SEALED_SHRINK_COUNT,
   LADDER_SITE_ORE_FLOOR,
   LADDER_SITE_ORE_SHARE,
   LADDER_GATE_MIN_GRADE,
@@ -60,32 +58,23 @@ describe('decideLadderShotSide', () => {
     }
   });
 
-  it('caps at LADDER_G2_MAX_SIDE for clean shots at the gate grade', () => {
-    expect(decideLadderShotSide({ ...clean, limitSide: 8, grade: LADDER_GATE_MIN_GRADE })).toBe(LADDER_G2_MAX_SIDE);
-    expect(decideLadderShotSide({ ...clean, limitSide: 2, grade: LADDER_GATE_MIN_GRADE })).toBe(2);
-    expect(decideLadderShotSide({ ...clean, limitSide: 8, grade: LADDER_GATE_MIN_GRADE + 2 }))
-      .toBe(Math.min(8, LADDER_G2_MAX_SIDE));
-  });
-
   // #2080: a clean grade-2+ shot of side 3 (9 holes) starves ore yield; the Shareholder Summit
-  // competent run then ends game_over:worker_revolt. Measured: any cap >= 4 passes. 4 is the floor
-  // of starvation, so the clean side must reach it whenever the permit limit allows.
+  // competent run then ends game_over:worker_revolt. Measured: any side >= 4 passes.
   const STARVATION_FLOOR_SIDE = 4;
 
-  it('keeps clean grade-2+ shots at or above the starvation floor given a large limit', () => {
-    for (const grade of [LADDER_GATE_MIN_GRADE, LADDER_GATE_MIN_GRADE + 1, 3, 4, 5]) {
-      expect(decideLadderShotSide({ ...clean, limitSide: 8, grade })).toBeGreaterThanOrEqual(STARVATION_FLOOR_SIDE);
-      expect(decideLadderShotSide({ ...clean, limitSide: 20, grade })).toBeGreaterThanOrEqual(STARVATION_FLOOR_SIDE);
+  it('clean state returns limitSide at every grade (>=4 for limitSide>=4)', () => {
+    for (const grade of [0, 1, LADDER_GATE_MIN_GRADE, 3, 4, 5]) {
+      for (let limitSide = 1; limitSide <= 20; limitSide++) {
+        const side = decideLadderShotSide({ ...clean, limitSide, grade });
+        expect(side).toBe(limitSide);
+        if (limitSide >= STARVATION_FLOOR_SIDE) expect(side).toBeGreaterThanOrEqual(STARVATION_FLOOR_SIDE);
+      }
     }
-    expect(LADDER_G2_MAX_SIDE).toBeGreaterThanOrEqual(STARVATION_FLOOR_SIDE);
   });
 
-  it('still shrinks strictly below the floor-sized clean shot on failure and sealed rubble', () => {
+  it('shrinks strictly below the clean side on failure', () => {
     const cleanSide = decideLadderShotSide({ ...clean, limitSide: 8, grade: 3 });
-    expect(cleanSide).toBeGreaterThanOrEqual(STARVATION_FLOOR_SIDE);
     expect(decideLadderShotSide({ ...clean, lastShotFailed: true, limitSide: 8, grade: 3 })).toBeLessThan(cleanSide);
-    expect(decideLadderShotSide({ ...clean, sealedRubbleCount: LADDER_SEALED_SHRINK_COUNT, limitSide: 8, grade: 3 }))
-      .toBeLessThan(cleanSide);
   });
 
   it('shrinks strictly after a failed shot', () => {
@@ -95,22 +84,19 @@ describe('decideLadderShotSide', () => {
     expect(failed).toBeGreaterThanOrEqual(1);
   });
 
-  it('shrinks strictly at the sealed rubble threshold', () => {
-    const cleanSide = decideLadderShotSide({ ...clean, limitSide: 8, grade: 2 });
-    const sealed = decideLadderShotSide({ ...clean, sealedRubbleCount: LADDER_SEALED_SHRINK_COUNT, limitSide: 8, grade: 2 });
-    expect(sealed).toBeLessThan(cleanSide);
-    expect(sealed).toBeGreaterThanOrEqual(1);
-  });
-
-  it('does not shrink just under the sealed threshold', () => {
-    const cleanSide = decideLadderShotSide({ ...clean, limitSide: 8, grade: 2 });
-    expect(decideLadderShotSide({ ...clean, sealedRubbleCount: LADDER_SEALED_SHRINK_COUNT - 1, limitSide: 8, grade: 2 }))
-      .toBe(cleanSide);
+  // Regression pin (#2080): a sealed-rubble shrink alone reproduced game_over:worker_revolt in the
+  // Shareholder Summit competent run. Sealed rubble must never move the side.
+  it('does not shrink the side for sealed rubble at any count', () => {
+    for (const grade of [0, 2, 3]) {
+      for (const sealedRubbleCount of [0, 99, 100, 101, 1000, 100000]) {
+        expect(decideLadderShotSide({ ...clean, sealedRubbleCount, limitSide: 8, grade })).toBe(8);
+      }
+    }
   });
 
   it('stays at 1 when the clean value is already 1', () => {
     expect(decideLadderShotSide({ limitSide: 1, grade: 2, lastShotFailed: true, sealedRubbleCount: 0 })).toBe(1);
-    expect(decideLadderShotSide({ limitSide: 1, grade: 2, lastShotFailed: false, sealedRubbleCount: LADDER_SEALED_SHRINK_COUNT })).toBe(1);
+    expect(decideLadderShotSide({ limitSide: 1, grade: 2, lastShotFailed: false, sealedRubbleCount: 100 })).toBe(1);
     expect(decideLadderShotSide({ limitSide: 1, grade: 2, lastShotFailed: false, sealedRubbleCount: 0 })).toBe(1);
   });
 
@@ -122,7 +108,7 @@ describe('decideLadderShotSide', () => {
     for (let limitSide = 1; limitSide <= 10; limitSide++) {
       for (const grade of [0, 1, 2, 3, 5]) {
         for (const lastShotFailed of [false, true]) {
-          for (const sealedRubbleCount of [0, 1, LADDER_SEALED_SHRINK_COUNT - 1, LADDER_SEALED_SHRINK_COUNT, 1000, 100000]) {
+          for (const sealedRubbleCount of [0, 1, 99, 100, 1000, 100000]) {
             const side = decideLadderShotSide({ limitSide, grade, lastShotFailed, sealedRubbleCount });
             expect(side).toBeGreaterThanOrEqual(1);
             expect(side).toBeLessThanOrEqual(limitSide);
