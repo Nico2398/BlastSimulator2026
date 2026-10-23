@@ -281,15 +281,15 @@ export function judgeLadderShot(input: LadderShotJudgeInput): LadderShotJudgment
 }
 
 /** Ticks a pattern may stay buried under rubble before the ladder drops it. */
-export const LADDER_BURIED_DROP_TICKS = 500;
+const LADDER_BURIED_DROP_TICKS = 500;
 
-export interface BuriedPatternInput {
+interface BuriedPatternInput {
   buriedHoleCount: number;
   buriedSinceTick: number | null;
   tick: number;
 }
 
-export interface BuriedPatternDecision {
+interface BuriedPatternDecision {
   action: 'wait' | 'drop';
   buriedSinceTick: number | null;
 }
@@ -299,16 +299,19 @@ export interface BuriedPatternDecision {
  * buriedSinceTick = tick; buried for >= LADDER_BURIED_DROP_TICKS -> drop, null; a count back to 0
  * resets buriedSinceTick to null.
  */
-export function decideBuriedPattern(_input: BuriedPatternInput): BuriedPatternDecision {
-  throw new Error('not implemented');
+export function decideBuriedPattern(input: BuriedPatternInput): BuriedPatternDecision {
+  if (input.buriedHoleCount === 0) return { action: 'wait', buriedSinceTick: null };
+  const since = input.buriedSinceTick ?? input.tick;
+  if (input.tick - since >= LADDER_BURIED_DROP_TICKS) return { action: 'drop', buriedSinceTick: null };
+  return { action: 'wait', buriedSinceTick: since };
 }
 
 /** Sealed-rubble cell count at which the ladder shrinks its shot side. */
-export const LADDER_SEALED_SHRINK_COUNT = 100;
+const LADDER_SEALED_SHRINK_COUNT = 100;
 /** Largest shot side at grade >= LADDER_GATE_MIN_GRADE. */
-export const LADDER_G2_MAX_SIDE = 4;
+const LADDER_G2_MAX_SIDE = 3;
 
-export interface LadderShotSideInput {
+interface LadderShotSideInput {
   limitSide: number;
   grade: number;
   lastShotFailed: boolean;
@@ -320,14 +323,16 @@ export interface LadderShotSideInput {
  * lastShotFailed or sealedRubbleCount >= LADDER_SEALED_SHRINK_COUNT gives a side strictly smaller
  * than the clean value, floor 1; non-increasing in sealedRubbleCount. Result is in [1, limitSide].
  */
-export function decideLadderShotSide(_input: LadderShotSideInput): number {
-  throw new Error('not implemented');
+export function decideLadderShotSide(input: LadderShotSideInput): number {
+  const clean = input.grade < LADDER_GATE_MIN_GRADE ? input.limitSide : Math.min(input.limitSide, LADDER_G2_MAX_SIDE);
+  const shrink = input.lastShotFailed || input.sealedRubbleCount >= LADDER_SEALED_SHRINK_COUNT;
+  return Math.max(1, shrink ? clean - 1 : clean);
 }
 
 /** Share of the best site's ore a site must hold to be worth a shot. */
-export const LADDER_SITE_ORE_SHARE = 0.25;
+const LADDER_SITE_ORE_SHARE = 0.25;
 
-export interface SiteOreInput {
+interface SiteOreInput {
   oreKgUnderSite: number;
   bestSiteOre: number;
 }
@@ -336,6 +341,7 @@ export interface SiteOreInput {
  * Contract: bestSiteOre 0 -> true; otherwise oreKgUnderSite >= LADDER_SITE_ORE_SHARE * bestSiteOre
  * and >= LADDER_SITE_ORE_FLOOR.
  */
-export function siteHoldsOre(_input: SiteOreInput): boolean {
-  throw new Error('not implemented');
+export function siteHoldsOre(input: SiteOreInput): boolean {
+  if (input.bestSiteOre <= 0) return true;
+  return input.oreKgUnderSite >= LADDER_SITE_ORE_SHARE * input.bestSiteOre && input.oreKgUnderSite >= LADDER_SITE_ORE_FLOOR;
 }
