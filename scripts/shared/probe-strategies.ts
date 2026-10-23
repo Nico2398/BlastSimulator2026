@@ -82,7 +82,7 @@ import {
   decideLadderDeepen, decideFreshShotSite, decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM,
   LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
   rampProtectionZones, shotOverlapsProtectedRamp,
-  decideLadderHoleDepth, judgeLadderShot, decideLadderCrewSize, LADDER_GATE_RUNWAY_TICKS,
+  decideLadderHoleDepth, judgeLadderShot,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
 import { sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
@@ -670,8 +670,6 @@ interface LadderMemory extends ReinvestMemory {
   judgedShots: number;
   /** Pit depth and haulable ore a shot's result is compared against; follows the world until a shot fires. */
   before: { pitM: number; oreKg: number };
-  /** Consecutive decision intervals cash sat above the runway reserve; sandbox runs only. */
-  idleIntervals: number;
 }
 
 /** Depth (m) the next grade asks for; 0 when it asks none. */
@@ -959,25 +957,6 @@ function ladderCrew(s: ProbeSession, m: ReinvestMemory): void {
   }
 }
 
-/** Most of each shot-crew role the sandbox ladder fields once cash is idle: a shot waits on its crew (drilling, then charging), so a bigger crew fires more often. */
-const LADDER_MAX_SHOT_CREW = 3;
-
-/** Sandbox only: another driller or blaster while cash sits above the payroll runway. */
-function ladderShotCrew(s: ProbeSession, m: LadderMemory): void {
-  if (!sandboxRun(s)) return;
-  const { state } = s;
-  const reserve = LADDER_GATE_RUNWAY_TICKS * getOperatingCostPerHour(state).payroll + LADDER_UPGRADE_RESERVE;
-  // Idle is cash held above the runway while the crew has not yet been grown: the counter feeds decideLadderCrewSize.
-  m.idleIntervals = state.cash > reserve ? m.idleIntervals + 1 : 0;
-  for (const role of ['driller', 'blaster'] as const) {
-    const have = state.employees.employees.filter(e => e.alive && e.role === role).length;
-    const wanted = decideLadderCrewSize({
-      cash: state.cash - HIRING_COSTS[role], reserve, idleTicks: m.idleIntervals, drillers: have, maxDrillers: LADDER_MAX_SHOT_CREW,
-    });
-    if (wanted > have) tryOnce(s, m, `crew_extra_${role}`, () => s.run(`employee hire role:${role}`).success);
-  }
-}
-
 /** Ecology under which another spoil heap is built, and the most the ladder builds: loose rubble past a heap's capacity drains it. */
 const LADDER_ECOLOGY_FLOOR = 40;
 const LADDER_MAX_SPOIL_HEAPS = 4;
@@ -1094,13 +1073,12 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     researchOrdered: false, retryAt: {},
     crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.ramp.slope, ramps: {}, rampPending: null, rampedFloorM: 0, maxGrade, barred: [],
     holeCapM: ladderHoleDepthM(s), lastShotFailed: false, dudStreak: 0, judgedShots: 1,
-    before: { pitM: 0, oreKg: 0 }, idleIntervals: 0,
+    before: { pitM: 0, oreKg: 0 },
   };
   recordRamp(m, opened.at, opened.ramp);
   playOut(s, () => {
     ladderPermit(s, m);
     ladderCrew(s, m);
-    ladderShotCrew(s, m);
     ladderSpoil(s, m);
     ladderSafety(s, m);
     dropUnreachablePattern(s, m);

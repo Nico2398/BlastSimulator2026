@@ -279,22 +279,3 @@ export function judgeLadderShot(input: LadderShotJudgeInput): LadderShotJudgment
   const bar = shouldBarCrater(streak);
   return { judged: true, lastShotFailed, dudStreak: bar ? 0 : streak, bar };
 }
-
-export interface LadderCrewSizeInput {
-  /** Cash on hand. */
-  cash: number;
-  /** Cash the ladder keeps back (runway rule: `LADDER_GATE_RUNWAY_TICKS` of upkeep); no hire may dip below it. */
-  reserve: number;
-  /** Consecutive ticks cash has sat above the reserve with the probe idle. */
-  idleTicks: number;
-  /** Drillers currently employed. */
-  drillers: number;
-  /** Most drillers the ladder will ever field. */
-  maxDrillers: number;
-}
-
-/** Desired driller count: grows past `drillers` only while idle cash exceeds the reserve; never above `maxDrillers`, never below `drillers`. */
-export function decideLadderCrewSize(input: LadderCrewSizeInput): number {
-  if (input.drillers >= input.maxDrillers) return input.drillers;
-  return input.cash > input.reserve && input.idleTicks >= 1 ? input.drillers + 1 : input.drillers;
-}

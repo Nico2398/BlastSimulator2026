@@ -32,8 +32,6 @@ import {
   LADDER_DUD_SHOT_LIMIT,
   type LadderHoleDepthInput,
   type LadderShotJudgeInput,
-  decideLadderCrewSize,
-  type LadderCrewSizeInput,
 } from '../../../scripts/shared/probe-ladder-policy';
 
 const rampBase: LadderRampInput = {
@@ -599,66 +597,5 @@ describe('judgeLadderShot', () => {
   it('a null report is not a dud', () => {
     const r = judgeLadderShot({ ...judgeBase, report: null, dudStreak: 1 });
     expect(r).toMatchObject({ judged: true, dudStreak: 0, bar: false });
-  });
-});
-
-// Rule chosen (#2072): grow by exactly one driller per decision when cash is strictly above
-// the reserve AND the probe has been idle for at least one tick (idleTicks >= 1).
-describe('decideLadderCrewSize', () => {
-  const crewBase: LadderCrewSizeInput = {
-    cash: 50000,
-    reserve: 10000,
-    idleTicks: 100,
-    drillers: 2,
-    maxDrillers: 6,
-  };
-
-  it('grows by one when idle cash sits above the reserve', () => {
-    expect(decideLadderCrewSize(crewBase)).toBe(3);
-  });
-
-  it('holds at cash exactly equal to the reserve (strictly above required)', () => {
-    expect(decideLadderCrewSize({ ...crewBase, cash: 10000 })).toBe(2);
-  });
-
-  it('grows at one cash unit above the reserve', () => {
-    expect(decideLadderCrewSize({ ...crewBase, cash: 10001 })).toBe(3);
-  });
-
-  it('holds below the reserve', () => {
-    expect(decideLadderCrewSize({ ...crewBase, cash: 9999 })).toBe(2);
-    expect(decideLadderCrewSize({ ...crewBase, cash: -500 })).toBe(2);
-  });
-
-  it('does not grow when the probe is not idle (idleTicks 0)', () => {
-    expect(decideLadderCrewSize({ ...crewBase, idleTicks: 0 })).toBe(2);
-  });
-
-  it('never exceeds maxDrillers', () => {
-    expect(decideLadderCrewSize({ ...crewBase, drillers: 6 })).toBe(6);
-    expect(decideLadderCrewSize({ ...crewBase, drillers: 5 })).toBe(6);
-  });
-
-  it('never shrinks, even when already over the cap', () => {
-    expect(decideLadderCrewSize({ ...crewBase, drillers: 8, maxDrillers: 6 })).toBeGreaterThanOrEqual(6);
-    expect(decideLadderCrewSize({ ...crewBase, drillers: 3, cash: 0 })).toBe(3);
-  });
-
-  it('is deterministic for identical input', () => {
-    const a = decideLadderCrewSize(crewBase);
-    expect(decideLadderCrewSize({ ...crewBase })).toBe(a);
-    expect(decideLadderCrewSize(crewBase)).toBe(a);
-  });
-
-  it('result stays within [drillers, maxDrillers] across a sweep', () => {
-    for (const cash of [0, 9999, 10000, 10001, 1e9]) {
-      for (const idleTicks of [0, 1, 50]) {
-        for (const drillers of [0, 1, 5, 6]) {
-          const r = decideLadderCrewSize({ ...crewBase, cash, idleTicks, drillers });
-          expect(r).toBeGreaterThanOrEqual(drillers);
-          expect(r).toBeLessThanOrEqual(6);
-        }
-      }
-    }
   });
 });
