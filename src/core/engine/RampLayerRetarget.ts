@@ -1,5 +1,43 @@
-import type { GameState, PendingAction } from '../state/GameState.js';
+import type { GameState, PendingAction, PlannedRamp, RampSegmentTracker } from '../state/GameState.js';
+import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { pickReachableColumn } from '../mining/WorkTarget.js';
+
+type Column = { x: number; z: number };
+
+/** Column lists tried in order (nearest reachable of the first non-empty hit wins) for one unreachable lead. */
+type CandidateStrategy = (ramp: PlannedRamp, lead: RampSegmentTracker) => ReadonlyArray<ReadonlyArray<Column>>;
+
+/**
+ * Shared driver: for each planned ramp whose never-claimed lead layer sits on an unreachable
+ * target, move it to the nearest reachable column of the strategy's candidate lists. Returns the number moved.
+ */
+function retargetLeads(
+  state: Pick<GameState, 'plannedRamps' | 'pendingActions'>,
+  canReach: (action: PendingAction, x: number, z: number) => boolean,
+  candidatesFor: CandidateStrategy,
+): number {
+  let moved = 0;
+  for (const ramp of state.plannedRamps) {
+    const lead = ramp.segments.find(s => !s.done);
+    if (lead === undefined) continue;
+    const action = state.pendingActions.find(a => a.id === lead.actionId);
+    if (action === undefined || action.status !== 'queued') continue;
+    if (canReach(action, action.targetX, action.targetZ)) continue;
+
+    const anchor = { x: action.targetX, z: action.targetZ };
+    const reach = (x: number, z: number) => canReach(action, x, z);
+    let pick: Column | null = null;
+    for (const columns of candidatesFor(ramp, lead)) {
+      pick = pickReachableColumn(columns, anchor, reach);
+      if (pick !== null) break;
+    }
+    if (pick === null) continue;
+    action.targetX = pick.x;
+    action.targetZ = pick.z;
+    moved++;
+  }
+  return moved;
+}
 
 /**
  * Move the lead `dig_ramp_segment` layer of each planned ramp onto the nearest
@@ -15,16 +53,7 @@ export function retargetRampLayers(
   state: Pick<GameState, 'plannedRamps' | 'pendingActions'>,
   canReach: (action: PendingAction, x: number, z: number) => boolean,
 ): number {
-  let moved = 0;
-  for (const ramp of state.plannedRamps) {
-    const lead = ramp.segments.find(s => !s.done);
-    if (lead === undefined) continue;
-    const action = state.pendingActions.find(a => a.id === lead.actionId);
-    if (action === undefined || action.status !== 'queued') continue;
-    if (canReach(action, action.targetX, action.targetZ)) continue;
-
-    const anchor = { x: action.targetX, z: action.targetZ };
-    const reach = (x: number, z: number) => canReach(action, x, z);
+  return retargetLeads(state, canReach, (ramp, lead) => {
     const own = distinctColumns(lead.cells);
     // Fallback: the carve acts on the segment's cells wherever the digger
     // stands, so any reachable column of the already-built part will do.
@@ -32,13 +61,32 @@ export function retargetRampLayers(
     const probed = new Set(own.map(c => `${c.x},${c.z}`));
     const others = distinctColumns(ramp.segments.flatMap(s => (s === lead ? [] : s.cells)))
       .filter(c => !probed.has(`${c.x},${c.z}`));
-    const pick = pickReachableColumn(own, anchor, reach) ?? pickReachableColumn(others, anchor, reach);
-    if (pick === null) continue;
-    action.targetX = pick.x;
-    action.targetZ = pick.z;
-    moved++;
-  }
-  return moved;
+    return [own, others];
+  });
+}
+
+/**
+ * Second chance for a lead layer `retargetRampLayers` left unreachable (#2082): the nearest reachable
+ * column beside the layer's own cells, where the digger can stand and carve it. Only a queued lead is moved.
+ */
+export function retargetBesideRampLayers(
+  state: Pick<GameState, 'plannedRamps' | 'pendingActions'>,
+  canReach: (action: PendingAction, x: number, z: number) => boolean,
+): number {
+  return retargetLeads(state, canReach, (_ramp, lead) => {
+    const own = distinctColumns(lead.cells);
+    const seen = new Set(own.map(c => `${c.x},${c.z}`));
+    const beside: Column[] = [];
+    for (const c of own) {
+      for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+        const key = `${c.x + dx},${c.z + dz}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        beside.push({ x: c.x + dx, z: c.z + dz });
+      }
+    }
+    return [beside];
+  });
 }
 
 function distinctColumns(cells: readonly { x: number; z: number }[]): { x: number; z: number }[] {

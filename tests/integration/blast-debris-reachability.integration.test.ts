@@ -844,7 +844,11 @@ function rampIntoCrater(endZ: number, biome = 'desert_badlands', depth = 8): Cra
   expect(state.lastBlastReport).not.toBeNull();
 
   expect(run(`build_ramp start:40,12 end:40,${endZ} depth:${depth}`)).toMatchObject({ success: true });
-  const rampDone = (): boolean => state.plannedRamps.every(r => r.segments.every(s => s.done));
+  // The core may order its own crater-access ramp (#2082) for what the player's ramp leaves stranded;
+  // this helper judges only the ramp the player ordered.
+  const playerRampIds = new Set(state.plannedRamps.map(r => r.id));
+  const playerRamps = (): typeof state.plannedRamps => state.plannedRamps.filter(r => playerRampIds.has(r.id));
+  const rampDone = (): boolean => playerRamps().every(r => r.segments.every(s => s.done));
   tickWhile(rampDone, 2500);
   // Classification runs at the start of each employee tick: give it a pass after the last segment.
   for (let i = 0; i < 3; i++) run('tick 1');
@@ -852,7 +856,7 @@ function rampIntoCrater(endZ: number, biome = 'desert_badlands', depth = 8): Cra
   const stranded = (): number => state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach').length;
   if (rampDone()) tickWhile(() => stranded() === 0, 1500);
 
-  const segmentActions = state.plannedRamps.flatMap(r => r.segments.map(s => state.pendingActions.find(a => a.id === s.actionId)));
+  const segmentActions = playerRamps().flatMap(r => r.segments.map(s => state.pendingActions.find(a => a.id === s.actionId)));
   const debris = state.pendingActions.filter(a => a.type === 'haul_debris' || a.type === 'fragment_debris');
   return {
     allDone: rampDone(),

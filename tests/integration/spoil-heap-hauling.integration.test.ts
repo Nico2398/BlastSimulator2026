@@ -584,7 +584,9 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
 
     const tracking = { on: false };
     const claimedSeen = new Set<number>();
-    const carried = new Map<number, { kg: number; barren: boolean }>();
+    const carried = new Map<number, { kg: number; barren: boolean; blast: boolean }>();
+    /** Fragments on the ground when the window opens: the blast's own debris. Spoil the auto crater-access ramp (#2082) digs during the window is hauled too; its barren part is not blast debris, so the barren share counts blast debris only (against all tonnage carried). */
+    const blastIds = new Set<number>();
     const violations: string[] = [];
     let barrenStarts = 0;
     let oreStored = 0;
@@ -618,7 +620,7 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
       if (!tracking.on) return;
       const byId = firstFragmentById(state.logistics.fragments);
       for (const t of state.logistics.fragments) {
-        if (t.state === 'in_transit' && !carried.has(t.fragment.id)) carried.set(t.fragment.id, { kg: t.fragment.mass, barren: isBarrenFragment(t.fragment.oreDensities) });
+        if (t.state === 'in_transit' && !carried.has(t.fragment.id)) carried.set(t.fragment.id, { kg: t.fragment.mass, barren: isBarrenFragment(t.fragment.oreDensities), blast: blastIds.has(t.fragment.id) });
         if (t.state === 'stored' && !storedSeen.has(t.fragment.id) && !isBarrenFragment(t.fragment.oreDensities)) {
           storedSeen.add(t.fragment.id);
           oreStored += t.fragment.mass;
@@ -659,11 +661,12 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
     expect(logged('blast').success).toBe(true);
     expect(state.levelEnded, `ended ${String(state.levelEndReason)}`).toBe(false);
 
+    for (const t of state.logistics.fragments) blastIds.add(t.fragment.id);
     tracking.on = true;
     const windowStart = elapsed();
     playUntil(WINDOW_TICKS, () => elapsed() - windowStart >= WINDOW_TICKS);
 
-    const kg = (barren: boolean) => [...carried.values()].filter(c => c.barren === barren).reduce((sum, c) => sum + c.kg, 0);
+    const kg = (barren: boolean) => [...carried.values()].filter(c => c.barren === barren && (!barren || c.blast)).reduce((sum, c) => sum + c.kg, 0);
     const total = kg(true) + kg(false);
     expect(violations).toEqual([]);
     expect(oreStored, 'ore keeps arriving at the warehouse in the window').toBeGreaterThan(0);
