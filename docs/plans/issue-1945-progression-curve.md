@@ -298,3 +298,43 @@ the 50,000-tick seed-42 desert_badlands full-kit ladder probe: g1@968, g2@2482, 
 bankrupt at t23799 (low cash -86,300), g3 (window 8000-14000) missed; boulder ore sold 45%.
 Shareholder Summit competent ladder (volcanic_flats, digger, seed 42) wins at tick 3461 (was 2981 on main).
 Remaining: survival to 50,000 and g3+ are tracked in #2072.
+
+## 2026-10-23 record: re-measure after #2066 / #2068, no tuning landed (#2063, MISSED)
+
+Seed 42, desert_badlands, full kit, `scripts/progression-probe.ts`, main at `68527fec`. Probe code and every balance constant unchanged, so no sandbox pin
+and no campaign pin moved; none was re-measured because none could change.
+
+| run | g1 | g2 | g3-5 | cash@3k | cash@6k | cash@10k | cash@15k | boulder ore sold | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder, 50,000 horizon | 968 | 2482 | not reached | 4.66 M | 10.54 M | 9.67 M | 6.13 M | 45% | bankrupt t23799 (low cash -86,300) |
+| stay_g1, 10,000 horizon | 968 | capped | n/a | 4.88 M | 10.10 M | 9.01 M | n/a | 44% | t10000 alive |
+| reinvest, 10,000 horizon | 1178 | n/a | n/a | 2.83 M | 4.60 M | 6.65 M | n/a | 39% | t10000 alive |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| ladder survives 50,000 ticks | bankrupt t23799 | MISSED |
+| grade 3 at t8,000-14,000 | not reached (ore 121 t of 150 t flat from t9,500; pit 10.4 m of 20 m) | MISSED |
+| grade 4 at t15,000-25,000 | not reached | MISSED |
+| grade 5 at t30,000-45,000 | not reached | MISSED |
+| ladder ahead of stay_g1 at t10,000 | 9.67 M vs 9.01 M | MET |
+| fragmenter ahead of no-fragmenter at t10,000 | not measured (the digger-kit ladder was not re-run) | UNKNOWN |
+| >= 60% boulder ore sold | ladder 45%, stay_g1 44%, reinvest 39% | MISSED |
+
+Why no `MINE_GRADES`, `BUYER_*`, fee or `PERMIT_LIMITS` value moved: the ladder never reaches grade 3, so no grade-3-to-5 window can be measured, and retuning
+balance to route around a stalled policy would hide the defect.
+
+Root cause traced (instrumented 12,000-tick runs; instrumentation and the trial fix reverted, the diff is not committed):
+
+1. After grade 2 income is nearly flat: cash rises to 10.5 M by t6,000 then falls about 700 a tick (payroll 525-562) with ore delivered 100 t at t5,500, 121 t at t9,500, then flat.
+2. Only 4 shots fire before t6,000 and 5-6 by t12,000. The grade-2 800 kg / 36-hole shots leave 2.6-6.6 M kg of rubble on the ground, 4,100-4,400 haul orders blocked
+   and 270-500 pending that deliver no ore (waste rock, or ore-less ground).
+3. The fifth shot is a fresh pattern ordered over ground the fourth shot buried: its 9 drill holes sit `buried_under_rubble` for thousands of ticks. `dropUnreachablePattern`
+   handles only `target_unreachable`, so the half-drilled pattern holds the ladder until the 3,000-tick step budget runs out twice (t6,000 to t10,200, then the stale-pattern drop
+   at about t13,000). A trial that drops a pattern whose holes stay buried for 500 ticks and bars its footprint freed the ladder (barred sites 2, then 6) but changed no outcome:
+   fresh sites are ore-less (ore 121,450 kg flat t9,500 to t12,800) and the pit stays at 10.4 m, because deepening waits for a crater with no ordered rubble and the
+   crater holds thousands of sealed fragments.
+4. Pit depth: no deepen after 10.4 m. The deepen gate (`decideLadderDeepen`) ignores sealed rubble, yet the latest crater is the fifth shot's, whose 68 to 2,586 fragments are all
+   sealed and whose floor gained nothing.
+
+Remainder (needs its own run, tracked with #2072): make grade-2 shots deliver ore and open depth instead of burying the map (shot size below the limit, a ramp before the next
+shot, or ore-aware site choice), drop a pattern whose holes stay buried, then rerun the 50,000-tick probe and only then tune `MINE_GRADES`, `BUYER_*`, fees and `PERMIT_LIMITS`.
