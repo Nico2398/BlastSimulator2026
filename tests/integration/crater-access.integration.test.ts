@@ -34,12 +34,13 @@ describe('crater access ramp (#2082)', () => {
     tickUntilFresh(run, state, () => state.plannedRamps.length > 0, CRATER_ACCESS_RECHECK_TICKS + 2);
     expect(state.plannedRamps).toHaveLength(1);
 
-    tickUntilFresh(run, state, () => state.plannedRamps[0]!.segments.every(s => s.done), DIG_TICKS);
-    expect(state.plannedRamps[0]!.segments.every(s => s.done)).toBe(true);
+    // A finished ramp leaves plannedRamps (TaskCompletionEffects), so completion is the list emptying.
+    tickUntilFresh(run, state, () => state.plannedRamps.length === 0, DIG_TICKS);
+    expect(state.plannedRamps).toHaveLength(0);
 
     tickUntilFresh(run, state, () => false, CRATER_ACCESS_RECHECK_TICKS);
     expect(crater().filter(a => a.blockedReason === 'debris_out_of_reach')).toEqual([]);
-    expect(state.plannedRamps).toHaveLength(1);
+    expect(state.plannedRamps).toHaveLength(0);
     expectNoWorldInvariantViolations(state);
   });
 

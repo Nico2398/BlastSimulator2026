@@ -70,6 +70,16 @@ export function dropRubble(site: CraterSite, pit: Pit, count: number, firstId = 
   addBlastFragments(site.state.logistics, frags, site.state.navGrid);
 }
 
+/** Barren rubble is hauled to a spoil heap; without one every haul order stalls on no_spoil_heap. Placed clear of the pits. */
+function placeSpoilHeap(run: (cmd: string) => unknown): void {
+  for (let z = 14; z < 30; z += 4) {
+    for (let x = 14; x < 30; x += 4) {
+      if ((run(`build spoil_heap at:${x},${z}`) as { success: boolean }).success) return;
+    }
+  }
+  throw new Error('no placeable site for spoil_heap');
+}
+
 /** A flat, staffed progression site (`sandbox start staffed:true`) with the given pits already cut. */
 export function makeCraterSite(pits: Pit[], opts: { cash?: number } = {}): CraterSite {
   const { runner, ctx } = createRunner();
@@ -79,6 +89,7 @@ export function makeCraterSite(pits: Pit[], opts: { cash?: number } = {}): Crate
   state.events.eventFreqMultiplier = 0;
   state.cash = opts.cash ?? 5_000_000;
   const site: CraterSite = { run, state, ctx, top: flatten(ctx), pits: [] };
+  placeSpoilHeap(run);
   for (const pit of pits) cutPit(site, pit);
   tickUntilFresh(run, state, () => false, 1);
   return site;

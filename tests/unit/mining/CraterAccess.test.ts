@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   clusterStrandedFloors, planCraterAccess, type AccessSurface, type StrandedFloor,
 } from '../../../src/core/mining/CraterAccess.js';
-import { rampPathCells } from '../../../src/core/mining/RampPath.js';
+import { rampPathCells, rampPathOf } from '../../../src/core/mining/RampPath.js';
 import {
   MAX_RAMP_LENGTH, NAV_MAX_SLOPE_RATIO, RAMP_CRATER_MIN_DROP_M, RAMP_FLOOR_SNAP_REACH_M,
 } from '../../../src/core/config/balance.js';
@@ -105,7 +105,7 @@ describe('planCraterAccess', () => {
     const plan = planCraterAccess(centreFloor(PIT), s, MAX_RATIO, 3);
     expect(plan.ok).toBe(true);
     if (!plan.ok) return;
-    const cells = rampPathCells(plan.def, 3);
+    const cells = rampPathCells(rampPathOf(plan.def), 3);
     expect(cells.length).toBeGreaterThan(1);
     const first = cells[0]!;
     const last = cells[cells.length - 1]!;
@@ -127,7 +127,7 @@ describe('planCraterAccess', () => {
     const plan = planCraterAccess({ x: 45, z: 40, floorY: -PIT.depth, orderCount: 5 }, s, MAX_RATIO, 3);
     expect(plan.ok).toBe(true);
     if (!plan.ok) return;
-    const first = rampPathCells(plan.def, 3)[0]!;
+    const first = rampPathCells(rampPathOf(plan.def), 3)[0]!;
     expect(ledge(first.x, first.z)).toBe(true);
   });
 

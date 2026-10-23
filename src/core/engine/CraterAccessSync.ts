@@ -31,12 +31,18 @@ function floorsSignature(revision: number, floors: readonly StrandedFloor[]): st
   return `${revision}|${floors.map(f => `${f.x},${f.z},${f.floorY},${f.orderCount}`).join(';')}`;
 }
 
-/** Stranded floors with each target's y read from the terrain (rubble tops sit above the floor). */
-function strandedFloors(state: GameState, grid: VoxelGrid): StrandedFloor[] {
-  const cells = strandedDebrisTargets(state).map(t => {
-    const y = computeVoxelColumnSurfaceHeight(grid, Math.round(t.x), Math.round(t.z));
-    return { x: t.x, z: t.z, y: Number.isFinite(y) ? y : t.y };
-  });
+/**
+ * Stranded floors with each target's y read from the terrain (rubble tops sit above the floor).
+ * A stamp lags the world: a ramp that just connected the crater leaves its orders stamped until the next
+ * classification sweep, so a target the vehicle network reaches now is not stranded and is skipped.
+ */
+function strandedFloors(state: GameState, grid: VoxelGrid, surface: AccessSurface): StrandedFloor[] {
+  const cells = strandedDebrisTargets(state)
+    .filter(t => !surface.reachableFrom(Math.round(t.x), Math.round(t.z)))
+    .map(t => {
+      const y = computeVoxelColumnSurfaceHeight(grid, Math.round(t.x), Math.round(t.z));
+      return { x: t.x, z: t.z, y: Number.isFinite(y) ? y : t.y };
+    });
   return clusterStrandedFloors(cells, CRATER_ACCESS_CLUSTER_GAP_CELLS)
     .filter(f => f.orderCount >= CRATER_ACCESS_MIN_STRANDED_ORDERS)
     .sort((a, b) => b.orderCount - a.orderCount);
@@ -62,13 +68,13 @@ export function syncCraterAccess(state: GameState, grid?: VoxelGrid | null): voi
   cursors.set(state, next);
 
   if (state.pendingActions.some(a => a.type === 'dig_ramp_segment')) return;
-  const floors = strandedFloors(state, grid);
+  const surface = accessSurface(state, grid);
+  if (surface === null) return;
+  const floors = strandedFloors(state, grid, surface);
   if (floors.length === 0) { next.failedSignature = null; return; }
   const signature = floorsSignature(state.navGrid.revision, floors);
   if (signature === next.failedSignature) return;
 
-  const surface = accessSurface(state, grid);
-  if (surface === null) return;
   const reserve = getOperatingCostPerHour(state).payroll * CRATER_ACCESS_CASH_RESERVE_TICKS;
   let affordabilityBlocked = false;
   for (const floor of floors) {

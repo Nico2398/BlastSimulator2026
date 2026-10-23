@@ -24,7 +24,7 @@ export interface AccessSurface extends SpiralSurface {
   reachableFrom(x: number, z: number): boolean;
 }
 
-export type CraterAccessPlan =
+type CraterAccessPlan =
   | { ok: true; def: RampDef; cost: number; gradeDegrees: number }
   | { ok: false; reasonKey: string };
 
