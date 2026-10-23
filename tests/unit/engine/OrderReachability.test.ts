@@ -1555,3 +1555,60 @@ describe('unreachable vehicle orders name the blocking ramp (#1938)', () => {
     expect(actionOf(state, id).blockedDetail ?? null).toBeNull();
   });
 });
+
+describe('ramp covered by crater fragments (#2085)', () => {
+  const RAMP_X = [11, 12, 13, 14, 15];
+  const RAMP_Z = 6;
+
+  function rubble(id: number, x: number, z: number): FragmentData {
+    return {
+      id, position: { x, y: 0, z }, volume: 0.3, mass: 400, rockId: 'cruite', oreDensities: {},
+      initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: id, origin: { x, y: 0, z },
+    };
+  }
+
+  /** Digger in A; a ramp lies beyond the sealed wall, its columns and the wall itself buried under fragments. */
+  function stageBuriedRamp(): { state: GameState; id: number } {
+    const state = makeState();
+    hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_digger, 'driving.excavator']);
+    purchaseVehicle(state.vehicles, 'rock_digger', IN_A.x, IN_A.z);
+    const cells = RAMP_X.map(x => ({ x, y: 0, z: RAMP_Z }));
+    const covered = [WALL_X, ...RAMP_X];
+    addBlastFragments(state.logistics, covered.map((x, i) => rubble(i + 1, x, RAMP_Z)), state.navGrid);
+    const id = queue(state, 'dig_ramp_segment', { x: 13, z: RAMP_Z }, {
+      requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger',
+      payload: { rampId: 1, segmentIndex: 0, cells, region: null },
+    });
+    state.plannedRamps.push({
+      id: 1,
+      def: { originX: 11, originZ: RAMP_Z, direction: 'east', length: 5, targetDepth: 6 },
+      footprint: { minX: 11, maxX: 15, minZ: RAMP_Z, maxZ: RAMP_Z },
+      segments: [{ index: 0, actionId: id, cells, region: null, done: false }],
+    });
+    return { state, id };
+  }
+
+  it('classifies the lead segment reachable instead of target_unreachable', () => {
+    const { state, id } = stageBuriedRamp();
+    classifyQueuedOrders(state);
+    const action = state.pendingActions.find(a => a.id === id)!;
+    expect(judgeQueuedOrders(state).get(id)).toBe('reachable');
+    expect(action.blockedReason ?? null).not.toBe('target_unreachable');
+  });
+
+  it('leaves the lead segment ghost blue', () => {
+    const { state, id } = stageBuriedRamp();
+    classifyQueuedOrders(state);
+    expect(ghostOf(state, id).unreachable).toBe(false);
+  });
+
+  it('a haul_debris order on the sealed cell still stays debris_out_of_reach', () => {
+    const { state } = stageBuriedRamp();
+    hire(state, { x: IN_A.x + 1, z: IN_A.z }, [ROLE_LICENCE_REQUIRED.debris_hauler]);
+    purchaseVehicle(state.vehicles, 'debris_hauler', IN_A.x + 1, IN_A.z);
+    const haul = queue(state, 'haul_debris', { x: 13, z: RAMP_Z }, { requiredVehicleRole: 'debris_hauler', payload: { fragmentId: 3 } });
+    classifyQueuedOrders(state);
+    expect(state.pendingActions.find(a => a.id === haul)!.blockedReason).toBe('debris_out_of_reach');
+  });
+});

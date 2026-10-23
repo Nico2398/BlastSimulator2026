@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { makeCraterSite, dropRubble, type CraterSite, type Pit } from '../../helpers/craterAccessFixture.js';
 import { tickUntilFresh } from '../../helpers/blastFixtures.js';
 import { CRATER_ACCESS_MIN_STRANDED_ORDERS, CRATER_ACCESS_RECHECK_TICKS } from '../../../src/core/config/balance.js';
+import type { PlannedRamp } from '../../../src/core/state/GameState.js';
 import { strandedDebrisTargets } from '../../../src/core/engine/OrderReachability.js';
 
 const PIT: Pit = { x0: 40, z0: 40, size: 12, drop: 8 };
@@ -101,6 +102,63 @@ describe('syncCraterAccess', () => {
     const site = makeCraterSite([]);
     tickUntilFresh(site.run, site.state, () => false, CRATER_ACCESS_RECHECK_TICKS * 2);
     expect(site.state.plannedRamps).toHaveLength(0);
+  });
+});
+
+/** Twelve dig_ramp_segment orders parked inside the pit, as the classifier stamps them target_unreachable (#2085). */
+function parkBlockedRamp(site: CraterSite, count = 12): void {
+  const { state } = site;
+  const cx = PIT.x0 + PIT.size - 1;
+  const ids: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const id = state.nextPendingActionId++;
+    ids.push(id);
+    state.pendingActions.push({
+      id, type: 'dig_ramp_segment', requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger',
+      targetX: cx, targetZ: cx, targetY: 0, payload: { rampId: 900, segmentIndex: i, cells: [], region: null },
+      targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: state.tickCount,
+      blockedReason: 'target_unreachable',
+    });
+  }
+  const planned: PlannedRamp = {
+    id: 900,
+    def: { originX: cx, originZ: cx, direction: 'south', length: 1, targetDepth: 2 },
+    footprint: { minX: cx, maxX: cx, minZ: cx, maxZ: cx },
+    segments: ids.map((actionId, index) => ({ index, actionId, cells: [], region: null, done: false })),
+  };
+  state.plannedRamps.push(planned);
+}
+
+describe('syncCraterAccess with blocked ramp segments (#2085)', () => {
+  it('orders a new ramp within one recheck window although 12 blocked segments are pending', () => {
+    const site = strandedSite();
+    parkBlockedRamp(site);
+    const before = site.state.plannedRamps.length;
+    tickUntilFresh(site.run, site.state, () => site.state.plannedRamps.length > before, WINDOW);
+    expect(site.state.plannedRamps.length).toBe(before + 1);
+  });
+
+  it('charges the new ramp as construction spending exactly once', () => {
+    const site = strandedSite();
+    parkBlockedRamp(site);
+    const constructionSpend = () => site.state.finances.transactions.filter(e => e.type === 'expense' && e.category === 'construction').length;
+    const before = constructionSpend();
+    tickUntilFresh(site.run, site.state, () => constructionSpend() > before, WINDOW);
+    expect(constructionSpend()).toBe(before + 1);
+    tickUntilFresh(site.run, site.state, () => false, CRATER_ACCESS_RECHECK_TICKS);
+    expect(constructionSpend()).toBe(before + 1);
+  });
+
+  it('still orders nothing while one live ramp segment is pending beside the blocked ones', () => {
+    const site = strandedSite();
+    expect(site.run('build_ramp start:30,46 end:39,46 depth:4')).toMatchObject({ success: true });
+    parkBlockedRamp(site);
+    const constructionSpend = () => site.state.finances.transactions.filter(e => e.type === 'expense' && e.category === 'construction').length;
+    const ordered = constructionSpend();
+    for (const a of rampOrders(site)) if (a.blockedReason !== 'target_unreachable') a.status = 'queued';
+    tickUntilFresh(site.run, site.state, () => false, CRATER_ACCESS_RECHECK_TICKS * 2);
+    // The crew may finish the player's ramp meanwhile; what must not happen is a second, automatic order.
+    expect(constructionSpend()).toBe(ordered);
   });
 });
 
