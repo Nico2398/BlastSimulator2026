@@ -1,13 +1,9 @@
-// BlastSimulator2026 — Integration: an armed blast names a walker who cannot move out (#1990).
-// Constructed state (#1937 stops the sandbox route at drilling): an employee inside the danger zone, on a
-// cell ringed by fragment debris, with the cells beyond the debris genuinely blocked (#2077: evacuation walkers now
-// cross rubble and vehicle cells, so only a blocked/void ring strands). No route exists, so the
-// order Zone.clearZone issues (allowUnreachable) succeeds but the walk fails every tick. The real console
-// tick loop (move -> tickDetonation) must name him as stranded within the bound instead of "1 left".
-//
-// Approximation: the parked vehicle is modelled by the nav grid's vehicleOccupied flag on a ring of cells
-// (what a parked vehicle sets on the cells it covers), not by a vehicle entity, because a vehicle entity
-// inside the zone would itself be evacuated or stranded and confound the verdict under test.
+// BlastSimulator2026 — Integration: an armed blast names a walker who cannot move out (#1990, #2077).
+// Constructed state (#1937 stops the sandbox route at drilling): an employee inside the danger zone on a
+// cell surrounded by fragment debris, with a ring of genuinely blocked cells beyond the debris. Evacuation
+// walkers cross rubble (#2077), so only the blocked ring strands him. No route exists at all, so the
+// real console tick loop (move -> tickDetonation) must name him as stranded within the bound
+// instead of "1 left".
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
@@ -26,7 +22,7 @@ import { armDetonation, detonationPhase } from '../../src/core/engine/Detonation
 const SIZE = 80;
 const CENTER = 20; // hole and employee; danger zone is the box (5,5)-(35,35)
 const DEBRIS_RADIUS = 4;
-const VEHICLE_RING = 5;
+const BLOCKED_RING_RADIUS = 5;
 
 function flatNav(): NavGrid {
   const vg = new VoxelGrid(SIZE, SIZE);
@@ -43,8 +39,8 @@ function flatNav(): NavGrid {
 
 /** Debris on every cell within DEBRIS_RADIUS of the centre, a blocked ring just outside it (#2077: rubble alone no longer strands). */
 function boxIn(nav: NavGrid): void {
-  for (let dx = -VEHICLE_RING; dx <= VEHICLE_RING; dx++) {
-    for (let dz = -VEHICLE_RING; dz <= VEHICLE_RING; dz++) {
+  for (let dx = -BLOCKED_RING_RADIUS; dx <= BLOCKED_RING_RADIUS; dx++) {
+    for (let dz = -BLOCKED_RING_RADIUS; dz <= BLOCKED_RING_RADIUS; dz++) {
       const ring = Math.max(Math.abs(dx), Math.abs(dz));
       if (ring <= DEBRIS_RADIUS) nav.addFragmentOccupant(CENTER + dx, CENTER + dz);
       else nav.cellAt(CENTER + dx, CENTER + dz)!.type = 'blocked';
@@ -78,6 +74,7 @@ describe('Detonation with a walker boxed in by debris and a blocked ring (#1990,
     expect(Math.round(walker.x)).toBe(CENTER); // he never got out
     expect(Math.round(walker.z)).toBe(CENTER);
     // A blocked ring has no route at all: clearZone cannot order the walk, so he is named stranded outright.
+    expect(state.pendingDetonation!.strandedEmployeeIds).toContain(walker.id);
     expect(detonationPhase(state)).toEqual({ kind: 'stranded', names: [walker.name] });
   });
 
