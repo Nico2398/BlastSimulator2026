@@ -45,17 +45,22 @@ describe('syncCraterAccess', () => {
 
   it('charges the ramp as construction spending', () => {
     const site = strandedSite();
-    const before = site.state.finances.expenses?.length ?? 0;
+    const before = site.state.finances.transactions.length;
     tickUntilRamp(site, WINDOW);
-    const spent = (site.state.finances.expenses ?? []).slice(before).filter(e => e.category === 'construction');
+    const spent = site.state.finances.transactions.slice(before).filter(e => e.type === 'expense' && e.category === 'construction');
     expect(spent.length).toBeGreaterThan(0);
   });
 
   it('is idempotent: scanning again later does not order a second ramp for the same crater', () => {
     const site = strandedSite();
+    const constructionSpend = () => site.state.finances.transactions.filter(e => e.type === 'expense' && e.category === 'construction').length;
     tickUntilRamp(site, WINDOW);
+    const ordered = constructionSpend();
+    expect(ordered).toBeGreaterThan(0);
+    // The crew may finish the ramp meanwhile (planned entry removed), so count charges, not plans.
     tickUntilFresh(site.run, site.state, () => false, CRATER_ACCESS_RECHECK_TICKS * 3);
-    expect(site.state.plannedRamps).toHaveLength(1);
+    expect(constructionSpend()).toBe(ordered);
+    expect(site.state.plannedRamps.length).toBeLessThanOrEqual(1);
   });
 
   it('orders nothing while a ramp is still pending', () => {
