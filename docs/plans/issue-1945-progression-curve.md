@@ -302,8 +302,7 @@ Remaining: survival to 50,000 and g3+ are tracked in #2072.
 ## 2026-10-23 record (#2076)
 
 Seed 42, desert_badlands, full kit, `scripts/progression-probe.ts`, ladder, 50,000 horizon. Probe policy only (scripts/); no balance constant, `MINE_GRADES`, `BUYER_*`,
-fee or `PERMIT_LIMITS` value moved. Wired: `decideBuriedPattern` (drop a pattern buried 500 ticks, bar its hole bounding box), `decideLadderShotSide` (g2 side cap
-`LADDER_G2_MAX_SIDE` 4 (3 starved yield, #2080), shrink after a failed shot or 100 sealed fragments), `siteHoldsOre` (25% of the best site's ore), a 16 m building keep-out on fresh sites, and an
+fee or `PERMIT_LIMITS` value moved. Wired: `decideBuriedPattern` (drop a pattern buried 500 ticks, bar its hole bounding box), `decideLadderShotSide` (no grade cap and no sealed-rubble shrink: caps of 3-6 and the 100-fragment shrink each starved yield and ended the summit run in a worker revolt, #2080; shrink one step after a failed shot), `siteHoldsOre` (25% of the best site's ore), a 16 m building keep-out on fresh sites, and an
 oldest-bar age-out when no site orders.
 
 | run | g1 | g2 | g3-5 | cash@3k | cash@6k | cash@10k | cash@15k | boulder ore sold | end |

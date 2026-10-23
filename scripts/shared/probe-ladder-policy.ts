@@ -308,12 +308,6 @@ export function decideBuriedPattern(input: BuriedPatternInput): BuriedPatternDec
 
 /** Sealed-rubble cell count at which the ladder shrinks its shot side. */
 export const LADDER_SEALED_SHRINK_COUNT = 100;
-/**
- * Largest shot side at grade >= LADDER_GATE_MIN_GRADE. A cap of 3 starved ladder yield and the
- * Shareholder Summit competent run ended game_over:worker_revolt (#2080); 4 is the contract floor.
- */
-export const LADDER_G2_MAX_SIDE = 4;
-
 interface LadderShotSideInput {
   limitSide: number;
   grade: number;
@@ -322,14 +316,13 @@ interface LadderShotSideInput {
 }
 
 /**
- * Contract: grade < LADDER_GATE_MIN_GRADE returns limitSide; grade >= it caps at LADDER_G2_MAX_SIDE;
- * lastShotFailed or sealedRubbleCount >= LADDER_SEALED_SHRINK_COUNT gives a side strictly smaller
- * than the clean value, floor 1; non-increasing in sealedRubbleCount. Result is in [1, limitSide].
+ * Contract: a clean state returns limitSide at every grade; lastShotFailed gives a side strictly
+ * smaller, floor 1. Result is in [1, limitSide]. No grade cap (caps of 3-6 starved ladder yield and
+ * ended the Shareholder Summit competent run in game_over:worker_revolt) and no sealed-rubble shrink
+ * (it alone reproduced that revolt, #2080): sealedRubbleCount is accepted but does not move the side.
  */
 export function decideLadderShotSide(input: LadderShotSideInput): number {
-  const clean = input.grade < LADDER_GATE_MIN_GRADE ? input.limitSide : Math.min(input.limitSide, LADDER_G2_MAX_SIDE);
-  const shrink = input.lastShotFailed || input.sealedRubbleCount >= LADDER_SEALED_SHRINK_COUNT;
-  return Math.max(1, shrink ? clean - 1 : clean);
+  return Math.max(1, input.lastShotFailed ? input.limitSide - 1 : input.limitSide);
 }
 
 /** Share of the best site's ore a site must hold to be worth a shot. */
