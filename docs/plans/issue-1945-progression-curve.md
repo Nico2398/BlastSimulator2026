@@ -348,3 +348,41 @@ Seed 42, desert_badlands, full kit, ladder, horizon 50,000, no balance constant 
 Limit: only 4 blasts fire in 19,900 ticks, so after g2 income is flat while payroll drains about 9 M by t15,000. Deepening needs a crater with no ordered rubble; no ore yield or depth arrives to
 lift the grade-3 gate. Not fixable from probe policy alone without per-tick instrumentation (a run costs about 12 minutes of wall clock); the remaining lever is the balance side (`MINE_GRADES`,
 `BUYER_*`, payroll vs. income) tracked in #2072 / #2063. #2076 lands the policy pieces and tests; survival and g3 stay open under #2072.
+
+## 2026-10-23 instrumented iteration (#2076)
+
+Seed 42, desert_badlands, full kit, `ladder`, probe policy only (`scripts/shared/probe-strategies.ts`, `probe-ladder-policy.ts`); no balance constant moved.
+New permanent diagnostics: `PROBE_DIAG=1 [PROBE_DIAG_TICKS=1000] npm run probe:progression ...` prints a `[diag tN]` line (grade, blasts, pit, cash, payroll/tick,
+idle crew, rubble kg, reachable rubble kg, ore delivered, haul orders, pattern state, crater rubble ordered/orderless/sealed, shot plan cost, fleet and drivers,
+blocked orders by reason) and a `[diag-act tN]` line (pending orders by type, active orders, per-employee fatigue/rest/queue) to stderr.
+
+Findings (each read off the diagnostics, not guessed):
+
+1. Licence stall (fixed). `ladderEquipment` upgraded all six haulers to tier 2 around the one driver holding the tier 2 licence; when he left the roster every haul
+   order read `licence_level_too_low`, ore delivered froze at 113,250 kg from t7500 and payroll drained the cash to bankruptcy. Haulers are no longer upgraded
+   (`LADDER_UPGRADE_ROLES`), as the comment above it always claimed.
+2. Degenerate gentle ramp (fixed). The tier 2 "gentle" ramp over a 10 m crater found no start outside the crater at a buildable length and was ordered from the crater's
+   own rim (1 m deep, `target_unreachable` for good). It recorded a gentle slope for the crater, so `ladderCraterRamp` believed the crater had a way in and never ordered a
+   real one. `rampStartsInsideCrater` now refuses such starts; `dropStaleRamp` cancels a ramp unreachable for `LADDER_STALE_RAMP_TICKS`, bans its lane and forgets it.
+   Neither changed the outcome: the replacement ramp segments also read `target_unreachable`.
+3. Not a policy lever: after 4 limit-sized shots (about 1 M kg of rubble each) 3.1 to 3.7 M kg lies on the 64 m map; about 1.1 M kg of haul orders are `debris_out_of_reach`
+   and 945 fragments of the deepest crater are sealed. Haulers clear what they reach by t6000 to t7000 (ore 110 k of the 150 k needed), then no reachable rubble remains,
+   income is zero, the crew idles (9 of 11 resting or idle) and fresh shots fail: the last charge hole of every pattern is unreachable among rubble, the pattern is
+   dropped after 500 ticks and reordered. The ramp digger cannot reach any ramp segment (`dig_ramp_segment:target_unreachable`), so the sealed crater is never opened and
+   the pit stays at 10.2 m of the 20 m grade-3 target.
+4. Twelve haulers (tried, reverted): reachable rubble is gone by t4000, ore stalls at 58 k and the run is bankrupt by t9000. Six stay.
+5. t2000 to t6000 the ladder fires no shot while cash climbs from 2.4 M to 9.9 M: `wanted` is false (no cleared crater, haulers busy, pit at the hole depth). Firing
+   there only adds rubble no hauler reaches (finding 3), so it was not changed.
+
+| run | g1 | g2 | g3-5 | cash@6k | cash@10k | cash@15k | blasts | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder, 50,000 horizon (final) | 968 | 2452 | not reached | 9.91 M | 7.60 M | 3.34 M | 4 | bankrupt t18899 (low cash -76,828) |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| ladder survives 50,000 ticks | bankrupt t18899 (was t19908) | MISSED |
+| grade 3 at t8,000-14,000 | not reached (pit 10.2 m of 20 m, ore 110 k of 150 k kg) | MISSED |
+
+Blocker for the remainder: reachability of rubble and ramp segments after limit-sized grade-1 shots (`OrderReachability` / `CraterAccessSync`, #2082), not the probe policy.
+The ladder has no income once the reachable rubble is hauled; payroll alone (about 650 a tick) outlasts about 15,000 ticks of the 10 M peak. The Shareholder Summit
+competent integration test still passes (wins at 2901 ticks).

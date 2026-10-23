@@ -82,7 +82,7 @@ import {
   decideLadderDeepen, decideFreshShotSite, decideBuriedPattern, decideLadderShotSide, siteHoldsOre, decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM,
   LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
   rampProtectionZones, shotOverlapsProtectedRamp,
-  decideLadderHoleDepth, judgeLadderShot,
+  decideLadderHoleDepth, judgeLadderShot, decideLadderHaulerBuy, rampStartsInsideCrater, LADDER_STALE_RAMP_TICKS,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
 import { sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
@@ -363,6 +363,9 @@ function fireShot(s: ProbeSession): boolean {
 
 // ── Ramp ──
 
+/** Identifies a ramp lane (start tile and direction) so a lane that proved unreachable is not ordered again. */
+const rampLaneKey = (x: number, z: number, dirX: number, dirZ: number): string => `${x},${z},${dirX},${dirZ}`;
+
 /** A ramp accepted by `build_ramp`: rise over run, and the horizontal run (m). */
 interface RampOrder extends RampFootprintInput { slope: number }
 
@@ -370,7 +373,9 @@ interface RampOrder extends RampFootprintInput { slope: number }
  * Order a ramp from the open ground into the crater the shot at `at` (`span` wide) made, no steeper than
  * `maxSlope` rise per tile; the ramp's slope ratio and run when one was accepted, else null.
  */
-function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = RAMP_MAX_SLOPE): RampOrder | null {
+function orderRamp(
+  s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = RAMP_MAX_SLOPE, banned: ReadonlySet<string> = new Set(),
+): RampOrder | null {
   const { grid } = s;
   const mid = span / 2;
   const centre = { x: at.x + mid, z: at.z + mid };
@@ -384,7 +389,9 @@ function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = RA
   for (let length = 8; length <= RAMP_MAX_LENGTH; length++) {
     for (const lane of lanes) {
       const start = { x: lane.end.x - lane.dx * length, z: lane.end.z - lane.dz * length };
+      if (banned.has(rampLaneKey(start.x, start.z, lane.dx, lane.dz))) continue;
       if (start.x < 1 || start.z < 1 || start.x >= grid.sizeX - 1 || start.z >= grid.sizeZ - 1) continue;
+      if (rampStartsInsideCrater({ startX: start.x, startZ: start.z, craterX: at.x, craterZ: at.z, craterSpan: span })) continue;
       const depth = Math.round(getSmoothTerrainSurfaceY(grid, start.x, start.z) - floor);
       if (depth < 1 || depth / length > maxSlope) continue;
       if (s.run(`build_ramp start:${start.x},${start.z} end:${lane.end.x},${lane.end.z} depth:${depth}`).success) return { slope: depth / length, x: start.x, z: start.z, runM: length, dirX: lane.dx, dirZ: lane.dz };
@@ -570,6 +577,29 @@ function dropUnreachablePattern(s: ProbeSession, m: LadderMemory): void {
   delete m.stalePatternSinceTick;
 }
 
+/**
+ * A ramp order none of the diggers reaches never finishes, and while its segments stand no later ramp is ordered: the crater
+ * it was meant for keeps its rubble sealed. After LADDER_STALE_RAMP_TICKS, cancel it, ban its lane and forget it so the crater is ramped again from another side.
+ */
+function dropStaleRamp(s: ProbeSession, m: LadderMemory): void {
+  const blocked = s.state.pendingActions.filter(a => a.type === 'dig_ramp_segment' && a.blockedReason === 'target_unreachable');
+  const verdict = decideBuriedPattern({
+    buriedHoleCount: blocked.length, buriedSinceTick: m.rampBlockedSinceTick, tick: s.state.tickCount, dropAfterTicks: LADDER_STALE_RAMP_TICKS,
+  });
+  m.rampBlockedSinceTick = verdict.buriedSinceTick;
+  if (verdict.action !== 'drop') return;
+  for (const id of new Set(blocked.map(a => (a.payload as { rampId: number }).rampId))) s.run(`build_ramp cancel ${id}`);
+  for (const [key, ramp] of Object.entries(m.ramps)) {
+    const [zone] = rampProtectionZones([ramp], 0);
+    if (!blocked.some(a => shotOverlapsProtectedRamp({ x: a.targetX, z: a.targetZ, span: 1 }, [zone!]))) continue;
+    m.bannedRamps.add(rampLaneKey(ramp.x, ramp.z, ramp.dirX, ramp.dirZ));
+    delete m.ramps[key];
+  }
+  m.rampPending = null;
+  delete m.retryAt[LADDER_RAMP_RETRY_KEY];
+  delete m.retryAt['crater_ramp'];
+}
+
 /** Give up the ordered shot: bar its footprint from later fresh sites, clear the pattern and forget the shot. */
 function abandonShot(s: ProbeSession, m: LadderMemory, barred: Pattern & { span: number }): void {
   m.barred.push(barred);
@@ -647,15 +677,17 @@ const sandboxRun = (s: ProbeSession): boolean => !s.engine.ctx.campaignProfile.c
 export const ladderHoleDepthM = (s: ProbeSession): number => sandboxRun(s) ? LADDER_SANDBOX_HOLE_DEPTH_M : LADDER_CAMPAIGN_HOLE_DEPTH_M;
 /** A pit this close under the hole depth counts as dug: deepening then waits for a cleared crater instead of a fresh site. */
 const LADDER_FRESH_SHOT_DEPTH_SLACK_M = 0.5;
-/** Haulers the ladder buys while cash is idle: rubble clears at the fleet's pace, and a buried pit stalls every later shot. */
-const LADDER_MAX_HAULERS = 6;
 /** Shrink factors tried when a limit-sized pattern fits no free site, widest first. */
 const LADDER_SHRINK_STEPS = [1, 0.75, 0.5, 0.25] as const;
 const LADDER_RAMP_RETRY_KEY = 'gentle_ramp';
 const SOFTEST_SAFE_FACE_M = WALL_SAFE_FACE_HEIGHT_M_BY_TIER[1]!;
 
-/** Roles the ladder upgrades in place, in priority order: depth (rig), then ramp digging. Haulers are not upgraded: tier 2 climbs less steeply. */
-const LADDER_UPGRADE_ROLES: readonly VehicleRole[] = ['drill_rig', 'debris_hauler', 'rock_digger'];
+/**
+ * Roles the ladder upgrades in place, in priority order: depth (rig), then ramp digging. Haulers are not upgraded: tier 2 climbs
+ * less steeply, and a fleet upgraded around one licensed driver stalled the whole haul when that driver died (every order
+ * `licence_level_too_low`, income zero, bankrupt t19908).
+ */
+export const LADDER_UPGRADE_ROLES: readonly VehicleRole[] = ['drill_rig', 'rock_digger'];
 /** Cash kept back after an upgrade or a licence course: a stalled income must outlast the payroll it grew. */
 const LADDER_UPGRADE_RESERVE = 150_000;
 /** Ticks between hires made for a licence course: a fresh hire needs time to enrol and train before another is paid for. */
@@ -680,6 +712,10 @@ interface LadderMemory extends ReinvestMemory {
   barred: Array<Pattern & { span: number }>;
   /** Tick since which a pattern's drill orders have stayed buried under rubble; null when none is. */
   buriedSinceTick: number | null;
+  /** Tick since which a ramp order has stayed unreachable by every digger; null when none is. */
+  rampBlockedSinceTick: number | null;
+  /** Ramp lanes (`rampLaneKey`) cancelled as unreachable: later ramps pick another. */
+  bannedRamps: Set<string>;
   /** Hole depth cap (m) in force for the last shot. */
   holeCapM: number;
   /** Whether the last judged shot gained no pit depth and no new ore. */
@@ -932,7 +968,7 @@ function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
   const reachable = ([3, 2] as const).find(t => mayBuyVehicleTier(t, grade, 0));
   if (reachable !== undefined && m.rampSlope > tierSlopeRatio(reachable) && m.rampPending === null) {
     tryOnce(s, m, LADDER_RAMP_RETRY_KEY, () => {
-      const ramp = orderRamp(s, m.crater, m.crater.span, tierSlopeRatio(reachable));
+      const ramp = orderRamp(s, m.crater, m.crater.span, tierSlopeRatio(reachable), m.bannedRamps);
       if (ramp !== null) {
         m.rampPending = ramp.slope;
         recordRamp(m, m.crater, ramp);
@@ -1022,7 +1058,7 @@ function ladderCraterRamp(s: ProbeSession, m: LadderMemory): void {
   const needsWayIn = reach !== 'fire' && (sandboxRun(s) || gradeOf(s) >= LADDER_GATE_MIN_GRADE);
   if (deeper === 'skip' && (!needsWayIn || !affordable)) return;
   tryOnce(s, m, 'crater_ramp', () => {
-    const ramp = orderRamp(s, m.crater, m.crater.span, Math.min(RAMP_MAX_SLOPE, climb));
+    const ramp = orderRamp(s, m.crater, m.crater.span, Math.min(RAMP_MAX_SLOPE, climb), m.bannedRamps);
     if (ramp === null) return false;
     recordRamp(m, m.crater, ramp);
     m.rampedFloorM = Math.max(m.rampedFloorM, floorDepthM);
@@ -1087,10 +1123,38 @@ function gatedLadderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
 
 /** Another hauler (and its driver) while cash sits idle and the pit still holds rubble. */
 function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
-  const haulers = s.state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length;
   const cost = getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver;
-  if (haulers >= LADDER_MAX_HAULERS || s.state.cash - cost < LADDER_UPGRADE_RESERVE || onGroundMassKg(s.state.logistics) === 0) return;
+  if (decideLadderHaulerBuy({
+    haulers: s.state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length,
+    cash: s.state.cash, cost, reserve: LADDER_UPGRADE_RESERVE, rubbleKg: onGroundMassKg(s.state.logistics),
+  }) === 'skip') return;
   tryOnce(s, m, 'hauler', () => buyHauler(s));
+}
+
+/** Opt-in (PROBE_DIAG=1) one-line ladder state to stderr every PROBE_DIAG_TICKS ticks: why a run stalls reads off the line. */
+function ladderDiagnostics(s: ProbeSession, m: LadderMemory): void {
+  const every = Number(process.env['PROBE_DIAG_TICKS'] ?? 1000);
+  if (process.env['PROBE_DIAG'] !== '1' || s.state.tickCount % every !== 0) return;
+  const { state } = s;
+  const count = (f: (a: GameState['pendingActions'][number]) => boolean): number => state.pendingActions.filter(f).length;
+  const blocked: Record<string, number> = {};
+  for (const a of state.pendingActions) if (a.blockedReason) blocked[`${a.type}:${a.blockedReason}`] = (blocked[`${a.type}:${a.blockedReason}`] ?? 0) + 1;
+  const emps = state.employees.employees.filter(e => e.alive);
+  const idle = emps.filter(e => e.activeActionId === null && e.taskQueue.length === 0).length;
+  const counts = craterRubbleCounts(state, m.crater);
+  const hist: Record<string, number> = {};
+  for (const a of state.pendingActions) hist[a.type] = (hist[a.type] ?? 0) + 1;
+  const act = emps.filter(e => e.activeActionId !== null).map(e => `${e.id}:${state.pendingActions.find(a => a.id === e.activeActionId)?.type ?? 'x'}`);
+  console.error(`[diag-act t${state.tickCount}] pending=${JSON.stringify(hist)} active=${act.join(',')} detonation=${state.pendingDetonation !== null} `
+    + `charges=${Object.keys(state.chargesByHole).length}/${Object.keys(state.plannedChargesByHole).length} emp=${emps.map(e => `${e.id}${e.role.slice(0, 2)}f${Math.round(e.fatigue)}r${e.restTicksRemaining ?? '-'}q${e.taskQueue.length}${e.collapsing ? 'C' : ''}${e.trainingState ? 'T' : ''}${e.injured ? 'I' : ''}${e.locomotion?.kind ?? ''}`).join(' ')}`);
+  const plan = ladderPlan(s, m);
+  console.error(`[diag t${state.tickCount}] g${gradeOf(s)} blasts=${state.grade?.blastsFired} pit=${(state.grade?.deepestPitM ?? 0).toFixed(1)} `
+    + `cash=${Math.round(state.cash)} payroll/t=${Math.round(getOperatingCostPerHour(state).payroll)} emps=${emps.length} idle=${idle} `
+    + `rubbleKg=${Math.round(onGroundMassKg(state.logistics))} reachKg=${Math.round(reachableRubbleKg(state))} ore=${Math.round(state.grade?.oreDeliveredKg ?? 0)} `
+    + `haulOrders=${count(a => a.type === 'haul_debris')} shot=${m.shot !== null} patt=${state.plannedDrillHoles.length}/${state.drillHoles.length} `
+    + `barred=${m.barred.length} craterRubble=${counts.ordered}/${counts.orderless}/${counts.sealed} planCost=${Number.isFinite(plan.cost) ? Math.round(plan.cost) : 'inf'} wanted=${plan.wanted} `
+    + `fleet=${state.vehicles.vehicles.map(v => `${v.type.slice(0, 5)}${v.tier}:${vehicleDriverId(v) ?? '-'}`).join(',')} `
+    + `lic=${emps.map(e => `${e.id}${e.role.slice(0, 2)}${licenceLevelOfSkill(e.qualifications, ROLE_LICENCE_REQUIRED.debris_hauler)}`).join(',')} blocked=${JSON.stringify(blocked)}`);
 }
 
 function runLadder(s: ProbeSession, maxGrade: number | null): void {
@@ -1098,7 +1162,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {},
-    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.ramp.slope, ramps: {}, rampPending: null, rampedFloorM: 0, maxGrade, barred: [], buriedSinceTick: null,
+    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.ramp.slope, ramps: {}, rampPending: null, rampedFloorM: 0, maxGrade, barred: [], buriedSinceTick: null, rampBlockedSinceTick: null, bannedRamps: new Set(),
     holeCapM: ladderHoleDepthM(s), lastShotFailed: false, dudStreak: 0, judgedShots: 1,
     before: { pitM: 0, oreKg: 0 },
   };
@@ -1109,6 +1173,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     ladderSpoil(s, m);
     ladderSafety(s, m);
     dropUnreachablePattern(s, m);
+    dropStaleRamp(s, m);
     reinvestShot(s, m, () => gatedLadderPlan(s, m));
     trackLadderShot(s, m);
     const last = m.origins[m.origins.length - 1]!;
@@ -1120,6 +1185,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     ladderEquipment(s, m);
     const need = ladderPlan(s, m);
     if (!Number.isFinite(need.cost)) upgradeBuilding(s, m, 'explosive_warehouse');
+    ladderDiagnostics(s, m);
   });
 }
 
