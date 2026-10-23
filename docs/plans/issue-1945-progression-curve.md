@@ -329,3 +329,22 @@ An armed detonation was cancelled "cannot leave the blast zone" when an in-zone 
 `findSafeEvacuationCell` proved reachability with a relaxed `findPath`, but `Locomotion.planPath` used `findFootPathWithVehicleFallback`, whose fallback rejects
 relaxed routes crossing fragment cells (#954/#1090), so the walker stuck and the phase read 'stranded'. `Zone.clearZone` now passes `crossFragments: true`; the flag is stamped on the leg
 (`Leg.crossesFragments`) so the cost estimate and the executor agree. Every other caller keeps the fragment guard; blocked/void rings stay stranded.
+
+## 2026-10-23 re-measure on merged main (#2076)
+
+Branch policy (`decideBuriedPattern`, `decideLadderShotSide`, `siteHoldsOre`, building keep-out) merged with main's #2077 (evacuating walkers cross rubble), #2082 (auto access ramp) and #2084 (g2 shot side keeps limit size).
+Seed 42, desert_badlands, full kit, ladder, horizon 50,000, no balance constant moved. Probe policy unchanged by this re-measure.
+
+| run | g1 | g2 | g3-5 | cash@3k | cash@6k | cash@10k | cash@15k | blasts | boulder ore sold | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder, 50,000 horizon | 968 | 2452 | not reached | 4.29 M | 9.91 M | 7.75 M | 3.82 M | 4 | 51% | bankrupt t19908 (low cash -69,456, final cash below zero) |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| ladder survives 50,000 ticks | bankrupt t19908 (was t28359 before the main merge) | MISSED |
+| grade 3 at t8,000-14,000 | not reached | MISSED |
+| grade 4-5 | not reached | MISSED |
+
+Limit: only 4 blasts fire in 19,900 ticks, so after g2 income is flat while payroll drains about 9 M by t15,000. Deepening needs a crater with no ordered rubble; no ore yield or depth arrives to
+lift the grade-3 gate. Not fixable from probe policy alone without per-tick instrumentation (a run costs about 12 minutes of wall clock); the remaining lever is the balance side (`MINE_GRADES`,
+`BUYER_*`, payroll vs. income) tracked in #2072 / #2063. #2076 lands the policy pieces and tests; survival and g3 stay open under #2072.
