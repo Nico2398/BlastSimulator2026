@@ -9,6 +9,7 @@ import {
 import { slopeDegreesForRatio } from '../nav/ClimbLimit.js';
 import { computeRampCost, rampDefFromLegs, rampFootOffset, validateRampOrder, type RampDef } from './Ramp.js';
 import { RAMP_DIR_OFFSETS, findRampPathFault, rampPathOf, type RampDirection, type RampFootprint } from './RampPath.js';
+import { rampFootprint } from './RampWidening.js';
 import { isPitRim, proposeRampSpiral, type SpiralSurface } from './RampSpiral.js';
 
 /** A cluster of unreachable order targets sharing one deepened floor. */
@@ -91,12 +92,19 @@ function floorOf(cells: ReadonlyArray<{ x: number; z: number; y: number }>, memb
   return { x: best.x, z: best.z, floorY, orderCount: members.length };
 }
 
+/** True when the ramp's footprint shares a tile with any stuck ramp's footprint (inclusive rectangles). */
+function overlapsAny(def: RampDef, width: RampWidth, avoid: readonly RampFootprint[]): boolean {
+  if (avoid.length === 0) return false;
+  const f = rampFootprint(def, width);
+  return avoid.some(a => f.minX <= a.maxX && f.maxX >= a.minX && f.minZ <= a.maxZ && f.maxZ >= a.minZ);
+}
+
 /**
  * Straight ramp ending on the floor tile, starting on the nearest reachable cell along one of four axes
  * whose grade stays within `limitRatio`. Shorter first, so a built ramp's foot beats the rim.
  */
 function planStraight(
-  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth,
+  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, avoid: readonly RampFootprint[],
 ): { plan: CraterAccessPlan | null; sawShallow: boolean } {
   const fx = Math.round(floor.x);
   const fz = Math.round(floor.z);
@@ -115,6 +123,7 @@ function planStraight(
       if (Math.abs(rampFootOffset(startGround, floor.floorY, drop, length)) > RAMP_FLOOR_SNAP_REACH_M) continue;
       const def: RampDef = { originX: sx, originZ: sz, direction, length, targetDepth: drop, width };
       if (findRampPathFault(rampPathOf(def), width) !== null) continue;
+      if (overlapsAny(def, width, avoid)) continue;
       const check = validateRampOrder(def, Infinity);
       if (!check.success) continue;
       return {
@@ -145,7 +154,9 @@ function* reachableRimStarts(floor: StrandedFloor, surface: AccessSurface): Gene
 }
 
 /** Spiral road down a pit wall from the nearest reachable rim tile, when no straight start exists. */
-function planSpiral(floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth): CraterAccessPlan | null {
+function planSpiral(
+  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, avoid: readonly RampFootprint[],
+): CraterAccessPlan | null {
   const gradeDegrees = Math.max(0.1, Math.floor(slopeDegreesForRatio(limitRatio) * 10) / 10);
   let attempts = 0;
   for (const start of reachableRimStarts(floor, surface)) {
@@ -159,6 +170,7 @@ function planSpiral(floor: StrandedFloor, surface: AccessSurface, limitRatio: nu
     const p = result.proposal;
     const def = rampDefFromLegs({ x: p.originX, z: p.originZ }, p.legs, p.depth, width);
     def.gradeDegrees = p.gradeDegrees;
+    if (overlapsAny(def, width, avoid)) continue;
     const check = validateRampOrder(def, Infinity);
     if (!check.success) continue;
     return { ok: true, def, cost: computeRampCost(p.totalLength, width), gradeDegrees: p.gradeDegrees };
@@ -172,13 +184,13 @@ export function planCraterAccess(
   surface: AccessSurface,
   maxClimbRatio: number,
   width: RampWidth,
-  _avoid?: readonly RampFootprint[],
+  avoid: readonly RampFootprint[] = [],
 ): CraterAccessPlan {
   const limitRatio = maxClimbRatio * CRATER_ACCESS_MAX_GRADE_MARGIN;
   if (!(limitRatio > 0) || !Number.isFinite(floor.floorY)) return { ok: false, reasonKey: `${KEY}no_start` };
-  const straight = planStraight(floor, surface, limitRatio, width);
+  const straight = planStraight(floor, surface, limitRatio, width, avoid);
   if (straight.plan !== null) return straight.plan;
-  const spiral = planSpiral(floor, surface, limitRatio, width);
+  const spiral = planSpiral(floor, surface, limitRatio, width, avoid);
   if (spiral !== null) return spiral;
   return { ok: false, reasonKey: `${KEY}${straight.sawShallow ? 'too_shallow' : 'no_start'}` };
 }

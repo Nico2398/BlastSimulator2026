@@ -305,3 +305,15 @@ An armed detonation was cancelled "cannot leave the blast zone" when an in-zone 
 `findSafeEvacuationCell` proved reachability with a relaxed `findPath`, but `Locomotion.planPath` used `findFootPathWithVehicleFallback`, whose fallback rejects
 relaxed routes crossing fragment cells (#954/#1090), so the walker stuck and the phase read 'stranded'. `Zone.clearZone` now passes `crossFragments: true`; the flag is stamped on the leg
 (`Leg.crossesFragments`) so the cost estimate and the executor agree. Every other caller keeps the fragment guard; blocked/void rings stay stranded.
+
+## 2026-10-23 note: stranded crater access (#2085)
+
+After #2082 the ladder probe stalled at ~10.2 m: blocked `dig_ramp_segment` orders suppressed every later access ramp and ~1,000 `debris_out_of_reach` haul orders never cleared.
+`syncCraterAccess` now ignores blocked segments (`hasLiveRampWork`), has the planner avoid footprints of fully blocked ramps (`blockedRampFootprints` -> `planCraterAccess(..., avoid)`),
+and cancels debris orders of floors unplannable for `CRATER_ACCESS_ABANDON_DEBRIS_TICKS` (`pruneAbandonedDebris`; fragments marked so dispatch does not re-queue them until the next access ramp is ordered).
+Ramp reachability already ignores fragment occupancy and drive legs cross fragments, so no reachability change was needed. Rules: `gameplay-navmesh`, "Crater access".
+
+Probe after #2085 (seed 42 desert_badlands full ladder, 14,000-tick horizon): still g1@968, g2@2452, bankrupt t11,919 after 4 blasts; the 20 m depth is NOT reached.
+Instrumented diagnosis (instrumentation reverted): the only `rock_digger` ends parked, driverless, on a crater floor (surface 8.5 m) cut off from the site network by the unfinished ramp. `fillPool` in `OrderReachability.ts` counts a vehicle as an
+actor only when its driver is a candidate or its cell is in the employees' on-foot reach, so every `dig_ramp_segment` reads `target_unreachable` (all 44-57 segments blocked) even though a climb labelling from the digger itself reaches the targets.
+Nobody can board the digger, so the ramp that would free it can never be dug: a deadlock that planner avoidance and debris pruning cannot resolve. Separately, a probe-placed Driving Center at (8,8) walls the rally yard on this seed.
