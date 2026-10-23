@@ -8,7 +8,7 @@ import {
 } from '../config/balance.js';
 import { slopeDegreesForRatio } from '../nav/ClimbLimit.js';
 import { computeRampCost, rampDefFromLegs, rampFootOffset, validateRampOrder, type RampDef } from './Ramp.js';
-import { RAMP_DIR_OFFSETS, findRampPathFault, rampPathOf, type RampDirection } from './RampPath.js';
+import { RAMP_DIR_OFFSETS, findRampPathFault, rampPathOf, type RampDirection, type RampFootprint } from './RampPath.js';
 import { isPitRim, proposeRampSpiral, type SpiralSurface } from './RampSpiral.js';
 
 /** A cluster of unreachable order targets sharing one deepened floor. */
@@ -172,6 +172,7 @@ export function planCraterAccess(
   surface: AccessSurface,
   maxClimbRatio: number,
   width: RampWidth,
+  _avoid?: readonly RampFootprint[],
 ): CraterAccessPlan {
   const limitRatio = maxClimbRatio * CRATER_ACCESS_MAX_GRADE_MARGIN;
   if (!(limitRatio > 0) || !Number.isFinite(floor.floorY)) return { ok: false, reasonKey: `${KEY}no_start` };

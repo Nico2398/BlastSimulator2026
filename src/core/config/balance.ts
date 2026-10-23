@@ -3384,3 +3384,7 @@ export const CRATER_ACCESS_MAX_GRADE_MARGIN = 0.9;
 export const CRATER_ACCESS_CLUSTER_GAP_CELLS = 6;
 /** Candidate pit-rim starts a crater access plan tries with the spiral backend before giving up. */
 export const CRATER_ACCESS_SPIRAL_START_ATTEMPTS = 6;
+/** Ticks a stranded floor may stay unplannable before its debris_out_of_reach auto-debris orders are cancelled. */
+export const CRATER_ACCESS_ABANDON_DEBRIS_TICKS = 600;
+/** Ticks a crater access ramp order may stay fully blocked before planners route around its footprint. */
+export const CRATER_ACCESS_STUCK_RAMP_TICKS = 1200;
