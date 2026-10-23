@@ -67,6 +67,27 @@ describe('decideLadderShotSide', () => {
       .toBe(Math.min(8, LADDER_G2_MAX_SIDE));
   });
 
+  // #2080: a clean grade-2+ shot of side 3 (9 holes) starves ore yield; the Shareholder Summit
+  // competent run then ends game_over:worker_revolt. Measured: any cap >= 4 passes. 4 is the floor
+  // of starvation, so the clean side must reach it whenever the permit limit allows.
+  const STARVATION_FLOOR_SIDE = 4;
+
+  it('keeps clean grade-2+ shots at or above the starvation floor given a large limit', () => {
+    for (const grade of [LADDER_GATE_MIN_GRADE, LADDER_GATE_MIN_GRADE + 1, 3, 4, 5]) {
+      expect(decideLadderShotSide({ ...clean, limitSide: 8, grade })).toBeGreaterThanOrEqual(STARVATION_FLOOR_SIDE);
+      expect(decideLadderShotSide({ ...clean, limitSide: 20, grade })).toBeGreaterThanOrEqual(STARVATION_FLOOR_SIDE);
+    }
+    expect(LADDER_G2_MAX_SIDE).toBeGreaterThanOrEqual(STARVATION_FLOOR_SIDE);
+  });
+
+  it('still shrinks strictly below the floor-sized clean shot on failure and sealed rubble', () => {
+    const cleanSide = decideLadderShotSide({ ...clean, limitSide: 8, grade: 3 });
+    expect(cleanSide).toBeGreaterThanOrEqual(STARVATION_FLOOR_SIDE);
+    expect(decideLadderShotSide({ ...clean, lastShotFailed: true, limitSide: 8, grade: 3 })).toBeLessThan(cleanSide);
+    expect(decideLadderShotSide({ ...clean, sealedRubbleCount: LADDER_SEALED_SHRINK_COUNT, limitSide: 8, grade: 3 }))
+      .toBeLessThan(cleanSide);
+  });
+
   it('shrinks strictly after a failed shot', () => {
     const cleanSide = decideLadderShotSide({ ...clean, limitSide: 8, grade: 2 });
     const failed = decideLadderShotSide({ ...clean, lastShotFailed: true, limitSide: 8, grade: 2 });
