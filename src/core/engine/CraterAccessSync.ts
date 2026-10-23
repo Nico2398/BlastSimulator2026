@@ -92,7 +92,7 @@ export function syncCraterAccess(state: GameState, grid?: VoxelGrid | null): voi
   let affordabilityBlocked = false;
   const unplannable: StrandedFloor[] = [];
   for (const floor of floors) {
-    const plan = planCraterAccess(floor, surface, slowestVehicleTierSlopeRatio(), RAMP_DEFAULT_WIDTH, avoid);
+    const plan = planCraterAccess(floor, surface, slowestVehicleTierSlopeRatio(), RAMP_DEFAULT_WIDTH, avoid, state.builtRamps);
     if (!plan.ok) { unplannable.push(floor); continue; }
     if (state.cash - plan.cost < reserve) { affordabilityBlocked = true; continue; }
     const segments = defineRampSegments(grid, plan.def);

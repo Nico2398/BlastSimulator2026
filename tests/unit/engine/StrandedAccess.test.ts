@@ -64,8 +64,11 @@ describe('pruneAbandonedDebris', () => {
   const OTHER: StrandedFloor = { x: 70, z: 70, floorY: -8, orderCount: 5 };
   const ABANDON = CRATER_ACCESS_ABANDON_DEBRIS_TICKS;
 
-  function stateWith(...orders: PendingAction[]): Pick<GameState, 'pendingActions'> {
-    return { pendingActions: orders };
+  // A full game: pruning cancels through cancelAction, which releases reservations and ghosts on the whole state.
+  function stateWith(...orders: PendingAction[]): GameState {
+    const state = createGame({ seed: 42 });
+    state.pendingActions = orders;
+    return state;
   }
 
   const stuckHaul = (x = 42, z = 42) => action('haul_debris', x, z, { blockedReason: 'debris_out_of_reach' });

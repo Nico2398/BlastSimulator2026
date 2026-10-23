@@ -3391,5 +3391,3 @@ export const CRATER_ACCESS_ABANDON_DEBRIS_TICKS = 600;
  * stays put before it is brought back to the crew (#2085). Long enough that a ramp being dug to the floor wins the race.
  */
 export const STRANDED_RECOVERY_TICKS = 300;
-/** Ticks a crater access ramp order may stay fully blocked before planners route around its footprint. */
-export const CRATER_ACCESS_STUCK_RAMP_TICKS = 1200;

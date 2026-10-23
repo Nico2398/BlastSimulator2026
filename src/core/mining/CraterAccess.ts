@@ -4,11 +4,11 @@
 
 import {
   CRATER_ACCESS_MAX_GRADE_MARGIN, CRATER_ACCESS_SPIRAL_START_ATTEMPTS, MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M,
-  RAMP_FLOOR_SNAP_REACH_M, RAMP_SPIRAL_MAX_PIT_SPAN_M, type RampWidth,
+  RAMP_FLOOR_SNAP_REACH_M, RAMP_SPIRAL_MAX_PIT_SPAN_M, RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth,
 } from '../config/balance.js';
 import { slopeDegreesForRatio } from '../nav/ClimbLimit.js';
 import { computeRampCost, rampDefFromLegs, rampFootOffset, validateRampOrder, type RampDef } from './Ramp.js';
-import { RAMP_DIR_OFFSETS, findRampPathFault, rampPathOf, type RampDirection, type RampFootprint } from './RampPath.js';
+import { RAMP_DIR_OFFSETS, findRampPathFault, rampPathOf, rampWaypoints, type RampDirection, type RampFootprint } from './RampPath.js';
 import { rampFootprint } from './RampWidening.js';
 import { isPitRim, proposeRampSpiral, type SpiralSurface } from './RampSpiral.js';
 
@@ -92,6 +92,12 @@ function floorOf(cells: ReadonlyArray<{ x: number; z: number; y: number }>, memb
   return { x: best.x, z: best.z, floorY, orderCount: members.length };
 }
 
+/** A ramp already dug, as the planner compares it. */
+type DugRamp = { def: RampDef; width: RampWidth };
+
+const rampKey = (def: RampDef, width: RampWidth): string =>
+  `${JSON.stringify(rampPathOf(def))}|${def.targetDepth}|${width}`;
+
 /** True when the ramp's footprint shares a tile with any stuck ramp's footprint (inclusive rectangles). */
 function overlapsAny(def: RampDef, width: RampWidth, avoid: readonly RampFootprint[]): boolean {
   if (avoid.length === 0) return false;
@@ -99,12 +105,14 @@ function overlapsAny(def: RampDef, width: RampWidth, avoid: readonly RampFootpri
   return avoid.some(a => f.minX <= a.maxX && f.maxX >= a.minX && f.minZ <= a.maxZ && f.maxZ >= a.minZ);
 }
 
+type Excluded = (def: RampDef) => boolean;
+
 /**
  * Straight ramp ending on the floor tile, starting on the nearest reachable cell along one of four axes
  * whose grade stays within `limitRatio`. Shorter first, so a built ramp's foot beats the rim.
  */
 function planStraight(
-  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, avoid: readonly RampFootprint[],
+  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded,
 ): { plan: CraterAccessPlan | null; sawShallow: boolean } {
   const fx = Math.round(floor.x);
   const fz = Math.round(floor.z);
@@ -123,7 +131,7 @@ function planStraight(
       if (Math.abs(rampFootOffset(startGround, floor.floorY, drop, length)) > RAMP_FLOOR_SNAP_REACH_M) continue;
       const def: RampDef = { originX: sx, originZ: sz, direction, length, targetDepth: drop, width };
       if (findRampPathFault(rampPathOf(def), width) !== null) continue;
-      if (overlapsAny(def, width, avoid)) continue;
+      if (excluded(def)) continue;
       const check = validateRampOrder(def, Infinity);
       if (!check.success) continue;
       return {
@@ -153,9 +161,27 @@ function* reachableRimStarts(floor: StrandedFloor, surface: AccessSurface): Gene
   }
 }
 
+/**
+ * True when ground at the floor's level lies within the spiral's rim gap of its last tile (#2085). A spiral rings the
+ * whole void its start sees; round a pit nested in a wider one that ring hugs the outer pit, and its foot ends at the
+ * right depth beside nothing, so digging it never frees the floor and the same floor is re-planned forever.
+ */
+function footMeetsFloor(def: RampDef, floor: StrandedFloor, surface: AccessSurface, width: RampWidth): boolean {
+  const foot = rampWaypoints(rampPathOf(def)).at(-1)!;
+  const reach = (RAMP_SPIRAL_RIM_GAP_WIDTHS + 1) * width;
+  for (let dz = -reach; dz <= reach; dz++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+      const x = foot.x + dx;
+      const z = foot.z + dz;
+      if (surface.contains(x, z) && Math.abs(surface.heightAt(x, z) - floor.floorY) <= RAMP_FLOOR_SNAP_REACH_M) return true;
+    }
+  }
+  return false;
+}
+
 /** Spiral road down a pit wall from the nearest reachable rim tile, when no straight start exists. */
 function planSpiral(
-  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, avoid: readonly RampFootprint[],
+  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded,
 ): CraterAccessPlan | null {
   const gradeDegrees = Math.max(0.1, Math.floor(slopeDegreesForRatio(limitRatio) * 10) / 10);
   let attempts = 0;
@@ -170,7 +196,7 @@ function planSpiral(
     const p = result.proposal;
     const def = rampDefFromLegs({ x: p.originX, z: p.originZ }, p.legs, p.depth, width);
     def.gradeDegrees = p.gradeDegrees;
-    if (overlapsAny(def, width, avoid)) continue;
+    if (excluded(def) || !footMeetsFloor(def, floor, surface, width)) continue;
     const check = validateRampOrder(def, Infinity);
     if (!check.success) continue;
     return { ok: true, def, cost: computeRampCost(p.totalLength, width), gradeDegrees: p.gradeDegrees };
@@ -185,12 +211,16 @@ export function planCraterAccess(
   maxClimbRatio: number,
   width: RampWidth,
   avoid: readonly RampFootprint[] = [],
+  built: readonly DugRamp[] = [],
 ): CraterAccessPlan {
   const limitRatio = maxClimbRatio * CRATER_ACCESS_MAX_GRADE_MARGIN;
   if (!(limitRatio > 0) || !Number.isFinite(floor.floorY)) return { ok: false, reasonKey: `${KEY}no_start` };
-  const straight = planStraight(floor, surface, limitRatio, width, avoid);
+  // A plan identical to a dug ramp carves nothing new: re-ordering it would loop forever on a floor it never reached (#2085).
+  const builtKeys = new Set(built.map(b => rampKey(b.def, b.width)));
+  const excluded: Excluded = def => builtKeys.has(rampKey(def, width)) || overlapsAny(def, width, avoid);
+  const straight = planStraight(floor, surface, limitRatio, width, excluded);
   if (straight.plan !== null) return straight.plan;
-  const spiral = planSpiral(floor, surface, limitRatio, width, avoid);
+  const spiral = planSpiral(floor, surface, limitRatio, width, excluded);
   if (spiral !== null) return spiral;
   return { ok: false, reasonKey: `${KEY}${straight.sawShallow ? 'too_shallow' : 'no_start'}` };
 }

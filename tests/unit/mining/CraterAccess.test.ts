@@ -213,4 +213,49 @@ describe('planCraterAccess', () => {
       expect(planCraterAccess(centreFloor(PIT), s(), MAX_RATIO, 3, [far])).toEqual(a);
     });
   });
+
+  describe('ramps that would free nothing (#2085)', () => {
+    /** Only a two-tile band of surface round `pit` is on the network, so no straight ramp is gentle enough. */
+    const rimOnly = (pit: Pit) => (x: number, z: number) =>
+      !inPit(pit, x, z) && x >= pit.x0 - 2 && x < pit.x0 + pit.w + 2 && z >= pit.z0 - 2 && z < pit.z0 + pit.h + 2;
+    const OUTER: Pit = { x0: 20, z0: 20, w: 30, h: 30, depth: 8 };
+    const INNER: Pit = { x0: 32, z0: 32, w: 6, h: 6, depth: 16 };
+    /** Too deep for a straight ramp from the rim band. */
+    const SINGLE: Pit = { x0: 20, z0: 20, w: 30, h: 30, depth: 14 };
+    const nested: AccessSurface = {
+      heightAt: (x, z) => (inPit(INNER, x, z) ? -INNER.depth : inPit(OUTER, x, z) ? -OUTER.depth : 0),
+      contains: (x, z) => x >= AREA.min && x < AREA.max && z >= AREA.min && z < AREA.max,
+      reachableFrom: rimOnly(OUTER),
+    };
+
+    it('plans a spiral down a single pit wall when no straight start exists', () => {
+      const plan = planCraterAccess(centreFloor(SINGLE), surface(SINGLE, rimOnly(SINGLE)), MAX_RATIO, 3);
+      expect(plan.ok).toBe(true);
+      if (plan.ok) expect(plan.def.legs?.length ?? 1).toBeGreaterThan(1);
+    });
+
+    it('refuses a spiral round an outer pit whose foot ends nowhere near the nested floor', () => {
+      const plan = planCraterAccess(centreFloor(INNER), nested, MAX_RATIO, 3);
+      expect(plan.ok).toBe(false);
+    });
+
+    it('never re-plans a ramp identical to one already dug, but still plans another', () => {
+      const first = planCraterAccess(centreFloor(PIT), surface(PIT, outsidePit(PIT)), MAX_RATIO, 3);
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      const second = planCraterAccess(centreFloor(PIT), surface(PIT, outsidePit(PIT)), MAX_RATIO, 3, [], [{ def: first.def, width: 3 }]);
+      expect(second.ok).toBe(true);
+      if (second.ok) expect(second.def).not.toEqual(first.def);
+    });
+
+    it('never repeats a dug spiral either', () => {
+      const first = planCraterAccess(centreFloor(SINGLE), surface(SINGLE, rimOnly(SINGLE)), MAX_RATIO, 3);
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      const dug = [{ def: first.def, width: 3 as const }];
+      const again = planCraterAccess(centreFloor(SINGLE), surface(SINGLE, rimOnly(SINGLE)), MAX_RATIO, 3, [], dug);
+      if (again.ok) expect(again.def).not.toEqual(first.def);
+      else expect(again.reasonKey.length).toBeGreaterThan(0);
+    });
+  });
 });

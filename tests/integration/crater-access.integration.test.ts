@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { makeCraterSite, dropRubble, cutPit, type Pit } from '../helpers/craterAccessFixture.js';
 import { tickUntilFresh } from '../helpers/blastFixtures.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
-import { CRATER_ACCESS_RECHECK_TICKS } from '../../src/core/config/balance.js';
+import { CRATER_ACCESS_ABANDON_DEBRIS_TICKS, CRATER_ACCESS_RECHECK_TICKS } from '../../src/core/config/balance.js';
 import { addBlastFragments } from '../../src/core/economy/Logistics.js';
 import { makeRubbleFragment } from '../helpers/blastFixtures.js';
 
@@ -78,7 +78,11 @@ describe('deepened crater with a buried first ramp (#2085)', () => {
   const DEEP: Pit = { x0: 44, z0: 44, size: 6, drop: 16 };
   const SETTLE_TICKS = 9000;
 
-  it('clears every stranded auto-debris order and digs a second ramp past the buried one', () => {
+  // The inner pit sits 8 m below a 12 m wide outer floor: no straight ramp fits the slowest tier's grade inside a
+  // 64-cell site, and a spiral rings the whole outer pit and ends nowhere near the inner floor. The floor is
+  // unplannable, so its debris is abandoned after CRATER_ACCESS_ABANDON_DEBRIS_TICKS instead of ordering
+  // useless ramps forever (an earlier build dug 40+ identical spirals here and drained the cash).
+  it('abandons the stranded auto-debris of an unplannable deepened floor without digging useless ramps', () => {
     const site = makeCraterSite([PIT]);
     dropRubble(site, PIT, 8);
     const { state, run } = site;
@@ -104,10 +108,17 @@ describe('deepened crater with a buried first ramp (#2085)', () => {
     const strandedAuto = () => state.pendingActions.filter(a =>
       (a.type === 'haul_debris' || a.type === 'fragment_debris')
       && a.blockedReason === 'debris_out_of_reach' && inPit(a.targetX, a.targetZ));
-    tickUntilFresh(run, state, () => state.builtRamps.length >= 2 && strandedAuto().length === 0, SETTLE_TICKS);
+    tickUntilFresh(run, state, () => false, 2);
+    expect(strandedAuto().length).toBeGreaterThan(0);
+    const cutTick = state.tickCount;
+    tickUntilFresh(run, state, () => strandedAuto().length === 0, SETTLE_TICKS);
 
-    expect(state.builtRamps.length).toBeGreaterThanOrEqual(2);
     expect(strandedAuto()).toEqual([]);
+    expect(state.tickCount - cutTick).toBeGreaterThanOrEqual(CRATER_ACCESS_ABANDON_DEBRIS_TICKS);
+    expect(state.builtRamps).toHaveLength(1);
+    expect(state.plannedRamps).toHaveLength(0);
+    const rampSpend = state.finances.transactions.filter(e => e.type === 'expense' && e.category === 'construction' && e.tick >= cutTick);
+    expect(rampSpend).toEqual([]);
     expect(state.plannedRamps.every(r => r.segments.some(sg => !sg.done))).toBe(true);
     expectNoWorldInvariantViolations(state);
   });

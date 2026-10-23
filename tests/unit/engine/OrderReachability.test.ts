@@ -1568,14 +1568,21 @@ describe('ramp covered by crater fragments (#2085)', () => {
     };
   }
 
-  /** Digger in A; a ramp lies beyond the sealed wall, its columns and the wall itself buried under fragments. */
-  function stageBuriedRamp(): { state: GameState; id: number } {
-    const state = makeState();
+  /**
+   * Digger in A; a ramp lies beyond the WALL_X column, which is buried under fragments along with the ramp's
+   * own columns. By default the column is rubble only (no building), so rubble is all that separates digger
+   * and ramp; `sealed` keeps the impassable wall under it, so the far side is genuinely cut off.
+   */
+  function stageBuriedRamp(sealed = false): { state: GameState; id: number } {
+    const state = makeState(sealed);
     hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_digger, 'driving.excavator']);
     purchaseVehicle(state.vehicles, 'rock_digger', IN_A.x, IN_A.z);
     const cells = RAMP_X.map(x => ({ x, y: 0, z: RAMP_Z }));
-    const covered = [WALL_X, ...RAMP_X];
-    addBlastFragments(state.logistics, covered.map((x, i) => rubble(i + 1, x, RAMP_Z)), state.navGrid);
+    const covered = [
+      ...RAMP_X.map(x => ({ x, z: RAMP_Z })),
+      ...Array.from({ length: HEIGHT }, (_, z) => ({ x: WALL_X, z })),
+    ];
+    addBlastFragments(state.logistics, covered.map((c, i) => rubble(i + 1, c.x, c.z)), state.navGrid);
     const id = queue(state, 'dig_ramp_segment', { x: 13, z: RAMP_Z }, {
       requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger',
       payload: { rampId: 1, segmentIndex: 0, cells, region: null },
@@ -1604,7 +1611,7 @@ describe('ramp covered by crater fragments (#2085)', () => {
   });
 
   it('a haul_debris order on the sealed cell still stays debris_out_of_reach', () => {
-    const { state } = stageBuriedRamp();
+    const { state } = stageBuriedRamp(true);
     hire(state, { x: IN_A.x + 1, z: IN_A.z }, [ROLE_LICENCE_REQUIRED.debris_hauler]);
     purchaseVehicle(state.vehicles, 'debris_hauler', IN_A.x + 1, IN_A.z);
     const haul = queue(state, 'haul_debris', { x: 13, z: RAMP_Z }, { requiredVehicleRole: 'debris_hauler', payload: { fragmentId: 3 } });

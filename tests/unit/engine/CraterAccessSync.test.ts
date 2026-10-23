@@ -9,6 +9,7 @@ import { tickUntilFresh } from '../../helpers/blastFixtures.js';
 import { CRATER_ACCESS_MIN_STRANDED_ORDERS, CRATER_ACCESS_RECHECK_TICKS } from '../../../src/core/config/balance.js';
 import type { PlannedRamp } from '../../../src/core/state/GameState.js';
 import { strandedDebrisTargets } from '../../../src/core/engine/OrderReachability.js';
+import { hasLiveRampWork } from '../../../src/core/engine/StrandedAccess.js';
 
 const PIT: Pit = { x0: 40, z0: 40, size: 12, drop: 8 };
 /** One recheck window, plus a tick of classification lag before the first scan can see the orders. */
@@ -156,8 +157,11 @@ describe('syncCraterAccess with blocked ramp segments (#2085)', () => {
     const constructionSpend = () => site.state.finances.transactions.filter(e => e.type === 'expense' && e.category === 'construction').length;
     const ordered = constructionSpend();
     for (const a of rampOrders(site)) if (a.blockedReason !== 'target_unreachable') a.status = 'queued';
-    tickUntilFresh(site.run, site.state, () => false, CRATER_ACCESS_RECHECK_TICKS * 2);
-    // The crew may finish the player's ramp meanwhile; what must not happen is a second, automatic order.
+    // Tick only while the player's ramp is live: once the crew finishes it, just the blocked segments remain,
+    // and those must not suppress an access ramp (the floor is still stranded), so a later order is correct.
+    const start = site.state.tickCount;
+    tickUntilFresh(site.run, site.state, () => !hasLiveRampWork(site.state.pendingActions), CRATER_ACCESS_RECHECK_TICKS * 2);
+    expect(site.state.tickCount - start).toBeGreaterThanOrEqual(CRATER_ACCESS_RECHECK_TICKS + 1); // at least two scans saw it live
     expect(constructionSpend()).toBe(ordered);
   });
 });

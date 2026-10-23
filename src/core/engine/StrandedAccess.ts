@@ -11,9 +11,17 @@ import { cancelAction } from './TaskCancellation.js';
 /** Chebyshev reach (cells) from a floor's representative cell within which its debris orders belong to it. */
 const FLOOR_REACH_CELLS = CRATER_ACCESS_CLUSTER_GAP_CELLS * 2;
 
-/** True when a dig_ramp_segment order is pending AND not stamped blocked (target_unreachable etc.). */
+/**
+ * True for a dig_ramp_segment order that is queued, unheld and stamped blocked (target_unreachable etc.).
+ * Only queued orders are reclassified, so a held order can carry a stale stamp from before its claim: it is live.
+ */
+function isStuckRampSegment(a: PendingAction): boolean {
+  return a.type === 'dig_ramp_segment' && a.holderId === null && a.status === 'queued' && (a.blockedReason ?? null) !== null;
+}
+
+/** True when some dig_ramp_segment order is pending and not stuck (see `isStuckRampSegment`). */
 export function hasLiveRampWork(pending: ReadonlyArray<PendingAction>): boolean {
-  return pending.some(a => a.type === 'dig_ramp_segment' && (a.blockedReason ?? null) === null);
+  return pending.some(a => a.type === 'dig_ramp_segment' && !isStuckRampSegment(a));
 }
 
 /** First tick each unplannable floor was seen, per state; a floor that leaves the list loses its clock. */
@@ -60,11 +68,11 @@ export function pruneAbandonedDebris(
   return removed;
 }
 
-/** Footprints of planned ramps whose every remaining segment is blocked; planners avoid these. */
+/** Footprints of planned ramps whose every remaining segment is stuck (blocked and unheld); planners avoid these. */
 export function blockedRampFootprints(state: Pick<GameState, 'plannedRamps' | 'pendingActions'>): RampFootprint[] {
   const blockedActions = new Set<number>();
   for (const a of state.pendingActions) {
-    if (a.type === 'dig_ramp_segment' && (a.blockedReason ?? null) !== null) blockedActions.add(a.id);
+    if (isStuckRampSegment(a)) blockedActions.add(a.id);
   }
   if (blockedActions.size === 0) return [];
   const out: RampFootprint[] = [];
