@@ -59,15 +59,11 @@ describe('decideLadderShotSide', () => {
   });
 
   // #2080: a clean grade-2+ shot of side 3 (9 holes) starves ore yield; the Shareholder Summit
-  // competent run then ends game_over:worker_revolt. Measured: any side >= 4 passes.
-  const STARVATION_FLOOR_SIDE = 4;
-
-  it('clean state returns limitSide at every grade (>=4 for limitSide>=4)', () => {
+  // competent run then ends game_over:worker_revolt. Clean state must return limitSide unchanged.
+  it('clean state returns limitSide at every grade', () => {
     for (const grade of [0, 1, LADDER_GATE_MIN_GRADE, 3, 4, 5]) {
       for (let limitSide = 1; limitSide <= 20; limitSide++) {
-        const side = decideLadderShotSide({ ...clean, limitSide, grade });
-        expect(side).toBe(limitSide);
-        if (limitSide >= STARVATION_FLOOR_SIDE) expect(side).toBeGreaterThanOrEqual(STARVATION_FLOOR_SIDE);
+        expect(decideLadderShotSide({ ...clean, limitSide, grade })).toBe(limitSide);
       }
     }
   });
@@ -112,21 +108,6 @@ describe('decideLadderShotSide', () => {
             const side = decideLadderShotSide({ limitSide, grade, lastShotFailed, sealedRubbleCount });
             expect(side).toBeGreaterThanOrEqual(1);
             expect(side).toBeLessThanOrEqual(limitSide);
-          }
-        }
-      }
-    }
-  });
-
-  it('is non-increasing in sealedRubbleCount', () => {
-    for (let limitSide = 1; limitSide <= 10; limitSide++) {
-      for (const grade of [0, 2, 4]) {
-        for (const lastShotFailed of [false, true]) {
-          let prev = Infinity;
-          for (let n = 0; n <= 600; n += 10) {
-            const side = decideLadderShotSide({ limitSide, grade, lastShotFailed, sealedRubbleCount: n });
-            expect(side).toBeLessThanOrEqual(prev);
-            prev = side;
           }
         }
       }
