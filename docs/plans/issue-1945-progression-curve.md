@@ -355,3 +355,32 @@ and 6 haulers, yet the pit stays at 10.2 m (g3 needs 20 m).
 - t7,200 onwards: a fresh shot has 9 planned holes and 0 drilled for 1,600+ ticks with the driller idle at the rally point, so the 3,000-tick shot budget burns.
 Payroll then drains the cash. Tuning `BUYER_*`, `MINE_GRADES` or `PERMIT_LIMITS` cannot move these numbers: the stall is that debris and drill sites become unreachable after the second crater (ramp geometry / sealed rubble).
 `balance.ts`, the sandbox pins and campaign pins are untouched. Next slice: make crater rubble and hole sites reachable (ramp to every crater a shot opens), then re-run this 50,000-tick measurement and tune.
+
+## 2026-10-23 record (#2072, after #2082): still stalled at 10.2 m, tuning not reached
+
+Seed 42, desert_badlands, full kit, ladder, `main` with #2082 (auto access ramp). Code unchanged by this run (experiments below reverted).
+
+| run | g1 | g2 | g3-5 | cash@3k | cash@6k | cash@10k | cash@15k | blasts | boulder ore sold | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder, full, 14,000 | 968 | 2452 | not reached | 4.29 M | 9.91 M | 7.77 M | n/a | 4 | 51% | t14,000 alive (8 min wall) |
+| ladder, full, 50,000 | 968 | 2452 | not reached | 4.29 M | 9.91 M | 7.77 M | 4.05 M | 4 | 51% | bankrupt t20,509 |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| grade 3 at t8,000-14,000 | not reached | MISSED |
+| grade 4 at t15,000-25,000 | not reached | MISSED |
+| grade 5 at t30,000-45,000 | not reached | MISSED |
+| >= 60% boulder ore sold | 51% | MISSED |
+| survives 50,000 ticks | bankrupt t20,509 | MISSED |
+
+Wall time is no longer the limit (14,000 ticks in about 8 minutes); the pit is. Instrumented 9,000-tick runs (per-500-tick pending-action census, removed):
+
+- The pit stays at 10.21 m from t2,000 (4 craters); g2 (10 m) is met, g3 needs 20 m. Cash is 4-10 M and idle.
+- From t2,000, ~1,000 haul orders (545 haul_debris + 458 fragment_debris) are `debris_out_of_reach` and never clear; 12 `dig_ramp_segment` orders sit `target_unreachable`.
+- `syncCraterAccess` returns early while ANY `dig_ramp_segment` is pending, blocked ones included, so those 12 stranded segments hold every later access ramp. Ignoring blocked segments there made it order and finish 6 more segments, but the stranded orders (470 + 566) stayed out of reach and the pit reached only 10.4 m at t7,000 (the 5th shot added 4,200 more out-of-reach haul orders and 9 `buried_under_rubble` holes). Reverted: no measured gain.
+- Shots fire only at t~5,000-5,500 (the reachable-rubble gate `LADDER_GATE_RUBBLE_KG` holds until hauling drains below it). Gate at 1.2 M and 3 M kg: shots at the same ticks, pit 10.4 m, no change; the gate is not the limiter (`decideLadderDeepen` waits for the crater rubble).
+- More haulers (`LADDER_MAX_HAULERS` 12): reachable rubble drains by t4,000, then hauling stops (nothing reachable), cash falls 4.7 M to -17 k and the run goes bankrupt at t8,079. Worse.
+
+Why no constant was tuned: with the pit capped at about 10 m no grade-3 window can be measured, and retuning `BUYER_*`, `MINE_GRADES` or `PERMIT_LIMITS` would hide the defect. `balance.ts`, sandbox pins and campaign pins are untouched.
+
+Next slice (core, not probe): make rubble in a deepened crater reachable. #2082's ramp covers the stranded orders only when its ramp segments themselves are reachable and its path clears sealed rubble; here the ramp columns are buried by the crater's own fragments.
