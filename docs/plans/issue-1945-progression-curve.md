@@ -298,3 +298,23 @@ the 50,000-tick seed-42 desert_badlands full-kit ladder probe: g1@968, g2@2482, 
 bankrupt at t23799 (low cash -86,300), g3 (window 8000-14000) missed; boulder ore sold 45%.
 Shareholder Summit competent ladder (volcanic_flats, digger, seed 42) wins at tick 3461 (was 2981 on main).
 Remaining: survival to 50,000 and g3+ are tracked in #2072.
+
+## 2026-10-23 record (#2072, paused)
+
+Measured on seed 42, desert_badlands, full kit, 4,000 ticks:
+
+| Variant | Blasts | Grades | Wall time |
+|---------|--------|--------|-----------|
+| Baseline | 4 | g1@968, g2@2482 | 152 s |
+| Sandbox-gated extra shot crew (`decideLadderCrewSize` wired via `ladderShotCrew`, `LADDER_MAX_SHOT_CREW=3`) | 3 | g2 missed | 141 s |
+| Variant forcing shots while cash is idle (reverted) | 4 | g2 missed | 285 s |
+
+Root cause: the armed detonation is cancelled at t~1780, 1870 and 1960 because employee Otto Rockwell cannot leave the blast zone. After three cancels the shot is dropped and the next one fires at t=2405, so about 600 ticks are dead per shot cycle while 3M+ cash sits idle.
+
+A CPU profile of 3,000 ticks puts `playTick` (src/core) at 94% (`EmployeeDispatchSteps`, `ActionSelection`, `NavGridReachability`). The probe's own decision and scan work is about 3%, so no probe-side speed-up exists.
+
+Crew size is not the lever; evacuation is. Filed as #2077 (blocker).
+
+Still unmeasured or unmet: g3/g4/g5 targets, the 60% boulder share, and 50,000-tick survival. `balance.ts` and the sandbox pins are untouched on purpose, since tuning before throughput is fixed would contaminate the measurement.
+
+The crew wiring regresses this slice (3 blasts instead of 4, g2 missed). The resumed run must re-evaluate it, and revert it if it still hurts, once #2077 lands.
