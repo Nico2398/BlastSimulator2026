@@ -5,7 +5,7 @@
 // nearest reachable column of its own cells.
 
 import { describe, it, expect, vi } from 'vitest';
-import { retargetRampLayers } from '../../../src/core/engine/RampLayerRetarget.js';
+import { retargetBesideRampLayers, retargetRampLayers } from '../../../src/core/engine/RampLayerRetarget.js';
 import type { PendingAction, PlannedRamp, GameState } from '../../../src/core/state/GameState.js';
 
 type S = Pick<GameState, 'plannedRamps' | 'pendingActions'>;
@@ -153,5 +153,27 @@ describe('retargetRampLayers (#1719)', () => {
       // centre probe + 5 own columns; the second segment adds no new column.
       expect(canReach).toHaveBeenCalledTimes(6);
     });
+  });
+});
+
+describe('retargetBesideRampLayers (#2082)', () => {
+  it('moves a lead whose own columns are unreachable onto a reachable column beside them', () => {
+    const s = make([action(1), action(2)], [ramp(1, [1, 2])]);
+    // Own cells sit on z=10; only the z=9 row beside them is reachable.
+    const moved = retargetBesideRampLayers(s, (_a, _x, z) => z === 9);
+    expect(moved).toBe(1);
+    expect(targetOf(s, 1)).toEqual({ x: 12, z: 9 });
+    expect(targetOf(s, 2)).toEqual({ x: 12, z: 10 });
+  });
+
+  it('never stands on the lead\'s own columns, and leaves the lead alone when nothing beside is reachable', () => {
+    const s = make([action(1)], [ramp(1, [1])]);
+    expect(retargetBesideRampLayers(s, (_a, _x, z) => z === 10)).toBe(0);
+    expect(targetOf(s, 1)).toEqual({ x: 12, z: 10 });
+  });
+
+  it('does not move a claimed lead', () => {
+    const s = make([action(1, { status: 'assigned' })], [ramp(1, [1])]);
+    expect(retargetBesideRampLayers(s, (_a, _x, z) => z === 9)).toBe(0);
   });
 });

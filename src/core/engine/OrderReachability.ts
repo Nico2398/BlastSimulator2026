@@ -499,7 +499,7 @@ export function roleShortfall(
   return null;
 }
 
-/** Targets of queued auto-debris / drill-hole orders classified debris_out_of_reach or buried_under_rubble (#2082); reads the stamped verdicts, no fill. */
+/** Targets of queued orders of any type whose stamped verdict is debris_out_of_reach or buried_under_rubble (#2082); reads the stamped verdicts, no fill. */
 export function strandedDebrisTargets(state: GameState): ReadonlyArray<{ x: number; z: number; y: number }> {
   const out: { x: number; z: number; y: number }[] = [];
   for (const a of state.pendingActions) {

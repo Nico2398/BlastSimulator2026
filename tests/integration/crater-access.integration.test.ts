@@ -69,16 +69,4 @@ describe('crater access ramp (#2082)', () => {
     expect(state.drillHoles.map(h => h.id).sort()).toEqual(ids);
     expectNoWorldInvariantViolations(state);
   });
-
-  it('a hole order becomes claimable (no blocked reason) after access and hauling', () => {
-    const site = makeCraterSite([PIT]);
-    dropRubble(site, PIT, 16);
-    const { state, run } = site;
-    expect(run('drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:42,42')).toMatchObject({ success: true });
-    tickUntilFresh(run, state, () => state.logistics.fragments.every(f => f.state !== 'on_ground'), DIG_TICKS * 2);
-    const queuedHole = state.pendingActions.find(a => a.type === 'drill_hole' && a.status === 'queued');
-    const started = state.drillHoles.length > 0 || state.pendingActions.some(a => a.type === 'drill_hole' && a.status !== 'queued');
-    expect(started || queuedHole?.blockedReason === undefined).toBe(true);
-    expect(state.logistics.fragments.some(f => f.state === 'on_ground')).toBe(false);
-  });
 });

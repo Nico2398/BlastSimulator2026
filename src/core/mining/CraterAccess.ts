@@ -30,7 +30,6 @@ type CraterAccessPlan =
 
 const KEY = 'mining.crater_access.';
 const DIRECTIONS: readonly RampDirection[] = ['south', 'north', 'east', 'west'];
-const RAD_TO_DEG = 180 / Math.PI;
 
 /** Groups stranded cells whose spacing is within `gapCells` (Chebyshev) into floors. */
 export function clusterStrandedFloors(
@@ -119,7 +118,7 @@ function planStraight(
       const check = validateRampOrder(def, Infinity);
       if (!check.success) continue;
       return {
-        plan: { ok: true, def, cost: check.cost, gradeDegrees: Math.atan(drop / length) * RAD_TO_DEG },
+        plan: { ok: true, def, cost: check.cost, gradeDegrees: slopeDegreesForRatio(drop / length) },
         sawShallow,
       };
     }
@@ -167,7 +166,7 @@ function planSpiral(floor: StrandedFloor, surface: AccessSurface, limitRatio: nu
   return null;
 }
 
-/** Plans a ramp from the reachable network down to `floor`, within `maxClimbRatio`. Never throws. */
+/** Plans a ramp from the reachable network down to `floor`, within `maxClimbRatio`. Failure is a result, not an exception. */
 export function planCraterAccess(
   floor: StrandedFloor,
   surface: AccessSurface,
@@ -176,13 +175,9 @@ export function planCraterAccess(
 ): CraterAccessPlan {
   const limitRatio = maxClimbRatio * CRATER_ACCESS_MAX_GRADE_MARGIN;
   if (!(limitRatio > 0) || !Number.isFinite(floor.floorY)) return { ok: false, reasonKey: `${KEY}no_start` };
-  try {
-    const straight = planStraight(floor, surface, limitRatio, width);
-    if (straight.plan !== null) return straight.plan;
-    const spiral = planSpiral(floor, surface, limitRatio, width);
-    if (spiral !== null) return spiral;
-    return { ok: false, reasonKey: `${KEY}${straight.sawShallow ? 'too_shallow' : 'no_start'}` };
-  } catch {
-    return { ok: false, reasonKey: `${KEY}no_start` };
-  }
+  const straight = planStraight(floor, surface, limitRatio, width);
+  if (straight.plan !== null) return straight.plan;
+  const spiral = planSpiral(floor, surface, limitRatio, width);
+  if (spiral !== null) return spiral;
+  return { ok: false, reasonKey: `${KEY}${straight.sawShallow ? 'too_shallow' : 'no_start'}` };
 }
