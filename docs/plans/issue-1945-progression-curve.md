@@ -318,3 +318,10 @@ Crew size is not the lever; evacuation is. Filed as #2077 (blocker).
 Still unmeasured or unmet: g3/g4/g5 targets, the 60% boulder share, and 50,000-tick survival. `balance.ts` and the sandbox pins are untouched on purpose, since tuning before throughput is fixed would contaminate the measurement.
 
 The crew wiring regresses this slice (3 blasts instead of 4, g2 missed). The resumed run must re-evaluate it, and revert it if it still hurts, once #2077 lands.
+
+## 2026-10-23 note: evacuation cancelled by rubble-boxed walker (#2077)
+
+An armed detonation was cancelled "cannot leave the blast zone" when an in-zone employee was boxed in by rubble (`fragmentOccupancy > 0` on the neighbour cells).
+`findSafeEvacuationCell` proved reachability with a relaxed `findPath`, but `Locomotion.planPath` used `findFootPathWithVehicleFallback`, whose fallback rejects
+relaxed routes crossing fragment cells (#954/#1090), so the walker stuck and the phase read 'stranded'. `Zone.clearZone` now passes `crossFragments: true`; the flag is stamped on the leg
+(`Leg.crossesFragments`) so the cost estimate and the executor agree. Every other caller keeps the fragment guard; blocked/void rings stay stranded.
