@@ -299,6 +299,30 @@ bankrupt at t23799 (low cash -86,300), g3 (window 8000-14000) missed; boulder or
 Shareholder Summit competent ladder (volcanic_flats, digger, seed 42) wins at tick 3461 (was 2981 on main).
 Remaining: survival to 50,000 and g3+ are tracked in #2072.
 
+## 2026-10-23 record (#2076)
+
+Seed 42, desert_badlands, full kit, `scripts/progression-probe.ts`, ladder, 50,000 horizon. Probe policy only (scripts/); no balance constant, `MINE_GRADES`, `BUYER_*`,
+fee or `PERMIT_LIMITS` value moved. Wired: `decideBuriedPattern` (drop a pattern buried 500 ticks, bar its hole bounding box), `decideLadderShotSide` (no grade cap and no sealed-rubble shrink: caps of 3-6 and the 100-fragment shrink each starved yield and ended the summit run in a worker revolt, #2080; shrink one step after a failed shot), `siteHoldsOre` (25% of the best site's ore), a 16 m building keep-out on fresh sites, and an
+oldest-bar age-out when no site orders.
+
+| run | g1 | g2 | g3-5 | cash@3k | cash@6k | cash@10k | cash@15k | boulder ore sold | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder, 50,000 horizon | 968 | 2372 | not reached | 4.61 M | 10.35 M | 12.15 M | 8.88 M | 57% | bankrupt t28359 (low cash -73,033) |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| ladder survives 50,000 ticks | bankrupt t28359 (was t23799) | MISSED |
+| grade 3 at t8,000-14,000 | not reached (pit 10.2 m of 20 m flat from t2,000) | MISSED |
+| grade 4-5 | not reached | MISSED |
+
+Findings from instrumented runs (instrumentation removed):
+
+1. Before the building keep-out, shot 5 destroyed a building and well-being went 96 to 0: worker_revolt at t8520 with 10 M cash.
+2. After g2 the pit sits at 10.2 m. Reachable rubble (1.0-1.1 M kg) clears at about 220 kg a tick, so the next shot waits to t7,300; then every crater on the 64 m map is
+   barred, buried or sealed and `freshSites` returns no candidate (origins plus bars cover the map): the ladder fires 5 to 8 shots in 28,000 ticks and bleeds payroll.
+3. Open: deepening existing craters is the only way left to gain depth; it needs a crater with no ordered rubble, and sealed rubble plus bars exclude every one.
+
+
 ## 2026-10-23 note: evacuation cancelled by rubble-boxed walker (#2077)
 
 An armed detonation was cancelled "cannot leave the blast zone" when an in-zone employee was boxed in by rubble (`fragmentOccupancy > 0` on the neighbour cells).
