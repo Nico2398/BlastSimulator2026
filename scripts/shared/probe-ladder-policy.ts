@@ -281,7 +281,7 @@ export function judgeLadderShot(input: LadderShotJudgeInput): LadderShotJudgment
 }
 
 /** Ticks a pattern may stay buried under rubble before the ladder drops it. */
-const LADDER_BURIED_DROP_TICKS = 500;
+export const LADDER_BURIED_DROP_TICKS = 500;
 
 interface BuriedPatternInput {
   buriedHoleCount: number;
@@ -307,9 +307,9 @@ export function decideBuriedPattern(input: BuriedPatternInput): BuriedPatternDec
 }
 
 /** Sealed-rubble cell count at which the ladder shrinks its shot side. */
-const LADDER_SEALED_SHRINK_COUNT = 100;
+export const LADDER_SEALED_SHRINK_COUNT = 100;
 /** Largest shot side at grade >= LADDER_GATE_MIN_GRADE. */
-const LADDER_G2_MAX_SIDE = 3;
+export const LADDER_G2_MAX_SIDE = 3;
 
 interface LadderShotSideInput {
   limitSide: number;
@@ -330,7 +330,7 @@ export function decideLadderShotSide(input: LadderShotSideInput): number {
 }
 
 /** Share of the best site's ore a site must hold to be worth a shot. */
-const LADDER_SITE_ORE_SHARE = 0.25;
+export const LADDER_SITE_ORE_SHARE = 0.25;
 
 interface SiteOreInput {
   oreKgUnderSite: number;
