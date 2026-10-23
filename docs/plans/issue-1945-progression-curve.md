@@ -325,3 +325,33 @@ An armed detonation was cancelled "cannot leave the blast zone" when an in-zone 
 `findSafeEvacuationCell` proved reachability with a relaxed `findPath`, but `Locomotion.planPath` used `findFootPathWithVehicleFallback`, whose fallback rejects
 relaxed routes crossing fragment cells (#954/#1090), so the walker stuck and the phase read 'stranded'. `Zone.clearZone` now passes `crossFragments: true`; the flag is stamped on the leg
 (`Leg.crossesFragments`) so the cost estimate and the executor agree. Every other caller keeps the fragment guard; blocked/void rings stay stranded.
+
+## 2026-10-23 resumed record (#2072, after #2077)
+
+4,000-tick slice, seed 42, desert_badlands, full kit (#2077 on main):
+
+| Variant | Blasts | Grades | Cash@3000 | Wall time (two runs in parallel) |
+|---------|--------|--------|-----------|-----------|
+| Without crew wiring | 4 | g1@968, g2@2482 | 4.66 M | 123 s |
+| With crew wiring (`decideLadderCrewSize`, max 3) | 4 | g1@968, g2@2412 | 4.09 M | 178 s |
+
+The wiring adds no blast and costs cash and wall time (g2 70 ticks earlier is the only gain), so it and its tests were dropped (`decideLadderCrewSize`, `ladderShotCrew`).
+#2077 did not change the baseline slice (same blasts and grade ticks as before it).
+
+Full 50,000-tick ladder (no wiring): identical to the #2068 record, bankrupt at t23,799 (low cash -86,300), 5 blasts, boulder ore sold 45%, g3-g5 missed.
+
+| target | measured | verdict |
+| --- | --- | --- |
+| grade 3 at t8,000-14,000 | not reached | MISSED |
+| grade 4 at t15,000-25,000 | not reached | MISSED |
+| grade 5 at t30,000-45,000 | not reached | MISSED |
+| >= 60% boulder ore sold | 45% | MISSED |
+| survives 50,000 ticks | bankrupt t23,799 | MISSED |
+
+Diagnosis (temporary per-200-tick instrumentation of a 9,000-tick run, removed): cash is 4-10 M and idle from t2,600 on with 10 staff (1 driller, 1 blaster, 8 drivers)
+and 6 haulers, yet the pit stays at 10.2 m (g3 needs 20 m).
+- t2,600-5,800: no shot is ordered (`wanted` false, reload gate shut) while ~800 k kg of rubble lies in the pit.
+- At t7,600 almost every pending `haul_debris` / `fragment_debris` action is blocked `debris_out_of_reach` (2 of ~40 are not), so haulers earn nothing.
+- t7,200 onwards: a fresh shot has 9 planned holes and 0 drilled for 1,600+ ticks with the driller idle at the rally point, so the 3,000-tick shot budget burns.
+Payroll then drains the cash. Tuning `BUYER_*`, `MINE_GRADES` or `PERMIT_LIMITS` cannot move these numbers: the stall is that debris and drill sites become unreachable after the second crater (ramp geometry / sealed rubble).
+`balance.ts`, the sandbox pins and campaign pins are untouched. Next slice: make crater rubble and hole sites reachable (ramp to every crater a shot opens), then re-run this 50,000-tick measurement and tune.
