@@ -1612,3 +1612,43 @@ describe('ramp covered by crater fragments (#2085)', () => {
     expect(state.pendingActions.find(a => a.id === haul)!.blockedReason).toBe('debris_out_of_reach');
   });
 });
+
+describe('walk-only pins an employee can no longer serve (#2085)', () => {
+  const pinnedOrder = (state: GameState, pinnedTo: number): PendingAction => {
+    const id = queue(state, 'level_ground', IN_A_TARGET, {
+      requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger',
+      targetEmployeeId: pinnedTo, payload: { walkOnlyPinnedBy: pinnedTo },
+    });
+    return state.pendingActions.find(a => a.id === id)!;
+  };
+
+  it('opens the order to the whole pool once the pinned employee cannot drive the fleet tier', () => {
+    const state = makeState();
+    const pinned = hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_digger, 'driving.excavator']); // level 1 licence
+    purchaseVehicle(state.vehicles, 'rock_digger', IN_A.x, IN_A.z, 2); // upgraded in place: tier 2 needs level 2
+    const order = pinnedOrder(state, pinned.id);
+    classifyQueuedOrders(state);
+    expect(order.targetEmployeeId).toBeNull();
+    expect(order.payload['walkOnlyPinnedBy']).toBeUndefined();
+  });
+
+  it('keeps the pin while the pinned employee can still serve the order', () => {
+    const state = makeState();
+    const pinned = hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_digger, 'driving.excavator']);
+    purchaseVehicle(state.vehicles, 'rock_digger', IN_A.x, IN_A.z, 1);
+    const order = pinnedOrder(state, pinned.id);
+    classifyQueuedOrders(state);
+    expect(order.targetEmployeeId).toBe(pinned.id);
+  });
+
+  it('never releases a permanent target', () => {
+    const state = makeState();
+    const target = hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_digger, 'driving.excavator']);
+    purchaseVehicle(state.vehicles, 'rock_digger', IN_A.x, IN_A.z, 2);
+    const id = queue(state, 'level_ground', IN_A_TARGET, {
+      requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger', targetEmployeeId: target.id,
+    });
+    classifyQueuedOrders(state);
+    expect(state.pendingActions.find(a => a.id === id)!.targetEmployeeId).toBe(target.id);
+  });
+});
