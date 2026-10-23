@@ -122,7 +122,7 @@ Everything not on that list is a decision to take, a fix to make, a bypass to wr
 
 ## Churn is not a blocker
 
-The count of review findings, visual iterations, implementer rounds, cherry-pick retries, and failed test runs decides nothing about PR status. A run that converged after five iterations converged. What decides status is whether every verification channel the change owes reports PASS.
+The count of review findings, visual iterations, implementation rounds, cherry-pick retries, and failed test runs decides nothing about PR status. A run that converged after five iterations converged. What decides status is whether every verification channel the change owes reports PASS.
 
 An earlier convention held a PR back for "significant churn". It cost a green, fully verified run its auto-merge and sent a human to re-review work that five specialist reviewers had already passed — while the issue stayed `in-progress` and the chain stalled behind it. Iteration count measures how hard the problem was, not how likely the answer is to be wrong.
 

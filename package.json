@@ -8,6 +8,7 @@
     "build": "vite build",
     "console": "tsx src/console.ts",
     "long": "tsx scripts/long-run.ts",
+    "pipeline": "tsx scripts/pipeline.ts",
     "validate": "tsc --noEmit && npm run test:coverage && npm run test && vite build",
     "typecheck": "tsc --noEmit && tsc --noEmit --project scripts/tsconfig.json && tsc --noEmit --project tests/tsconfig.json",
     "test:coverage": "vitest run --coverage --config vitest.coverage.config.ts",

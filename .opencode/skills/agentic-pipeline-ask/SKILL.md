@@ -1,32 +1,23 @@
 ---
 name: agentic-pipeline-ask
 description: >
-  Ask pipeline for the TDD orchestrator. Answers questions via @ask sub-agent,
-  posts result as PR/issue comment. Use when the orchestrator classifies a task
-  as question or analysis.
+  Ask pipeline: the lead answers a question read-only with file:line evidence,
+  posts the answer as a comment, and releases the assigned issue as a non-diff
+  deliverable. Use when the task is a question or an analysis.
 ---
 
-## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
-Simple read-only analysis pipeline. No code changes. No exploration between steps.
-
-| Step | Who | Action |
-|------|-----|--------|
-| 1 | @ask | Answer question directly (read-only analysis) |
-| 2 | [post] | Post answer as PR/issue comment via `gh pr comment` or `gh issue comment` |
-| 3 | [release] | Return the assigned issue to a terminal state — the posted answer is the deliverable |
-
-### Rules
-
-- `@ask` is read-only — no branch creation, no commits, no file writes
-- Post step prepends the original question as context for readers. Format: `"**Question:** <original>\n\n**Answer:** <answer body>"`
-- When posting as comment, reference the original question URL if available
-- **The answer finishes the issue.** Assignment labels an issue `in-progress`, and the only things that take that label off are a merged pull request and the stall sweep that declares a run lost. A pipeline whose deliverable is a comment rather than a diff therefore releases its own issue, or the queue keeps deferring behind a run that already succeeded and then reports it as a failure hours later.
-- Release applies to the issue this run was assigned. A question asked on a pull request has no issue lifecycle to close — post the answer and stop.
-
-### Non-Agentic Steps
+Read-only analysis. No branch, no commit, no sub-agent: the lead already holds the question, and a delegate would read the same files again.
 
 | Step | Action |
 |------|--------|
-| post | `gh pr comment <pr-url> --body "<answer>"` or `gh issue comment <issue-url> --body "<answer>"` |
-| release | `gh issue edit <N> --add-label done --remove-label in-progress` then `gh issue close <N> --reason completed` — after the answer is posted, and only for an assigned issue. That is the Definition of Done for a deliverable that is not a diff (`agentic-autonomous-pipeline`) |
+| 1 | [answer] Locate the code the question is about (grep, then read the ranges), load the skill that owns the domain, and write the answer with `file:line` evidence for every claim |
+| 2 | [post] `gh issue comment <N> --body-file <answer>` or `gh pr comment <N> --body-file <answer>`, formatted `**Question:** <original>` then `**Answer:** <body>` |
+| 3 | [release] For an assigned issue: `gh issue edit <N> --add-label done --remove-label in-progress`, then `gh issue close <N> --reason completed` |
+
+### Rules
+
+- **The answer finishes the issue.** Assignment labels an issue `in-progress`, and only a merged pull request or the stall sweep takes that label off. A pipeline whose deliverable is a comment releases its own issue, or the queue defers behind a run that already succeeded — the Definition of Done for a non-diff deliverable (`agentic-autonomous-pipeline`).
+- A question asked on a pull request has no issue lifecycle: post the answer and stop.
+- An answer that turns out to need a code change is still an answer: say what the change would be, and file it per `agentic-issue-creation` when it is a defect.

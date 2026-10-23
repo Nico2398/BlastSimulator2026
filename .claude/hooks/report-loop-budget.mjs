@@ -17,7 +17,7 @@
 // terminal — and then this hook says nothing: the budget is open. It never
 // blocks: what to do with the number is the orchestrator's decision under the
 // skill, and a delegation past the deadline is often the right one (the
-// iteration in flight, a reviewer, the validator, the PR).
+// iteration in flight, the reviewer, the PR).
 //
 // Exit 0 always. Output is the JSON Claude Code reads for additional context.
 

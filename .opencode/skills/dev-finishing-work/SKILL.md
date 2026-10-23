@@ -16,7 +16,7 @@ The Verification Gate in the entry point decides *which* channels a change owes.
 
 ## ▶ PROCEDURE — the finish line
 
-1. **Run every channel the change touches.** The Verification Gate names them; run the ones the change earns, not the cheapest one.
+1. **Run every channel the change touches.** The Verification Gate names them; run the ones the change earns, not the cheapest one. `npm run pipeline -- verify` reads the branch's diff, runs exactly the non-visual channels it owes, skips any already green on this committed tree, and prints one line per channel with an excerpt of a failure — the logs stay in `.agentic/verify/logs/`. It outlives one Bash call on a code change: start it through `npm run long`.
 2. **Hand the browser-heavy channels to CI** — see the ownership table below. A channel CI owns is covered, never pending.
 3. **Commit and push** to the branch this work belongs on.
 4. **Open the pull request** if none is open, laid out per `.github/pull_request_template.md` — or `.github/PULL_REQUEST_TEMPLATE/pipeline.md` in a pipeline run (`agentic-pipeline-finalization`) — and apply the labels the change earns.

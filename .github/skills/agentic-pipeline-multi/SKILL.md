@@ -1,83 +1,38 @@
 ---
 name: agentic-pipeline-multi
 description: >
-  Multi-pipeline for complex/mixed prompts. Decomposes a prompt with multiple
-  task types (feature + fix-bug + visual-change) into sequential sections,
-  each running `agentic-pipeline-tdd`. All sections merge into a single PR
-  via `agentic-pipeline-finalization`.
+  Multi-pipeline for a task mixing several task types: decompose it into ordered
+  sections, run each code section's TDD cycle (`agentic-pipeline-tdd`) onto one
+  shared feature branch, run question and command sections in place, and
+  finalize once into a single PR (`agentic-pipeline-finalization`).
 ---
 
-## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
-
-Use when the prompt mixes multiple task types.
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
 ```
- 1. [decompose]           → (orchestrator) Split prompt into N sections.
-                            Each section = { id, title, task_type, description, acceptance_criteria }
-                            Supported task_types: feature, fix-bug, full, ask, executor, review-pr
-                            Assign issue-number = single GitHub issue for all sections.
-  2. [plan-all]            → (orchestrator) Create a TODO list with all sections.
-                             Report to invoker: "Section 1 → Section 2 → ... → Section N. Single PR."
-  3. For each section K in [1..N]:
-         Route by task_type:
-         - Code-producing (feature, fix-bug, full) → `agentic-pipeline-tdd` with
-             label = <run-label>-section-<K>,
-             base_branch = (K=1 ? `main` : `pipeline/feature-<run-label>`)
-         - Ask  → `agentic-pipeline-ask`
-         - Executor → `agentic-pipeline-executor`
-         - Review-pr → `agentic-pipeline-review-pr`
-
-         For code-producing sections:
-         - Section 1 creates pipeline/feature-<run-label> (shared across all sections)
-         - Sections 2..N cherry-pick onto the EXISTING pipeline/feature-<run-label>
-         - [test-runner] runs after EACH code-producing section (catch regressions early)
-         - If test-runner fails → @fixer → re-run test-runner (tight loop, max 7 retries)
-         - If cherry-pick conflicts → @conflict-resolver → retry cherry-pick (max 3 retries)
-
-         For non-code sections:
-         - No branch creation, no cherry-pick, no test-runner
-         - Results captured and included in final PR description
-  4. After ALL sections merged:
-         [qualimetry]              → jscpd syntactic duplication check
-                                     if fail → @implementer → re-run affected section
-         [finalization]            → Delegate to `agentic-pipeline-finalization` skill
-         @context-maintainer       → Context maintenance
-                                     Update context files to reflect project changes.
-                                     Do nothing if no project logic changed.
+ 1. [decompose]   Split the task into N ordered sections:
+                  { id, title, task_type, acceptance_criteria }, task_type one of
+                  feature, fix-bug, ask, executor, review-pr. One issue for all of them.
+ 2. [plan-all]    One plan file per code section (`agentic-pipeline-tdd`'s format), and a
+                  TODO list naming the order: "Section 1 → … → Section N. Single PR."
+ 3. For each section K:
+      code (feature, fix-bug) → `agentic-pipeline-tdd` with
+          label     = <run-label>-s<K>
+          --feature   pipeline/feature-<run-label>
+          --base      main for K = 1, pipeline/feature-<run-label> after
+      ask / executor / review-pr → that pipeline's skill, in place; its result goes in
+          the PR body.
+ 4. After every section:
+      [visual-loop]   once, for all player-facing sections — `agentic-pipeline-full`
+      [refactor] and [context]  once — `agentic-pipeline-full`
+      Finalization    once — `agentic-pipeline-finalization`, its reviewer briefed with
+                      every section's label
 ```
 
-### Branch Strategy
-
-`<run-label>` is `<issue>-<runId>` — the run id is what keeps this run's branches
-its own, and `agentic-pipeline-tdd`'s Branch naming holds the rule and the
-incident behind it (#554). Every branch below carries it.
-
-```
-main
- └─ pipeline/tests-<run-label>-section-1   (stubs + tests, forked from main)
- │    └─ pipeline/impl-<run-label>-section-1  (implementer)
- └─ pipeline/tests-<run-label>-section-2   (stubs + tests, forked from pipeline/feature-<run-label>)
- │    └─ pipeline/impl-<run-label>-section-2  (implementer)
- └─ pipeline/feature-<run-label>           (accumulated — ALL sections cherry-picked here)
-      └─ qualimetry → finalization → PR to main
-```
-
-Each section preserves branch isolation. Feature branch accumulates all changes. Single PR at the end.
+`<run-label>` is `<issue>-<runId>` (`agentic-pipeline-tdd`'s Branch naming, and the #554 incident behind it). Every section joins onto `pipeline/feature-<run-label>`, so each section's tests run against everything the earlier sections built — `verify` after each join catches a cross-section regression where it entered.
 
 ### Rules
 
-- Section 1 creates pipeline/feature-<run-label> with base_branch=main. Sections 2..N use base_branch=pipeline/feature-<run-label> (includes prior sections' code).
-- Test-runner runs after every section to catch cross-section regressions early.
-- Qualimetry and finalization run once, after all sections merged.
-- Each section has its own retry budget (max 7 failures before escalation). One section's flakiness doesn't affect another's budget.
-
-### Non-Agentic Steps
-
-> Assumes `main` base branch. Override via `base_branch` parameter.
-
-| Step | Action |
-|------|--------|
-| decompose | Manual — orchestrator splits prompt |
-| plan-all | Orchestrator creates TODO list |
-| test-runner | `npx vitest run` — route to @fixer on fail |
-| qualimetry | Bash: `changed=$(git diff --name-only origin/main -- src/ tests/); if [ -n "$changed" ]; then npx jscpd $changed; fi` / PS: `$changed=git diff --name-only origin/main -- src/ tests/; if($changed){npx jscpd $changed}` (changed files only) — route to @implementer on fail |
+- Each section has its own blind phase, its own RED proof and its own seven-failure budget.
+- One review, one PR, one CI wait, at the end.
+- A non-code section creates no branch and runs no cycle.

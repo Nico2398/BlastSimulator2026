@@ -30,7 +30,7 @@ The open-pr step passes `--draft` to `gh pr create` when evaluation is `draft`.
 
 "Could not run" means **nothing will ever report on it** — not that this session did not run it. A channel CI owns is not a draft case; see below.
 
-**These never make a PR a draft:** iteration counts of any kind (visual loop rounds, implementer do-overs, review findings addressed, cherry-pick retries), a fix that reached beyond the issue's framing, or a requirement the run had to default. Churn measures how hard the problem was. The channels measure whether the answer is right — see `agentic-decision-autonomy`.
+**These never make a PR a draft:** iteration counts of any kind (visual loop rounds, implementation do-overs, review findings addressed, cherry-pick retries), a fix that reached beyond the issue's framing, or a requirement the run had to default. Churn measures how hard the problem was. The channels measure whether the answer is right — see `agentic-decision-autonomy`.
 
 ## READY TO MERGE
 
@@ -104,4 +104,4 @@ Which machine runs a channel is never a reason to withhold the marker, and never
 
 Rules:
 - **NEVER** include `[skip ci]` in any commit message on `pipeline/feature-*` branches
-- The `verify-commit` auto-commit message must NOT contain `[skip ci]`
+- No commit the run makes — the lead's, or the RED commit `tdd red` writes — carries `[skip ci]`

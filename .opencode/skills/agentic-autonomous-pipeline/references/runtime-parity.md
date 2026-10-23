@@ -31,7 +31,7 @@ So "invoke the reviewers in parallel" reads as *fan out and await* under OpenCod
 
 **The principle generalises past that one parameter. Where runtimes differ, the shared context states the invariant and each runtime's own configuration layer enforces it.** A body that names one runtime's parameters is a body that is wrong for the other two.
 
-Issue filing splits the same way. The rule — a read-only agent reports a finding, the orchestrator files it — is uniform. What denies the agent the command is not:
+Issue filing splits the same way. The rule — a read-only agent reports a finding, the lead files it — is uniform. What denies the agent the command is not:
 
 | Runtime | Read-only agents denied GitHub writes by |
 |---------|------------------------------------------|
@@ -39,21 +39,22 @@ Issue filing splits the same way. The rule — a read-only agent reports a findi
 | Copilot | `tools: ["read", "search"]` — no shell to run `gh` with |
 | Claude Code | A `PreToolUse` hook on `Bash`, `block-git-gh.mjs`, registered in the agent's frontmatter |
 
-Three mechanisms, one behaviour: a reviewer that tries to open an issue fails wherever it runs, so a finding reaches GitHub through the orchestrator or not at all. `agentic-pipeline-review-pr` states the rule and names none of them.
+Three mechanisms, one behaviour: a reviewer that tries to open an issue fails wherever it runs, so a finding reaches GitHub through the lead or not at all. `agentic-pipeline-review-pr` states the rule and names none of them.
 
 ## Claude Code prerequisites
 
 Delegation depends on configuration that is off by default:
 
-- **Nested spawning.** A subagent cannot spawn subagents unless `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is set in `.claude/settings.json`. Without it the orchestrator does every step itself, collapsing branch isolation and the whole TDD guarantee.
+- **Nested spawning.** A subagent cannot spawn subagents unless `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is set in `.claude/settings.json`. Without it the lead could not delegate the test-writer, and the blind phase would have no one to write the tests.
 - **Foreground delegation.** Two layers. The first is `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` in the `env` of `.claude/settings.json`, which makes Claude Code run every sub-agent in the foreground in every kind of session. It is what makes the orchestrator usable at a local CLI at all: an interactive session runs in fork mode, where the `Agent` tool has no `run_in_background` parameter and backgrounds every sub-agent, so no call could be made foreground and the guard below refused every delegation. The second is `.claude/hooks/require-foreground-agents.mjs`, a `PreToolUse` hook in `.claude/settings.json`: where the variable did not arrive, `run_in_background` defaults to `true`, which under a single-turn runner discards the run, so the guard rejects any delegation that is not explicitly foreground and tells the caller to re-issue it. It blocks by default so a runner cannot lose a run to an environment variable that failed to arrive; an interactive session opts out with `AGENTIC_ALLOW_BACKGROUND_AGENTS=1`, which no workflow sets. It states the same rule the shared bodies state in runtime-neutral terms, enforced here because this is the runtime whose default breaks it.
 - **Hooks run on every OS.** Every hook is a Node script under `.claude/hooks/`, registered in exec form — `command: node`, `args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/<name>.mjs"]` — so no shell stands between Claude Code and the hook, and the path resolves whether Claude Code would have picked Git Bash or PowerShell. Node is the one runtime every environment has, because it is the toolchain. The shell versions these replaced degraded silently on Windows: they needed Git Bash plus python3, failed open without it, and the stop guard's Python liveness probe, `os.kill(pid, 0)`, is TerminateProcess there — it killed the long run it was checking. `validate:context` rejects a hook registered any other way.
 - **The loop budget.** `.claude/hooks/report-loop-budget.mjs`, a `PreToolUse` hook on delegation in `.claude/settings.json`, tells the orchestrator before every delegation how much of `AGENTIC_LOOP_DEADLINE_EPOCH` is left, or that it has passed. `PreToolUse` is the event that honours `additionalContext`; a hook after the delegation returns cannot speak to the model. Without the variable the hook says nothing and the budget is open. OpenCode receives the same variable in its runner environment and nothing reports it: an OpenCode session reads the clock only if it does so itself under the shared rule — a gap recorded here, not closed.
-- **Tool budgets.** Each agent's `tools` / `disallowedTools` frontmatter is the enforcement layer. The orchestrator is denied `Edit` and `Write`; read-only reviewers get no write tools at all.
-- **Preloaded skills.** Each specialist declares its domain skills in `skills:` frontmatter, so it starts with the spec already in context. Preloading costs context on every run of that agent — preload what the agent needs to act, and leave what it needs only sometimes to be read on demand.
+- **Tool budgets.** Each agent's `tools` / `disallowedTools` frontmatter is the enforcement layer. The reviewer gets no write tools at all; the test-writer, the batch worker and the visual-tester get `block-git-gh.mjs`.
+- **The blind phase.** `.claude/hooks/blind-to-tests.mjs`, a `PreToolUse` hook on the file and shell tools in `.claude/settings.json`, refuses every session except the one whose payload carries `agent_type: test-writer` any call reaching the tests worktree or branch while `.agentic/tdd/blind.json` exists. It has to be in `settings.json` for the same reason the delegation guard does: the lead is entered by a fork, not through the `Agent` tool. OpenCode and Copilot have no equivalent yet: under them the blind phase rests on the worktree split and the test-writer's report format alone — a gap recorded here, not closed.
+- **Preloaded skills.** Each agent declares its domain skills in `skills:` frontmatter, so it starts with the spec already in context. Preloading costs context on every run of that agent — preload what the agent needs to act, and leave what it needs only sometimes to be read on demand.
 
 Verify all of it with `npm run validate:context`.
 
 ## Model
 
-Claude runs on the `sonnet` alias (latest Sonnet) at `--effort medium`, both set through `claude_args` in `claude-runner.yml`. OpenCode's model is set in `.opencode/opencode.json` and in the runner's environment. Every agent inherits the session model; no agent definition pins a model of its own.
+Claude runs on the `sonnet` alias (latest Sonnet) at `--effort medium`, both set through `claude_args` in `claude-runner.yml`. OpenCode's model is set in `.opencode/opencode.json` and in the runner's environment. Every agent inherits the session model; no agent definition pins a model of its own. The reviewer raises its own `effort` to `high`: it is the one judgment five reviewers used to share.
