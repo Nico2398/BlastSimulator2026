@@ -101,6 +101,14 @@ A ramp connection (`findRampConnections`) requires `isStepClimbable` steps from 
 
 A pit floor is therefore only workable once a ramp reaches it: dispatch queues haul/charge actions against fragments the crew cannot climb down to, and they sit unclaimed until one is dug. Level scripts and scenarios that blast a bench and then expect it hauled out have to build that ramp first (`level2-playthrough-win.json` does, at the rim, before its first blast).
 
+**Crater access (#2082).** Blasts deepen the pit below the built ramps; a floor the slowest vehicle tier cannot climb to strands its rubble (`debris_out_of_reach`) and buries its planned holes (`buried_under_rubble`). Progression sites only (`isProgressionSite`), `syncCraterAccess` (`src/core/engine/CraterAccessSync.ts`, right after `syncHaulDispatch`) orders the ramp itself:
+- Every `CRATER_ACCESS_RECHECK_TICKS` (50) it clusters the stranded order targets (`strandedDebrisTargets`, the verdicts `classify` already stamped; `clusterStrandedFloors`, gap `CRATER_ACCESS_CLUSTER_GAP_CELLS`) into floors; a floor needs `CRATER_ACCESS_MIN_STRANDED_ORDERS` (3) orders.
+- At most one access ramp is in flight: nothing is ordered while any `dig_ramp_segment` is pending. Largest-order floor first; cost is an ordinary construction expense (`queueRampOrder`) and is skipped when cash minus cost drops below `CRATER_ACCESS_CASH_RESERVE_TICKS` (200) ticks of payroll.
+- `planCraterAccess` (`src/core/mining/CraterAccess.ts`, pure) finds the nearest cell the slowest tier reaches from the rally point (`siteVehicleReach`; an existing ramp's foot counts) from which a straight ramp of default width ends on the floor at grade <= `CRATER_ACCESS_MAX_GRADE_MARGIN` (0.9) x the slowest tier's limit (foot checked with `rampFootOffset`, `RAMP_FLOOR_SNAP_REACH_M`). With no straight start it falls back to `proposeRampSpiral` from a reachable pit-rim tile (pit span within `RAMP_SPIRAL_MAX_PIT_SPAN_M`, up to `CRATER_ACCESS_SPIRAL_START_ATTEMPTS` rim tiles). It refuses (never throws) with `mining.crater_access.no_start` / `too_shallow` (floor under `RAMP_CRATER_MIN_DROP_M`).
+- A world that planned nothing is not re-planned until the nav grid or the stranded floors change; an unaffordable plan is retried.
+- Core never removes a planned hole or clears a pattern for this: holes stay queued until access exists.
+- A ramp layer none of whose own or sibling columns the digger reaches falls back to a column beside its cells (`retargetBesideRampLayers`), rather than staying `target_unreachable`.
+
 ## Dynamic NavGrid Updates
 
 NavGrid is **incrementally updated** — full rebuild too expensive.

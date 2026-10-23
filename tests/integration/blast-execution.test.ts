@@ -1044,6 +1044,8 @@ describe('Blast execution — haulers keep hauling reachable debris past a crate
 
     const WINDOW = 400;
     const start = state().tickCount;
+    const movedFragments = () => state().logistics.fragments.filter(f => f.state !== 'on_ground').length;
+    const movedAtStart = movedFragments();
     let idleWhileReachable = 0;
     let peakQueued = -1;
     for (let i = 0; i < WINDOW; i++) {
@@ -1062,8 +1064,10 @@ describe('Blast execution — haulers keep hauling reachable debris past a crate
 
     // Before the fix the crew idled for ~250 of the 400 ticks with reachable orders still queued.
     expect(idleWhileReachable).toBeLessThan(WINDOW / 10);
-    // Reachable orders left at the peak keep draining afterwards (stranded ones carry a blockedReason and are not counted).
-    if (peakQueued > 0) expect(reachableQueued()).toBeLessThan(peakQueued);
+    // Reachable rock keeps being hauled. The core's own crater-access ramp (#2082) opens the whole crater
+    // to the crew early in the window and fragmenting its rubble spawns new haul orders as fast as they
+    // drain, so progress is counted in fragments moved off the ground, not in a shrinking queue.
+    if (peakQueued > 0) expect(movedFragments()).toBeGreaterThan(movedAtStart);
   }, 240_000);
 });
 

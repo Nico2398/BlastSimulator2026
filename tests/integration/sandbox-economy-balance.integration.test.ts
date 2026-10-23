@@ -665,6 +665,8 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
    * ranking can move them, so they only ever measured the blast geometry. Measured 0.5 t reachable.
    */
   const HIGH_GRADE_GROUND_CEILING_KG = 10_000;
+  /** A fragment resting this close to a column that was ever out of reach counts as part of the stranded rock. */
+  const STRANDED_REACH_CELLS = 2;
 
   it('full: accepted rustite contracts mostly complete, rustite and dirtite sell, high-grade rustite leaves the ground', () => {
     const acceptedRustite = new Set<number>();
@@ -678,8 +680,15 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
     // Last tick rustite sat in the warehouse: once the reachable rustite is all hauled and sold nothing can fill a later offer,
     // so contracts accepted after it expire for want of ore, whatever the haul ranking does.
     let lastRustiteStockTick = 0;
+    // Columns where an order was debris_out_of_reach at any tick. The core's crater-access ramp (#2082) opens that
+    // rock mid-run (and fragmenting it mints new ids), so it is no longer unreachable at the horizon, but it only
+    // became haulable late and was never part of the ranking this test measures.
+    const strandedColumns = new Set<string>();
     const { state, commands, logged, over, playUntil } = startPlayLoop('full', HORIZON, () => {
       if ((state.collectedOre['rustite'] ?? 0) > 1) lastRustiteStockTick = state.tickCount;
+      for (const a of state.pendingActions) {
+        if (a.blockedReason === 'debris_out_of_reach') strandedColumns.add(`${Math.round(a.targetX)},${Math.round(a.targetZ)}`);
+      }
       acceptSmallRustite(logged);
     }, FULL_ORE_GRADE);
 
@@ -709,9 +718,14 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
     expect(sales('dirtite'), 'dirtite sales continued').toBeGreaterThanOrEqual(5);
 
     const unreachable = new Set<number>();
-    for (const a of state.pendingActions) {
-      const id = a.payload['fragmentId'];
-      if (a.blockedReason === 'debris_out_of_reach' && typeof id === 'number') unreachable.add(id);
+    for (const t of state.logistics.fragments) {
+      const cx = Math.round(t.fragment.position.x);
+      const cz = Math.round(t.fragment.position.z);
+      for (let dx = -STRANDED_REACH_CELLS; dx <= STRANDED_REACH_CELLS; dx++) {
+        for (let dz = -STRANDED_REACH_CELLS; dz <= STRANDED_REACH_CELLS; dz++) {
+          if (strandedColumns.has(`${cx + dx},${cz + dz}`)) unreachable.add(t.fragment.id);
+        }
+      }
     }
     let highGradeRustiteKg = 0;
     for (const t of state.logistics.fragments) {
