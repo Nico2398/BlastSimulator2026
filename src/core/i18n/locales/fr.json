@@ -4478,6 +4478,8 @@
   "mining.ramp_spiral.too_long": "Cette pente exige {needed} m de route ; la rampe la plus longue permise est de {max} m. Raidissez la route ou réduisez la profondeur.",
   "mining.ramp_spiral.too_short": "Cette pente exige {needed} m de paroi ; cette fosse en offre {offered} m. Élargissez la fosse ou raidissez la route.",
   "mining.ramp_spiral.not_on_rim": "La case de départ n'est pas sur le bord d'une fosse. Choisissez une case contre le vide.",
+  "mining.crater_access.no_start": "Aucun terrain accessible pour amorcer une rampe d'accès.",
+  "mining.crater_access.too_shallow": "Le fond du cratère est trop peu profond pour une rampe d'accès.",
   "mining.ramp_spiral.no_pit": "Aucune fosse à la case de départ. Partez du bord d'un trou profond d'au moins {depth} m.",
   "mining.ramp_spiral.start_in_void": "La case de départ est dans la fosse. Partez du bord.",
   "mining.ramp_spiral.outside_area": "La case de départ est hors de votre zone concédée.",
