@@ -3380,3 +3380,7 @@ export const CRATER_ACCESS_CASH_RESERVE_TICKS = 200;
 export const CRATER_ACCESS_RECHECK_TICKS = 50;
 /** Fraction of the maximum nav grade a crater access ramp may use (1 = right at the limit; below 1 keeps margin). */
 export const CRATER_ACCESS_MAX_GRADE_MARGIN = 0.9;
+/** Largest gap (cells, Chebyshev) between two stranded order targets that still belong to one crater floor. */
+export const CRATER_ACCESS_CLUSTER_GAP_CELLS = 6;
+/** Candidate pit-rim starts a crater access plan tries with the spiral backend before giving up. */
+export const CRATER_ACCESS_SPIRAL_START_ATTEMPTS = 6;

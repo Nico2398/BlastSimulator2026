@@ -1,4 +1,5 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
+import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { pickReachableColumn } from '../mining/WorkTarget.js';
 
 /**
@@ -33,6 +34,41 @@ export function retargetRampLayers(
     const others = distinctColumns(ramp.segments.flatMap(s => (s === lead ? [] : s.cells)))
       .filter(c => !probed.has(`${c.x},${c.z}`));
     const pick = pickReachableColumn(own, anchor, reach) ?? pickReachableColumn(others, anchor, reach);
+    if (pick === null) continue;
+    action.targetX = pick.x;
+    action.targetZ = pick.z;
+    moved++;
+  }
+  return moved;
+}
+
+/**
+ * Second chance for a lead layer `retargetRampLayers` left unreachable (#2082): the nearest reachable
+ * column beside the layer's own cells, where the digger can stand and carve it. Only a queued lead is moved.
+ */
+export function retargetBesideRampLayers(
+  state: Pick<GameState, 'plannedRamps' | 'pendingActions'>,
+  canReach: (action: PendingAction, x: number, z: number) => boolean,
+): number {
+  let moved = 0;
+  for (const ramp of state.plannedRamps) {
+    const lead = ramp.segments.find(s => !s.done);
+    if (lead === undefined) continue;
+    const action = state.pendingActions.find(a => a.id === lead.actionId);
+    if (action === undefined || action.status !== 'queued') continue;
+    if (canReach(action, action.targetX, action.targetZ)) continue;
+    const own = distinctColumns(lead.cells);
+    const seen = new Set(own.map(c => `${c.x},${c.z}`));
+    const beside: { x: number; z: number }[] = [];
+    for (const c of own) {
+      for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+        const key = `${c.x + dx},${c.z + dz}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        beside.push({ x: c.x + dx, z: c.z + dz });
+      }
+    }
+    const pick = pickReachableColumn(beside, { x: action.targetX, z: action.targetZ }, (x, z) => canReach(action, x, z));
     if (pick === null) continue;
     action.targetX = pick.x;
     action.targetZ = pick.z;

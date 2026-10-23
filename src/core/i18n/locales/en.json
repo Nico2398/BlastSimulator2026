@@ -4478,6 +4478,8 @@
   "mining.ramp_spiral.too_long": "This grade needs {needed} m of road; the longest ramp allowed is {max} m. Steepen the road or reduce the depth.",
   "mining.ramp_spiral.too_short": "This grade needs {needed} m of wall; this pit offers {offered} m. Widen the pit or steepen the road.",
   "mining.ramp_spiral.not_on_rim": "The start tile is not on the rim of a pit. Pick a tile next to the drop.",
+  "mining.crater_access.no_start": "No reachable ground to start an access ramp from.",
+  "mining.crater_access.too_shallow": "The crater floor is too shallow for an access ramp.",
   "mining.ramp_spiral.no_pit": "No pit found at the start tile. Start from the rim of a hole at least {depth} m deep.",
   "mining.ramp_spiral.start_in_void": "The start tile is inside the pit. Start from the rim.",
   "mining.ramp_spiral.outside_area": "The start tile is outside your claimed area.",
