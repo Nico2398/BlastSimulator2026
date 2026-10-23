@@ -308,8 +308,11 @@ export function decideBuriedPattern(input: BuriedPatternInput): BuriedPatternDec
 
 /** Sealed-rubble cell count at which the ladder shrinks its shot side. */
 export const LADDER_SEALED_SHRINK_COUNT = 100;
-/** Largest shot side at grade >= LADDER_GATE_MIN_GRADE. */
-export const LADDER_G2_MAX_SIDE = 3;
+/**
+ * Largest shot side at grade >= LADDER_GATE_MIN_GRADE. A cap of 3 starved ladder yield and the
+ * Shareholder Summit competent run ended game_over:worker_revolt (#2080); 4 is the contract floor.
+ */
+export const LADDER_G2_MAX_SIDE = 4;
 
 interface LadderShotSideInput {
   limitSide: number;
