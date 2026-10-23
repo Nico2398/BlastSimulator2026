@@ -22,7 +22,7 @@ export function moveTo(
   // `allowUnreachable` (#1178, single-mover unification): forwarded straight
   // to planItinerary's own opts — a best-effort route instead of a refusal
   // when the target is unreachable right now.
-  opts?: { via?: number; allowUnreachable?: boolean },
+  opts?: { via?: number; allowUnreachable?: boolean; crossFragments?: boolean },
   emitter?: EventEmitter,
 ): MoveResult;
 /** Walk to a vehicle and board it — no destination beyond the vehicle itself. */
@@ -44,7 +44,7 @@ export function moveTo(
   state: GameState,
   employeeId: number,
   target: { actionId: number },
-  opts?: { via?: number; allowUnreachable?: boolean },
+  opts?: { via?: number; allowUnreachable?: boolean; crossFragments?: boolean },
   emitter?: EventEmitter,
 ): MoveResult;
 /**
@@ -72,14 +72,14 @@ export function moveTo(
   // `allowUnreachable` (#1204): threaded through to planItinerary — the same
   // best-effort-route opt-in `beginRestTravel` already uses for the (x, z)
   // overload above.
-  opts?: { allowUnreachable?: boolean },
+  opts?: { allowUnreachable?: boolean; crossFragments?: boolean },
   emitter?: EventEmitter,
 ): MoveResult;
 export function moveTo(
   state: GameState,
   employeeId: number,
   target: { x: number; z: number } | { vehicleId: number } | { actionId: number } | { buildingId: number },
-  opts?: { via?: number; allowUnreachable?: boolean },
+  opts?: { via?: number; allowUnreachable?: boolean; crossFragments?: boolean },
   emitter?: EventEmitter,
 ): MoveResult {
   const employee = state.employees.employees.find(e => e.id === employeeId);

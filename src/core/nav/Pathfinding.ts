@@ -285,6 +285,7 @@ export function findFootPathWithVehicleFallback(
   grid: NavGrid,
   request: PathRequest,
   exact: boolean,
+  _opts?: { crossFragments?: boolean },
 ): FootPathFallbackResult {
   const pathfinder = exact ? findExactPath : findPath;
   const attempt = pathfinder(grid, request);

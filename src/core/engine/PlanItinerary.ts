@@ -834,7 +834,7 @@ export function planItinerary(
   // `allowUnreachable` (#1178, single-mover unification): threaded through to
   // buildDriveLeg's vehicle-gated drive leg below — a best-effort route
   // instead of a refusal when the target is unreachable right now.
-  opts?: { via?: number; action?: PendingAction; allowUnreachable?: boolean },
+  opts?: { via?: number; action?: PendingAction; allowUnreachable?: boolean; crossFragments?: boolean },
 ): Itinerary | null {
   // haul_debris/fragment_debris (#1091): these two action types need more
   // than the generic single-drive-leg-then-work shape the rest of this
