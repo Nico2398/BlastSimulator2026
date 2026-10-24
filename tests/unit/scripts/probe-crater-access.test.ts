@@ -2,8 +2,13 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  RAMP_SHOT_KEEP_OUT_M, buildRampCommand, hasLiveRampWork, newCraterAccessMemory, rampKeepOutZones, rampedAlready, stuckRampFootprints,
+  RAMP_SHOT_KEEP_OUT_M, buildRampCommand, hasLiveRampWork, keepsVehicleNetwork, newCraterAccessMemory, rampKeepOutZones, rampedAlready,
+  stuckRampFootprints,
 } from '../../../scripts/shared/probe-crater-access.js';
+import { createGame } from '../../../src/core/state/GameState.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
+import { VoxelGrid, setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
+import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { shotOverlapsProtectedRamp } from '../../../scripts/shared/probe-ladder-policy.js';
 import type { PendingAction, PlannedRamp } from '../../../src/core/state/GameState.js';
 import type { RampDef } from '../../../src/core/mining/Ramp.js';
@@ -100,5 +105,40 @@ describe('rampKeepOutZones (#2045)', () => {
 
   it('is empty with no built ramp', () => {
     expect(rampKeepOutZones({ builtRamps: [] })).toEqual([]);
+  });
+});
+
+describe('keepsVehicleNetwork (#2045)', () => {
+  /**
+   * A plateau (x < 10, height 10) and a lowland (x > 22, height 6), joined only by a gentle slope across z 10..14; a
+   * cliff everywhere else. The rally point is on the plateau.
+   */
+  function slopeSite() {
+    const grid = new VoxelGrid(40, 40);
+    const comp = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let z = 0; z < 40; z++) {
+      for (let x = 0; x < 40; x++) {
+        const onSlope = z >= 10 && z <= 14;
+        const h = x < 10 ? 10 : x > 22 ? 6 : onSlope ? 10 - (4 * (x - 10)) / 12 : x < 16 ? 10 : 6;
+        setVoxelColumnSurfaceHeight(grid, x, z, h, comp);
+      }
+    }
+    const state = createGame({ seed: 42 });
+    state.grade = createGradeState();
+    state.navGrid = NavGrid.buildNavGrid(grid, [], []);
+    state.rallyPoint = { x: 4, z: 4 };
+    return { state, grid };
+  }
+
+  it('accepts a trench dug in the lowland, away from the one slope', () => {
+    const { state, grid } = slopeSite();
+    const lowland: RampDef = { originX: 30, originZ: 2, direction: 'south', length: 20, targetDepth: 3, width: 3 };
+    expect(keepsVehicleNetwork(state, grid, lowland)).toBe(true);
+  });
+
+  it('refuses a trench dug across the one slope: it walls the rally off from the lowland', () => {
+    const { state, grid } = slopeSite();
+    const across: RampDef = { originX: 16, originZ: 4, direction: 'south', length: 24, targetDepth: 4, width: 3 };
+    expect(keepsVehicleNetwork(state, grid, across)).toBe(false);
   });
 });

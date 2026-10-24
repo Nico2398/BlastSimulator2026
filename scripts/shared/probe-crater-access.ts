@@ -10,14 +10,19 @@
 import type { GameState, PendingAction } from '../../src/core/state/GameState.js';
 import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { clusterStrandedFloors, planCraterAccess, type AccessSurface, type StrandedFloor } from '../../src/core/mining/CraterAccess.js';
-import { rampPathOf, rampWaypoints, type RampFootprint } from '../../src/core/mining/RampPath.js';
-import { rampWidthOf, type RampDef } from '../../src/core/mining/Ramp.js';
+import { rampPathCells, rampPathOf, rampTotalLength, rampWaypoints, type RampFootprint } from '../../src/core/mining/RampPath.js';
+import { rampFloorDepthAt, rampWidthOf, type RampDef } from '../../src/core/mining/Ramp.js';
+import { rampFootprint } from '../../src/core/mining/RampWidening.js';
+import { NavGrid, type NavCell } from '../../src/core/nav/NavGrid.js';
+import { computeClimbComponents } from '../../src/core/nav/NavGridReachability.js';
+import { vehicleMaxSlopeRatio } from '../../src/core/entities/Vehicle.js';
+import { isProgressionSite } from '../../src/core/state/GameState.js';
 import { siteVehicleReach, strandedDebrisTargets } from '../../src/core/engine/OrderReachability.js';
 import { quoteRampRepair } from '../../src/core/mining/RampRepair.js';
 import { buildingFootprintOccupants } from '../../src/core/nav/NavGridSync.js';
 import { isBuildingFootprintCell } from '../../src/core/entities/Building.js';
 import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
-import { CRATER_ACCESS_CLUSTER_GAP_CELLS, RAMP_DEFAULT_WIDTH, VEHICLE_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
+import { CRATER_ACCESS_CLUSTER_GAP_CELLS, NAV_CLEARANCE_VEHICLE_CELLS, RAMP_DEFAULT_WIDTH, VEHICLE_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
 import type { ProtectedZone } from './probe-ladder-policy.js';
 
 type Run = (cmd: string) => { success: boolean; output: string };
@@ -153,8 +158,77 @@ export function buildRampCommand(def: RampDef): string {
   return `build_ramp path:${path} depth:${def.targetDepth} width:${rampWidthOf(def)}${grade}`;
 }
 
+/** `nav` with the corridor of `def` set to its line: the ground vehicles will drive once the ramp is dug. */
+function navAfterRamp(nav: NavGrid, grid: VoxelGrid, def: RampDef): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < nav.height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < nav.width; x++) row.push({ ...nav.cellAt(nav.originX + x, nav.originZ + z)! });
+    cells.push(row);
+  }
+  const after = new NavGrid(nav.width, nav.height, cells, nav.maxSurfaceY, nav.originX, nav.originZ, nav.maxClimbY);
+  const path = rampPathOf(def);
+  const total = rampTotalLength(path.legs);
+  const start = computeVoxelColumnSurfaceHeight(grid, def.originX, def.originZ);
+  for (const c of rampPathCells(path, rampWidthOf(def))) {
+    const cell = after.cellAt(c.x, c.z);
+    if (cell !== undefined) cell.surfaceY = start - rampFloorDepthAt(c.step, total, def.targetDepth, def.gradeDegrees);
+  }
+  return after;
+}
+
+/** Cells of the rally point's vehicle network on `nav`, keyed `x,z`. */
+function networkCells(state: GameState, nav: NavGrid): Set<string> {
+  const out = new Set<string>();
+  if (state.rallyPoint === undefined) return out;
+  const ratio = vehicleMaxSlopeRatio(isProgressionSite(state));
+  const network = computeClimbComponents(nav, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom([state.rallyPoint]);
+  for (let z = nav.originZ; z < nav.maxZ; z++) {
+    for (let x = nav.originX; x < nav.maxX; x++) if (network.has(x, z)) out.add(`${x},${z}`);
+  }
+  return out;
+}
+
+/** Cells of today's vehicle network a dug ramp may leave off it (the rim cells its trench walls stand on). */
+const ACCESS_SEVER_TOLERANCE_CELLS = 25;
+
+/**
+ * True when digging `def` keeps today's vehicle network whole: at most ACCESS_SEVER_TOLERANCE_CELLS of the cells the
+ * rally point's vehicles reach now fall off it, the corridor itself aside. A trench cut along the one gentle slope
+ * between the rally and the rest of the site walls the rally and its depots off from every pit (#2045): the player
+ * never cuts their own road.
+ */
+export function keepsVehicleNetwork(state: GameState, grid: VoxelGrid, def: RampDef): boolean {
+  const nav = state.navGrid;
+  if (nav === null) return true;
+  const before = networkCells(state, nav);
+  if (before.size === 0) return true;
+  const after = networkCells(state, navAfterRamp(nav, grid, def));
+  const corridor = new Set(rampPathCells(rampPathOf(def), rampWidthOf(def)).map(c => `${c.x},${c.z}`));
+  let severed = 0;
+  for (const key of before) if (!after.has(key) && !corridor.has(key)) severed++;
+  return severed <= ACCESS_SEVER_TOLERANCE_CELLS;
+}
+
 function signatureOf(state: GameState, floors: readonly StrandedFloor[], avoid: readonly RampFootprint[]): string {
   return `${state.navGrid?.revision ?? -1}|${avoid.map(a => `${a.minX},${a.maxX},${a.minZ},${a.maxZ}`).join(';')}|${floors.map(f => `${f.x},${f.z},${f.floorY},${f.orderCount}`).join(';')}`;
+}
+
+/** Plans tried for one floor before it is given up: a plan that cuts the network is set aside and the floor planned again. */
+const ACCESS_PLAN_ATTEMPTS = 4;
+
+/** A plan down to `floor` whose dig keeps the vehicle network whole (`keepsVehicleNetwork`), or null. */
+function planKeepingRoads(
+  state: GameState, grid: VoxelGrid, floor: StrandedFloor, surface: AccessSurface, avoid: readonly RampFootprint[],
+): { def: RampDef; cost: number } | null {
+  const setAside = [...avoid];
+  for (let attempt = 0; attempt < ACCESS_PLAN_ATTEMPTS; attempt++) {
+    const plan = planCraterAccess(floor, surface, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH, setAside, state.builtRamps);
+    if (!plan.ok) return null;
+    if (keepsVehicleNetwork(state, grid, plan.def)) return plan;
+    setAside.push(rampFootprint(plan.def, rampWidthOf(plan.def)));
+  }
+  return null;
 }
 
 /**
@@ -179,8 +253,8 @@ export function orderCraterAccess(run: Run, state: GameState, grid: VoxelGrid, m
   const reserve = getOperatingCostPerHour(state).payroll * ACCESS_CASH_RESERVE_TICKS;
   let unaffordable = false;
   for (const floor of floors) {
-    const plan = planCraterAccess(floor, surface, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH, avoid, state.builtRamps);
-    if (!plan.ok) continue;
+    const plan = planKeepingRoads(state, grid, floor, surface, avoid);
+    if (plan === null) continue;
     if (state.cash - plan.cost < reserve) { unaffordable = true; continue; }
     const ordered = run(buildRampCommand(plan.def));
     if (ordered.success) {

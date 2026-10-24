@@ -712,8 +712,9 @@ describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
     return { state, id };
   }
   const reasonOf = (state: GameState, id: number) => state.pendingActions.find(a => a.id === id)!.blockedReason ?? null;
+  /** On the hauler's side of the wall: a haul needs a road on to its depot too (#2045). */
   const addWarehouse = (state: GameState) => {
-    const r = placeBuilding(state.buildings, 'freight_warehouse', 20, 8, 64, 64);
+    const r = placeBuilding(state.buildings, 'freight_warehouse', 5, 8, 64, 64);
     if (!r.success) throw new Error(r.error);
   };
 
@@ -746,6 +747,19 @@ describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
     setFreightRoomExact(state, 200);
     classifyQueuedOrders(state);
     state.logistics.fragments = state.logistics.fragments.filter(f => f.state !== 'stored'); // filler gone
+    classifyQueuedOrders(state);
+    expect(reasonOf(state, id)).toBeNull();
+  });
+
+  it('stamps debris_out_of_reach when the only warehouse lies across the wall from the hauler: no road on to unload (#2045)', () => {
+    const { state, id } = stageHaul();
+    const r = placeBuilding(state.buildings, 'freight_warehouse', 18, 2, 64, 64);
+    if (!r.success) throw new Error(r.error);
+    setFreightRoom(state, 5000);
+    classifyQueuedOrders(state);
+    expect(reasonOf(state, id)).toBe('debris_out_of_reach');
+    addWarehouse(state);
+    setFreightRoom(state, 5000);
     classifyQueuedOrders(state);
     expect(reasonOf(state, id)).toBeNull();
   });

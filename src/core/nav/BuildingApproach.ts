@@ -38,6 +38,17 @@ export function isOnBuildingRing(building: FootprintAnchor, def: BuildingDef, x:
   return x === minX || x === maxX || z === minZ || z === maxZ;
 }
 
+/** True when some cell of the one-cell ring around a building's footprint satisfies `has` (#2045). */
+export function buildingRingTouches(building: FootprintAnchor, def: BuildingDef, has: (x: number, z: number) => boolean): boolean {
+  const { minX, maxX, minZ, maxZ } = ringBounds(building, def);
+  for (let x = minX; x <= maxX; x++) {
+    for (let z = minZ; z <= maxZ; z++) {
+      if ((x === minX || x === maxX || z === minZ || z === maxZ) && has(x, z)) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * The ring cell closest to (fromX, fromZ) whose NavGrid cell passes
  * `accept`, or null when none does. Cells are visited in a fixed row order

@@ -33,6 +33,11 @@ import {
 } from '../nav/NavGridReachability.js';
 import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
 import { dockedFrom, withDockingCells } from '../nav/DockingReach.js';
+import { buildingRingTouches } from '../nav/BuildingApproach.js';
+import { haulDestinationOf } from '../economy/SpoilHeaps.js';
+import { oreGradeScaleOf } from '../economy/OreGrade.js';
+import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
+import { getBuildingDef } from '../entities/Building.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO, VEHICLE_MAX_SLOPE_RATIO, VEHICLE_MAX_SLOPE_DEGREES } from '../config/balance.js';
 import { steepestBlockingRamp } from '../mining/RampGrade.js';
 
@@ -211,6 +216,35 @@ interface Judgement {
 }
 
 /**
+ * Whether a haul order's pool can also drive on to a depot for its rubble (a freight warehouse, or a spoil heap for
+ * barren rock): a hauler that reaches the rubble in a pit with no road out can load it and never unload it, so the
+ * order is out of reach until the player opens a way out (#2045). True for every other order, and while no depot of
+ * the kind stands (the order then reads no warehouse or no spoil heap). Memoised per pool and destination.
+ */
+function haulDepotReach(state: GameState, reach: OrderReachability): (action: PendingAction, key: OrderActorKey) => boolean {
+  const memo = new Map<string, boolean>();
+  const fragmentOf = createFragmentLookup(state);
+  const gradeScale = oreGradeScaleOf(state.world);
+  return (action, key) => {
+    if (action.type !== 'haul_debris') return true;
+    const tracked = fragmentOf(action.payload['fragmentId'] as number);
+    if (tracked === undefined) return true;
+    const destination = haulDestinationOf(tracked.fragment, gradeScale);
+    const memoKey = `${key}|${destination}`;
+    let reaches = memo.get(memoKey);
+    if (reaches === undefined) {
+      const sites = destination === 'spoil_heap' ? spoilHeapSites(state.buildings) : freightWarehouseSites(state.buildings);
+      reaches = sites.length === 0 || sites.some(site => {
+        const depot = state.buildings.buildings.find(b => b.id === site.id);
+        return depot !== undefined && buildingRingTouches(depot, getBuildingDef(depot.type, depot.tier), (x, z) => reach.canReach(key, x, z));
+      });
+      memo.set(memoKey, reaches);
+    }
+    return reaches;
+  };
+}
+
+/**
  * Verdict for each of `targets`. A ramp layer takes the verdict of the ramp's
  * first not-done segment (the layer next in line to dig), claimed or not, so
  * layers waiting behind a half-dug layer follow that layer's verdict and never
@@ -237,10 +271,11 @@ function judgeActions(state: GameState, targets: ReadonlyArray<PendingAction>): 
     if (repAction !== undefined) judged.push(repAction);
   }
   const reach = buildOrderReachability(state, judged);
+  const reachesDepot = haulDepotReach(state, reach);
   const judgementOf = (action: PendingAction): Judgement => {
     const key = orderActorKey(action);
     const hasActor = reach.hasActor(key);
-    const reachable = hasActor && reach.canReach(key, action.targetX, action.targetZ);
+    const reachable = hasActor && reach.canReach(key, action.targetX, action.targetZ) && reachesDepot(action, key);
     return { verdict: reachable ? 'reachable' : 'unreachable', hasActor };
   };
 
