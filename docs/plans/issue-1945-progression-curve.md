@@ -435,3 +435,27 @@ Pit depth was not recorded by the probe table, so it is not stated here.
 
 Verdict: 20 m / grade 3 still not reached within 14,000 ticks. The bankruptcy is gone, but the next stall is unmeasured. Cash is not the limit (9-10 M idle).
 Next step: a pit-depth and stall diagnosis.
+
+## 2026-10-24 record (#2072, after #2085 parts 1 and 2): stall located, tuning still not reached
+
+Seed 42, desert_badlands, full kit, ladder. Code unchanged by this run (temporary per-250-tick instrumentation of `ladderPlan` and `syncCraterAccess`, reverted). No `MINE_GRADES`, `BUYER_*`, `PERMIT_LIMITS`, fee, sandbox pin or campaign pin moved.
+
+| run | g1 | g2 | g3-5 | cash@3k | cash@6k | cash@10k | blasts | boulder ore sold | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder, full, 14,000 (37 min wall, two runs in parallel) | 978 | 2272 | not reached | 4.70 M | 10.15 M | 9.28 M | 7 | 45% (boulder sold share 51%) | t14000 alive, low cash 63,699 at t550 |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| grade 3 at t8,000-14,000 | not reached (pit 10.2 m of 20 m, flat from t2,000) | MISSED |
+| grade 4 at t15,000-25,000 | not reached | MISSED |
+| grade 5 at t30,000-45,000 | not reached | MISSED |
+| >= 60% boulder ore sold | 45% | MISSED |
+| survives 50,000 ticks | see the 50,000 line below | |
+
+Where the run stalls (9,000-tick instrumented run, pit depth is `deepestPitM`):
+
+1. t2,000-6,750: pit 10.2 m, 4 blasts. The fourth crater holds ~1,100 fragments; at t3,000 it reads 93-107 ordered, 819 orderless (no haul order exists), 130 sealed, and the ordered count falls only 107 -> 63 in 3,250 ticks. The probe's shot gate (`wanted`: `!hauling` or pit below the fresh hole depth) stays shut, and `decideLadderDeepen` finds no crater with cleared rubble, so no shot fires for ~4,000 ticks with 4 to 10 M idle.
+2. t6,750: one deepening shot at crater (20,26) fails (`lastShotFailed`): 5,191 fragments, all sealed, pit stays 10.2 m. From t7,500 they read 5,191 orderless for 1,500+ ticks; no more blasts through t9,000 (cash 10.5 M).
+3. Cause of the orderless rubble, from `syncCraterAccess` (printed per sweep): stranded floors at (12,49) y=6.5 (870-930 orders) and (40,45) y=7.5 (143 orders) report `mining.crater_access.no_start` from t1,901 on: `planCraterAccess` finds neither a straight start nor a spiral for them, so `pruneAbandonedDebris` cancels their haul orders after 600 ticks and marks the fragments abandoned until a ramp is ordered, and none ever is. Rubble in those craters is never hauled, so no crater is ever "cleared" to deepen.
+
+So the limiter is still geometry, not economy or probe cadence: a second core slice must make `planCraterAccess` (`src/core/mining/CraterAccess.ts`) find a start for these floors (candidates: `validateRampOrder` refusals near buildings or the map edge, `MAX_RAMP_LENGTH`, `RAMP_FLOOR_SNAP_REACH_M`), or the probe must pick fresh sites whose craters keep an open lane. Forcing more shots while cash idles (tried in #2072's first run, reverted) adds rubble to craters that cannot be cleared, so it is not a lever here. Tuning `BUYER_*`, `MINE_GRADES` or `PERMIT_LIMITS` would hide this and was not attempted.
