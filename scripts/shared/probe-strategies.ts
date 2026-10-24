@@ -1143,6 +1143,7 @@ function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
 
 /** Opt-in (PROBE_DIAG=1) one-line ladder state to stderr every PROBE_DIAG_TICKS ticks: why a run stalls reads off the line. */
 function ladderDiagnostics(s: ProbeSession, m: LadderMemory): void {
+  tmpDump(s);
   const every = Number(process.env['PROBE_DIAG_TICKS'] ?? 1000);
   if (process.env['PROBE_DIAG'] !== '1' || s.state.tickCount % every !== 0) return;
   const { state } = s;
@@ -1300,3 +1301,39 @@ export function runMatrix(
   }
   return results;
 }
+
+import { strandedDebrisTargets, siteVehicleReach } from '../../src/core/engine/OrderReachability.js';
+import { clusterStrandedFloors, planCraterAccess } from '../../src/core/mining/CraterAccess.js';
+import { computeVoxelColumnSurfaceHeight } from '../../src/core/world/VoxelGrid.js';
+import { slowestVehicleTierSlopeRatio } from '../../src/core/nav/ClimbLimit.js';
+function tmpDump(s: ProbeSession): void {
+  const at = (process.env['PROBE_DUMP_TICKS'] ?? '').split(',').map(Number);
+  if (!at.includes(s.state.tickCount)) return;
+  const st = s.state; const grid = s.grid; const nav = st.navGrid!;
+  console.error('[dump] tick', st.tickCount, 'planned', JSON.stringify(st.plannedRamps.map(r => ({ id: r.id, def: r.def, fp: r.footprint, segs: r.segments.map(g => [g.actionId, g.done, st.pendingActions.find(a => a.id === g.actionId)?.blockedReason ?? null, st.pendingActions.find(a => a.id === g.actionId)?.status ?? null]) }))));
+  console.error('[dump] built', JSON.stringify(st.builtRamps.map(r => ({ def: r.def, width: r.width }))));
+  console.error('[dump] segs', JSON.stringify(st.pendingActions.filter(a => a.type === 'dig_ramp_segment')));
+  console.error('[dump] diggers', JSON.stringify(st.vehicles.vehicles.filter(v => v.type === 'rock_digger')), JSON.stringify(st.employees.employees.map(e => [e.id, e.role, e.qualifications, e.activeActionId, e.taskQueue.length, e.locomotion?.kind])));
+  for (const id of [4, 12, 6]) {
+    const e = st.employees.employees.find(x => x.id === id)!;
+    for (const a of st.pendingActions.filter(x => x.type === 'dig_ramp_segment').slice(0, 1)) {
+      console.error('[dump] claim', id, a.id, JSON.stringify(findVehicleForClaim(st, a, e)).slice(0, 200), 'pos', e.x, e.z, 'sel', JSON.stringify(selectBestActionForEmployee(st, e, [a])?.action.id ?? null), 'claimable', isRampSegmentClaimable(st, a), 'backoff', a.stuckBackoffUntilTick);
+    }
+  }
+  { const e = st.employees.employees.find(x => x.id === 12)!; const cr = employeeClimbReach(st)!;
+    for (const a of st.pendingActions.filter(x => x.type === 'dig_ramp_segment')) console.error('[dump] reach', a.id, a.targetX, a.targetZ, 'canReach', cr.canReach(e.x, e.z, a.targetX, a.targetZ), 'cost', JSON.stringify(resolveActionCost(st, e, a)));
+    for (const z of [6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46, 48]) console.error('[dump] ramp col', z, 'h', computeVoxelColumnSurfaceHeight(grid, 7, z), 'nav', JSON.stringify(nav.cellAt(7, z)), 'ccan', cr.canReach(e.x, e.z, 7, z)); }
+  console.error('[dump] buildings', JSON.stringify(st.buildings.buildings.map(b => [b.id, b.type, b.tier, b.x, b.z, b.width, b.depth, b.rotation])), JSON.stringify(st.plannedBuildings ?? null).slice(0, 600));
+  const reach = siteVehicleReach(st)!;
+  const cells = strandedDebrisTargets(st).filter(t => !reach(Math.round(t.x), Math.round(t.z))).map(t => ({ x: t.x, z: t.z, y: computeVoxelColumnSurfaceHeight(grid, Math.round(t.x), Math.round(t.z)) }));
+  const floors = clusterStrandedFloors(cells, 4);
+  console.error('[dump] stranded cells', cells.length, 'floors', JSON.stringify(floors));
+  const surface = { heightAt: (x: number, z: number) => computeVoxelColumnSurfaceHeight(grid, x, z), contains: (x: number, z: number) => grid.containsColumn(x, z) && (nav.cellAt(x, z)?.type ?? 'void') !== 'void', reachableFrom: reach };
+  for (const f of floors) console.error('[dump] plan', JSON.stringify(f), JSON.stringify(planCraterAccess(f, surface, slowestVehicleTierSlopeRatio(), 3 as never, [], st.builtRamps)));
+  // height map around crater
+  const c = floors[0]; if (c) { for (let z = Math.round(c.z) - 14; z <= Math.round(c.z) + 14; z += 2) { let row = ''; for (let x = Math.round(c.x) - 20; x <= Math.round(c.x) + 20; x++) { const h = computeVoxelColumnSurfaceHeight(grid, x, z); row += (Number.isFinite(h) ? Math.round(h).toString(36) : '.') + (reach(x, z) ? '+' : ''); } console.error(`[dump] z${z} ${row}`); } }
+}
+
+import { findVehicleForClaim } from '../../src/core/engine/VehicleReservation.js';
+import { employeeClimbReach } from '../../src/core/engine/OrderReachability.js';
+import { selectBestActionForEmployee, isRampSegmentClaimable, resolveActionCost } from '../../src/core/engine/ActionSelection.js';

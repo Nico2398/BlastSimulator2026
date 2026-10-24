@@ -15,6 +15,8 @@ import { defineRampSegments } from '../mining/Ramp.js';
 import { rampFootprint } from '../mining/RampWidening.js';
 import { queueRampOrder } from '../mining/RampOrder.js';
 import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../world/VoxelGrid.js';
+import { buildingFootprintOccupants } from '../nav/NavGridSync.js';
+import { isBuildingFootprintCell } from '../entities/BuildingPlacement.js';
 import { clearAbandonedDebris } from '../economy/HaulDispatch.js';
 import { blockedRampFootprints, hasLiveRampWork, pruneAbandonedDebris } from './StrandedAccess.js';
 import { siteVehicleReach, strandedDebrisTargets } from './OrderReachability.js';
@@ -89,10 +91,12 @@ export function syncCraterAccess(state: GameState, grid?: VoxelGrid | null): voi
   }
 
   const reserve = getOperatingCostPerHour(state).payroll * CRATER_ACCESS_CASH_RESERVE_TICKS;
+  const buildings = buildingFootprintOccupants(state);
+  const occupied = (x: number, z: number): boolean => buildings.some(b => isBuildingFootprintCell(b, x, z));
   let affordabilityBlocked = false;
   const unplannable: StrandedFloor[] = [];
   for (const floor of floors) {
-    const plan = planCraterAccess(floor, surface, slowestVehicleTierSlopeRatio(), RAMP_DEFAULT_WIDTH, avoid, state.builtRamps);
+    const plan = planCraterAccess(floor, surface, slowestVehicleTierSlopeRatio(), RAMP_DEFAULT_WIDTH, avoid, state.builtRamps, occupied);
     if (!plan.ok) { unplannable.push(floor); continue; }
     if (state.cash - plan.cost < reserve) { affordabilityBlocked = true; continue; }
     const segments = defineRampSegments(grid, plan.def);
