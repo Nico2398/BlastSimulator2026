@@ -988,6 +988,16 @@ function ladderCrew(s: ProbeSession, m: ReinvestMemory): void {
 const LADDER_ECOLOGY_FLOOR = 40;
 const LADDER_MAX_SPOIL_HEAPS = 4;
 
+/**
+ * Whether the ladder needs another spoil heap for `barrenKgPending` of rubble awaiting a heap while `heaps` are built:
+ * the rubble outgrows their combined capacity and the heap cap is not reached (#2085).
+ */
+export function spoilHeapsNeeded(barrenKgPending: number, heaps: number): boolean {
+  void barrenKgPending; void heaps;
+  // TODO: implement
+  return false;
+}
+
 /** Another spoil heap while ecology sags and rubble outgrows the heaps' room. */
 function ladderSpoil(s: ProbeSession, m: ReinvestMemory): void {
   if (s.state.scores.ecology >= LADDER_ECOLOGY_FLOOR || countOf(s, 'spoil_heap') >= LADDER_MAX_SPOIL_HEAPS

@@ -415,3 +415,15 @@ export function haulBlockedReason(
   if (state.logistics.storageCapacityKg === 0) return 'no_freight_warehouse';
   return fits(tracked) ? null : 'storage_full';
 }
+
+/**
+ * Total mass (kg) of the on-ground fragments that queued haul_debris orders
+ * stamped 'spoil_heap_full' are waiting to carry: the barren rubble no built
+ * spoil heap has room for (#2085). Other blocked reasons and action types are
+ * ignored.
+ */
+export function pendingSpoilOverflowKg(state: Pick<GameState, 'pendingActions' | 'logistics'>): number {
+  void state;
+  // TODO: implement
+  return 0;
+}
