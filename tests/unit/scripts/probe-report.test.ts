@@ -13,6 +13,7 @@ function makeResult(seed: number, over: Partial<RunResult['metrics']> = {}): Run
       bankruptTick: null,
       firstBlastSoldShareAt6000: null,
       blastsFired: 3,
+      deepestPitM: 10.2,
       warehouseFullTick: 900,
       ticksHaulWaitedOnFullStorage: 17,
       boulderSoldShare: null,
@@ -54,7 +55,7 @@ describe('probe-report formatTable', () => {
   it('includes every metric column', () => {
     const header = lines[0]!.toLowerCase();
     for (const col of [
-      'seed', 'biome', 'kit', 'strategy', 'low cash', 'low tick', 'bankrupt', 'blasts',
+      'seed', 'biome', 'kit', 'strategy', 'low cash', 'low tick', 'bankrupt', 'blasts', 'pit m',
       'warehousefull', 'boulder', 'grade', 'warehouset2', 'researchcenter', 'secondhauler',
     ]) {
       expect(header).toContain(col);
@@ -65,6 +66,10 @@ describe('probe-report formatTable', () => {
   it('shows values of the run', () => {
     expect(lines[2]).toContain('12345');
     expect(lines[3]).toContain('9');
+  });
+
+  it('shows the deepest pit with one decimal', () => {
+    expect(lines[2]).toContain('10.2');
   });
 
   it('is deterministic', () => {

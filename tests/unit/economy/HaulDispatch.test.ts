@@ -21,7 +21,7 @@ import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
-import { haulBlockedReason, isAutoDebrisAction, syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre, createFragmentLookup, findNearbyHaulableFragments } from '../../../src/core/economy/HaulDispatch.js';
+import { abandonDebrisFragments, clearAbandonedDebris, isDebrisAbandoned, haulBlockedReason, isAutoDebrisAction, syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre, createFragmentLookup, findNearbyHaulableFragments } from '../../../src/core/economy/HaulDispatch.js';
 import { pickupFragment } from '../../../src/core/economy/Logistics.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { isHaulBlockedReason } from '../../../src/core/economy/HaulDispatch.js';
@@ -1210,5 +1210,17 @@ describe('haulBlockedReason — full spoil heaps (#1892)', () => {
     fillHeaps(state, SPOIL_HEAP_CAPACITY_KG);
     addBlastFragments(state.logistics, [barren(1, 5, 5, 400)]);
     expect(isHaulOrFragmentActionClaimable(state, action())).toBe(false);
+  });
+});
+
+describe('isDebrisAbandoned (#2076)', () => {
+  it('is false until a fragment is abandoned, true after, false again once cleared', () => {
+    const state = createGame({ seed: 42 });
+    expect(isDebrisAbandoned(state, 7)).toBe(false);
+    abandonDebrisFragments(state, [7]);
+    expect(isDebrisAbandoned(state, 7)).toBe(true);
+    expect(isDebrisAbandoned(state, 8)).toBe(false);
+    clearAbandonedDebris(state);
+    expect(isDebrisAbandoned(state, 7)).toBe(false);
   });
 });

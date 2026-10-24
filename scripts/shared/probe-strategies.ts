@@ -85,7 +85,7 @@ import {
   decideLadderHoleDepth, judgeLadderShot, decideLadderHaulerBuy, rampStartsInsideCrater, LADDER_STALE_RAMP_TICKS,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
-import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
+import { isDebrisAbandoned, pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
@@ -806,7 +806,8 @@ export function craterRubbleCounts(state: GameState, crater: Pattern & { span: n
   for (const f of state.logistics.fragments) {
     if (f.state !== 'on_ground' || !inCraterFringe(f.fragment.position.x, f.fragment.position.z, crater)) continue;
     const id = f.fragment.id;
-    if (sealedIds.has(id)) counts.sealed++;
+    // An abandoned fragment lost its order for being out of reach: it is sealed too, not waiting for an order (#2076).
+    if (sealedIds.has(id) || isDebrisAbandoned(state, id)) counts.sealed++;
     else if (orderedIds.has(id)) counts.ordered++;
     else counts.orderless++;
   }
