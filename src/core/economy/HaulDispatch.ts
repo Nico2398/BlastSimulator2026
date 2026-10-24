@@ -423,7 +423,12 @@ export function haulBlockedReason(
  * ignored.
  */
 export function pendingSpoilOverflowKg(state: Pick<GameState, 'pendingActions' | 'logistics'>): number {
-  void state;
-  // TODO: implement
-  return 0;
+  const lookup: FragmentLookup = id => findById(state.logistics.fragments, fragmentIdOf, id);
+  let kg = 0;
+  for (const a of state.pendingActions) {
+    if (a.type !== 'haul_debris' || a.status !== 'queued' || a.blockedReason !== 'spoil_heap_full') continue;
+    const fragmentId = a.payload['fragmentId'];
+    if (typeof fragmentId === 'number') kg += lookup(fragmentId)?.fragment.mass ?? 0;
+  }
+  return kg;
 }

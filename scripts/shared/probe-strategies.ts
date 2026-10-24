@@ -62,7 +62,7 @@ import { computeVehicleUpgradeCost } from '../../src/core/entities/VehicleUpgrad
 import { ROLE_LICENCE_REQUIRED, canDriveTier, countLicenceHolders, licenceLevelOfSkill } from '../../src/core/entities/VehicleDriverAssignment.js';
 import { isEnrolledInTraining } from '../../src/core/entities/EmployeeTraining.js';
 import {
-  DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS,
+  DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS, SPOIL_HEAP_CAPACITY_KG,
   WALL_BERM_MIN_WIDTH_M, WALL_SAFE_FACE_HEIGHT_M_BY_TIER,
 } from '../../src/core/config/balance.js';
 import { gradeDef } from '../../src/core/economy/MineGrade.js';
@@ -85,7 +85,7 @@ import {
   decideLadderHoleDepth, judgeLadderShot,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
-import { sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
+import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
@@ -993,14 +993,14 @@ const LADDER_MAX_SPOIL_HEAPS = 4;
  * the rubble outgrows their combined capacity and the heap cap is not reached (#2085).
  */
 export function spoilHeapsNeeded(barrenKgPending: number, heaps: number): boolean {
-  void barrenKgPending; void heaps;
-  // TODO: implement
-  return false;
+  return barrenKgPending > 0 && heaps < LADDER_MAX_SPOIL_HEAPS && barrenKgPending > heaps * SPOIL_HEAP_CAPACITY_KG;
 }
 
 /** Another spoil heap while ecology sags and rubble outgrows the heaps' room. */
 function ladderSpoil(s: ProbeSession, m: ReinvestMemory): void {
-  if (s.state.scores.ecology >= LADDER_ECOLOGY_FLOOR || countOf(s, 'spoil_heap') >= LADDER_MAX_SPOIL_HEAPS
+  const heaps = countOf(s, 'spoil_heap');
+  const needed = s.state.scores.ecology < LADDER_ECOLOGY_FLOOR || spoilHeapsNeeded(pendingSpoilOverflowKg(s.state), heaps);
+  if (!needed || heaps >= LADDER_MAX_SPOIL_HEAPS
     || s.state.plannedBuildings.some(p => p.type === 'spoil_heap')
     || spendable(s) < getBuildingDef('spoil_heap', 1).constructionCost) return;
   tryOnce(s, m, 'spoil_heap', () => placeBuilding(s, 'spoil_heap', rallyOf(s), null) !== null);
