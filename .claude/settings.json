@@ -153,6 +153,20 @@
           }
         ]
       }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/compact-at-step-boundary.mjs"
+            ]
+          }
+        ]
+      }
     ]
   }
 }

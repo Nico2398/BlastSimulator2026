@@ -57,14 +57,16 @@ Verify all of it with `npm run validate:context`.
 
 ## Compaction
 
-Claude Code compacts on its own; no session triggers it, and it can land on any turn. The runner sets the window and makes the timing harmless:
+Automatic compaction runs between pipeline steps, never inside one. No headless session can trigger a compaction; the runner makes one due early and holds it until a step boundary:
 
-- **`CLAUDE_CODE_AUTO_COMPACT_WINDOW: '300000'`** on both Claude steps of `claude-runner.yml`. It applies to the lead and every sub-agent. Raise it only on evidence from run metrics (`peakContextTokens`, `compactions` per agent).
-- **`.claude/hooks/restore-after-compact.mjs`**, a `SessionStart` hook with matcher `compact` in `.claude/settings.json`, prints the run state on disk right after the summary: open TDD cycles and their phase, the blind marker, the branch and uncommitted paths, the last commits, each plan's `## Progress`, the last `verify`. Outside a pipeline run it prints nothing.
-- **The lead checkpoints every step boundary** into the plan's `## Progress` (`agentic-pipeline-tdd`), so the state the hook restores is current.
+- **`CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000'`**, the smallest window, on both Claude steps of `claude-runner.yml`. A compaction is due as soon as a step has grown the context; the model's hard limit stays 1M.
+- **`npm run pipeline -- step <name> --label <label>`** marks a boundary: it records the finished step in the plan's `## Progress` and writes `.agentic/step.json` for the step now in flight. `step done` closes the last one.
+- **`.claude/hooks/compact-at-step-boundary.mjs`**, a `PreCompact` hook on `auto` in `.claude/settings.json`, refuses the lead's automatic compaction while `.agentic/step.json` exists. Claude Code asks again on every request, so the compaction runs on the first request after the next boundary. It allows manual `/compact`, sub-agents (`agent_type` set), sessions with no step marker, and a lead whose last prompt reached 600k tokens.
+- **`.claude/hooks/restore-after-compact.mjs`**, a `SessionStart` hook on `compact`, prints the run state on disk right after the summary: the step in flight, open TDD cycles and their phase, the blind marker, the branch and uncommitted paths, the last commits, each plan's `## Progress`, the last `verify`. Outside a pipeline run it prints nothing.
 - **Blindness survives compaction** by construction: `blind-to-tests.mjs` reads the marker on every call, not the conversation.
+- Run metrics count `compactions` and `peakContextTokens` per agent: the window and the 600k valve change on that evidence.
 
-OpenCode compacts by its own rules and has no equivalent hook: a gap recorded here, not closed.
+OpenCode compacts by its own rules and has neither hook: a gap recorded here, not closed.
 
 ## Model and effort
 

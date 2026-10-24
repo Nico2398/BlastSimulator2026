@@ -58,7 +58,7 @@ The script refuses every step out of order — no skeleton commit, a skeleton th
 - <step> done — <commit sha> — next: <step> — open: <failures, decisions pending> | none
 ```
 
-`## Progress` takes one line per finished step (`agentic-pipeline-full` and `agentic-pipeline-finalization` steps included); it is what `restore-after-compact.mjs` hands back after a compaction. The test-writer receives the Contract and nothing else. The Contract says **what** the change must do, never how: an implementation detail in it reaches the tests and pins them to one design. The reviewer receives the whole plan.
+`## Progress` is written by `npm run pipeline -- step`, one line per finished step, and is what `restore-after-compact.mjs` hands back after a compaction. The test-writer receives the Contract and nothing else. The Contract says **what** the change must do, never how: an implementation detail in it reaches the tests and pins them to one design. The reviewer receives the whole plan.
 
 ### The blind phase
 

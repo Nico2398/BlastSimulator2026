@@ -15,6 +15,7 @@
  *   npm run pipeline -- tdd status --label <label>
  *   npm run pipeline -- verify [--base origin/main] [--only static,logic] [--no-cache]
  *   npm run pipeline -- review-brief [--base origin/main] [--label <label>]...
+ *   npm run pipeline -- step <name> --label <label> [--note "<what is open>"]   (`step done` closes the last)
  *
  * `verify` outlives one Bash call on a full change: run it through
  * `npm run long -- start verify -- npm run pipeline -- verify`.
@@ -25,13 +26,15 @@
 import { GitError } from './lib/pipeline/git.js';
 import { CHANNEL_ORDER, type Channel } from './lib/pipeline/paths.js';
 import { reviewBrief } from './lib/pipeline/review-brief.js';
+import { step, StepError } from './lib/pipeline/steps.js';
 import { joinCycle, PipelineError, red, split, start, status } from './lib/pipeline/tdd.js';
 import { verify } from './lib/pipeline/verify.js';
 
 const USAGE = `Usage:
   npm run pipeline -- tdd start|split|red|join|status --label <label> [--base <ref>] [--feature <branch>] [--no-commit]
   npm run pipeline -- verify [--base <ref>] [--only <channel,...>] [--no-cache]
-  npm run pipeline -- review-brief [--base <ref>] [--label <label>]...`;
+  npm run pipeline -- review-brief [--base <ref>] [--label <label>]...
+  npm run pipeline -- step <name>|done --label <label> [--note <text>]`;
 
 /** Values of `--name value` (repeatable) and the presence of bare `--flag`s. */
 export function parseArgs(argv: string[]): { positional: string[]; values: Map<string, string[]>; flags: Set<string> } {
@@ -100,6 +103,12 @@ function run(argv: string[]): number {
     print(result.lines);
     return result.ok ? 0 : 1;
   }
+  if (command === 'step') {
+    const name = positional.slice(1).join(' ');
+    if (name === '') throw new PipelineError(USAGE);
+    print(step(cwd, required(values, 'label'), name, one(values, 'note')));
+    return 0;
+  }
   if (command === 'review-brief') {
     print(reviewBrief(cwd, { base: one(values, 'base'), labels: values.get('label') }));
     return 0;
@@ -111,7 +120,7 @@ if (process.argv[1] !== undefined && process.argv[1].endsWith('pipeline.ts')) {
   try {
     process.exitCode = run(process.argv.slice(2));
   } catch (error) {
-    if (!(error instanceof PipelineError) && !(error instanceof GitError)) throw error;
+    if (!(error instanceof PipelineError) && !(error instanceof GitError) && !(error instanceof StepError)) throw error;
     console.error(error.message);
     process.exitCode = 2;
   }

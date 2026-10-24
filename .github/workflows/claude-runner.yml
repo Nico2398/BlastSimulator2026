@@ -233,12 +233,12 @@ jobs:
           # absolute deadline goes to the retry, which therefore starts with its
           # loops already closed and does linear work only.
           AGENTIC_LOOP_DEADLINE_EPOCH: ${{ steps.clock.outputs.loop_deadline }}
-          # Compact early and often: at ~300k tokens rather than near the 1M
-          # window, so no turn re-reads a near-full context from cache. Safe at
-          # any turn because `restore-after-compact.mjs` hands the run state on
-          # disk back after every compaction — `agentic-autonomous-pipeline`'s
-          # runtime-parity reference holds the strategy.
-          CLAUDE_CODE_AUTO_COMPACT_WINDOW: '300000'
+          # The smallest window: a compaction is due as soon as a step has
+          # grown the context, and `compact-at-step-boundary.mjs` holds it until
+          # the lead marks the next step boundary, so it runs between steps,
+          # never inside one. `agentic-autonomous-pipeline`'s runtime-parity
+          # reference holds the strategy.
+          CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000'
         # Pinned to a SHA, not the moving `v1` tag. The action hardcodes the
         # Claude Code build it installs (`base-action/action.yml`), so `v1`
         # silently changes the agent binary under every run: the tag moved to
@@ -407,12 +407,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           AGENTIC_LOOP_DEADLINE_EPOCH: ${{ steps.clock.outputs.loop_deadline }}
-          # Compact early and often: at ~300k tokens rather than near the 1M
-          # window, so no turn re-reads a near-full context from cache. Safe at
-          # any turn because `restore-after-compact.mjs` hands the run state on
-          # disk back after every compaction — `agentic-autonomous-pipeline`'s
-          # runtime-parity reference holds the strategy.
-          CLAUDE_CODE_AUTO_COMPACT_WINDOW: '300000'
+          # The smallest window: a compaction is due as soon as a step has
+          # grown the context, and `compact-at-step-boundary.mjs` holds it until
+          # the lead marks the next step boundary, so it runs between steps,
+          # never inside one. `agentic-autonomous-pipeline`'s runtime-parity
+          # reference holds the strategy.
+          CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000'
         # Same pin as the first attempt, and it has to stay the same one: a
         # retry on a different agent build is a different run, not a second try.
         uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237

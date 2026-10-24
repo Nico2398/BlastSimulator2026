@@ -46,6 +46,7 @@ const blind = existsSync(join(tddDir, 'blind.json')) ? readJson(join(tddDir, 'bl
 const planDir = join(agentic, 'plan');
 const plans = existsSync(planDir) ? readdirSync(planDir).filter((name) => name.endsWith('.md')) : [];
 const lastVerify = join(agentic, 'verify', 'last.txt');
+const stepInFlight = existsSync(join(agentic, 'step.json')) ? readJson(join(agentic, 'step.json')) : undefined;
 
 if (cycles.length === 0 && plans.length === 0 && !existsSync(lastVerify)) process.exit(0);
 
@@ -57,6 +58,8 @@ if (blind) {
     '',
   );
 }
+
+if (stepInFlight) lines.push(`- Step in flight: \`${stepInFlight.name}\` (since ${stepInFlight.since}). Close it with \`npm run pipeline -- step <next> --label ${stepInFlight.label}\` when it is done.`);
 
 for (const cycle of cycles) {
   lines.push(

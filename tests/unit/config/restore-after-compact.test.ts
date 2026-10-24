@@ -72,6 +72,6 @@ describe('registration', () => {
 
   it('the runner compacts early on both Claude steps', () => {
     const runner = readFileSync(join(ROOT, '.github/workflows/claude-runner.yml'), 'utf8');
-    expect(runner.match(/CLAUDE_CODE_AUTO_COMPACT_WINDOW: '300000'/g)).toHaveLength(2);
+    expect(runner.match(/CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000'/g)).toHaveLength(2);
   });
 });
