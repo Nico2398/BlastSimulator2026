@@ -1,6 +1,7 @@
 ---
 name: visual-tester
 description: Visual testing: Puppeteer scenario tests, screenshots, state dumps. Use when change affects rendering, UI, or visual presentation.
+effort: medium
 tools: Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite
 skills:
   - dev-visual-testing

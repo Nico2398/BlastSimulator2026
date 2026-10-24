@@ -1,15 +1,15 @@
 ---
 name: orchestrator
 description: Runs one autonomous pipeline task end to end as its lead. Classifies the task, does the planning, implementation, fixes and git work itself, and delegates only the steps that need a separate context — blind test-writing, independent review, screenshot inspection, volumetric batches.
+effort: medium
 skills:
   - agentic-autonomous-pipeline
   - agentic-decision-autonomy
 # Enforcement lives in `.claude/settings.json`, not here. A frontmatter hook is
 # registered only for an agent started through the `Agent` tool, and `/agentic-run`
-# forks the session into this agent instead — so this block alone never fired, and
-# issue #406 lost its run to a backgrounded sub-agent. Kept as a fallback for the
-# case where the orchestrator IS invoked as a sub-agent. Do not delete the
-# settings.json entry; `npm run validate:context` fails without it.
+# forks the session into this agent instead — so this block alone does not fire.
+# Kept as a fallback for the case where the orchestrator IS invoked as a sub-agent.
+# Do not delete the settings.json entry; `npm run validate:context` fails without it.
 hooks:
   PreToolUse:
     - matcher: Agent|Task
@@ -69,3 +69,5 @@ First match wins. Execute the loaded skill's first step next.
 ## Report
 
 After each phase, one line: phase, outcome, commit SHA, branch. At the end, the comment `/agentic-run` asks for.
+
+History: docs/context-history/agent-orchestrator.md

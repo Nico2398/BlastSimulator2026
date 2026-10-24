@@ -36,7 +36,7 @@ description: >
                  VERIFY: FAIL → the fix loop below
 ```
 
-The script refuses every step out of order — no skeleton commit, a skeleton that writes tests, a join before RED or before an implementation commit, a dirty tree — and says what is missing. It replaces the branch-sanity, verify-commit, cherry-pick and git-verify steps the cycle used to spend model turns on.
+The script refuses every step out of order — no skeleton commit, a skeleton that writes tests, a join before RED or before an implementation commit, a dirty tree — and says what is missing.
 
 ### The plan
 
@@ -59,7 +59,7 @@ The test-writer receives the Contract and nothing else. The Contract says **what
 
 ### The blind phase
 
-From `split` until `join` the lead does not see the tests: `blind-to-tests.mjs` refuses every file and shell tool call that reaches the tests worktree or branch, from every session but the test-writer's, and the test-writer's report names files and criteria, never test content. The implementation is therefore shaped by the Contract alone, and the tests by the Contract alone — the separation the old cycle bought with a separate implementer agent, kept here without one.
+From `split` until `join` the lead does not see the tests: `blind-to-tests.mjs` refuses every file and shell tool call that reaches the tests worktree or branch, from every session but the test-writer's, and the test-writer's report names files and criteria, never test content. The implementation is therefore shaped by the Contract alone, and the tests by the Contract alone.
 
 The test-writer works in its own worktree, so the two sides never share a working directory or an index.
 
@@ -77,7 +77,7 @@ Caller provides a `<label>` and optionally a base branch (default `main`):
 - `pipeline/tests-<label>` — skeleton + tests, cut from the skeleton commit, in its own worktree
 - `pipeline/feature-<label>` — the deliverable and the PR head
 
-**`<label>` is `<issue>-<runId>`, never the issue number alone.** In GitHub Actions the runner states the three branch names in the trigger prompt — use exactly those; in a CLI session pick `local-$(openssl rand -hex 4)` once for the run. Issue #554 is why: run 166 rebuilt `pipeline/feature-554` from `main` while run 160's abandoned branch held the name on the remote, and six hours of finished work died on `! [rejected] (non-fast-forward)`.
+**`<label>` is `<issue>-<runId>`, never the issue number alone.** In GitHub Actions the runner states the three branch names in the trigger prompt — use exactly those; in a CLI session pick `local-$(openssl rand -hex 4)` once for the run.
 
 - **Never reuse a branch from an earlier run, and never force-push over one.** `tdd start` refuses an existing label or branch.
 - Commit messages cite the **issue**, not the label: `<role>: <what> (#<issue>)`.
@@ -87,7 +87,7 @@ A multi-pipeline section uses `<run-label>-s<K>` with `--feature pipeline/featur
 
 ### ▶ Volumetric work goes out in parallel batches
 
-A step is **volumetric** when it is the same transformation applied to N independent files — scenario definitions to adapt to a new pacing, locale keys to add, call sites to migrate, screenshots to read back. Issue #554's run 166 edited 94 files one at a time and was cancelled at 360 minutes with nothing pushed.
+A step is **volumetric** when it is the same transformation applied to N independent files — scenario definitions to adapt to a new pacing, locale keys to add, call sites to migrate, screenshots to read back.
 
 **At N ≥ 5 independent items, fan out. Do not iterate.**
 
@@ -115,3 +115,5 @@ A step is **volumetric** when it is the same transformation applied to N indepen
 | Join conflict | Resolve so both sides survive, `git add`, `git cherry-pick --continue`, re-run `tdd join` |
 | `VERIFY: FAIL` | The fix loop |
 | Seven failures of one step | Comment the history on the issue, stop with `ESCALATED: human intervention required` |
+
+History: docs/context-history/agentic-pipeline-tdd.md

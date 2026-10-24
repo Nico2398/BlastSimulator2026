@@ -1,6 +1,7 @@
 ---
 name: batch-worker
 description: Applies one stated transformation to a listed, disjoint set of files, in parallel with other batch workers — call sites to migrate, definitions to adapt, keys to add. Edits only its files, commits nothing, runs no suite.
+effort: medium
 tools: Read, Edit, Write, Grep, Glob, Bash, Skill
 hooks:
   PreToolUse:

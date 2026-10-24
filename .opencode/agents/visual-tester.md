@@ -1,6 +1,6 @@
 ---
 model: opencode/mimo-v2.5-free
-reasoningEffort: high
+reasoningEffort: medium
 description:  Visual testing: Puppeteer scenario tests, screenshots, state dumps. Use when change affects rendering, UI, or visual presentation.
 mode: subagent
 permission:

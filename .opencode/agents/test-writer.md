@@ -1,6 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
-reasoningEffort: max
+reasoningEffort: high
 description:  TDD red phase. Writes failing tests from a plan's Contract in the tests worktree the lead names, proves RED with `npm run pipeline -- tdd red`, and reports without revealing the tests. Never sees an implementation; the lead never sees its tests until the join.
 mode: subagent
 permission:

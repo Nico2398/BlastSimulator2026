@@ -72,5 +72,5 @@ jobs:
           # `deny` rules from .claude/settings.json still enforced.
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-          claude_args: '--permission-mode bypassPermissions'
+          claude_args: '--permission-mode bypassPermissions --effort high'
 

@@ -87,7 +87,7 @@ What may be assigned is decided in one place, `.github/scripts/assignability.cjs
 
 A session started by the autonomous pipeline — a GitHub Actions run woken by the configured agent mention in a pipeline assignment comment — is not an ordinary session. Its first action is to run as the orchestrator: classify the task, then do the work, delegating only the steps that need a separate context — blind test-writing, independent review, screenshot inspection. Never implement a pipeline-assigned task directly, and never explore the codebase before the task has been classified. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
 
-That mandate is for a pipeline-dispatched run specifically. Any session that touches a numbered issue — including one opened directly against it, with no `/agentic-run` in sight — still owns getting its branch, PR and labels right before ending, whether or not it ever enters the orchestrator: `agentic-autonomous-pipeline`'s before-ending checklist binds regardless of entry point, including a hard-won rule about how GitHub's own merge-time parser reads a PR body — load that skill before your last message whenever your work discusses an issue you are not closing.
+That mandate is for a pipeline-dispatched run specifically. Any session that touches a numbered issue — including one opened directly against it, with no `/agentic-run` in sight — still owns getting its branch, PR and labels right before ending, whether or not it ever enters the orchestrator: `agentic-autonomous-pipeline`'s before-ending checklist binds regardless of entry point, including a rule about how GitHub's own merge-time parser reads a PR body — load that skill before your last message whenever your work discusses an issue you are not closing.
 
 ## ▶ Capability Gate — CHECK BEFORE ANY ACTION
 
@@ -120,7 +120,7 @@ Sort a finding by **size** and by **whether it is in your way**. Those two quest
 
 **Filing never halts you.** It does not hold your PR, downgrade it to draft, or leave your own issue non-terminal. Fix what your change exposes; file the rest. If your tools block `gh`, hand the finding to whoever invoked you.
 
-**One issue per run.** The gate is a cap as well as a filter: a run files at most one issue for what it found, on top of whatever a bypass, a pause or a scope cut structurally requires — those carry a `TODO(#N)` or a named remainder, and dropping them leaves the codebase pointing at nothing. Everything else goes in the follow-up comment. A pipeline that files as fast as it merges spends its throughput on itself; the measured cost of doing so is in `agentic-pipeline-finalization`.
+**One issue per run.** The gate is a cap as well as a filter: a run files at most one issue for what it found, on top of whatever a bypass, a pause or a scope cut structurally requires — those carry a `TODO(#N)` or a named remainder, and dropping them leaves the codebase pointing at nothing. Everything else goes in the follow-up comment. A pipeline that files as fast as it merges spends its throughput on itself.
 
 **A convention a machine can check is never issue material.** A convention worth holding is worth a lint test under `tests/unit/lint/` — enforce it there rather than re-discovering it once per pull request. File cohesion (single responsibility) is deliberately not one of these: no lint test owns it, so it is ordinary Follow-up Gate material like the table above, per `dev-coding-conventions`. What earns an issue is a defect — `agentic-issue-creation` holds the boundary.
 
@@ -129,3 +129,5 @@ Sort a finding by **size** and by **whether it is in your way**. Those two quest
 ## Communication Style
 
 Carried by the `communication-style` instructions file (`.github/instructions/communication-style.instructions.md`), which applies to every session. It is stated there once rather than restated here, so the three runtimes cannot drift apart on it.
+
+History: docs/context-history/entry-points.md

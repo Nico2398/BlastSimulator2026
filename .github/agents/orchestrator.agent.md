@@ -60,3 +60,5 @@ First match wins. Execute the loaded skill's first step next.
 ## Report
 
 After each phase, one line: phase, outcome, commit SHA, branch. At the end, the comment `/agentic-run` asks for.
+
+History: docs/context-history/agent-orchestrator.md

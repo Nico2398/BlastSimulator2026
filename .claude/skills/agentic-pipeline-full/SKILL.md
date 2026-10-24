@@ -51,9 +51,9 @@ LOOP:
   d. goto (a)       → while fewer than 3 iterations have run and the loop budget is open.
 ```
 
-- **Volumetric iterations fan out.** Five or more screenshots to capture and read back, or five or more scenario definitions to adapt, is a parallel batch wave — `agentic-pipeline-tdd`'s "Volumetric work goes out in parallel batches" holds the procedure. A browser harness is the most expensive thing this pipeline runs (~6.4 s/frame without a GPU), so this is where the job budget is won or lost.
+- **Volumetric iterations fan out.** Five or more screenshots to capture and read back, or five or more scenario definitions to adapt, is a parallel batch wave — `agentic-pipeline-tdd`'s "Volumetric work goes out in parallel batches" holds the procedure.
 - Each iteration re-runs the same named scenarios and reports what remains. The visual-tester's report is words, never images: the screenshots stay in its context.
-- Three iterations is the cap, and the loop budget closes the loop sooner. A failure still present after the last iteration goes on the PR the way any red channel does — `agentic-pipeline-pr-management`. #956 finished its TDD cycle 28 minutes in and spent the next five and a half hours in this loop.
+- Three iterations is the cap, and the loop budget closes the loop sooner. A failure still present after the last iteration goes on the PR the way any red channel does — `agentic-pipeline-pr-management`.
 
 ### Failure loops
 
@@ -65,3 +65,5 @@ LOOP:
 | [refactor] turns `verify` red | revert the refactor commit or fix it; never ship a red refactor |
 | Finalization | `agentic-pipeline-finalization` |
 | Any step × 7 | Comment the history on the issue, stop with `ESCALATED: human intervention required` |
+
+History: docs/context-history/agentic-pipeline-full.md

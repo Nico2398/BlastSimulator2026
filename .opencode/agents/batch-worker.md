@@ -1,6 +1,6 @@
 ---
 model: opencode/mimo-v2.5-free
-reasoningEffort: high
+reasoningEffort: medium
 description:  Applies one stated transformation to a listed, disjoint set of files, in parallel with other batch workers — call sites to migrate, definitions to adapt, keys to add. Edits only its files, commits nothing, runs no suite.
 mode: subagent
 permission:

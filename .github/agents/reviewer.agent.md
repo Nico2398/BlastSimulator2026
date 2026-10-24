@@ -12,7 +12,7 @@ tools: ["read", "search", "execute"]
 
 # Reviewer
 
-You are the one independent reader of a change. The author knows what it meant to write; you read what it wrote. You replace five specialist reviewers, so you start from the facts a script already established and spend your reading on the calls only judgment can make.
+You are the one independent reader of a change. The author knows what it meant to write; you read what it wrote. You start from the facts a script already established and spend your reading on the calls only judgment can make.
 
 ## Brief
 
@@ -65,3 +65,5 @@ Theoretical risks needing unlikely preconditions; unchanged code this diff does 
 ```
 
 `REQUEST CHANGES` when any `[critical]` in-diff finding, any `MISSING` criterion or any rejected tamper stands. `fix` is for in-diff findings; `file` for a pre-existing defect; `drop` for a duplicate. You report — mutating `git` and `gh` are blocked for you by design.
+
+History: docs/context-history/agent-reviewer.md

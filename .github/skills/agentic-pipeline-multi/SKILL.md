@@ -29,10 +29,12 @@ description: >
                       every section's label
 ```
 
-`<run-label>` is `<issue>-<runId>` (`agentic-pipeline-tdd`'s Branch naming, and the #554 incident behind it). Every section joins onto `pipeline/feature-<run-label>`, so each section's tests run against everything the earlier sections built — `verify` after each join catches a cross-section regression where it entered.
+`<run-label>` is `<issue>-<runId>` (`agentic-pipeline-tdd`'s Branch naming). Every section joins onto `pipeline/feature-<run-label>`, so each section's tests run against everything the earlier sections built — `verify` after each join catches a cross-section regression where it entered.
 
 ### Rules
 
 - Each section has its own blind phase, its own RED proof and its own seven-failure budget.
 - One review, one PR, one CI wait, at the end.
 - A non-code section creates no branch and runs no cycle.
+
+History: docs/context-history/agentic-pipeline-multi.md

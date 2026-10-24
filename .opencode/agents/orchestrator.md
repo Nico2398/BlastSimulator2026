@@ -1,6 +1,6 @@
 ---
 model: opencode/deepseek-v4-flash-free
-reasoningEffort: max
+reasoningEffort: medium
 description:  Runs one autonomous pipeline task end to end as its lead. Classifies the task, does the planning, implementation, fixes and git work itself, and delegates only the steps that need a separate context — blind test-writing, independent review, screenshot inspection, volumetric batches.
 mode: primary
 permission:
@@ -58,3 +58,5 @@ First match wins. Execute the loaded skill's first step next.
 ## Report
 
 After each phase, one line: phase, outcome, commit SHA, branch. At the end, the comment `/agentic-run` asks for.
+
+History: docs/context-history/agent-orchestrator.md
