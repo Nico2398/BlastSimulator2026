@@ -60,10 +60,10 @@ describe('pendingSpoilOverflowKg', () => {
     expect(pendingSpoilOverflowKg(state)).toBe(2000);
   });
 
-  it('ignores orders no longer queued (claimed)', () => {
+  it('ignores orders no longer queued (assigned)', () => {
     const state = world([1000, 2000]);
     state.pendingActions.push(
-      order(1, 1, { status: 'claimed', holderId: 7, blockedReason: 'spoil_heap_full' }),
+      order(1, 1, { status: 'assigned', holderId: 7, blockedReason: 'spoil_heap_full' }),
       order(2, 2, { blockedReason: 'spoil_heap_full' }),
     );
     expect(pendingSpoilOverflowKg(state)).toBe(2000);

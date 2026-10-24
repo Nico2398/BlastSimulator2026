@@ -147,14 +147,14 @@ describe('syncCraterAccess with a held ramp segment carrying a stale stamp (#208
     parkBlockedRamp(site, PIT);
     // One segment was claimed after being stamped: held, still carrying the old blockedReason.
     const held = rampOrders(site)[0]!;
-    held.status = 'claimed';
+    held.status = 'assigned';
     held.holderId = site.state.employees.employees[0]!.id;
     expect(held.blockedReason).toBe('target_unreachable');
     expect(hasLiveRampWork([held])).toBe(true);
     const before = site.state.plannedRamps.length;
     // Keep the hold alive across scans.
     tickUntilFresh(site.run, site.state, () => {
-      held.status = 'claimed';
+      held.status = 'assigned';
       held.holderId = site.state.employees.employees[0]!.id;
       return site.state.plannedRamps.length > before;
     }, CRATER_ACCESS_RECHECK_TICKS * 2);
