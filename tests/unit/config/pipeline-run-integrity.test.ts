@@ -63,10 +63,10 @@ describe('foreground delegation guard', () => {
     expect(runGuard({ subagent_type: 'planner', run_in_background: false }).status).toBe(0);
   });
 
-  // Parallel delegation is how the pipeline runs its reviewers, and it must stay
-  // available: several calls in one message, every one of them foreground.
+  // Parallel delegation is how the pipeline fans out batch workers, and it must
+  // stay available: several calls in one message, every one of them foreground.
   it('allows several synchronous delegations issued together', () => {
-    for (const agent of ['quality-reviewer', 'security-reviewer', 'i18n-reviewer']) {
+    for (const agent of ['batch-worker', 'batch-worker', 'batch-worker']) {
       expect(runGuard({ subagent_type: agent, run_in_background: false }).status).toBe(0);
     }
   });
