@@ -341,3 +341,18 @@ Probe after #2085 (seed 42 desert_badlands full ladder, 14,000-tick horizon): st
 Instrumented diagnosis (instrumentation reverted): the only `rock_digger` ends parked, driverless, on a crater floor (surface 8.5 m) cut off from the site network by the unfinished ramp. `fillPool` in `OrderReachability.ts` counts a vehicle as an
 actor only when its driver is a candidate or its cell is in the employees' on-foot reach, so every `dig_ramp_segment` reads `target_unreachable` (all 44-57 segments blocked) even though a climb labelling from the digger itself reaches the targets.
 Nobody can board the digger, so the ramp that would free it can never be dug: a deadlock that planner avoidance and debris pruning cannot resolve. Separately, a probe-placed Driving Center at (8,8) walls the rally yard on this seed.
+
+## 2026-10-24 note: spoil overflow heap, probe result (#2085, second part)
+
+`ladderSpoil` now also builds a spoil heap (up to `LADDER_MAX_SPOIL_HEAPS`) when queued `haul_debris` orders are blocked `spoil_heap_full` (`pendingSpoilOverflowKg > 0`).
+
+Probe, seed 42 desert_badlands, full ladder, 14,000-tick horizon:
+
+| g1 | g2 | g3 | bankruptcy | blasts | cash@6000 | cash@10000 | boulder sold share | boulder ore sold | warehouseFull | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 978 | 2272 | missed (window 8,000-14,000) | none (was bankrupt t20,509) | 7 | 10.15 M | 9.28 M | 51% | 45% | tick 805 | t14000 |
+
+Pit depth was not recorded by the probe table, so it is not stated here.
+
+Verdict: 20 m / grade 3 still not reached within 14,000 ticks. The bankruptcy is gone, but the next stall is unmeasured. Cash is not the limit (9-10 M idle).
+Next step: a pit-depth and stall diagnosis.

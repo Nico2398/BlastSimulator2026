@@ -199,7 +199,7 @@ export type FragmentLookup = (fragmentId: number) => TrackedFragment | undefined
  * relies on. A fragment's own `state` transitions mutate the object the array
  * holds. First occurrence wins, exactly like `find`.
  */
-export function createFragmentLookup(state: GameState): FragmentLookup {
+export function createFragmentLookup(state: Pick<GameState, 'logistics'>): FragmentLookup {
   return fragmentId => findById(state.logistics.fragments, fragmentIdOf, fragmentId);
 }
 
@@ -414,4 +414,21 @@ export function haulBlockedReason(
   }
   if (state.logistics.storageCapacityKg === 0) return 'no_freight_warehouse';
   return fits(tracked) ? null : 'storage_full';
+}
+
+/**
+ * Total mass (kg) of the on-ground fragments that queued haul_debris orders
+ * stamped 'spoil_heap_full' are waiting to carry: the barren rubble no built
+ * spoil heap has room for (#2085). Other blocked reasons and action types are
+ * ignored.
+ */
+export function pendingSpoilOverflowKg(state: Pick<GameState, 'pendingActions' | 'logistics'>): number {
+  const lookup = createFragmentLookup(state);
+  let kg = 0;
+  for (const a of state.pendingActions) {
+    if (a.type !== 'haul_debris' || a.status !== 'queued' || a.blockedReason !== 'spoil_heap_full') continue;
+    const fragmentId = a.payload['fragmentId'];
+    if (typeof fragmentId === 'number') kg += lookup(fragmentId)?.fragment.mass ?? 0;
+  }
+  return kg;
 }

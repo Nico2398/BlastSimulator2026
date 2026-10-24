@@ -85,7 +85,7 @@ import {
   decideLadderHoleDepth, judgeLadderShot,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
-import { sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
+import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
@@ -986,11 +986,21 @@ function ladderCrew(s: ProbeSession, m: ReinvestMemory): void {
 
 /** Ecology under which another spoil heap is built, and the most the ladder builds: loose rubble past a heap's capacity drains it. */
 const LADDER_ECOLOGY_FLOOR = 40;
-const LADDER_MAX_SPOIL_HEAPS = 4;
+export const LADDER_MAX_SPOIL_HEAPS = 4;
 
-/** Another spoil heap while ecology sags and rubble outgrows the heaps' room. */
+/**
+ * Whether blocked overflow calls for another spoil heap: `barrenKgPending` (`pendingSpoilOverflowKg`) already counts only
+ * rubble that did not fit the `heaps` built, so any of it means more room is needed while the heap cap is not reached (#2085).
+ */
+export function spoilHeapsNeeded(barrenKgPending: number, heaps: number): boolean {
+  return barrenKgPending > 0 && heaps < LADDER_MAX_SPOIL_HEAPS;
+}
+
+/** Another spoil heap while ecology sags or queued haul orders are blocked on full heaps. */
 function ladderSpoil(s: ProbeSession, m: ReinvestMemory): void {
-  if (s.state.scores.ecology >= LADDER_ECOLOGY_FLOOR || countOf(s, 'spoil_heap') >= LADDER_MAX_SPOIL_HEAPS
+  const heaps = countOf(s, 'spoil_heap');
+  const needed = s.state.scores.ecology < LADDER_ECOLOGY_FLOOR || spoilHeapsNeeded(pendingSpoilOverflowKg(s.state), heaps);
+  if (!needed || heaps >= LADDER_MAX_SPOIL_HEAPS
     || s.state.plannedBuildings.some(p => p.type === 'spoil_heap')
     || spendable(s) < getBuildingDef('spoil_heap', 1).constructionCost) return;
   tryOnce(s, m, 'spoil_heap', () => placeBuilding(s, 'spoil_heap', rallyOf(s), null) !== null);

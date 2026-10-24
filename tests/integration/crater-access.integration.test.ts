@@ -9,10 +9,10 @@
 // blasts), then drops rubble on the floor. Everything after is driven through console commands.
 
 import { describe, it, expect } from 'vitest';
-import { makeCraterSite, dropRubble, cutPit, type Pit } from '../helpers/craterAccessFixture.js';
+import { makeCraterSite, dropRubble, cutPit, parkBlockedRamp, type Pit } from '../helpers/craterAccessFixture.js';
 import { tickUntilFresh } from '../helpers/blastFixtures.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
-import { CRATER_ACCESS_ABANDON_DEBRIS_TICKS, CRATER_ACCESS_RECHECK_TICKS } from '../../src/core/config/balance.js';
+import { CRATER_ACCESS_ABANDON_DEBRIS_TICKS, CRATER_ACCESS_RECHECK_TICKS, STRANDED_RECOVERY_TICKS } from '../../src/core/config/balance.js';
 import { addBlastFragments } from '../../src/core/economy/Logistics.js';
 import { makeRubbleFragment } from '../helpers/blastFixtures.js';
 
@@ -120,6 +120,26 @@ describe('deepened crater with a buried first ramp (#2085)', () => {
     const rampSpend = state.finances.transactions.filter(e => e.type === 'expense' && e.category === 'construction' && e.tick >= cutTick);
     expect(rampSpend).toEqual([]);
     expect(state.plannedRamps.every(r => r.segments.some(sg => !sg.done))).toBe(true);
+    expectNoWorldInvariantViolations(state);
+  });
+});
+
+describe('stranded digger recovery (#2085)', () => {
+  it('a driverless rock_digger parked in a cut-off pit is towed out of it', () => {
+    const site = makeCraterSite([PIT]);
+    const { state, run } = site;
+    const digger = state.vehicles.vehicles.find(v => v.type === 'rock_digger')!;
+    expect(digger).toBeDefined();
+    digger.occupantIds = [];
+    digger.x = PIT.x0 + 3;
+    digger.z = PIT.z0 + 3;
+    parkBlockedRamp(site, PIT);
+
+    tickUntilFresh(run, state, () => false, 2);
+    expect(inPit(digger.x, digger.z)).toBe(true);
+
+    tickUntilFresh(run, state, () => !inPit(digger.x, digger.z), STRANDED_RECOVERY_TICKS + 2 * CRATER_ACCESS_RECHECK_TICKS);
+    expect(inPit(digger.x, digger.z)).toBe(false);
     expectNoWorldInvariantViolations(state);
   });
 });
