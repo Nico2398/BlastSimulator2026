@@ -16,7 +16,7 @@ No layer optional. **More tests always better** — do not limit test cases.
 3. **Full-level integration tests** — Complete runs from `new_game` to terminal outcome (win or each loss condition).
 4. **Visual scenario tests** — Full browser sessions (Puppeteer), real clicks. Screenshots + JSON state dumps after every command. Proves a player can reach the goal — no console command stands in for a player action.
 
-All four layers must pass before any PR is merged. Playability used to be a fifth, separate layer (`npm run playtest`); issue #515 folded it into `visual` once every scenario step carried a structurally-enforced `role` and interaction-mode `expect.usable`/`expect.blocked` checks proved what a playtest beat proved. The old playtest script and its JSON definitions are deleted.
+All four layers must pass before any PR is merged.
 
 ## Verification Channels
 
@@ -54,7 +54,7 @@ npm run sounds:check      # audio: every asset decodes in headless Chromium, off
 npm run audio:smoke       # audio: wiring in a real engine, intended cues of a scripted game (needs a browser)
 ```
 
-Progression probe (`npm run probe:progression`, #1922): plays the `opening` and `reinvest` strategies headlessly through console commands and prints a markdown economy table (cash curve, low point, first-blast sold share, blasts, storage waits, grades, affordability). `-- --quick` is one site to 3000 ticks; flags `--seed --biome --kit --strategy --horizon --json <path>`. Not a verification channel and not in `validate`. The full 24-run matrix outlives one foreground call: `npm run long -- start probe -- npm run probe:progression -- --json out.json`, then `npm run long -- wait probe` with explicit timeout 600000 until it prints FINISHED. The `ladder` strategy (#1945) plays the grade ladder (limit-sized shots, in-place vehicle upgrades, Driving Center licence courses, crew and spoil-heap upkeep) and `stay_g1` is the same policy capped at grade 1; the table gains `grades`, `grade cash`, `catalog bought` and the grade-window verdicts. Measured curve and its gaps: `docs/plans/issue-1945-progression-curve.md`.
+Progression probe (`npm run probe:progression`): plays the `opening` and `reinvest` strategies headlessly through console commands and prints a markdown economy table (cash curve, low point, first-blast sold share, blasts, storage waits, grades, affordability). `-- --quick` is one site to 3000 ticks; flags `--seed --biome --kit --strategy --horizon --json <path>`. Not a verification channel and not in `validate`. The full 24-run matrix outlives one foreground call: `npm run long -- start probe -- npm run probe:progression -- --json out.json`, then `npm run long -- wait probe` with explicit timeout 600000 until it prints FINISHED. The `ladder` strategy plays the grade ladder (limit-sized shots, in-place vehicle upgrades, Driving Center licence courses, crew and spoil-heap upkeep) and `stay_g1` is the same policy capped at grade 1; the table gains `grades`, `grade cash`, `catalog bought` and the grade-window verdicts. Measured curve and its gaps: `docs/plans/issue-1945-progression-curve.md`.
 
 The two audio commands prove assets, levels and wiring, never how anything sounds; what each does and does not prove: `dev-audio`. They are not among the four channels and run on request, not in `npm run validate`.
 
@@ -88,11 +88,8 @@ nature.
 **Coverage is measured through `vitest.coverage.config.ts`, not the plain config.** It excludes
 `tests/unit/benchmarks/` (asserts wall-clock times that v8 instrumentation inflates past their
 budgets) and `tests/unit/lint/` (static rules about scenario JSON and repo hygiene, not `src/`
-behaviour — nothing there adds to the measurement). Excluding those two took the measurement from
-48 minutes to ~6 with the thresholds unchanged and still passing. The lint directory used to also
-replay every scenario through the console (`ScenarioCommandOutcomes`, ~240 s, half of `npm run
-test`); that replay was retired because `npm run scenarios` already fails an undeclared refusal
-through `checkCommandOutcome` in `runSteps`, on every pull request, with the same message. Both directories still run, unexcluded, in `npm run test` — the `logic`
+behaviour — nothing there adds to the measurement). An undeclared command refusal is failed by
+`npm run scenarios` through `checkCommandOutcome` in `runSteps`, not by a lint-directory replay. Both directories still run, unexcluded, in `npm run test` — the `logic`
 channel and CI's `test` job — so nothing goes unrun; only the coverage measurement is narrowed.
 
 ### What the coverage gate actually holds
@@ -131,8 +128,7 @@ one today.
 `tsc` already refuses unused locals, parameters and imports (`noUnusedLocals`,
 `noUnusedParameters`), so dead code *inside* a file cannot survive a typecheck. The module graph
 above it is what `scripts/dead-code.ts` covers: a file nobody imports, an export nobody imports —
-both typecheck perfectly, and a 46-line table of typed i18n key constants lived there, imported by
-nothing, until the check was written.
+both typecheck perfectly.
 
 It runs as a lint test rather than a CI job of its own, so it costs the `logic` channel a second and
 needs no new runner. Two gates, because the findings differ in kind:
@@ -206,7 +202,7 @@ Scenario steps can define an `interaction` array of `InteractionStepAction` obje
 
 Steps also carry `role: 'player' | 'setup' | 'observe'`, `expect` (`ScenarioStepGoal`), and `commandOutcome: 'refused' | 'either'` — `role` constrains which commands an interaction array may reach for, `expect` proves the step's actions actually moved game state rather than merely not throwing, `commandOutcome` declares when a step's command is expected to be refused by the console (default: the command must succeed, or the step fails, naming the command and the console's refusal text). Full field list and current tagging state: `scripts/shared/scenario-types.ts`'s doc comments (narrative version: `dev-scenario-authoring` skill).
 
-**Assert a step's own delta, not the file's running total.** For any field that accumulates across a scenario (cash, scores, counts), prefer `expect.changedBy` (the exact amount *this step's own actions* moved the field) or `expect.increased`/`decreased` (direction only) over a chained `expect.equals` on the same field. `equals` encodes the whole cumulative history of the file up to that step, so inserting a step anywhere upstream — exactly what the #554-#557 "is real work" migrations do, converting an instant action into queued, worker-gated work — forces every absolute figure after it to be recomputed by hand. A step-local assertion only needs editing when its own step changes. Reserve `equals` for a field that genuinely describes a state rather than a running total: flags, ids, terminal outcomes (`levelEndReason`), counts that are set rather than accrued. Full rationale and the field's evaluator: `dev-scenario-authoring` skill.
+**Assert a step's own delta, not the file's running total.** For any field that accumulates across a scenario (cash, scores, counts), prefer `expect.changedBy` (the exact amount *this step's own actions* moved the field) or `expect.increased`/`decreased` (direction only) over a chained `expect.equals` on the same field. `equals` encodes the whole cumulative history of the file up to that step, so inserting a step anywhere upstream — exactly what converting an instant action into queued, worker-gated work does — forces every absolute figure after it to be recomputed by hand. A step-local assertion only needs editing when its own step changes. Reserve `equals` for a field that genuinely describes a state rather than a running total: flags, ids, terminal outcomes (`levelEndReason`), counts that are set rather than accrued. Full rationale and the field's evaluator: `dev-scenario-authoring` skill.
 
 **Async commands need tick padding.** A command that queues async work (e.g. `survey seismic`) must be followed by enough `tick` steps to let it resolve before a dependent step runs, or the dependent step reads stale state. Insert several `tick 10` steps after the async command, matching `survey-then-blast.json`.
 
@@ -264,9 +260,9 @@ CI has 3 tiers of scenario testing:
 |------|------|------|------|
 | **1 — Command** | Every scenario definition in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~2 min |
 | **2 — Interaction** | Every scenario definition in interaction mode (Puppeteer, real browser), sharded | Every push and pull request, schedule (weekly), workflow_dispatch | a few minutes wall clock† |
-| **3 — Full** | Tiers 1 + 2, alongside every other job — nothing waits on the unit suite any more | Every push and pull request | the slowest job† |
+| **3 — Full** | Tiers 1 + 2, alongside every other job — nothing waits on the unit suite | Every push and pull request | the slowest job† |
 
-† No GPU means ~6 s/frame in software rasterisation (#475) — which is why a scenario page now boots with drawing suspended (`?scenarioMode=1`, main.ts) instead of paying ~10 s of never-seen frames per tab. Before that, CI's 10-shard runs on 13–14 Sep 2026 took ~12 min for the shards and 15–19 min end to end, half of it the unit suite the shards waited on. Shards are cost-balanced (`selectShard`, `scripts/run-all-scenarios-cli.ts`), so the count in `SCENARIO_INTERACTION_SHARDS` is the lever: more shards, shorter wall clock, until the ~1 min of per-shard setup dominates. Figures go stale as the suite grows. Why both jobs run on every PR: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
+† No GPU means ~6 s/frame in software rasterisation, so a scenario page boots with drawing suspended (`?scenarioMode=1`, main.ts). Shards are cost-balanced (`selectShard`, `scripts/run-all-scenarios-cli.ts`), so the count in `SCENARIO_INTERACTION_SHARDS` is the lever: more shards, shorter wall clock, until the ~1 min of per-shard setup dominates. Figures go stale as the suite grows. Why both jobs run on every PR: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
 
 **Every scenario job runs on every pull request.** The in-session `visual` channel covers the one scenario that exercises a change — that is the working loop — and CI covers the rest. Why: `agentic-pipeline-pr-management`.
 
@@ -287,3 +283,5 @@ A fixed-duration wait is legitimate only where no observable condition exists to
 Any bug fix must include new unit or integration test that:
 - Fails on the buggy code
 - Passes on the fix
+
+History: docs/context-history/dev-testing-strategy.md

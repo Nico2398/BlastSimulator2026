@@ -7,7 +7,7 @@
  * immediately followed by `#<number>` as a bare substring, anywhere outside a
  * code span or fenced block — with no awareness of negation, quotation, or
  * tense. Three independent incidents on issue #707 in one day (see
- * `.claude/skills/agentic-autonomous-pipeline/references/keyword-closing-postmortem.md`)
+ * `docs/context-history/agentic-autonomous-pipeline.md` (section "SKILL.md — Before ending"))
  * each a docs-only attempt to correct the previous one, each retriggered the
  * exact bug it was documenting. Prose guidance alone is not enough: this is
  * the mechanical guard that reads a PR the same way GitHub's parser does.
@@ -158,7 +158,7 @@ function main() {
         ' as a bare substring, with no awareness of negation, quotation, or tense — see'
     );
     console.error(
-      '.claude/skills/agentic-autonomous-pipeline/references/keyword-closing-postmortem.md'
+      'docs/context-history/agentic-autonomous-pipeline.md'
     );
     console.error('');
     console.error(
