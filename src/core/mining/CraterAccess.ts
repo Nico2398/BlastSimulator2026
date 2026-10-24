@@ -3,7 +3,7 @@
 // Reads terrain only through the narrow AccessSurface seam; no GameState.
 
 import {
-  CRATER_ACCESS_MAX_GRADE_MARGIN, CRATER_ACCESS_SPIRAL_START_ATTEMPTS, MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M,
+  CRATER_ACCESS_CLUSTER_GAP_CELLS, CRATER_ACCESS_MAX_GRADE_MARGIN, CRATER_ACCESS_SPIRAL_START_ATTEMPTS, MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M,
   RAMP_FLOOR_SNAP_REACH_M, RAMP_SPIRAL_MAX_PIT_SPAN_M, RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth,
 } from '../config/balance.js';
 import { slopeDegreesForRatio } from '../nav/ClimbLimit.js';
@@ -113,9 +113,10 @@ type Excluded = (def: RampDef) => boolean;
  */
 function planStraight(
   floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded,
+  foot: { x: number; z: number } = { x: Math.round(floor.x), z: Math.round(floor.z) },
 ): { plan: CraterAccessPlan | null; sawShallow: boolean } {
-  const fx = Math.round(floor.x);
-  const fz = Math.round(floor.z);
+  const fx = foot.x;
+  const fz = foot.z;
   let sawShallow = false;
   for (let length = Math.max(1, width); length <= MAX_RAMP_LENGTH; length++) {
     for (const direction of DIRECTIONS) {
@@ -204,6 +205,31 @@ function planSpiral(
   return null;
 }
 
+/**
+ * Straight ramp ending on floor-level ground beside the representative cell (#2086). A start on a ledge or at the foot
+ * of a built ramp rarely lies on an axis through that one cell; any cell within the cluster gap whose ground matches
+ * the floor serves as the foot instead. Nearest foot first; cost walks the window, not the map.
+ */
+function planOffsetStraight(
+  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded,
+): CraterAccessPlan | null {
+  const fx = Math.round(floor.x);
+  const fz = Math.round(floor.z);
+  for (let r = 1; r <= CRATER_ACCESS_CLUSTER_GAP_CELLS; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dz = -r; dz <= r; dz++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+        const x = fx + dx;
+        const z = fz + dz;
+        if (!surface.contains(x, z) || Math.abs(surface.heightAt(x, z) - floor.floorY) > RAMP_FLOOR_SNAP_REACH_M) continue;
+        const { plan } = planStraight(floor, surface, limitRatio, width, excluded, { x, z });
+        if (plan !== null) return plan;
+      }
+    }
+  }
+  return null;
+}
+
 /** Plans a ramp from the reachable network down to `floor`, within `maxClimbRatio`. Failure is a result, not an exception. */
 export function planCraterAccess(
   floor: StrandedFloor,
@@ -222,5 +248,7 @@ export function planCraterAccess(
   if (straight.plan !== null) return straight.plan;
   const spiral = planSpiral(floor, surface, limitRatio, width, excluded);
   if (spiral !== null) return spiral;
+  const offset = planOffsetStraight(floor, surface, limitRatio, width, excluded);
+  if (offset !== null) return offset;
   return { ok: false, reasonKey: `${KEY}${straight.sawShallow ? 'too_shallow' : 'no_start'}` };
 }
