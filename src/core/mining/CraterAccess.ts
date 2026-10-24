@@ -7,8 +7,10 @@ import {
   RAMP_FLOOR_SNAP_REACH_M, RAMP_SPIRAL_MAX_PIT_SPAN_M, RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth,
 } from '../config/balance.js';
 import { slopeDegreesForRatio } from '../nav/ClimbLimit.js';
-import { computeRampCost, rampDefFromLegs, rampFootOffset, validateRampOrder, type RampDef } from './Ramp.js';
-import { RAMP_DIR_OFFSETS, findRampPathFault, rampPathOf, rampWaypoints, type RampDirection, type RampFootprint } from './RampPath.js';
+import { computeRampCost, rampDefFromLegs, rampFootOffset, rampLengthForGrade, validateRampOrder, type RampDef } from './Ramp.js';
+import {
+  RAMP_DIR_OFFSETS, findRampPathFault, rampPathOf, rampTotalLength, rampWaypoints, type RampDirection, type RampFootprint, type RampLeg,
+} from './RampPath.js';
 import { rampFootprint } from './RampWidening.js';
 import { isPitRim, proposeRampSpiral, type SpiralSurface } from './RampSpiral.js';
 
@@ -156,7 +158,7 @@ function* reachableRimStarts(floor: StrandedFloor, surface: AccessSurface): Gene
         const x = fx + dx;
         const z = fz + dz;
         if (!surface.contains(x, z) || !surface.reachableFrom(x, z)) continue;
-        if (isPitRim(surface, { x, z })) yield { x, z };
+        if (isPitRim(surface, { x, z }, true)) yield { x, z };
       }
     }
   }
@@ -169,7 +171,7 @@ function* reachableRimStarts(floor: StrandedFloor, surface: AccessSurface): Gene
  */
 function footMeetsFloor(def: RampDef, floor: StrandedFloor, surface: AccessSurface, width: RampWidth): boolean {
   const foot = rampWaypoints(rampPathOf(def)).at(-1)!;
-  const reach = (RAMP_SPIRAL_RIM_GAP_WIDTHS + 1) * width;
+  const reach = Math.floor(width / 2) + 1;
   for (let dz = -reach; dz <= reach; dz++) {
     for (let dx = -reach; dx <= reach; dx++) {
       const x = foot.x + dx;
@@ -180,29 +182,122 @@ function footMeetsFloor(def: RampDef, floor: StrandedFloor, surface: AccessSurfa
   return false;
 }
 
-/** Spiral road down a pit wall from the nearest reachable rim tile, when no straight start exists. */
+/** Floor-level ground: within the foot snap reach of the floor's depth. */
+const atFloorLevel = (surface: AccessSurface, floor: StrandedFloor, x: number, z: number): boolean =>
+  surface.contains(x, z) && Math.abs(surface.heightAt(x, z) - floor.floorY) <= RAMP_FLOOR_SNAP_REACH_M;
+
+/** True when the corridor of a leg of `length` tiles from `from` along `direction` lies wholly inside the claimed area. */
+function legContained(surface: AccessSurface, from: { x: number; z: number }, direction: RampDirection, length: number, width: number): boolean {
+  const o = RAMP_DIR_OFFSETS[direction];
+  const half = Math.floor(width / 2);
+  for (let s = 0; s <= length; s++) {
+    for (let k = -half; k <= half; k++) {
+      if (!surface.contains(from.x + o.dx * s + Math.abs(o.dz) * k, from.z + o.dz * s + Math.abs(o.dx) * k)) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * A spiral rings the rim, so its foot stands a rim gap and the pit wall away from the floor and frees nothing (#2086).
+ * Ends the ring at some tile within `reach` of its end and cuts a straight leg from there across the wall to the first
+ * floor-level ground, long enough that the road still reaches the full depth (a grade-set ramp runs level past it).
+ */
+function spiralToFloor(
+  legs: readonly RampLeg[], origin: { x: number; z: number }, needed: number,
+  floor: StrandedFloor, surface: AccessSurface, width: RampWidth,
+): RampLeg[] | null {
+  const total = rampTotalLength(legs);
+  const reach = (RAMP_SPIRAL_RIM_GAP_WIDTHS + 1) * width + CRATER_ACCESS_CLUSTER_GAP_CELLS;
+  const starts: { x: number; z: number }[] = [origin];
+  for (const leg of legs) {
+    const o = RAMP_DIR_OFFSETS[leg.direction];
+    const last = starts.at(-1)!;
+    starts.push({ x: last.x + o.dx * leg.length, z: last.z + o.dz * leg.length });
+  }
+  for (let t = total; t >= Math.max(width, needed - reach); t--) {
+    const kept: RampLeg[] = [];
+    let used = 0;
+    for (const leg of legs) {
+      if (used >= t) break;
+      kept.push({ direction: leg.direction, length: Math.min(leg.length, t - used) });
+      used += kept.at(-1)!.length;
+    }
+    const last = kept.at(-1)!;
+    if (kept.length > 1 && last.length < width) continue;
+    const o = RAMP_DIR_OFFSETS[last.direction];
+    const base = starts[kept.length - 1]!;
+    const end = { x: base.x + o.dx * last.length, z: base.z + o.dz * last.length };
+    for (const direction of DIRECTIONS) {
+      const d = RAMP_DIR_OFFSETS[direction];
+      if (d.dx === -o.dx && d.dz === -o.dz) continue;
+      for (let k = Math.max(width, needed - t); k <= reach; k++) {
+        if (!atFloorLevel(surface, floor, end.x + d.dx * k, end.z + d.dz * k)) continue;
+        if (!legContained(surface, end, direction, k, width)) break;
+        return direction === last.direction
+          ? [...kept.slice(0, -1), { direction, length: last.length + k }]
+          : [...kept, { direction, length: k }];
+      }
+    }
+  }
+  return null;
+}
+
+/** Spiral road down a pit wall from a reachable rim tile, when no straight start exists. */
 function planSpiral(
   floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded,
 ): CraterAccessPlan | null {
   const gradeDegrees = Math.max(0.1, Math.floor(slopeDegreesForRatio(limitRatio) * 10) / 10);
-  let attempts = 0;
+  // Attempts are budgeted per start height: a wall of same-height rim cells must not use up the tries before a lower
+  // start (a ledge, a built ramp's foot), which leaves a shorter drop, is reached (#2086).
+  const attempts = new Map<number, number>();
   for (const start of reachableRimStarts(floor, surface)) {
-    if (attempts++ >= CRATER_ACCESS_SPIRAL_START_ATTEMPTS) break;
+    const level = Math.round(surface.heightAt(start.x, start.z));
+    const tried = attempts.get(level) ?? 0;
+    if (tried >= CRATER_ACCESS_SPIRAL_START_ATTEMPTS) continue;
+    attempts.set(level, tried + 1);
     const depth = surface.heightAt(start.x, start.z) - floor.floorY;
     if (depth < RAMP_CRATER_MIN_DROP_M) continue;
-    const result = proposeRampSpiral(
-      { fromX: start.x, fromZ: start.z, depth, gradeDegrees, width, dir: 'cw' }, surface,
-    );
-    if (!result.success) continue;
-    const p = result.proposal;
-    const def = rampDefFromLegs({ x: p.originX, z: p.originZ }, p.legs, p.depth, width);
-    def.gradeDegrees = p.gradeDegrees;
-    if (excluded(def) || !footMeetsFloor(def, floor, surface, width)) continue;
-    const check = validateRampOrder(def, Infinity);
-    if (!check.success) continue;
-    return { ok: true, def, cost: computeRampCost(p.totalLength, width), gradeDegrees: p.gradeDegrees };
+    for (const dir of ['cw', 'ccw'] as const) {
+      const plan = spiralPlanFrom(start, depth, gradeDegrees, dir, floor, surface, width, excluded);
+      if (plan !== null) return plan;
+    }
   }
   return null;
+}
+
+/** One spiral attempt from `start`: as proposed when its foot meets the floor, else with a leg across the wall to it. */
+function spiralPlanFrom(
+  start: { x: number; z: number }, depth: number, gradeDegrees: number, dir: 'cw' | 'ccw',
+  floor: StrandedFloor, surface: AccessSurface, width: RampWidth, excluded: Excluded,
+): CraterAccessPlan | null {
+  const propose = (d: number) =>
+    proposeRampSpiral({ fromX: start.x, fromZ: start.z, depth: d, gradeDegrees, width, dir, fromReachable: true }, surface);
+  let result = propose(depth);
+  if (!result.success) return null;
+  // The ring begins on the nearest ring tile, not on `start`; the drop it must cut is measured from that tile's ground.
+  const origin = { x: result.proposal.originX, z: result.proposal.originZ };
+  const originDepth = surface.heightAt(origin.x, origin.z) - floor.floorY;
+  if (originDepth < RAMP_CRATER_MIN_DROP_M) return null;
+  if (originDepth !== depth) {
+    result = propose(originDepth);
+    if (!result.success) return null;
+  }
+  const p = result.proposal;
+  let legs: readonly RampLeg[] | null = p.legs;
+  let def = rampDefFromLegs({ x: p.originX, z: p.originZ }, p.legs, p.depth, width);
+  def.gradeDegrees = p.gradeDegrees;
+  if (!footMeetsFloor(def, floor, surface, width)) {
+    legs = spiralToFloor(p.legs, { x: p.originX, z: p.originZ }, rampLengthForGrade(p.depth, p.gradeDegrees), floor, surface, width);
+    if (legs === null) return null;
+    def = rampDefFromLegs({ x: p.originX, z: p.originZ }, legs, p.depth, width);
+    def.gradeDegrees = p.gradeDegrees;
+    if (findRampPathFault(rampPathOf(def), width) !== null) return null;
+  }
+  if (excluded(def)) return null;
+  const check = validateRampOrder(def, Infinity);
+  if (!check.success) return null;
+  return { ok: true, def, cost: computeRampCost(rampTotalLength(legs), width), gradeDegrees: p.gradeDegrees };
 }
 
 /**

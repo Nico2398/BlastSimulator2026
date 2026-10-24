@@ -181,7 +181,7 @@ export function addSpoilHeaps(run: (cmd: string) => unknown, count: number): num
   return placed;
 }
 
-/** A shot kills the crew standing at the pattern and destroys its drill rig and charging truck; rehires the driller and buys the missing vehicles back so the next shot can be drilled (#2086). */
+/** A shot kills the crew standing at the pattern and destroys its drill rig and charging truck; rehires the driller and buys the missing vehicles (digger included) back so the next shot can be drilled (#2086). */
 export function restockShotFleet(site: CraterSite): void {
   const { run, state } = site;
   if (!state.employees.employees.some(e => e.role === 'driller' && e.alive)) {
@@ -196,6 +196,7 @@ export function restockShotFleet(site: CraterSite): void {
   if (!state.vehicles.vehicles.some(v => v.type === 'charging_truck')) buyChargingTruck(run, state, driller.id);
   crewIfMissing(site, 'debris_hauler', 'driving.truck');
   crewIfMissing(site, 'rock_fragmenter', 'driving.rock_fragmenter');
+  crewIfMissing(site, 'rock_digger', 'driving.excavator'); // the blast also buries the digger that cut the first ramp
 }
 
 /** Buys `type` when the fleet lacks one and crews it with the first free driver the vehicle can be routed to. */

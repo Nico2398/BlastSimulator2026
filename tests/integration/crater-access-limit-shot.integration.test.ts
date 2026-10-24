@@ -14,6 +14,7 @@ import {
 } from '../helpers/craterAccessFixture.js';
 import { tickUntilFresh } from '../helpers/blastFixtures.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
+import { isFragmentSealed } from '../../src/core/economy/SealedFragments.js';
 import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
 import { CRATER_ACCESS_ABANDON_DEBRIS_TICKS, CRATER_ACCESS_CASH_RESERVE_TICKS, CRATER_ACCESS_RECHECK_TICKS } from '../../src/core/config/balance.js';
 
@@ -32,6 +33,13 @@ function tickSite(site: CraterSite, until: () => boolean, maxTicks: number): voi
 }
 
 const onGround = (site: CraterSite) => site.state.logistics.fragments.filter(f => f.state === 'on_ground').length;
+/**
+ * Fragments a hauler can ever pick up: a blast also leaves rubble embedded in rock columns it did not break (the pillars of
+ * a deepened crater). Those are sealed (`isFragmentSealed`), get no haul order until the rock is cut away, and no ramp
+ * changes that, so the crater counts as hauled out once only sealed fragments remain.
+ */
+const unsealedOnGround = (site: CraterSite) => site.state.logistics.fragments
+  .filter(f => f.state === 'on_ground' && !isFragmentSealed(site.ctx.grid!, f.fragment.position)).length;
 const strandedOrders = (site: CraterSite) => site.state.pendingActions.filter(a =>
   (a.type === 'haul_debris' || a.type === 'fragment_debris') && a.blockedReason === 'debris_out_of_reach');
 
@@ -126,10 +134,12 @@ describe('a shot that deepens an opened crater (#2086)', () => {
     const before = onGround(site);
     expect(before).toBeGreaterThan(0);
 
-    tickSite(site, () => onGround(site) === 0 && state.plannedRamps.length === 0, DIG_TICKS);
-    expect(onGround(site)).toBe(0);
+    const debrisOrders = () => state.pendingActions.filter(a => a.type === 'haul_debris' || a.type === 'fragment_debris');
+    tickSite(site, () => unsealedOnGround(site) === 0 && debrisOrders().length === 0 && state.plannedRamps.length === 0, DIG_TICKS);
+    expect(unsealedOnGround(site)).toBe(0);
+    expect(onGround(site)).toBeLessThan(before);
     expect(strandedOrders(site)).toEqual([]);
-    expect(state.pendingActions.filter(a => a.type === 'haul_debris' || a.type === 'fragment_debris')).toEqual([]);
+    expect(debrisOrders()).toEqual([]);
     expectNoWorldInvariantViolations(state);
   });
 
