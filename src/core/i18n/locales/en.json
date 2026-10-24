@@ -3631,6 +3631,7 @@
   "inspector.ramp.widen_short_funds": "Not enough cash: widening costs ${cost}",
   "inspector.ramp.repair": "Repair · ${cost}",
   "inspector.ramp.repair_short_funds": "Not enough cash: the repair costs ${cost}",
+  "inspector.ramp.repair_in_progress": "A repair of this ramp is already under way",
   "shell.selection.ramp_title": "Ramp ({width}m wide)",
   "shell.selection.ramp_sub": "#{id} · {length}m long · {width}m wide",
   "shell.selection.ramp_grade": "{grade}° grade",

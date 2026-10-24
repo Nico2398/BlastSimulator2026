@@ -176,27 +176,36 @@ describe('Repair action (#2045)', () => {
   const offering = (offer: RampRepairOffer): InspectorLinks => ({ ...links, rampRepairQuote: () => offer });
 
   it('is absent without terrain, and for an intact ramp', () => {
-    expect(repairAction(rampOf(3), 1_000_000, links)).toBeNull();
-    expect(repairAction(rampOf(3), 1_000_000, offering({ kind: 'refused', errorKey: 'mining.repair_ramp.intact', errorParams: { id: 1 } }))).toBeNull();
+    expect(repairAction(rampOf(3), [], 1_000_000, links)).toBeNull();
+    expect(repairAction(rampOf(3), [], 1_000_000, offering({ kind: 'refused', errorKey: 'mining.repair_ramp.intact', errorParams: { id: 1 } }))).toBeNull();
   });
 
   it('a damaged ramp offers Repair at its quoted cost, enabled when the cash covers it', () => {
-    const action = repairAction(rampOf(3), 1_000_000, offering({ kind: 'quote', cost: 420 }))!;
+    const action = repairAction(rampOf(3), [], 1_000_000, offering({ kind: 'quote', cost: 420 }))!;
     expect(action.action).toBe('repair');
     expect(action.label).toBe(t('inspector.ramp.repair', { cost: formatMoney(420) }));
     expect(action.disabled).toBe(false);
   });
 
   it('is disabled with the reason when the cash falls short', () => {
-    const action = repairAction(rampOf(3), 100, offering({ kind: 'quote', cost: 420 }))!;
+    const action = repairAction(rampOf(3), [], 100, offering({ kind: 'quote', cost: 420 }))!;
     expect(action.disabled).toBe(true);
     expect(action.title).toBe(t('inspector.ramp.repair_short_funds', { cost: formatMoney(420) }));
   });
 
   it('is disabled with the refusal when the ramp no longer reaches its floor', () => {
-    const action = repairAction(rampOf(3), 1_000_000, offering({ kind: 'refused', errorKey: 'mining.repair_ramp.out_of_reach', errorParams: { id: 1 } }))!;
+    const action = repairAction(rampOf(3), [], 1_000_000, offering({ kind: 'refused', errorKey: 'mining.repair_ramp.out_of_reach', errorParams: { id: 1 } }))!;
     expect(action.disabled).toBe(true);
     expect(action.title).toBe(t('mining.repair_ramp.out_of_reach', { id: 1 }));
+  });
+
+  it('is disabled while a repair of the ramp is under way, and Widen waits for it too', () => {
+    const r = rampOf(3);
+    const repairing: PlannedRamp = { id: 6, def: r.def, footprint: r.footprint, segments: [], repairOf: r.id };
+    const action = repairAction(r, [repairing], 1_000_000, offering({ kind: 'quote', cost: 420 }))!;
+    expect(action.disabled).toBe(true);
+    expect(action.title).toBe(t('inspector.ramp.repair_in_progress'));
+    expect(widenState(r, [repairing], 1_000_000).disabledReason).toBe(t('inspector.ramp.repair_in_progress'));
   });
 
   it('rides the ramp view next to Widen, and its state is part of the view signature', () => {

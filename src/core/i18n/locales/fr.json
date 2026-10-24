@@ -3631,6 +3631,7 @@
   "inspector.ramp.widen_short_funds": "Pas assez de liquidités : l'élargissement coûte ${cost}",
   "inspector.ramp.repair": "Réparer · {cost} $",
   "inspector.ramp.repair_short_funds": "Pas assez de liquidités : la réparation coûte {cost} $",
+  "inspector.ramp.repair_in_progress": "Une réparation de cette rampe est déjà en cours",
   "shell.selection.ramp_title": "Rampe ({width}m de large)",
   "shell.selection.ramp_sub": "#{id} · {length}m de long · {width}m de large",
   "shell.selection.ramp_grade": "Pente de {grade}°",

@@ -24,6 +24,7 @@ export function widenState(ramp: BuiltRamp, plannedRamps: readonly PlannedRamp[]
   const cost = computeRampCost(ramp.def.length, next - ramp.width);
   if (ramp.def.legs) return { cost, disabledReason: t('inspector.ramp.widen_multi_leg') };
   if (plannedRamps.some(p => p.widenOf === ramp.id)) return { cost, disabledReason: t('inspector.ramp.widen_in_progress') };
+  if (plannedRamps.some(p => p.repairOf === ramp.id)) return { cost, disabledReason: t('inspector.ramp.repair_in_progress') };
   if (cash < cost) return { cost, disabledReason: t('inspector.ramp.widen_short_funds', { cost: formatMoney(cost) }) };
   return { cost, disabledReason: null };
 }
@@ -32,10 +33,13 @@ export function widenState(ramp: BuiltRamp, plannedRamps: readonly PlannedRamp[]
  * The Repair action for a built ramp a blast damaged (#2045): its cost, disabled with the reason when the cash
  * or the ramp's reach falls short; none when the ramp is intact or no terrain can be read.
  */
-export function repairAction(ramp: BuiltRamp, cash: number, links: InspectorLinks): ActionSpec | null {
+export function repairAction(ramp: BuiltRamp, plannedRamps: readonly PlannedRamp[], cash: number, links: InspectorLinks): ActionSpec | null {
+  const base = { action: 'repair', labelKey: 'inspector.ramp.repair', icon: 'build', variant: 'ghost' } as const;
+  if (plannedRamps.some(p => p.repairOf === ramp.id)) {
+    return { ...base, label: t('inspector.action.repair'), disabled: true, title: t('inspector.ramp.repair_in_progress') };
+  }
   const offer = links.rampRepairQuote?.(ramp.id);
   if (offer === undefined || (offer.kind === 'refused' && offer.errorKey === 'mining.repair_ramp.intact')) return null;
-  const base = { action: 'repair', labelKey: 'inspector.ramp.repair', icon: 'build', variant: 'ghost' } as const;
   if (offer.kind === 'refused') {
     return { ...base, label: t('inspector.action.repair'), disabled: true, title: t(offer.errorKey, offer.errorParams) };
   }
@@ -88,7 +92,7 @@ export const rampContent: KindContent = {
       disabled: widen.disabledReason !== null,
       ...(widen.disabledReason !== null ? { title: widen.disabledReason } : {}),
     }];
-    const repair = repairAction(ramp, state.cash, links);
+    const repair = repairAction(ramp, state.plannedRamps, state.cash, links);
     if (repair !== null) actions.push(repair);
     return {
       title: desc.title,
