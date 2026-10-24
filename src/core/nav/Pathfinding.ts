@@ -279,14 +279,12 @@ export interface FootPathFallbackResult extends PathResult {
  * failure, retries with vehicles unavoidable and rejects the relaxed route if
  * it crosses fragment debris (`pathCrossesFragmentOccupancy`). Shared by
  * PlanItinerary's cost estimation (exact: true) and Locomotion's runtime
- * execution (exact: false). `opts.crossFragments` accepts the relaxed route
- * through debris (evacuation walkers must get out of a rubble pocket).
+ * execution (exact: false).
  */
 export function findFootPathWithVehicleFallback(
   grid: NavGrid,
   request: PathRequest,
   exact: boolean,
-  opts?: { crossFragments?: boolean },
 ): FootPathFallbackResult {
   const pathfinder = exact ? findExactPath : findPath;
   const attempt = pathfinder(grid, request);
@@ -296,7 +294,7 @@ export function findFootPathWithVehicleFallback(
   }
 
   const relaxed = pathfinder(grid, { ...request, avoidVehicles: false });
-  if (!relaxed.found || (!opts?.crossFragments && pathCrossesFragmentOccupancy(grid, relaxed.waypoints))) {
+  if (!relaxed.found || pathCrossesFragmentOccupancy(grid, relaxed.waypoints)) {
     return { ...attempt, crossedVehicles: false };
   }
 

@@ -316,10 +316,6 @@ function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: numbe
  * for the whole trip. The one shared entry point every rest-creating path
  * calls.
  *
- * A walking rest trip crosses rubble (`crossFragments`, as an evacuation does, #2077): a
- * worker boxed in by fragments must be able to reach the quarters, else the rest walk fails
- * forever and the worker never returns to the haulers or diggers that would clear the rubble (#2085).
- *
  * `buildingId` (#1204): when given and the employee is on foot (including one
  * who just parked), routes through `moveTo(state, emp.id, { buildingId }, ...)`
  * so the employee walks to the living_quarters' ring and enters it unseen on
@@ -347,12 +343,12 @@ export function beginRestTravel(state: GameState, emp: Employee, x: number, z: n
     alightIfMounted(state, emp, emitter, { x, z });
   }
   const viaBuilding = !isMounted(emp.locomotion) && buildingId !== undefined
-    ? moveTo(state, emp.id, { buildingId }, { allowUnreachable: true, crossFragments: true }, emitter)
+    ? moveTo(state, emp.id, { buildingId }, { allowUnreachable: true }, emitter)
     : undefined;
   if (!viaBuilding?.success) {
     // Driven trip (#1122): see moveToAndFreeVehicleOnArrival.
     if (isMounted(emp.locomotion)) moveToAndFreeVehicleOnArrival(state, emp, x, z, emitter);
-    else moveTo(state, emp.id, { x, z }, { allowUnreachable: true, crossFragments: true }, emitter);
+    else moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
   }
   emp.pendingActionType = 'rest';
 }

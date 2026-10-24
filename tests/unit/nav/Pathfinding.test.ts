@@ -2672,43 +2672,10 @@ describe('findFootPathWithVehicleFallback', () => {
     expect(result.crossedVehicles).toBe(false);
   });
 
-  describe('crossFragments (#2077)', () => {
-    function rubbleBoxedGrid(): NavGrid {
-      const grid = makeFlatGrid(3, 1);
-      setCell(grid, 1, 0, 'walkable', { fragmentOccupancy: 1 });
-      return grid;
-    }
-
-    it('returns the relaxed route across rubble when crossFragments is true (exact: false)', () => {
-      const result = findFootPathWithVehicleFallback(rubbleBoxedGrid(), request, false, { crossFragments: true });
-      expect(result.found).toBe(true);
-      expect(result.crossedVehicles).toBe(true);
-      expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: 2, z: 0 });
-    });
-
-    it('returns the relaxed route across rubble when crossFragments is true (exact: true)', () => {
-      const result = findFootPathWithVehicleFallback(rubbleBoxedGrid(), request, true, { crossFragments: true });
-      expect(result.found).toBe(true);
-      expect(result.crossedVehicles).toBe(true);
-    });
-
-    it('still rejects the rubble route by default', () => {
-      const result = findFootPathWithVehicleFallback(rubbleBoxedGrid(), request, false);
-      expect(result.found).toBe(false);
-      expect(result.crossedVehicles).toBe(false);
-    });
-
-    it('still rejects the rubble route when crossFragments is false or unset in opts', () => {
-      expect(findFootPathWithVehicleFallback(rubbleBoxedGrid(), request, false, { crossFragments: false }).found).toBe(false);
-      expect(findFootPathWithVehicleFallback(rubbleBoxedGrid(), request, false, {}).found).toBe(false);
-    });
-
-    it('does not make a genuinely walled-in start reachable', () => {
-      const grid = makeFlatGrid(3, 1);
-      setCell(grid, 1, 0, 'blocked');
-      const result = findFootPathWithVehicleFallback(grid, request, false, { crossFragments: true });
-      expect(result.found).toBe(false);
-      expect(result.crossedVehicles).toBe(false);
-    });
+  it('rejects a route whose only way is across rubble, exact or not (#2094)', () => {
+    const grid = makeFlatGrid(3, 1);
+    setCell(grid, 1, 0, 'walkable', { fragmentOccupancy: 1 });
+    expect(findFootPathWithVehicleFallback(grid, request, false).found).toBe(false);
+    expect(findFootPathWithVehicleFallback(grid, request, true).found).toBe(false);
   });
 });

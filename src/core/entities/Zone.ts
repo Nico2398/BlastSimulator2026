@@ -224,7 +224,7 @@ export function clearZone(
     if (inZoneDriverIds.has(emp.id)) continue;
 
     const dest = findSafeDestination(emp.x, emp.z, zone);
-    if (dest && moveTo(state, emp.id, { x: dest.x, z: dest.z }, { allowUnreachable: true, crossFragments: true }).success) {
+    if (dest && moveTo(state, emp.id, { x: dest.x, z: dest.z }, { allowUnreachable: true }).success) {
       result.orderedEmployeeIds.push(emp.id);
     } else {
       result.strandedEmployeeIds.push(emp.id);

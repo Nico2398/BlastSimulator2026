@@ -1,9 +1,7 @@
-// BlastSimulator2026 — Integration: evacuation of an employee boxed in by rubble (#2077).
-// Evacuation proves a way out with the relaxed findPath (avoidVehicles:false), but Locomotion's foot
-// planner used to reject any relaxed route crossing fragment cells, so the walker was flagged stuck and
-// the armed detonation read 'stranded' ("cannot leave the blast zone"). Zone.clearZone now opts in with
-// crossFragments:true. Genuinely enclosed walkers (blocked/void cells) must still be stranded, and an
-// ordinary moveTo (no crossFragments) must still refuse a rubble-boxed target.
+// BlastSimulator2026 — Integration: an employee boxed in by rubble is stranded, not walked through it (#2094).
+// A rubble ring is a management problem the player solves: haul a path clear, or press Fire anyway. No
+// walk crosses fragment cells, evacuation included (the #954/#1090 guard), so the armed detonation reads
+// 'stranded' with the walker's name, exactly as a walker walled in by blocked or void cells does.
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
@@ -74,32 +72,23 @@ function armedState(prepare: (nav: NavGrid) => void) {
   return { run: (cmd: string) => runner.run(cmd), state, walker };
 }
 
-describe('Evacuation of an employee boxed in by rubble (#2077)', () => {
-  it('walks the boxed-in blaster out of the zone, never stranded, never move-stuck', () => {
+describe('An employee boxed in by rubble stays inside it (#2094)', () => {
+  it('never crosses the ring: the blaster stays in the zone and is named stranded', () => {
     const { run, state, walker } = armedState(rubbleRing);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M)!;
     expect(isInZone(walker.x, walker.z, zone)).toBe(true); // precondition: starts inside
 
-    for (let i = 0; i < 60; i++) {
-      expect(run('tick 1')).toMatchObject({ success: true });
-      expect(detonationPhase(state)).not.toMatchObject({ kind: 'stranded' });
-      expect(walker.isMoveStuck).toBe(false);
-    }
+    const budget = DETONATION_STUCK_WALKER_FAILURE_TICKS + DETONATION_REEVACUATE_INTERVAL_TICKS + 1;
+    for (let i = 0; i < budget; i++) expect(run('tick 1')).toMatchObject({ success: true });
     expect(walker.alive).toBe(true);
-    expect(isInZone(walker.x, walker.z, zone)).toBe(false);
-  });
-
-  it('never reports stranded across several re-evacuation intervals', () => {
-    const { run, state } = armedState(rubbleRing);
-    for (let i = 0; i < 3 * DETONATION_REEVACUATE_INTERVAL_TICKS; i++) {
-      run('tick 1');
-      expect(detonationPhase(state).kind).not.toBe('stranded');
-    }
-    expect(state.pendingDetonation?.strandedEmployeeIds ?? []).toEqual([]);
+    expect(Math.round(walker.x)).toBe(CENTER);
+    expect(Math.round(walker.z)).toBe(CENTER);
+    expect(isInZone(walker.x, walker.z, zone)).toBe(true);
+    expect(detonationPhase(state)).toEqual({ kind: 'stranded', names: [walker.name] });
   });
 });
 
-describe('A genuinely enclosed walker is still stranded (#2077)', () => {
+describe('A walker walled in by blocked or void cells is stranded too', () => {
   for (const type of ['blocked', 'void'] as const) {
     it(`names a walker walled in by ${type} cells as stranded`, () => {
       const { run, state, walker } = armedState(nav => wallRing(nav, type));
@@ -112,32 +101,14 @@ describe('A genuinely enclosed walker is still stranded (#2077)', () => {
   }
 });
 
-describe('moveTo keeps the fragment guard unless crossFragments is requested (#2077)', () => {
-  function rubbleBoxedTarget() {
+describe('moveTo keeps the fragment guard (#954/#1090, #2094)', () => {
+  it('refuses a route into a rubble-boxed target', () => {
     const { runner, ctx } = createRunner();
     expect(runner.run('new_game seed:42 size:80')).toMatchObject({ success: true });
     const state: GameState = ctx.state!;
     state.navGrid = flatNav();
     rubbleRing(state.navGrid);
     const walker = hireEmployee(state.employees, 'blaster', new Random(42), 50, 50).employee;
-    return { state, walker };
-  }
-
-  it('refuses a route into a rubble-boxed target by default', () => {
-    const { state, walker } = rubbleBoxedTarget();
-    const result = moveTo(state, walker.id, { x: CENTER, z: CENTER });
-    expect(result.success).toBe(false);
-  });
-
-  it('refuses it when crossFragments is explicitly false', () => {
-    const { state, walker } = rubbleBoxedTarget();
-    const result = moveTo(state, walker.id, { x: CENTER, z: CENTER }, { crossFragments: false });
-    expect(result.success).toBe(false);
-  });
-
-  it('plans it when crossFragments is true', () => {
-    const { state, walker } = rubbleBoxedTarget();
-    const result = moveTo(state, walker.id, { x: CENTER, z: CENTER }, { crossFragments: true });
-    expect(result.success).toBe(true);
+    expect(moveTo(state, walker.id, { x: CENTER, z: CENTER }).success).toBe(false);
   });
 });

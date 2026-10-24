@@ -206,7 +206,6 @@ function estimateFootLegDistance(
   fromX: number, fromZ: number,
   toX: number, toZ: number,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
-  crossFragments: boolean = false,
 ): number | null {
   if (fidelity === 'estimate' || state.navGrid === null) {
     return octileHeuristic(fromX, fromZ, toX, toZ);
@@ -215,7 +214,6 @@ function estimateFootLegDistance(
   const avoidVehicles = !isDestinationOccupied(state, toX, toZ);
   const path = findFootPathWithVehicleFallback(
     state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance }, true /* exact */,
-    { crossFragments },
   );
   return path.found ? path.totalCost : null;
 }
@@ -480,11 +478,8 @@ function buildFootOnlyItinerary(
   targetZ: number,
   workTicks: number,
   allowUnreachable: boolean,
-  // Evacuation walkers (#2077): the relaxed route may cross rubble; stamped on
-  // the leg so the executor (Locomotion) plans with the same rule.
-  crossFragments: boolean = false,
 ): Itinerary | null {
-  const dist = estimateFootLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ, undefined, crossFragments);
+  const dist = estimateFootLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ);
   const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, employee.x, employee.z, targetX, targetZ);
   if (effectiveDist === null) return null;
 
@@ -499,7 +494,6 @@ function buildFootOnlyItinerary(
     // ring — mirrors #1203's identical enter_building step for training.
     onArrive: goal.kind === 'rest' ? { kind: 'enter_building', buildingId: goal.buildingId } : { kind: 'none' },
     estTicks: cellsToTravelTicks(effectiveDist, AGENT_WALK_SPEED),
-    ...(crossFragments ? { crossesFragments: true } : {}),
   };
 
   return { legs: [footLeg], goal, workTicks, estTotalTicks: footLeg.estTicks + workTicks };
@@ -840,7 +834,7 @@ export function planItinerary(
   // `allowUnreachable` (#1178, single-mover unification): threaded through to
   // buildDriveLeg's vehicle-gated drive leg below — a best-effort route
   // instead of a refusal when the target is unreachable right now.
-  opts?: { via?: number; action?: PendingAction; allowUnreachable?: boolean; crossFragments?: boolean },
+  opts?: { via?: number; action?: PendingAction; allowUnreachable?: boolean },
 ): Itinerary | null {
   // haul_debris/fragment_debris (#1091): these two action types need more
   // than the generic single-drive-leg-then-work shape the rest of this
@@ -871,7 +865,7 @@ export function planItinerary(
   );
 
   if (role === null && via === undefined) {
-    const footItinerary = buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks, opts?.allowUnreachable ?? false, opts?.crossFragments ?? false);
+    const footItinerary = buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks, opts?.allowUnreachable ?? false);
     if (footItinerary === null) return null;
 
     if (VEHICLE_TRANSPORT_PLANNING_ENABLED && goal.kind === 'work' && resolved.actionId !== null) {

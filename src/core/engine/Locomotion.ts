@@ -438,7 +438,6 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
         state.navGrid,
         { agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles },
         false /* exact */,
-        { crossFragments: leg.crossesFragments === true },
       );
       path = footResult;
       if (footResult.crossedVehicles) {

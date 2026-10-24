@@ -78,8 +78,6 @@ export interface Leg {
    * true, so it behaves exactly like every leg before this fix).
    */
   crossesVehicles?: boolean;
-  /** (#2077) Leg was routed through fragment-occupied cells (rubble) because the walker was boxed in. */
-  crossesFragments?: boolean;
   /**
    * Set on a leg whose destination is the one cell its arrival is for, so
    * `handleAgentOccupancyBlock`'s destination-spread step (and the traffic-jam
