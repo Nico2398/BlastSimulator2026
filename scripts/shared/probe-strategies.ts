@@ -62,7 +62,7 @@ import { computeVehicleUpgradeCost } from '../../src/core/entities/VehicleUpgrad
 import { ROLE_LICENCE_REQUIRED, canDriveTier, countLicenceHolders, licenceLevelOfSkill } from '../../src/core/entities/VehicleDriverAssignment.js';
 import { isEnrolledInTraining } from '../../src/core/entities/EmployeeTraining.js';
 import {
-  DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS, SPOIL_HEAP_CAPACITY_KG,
+  DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS,
   WALL_BERM_MIN_WIDTH_M, WALL_SAFE_FACE_HEIGHT_M_BY_TIER,
 } from '../../src/core/config/balance.js';
 import { gradeDef } from '../../src/core/economy/MineGrade.js';
@@ -986,17 +986,17 @@ function ladderCrew(s: ProbeSession, m: ReinvestMemory): void {
 
 /** Ecology under which another spoil heap is built, and the most the ladder builds: loose rubble past a heap's capacity drains it. */
 const LADDER_ECOLOGY_FLOOR = 40;
-const LADDER_MAX_SPOIL_HEAPS = 4;
+export const LADDER_MAX_SPOIL_HEAPS = 4;
 
 /**
- * Whether the ladder needs another spoil heap for `barrenKgPending` of rubble awaiting a heap while `heaps` are built:
- * the rubble outgrows their combined capacity and the heap cap is not reached (#2085).
+ * Whether blocked overflow calls for another spoil heap: `barrenKgPending` (`pendingSpoilOverflowKg`) already counts only
+ * rubble that did not fit the `heaps` built, so any of it means more room is needed while the heap cap is not reached (#2085).
  */
 export function spoilHeapsNeeded(barrenKgPending: number, heaps: number): boolean {
-  return barrenKgPending > 0 && heaps < LADDER_MAX_SPOIL_HEAPS && barrenKgPending > heaps * SPOIL_HEAP_CAPACITY_KG;
+  return barrenKgPending > 0 && heaps < LADDER_MAX_SPOIL_HEAPS;
 }
 
-/** Another spoil heap while ecology sags and rubble outgrows the heaps' room. */
+/** Another spoil heap while ecology sags or queued haul orders are blocked on full heaps. */
 function ladderSpoil(s: ProbeSession, m: ReinvestMemory): void {
   const heaps = countOf(s, 'spoil_heap');
   const needed = s.state.scores.ecology < LADDER_ECOLOGY_FLOOR || spoilHeapsNeeded(pendingSpoilOverflowKg(s.state), heaps);

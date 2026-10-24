@@ -59,4 +59,22 @@ describe('pendingSpoilOverflowKg', () => {
     );
     expect(pendingSpoilOverflowKg(state)).toBe(2000);
   });
+
+  it('ignores orders no longer queued (claimed)', () => {
+    const state = world([1000, 2000]);
+    state.pendingActions.push(
+      order(1, 1, { status: 'claimed', holderId: 7, blockedReason: 'spoil_heap_full' }),
+      order(2, 2, { blockedReason: 'spoil_heap_full' }),
+    );
+    expect(pendingSpoilOverflowKg(state)).toBe(2000);
+  });
+
+  it('adds 0 for an order whose fragment is missing', () => {
+    const state = world([1500]);
+    state.pendingActions.push(
+      order(1, 99, { blockedReason: 'spoil_heap_full' }),
+      order(2, 1, { blockedReason: 'spoil_heap_full' }),
+    );
+    expect(pendingSpoilOverflowKg(state)).toBe(1500);
+  });
 });

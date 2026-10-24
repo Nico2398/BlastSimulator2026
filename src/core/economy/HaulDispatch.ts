@@ -199,7 +199,7 @@ export type FragmentLookup = (fragmentId: number) => TrackedFragment | undefined
  * relies on. A fragment's own `state` transitions mutate the object the array
  * holds. First occurrence wins, exactly like `find`.
  */
-export function createFragmentLookup(state: GameState): FragmentLookup {
+export function createFragmentLookup(state: Pick<GameState, 'logistics'>): FragmentLookup {
   return fragmentId => findById(state.logistics.fragments, fragmentIdOf, fragmentId);
 }
 
@@ -423,7 +423,7 @@ export function haulBlockedReason(
  * ignored.
  */
 export function pendingSpoilOverflowKg(state: Pick<GameState, 'pendingActions' | 'logistics'>): number {
-  const lookup: FragmentLookup = id => findById(state.logistics.fragments, fragmentIdOf, id);
+  const lookup = createFragmentLookup(state);
   let kg = 0;
   for (const a of state.pendingActions) {
     if (a.type !== 'haul_debris' || a.status !== 'queued' || a.blockedReason !== 'spoil_heap_full') continue;
