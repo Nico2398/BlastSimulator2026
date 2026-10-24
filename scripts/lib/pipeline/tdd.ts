@@ -141,6 +141,32 @@ export function split(cwd: string, label: string): string[] {
 interface RedOptions {
   label: string;
   commit: boolean;
+  /** Quote load errors and type errors in full — the test-writer's view; the lead's view names files and codes only. */
+  detail?: boolean;
+}
+
+/** What the tests worktree changed that a test-writer may not: production paths, and tests the skeleton already had. */
+function outOfScope(worktree: string, skeleton: string): string[] {
+  const out = git(worktree, 'diff', '--name-status', '--no-renames', skeleton);
+  const problems: string[] = [];
+  for (const line of out === '' ? [] : out.split('\n')) {
+    const [status, path] = line.split('\t');
+    if (!path) continue;
+    if (!isTestPath(path)) problems.push(`${path}: not a test path — the test-writer changes tests/ and scripts/scenario-defs/ only`);
+    else if (status === 'D') problems.push(`${path}: deleted — a test the skeleton already had stays`);
+  }
+  for (const path of untrackedPaths(worktree)) {
+    if (!isTestPath(path)) problems.push(`${path}: not a test path — the test-writer changes tests/ and scripts/scenario-defs/ only`);
+  }
+  return problems;
+}
+
+/** A RED problem with every quote of test code cut: the file, the line, the error code. */
+function redacted(problem: string): string {
+  return problem
+    .replace(/^(type error: \S+?\(\d+,\d+\): error TS\d+).*$/, '$1')
+    .replace(/^(\S+: did not load) — .*$/, '$1')
+    .replace(/^(\S+: must pass and does not) \(.*\)$/, '$1');
 }
 
 function runCapture(command: string, args: string[], cwd: string): { status: number; output: string } {
@@ -179,13 +205,19 @@ export function red(cwd: string, options: RedOptions): { verdict: RedVerdict; li
   const guardSummaries = summarizeVitest(report, worktree, guardFiles);
   if (guards.length > 0 && guardFiles.length === 0) guardSummaries.push({ file: guards[0]!, total: 0, failed: 0, loadError: 'did not run' });
   const tsc = vitestFiles.length > 0 ? runCapture('npx', ['tsc', '--noEmit', '--project', 'tests/tsconfig.json'], worktree).output : '';
-  const verdict = judgeRed(files, typeErrorsIn(tsc, changed), guardSummaries);
+  const judged = judgeRed(files, typeErrorsIn(tsc, changed), guardSummaries);
+  const scope = outOfScope(worktree, state.skeleton!);
+  const verdict = scope.length === 0 ? judged : { ...judged, red: false, problems: [...scope, ...judged.problems] };
+  const show = options.detail ? (problem: string) => problem : redacted;
 
-  const lines = files.map((f) => `  ${f.file}: ${f.loadError ? `LOAD ERROR (${f.loadError})` : `${f.failed}/${f.total} failing`}`);
+  const lines = files.map(
+    (f) => `  ${f.file}: ${f.loadError ? (options.detail ? `LOAD ERROR (${f.loadError})` : 'LOAD ERROR') : `${f.failed}/${f.total} failing`}`,
+  );
   if (verdict.passingOnStubs.length > 0) lines.push(`Passing on the stubs (check they test new behaviour): ${verdict.passingOnStubs.join(', ')}`);
   if (!verdict.red) {
     lines.unshift(`RED NOT PROVEN for ${options.label}:`);
-    lines.push(...verdict.problems.map((problem) => `  ✗ ${problem}`));
+    lines.push(...verdict.problems.map((problem) => `  ✗ ${show(problem)}`));
+    if (!options.detail) lines.push('  (file names and error codes only: the test-writer runs `tdd red --detail` for the full text.)');
     return { verdict, lines };
   }
   lines.unshift(`RED PROVEN for ${options.label} (${files.reduce((sum, f) => sum + f.failed, 0)} failing tests in ${files.length} files):`);
@@ -229,7 +261,13 @@ export function joinCycle(cwd: string, label: string): string[] {
     } else {
       git(root, 'checkout', '-b', state.featureBranch, state.baseSha);
     }
-    state = { ...state, phase: 'joining-tests' };
+    const commits = (range: string) => Number(git(root, 'rev-list', '--count', range));
+    state = {
+      ...state,
+      phase: 'joining-tests',
+      joinFrom: headSha(root),
+      joinCommits: commits(`${state.baseSha}..${state.testsBranch}`) + commits(`${state.skeleton}..${state.implBranch}`),
+    };
     writeState(root, state);
     const conflicts = pick(root, `${state.baseSha}..${state.testsBranch}`);
     if (conflicts) return conflictLines(label, 'tests', conflicts);
@@ -244,6 +282,16 @@ export function joinCycle(cwd: string, label: string): string[] {
 
   if (state.phase === 'joining-impl') {
     requireClean(root, 'The feature branch');
+    if (state.joinFrom && state.joinCommits !== undefined) {
+      const landed = Number(git(root, 'rev-list', '--count', `${state.joinFrom}..HEAD`));
+      if (landed < state.joinCommits) {
+        throw new PipelineError(
+          `${state.featureBranch} holds ${landed} of the ${state.joinCommits} commits the join picks — a cherry-pick was aborted or skipped. ` +
+            `Pick what is missing from ${state.baseSha.slice(0, 9)}..${state.testsBranch} and ${state.skeleton!.slice(0, 9)}..${state.implBranch} ` +
+            '(`git cherry-pick --allow-empty <sha>`), then re-run `tdd join`.',
+        );
+      }
+    }
     if (state.worktree && existsSync(state.worktree)) git(root, 'worktree', 'remove', '--force', state.worktree);
     state = { ...state, phase: 'joined', worktree: undefined };
     writeState(root, state);

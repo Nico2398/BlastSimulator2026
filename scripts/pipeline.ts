@@ -10,7 +10,7 @@
  * Usage:
  *   npm run pipeline -- tdd start  --label <issue>-<runId> [--base main] [--feature <branch>]
  *   npm run pipeline -- tdd split  --label <label>
- *   npm run pipeline -- tdd red    --label <label> [--no-commit]     (the test-writer runs this)
+ *   npm run pipeline -- tdd red    --label <label> [--no-commit] [--detail]  (the test-writer runs this with --detail)
  *   npm run pipeline -- tdd join   --label <label>
  *   npm run pipeline -- tdd status --label <label>
  *   npm run pipeline -- verify [--base origin/main] [--only static,logic] [--no-cache]
@@ -45,7 +45,7 @@ export function parseArgs(argv: string[]): { positional: string[]; values: Map<s
     const arg = argv[i]!;
     if (!arg.startsWith('--')) {
       positional.push(arg);
-    } else if (['--no-commit', '--no-cache', '--heavy'].includes(arg)) {
+    } else if (['--no-commit', '--no-cache', '--heavy', '--detail'].includes(arg)) {
       flags.add(arg.slice(2));
     } else {
       const value = argv[++i];
@@ -87,7 +87,7 @@ function run(argv: string[]): number {
     else if (sub === 'join') print(joinCycle(cwd, label));
     else if (sub === 'status') print(status(cwd, label));
     else if (sub === 'red') {
-      const result = red(cwd, { label, commit: !flags.has('no-commit') });
+      const result = red(cwd, { label, commit: !flags.has('no-commit'), detail: flags.has('detail') });
       print(result.lines);
       return result.verdict.red ? 0 : 1;
     } else throw new PipelineError(USAGE);

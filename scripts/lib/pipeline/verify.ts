@@ -127,13 +127,17 @@ export function verify(root: string, options: VerifyOptions = {}): { ok: boolean
       results.push({ channel, status: 'skipped', seconds: 0 });
       continue;
     }
-    // `logic` already runs the suites `context` would run on its own.
-    const commands = channel === 'context' && channels.includes('logic') ? CHANNEL_COMMANDS.context.slice(0, 1) : CHANNEL_COMMANDS[channel];
+    // `logic` already runs the suites `context` would run on its own, so a
+    // reduced `context` is cached only once `logic` has passed too.
+    const reduced = channel === 'context' && channels.includes('logic');
+    const commands = reduced ? CHANNEL_COMMANDS.context.slice(0, 1) : CHANNEL_COMMANDS[channel];
     options.progress?.(`running ${channel}: ${commands.map((c) => c.join(' ')).join(' && ')}`);
     const result = runChannel(root, channel, commands);
     results.push(result);
-    if (result.status === 'pass' && tree) writeCache(root, tree, { ...readCache(root, tree), [channel]: 'pass' });
+    if (result.status === 'pass' && tree && !reduced) writeCache(root, tree, { ...readCache(root, tree), [channel]: 'pass' });
   }
+  const passed = (channel: Channel) => results.some((r) => r.channel === channel && (r.status === 'pass' || r.status === 'cached'));
+  if (tree && passed('context') && passed('logic')) writeCache(root, tree, { ...readCache(root, tree), context: 'pass' });
 
   const lines = [`Changed vs ${base}: ${changed.length} files. Channels owed: ${channels.join(', ') || 'none'}.`];
   for (const result of results) {

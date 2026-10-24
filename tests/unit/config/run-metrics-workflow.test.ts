@@ -25,9 +25,19 @@ describe('run metrics export', () => {
     const extract = step('Export run metrics');
     expect(extract).toContain('if: always()');
     expect(extract).toContain('continue-on-error: true');
-    expect(extract).toContain('npm run -s metrics -- extract');
+    expect(extract).toContain('scripts/agentic-metrics.ts" extract');
+    expect(extract).toContain('shell: bash');
     expect(extract).toContain('--since "$STARTED_AT"');
     expect(runner.indexOf('- name: Export run metrics')).toBeGreaterThan(runner.indexOf('- name: Did the retry settle its issue?'));
+  });
+
+  // The agent may leave any branch checked out: an older one without the
+  // tooling, or one that changed the sanitizer.
+  it('runs the tooling from the workflow commit, not the agent checkout', () => {
+    const extract = step('Export run metrics');
+    expect(extract).toContain('git archive "$GITHUB_SHA"');
+    expect(step('Append run metrics to the agentic-metrics branch')).toContain('"$METRICS_SRC/scripts/agentic-metrics.ts" publish');
+    expect(runner).not.toContain('npm run -s metrics --');
   });
 
   it('uploads the sanitized records, never a transcript', () => {

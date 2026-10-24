@@ -167,11 +167,38 @@ function toolResultTexts(record: TranscriptRecord): { text: string; isError: boo
     });
 }
 
-/** Tool names are a fixed vocabulary, except MCP tools: keep their server, drop nothing secret. */
-function toolName(name: string): string {
-  return /^[A-Za-z0-9_:-]{1,80}$/.test(name) ? name : 'other';
+/**
+ * The names a record may carry, beyond numbers. Everything a session can type
+ * is mapped onto it, and what falls outside is `other`: npm scripts from
+ * package.json, skill and agent names from `.claude/`.
+ */
+export interface Vocabulary {
+  scripts: ReadonlySet<string>;
+  skills: ReadonlySet<string>;
+  agents: ReadonlySet<string>;
 }
 
+const BUILT_IN_TOOLS = new Set([
+  'Agent', 'AskUserQuestion', 'Bash', 'BashOutput', 'Edit', 'EnterPlanMode', 'ExitPlanMode', 'Glob', 'Grep',
+  'KillShell', 'ListMcpResourcesTool', 'Monitor', 'MultiEdit', 'NotebookEdit', 'Read', 'ReadMcpResourceTool',
+  'SendMessage', 'Skill', 'SlashCommand', 'Task', 'TaskCreate', 'TaskGet', 'TaskList', 'TaskOutput', 'TaskStop',
+  'TaskUpdate', 'TodoWrite', 'ToolSearch', 'WebFetch', 'WebSearch', 'Write',
+]);
+
+const BUILT_IN_AGENTS = new Set(['general-purpose', 'Explore', 'Plan', 'claude-code-guide', 'statusline-setup', 'fork']);
+
+/** A built-in tool by name; an MCP tool by its server alone; anything else `other`. */
+function toolName(name: string): string {
+  if (BUILT_IN_TOOLS.has(name)) return name;
+  const mcp = /^mcp__([a-z][a-z0-9_-]{0,30})__/.exec(name);
+  return mcp ? `mcp__${mcp[1]}` : 'other';
+}
+
+function inVocabulary(name: unknown, ...sets: ReadonlySet<string>[]): string {
+  return typeof name === 'string' && sets.some((set) => set.has(name)) ? name : 'other';
+}
+
+/** Model names come from the API and Claude Code's own cost state, not from what a session typed. */
 const SAFE_NAME = /^[A-Za-z0-9:_-]{1,64}$/;
 
 interface AgentAccumulator {
@@ -185,7 +212,7 @@ function accumulate(
   acc: AgentAccumulator,
   records: TranscriptRecord[],
   run: RunMetrics,
-  scripts: ReadonlySet<string>,
+  vocab: Vocabulary,
 ): void {
   const latest = new Map<string, TranscriptRecord>();
   const order: string[] = [];
@@ -202,15 +229,16 @@ function accumulate(
       latest.set(id, record);
       for (const use of toolUses(record)) {
         bump(acc.metrics.tools, toolName(use.name));
-        if (use.name === 'Skill' && typeof use.input.skill === 'string' && SAFE_NAME.test(use.input.skill)) {
-          bump(run.skills, use.input.skill);
-          if (run.pipeline.pipelineSkill === undefined && use.input.skill.startsWith('agentic-pipeline-')) run.pipeline.pipelineSkill = use.input.skill;
+        if (use.name === 'Skill') {
+          const skill = inVocabulary(use.input.skill, vocab.skills);
+          bump(run.skills, skill);
+          if (run.pipeline.pipelineSkill === undefined && skill.startsWith('agentic-pipeline-')) run.pipeline.pipelineSkill = skill;
         }
-        if ((use.name === 'Agent' || use.name === 'Task') && typeof use.input.subagent_type === 'string' && SAFE_NAME.test(use.input.subagent_type)) {
-          bump(run.pipeline.delegations, use.input.subagent_type);
+        if (use.name === 'Agent' || use.name === 'Task') {
+          bump(run.pipeline.delegations, inVocabulary(use.input.subagent_type ?? 'general-purpose', vocab.agents, BUILT_IN_AGENTS));
         }
         if (use.name === 'Bash' && typeof use.input.command === 'string') {
-          const category = bashCategory(use.input.command, scripts);
+          const category = bashCategory(use.input.command, vocab.scripts);
           bump(run.bash, category);
           if (category === 'npm run long wait') run.pipeline.longWaitPolls++;
         }
@@ -232,8 +260,9 @@ function accumulate(
   for (const id of order) {
     const record = latest.get(id)!;
     const tokens = usageTokens(record.message?.usage);
+    // Claude Code writes API errors as `<synthetic>` messages: no request was billed.
+    if (record.message?.model === '<synthetic>') continue;
     const model = typeof record.message?.model === 'string' && SAFE_NAME.test(record.message.model) ? record.message.model : 'unknown';
-    if (model === '<synthetic>') continue;
     acc.metrics.requests++;
     addTokens(acc.metrics.tokens, tokens);
     if (!acc.byModel.has(model)) acc.byModel.set(model, zero());
@@ -262,7 +291,7 @@ function lastCostState(records: TranscriptRecord[]): TranscriptRecord | undefine
 }
 
 /** The metrics of one session and every sub-agent it ran. */
-export function extractMetrics(session: SessionTranscript, context: RunContext, scripts: ReadonlySet<string>): RunMetrics {
+export function extractMetrics(session: SessionTranscript, context: RunContext, vocab: Vocabulary): RunMetrics {
   const run: RunMetrics = {
     schema: METRICS_SCHEMA,
     ...context,
@@ -288,11 +317,11 @@ export function extractMetrics(session: SessionTranscript, context: RunContext, 
   };
   const main = agentFor('main');
   main.metrics.invocations = 1;
-  accumulate(main, session.records, run, scripts);
+  accumulate(main, session.records, run, vocab);
   for (const sub of session.subagents) {
-    const acc = agentFor(sub.agentType);
+    const acc = agentFor(inVocabulary(sub.agentType, vocab.agents, BUILT_IN_AGENTS));
     acc.metrics.invocations++;
-    accumulate(acc, sub.records, run, scripts);
+    accumulate(acc, sub.records, run, vocab);
   }
 
   const all = [...agents.values()];

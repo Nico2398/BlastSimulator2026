@@ -19,6 +19,16 @@ const GIT_SUBCOMMANDS = new Set([
 
 const GH_COMMANDS = new Set(['pr', 'issue', 'run', 'api', 'label', 'workflow', 'repo', 'release', 'search']);
 
+const GH_SUBCOMMANDS = new Set([
+  'view', 'list', 'create', 'edit', 'comment', 'close', 'reopen', 'merge', 'checks', 'diff', 'status', 'ready',
+  'checkout', 'review', 'rerun', 'watch', 'cancel', 'download', 'delete', 'develop', 'issues', 'prs', 'code',
+]);
+
+const PIPELINE_COMMANDS = new Set(['tdd', 'verify', 'review-brief', 'step']);
+const TDD_ACTIONS = new Set(['start', 'split', 'red', 'join', 'status']);
+
+const NPX_BINS = new Set(['vitest', 'tsc', 'tsx', 'vite', 'playwright', 'jscpd', 'eslint', 'prettier', 'knip', 'puppeteer']);
+
 const TOOLS = new Set([
   'ls', 'cat', 'grep', 'rg', 'sed', 'awk', 'head', 'tail', 'find', 'wc', 'mkdir', 'rm', 'cp', 'mv', 'echo',
   'printf', 'sort', 'uniq', 'diff', 'jq', 'node', 'python3', 'python', 'curl', 'tsx', 'bash', 'sh', 'test',
@@ -47,21 +57,21 @@ export function bashCategory(command: string, scripts: ReadonlySet<string>): str
     if (!scripts.has(script)) return 'npm run (other)';
     const sub = words[3] === '--' ? words[4] : undefined;
     if (script === 'long' && (sub === 'start' || sub === 'wait' || sub === 'status')) return `npm run long ${sub}`;
-    if (script === 'pipeline' && sub !== undefined && /^[a-z-]+$/.test(sub)) {
-      const action = sub === 'tdd' && /^[a-z]+$/.test(words[5] ?? '') ? ` ${words[5]}` : '';
+    if (script === 'pipeline' && sub !== undefined && PIPELINE_COMMANDS.has(sub)) {
+      const action = sub === 'tdd' && TDD_ACTIONS.has(words[5] ?? '') ? ` ${words[5]}` : '';
       return `npm run pipeline ${sub}${action}`;
     }
     return `npm run ${script}`;
   }
   if (head === 'npm' && (second === 'test' || second === 'ci' || second === 'install')) return `npm ${second}`;
-  if (head === 'npx') return /^[a-z@][a-z0-9@/._-]*$/.test(second ?? '') && second!.length < 40 ? `npx ${second}` : 'npx (other)';
+  if (head === 'npx') return NPX_BINS.has(second ?? '') ? `npx ${second}` : 'npx (other)';
   if (head === 'git') {
     const sub = second === '-C' ? words[3] : second;
     return sub !== undefined && GIT_SUBCOMMANDS.has(sub) ? `git ${sub}` : 'git (other)';
   }
   if (head === 'gh') {
     if (second === undefined || !GH_COMMANDS.has(second)) return 'gh (other)';
-    return /^[a-z-]+$/.test(third ?? '') ? `gh ${second} ${third}` : `gh ${second}`;
+    return GH_SUBCOMMANDS.has(third ?? '') ? `gh ${second} ${third}` : `gh ${second}`;
   }
   return TOOLS.has(head) ? head : 'other';
 }

@@ -30,7 +30,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join, resolve } from 'path';
-import { extractMetrics, type RunContext, type RunMetrics } from './lib/metrics/extract.js';
+import { extractMetrics, type RunContext, type RunMetrics, type Vocabulary } from './lib/metrics/extract.js';
 import { aggregateReport, runSummary } from './lib/metrics/report.js';
 import { publish } from './lib/metrics/publish.js';
 import { readSessions } from './lib/metrics/transcripts.js';
@@ -40,13 +40,29 @@ function option(argv: string[], name: string): string | undefined {
   return index === -1 ? undefined : argv[index + 1];
 }
 
+/** The repository this script belongs to — not the cwd, which may be an agent's checkout. */
+const REPO = resolve(import.meta.dirname, '..');
+
 function npmScripts(): Set<string> {
   try {
-    const pkg = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8')) as { scripts?: Record<string, string> };
+    const pkg = JSON.parse(readFileSync(resolve(REPO, 'package.json'), 'utf8')) as { scripts?: Record<string, string> };
     return new Set(Object.keys(pkg.scripts ?? {}));
   } catch {
     return new Set();
   }
+}
+
+/** Entry names under `.claude/<dir>`, without `suffix`. */
+function contextNames(dir: string, suffix = ''): Set<string> {
+  try {
+    return new Set(readdirSync(resolve(REPO, '.claude', dir)).filter((name) => name.endsWith(suffix)).map((name) => name.slice(0, name.length - suffix.length)));
+  } catch {
+    return new Set();
+  }
+}
+
+function vocabulary(): Vocabulary {
+  return { scripts: npmScripts(), skills: contextNames('skills'), agents: contextNames('agents', '.md') };
 }
 
 /** Records from JSONL files and directories of `.json` records. */
@@ -92,10 +108,10 @@ function extract(argv: string[]): number {
   };
   const sessions = readSessions(option(argv, 'projects') ?? join(homedir(), '.claude', 'projects'), Number.isFinite(since) ? since * 1000 : 0);
   mkdirSync(out, { recursive: true });
-  const scripts = npmScripts();
+  const vocab = vocabulary();
   const summaries: string[] = [];
   for (const session of sessions) {
-    const run = extractMetrics(session, context, scripts);
+    const run = extractMetrics(session, context, vocab);
     if (run.agents.every((agent) => agent.requests === 0)) continue;
     writeFileSync(join(out, `${run.sessionId}.json`), `${JSON.stringify(run)}\n`);
     summaries.push(runSummary(run));

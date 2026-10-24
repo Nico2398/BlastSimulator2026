@@ -22,7 +22,7 @@ export function git(cwd: string, ...args: string[]): string {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       maxBuffer: 64 * 1024 * 1024,
-    }).trim();
+    }).trimEnd();
   } catch (error) {
     const stderr = String((error as { stderr?: unknown }).stderr ?? '').trim();
     throw new GitError(`git ${args.join(' ')} failed${stderr ? `:\n${stderr}` : ''}`);

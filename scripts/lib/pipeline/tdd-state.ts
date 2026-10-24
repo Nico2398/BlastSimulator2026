@@ -35,6 +35,9 @@ export interface TddState {
   red?: string;
   /** Test files the RED commit added or changed. */
   redFiles?: string[];
+  /** The feature branch head the join picks onto, and how many commits it picks. */
+  joinFrom?: string;
+  joinCommits?: number;
 }
 
 interface BlindMarker {

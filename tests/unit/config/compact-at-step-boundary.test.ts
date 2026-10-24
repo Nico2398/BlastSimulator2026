@@ -10,7 +10,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { step, withProgressLine } from '../../../scripts/lib/pipeline/steps.js';
@@ -32,18 +32,38 @@ afterEach(() => {
 
 const SINCE = '2026-10-24T10:00:00.000Z';
 
-/** A lead transcript whose last prompt is `promptTokens`, with `afterSince` API responses after SINCE. */
-function transcript(promptTokens: number, afterSince = 0): string {
-  const path = join(project, 'transcript.jsonl');
+type TranscriptRecord = { type: string; timestamp: string; message: { id: string; model?: string; usage?: object } };
+
+/** Records whose last prompt is `promptTokens`, with `afterSince` API responses after SINCE. */
+function records(promptTokens: number, afterSince: number): TranscriptRecord[] {
   const usage = { input_tokens: 10, cache_read_input_tokens: promptTokens - 10, cache_creation_input_tokens: 0 };
-  const records = [{ type: 'assistant', timestamp: '2026-10-24T09:59:00.000Z', message: { id: 'before', usage } }];
+  const list: TranscriptRecord[] = [{ type: 'assistant', timestamp: '2026-10-24T09:59:00.000Z', message: { id: 'before', usage } }];
   for (let i = 0; i < afterSince; i += 1) {
     const timestamp = new Date(Date.parse(SINCE) + (i + 1) * 1000).toISOString();
     // A response streamed as two records shares one message id and counts once.
-    records.push({ type: 'assistant', timestamp, message: { id: `m${i}`, usage } }, { type: 'assistant', timestamp, message: { id: `m${i}`, usage } });
+    list.push({ type: 'assistant', timestamp, message: { id: `m${i}`, usage } }, { type: 'assistant', timestamp, message: { id: `m${i}`, usage } });
   }
-  writeFileSync(path, `${records.map((r) => JSON.stringify(r)).join('\n')}\n`);
+  return list;
+}
+
+function writeRecords(path: string, list: TranscriptRecord[]): string {
+  writeFileSync(path, `${list.map((r) => JSON.stringify(r)).join('\n')}\n`);
   return path;
+}
+
+/** The main session's transcript. */
+function transcript(promptTokens: number, afterSince = 0): string {
+  return writeRecords(join(project, 'session.jsonl'), records(promptTokens, afterSince));
+}
+
+/** A sub-agent transcript of the session above, written after it, as a fork or a delegation writes one. */
+function agentTranscript(agentType: string, promptTokens: number, afterSince = 0): void {
+  const dir = join(project, 'session', 'subagents');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `agent-a${agentType}.meta.json`), JSON.stringify({ agentType }));
+  const path = writeRecords(join(dir, `agent-a${agentType}.jsonl`), records(promptTokens, afterSince));
+  const later = new Date(Date.now() + 60_000);
+  utimesSync(path, later, later);
 }
 
 function marker(heavy: boolean): void {
@@ -91,26 +111,27 @@ describe('the gating hook', () => {
 
   it('allows at the boundary before a heavy step once the context passed the heavy floor', () => {
     marker(true);
+    expect(compact({ transcript_path: transcript(100_000, 0) }).blocked).toBe(false);
     expect(compact({ transcript_path: transcript(100_000, 1) }).blocked).toBe(false);
     expect(compact({ transcript_path: transcript(60_000, 1) }).blocked).toBe(true);
   });
 
   it('refuses at the boundary before a light step until the context is near full', () => {
     marker(false);
-    const light = compact({ transcript_path: transcript(100_000, 2) });
+    const light = compact({ transcript_path: transcript(100_000, 1) });
     expect(light.status).toBe(0);
     expect(light.blocked).toBe(true);
     expect(light.stdout).toContain('tdd:6 implement');
-    expect(compact({ transcript_path: transcript(520_000, 2) }).blocked).toBe(false);
+    expect(compact({ transcript_path: transcript(520_000, 1) }).blocked).toBe(false);
   });
 
   it('refuses inside a step, heavy or not, until the mid-step valve', () => {
     marker(true);
-    const inside = compact({ transcript_path: transcript(600_000, 3) });
+    const inside = compact({ transcript_path: transcript(600_000, 2) });
     expect(inside.blocked).toBe(true);
     expect(inside.stdout).toContain('in flight');
-    expect(compact({ agent_type: 'orchestrator', transcript_path: transcript(600_000, 3) }).blocked).toBe(true);
-    expect(compact({ transcript_path: transcript(860_000, 3) }).blocked).toBe(false);
+    expect(compact({ agent_type: 'orchestrator', transcript_path: transcript(600_000, 2) }).blocked).toBe(true);
+    expect(compact({ transcript_path: transcript(860_000, 2) }).blocked).toBe(false);
   });
 
   it('treats a marker without a start time as mid-step', () => {
@@ -118,10 +139,39 @@ describe('the gating hook', () => {
     expect(compact({ transcript_path: transcript(520_000, 0) }).blocked).toBe(true);
   });
 
-  it('allows manual compaction and sub-agents', () => {
+  it('judges a forked orchestrator by its own transcript, not the idle main session', () => {
+    marker(true);
+    const main = transcript(20_000, 0);
+    agentTranscript('orchestrator', 600_000, 3);
+    expect(compact({ transcript_path: main }).stdout).toContain('in flight');
+    agentTranscript('orchestrator', 860_000, 3);
+    expect(compact({ transcript_path: main }).blocked).toBe(false);
+    agentTranscript('orchestrator', 100_000, 0);
+    expect(compact({ transcript_path: main }).blocked).toBe(false);
+  });
+
+  it('allows a sub-agent, whether the payload names it or only its transcript does', () => {
+    marker(false);
+    const main = transcript(20_000, 0);
+    agentTranscript('test-writer', 150_000, 5);
+    expect(compact({ transcript_path: main }).blocked).toBe(false);
+    expect(compact({ agent_type: 'test-writer' }).blocked).toBe(false);
+  });
+
+  it('skips API-error records for the prompt size, and allows when the transcript ends on one', () => {
+    marker(false);
+    const path = join(project, 'session.jsonl');
+    const synthetic = (id: string): TranscriptRecord => ({ type: 'assistant', timestamp: '2026-10-24T10:00:30.000Z', message: { id, model: '<synthetic>', usage: { input_tokens: 0 } } });
+    const grown = records(600_000, 3);
+    writeRecords(path, [...grown.slice(0, 2), synthetic('e1'), ...grown.slice(2)]);
+    expect(compact({ transcript_path: path }).stdout).toContain('in flight');
+    writeRecords(path, [...grown, synthetic('e2')]);
+    expect(compact({ transcript_path: path }).blocked).toBe(false);
+  });
+
+  it('allows manual compaction', () => {
     marker(false);
     expect(compact({ trigger: 'manual' }).blocked).toBe(false);
-    expect(compact({ agent_type: 'test-writer' }).blocked).toBe(false);
   });
 });
 

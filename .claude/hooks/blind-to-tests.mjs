@@ -18,7 +18,7 @@
 // Exit 0 = allow.
 
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, isAbsolute, join, resolve, sep } from 'node:path';
 import { block, parsePayload, readStdin, toolInput } from './lib/hook-io.mjs';
 
 const OWNER = 'test-writer';
@@ -46,10 +46,31 @@ const needles = [marker.worktree, marker.worktree && basename(marker.worktree), 
   (value) => typeof value === 'string' && value !== '',
 );
 
+const command = String(input.command ?? '');
 // Ref-wide git reads show the tests branch without naming it.
-const refWide = /\bgit\b[^\n]*\s--(all|branches|glob|remotes)\b/.test(String(input.command ?? ''));
+const refWide = /\bgit\b[^\n]*\s--(all|branches|glob|remotes)\b/.test(command);
+// The test-writer's detailed RED report quotes test code.
+const detailedRed = /\btdd\s+red\b[^\n]*\s--detail\b/.test(command);
 
-if (needles.some((needle) => reached.includes(needle)) || refWide) {
+// A directory holding the worktree reaches it without naming it: `..`, the
+// worktree's parent, `/`. Paths are resolved; in a shell command every token
+// that looks like a path is, up to its first glob character.
+const cwd = typeof payload?.cwd === 'string' ? payload.cwd : project;
+const holdsWorktree = (path) => {
+  if (typeof marker.worktree !== 'string' || marker.worktree === '') return false;
+  const literal = path.split(/[*?[{]/)[0].replace(/^~(?=\/|$)/, process.env.HOME ?? '~');
+  const dir = resolve(isAbsolute(literal) ? literal : join(cwd, literal));
+  return marker.worktree === dir || marker.worktree.startsWith(dir.endsWith(sep) ? dir : `${dir}${sep}`);
+};
+const pathArgs = [input.file_path, input.path, input.notebook_path, input.pattern, input.glob].filter(
+  (value) => typeof value === 'string' && value !== '' && (value.startsWith('/') || value.startsWith('.') || value.startsWith('~')),
+);
+const shellPaths = command
+  .split(/[\s;&|()<>'"`=]+/)
+  .filter((token) => token === '.' || token === '..' || /^(\/|\.\.?\/|~)/.test(token));
+const reachesParent = [...pathArgs, ...shellPaths].some(holdsWorktree);
+
+if (needles.some((needle) => reached.includes(needle)) || refWide || detailedRed || reachesParent) {
   block(
     `Blind phase for ${marker.label}: the tests in ${marker.worktree} (${marker.testsBranch}) belong to the test-writer ` +
       'until your implementation is committed and `npm run pipeline -- tdd join` has run. ' +

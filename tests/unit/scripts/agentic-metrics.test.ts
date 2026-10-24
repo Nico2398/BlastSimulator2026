@@ -18,6 +18,7 @@ import { aggregateReport, runSummary } from '../../../scripts/lib/metrics/report
 import { parseJsonl, type SessionTranscript, type TranscriptRecord } from '../../../scripts/lib/metrics/transcripts.js';
 
 const SCRIPTS = new Set(['test', 'long', 'pipeline', 'typecheck']);
+const VOCAB = { scripts: SCRIPTS, skills: new Set(['agentic-pipeline-full', 'agentic-pipeline-tdd']), agents: new Set(['test-writer', 'reviewer']) };
 
 function assistant(id: string, usage: Record<string, unknown>, content: unknown[] = [], at = '2026-10-24T00:00:00Z'): TranscriptRecord {
   return { type: 'assistant', timestamp: at, effort: 'medium', message: { id, model: 'claude-sonnet-5-5', usage, content } };
@@ -81,6 +82,9 @@ describe('bashCategory', () => {
     ['FOO=1 npx vitest run tests/unit/nav/Pathfinding.test.ts', 'npx vitest'],
     ['curl -H "Authorization: token ghp_secret" https://x', 'curl'],
     ['./do-something --password hunter2', 'other'],
+    ['npx ghp_secrettoken', 'npx (other)'],
+    ['gh pr ghpsecret', 'gh pr'],
+    ['npm run pipeline -- ghpsecret', 'npm run pipeline'],
   ])('%s → %s', (command, category) => {
     expect(bashCategory(command, SCRIPTS)).toBe(category);
   });
@@ -97,7 +101,7 @@ describe('usageTokens', () => {
 });
 
 describe('extractMetrics', () => {
-  const run = extractMetrics(session(), { issue: '1', runId: '99' }, SCRIPTS);
+  const run = extractMetrics(session(), { issue: '1', runId: '99' }, VOCAB);
 
   it('takes the cost from cost-state and shares it across agents', () => {
     expect(run.cost).toMatchObject({ totalUSD: 3, source: 'cost-state' });
@@ -138,10 +142,38 @@ describe('extractMetrics', () => {
     expect(text).not.toContain('example.invalid');
   });
 
+  it('maps every name a session typed onto the vocabulary', () => {
+    const typed = session();
+    typed.records.push(
+      assistant('m3', usage(1, 1, 1, 1), [
+        { type: 'tool_use', name: 'Skill', input: { skill: 'ghp_tokenLookingSkill' } },
+        { type: 'tool_use', name: 'Agent', input: { subagent_type: '/home/runner/secret' } },
+        { type: 'tool_use', name: 'mcp__github__issue_read', input: {} },
+        { type: 'tool_use', name: 'ghp_notATool', input: {} },
+      ]),
+    );
+    typed.subagents[0]!.agentType = 'ghp_agentType';
+    const mapped = extractMetrics(typed, {}, VOCAB);
+    const text = JSON.stringify(mapped);
+    expect(text).not.toContain('ghp_');
+    expect(text).not.toContain('/home/runner');
+    expect(mapped.skills).toMatchObject({ other: 1 });
+    expect(mapped.pipeline.delegations).toMatchObject({ other: 1 });
+    expect(mapped.agents.find((a) => a.agent === 'main')!.tools).toMatchObject({ mcp__github: 1, other: 1 });
+  });
+
+  it('does not count an API error as a request or a context size', () => {
+    const errored = session();
+    errored.records.push({ type: 'assistant', timestamp: '2026-10-24T00:12:00Z', message: { id: 'e1', model: '<synthetic>', usage: usage(0, 0, 0, 0), content: [] } });
+    const main = extractMetrics(errored, {}, VOCAB).agents.find((a) => a.agent === 'main')!;
+    expect(main.requests).toBe(2);
+    expect(main.finalContextTokens).toBe(1505);
+  });
+
   it('reports no cost rather than inventing one when cost-state is missing', () => {
     const partial = session();
     partial.records = partial.records.filter((record) => record.type !== 'cost-state');
-    const estimated = extractMetrics(partial, {}, SCRIPTS);
+    const estimated = extractMetrics(partial, {}, VOCAB);
     expect(estimated.cost.source).toBe('estimated');
     expect(estimated.cost.totalUSD).toBe(0);
     expect(estimated.cost.byModel['claude-sonnet-5-5']!.output).toBe(400);
@@ -155,7 +187,7 @@ describe('transcripts', () => {
 });
 
 describe('reports', () => {
-  const run = extractMetrics(session(), { issue: '1', terminal: 'true' }, SCRIPTS);
+  const run = extractMetrics(session(), { issue: '1', terminal: 'true' }, VOCAB);
 
   it('summarises one run', () => {
     const summary = runSummary(run);

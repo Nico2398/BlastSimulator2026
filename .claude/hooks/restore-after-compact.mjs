@@ -32,7 +32,7 @@ const readJson = (path) => {
 
 const git = (...args) => {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
-  return result.status === 0 ? result.stdout.trim() : '';
+  return result.status === 0 ? result.stdout.trimEnd() : '';
 };
 
 const tddDir = join(agentic, 'tdd');

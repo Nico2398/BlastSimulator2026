@@ -485,10 +485,14 @@ jobs:
       # repository is public (see `show_full_output` above). `always()`: a
       # failed or timed-out run is the one most worth measuring.
       # `continue-on-error`: observability never decides a run's outcome.
+      # The tooling runs from this workflow's own commit, never from whatever
+      # branch the agent left checked out: an older branch may not have it, and
+      # a branch may have changed the sanitizer the records rely on.
       - name: Export run metrics
         id: metrics
         if: always()
         continue-on-error: true
+        shell: bash
         env:
           ISSUE: ${{ steps.context.outputs.issue }}
           ENTITY: ${{ steps.context.outputs.entity }}
@@ -496,12 +500,16 @@ jobs:
           CONCLUSION: ${{ steps.claude_retry.outcome != 'skipped' && steps.claude_retry.outcome || steps.claude.outcome }}
           TERMINAL: ${{ steps.state_retry.outputs.terminal || steps.state.outputs.terminal }}
         run: |
+          src="${RUNNER_TEMP}/agentic-metrics-src"
           out="${RUNNER_TEMP}/agentic-metrics"
-          npm run -s metrics -- extract --out "$out" --since "$STARTED_AT" \
+          mkdir -p "$src"
+          git archive "$GITHUB_SHA" package.json scripts/agentic-metrics.ts scripts/lib/metrics .claude/skills .claude/agents | tar -x -C "$src"
+          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$src/scripts/agentic-metrics.ts" extract --out "$out" --since "$STARTED_AT" \
             --issue "$ISSUE" --entity "$ENTITY" --conclusion "$CONCLUSION" --terminal "$TERMINAL" \
             --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
             --workflow "$GITHUB_WORKFLOW" --repo "$GITHUB_REPOSITORY" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "dir=${out}" >> "$GITHUB_OUTPUT"
+          echo "src=${src}" >> "$GITHUB_OUTPUT"
 
       - name: Upload run metrics
         if: always() && steps.metrics.outcome == 'success'
@@ -522,9 +530,10 @@ jobs:
         continue-on-error: true
         env:
           METRICS_DIR: ${{ steps.metrics.outputs.dir }}
+          METRICS_SRC: ${{ steps.metrics.outputs.src }}
           REMOTE: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
         run: |
-          if ! npm run -s metrics -- publish --dir "$METRICS_DIR" --remote "$REMOTE"; then
+          if ! "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$METRICS_SRC/scripts/agentic-metrics.ts" publish --dir "$METRICS_DIR" --remote "$REMOTE"; then
             echo "::warning::Run metrics were not appended to the agentic-metrics branch; the artifact still holds them."
             exit 1
           fi

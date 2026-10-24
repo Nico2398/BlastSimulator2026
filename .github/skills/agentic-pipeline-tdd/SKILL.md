@@ -103,7 +103,7 @@ A step is **volumetric** when it is the same transformation applied to N indepen
 
 | Work | Batch agent |
 |------|-------------|
-| Tests and scenario definitions, during step 5 | @test-writer in batch mode — it stops before `tdd red`, and the lead runs `npm run pipeline -- tdd red --label <label>` once for the wave (its output names files and counts only) |
+| Tests and scenario definitions, during step 5 | @test-writer in batch mode — it stops before `tdd red`, and the lead runs `npm run pipeline -- tdd red --label <label>` once for the wave (its output names files, counts and error codes only; a `RED NOT PROVEN` goes back to the batch that owns the named file) |
 | Production call sites, during step 6 | @batch-worker — blind like the lead |
 | Screenshots to capture and read back | @visual-tester |
 

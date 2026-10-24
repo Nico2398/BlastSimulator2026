@@ -14,7 +14,8 @@ import { execFileSync } from 'child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
-import { joinCycle, PipelineError, split, start, worktreePath } from '../../../scripts/lib/pipeline/tdd.js';
+import { joinCycle, PipelineError, red, split, start, worktreePath } from '../../../scripts/lib/pipeline/tdd.js';
+import { dirtyPaths } from '../../../scripts/lib/pipeline/git.js';
 import { readBlind, readState, writeState } from '../../../scripts/lib/pipeline/tdd-state.js';
 
 const IDENTITY = {
@@ -186,5 +187,41 @@ describe('tdd join', () => {
     execFileSync('git', ['cherry-pick', '--continue'], { cwd: repo, env: { ...process.env, GIT_EDITOR: 'true' } });
     joinCycle(repo, '42-7');
     expect(readState(repo, '42-7')).toMatchObject({ phase: 'joined' });
+  });
+
+  it('refuses to call a join done when an aborted cherry-pick dropped commits', () => {
+    recordRed('42-7');
+    write(repo, TEST, '// implementer version\n');
+    commitAll(repo, 'implement: score (#42)');
+    joinCycle(repo, '42-7');
+    sh(repo, 'cherry-pick', '--abort');
+    expect(() => joinCycle(repo, '42-7')).toThrow(/holds 2 of the 3 commits/);
+    expect(readState(repo, '42-7')).not.toMatchObject({ phase: 'joined' });
+  });
+});
+
+describe('tdd red', () => {
+  beforeEach(() => {
+    start(repo, { label: '42-7' });
+    write(repo, SOURCE, "export function score(a: number, b: number): number { throw new Error('stub'); }\n");
+    commitAll(repo, 'skeleton');
+    split(repo, '42-7');
+  });
+
+  it('refuses a tests worktree that changed production code or deleted a test, and commits nothing', () => {
+    const worktree = readState(repo, '42-7')!.worktree!;
+    write(worktree, SOURCE, 'export function score(): number { return 3; }\n');
+    const result = red(repo, { label: '42-7', commit: true });
+    expect(result.verdict.red).toBe(false);
+    expect(result.lines.join('\n')).toContain(`${SOURCE}: not a test path`);
+    expect(result.lines.join('\n')).toContain('--detail');
+    expect(readState(repo, '42-7')).toMatchObject({ phase: 'tests' });
+  });
+});
+
+describe('git status paths', () => {
+  it('keeps the first path whole', () => {
+    write(repo, SOURCE, 'export const version = 2;\n');
+    expect(dirtyPaths(repo)).toEqual([SOURCE]);
   });
 });

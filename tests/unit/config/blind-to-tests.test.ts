@@ -21,8 +21,10 @@ const worktree = '/work/BlastSimulator2026-tests-42-7';
 // Built so the repo-wide dangling-reference lint does not read it as one of ours.
 const TEST = ['tests', 'unit', 'score.test.ts'].join('/');
 
+const repo = '/work/BlastSimulator2026';
+
 function call(tool: string, input: Record<string, unknown>, agentType?: string) {
-  const payload = { tool_name: tool, tool_input: input, ...(agentType ? { agent_type: agentType } : {}) };
+  const payload = { tool_name: tool, tool_input: input, cwd: repo, ...(agentType ? { agent_type: agentType } : {}) };
   return runHook(HOOK, JSON.stringify(payload), { CLAUDE_PROJECT_DIR: project });
 }
 
@@ -56,6 +58,14 @@ describe('with a blind phase open', () => {
     ['Bash', { command: `git show pipeline/tests-42-7:${TEST}` }],
     ['Bash', { command: 'git log --all --stat' }],
     ['Bash', { command: `cat ${worktree}/${TEST}` }],
+    ['Grep', { pattern: 'score', path: '..' }],
+    ['Grep', { pattern: 'score', path: '/work' }],
+    ['Glob', { pattern: '**/*.test.ts', path: '/' }],
+    ['Bash', { command: 'grep -rn score ..' }],
+    ['Bash', { command: "find .. -name '*.test.ts'" }],
+    ['Bash', { command: 'cat ../*-tests-*/tests/unit/x.test.ts 2>/dev/null' }],
+    ['Monitor', { command: 'tail -f ../BlastSimulator2026-tests-42-7/log' }],
+    ['Bash', { command: 'npm run pipeline -- tdd red --label 42-7 --detail' }],
   ])('refuses the implementing session %s %j', (tool, input) => {
     const run = call(tool, input);
     expect(run.status).toBe(2);
@@ -76,6 +86,9 @@ describe('with a blind phase open', () => {
     expect(call('Read', { file_path: '/work/BlastSimulator2026/src/core/config/balance.ts' }).status).toBe(0);
     expect(call('Bash', { command: 'npm run pipeline -- tdd join --label 42-7' }).status).toBe(0);
     expect(call('Bash', { command: 'git log --oneline -3' }).status).toBe(0);
+    expect(call('Grep', { pattern: 'score', path: repo }).status).toBe(0);
+    expect(call('Bash', { command: 'grep -rn score ./src 2>/dev/null | head -5' }).status).toBe(0);
+    expect(call('Bash', { command: 'npm run pipeline -- tdd red --label 42-7' }).status).toBe(0);
   });
 });
 
@@ -85,7 +98,7 @@ describe('registration', () => {
   // settings.json, not an agent's frontmatter: the orchestrator is entered by
   // `/agentic-run` forking into it, and frontmatter hooks only register for
   // agents started through the Agent tool.
-  it.each(['Read', 'Grep', 'Glob', 'Bash', 'Edit', 'Write', 'NotebookEdit'])('guards %s from settings.json', (tool) => {
+  it.each(['Read', 'Grep', 'Glob', 'Bash', 'Monitor', 'Edit', 'MultiEdit', 'Write', 'NotebookEdit'])('guards %s from settings.json', (tool) => {
     const guards = (settings.hooks?.PreToolUse ?? []).filter((entry) => new RegExp(`^(${entry.matcher ?? '.*'})$`).test(tool));
     const scripts = guards.flatMap((entry) => (entry.hooks ?? []).map((hook) => hookScript(hook)));
     expect(scripts.some((script) => script.endsWith(`/${HOOK}`))).toBe(true);
