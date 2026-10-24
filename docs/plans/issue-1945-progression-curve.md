@@ -450,7 +450,7 @@ Seed 42, desert_badlands, full kit, ladder. Code unchanged by this run (temporar
 | grade 4 at t15,000-25,000 | not reached | MISSED |
 | grade 5 at t30,000-45,000 | not reached | MISSED |
 | >= 60% boulder ore sold | 45% | MISSED |
-| survives 50,000 ticks | see the 50,000 line below | |
+| survives 50,000 ticks | bankrupt t31,869 (low cash -72,682; cash 9.28 M @10k, 7.75 M @15k, 2.87 M @25k; 7 blasts total; boulder sold share 61%, boulder ore sold 57%) | MISSED (was t20,509 before #2085) |
 
 Where the run stalls (9,000-tick instrumented run, pit depth is `deepestPitM`):
 
