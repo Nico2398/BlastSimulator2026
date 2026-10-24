@@ -12,7 +12,7 @@ import {
   RAMP_DIR_OFFSETS, findRampPathFault, rampPathOf, rampTotalLength, rampWaypoints, type RampDirection, type RampFootprint, type RampLeg,
 } from './RampPath.js';
 import { rampFootprint } from './RampWidening.js';
-import { isPitRim, proposeRampSpiral, type SpiralSurface } from './RampSpiral.js';
+import { isPitRim, proposeRampSpiral, type SpiralDir, type SpiralSurface } from './RampSpiral.js';
 
 /** A cluster of unreachable order targets sharing one deepened floor. */
 export interface StrandedFloor {
@@ -146,28 +146,33 @@ function planStraight(
   return { plan: null, sawShallow };
 }
 
-/** Reachable cells in rings round the floor, nearest first, that sit on a pit rim. */
-function* reachableRimStarts(floor: StrandedFloor, surface: AccessSurface): Generator<{ x: number; z: number }> {
+/** Cells on the Chebyshev ring perimeters round the floor's rounded cell, ring 1 to `maxRing`, nearest ring first. */
+function* chebyshevRings(floor: StrandedFloor, maxRing: number): Generator<{ x: number; z: number }> {
   const fx = Math.round(floor.x);
   const fz = Math.round(floor.z);
-  const reach = Math.floor(RAMP_SPIRAL_MAX_PIT_SPAN_M / 2) + 1;
-  for (let r = 1; r <= reach; r++) {
+  for (let r = 1; r <= maxRing; r++) {
     for (let dx = -r; dx <= r; dx++) {
-      for (let dz = -r; dz <= r; dz++) {
-        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
-        const x = fx + dx;
-        const z = fz + dz;
-        if (!surface.contains(x, z) || !surface.reachableFrom(x, z)) continue;
-        if (isPitRim(surface, { x, z }, true)) yield { x, z };
-      }
+      // Edge columns hold the whole side; inner columns only their two ring cells.
+      const edge = Math.abs(dx) === r;
+      for (let dz = -r; dz <= r; dz += edge ? 1 : 2 * r) yield { x: fx + dx, z: fz + dz };
     }
   }
 }
 
+/** Reachable cells in rings round the floor, nearest first, that sit on a pit rim. */
+function* reachableRimStarts(floor: StrandedFloor, surface: AccessSurface): Generator<{ x: number; z: number }> {
+  const reach = Math.floor(RAMP_SPIRAL_MAX_PIT_SPAN_M / 2) + 1;
+  for (const { x, z } of chebyshevRings(floor, reach)) {
+    if (!surface.contains(x, z) || !surface.reachableFrom(x, z)) continue;
+    if (isPitRim(surface, { x, z }, true)) yield { x, z };
+  }
+}
+
 /**
- * True when ground at the floor's level lies within the spiral's rim gap of its last tile (#2085). A spiral rings the
+ * True when floor-level ground lies within the ramp corridor's half-width plus one tile of its last tile (#2085). A spiral rings the
  * whole void its start sees; round a pit nested in a wider one that ring hugs the outer pit, and its foot ends at the
  * right depth beside nothing, so digging it never frees the floor and the same floor is re-planned forever.
+ * A foot that misses is extended to the floor by `spiralToFloor`.
  */
 function footMeetsFloor(def: RampDef, floor: StrandedFloor, surface: AccessSurface, width: RampWidth): boolean {
   const foot = rampWaypoints(rampPathOf(def)).at(-1)!;
@@ -176,7 +181,7 @@ function footMeetsFloor(def: RampDef, floor: StrandedFloor, surface: AccessSurfa
     for (let dx = -reach; dx <= reach; dx++) {
       const x = foot.x + dx;
       const z = foot.z + dz;
-      if (surface.contains(x, z) && Math.abs(surface.heightAt(x, z) - floor.floorY) <= RAMP_FLOOR_SNAP_REACH_M) return true;
+      if (atFloorLevel(surface, floor, x, z)) return true;
     }
   }
   return false;
@@ -215,6 +220,8 @@ function spiralToFloor(
     const last = starts.at(-1)!;
     starts.push({ x: last.x + o.dx * leg.length, z: last.z + o.dz * leg.length });
   }
+  // Try the longest ring prefix first (t descends) so the cut leg stays as short as possible. A leg that leaves the
+  // claimed area ends that direction's search (`break`): a longer leg the same way would leave it too.
   for (let t = total; t >= Math.max(width, needed - reach); t--) {
     const kept: RampLeg[] = [];
     let used = 0;
@@ -268,7 +275,7 @@ function planSpiral(
 
 /** One spiral attempt from `start`: as proposed when its foot meets the floor, else with a leg across the wall to it. */
 function spiralPlanFrom(
-  start: { x: number; z: number }, depth: number, gradeDegrees: number, dir: 'cw' | 'ccw',
+  start: { x: number; z: number }, depth: number, gradeDegrees: number, dir: SpiralDir,
   floor: StrandedFloor, surface: AccessSurface, width: RampWidth, excluded: Excluded,
 ): CraterAccessPlan | null {
   const propose = (d: number) =>
@@ -285,13 +292,16 @@ function spiralPlanFrom(
   }
   const p = result.proposal;
   let legs: readonly RampLeg[] | null = p.legs;
-  let def = rampDefFromLegs({ x: p.originX, z: p.originZ }, p.legs, p.depth, width);
-  def.gradeDegrees = p.gradeDegrees;
+  const defOf = (ramp: readonly RampLeg[]): RampDef => {
+    const d = rampDefFromLegs({ x: p.originX, z: p.originZ }, ramp, p.depth, width);
+    d.gradeDegrees = p.gradeDegrees;
+    return d;
+  };
+  let def = defOf(p.legs);
   if (!footMeetsFloor(def, floor, surface, width)) {
     legs = spiralToFloor(p.legs, { x: p.originX, z: p.originZ }, rampLengthForGrade(p.depth, p.gradeDegrees), floor, surface, width);
     if (legs === null) return null;
-    def = rampDefFromLegs({ x: p.originX, z: p.originZ }, legs, p.depth, width);
-    def.gradeDegrees = p.gradeDegrees;
+    def = defOf(legs);
     if (findRampPathFault(rampPathOf(def), width) !== null) return null;
   }
   if (excluded(def)) return null;
@@ -308,19 +318,10 @@ function spiralPlanFrom(
 function planOffsetStraight(
   floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded,
 ): CraterAccessPlan | null {
-  const fx = Math.round(floor.x);
-  const fz = Math.round(floor.z);
-  for (let r = 1; r <= CRATER_ACCESS_CLUSTER_GAP_CELLS; r++) {
-    for (let dx = -r; dx <= r; dx++) {
-      for (let dz = -r; dz <= r; dz++) {
-        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
-        const x = fx + dx;
-        const z = fz + dz;
-        if (!surface.contains(x, z) || Math.abs(surface.heightAt(x, z) - floor.floorY) > RAMP_FLOOR_SNAP_REACH_M) continue;
-        const { plan } = planStraight(floor, surface, limitRatio, width, excluded, { x, z });
-        if (plan !== null) return plan;
-      }
-    }
+  for (const foot of chebyshevRings(floor, CRATER_ACCESS_CLUSTER_GAP_CELLS)) {
+    if (!atFloorLevel(surface, floor, foot.x, foot.z)) continue;
+    const { plan } = planStraight(floor, surface, limitRatio, width, excluded, foot);
+    if (plan !== null) return plan;
   }
   return null;
 }

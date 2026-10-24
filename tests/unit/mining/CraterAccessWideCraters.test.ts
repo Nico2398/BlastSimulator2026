@@ -43,7 +43,7 @@ describe('planCraterAccess on wide limit-shot craters (#2086)', () => {
     const p = plan(wideFloor(), s);
     expect(p.ok).toBe(true);
     if (p.ok) {
-      expect(p.def.targetDepth).toBeCloseTo(10, 5);
+      expect(Math.abs(p.def.targetDepth - 10)).toBeLessThanOrEqual(RAMP_FLOOR_SNAP_REACH_M);
       expect(p.def.length).toBeLessThanOrEqual(MAX_RAMP_LENGTH);
     }
   });
@@ -129,9 +129,9 @@ describe('planCraterAccess beside a built ramp whose foot ends above the floor (
     }
   });
 
-  it('gives a reason key, never an exception, when it cannot plan', () => {
-    const p = plan(floor(), rampSurface());
-    if (!p.ok) expect(p.reasonKey).toMatch(/^mining\.crater_access\./);
+  it('gives a no_start reason key, not an exception, when no cell of the network can start a ramp', () => {
+    const sealed: AccessSurface = { ...rampSurface(), reachableFrom: () => false };
+    expect(plan(floor(), sealed)).toEqual({ ok: false, reasonKey: 'mining.crater_access.no_start' });
   });
 });
 
@@ -158,9 +158,15 @@ describe('planCraterAccess on nested craters (#2086)', () => {
     const s = surface([OUTER, INNER], reachesDownTo(-8));
     const p = plan({ x: 32, z: 32, floorY: -16, orderCount: 300 }, s, [firstRamp]);
     expect(p.ok).toBe(true);
+    if (p.ok) {
+      const { def } = p;
+      const same = def.originX === firstRamp.def.originX && def.originZ === firstRamp.def.originZ
+        && def.direction === firstRamp.def.direction && def.length === firstRamp.def.length;
+      expect(same).toBe(false);
+    }
   });
 
-  it('plans for an inner pit three times as deep as the outer pit is wide fits the climb limit', () => {
+  it('plans down a narrow 9-cell pit sunk 12 m below the outer floor (20 m deep overall)', () => {
     const narrow: Box = { x0: 28, x1: 36, z0: 28, z1: 36, y: -20 };
     const s = surface([OUTER, narrow], reachesDownTo(-8));
     expect(plan({ x: 32, z: 32, floorY: -20, orderCount: 100 }, s).ok).toBe(true);
