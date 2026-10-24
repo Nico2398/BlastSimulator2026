@@ -22,6 +22,7 @@ import { vehicleDriverId, vehicleMaxSlopeRatio } from '../entities/Vehicle.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../entities/Vehicle.js';
 import { retargetBesideRampLayers, retargetRampLayers } from './RampLayerRetarget.js';
 import { lowestFleetTier, minVehicleTierFor } from './VehicleReservation.js';
+import { clearWalkOnlyPin } from './TaskCancellation.js';
 import { canDriveTier, licenceLevelOf } from '../entities/VehicleDriverAssignment.js';
 import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup, createStorageFit } from '../economy/HaulDispatch.js';
 import { holdsRequiredSkill, isEligibleForWork } from '../entities/Employee.js';
@@ -456,6 +457,19 @@ function retargetQueuedRampLayers(state: GameState): void {
 }
 
 /**
+ * A queued order pinned to one employee by an interrupted walk (`walkOnlyPinnedBy`) goes back to the
+ * whole pool once that employee can no longer perform it — a vehicle upgraded in place to a tier their
+ * licence does not cover, say — else nobody could ever claim it (#2085). A permanent target is untouched.
+ */
+function releaseUnservableWalkPins(state: GameState): void {
+  for (const action of state.pendingActions) {
+    const pinned = action.targetEmployeeId;
+    if (action.status !== 'queued' || pinned === null || action.payload['walkOnlyPinnedBy'] !== pinned) continue;
+    if (!candidateEmployees(state, action).some(emp => emp.id === pinned)) clearWalkOnlyPin(action);
+  }
+}
+
+/**
  * Classify every queued, unclaimed action: stamp `blockedReason`, flip each
  * ghost's `unreachable` flag (bumping `ghostPreviewsRevision` only on a flip),
  * and report the actions no eligible employee could ever perform.
@@ -464,6 +478,7 @@ function retargetQueuedRampLayers(state: GameState): void {
  * `sliceDebris`.
  */
 export function classifyQueuedOrders(state: GameState, debrisPerCall = Infinity): { unqualifiedIds: Set<number> } {
+  releaseUnservableWalkPins(state);
   retargetQueuedRampLayers(state);
   let flipped = false;
   for (const ghost of state.ghostPreviews) {

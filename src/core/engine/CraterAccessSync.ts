@@ -4,10 +4,10 @@
 // Holes and patterns are never touched here: they stay queued until access exists.
 
 import {
-  CRATER_ACCESS_CASH_RESERVE_TICKS, CRATER_ACCESS_CLUSTER_GAP_CELLS, CRATER_ACCESS_MIN_STRANDED_ORDERS,
+  CRATER_ACCESS_ABANDON_DEBRIS_TICKS, CRATER_ACCESS_CASH_RESERVE_TICKS, CRATER_ACCESS_CLUSTER_GAP_CELLS, CRATER_ACCESS_MIN_STRANDED_ORDERS,
   CRATER_ACCESS_RECHECK_TICKS, RAMP_DEFAULT_WIDTH,
 } from '../config/balance.js';
-import { isProgressionSite, type GameState } from '../state/GameState.js';
+import { isProgressionSite, type GameState, type RampFootprint } from '../state/GameState.js';
 import { getOperatingCostPerHour } from '../economy/OperatingFinance.js';
 import { slowestVehicleTierSlopeRatio } from '../nav/ClimbLimit.js';
 import { clusterStrandedFloors, planCraterAccess, type AccessSurface, type StrandedFloor } from '../mining/CraterAccess.js';
@@ -15,6 +15,8 @@ import { defineRampSegments } from '../mining/Ramp.js';
 import { rampFootprint } from '../mining/RampWidening.js';
 import { queueRampOrder } from '../mining/RampOrder.js';
 import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../world/VoxelGrid.js';
+import { clearAbandonedDebris } from '../economy/HaulDispatch.js';
+import { blockedRampFootprints, hasLiveRampWork, pruneAbandonedDebris } from './StrandedAccess.js';
 import { siteVehicleReach, strandedDebrisTargets } from './OrderReachability.js';
 
 interface Cursor {
@@ -22,13 +24,15 @@ interface Cursor {
   tick: number;
   /** Nav revision and floors of the last scan that found no affordable plan; the same world is not re-planned. */
   failedSignature: string | null;
+  /** Floors the last scan could not plan a ramp for (not for lack of cash); kept so a cached scan still ages them. */
+  unplannable: StrandedFloor[];
 }
 
 /** Derived, never saved: a fresh state simply scans on its next recheck. */
 const cursors = new WeakMap<GameState, Cursor>();
 
-function floorsSignature(revision: number, floors: readonly StrandedFloor[]): string {
-  return `${revision}|${floors.map(f => `${f.x},${f.z},${f.floorY},${f.orderCount}`).join(';')}`;
+function floorsSignature(revision: number, floors: readonly StrandedFloor[], avoid: readonly RampFootprint[]): string {
+  return `${revision}|${avoid.map(a => `${a.minX},${a.maxX},${a.minZ},${a.maxZ}`).join(';')}|${floors.map(f => `${f.x},${f.z},${f.floorY},${f.orderCount}`).join(';')}`;
 }
 
 /**
@@ -64,27 +68,45 @@ export function syncCraterAccess(state: GameState, grid?: VoxelGrid | null): voi
   if (!grid || state.navGrid === null || !isProgressionSite(state)) return;
   const cursor = cursors.get(state);
   if (cursor !== undefined && state.tickCount - cursor.tick < CRATER_ACCESS_RECHECK_TICKS && state.tickCount >= cursor.tick) return;
-  const next: Cursor = { tick: state.tickCount, failedSignature: cursor?.failedSignature ?? null };
+  const next: Cursor = { tick: state.tickCount, failedSignature: cursor?.failedSignature ?? null, unplannable: cursor?.unplannable ?? [] };
   cursors.set(state, next);
 
-  if (state.pendingActions.some(a => a.type === 'dig_ramp_segment')) return;
+  if (hasLiveRampWork(state.pendingActions)) return;
   const surface = accessSurface(state, grid);
   if (surface === null) return;
   const floors = strandedFloors(state, grid, surface);
-  if (floors.length === 0) { next.failedSignature = null; return; }
-  const signature = floorsSignature(state.navGrid.revision, floors);
-  if (signature === next.failedSignature) return;
+  if (floors.length === 0) {
+    next.failedSignature = null;
+    next.unplannable = [];
+    pruneAbandonedDebris(state, [], state.tickCount, CRATER_ACCESS_ABANDON_DEBRIS_TICKS);
+    return;
+  }
+  const avoid = blockedRampFootprints(state);
+  const signature = floorsSignature(state.navGrid.revision, floors, avoid);
+  if (signature === next.failedSignature) {
+    pruneAbandonedDebris(state, next.unplannable, state.tickCount, CRATER_ACCESS_ABANDON_DEBRIS_TICKS);
+    return;
+  }
 
   const reserve = getOperatingCostPerHour(state).payroll * CRATER_ACCESS_CASH_RESERVE_TICKS;
   let affordabilityBlocked = false;
+  const unplannable: StrandedFloor[] = [];
   for (const floor of floors) {
-    const plan = planCraterAccess(floor, surface, slowestVehicleTierSlopeRatio(), RAMP_DEFAULT_WIDTH);
-    if (!plan.ok) continue;
+    const plan = planCraterAccess(floor, surface, slowestVehicleTierSlopeRatio(), RAMP_DEFAULT_WIDTH, avoid, state.builtRamps);
+    if (!plan.ok) { unplannable.push(floor); continue; }
     if (state.cash - plan.cost < reserve) { affordabilityBlocked = true; continue; }
     const segments = defineRampSegments(grid, plan.def);
     const footprint = rampFootprint(plan.def, RAMP_DEFAULT_WIDTH);
-    if (queueRampOrder(state, plan.def, footprint, segments, plan.cost, 'Crater access ramp') !== null) return;
+    if (queueRampOrder(state, plan.def, footprint, segments, plan.cost, 'Crater access ramp') !== null) {
+      // A ramp now heads for the crater: its abandoned rubble may be hauled again once it connects.
+      clearAbandonedDebris(state);
+      next.unplannable = [];
+      pruneAbandonedDebris(state, [], state.tickCount, CRATER_ACCESS_ABANDON_DEBRIS_TICKS);
+      return;
+    }
   }
+  next.unplannable = unplannable;
+  pruneAbandonedDebris(state, unplannable, state.tickCount, CRATER_ACCESS_ABANDON_DEBRIS_TICKS);
   // Only a world with nothing buildable is remembered; an unaffordable plan is retried as cash changes.
   next.failedSignature = affordabilityBlocked ? null : signature;
 }

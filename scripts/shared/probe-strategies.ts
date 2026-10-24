@@ -79,13 +79,13 @@ import {
   type BuyRule, type LadderShot, type PermitLimit,
 } from './probe-ladder.js';
 import {
-  decideLadderDeepen, decideFreshShotSite, decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM,
+  decideLadderDeepen, decideFreshShotSite, decideBuriedPattern, decideLadderShotSide, siteHoldsOre, decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM,
   LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
   rampProtectionZones, shotOverlapsProtectedRamp,
   decideLadderHoleDepth, judgeLadderShot,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
-import { sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
+import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
@@ -127,6 +127,8 @@ const DEPOSIT_CANDIDATES_TRIED = 12;
 const DEPOSIT_SCAN_STEP = 2;
 /** Keep-out (tiles) around the pattern footprint when siting a building. */
 const BUILDING_KEEP_OUT = 10;
+/** Metres a fresh ladder shot keeps from any standing building when a site allows it. */
+const LADDER_BUILDING_KEEP_OUT_M = 16;
 const BUILDING_SCAN_STEP = 4;
 const BUILDING_SCAN_EDGE = 8;
 /** Ramp: tiles between the pattern edge and the ramp's lower end, longest ramp tried, steepest rise per tile. */
@@ -296,9 +298,13 @@ export function freshSites(grid: VoxelGrid, span: number, depth: number, earlier
     .filter(c => !earlier.some(o => overlapsShot({ ...c, span }, o, earlier.length > 0 ? BERM_GAP : 0)));
   if (!rules) return free;
   const groundOreKgRemaining = free.reduce((sum, c) => sum + c.ore, 0);
-  const worthIt = free.filter(c => decideFreshShotSite({
+  const bestSiteOre = free.reduce((best, c) => Math.max(best, c.ore), 0);
+  const floored = free.filter(c => decideFreshShotSite({
     oreKgUnderSite: c.ore, siteOreKgFloor: LADDER_SITE_ORE_FLOOR, groundOreKgRemaining,
   }) === 'fire');
+  // A site far poorer than the best only buries ground the ladder must clear; if none is rich enough, keep the floored set.
+  const rich = floored.filter(c => siteHoldsOre({ oreKgUnderSite: c.ore, bestSiteOre }));
+  const worthIt = rich.length > 0 ? rich : floored;
   const clear = worthIt.filter(c => !shotOverlapsProtectedRamp({ x: c.x, z: c.z, span }, rules.protectedZones));
   return clear.length > 0 ? clear : worthIt;
 }
@@ -547,8 +553,20 @@ function dropUnreachablePattern(s: ProbeSession, m: LadderMemory): void {
     return;
   }
   const stuck = s.state.pendingActions.find(a => a.type === 'drill_hole' && a.blockedReason === 'target_unreachable');
-  if (!stuck) return;
-  abandonShot(s, m, { x: stuck.targetX, z: stuck.targetZ, span: 1 });
+  if (stuck) {
+    abandonShot(s, m, { x: stuck.targetX, z: stuck.targetZ, span: 1 });
+    delete m.stalePatternSinceTick;
+    return;
+  }
+  // Holes the previous shot's rubble buried stay undrilled until hauled; a pattern buried for too long is dropped.
+  const buried = s.state.pendingActions.filter(a => a.type === 'drill_hole' && a.blockedReason === 'buried_under_rubble');
+  const verdict = decideBuriedPattern({ buriedHoleCount: buried.length, buriedSinceTick: m.buriedSinceTick, tick: s.state.tickCount });
+  m.buriedSinceTick = verdict.buriedSinceTick;
+  if (verdict.action !== 'drop') return;
+  const x = Math.min(...buried.map(a => a.targetX));
+  const z = Math.min(...buried.map(a => a.targetZ));
+  const span = Math.max(Math.max(...buried.map(a => a.targetX)) - x, Math.max(...buried.map(a => a.targetZ)) - z) + 1;
+  abandonShot(s, m, { x, z, span });
   delete m.stalePatternSinceTick;
 }
 
@@ -660,6 +678,8 @@ interface LadderMemory extends ReinvestMemory {
   maxGrade: number | null;
   /** Footprints around a hole no rig could reach: a fresh shot keeps clear of them, or it would pick the same site again. */
   barred: Array<Pattern & { span: number }>;
+  /** Tick since which a pattern's drill orders have stayed buried under rubble; null when none is. */
+  buriedSinceTick: number | null;
   /** Hole depth cap (m) in force for the last shot. */
   holeCapM: number;
   /** Whether the last judged shot gained no pit depth and no new ore. */
@@ -812,7 +832,10 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const inset = deepen && shouldBench(state.grade?.deepestPitM ?? 0, SOFTEST_SAFE_FACE_M) ? BERM_GAP : 0;
   const siteSide = Math.floor((Math.min(s.grid.sizeX, s.grid.sizeZ) - 2 * BUILDING_SCAN_EDGE - 1) / sized.spacing) + 1;
   const craterSide = Math.floor(((crater?.span ?? 0) - 2 * inset) / sized.spacing) + 1;
-  const wanted = Math.max(1, Math.min(sized.rows, deepen ? craterSide : siteSide));
+  const limitSide = Math.max(1, Math.min(sized.rows, deepen ? craterSide : siteSide));
+  const wanted = decideLadderShotSide({
+    limitSide, grade: gradeOf(s), lastShotFailed: m.lastShotFailed, sealedRubbleCount: craterRubbleCounts(state, m.crater).sealed,
+  });
   const free = getExplosivesFreeCapacity(state.buildings);
   let side = wanted;
   while (side > 0 && side * side * (kgFor(side) + 0.1) > free) side--;
@@ -820,7 +843,9 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const specFor = (n: number): ShotSpec => ({
     rows: n, cols: n, spacing: sized.spacing, depth, explosive: shotExplosive(s), kg: kgFor(n), stemming: sized.stemming, diameterM: sized.diameterM,
   });
-  const protectedZones = rampProtectionZones(Object.values(m.ramps), LADDER_RAMP_PROTECT_MARGIN_M);
+  // A g2 shot throws rock far enough to destroy a building beside the site (a lost building sank well-being to a revolt at t8520, #2076).
+  const buildingZones = state.buildings.buildings.map(b => ({ x: b.x - LADDER_BUILDING_KEEP_OUT_M, z: b.z - LADDER_BUILDING_KEEP_OUT_M, span: 2 * LADDER_BUILDING_KEEP_OUT_M + 1 }));
+  const protectedZones = [...rampProtectionZones(Object.values(m.ramps), LADDER_RAMP_PROTECT_MARGIN_M), ...buildingZones];
   // Orders no ramp reaches never get hauled: they are not work for the crew.
   const hauling = state.pendingActions.some(a => a.type === 'haul_debris' && a.blockedReason === null);
   return {
@@ -837,6 +862,8 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
           ordered = orderShot(s, [...m.origins, ...m.barred], specFor(n), at, { protectedZones });
           if (ordered !== null) return true;
         }
+        // The 64 m map holds few sites: when none is left, age out the oldest bar so a cleared crater can be deepened again.
+        m.barred.shift();
         return false;
       });
       return ordered;
@@ -959,11 +986,21 @@ function ladderCrew(s: ProbeSession, m: ReinvestMemory): void {
 
 /** Ecology under which another spoil heap is built, and the most the ladder builds: loose rubble past a heap's capacity drains it. */
 const LADDER_ECOLOGY_FLOOR = 40;
-const LADDER_MAX_SPOIL_HEAPS = 4;
+export const LADDER_MAX_SPOIL_HEAPS = 4;
 
-/** Another spoil heap while ecology sags and rubble outgrows the heaps' room. */
+/**
+ * Whether blocked overflow calls for another spoil heap: `barrenKgPending` (`pendingSpoilOverflowKg`) already counts only
+ * rubble that did not fit the `heaps` built, so any of it means more room is needed while the heap cap is not reached (#2085).
+ */
+export function spoilHeapsNeeded(barrenKgPending: number, heaps: number): boolean {
+  return barrenKgPending > 0 && heaps < LADDER_MAX_SPOIL_HEAPS;
+}
+
+/** Another spoil heap while ecology sags or queued haul orders are blocked on full heaps. */
 function ladderSpoil(s: ProbeSession, m: ReinvestMemory): void {
-  if (s.state.scores.ecology >= LADDER_ECOLOGY_FLOOR || countOf(s, 'spoil_heap') >= LADDER_MAX_SPOIL_HEAPS
+  const heaps = countOf(s, 'spoil_heap');
+  const needed = s.state.scores.ecology < LADDER_ECOLOGY_FLOOR || spoilHeapsNeeded(pendingSpoilOverflowKg(s.state), heaps);
+  if (!needed || heaps >= LADDER_MAX_SPOIL_HEAPS
     || s.state.plannedBuildings.some(p => p.type === 'spoil_heap')
     || spendable(s) < getBuildingDef('spoil_heap', 1).constructionCost) return;
   tryOnce(s, m, 'spoil_heap', () => placeBuilding(s, 'spoil_heap', rallyOf(s), null) !== null);
@@ -1071,7 +1108,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {},
-    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.ramp.slope, ramps: {}, rampPending: null, rampedFloorM: 0, maxGrade, barred: [],
+    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.ramp.slope, ramps: {}, rampPending: null, rampedFloorM: 0, maxGrade, barred: [], buriedSinceTick: null,
     holeCapM: ladderHoleDepthM(s), lastShotFailed: false, dudStreak: 0, judgedShots: 1,
     before: { pitM: 0, oreKg: 0 },
   };

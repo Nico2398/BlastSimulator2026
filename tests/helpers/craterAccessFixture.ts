@@ -7,7 +7,7 @@
 
 import { expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
-import type { GameState } from '../../src/core/state/GameState.js';
+import type { GameState, PlannedRamp } from '../../src/core/state/GameState.js';
 import type { MiningContext } from '../../src/console/commands/mining/types.js';
 import { addBlastFragments } from '../../src/core/economy/Logistics.js';
 import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
@@ -93,4 +93,28 @@ export function makeCraterSite(pits: Pit[], opts: { cash?: number } = {}): Crate
   for (const pit of pits) cutPit(site, pit);
   tickUntilFresh(run, state, () => false, 1);
   return site;
+}
+
+/** Twelve dig_ramp_segment orders parked inside the pit, as the classifier stamps them target_unreachable (#2085). */
+export function parkBlockedRamp(site: CraterSite, pit: Pit, count = 12): void {
+  const { state } = site;
+  const cx = pit.x0 + pit.size - 1;
+  const ids: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const id = state.nextPendingActionId++;
+    ids.push(id);
+    state.pendingActions.push({
+      id, type: 'dig_ramp_segment', requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger',
+      targetX: cx, targetZ: cx, targetY: 0, payload: { rampId: 900, segmentIndex: i, cells: [], region: null },
+      targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: state.tickCount,
+      blockedReason: 'target_unreachable',
+    });
+  }
+  const planned: PlannedRamp = {
+    id: 900,
+    def: { originX: cx, originZ: cx, direction: 'south', length: 1, targetDepth: 2 },
+    footprint: { minX: cx, maxX: cx, minZ: cx, maxZ: cx },
+    segments: ids.map((actionId, index) => ({ index, actionId, cells: [], region: null, done: false })),
+  };
+  state.plannedRamps.push(planned);
 }

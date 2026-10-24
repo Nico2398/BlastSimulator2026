@@ -4,10 +4,11 @@
 // debris_out_of_reach. Everything runs through the real tick pipeline; nothing is mocked.
 
 import { describe, it, expect } from 'vitest';
-import { makeCraterSite, dropRubble, type CraterSite, type Pit } from '../../helpers/craterAccessFixture.js';
+import { makeCraterSite, dropRubble, parkBlockedRamp, type CraterSite, type Pit } from '../../helpers/craterAccessFixture.js';
 import { tickUntilFresh } from '../../helpers/blastFixtures.js';
 import { CRATER_ACCESS_MIN_STRANDED_ORDERS, CRATER_ACCESS_RECHECK_TICKS } from '../../../src/core/config/balance.js';
 import { strandedDebrisTargets } from '../../../src/core/engine/OrderReachability.js';
+import { hasLiveRampWork } from '../../../src/core/engine/StrandedAccess.js';
 
 const PIT: Pit = { x0: 40, z0: 40, size: 12, drop: 8 };
 /** One recheck window, plus a tick of classification lag before the first scan can see the orders. */
@@ -101,6 +102,63 @@ describe('syncCraterAccess', () => {
     const site = makeCraterSite([]);
     tickUntilFresh(site.run, site.state, () => false, CRATER_ACCESS_RECHECK_TICKS * 2);
     expect(site.state.plannedRamps).toHaveLength(0);
+  });
+});
+
+describe('syncCraterAccess with blocked ramp segments (#2085)', () => {
+  it('orders a new ramp within one recheck window although 12 blocked segments are pending', () => {
+    const site = strandedSite();
+    parkBlockedRamp(site, PIT);
+    const before = site.state.plannedRamps.length;
+    tickUntilFresh(site.run, site.state, () => site.state.plannedRamps.length > before, WINDOW);
+    expect(site.state.plannedRamps.length).toBe(before + 1);
+  });
+
+  it('charges the new ramp as construction spending exactly once', () => {
+    const site = strandedSite();
+    parkBlockedRamp(site, PIT);
+    const constructionSpend = () => site.state.finances.transactions.filter(e => e.type === 'expense' && e.category === 'construction').length;
+    const before = constructionSpend();
+    tickUntilFresh(site.run, site.state, () => constructionSpend() > before, WINDOW);
+    expect(constructionSpend()).toBe(before + 1);
+    tickUntilFresh(site.run, site.state, () => false, CRATER_ACCESS_RECHECK_TICKS);
+    expect(constructionSpend()).toBe(before + 1);
+  });
+
+  it('still orders nothing while one live ramp segment is pending beside the blocked ones', () => {
+    const site = strandedSite();
+    expect(site.run('build_ramp start:30,46 end:39,46 depth:4')).toMatchObject({ success: true });
+    parkBlockedRamp(site, PIT);
+    const constructionSpend = () => site.state.finances.transactions.filter(e => e.type === 'expense' && e.category === 'construction').length;
+    const ordered = constructionSpend();
+    for (const a of rampOrders(site)) if (a.blockedReason !== 'target_unreachable') a.status = 'queued';
+    // Tick only while the player's ramp is live: once the crew finishes it, just the blocked segments remain,
+    // and those must not suppress an access ramp (the floor is still stranded), so a later order is correct.
+    const start = site.state.tickCount;
+    tickUntilFresh(site.run, site.state, () => !hasLiveRampWork(site.state.pendingActions), CRATER_ACCESS_RECHECK_TICKS * 2);
+    expect(site.state.tickCount - start).toBeGreaterThanOrEqual(CRATER_ACCESS_RECHECK_TICKS + 1); // at least two scans saw it live
+    expect(constructionSpend()).toBe(ordered);
+  });
+});
+
+describe('syncCraterAccess with a held ramp segment carrying a stale stamp (#2085)', () => {
+  it('counts a held segment as live work: no new ramp is ordered while it is held', () => {
+    const site = strandedSite();
+    parkBlockedRamp(site, PIT);
+    // One segment was claimed after being stamped: held, still carrying the old blockedReason.
+    const held = rampOrders(site)[0]!;
+    held.status = 'assigned';
+    held.holderId = site.state.employees.employees[0]!.id;
+    expect(held.blockedReason).toBe('target_unreachable');
+    expect(hasLiveRampWork([held])).toBe(true);
+    const before = site.state.plannedRamps.length;
+    // Keep the hold alive across scans.
+    tickUntilFresh(site.run, site.state, () => {
+      held.status = 'assigned';
+      held.holderId = site.state.employees.employees[0]!.id;
+      return site.state.plannedRamps.length > before;
+    }, CRATER_ACCESS_RECHECK_TICKS * 2);
+    expect(site.state.plannedRamps.length).toBe(before);
   });
 });
 

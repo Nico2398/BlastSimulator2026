@@ -279,3 +279,63 @@ export function judgeLadderShot(input: LadderShotJudgeInput): LadderShotJudgment
   const bar = shouldBarCrater(streak);
   return { judged: true, lastShotFailed, dudStreak: bar ? 0 : streak, bar };
 }
+
+/** Ticks a pattern may stay buried under rubble before the ladder drops it. */
+export const LADDER_BURIED_DROP_TICKS = 500;
+
+interface BuriedPatternInput {
+  buriedHoleCount: number;
+  buriedSinceTick: number | null;
+  tick: number;
+}
+
+interface BuriedPatternDecision {
+  action: 'wait' | 'drop';
+  buriedSinceTick: number | null;
+}
+
+/**
+ * Contract: no buried holes -> wait, buriedSinceTick null; first buried call -> wait,
+ * buriedSinceTick = tick; buried for >= LADDER_BURIED_DROP_TICKS -> drop, null; a count back to 0
+ * resets buriedSinceTick to null.
+ */
+export function decideBuriedPattern(input: BuriedPatternInput): BuriedPatternDecision {
+  if (input.buriedHoleCount === 0) return { action: 'wait', buriedSinceTick: null };
+  const since = input.buriedSinceTick ?? input.tick;
+  if (input.tick - since >= LADDER_BURIED_DROP_TICKS) return { action: 'drop', buriedSinceTick: null };
+  return { action: 'wait', buriedSinceTick: since };
+}
+
+interface LadderShotSideInput {
+  limitSide: number;
+  grade: number;
+  lastShotFailed: boolean;
+  sealedRubbleCount: number;
+}
+
+/**
+ * Contract: a clean state returns limitSide at every grade; lastShotFailed gives a side strictly
+ * smaller, floor 1. Result is in [1, limitSide]. No grade cap (caps of 3-6 starved ladder yield and
+ * ended the Shareholder Summit competent run in game_over:worker_revolt) and no sealed-rubble shrink
+ * (it alone reproduced that revolt, #2080): sealedRubbleCount is accepted but does not move the side.
+ */
+export function decideLadderShotSide(input: LadderShotSideInput): number {
+  return Math.max(1, input.lastShotFailed ? input.limitSide - 1 : input.limitSide);
+}
+
+/** Share of the best site's ore a site must hold to be worth a shot. */
+export const LADDER_SITE_ORE_SHARE = 0.25;
+
+interface SiteOreInput {
+  oreKgUnderSite: number;
+  bestSiteOre: number;
+}
+
+/**
+ * Contract: bestSiteOre 0 -> true; otherwise oreKgUnderSite >= LADDER_SITE_ORE_SHARE * bestSiteOre
+ * and >= LADDER_SITE_ORE_FLOOR.
+ */
+export function siteHoldsOre(input: SiteOreInput): boolean {
+  if (input.bestSiteOre <= 0) return true;
+  return input.oreKgUnderSite >= LADDER_SITE_ORE_SHARE * input.bestSiteOre && input.oreKgUnderSite >= LADDER_SITE_ORE_FLOOR;
+}
