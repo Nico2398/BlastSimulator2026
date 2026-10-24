@@ -69,6 +69,15 @@ describe('clusterStrandedFloors', () => {
     expect(floor!.z).toBeLessThanOrEqual(12);
   });
 
+  it('names the level most of its orders sit on, not a hole bottom below it, and counts only those (#2045)', () => {
+    const floorCells = [{ x: 10, z: 10, y: 2.5 }, { x: 11, z: 10, y: 2.5 }, { x: 12, z: 10, y: 2.6 }, { x: 13, z: 10, y: 2.5 }];
+    const hole = { x: 11, z: 11, y: 0.5 };
+    const [floor] = clusterStrandedFloors([hole, ...floorCells], 2);
+    expect(floor!.floorY).toBeCloseTo(2.5, 5);
+    expect(floor!.orderCount).toBe(4);
+    expect(floor!.z).toBe(10);
+  });
+
   it('counts a single isolated cell as a floor of one order', () => {
     const floors = clusterStrandedFloors([{ x: 5, z: 5, y: -3 }], 2);
     expect(floors).toHaveLength(1);
@@ -111,6 +120,22 @@ describe('planCraterAccess', () => {
     const last = cells[cells.length - 1]!;
     expect(s.reachableFrom(first.x, first.z)).toBe(true);
     expect(Math.abs(s.heightAt(last.x, last.z) - -PIT.depth)).toBeLessThanOrEqual(CRATER_ACCESS_FLOOR_LEVEL_M);
+  });
+
+  it('never runs a corridor over ground the surface leaves out, such as a building (#2045)', () => {
+    const open = planCraterAccess(centreFloor(PIT), surface(PIT, outsidePit(PIT)), MAX_RATIO, 3);
+    expect(open.ok).toBe(true);
+    if (!open.ok) return;
+    // A building on the open plan's corridor, part way down it.
+    const cells = rampPathCells(rampPathOf(open.def), 3);
+    const site = cells[Math.floor(cells.length / 2)]!;
+    const building = (x: number, z: number) => Math.abs(x - site.x) <= 2 && Math.abs(z - site.z) <= 2;
+    const base = surface(PIT, outsidePit(PIT));
+    const s: AccessSurface = { ...base, contains: (x, z) => base.contains(x, z) && !building(x, z) };
+    const plan = planCraterAccess(centreFloor(PIT), s, MAX_RATIO, 3);
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(rampPathCells(rampPathOf(plan.def), 3).filter(c => building(c.x, c.z))).toEqual([]);
   });
 
   it('never exceeds the longest ramp the game accepts', () => {

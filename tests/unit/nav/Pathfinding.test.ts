@@ -22,6 +22,9 @@ import {
   NAV_MAX_SLOPE_RATIO, NAV_CLEARANCE_MAX_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS,
 } from '../../../src/core/config/balance.js';
 import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+import { computeClimbComponents } from '../../../src/core/nav/NavGridReachability.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 const RAMP_WIDTH = RAMP_DEFAULT_WIDTH;
 
 
@@ -2677,5 +2680,41 @@ describe('findFootPathWithVehicleFallback', () => {
     setCell(grid, 1, 0, 'walkable', { fragmentOccupancy: 1 });
     expect(findFootPathWithVehicleFallback(grid, request, false).found).toBe(false);
     expect(findFootPathWithVehicleFallback(grid, request, true).found).toBe(false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// The whole-grid retry is a complete search (#2045)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('findPath: the whole-grid retry finds a long vehicle road out of a pit (#2045)', () => {
+  /** The nav grid a 20-degree probe run left: a pit floor whose only road out is a ramp on the side away from the depot. */
+  function pitSite(): NavGrid {
+    const fixture = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures/pit-route-navgrid.json'), 'utf8')) as { width: number; height: number; rows: string[] };
+    const TYPES: Record<string, NavCellType> = { w: 'walkable', b: 'blocked', r: 'ramp', d: 'drill_hole', v: 'void' };
+    const cells = fixture.rows.map(row => row.split(' ').map(code => {
+      const [head, clearance, bench] = code.split(':');
+      const surfaceY = head!.length > 1 ? Number(head!.slice(1)) / 100 : undefined;
+      return { ...makeCell(TYPES[head![0]!]!, Number(bench), surfaceY), ...(clearance !== '' && { clearance: Number(clearance) }) };
+    }));
+    return new NavGrid(fixture.width, fixture.height, cells);
+  }
+  const ratio = Math.tan(20 * Math.PI / 180);
+  const drive = (fromX: number, fromZ: number, toX: number, toZ: number) =>
+    ({ agentId: 1, fromX, fromZ, toX, toZ, avoidVehicles: false, requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS, maxSlopeRatio: ratio });
+
+  it('the climb labelling connects the pit floor to the warehouse dock', () => {
+    const grid = pitSite();
+    expect(computeClimbComponents(grid, NAV_CLEARANCE_VEHICLE_CELLS, ratio).canReach(52, 34, 37, 39)).toBe(true);
+    expect(findPath(grid, drive(52, 34, 5, 17)).found).toBe(true);
+  });
+
+  it('a hauler on the pit floor finds its road to the dock, up the far ramp and round the pit', () => {
+    const grid = pitSite();
+    for (const [x, z] of [[44, 30], [37, 39]] as const) {
+      const path = findExactPath(grid, drive(x, z, 5, 17));
+      expect(path.found, `${x},${z}`).toBe(true);
+      expect(path.waypoints.at(-1)).toEqual({ x: 5, z: 17 });
+    }
   });
 });

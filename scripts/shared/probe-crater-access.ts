@@ -14,8 +14,11 @@ import { rampPathOf, rampWaypoints, type RampFootprint } from '../../src/core/mi
 import { rampWidthOf, type RampDef } from '../../src/core/mining/Ramp.js';
 import { siteVehicleReach, strandedDebrisTargets } from '../../src/core/engine/OrderReachability.js';
 import { quoteRampRepair } from '../../src/core/mining/RampRepair.js';
+import { buildingFootprintOccupants } from '../../src/core/nav/NavGridSync.js';
+import { isBuildingFootprintCell } from '../../src/core/entities/Building.js';
 import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
 import { CRATER_ACCESS_CLUSTER_GAP_CELLS, RAMP_DEFAULT_WIDTH, VEHICLE_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
+import type { ProtectedZone } from './probe-ladder-policy.js';
 
 type Run = (cmd: string) => { success: boolean; output: string };
 
@@ -25,6 +28,12 @@ const ACCESS_MIN_STRANDED_ORDERS = 3;
 export const ACCESS_CASH_RESERVE_TICKS = 200;
 /** Ticks between two looks at the stranded floors. */
 export const ACCESS_RECHECK_TICKS = 50;
+
+/**
+ * Metres a shot's footprint keeps clear of a built ramp: one hole spacing of broken burden past the outer holes. The
+ * player keeps a ramp out of a shot rather than repair it after (#2045).
+ */
+export const RAMP_SHOT_KEEP_OUT_M = 4;
 
 /** A floor within this many cells, and this many metres of depth, of one already ramped is that same floor. */
 const SAME_FLOOR_CELLS = CRATER_ACCESS_CLUSTER_GAP_CELLS * 2;
@@ -47,10 +56,12 @@ export interface CraterAccessMemory {
   avoid: RampFootprint[];
   /** Nav-grid revision of the last look at the built ramps for damage; they are looked at again once the terrain changes. */
   repairRevision: number;
+  /** Built ramps whose repair got stuck out of every digger's reach and was cancelled: the player gives up on them. */
+  unrepairable: number[];
 }
 
 export function newCraterAccessMemory(): CraterAccessMemory {
-  return { lastTick: -Infinity, failedSignature: null, served: [], avoid: [], repairRevision: -1 };
+  return { lastTick: -Infinity, failedSignature: null, served: [], avoid: [], repairRevision: -1, unrepairable: [] };
 }
 
 /** True when the probe already ordered a ramp down to `floor` (or one beside it at the same depth). */
@@ -59,15 +70,23 @@ export function rampedAlready(memory: Pick<CraterAccessMemory, 'served'>, floor:
     && Math.abs(f.floorY - floor.floorY) < SAME_FLOOR_M);
 }
 
-/** Cancels the probe's ramps that are stuck, remembering their footprints, and frees their floors for another plan. */
+/**
+ * Cancels the probe's ramps that are stuck, remembering their footprints, and frees their floors for another plan. A
+ * stuck repair is cancelled too, and its ramp left as it is: a shot cut it off from every digger.
+ */
 function dropStuckRamps(run: Run, state: GameState, memory: CraterAccessMemory): void {
   const stuck = new Set(stuckRampFootprints(state));
+  if (stuck.size === 0) return;
   for (const served of [...memory.served]) {
     const ramp = state.plannedRamps.find(r => r.id === served.rampId);
     if (ramp === undefined || !stuck.has(ramp.footprint)) continue;
     run(`build_ramp cancel ${ramp.id}`);
     memory.avoid.push(ramp.footprint);
     memory.served.splice(memory.served.indexOf(served), 1);
+  }
+  for (const repair of state.plannedRamps.filter(p => p.repairOf !== undefined && stuck.has(p.footprint))) {
+    run(`build_ramp cancel ${repair.id}`);
+    memory.unrepairable.push(repair.repairOf!);
   }
 }
 
@@ -90,15 +109,24 @@ export function stuckRampFootprints(state: Pick<GameState, 'plannedRamps' | 'pen
     .map(r => r.footprint);
 }
 
-/** The terrain a ramp can start from: ground a vehicle drives to from the rally point. */
+/**
+ * The terrain a ramp can start from: ground a vehicle drives to from the rally point, and the tiles rubble lies on. A
+ * ramp is never planned over a building or a building still to be raised: the console refuses it, and a building raised
+ * on a ramp blocks it.
+ */
 function accessSurface(state: GameState, grid: VoxelGrid): AccessSurface | null {
   const reach = siteVehicleReach(state);
   const nav = state.navGrid;
   if (reach === null || nav === null) return null;
+  const rubble = new Set(state.logistics.fragments.filter(f => f.state === 'on_ground')
+    .map(f => `${Math.round(f.fragment.position.x)},${Math.round(f.fragment.position.z)}`));
+  const buildings = buildingFootprintOccupants(state);
   return {
     heightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
-    contains: (x, z) => grid.containsColumn(x, z) && (nav.cellAt(x, z)?.type ?? 'void') !== 'void',
+    contains: (x, z) => grid.containsColumn(x, z) && (nav.cellAt(x, z)?.type ?? 'void') !== 'void'
+      && !buildings.some(b => isBuildingFootprintCell(b, x, z)),
     reachableFrom: reach,
+    holdsRubble: (x, z) => rubble.has(`${x},${z}`),
   };
 }
 
@@ -168,8 +196,8 @@ export function orderCraterAccess(run: Run, state: GameState, grid: VoxelGrid, m
 
 /**
  * Orders a repair of each built ramp a shot damaged (`quoteRampRepair`), once per terrain change, when the cash
- * covers it with ACCESS_CASH_RESERVE_TICKS of payroll to spare. A ramp a deeper floor put out of reach is left:
- * `orderCraterAccess` plans a new way down. Returns the console outputs of the orders placed.
+ * covers it with ACCESS_CASH_RESERVE_TICKS of payroll to spare. A ramp a deeper floor put out of reach, or whose repair
+ * got stuck (`unrepairable`), is left: `orderCraterAccess` plans a new way down. Returns the console outputs of the orders placed.
  */
 function repairDamagedRamps(run: Run, state: GameState, grid: VoxelGrid, memory: CraterAccessMemory): string[] {
   const revision = state.navGrid?.revision ?? -1;
@@ -178,6 +206,7 @@ function repairDamagedRamps(run: Run, state: GameState, grid: VoxelGrid, memory:
   const reserve = getOperatingCostPerHour(state).payroll * ACCESS_CASH_RESERVE_TICKS;
   const outputs: string[] = [];
   for (const ramp of state.builtRamps) {
+    if (memory.unrepairable.includes(ramp.id)) continue;
     if (state.plannedRamps.some(p => p.repairOf === ramp.id || p.widenOf === ramp.id)) continue;
     const quote = quoteRampRepair(grid, ramp);
     if (!quote.success || state.cash - quote.data.cost < reserve) continue;
@@ -185,6 +214,14 @@ function repairDamagedRamps(run: Run, state: GameState, grid: VoxelGrid, memory:
     if (ordered.success) outputs.push(ordered.output);
   }
   return outputs;
+}
+
+/** Ground a shot keeps off: every built ramp's footprint grown by RAMP_SHOT_KEEP_OUT_M on each side. */
+export function rampKeepOutZones(state: Pick<GameState, 'builtRamps'>): ProtectedZone[] {
+  const m = RAMP_SHOT_KEEP_OUT_M;
+  return state.builtRamps.map(({ footprint: f }) => ({
+    x: f.minX - m, z: f.minZ - m, span: f.maxX - f.minX + 1 + 2 * m, spanZ: f.maxZ - f.minZ + 1 + 2 * m,
+  }));
 }
 
 /** The player's pit logistics for one decision interval: repair what a shot damaged, then open what it stranded. */

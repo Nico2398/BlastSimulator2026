@@ -32,7 +32,7 @@ import {
   type ReachableSet,
 } from '../nav/NavGridReachability.js';
 import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
-import { withDockingCells } from '../nav/DockingReach.js';
+import { dockedFrom, withDockingCells } from '../nav/DockingReach.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO, VEHICLE_MAX_SLOPE_RATIO, VEHICLE_MAX_SLOPE_DEGREES } from '../config/balance.js';
 import { steepestBlockingRamp } from '../mining/RampGrade.js';
 
@@ -143,7 +143,8 @@ function fillPool(
   });
   // Every vehicle climbs at the site's one vehicle limit (#2045).
   const ratio = uniformRatio ?? vehicleMaxSlopeRatio(isProgressionSite(state));
-  const vehicleReach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(usable);
+  // A vehicle parked on a docking cell stands for the cells it docked from (#2045).
+  const vehicleReach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(dockedFrom(cache.navGrid, usable, NAV_CLEARANCE_VEHICLE_CELLS));
   // A clearance-1 approach cell beside a building is where a vehicle docks (#1840).
   // Role-agnostic: applies to every vehicle-gated order, not only demolition.
   return { hasActor: true, reachable: withDockingCells(cache.navGrid, vehicleReach, NAV_CLEARANCE_VEHICLE_CELLS) };
@@ -506,13 +507,14 @@ export function strandedDebrisTargets(state: GameState): ReadonlyArray<{ x: numb
 }
 
 /**
- * Whether a vehicle can drive to (x, z) from the rally point: the network a crater
- * access ramp must start on (#2082). Always false without a nav grid or a rally point.
+ * Whether a vehicle can drive to (x, z) from the rally point, at the site's vehicle climb limit: the network a crater
+ * access ramp must start on (#2082) and a parked vehicle is moved onto (#2045). Null without a nav grid or a rally point.
  */
 export function siteVehicleReach(state: GameState): ((x: number, z: number) => boolean) | null {
   const cache = cacheFor(state);
   const rally = state.rallyPoint;
   if (cache === null || rally === undefined) return null;
-  const reach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, VEHICLE_MAX_SLOPE_RATIO).reachableFrom([rally]);
+  const ratio = vehicleMaxSlopeRatio(isProgressionSite(state));
+  const reach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom([rally]);
   return (x, z) => reach.has(x, z);
 }

@@ -160,6 +160,8 @@ export interface ProtectedZone {
   x: number;
   z: number;
   span: number;
+  /** Extent along z when it differs from `span` (a rectangle); a square without it. */
+  spanZ?: number;
 }
 
 /**
@@ -182,7 +184,7 @@ export function rampProtectionZones(ramps: readonly RampFootprintInput[], margin
 /** Whether a shot footprint overlaps any protected zone; boxes that merely touch do not. */
 export function shotOverlapsProtectedRamp(site: ProtectedZone, zones: readonly ProtectedZone[]): boolean {
   return zones.some(z => site.x < z.x + z.span && z.x < site.x + site.span
-    && site.z < z.z + z.span && z.z < site.z + site.span);
+    && site.z < z.z + (z.spanZ ?? z.span) && z.z < site.z + (site.spanZ ?? site.span));
 }
 
 /** Deepest hole (m) the ladder drills on a fresh site, where the floor is not yet open: deeper holes seal under the burden cap. */

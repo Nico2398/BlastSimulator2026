@@ -4,10 +4,10 @@
 // re-cuts the built ramp to its line, landed again on the floor its end row shows now: what stands above the line
 // is cut, what the blast threw out below it is filled. It is paid per cell of that work.
 
-import { RAMP_REPAIR_COST_PER_CELL } from '../config/balance.js';
+import { RAMP_REPAIR_COST_PER_CELL, RAMP_REPAIR_TOLERANCE_M } from '../config/balance.js';
 import { formatMoney } from '../economy/formatMoney.js';
 import type { BuiltRamp, GameState } from '../state/GameState.js';
-import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../world/VoxelGrid.js';
 import { defineRampSegments, isRampCellPending, landRampOnGrid, validateRampOrder, type RampDef, type RampSegmentDef } from './Ramp.js';
 import { queueRampOrder } from './RampOrder.js';
 import { rampFootprint } from './RampWidening.js';
@@ -36,10 +36,36 @@ function failure(error: string, errorKey: string, errorParams?: Record<string, s
   return { success: false, error, errorKey, ...(errorParams ? { errorParams } : {}) };
 }
 
-/** The segments of `def` keeping only cells off the line, re-indexed from 0. */
-function pendingSegments(grid: VoxelGrid, def: RampDef): RampSegmentDef[] {
+/** The line height of a floor-row cell: the fill it rises to, or the floor it is banded down to; undefined above the floor row. */
+function lineOf(cell: RampSegmentDef['cells'][number]): number | undefined {
+  if (cell.fillTarget !== undefined) return cell.fillTarget;
+  return cell.floorAdjustment === undefined ? undefined : cell.y - 1 + cell.floorAdjustment;
+}
+
+/**
+ * How far the ground strays from the line in shape: the spread of (ground - line) over every column of `segments`.
+ * A line re-anchored on a ground another order nudged sits off by the same hair everywhere and spreads by none.
+ */
+function offLineSpread(grid: VoxelGrid, segments: readonly RampSegmentDef[]): number {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const segment of segments) {
+    for (const cell of segment.cells) {
+      const line = lineOf(cell);
+      if (line === undefined) continue;
+      const ground = computeVoxelColumnSurfaceHeight(grid, cell.x, cell.z);
+      const off = Number.isFinite(ground) ? ground - line : -Infinity;
+      lo = Math.min(lo, off);
+      hi = Math.max(hi, off);
+    }
+  }
+  return hi >= lo ? hi - lo : 0;
+}
+
+/** `segments` keeping only cells off the line, re-indexed from 0. */
+function pendingSegments(grid: VoxelGrid, segments: readonly RampSegmentDef[]): RampSegmentDef[] {
   const out: RampSegmentDef[] = [];
-  for (const segment of defineRampSegments(grid, def)) {
+  for (const segment of segments) {
     const cells = segment.cells.filter(cell => isRampCellPending(grid, cell));
     if (cells.length > 0) out.push({ ...segment, index: out.length, cells });
   }
@@ -47,9 +73,10 @@ function pendingSegments(grid: VoxelGrid, def: RampDef): RampSegmentDef[] {
 }
 
 /**
- * What repairing `ramp` takes on `grid` now, without changing anything. Refused when the ramp is intact (nothing
- * off its line) and when, landed on a floor a later shot deepened, it no longer reaches that floor within the cut
- * limit: the player then needs a longer ramp, not a repair.
+ * What repairing `ramp` takes on `grid` now, without changing anything. Refused when the ramp is intact (its ground
+ * strays from its line by no more than RAMP_REPAIR_TOLERANCE_M in shape) and when, landed on a floor a later shot
+ * deepened, it no longer reaches that floor within the cut limit: the player then needs a longer ramp, not a repair.
+ * A damaged ramp is re-cut whole: every cell off the line, however slightly, so the repaired floor is one line.
  */
 export function quoteRampRepair(grid: VoxelGrid, ramp: BuiltRamp): RepairResult<RampRepairQuote> {
   const def = landRampOnGrid(grid, { ...ramp.def, width: ramp.width });
@@ -57,7 +84,8 @@ export function quoteRampRepair(grid: VoxelGrid, ramp: BuiltRamp): RepairResult<
   if (!geometry.success) {
     return failure(`Ramp #${ramp.id} no longer reaches its floor: build a longer ramp.`, 'mining.repair_ramp.out_of_reach', { id: ramp.id });
   }
-  const segments = pendingSegments(grid, def);
+  const line = defineRampSegments(grid, def);
+  const segments = offLineSpread(grid, line) > RAMP_REPAIR_TOLERANCE_M ? pendingSegments(grid, line) : [];
   const cells = segments.reduce((n, s) => n + s.cells.length, 0);
   if (cells === 0) return failure(`Ramp #${ramp.id} is intact: nothing to repair.`, 'mining.repair_ramp.intact', { id: ramp.id });
   return { success: true, data: { def, segments, cells, cost: cells * RAMP_REPAIR_COST_PER_CELL } };

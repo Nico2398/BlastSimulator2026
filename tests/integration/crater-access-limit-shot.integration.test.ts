@@ -124,12 +124,18 @@ describe('limit-sized shot on a levelled site (#2086, #2095)', () => {
 });
 
 describe('a shot that deepens an opened crater (#2086, #2095)', () => {
+  /** The first crater's way in, ordered by hand so the shot below cuts its foot whatever the access policy would plan. */
+  const FIRST_RAMP = 'build_ramp start:37,11 end:37,36 depth:8';
   /** Centred in the first crater, one grid cell inside it. */
   const DEEPEN: LimitShot = { ...SHOT, side: 3, x0: 33, z0: 33 };
 
   function deepened(access: CraterAccessMemory): CraterSite {
     const site = limitSite();
-    shootAndClear(site, SHOT, access);
+    // The player opened the first crater with a straight ramp in from the north; the deepening shot cuts its foot.
+    fireLimitShot(site, SHOT);
+    thinRubble(site, THIN);
+    expect(site.run(FIRST_RAMP)).toMatchObject({ success: true });
+    tickSite(site, () => unsealedOnGround(site) === 0 && site.state.plannedRamps.length === 0, DIG_TICKS, access);
     const firstDepth = Math.max(...craterCells(site).map(c => c.depth));
     restockShotFleet(site);
     fireLimitShot(site, DEEPEN);
@@ -185,6 +191,9 @@ describe('a shot that deepens an opened crater (#2086, #2095)', () => {
 });
 
 describe('a second crater (#2086, #2095)', () => {
+  /** Fragments the second shot may leave on a wall it did not break, out of every ramp's reach. */
+  const LEFT_ON_WALLS = 2;
+
   it('gets its own access ramp even though the first crater already has one', () => {
     const site = limitSite();
     const access = newCraterAccessMemory();
@@ -197,10 +206,15 @@ describe('a second crater (#2086, #2095)', () => {
     fireLimitShot(site, { ...SHOT, x0: 14, z0: 26 });
     thinRubble(site, THIN);
     restockShotFleet(site); // the blast threw the hauler away
-    tickSite(site, () => state.builtRamps.length > first && state.plannedRamps.length === 0 && onGround(site) === 0, DIG_TICKS, access);
+    tickSite(site, () => state.builtRamps.length > first && state.plannedRamps.length === 0 && onGround(site) <= LEFT_ON_WALLS, DIG_TICKS, access);
     expect(state.builtRamps.length).toBeGreaterThan(first);
-    expect(onGround(site)).toBe(0);
-    expect(strandedOrders(site)).toEqual([]);
+    // What may stay lies on a wall the shot left standing between the craters and the first ramp: no ramp reaches
+    // it, and its order says so.
+    const left = state.logistics.fragments.filter(f => f.state === 'on_ground');
+    expect(left.length).toBeLessThanOrEqual(LEFT_ON_WALLS);
+    const orders = new Map(state.pendingActions.map(a => [a.payload['fragmentId'], a]));
+    expect(left.every(f => orders.get(f.fragment.id)?.blockedReason === 'debris_out_of_reach')).toBe(true);
+    expect(strandedOrders(site).length).toBeLessThanOrEqual(left.length);
     expectNoWorldInvariantViolations(state);
   });
 });

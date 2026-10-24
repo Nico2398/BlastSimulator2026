@@ -6,12 +6,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import { computeVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceHeight, setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
 import { createGame, type BuiltRamp, type GameState } from '../../../src/core/state/GameState.js';
 import { buildRamp, carveRampSegment, landRampOnGrid, type RampDef } from '../../../src/core/mining/Ramp.js';
 import { rampFootprint, recordBuiltRamp } from '../../../src/core/mining/RampWidening.js';
 import { orderRampRepair, quoteRampRepair } from '../../../src/core/mining/RampRepair.js';
-import { RAMP_REPAIR_COST_PER_CELL } from '../../../src/core/config/balance.js';
+import { RAMP_REPAIR_COST_PER_CELL, RAMP_REPAIR_TOLERANCE_M } from '../../../src/core/config/balance.js';
 
 const ROCK = { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
 const TOP = 15;
@@ -55,6 +55,28 @@ describe('quoteRampRepair (#2045)', () => {
   it('refuses an intact ramp: nothing is off its line', () => {
     const { grid, ramp } = builtSite();
     expect(quoteRampRepair(grid, ramp)).toMatchObject({ success: false, errorKey: 'mining.repair_ramp.intact' });
+  });
+
+  it('reads intact when another order nudged the ground its line starts from: the whole line moves with it', () => {
+    // A ramp whose origin sits on another ramp's carve re-anchors on it; a hair off everywhere is no damage,
+    // or two chained ramps re-order each other's repair forever.
+    const { grid, ramp } = builtSite();
+    const compId = grid.palette.intern(ROCK.composition);
+    const origin = computeVoxelColumnSurfaceHeight(grid, 10, 0);
+    setVoxelColumnSurfaceHeight(grid, 10, 0, origin + RAMP_REPAIR_TOLERANCE_M * 0.7, compId);
+    expect(quoteRampRepair(grid, ramp)).toMatchObject({ success: false, errorKey: 'mining.repair_ramp.intact' });
+  });
+
+  it('a dip past the tolerance in one column is damage, and the repair re-cuts the whole line', () => {
+    const { grid, ramp } = builtSite();
+    const compId = grid.palette.intern(ROCK.composition);
+    for (const x of [9, 10, 11]) {
+      setVoxelColumnSurfaceHeight(grid, x, 12, computeVoxelColumnSurfaceHeight(grid, x, 12) - RAMP_REPAIR_TOLERANCE_M * 2, compId);
+    }
+    const quote = quoteRampRepair(grid, ramp);
+    expect(quote.success).toBe(true);
+    if (!quote.success) return;
+    expect(quote.data.cells).toBeGreaterThanOrEqual(3);
   });
 
   it('quotes the cells a blast threw out of the foot, at the per-cell cost', () => {

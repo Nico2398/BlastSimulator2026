@@ -54,6 +54,22 @@ describe('freshSites', () => {
     expect(sites.some(c => c.x === PATCH.lo && c.z === PATCH.lo)).toBe(false);
   });
 
+  it('without rules, keeps a site off a built ramp\'s keep-out zone, a rectangle, while others remain (#2045)', () => {
+    const grid = gridWithPatch(true);
+    const all = freshSites(grid, SPAN, DEPTH, []);
+    const ramp = { x: PATCH.lo, z: 0, span: 1, spanZ: SIZE };
+    const sites = freshSites(grid, SPAN, DEPTH, [], undefined, [ramp]);
+    expect(sites.length).toBeGreaterThan(0);
+    expect(sites.length).toBeLessThan(all.length);
+    expect(sites.every(c => c.x + SPAN <= PATCH.lo || c.x > PATCH.lo)).toBe(true);
+    expect(sites.some(c => c.z > PATCH.hi)).toBe(true);
+  });
+
+  it('falls back to every site when the keep-out zones cover them all', () => {
+    const grid = gridWithPatch(true);
+    expect(freshSites(grid, SPAN, DEPTH, [], undefined, [{ x: 0, z: 0, span: SIZE }])).toEqual(freshSites(grid, SPAN, DEPTH, []));
+  });
+
   it('falls back to the unprotected worthwhile sites when every one is protected', () => {
     const grid = gridWithPatch(true);
     const all = freshSites(grid, SPAN, DEPTH, [], { protectedZones: [] });

@@ -1863,9 +1863,22 @@ describe('landRampOnEndFloor (#1852, #2045)', () => {
 describe('rampEndRowGround (#2045)', () => {
   const def: RampDef = { originX: 10, originZ: 0, direction: 'south', length: 10, targetDepth: 5, width: 3 };
 
-  it('is the lowest ground across the end row, so a lump a blast left beside the floor is not landed on', () => {
+  it('is the lowest ground when every end-row tile stands on its own level', () => {
     const heights: Record<string, number> = { '9,10': 4.5, '10,10': 5.5, '11,10': 7.5 };
     expect(rampEndRowGround(def, (x, z) => heights[`${x},${z}`] ?? 99)).toBe(4.5);
+  });
+
+  it('with an aim, is the level of the end row nearest it, however few tiles stand on it', () => {
+    const hole: Record<string, number> = { '9,10': 2.5, '10,10': 0.5, '11,10': 2.5 };
+    expect(rampEndRowGround(def, (x, z) => hole[`${x},${z}`] ?? 99, 0.8)).toBe(0.5);
+    expect(rampEndRowGround(def, (x, z) => hole[`${x},${z}`] ?? 99, 3)).toBe(2.5);
+  });
+
+  it('with no aim, is the level most of the end row shares: not a lump beside the floor, not a hole bottom in it', () => {
+    const lump: Record<string, number> = { '9,10': 4.5, '10,10': 6.5, '11,10': 4.5 };
+    expect(rampEndRowGround(def, (x, z) => lump[`${x},${z}`] ?? 99)).toBe(4.5);
+    const hole: Record<string, number> = { '9,10': 2.5, '10,10': 0.5, '11,10': 2.5 };
+    expect(rampEndRowGround(def, (x, z) => hole[`${x},${z}`] ?? 99)).toBe(2.5);
   });
 
   it('skips tiles it cannot read, and is NaN when it reads none', () => {
@@ -1889,8 +1902,14 @@ describe('landRampOnGrid (#2045)', () => {
   }
   const ramp: RampDef = { originX: 10, originZ: 0, direction: 'south', length: 20, targetDepth: 4, width: 3 };
 
-  it('lands on the floor beside a lump on the end tile: 15.5 - 9.5 = 6 m, not the lump\'s 15.5 - 11.5', () => {
-    expect(landRampOnGrid(gridWithFloor(9, 11), ramp).targetDepth).toBeCloseTo(6, 6);
+  it('lands on the floor beside a lump on the end tile when the asked depth is as near the floor: 15.5 - 9.5 = 6 m', () => {
+    // Asked 5 m: the floor (6 m down) and the lump (4 m down) are a metre off either way; the floor holds more of the row.
+    expect(landRampOnGrid(gridWithFloor(9, 11), { ...ramp, targetDepth: 5 }).targetDepth).toBeCloseTo(6, 6);
+    expect(landRampOnGrid(gridWithFloor(9, 11), { ...ramp, targetDepth: 8 }).targetDepth).toBeCloseTo(6, 6);
+  });
+
+  it('lands on the level of the end row the asked depth reaches for: a lump when asked for the lump\'s depth', () => {
+    expect(landRampOnGrid(gridWithFloor(9, 11), ramp).targetDepth).toBeCloseTo(4, 6);
   });
 
   it('keeps the ordered depth when the end row is intact ground', () => {

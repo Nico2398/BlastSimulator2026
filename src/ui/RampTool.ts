@@ -14,7 +14,7 @@ import {
   proposeRampSpiral, isPitRim, type RampSpiralResult, type SpiralDir, type SpiralSurface,
 } from '../core/mining/RampSpiral.js';
 import {
-  computeRampCost, landRampOnEndFloor, rampDefFromEndpoints, rampCutSlopeRatio, rampDefFromLegs, rampEndRowGround, rampGradeBoundsDegrees, validateRampOrder,
+  computeRampCost, landRampOnEndFloor, rampDefFromEndpoints, rampCutSlopeRatio, rampDefFromLegs, rampEndGroundsAt, rampGradeBoundsDegrees, validateRampOrder,
   type RampDef,
 } from '../core/mining/Ramp.js';
 import { legsFromWaypoints, rampLegsOf, rampTotalLength, type RampLeg } from '../core/mining/RampPath.js';
@@ -228,14 +228,21 @@ export class RampTool {
     return this.deps.sampler?.(x, z) ?? NaN;
   }
 
+  /** Where `def` starts and lands, read as the order will read it (#2045). */
+  private ends(def: RampDef): { start: number; end: number } {
+    return rampEndGroundsAt(def, (x, z) => this.groundAt(x, z));
+  }
+
   /** `def` landed on its end floor, as the order will be (#2045); unchanged when no ground can be read. */
   private landed(def: RampDef): RampDef {
-    return landRampOnEndFloor(def, this.groundAt(def.originX, def.originZ), rampEndRowGround(def, (x, z) => this.groundAt(x, z)));
+    const { start, end } = this.ends(def);
+    return landRampOnEndFloor(def, start, end);
   }
 
   /** Foot line: the depth the ramp lands at when it ends on a dug floor. */
   private footLine(def: RampDef): string {
-    return rampFootLine(this.groundAt(def.originX, def.originZ), rampEndRowGround(def, (x, z) => this.groundAt(x, z)));
+    const { start, end } = this.ends(def);
+    return rampFootLine(start, end);
   }
 
   private stripConfig(refresh: () => void): ParamStripConfig {

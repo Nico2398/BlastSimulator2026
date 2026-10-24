@@ -999,6 +999,7 @@ function findOrdinaryPath(
   goalPocket: Set<number> | null,
   budget: number = pathfindingNodeBudget(grid.width, grid.height),
   maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
+  heuristicWeight: number = ASTAR_HEURISTIC_WEIGHT,
 ): PathResult {
   // Fast path — try direct line before A* only if it's clearly optimal.
   //    Compare direct-line cost to heuristic lower bound (octile * MIN_WALKABLE_COST).
@@ -1028,7 +1029,7 @@ function findOrdinaryPath(
   gScoreArr[startPos] = 0;
   stampArr[startPos] = currentStamp;
   cameFromArr[startPos] = -1;
-  const hStart = octileHeuristic(sx, sz, gx, gz) * ASTAR_HEURISTIC_WEIGHT;
+  const hStart = octileHeuristic(sx, sz, gx, gz) * heuristicWeight;
   openHeap.push({ key: tieBreakKey(hStart, startPos), pos: startPos, g: 0 });
 
   while (openHeap.size > 0 && exploredCount < budget) {
@@ -1073,7 +1074,7 @@ function findOrdinaryPath(
         gScoreArr[neighborPos] = tentativeG;
         stampArr[neighborPos] = currentStamp;
         cameFromArr[neighborPos] = current.pos;
-        const h = octileHeuristic(nx, nz, gx, gz) * ASTAR_HEURISTIC_WEIGHT;
+        const h = octileHeuristic(nx, nz, gx, gz) * heuristicWeight;
         openHeap.push({ key: tieBreakKey(tentativeG + h, neighborPos), pos: neighborPos, g: tentativeG });
       }
     }
@@ -1081,9 +1082,14 @@ function findOrdinaryPath(
 
   // Budget exhausted with frontier left (not a genuine wall): a long switchback
   // can need more nodes than the base budget, so retry once with a bigger one.
+  // The retry searches on the true lower bound (a consistent heuristic), so no
+  // cell is expanded twice and a budget of the whole grid is a complete search:
+  // the inflated weight re-opens cells, and on a vehicle-limited site (#2045)
+  // a cross-map route out of a pit ran a whole-grid budget dry before it found
+  // the ramp, reading a connected haul as having no road back to the depot.
   const retryBudget = pathfindingRetryNodeBudget(grid.width, grid.height);
   if (openHeap.size > 0 && budget < retryBudget) {
-    const retried = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, retryBudget, maxSlopeRatio);
+    const retried = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, retryBudget, maxSlopeRatio, MIN_WALKABLE_COST);
     // The retry already ran the direct-line fallback on exhaustion.
     return retried;
   }

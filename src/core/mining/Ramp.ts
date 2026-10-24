@@ -14,8 +14,9 @@ import {
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
+import { nearestLevel } from '../math/ModalLevel.js';
 import {
-  MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M, RAMP_CUT_SLOPE_RATIO, RAMP_CUT_SLOPE_MARGIN, NAV_MAX_SLOPE_RATIO, VEHICLE_MAX_SLOPE_RATIO,
+  MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M, RAMP_LANDING_LEVEL_M, RAMP_CUT_SLOPE_RATIO, RAMP_CUT_SLOPE_MARGIN, NAV_MAX_SLOPE_RATIO, VEHICLE_MAX_SLOPE_RATIO,
   RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH,
   RAMP_COST_PER_METER_PER_WIDTH, isRampWidth, type RampWidth,
 } from '../config/balance.js';
@@ -963,30 +964,34 @@ function continuousGroundAt(grid: VoxelGrid, x: number, z: number): number {
   return Number.isFinite(h) ? h : computeColumnSurfaceY(grid, x, z);
 }
 
+type EndRowDef = Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length' | 'legs' | 'width'>;
+
 /**
- * The ground a ramp lands on: the lowest ground of its end row (`rampEndRow`), so the foot is
- * flush with the floor beside a lump a blast left on it, never with the lump. Unreadable tiles
- * are skipped; NaN when none reads.
+ * The floor of a ramp's end row (`rampEndRow`): its tiles grouped into levels (tiles within RAMP_LANDING_LEVEL_M of one
+ * another), the level nearest `aimY` (`nearestLevel`), else the level most of the row shares (`modalLevel`). Either way
+ * the foot meets a level the row stands on: the floor the order reaches for, never a lump beside it or a hole a charge
+ * left in it unless that is what it reaches for. Unreadable tiles are skipped; NaN when none reads.
  */
-export function rampEndRowGround(
-  def: Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length' | 'legs' | 'width'>, heightAt: (x: number, z: number) => number,
-): number {
-  let lowest = Infinity;
-  for (const tile of rampEndRow(rampPathOf(def), rampWidthOf(def))) {
-    const h = heightAt(tile.x, tile.z);
-    if (Number.isFinite(h) && h < lowest) lowest = h;
-  }
-  return Number.isFinite(lowest) ? lowest : NaN;
+export function rampEndRowGround(def: EndRowDef, heightAt: (x: number, z: number) => number, aimY = NaN): number {
+  return nearestLevel(rampEndRow(rampPathOf(def), rampWidthOf(def)).map(tile => heightAt(tile.x, tile.z)), RAMP_LANDING_LEVEL_M, aimY);
 }
 
-/** The ground a ramp's line starts from (its origin column) and lands on (the lowest of its end row). */
-function rampEndGrounds(
-  grid: VoxelGrid, def: Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length' | 'legs' | 'width'>,
+/**
+ * The ground a ramp's line starts from (its origin column) and lands on: the level of its end row nearest the bottom
+ * it asks for, the start ground less its depth (`rampEndRowGround`).
+ */
+export function rampEndGroundsAt(
+  def: EndRowDef & Pick<RampDef, 'targetDepth'>, heightAt: (x: number, z: number) => number,
 ): { start: number; end: number } {
-  return {
-    start: continuousGroundAt(grid, def.originX, def.originZ),
-    end: rampEndRowGround(def, (x, z) => (grid.containsColumn(x, z) ? continuousGroundAt(grid, x, z) : NaN)),
-  };
+  const start = heightAt(def.originX, def.originZ);
+  return { start, end: rampEndRowGround(def, heightAt, start - def.targetDepth) };
+}
+
+/** `rampEndGroundsAt` on `grid`'s continuous ground; the origin column reads its integer top when it has no crossing. */
+function rampEndGrounds(grid: VoxelGrid, def: EndRowDef & Pick<RampDef, 'targetDepth'>): { start: number; end: number } {
+  const start = continuousGroundAt(grid, def.originX, def.originZ);
+  const ground = (x: number, z: number): number => (grid.containsColumn(x, z) ? continuousGroundAt(grid, x, z) : NaN);
+  return { start, end: rampEndRowGround(def, ground, start - def.targetDepth) };
 }
 
 /** `def` landed on the end floor `grid` shows it (`landRampOnEndFloor`). */

@@ -192,6 +192,14 @@ describe('build_ramp path: refusals charge nothing and queue nothing', () => {
     expectRefusedFor('mining.build_ramp.leg_hits_building', { path: '12,21;26,21;26,29', depth: '4', width: '3' }, ctx);
   });
 
+  it('refuses a straight ramp across a planned building\'s footprint: the building would block it once raised (#2045)', () => {
+    const ctx = makeCtx();
+    ctx.state!.buildings.unlockedTiers.management_office = 3;
+    expect(buildCommand(ctx, ['management_office'], { at: '20,20' }).success).toBe(true);
+    expect(ctx.state!.plannedBuildings.length).toBeGreaterThan(0);
+    expectRefusedFor('mining.build_ramp.leg_hits_building', { path: '21,12;21,40', depth: '4', width: '3' }, ctx);
+  });
+
   it('refuses a path with a single waypoint', () => {
     expect(expectRefused({ path: '5,5', depth: '4', width: '3' })).toBe(t('mining.build_ramp.path_too_few'));
   });

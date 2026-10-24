@@ -1335,6 +1335,9 @@ export const RAMP_CUT_SLOPE_RATIO = NAV_MAX_SLOPE_RATIO * RAMP_CUT_SLOPE_MARGIN;
 /** A ramp's end row counts as dug floor, which the ramp lands on, only when at least this far (m) below the start ground (#1852, #2045). */
 export const RAMP_CRATER_MIN_DROP_M = 2;
 
+/** End-row tiles within this many metres of one another stand on one level: the level most of the row shares is the floor a ramp lands on (#2045). */
+export const RAMP_LANDING_LEVEL_M = 0.5;
+
 /** Required clearance, in cells, for an employee on foot (#1154). */
 export const NAV_CLEARANCE_EMPLOYEE_CELLS = 1;
 
@@ -1427,6 +1430,12 @@ export const RAMP_MAX_DEPTH_M = 55;
 export const RAMP_GRADE_STEP_DEGREES = 1;
 /** Ramp repair (#2045): cost per cell a repair cuts down to the ramp's line or fills back up to it. */
 export const RAMP_REPAIR_COST_PER_CELL = 10;
+/**
+ * Ramp repair (#2045): a ramp is damaged only when its ground strays from its line by more than this (m) in shape — the
+ * spread of (ground - line) across its columns. A line re-anchored on a ground another order nudged sits off by the same
+ * hair everywhere and drives as before; a shot that cuts into a ramp or deepens its floor spreads it by far more.
+ */
+export const RAMP_REPAIR_TOLERANCE_M = 0.1;
 /** Ramp cost per meter of length per voxel of width; the default width costs the pre-#1298 flat $100/m. */
 export const RAMP_COST_PER_METER_PER_WIDTH = 100 / 3;
 
@@ -3374,7 +3383,7 @@ export const CRATER_ACCESS_CLUSTER_GAP_CELLS = 6;
 /** Candidate pit-rim starts a crater access plan tries with the spiral backend before giving up. */
 export const CRATER_ACCESS_SPIRAL_START_ATTEMPTS = 6;
 /**
- * Largest gap (m) between the ground a planned ramp lands on (the lowest of its end row) and the stranded floor
+ * Largest gap (m) between the ground a planned ramp lands on (the level most of its end row shares) and the stranded floor
  * for the ramp to count as reaching it: within one voxel layer, so the landed foot is flush with that floor (#2045).
  */
 export const CRATER_ACCESS_FLOOR_LEVEL_M = 0.5;

@@ -494,9 +494,9 @@ describe('RampTool: grade ceiling follows the vehicle limit (#2045)', () => {
 });
 
 describe('RampTool: foot line over a multi-leg path', () => {
-  it('lands on the floor at the end tile: the line names the depth from the origin\'s ground to that floor', () => {
+  it('lands on the floor across the end row: the line names the depth from the origin\'s ground to that floor', () => {
     const calls: Array<[number, number]> = [];
-    const sampler = (x: number, z: number): number => { calls.push([x, z]); return x === C.x && z === C.z ? 6 : 10; };
+    const sampler = (x: number, z: number): number => { calls.push([x, z]); return Math.abs(x - C.x) <= 1 && Math.abs(z - C.z) <= 1 ? 6 : 10; };
     const s = setup({ sampler, surface: null });
     s.controller.simulateWaypoints([A, B, C]);
     expect(calls).toContainEqual([A.x, A.z]);

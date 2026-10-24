@@ -26,6 +26,8 @@
 //            e. buy a second hauler and hire its driver
 //            f. `permit apply` once `permit status` shows every target met
 //               (nextGradeTargets in src/core/economy/MineGrade.ts)
+//            g. a replacement for any core role nobody alive holds (replaceLostCrew): an event can
+//               take the only blaster, and every later charge order waits on one
 //            Calibration tasks extend this list; keep each rule one short block.
 //
 //   ladder   The full-ladder player (#1945). The reinvest opening, then every interval:
@@ -74,7 +76,7 @@ import { getEventById } from '../../src/core/events/EventPool.js';
 import type { EventConsequence } from '../../src/core/events/EventPool.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
-import { newCraterAccessMemory, playPitLogistics, type CraterAccessMemory } from './probe-crater-access.js';
+import { newCraterAccessMemory, playPitLogistics, rampKeepOutZones, type CraterAccessMemory } from './probe-crater-access.js';
 import {
   floorToKgResolution, limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
   type BuyRule, type LadderShot, type PermitLimit,
@@ -291,9 +293,19 @@ export interface FreshSiteRules {
 
 /**
  * Free deposits best first. With `rules`, sites on ore-less ground are skipped while ore remains elsewhere, and sites over a
- * protected ramp corridor are skipped unless that would leave none (a ladder that finds no site stalls).
+ * protected ramp corridor are skipped unless that would leave none (a ladder that finds no site stalls). Sites over
+ * `keepOut` (the built ramps a shot must not damage, `rampKeepOutZones`) are skipped the same way.
  */
-export function freshSites(grid: VoxelGrid, span: number, depth: number, earlier: readonly (Pattern & { span?: number })[], rules?: FreshSiteRules): Pattern[] {
+export function freshSites(
+  grid: VoxelGrid, span: number, depth: number, earlier: readonly (Pattern & { span?: number })[], rules?: FreshSiteRules,
+  keepOut: readonly ProtectedZone[] = [],
+): Pattern[] {
+  const sites = ruledSites(grid, span, depth, earlier, rules);
+  const clear = sites.filter(c => !shotOverlapsProtectedRamp({ x: c.x, z: c.z, span }, keepOut));
+  return clear.length > 0 ? clear : sites;
+}
+
+function ruledSites(grid: VoxelGrid, span: number, depth: number, earlier: readonly (Pattern & { span?: number })[], rules?: FreshSiteRules): Pattern[] {
   const free = rankDeposits(grid, span, depth)
     .filter(c => !earlier.some(o => overlapsShot({ ...c, span }, o, earlier.length > 0 ? BERM_GAP : 0)));
   if (!rules) return free;
@@ -312,7 +324,7 @@ export function freshSites(grid: VoxelGrid, span: number, depth: number, earlier
 /** Order `spec` at `at`, or on the best free deposit when `at` is not given. */
 function orderShot(s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = { ...SHOT, explosive: shotExplosive(s) }, at?: Pattern, rules?: FreshSiteRules): Shot | null {
   const span = spanOf(spec);
-  const candidates = at ? [at] : freshSites(s.grid, span, spec.depth, earlier, rules).slice(0, DEPOSIT_CANDIDATES_TRIED);
+  const candidates = at ? [at] : freshSites(s.grid, span, spec.depth, earlier, rules, rampKeepOutZones(s.state)).slice(0, DEPOSIT_CANDIDATES_TRIED);
   // The stock buy takes whole kg; round up so the pattern's charge is covered.
   const totalKg = Math.ceil(spec.rows * spec.cols * spec.kg);
   const diameter = spec.diameterM === undefined ? '' : ` diameter:${spec.diameterM}`;
@@ -629,6 +641,7 @@ function runReinvest(s: ProbeSession): void {
     reinvestShot(s, m);
     reinvestBuy(s, m);
     reinvestPermit(s);
+    replaceLostCrew(s, m);
   });
 }
 
@@ -952,7 +965,7 @@ function ladderFragmenter(s: ProbeSession, m: ReinvestMemory): void {
 }
 
 /** Hire a replacement for any core role nobody alive holds (a blaster lost mid-shot stalls every charge order). */
-function ladderCrew(s: ProbeSession, m: ReinvestMemory): void {
+function replaceLostCrew(s: ProbeSession, m: ReinvestMemory): void {
   for (const role of ['blaster', 'driller', 'driver'] as const) {
     if (s.state.employees.employees.some(e => e.alive && e.role === role) || spendable(s) < HIRING_COSTS[role]) continue;
     tryOnce(s, m, `crew_${role}`, () => s.run(`employee hire role:${role}`).success);
@@ -1091,7 +1104,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   playOut(s, () => {
     playPitLogistics(s.run, s.state, s.grid, m.access);
     ladderPermit(s, m);
-    ladderCrew(s, m);
+    replaceLostCrew(s, m);
     ladderSpoil(s, m);
     ladderSafety(s, m);
     dropUnreachablePattern(s, m);

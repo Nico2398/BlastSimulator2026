@@ -100,13 +100,12 @@ function orderRampDef(ctx: MiningContext, ordered: RampDef): CommandResult {
   }
 
   const footprint = rampFootprint(rampDef, rampWidthOf(rampDef));
-  const pathCells = rampDef.legs ? rampPathCells(rampPathOf(rampDef), rampWidthOf(rampDef)) : null;
-  if (pathCells) {
-    const refusal = legHitsBuilding(ctx, pathCells);
-    if (refusal) return { success: false, output: refusal };
-  }
+  // Every corridor, straight or turning: a building raised on a ramp blocks it (#2045).
+  const corridor = rampPathCells(rampPathOf(rampDef), rampWidthOf(rampDef));
+  const refusal = legHitsBuilding(ctx, corridor);
+  if (refusal) return { success: false, output: refusal };
   const rampClaim = claimForAction(
-    ctx, pathCells ?? cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp',
+    ctx, rampDef.legs ? corridor : cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp',
   );
   if (!rampClaim.ok) return { success: false, output: rampClaim.output! };
 
@@ -218,7 +217,7 @@ function rampDefFromPath(
   return { success: true, def: rampDefFromLegs({ x: originX, z: originZ }, legs, depth, width) };
 }
 
-/** Refusal text when a corridor tile of a multi-leg ramp lies on a built or planned building, else null. */
+/** Refusal text when a corridor tile of a ramp lies on a built or planned building, else null. */
 function legHitsBuilding(ctx: MiningContext, cells: readonly RampPathCell[]): string | null {
   const occupants = buildingFootprintOccupants(ctx.state!);
   const hit = firstOccupiedPathTile(cells, (x, z) => occupants.some(o => isBuildingFootprintCell(o, x, z)));

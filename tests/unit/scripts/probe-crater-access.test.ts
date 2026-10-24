@@ -2,8 +2,9 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  buildRampCommand, hasLiveRampWork, newCraterAccessMemory, rampedAlready, stuckRampFootprints,
+  RAMP_SHOT_KEEP_OUT_M, buildRampCommand, hasLiveRampWork, newCraterAccessMemory, rampKeepOutZones, rampedAlready, stuckRampFootprints,
 } from '../../../scripts/shared/probe-crater-access.js';
+import { shotOverlapsProtectedRamp } from '../../../scripts/shared/probe-ladder-policy.js';
 import type { PendingAction, PlannedRamp } from '../../../src/core/state/GameState.js';
 import type { RampDef } from '../../../src/core/mining/Ramp.js';
 
@@ -79,5 +80,25 @@ describe('rampedAlready (#2095)', () => {
     expect(rampedAlready(memory, { ...floor, x: 24, z: 17 })).toBe(true);
     expect(rampedAlready(memory, { ...floor, floorY: 3 })).toBe(false);
     expect(rampedAlready(memory, { ...floor, x: 60 })).toBe(false);
+  });
+});
+
+describe('rampKeepOutZones (#2045)', () => {
+  it('grows each built ramp\'s footprint by the keep-out margin on every side', () => {
+    const ramp = { footprint: { minX: 10, maxX: 12, minZ: 5, maxZ: 24 } } as Parameters<typeof rampKeepOutZones>[0]['builtRamps'][number];
+    const [zone] = rampKeepOutZones({ builtRamps: [ramp] });
+    const m = RAMP_SHOT_KEEP_OUT_M;
+    expect(zone).toEqual({ x: 10 - m, z: 5 - m, span: 3 + 2 * m, spanZ: 20 + 2 * m });
+  });
+
+  it('a shot beside the corridor overlaps the zone; one past the margin does not', () => {
+    const ramp = { footprint: { minX: 10, maxX: 12, minZ: 5, maxZ: 24 } } as Parameters<typeof rampKeepOutZones>[0]['builtRamps'][number];
+    const zones = rampKeepOutZones({ builtRamps: [ramp] });
+    expect(shotOverlapsProtectedRamp({ x: 13, z: 10, span: 4 }, zones)).toBe(true);
+    expect(shotOverlapsProtectedRamp({ x: 13 + RAMP_SHOT_KEEP_OUT_M, z: 10, span: 4 }, zones)).toBe(false);
+  });
+
+  it('is empty with no built ramp', () => {
+    expect(rampKeepOutZones({ builtRamps: [] })).toEqual([]);
   });
 });

@@ -1285,6 +1285,18 @@ describe('docking cells beside a building (#1840)', () => {
     expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
   });
 
+  it('a vehicle parked on the dock cell still reaches open ground: it stands for the ground it docked from (#2045)', () => {
+    // Its driver is off resting; the vehicle sits on the clearance-1 cell beside the building. Read from that cell alone it
+    // reaches no clearance-2 component, every order it serves would read out of reach, and no driver would come back.
+    const state = createGame({ seed: 42 });
+    // A strip two thin cells deep (#1840): the ring beside the building, then the cell beside that.
+    state.navGrid = makeDockGrid((x, z) => (x === 5 && z >= 5 && z <= 7 ? { clearance: 1 } : besideBuilding(x, z)));
+    hire(state, IN_A, [ROLE_LICENCE_REQUIRED.building_destroyer]);
+    purchaseVehicle(state.vehicles, 'building_destroyer', DOCK.x, DOCK.z);
+    const id = queue(state, 'demolish_building', IN_A, { requiredVehicleRole: 'building_destroyer' });
+    expect(judgeQueuedOrders(state).get(id)).toBe('reachable');
+  });
+
   it('a dock cell only touching thin cells (no clearance-2 neighbour) is unreachable', () => {
     const pocket = (x: number, z: number): Partial<NavCell> | null => {
       if (Math.abs(x - DOCK.x) <= 1 && Math.abs(z - DOCK.z) <= 1) return { clearance: 1 };
