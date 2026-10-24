@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Pathfinding: A* route finding over the NavGrid
 // Part of the navmesh system.
 
-import { NavGrid, isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
+import { NavGrid, isGridStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
 import { pathfindingNodeBudget, pathfindingRetryNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 as NEIGHBOUR_OFFSETS } from './NeighbourOffsets.js';
@@ -480,7 +480,6 @@ export function directLineWalk(
   let totalCost = 0;
   let prevX = x0;
   let prevZ = z0;
-  let prevCell: NavCell | undefined;
 
   for (let i = 0; i <= steps; i++) {
     const t = steps > 0 ? i / steps : 0;
@@ -503,7 +502,7 @@ export function directLineWalk(
     if (i > 0) {
       const stepDx = clampedX - prevX;
       const stepDz = clampedZ - prevZ;
-      if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, Math.hypot(stepDx, stepDz), maxSlopeRatio)) return null;
+      if (!isGridStepClimbable(grid, prevX, prevZ, clampedX, clampedZ, maxSlopeRatio)) return null;
       const isDiagonal = stepDx !== 0 && stepDz !== 0;
       // Only a genuine single-cell diagonal move needs the corner check (#1197)
       // — a DDA step that jumps more than one cell (rounding artifact) is out
@@ -517,7 +516,6 @@ export function directLineWalk(
     waypoints.push({ x: clampedX, z: clampedZ });
     prevX = clampedX;
     prevZ = clampedZ;
-    prevCell = cell;
   }
 
   return { found: true, waypoints, totalCost };
@@ -549,7 +547,7 @@ export function findRampConnections(grid: NavGrid, maxSlopeRatio: number = NAV_M
         const neighbor = grid.cellAt(nx, nz);
         if (!neighbor || neighbor.type === 'blocked' || neighbor.type === 'void') continue;
         // A cliff-adjacent ramp cell is no connection: the step must be walkable.
-        if (!isStepClimbable(cell.surfaceY, neighbor.surfaceY, Math.hypot(dx, dz), maxSlopeRatio)) continue;
+        if (!isGridStepClimbable(grid, x, z, nx, nz, maxSlopeRatio)) continue;
 
         const level = neighbor.benchLevel;
         // Keep first neighbor per level for determinism
@@ -1062,8 +1060,7 @@ function findOrdinaryPath(
       const skipClearance = (startPocket?.has(neighborIdxForPocket) ?? false) || (goalPocket?.has(neighborIdxForPocket) ?? false);
       if (!neighborCell || isImpassable(neighborCell, avoidVehicles, false, requiredClearance, skipClearance)) continue;
       if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(grid, cx, cz, nx, nz)) continue;
-      const currentCell = grid.cellAt(cx, cz)!;
-      if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, Math.hypot(dx, dz), maxSlopeRatio)) continue;
+      if (!isGridStepClimbable(grid, cx, cz, nx, nz, maxSlopeRatio)) continue;
 
       // Move cost
       const isDiagonal = dx !== 0 && dz !== 0;

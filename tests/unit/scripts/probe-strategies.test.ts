@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { PERMIT_LIMITS } from '../../../src/core/config/balance.js';
 import { RELOAD_FRACTION, shouldReload, SHOT } from '../../../scripts/shared/probe-strategies.js';
 
@@ -61,5 +63,23 @@ describe('PERMIT_LIMITS monotonic (#1944)', () => {
   it('grade-1 limits accommodate the grade-0 reference opening', () => {
     expect(PERMIT_LIMITS[1]!.maxChargeKg).toBeGreaterThanOrEqual(SHOT.rows * SHOT.cols * SHOT.kg);
     expect(PERMIT_LIMITS[1]!.maxHoles).toBeGreaterThanOrEqual(SHOT.rows * SHOT.cols);
+  });
+});
+
+describe('probe ramps follow the one vehicle slope limit (#2045)', () => {
+  const source = readFileSync(join(__dirname, '../../../scripts/shared/probe-strategies.ts'), 'utf8');
+  const ladder = readFileSync(join(__dirname, '../../../scripts/shared/probe-ladder.ts'), 'utf8');
+
+  it('cuts ramps at the progression cut ratio, not a hand-picked 0.45 that works only through the zigzag', () => {
+    expect(source).not.toMatch(/RAMP_MAX_SLOPE\s*=\s*0\.45/);
+    expect(source).toContain('rampCutSlopeRatio(true)');
+  });
+
+  it('no longer reads per-tier slope limits or digs a gentle-ramp retry', () => {
+    for (const text of [source, ladder]) {
+      expect(text).not.toContain('tierSlopeRatio');
+      expect(text).not.toContain('VEHICLE_TIER_MAX_SLOPE_DEGREES');
+    }
+    expect(source).not.toContain('gentle_ramp');
   });
 });

@@ -521,7 +521,7 @@ describe('A 3 m pattern on desert seed 42 leaves no one-voxel pocket and no stra
         for (const x of [29, 30]) expect(computeVoxelColumnSurfaceY(grid, x, z), `pocket cell ${x},${z}`).toBe(floorY);
       }
 
-      expect(run('build_ramp start:32,46 end:32,26 depth:8')).toMatchObject({ success: true });
+      expect(run('build_ramp start:32,49 end:32,26 depth:8')).toMatchObject({ success: true });
       tickWhile(() => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 3000);
       expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
 
@@ -555,11 +555,11 @@ describe('A 3 m pattern on desert seed 42 leaves no one-voxel pocket and no stra
 
 const PATTERN_START_X = 28;
 const PATTERN_START_Z = 18;
-// Depth 9, not 8: the ramp line now starts on the rim's continuous ground (16.26, #2043) rather than the integer top
+// 28 m long (start z=54, not 46): a 9 m drop at the 20 degree vehicle limit needs 25.2 m (#2045). Depth 9, not 8: the ramp line now starts on the rim's continuous ground (16.26, #2043) rather than the integer top
 // voxel (16), so the whole line sits 0.26 m higher. The shot floors the crater to 8.5 and clips the ramp's lowest
 // cells to it, leaving the first untouched ramp cell (z=30) standing above the crater floor: 9.50 at depth 8, a 1 m
 // wall past what a diagonal step climbs (tan 30 * sqrt 2 = 0.82); 8.66 at depth 9, a 0.16 m step.
-const RAMP_COMMAND = 'build_ramp start:32,46 end:32,27 depth:9';
+const RAMP_COMMAND = 'build_ramp start:32,54 end:32,26 depth:9';
 /** The pillar cells that stood at full height with the ramp dug first: between the north and middle hole rows. */
 const PILLAR_CELLS: Array<[number, number]> = [];
 for (const z of [20, 21]) for (const x of [30, 31, 33, 34]) PILLAR_CELLS.push([x, z]);
@@ -656,7 +656,7 @@ describe('A 4 m pattern shot after its access ramp was dug leaves no pillar and 
       }
 
       expect(run(RAMP_COMMAND)).toMatchObject({ success: true });
-      tickWhile(() => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 3000);
+      tickWhile(() => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 4500);
       expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
 
       tickWhile(() => false, 2);
@@ -745,7 +745,7 @@ describe('A second bench drilled from a crater floor leaves no pillar at the cen
       expect(columnsOffFloor(grid, 36, 44, 32, 40, 8), 'first bench columns off floor 8').toEqual([]);
 
       // The crew reaches the first crater floor by a ramp from the north (#1825's in-play opening) before drilling the second bench.
-      digRamp(run, state, tickWhile, 'build_ramp start:40,12 end:40,31 depth:8');
+      digRamp(run, state, tickWhile, 'build_ramp start:40,8 end:40,31 depth:8');
       shoot(3, 3, 36, 32);
       const off = columnsOffFloor(grid, 36, 44, 32, 40, 0);
       expect(off, `second bench columns off floor 0 (centres are 38,34 42,34 38,38 42,38): ${off.join(' ')}`).toEqual([]);
@@ -771,7 +771,7 @@ describe('A second bench drilled from a crater floor leaves no pillar at the cen
       const { run, state, grid, tickWhile, shoot } = startBenchSession('desert_badlands', 42);
 
       shoot(3, 3, 36, 32);
-      digRamp(run, state, tickWhile, 'build_ramp start:40,12 end:40,31 depth:8');
+      digRamp(run, state, tickWhile, 'build_ramp start:40,8 end:40,31 depth:8');
       shoot(2, 2, 38, 34);
 
       expect(computeVoxelColumnSurfaceY(grid, 40, 36), 'the centre of the four holes').toBe(0);
@@ -843,13 +843,13 @@ function rampIntoCrater(endZ: number, biome = 'desert_badlands', depth = 8): Cra
   tickWhile(() => state.lastBlastReport !== null, 400);
   expect(state.lastBlastReport).not.toBeNull();
 
-  expect(run(`build_ramp start:40,12 end:40,${endZ} depth:${depth}`)).toMatchObject({ success: true });
+  expect(run(`build_ramp start:40,${Math.min(12, endZ - 23)} end:40,${endZ} depth:${depth}`)).toMatchObject({ success: true });
   // The core may order its own crater-access ramp (#2082) for what the player's ramp leaves stranded;
   // this helper judges only the ramp the player ordered.
   const playerRampIds = new Set(state.plannedRamps.map(r => r.id));
   const playerRamps = (): typeof state.plannedRamps => state.plannedRamps.filter(r => playerRampIds.has(r.id));
   const rampDone = (): boolean => playerRamps().every(r => r.segments.every(s => s.done));
-  tickWhile(rampDone, 2500);
+  tickWhile(rampDone, 4000); // the 20 degree limit makes the ramp ~35% longer than the old 30 degree one (#2045)
   // Classification runs at the start of each employee tick: give it a pass after the last segment.
   for (let i = 0; i < 3; i++) run('tick 1');
   // Stamps clear on the next sweep once the crater is connected; a ramp that never connects it keeps them.
@@ -879,9 +879,11 @@ describe('A ramp ending inside an already-dug crater finishes and connects it (#
   );
 
   it(
-    'control: ending on the crater edge (40,31) finishes with no order out of reach',
+    // Ends 2 tiles inside, not on the edge (40,31): at the 20 degree vehicle limit a ramp stopping on the rim leaves a
+    // lip (0.4 m) its last layer cannot be reached over, and that layer starves behind unresolvable debris orders (#2045).
+    'control: ending 2 tiles inside the crater edge (40,33) finishes with no order out of reach',
     () => {
-      const r = rampIntoCrater(31);
+      const r = rampIntoCrater(33);
       expect(r.allDone).toBe(true);
       expect(r.unreachableSegments).toBe(0);
       expect(r.outOfReach).toBe(0);
@@ -922,7 +924,7 @@ describe('A depth-8 ramp into a red_canyon crater meets the crater floor (#1852)
   it(
     'control: desert_badlands seed 42 at depth 8 stays fully reachable',
     () => {
-      const r = rampIntoCrater(31, 'desert_badlands', 8);
+      const r = rampIntoCrater(33, 'desert_badlands', 8);
       expect(r.allDone).toBe(true);
       expect(r.unreachableSegments).toBe(0);
       expect(r.outOfReach).toBe(0);

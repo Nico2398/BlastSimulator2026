@@ -14,11 +14,11 @@ import {
   proposeRampSpiral, isPitRim, type RampSpiralResult, type SpiralDir, type SpiralSurface,
 } from '../core/mining/RampSpiral.js';
 import {
-  computeRampCost, rampDefFromEndpoints, rampDefFromLegs, rampEndTile, rampFloorDepthAt, rampGradeBoundsDegrees, validateRampOrder,
+  computeRampCost, rampDefFromEndpoints, rampCutSlopeRatio, rampDefFromLegs, rampEndTile, rampFloorDepthAt, rampGradeBoundsDegrees, validateRampOrder,
   type RampDef,
 } from '../core/mining/Ramp.js';
 import { legsFromWaypoints, rampLegsOf, rampPathOf, rampTotalLength, rampWaypoints, type RampLeg } from '../core/mining/RampPath.js';
-import { climbTiersFor, plannedRampGradeDegrees } from '../core/mining/RampGrade.js';
+import { climbForGrade, plannedRampGradeDegrees } from '../core/mining/RampGrade.js';
 import {
   MAX_RAMP_LENGTH, RAMP_DEFAULT_WIDTH, RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_DEPTH_M, RAMP_MAX_DEPTH_M, RAMP_GRADE_STEP_DEGREES, type RampWidth,
 } from '../core/config/balance.js';
@@ -97,7 +97,7 @@ export class RampTool {
    * affordability, drives the clamp.
    */
   private clampDepthToExactRegion(region: TileRegion): void {
-    const rampDef = rampDefFromEndpoints(region.x1, region.z1, region.x2, region.z2, this.depth);
+    const rampDef = rampDefFromEndpoints(region.x1, region.z1, region.x2, region.z2, this.depth, this.cutRatio());
     let depth = this.depth;
     while (depth > 1 && !validateRampOrder({ ...rampDef, targetDepth: depth }, Infinity).success) {
       depth--;
@@ -131,7 +131,7 @@ export class RampTool {
     if (wps.length < 2) return null;
     const exact = this.deps.kit.controller.activeRegion?.exact === true;
     const base = exact
-      ? { ...rampDefFromEndpoints(wps[0]!.x, wps[0]!.z, wps[1]!.x, wps[1]!.z, this.depth), width: this.width }
+      ? { ...rampDefFromEndpoints(wps[0]!.x, wps[0]!.z, wps[1]!.x, wps[1]!.z, this.depth, this.cutRatio()), width: this.width }
       : this.defFromWaypoints(wps);
     if (base === null) return null;
     const grade = this.chosenGrade(this.gradeRange(rampTotalLength(rampLegsOf(base))));
@@ -140,12 +140,18 @@ export class RampTool {
 
   private defFromWaypoints(wps: readonly Tile[]): RampDef | null {
     const legs = legsFromWaypoints(wps);
-    return legs.success ? rampDefFromLegs({ x: legs.originX, z: legs.originZ }, legs.legs, this.depth, this.width) : null;
+    return legs.success ? rampDefFromLegs({ x: legs.originX, z: legs.originZ }, legs.legs, this.depth, this.width, this.cutRatio()) : null;
+  }
+
+  /** Rise per metre of run a ramp is cut at on this site: just under the vehicle limit on a progression site (#2045). */
+  private cutRatio(): number {
+    const state = this.deps.getState();
+    return rampCutSlopeRatio(state !== null && isProgressionSite(state));
   }
 
   /** Whole-and-tenth degrees the grade may take over `totalLength` metres; a lone corner reasons over the longest ramp. */
   private gradeRange(totalLength: number | null): { lo: number; hi: number } {
-    return tenths(rampGradeBoundsDegrees(totalLength ?? MAX_RAMP_LENGTH, this.depth));
+    return tenths(rampGradeBoundsDegrees(totalLength ?? MAX_RAMP_LENGTH, this.depth, this.cutRatio()));
   }
 
   /** The chosen grade clamped into `range`; null while automatic, inert under an exact region, or when no grade fits. Pure. */
@@ -169,19 +175,21 @@ export class RampTool {
     return result;
   }
 
-  /** A chosen grade is proposed as is; an automatic one starts at the gentlest grade and steepens by whole degrees until the pit fits a road. */
+  /** A chosen grade is proposed as is; an automatic one starts at the steepest grade and gentles by whole degrees until the pit fits a road (the steepest fit is the shortest, fastest road). */
   private proposeSpiral(from: Tile, surface: SpiralSurface): RampSpiralResult {
     const ask = (gradeDegrees: number): RampSpiralResult => proposeRampSpiral(
-      { fromX: from.x, fromZ: from.z, depth: this.depth, gradeDegrees, width: this.width, dir: SPIRAL_DIR }, surface,
+      { fromX: from.x, fromZ: from.z, depth: this.depth, gradeDegrees, width: this.width, dir: SPIRAL_DIR, cutSlopeRatio: this.cutRatio() }, surface,
     );
     const { lo, hi } = this.gradeRange(null);
     const chosen = this.chosenGrade({ lo, hi });
     if (chosen !== null) return ask(chosen);
-    let result = ask(lo);
-    for (let g = lo + RAMP_GRADE_STEP_DEGREES; !result.success && g < hi + RAMP_GRADE_STEP_DEGREES; g += RAMP_GRADE_STEP_DEGREES) {
-      result = ask(Math.min(g, hi));
+    const steepest = ask(hi);
+    if (steepest.success) return steepest;
+    for (let g = Math.round((hi - RAMP_GRADE_STEP_DEGREES) * 10) / 10; g >= lo; g = Math.round((g - RAMP_GRADE_STEP_DEGREES) * 10) / 10) {
+      const result = ask(g);
+      if (result.success) return result;
     }
-    return result;
+    return steepest;
   }
 
   private spiralSurfaceAt(wps: readonly Tile[]): SpiralSurface | null {
@@ -245,7 +253,7 @@ export class RampTool {
     let planGrade = 0;
     if (spiral?.success) {
       const p = spiral.proposal;
-      def = { ...rampDefFromLegs({ x: p.originX, z: p.originZ }, p.legs, p.depth, this.width), gradeDegrees: p.gradeDegrees };
+      def = { ...rampDefFromLegs({ x: p.originX, z: p.originZ }, p.legs, p.depth, this.width, this.cutRatio()), gradeDegrees: p.gradeDegrees };
       legsPreview = { originX: p.originX, originZ: p.originZ, legs: p.legs };
       planGrade = p.gradeDegrees;
     } else if (spiral === null) {
@@ -282,7 +290,7 @@ export class RampTool {
     const cost = def === null || totalLength === null ? 0 : (validation?.success ? validation.cost : computeRampCost(totalLength, this.width));
     const readout = def === null || totalLength === null ? [] : describeRampPlan({
       length: totalLength, legs: rampLegsOf(def).length, cost, gradeDeg: planGrade,
-      tiers: progression ? climbTiersFor(planGrade, true) : null,
+      climb: progression ? climbForGrade(planGrade, true) : null,
     });
     const actions: NonNullable<ParamStripConfig['actions']> = [];
     if (!exact && wps.length > 0) {

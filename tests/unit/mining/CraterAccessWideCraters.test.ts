@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { planCraterAccess, type AccessSurface, type StrandedFloor } from '../../../src/core/mining/CraterAccess.js';
 import { MAX_RAMP_LENGTH, RAMP_DEFAULT_WIDTH, RAMP_FLOOR_SNAP_REACH_M } from '../../../src/core/config/balance.js';
-import { slowestVehicleTierSlopeRatio } from '../../../src/core/nav/ClimbLimit.js';
+import { VEHICLE_MAX_SLOPE_RATIO } from '../../../src/core/config/balance.js';
 
 const SITE = 64;
 
@@ -29,7 +29,7 @@ function surface(boxes: readonly Box[], reachable: (x: number, z: number, h: num
 /** The network reaches every cell at or above `level` (the surface and any ramp already dug down to it). */
 const reachesDownTo = (level: number) => (_x: number, _z: number, h: number) => h >= level;
 
-const ratio = () => slowestVehicleTierSlopeRatio();
+const ratio = () => VEHICLE_MAX_SLOPE_RATIO;
 const plan = (floor: StrandedFloor, s: AccessSurface, built: Parameters<typeof planCraterAccess>[5] = []) =>
   planCraterAccess(floor, s, ratio(), RAMP_DEFAULT_WIDTH, [], built);
 

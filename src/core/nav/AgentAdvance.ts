@@ -5,7 +5,7 @@
 // (vehicle occupancy pre-check, employee morale penalty).
 
 import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from './AgentMovement.js';
-import { isStepClimbable, type NavGrid } from './NavGrid.js';
+import { isGridStepClimbable, type NavGrid } from './NavGrid.js';
 import { NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { isImpassable, directLineWalk } from './Pathfinding.js';
 import type { Occupant, AgentOccupancy } from './AgentOccupancy.js';
@@ -626,7 +626,7 @@ function resolveTargetWaypoint(
     // neighbour-expansion call, which measures the same way from consecutive
     // integer cell coordinates.
     const climbLegal = !!standingCell && !!targetCell
-      && isStepClimbable(standingCell.surfaceY, targetCell.surfaceY, Math.hypot(targetCellX - standingCellX, targetCellZ - standingCellZ), maxSlopeRatio);
+      && isGridStepClimbable(navGrid, standingCellX, standingCellZ, targetCellX, targetCellZ, maxSlopeRatio);
     if (blocked || !climbLegal) return adoptFresh();
   }
 
@@ -767,12 +767,11 @@ function firstUnwalkedWaypoint(
   if (!target || target.type === 'blocked' || target.type === 'void') return 1;
   const standingX = navGrid.clampX(x);
   const standingZ = navGrid.clampZ(z);
-  const standing = navGrid.cellAt(standingX, standingZ);
   // `run` is the fixed inter-cell step distance between the standing cell
   // and afterNext (1.0 cardinal, sqrt(2) diagonal), not the agent's raw
   // continuous distance to afterNext — same fix as resolveTargetWaypoint's
   // climb check above (#1166).
-  return isStepClimbable(standing?.surfaceY, target.surfaceY, Math.hypot(afterNext.x - standingX, afterNext.z - standingZ), maxSlopeRatio) ? 2 : 1;
+  return isGridStepClimbable(navGrid, standingX, standingZ, afterNext.x, afterNext.z, maxSlopeRatio) ? 2 : 1;
 }
 
 /**

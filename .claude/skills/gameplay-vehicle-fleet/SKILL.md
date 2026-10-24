@@ -413,17 +413,16 @@ Truck-worked charging stalls (#1660), decisions taken:
 - `releaseDeadHoldersActions` (TickPipeline, before dispatch) returns any claim held by a dead employee to the pool, whatever killed them, so `OrderReachability` re-stamps it (`no_vehicle_in_fleet`, `no_dual_qualified_employee`). A destroyed vehicle already releases its driver's claim through the aborted drive leg.
 - A drive leg blocked by a parked, driverless vehicle crosses it (`handleAgentOccupancyBlock` step 2.5) instead of trying the avoid-all reroute first: plain drive pathing repaths every tick through the parked vehicle, so a reroute step was undone next tick and reset the stuck counters, never reaching `MOVE_STUCK_ABANDON_TICKS`. Parking the truck clear of the blast zone is out of scope.
 
-## Tier slope limit (#1938)
+## Vehicle slope limit (#1938, #2045)
 
-On progression sites (`state.grade !== undefined`) a vehicle climbs at most its tier's slope: tier 1 30°, tier 2 24°, tier 3 18° (`VEHICLE_TIER_MAX_SLOPE_DEGREES`), for every role. Walking and non-progression sites stay at 30°.
+On progression sites (`state.grade !== undefined`) every vehicle, of every role and tier, climbs at most 20° (`VEHICLE_MAX_SLOPE_DEGREES`): upgrading never makes a vehicle worse, and the need for a spiral haul road comes from pit depth, not tier. Walking and non-progression sites (campaign) stay at 30°.
 
-- `vehicleMaxSlopeRatio(vehicle, progression)` (`Vehicle.ts`) is the one helper. `planItinerary` drive legs (`estimateLegDistance`'s `maxSlopeRatio`, ride alight point) and `Locomotion` drive legs (routes, reroutes, `advanceAlongPath`) both call it; foot legs always use 30°. Spawn on a progression sandbox (#2044): the rally flag, every starting building and vehicle share one component driveable at the slowest tier (`slowestVehicleTierSlopeRatio`, 18°) that reaches the first-blast target; campaign levels keep 30° placement.
-- `PathRequest.maxSlopeRatio` carries it into `findPath`; reachability caches are keyed by clearance and ratio. `fillPool` groups usable vehicles by ratio and unions the per-ratio sets: the best climber decides.
-- A vehicle order unreachable on a progression site but reachable at 30° keeps `blockedReason: 'target_unreachable'` and gets `PendingAction.blockedDetail` (`order.blocked.ramp_too_steep`) naming the steepest blocking ramp: "Ramp #3 is 30°: too steep for a tier-3 hauler (max 18°)." The detail is cleared once the order is reachable.
-- The ramp inspector shows grade and the tiers that climb it (`describeRampClimb`, `RampGrade.ts`).
+- `vehicleMaxSlopeRatio(progression)` (`Vehicle.ts`) is the one helper. `planItinerary` drive legs (`estimateLegDistance`'s `maxSlopeRatio`, ride alight point) and `Locomotion` drive legs (routes, reroutes, `advanceAlongPath`) both call it; foot legs always use 30°. Spawn on a progression sandbox (#2044): the rally flag, every starting building and vehicle share one component driveable at the vehicle limit that reaches the first-blast target; campaign levels keep 30° placement.
+- `PathRequest.maxSlopeRatio` carries it into `findPath`; reachability caches are keyed by clearance and ratio; `fillPool` uses the site's single ratio.
+- No diagonal shortcut (`stepClimbRun`, see `gameplay-navmesh`): a nominal 20° means 20° along a ramp's axis. A straight ramp at the ceiling (about 19.6°, `rampCutSlopeRatio`) needs about 2.75 m of road per metre of depth.
+- A vehicle order unreachable on a progression site but reachable at 30° keeps `blockedReason: 'target_unreachable'` and gets `PendingAction.blockedDetail` (`order.blocked.ramp_too_steep`, params `id`, `grade`, `max`) naming the steepest blocking ramp: "Ramp #3 is 26°: too steep for vehicles (max 20°)." The detail is cleared once the order is reachable.
+- The ramp inspector shows grade and one climbable line (`describeRampClimbability`, `RampGrade.ts`): "Vehicles can climb it (max 20°)" or "Too steep for vehicles (max 20°)".
 - Console: `employee assign_skill <id> skill:driving.<role> level:N licence:1-3` sets the driver's licence level.
-
-**Decision (#1938): per-step limit, diagonals included.** A diagonal step over an x-graded ramp has grade `atan(tan g / sqrt(2))`, so ramps at least 2 cells wide are climbable by a diagonal zigzag up to about `tan(limit) * sqrt(2)`. The inspector grade is the steepest cardinal step; its tiers line is conservative. Recorded decision (see `gameplay-navmesh`).
 
 ## Dealer grade gate (#1928)
 

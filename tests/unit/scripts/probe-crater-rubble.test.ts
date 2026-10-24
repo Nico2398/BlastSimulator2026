@@ -1,10 +1,8 @@
-// #2062: craterRubbleCounts classifies on-ground crater fragments in one pass; fleetClimbRatio is the slowest hauler's ratio.
+// #2062: craterRubbleCounts classifies on-ground crater fragments in one pass.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
-import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
-import { tierSlopeRatio } from '../../../src/core/nav/ClimbLimit.js';
 
 // sealedFragmentIdsOf reads a per-state WeakMap filled by a dispatch pass; the test controls it directly.
 let sealedIds: ReadonlySet<number> | undefined;
@@ -13,7 +11,7 @@ vi.mock('../../../src/core/economy/HaulDispatch.js', async importOriginal => {
   return { ...actual, sealedFragmentIdsOf: () => sealedIds };
 });
 
-const { craterRubbleCounts, fleetClimbRatio } = await import('../../../scripts/shared/probe-strategies.js');
+const { craterRubbleCounts } = await import('../../../scripts/shared/probe-strategies.js');
 
 const crater = { x: 10, z: 10, span: 8 };
 
@@ -145,31 +143,5 @@ describe('craterRubbleCounts blocked orders (#2062)', () => {
     sealedIds = given;
     craterRubbleCounts(state, crater);
     expect([...given]).toEqual([99]);
-  });
-});
-
-describe('fleetClimbRatio', () => {
-  const vehicle = (id: number, type: Vehicle['type'], tier: Vehicle['tier']): Vehicle =>
-    ({ id, type, tier, x: 0, z: 0, hp: 100 }) as unknown as Vehicle;
-
-  it('tier 1 ratio when the fleet has no haulers', () => {
-    expect(fleetClimbRatio([])).toBe(tierSlopeRatio(1));
-    expect(fleetClimbRatio([vehicle(1, 'drill_rig', 3)])).toBe(tierSlopeRatio(1));
-  });
-
-  it('the hauler tier ratio for a single hauler', () => {
-    expect(fleetClimbRatio([vehicle(1, 'debris_hauler', 2)])).toBe(tierSlopeRatio(2));
-  });
-
-  it('the slowest hauler tier decides, not the best', () => {
-    const fleet = [vehicle(1, 'debris_hauler', 1), vehicle(2, 'debris_hauler', 2)];
-    // Tier 1 climbs 30deg, tier 2 only 24deg: the lower-tier-ratio hauler limits the fleet.
-    expect(tierSlopeRatio(2)).toBeLessThan(tierSlopeRatio(1));
-    expect(fleetClimbRatio(fleet)).toBe(tierSlopeRatio(2));
-  });
-
-  it('non-hauler tiers do not lower or raise the ratio', () => {
-    const fleet = [vehicle(1, 'debris_hauler', 2), vehicle(2, 'drill_rig', 1)];
-    expect(fleetClimbRatio(fleet)).toBe(tierSlopeRatio(2));
   });
 });

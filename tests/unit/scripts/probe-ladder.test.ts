@@ -13,13 +13,11 @@ import type { BuyRule, LadderShot } from '../../../scripts/shared/probe-ladder.j
 import {
   DRILL_HOLE_DIAMETER_OPTIONS_M,
   PERMIT_LIMITS,
-  VEHICLE_TIER_MAX_SLOPE_DEGREES,
   VEHICLE_TIER_UNLOCK_GRADE,
 } from '../../../src/core/config/balance.js';
 
 const BASE: LadderShot = { rows: 3, cols: 3, spacing: 4, depth: 5, kgPerHole: 4, stemming: 2.5, diameterM: 0.089 };
 const WIDE = 0.165;
-const slopeRatio = (deg: number) => Math.tan((deg * Math.PI) / 180);
 
 describe('limitSizedShot', () => {
   for (const grade of [0, 1, 2, 3, 4, 5]) {
@@ -84,29 +82,24 @@ describe('pickDiameter', () => {
   });
 });
 
-describe('mayBuyVehicleTier', () => {
-  it('allows tier 1 at grade 0 with no ramp', () => {
-    expect(mayBuyVehicleTier(1, 0, null)).toBe(true);
+describe('mayBuyVehicleTier (#2045: one slope limit, no ramp argument)', () => {
+  it('allows tier 1 at grade 0', () => {
+    expect(mayBuyVehicleTier(1, 0)).toBe(true);
   });
 
   it('refuses a tier below its unlock grade', () => {
-    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2] - 1, slopeRatio(10))).toBe(false);
-    expect(mayBuyVehicleTier(3, VEHICLE_TIER_UNLOCK_GRADE[3] - 1, slopeRatio(10))).toBe(false);
+    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2] - 1)).toBe(false);
+    expect(mayBuyVehicleTier(3, VEHICLE_TIER_UNLOCK_GRADE[3] - 1)).toBe(false);
   });
 
-  it('refuses tier 2 and 3 with no ramp even when unlocked', () => {
-    expect(mayBuyVehicleTier(2, 5, null)).toBe(false);
-    expect(mayBuyVehicleTier(3, 5, null)).toBe(false);
+  it('allows an unlocked tier whatever ramp exists: upgrading never makes a vehicle worse', () => {
+    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2])).toBe(true);
+    expect(mayBuyVehicleTier(3, VEHICLE_TIER_UNLOCK_GRADE[3])).toBe(true);
+    expect(mayBuyVehicleTier(3, 5)).toBe(true);
   });
 
-  it('refuses a ramp steeper than the tier slope limit', () => {
-    expect(mayBuyVehicleTier(2, 5, slopeRatio(VEHICLE_TIER_MAX_SLOPE_DEGREES[2] + 3))).toBe(false);
-    expect(mayBuyVehicleTier(3, 5, slopeRatio(VEHICLE_TIER_MAX_SLOPE_DEGREES[3] + 3))).toBe(false);
-  });
-
-  it('allows an unlocked tier on a gentle ramp', () => {
-    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2], slopeRatio(10))).toBe(true);
-    expect(mayBuyVehicleTier(3, VEHICLE_TIER_UNLOCK_GRADE[3], slopeRatio(10))).toBe(true);
+  it('takes exactly two parameters', () => {
+    expect(mayBuyVehicleTier.length).toBe(2);
   });
 });
 

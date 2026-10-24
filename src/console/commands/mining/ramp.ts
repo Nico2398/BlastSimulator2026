@@ -4,8 +4,9 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame } from './shared.js';
+import { isProgressionSite } from '../../../core/state/GameState.js';
 import {
-  validateRampOrder, defineRampSegments, rampDefFromEndpoints, rampWidthOf,
+  validateRampOrder, defineRampSegments, rampCutSlopeRatio, rampDefFromEndpoints, rampWidthOf,
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
 import { proposeRampSpiral, spiralSurfaceFrom, type RampSpiralProposal, type RampSpiralResult, type SpiralDir, type SpiralRequest } from '../../../core/mining/RampSpiral.js';
@@ -81,6 +82,7 @@ export function buildRampCommand(
 /** Validates, claims and queues the ordered `rampDef` (straight or multi-leg); the shared tail of every ramp order form. */
 function orderRampDef(ctx: MiningContext, rampDef: RampDef): CommandResult {
   const { direction, length } = rampDef;
+  rampDef.cutSlopeRatio = rampCutSlopeRatio(isProgressionSite(ctx.state!));
 
   // validateRampOrder runs first, before rampFootprint/cellsInRect build any
   // array — its finite/positive and MAX_RAMP_LENGTH checks are the sole
@@ -153,7 +155,7 @@ function spiralRampCommand(
   const dir: SpiralDir = rawDir;
   const grid = ctx.grid!;
   const area = ctx.playableArea;
-  const request: SpiralRequest = { fromX: from.x, fromZ: from.z, depth, gradeDegrees: grade, width, dir };
+  const request: SpiralRequest = { fromX: from.x, fromZ: from.z, depth, gradeDegrees: grade, width, dir, cutSlopeRatio: rampCutSlopeRatio(isProgressionSite(ctx.state!)) };
   const result: RampSpiralResult = proposeRampSpiral(request, spiralSurfaceFrom(grid, area));
   if (!result.success) return { success: false, output: t(result.reasonKey, result.params) };
   const p: RampSpiralProposal = result.proposal;

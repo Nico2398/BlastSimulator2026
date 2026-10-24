@@ -1382,9 +1382,9 @@ describe('roleShortfall (#1820)', () => {
 });
 
 
-// ── Slope-limited vehicles: the order says which ramp is too steep (#1938) ─────
+// ── One slope limit for every vehicle: the order says which ramp is too steep (#1938, #2045) ─────
 
-describe('unreachable vehicle orders name the blocking ramp (#1938)', () => {
+describe('unreachable vehicle orders name the blocking ramp (#1938, #2045)', () => {
   const RIG_ORDER = { requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig' } as const;
   const licence = ROLE_LICENCE_REQUIRED.drill_rig;
   const FLOOR = { x: 1, z: bandCentreZ(0) };
@@ -1403,32 +1403,33 @@ describe('unreachable vehicle orders name the blocking ramp (#1938)', () => {
     queue(state, 'drill_hole', at, { ...RIG_ORDER, payload: { depth: 12 } });
   const actionOf = (state: GameState, id: number) => state.pendingActions.find(a => a.id === id)!;
 
-  it('a tier-3 rig behind a 30 degree ramp: blocked, and the detail names the ramp, its grade, the tier and the limit', () => {
-    const state = pit([30]);
+  it('a rig behind a 26 degree ramp, zigzag included: blocked, and the detail names the ramp, its grade and the 20 degree limit', () => {
+    const state = pit([26]);
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 3);
     const id = orderOn(state);
     classifyQueuedOrders(state);
     const action = actionOf(state, id);
     expect(action.blockedReason).toBe('target_unreachable');
     expect(action.blockedDetail?.key).toBe('order.blocked.ramp_too_steep');
-    expect(action.blockedDetail?.params).toMatchObject({ id: 1, grade: 30, tier: 3, max: 18 });
-    expect(typeof action.blockedDetail?.params.role).toBe('string');
+    expect(action.blockedDetail?.params).toMatchObject({ id: 1, grade: 26, max: 20 });
+    expect(action.blockedDetail?.params).not.toHaveProperty('tier');
+    expect(Object.keys(action.blockedDetail!.params).sort()).toEqual(['grade', 'id', 'max']);
   });
 
-  it('the detail renders as the player-facing sentence', () => {
+  it('the detail renders as the player-facing sentence, naming no tier', () => {
     setLocale('en');
-    const state = pit([30]);
+    const state = pit([26]);
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 3);
     const id = orderOn(state);
     classifyQueuedOrders(state);
     const { key, params } = actionOf(state, id).blockedDetail!;
     const text = t(key, params);
-    expect(text).toContain('Ramp #1 is 30°: too steep for a tier-3 ');
-    expect(text).toContain('(max 18°).');
+    expect(text).toBe('Ramp #1 is 26°: too steep for vehicles (max 20°).');
+    expect(text).not.toMatch(/tier/i);
   });
 
   it('classifyNewOrder stamps the detail on a fresh order before any tick', () => {
-    const state = pit([30]);
+    const state = pit([26]);
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 3);
     const id = orderOn(state);
     delete state.pendingActions.find(a => a.id === id)!.blockedDetail;
@@ -1436,13 +1437,32 @@ describe('unreachable vehicle orders name the blocking ramp (#1938)', () => {
     expect(actionOf(state, id).blockedDetail?.key).toBe('order.blocked.ramp_too_steep');
   });
 
-  it('names the tier and limit of the best vehicle available: a tier-2 rig reads 24 degrees', () => {
-    // 34 degrees, not 30: a diagonal step over the 3-wide corridor climbs at tan(34)/sqrt2 = 25.5 degrees, which tier 2 would still manage on a 30 degree ramp (22 degrees).
-    const state = pit([34]);
-    purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 2);
+  for (const tier of [1, 2, 3] as const) {
+    it(`a tier-${tier} rig is blocked by a 26 degree ramp with the same 20 degree limit`, () => {
+      const state = pit([26]);
+      purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, tier);
+      const id = orderOn(state);
+      classifyQueuedOrders(state);
+      expect(actionOf(state, id).blockedReason).toBe('target_unreachable');
+      expect(actionOf(state, id).blockedDetail?.params).toMatchObject({ id: 1, grade: 26, max: 20 });
+    });
+
+    it(`a tier-${tier} rig takes a 20 degree ramp: no block, no detail`, () => {
+      const state = pit([20]);
+      purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, tier);
+      const id = orderOn(state);
+      classifyQueuedOrders(state);
+      expect(actionOf(state, id).blockedReason ?? null).toBeNull();
+      expect(actionOf(state, id).blockedDetail ?? null).toBeNull();
+    });
+  }
+
+  it('a tier-1 rig no longer takes a 30 degree ramp on a progression site', () => {
+    const state = pit([30]);
+    purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 1);
     const id = orderOn(state);
     classifyQueuedOrders(state);
-    expect(actionOf(state, id).blockedDetail?.params).toMatchObject({ id: 1, grade: 34, tier: 2, max: 24 });
+    expect(actionOf(state, id).blockedReason).toBe('target_unreachable');
   });
 
   it('names the steepest of several blocking ramps', () => {
@@ -1450,67 +1470,33 @@ describe('unreachable vehicle orders name the blocking ramp (#1938)', () => {
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 3);
     const id = orderOn(state);
     classifyQueuedOrders(state);
-    expect(actionOf(state, id).blockedDetail?.params).toMatchObject({ id: 2, grade: 30 });
+    expect(actionOf(state, id).blockedDetail?.params).toMatchObject({ id: 2, grade: 30, max: 20 });
   });
 
-  it('a tier-1 rig takes the 30 degree ramp as today: no block, no detail', () => {
-    const state = pit([30]);
-    purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 1);
-    const id = orderOn(state);
-    classifyQueuedOrders(state);
-    expect(actionOf(state, id).blockedReason ?? null).toBeNull();
-    expect(actionOf(state, id).blockedDetail ?? null).toBeNull();
-  });
-
-  it('digging a gentle ramp clears the block and the detail', () => {
-    const state = pit([30]);
+  it('digging a 20 degree ramp clears the block and the detail', () => {
+    const state = pit([26]);
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 3);
     const id = orderOn(state);
     classifyQueuedOrders(state);
     expect(actionOf(state, id).blockedDetail).toBeDefined();
 
-    installGradedRamps(state, [30, 15]);
+    installGradedRamps(state, [26, 20]);
     classifyQueuedOrders(state);
     expect(actionOf(state, id).blockedReason ?? null).toBeNull();
     expect(actionOf(state, id).blockedDetail ?? null).toBeNull();
   });
 
-  it('a mixed fleet is judged by its best climber: tier 1 beside tier 3 reaches over the steep ramp', () => {
-    const state = pit([30]);
+  it('a mixed fleet shares one limit: tier 1 beside tier 3 are both stopped by a 26 degree ramp', () => {
+    const state = pit([26]);
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 3);
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x + 1, FLOOR.z, 1);
     const id = orderOn(state);
-    classifyQueuedOrders(state);
-    expect(actionOf(state, id).blockedReason ?? null).toBeNull();
-    expect(actionOf(state, id).blockedDetail ?? null).toBeNull();
-  });
-
-  it('buying the tier-1 rig later flips a stale tier-3 verdict: reachability is cached per limit, not shared', () => {
-    const state = pit([30]);
-    purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 3);
-    const id = orderOn(state);
-    classifyQueuedOrders(state);
-    expect(actionOf(state, id).blockedReason).toBe('target_unreachable');
-    purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x + 1, FLOOR.z, 1);
-    classifyQueuedOrders(state);
-    expect(actionOf(state, id).blockedReason ?? null).toBeNull();
-    expect(judgeQueuedOrders(state).get(id)).toBe('reachable');
-  });
-
-  it('and the other way: judging with the tier-1 rig first does not leak its limit to a later tier-3-only fleet', () => {
-    const state = pit([30]);
-    const { vehicle: first } = purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 1);
-    const id = orderOn(state);
-    classifyQueuedOrders(state);
-    expect(judgeQueuedOrders(state).get(id)).toBe('reachable');
-    state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== first.id);
-    purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 3);
     classifyQueuedOrders(state);
     expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
   });
 
-  it('a second pass over an unchanged grid relabels nothing, per-limit labellings included', () => {
-    const state = pit([30]);
+  it('a second pass over an unchanged grid relabels nothing', () => {
+    const state = pit([26]);
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 3);
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x + 1, FLOOR.z, 1);
     orderOn(state);
@@ -1521,7 +1507,17 @@ describe('unreachable vehicle orders name the blocking ramp (#1938)', () => {
     expect(fills.count).toBe(0);
   });
 
-  it('a campaign site gives no ramp reason: the tier-3 rig climbs 30 degrees', () => {
+  it('a mixed fleet costs one vehicle labelling, not one per tier', () => {
+    const state = pit([20]);
+    for (const tier of [1, 2, 3] as const) purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x + tier, FLOOR.z, tier);
+    orderOn(state);
+    fills.count = 0; fills.labels = 0;
+    classifyQueuedOrders(state);
+    // employee labelling + one vehicle labelling at most
+    expect(fills.labels).toBeLessThanOrEqual(2);
+  });
+
+  it('a campaign site gives no ramp reason: the rig climbs 30 degrees', () => {
     const state = pit([30], { campaign: true });
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 3);
     const id = orderOn(state);

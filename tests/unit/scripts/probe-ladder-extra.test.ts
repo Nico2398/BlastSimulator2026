@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { floorToKgResolution, mayBuyVehicleTier, shouldBench } from '../../../scripts/shared/probe-ladder.js';
 import { formatGradeSummary } from '../../../scripts/shared/probe-report.js';
 import { VEHICLE_TIER_UNLOCK_GRADE } from '../../../src/core/config/balance.js';
-import { tierSlopeRatio } from '../../../src/core/nav/ClimbLimit.js';
 import type { RunResult } from '../../../scripts/shared/probe-metrics.js';
 
 function run(grades: Record<number, number>, cash: Record<number, number>): RunResult {
@@ -47,15 +46,11 @@ describe('shouldBench', () => {
 });
 
 describe('mayBuyVehicleTier boundaries', () => {
-  it('allows a ramp at exactly the tier slope limit, refuses just above', () => {
-    const limit = tierSlopeRatio(2);
-    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2], limit)).toBe(true);
-    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2], limit + 1e-6)).toBe(false);
-  });
-
   it('unlocks at exactly the unlock grade, not one below', () => {
-    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2] - 1, 0)).toBe(false);
-    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2], 0)).toBe(true);
+    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2] - 1)).toBe(false);
+    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2])).toBe(true);
+    expect(mayBuyVehicleTier(3, VEHICLE_TIER_UNLOCK_GRADE[3] - 1)).toBe(false);
+    expect(mayBuyVehicleTier(3, VEHICLE_TIER_UNLOCK_GRADE[3])).toBe(true);
   });
 });
 

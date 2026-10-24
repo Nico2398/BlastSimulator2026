@@ -9,7 +9,7 @@ import {
 } from '../config/balance.js';
 import { isProgressionSite, type GameState, type RampFootprint } from '../state/GameState.js';
 import { getOperatingCostPerHour } from '../economy/OperatingFinance.js';
-import { slowestVehicleTierSlopeRatio } from '../nav/ClimbLimit.js';
+import { VEHICLE_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { clusterStrandedFloors, planCraterAccess, type AccessSurface, type StrandedFloor } from '../mining/CraterAccess.js';
 import { defineRampSegments } from '../mining/Ramp.js';
 import { rampFootprint } from '../mining/RampWidening.js';
@@ -92,7 +92,7 @@ export function syncCraterAccess(state: GameState, grid?: VoxelGrid | null): voi
   let affordabilityBlocked = false;
   const unplannable: StrandedFloor[] = [];
   for (const floor of floors) {
-    const plan = planCraterAccess(floor, surface, slowestVehicleTierSlopeRatio(), RAMP_DEFAULT_WIDTH, avoid, state.builtRamps);
+    const plan = planCraterAccess(floor, surface, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH, avoid, state.builtRamps);
     if (!plan.ok) { unplannable.push(floor); continue; }
     if (state.cash - plan.cost < reserve) { affordabilityBlocked = true; continue; }
     const segments = defineRampSegments(grid, plan.def);
