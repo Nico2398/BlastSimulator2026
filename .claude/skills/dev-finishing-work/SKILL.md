@@ -16,7 +16,7 @@ The Verification Gate in the entry point decides *which* channels a change owes.
 
 ## ▶ PROCEDURE — the finish line
 
-1. **Run every channel the change touches.** The Verification Gate names them; run the ones the change earns, not the cheapest one.
+1. **Run every channel the change touches.** The Verification Gate names them; run the ones the change earns, not the cheapest one. `npm run pipeline -- verify` reads the branch's diff, runs exactly the non-visual channels it owes, skips any already green on this committed tree, and prints one line per channel with an excerpt of a failure — the logs stay in `.agentic/verify/logs/`. It outlives one Bash call on a code change: start it through `npm run long`.
 2. **Hand the browser-heavy channels to CI** — see the ownership table below. A channel CI owns is covered, never pending.
 3. **Commit and push** to the branch this work belongs on.
 4. **Open the pull request** if none is open, laid out per `.github/pull_request_template.md` — or `.github/PULL_REQUEST_TEMPLATE/pipeline.md` in a pipeline run (`agentic-pipeline-finalization`) — and apply the labels the change earns.
@@ -35,7 +35,7 @@ Steps 5 and 6 are where a finished-looking change stops being finished. Everythi
 | `build` (production bundle) | CI job `Production build`, on every push and pull request. |
 | All scenarios in interaction mode | CI job `Scenarios (interaction mode)`, sharded, on every push and pull request. |
 
-Locally, run one named definition you are actively debugging. Never the whole interaction-mode suite: without a GPU the terrain material costs ~6 s **per frame** in software rasterisation (#475), and the browser harnesses wait a full frame per probe, so one player action costs tens of seconds and one scenario beat costs minutes. Level loading is cheap by comparison (a `new_game` is ~4 s, a campaign start ~16 s), and the simulation itself is not the cost — turning ticking off changes the frame by 1.7%. Do not go looking for it in world size, navgrid rebuilds, or terrain generation.
+Locally, run one named definition you are actively debugging. Never the whole interaction-mode suite: without a GPU the terrain material costs ~6 s **per frame** in software rasterisation, and the browser harnesses wait a full frame per probe, so one player action costs tens of seconds and one scenario beat costs minutes. Level loading is cheap by comparison (a `new_game` is ~4 s, a campaign start ~16 s), and the simulation itself is not the cost. Do not go looking for it in world size, navgrid rebuilds, or terrain generation.
 
 ## Every CI job runs on every pull request
 
@@ -52,13 +52,6 @@ Read it one of two ways:
 
 **`mergeable_state` is not a CI verdict.** It describes mergeability, and it reads `unstable` for a pull request whose checks are merely still running — which looks exactly like a pull request whose checks failed. A run that reads the merge state, calls it "still settling", and reports the work done has not read CI at all.
 
-Two pull requests paid for this rule:
-
-| PR | What the session did | Cost |
-|----|----------------------|------|
-| #581 | Green on every channel it ran locally, marked `READY TO MERGE`, ended. | Two interaction shards red. Issue #552 held the queue until a human looked. |
-| #888 | Opened the PR, labelled it, read `mergeable_state: "unstable"`, called it settling, reported success. | One interaction shard red — on the run's own new scenario. Found only because a human asked. |
-
 ## ▶ Driving a red CI green
 
 Pull the failing job's logs and read the actual assertion before touching anything. Then:
@@ -68,7 +61,7 @@ Pull the failing job's logs and read the actual assertion before touching anythi
 3. **"Flake" is not a root cause.** Re-run a job only to confirm that first case, or if it died before any test body ran (checkout, install, runner loss). At most once. A second failure is real.
 4. **Never skip, disable, or quarantine a test to reach green**, and never push an empty commit to kick CI.
 
-**A margin that holds in your sandbox is not a margin that holds in CI.** The environments differ in ways that decide timing-sensitive assertions: browser version, and one shared browser across a whole shard against a dedicated one per local run. PR #888's own new scenario asserted a scroll position immediately after dispatching a wheel event — `page.mouse.wheel()` resolving does not mean Chrome has committed the scroll, since it can land on the compositor thread after the CDP call returns. It passed every local run and failed CI reproducibly. When an assertion depends on the browser having settled, make it wait for that explicitly rather than relying on a margin that happens to hold locally.
+**A margin that holds in your sandbox is not a margin that holds in CI.** The environments differ in ways that decide timing-sensitive assertions: browser version, and one shared browser across a whole shard against a dedicated one per local run. `page.mouse.wheel()` resolving does not mean Chrome has committed the scroll, since it can land on the compositor thread after the CDP call returns. When an assertion depends on the browser having settled, make it wait for that explicitly rather than relying on a margin that happens to hold locally.
 
 Before pushing a fix, reproduce the original failure, then show the same check passing. Keep the fix minimal. One validated push beats three speculative ones.
 
@@ -83,3 +76,5 @@ Before pushing a fix, reproduce the original failure, then show the same check p
 State which channels ran and what each showed — in the pull request body, that is the `## Verification` section the default and pipeline templates both carry. A channel handed to CI is reported by CI's result, once read. A channel that could not run at all is named as unproven, with the reason — never as passed, and never substituted with a weaker artifact (a state dump standing in for an image nobody inspected).
 
 "Tests pass" is not a verification report for a change that was visual, and "CI looks fine" is not a CI report. Name the jobs and their conclusions.
+
+History: docs/context-history/dev-finishing-work.md

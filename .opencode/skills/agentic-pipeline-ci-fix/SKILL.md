@@ -8,12 +8,12 @@ description: >
   [await-ci] step reports RED.
 ---
 
-## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
-The pull request already exists, its branch already carries the work, and its issue is already `in-progress`. **Nothing here is rebuilt.** No planner, no skeleton, no TDD cycle, no new branch, no second PR.
+The pull request already exists, its branch already carries the work, and its issue is already `in-progress`. **Nothing here is rebuilt.** No plan, no skeleton, no TDD cycle, no new branch, no second PR. The lead diagnoses and fixes; the only delegation is @visual-tester, for a failure only screenshots can explain.
 
 ```
-[ ] = orchestrator-executed command  |  @agent = AI agent invocation
+[ ] = a step the lead runs itself  |  @agent = a delegation
 
  1. [scope]        → Read the trigger comment for the PR number, and whether it names
                        failing jobs or a conflict with `main` (the conflict variant, below).
@@ -33,17 +33,18 @@ The pull request already exists, its branch already carries the work, and its is
                        command-mode `scenario`. One named definition, never the whole suite.
                        A channel that needs a GPU is not reproducible here — say so and work
                        from the log. Failure to reproduce is not evidence the failure is not real.
- 5. @fixer         → A test or a baked expectation disagreeing with the change.
-    @implementer   → A defect in the change itself.
-    @visual-tester → A rendering or click-reachability claim.
-                       Pick by what the log says, not by which is cheapest.
- 6. [verify]       → Every channel the fix touches, per the Verification Gate. Then commit.
-                       Never `[skip ci]` — `agentic-pipeline-pr-management`.
+ 5. [fix]          → Decide from the log which side is wrong — the change, or a test or
+                       baked expectation it legitimately moved — and fix that side.
+                       A rendering or click-reachability claim → @visual-tester reads the
+                       screenshots first, and reports what it sees.
+ 6. [verify]       → `npm run pipeline -- verify` — every channel the fix touches. Then
+                       commit. Never `[skip ci]` — `agentic-pipeline-pr-management`.
  7. [push]         → `git pull --no-rebase origin <head> && git push origin <head>`, or
                        rebase onto `origin/main` and `git push --force-with-lease`.
                        The merge gate may have merged `main` into the branch since the
                        checkout. Never a bare `--force`.
- 8. [await-ci]     → `npm run ci:await -- --pr <number>`. RED → back to step 3.
+ 8. [await-ci]     → `npm run long -- start ci -- npm run ci:await -- --pr <number>`, then
+                       `npm run long -- wait ci` until FINISHED. RED → back to step 3.
                        GREEN → done: the merge gate takes the PR from here.
 ```
 
@@ -54,8 +55,8 @@ The pull request already exists, its branch already carries the work, and its is
 The merge gate merges a pull request only on a head that contains `main`'s tip, and brings a green head that is behind up to date on its own. It cannot do that for a head that conflicts with `main` — only an agent can — so the fail-safe hands it back with the base tip named. Replace steps 3 to 5 with:
 
 1. `git fetch origin main && git merge origin/main`. Nothing to merge, or it merges cleanly → someone resolved it first: skip to step 8.
-2. Delegate the conflicted files to `@conflict-resolver`. Both sides' intent survives: this branch's change applied on top of what landed on `main`, never one side dropped. Lockfiles and generated files are regenerated with their tooling, never hand-merged. A mirrored context file is resolved once and the result copied to all three runtime directories.
-3. Commit the merge, then continue at step 6 — `typecheck`, `test`, and `validate:context` when a context file conflicted, plus any channel the other side's change touches in files this branch changes.
+2. Resolve the conflicted files so both sides' intent survives: this branch's change applied on top of what landed on `main`, never one side dropped. Lockfiles and generated files are regenerated with their tooling, never hand-merged. A mirrored context file is resolved once and the result copied to all three runtime directories.
+3. Commit the merge, then continue at step 6 — `verify` reads the merged diff, so it runs the channels both sides' changes owe.
 
 A conflict that can only be resolved by choosing between two behaviours is a decision, not a merge: comment what the two sides want, convert the PR to a draft, label the issue `blocked`, stop with `ESCALATED: conflict with main needs a decision`.
 

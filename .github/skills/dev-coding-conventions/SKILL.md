@@ -29,12 +29,12 @@ is argued rather than looked up: `dev-design-principles`.
 - **Functional style** in `src/core/` — prefer pure functions, avoid mutation
 - **Interfaces over classes** for data structures; **classes** for stateful systems
 - **Named exports** — no default exports except entry points
-- **Single responsibility, not line count.** A code file under `src/` or `scripts/` holds one concern; split it when it doesn't, whatever its length. No lint test owns this — it is a judgment call for the author and, on review, for `@quality-reviewer`/`@refactorer`. A short file mixing two unrelated concerns is a split; a long file holding one genuinely cohesive concern (a data table, a catalog) is not. This applies to `src/core/config/balance.ts`, `src/ui/tokens.ts`, and `src/ui/styles.ts` too — their size tracks how much game content exists, not how many responsibilities the module carries. Tests are outside this call as well: a test file grows one independent case at a time, so its length carries no cohesion signal, and splitting one mints the near-duplicate fixtures a duplication review then flags.
+- **Single responsibility, not line count.** A code file under `src/` or `scripts/` holds one concern; split it when it doesn't, whatever its length. No lint test owns this — it is a judgment call for the author and, on review, for the reviewer. A short file mixing two unrelated concerns is a split; a long file holding one genuinely cohesive concern (a data table, a catalog) is not. This applies to `src/core/config/balance.ts`, `src/ui/tokens.ts`, and `src/ui/styles.ts` too — their size tracks how much game content exists, not how many responsibilities the module carries. Tests are outside this call as well: a test file grows one independent case at a time, so its length carries no cohesion signal, and splitting one mints the near-duplicate fixtures a duplication review then flags.
 - **Comments:** Document non-obvious algorithms. Don't comment obvious code.
 - **`TODO(#N)` — every TODO names its issue.** A bare `TODO` is debt with no owner and no queue position; `TODO(#N)` is debt an issue will come back and remove. Write what to do when #N lands, not just what is wrong, and say so on the line when the workaround degrades behaviour:
 
   ```ts
-  // TODO(#742): SurveyPanel re-reads the grid every tick. Cache once #742 lands.
+  // TODO(#N): SurveyPanel re-reads the grid every tick. Cache once #N lands.
   const composition = grid.compositionAt(x, y); // recomputed per frame until then
   ```
 
@@ -84,7 +84,7 @@ Concrete measures below; the general rule for how cost must scale as the game gr
 - Marching cubes recalculation localized — only recompute chunks near blast
 - Fragment count capped per blast (max 2000) to avoid physics overload
 - Event system timers use delta-time accumulation, not setTimeout
-- A UI element that must delay by real wall-clock time (not simulation ticks — e.g. letting an animation play before a modal opens) gates on rendered time the renderer already measures (a capped-dt playback clock passed in as a snapshot), never on wall-clock timers: wall time and rendered time diverge without a GPU. The snapshot names what it is timing, and the consumer checks it is its own before trusting the clock — the state can run frames ahead of the renderer, and an earlier, long-finished playback otherwise reads as done. Tests pass a snapshot instead of waiting. See `BlastReportModal` and `isBlastReportDue` (#1590).
+- A UI element that must delay by real wall-clock time (not simulation ticks — e.g. letting an animation play before a modal opens) gates on rendered time the renderer already measures (a capped-dt playback clock passed in as a snapshot), never on wall-clock timers: wall time and rendered time diverge without a GPU. The snapshot names what it is timing, and the consumer checks it is its own before trusting the clock — the state can run frames ahead of the renderer, and an earlier, long-finished playback otherwise reads as done. Tests pass a snapshot instead of waiting. See `BlastReportModal` and `isBlastReportDue`.
 - Voxel grid operations use spatial indexing where beneficial
 
 ## Centralized Configuration
@@ -116,3 +116,5 @@ Handle all technical decisions autonomously (architecture, algorithms, tests, ba
   → Comment `@copilot <specific fix instruction>` so agent can iterate
 - **SOLID compliance and durability under growth** — single responsibility, open/closed, Liskov substitution, interface segregation, dependency inversion, plus coupling, genericity, and cost curve: `dev-design-principles` holds the criteria and the counterweight against speculative generality.
 - Tag @Nico2398 if: architectural decisions needed, ambiguous requirements, or creative direction needed
+
+History: docs/context-history/dev-coding-conventions.md

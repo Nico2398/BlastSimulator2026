@@ -1,89 +1,63 @@
 ---
 name: agentic-pipeline-finalization
 description: >
-  Standard finalization procedure for TDD pipelines. Runs parallel code review,
-  merges findings, refactors, validates, and opens PR. Used as the final phase
-  of full, fix-bug, and multi pipelines.
+  Final phase of the full, fix-bug and multi pipelines: one independent review,
+  the lead's fixes, sync with main, the pull request, the follow-up register,
+  and the in-turn wait for CI with its one fix round.
 ---
 
-## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
-Runs after qualimetry passes. Branch: `pipeline/feature-<label>` — `<label>` is `<issue>-<runId>`, per `agentic-pipeline-tdd`'s Branch naming.
+Runs on `pipeline/feature-<label>` — `<label>` is `<issue>-<runId>`, per `agentic-pipeline-tdd`'s Branch naming — with the tree committed and `npm run pipeline -- verify` green.
 
-**Parameters:**
-- `skip_refactorer` (default: `false`) — set to `true` for bug-fix pipelines to skip refactoring phase.
-- `visual_incomplete` (default: `false`) — set to `true` when visual feedback loop could NOT complete inspection (VISUAL: BLOCKED). When `true`, the PR MUST be created as draft (--draft) WITHOUT `READY TO MERGE`.
+**Parameter:** `visual_incomplete` (default `false`) — `true` when the visual feedback loop ended `VISUAL: BLOCKED`. Then the PR MUST be a draft WITHOUT `READY TO MERGE`.
 
 ```
-[ ] = orchestrator-executed command  |  @agent = AI agent invocation
+[ ] = a step the lead runs itself  |  @agent = a delegation
 
- 1. Code review (parallel):
-        Delegate to `agentic-pipeline-review-pr` skill's code review step.
-        All five delegations go out in ONE message and are awaited in that same
-        turn — never backgrounded. See that skill's rules for why.
- 2. [merge-findings]     → Orchestrator merges all sub-reviewer findings → pass/fail.
-                            Pass/fail evaluated AFTER all reviewers complete.
-                            if fail → @implementer (big loop)
- 3. @refactorer          → If `skip_refactorer=true` → skip this step (jump to step 5).
-                            Otherwise: clean up conventions, no behavior change,
-                            then re-run [test-runner] to verify no regression.
-                            [test-runner] results:
-                              PASS → continue to step 5 (skip qualimetry + code review)
-                              FAIL → @implementer (big loop: TDD → qualimetry → finalization from start)
- 4. [verify-commit]      → confirm refactor commit exists; auto-commit if dirty
- 5. @validator           → Full validation: typecheck → tests → build
-                            if fail → @implementer (big loop)
- 6. [verify-commit]      → final commit check before PR
-    [sync-main]          → bring the feature branch up to date with the current `main`:
-                             merge it in, or rebase onto it and push with
-                             `--force-with-lease` (`agentic-autonomous-pipeline`).
-                             Other sessions may have merged since the branch was
-                             cut; a conflict → @conflict-resolver, then [test-runner].
-                             Already up to date → nothing to do.
- 7. [open-pr]            → create PR from feature branch to main.
-                             Evaluate draft/ready per `agentic-pipeline-pr-management` skill.
-                             Carry every defaulted requirement into the body under
-                             `## Decisions taken` per `agentic-decision-autonomy`.
-                             **If `visual_incomplete=true` → MUST use --draft, NO `READY TO MERGE`.**
-                             **The PR leaves this step marked or --draft. Never both absent:
-                             a channel CI runs is covered by the marker, not a reason to defer it.**
- 8. [followup]           → Drain the follow-up register (below): every finding and scope cut
-                             reported by a sub-agent this run, plus any decision material to
-                             gameplay, economy, or a player-facing default. File each per
-                             `agentic-issue-creation`, carrying the PR link, then post **one**
-                             comment on the PR listing what was filed. The issues link to the
-                             PR; the comment is what links the PR back to them, because
-                             `open-pr` composed the body a step earlier and cannot name numbers
-                             that did not exist yet.
-                             Register empty → skip both the filing and the comment.
-                             Filing never reopens an earlier step and never changes the PR's
-                             status.
- 9. [git-verify]         → confirm clean state: git status, branch, last commits
-10. [await-ci]           → `npm run ci:await -- --pr <number>`. Blocks until every workflow
-                             run on the PR head reports — no deadline, because any deadline
-                             would be a guess about CI that reports "still running" as an
-                             outcome. **The run does not end before this step does.**
-                             Exit 0 (GREEN) → the run is finished. Exit 1 (RED) → the CI-fix
-                             loop below. Exit 3/4 → say so in a PR comment naming what never
-                             reported, then stop. Never pass `--timeout-minutes` in a
-                             pipeline run: the bound is the job's own timeout, and reaching
-                             it hands the PR to `agentic-ci-failure.yml` intact.
-                             Skip only when the PR was created `--draft`: a draft already
-                             names a channel that stayed red, and its issue is `blocked`.
+ 1. [verify]          → npm run pipeline -- verify. Already green on this tree → it answers
+                        from its cache in a second.
+ 2. @reviewer         → Brief: issue number, every TDD label of the run, the plan file's
+                        content. One reviewer, never a fan-out: it applies only the sections
+                        `review-brief` says the diff owes.
+ 3. [apply-review]    → The lead fixes every `fix` finding and every rejected tamper, adds
+                        every `file` finding to the follow-up register, commits
+                        `review: <what> (#<issue>)`, runs `verify`.
+                        Verdict was REQUEST CHANGES → @reviewer again, a fresh one, briefed
+                        with its previous report and "review only the commits since <sha>".
+                        At most two re-reviews, none once the loop budget is closed; what
+                        still stands goes on the PR as a red channel does.
+ 4. [sync-main]       → bring the feature branch up to date with the current `main` (below).
+ 5. [open-pr]         → create the PR (below). Evaluate draft/ready per
+                        `agentic-pipeline-pr-management`. Carry every defaulted requirement
+                        into the body under `## Decisions taken`.
+                        **If `visual_incomplete=true` → MUST use --draft, NO `READY TO MERGE`.**
+                        **The PR leaves this step marked or --draft. Never both absent:
+                        a channel CI runs is covered by the marker, not a reason to defer it.**
+ 6. [followup]        → Drain the follow-up register (below), then post **one** comment on
+                        the PR listing what was filed. Register empty → skip both.
+ 7. [await-ci]        → `npm run long -- start ci -- npm run ci:await -- --pr <number>`, then
+                        `npm run long -- wait ci` until FINISHED. **The run does not end before
+                        this step does.** Exit 0 (GREEN) → the run is finished. Exit 1 (RED) →
+                        the CI-fix round below. Exit 3/4 → say so in a PR comment naming what
+                        never reported, then stop. Never pass `--timeout-minutes` in a
+                        pipeline run. Skip only when the PR was created `--draft`.
 ```
 
-**Retry counter:** resets at start of each finalization invocation.
+**Retry counter:** resets at the start of each finalization.
+
+The review runs once per pull request, on the diff that ships: the lead's refactor and context upkeep came before it. It is the one step the lead cannot do itself — an author reviewing its own diff reads what it meant to write.
 
 ### The follow-up register
 
-A run's sub-agents notice work that is not this run's task: a reviewer finds pre-existing debt, an implementer hits a task bigger than one run, a test-writer finds a convention the codebase contradicts. None of them files an issue — every runtime denies its read-only agents the commands that mutate GitHub, and five parallel reviewers filing independently would produce five issues for one finding.
+A run notices work that is not its task: the reviewer finds pre-existing debt, the lead hits a task bigger than one run, the test-writer reports a contract gap. None of it is filed when it is noticed — the sub-agents cannot mutate GitHub by design, and filing as you go files one finding twice under two names.
 
-Instead the orchestrator keeps a register for the run. Every sub-agent report may append to it; nothing is filed until `[followup]`.
+Instead the lead keeps a register for the run. Every report may append to it; nothing is filed until `[followup]`.
 
 | Column | Holds |
 |--------|-------|
 | Kind | `finding` / `scope-cut` / `decision` |
-| Reported by | Which agent, at which step |
+| Reported by | Who, at which step |
 | Summary | One line, enough to duplicate-check against |
 | Evidence | File and line, the failing case, or the constraint that forces the cut |
 | Confidence | Whether it is verified real, or needs a human to confirm — this is what `agentic-issue-creation`'s label table reads |
@@ -100,11 +74,9 @@ Draining the register is a disposition, not a transfer. Every entry becomes exac
 
 **One filed finding per run.** On top of the structural issues in the last row, a run files at most one issue for what it noticed. A second defect goes in the comment with its evidence, where a human or a later run promotes it. The cap rarely binds — genuine defects arrive well under one per run — and it is what keeps review volume from becoming queue volume.
 
-Convention debt found `[in-diff]` is not recorded either: @refactorer fixes it inside the run, which is what that phase is for.
+Convention debt found `[in-diff]` is not recorded either: the lead fixes it inside the run.
 
-The register drained without this gate is a generator rather than a backlog. Five reviewers audit every pull request the pipeline merges, so entries scale with the pipeline's own output and not with any fixed stock of debt. One stretch ran at 0.99 filed issues per run — one new issue for every issue closed — with half of every merged pull request resolving an issue the pipeline had filed for itself, finding-chains seven generations deep from a single human task, and the median finding pointing at code merged two issue numbers earlier. The queue never grew; its contents were replaced, while the two human-authored gameplay issues in it went untouched. The gate protects the throughput, not the issue count.
-
-`[followup]` runs **after** review and validation for one reason: by then every agent has reported, so the register can be deduplicated across all of them at once. The same debt reported by @quality-reviewer and @duplication-reviewer under two names is one issue, and only a pass that sees both can tell.
+`[followup]` runs **after** review for one reason: by then every report is in, so the register can be deduplicated across all of them at once.
 
 A register entry is not a blocker. It never holds the PR, never downgrades it to draft, and never delays `[await-ci]`. A run that files four follow-ups still finishes its own issue.
 
@@ -130,43 +102,36 @@ One comment per run, posted only when the register held something. An empty regi
 
 | Failure at | Loops back to |
 |------------|--------------|
-| [merge-findings] | @implementer (big loop) |
-| @refactorer or [test-runner after refactorer] | @implementer (big loop) |
-| @validator | @implementer (big loop) |
-| [git-verify] | Diagnose and fix — never proceed with dirty state |
-| [await-ci] | The one CI-fix round below — never a big loop: the PR exists and its branch is the deliverable |
-| Any × 7 | Human escalation: add PR/issue comment summarizing failure + history, then stop with `ESCALATED: human intervention required` |
+| [verify] | `agentic-pipeline-tdd`'s fix loop |
+| @reviewer REQUEST CHANGES | [apply-review], then a scoped re-review |
+| [sync-main] conflict | resolve, then `verify` |
+| [await-ci] | The one CI-fix round below — never a rebuild: the PR exists and its branch is the deliverable |
+| Any × 7 | Comment the failure and its history on the PR or issue, stop with `ESCALATED: human intervention required` |
 
 ### The CI-fix round — a red channel this run handed to CI is still this run's
 
-`static`, `logic` and command-mode `scenario` are runnable in the session. Interaction-mode `visual`, the production `build`, and every channel on a machine with a GPU are CI's — and CI reports minutes *after* the step that opened the PR. Ending there is what PR #581 did: green on every channel its session ran, marked `READY TO MERGE`, two interaction shards red in CI, and `agentic-auto-merge.yml` skips a failed CI run by design. Nothing merged it, nothing chained, and issue #552 held `in-progress` with the whole queue behind it.
+`static`, `logic` and command-mode `scenario` are runnable in the session. Interaction-mode `visual`, the production `build`, and every channel on a machine with a GPU are CI's — and CI reports minutes *after* the step that opened the PR. `agentic-auto-merge.yml` skips a failed CI run by design: a run that ends at open-pr leaves a red CI that nothing merges and nothing chains from, with its issue holding `in-progress` and the whole queue behind it.
 
 So `[await-ci]` is not a courtesy wait. It is the step that reads the channels this run deferred.
 
 On RED, **one round**, counted per finalization invocation, and only while the loop budget is open (`agentic-autonomous-pipeline`):
 
-1. Read the failing jobs the script named. Fetch the log; for an interaction-mode failure read the FAIL screenshots in the run's artifacts. Never re-run the whole suite locally to "confirm" it — a sandbox without a GPU cannot reproduce that channel, and #581's session already proved a local run of those exact files times out on load contention.
-2. Decide which side is wrong, the change or the expectation, then delegate: `@fixer` for a test/expectation disagreement, `@implementer` for a defect in the change, `@visual-tester` when the failure is a rendering or click-reachability claim.
+1. Read the failing jobs the script named. Fetch the log; for an interaction-mode failure read the FAIL screenshots in the run's artifacts. Never re-run the whole suite locally to "confirm" it — a sandbox without a GPU cannot reproduce that channel, and a local run of those files times out on load contention.
+2. Decide which side is wrong, the change or the expectation, and fix that side yourself — a RED test only under `agentic-pipeline-tdd`'s fix-loop rule. Delegate `@visual-tester` only when the failure is a rendering or click-reachability claim that needs screenshots read.
 3. Commit and fetch — the merge gate may have merged `main` into the branch since the PR opened — then `git pull --no-rebase origin pipeline/feature-<label>` and push, or rebase onto `origin/main` and `git push --force-with-lease`. Never `[skip ci]` — `agentic-pipeline-pr-management` holds why. Never a bare `--force`.
 4. Run `[await-ci]` again. The script reads one run per workflow, newest first, so the run CI cancelled on the previous head does not count against you.
 
 Still red after that round, or red with the loop budget closed: **end the run with the pull request as it stands** — marker on, not a draft, the issue's labels untouched — and say so in the summary comment, naming the failing jobs. `agentic-ci-failure.yml` hands that red to a fresh session with a whole budget, bounded by `AGENTIC_CI_FIX_ATTEMPT_LIMIT`; because this session was live when the verdict landed, the watchdog's sweep is what raises it — `agentic-autonomous-pipeline`'s github-loop reference holds the path. The same fail-safe covers a session that dies before `[await-ci]` returns.
 
-Three rounds used to be allowed here. #947's run opened its PR four hours and twenty minutes in, then spent its last ninety-eight minutes on two of them — each push cancelling a twenty-minute CI run and starting another — and the job clock cut it off waiting on the third; the ci-fix session that took the handback the next morning turned the same PR green in a hundred and thirty minutes. A round costs the same in a spent session as in a fresh one, and the fresh one has the budget to finish.
+A round costs the same in a spent session as in a fresh one, and the fresh one has the budget to finish.
 
-When looping back to `@implementer` from any finalization step:
-`@implementer on impl branch → cherry-pick → switch-to-feature → qualimetry → finalization`
-Do NOT re-run skeleton-writer or test-writer — branches and tests already exist.
-
-### Non-Agentic Steps
+### Steps in detail
 
 | Step | Action |
 |------|--------|
-| merge-findings | Deduplicate and merge all reviewer outputs → pass/fail (evaluate after ALL reviewers complete) |
-| After refactorer | `npx vitest run` — PASS → @validator, FAIL → @implementer (big loop) |
-| verify-commit | `git log --oneline -1` — auto-commit if dirty, use message `"<agent-name>: <step-context> (#<N>)"` |
-| sync-main | `git fetch origin main && git merge --no-edit origin/main`. Merges nothing when the branch already contains `main`. A conflict: delegate the conflicted files to `@conflict-resolver`, commit the merge, then `npm run typecheck` and `npm run test` (`npm run validate:context` too when a context file conflicted). The merge gate merges a PR only on a head containing `main`'s tip, so a branch that skips this step pays for it with an extra CI round after it opens — `agentic-autonomous-pipeline` holds why `main` moves under a run. |
-| open-pr | `gh pr create --base main --head pipeline/feature-<label> --title "<type>: <summary> (#<N>)" --body-file <body>`, where `<body>` is `.github/PULL_REQUEST_TEMPLATE/pipeline.md` copied outside the working tree (so `[git-verify]` still finds it clean) with every `<…>` placeholder filled. Determine `<type>` from pipeline: `full → feat`, `fix-bug → fix`, `multi → feat`. `<summary>` is one line, imperative mood, under ~70 characters, naming what changed for the player or the codebase — the descriptive half of the title pipeline PRs carried through #616 (`feat: Resolve #554 — charging is real work, a blaster loads holes one at a time`), e.g. `feat: charging is real work, a blaster loads holes one at a time (#554)`. Never the bare `<type>: Resolve #<N>`: that is what every pipeline PR from #773 to #980 read, and it says nothing in `git log`. The title carries no closing directive — the body's standalone `Closes #<N>` line is what closes the issue at merge — so the summary must not place `close`/`fix`/`resolve` in any tense immediately before a `#<number>`: `agentic-closing-keyword-guard.yml` reads the title and fails the PR on that shape (`keyword-closing-postmortem.md`). `## Verification` is the report the Definition of Done asks the body for (`agentic-autonomous-pipeline`): one line per channel, saying what ran and what it showed, per `dev-finishing-work`; `<test_count>` is the `Tests` total of the last full `npm run test`. `## Decisions taken` is the block `agentic-decision-autonomy` formats, dropped when the run defaulted nothing. For draft: add `--draft`, drop the `READY TO MERGE` line. For a **paused handover** (the run stopped on a dependency it filed — `agentic-decision-autonomy`): add `--draft --label "paused"` on the same call and fill `.github/PULL_REQUEST_TEMPLATE/paused.md` instead, which carries no `READY TO MERGE` line. The `paused` label is what keeps the issue assignable, so it is never a follow-up edit either. **Never a follow-up `gh pr edit --add-label`** — a label added after `create` raises no `pull_request` event of its own, which is how PR #615 merged with its interaction-mode job silently skipped back when a label gated it; the job runs unconditionally now, and the opening-call rule stands for `paused`. |
-| await-ci | `npm run ci:await -- --pr <number>` (or `--head pipeline/feature-<label>` before the number is known). Exit codes: `0` GREEN, `1` RED with the failing jobs and their log URLs printed, `2` TIMEOUT (only reachable if you pass `--timeout-minutes`, which a pipeline run never does), `3` the PR is gone, `4` bad arguments or `gh` could not answer. It listens to **every** workflow run on the PR head — not `ci.yml` alone, since a check any workflow emits blocks the merge just as hard (PR #773's was the closing-keyword guard, with CI green) — minus a named list of merge-machinery workflows; it never re-runs a channel, and no verdict it reports depends on a duration. |
+| sync-main | `git fetch origin main && git merge --no-edit origin/main`. Merges nothing when the branch already contains `main`. A conflict: resolve it so both sides' intent survives (lockfiles and generated files regenerated with their tooling, a mirrored context file resolved once and copied to all three runtimes), commit the merge, then `npm run pipeline -- verify`. The merge gate merges a PR only on a head containing `main`'s tip, so a branch that skips this step pays for it with an extra CI round after it opens — `agentic-autonomous-pipeline` holds why `main` moves under a run. |
+| open-pr | `gh pr create --base main --head pipeline/feature-<label> --title "<type>: <summary> (#<N>)" --body-file <body>`, where `<body>` is `.github/PULL_REQUEST_TEMPLATE/pipeline.md` copied outside the working tree (so the tree stays clean) with every `<…>` placeholder filled. Determine `<type>` from pipeline: `full → feat`, `fix-bug → fix`, `multi → feat`. `<summary>` is one line, imperative mood, under ~70 characters, naming what changed for the player or the codebase, e.g. `feat: charging is real work, a blaster loads holes one at a time (#<N>)`. Never the bare `<type>: Resolve #<N>`: it says nothing in `git log`. The title carries no closing directive — the body's standalone `Closes #<N>` line is what closes the issue at merge — so the summary must not place `close`/`fix`/`resolve` in any tense immediately before a `#<number>`: `agentic-closing-keyword-guard.yml` reads the title and fails the PR on that shape. `## Verification` is the report the Definition of Done asks the body for (`agentic-autonomous-pipeline`): one line per channel, saying what ran and what it showed, per `dev-finishing-work`; `<test_count>` is the `Tests` total in the last `verify` run's `logic` log. `## Decisions taken` is the block `agentic-decision-autonomy` formats, dropped when the run defaulted nothing. For draft: add `--draft`, drop the `READY TO MERGE` line. For a **paused handover** (the run stopped on a dependency it filed — `agentic-decision-autonomy`): add `--draft --label "paused"` on the same call and fill `.github/PULL_REQUEST_TEMPLATE/paused.md` instead, which carries no `READY TO MERGE` line. The `paused` label is what keeps the issue assignable, so it is never a follow-up edit either. **Never a follow-up `gh pr edit --add-label`** — a label added after `create` raises no `pull_request` event of its own. |
+| await-ci | `npm run ci:await -- --pr <number>` (or `--head pipeline/feature-<label>` before the number is known). Exit codes: `0` GREEN, `1` RED with the failing jobs and their log URLs printed, `2` TIMEOUT (only reachable if you pass `--timeout-minutes`, which a pipeline run never does), `3` the PR is gone, `4` bad arguments or `gh` could not answer. It listens to **every** workflow run on the PR head — not `ci.yml` alone, since a check any workflow emits blocks the merge just as hard (the closing-keyword guard can fail with CI green) — minus a named list of merge-machinery workflows; it never re-runs a channel, and no verdict it reports depends on a duration. |
 | followup | Drain the register in one pass through the filing gate above — defects only, one filed finding per run, convention debt recorded rather than filed — newest entry last, then `gh pr comment <pr-url> --body "<the table below>"` — one comment, only when something was filed. Decisions: `gh label create decision-review --description "A default the pipeline chose; revisit when convenient" --color ededed --force` then `gh issue create --label agent-task --label decision-review --label scope:<area> --title "Decision review: <summary> (from #<N>)" --body-file <body>`, the body filled from `.github/ISSUE_BODY_TEMPLATE/decision-review.md` per `agentic-decision-autonomy`. `--force` makes the label step idempotent — it updates an existing label instead of failing the run on every issue after the first. Findings and scope cuts: duplicate-check, then file per `agentic-issue-creation` — `agent-task` and the `scope:*` labels of the code the finding lives in, always; `ready` whenever its Definition of Ready holds, which a reproduced defect with no open question does. A finding filed without `ready` carries an `## Open question` in its body, and its row in the comment below names that question. **A bypassed blocker is not filed here** — its issue number has to exist before the `TODO(#N)` referencing it is written, so it was filed at the moment of bypassing, back in the TDD phase (`agentic-decision-autonomy`). Draining the register here only records it in the summary table. |
-| git-verify | `git status --porcelain` (must be empty) → `git branch --show-current` → `git log --oneline -3` |
+
+History: docs/context-history/agentic-pipeline-finalization.md

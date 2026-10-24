@@ -62,7 +62,7 @@ Single tier: `building_spoil_heap_t1` — The Dump: lumpy barren-rock mound (`Ti
 arrayed row of loose stones. No doors (crewless). Built in `buildings_t1.py`; `build.py` and `registry()` skip tiers 2 and 3, and the
 renderer maps every tier onto it.
 
-Vanity projects (#1948), single tier, all in `buildings_vanity.py` (`build.py` skips the tier overrides; footprints from `BuildingDefs`):
+Vanity projects, single tier, all in `buildings_vanity.py` (`build.py` skips the tier overrides; footprints from `BuildingDefs`):
 
 | Model | Footprint | Caricature |
 |-------|-----------|------------|
@@ -92,3 +92,5 @@ Instanced scenery. Single `Body` node, no animation nodes.
 | `prop_grass_<0-2>` | 3 | Fat cartoon tufts, thousands per level, `TintGrass` per biome, drawn without an outline |
 | `prop_flower_<0-1>` | 2 | Wildflowers among the grass where `FLOWER_BIOMES` allows |
 | `prop_twister` | 1 | The desert dust devil: a striped funnel on a dust cloud, 9 m tall, spun and wobbled per devil. Not instanced |
+
+History: docs/context-history/dev-3d-models.md

@@ -149,12 +149,24 @@ skills/<name>/
   references/<subject>.md    read on demand, when a step needs that subject
 ```
 
-SKILL.md carries what a reader needs *to act* and an index naming each reference file and what it answers. Reference files carry what a reader needs *sometimes*: design rationale, per-runtime configuration, post-mortems, long tables. The split matters most for a skill preloaded through an agent's `skills:` frontmatter — that content is paid for on every single run of that agent, whether the run needs it or not.
+SKILL.md carries what a reader needs *to act* and an index naming each reference file and what it answers. Reference files carry what a reader needs *sometimes*: per-runtime configuration, long tables, detailed procedures. Rationale and post-mortems are neither — they go to history (below). The split matters most for a skill preloaded through an agent's `skills:` frontmatter — that content is paid for on every single run of that agent, whether the run needs it or not.
 
 Rules:
 - Every bundled file is named by its SKILL.md. A file nothing points at is context no agent reaches.
 - Reference paths are relative to the skill directory, forward slashes: `references/github-loop.md`.
 - Bundled files mirror across all three runtime directories exactly like SKILL.md does.
+
+### ▶ What, Not Why
+
+Context files say **what to do**. The reasons a rule exists — the incident that produced it, the run it cost, the PR or issue it came from, what the pipeline did before — live in a history file, never in the context file. Every context file is paid for each time it loads; a story is paid for on every load and changes no action.
+
+1. **State the rule as the rule.** "Never reuse a branch from an earlier run", not "Run 166 rebuilt the branch and lost six hours, so never reuse one". When a reason defines the rule's boundary, write the boundary itself as the rule.
+2. **No issue, PR or run numbers, past costs or durations, "used to", "was added for".** These are history by construction. Placeholders (`#<N>`, `TODO(#N)`) are templates, not history.
+3. **Keep every instruction, condition, number, command, path and threshold.** Moving history out removes no behaviour.
+4. **History lives in `docs/context-history/<id>.md`**, one file per context file: `<skill-name>.md` for a skill and its references, `agent-<name>.md`, `rule-<name>.md`, `command-<name>.md`, `entry-points.md` for `CLAUDE.md`, `copilot-instructions.md` and `AGENTS.md`. It is not mirrored and never loads into a session.
+5. **The context file links it with one last line and nothing more:** `History: docs/context-history/<id>.md`. No summary of what is in it.
+
+`tests/unit/lint/ContextFilesStateWhatNotWhy.test.ts` fails on an issue or PR reference in any context file and on a history link that resolves to nothing.
 
 ### Reference, Don't Duplicate
 
@@ -252,6 +264,7 @@ Keep examples generic — domain-specific references lose meaning outside origin
 - [ ] Under 500 lines
 - [ ] Forward slashes only
 - [ ] Concise: every token earns its place
+- [ ] What, not why: no incident, issue/PR number or past cost — history goes to `docs/context-history/`, linked by one last line
 - [ ] Positive phrasing: describes what agent does
 - [ ] No cross-file tight coupling (no step numbers, no "used by")
 - [ ] No user-input instructions

@@ -72,7 +72,7 @@ Size is the test, not tidiness. "It is not my task" is never a reason to file so
 **2. Bypass it, with a `TODO` that names the issue.** The finding is real work — too big for your diff, or in code your task has no business rewriting — but your task can still be delivered around it. File the issue, then write the smallest honest workaround and tag it:
 
 ```ts
-// TODO(#742): SurveyPanel re-reads the grid on every tick. Cache once #742 lands.
+// TODO(#N): SurveyPanel re-reads the grid on every tick. Cache once #N lands.
 const composition = grid.compositionAt(x, y); // recomputed per frame until then
 ```
 
@@ -122,9 +122,7 @@ Everything not on that list is a decision to take, a fix to make, a bypass to wr
 
 ## Churn is not a blocker
 
-The count of review findings, visual iterations, implementer rounds, cherry-pick retries, and failed test runs decides nothing about PR status. A run that converged after five iterations converged. What decides status is whether every verification channel the change owes reports PASS.
-
-An earlier convention held a PR back for "significant churn". It cost a green, fully verified run its auto-merge and sent a human to re-review work that five specialist reviewers had already passed — while the issue stayed `in-progress` and the chain stalled behind it. Iteration count measures how hard the problem was, not how likely the answer is to be wrong.
+The count of review findings, visual iterations, implementation rounds, cherry-pick retries, and failed test runs decides nothing about PR status. A run that converged after five iterations converged. What decides status is whether every verification channel the change owes reports PASS.
 
 ## Scope beyond the issue's framing is not a blocker
 
@@ -153,9 +151,11 @@ One entry per decision: what was open, what was chosen, why, and what a human wo
 
 ## Event option comparison
 
-Rule for balancing event options (#1894): no option of an event may dominate a sibling. `optionValue` / `dominates` / `findDominatedPairs` (`src/core/events/EventOptionBalance.ts`) apply Pareto dominance, higher = better; `npm run events:balance` lists every dominated pair (exit 1 if any).
+Rule for balancing event options: no option of an event may dominate a sibling. `optionValue` / `dominates` / `findDominatedPairs` (`src/core/events/EventOptionBalance.ts`) apply Pareto dominance, higher = better; `npm run events:balance` lists every dominated pair (exit 1 if any).
 
 - An option is valued at its expected value: a `probability` < 1 weights the main branch by p and `altConsequence` by 1 - p (a missing alt is empty); effects count at their branch weight.
 - Dimensions: cash; one per `scoreDelta` key (nuisance is not flipped); corruption and exposure are costs (a rise is worse); lasting effects (work lost, morale, crew, payroll, bans, cost factors, contract income, contracts, out-of-service time) are separate dimensions with no cash exchange rate.
 - Follow-up events, `forced_weather` and `event_weight` effects are opaque: options only dominate each other when their signatures are equal. `effectTag`-routed handler outcomes are unvalued and reviewed by hand.
 - Levers: `EVENT_BALANCE_PERMANENT_DAYS` (horizon of a permanent effect) and `EVENT_BALANCE_REFERENCE_CREW` (crew size for per-employee effects) in `src/core/config/balance.ts`.
+
+History: docs/context-history/agentic-decision-autonomy.md

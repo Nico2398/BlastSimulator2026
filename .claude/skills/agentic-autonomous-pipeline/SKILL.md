@@ -12,11 +12,11 @@ One human input drives this system: a GitHub issue. Everything after it — pick
 
 ## Execution Model
 
-The pipeline runs as an **Orchestrator Agent** (`orchestrator`) invoked by a developer or by a GitHub Actions workflow. The orchestrator writes no code — it delegates to sub-agents in the correct TDD sequence, passing context forward between steps.
+The pipeline runs as one **lead** session — the `orchestrator` agent — invoked by a developer or by a GitHub Actions workflow. The lead does the work itself: plan, skeleton, implementation, fixes, refactor, context upkeep, git, the pull request. It delegates only the steps where a separate context buys quality or keeps tokens out of its own: the blind test-writer, the independent reviewer, the visual-tester's screenshots, and volumetric batches. The orchestrator definition holds that table and why each row earns its sub-agent; every mechanical step is a `npm run pipeline` command rather than a model turn.
 
 | Runtime | Entry point | Delegation mechanism |
 |---------|-------------|---------------------|
-| Claude Code, CLI | `/resolve-issue <issue>` — forks into the `orchestrator` agent | `Agent` tool, one sub-agent per pipeline step |
+| Claude Code, CLI | `/resolve-issue <issue>` — forks into the `orchestrator` agent | `Agent` tool, for the steps that need a separate context |
 | Claude Code, GitHub Actions | `claude-runner.yml` → `/agentic-run <entity> <trigger context>` — forks into the `orchestrator` agent | `Agent` tool |
 | OpenCode, CLI | `opencode run /resolve-issue` | `task` tool |
 | OpenCode, GitHub Actions | `opencode-runner.yml` → `opencode github run` | `task` tool |
@@ -36,19 +36,19 @@ Two rules follow, and they hold under every runtime:
 
 The single turn is also why the CI verdict has to be read inside it. The channels CI owns report minutes after the pull request opens, and a red one is announced to nobody: the merge gate declines a failed CI run, and the watchdog skips any issue with a linked pull request. So the run waits for the report — `agentic-pipeline-finalization`'s `[await-ci]` step, which blocks in-turn and returns to the session that called it. Waiting on an event that returns to you is not the outstanding work rule 1 forbids; it is the last verification channel being read. `agentic-ci-failure.yml` covers the session that dies before it returns, and `references/github-loop.md` holds how.
 
-The runtimes disagree on what delegation defaults to, so the same sentence produces opposite behaviour depending on where it is read. Each runtime's own configuration layer enforces the rule; `references/runtime-parity.md` records which layer, and the run that died proving it necessary.
+The runtimes disagree on what delegation defaults to, so the same sentence produces opposite behaviour depending on where it is read. Each runtime's own configuration layer enforces the rule; `references/runtime-parity.md` records which layer.
 
 ## ▶ The loop budget
 
-Every pipeline bounds its loops by count — fixer retries after a red test run, visual iterations, big loops back to the implementer, CI-fix rounds — and each count was set alone. On a two-core runner one iteration of any of them costs 15 to 30 minutes of fixed verification before any thinking happens: a full `npm run test`, a full `npm run scenarios`, a CI round. Added together the counts hold more than the job does. Runs 565, 591, 606 and 609 (#921, #947, #953, #956) each finished their TDD cycle inside the first hour and spent the next five iterating — scenario recalibration, a visual loop on a runner without a GPU, fix rounds against CI — until the job clock cut them off with nothing landed.
+Every pipeline bounds its loops by count — fix iterations after a red `verify`, visual iterations, re-reviews, CI-fix rounds — and each count was set alone. On a two-core runner one iteration of any of them costs 15 to 30 minutes of fixed verification before any thinking happens: a full `npm run test`, a full `npm run scenarios`, a CI round. Added together the counts hold more than the job does.
 
-So a run carries **one clock across all of its loops**, the loop deadline. The runner sets it — `AGENTIC_LOOP_BUDGET_MINUTES` after the job started, default 180 — and exports it to the session as `AGENTIC_LOOP_DEADLINE_EPOCH`; the orchestrator is told how much of it is left before every delegation. A session nobody timed — a CLI, a human at a terminal — has no deadline, and its budget is open.
+So a run carries **one clock across all of its loops**, the loop deadline. The runner sets it — `AGENTIC_LOOP_BUDGET_MINUTES` after the job started, default 180 — and exports it to the session as `AGENTIC_LOOP_DEADLINE_EPOCH`; the lead is told how much of it is left before every delegation. A session nobody timed — a CLI, a human at a terminal — has no deadline, and its budget is open.
 
 Once the deadline has passed:
 
-- **No loop-back row in any pipeline's failure table starts a new iteration.** Every `→ @fixer → re-run`, every big loop to `@implementer`, every visual iteration, the CI-fix round.
-- **The iteration in flight finishes.** A fixer already delegated completes and its test run happens; an implementer already fixing visual findings commits and is verified once. The deadline closes the *next* iteration, never the current one.
-- **Every linear step still runs.** Qualimetry, the reviewers, the refactorer, the validator, the pull request, `[await-ci]`, the context maintainer, the summary comment. A closed budget skips nothing; it stops repeating.
+- **No loop-back row in any pipeline's failure table starts a new iteration.** Every fix-loop iteration after a red `verify`, every re-review, every visual iteration, the CI-fix round.
+- **The iteration in flight finishes.** A fix already being written is committed and verified once; a re-review already delegated completes. The deadline closes the *next* iteration, never the current one.
+- **Every linear step still runs.** The refactor, context upkeep, the review, `verify`, the pull request, `[await-ci]`, the summary comment. A closed budget skips nothing; it stops repeating.
 - **PR status is decided exactly as before**, by `agentic-pipeline-pr-management`: green channels carry `READY TO MERGE`; a channel that stayed red makes a draft that names it. A closed budget is never itself a reason to draft, pause or block, and the summary comment says which loop it closed and what that loop left red.
 
 A retry attempt inherits the same absolute deadline, so it starts with its loops already closed and does linear work only — which is the work a retry exists for.
@@ -59,43 +59,39 @@ Every AI solution wants to name branches its own way, and several create one bef
 
 | Branch | Owner | Role |
 |--------|-------|------|
-| `pipeline/tests-<label>`, `pipeline/impl-<label>`, `pipeline/feature-<label>` | The orchestrator, via plain git | The only branches the pipeline uses, where `<label>` is `<issue>-<runId>`. `pipeline/feature-<label>` is always the PR head. Shorthand elsewhere in these docs is `pipeline/feature-<N>`; the branch on the remote carries the run id too. |
+| `pipeline/tests-<label>`, `pipeline/impl-<label>`, `pipeline/feature-<label>` | The lead, via `npm run pipeline -- tdd` | The only branches the pipeline uses, where `<label>` is `<issue>-<runId>`. `pipeline/feature-<label>` is always the PR head. Shorthand elsewhere in these docs is `pipeline/feature-<N>`; the branch on the remote carries the run id too. |
 | `pipeline/scratch-*` | `claude-code-action` (`branch_prefix`) | A harness branch, never the deliverable |
 | `copilot/*` | GitHub Copilot coding agent | A harness branch, never the deliverable |
 | anything else | Whatever runtime is in use | A harness branch, never the deliverable |
 
-Three rules make this hold under any solution:
+Four rules make this hold under any solution:
 
-1. **Branch from `main` by name, never from `HEAD`.** `git checkout -b pipeline/tests-<label> main` is unaffected by whatever the harness checked out. Runners clone with `fetch-depth: 0` and materialise a local `main` first, because `git rev-parse main` fails when only `origin/main` exists — which is exactly what a PR-review-comment checkout leaves behind.
-2. **`branch-sanity` before every agent step.** `git branch --show-current` must match the expected pipeline branch; if it does not, check it out before continuing. This catches a harness that switched branches underneath the run. When the test-writer and implementer phases are delegated in parallel, `branch-sanity` for each concurrently-delegated agent also confirms that agent's working directory is that branch's own dedicated worktree — `git rev-parse --show-toplevel` (or `git worktree list`) matching the path assigned to that agent. Scenario and procedure: `agentic-pipeline-tdd`.
+1. **Branch from `main` by name, never from `HEAD`.** `npm run pipeline -- tdd start` resolves its base by name, so it is unaffected by whatever the harness checked out. Runners clone with `fetch-depth: 0` and materialise a local `main` first, because `git rev-parse main` fails when only `origin/main` exists — which is exactly what a PR-review-comment checkout leaves behind.
+2. **The pipeline CLI checks the branch at every step.** Each `npm run pipeline -- tdd` step refuses to run on any branch but the one it expects, or on a dirty tree, and names what it found — which catches a harness that switched branches underneath the run. The test-writer works in its own worktree, so the two sides of a cycle never share a working directory.
 3. **The PR head is always `pipeline/feature-<label>`.** Never open a PR from a harness branch, even when the harness offers to.
-4. **Every branch a run creates carries that run's id** (`<label>` = `<issue>-<runId>`), so no two runs on one issue ever contend for a name. #554 spent two six-hour budgets proving why: the second run rebuilt `pipeline/feature-554` from `main` while the first run's abandoned branch still held the name, and the rescue push was refused `non-fast-forward` with the whole run on it. `agentic-pipeline-tdd` holds the naming rule; everything that matches a branch accepts the bare name too, so nothing older stops being found.
+4. **Every branch a run creates carries that run's id** (`<label>` = `<issue>-<runId>`), so no two runs on one issue ever contend for a name: never rebuild a feature branch whose name an earlier run's branch still holds. `agentic-pipeline-tdd` holds the naming rule; everything that matches a branch accepts the bare name too, so nothing older stops being found.
 
 Harness prefixes are also skipped by `claude-code-review.yml`, so a stray branch cannot trigger a review of itself.
 
 ## ▶ Branch isolation
 
-Critical to unbiased implementation: test code and implementation code never mix during development.
+Critical to unbiased implementation: the tests are written from the plan's Contract without an implementation to look at, and the implementation is written without the tests to look at.
 
 ```
 main
- └─ pipeline/tests-<label>   (test branch — skeleton → tests)
- │    └─ pipeline/impl-<label>  (impl branch — forked from skeleton commit)
- │
- └─ pipeline/feature-<label> (deliverable branch — created from tests branch HEAD)
-                                     ↓ cherry-pick impl → quality gates + PR → main
+ └─ pipeline/impl-<label>      skeleton → implementation            (the lead, main working tree)
+      └─ pipeline/tests-<label>   skeleton → RED tests              (the test-writer, own worktree)
+ └─ pipeline/feature-<label>   base + skeleton + tests + implementation  → quality gates + PR → main
 ```
 
-1. **Skeleton branch:** create `pipeline/tests-<label>` from `main`, write empty stubs, record `skeleton_commit_sha`
-2. **Fork impl branch:** create `pipeline/impl-<label>` from that skeleton commit
-3. **Write tests** on `pipeline/tests-<label>` (test branch)
-4. **Implement** on `pipeline/impl-<label>` (impl branch) — agent never sees test commits
-5. **Create feature branch:** create `pipeline/feature-<label>` from `pipeline/tests-<label>` HEAD
-6. **Cherry-pick** the implementation commit onto `pipeline/feature-<label>`
-7. **Resolve conflicts** if the cherry-pick fails — a conflict resolver agent merges both sides and stages the result; on resolution failure the implementer re-runs
-8. **All subsequent quality gates** run on `pipeline/feature-<label>`
+1. `tdd start` cuts `pipeline/impl-<label>` from `main`; the lead commits the skeleton there.
+2. `tdd split` cuts `pipeline/tests-<label>` at the skeleton in a sibling worktree and opens the **blind phase**.
+3. The test-writer writes the tests in that worktree; `tdd red` proves they fail on the stubs and commits them.
+4. The lead implements on `pipeline/impl-<label>`. `blind-to-tests.mjs` refuses it — and every session but the test-writer — any tool call reaching the tests worktree or branch.
+5. `tdd join` builds `pipeline/feature-<label>` from the base by cherry-picking the tests, then the implementation, closes the blind phase and removes the worktree.
+6. Every later gate runs on `pipeline/feature-<label>`; the reviewer audits any RED test edited after the join.
 
-**Delegating the test-writer and implementer phases in parallel (in one Agent-tool message) needs a dedicated worktree per branch, so their concurrent `git`/file-edit commands never land in the same working directory** — `agentic-pipeline-tdd` holds the procedure.
+`agentic-pipeline-tdd` holds the procedure.
 
 ## ▶ Other sessions may be live
 
@@ -157,7 +153,7 @@ A red CI on an existing open PR is the other task shape that works this way, and
 
 Binds every session that touches a numbered issue, not only ones dispatched through `/agentic-run` or `/resolve-issue`. Before your last message, if your PR body discusses a numbered issue at all:
 
-1. **Never let a closing keyword sit immediately before a bare issue number in prose — in a PR body or any commit message in its range.** Negation, quotation, and past tense do not protect you, and neither does a commit already merged once before: squash-merging concatenates every constituent commit message into the base branch's history verbatim, and a branch updated by merging the base back in (rather than reset to it) keeps its own pre-squash commits reachable, ready to ride into the next PR's range as if new. GitHub's parser matches the substring, not the sentence, and skips only code spans and fenced blocks. `references/keyword-closing-postmortem.md` has the real incident this was learned from, in four rounds — read it once before you next write a PR that mentions an issue you are not closing.
+1. **Never let a closing keyword sit immediately before a bare issue number in prose — in a PR title, PR body or any commit message in its range.** GitHub's merge-time parser matches close/closes/closed/fix/fixes/fixed/resolve/resolves/resolved immediately followed by `#` and a number, as a substring, not a sentence: negation, quotation, and past tense do not protect a number, and neither does a commit already merged once before — squash-merging concatenates every constituent commit message into the base branch's history verbatim, and a branch updated by merging the base back in (rather than reset to it) keeps its own pre-squash commits reachable, ready to ride into the next PR's range as if new. What does protect a number: rephrasing so the keyword and the number are not adjacent; wrapping the whole keyword-plus-number phrase in one code span or fenced block — the only text the parser skips — in the commit message too, not only where it is later quoted; and, after a squash merge, resetting the working branch to the new base rather than merging the base back in. The one sanctioned shape is a line whose entire content is the directive `Closes #<N>`, optionally behind a conventional-commit type; `agentic-closing-keyword-guard.yml` fails a PR whose title, body or commit messages carry the shape anywhere else. Before submitting, reread every commit message in the range and the PR body for the literal shape — keyword, then `#`, then digits — the way the parser reads, not for what the sentence means.
 2. **Re-read the issue's own body, Files and Verification sections against your actual diff — not just its comment thread.** A long investigation history accumulates tangents; the issue's original ask is still the bar a closing PR has to clear. If your diff answers something the thread raised rather than what the issue itself describes, say so and leave the issue open.
 3. **Labels match the terminal state you're leaving.** A closed issue meets the Definition of Done — `done`, and nothing left over from `ready`/`blocked`/`in-progress`/`paused`. An issue you file or put back in the queue meets the Definition of Ready — `agent-task` and its `scope:*` labels before `ready`.
 4. **Passing human review is not proof either check above happened.**
@@ -168,9 +164,11 @@ Binds every session that touches a numbered issue, not only ones dispatched thro
 |---------|-------|
 | Issue in, pull request out — intake, assignment, parallel runs and scopes, the merge gate, rescue, watchdog, the tokens the loop depends on | `references/github-loop.md` |
 | Runtime parity — the three config trees, per-runtime delegation defaults, Claude Code prerequisites | `references/runtime-parity.md` |
-| GitHub's closing-keyword parser, and the real incident it caused | `references/keyword-closing-postmortem.md` |
 | Per-pipeline step sequences | `agentic-pipeline-full`, `agentic-pipeline-fix-bug`, `agentic-pipeline-multi`, `agentic-pipeline-review-pr`, `agentic-pipeline-ask`, `agentic-pipeline-executor`, `agentic-pipeline-ci-fix` |
 | TDD cycle, finalization, PR status | `agentic-pipeline-tdd`, `agentic-pipeline-finalization`, `agentic-pipeline-pr-management` |
 | Writing an issue the pipeline can consume, its scope labels, and the Definition of Ready | `agentic-issue-creation` |
 | Editing any of these context files | `agentic-context-edition` |
 | Editing the workflows, composite actions and decision modules that run all of this | `agentic-workflow-edition` — no timer, which token raises which event, fail closed and loud |
+| What runs cost and how they spend it — per model, per agent, context size, cache, tools, pipeline counters | `npm run metrics -- report` over `runs.jsonl` on the `agentic-metrics` branch: `git fetch origin agentic-metrics && git show origin/agentic-metrics:runs.jsonl > runs.jsonl && npm run metrics -- report runs.jsonl`; one run's page is its job summary |
+
+History: docs/context-history/agentic-autonomous-pipeline.md

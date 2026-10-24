@@ -328,6 +328,15 @@ function start(label: string, command: string[]): number {
   return 0;
 }
 
+/**
+ * Log lines `wait` prints. A still-running slice only needs proof of life, and
+ * an agent may poll a long command a dozen times: 40 lines per poll was most
+ * of what a scenario run cost to watch.
+ */
+const TAIL_LINES_RUNNING = 5;
+const TAIL_LINES_PASSED = 30;
+const TAIL_LINES_FAILED = 200;
+
 async function wait(label: string, budgetSeconds: number): Promise<number> {
   const handle = handleFor(label);
   if (!existsSync(handle.pidPath) && !existsSync(handle.exitPath)) {
@@ -346,7 +355,9 @@ async function wait(label: string, budgetSeconds: number): Promise<number> {
 
     if (state.kind === 'finished') {
       const elapsed = Math.round((Date.now() - startedAt) / 1000);
-      console.log(tail(handle.logPath, 200));
+      // A green command's totals are at the end; a red one's cause can sit
+      // further up. Every line printed here is read into a model's context.
+      console.log(tail(handle.logPath, state.code === 0 ? TAIL_LINES_PASSED : TAIL_LINES_FAILED));
       console.log(
         `\nLONG RUN ${label} FINISHED exit=${state.code} (waited ${elapsed}s in this call)\n` +
         `  command: ${command}\n` +
@@ -367,7 +378,7 @@ async function wait(label: string, budgetSeconds: number): Promise<number> {
 
     if (Date.now() - startedAt >= budgetSeconds * 1000) {
       const elapsed = Math.round((Date.now() - startedAt) / 1000);
-      console.log(tail(handle.logPath, 40));
+      console.log(tail(handle.logPath, TAIL_LINES_RUNNING));
       console.log(
         `\nLONG RUN ${label} STILL RUNNING after ${elapsed}s of this call (pid ${state.pid}).\n` +
         `  command: ${command}\n` +

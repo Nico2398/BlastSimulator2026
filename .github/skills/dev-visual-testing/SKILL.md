@@ -31,9 +31,9 @@ npm run dev &
 ## ▶ What to run here, and what to leave to CI
 
 No GPU means Chromium rasterises in software, and the terrain material costs
-~6 s/frame that way (#475, open) — in a sandbox and on a CI runner alike. The
+~6 s/frame that way — in a sandbox and on a CI runner alike. The
 cost is per *frame*, not per level load (a `new_game` is ~4 s) and not the
-simulation (ticking is 1.7% of a frame). So anything that waits on frames in a
+simulation. So anything that waits on frames in a
 loop runs for tens of minutes, while a single screenshot pays it once.
 
 | Task | Where |
@@ -175,8 +175,6 @@ Work in this order. Stop at the first one that explains it.
 7. **Check for a timed card.** Auto-advance tutorial steps move on after 2s. Acting before the next card appears makes that step snapshot state *after* the change it was watching for, so it never completes. Use `waitForTutorialStep`.
 8. **Only then suspect the harness.** If `__probeSelector` says a control is usable and clicking it does nothing, the handler is not wired.
 
-A real failure this diagnostic order was built to catch: `hireEmployee` created every employee with `qualifications: []`. Surveys require a `geology` qualification, so a hired surveyor could not survey. `logic` and `scenario` were both green — the unit tests granted the skill with `assignSkill`, and the console-mode scenarios did the same. The model was correct; the game was unplayable, and only a real click caught it.
-
 ### Extra Capture Modes
 
 | Flag | Effect |
@@ -195,7 +193,7 @@ npm run validate:state   # State JSON schema validation
 npm run ui:diagnostic    # Clicks every UI button, reports computed styles and dead controls
 ```
 
-`npm run a11y` (#1419) needs the dev server. It starts a staffed game (`new_game seed:42 staffed:true`, one tick), measures the TopBar and ToolRail, then opens each panel by clicking its real rail button, measures it and closes it. It never hides the main menu or forces a panel visible. An element whose ancestors have no opaque background is listed under `unresolvedBackground`, never assumed white. A region that measures no text throws. It is not wired into CI or `validate`; it exits 1 while a black-on-dark defect (clock, roster labels) is on screen, until the colour fix lands.
+`npm run a11y` needs the dev server. It starts a staffed game (`new_game seed:42 staffed:true`, one tick), measures the TopBar and ToolRail, then opens each panel by clicking its real rail button, measures it and closes it. It never hides the main menu or forces a panel visible. An element whose ancestors have no opaque background is listed under `unresolvedBackground`, never assumed white. A region that measures no text throws. It is not wired into CI or `validate`; it exits 1 while a black-on-dark defect (clock, roster labels) is on screen, until the colour fix lands.
 
 ## What to Evaluate
 
@@ -235,3 +233,5 @@ When images could not be produced at all, say the visual channel is unverified a
 A screenshot shows a button. It does not show that the button is enabled, that a click reaches it, or that a player can satisfy its preconditions. What proves that: a `role: 'player'` scenario step, whose `interaction` array can never fall back to a console command (`checkStepActionAllowed`, `scripts/shared/interaction-executor.ts` — throws before the command reaches the game), combined with an `expect.usable`/`expect.blocked` check on the control it just clicked. A step whose click cannot complete fails the whole scenario and names the blocking control, the same diagnosis `__probeSelector`/`blockedBy` gives above.
 
 When the change touches a player-facing flow, run the scenario suite in interaction mode (`npm run scenarios:interaction`, or one named scenario with `npm run scenario -- --mode interaction --screenshots`) — no console command may stand in for a player action. Step roles and the allowlists each role is checked against: `dev-scenario-authoring` skill.
+
+History: docs/context-history/dev-visual-testing.md

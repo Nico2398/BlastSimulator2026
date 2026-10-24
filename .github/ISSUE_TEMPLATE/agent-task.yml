@@ -7,7 +7,7 @@ body:
       value: >
         Filing this issue is the whole handover. The pipeline picks it up on its own,
         plans it, writes the tests, implements it, verifies it, and opens the pull
-        request. Describe the outcome you want — the planner derives which files and
+        request. Describe the outcome you want — the run's plan derives which files and
         tests it needs. Where this issue leaves a choice open the run takes the default
         the specs already imply and records it in the pull request, so an unanswered
         corner is not a reason to hold the issue back.
