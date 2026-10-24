@@ -31,7 +31,7 @@ function gradeCash(r: RunResult): string {
 const HEADERS = [
   'seed', 'biome', 'kit', 'strategy',
   ...CASH_SAMPLE_TICKS.map(t => `cash@${t}`),
-  'low cash', 'low tick', 'bankrupt', 'firstBlastSold@6000', 'blasts',
+  'low cash', 'low tick', 'bankrupt', 'firstBlastSold@6000', 'blasts', 'pit m',
   'warehouseFull tick', 'haulWait ticks', 'boulderSold', 'boulderOreSold', 'grades', 'grade cash', 'catalog bought',
   'affordable warehouseT2', 'affordable researchCenter', 'affordable secondHauler', 'end',
 ];
@@ -42,7 +42,7 @@ function row(r: RunResult): string[] {
     String(r.config.seed), r.config.biome, r.config.kit, r.config.strategy,
     ...CASH_SAMPLE_TICKS.map(t => cell(m.cashAt[t] ?? null)),
     cell(m.lowPointCash), cell(m.lowPointTick), cell(m.bankruptTick),
-    share(m.firstBlastSoldShareAt6000), cell(m.blastsFired),
+    share(m.firstBlastSoldShareAt6000), cell(m.blastsFired), cell(m.deepestPitM, 1),
     cell(m.warehouseFullTick), cell(m.ticksHaulWaitedOnFullStorage), share(m.boulderSoldShare), share(m.boulderOreSoldShare), grades(r), gradeCash(r), cell(m.catalogBoughtTick),
     cell(m.affordableTick.warehouseT2), cell(m.affordableTick.researchCenter), cell(m.affordableTick.secondHauler),
     r.endReason ?? `t${r.endTick}`,
@@ -68,7 +68,7 @@ function medianRow(runs: RunResult[]): string[] {
     ...CASH_SAMPLE_TICKS.map(t => cell(med(runs, r => r.metrics.cashAt[t] ?? null))),
     cell(med(runs, r => r.metrics.lowPointCash)), cell(med(runs, r => r.metrics.lowPointTick)),
     cell(med(runs, r => r.metrics.bankruptTick)),
-    share(med(runs, r => r.metrics.firstBlastSoldShareAt6000)), cell(med(runs, r => r.metrics.blastsFired)),
+    share(med(runs, r => r.metrics.firstBlastSoldShareAt6000)), cell(med(runs, r => r.metrics.blastsFired)), cell(med(runs, r => r.metrics.deepestPitM), 1),
     cell(med(runs, r => r.metrics.warehouseFullTick)), cell(med(runs, r => r.metrics.ticksHaulWaitedOnFullStorage)),
     share(med(runs, r => r.metrics.boulderSoldShare)), share(med(runs, r => r.metrics.boulderOreSoldShare)), NONE, NONE,
     cell(med(runs, r => r.metrics.catalogBoughtTick)),

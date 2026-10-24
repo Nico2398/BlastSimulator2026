@@ -131,6 +131,19 @@ describe('planCraterAccess', () => {
     expect(ledge(first.x, first.z)).toBe(true);
   });
 
+  it('never routes a ramp through a tile a building occupies (#2076)', () => {
+    const s = surface(PIT, outsidePit(PIT));
+    const free = planCraterAccess(centreFloor(PIT), s, MAX_RATIO, 3);
+    expect(free.ok).toBe(true);
+    if (!free.ok) return;
+    const taken = new Set(rampPathCells(rampPathOf(free.def), 3).map(c => `${c.x},${c.z}`));
+    const occupied = (x: number, z: number) => taken.has(`${x},${z}`);
+    const plan = planCraterAccess(centreFloor(PIT), s, MAX_RATIO, 3, [], [], occupied);
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(rampPathCells(rampPathOf(plan.def), 3).some(c => occupied(c.x, c.z))).toBe(false);
+  });
+
   it('refuses with a reason key when no network cell lies within the longest ramp', () => {
     const plan = planCraterAccess(centreFloor(PIT), surface(PIT, () => false), MAX_RATIO, 3);
     expect(plan.ok).toBe(false);

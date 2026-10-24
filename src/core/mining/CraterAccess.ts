@@ -9,7 +9,7 @@ import {
 import { slopeDegreesForRatio } from '../nav/ClimbLimit.js';
 import { computeRampCost, rampDefFromLegs, rampFootOffset, rampLengthForGrade, validateRampOrder, type RampDef } from './Ramp.js';
 import {
-  RAMP_DIR_OFFSETS, findRampPathFault, rampPathOf, rampTotalLength, rampWaypoints, type RampDirection, type RampFootprint, type RampLeg,
+  RAMP_DIR_OFFSETS, findRampPathFault, firstOccupiedPathTile, rampPathCells, rampPathOf, rampTotalLength, rampWaypoints, type RampDirection, type RampFootprint, type RampLeg,
 } from './RampPath.js';
 import { rampFootprint } from './RampWidening.js';
 import { isPitRim, proposeRampSpiral, type SpiralDir, type SpiralSurface } from './RampSpiral.js';
@@ -334,12 +334,15 @@ export function planCraterAccess(
   width: RampWidth,
   avoid: readonly RampFootprint[] = [],
   built: readonly DugRamp[] = [],
+  occupied: (x: number, z: number) => boolean = () => false,
 ): CraterAccessPlan {
   const limitRatio = maxClimbRatio * CRATER_ACCESS_MAX_GRADE_MARGIN;
   if (!(limitRatio > 0) || !Number.isFinite(floor.floorY)) return { ok: false, reasonKey: `${KEY}no_start` };
   // A plan identical to a dug ramp carves nothing new: re-ordering it would loop forever on a floor it never reached (#2085).
   const builtKeys = new Set(built.map(b => rampKey(b.def, b.width)));
-  const excluded: Excluded = def => builtKeys.has(rampKey(def, width)) || overlapsAny(def, width, avoid);
+  // A ramp through a building's tile is dug but never driven: the building blocks the road (#2076).
+  const hitsBuilding = (def: RampDef): boolean => firstOccupiedPathTile(rampPathCells(rampPathOf(def), width), occupied) !== null;
+  const excluded: Excluded = def => builtKeys.has(rampKey(def, width)) || overlapsAny(def, width, avoid) || hitsBuilding(def);
   const straight = planStraight(floor, surface, limitRatio, width, excluded);
   if (straight.plan !== null) return straight.plan;
   const spiral = planSpiral(floor, surface, limitRatio, width, excluded);

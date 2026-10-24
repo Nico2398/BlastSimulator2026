@@ -82,10 +82,10 @@ import {
   decideLadderDeepen, decideFreshShotSite, decideBuriedPattern, decideLadderShotSide, siteHoldsOre, decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM,
   LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
   rampProtectionZones, shotOverlapsProtectedRamp,
-  decideLadderHoleDepth, judgeLadderShot,
+  decideLadderHoleDepth, judgeLadderShot, decideLadderHaulerBuy, rampStartsInsideCrater, LADDER_STALE_RAMP_TICKS,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
-import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
+import { isDebrisAbandoned, pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
@@ -363,6 +363,9 @@ function fireShot(s: ProbeSession): boolean {
 
 // ── Ramp ──
 
+/** Identifies a ramp lane (start tile and direction) so a lane that proved unreachable is not ordered again. */
+const rampLaneKey = (x: number, z: number, dirX: number, dirZ: number): string => `${x},${z},${dirX},${dirZ}`;
+
 /** A ramp accepted by `build_ramp`: rise over run, and the horizontal run (m). */
 interface RampOrder extends RampFootprintInput { slope: number }
 
@@ -370,7 +373,9 @@ interface RampOrder extends RampFootprintInput { slope: number }
  * Order a ramp from the open ground into the crater the shot at `at` (`span` wide) made, no steeper than
  * `maxSlope` rise per tile; the ramp's slope ratio and run when one was accepted, else null.
  */
-function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = RAMP_MAX_SLOPE): RampOrder | null {
+function orderRamp(
+  s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = RAMP_MAX_SLOPE, banned: ReadonlySet<string> = new Set(),
+): RampOrder | null {
   const { grid } = s;
   const mid = span / 2;
   const centre = { x: at.x + mid, z: at.z + mid };
@@ -384,7 +389,9 @@ function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = RA
   for (let length = 8; length <= RAMP_MAX_LENGTH; length++) {
     for (const lane of lanes) {
       const start = { x: lane.end.x - lane.dx * length, z: lane.end.z - lane.dz * length };
+      if (banned.has(rampLaneKey(start.x, start.z, lane.dx, lane.dz))) continue;
       if (start.x < 1 || start.z < 1 || start.x >= grid.sizeX - 1 || start.z >= grid.sizeZ - 1) continue;
+      if (rampStartsInsideCrater({ startX: start.x, startZ: start.z, craterX: at.x, craterZ: at.z, craterSpan: span })) continue;
       const depth = Math.round(getSmoothTerrainSurfaceY(grid, start.x, start.z) - floor);
       if (depth < 1 || depth / length > maxSlope) continue;
       if (s.run(`build_ramp start:${start.x},${start.z} end:${lane.end.x},${lane.end.z} depth:${depth}`).success) return { slope: depth / length, x: start.x, z: start.z, runM: length, dirX: lane.dx, dirZ: lane.dz };
@@ -570,6 +577,29 @@ function dropUnreachablePattern(s: ProbeSession, m: LadderMemory): void {
   delete m.stalePatternSinceTick;
 }
 
+/**
+ * A ramp order none of the diggers reaches never finishes, and while its segments stand no later ramp is ordered: the crater
+ * it was meant for keeps its rubble sealed. After LADDER_STALE_RAMP_TICKS, cancel it, ban its lane and forget it so the crater is ramped again from another side.
+ */
+function dropStaleRamp(s: ProbeSession, m: LadderMemory): void {
+  const blocked = s.state.pendingActions.filter(a => a.type === 'dig_ramp_segment' && a.blockedReason === 'target_unreachable');
+  const verdict = decideBuriedPattern({
+    buriedHoleCount: blocked.length, buriedSinceTick: m.rampBlockedSinceTick, tick: s.state.tickCount, dropAfterTicks: LADDER_STALE_RAMP_TICKS,
+  });
+  m.rampBlockedSinceTick = verdict.buriedSinceTick;
+  if (verdict.action !== 'drop') return;
+  for (const id of new Set(blocked.map(a => (a.payload as { rampId: number }).rampId))) s.run(`build_ramp cancel ${id}`);
+  for (const [key, ramp] of Object.entries(m.ramps)) {
+    const [zone] = rampProtectionZones([ramp], 0);
+    if (!blocked.some(a => shotOverlapsProtectedRamp({ x: a.targetX, z: a.targetZ, span: 1 }, [zone!]))) continue;
+    m.bannedRamps.add(rampLaneKey(ramp.x, ramp.z, ramp.dirX, ramp.dirZ));
+    delete m.ramps[key];
+  }
+  m.rampPending = null;
+  delete m.retryAt[LADDER_RAMP_RETRY_KEY];
+  delete m.retryAt['crater_ramp'];
+}
+
 /** Give up the ordered shot: bar its footprint from later fresh sites, clear the pattern and forget the shot. */
 function abandonShot(s: ProbeSession, m: LadderMemory, barred: Pattern & { span: number }): void {
   m.barred.push(barred);
@@ -647,15 +677,17 @@ const sandboxRun = (s: ProbeSession): boolean => !s.engine.ctx.campaignProfile.c
 export const ladderHoleDepthM = (s: ProbeSession): number => sandboxRun(s) ? LADDER_SANDBOX_HOLE_DEPTH_M : LADDER_CAMPAIGN_HOLE_DEPTH_M;
 /** A pit this close under the hole depth counts as dug: deepening then waits for a cleared crater instead of a fresh site. */
 const LADDER_FRESH_SHOT_DEPTH_SLACK_M = 0.5;
-/** Haulers the ladder buys while cash is idle: rubble clears at the fleet's pace, and a buried pit stalls every later shot. */
-const LADDER_MAX_HAULERS = 6;
 /** Shrink factors tried when a limit-sized pattern fits no free site, widest first. */
 const LADDER_SHRINK_STEPS = [1, 0.75, 0.5, 0.25] as const;
 const LADDER_RAMP_RETRY_KEY = 'gentle_ramp';
 const SOFTEST_SAFE_FACE_M = WALL_SAFE_FACE_HEIGHT_M_BY_TIER[1]!;
 
-/** Roles the ladder upgrades in place, in priority order: depth (rig), then ramp digging. Haulers are not upgraded: tier 2 climbs less steeply. */
-const LADDER_UPGRADE_ROLES: readonly VehicleRole[] = ['drill_rig', 'debris_hauler', 'rock_digger'];
+/**
+ * Roles the ladder upgrades in place, in priority order: depth (rig), then ramp digging. Haulers are not upgraded: tier 2 climbs
+ * less steeply, and a fleet upgraded around one licensed driver stalled the whole haul when that driver died (every order
+ * `licence_level_too_low`, income zero, bankrupt t19908).
+ */
+export const LADDER_UPGRADE_ROLES: readonly VehicleRole[] = ['drill_rig', 'rock_digger'];
 /** Cash kept back after an upgrade or a licence course: a stalled income must outlast the payroll it grew. */
 const LADDER_UPGRADE_RESERVE = 150_000;
 /** Ticks between hires made for a licence course: a fresh hire needs time to enrol and train before another is paid for. */
@@ -680,6 +712,10 @@ interface LadderMemory extends ReinvestMemory {
   barred: Array<Pattern & { span: number }>;
   /** Tick since which a pattern's drill orders have stayed buried under rubble; null when none is. */
   buriedSinceTick: number | null;
+  /** Tick since which a ramp order has stayed unreachable by every digger; null when none is. */
+  rampBlockedSinceTick: number | null;
+  /** Ramp lanes (`rampLaneKey`) cancelled as unreachable: later ramps pick another. */
+  bannedRamps: Set<string>;
   /** Hole depth cap (m) in force for the last shot. */
   holeCapM: number;
   /** Whether the last judged shot gained no pit depth and no new ore. */
@@ -770,7 +806,8 @@ export function craterRubbleCounts(state: GameState, crater: Pattern & { span: n
   for (const f of state.logistics.fragments) {
     if (f.state !== 'on_ground' || !inCraterFringe(f.fragment.position.x, f.fragment.position.z, crater)) continue;
     const id = f.fragment.id;
-    if (sealedIds.has(id)) counts.sealed++;
+    // An abandoned fragment lost its order for being out of reach: it is sealed too, not waiting for an order (#2076).
+    if (sealedIds.has(id) || isDebrisAbandoned(state, id)) counts.sealed++;
     else if (orderedIds.has(id)) counts.ordered++;
     else counts.orderless++;
   }
@@ -932,7 +969,7 @@ function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
   const reachable = ([3, 2] as const).find(t => mayBuyVehicleTier(t, grade, 0));
   if (reachable !== undefined && m.rampSlope > tierSlopeRatio(reachable) && m.rampPending === null) {
     tryOnce(s, m, LADDER_RAMP_RETRY_KEY, () => {
-      const ramp = orderRamp(s, m.crater, m.crater.span, tierSlopeRatio(reachable));
+      const ramp = orderRamp(s, m.crater, m.crater.span, tierSlopeRatio(reachable), m.bannedRamps);
       if (ramp !== null) {
         m.rampPending = ramp.slope;
         recordRamp(m, m.crater, ramp);
@@ -1032,7 +1069,7 @@ function ladderCraterRamp(s: ProbeSession, m: LadderMemory): void {
   const needsWayIn = reach !== 'fire' && (sandboxRun(s) || gradeOf(s) >= LADDER_GATE_MIN_GRADE);
   if (deeper === 'skip' && (!needsWayIn || !affordable)) return;
   tryOnce(s, m, 'crater_ramp', () => {
-    const ramp = orderRamp(s, m.crater, m.crater.span, Math.min(RAMP_MAX_SLOPE, climb));
+    const ramp = orderRamp(s, m.crater, m.crater.span, Math.min(RAMP_MAX_SLOPE, climb), m.bannedRamps);
     if (ramp === null) return false;
     recordRamp(m, m.crater, ramp);
     m.rampedFloorM = Math.max(m.rampedFloorM, floorDepthM);
@@ -1097,10 +1134,39 @@ function gatedLadderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
 
 /** Another hauler (and its driver) while cash sits idle and the pit still holds rubble. */
 function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
-  const haulers = s.state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length;
   const cost = getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver;
-  if (haulers >= LADDER_MAX_HAULERS || s.state.cash - cost < LADDER_UPGRADE_RESERVE || onGroundMassKg(s.state.logistics) === 0) return;
+  if (decideLadderHaulerBuy({
+    haulers: s.state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length,
+    cash: s.state.cash, cost, reserve: LADDER_UPGRADE_RESERVE, rubbleKg: onGroundMassKg(s.state.logistics),
+  }) === 'skip') return;
   tryOnce(s, m, 'hauler', () => buyHauler(s));
+}
+
+/** Opt-in (PROBE_DIAG=1) one-line ladder state to stderr every PROBE_DIAG_TICKS ticks: why a run stalls reads off the line. */
+function ladderDiagnostics(s: ProbeSession, m: LadderMemory): void {
+  tmpDump(s);
+  const every = Number(process.env['PROBE_DIAG_TICKS'] ?? 1000);
+  if (process.env['PROBE_DIAG'] !== '1' || s.state.tickCount % every !== 0) return;
+  const { state } = s;
+  const count = (f: (a: GameState['pendingActions'][number]) => boolean): number => state.pendingActions.filter(f).length;
+  const blocked: Record<string, number> = {};
+  for (const a of state.pendingActions) if (a.blockedReason) blocked[`${a.type}:${a.blockedReason}`] = (blocked[`${a.type}:${a.blockedReason}`] ?? 0) + 1;
+  const emps = state.employees.employees.filter(e => e.alive);
+  const idle = emps.filter(e => e.activeActionId === null && e.taskQueue.length === 0).length;
+  const counts = craterRubbleCounts(state, m.crater);
+  const hist: Record<string, number> = {};
+  for (const a of state.pendingActions) hist[a.type] = (hist[a.type] ?? 0) + 1;
+  const act = emps.filter(e => e.activeActionId !== null).map(e => `${e.id}:${state.pendingActions.find(a => a.id === e.activeActionId)?.type ?? 'x'}`);
+  console.error(`[diag-act t${state.tickCount}] pending=${JSON.stringify(hist)} active=${act.join(',')} detonation=${state.pendingDetonation !== null} `
+    + `charges=${Object.keys(state.chargesByHole).length}/${Object.keys(state.plannedChargesByHole).length} emp=${emps.map(e => `${e.id}${e.role.slice(0, 2)}f${Math.round(e.fatigue)}r${e.restTicksRemaining ?? '-'}q${e.taskQueue.length}${e.collapsing ? 'C' : ''}${e.trainingState ? 'T' : ''}${e.injured ? 'I' : ''}${e.locomotion?.kind ?? ''}`).join(' ')}`);
+  const plan = ladderPlan(s, m);
+  console.error(`[diag t${state.tickCount}] g${gradeOf(s)} blasts=${state.grade?.blastsFired} pit=${(state.grade?.deepestPitM ?? 0).toFixed(1)} `
+    + `cash=${Math.round(state.cash)} payroll/t=${Math.round(getOperatingCostPerHour(state).payroll)} emps=${emps.length} idle=${idle} `
+    + `rubbleKg=${Math.round(onGroundMassKg(state.logistics))} reachKg=${Math.round(reachableRubbleKg(state))} ore=${Math.round(state.grade?.oreDeliveredKg ?? 0)} `
+    + `haulOrders=${count(a => a.type === 'haul_debris')} shot=${m.shot !== null} patt=${state.plannedDrillHoles.length}/${state.drillHoles.length} `
+    + `barred=${m.barred.length} craterRubble=${counts.ordered}/${counts.orderless}/${counts.sealed} planCost=${Number.isFinite(plan.cost) ? Math.round(plan.cost) : 'inf'} wanted=${plan.wanted} `
+    + `fleet=${state.vehicles.vehicles.map(v => `${v.type.slice(0, 5)}${v.tier}:${vehicleDriverId(v) ?? '-'}`).join(',')} `
+    + `lic=${emps.map(e => `${e.id}${e.role.slice(0, 2)}${licenceLevelOfSkill(e.qualifications, ROLE_LICENCE_REQUIRED.debris_hauler)}`).join(',')} blocked=${JSON.stringify(blocked)}`);
 }
 
 function runLadder(s: ProbeSession, maxGrade: number | null): void {
@@ -1108,7 +1174,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {},
-    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.ramp.slope, ramps: {}, rampPending: null, rampedFloorM: 0, maxGrade, barred: [], buriedSinceTick: null,
+    crater: { ...opened.at, span: SHOT_SPAN }, rampSlope: opened.ramp.slope, ramps: {}, rampPending: null, rampedFloorM: 0, maxGrade, barred: [], buriedSinceTick: null, rampBlockedSinceTick: null, bannedRamps: new Set(),
     holeCapM: ladderHoleDepthM(s), lastShotFailed: false, dudStreak: 0, judgedShots: 1,
     before: { pitM: 0, oreKg: 0 },
   };
@@ -1119,6 +1185,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     ladderSpoil(s, m);
     ladderSafety(s, m);
     dropUnreachablePattern(s, m);
+    dropStaleRamp(s, m);
     reinvestShot(s, m, () => gatedLadderPlan(s, m));
     trackLadderShot(s, m);
     const last = m.origins[m.origins.length - 1]!;
@@ -1130,6 +1197,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     ladderEquipment(s, m);
     const need = ladderPlan(s, m);
     if (!Number.isFinite(need.cost)) upgradeBuilding(s, m, 'explosive_warehouse');
+    ladderDiagnostics(s, m);
   });
 }
 
@@ -1234,3 +1302,59 @@ export function runMatrix(
   }
   return results;
 }
+
+import { strandedDebrisTargets, siteVehicleReach } from '../../src/core/engine/OrderReachability.js';
+import { clusterStrandedFloors, planCraterAccess } from '../../src/core/mining/CraterAccess.js';
+import { computeVoxelColumnSurfaceHeight } from '../../src/core/world/VoxelGrid.js';
+import { slowestVehicleTierSlopeRatio } from '../../src/core/nav/ClimbLimit.js';
+let tmpLast: unknown = null;
+function tmpDump(s: ProbeSession): void {
+  if (process.env['PROBE_BLASTLOG'] === '1' && s.state.lastBlastReport && s.state.lastBlastReport !== tmpLast) { tmpLast = s.state.lastBlastReport; const r = s.state.lastBlastReport as unknown as Record<string, unknown>; console.error('[blast] t', s.state.tickCount, 'pit', s.state.grade?.deepestPitM, JSON.stringify(Object.fromEntries(Object.entries(r).filter(([, v]) => typeof v !== 'object' || v === null))), 'holes', JSON.stringify(s.state.drillHoles.map(h => [h.x, h.z, h.depth, h.diameter]).slice(0, 3))); }
+  const at = (process.env['PROBE_DUMP_TICKS'] ?? '').split(',').map(Number);
+  if (!at.includes(s.state.tickCount)) return;
+  const st = s.state; const grid = s.grid; const nav = st.navGrid!;
+  console.error('[dump] tick', st.tickCount, 'planned', JSON.stringify(st.plannedRamps.map(r => ({ id: r.id, def: r.def, fp: r.footprint, segs: r.segments.map(g => [g.actionId, g.done, st.pendingActions.find(a => a.id === g.actionId)?.blockedReason ?? null, st.pendingActions.find(a => a.id === g.actionId)?.status ?? null]) }))));
+  console.error('[dump] built', JSON.stringify(st.builtRamps.map(r => ({ def: r.def, width: r.width }))));
+  { const holes = st.plannedDrillHoles; const sealedIds = sealedFragmentIdsOf(st); const reachV = siteVehicleReach(st)!;
+    console.error('[dump] planned holes', JSON.stringify(holes.map(h => [h.id, h.x, h.z])));
+    const cover = st.logistics.fragments.filter(f => f.state === 'on_ground' && holes.some(h => Math.abs(f.fragment.position.x - h.x) <= 1.5 + (f.fragment.halfExtents?.x ?? 0) && Math.abs(f.fragment.position.z - h.z) <= 1.5 + (f.fragment.halfExtents?.z ?? 0)));
+    console.error('[dump] covering', cover.length, JSON.stringify(cover.slice(0, 12).map(f => ({ id: f.fragment.id, p: f.fragment.position, sealed: sealedIds?.has(f.fragment.id), aband: isDebrisAbandoned(st, f.fragment.id), orders: st.pendingActions.filter(a => (a.payload as { fragmentId?: number }).fragmentId === f.fragment.id).map(a => [a.type, a.blockedReason, a.status]), reachV: reachV(Math.round(f.fragment.position.x), Math.round(f.fragment.position.z)) }))));
+  }
+  { const rch = siteVehicleReach(st)!; for (let z = 36; z <= 56; z++) { let row = ''; for (let x = 0; x <= 24; x++) { const h = computeVoxelColumnSurfaceHeight(grid, x, z); row += (Number.isFinite(h) ? Math.round(h).toString(36) : '.') + (rch(x, z) ? '+' : ' '); } console.error(`[map] z${z} ${row}`); } }
+  console.error('[dump] segs', JSON.stringify(st.pendingActions.filter(a => a.type === 'dig_ramp_segment')));
+  console.error('[dump] diggers', JSON.stringify(st.vehicles.vehicles.filter(v => v.type === 'rock_digger')), JSON.stringify(st.employees.employees.map(e => [e.id, e.role, e.qualifications, e.activeActionId, e.taskQueue.length, e.locomotion?.kind])));
+  for (const id of [4, 12, 6]) {
+    const e = st.employees.employees.find(x => x.id === id)!;
+    for (const a of st.pendingActions.filter(x => x.type === 'dig_ramp_segment').slice(0, 1)) {
+      console.error('[dump] claim', id, a.id, JSON.stringify(findVehicleForClaim(st, a, e)).slice(0, 200), 'pos', e.x, e.z, 'sel', JSON.stringify(selectBestActionForEmployee(st, e, [a])?.action.id ?? null), 'claimable', isRampSegmentClaimable(st, a), 'backoff', a.stuckBackoffUntilTick);
+    }
+  }
+  { const e = st.employees.employees.find(x => x.id === 12)!; const cr = employeeClimbReach(st)!;
+    for (const a of st.pendingActions.filter(x => x.type === 'dig_ramp_segment')) console.error('[dump] reach', a.id, a.targetX, a.targetZ, 'canReach', cr.canReach(e.x, e.z, a.targetX, a.targetZ), 'cost', JSON.stringify(resolveActionCost(st, e, a)));
+    for (const z of [6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46, 48]) console.error('[dump] ramp col', z, 'h', computeVoxelColumnSurfaceHeight(grid, 7, z), 'nav', JSON.stringify(nav.cellAt(7, z)), 'ccan', cr.canReach(e.x, e.z, 7, z)); }
+  console.error('[dump] buildings', JSON.stringify(st.buildings.buildings.map(b => [b.id, b.type, b.tier, b.x, b.z, b.width, b.depth, b.rotation])), JSON.stringify(st.plannedBuildings ?? null).slice(0, 600));
+  const reach = siteVehicleReach(st)!;
+  const cells = strandedDebrisTargets(st).filter(t => !reach(Math.round(t.x), Math.round(t.z))).map(t => ({ x: t.x, z: t.z, y: computeVoxelColumnSurfaceHeight(grid, Math.round(t.x), Math.round(t.z)) }));
+  const floors = clusterStrandedFloors(cells, 4);
+  console.error('[dump] stranded cells', cells.length, 'floors', JSON.stringify(floors));
+  const surface = { heightAt: (x: number, z: number) => computeVoxelColumnSurfaceHeight(grid, x, z), contains: (x: number, z: number) => grid.containsColumn(x, z) && (nav.cellAt(x, z)?.type ?? 'void') !== 'void', reachableFrom: reach };
+  const bocc = buildingFootprintOccupants(st);
+  console.error('[dump] vehicles', JSON.stringify(st.vehicles.vehicles.map(v => [v.id, v.type, v.tier, Math.round(v.x), Math.round(v.z), reach(Math.round(v.x), Math.round(v.z)) ? 'in' : 'out'])));
+  console.error('[dump] rally', JSON.stringify(st.rallyPoint), 'size', grid.sizeX, grid.sizeZ);
+  for (let z = 0; z < 0; z += 2) { let row = ''; for (let x = 0; x < Math.min(grid.sizeX, 70); x += 1) { const b = bocc.some(o => isBuildingFootprintCell(o, x, z)); row += b ? '#' : reach(x, z) ? '+' : (nav.cellAt(x, z)?.type === 'void' ? ' ' : '.'); } console.error(`[rmap] z${String(z).padStart(2)} ${row}`); }
+  { const f = floors[0]; if (f) { const D: Record<string, [number, number]> = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] };
+    for (const length of [26, 30, 34, 38, 42, 46, 50, 56]) for (const dname of Object.keys(D)) { const [dx, dz] = D[dname]!; const sx = Math.round(f.x) - dx * length; const sz = Math.round(f.z) - dz * length;
+      const inside = grid.containsColumn(sx, sz); const rc = inside && reach(sx, sz); const hgt = computeVoxelColumnSurfaceHeight(grid, sx, sz);
+      let occ = 0; for (let s = 0; s <= length; s++) for (let k = -1; k <= 1; k++) { const x = sx + dx * s + Math.abs(dz) * k; const z = sz + dz * s + Math.abs(dx) * k; if (bocc.some(b => isBuildingFootprintCell(b, x, z))) occ++; }
+      console.error('[probe-dir]', length, dname, 'start', sx, sz, 'in', inside, 'reach', rc, 'h', Math.round(hgt * 10) / 10, 'drop/len', Math.round((hgt - f.floorY) / length * 1000) / 1000, 'occ', occ); } } }
+  for (const f of floors) console.error('[dump] plan', JSON.stringify(f), JSON.stringify(planCraterAccess(f, surface, slowestVehicleTierSlopeRatio(), 3 as never, [], st.builtRamps, (x, z) => bocc.some(b => isBuildingFootprintCell(b, x, z)))), 'ratio', slowestVehicleTierSlopeRatio());
+  // height map around crater
+  const c = floors[0]; if (c) { for (let z = Math.round(c.z) - 14; z <= Math.round(c.z) + 14; z += 2) { let row = ''; for (let x = Math.round(c.x) - 20; x <= Math.round(c.x) + 20; x++) { const h = computeVoxelColumnSurfaceHeight(grid, x, z); row += (Number.isFinite(h) ? Math.round(h).toString(36) : '.') + (reach(x, z) ? '+' : ''); } console.error(`[dump] z${z} ${row}`); } }
+}
+
+import { findVehicleForClaim } from '../../src/core/engine/VehicleReservation.js';
+import { employeeClimbReach } from '../../src/core/engine/OrderReachability.js';
+import { selectBestActionForEmployee, isRampSegmentClaimable, resolveActionCost } from '../../src/core/engine/ActionSelection.js';
+
+import { buildingFootprintOccupants } from '../../src/core/nav/NavGridSync.js';
+import { isBuildingFootprintCell } from '../../src/core/entities/BuildingPlacement.js';

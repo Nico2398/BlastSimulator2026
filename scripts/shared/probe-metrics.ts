@@ -19,6 +19,8 @@ interface ProbeMetrics {
   bankruptTick: number | null;
   firstBlastSoldShareAt6000: number | null;
   blastsFired: number;
+  /** Deepest pit (m) the run reached; grade 3 asks for 20. */
+  deepestPitM: number;
   warehouseFullTick: number | null;
   ticksHaulWaitedOnFullStorage: number;
   boulderSoldShare: number | null;
@@ -97,6 +99,7 @@ export class MetricsObserver {
   private lowPointTick = 0;
   private bankruptTick: number | null = null;
   private blastsFired = 0;
+  private deepestPitM = 0;
   private lastReport: BlastReport | null = null;
   private firstBlastOreKg: number | null = null;
   private soldAtSecondBlastKg: number | null = null;
@@ -136,6 +139,7 @@ export class MetricsObserver {
     if (this.bankruptTick === null && (state.bankruptcy.bankrupt || state.levelEndReason === 'bankruptcy')) {
       this.bankruptTick = t;
     }
+    this.deepestPitM = Math.max(this.deepestPitM, state.grade?.deepestPitM ?? 0);
     this.observeBlast(state);
     this.observeStorage(state);
     this.observeProgress(state);
@@ -211,6 +215,7 @@ export class MetricsObserver {
       bankruptTick: this.bankruptTick,
       firstBlastSoldShareAt6000: this.soldShare(),
       blastsFired: this.blastsFired,
+      deepestPitM: this.deepestPitM,
       warehouseFullTick: this.warehouseFullTick,
       ticksHaulWaitedOnFullStorage: this.haulWaitTicks,
       boulderSoldShare: this.boulderShare(),

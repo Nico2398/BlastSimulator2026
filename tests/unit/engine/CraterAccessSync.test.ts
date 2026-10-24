@@ -4,7 +4,7 @@
 // debris_out_of_reach. Everything runs through the real tick pipeline; nothing is mocked.
 
 import { describe, it, expect } from 'vitest';
-import { makeCraterSite, dropRubble, parkBlockedRamp, type CraterSite, type Pit } from '../../helpers/craterAccessFixture.js';
+import { makeCraterSite, cutPit, dropRubble, parkBlockedRamp, type CraterSite, type Pit } from '../../helpers/craterAccessFixture.js';
 import { tickUntilFresh } from '../../helpers/blastFixtures.js';
 import { CRATER_ACCESS_MIN_STRANDED_ORDERS, CRATER_ACCESS_RECHECK_TICKS } from '../../../src/core/config/balance.js';
 import { strandedDebrisTargets } from '../../../src/core/engine/OrderReachability.js';
@@ -42,6 +42,15 @@ describe('syncCraterAccess', () => {
     tickUntilRamp(site, WINDOW);
     expect(site.state.plannedRamps).toHaveLength(1);
     expect(rampOrders(site).length).toBeGreaterThan(0);
+  });
+
+  it('judges the network by where the fleet drives, not by a rally point cut off from it (#2076)', () => {
+    const site = strandedSite();
+    // A flag in a pit of its own stands for a pocket the fleet does not use: the fleet is on the surface.
+    cutPit(site, { x0: 8, z0: 8, size: 8, drop: 8 });
+    site.state.rallyPoint = { x: 12, z: 12 };
+    tickUntilRamp(site, WINDOW);
+    expect(site.state.plannedRamps).toHaveLength(1);
   });
 
   it('charges the ramp as construction spending', () => {

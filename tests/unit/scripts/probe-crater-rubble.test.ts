@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import { abandonDebrisFragments } from '../../../src/core/economy/HaulDispatch.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { tierSlopeRatio } from '../../../src/core/nav/ClimbLimit.js';
 
@@ -89,6 +90,13 @@ describe('craterRubbleCounts', () => {
     withFragment(state, 1, 9, 9);
     withFragment(state, 2, 19, 19);
     expect(craterRubbleCounts(state, crater).orderless).toBe(2);
+  });
+
+  it('counts an unordered abandoned fragment as sealed, not orderless (#2076)', () => {
+    withFragment(state, 1, 12, 12);
+    withFragment(state, 2, 13, 13);
+    abandonDebrisFragments(state, [1]);
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 1, sealed: 1 });
   });
 
   it('counts an unordered sealed fragment as sealed only', () => {

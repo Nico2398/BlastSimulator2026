@@ -129,6 +129,11 @@ export function abandonDebrisFragments(state: GameState, fragmentIds: ReadonlyAr
   abandonedFragmentIds.set(state, set);
 }
 
+/** True while `fragmentId` is held back from haul orders as unreachable (#2076): nobody can haul it, whatever its order list says. */
+export function isDebrisAbandoned(state: GameState, fragmentId: number): boolean {
+  return abandonedFragmentIds.get(state)?.has(fragmentId) === true;
+}
+
 /** Lets abandoned fragments get orders again (a ramp now reaches their crater). */
 export function clearAbandonedDebris(state: GameState): void {
   if (abandonedFragmentIds.delete(state)) lastHaulDispatch.delete(state);

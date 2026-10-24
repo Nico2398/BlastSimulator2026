@@ -84,6 +84,19 @@ describe('MetricsObserver', () => {
 });
 
 describe('extended metrics (#1945)', () => {
+  it('keeps the deepest pit seen (#2076)', () => {
+    const obs = new MetricsObserver();
+    const at = (tick: number, pit: number) => {
+      const s = synthetic({ tick }) as unknown as { grade: { deepestPitM: number } };
+      s.grade.deepestPitM = pit;
+      obs.onTick(s as never);
+    };
+    at(1, 4);
+    at(2, 10.2);
+    at(3, 8);
+    expect(obs.finalize().deepestPitM).toBe(10.2);
+  });
+
   it('samples cash at the extended ticks', () => {
     expect([...CASH_SAMPLE_TICKS]).toEqual([1000, 3000, 6000, 10000, 15000, 25000, 40000, 50000]);
     const obs = new MetricsObserver();

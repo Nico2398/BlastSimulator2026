@@ -287,6 +287,8 @@ interface BuriedPatternInput {
   buriedHoleCount: number;
   buriedSinceTick: number | null;
   tick: number;
+  /** Ticks buried before the drop; defaults to LADDER_BURIED_DROP_TICKS. Also serves any other order blocked for good (a ramp no digger reaches). */
+  dropAfterTicks?: number;
 }
 
 interface BuriedPatternDecision {
@@ -302,7 +304,7 @@ interface BuriedPatternDecision {
 export function decideBuriedPattern(input: BuriedPatternInput): BuriedPatternDecision {
   if (input.buriedHoleCount === 0) return { action: 'wait', buriedSinceTick: null };
   const since = input.buriedSinceTick ?? input.tick;
-  if (input.tick - since >= LADDER_BURIED_DROP_TICKS) return { action: 'drop', buriedSinceTick: null };
+  if (input.tick - since >= (input.dropAfterTicks ?? LADDER_BURIED_DROP_TICKS)) return { action: 'drop', buriedSinceTick: null };
   return { action: 'wait', buriedSinceTick: since };
 }
 
@@ -339,3 +341,48 @@ export function siteHoldsOre(input: SiteOreInput): boolean {
   if (input.bestSiteOre <= 0) return true;
   return input.oreKgUnderSite >= LADDER_SITE_ORE_SHARE * input.bestSiteOre && input.oreKgUnderSite >= LADDER_SITE_ORE_FLOOR;
 }
+
+/**
+ * Haulers the ladder keeps while rubble lies in the pit. Measured (seed 42 desert_badlands, #2076): twelve haulers drain the
+ * rubble they can reach by t4000 and then idle on payroll with the rest sealed, bankrupt by t9000; six lasted to t19908.
+ */
+export const LADDER_MAX_HAULERS = 6;
+
+export interface LadderHaulerBuyInput {
+  haulers: number;
+  cash: number;
+  /** Purchase price plus the driver's hiring cost. */
+  cost: number;
+  reserve: number;
+  /** Rubble (kg) lying on the ground. */
+  rubbleKg: number;
+}
+
+/** Buy another hauler while rubble lies, the cap is not reached and the cash reserve survives the purchase. */
+export function decideLadderHaulerBuy(input: LadderHaulerBuyInput): 'buy' | 'skip' {
+  if (input.haulers >= LADDER_MAX_HAULERS || input.rubbleKg <= 0) return 'skip';
+  return input.cash - input.cost >= input.reserve ? 'buy' : 'skip';
+}
+
+export interface RampCraterInput {
+  /** Ramp start tile. */
+  startX: number;
+  startZ: number;
+  /** Corner and side of the crater footprint the ramp is meant to reach. */
+  craterX: number;
+  craterZ: number;
+  craterSpan: number;
+}
+
+/**
+ * Whether a ramp starts inside the footprint of the crater it is meant to enter. Such a ramp is a stub on the crater's own rim:
+ * a gentle slope limit over a deep pit leaves no start outside it at a buildable length, so it digs a metre of rubble-covered
+ * rim no digger reaches (blocked `target_unreachable` for good), and its recorded slope then hides that the crater has no way in.
+ */
+export function rampStartsInsideCrater(input: RampCraterInput): boolean {
+  return input.startX >= input.craterX && input.startX < input.craterX + input.craterSpan
+    && input.startZ >= input.craterZ && input.startZ < input.craterZ + input.craterSpan;
+}
+
+/** Ticks a ramp order may stay unreachable by every digger before the ladder cancels it and tries another lane. */
+export const LADDER_STALE_RAMP_TICKS = 600;
