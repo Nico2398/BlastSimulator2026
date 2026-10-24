@@ -258,4 +258,14 @@ describe('planCraterAccess', () => {
       else expect(again.reasonKey.length).toBeGreaterThan(0);
     });
   });
+
+  it('plans from a reachable ledge that lies on no axis of the representative cell (#2086)', () => {
+    const pit: Pit = { x0: 20, z0: 20, w: 12, h: 12, depth: 15 };
+    const ledge = (x: number, z: number) => x >= 20 && x <= 23 && z >= 22 && z <= 23;
+    const base = surface(pit, (x, z) => !inPit(pit, x, z) || ledge(x, z));
+    // The ledge sits 5 m below ground; the floor cell is one column off every axis through it.
+    const s: AccessSurface = { ...base, heightAt: (x, z) => (ledge(x, z) ? -10 : base.heightAt(x, z)) };
+    const plan = planCraterAccess({ x: 27, z: 26, floorY: -15, orderCount: 5 }, s, MAX_RATIO, 3);
+    expect(plan.ok).toBe(true);
+  });
 });
