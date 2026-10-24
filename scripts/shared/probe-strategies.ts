@@ -1307,12 +1307,20 @@ import { strandedDebrisTargets, siteVehicleReach } from '../../src/core/engine/O
 import { clusterStrandedFloors, planCraterAccess } from '../../src/core/mining/CraterAccess.js';
 import { computeVoxelColumnSurfaceHeight } from '../../src/core/world/VoxelGrid.js';
 import { slowestVehicleTierSlopeRatio } from '../../src/core/nav/ClimbLimit.js';
+let tmpLast: unknown = null;
 function tmpDump(s: ProbeSession): void {
+  if (process.env['PROBE_BLASTLOG'] === '1' && s.state.lastBlastReport && s.state.lastBlastReport !== tmpLast) { tmpLast = s.state.lastBlastReport; const r = s.state.lastBlastReport as unknown as Record<string, unknown>; console.error('[blast] t', s.state.tickCount, 'pit', s.state.grade?.deepestPitM, JSON.stringify(Object.fromEntries(Object.entries(r).filter(([, v]) => typeof v !== 'object' || v === null))), 'holes', JSON.stringify(s.state.drillHoles.map(h => [h.x, h.z, h.depth, h.diameter]).slice(0, 3))); }
   const at = (process.env['PROBE_DUMP_TICKS'] ?? '').split(',').map(Number);
   if (!at.includes(s.state.tickCount)) return;
   const st = s.state; const grid = s.grid; const nav = st.navGrid!;
   console.error('[dump] tick', st.tickCount, 'planned', JSON.stringify(st.plannedRamps.map(r => ({ id: r.id, def: r.def, fp: r.footprint, segs: r.segments.map(g => [g.actionId, g.done, st.pendingActions.find(a => a.id === g.actionId)?.blockedReason ?? null, st.pendingActions.find(a => a.id === g.actionId)?.status ?? null]) }))));
   console.error('[dump] built', JSON.stringify(st.builtRamps.map(r => ({ def: r.def, width: r.width }))));
+  { const holes = st.plannedDrillHoles; const sealedIds = sealedFragmentIdsOf(st); const reachV = siteVehicleReach(st)!;
+    console.error('[dump] planned holes', JSON.stringify(holes.map(h => [h.id, h.x, h.z])));
+    const cover = st.logistics.fragments.filter(f => f.state === 'on_ground' && holes.some(h => Math.abs(f.fragment.position.x - h.x) <= 1.5 + (f.fragment.halfExtents?.x ?? 0) && Math.abs(f.fragment.position.z - h.z) <= 1.5 + (f.fragment.halfExtents?.z ?? 0)));
+    console.error('[dump] covering', cover.length, JSON.stringify(cover.slice(0, 12).map(f => ({ id: f.fragment.id, p: f.fragment.position, sealed: sealedIds?.has(f.fragment.id), aband: isDebrisAbandoned(st, f.fragment.id), orders: st.pendingActions.filter(a => (a.payload as { fragmentId?: number }).fragmentId === f.fragment.id).map(a => [a.type, a.blockedReason, a.status]), reachV: reachV(Math.round(f.fragment.position.x), Math.round(f.fragment.position.z)) }))));
+  }
+  { const rch = siteVehicleReach(st)!; for (let z = 36; z <= 56; z++) { let row = ''; for (let x = 0; x <= 24; x++) { const h = computeVoxelColumnSurfaceHeight(grid, x, z); row += (Number.isFinite(h) ? Math.round(h).toString(36) : '.') + (rch(x, z) ? '+' : ' '); } console.error(`[map] z${z} ${row}`); } }
   console.error('[dump] segs', JSON.stringify(st.pendingActions.filter(a => a.type === 'dig_ramp_segment')));
   console.error('[dump] diggers', JSON.stringify(st.vehicles.vehicles.filter(v => v.type === 'rock_digger')), JSON.stringify(st.employees.employees.map(e => [e.id, e.role, e.qualifications, e.activeActionId, e.taskQueue.length, e.locomotion?.kind])));
   for (const id of [4, 12, 6]) {
@@ -1330,7 +1338,16 @@ function tmpDump(s: ProbeSession): void {
   const floors = clusterStrandedFloors(cells, 4);
   console.error('[dump] stranded cells', cells.length, 'floors', JSON.stringify(floors));
   const surface = { heightAt: (x: number, z: number) => computeVoxelColumnSurfaceHeight(grid, x, z), contains: (x: number, z: number) => grid.containsColumn(x, z) && (nav.cellAt(x, z)?.type ?? 'void') !== 'void', reachableFrom: reach };
-  for (const f of floors) console.error('[dump] plan', JSON.stringify(f), JSON.stringify(planCraterAccess(f, surface, slowestVehicleTierSlopeRatio(), 3 as never, [], st.builtRamps)));
+  const bocc = buildingFootprintOccupants(st);
+  console.error('[dump] vehicles', JSON.stringify(st.vehicles.vehicles.map(v => [v.id, v.type, v.tier, Math.round(v.x), Math.round(v.z), reach(Math.round(v.x), Math.round(v.z)) ? 'in' : 'out'])));
+  console.error('[dump] rally', JSON.stringify(st.rallyPoint), 'size', grid.sizeX, grid.sizeZ);
+  for (let z = 0; z < 0; z += 2) { let row = ''; for (let x = 0; x < Math.min(grid.sizeX, 70); x += 1) { const b = bocc.some(o => isBuildingFootprintCell(o, x, z)); row += b ? '#' : reach(x, z) ? '+' : (nav.cellAt(x, z)?.type === 'void' ? ' ' : '.'); } console.error(`[rmap] z${String(z).padStart(2)} ${row}`); }
+  { const f = floors[0]; if (f) { const D: Record<string, [number, number]> = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] };
+    for (const length of [26, 30, 34, 38, 42, 46, 50, 56]) for (const dname of Object.keys(D)) { const [dx, dz] = D[dname]!; const sx = Math.round(f.x) - dx * length; const sz = Math.round(f.z) - dz * length;
+      const inside = grid.containsColumn(sx, sz); const rc = inside && reach(sx, sz); const hgt = computeVoxelColumnSurfaceHeight(grid, sx, sz);
+      let occ = 0; for (let s = 0; s <= length; s++) for (let k = -1; k <= 1; k++) { const x = sx + dx * s + Math.abs(dz) * k; const z = sz + dz * s + Math.abs(dx) * k; if (bocc.some(b => isBuildingFootprintCell(b, x, z))) occ++; }
+      console.error('[probe-dir]', length, dname, 'start', sx, sz, 'in', inside, 'reach', rc, 'h', Math.round(hgt * 10) / 10, 'drop/len', Math.round((hgt - f.floorY) / length * 1000) / 1000, 'occ', occ); } } }
+  for (const f of floors) console.error('[dump] plan', JSON.stringify(f), JSON.stringify(planCraterAccess(f, surface, slowestVehicleTierSlopeRatio(), 3 as never, [], st.builtRamps, (x, z) => bocc.some(b => isBuildingFootprintCell(b, x, z)))), 'ratio', slowestVehicleTierSlopeRatio());
   // height map around crater
   const c = floors[0]; if (c) { for (let z = Math.round(c.z) - 14; z <= Math.round(c.z) + 14; z += 2) { let row = ''; for (let x = Math.round(c.x) - 20; x <= Math.round(c.x) + 20; x++) { const h = computeVoxelColumnSurfaceHeight(grid, x, z); row += (Number.isFinite(h) ? Math.round(h).toString(36) : '.') + (reach(x, z) ? '+' : ''); } console.error(`[dump] z${z} ${row}`); } }
 }
@@ -1338,3 +1355,6 @@ function tmpDump(s: ProbeSession): void {
 import { findVehicleForClaim } from '../../src/core/engine/VehicleReservation.js';
 import { employeeClimbReach } from '../../src/core/engine/OrderReachability.js';
 import { selectBestActionForEmployee, isRampSegmentClaimable, resolveActionCost } from '../../src/core/engine/ActionSelection.js';
+
+import { buildingFootprintOccupants } from '../../src/core/nav/NavGridSync.js';
+import { isBuildingFootprintCell } from '../../src/core/entities/BuildingPlacement.js';

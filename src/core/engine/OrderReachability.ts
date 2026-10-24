@@ -526,13 +526,34 @@ export function strandedDebrisTargets(state: GameState): ReadonlyArray<{ x: numb
 }
 
 /**
- * Whether the slowest vehicle tier can drive to (x, z) from the rally point: the network a crater
- * access ramp must start on (#2082). Always false without a nav grid or a rally point.
+ * The vehicle of `cells` that the most others can drive to (lowest id on a tie), or null for none: where the fleet operates.
+ * O(vehicles squared) over a fleet of a few dozen.
+ */
+function fleetAnchor(
+  vehicles: ReadonlyArray<Pick<Vehicle, 'id' | 'x' | 'z'>>,
+  canReach: (sx: number, sz: number, tx: number, tz: number) => boolean,
+): { x: number; z: number } | null {
+  let best: Pick<Vehicle, 'id' | 'x' | 'z'> | null = null;
+  let bestCount = 0;
+  for (const v of vehicles) {
+    const count = vehicles.filter(o => canReach(v.x, v.z, o.x, o.z)).length;
+    if (count > bestCount || (count === bestCount && best !== null && v.id < best.id)) { best = v; bestCount = count; }
+  }
+  return best;
+}
+
+/**
+ * Whether the slowest vehicle tier can drive to (x, z) on the site's vehicle network: the rally point's
+ * component plus the one most of the fleet drives in (#2082, #2076). Buildings can wall the rally yard off
+ * the ground the fleet works on, and ground judged by the rally point alone then reads as stranded.
+ * Always false without a nav grid or a rally point.
  */
 export function siteVehicleReach(state: GameState): ((x: number, z: number) => boolean) | null {
   const cache = cacheFor(state);
   const rally = state.rallyPoint;
   if (cache === null || rally === undefined) return null;
-  const reach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, slowestVehicleTierSlopeRatio()).reachableFrom([rally]);
+  const components = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, slowestVehicleTierSlopeRatio());
+  const anchor = fleetAnchor(state.vehicles.vehicles, (sx, sz, tx, tz) => components.canReach(sx, sz, tx, tz));
+  const reach = components.reachableFrom(anchor === null ? [rally] : [rally, anchor]);
   return (x, z) => reach.has(x, z);
 }
