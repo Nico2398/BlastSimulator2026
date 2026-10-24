@@ -211,3 +211,148 @@ Landed (probe code only, `scripts/shared/probe-ladder-policy.ts` and `scripts/sh
 
 NOT done in this slice: tuning of `MINE_GRADES`, `BUYER_*`, fees and `PERMIT_LIMITS`, and the 50,000-tick survival measurement. No new measurement is
 reported here. The remainder is filed as #2066.
+
+## Update (#2066): measurement under the #2062 policy, no tuning landed (MISSED)
+
+Seed 42, desert_badlands, measured with `scripts/progression-probe.ts`:
+
+```
+npm run probe:progression -- --seed 42 --biome desert_badlands --kit full   --strategy ladder  --horizon 50000
+npm run probe:progression -- --seed 42 --biome desert_badlands --kit digger --strategy ladder  --horizon 12000
+npm run probe:progression -- --seed 42 --biome desert_badlands --kit full   --strategy stay_g1 --horizon 10000
+npm run probe:progression -- --seed 42 --biome desert_badlands --kit full   --strategy reinvest --horizon 10000
+```
+
+| run | g1 | g2-5 | cash@3k | cash@6k | cash@10k | cash@15k | boulder ore sold | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder, full kit | 968 | not reached | 4.84 M | 10.62 M | 7.51 M | 3.25 M | 75% | bankrupt t18,589 |
+| ladder, digger kit | 868 | not reached | 0.92 M | n/a | n/a | n/a | 0% | bankrupt t4,309 |
+| stay_g1, full kit | 968 | capped | 4.84 M | 10.62 M | 7.51 M | n/a | 75% | t10,000 |
+| reinvest, full kit | 1178 | n/a | 2.83 M | 4.60 M | 6.65 M | n/a | 39% | t10,000 |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| grade 3 at t8,000-14,000 | not reached | MISSED |
+| grade 4 at t15,000-25,000 | not reached | MISSED |
+| grade 5 at t30,000-45,000 | not reached | MISSED |
+| ladder ahead of stay_g1 at t10,000 | 7.51 M vs 7.51 M (identical: the ladder never leaves grade 1) | MISSED |
+| full kit ahead of digger kit at t10,000 | 7.51 M vs bankrupt at t4,309 | MET |
+| >= 60% boulder ore sold | 75% | MET |
+| ladder survives 50,000 ticks | bankrupt t18,589 | MISSED |
+
+No `MINE_GRADES`, `BUYER_*`, `PERMIT_LIMITS`, sandbox pin or campaign pin changed. Tuning was not attempted: the ladder never reaches grade 2, so no grade-3-to-5
+window can be measured, and retuning balance to route around a stalled probe policy would hide the defect.
+
+Root cause (measured by instrumenting a 4,000-tick run; instrumentation reverted). Diagnosis superseded by the follow-up below: the real stall was hole depth, not the ramp gate.
+
+1. Grade 2 needs depth 10 m; the pit stays at 5.02 m for the whole run (ore 55-69 k kg and safety targets are met by t3,500, cash is 5-9 M and idle).
+2. `ladderCraterRamp` returns while `m.shot !== null`. With cash plentiful the next shot is ordered the tick after the last fires, so a shot is always pending
+   and no ramp is ever ordered after the opening crater's. `needsWayIn` is also gated to grade >= `LADDER_GATE_MIN_GRADE` (2), unreachable here.
+3. Deepening shots (`decideLadderDeepen`, sealed rubble ignored) then re-fire at a crater whose rubble is all sealed (365, then 660 fragments with no way in), adding sealed
+   rubble and no depth.
+4. `LADDER_SITE_ORE_FLOOR` (1 vs 20) and `LADDER_RAMP_PROTECT_MARGIN_M` (2 vs 6) changed nothing: depth 5.02 m in every combination at t3,500.
+5. Removing both ramp gates orders a ramp into the second crater but income collapsed (3 blasts, 9 k ore, bankrupt t2,505): the ramp work starves the hauling crew. Reverted.
+
+Remainder (superseded by the follow-up below; the ramp-sequencing idea is not what unblocked grade 2): make the ladder dig a way into each fresh crater without starving hauling (sequence the ramp between shots, or give ramp work its own
+crew), then tune `BUYER_*`, `MINE_GRADES` and `PERMIT_LIMITS` against the g3/g4/g5 windows and the 50,000-tick survival.
+
+### Follow-up (#2066): hole-depth fix, grade 2 reached (partial, MISSED)
+
+Instrumented 4,000-tick runs found the real stall: the ladder drilled 11 m holes (`LADDER_HOLE_DEPTH_M`) with a grade-1 charge (120 kg). Under that much cover
+the blast buries its rubble sealed and opens no crater (surface unchanged), so the pit stayed at 5.02 m and `orderRamp` found no depression to ramp into.
+Hole depth sweep, pit depth at t4,000-5,500: 5 m -> 6.5 m, 7 m -> 8.2 m, 9 m -> grade 2 at t2,282, 10 m -> stalls at 9.99 m (just under the 10 m target), 11 m -> 5.02 m.
+
+Probe changes (`scripts/shared/probe-strategies.ts`): the 9 m hole depth and the ungated way-in (`needsWayIn` in `ladderCraterRamp` no longer waits for
+grade 2) apply to sandbox probe runs only (`sandboxRun`: no active campaign level). `LADDER_HOLE_DEPTH_M` no longer exists; it is split into
+`LADDER_SANDBOX_HOLE_DEPTH_M` = 9 and `LADDER_CAMPAIGN_HOLE_DEPTH_M` = 11 (the old value), picked by `ladderHoleDepthM`. Campaign runs keep 11 m because the
+volcanic_flats Shareholder Summit ends in a worker revolt with 9 m holes.
+Boulder share: the earlier section above reports 75% (the ladder never left grade 1); this follow-up reports 55% over the whole 14,000-tick run, because the ladder now
+progresses and the share is measured across more of the run.
+No balance constant, sandbox pin or campaign pin changed (no balance tuning was reached).
+
+| run | g1 | g2 | g3-5 | cash@3k | cash@6k | cash@10k | boulder ore sold | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder, full, 14,000 horizon | 968 | 2372 | not reached | 4.24 M | 10.27 M | 14.45 M | 55% | t14,000, 6 blasts |
+| ladder, digger, 12,000 horizon | 948 | 3092 | not reached | 2.15 M | n/a | n/a | 0% | bankrupt t5,989 |
+| stay_g1, full, 10,000 horizon | 968 | capped | n/a | 4.77 M | 10.79 M | 14.01 M | 59% | t10,000 |
+| reinvest, full (unchanged policy) | 1178 | n/a | n/a | 2.83 M | 4.60 M | 6.65 M | 39% | t10,000 |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| grade 3 at t8,000-14,000 | not reached by t14,000 | MISSED |
+| grade 4 at t15,000-25,000 | not measured (horizon 14,000) | MISSED |
+| grade 5 at t30,000-45,000 | not measured | MISSED |
+| ladder ahead of stay_g1 at t10,000 | 14.45 M vs 14.01 M | MET |
+| full kit ahead of digger kit at t10,000 | 14.45 M vs bankrupt t5,989 | MET |
+| >= 60% boulder ore sold | 55% (ladder, whole run to t14,000); 82% at t4,000 | MISSED |
+| ladder survives 50,000 ticks | not measured: the 50,000-tick run did not finish in over 90 minutes of wall clock | UNKNOWN |
+
+Observations for the remainder: only 6 blasts in 14,000 ticks (each shot takes about 500 ticks to drill and charge), and a probe run past grade 2 becomes very slow
+(a 14,000-tick run took about 40 minutes), so the g3 gate and `BUYER_*` / `MINE_GRADES` / `PERMIT_LIMITS` tuning need a faster loop, or the ladder needs
+to fire more often once cash is idle. The digger ladder still goes bankrupt.
+
+## 2026-10-22 record: ladder hole-depth policy (#2068)
+
+With the #2068 hole-depth policy (`decideLadderHoleDepth`, dud barring, blocked-order rubble counts; fresh cap 9 m sandbox / 11 m campaign kept),
+the 50,000-tick seed-42 desert_badlands full-kit ladder probe: g1@968, g2@2482, cash 10.54M @6000, 9.67M @10000, 6.13M @15000,
+bankrupt at t23799 (low cash -86,300), g3 (window 8000-14000) missed; boulder ore sold 45%.
+Shareholder Summit competent ladder (volcanic_flats, digger, seed 42) wins at tick 3461 (was 2981 on main).
+Remaining: survival to 50,000 and g3+ are tracked in #2072.
+
+## 2026-10-23 record (#2076)
+
+Seed 42, desert_badlands, full kit, `scripts/progression-probe.ts`, ladder, 50,000 horizon. Probe policy only (scripts/); no balance constant, `MINE_GRADES`, `BUYER_*`,
+fee or `PERMIT_LIMITS` value moved. Wired: `decideBuriedPattern` (drop a pattern buried 500 ticks, bar its hole bounding box), `decideLadderShotSide` (no grade cap and no sealed-rubble shrink: caps of 3-6 and the 100-fragment shrink each starved yield and ended the summit run in a worker revolt, #2080; shrink one step after a failed shot), `siteHoldsOre` (25% of the best site's ore), a 16 m building keep-out on fresh sites, and an
+oldest-bar age-out when no site orders.
+
+| run | g1 | g2 | g3-5 | cash@3k | cash@6k | cash@10k | cash@15k | boulder ore sold | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ladder, 50,000 horizon | 968 | 2372 | not reached | 4.61 M | 10.35 M | 12.15 M | 8.88 M | 57% | bankrupt t28359 (low cash -73,033) |
+
+| target | measured | verdict |
+| --- | --- | --- |
+| ladder survives 50,000 ticks | bankrupt t28359 (was t23799) | MISSED |
+| grade 3 at t8,000-14,000 | not reached (pit 10.2 m of 20 m flat from t2,000) | MISSED |
+| grade 4-5 | not reached | MISSED |
+
+Findings from instrumented runs (instrumentation removed):
+
+1. Before the building keep-out, shot 5 destroyed a building and well-being went 96 to 0: worker_revolt at t8520 with 10 M cash.
+2. After g2 the pit sits at 10.2 m. Reachable rubble (1.0-1.1 M kg) clears at about 220 kg a tick, so the next shot waits to t7,300; then every crater on the 64 m map is
+   barred, buried or sealed and `freshSites` returns no candidate (origins plus bars cover the map): the ladder fires 5 to 8 shots in 28,000 ticks and bleeds payroll.
+3. Open: deepening existing craters is the only way left to gain depth; it needs a crater with no ordered rubble, and sealed rubble plus bars exclude every one.
+
+
+## 2026-10-23 note: evacuation cancelled by rubble-boxed walker (#2077)
+
+An armed detonation was cancelled "cannot leave the blast zone" when an in-zone employee was boxed in by rubble (`fragmentOccupancy > 0` on the neighbour cells).
+`findSafeEvacuationCell` proved reachability with a relaxed `findPath`, but `Locomotion.planPath` used `findFootPathWithVehicleFallback`, whose fallback rejects
+relaxed routes crossing fragment cells (#954/#1090), so the walker stuck and the phase read 'stranded'. `Zone.clearZone` now passes `crossFragments: true`; the flag is stamped on the leg
+(`Leg.crossesFragments`) so the cost estimate and the executor agree. Every other caller keeps the fragment guard; blocked/void rings stay stranded.
+
+## 2026-10-23 note: stranded crater access (#2085)
+
+After #2082 the ladder probe stalled at ~10.2 m: blocked `dig_ramp_segment` orders suppressed every later access ramp and ~1,000 `debris_out_of_reach` haul orders never cleared.
+`syncCraterAccess` now ignores blocked segments (`hasLiveRampWork`), has the planner avoid footprints of fully blocked ramps (`blockedRampFootprints` -> `planCraterAccess(..., avoid)`),
+and cancels debris orders of floors unplannable for `CRATER_ACCESS_ABANDON_DEBRIS_TICKS` (`pruneAbandonedDebris`; fragments marked so dispatch does not re-queue them until the next access ramp is ordered).
+Ramp reachability already ignores fragment occupancy and drive legs cross fragments, so no reachability change was needed. Rules: `gameplay-navmesh`, "Crater access".
+
+Probe after #2085 (seed 42 desert_badlands full ladder, 14,000-tick horizon): still g1@968, g2@2452, bankrupt t11,919 after 4 blasts; the 20 m depth is NOT reached.
+Instrumented diagnosis (instrumentation reverted): the only `rock_digger` ends parked, driverless, on a crater floor (surface 8.5 m) cut off from the site network by the unfinished ramp. `fillPool` in `OrderReachability.ts` counts a vehicle as an
+actor only when its driver is a candidate or its cell is in the employees' on-foot reach, so every `dig_ramp_segment` reads `target_unreachable` (all 44-57 segments blocked) even though a climb labelling from the digger itself reaches the targets.
+Nobody can board the digger, so the ramp that would free it can never be dug: a deadlock that planner avoidance and debris pruning cannot resolve. Separately, a probe-placed Driving Center at (8,8) walls the rally yard on this seed.
+
+## 2026-10-24 note: spoil overflow heap, probe result (#2085, second part)
+
+`ladderSpoil` now also builds a spoil heap (up to `LADDER_MAX_SPOIL_HEAPS`) when queued `haul_debris` orders are blocked `spoil_heap_full` (`pendingSpoilOverflowKg > 0`).
+
+Probe, seed 42 desert_badlands, full ladder, 14,000-tick horizon:
+
+| g1 | g2 | g3 | bankruptcy | blasts | cash@6000 | cash@10000 | boulder sold share | boulder ore sold | warehouseFull | end |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 978 | 2272 | missed (window 8,000-14,000) | none (was bankrupt t20,509) | 7 | 10.15 M | 9.28 M | 51% | 45% | tick 805 | t14000 |
+
+Pit depth was not recorded by the probe table, so it is not stated here.
+
+Verdict: 20 m / grade 3 still not reached within 14,000 ticks. The bankruptcy is gone, but the next stall is unmeasured. Cash is not the limit (9-10 M idle).
+Next step: a pit-depth and stall diagnosis.

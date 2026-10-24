@@ -184,3 +184,158 @@ export function shotOverlapsProtectedRamp(site: ProtectedZone, zones: readonly P
   return zones.some(z => site.x < z.x + z.span && z.x < site.x + site.span
     && site.z < z.z + z.span && z.z < site.z + site.span);
 }
+
+/** Deepest hole (m) the ladder drills on a fresh site, where the floor is not yet open: deeper holes seal under the burden cap. */
+export const LADDER_FRESH_HOLE_DEPTH_M = 8;
+/** Metres the hole depth cap drops after a failed shot (no pit gain, no new ore). */
+export const LADDER_HOLE_STEP_DOWN_M = 2;
+/** Shallowest hole (m) the step-down ever reaches. */
+export const LADDER_HOLE_MIN_DEPTH_M = 4;
+/** Consecutive dud shots after which the crater is barred from further shots. */
+export const LADDER_DUD_SHOT_LIMIT = 2;
+
+/** Pit depth gain (m) at or under which a shot counts as having gained none. */
+const LADDER_PIT_GAIN_EPSILON_M = 0.01;
+
+export interface LadderHoleDepthInput {
+  /** Deepest hole the fleet's best drill rig can drill, in metres. */
+  rigMaxDepthM: number;
+  /** Depth (m) still to dig below the current floor, down to the target. */
+  remainingDepthM: number;
+  /** Whether the pit floor is already open (a cleared crater exists). */
+  floorOpen: boolean;
+  /** Whether the previous shot gained no pit depth and no new ore. */
+  lastShotFailed: boolean;
+  /** Hole depth cap (m) in force for the previous shot. */
+  currentCapM: number;
+  /** Fresh-site hole depth (m); defaults to LADDER_FRESH_HOLE_DEPTH_M. */
+  freshHoleDepthM?: number;
+}
+
+/** Hole depth (m) for the next ladder shot, within [min(LADDER_HOLE_MIN_DEPTH_M, rigMaxDepthM), rigMaxDepthM]; the minimum-depth floor lives here. */
+export function decideLadderHoleDepth(input: LadderHoleDepthInput): number {
+  const fresh = input.freshHoleDepthM ?? LADDER_FRESH_HOLE_DEPTH_M;
+  let base = input.floorOpen ? Math.min(fresh, input.remainingDepthM + 1) : fresh;
+  if (input.lastShotFailed) base = Math.min(base, Math.max(LADDER_HOLE_MIN_DEPTH_M, input.currentCapM - LADDER_HOLE_STEP_DOWN_M));
+  return Math.min(input.rigMaxDepthM, Math.max(LADDER_HOLE_MIN_DEPTH_M, base));
+}
+
+interface LadderShotOutcomeInput {
+  /** Columns the shot cleared. */
+  columnsCleared: number;
+  /** Rock volume (m3) the shot broke. */
+  volumeM3: number;
+}
+
+/** Whether a fired shot did nothing useful: no columns cleared or no volume broken. */
+export function isDudShot(input: LadderShotOutcomeInput): boolean {
+  return input.columnsCleared === 0 || input.volumeM3 === 0;
+}
+
+/** Whether a crater with this many consecutive dud shots is barred from further shots. */
+export function shouldBarCrater(consecutiveDuds: number): boolean {
+  return consecutiveDuds >= LADDER_DUD_SHOT_LIMIT;
+}
+
+export interface LadderShotJudgeInput {
+  /** Shots fired so far. */
+  shotsFired: number;
+  /** Shots already judged. */
+  shotsJudged: number;
+  /** Whether the latest shot's ore yield is still resolving. */
+  yieldPending: boolean;
+  /** Deepest pit (m) now. */
+  pitM: number;
+  /** Deepest pit (m) before the latest shot. */
+  baselinePitM: number;
+  /** Haulable ore (kg) now (the last resolved yield). */
+  oreKg: number;
+  /** Haulable ore (kg) before the latest shot. */
+  baselineOreKg: number;
+  /** Latest blast report outcome, or null when none exists. */
+  report: LadderShotOutcomeInput | null;
+  /** Consecutive duds so far at the current site. */
+  dudStreak: number;
+}
+
+interface LadderShotJudgment {
+  /** Whether a new shot was judged this call; when false only dudStreak is carried unchanged; lastShotFailed is false and callers ignore it. */
+  judged: boolean;
+  /** Whether the judged shot gained no pit depth and no new ore. */
+  lastShotFailed: boolean;
+  /** Consecutive duds after this judgment (reset to 0 when barring). */
+  dudStreak: number;
+  /** Whether the site should now be barred. */
+  bar: boolean;
+}
+
+/** Judge the latest fired shot once its yield resolved: failure when no pit gain and no new ore; duds accumulate toward barring. */
+export function judgeLadderShot(input: LadderShotJudgeInput): LadderShotJudgment {
+  if (input.shotsFired === input.shotsJudged || input.yieldPending) {
+    return { judged: false, lastShotFailed: false, dudStreak: input.dudStreak, bar: false };
+  }
+  const lastShotFailed = input.pitM <= input.baselinePitM + LADDER_PIT_GAIN_EPSILON_M && input.oreKg <= input.baselineOreKg;
+  const streak = input.report !== null && isDudShot(input.report) ? input.dudStreak + 1 : 0;
+  const bar = shouldBarCrater(streak);
+  return { judged: true, lastShotFailed, dudStreak: bar ? 0 : streak, bar };
+}
+
+/** Ticks a pattern may stay buried under rubble before the ladder drops it. */
+export const LADDER_BURIED_DROP_TICKS = 500;
+
+interface BuriedPatternInput {
+  buriedHoleCount: number;
+  buriedSinceTick: number | null;
+  tick: number;
+}
+
+interface BuriedPatternDecision {
+  action: 'wait' | 'drop';
+  buriedSinceTick: number | null;
+}
+
+/**
+ * Contract: no buried holes -> wait, buriedSinceTick null; first buried call -> wait,
+ * buriedSinceTick = tick; buried for >= LADDER_BURIED_DROP_TICKS -> drop, null; a count back to 0
+ * resets buriedSinceTick to null.
+ */
+export function decideBuriedPattern(input: BuriedPatternInput): BuriedPatternDecision {
+  if (input.buriedHoleCount === 0) return { action: 'wait', buriedSinceTick: null };
+  const since = input.buriedSinceTick ?? input.tick;
+  if (input.tick - since >= LADDER_BURIED_DROP_TICKS) return { action: 'drop', buriedSinceTick: null };
+  return { action: 'wait', buriedSinceTick: since };
+}
+
+interface LadderShotSideInput {
+  limitSide: number;
+  grade: number;
+  lastShotFailed: boolean;
+  sealedRubbleCount: number;
+}
+
+/**
+ * Contract: a clean state returns limitSide at every grade; lastShotFailed gives a side strictly
+ * smaller, floor 1. Result is in [1, limitSide]. No grade cap (caps of 3-6 starved ladder yield and
+ * ended the Shareholder Summit competent run in game_over:worker_revolt) and no sealed-rubble shrink
+ * (it alone reproduced that revolt, #2080): sealedRubbleCount is accepted but does not move the side.
+ */
+export function decideLadderShotSide(input: LadderShotSideInput): number {
+  return Math.max(1, input.lastShotFailed ? input.limitSide - 1 : input.limitSide);
+}
+
+/** Share of the best site's ore a site must hold to be worth a shot. */
+export const LADDER_SITE_ORE_SHARE = 0.25;
+
+interface SiteOreInput {
+  oreKgUnderSite: number;
+  bestSiteOre: number;
+}
+
+/**
+ * Contract: bestSiteOre 0 -> true; otherwise oreKgUnderSite >= LADDER_SITE_ORE_SHARE * bestSiteOre
+ * and >= LADDER_SITE_ORE_FLOOR.
+ */
+export function siteHoldsOre(input: SiteOreInput): boolean {
+  if (input.bestSiteOre <= 0) return true;
+  return input.oreKgUnderSite >= LADDER_SITE_ORE_SHARE * input.bestSiteOre && input.oreKgUnderSite >= LADDER_SITE_ORE_FLOOR;
+}

@@ -20,8 +20,9 @@ import { isDrillHoleBuried } from '../mining/BuriedHoles.js';
 import type { Employee } from '../entities/Employee.js';
 import { vehicleDriverId, vehicleMaxSlopeRatio } from '../entities/Vehicle.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../entities/Vehicle.js';
-import { retargetRampLayers } from './RampLayerRetarget.js';
+import { retargetBesideRampLayers, retargetRampLayers } from './RampLayerRetarget.js';
 import { lowestFleetTier, minVehicleTierFor } from './VehicleReservation.js';
+import { clearWalkOnlyPin } from './TaskCancellation.js';
 import { canDriveTier, licenceLevelOf } from '../entities/VehicleDriverAssignment.js';
 import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup, createStorageFit } from '../economy/HaulDispatch.js';
 import { holdsRequiredSkill, isEligibleForWork } from '../entities/Employee.js';
@@ -33,7 +34,7 @@ import {
 import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
 import { withDockingCells } from '../nav/DockingReach.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
-import { slopeDegreesForTier, tierSlopeRatio } from '../nav/ClimbLimit.js';
+import { slopeDegreesForTier, slowestVehicleTierSlopeRatio, tierSlopeRatio } from '../nav/ClimbLimit.js';
 import { steepestBlockingRamp } from '../mining/RampGrade.js';
 
 /** Identity of the actor pool able to serve an order (skill + vehicle role, or one named employee). */
@@ -443,14 +444,29 @@ function sliceDebris(state: GameState, queued: PendingAction[], perCall: number)
 /**
  * A ramp layer's work target follows the digger's reach: a lead layer whose
  * band centre sits on an unreachable fill cell moves to a reachable column of
- * its own cells (else of the ramp's other segments), so the verdict, ghost and dispatcher all read the same target.
+ * its own cells (else of the ramp's other segments, else a column beside them, #2082), so the verdict, ghost and dispatcher all read the same target.
  */
 function retargetQueuedRampLayers(state: GameState): void {
   if (state.navGrid === null || state.plannedRamps.length === 0) return;
   const rampLayers = state.pendingActions.filter(a => a.status === 'queued' && a.type === 'dig_ramp_segment');
   if (rampLayers.length === 0) return;
   const reach = buildOrderReachability(state, rampLayers);
-  retargetRampLayers(state, (action, x, z) => reach.canReach(orderActorKey(action), x, z));
+  const canReach = (action: PendingAction, x: number, z: number): boolean => reach.canReach(orderActorKey(action), x, z);
+  retargetRampLayers(state, canReach);
+  retargetBesideRampLayers(state, canReach);
+}
+
+/**
+ * A queued order pinned to one employee by an interrupted walk (`walkOnlyPinnedBy`) goes back to the
+ * whole pool once that employee can no longer perform it — a vehicle upgraded in place to a tier their
+ * licence does not cover, say — else nobody could ever claim it (#2085). A permanent target is untouched.
+ */
+function releaseUnservableWalkPins(state: GameState): void {
+  for (const action of state.pendingActions) {
+    const pinned = action.targetEmployeeId;
+    if (action.status !== 'queued' || pinned === null || action.payload['walkOnlyPinnedBy'] !== pinned) continue;
+    if (!candidateEmployees(state, action).some(emp => emp.id === pinned)) clearWalkOnlyPin(action);
+  }
 }
 
 /**
@@ -462,6 +478,7 @@ function retargetQueuedRampLayers(state: GameState): void {
  * `sliceDebris`.
  */
 export function classifyQueuedOrders(state: GameState, debrisPerCall = Infinity): { unqualifiedIds: Set<number> } {
+  releaseUnservableWalkPins(state);
   retargetQueuedRampLayers(state);
   let flipped = false;
   for (const ghost of state.ghostPreviews) {
@@ -495,4 +512,27 @@ export function roleShortfall(
   if (!vehicles.some(v => v.type === role)) return 'no_vehicle_in_fleet';
   if (!eligible.some(emp => licenceLevelOf(emp, role) > 0)) return 'no_licensed_driver';
   return null;
+}
+
+/** Targets of queued orders of any type whose stamped verdict is debris_out_of_reach or buried_under_rubble (#2082); reads the stamped verdicts, no fill. */
+export function strandedDebrisTargets(state: GameState): ReadonlyArray<{ x: number; z: number; y: number }> {
+  const out: { x: number; z: number; y: number }[] = [];
+  for (const a of state.pendingActions) {
+    if (a.status !== 'queued') continue;
+    if (a.blockedReason !== 'debris_out_of_reach' && a.blockedReason !== 'buried_under_rubble') continue;
+    out.push({ x: a.targetX, z: a.targetZ, y: a.targetY });
+  }
+  return out;
+}
+
+/**
+ * Whether the slowest vehicle tier can drive to (x, z) from the rally point: the network a crater
+ * access ramp must start on (#2082). Always false without a nav grid or a rally point.
+ */
+export function siteVehicleReach(state: GameState): ((x: number, z: number) => boolean) | null {
+  const cache = cacheFor(state);
+  const rally = state.rallyPoint;
+  if (cache === null || rally === undefined) return null;
+  const reach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, slowestVehicleTierSlopeRatio()).reachableFrom([rally]);
+  return (x, z) => reach.has(x, z);
 }

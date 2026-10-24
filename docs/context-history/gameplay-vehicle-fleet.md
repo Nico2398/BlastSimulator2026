@@ -63,3 +63,7 @@ Records why the rules in the `gameplay-vehicle-fleet` skill exist: the issues th
 ## Dealer grade gate
 
 - Introduced by #1928.
+
+## Stranded vehicle recovery — provenance (merged from main)
+
+- `recoverStranded` came with #2085.

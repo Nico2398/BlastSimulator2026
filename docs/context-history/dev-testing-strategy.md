@@ -25,3 +25,7 @@ The step-local assertion rule (`expect.changedBy` over chained `expect.equals`) 
 ## CI Launch Strategy
 
 The ~6 s/frame software-rasterisation cost was measured in #475 — which is why a scenario page now boots with drawing suspended (`?scenarioMode=1`, main.ts) instead of paying ~10 s of never-seen frames per tab. Before that, CI's 10-shard runs on 13–14 Sep 2026 took ~12 min for the shards and 15–19 min end to end, half of it the unit suite the shards waited on. Tier 3 used to wait on the unit suite; nothing does any more.
+
+## Progression probe — provenance (merged from main)
+
+- The probe came with #1922 and its ladder strategy with #1945; buried-pattern dropping, `decideLadderShotSide` g2 sizing and the ore-poor / building-adjacent skips with #2076.

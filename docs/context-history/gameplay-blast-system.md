@@ -74,3 +74,7 @@ Records why the rules in the `gameplay-blast-system` skill exist: the issues tha
 ## Wall warning prediction and overlay
 
 - Introduced by #1943.
+
+## Crater access clears buried holes — provenance (merged from main)
+
+- Added with #2082. The Pre-Flight building reach section came with #2030.
