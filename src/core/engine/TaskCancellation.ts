@@ -385,9 +385,7 @@ export function interruptActiveAction(
           && action.payload['walkOnlyPinnedBy'] === employee.id
           && (options?.forceOpenPool || hasCloserIdleCandidate(state, employee, action))
         ) {
-          action.targetEmployeeId = null;
-          const { walkOnlyPinnedBy: _unused, ...rest } = action.payload;
-          action.payload = rest;
+          clearWalkOnlyPin(action);
         }
       }
 
@@ -404,6 +402,13 @@ export function interruptActiveAction(
   }
 
   clearHolderWalkFields(employee);
+}
+
+/** Opens `action` to the whole pool again: drops the walk-only pin an interruption put on it (a permanent target is never one). */
+export function clearWalkOnlyPin(action: PendingAction): void {
+  action.targetEmployeeId = null;
+  const { walkOnlyPinnedBy: _unused, ...rest } = action.payload;
+  action.payload = rest;
 }
 
 /**

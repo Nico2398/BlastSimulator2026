@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   clusterStrandedFloors, planCraterAccess, type AccessSurface, type StrandedFloor,
 } from '../../../src/core/mining/CraterAccess.js';
-import { rampPathCells, rampPathOf } from '../../../src/core/mining/RampPath.js';
+import { rampPathCells, rampPathOf, type RampFootprint } from '../../../src/core/mining/RampPath.js';
 import {
   MAX_RAMP_LENGTH, NAV_MAX_SLOPE_RATIO, RAMP_CRATER_MIN_DROP_M, RAMP_FLOOR_SNAP_REACH_M,
 } from '../../../src/core/config/balance.js';
@@ -170,5 +170,92 @@ describe('planCraterAccess', () => {
       if (plan.ok) expect(plan.def.length).toBeGreaterThan(0);
       else expect(plan.reasonKey.length).toBeGreaterThan(0);
     }
+  });
+
+  describe('avoid footprints (#2085)', () => {
+    const s = () => surface(PIT, outsidePit(PIT));
+    const footprintOf = (plan: { ok: true; def: Parameters<typeof rampPathOf>[0] }): RampFootprint => {
+      const cells = rampPathCells(rampPathOf(plan.def), 3);
+      return {
+        minX: Math.min(...cells.map(c => c.x)), maxX: Math.max(...cells.map(c => c.x)),
+        minZ: Math.min(...cells.map(c => c.z)), maxZ: Math.max(...cells.map(c => c.z)),
+      };
+    };
+    const overlaps = (a: RampFootprint, b: RampFootprint) =>
+      a.minX <= b.maxX && b.minX <= a.maxX && a.minZ <= b.maxZ && b.minZ <= a.maxZ;
+
+    it('without avoid the plan is unchanged', () => {
+      const a = planCraterAccess(centreFloor(PIT), s(), MAX_RATIO, 3);
+      const b = planCraterAccess(centreFloor(PIT), s(), MAX_RATIO, 3, []);
+      expect(b).toEqual(a);
+    });
+
+    it('fails when every candidate overlaps a blocked ramp footprint', () => {
+      const everything: RampFootprint = { minX: -1000, maxX: 1000, minZ: -1000, maxZ: 1000 };
+      const plan = planCraterAccess(centreFloor(PIT), s(), MAX_RATIO, 3, [everything]);
+      expect(plan.ok).toBe(false);
+      if (!plan.ok) expect(plan.reasonKey.length).toBeGreaterThan(0);
+    });
+
+    it('never returns a ramp overlapping the avoided footprint, but still plans around it', () => {
+      const first = planCraterAccess(centreFloor(PIT), s(), MAX_RATIO, 3);
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      const avoid = footprintOf(first);
+      const second = planCraterAccess(centreFloor(PIT), s(), MAX_RATIO, 3, [avoid]);
+      if (second.ok) expect(overlaps(footprintOf(second), avoid)).toBe(false);
+      else expect(second.reasonKey.length).toBeGreaterThan(0);
+    });
+
+    it('ignores an avoided footprint far from any candidate', () => {
+      const far: RampFootprint = { minX: 70, maxX: 75, minZ: 70, maxZ: 75 };
+      const a = planCraterAccess(centreFloor(PIT), s(), MAX_RATIO, 3);
+      expect(planCraterAccess(centreFloor(PIT), s(), MAX_RATIO, 3, [far])).toEqual(a);
+    });
+  });
+
+  describe('ramps that would free nothing (#2085)', () => {
+    /** Only a two-tile band of surface round `pit` is on the network, so no straight ramp is gentle enough. */
+    const rimOnly = (pit: Pit) => (x: number, z: number) =>
+      !inPit(pit, x, z) && x >= pit.x0 - 2 && x < pit.x0 + pit.w + 2 && z >= pit.z0 - 2 && z < pit.z0 + pit.h + 2;
+    const OUTER: Pit = { x0: 20, z0: 20, w: 30, h: 30, depth: 8 };
+    const INNER: Pit = { x0: 32, z0: 32, w: 6, h: 6, depth: 16 };
+    /** Too deep for a straight ramp from the rim band. */
+    const SINGLE: Pit = { x0: 20, z0: 20, w: 30, h: 30, depth: 14 };
+    const nested: AccessSurface = {
+      heightAt: (x, z) => (inPit(INNER, x, z) ? -INNER.depth : inPit(OUTER, x, z) ? -OUTER.depth : 0),
+      contains: (x, z) => x >= AREA.min && x < AREA.max && z >= AREA.min && z < AREA.max,
+      reachableFrom: rimOnly(OUTER),
+    };
+
+    it('plans a spiral down a single pit wall when no straight start exists', () => {
+      const plan = planCraterAccess(centreFloor(SINGLE), surface(SINGLE, rimOnly(SINGLE)), MAX_RATIO, 3);
+      expect(plan.ok).toBe(true);
+      if (plan.ok) expect(plan.def.legs?.length ?? 1).toBeGreaterThan(1);
+    });
+
+    it('refuses a spiral round an outer pit whose foot ends nowhere near the nested floor', () => {
+      const plan = planCraterAccess(centreFloor(INNER), nested, MAX_RATIO, 3);
+      expect(plan.ok).toBe(false);
+    });
+
+    it('never re-plans a ramp identical to one already dug, but still plans another', () => {
+      const first = planCraterAccess(centreFloor(PIT), surface(PIT, outsidePit(PIT)), MAX_RATIO, 3);
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      const second = planCraterAccess(centreFloor(PIT), surface(PIT, outsidePit(PIT)), MAX_RATIO, 3, [], [{ def: first.def, width: 3 }]);
+      expect(second.ok).toBe(true);
+      if (second.ok) expect(second.def).not.toEqual(first.def);
+    });
+
+    it('never repeats a dug spiral either', () => {
+      const first = planCraterAccess(centreFloor(SINGLE), surface(SINGLE, rimOnly(SINGLE)), MAX_RATIO, 3);
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      const dug = [{ def: first.def, width: 3 as const }];
+      const again = planCraterAccess(centreFloor(SINGLE), surface(SINGLE, rimOnly(SINGLE)), MAX_RATIO, 3, [], dug);
+      if (again.ok) expect(again.def).not.toEqual(first.def);
+      else expect(again.reasonKey.length).toBeGreaterThan(0);
+    });
   });
 });
