@@ -3384,3 +3384,10 @@ export const CRATER_ACCESS_MAX_GRADE_MARGIN = 0.9;
 export const CRATER_ACCESS_CLUSTER_GAP_CELLS = 6;
 /** Candidate pit-rim starts a crater access plan tries with the spiral backend before giving up. */
 export const CRATER_ACCESS_SPIRAL_START_ATTEMPTS = 6;
+/** Ticks a stranded floor may stay unplannable before its debris_out_of_reach auto-debris orders are cancelled. */
+export const CRATER_ACCESS_ABANDON_DEBRIS_TICKS = 600;
+/**
+ * Ticks a driverless vehicle no licensed employee can walk to, or a worker cut off from the rest of the crew,
+ * stays put before it is brought back to the crew (#2085). Long enough that a ramp being dug to the floor wins the race.
+ */
+export const STRANDED_RECOVERY_TICKS = 300;

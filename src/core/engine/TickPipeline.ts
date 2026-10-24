@@ -51,6 +51,7 @@ import {
 import { onGroundMassKg, syncLogisticsCapacity } from '../economy/Logistics.js';
 import { syncHaulDispatch } from '../economy/HaulDispatch.js';
 import { syncCraterAccess } from './CraterAccessSync.js';
+import { recoverStranded } from './StrandedVehicleRecovery.js';
 import { syncRepairDispatch } from '../economy/RepairDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
 import { isHiringPoolDue, refreshHiringPool } from '../entities/HiringPool.js';
@@ -63,6 +64,7 @@ import {
   CONTRACT_REFRESH_INTERVAL,
   SCORE_VIBRATION_WINDOW_TICKS,
   VILLAGE_VIBRATION_SCORE_GAIN,
+  CRATER_ACCESS_RECHECK_TICKS,
 } from '../config/balance.js';
 import { isExposed, smugglingIncomeForTick, applyInvestigation, decayExposure } from '../events/MafiaActions.js';
 import { bookTaxAuditIncome, tickTaxAudit, settleTaxAudit, taxAuditRng, type AuditOutcome } from '../events/TaxAudit.js';
@@ -329,6 +331,8 @@ export function runTick(
 
   // 8c-3b. Crater access (#2082): order a ramp down to a pit floor the built ramps no longer reach.
   syncCraterAccess(state, grid);
+  // Vehicles nobody can walk to and workers cut off from the crew are brought back, else the ramp that frees them is never dug (#2085).
+  if (state.tickCount % CRATER_ACCESS_RECHECK_TICKS === 0) recoverStranded(state);
 
   // 8c-4. Repair dispatch (#1393): one repair_vehicle order per idle damaged
   // vehicle, queued until someone trained in repair is free. An unqualified

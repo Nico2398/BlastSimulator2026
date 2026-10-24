@@ -20,6 +20,11 @@ export interface SpiralRequest {
   gradeDegrees: number;
   width: RampWidth;
   dir: SpiralDir;
+  /**
+   * The start is ground the vehicle network already reaches (a ledge, a built ramp's foot). Standing in a wider hollow
+   * is then no bar: a start with a deeper void beside it is the rim of that void (#2086).
+   */
+  fromReachable?: boolean;
 }
 
 /** Terrain seam: surface height and pit-membership queries. */
@@ -185,9 +190,9 @@ export function proposeRampSpiral(req: SpiralRequest, surface: SpiralSurface): R
   if (gradeDegrees > maxGrade) return fail('mining.build_ramp.grade_too_steep', { grade: gradeDegrees, max: maxGrade });
 
   const ground = surface.heightAt(start.x, start.z);
-  if (startInHollow(surface, start, ground)) return fail(`${KEY}start_in_void`);
   const seeds = NEIGHBOUR_OFFSETS_8.map(([dx, dz]) => ({ x: start.x + dx, z: start.z + dz }))
     .filter(t => isVoid(surface, t.x, t.z, ground));
+  if (startInHollow(surface, start, ground) && !(req.fromReachable === true && seeds.length > 0)) return fail(`${KEY}start_in_void`);
   if (seeds.length === 0 && voidNearby(surface, start, ground)) return fail(`${KEY}not_on_rim`);
   const pit = seeds.length === 0 ? null : floodPit(surface, seeds, ground);
   if (pit === null) return fail(`${KEY}no_pit`, { depth: RAMP_CRATER_MIN_DROP_M });
@@ -243,11 +248,11 @@ export function spiralSurfaceFrom(grid: VoxelGrid, area: { contains(x: number, z
   };
 }
 
-/** Whether `tile` lies on the pit rim: not at the bottom of a hollow, with a void neighbour. */
-export function isPitRim(surface: SpiralSurface, tile: { x: number; z: number }): boolean {
+/** Whether `tile` lies on the pit rim: with a void neighbour, and (unless `fromReachable`) not at the bottom of a hollow. */
+export function isPitRim(surface: SpiralSurface, tile: { x: number; z: number }, fromReachable = false): boolean {
   const start = { x: Math.floor(tile.x), z: Math.floor(tile.z) };
   if (!surface.contains(start.x, start.z)) return false;
   const ground = surface.heightAt(start.x, start.z);
-  if (startInHollow(surface, start, ground)) return false;
+  if (!fromReachable && startInHollow(surface, start, ground)) return false;
   return NEIGHBOUR_OFFSETS_8.some(([dx, dz]) => isVoid(surface, start.x + dx, start.z + dz, ground));
 }
