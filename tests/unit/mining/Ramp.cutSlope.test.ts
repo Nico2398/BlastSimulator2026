@@ -2,12 +2,12 @@
 //
 // Contract: `rampCutSlopeRatio(progression)` is the steepest rise/run a ramp floor is cut at
 // (limit x RAMP_CUT_SLOPE_MARGIN). `RampDef.cutSlopeRatio` carries it; validateRampOrder,
-// computeMinimumRampLength, snapRampDepthToEndFloor (trailing optional `cutSlopeRatio`) and
+// computeMinimumRampLength and
 // rampGradeBoundsDegrees (trailing optional `cutSlopeRatio`) honour it. Undefined = the old 30 degree behaviour.
 
 import { describe, it, expect } from 'vitest';
 import {
-  rampCutSlopeRatio, validateRampOrder, computeMinimumRampLength, snapRampDepthToEndFloor,
+  rampCutSlopeRatio, validateRampOrder, computeMinimumRampLength,
   rampGradeBoundsDegrees, type RampDef,
 } from '../../../src/core/mining/Ramp.js';
 import {
@@ -108,17 +108,5 @@ describe('validateRampOrder honours RampDef.cutSlopeRatio (#2045)', () => {
   it('a chosen 25 degree grade is accepted on a def with no ratio (old save)', () => {
     const def: RampDef = { ...BASE, targetDepth: 8, length: 30, gradeDegrees: 25 };
     expect(validateRampOrder(def, 50_000_000).success).toBe(true);
-  });
-});
-
-describe('snapRampDepthToEndFloor with a cut ratio (#2045)', () => {
-  it('does not snap to a floor the length cannot reach within the 20 degree cut', () => {
-    // 12 m drop over 25 m: needs 12/tan30*0.98 = 21.2 m walking, but 12/PROGRESSION = 33.6 m at 20 degrees.
-    expect(snapRampDepthToEndFloor(20, 8, 11, 25, PROGRESSION)).toBe(11);
-    expect(snapRampDepthToEndFloor(20, 8, 11, 25)).toBe(12);
-  });
-
-  it('snaps when the length reaches the floor within the progression cut', () => {
-    expect(snapRampDepthToEndFloor(20, 8, 11, 40, PROGRESSION)).toBe(12);
   });
 });

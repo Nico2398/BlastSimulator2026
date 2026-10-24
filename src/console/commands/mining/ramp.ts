@@ -6,7 +6,7 @@ import type { MiningContext } from './types.js';
 import { requireGame } from './shared.js';
 import { isProgressionSite } from '../../../core/state/GameState.js';
 import {
-  validateRampOrder, defineRampSegments, rampCutSlopeRatio, rampDefFromEndpoints, rampWidthOf,
+  validateRampOrder, defineRampSegments, rampCutSlopeRatio, rampDefFromEndpoints, rampWidthOf, landRampOnGrid,
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
 import { proposeRampSpiral, spiralSurfaceFrom, type RampSpiralProposal, type RampSpiralResult, type SpiralDir, type SpiralRequest } from '../../../core/mining/RampSpiral.js';
@@ -16,6 +16,7 @@ import { rampPathCells, legsFromWaypoints, firstOccupiedPathTile, rampPathOf, ra
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { isBuildingFootprintCell } from '../../../core/entities/Building.js';
 import { rampFootprint, orderRampWiden, validateWidenRamp, type WidenFailure } from '../../../core/mining/RampWidening.js';
+import { orderRampRepair } from '../../../core/mining/RampRepair.js';
 import { RAMP_DEFAULT_WIDTH, RAMP_WIDTH_OPTIONS, isRampWidth, type RampWidth } from '../../../core/config/balance.js';
 import { cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -80,9 +81,11 @@ export function buildRampCommand(
 }
 
 /** Validates, claims and queues the ordered `rampDef` (straight or multi-leg); the shared tail of every ramp order form. */
-function orderRampDef(ctx: MiningContext, rampDef: RampDef): CommandResult {
-  const { direction, length } = rampDef;
-  rampDef.cutSlopeRatio = rampCutSlopeRatio(isProgressionSite(ctx.state!));
+function orderRampDef(ctx: MiningContext, ordered: RampDef): CommandResult {
+  const { direction, length } = ordered;
+  ordered.cutSlopeRatio = rampCutSlopeRatio(isProgressionSite(ctx.state!));
+  // A ramp ending on a dug floor lands on it (#2045): validated, and recorded, at the floor's real depth.
+  const rampDef = landRampOnGrid(ctx.grid!, ordered);
 
   // validateRampOrder runs first, before rampFootprint/cellsInRect build any
   // array — its finite/positive and MAX_RAMP_LENGTH checks are the sole
@@ -282,4 +285,19 @@ export function widenRampCommand(
   const result = orderRampWiden(state, ctx.grid!, rampId, toWidth);
   if (!result.success) return widenRefused(rampId, result);
   return { success: true, output: t('mining.widen_ramp.ordered', { id: rampId, width: toWidth, cost: formatMoney(result.data.cost) }) };
+}
+
+/** `repair_ramp id:N` — re-cuts a built ramp a blast damaged back to its line, landed on its floor as it is now (#2045). */
+export function repairRampCommand(
+  ctx: MiningContext,
+  _args: string[],
+  named: Record<string, string>,
+): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+  const rampId = parseInt(named['id'] ?? '', 10);
+  if (isNaN(rampId)) return { success: false, output: t('mining.repair_ramp.usage') };
+  const result = orderRampRepair(ctx.state!, ctx.grid!, rampId);
+  if (!result.success) return { success: false, output: t(result.errorKey, result.errorParams) };
+  return { success: true, output: t('mining.repair_ramp.ordered', { id: rampId, cells: result.data.cells, cost: formatMoney(result.data.cost) }) };
 }

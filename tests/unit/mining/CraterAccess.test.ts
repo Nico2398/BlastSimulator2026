@@ -7,7 +7,7 @@ import {
 } from '../../../src/core/mining/CraterAccess.js';
 import { rampPathCells, rampPathOf, type RampFootprint } from '../../../src/core/mining/RampPath.js';
 import {
-  MAX_RAMP_LENGTH, NAV_MAX_SLOPE_RATIO, RAMP_CRATER_MIN_DROP_M, RAMP_FLOOR_SNAP_REACH_M,
+  MAX_RAMP_LENGTH, NAV_MAX_SLOPE_RATIO, RAMP_CRATER_MIN_DROP_M, CRATER_ACCESS_FLOOR_LEVEL_M,
 } from '../../../src/core/config/balance.js';
 
 interface Pit { x0: number; z0: number; w: number; h: number; depth: number }
@@ -110,7 +110,7 @@ describe('planCraterAccess', () => {
     const first = cells[0]!;
     const last = cells[cells.length - 1]!;
     expect(s.reachableFrom(first.x, first.z)).toBe(true);
-    expect(Math.abs(s.heightAt(last.x, last.z) - -PIT.depth)).toBeLessThanOrEqual(RAMP_FLOOR_SNAP_REACH_M);
+    expect(Math.abs(s.heightAt(last.x, last.z) - -PIT.depth)).toBeLessThanOrEqual(CRATER_ACCESS_FLOOR_LEVEL_M);
   });
 
   it('never exceeds the longest ramp the game accepts', () => {

@@ -12,7 +12,7 @@ import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../src/ui/scene/PlacementController.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { rampFootLine } from '../../../src/ui/rampFootLine.js';
-import { rampFloorDepthAt, rampGradeBoundsDegrees, rampCutSlopeRatio, validateRampOrder, type RampDef } from '../../../src/core/mining/Ramp.js';
+import { rampGradeBoundsDegrees, rampCutSlopeRatio, validateRampOrder, type RampDef } from '../../../src/core/mining/Ramp.js';
 import { plannedRampGradeDegrees } from '../../../src/core/mining/RampGrade.js';
 import { proposeRampSpiral, type SpiralSurface } from '../../../src/core/mining/RampSpiral.js';
 import { t } from '../../../src/core/i18n/I18n.js';
@@ -494,17 +494,14 @@ describe('RampTool: grade ceiling follows the vehicle limit (#2045)', () => {
 });
 
 describe('RampTool: foot line over a multi-leg path', () => {
-  it('samples the last leg\'s start tile and the end tile, with the floor still to drop over that leg only', () => {
+  it('lands on the floor at the end tile: the line names the depth from the origin\'s ground to that floor', () => {
     const calls: Array<[number, number]> = [];
-    const sampler = (x: number, z: number): number => { calls.push([x, z]); return x === 25 && z === 27 ? 6 : 10; };
-    const s = setup({ sampler });
+    const sampler = (x: number, z: number): number => { calls.push([x, z]); return x === C.x && z === C.z ? 6 : 10; };
+    const s = setup({ sampler, surface: null });
     s.controller.simulateWaypoints([A, B, C]);
-    expect(calls).toContainEqual([B.x, B.z]);
+    expect(calls).toContainEqual([A.x, A.z]);
     expect(calls).toContainEqual([C.x, C.z]);
-    const def = SWITCHBACK_DEF;
-    const total = 22;
-    const dropBefore = rampFloorDepthAt(total - 10, total, def.targetDepth, undefined);
-    const expected = rampFootLine(10, 6, def.targetDepth - dropBefore, 10);
+    const expected = rampFootLine(10, 6);
     expect(s.shown().subtitle).toBe(expected);
     expect(expected).not.toBe('');
   });

@@ -17,7 +17,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
 import { el, button, reasonLine, panelRoot, panelHeader, panelHeaderButton, panelBody, replaceChildrenKeepingScroll } from '../dom.js';
 import { iconEl } from '../icons.js';
-import { contentFor, type InspectorAction, type ActionSpec, type InspectorView, type InspectorLinks } from '../panels/inspector/InspectorContent.js';
+import { contentFor, type InspectorAction, type ActionSpec, type InspectorView, type InspectorLinks, type RampRepairOffer } from '../panels/inspector/InspectorContent.js';
 import { shellLayoutRegistry } from './LayoutRegistry.js';
 import { writeText } from '../panels/inspector/inspectorWidgets.js';
 import { inspectorBounds } from '../panels/inspector/inspectorLayout.js';
@@ -42,6 +42,7 @@ export class Inspector {
   private onCommand: ((command: string) => void) | null = null;
   private onConfirm: ((config: ConfirmModalConfig) => void) | null = null;
   private onNavigate: ((panel: 'crew') => void) | null = null;
+  private rampRepairQuote: ((rampId: number) => RampRepairOffer) | null = null;
   private current: EntityPick | null = null;
   private lastState: GameState | null = null;
   private shownSignature: string | null = null;
@@ -52,6 +53,7 @@ export class Inspector {
     run: command => this.onCommand?.(command),
     confirm: config => this.onConfirm?.(config),
     navigate: panel => this.onNavigate?.(panel),
+    rampRepairQuote: rampId => this.rampRepairQuote?.(rampId) ?? { kind: 'refused', errorKey: 'mining.repair_ramp.intact', errorParams: { id: rampId } },
   };
 
   constructor(container: HTMLElement) {
@@ -93,6 +95,9 @@ export class Inspector {
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirm = cb; }
   /** Panel-opening sink for links such as a vehicle's "Train someone in Crew". */
   setNavigateHandler(cb: (panel: 'crew') => void): void { this.onNavigate = cb; }
+
+  /** Supplies ramp repair quotes from the terrain (#2045); without one the Repair action never shows. */
+  setRampRepairQuote(fn: (rampId: number) => RampRepairOffer): void { this.rampRepairQuote = fn; }
   /** Called when the close button is used; the caller clears the selection and its outline. */
   setCloseHandler(cb: () => void): void { this.onClose = cb; }
 

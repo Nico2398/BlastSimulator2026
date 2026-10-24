@@ -1332,10 +1332,7 @@ export const RAMP_CUT_SLOPE_MARGIN = 0.98;
 /** The actual rise-per-metre-of-run a ramp's floor is cut at (#1152). */
 export const RAMP_CUT_SLOPE_RATIO = NAV_MAX_SLOPE_RATIO * RAMP_CUT_SLOPE_MARGIN;
 
-/** Largest gap (m) between a ramp's planned foot and the end tile's floor that the depth snap bridges (#1852). */
-export const RAMP_FLOOR_SNAP_REACH_M = 2;
-
-/** An end tile counts as dug floor only when at least this far (m) below the start ground (#1852). */
+/** A ramp's end row counts as dug floor, which the ramp lands on, only when at least this far (m) below the start ground (#1852, #2045). */
 export const RAMP_CRATER_MIN_DROP_M = 2;
 
 /** Required clearance, in cells, for an employee on foot (#1154). */
@@ -1428,6 +1425,8 @@ export const RAMP_DEFAULT_WIDTH: RampWidth = 3;
 export const RAMP_DEFAULT_DEPTH_M = 8;
 export const RAMP_MAX_DEPTH_M = 55;
 export const RAMP_GRADE_STEP_DEGREES = 1;
+/** Ramp repair (#2045): cost per cell a repair cuts down to the ramp's line or fills back up to it. */
+export const RAMP_REPAIR_COST_PER_CELL = 10;
 /** Ramp cost per meter of length per voxel of width; the default width costs the pre-#1298 flat $100/m. */
 export const RAMP_COST_PER_METER_PER_WIDTH = 100 / 3;
 
@@ -3366,24 +3365,16 @@ export const SHAREHOLDER_SUMMIT_BOARD: BoardConfig = {
   growth: 1.25,
 };
 
-// ── Crater access (#2082) ──
+// ── Crater access planner (#2082; pure, called by the progression probe since #2095) ──
 
-/** Stranded orders (debris_out_of_reach / buried_under_rubble) on one floor before a ramp is ordered down to it. */
-export const CRATER_ACCESS_MIN_STRANDED_ORDERS = 3;
-/** Ticks of payroll that cash must still cover after paying for a crater access ramp. */
-export const CRATER_ACCESS_CASH_RESERVE_TICKS = 200;
-/** Ticks between stranded-floor rescans, so the per-tick cost stays flat. */
-export const CRATER_ACCESS_RECHECK_TICKS = 50;
 /** Fraction of the maximum nav grade a crater access ramp may use (1 = right at the limit; below 1 keeps margin). */
 export const CRATER_ACCESS_MAX_GRADE_MARGIN = 0.9;
 /** Largest gap (cells, Chebyshev) between two stranded order targets that still belong to one crater floor. */
 export const CRATER_ACCESS_CLUSTER_GAP_CELLS = 6;
 /** Candidate pit-rim starts a crater access plan tries with the spiral backend before giving up. */
 export const CRATER_ACCESS_SPIRAL_START_ATTEMPTS = 6;
-/** Ticks a stranded floor may stay unplannable before its debris_out_of_reach auto-debris orders are cancelled. */
-export const CRATER_ACCESS_ABANDON_DEBRIS_TICKS = 600;
 /**
- * Ticks a driverless vehicle no licensed employee can walk to, or a worker cut off from the rest of the crew,
- * stays put before it is brought back to the crew (#2085). Long enough that a ramp being dug to the floor wins the race.
+ * Largest gap (m) between the ground a planned ramp lands on (the lowest of its end row) and the stranded floor
+ * for the ramp to count as reaching it: within one voxel layer, so the landed foot is flush with that floor (#2045).
  */
-export const STRANDED_RECOVERY_TICKS = 300;
+export const CRATER_ACCESS_FLOOR_LEVEL_M = 0.5;

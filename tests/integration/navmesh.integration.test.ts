@@ -423,7 +423,8 @@ describe('NavMesh and pathfinding', () => {
     // carved sheer (straight clearVoxel, no gradual slope) down to floor
     // Y=14 — an 8-voxel drop, matching the issue's "eight-metre crater wall".
     // Columns x=[9,11] for z<=21 are left untouched by the crater cut so a
-    // real buildRamp() call can carve their own gradual descent instead.
+    // real buildRamp() call can carve their own gradual descent instead; the
+    // band's end row z=22 is crater floor, which the ramp lands on (#2045).
     const CRATER_MIN_X = 7, CRATER_MAX_X = 13, CRATER_MIN_Z = 15, CRATER_MAX_Z = 22;
     const RAMP_BAND_MIN_X = 9, RAMP_BAND_MAX_X = 11, RAMP_BAND_MAX_Z = 21;
 
@@ -445,29 +446,25 @@ describe('NavMesh and pathfinding', () => {
     it('routes through a dug ramp into the crater — every waypoint step respects the slope limit', () => {
       const grid = buildCraterPlateau();
 
-      // Ramp grade (#1151): the ramp band is fixed at 8 columns wide
-      // (RAMP_BAND_MAX_Z - originZ + 1), so targetDepth is capped at
-      // floor(8 / 1.8) = 4 to keep every per-column step within
-      // NAV_MAX_SLOPE_RATIO — the ramp reaches partway into the crater
-      // (down to y=18) rather than all the way to the crater's own sheer
-      // floor (y=14); that partial descent is still enough to prove a
-      // legal graded route exists where a sheer wall would refuse one.
+      // The ramp band x=[9,11] keeps its plateau ground down to z=21; the ramp runs 15 m south through it and
+      // its end row (z=22) is the crater floor 8 m down. A ramp ending on a dug floor lands on it (#2045): the
+      // asked depth of 4 m is only an input for a trench, so the line drops the full 8 m, within the cut limit
+      // over 15 m (8 / 15 = 0.53 < the 30 degree cut 0.566), and the foot is flush with the floor.
       const rampResult = buildRamp(grid, {
-        originX: 10, originZ: 14, direction: 'south', length: 8, targetDepth: 4,
+        originX: 10, originZ: 7, direction: 'south', length: 15, targetDepth: 4,
       }, 1_000_000);
       expect(rampResult.success).toBe(true);
 
       const nav = NavGrid.buildNavGrid(grid, [], []);
 
-      const from = { x: 10, z: 5 };  // surface, well outside the crater
-      const to = { x: 10, z: 21 };   // ramp's own last carved column
+      const from = { x: 10, z: 3 };  // surface, well outside the crater
+      const to = { x: 10, z: 22 };   // the crater floor, past the ramp's foot
 
       const result = findPath(nav, {
         agentId: 1, fromX: from.x, fromZ: from.z, toX: to.x, toZ: to.z, avoidVehicles: false,
       });
 
       expect(result.found).toBe(true);
-
       // Real proof it used the ramp, independent of cell-type labels: every
       // consecutive waypoint pair's surfaceY delta stays within the slope limit.
       for (let i = 0; i < result.waypoints.length - 1; i++) {

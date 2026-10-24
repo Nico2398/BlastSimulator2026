@@ -74,6 +74,7 @@ import { getEventById } from '../../src/core/events/EventPool.js';
 import type { EventConsequence } from '../../src/core/events/EventPool.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
+import { newCraterAccessMemory, playPitLogistics, type CraterAccessMemory } from './probe-crater-access.js';
 import {
   floorToKgResolution, limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
   type BuyRule, type LadderShot, type PermitLimit,
@@ -445,6 +446,8 @@ interface ReinvestMemory {
   stalePatternSinceTick?: number;
   /** Detonations of the current shot disarmed because someone could not leave the blast zone; each one sends the whole crew out of work. */
   fireCancels?: number;
+  /** Ramps the player repaired and dug down to stranded floors (#2095): the game does neither by itself. */
+  access: CraterAccessMemory;
 }
 
 function spendable(s: ProbeSession): number {
@@ -619,9 +622,10 @@ function runReinvest(s: ProbeSession): void {
   const first = runOpening(s).at;
   const m: ReinvestMemory = {
     shot: null, origins: [first], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
-    researchOrdered: false, retryAt: {},
+    researchOrdered: false, retryAt: {}, access: newCraterAccessMemory(),
   };
   playOut(s, () => {
+    playPitLogistics(s.run, s.state, s.grid, m.access);
     reinvestShot(s, m);
     reinvestBuy(s, m);
     reinvestPermit(s);
@@ -1078,13 +1082,14 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const opened = runOpening(s);
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
-    researchOrdered: false, retryAt: {},
+    researchOrdered: false, retryAt: {}, access: newCraterAccessMemory(),
     crater: { ...opened.at, span: SHOT_SPAN }, ramps: {}, rampedFloorM: 0, maxGrade, barred: [], buriedSinceTick: null,
     holeCapM: ladderHoleDepthM(s), lastShotFailed: false, dudStreak: 0, judgedShots: 1,
     before: { pitM: 0, oreKg: 0 },
   };
   recordRamp(m, opened.at, opened.ramp);
   playOut(s, () => {
+    playPitLogistics(s.run, s.state, s.grid, m.access);
     ladderPermit(s, m);
     ladderCrew(s, m);
     ladderSpoil(s, m);

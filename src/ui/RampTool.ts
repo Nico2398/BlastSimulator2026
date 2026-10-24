@@ -14,10 +14,10 @@ import {
   proposeRampSpiral, isPitRim, type RampSpiralResult, type SpiralDir, type SpiralSurface,
 } from '../core/mining/RampSpiral.js';
 import {
-  computeRampCost, rampDefFromEndpoints, rampCutSlopeRatio, rampDefFromLegs, rampEndTile, rampFloorDepthAt, rampGradeBoundsDegrees, validateRampOrder,
+  computeRampCost, landRampOnEndFloor, rampDefFromEndpoints, rampCutSlopeRatio, rampDefFromLegs, rampEndRowGround, rampGradeBoundsDegrees, validateRampOrder,
   type RampDef,
 } from '../core/mining/Ramp.js';
-import { legsFromWaypoints, rampLegsOf, rampPathOf, rampTotalLength, rampWaypoints, type RampLeg } from '../core/mining/RampPath.js';
+import { legsFromWaypoints, rampLegsOf, rampTotalLength, type RampLeg } from '../core/mining/RampPath.js';
 import { climbForGrade, plannedRampGradeDegrees } from '../core/mining/RampGrade.js';
 import {
   MAX_RAMP_LENGTH, RAMP_DEFAULT_WIDTH, RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_DEPTH_M, RAMP_MAX_DEPTH_M, RAMP_GRADE_STEP_DEGREES, type RampWidth,
@@ -221,18 +221,21 @@ export class RampTool {
     return { line, statusKey: 'ui.build.ramp_ordered' };
   }
 
-  /** Foot line of the last leg: its start and end ground, and the depth the floor still has to drop over it. */
+  /** Continuous ground at (x, z): the spiral seam's (the height the ramp is cut from), else the placement sampler. */
+  private groundAt(x: number, z: number): number {
+    const surface = this.deps.spiralSurface();
+    if (surface !== null) return surface.heightAt(x, z);
+    return this.deps.sampler?.(x, z) ?? NaN;
+  }
+
+  /** `def` landed on its end floor, as the order will be (#2045); unchanged when no ground can be read. */
+  private landed(def: RampDef): RampDef {
+    return landRampOnEndFloor(def, this.groundAt(def.originX, def.originZ), rampEndRowGround(def, (x, z) => this.groundAt(x, z)));
+  }
+
+  /** Foot line: the depth the ramp lands at when it ends on a dug floor. */
   private footLine(def: RampDef): string {
-    const sampler = this.deps.sampler;
-    if (!sampler) return '';
-    const legs = rampLegsOf(def);
-    const last = legs[legs.length - 1]!;
-    const total = rampTotalLength(legs);
-    const wps = rampWaypoints(rampPathOf(def));
-    const start = wps[wps.length - 2]!;
-    const end = rampEndTile(def);
-    const dropBefore = rampFloorDepthAt(total - last.length, total, def.targetDepth, def.gradeDegrees);
-    return rampFootLine(sampler(start.x, start.z), sampler(end.x, end.z), def.targetDepth - dropBefore, last.length);
+    return rampFootLine(this.groundAt(def.originX, def.originZ), rampEndRowGround(def, (x, z) => this.groundAt(x, z)));
   }
 
   private stripConfig(refresh: () => void): ParamStripConfig {
@@ -257,7 +260,8 @@ export class RampTool {
       legsPreview = { originX: p.originX, originZ: p.originZ, legs: p.legs };
       planGrade = p.gradeDegrees;
     } else if (spiral === null) {
-      def = this.planDef(wps);
+      const drawn = this.planDef(wps);
+      def = drawn === null ? null : this.landed(drawn);
       if (def !== null) {
         planGrade = plannedRampGradeDegrees(def);
         if (def.legs) legsPreview = { originX: def.originX, originZ: def.originZ, legs: def.legs };

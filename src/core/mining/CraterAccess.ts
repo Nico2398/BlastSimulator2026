@@ -1,13 +1,16 @@
-// BlastSimulator2026 — Crater access planning (#2082)
+// BlastSimulator2026 — Crater access planning (#2082, #2095)
 // Pure planner: finds floors stranded below the existing ramp network and proposes a ramp down to them.
-// Reads terrain only through the narrow AccessSurface seam; no GameState.
+// Reads terrain only through the narrow AccessSurface seam; no GameState. Nothing in the tick calls it:
+// opening a crater is the player's job, and the progression probe plays that player with it.
 
 import {
-  CRATER_ACCESS_CLUSTER_GAP_CELLS, CRATER_ACCESS_MAX_GRADE_MARGIN, CRATER_ACCESS_SPIRAL_START_ATTEMPTS, MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M,
-  RAMP_FLOOR_SNAP_REACH_M, RAMP_SPIRAL_MAX_PIT_SPAN_M, RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth,
+  CRATER_ACCESS_CLUSTER_GAP_CELLS, CRATER_ACCESS_FLOOR_LEVEL_M, CRATER_ACCESS_MAX_GRADE_MARGIN, CRATER_ACCESS_SPIRAL_START_ATTEMPTS, MAX_RAMP_LENGTH,
+  RAMP_CRATER_MIN_DROP_M, RAMP_SPIRAL_MAX_PIT_SPAN_M, RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth,
 } from '../config/balance.js';
 import { slopeDegreesForRatio } from '../nav/ClimbLimit.js';
-import { computeRampCost, rampDefFromLegs, rampFootOffset, rampLengthForGrade, validateRampOrder, type RampDef } from './Ramp.js';
+import {
+  computeRampCost, landRampOnEndFloor, rampDefFromLegs, rampEndRowGround, rampLengthForGrade, validateRampOrder, type RampDef,
+} from './Ramp.js';
 import {
   RAMP_DIR_OFFSETS, findRampPathFault, rampPathOf, rampTotalLength, rampWaypoints, type RampDirection, type RampFootprint, type RampLeg,
 } from './RampPath.js';
@@ -127,11 +130,10 @@ function planStraight(
       const sz = fz - o.dz * length;
       if (!surface.contains(sx, sz) || !surface.reachableFrom(sx, sz)) continue;
       const startGround = surface.heightAt(sx, sz);
-      const drop = startGround - floor.floorY;
+      const drop = startGround - landingGround(surface, { originX: sx, originZ: sz, direction, length, width });
       if (!Number.isFinite(drop)) continue;
       if (drop < RAMP_CRATER_MIN_DROP_M) { sawShallow = true; continue; }
       if (drop / length > limitRatio) continue;
-      if (Math.abs(rampFootOffset(startGround, floor.floorY, drop, length)) > RAMP_FLOOR_SNAP_REACH_M) continue;
       const def: RampDef = { originX: sx, originZ: sz, direction, length, targetDepth: drop, width };
       if (findRampPathFault(rampPathOf(def), width) !== null) continue;
       if (excluded(def)) continue;
@@ -187,9 +189,17 @@ function footMeetsFloor(def: RampDef, floor: StrandedFloor, surface: AccessSurfa
   return false;
 }
 
-/** Floor-level ground: within the foot snap reach of the floor's depth. */
+/** Floor-level ground: within one voxel layer of the floor's depth (#2045). */
 const atFloorLevel = (surface: AccessSurface, floor: StrandedFloor, x: number, z: number): boolean =>
-  surface.contains(x, z) && Math.abs(surface.heightAt(x, z) - floor.floorY) <= RAMP_FLOOR_SNAP_REACH_M;
+  surface.contains(x, z) && Math.abs(surface.heightAt(x, z) - floor.floorY) <= CRATER_ACCESS_FLOOR_LEVEL_M;
+
+/** The ground a ramp lands on, as the order will land it: the lowest of its end row (`rampEndRowGround`). */
+const landingGround = (surface: AccessSurface, def: Parameters<typeof rampEndRowGround>[0]): number =>
+  rampEndRowGround(def, (x, z) => (surface.contains(x, z) ? surface.heightAt(x, z) : NaN));
+
+/** True when `def` lands on `floor`: its end row's lowest ground is floor-level, so the landed foot is flush with it. */
+const landsOnFloor = (surface: AccessSurface, floor: StrandedFloor, def: RampDef): boolean =>
+  Math.abs(landingGround(surface, def) - floor.floorY) <= CRATER_ACCESS_FLOOR_LEVEL_M;
 
 /** True when the corridor of a leg of `length` tiles from `from` along `direction` lies wholly inside the claimed area. */
 function legContained(surface: AccessSurface, from: { x: number; z: number }, direction: RampDirection, length: number, width: number): boolean {
@@ -339,12 +349,16 @@ export function planCraterAccess(
   if (!(limitRatio > 0) || !Number.isFinite(floor.floorY)) return { ok: false, reasonKey: `${KEY}no_start` };
   // A plan identical to a dug ramp carves nothing new: re-ordering it would loop forever on a floor it never reached (#2085).
   const builtKeys = new Set(built.map(b => rampKey(b.def, b.width)));
-  const excluded: Excluded = def => builtKeys.has(rampKey(def, width)) || overlapsAny(def, width, avoid);
+  // A plan counts only when the ramp lands on this floor, flush (#2045), and still validates once landed.
+  const landed = (def: RampDef): RampDef => landRampOnEndFloor(def, surface.heightAt(def.originX, def.originZ), landingGround(surface, def));
+  const excluded: Excluded = def => builtKeys.has(rampKey(def, width)) || overlapsAny(def, width, avoid)
+    || !landsOnFloor(surface, floor, def) || !validateRampOrder(landed(def), Infinity).success;
+  const finish = (plan: CraterAccessPlan): CraterAccessPlan => (plan.ok ? { ...plan, def: landed(plan.def) } : plan);
   const straight = planStraight(floor, surface, limitRatio, width, excluded);
-  if (straight.plan !== null) return straight.plan;
+  if (straight.plan !== null) return finish(straight.plan);
   const spiral = planSpiral(floor, surface, limitRatio, width, excluded);
-  if (spiral !== null) return spiral;
+  if (spiral !== null) return finish(spiral);
   const offset = planOffsetStraight(floor, surface, limitRatio, width, excluded);
-  if (offset !== null) return offset;
+  if (offset !== null) return finish(offset);
   return { ok: false, reasonKey: `${KEY}${straight.sawShallow ? 'too_shallow' : 'no_start'}` };
 }

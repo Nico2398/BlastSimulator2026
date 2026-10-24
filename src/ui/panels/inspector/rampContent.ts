@@ -7,7 +7,7 @@ import { describeRampClimbability } from '../../../core/mining/RampGrade.js';
 import type { RampLeg } from '../../../core/mining/RampPath.js';
 import { isProgressionSite, type BuiltRamp, type PlannedRamp } from '../../../core/state/GameState.js';
 import { describeRamp } from '../../describeRamp.js';
-import type { ActionSpec, KindContent } from './InspectorContent.js';
+import type { ActionSpec, InspectorLinks, KindContent } from './InspectorContent.js';
 import { kindLabel, sectionOf, syncSection, valueRow } from './inspectorWidgets.js';
 import { el } from '../../dom.js';
 
@@ -28,6 +28,25 @@ export function widenState(ramp: BuiltRamp, plannedRamps: readonly PlannedRamp[]
   return { cost, disabledReason: null };
 }
 
+/**
+ * The Repair action for a built ramp a blast damaged (#2045): its cost, disabled with the reason when the cash
+ * or the ramp's reach falls short; none when the ramp is intact or no terrain can be read.
+ */
+export function repairAction(ramp: BuiltRamp, cash: number, links: InspectorLinks): ActionSpec | null {
+  const offer = links.rampRepairQuote?.(ramp.id);
+  if (offer === undefined || (offer.kind === 'refused' && offer.errorKey === 'mining.repair_ramp.intact')) return null;
+  const base = { action: 'repair', labelKey: 'inspector.ramp.repair', icon: 'build', variant: 'ghost' } as const;
+  if (offer.kind === 'refused') {
+    return { ...base, label: t('inspector.action.repair'), disabled: true, title: t(offer.errorKey, offer.errorParams) };
+  }
+  const cost = formatMoney(offer.cost);
+  const short = cash < offer.cost;
+  return {
+    ...base, label: t('inspector.ramp.repair', { cost }), disabled: short,
+    ...(short ? { title: t('inspector.ramp.repair_short_funds', { cost }) } : {}),
+  };
+}
+
 /** "2 · 12m south, 10m east": leg count, then each leg's length and heading. */
 function legsText(legs: readonly RampLeg[]): string {
   const items = legs.map(l => t('inspector.ramp.leg_item', { length: l.length, direction: t(`inspector.ramp.dir_${l.direction}`) }));
@@ -44,7 +63,7 @@ function buildDimensions(ramp: BuiltRamp): HTMLElement {
   const meters = (n: number) => t('inspector.depth_value', { depth: n });
   const rows = [
     valueRow(t('inspector.ramp.width'), meters(ramp.width)),
-    valueRow(t('inspector.ramp.depth'), meters(ramp.def.targetDepth)),
+    valueRow(t('inspector.ramp.depth'), meters(Math.round(ramp.def.targetDepth * 10) / 10)),
     valueRow(t('inspector.ramp.length'), meters(ramp.def.length)),
   ];
   if (ramp.def.legs) {
@@ -57,7 +76,7 @@ function buildDimensions(ramp: BuiltRamp): HTMLElement {
 }
 
 export const rampContent: KindContent = {
-  view(entity, state) {
+  view(entity, state, links) {
     const ramp = state.builtRamps.find(r => r.id === entity.id);
     if (!ramp) return null;
     const climb = describeRampClimbability(state.navGrid, ramp, isProgressionSite(state)) ?? undefined;
@@ -69,12 +88,14 @@ export const rampContent: KindContent = {
       disabled: widen.disabledReason !== null,
       ...(widen.disabledReason !== null ? { title: widen.disabledReason } : {}),
     }];
+    const repair = repairAction(ramp, state.cash, links);
+    if (repair !== null) actions.push(repair);
     return {
       title: desc.title,
       sub: `#${ramp.id} · ${kindLabel('ramp')}`,
       icon: 'layers',
       status: desc.sub,
-      signature: `${ramp.id}:${ramp.width}:${ramp.def.legs?.map(l => `${l.direction}${l.length}`).join('/') ?? ''}:${ramp.def.gradeDegrees ?? ''}:${climb?.climbable ?? ''}:${widen.disabledReason ?? 'ready'}`,
+      signature: `${ramp.id}:${ramp.width}:${ramp.def.legs?.map(l => `${l.direction}${l.length}`).join('/') ?? ''}:${ramp.def.gradeDegrees ?? ''}:${climb?.climbable ?? ''}:${widen.disabledReason ?? 'ready'}:${repair?.label ?? ''}:${repair?.disabled ?? ''}`,
       get sections() {
         const body = el('div', { className: 'bs-ramp-detail' });
         const section = buildDimensions(ramp);

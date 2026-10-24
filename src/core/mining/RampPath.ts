@@ -131,6 +131,16 @@ function perpOf(direction: RampDirection): { px: number; pz: number } {
   return direction === 'north' || direction === 'south' ? { px: 1, pz: 0 } : { px: 0, pz: 1 };
 }
 
+/** The row of `width` tiles one step past the ramp's foot, across its last leg: the ground a vehicle drives off onto (#2045). */
+export function rampEndRow(path: RampPathSpec, width: RampWidth): { x: number; z: number }[] {
+  const end = rampWaypoints(path).at(-1)!;
+  const { px, pz } = perpOf(path.legs.at(-1)!.direction);
+  const half = Math.floor(width / 2);
+  const out: { x: number; z: number }[] = [];
+  for (let w = -half; w <= half; w++) out.push({ x: end.x + px * w, z: end.z + pz * w });
+  return out;
+}
+
 /**
  * The width x width corner landing centred on the waypoint where leg `k` starts, as cells of leg `k`.
  * Each cell takes its step and lateral from the centreline it sits on or nearest to, so the

@@ -28,7 +28,7 @@ export interface CraterSite {
   pits: Pit[];
 }
 
-/** Levels the whole site to the surface found at (30, 30), so no natural slope links anything to anything. */
+/** Levels the whole site to the surface found at (30, 30), so no natural slope links anything to anything. The NavGrid learns of it through terrain:updated, as for a pit. */
 function flatten(ctx: MiningContext): number {
   const grid = ctx.grid!;
   const { minX, minZ, sizeX, sizeZ } = ctx.state!.world!;
@@ -41,6 +41,9 @@ function flatten(ctx: MiningContext): number {
       }
     }
   }
+  ctx.emitter.emit('terrain:updated', {
+    region: { minX, maxX: minX + sizeX - 1, minZ, maxZ: minZ + sizeZ - 1, minY: 0, maxY: GENERATED_TERRAIN_GRID_SIZE_Y - 1 },
+  });
   return top;
 }
 

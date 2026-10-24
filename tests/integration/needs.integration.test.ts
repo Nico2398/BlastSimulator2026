@@ -1759,7 +1759,7 @@ describe('#1801 — the debris-hauler driver on long hauls recovers morale under
 
   /**
    * The #1778 repro: sandbox Easy desert_badlands seed 42, Living Quarters at
-   * (30,48), one 3x3 Krackle 8 kg shot at (36,32), ramp (40,12)->(40,31), contracts
+   * (30,48), one 3x3 Krackle 8 kg shot at (36,32), ramp (40,9)->(40,31), contracts
    * sold as stock covers them (the shared player-honest driver). No cash injected.
    */
   function runHaul(policy?: string): HaulRun {
@@ -1805,7 +1805,8 @@ describe('#1801 — the debris-hauler driver on long hauls recovers morale under
       clearBlastZone(run, state);
       expect(run('blast').success).toBe(true);
       until(200, () => state.lastBlastReport !== null);
-      expect(run('build_ramp start:40,12 end:40,31 depth:6').success).toBe(true);
+      // 22 m: the crater floor lies 7.6 m down and the ramp lands on it (#2045), within the 20 degree cut.
+      expect(run('build_ramp start:40,9 end:40,31 depth:6').success).toBe(true);
     }
     until(TICKS, () => false);
 

@@ -341,6 +341,8 @@ export interface PlannedRamp {
   segments: RampSegmentTracker[];
   /** Set when this order widens the built ramp with this id instead of cutting a new one (#1298). */
   widenOf?: number;
+  /** Set when this order repairs the built ramp with this id instead of cutting a new one (#2045). */
+  repairOf?: number;
 }
 
 /**

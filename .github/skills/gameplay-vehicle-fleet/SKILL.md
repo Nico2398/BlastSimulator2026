@@ -375,14 +375,6 @@ does. The path-scoped `vehicles` rule names these invariants; this is where they
 | I8 | Every fragment in `v.cargo` has logistics state `in_transit` |
 | I9 | `e.taskTicksRemaining !== null` implies `e.itinerary === null` (arrived, no longer travelling) |
 
-One more writer exists for a vehicle nobody can reach (#2085): `recoverStranded`
-(`StrandedVehicleRecovery.ts`, rule in `gameplay-navmesh`, "Crater access") tows a **driverless**
-vehicle that no licensed employee can walk to to a free
-cell beside the nearest licensed crew member after `STRANDED_RECOVERY_TICKS`. It never touches a
-vehicle with an occupant, so I2 and I4 hold. Reason: `fillPool` counts a vehicle as an order actor
-only when a candidate driver walks to it, so an unreachable only-digger can never dig the ramp that
-would free it.
-
 Three lint checks keep the writers singular. `tests/unit/lint/SingleVehicleMover.test.ts`: only
 `Locomotion.ts` assigns a vehicle's `x`/`z`, and nothing outside it pathfinds from a vehicle's
 position. `tests/unit/lint/SingleMountWriter.test.ts`: only `Mount.ts` assigns `occupantIds` — a

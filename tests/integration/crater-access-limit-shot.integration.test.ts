@@ -1,8 +1,10 @@
-// BlastSimulator2026 — Integration: crater access after limit-sized shots (#2086).
+// BlastSimulator2026 — Integration: crater access after limit-sized shots (#2086, #2095).
 //
-// The ladder probe fires permit-limit shots; each cuts a wide crater and strands its rubble. #2082/#2085 order an
-// access ramp for the first crater, but a crater deepened by a later shot, or a second crater, stayed sealed:
-// haul orders read debris_out_of_reach until they were abandoned, and the pit never got deeper.
+// The ladder probe fires permit-limit shots; each cuts a wide crater and strands its rubble. The core never opens
+// a crater by itself (#2095): its haul orders stay debris_out_of_reach until the player orders a way in. Here the
+// probe's access policy (`orderCraterAccess`, scripts/shared/probe-crater-access.ts) plays that player, ordering
+// its ramps through the console and paying for them, for the first crater, a crater deepened by a later shot and
+// a second crater.
 //
 // The craters here come from real shots (drill_plan, charge, blast on a levelled grade 2 site), not hand-cut pits.
 // A real shot leaves thousands of fragments and takes minutes to haul, so `thinRubble` keeps one fragment in forty
@@ -16,18 +18,33 @@ import { tickUntilFresh } from '../helpers/blastFixtures.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { isFragmentSealed } from '../../src/core/economy/SealedFragments.js';
 import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
-import { CRATER_ACCESS_ABANDON_DEBRIS_TICKS, CRATER_ACCESS_CASH_RESERVE_TICKS, CRATER_ACCESS_RECHECK_TICKS } from '../../src/core/config/balance.js';
+import { describeRampClimbability } from '../../src/core/mining/RampGrade.js';
+import { siteVehicleReach } from '../../src/core/engine/OrderReachability.js';
+import { t } from '../../src/core/i18n/I18n.js';
+import {
+  ACCESS_CASH_RESERVE_TICKS, ACCESS_RECHECK_TICKS, newCraterAccessMemory, orderCraterAccess, type CraterAccessMemory,
+} from '../../scripts/shared/probe-crater-access.js';
 
 const THIN = 40;
 /** Ticks allowed for the crew to dig an access ramp and then clear the crater floor. */
 const DIG_TICKS = 4000;
 const SHOT: LimitShot = { side: 4, spacing: 4, depth: 8, kgPerHole: 10, x0: 30, z0: 30, explosive: 'krackle', diameter: 0.089 };
 
-/** Ticks with the score and cash topped up: a limit shot's rubble bleeds ecology to a shutdown before it is hauled. */
-function tickSite(site: CraterSite, until: () => boolean, maxTicks: number): void {
+/** Depth the player asks of the long access ramp; the order lands it on the floor its end row shows (#2045). */
+const PLAYER_RAMP_DEPTH = 15;
+/** Ticks the core is given to open a crater by itself; it must not. */
+const IDLE_TICKS = 2000;
+
+/**
+ * Ticks with the score and cash topped up: a limit shot's rubble bleeds ecology to a shutdown before it is hauled.
+ * With `access`, the probe's access policy plays the player between ticks.
+ */
+function tickSite(site: CraterSite, until: () => boolean, maxTicks: number, access?: CraterAccessMemory): void {
+  const run = site.run as (cmd: string) => { success: boolean; output: string };
   tickUntilFresh(site.run, site.state, () => {
     site.state.scores.ecology = 100;
     site.state.cash = Math.max(site.state.cash, 3_000_000);
+    if (access) orderCraterAccess(run, site.state, site.ctx.grid!, access);
     return until();
   }, maxTicks);
 }
@@ -49,65 +66,70 @@ function limitSite(): CraterSite {
   return site;
 }
 
-/** Fires a shot, thins its rubble and runs until no fragment is left on the ground. */
-function shootAndClear(site: CraterSite, shot: LimitShot): void {
+/** Fires a shot, thins its rubble and runs, the player ordering the way in, until no fragment is left on the ground. */
+function shootAndClear(site: CraterSite, shot: LimitShot, access: CraterAccessMemory): void {
   fireLimitShot(site, shot);
   thinRubble(site, THIN);
-  tickSite(site, () => onGround(site) === 0 && site.state.plannedRamps.length === 0, DIG_TICKS);
+  tickSite(site, () => onGround(site) === 0 && site.state.plannedRamps.length === 0, DIG_TICKS, access);
 }
 
-describe('limit-sized shot on a levelled site (#2086)', () => {
-  it('cuts a wide crater and strands its rubble, and the crater is opened and hauled out', () => {
+describe('limit-sized shot on a levelled site (#2086, #2095)', () => {
+  it('cuts a wide crater and strands its rubble, and the core opens nothing by itself', () => {
     const site = limitSite();
     fireLimitShot(site, SHOT);
     const crater = craterCells(site);
     expect(crater.length).toBeGreaterThan(150);
     expect(Math.max(...crater.map(c => c.depth))).toBeGreaterThanOrEqual(6);
-    const kept = thinRubble(site, THIN);
-    expect(kept).toBeGreaterThan(20);
+    expect(thinRubble(site, THIN)).toBeGreaterThan(20);
     const { state } = site;
 
-    tickSite(site, () => state.plannedRamps.length > 0 || state.builtRamps.length > 0, CRATER_ACCESS_RECHECK_TICKS * 4);
-    expect(state.plannedRamps.length + state.builtRamps.length).toBeGreaterThan(0);
+    tickSite(site, () => false, IDLE_TICKS);
+    expect(state.plannedRamps).toEqual([]);
+    expect(state.builtRamps).toEqual([]);
+    expect(strandedOrders(site).length).toBeGreaterThan(0);
+    expect(onGround(site)).toBeGreaterThan(0);
+    expectNoWorldInvariantViolations(state);
+  });
 
+  it('the player orders an access ramp, it is dug, and the crater is hauled out', () => {
+    const site = limitSite();
+    fireLimitShot(site, SHOT);
+    thinRubble(site, THIN);
+    const { state } = site;
+    const access = newCraterAccessMemory();
+
+    tickSite(site, () => state.plannedRamps.length > 0, ACCESS_RECHECK_TICKS * 4, access);
+    expect(state.plannedRamps).toHaveLength(1);
     const before = onGround(site);
-    tickSite(site, () => onGround(site) === 0, DIG_TICKS);
+    tickSite(site, () => onGround(site) === 0 && state.plannedRamps.length === 0, DIG_TICKS, access);
+    expect(state.builtRamps.length).toBeGreaterThanOrEqual(1);
+    expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
     expect(onGround(site)).toBeLessThan(before);
     expect(onGround(site)).toBe(0);
     expect(strandedOrders(site)).toEqual([]);
     expectNoWorldInvariantViolations(state);
   });
 
-  it('digs the access ramp: it leaves plannedRamps with every segment done', () => {
+  it('orders no second ramp for a crater the first ramp already opened', () => {
     const site = limitSite();
-    fireLimitShot(site, SHOT);
-    thinRubble(site, THIN);
-    const { state } = site;
-    tickSite(site, () => state.builtRamps.length >= 1 && state.plannedRamps.length === 0, DIG_TICKS);
-    expect(state.builtRamps.length).toBeGreaterThanOrEqual(1);
-    expect(state.plannedRamps).toHaveLength(0);
-    expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
-  });
-
-  it('does not queue a second ramp for a crater the first ramp already opened', () => {
-    const site = limitSite();
-    shootAndClear(site, SHOT);
+    const access = newCraterAccessMemory();
+    shootAndClear(site, SHOT, access);
     const { state } = site;
     const built = state.builtRamps.length;
     expect(built).toBeGreaterThanOrEqual(1);
-    tickSite(site, () => false, 2 * CRATER_ACCESS_RECHECK_TICKS);
+    tickSite(site, () => false, 2 * ACCESS_RECHECK_TICKS, access);
     expect(state.builtRamps).toHaveLength(built);
     expect(state.plannedRamps).toHaveLength(0);
   });
 });
 
-describe('a shot that deepens an opened crater (#2086)', () => {
+describe('a shot that deepens an opened crater (#2086, #2095)', () => {
   /** Centred in the first crater, one grid cell inside it. */
   const DEEPEN: LimitShot = { ...SHOT, side: 3, x0: 33, z0: 33 };
 
-  function deepened(): CraterSite {
+  function deepened(access: CraterAccessMemory): CraterSite {
     const site = limitSite();
-    shootAndClear(site, SHOT);
+    shootAndClear(site, SHOT, access);
     const firstDepth = Math.max(...craterCells(site).map(c => c.depth));
     restockShotFleet(site);
     fireLimitShot(site, DEEPEN);
@@ -117,46 +139,56 @@ describe('a shot that deepens an opened crater (#2086)', () => {
     return site;
   }
 
-  it('orders an access ramp to the deepened floor instead of leaving its rubble sealed', () => {
-    const site = deepened();
+  it('the deepened floor waits for the player: no ramp by itself, its rubble keeps its haul orders', () => {
+    const access = newCraterAccessMemory();
+    const site = deepened(access);
     const { state } = site;
     const rampsBefore = state.builtRamps.length;
     expect(onGround(site)).toBeGreaterThan(0);
-
-    tickSite(site, () => state.plannedRamps.length > 0 || state.builtRamps.length > rampsBefore,
-      CRATER_ACCESS_ABANDON_DEBRIS_TICKS + 2 * CRATER_ACCESS_RECHECK_TICKS);
-    expect(state.plannedRamps.length + state.builtRamps.length - rampsBefore).toBeGreaterThan(0);
+    tickSite(site, () => false, IDLE_TICKS);
+    expect(state.plannedRamps).toEqual([]);
+    expect(state.builtRamps).toHaveLength(rampsBefore);
+    expect(strandedOrders(site).length).toBeGreaterThan(0);
   });
 
-  it('hauls the deepened crater out within the dig window, with no order left debris_out_of_reach', () => {
-    const site = deepened();
-    const { state } = site;
-    const before = onGround(site);
+  it('the shot cut through the access ramp\'s foot: the ramp reads too steep and is past repair at its length', () => {
+    const access = newCraterAccessMemory();
+    const site = deepened(access);
+    const { state, run } = site;
+    const first = state.builtRamps[0]!;
+    expect(describeRampClimbability(state.navGrid, first, true)?.climbable).toBe(false);
+    expect(run(`repair_ramp id:${first.id}`)).toMatchObject({ success: false, output: t('mining.repair_ramp.out_of_reach', { id: first.id }) });
+  });
+
+  it('a longer ramp the player orders down to the deepened floor opens it, and the floor it lands on is hauled out', () => {
+    const access = newCraterAccessMemory();
+    const site = deepened(access);
+    const { state, run } = site;
+    const before = unsealedOnGround(site);
     expect(before).toBeGreaterThan(0);
+    // 15 m down from the surface needs 42 m of road at 20 degrees: down the east side, then west into the crater.
+    expect(run(`build_ramp path:55,5;55,37;43,37 depth:${PLAYER_RAMP_DEPTH}`)).toMatchObject({ success: true });
 
-    const debrisOrders = () => state.pendingActions.filter(a => a.type === 'haul_debris' || a.type === 'fragment_debris');
-    tickSite(site, () => unsealedOnGround(site) === 0 && debrisOrders().length === 0 && state.plannedRamps.length === 0, DIG_TICKS);
-    expect(unsealedOnGround(site)).toBe(0);
-    expect(onGround(site)).toBeLessThan(before);
-    expect(strandedOrders(site)).toEqual([]);
-    expect(debrisOrders()).toEqual([]);
+    tickSite(site, () => state.plannedRamps.length === 0, DIG_TICKS);
+    expect(state.plannedRamps).toEqual([]);
+    // The ramp lands flush on the deepened floor: its end tile is on the vehicle network.
+    expect(siteVehicleReach(state)!(43, 37)).toBe(true);
+    tickSite(site, () => false, DIG_TICKS);
+    // What stays is rubble on the lumps, the pillar and the old ledge the shot left standing above or apart from
+    // that floor: no ramp reaches those, the player levels the ground or leaves them (the pip says so).
+    expect(unsealedOnGround(site)).toBeLessThan(before / 2);
+    const leftover = state.logistics.fragments.filter(f => f.state === 'on_ground' && !isFragmentSealed(site.ctx.grid!, f.fragment.position));
+    const orders = new Map(state.pendingActions.map(a => [a.payload['fragmentId'], a]));
+    expect(leftover.every(f => orders.get(f.fragment.id)?.blockedReason === 'debris_out_of_reach')).toBe(true);
     expectNoWorldInvariantViolations(state);
-  });
-
-  it('does not silently abandon the sealed rubble: fragments on the ground keep a haul order or a ramp is under way', () => {
-    const site = deepened();
-    const { state } = site;
-    tickSite(site, () => false, CRATER_ACCESS_ABANDON_DEBRIS_TICKS + 3 * CRATER_ACCESS_RECHECK_TICKS);
-    const hasHaulOrder = state.pendingActions.some(a => a.type === 'haul_debris');
-    const rampUnderway = state.plannedRamps.length > 0;
-    expect(onGround(site) === 0 || hasHaulOrder || rampUnderway).toBe(true);
   });
 });
 
-describe('a second crater (#2086)', () => {
+describe('a second crater (#2086, #2095)', () => {
   it('gets its own access ramp even though the first crater already has one', () => {
     const site = limitSite();
-    shootAndClear(site, { ...SHOT, x0: 36, z0: 36 });
+    const access = newCraterAccessMemory();
+    shootAndClear(site, { ...SHOT, x0: 36, z0: 36 }, access);
     const { state } = site;
     const first = state.builtRamps.length;
     expect(first).toBeGreaterThanOrEqual(1);
@@ -165,7 +197,7 @@ describe('a second crater (#2086)', () => {
     fireLimitShot(site, { ...SHOT, x0: 14, z0: 26 });
     thinRubble(site, THIN);
     restockShotFleet(site); // the blast threw the hauler away
-    tickSite(site, () => state.builtRamps.length > first && state.plannedRamps.length === 0 && onGround(site) === 0, DIG_TICKS);
+    tickSite(site, () => state.builtRamps.length > first && state.plannedRamps.length === 0 && onGround(site) === 0, DIG_TICKS, access);
     expect(state.builtRamps.length).toBeGreaterThan(first);
     expect(onGround(site)).toBe(0);
     expect(strandedOrders(site)).toEqual([]);
@@ -173,51 +205,53 @@ describe('a second crater (#2086)', () => {
   });
 });
 
-describe('stranded rubble the planner cannot or may not act on (#2086)', () => {
+describe('stranded rubble the player cannot or may not open yet (#2086, #2095)', () => {
   const PIT = { x0: 40, z0: 40, size: 12, drop: 8 };
   const inPit = (x: number, z: number) => x >= PIT.x0 && x < PIT.x0 + PIT.size && z >= PIT.z0 && z < PIT.z0 + PIT.size;
   const crater = (site: CraterSite) => site.state.pendingActions.filter(a =>
     (a.type === 'haul_debris' || a.type === 'fragment_debris') && inPit(a.targetX, a.targetZ));
 
-  it('an unaffordable plan prunes nothing: the stranded orders stay past the abandon window, and the ramp is ordered once cash allows', () => {
+  it('a ramp the cash cannot cover is not ordered and drops nothing; it is ordered once cash allows', () => {
     const site = makeCraterSite([PIT]);
     dropRubble(site, PIT, 8);
     const { state, run } = site;
-    // Just above the cash reserve the planner keeps back for payroll: any ramp costs more than the surplus.
-    const broke = Math.ceil(getOperatingCostPerHour(state).payroll * CRATER_ACCESS_CASH_RESERVE_TICKS) + 1;
-    const hold = () => { state.cash = broke; return false; };
-    tickUntilFresh(run, state, hold, CRATER_ACCESS_ABANDON_DEBRIS_TICKS + 4 * CRATER_ACCESS_RECHECK_TICKS);
+    const access = newCraterAccessMemory();
+    const runner = run as (cmd: string) => { success: boolean; output: string };
+    // Just above the reserve the probe keeps back for payroll: any ramp costs more than the surplus.
+    const broke = Math.ceil(getOperatingCostPerHour(state).payroll * ACCESS_CASH_RESERVE_TICKS) + 1;
+    const hold = () => { state.cash = broke; orderCraterAccess(runner, state, site.ctx.grid!, access); return false; };
+    tickUntilFresh(run, state, hold, IDLE_TICKS);
     expect(state.plannedRamps).toHaveLength(0);
     expect(crater(site).length).toBeGreaterThan(0);
     expect(crater(site).every(a => a.blockedReason === 'debris_out_of_reach')).toBe(true);
     expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
 
     state.cash = 5_000_000;
-    tickUntilFresh(run, state, () => state.plannedRamps.length > 0, 2 * CRATER_ACCESS_RECHECK_TICKS);
+    tickUntilFresh(run, state, () => { orderCraterAccess(runner, state, site.ctx.grid!, access); return state.plannedRamps.length > 0; }, 2 * ACCESS_RECHECK_TICKS);
     expect(state.plannedRamps).toHaveLength(1);
     expectNoWorldInvariantViolations(state);
   });
 
-  it('a floor no ramp can reach is abandoned after the abandon window, with nothing dug and nothing spent', () => {
+  it('a floor no ramp can reach keeps its debris orders: nothing is dropped, dug or spent', () => {
     const site = makeCraterSite([]);
     // A 4 m square shaft as deep as the site allows: no straight run fits the 64 m site and a lap round it is too short.
     const shaft = { x0: 30, z0: 30, size: 4, drop: site.top - 1 };
     cutPit(site, shaft);
     dropRubble(site, shaft, 8);
     const { state, run } = site;
+    const access = newCraterAccessMemory();
+    const runner = run as (cmd: string) => { success: boolean; output: string };
     const stranded = () => state.pendingActions.filter(a =>
       (a.type === 'haul_debris' || a.type === 'fragment_debris') && a.blockedReason === 'debris_out_of_reach');
     tickUntilFresh(run, state, () => false, 2);
-    expect(stranded().length).toBeGreaterThan(0);
+    const ids = stranded().map(a => a.id).sort();
+    expect(ids.length).toBeGreaterThan(0);
     const start = state.tickCount;
-    const cashStart = state.cash;
-    tickUntilFresh(run, state, () => stranded().length === 0, CRATER_ACCESS_ABANDON_DEBRIS_TICKS + 4 * CRATER_ACCESS_RECHECK_TICKS);
-    expect(stranded()).toEqual([]);
-    expect(state.tickCount - start).toBeGreaterThanOrEqual(CRATER_ACCESS_ABANDON_DEBRIS_TICKS);
+    tickUntilFresh(run, state, () => { orderCraterAccess(runner, state, site.ctx.grid!, access); return false; }, IDLE_TICKS);
+    expect(stranded().map(a => a.id).sort()).toEqual(ids);
     expect(state.plannedRamps).toHaveLength(0);
     expect(state.builtRamps).toHaveLength(0);
     expect(state.finances.transactions.filter(e => e.type === 'expense' && e.category === 'construction' && e.tick >= start)).toEqual([]);
-    expect(state.cash).toBeLessThanOrEqual(cashStart);
     expectNoWorldInvariantViolations(state);
   });
 });

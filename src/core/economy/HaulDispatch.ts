@@ -70,7 +70,6 @@ export function syncHaulDispatch(state: GameState, grid?: VoxelGrid | null): voi
     if (typeof fragmentId === 'number') coveredFragmentIds.add(fragmentId);
   }
 
-  const abandoned = abandonedFragmentIds.get(state);
   const sealedPositions: Vec3[] = [];
   const sealedIds = new Set<number>();
   lastSealedIds.set(state, sealedIds);
@@ -78,7 +77,6 @@ export function syncHaulDispatch(state: GameState, grid?: VoxelGrid | null): voi
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
     if (coveredFragmentIds.has(tracked.fragment.id)) continue;
-    if (abandoned?.has(tracked.fragment.id)) continue;
     if (grid && isFragmentSealed(grid, tracked.fragment.position)) {
       sealedPositions.push(tracked.fragment.position);
       sealedIds.add(tracked.fragment.id);
@@ -116,22 +114,6 @@ export function syncHaulDispatch(state: GameState, grid?: VoxelGrid | null): voi
   }
   lastHaulDispatch.set(state, haulDispatchSignature(state));
   lastSealedPositions.set(state, sealedPositions);
-}
-
-/** Fragments whose debris order was dropped as unreachable (#2085): no order is re-queued for them until cleared. Derived, never saved. */
-const abandonedFragmentIds = new WeakMap<GameState, Set<number>>();
-
-/** Stop `syncHaulDispatch` re-queuing orders for these fragments; the next pass is forced. */
-export function abandonDebrisFragments(state: GameState, fragmentIds: ReadonlyArray<number>): void {
-  if (fragmentIds.length === 0) return;
-  const set = abandonedFragmentIds.get(state) ?? new Set<number>();
-  for (const id of fragmentIds) set.add(id);
-  abandonedFragmentIds.set(state, set);
-}
-
-/** Lets abandoned fragments get orders again (a ramp now reaches their crater). */
-export function clearAbandonedDebris(state: GameState): void {
-  if (abandonedFragmentIds.delete(state)) lastHaulDispatch.delete(state);
 }
 
 /**

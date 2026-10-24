@@ -54,6 +54,7 @@ export const COMMAND_CUES: Readonly<Record<string, VerbRule>> = {
   build_ramp: CANCELLABLE_ORDER,
   ramp: { subs: { spiral: ORDER }, otherwise: null },
   widen_ramp: CANCELLABLE_ORDER,
+  repair_ramp: CANCELLABLE_ORDER,
   level_ground: CANCELLABLE_ORDER,
   drain_hole: { otherwise: ORDER },
   install_tubing: { otherwise: ORDER },

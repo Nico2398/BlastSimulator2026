@@ -454,19 +454,17 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
       return { controller, strip, shown };
     }
 
-    it('a crater floor within reach: shows the snapped line with the snapped depth (15 - 8.5 = 6.5 m), no miss text', () => {
+    it('a crater floor: shows the landed line with the landed depth (15 - 8.5 = 6.5 m)', () => {
       const { shown } = armRampOver(8.5);
       const line = shown().subtitle as string;
       expect(line).toContain('6.5');
       expect(line).not.toBe('ui.build.ramp_foot_snapped'); // a translated line, not the bare key
     });
 
-    it('a crater floor far below the foot: shows the miss line with the offset and the depth that meets the floor, and Confirm stays enabled', () => {
-      const { shown } = armRampOver(4); // foot ~7.4 m, floor 4: 3.4 m above; start - end = 11 m
+    it('a crater floor far below the asked depth: the ramp still lands on it (15 - 4 = 11 m) and Confirm stays enabled', () => {
+      const { shown } = armRampOver(4); // the asked 8 m would leave the foot 3.4 m above the floor
       const line = shown().subtitle as string;
-      expect(line).toContain('3.4');
-      expect(line).toContain('11');
-      expect(line).not.toBe('ui.build.ramp_foot_miss');
+      expect(line).toContain('11.0');
       expect(shown().confirmEnabled).toBe(true);
     });
 
@@ -486,28 +484,27 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
       expect(shown().fields.map((f: { key: string }) => f.key)).toEqual(['depth', 'width', 'grade']);
     });
 
-    it('stepping the depth to a miss swaps the snapped line for the miss line live', () => {
+    it('stepping the depth does not move the landing: a ramp onto a floor lands on it whatever depth is asked', () => {
       const { shown } = armRampOver(8.5);
       expect(shown().subtitle).toContain('6.5');
       const depth = () => shown().fields[0];
-      for (let i = 0; i < 3; i++) depth().onInc(); // depth 11: foot 4.55, 3.95 m under the floor, out of reach of the snap
-      expect(shown().subtitle).not.toBe('');
-      expect(shown().subtitle).not.toContain('6.5');
+      for (let i = 0; i < 3; i++) depth().onInc();
+      expect(shown().subtitle).toContain('6.5');
     });
 
-    it('confirm still dispatches the player\'s chosen depth, not the snapped one', () => {
+    it('confirm dispatches the player\'s depth field; the console lands it on the floor', () => {
       const { controller } = armRampOver(8.5);
       controller.simulateConfirm();
       expect(gameConsole).toHaveBeenCalledWith(expect.stringContaining('depth:8'));
     });
 
-    it('en and fr both carry the two foot lines, and they differ between languages', async () => {
+    it('en and fr both carry the foot line, and they differ between languages', async () => {
       const { readFileSync } = await import('node:fs');
       const load = (lang: string): Record<string, string> =>
         JSON.parse(readFileSync(`src/core/i18n/locales/${lang}.json`, 'utf8'));
       const en = load('en');
       const fr = load('fr');
-      for (const key of ['ui.build.ramp_foot_snapped', 'ui.build.ramp_foot_miss']) {
+      for (const key of ['ui.build.ramp_foot_snapped']) {
         expect(en[key], `en ${key}`).toBeTruthy();
         expect(fr[key], `fr ${key}`).toBeTruthy();
         expect(fr[key]).not.toBe(en[key]);

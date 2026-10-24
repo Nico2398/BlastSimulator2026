@@ -94,7 +94,7 @@ export function orderRampWiden(
   if (!ramp) {
     return { success: false, error: `Ramp #${rampId} not found`, errorKey: 'mining.widen_ramp.not_found', errorParams: { id: rampId } };
   }
-  if (state.plannedRamps.some(p => p.widenOf === rampId)) {
+  if (state.plannedRamps.some(p => p.widenOf === rampId || p.repairOf === rampId)) {
     return {
       success: false, error: `Ramp #${rampId} is already being widened`,
       errorKey: 'mining.widen_ramp.in_progress', errorParams: { id: rampId },
@@ -107,7 +107,7 @@ export function orderRampWiden(
   const def: RampDef = { ...ramp.def, width };
   const segments = defineRampSegments(grid, def, ramp.width);
   const plannedRampId = queueRampOrder(
-    state, def, rampFootprint(def, width), segments, cost, 'Widen ramp', rampId,
+    state, def, rampFootprint(def, width), segments, cost, 'Widen ramp', { widenOf: rampId },
   );
   if (plannedRampId === null) {
     return { success: false, error: 'Nothing to excavate for this ramp', errorKey: 'mining.ramp.nothing_to_dig' };
@@ -116,11 +116,18 @@ export function orderRampWiden(
 }
 
 /**
- * Records a fully dug order: a widen order updates the ramp it widened, any
- * other order becomes a new built ramp (#1298).
+ * Records a fully dug order: a widen order updates the ramp it widened, a repair
+ * order the ramp it repaired (its line may have landed on a deeper floor, #2045),
+ * any other order becomes a new built ramp (#1298).
  */
 export function recordBuiltRamp(state: GameState, done: PlannedRamp): void {
   const width = rampWidthOf(done.def);
+  const repaired = done.repairOf === undefined ? undefined : state.builtRamps.find(r => r.id === done.repairOf);
+  if (repaired) {
+    repaired.def = { ...done.def, width: repaired.width };
+    repaired.footprint = rampFootprint(done.def, repaired.width);
+    return;
+  }
   const widened = done.widenOf === undefined ? undefined : state.builtRamps.find(r => r.id === done.widenOf);
   if (widened) {
     widened.width = width;

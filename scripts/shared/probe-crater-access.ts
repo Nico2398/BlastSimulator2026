@@ -1,0 +1,194 @@
+// BlastSimulator2026 — Progression probe: pit logistics, the player's job (#2045, #2095)
+//
+// Core never orders or repairs a ramp by itself: a shot that cuts into a ramp leaves it too steep, and a
+// crater deepened past the built ramps leaves its rubble `debris_out_of_reach` and its planned holes
+// `buried_under_rubble`; the game only says so. The probe plays a careful player here, through the
+// console and out of its own cash: it repairs a ramp a shot damaged (`repair_ramp`), and when enough
+// of its orders read out of reach it plans a ramp down to the stranded floor with the pure
+// `planCraterAccess` planner and orders it (`build_ramp`).
+
+import type { GameState, PendingAction } from '../../src/core/state/GameState.js';
+import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { clusterStrandedFloors, planCraterAccess, type AccessSurface, type StrandedFloor } from '../../src/core/mining/CraterAccess.js';
+import { rampPathOf, rampWaypoints, type RampFootprint } from '../../src/core/mining/RampPath.js';
+import { rampWidthOf, type RampDef } from '../../src/core/mining/Ramp.js';
+import { siteVehicleReach, strandedDebrisTargets } from '../../src/core/engine/OrderReachability.js';
+import { quoteRampRepair } from '../../src/core/mining/RampRepair.js';
+import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
+import { CRATER_ACCESS_CLUSTER_GAP_CELLS, RAMP_DEFAULT_WIDTH, VEHICLE_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
+
+type Run = (cmd: string) => { success: boolean; output: string };
+
+/** Stranded orders on one floor before the probe spends on a ramp down to it. */
+const ACCESS_MIN_STRANDED_ORDERS = 3;
+/** Ticks of payroll the probe keeps in cash after paying for an access ramp. */
+export const ACCESS_CASH_RESERVE_TICKS = 200;
+/** Ticks between two looks at the stranded floors. */
+export const ACCESS_RECHECK_TICKS = 50;
+
+/** A floor within this many cells, and this many metres of depth, of one already ramped is that same floor. */
+const SAME_FLOOR_CELLS = CRATER_ACCESS_CLUSTER_GAP_CELLS * 2;
+const SAME_FLOOR_M = 1;
+
+/** A floor the probe ordered a ramp down to, and that ramp's planned-ramp id. */
+interface ServedFloor { floor: StrandedFloor; rampId: number }
+
+/**
+ * What the probe remembers between looks: the last look, a world it already failed to plan for, the floors it
+ * already ramped down to and the footprints of ramps it gave up on. Rubble a ramp left out of reach on such a
+ * floor sits on a lump or a ledge the shot left standing: the player levels it or leaves it, and does not dig
+ * another ramp to the same floor. A ramp whose every remaining segment is stuck is cancelled (its unspent cost
+ * refunded) and its footprint avoided, and its floor may be planned again.
+ */
+export interface CraterAccessMemory {
+  lastTick: number;
+  failedSignature: string | null;
+  served: ServedFloor[];
+  avoid: RampFootprint[];
+  /** Nav-grid revision of the last look at the built ramps for damage; they are looked at again once the terrain changes. */
+  repairRevision: number;
+}
+
+export function newCraterAccessMemory(): CraterAccessMemory {
+  return { lastTick: -Infinity, failedSignature: null, served: [], avoid: [], repairRevision: -1 };
+}
+
+/** True when the probe already ordered a ramp down to `floor` (or one beside it at the same depth). */
+export function rampedAlready(memory: Pick<CraterAccessMemory, 'served'>, floor: StrandedFloor): boolean {
+  return memory.served.some(({ floor: f }) => Math.abs(f.x - floor.x) <= SAME_FLOOR_CELLS && Math.abs(f.z - floor.z) <= SAME_FLOOR_CELLS
+    && Math.abs(f.floorY - floor.floorY) < SAME_FLOOR_M);
+}
+
+/** Cancels the probe's ramps that are stuck, remembering their footprints, and frees their floors for another plan. */
+function dropStuckRamps(run: Run, state: GameState, memory: CraterAccessMemory): void {
+  const stuck = new Set(stuckRampFootprints(state));
+  for (const served of [...memory.served]) {
+    const ramp = state.plannedRamps.find(r => r.id === served.rampId);
+    if (ramp === undefined || !stuck.has(ramp.footprint)) continue;
+    run(`build_ramp cancel ${ramp.id}`);
+    memory.avoid.push(ramp.footprint);
+    memory.served.splice(memory.served.indexOf(served), 1);
+  }
+}
+
+/** True for a dig_ramp_segment order nobody holds that classification stamped blocked: it is going nowhere. */
+function isStuckRampSegment(a: PendingAction): boolean {
+  return a.type === 'dig_ramp_segment' && a.holderId === null && a.status === 'queued' && (a.blockedReason ?? null) !== null;
+}
+
+/** True while some ramp the probe ordered is still being dug: one way in at a time. */
+export function hasLiveRampWork(pending: ReadonlyArray<PendingAction>): boolean {
+  return pending.some(a => a.type === 'dig_ramp_segment' && !isStuckRampSegment(a));
+}
+
+/** Footprints of planned ramps whose every remaining segment is stuck; a new plan steers clear of them. */
+export function stuckRampFootprints(state: Pick<GameState, 'plannedRamps' | 'pendingActions'>): RampFootprint[] {
+  const stuck = new Set(state.pendingActions.filter(isStuckRampSegment).map(a => a.id));
+  if (stuck.size === 0) return [];
+  return state.plannedRamps
+    .filter(r => { const left = r.segments.filter(s => !s.done); return left.length > 0 && left.every(s => stuck.has(s.actionId)); })
+    .map(r => r.footprint);
+}
+
+/** The terrain a ramp can start from: ground a vehicle drives to from the rally point. */
+function accessSurface(state: GameState, grid: VoxelGrid): AccessSurface | null {
+  const reach = siteVehicleReach(state);
+  const nav = state.navGrid;
+  if (reach === null || nav === null) return null;
+  return {
+    heightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
+    contains: (x, z) => grid.containsColumn(x, z) && (nav.cellAt(x, z)?.type ?? 'void') !== 'void',
+    reachableFrom: reach,
+  };
+}
+
+/**
+ * Floors of the stranded orders, most orders first, each target's y read from the terrain. A target the
+ * vehicle network reaches now is skipped: its stamp lags a ramp that just connected the crater.
+ */
+function strandedFloors(state: GameState, grid: VoxelGrid, surface: AccessSurface): StrandedFloor[] {
+  const cells = strandedDebrisTargets(state)
+    .filter(t => !surface.reachableFrom(Math.round(t.x), Math.round(t.z)))
+    .map(t => {
+      const y = computeVoxelColumnSurfaceHeight(grid, Math.round(t.x), Math.round(t.z));
+      return { x: t.x, z: t.z, y: Number.isFinite(y) ? y : t.y };
+    });
+  return clusterStrandedFloors(cells, CRATER_ACCESS_CLUSTER_GAP_CELLS)
+    .filter(f => f.orderCount >= ACCESS_MIN_STRANDED_ORDERS)
+    .sort((a, b) => b.orderCount - a.orderCount);
+}
+
+/** The console order that builds `def`: its waypoints as a path, its depth, width and any chosen grade. */
+export function buildRampCommand(def: RampDef): string {
+  const path = rampWaypoints(rampPathOf(def)).map(w => `${w.x},${w.z}`).join(';');
+  const grade = def.gradeDegrees === undefined ? '' : ` grade:${def.gradeDegrees}`;
+  return `build_ramp path:${path} depth:${def.targetDepth} width:${rampWidthOf(def)}${grade}`;
+}
+
+function signatureOf(state: GameState, floors: readonly StrandedFloor[], avoid: readonly RampFootprint[]): string {
+  return `${state.navGrid?.revision ?? -1}|${avoid.map(a => `${a.minX},${a.maxX},${a.minZ},${a.maxZ}`).join(';')}|${floors.map(f => `${f.x},${f.z},${f.floorY},${f.orderCount}`).join(';')}`;
+}
+
+/**
+ * Orders at most one access ramp, down to the stranded floor with the most orders, every
+ * ACCESS_RECHECK_TICKS. One ramp per floor (`rampedAlready`), nothing while a ramp is still being dug, nothing the cash cannot cover with
+ * ACCESS_CASH_RESERVE_TICKS of payroll to spare, and a world it already failed to plan for is not
+ * planned again until the terrain or the floors change. Returns the order's console output, or null.
+ */
+export function orderCraterAccess(run: Run, state: GameState, grid: VoxelGrid, memory: CraterAccessMemory): string | null {
+  if (state.tickCount - memory.lastTick < ACCESS_RECHECK_TICKS && state.tickCount >= memory.lastTick) return null;
+  memory.lastTick = state.tickCount;
+  dropStuckRamps(run, state, memory);
+  if (hasLiveRampWork(state.pendingActions)) return null;
+  const surface = accessSurface(state, grid);
+  if (surface === null) return null;
+  const floors = strandedFloors(state, grid, surface).filter(f => !rampedAlready(memory, f));
+  if (floors.length === 0) { memory.failedSignature = null; return null; }
+  const avoid = [...stuckRampFootprints(state), ...memory.avoid];
+  const signature = signatureOf(state, floors, avoid);
+  if (signature === memory.failedSignature) return null;
+
+  const reserve = getOperatingCostPerHour(state).payroll * ACCESS_CASH_RESERVE_TICKS;
+  let unaffordable = false;
+  for (const floor of floors) {
+    const plan = planCraterAccess(floor, surface, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH, avoid, state.builtRamps);
+    if (!plan.ok) continue;
+    if (state.cash - plan.cost < reserve) { unaffordable = true; continue; }
+    const ordered = run(buildRampCommand(plan.def));
+    if (ordered.success) {
+      memory.failedSignature = null;
+      memory.served.push({ floor, rampId: state.plannedRamps.at(-1)!.id });
+      return ordered.output;
+    }
+  }
+  // Only a world with nothing buildable is remembered; an unaffordable plan is retried as cash changes.
+  memory.failedSignature = unaffordable ? null : signature;
+  return null;
+}
+
+/**
+ * Orders a repair of each built ramp a shot damaged (`quoteRampRepair`), once per terrain change, when the cash
+ * covers it with ACCESS_CASH_RESERVE_TICKS of payroll to spare. A ramp a deeper floor put out of reach is left:
+ * `orderCraterAccess` plans a new way down. Returns the console outputs of the orders placed.
+ */
+function repairDamagedRamps(run: Run, state: GameState, grid: VoxelGrid, memory: CraterAccessMemory): string[] {
+  const revision = state.navGrid?.revision ?? -1;
+  if (revision === memory.repairRevision) return [];
+  memory.repairRevision = revision;
+  const reserve = getOperatingCostPerHour(state).payroll * ACCESS_CASH_RESERVE_TICKS;
+  const outputs: string[] = [];
+  for (const ramp of state.builtRamps) {
+    if (state.plannedRamps.some(p => p.repairOf === ramp.id || p.widenOf === ramp.id)) continue;
+    const quote = quoteRampRepair(grid, ramp);
+    if (!quote.success || state.cash - quote.data.cost < reserve) continue;
+    const ordered = run(`repair_ramp id:${ramp.id}`);
+    if (ordered.success) outputs.push(ordered.output);
+  }
+  return outputs;
+}
+
+/** The player's pit logistics for one decision interval: repair what a shot damaged, then open what it stranded. */
+export function playPitLogistics(run: Run, state: GameState, grid: VoxelGrid, memory: CraterAccessMemory): void {
+  repairDamagedRamps(run, state, grid, memory);
+  orderCraterAccess(run, state, grid, memory);
+}

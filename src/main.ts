@@ -71,6 +71,7 @@ import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type
 import { HoverTag } from './ui/scene/HoverTag.js';
 import { buildDemolishConfirm, freightOreKg } from './ui/demolishConfirm.js';
 import { Inspector } from './ui/shell/Inspector.js';
+import type { RampRepairOffer } from './ui/panels/inspector/InspectorContent.js';
 import { formatBalance } from './ui/shell/TopBar.js';
 import { EntityHighlight } from './renderer/EntityHighlight.js';
 import { PlacementController } from './ui/scene/PlacementController.js';
@@ -81,6 +82,7 @@ import { scrapConfirmConfig } from './ui/panels/inspector/vehicleDetailParts.js'
 import { SelectionOverlay } from './renderer/SelectionOverlay.js';
 import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRegion.js';
 import { nextRampWidth } from './core/mining/RampWidening.js';
+import { quoteRampRepair } from './core/mining/RampRepair.js';
 import { spiralSurfaceFrom } from './core/mining/RampSpiral.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 import { hasLevelEnded } from './core/engine/GameOverConditions.js';
@@ -1342,6 +1344,22 @@ inspector.setCloseHandler(() => scenePicking.clearSelection());
 inspector.setCommandHandler((command) => reportIfFailed(t('inspector.command_failed'), window.__gameConsole(command)));
 inspector.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
 inspector.setNavigateHandler(() => uiManager.showPanel('employees'));
+// Ramp repair quotes (#2045): one per ramp per terrain revision, not per frame.
+let repairQuotes: { revision: number; byRamp: Map<number, RampRepairOffer> } | null = null;
+inspector.setRampRepairQuote(rampId => {
+  const ramp = ctx.state?.builtRamps.find(r => r.id === rampId);
+  const revision = ctx.state?.navGrid?.revision ?? -1;
+  if (!ramp || !ctx.grid) return { kind: 'refused', errorKey: 'mining.repair_ramp.intact', errorParams: { id: rampId } };
+  if (repairQuotes?.revision !== revision) repairQuotes = { revision, byRamp: new Map() };
+  const cached = repairQuotes.byRamp.get(rampId);
+  if (cached) return cached;
+  const quote = quoteRampRepair(ctx.grid, ramp);
+  const offer: RampRepairOffer = quote.success
+    ? { kind: 'quote', cost: quote.data.cost }
+    : { kind: 'refused', errorKey: quote.errorKey, ...(quote.errorParams ? { errorParams: quote.errorParams } : {}) };
+  repairQuotes.byRamp.set(rampId, offer);
+  return offer;
+});
 inspector.setActionHandler((action, entity) => {
   switch (action) {
     case 'dispatch_here': {
@@ -1399,6 +1417,9 @@ inspector.setActionHandler((action, entity) => {
       if (next !== null) reportIfFailed(t('inspector.action.widen'), window.__gameConsole(`widen_ramp id:${entity.id} width:${next}`));
       break;
     }
+    case 'repair':
+      reportIfFailed(t('inspector.action.repair'), window.__gameConsole(`repair_ramp id:${entity.id}`));
+      break;
     case 'demolish': {
       const placedBuilding = ctx.state?.buildings.buildings.find(x => x.id === entity.id);
       if (!placedBuilding) break;
