@@ -1,12 +1,12 @@
 /**
  * BlastSimulator2026 — Pipeline step boundaries
  *
- * `npm run pipeline -- step <name>` closes the step in flight — one line in
- * the plan's `## Progress` — and opens the next by writing
- * `.agentic/step.json`. While that file exists, `compact-at-step-boundary.mjs`
- * refuses the lead's automatic compaction; Claude Code asks again on every
- * request, so the compaction lands on the first request after a boundary,
- * never in the middle of a step. `step done` closes the last step.
+ * `npm run pipeline -- step <name> [--heavy]` closes the step in flight — one
+ * line in the plan's `## Progress` — and opens the next by writing
+ * `.agentic/step.json` with its start time and whether it is heavy.
+ * `compact-at-step-boundary.mjs` reads it to allow the lead's automatic
+ * compaction only in the first requests of a step, and only when the step
+ * ahead is heavy or the context is near full. `step done` closes the last.
  *
  * @module pipeline/steps
  */
@@ -22,6 +22,7 @@ interface StepMarker {
   label: string;
   name: string;
   since: string;
+  heavy: boolean;
 }
 
 function stepPath(root: string): string {
@@ -63,18 +64,19 @@ function closeStep(root: string, note: string | undefined): string | undefined {
 }
 
 /** Close the step in flight (if any) and open `name`; `name === 'done'` only closes. */
-export function step(cwd: string, label: string, name: string, note?: string): string[] {
+export function step(cwd: string, label: string, name: string, note?: string, heavy = false): string[] {
   if (!isValidLabel(label)) throw new StepError(`Invalid label ${label}.`);
   if (!/^[\w .:/-]{1,80}$/.test(name)) throw new StepError(`Invalid step name ${JSON.stringify(name)}: letters, digits, spaces and . : / - only.`);
   const root = mainRoot(cwd);
   const closed = closeStep(root, note);
   const lines = closed ? [`Progress: ${closed.slice(2)}`] : [];
   if (name === 'done') {
-    lines.push('No step in flight: automatic compaction may run.');
+    lines.push('No step in flight.');
     return lines;
   }
   mkdirSync(join(root, '.agentic'), { recursive: true });
-  writeFileSync(stepPath(root), `${JSON.stringify({ label, name, since: new Date().toISOString() })}\n`);
-  lines.push(`Step in flight: ${name}. Automatic compaction waits for the next boundary.`);
+  const marker: StepMarker = { label, name, since: new Date().toISOString(), heavy };
+  writeFileSync(stepPath(root), `${JSON.stringify(marker)}\n`);
+  lines.push(`Step in flight: ${name}${heavy ? ' (heavy: compaction may run before it starts)' : ''}.`);
   return lines;
 }

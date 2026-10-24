@@ -15,7 +15,7 @@
  *   npm run pipeline -- tdd status --label <label>
  *   npm run pipeline -- verify [--base origin/main] [--only static,logic] [--no-cache]
  *   npm run pipeline -- review-brief [--base origin/main] [--label <label>]...
- *   npm run pipeline -- step <name> --label <label> [--note "<what is open>"]   (`step done` closes the last)
+ *   npm run pipeline -- step <name> --label <label> [--heavy] [--note "<what is open>"]   (`step done` closes the last)
  *
  * `verify` outlives one Bash call on a full change: run it through
  * `npm run long -- start verify -- npm run pipeline -- verify`.
@@ -34,7 +34,7 @@ const USAGE = `Usage:
   npm run pipeline -- tdd start|split|red|join|status --label <label> [--base <ref>] [--feature <branch>] [--no-commit]
   npm run pipeline -- verify [--base <ref>] [--only <channel,...>] [--no-cache]
   npm run pipeline -- review-brief [--base <ref>] [--label <label>]...
-  npm run pipeline -- step <name>|done --label <label> [--note <text>]`;
+  npm run pipeline -- step <name>|done --label <label> [--heavy] [--note <text>]`;
 
 /** Values of `--name value` (repeatable) and the presence of bare `--flag`s. */
 export function parseArgs(argv: string[]): { positional: string[]; values: Map<string, string[]>; flags: Set<string> } {
@@ -45,7 +45,7 @@ export function parseArgs(argv: string[]): { positional: string[]; values: Map<s
     const arg = argv[i]!;
     if (!arg.startsWith('--')) {
       positional.push(arg);
-    } else if (['--no-commit', '--no-cache'].includes(arg)) {
+    } else if (['--no-commit', '--no-cache', '--heavy'].includes(arg)) {
       flags.add(arg.slice(2));
     } else {
       const value = argv[++i];
@@ -106,7 +106,7 @@ function run(argv: string[]): number {
   if (command === 'step') {
     const name = positional.slice(1).join(' ');
     if (name === '') throw new PipelineError(USAGE);
-    print(step(cwd, required(values, 'label'), name, one(values, 'note')));
+    print(step(cwd, required(values, 'label'), name, one(values, 'note'), flags.has('heavy')));
     return 0;
   }
   if (command === 'review-brief') {

@@ -1,17 +1,17 @@
-// PreCompact hook — automatic compaction runs between pipeline steps, never
-// inside one.
+// PreCompact hook — decide when the lead's automatic compaction may run.
 //
-// Registered in `.claude/settings.json`. The runner sets a small auto-compact
-// window, so a compaction becomes due early; this hook refuses it while
-// `.agentic/step.json` says a step is in flight (`npm run pipeline -- step`).
-// Claude Code asks again on every request, so the compaction runs on the first
-// request after the lead marks the next boundary.
+// Registered in `.claude/settings.json`. The runner's small auto-compact
+// window only makes Claude Code start asking early; every ask comes here, and
+// Claude Code asks again on each request it is refused. The policy:
 //
-// Refusal is the lead's alone. Manual `/compact`, sub-agents (their payload
-// carries `agent_type`), sessions with no step marker, and a lead whose last
-// prompt already reached SAFETY_PROMPT_TOKENS are all allowed: a step long
-// enough to approach the model's hard limit compacts where it stands rather
-// than fail.
+//   inside a step                        refuse, unless the prompt reached MID_STEP_VALVE
+//   at a boundary, the next step heavy   allow when the prompt reached HEAVY_FLOOR
+//   at a boundary, otherwise             allow when the prompt reached NEAR_FULL
+//
+// A boundary is the first BOUNDARY_REQUESTS requests after
+// `npm run pipeline -- step` wrote `.agentic/step.json`; `--heavy` marks the
+// step ahead as heavy. Manual `/compact`, sub-agents (their payload carries
+// `agent_type`) and sessions with no step marker keep Claude Code's own rule.
 //
 // Exit 0 always; a refusal is the JSON decision on stdout.
 
@@ -19,46 +19,62 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parsePayload, readStdin } from './lib/hook-io.mjs';
 
-const SAFETY_PROMPT_TOKENS = 600_000;
+const HEAVY_FLOOR = 80_000;
+const NEAR_FULL = 500_000;
+const MID_STEP_VALVE = 850_000;
+const BOUNDARY_REQUESTS = 2;
 const LEAD_AGENT_TYPES = new Set(['', 'orchestrator']);
 
 const payload = parsePayload(readStdin()) ?? {};
 const project = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-const marker = join(project, '.agentic', 'step.json');
+const markerPath = join(project, '.agentic', 'step.json');
 
 const allow = () => process.exit(0);
+const refuse = (reason) => {
+  process.stdout.write(JSON.stringify({ decision: 'block', reason }));
+  process.exit(0);
+};
 
 if (payload.trigger !== 'auto') allow();
 if (!LEAD_AGENT_TYPES.has(typeof payload.agent_type === 'string' ? payload.agent_type : '')) allow();
-if (!existsSync(marker)) allow();
+if (!existsSync(markerPath)) allow();
 
-/** Prompt size of the last API response the transcript recorded. */
-function lastPromptTokens(path) {
-  if (typeof path !== 'string' || !existsSync(path)) return 0;
-  const lines = readFileSync(path, 'utf8').trimEnd().split('\n');
-  for (let i = lines.length - 1; i >= 0; i--) {
-    try {
-      const record = JSON.parse(lines[i]);
-      const usage = record?.message?.usage;
-      if (record.type === 'assistant' && usage) {
-        return (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
-      }
-    } catch {
-      // A line still being written.
-    }
-  }
-  return 0;
-}
-
-if (lastPromptTokens(payload.transcript_path) >= SAFETY_PROMPT_TOKENS) allow();
-
-let step = 'a pipeline step';
+let marker = {};
 try {
-  step = `step "${JSON.parse(readFileSync(marker, 'utf8')).name}"`;
+  marker = JSON.parse(readFileSync(markerPath, 'utf8'));
 } catch {
   // An unreadable marker still means a step is in flight.
 }
 
-process.stdout.write(
-  JSON.stringify({ decision: 'block', reason: `${step} is in flight; compaction runs at the next \`npm run pipeline -- step\` boundary.` }),
-);
+/** The last prompt size, and how many API responses arrived since `sinceMs`. */
+function readTranscript(path, sinceMs) {
+  const result = { prompt: 0, requestsSince: Number.POSITIVE_INFINITY };
+  if (typeof path !== 'string' || !existsSync(path)) return result;
+  const ids = new Set();
+  let counted = Number.isFinite(sinceMs);
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    let record;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const usage = record?.message?.usage;
+    if (record?.type !== 'assistant' || !usage) continue;
+    result.prompt = (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
+    if (counted && Date.parse(record.timestamp) > sinceMs) ids.add(record.message.id);
+  }
+  if (counted) result.requestsSince = ids.size;
+  return result;
+}
+
+const { prompt, requestsSince } = readTranscript(payload.transcript_path, Date.parse(marker.since));
+const name = typeof marker.name === 'string' ? marker.name : 'a pipeline step';
+
+if (prompt >= MID_STEP_VALVE) allow();
+if (requestsSince <= BOUNDARY_REQUESTS) {
+  if (marker.heavy === true && prompt >= HEAVY_FLOOR) allow();
+  if (prompt >= NEAR_FULL) allow();
+  refuse(`At the start of "${name}" with ${Math.round(prompt / 1000)}k tokens: compaction waits for a heavy step or ${NEAR_FULL / 1000}k.`);
+}
+refuse(`"${name}" is in flight; compaction waits for the next \`npm run pipeline -- step\` boundary.`);

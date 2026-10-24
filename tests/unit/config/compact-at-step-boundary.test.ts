@@ -1,11 +1,12 @@
 // BlastSimulator2026 — Automatic compaction runs between pipeline steps
 //
-// The runner makes a compaction due early (the smallest auto-compact window),
-// and `compact-at-step-boundary.mjs` refuses it while `npm run pipeline --
-// step` says a step is in flight. Claude Code asks again on every request
-// (measured: a refused compaction was re-requested on each of the following
-// requests and ran on the first one after the marker went), so it lands at the
-// next boundary. These cases pin the hook's verdicts and the `step` command.
+// The runner makes Claude Code ask for a compaction early (the smallest
+// auto-compact window), and `compact-at-step-boundary.mjs` decides: allow in
+// the first requests after `npm run pipeline -- step` when the step ahead is
+// heavy or the context is near full, refuse inside a step unless it nears the
+// hard limit. Claude Code asks again on every refused request, so a refused
+// compaction lands at the next boundary that allows it. These cases pin the
+// hook's verdicts and the `step` command.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'child_process';
@@ -29,10 +30,24 @@ afterEach(() => {
   rmSync(project, { recursive: true, force: true });
 });
 
-function transcript(promptTokens: number): string {
+const SINCE = '2026-10-24T10:00:00.000Z';
+
+/** A lead transcript whose last prompt is `promptTokens`, with `afterSince` API responses after SINCE. */
+function transcript(promptTokens: number, afterSince = 0): string {
   const path = join(project, 'transcript.jsonl');
-  writeFileSync(path, `${JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: promptTokens - 10, cache_creation_input_tokens: 0 } } })}\n`);
+  const usage = { input_tokens: 10, cache_read_input_tokens: promptTokens - 10, cache_creation_input_tokens: 0 };
+  const records = [{ type: 'assistant', timestamp: '2026-10-24T09:59:00.000Z', message: { id: 'before', usage } }];
+  for (let i = 0; i < afterSince; i += 1) {
+    const timestamp = new Date(Date.parse(SINCE) + (i + 1) * 1000).toISOString();
+    // A response streamed as two records shares one message id and counts once.
+    records.push({ type: 'assistant', timestamp, message: { id: `m${i}`, usage } }, { type: 'assistant', timestamp, message: { id: `m${i}`, usage } });
+  }
+  writeFileSync(path, `${records.map((r) => JSON.stringify(r)).join('\n')}\n`);
   return path;
+}
+
+function marker(heavy: boolean): void {
+  writeFileSync(join(project, '.agentic/step.json'), JSON.stringify({ label: '42-7', name: 'tdd:6 implement', since: SINCE, heavy }));
 }
 
 function compact(fields: Record<string, unknown>) {
@@ -43,11 +58,14 @@ function compact(fields: Record<string, unknown>) {
 describe('step boundaries', () => {
   it('records each finished step in the plan and holds the marker for the one in flight', () => {
     step(project, '42-7', 'tdd:1 plan');
-    expect(JSON.parse(readFileSync(join(project, '.agentic/step.json'), 'utf8'))).toMatchObject({ label: '42-7', name: 'tdd:1 plan' });
-    step(project, '42-7', 'tdd:3 skeleton', 'none');
-    step(project, '42-7', 'done');
+    expect(JSON.parse(readFileSync(join(project, '.agentic/step.json'), 'utf8'))).toMatchObject({ label: '42-7', name: 'tdd:1 plan', heavy: false });
+    step(project, '42-7', 'tdd:6 implement', undefined, true);
+    const heavy = JSON.parse(readFileSync(join(project, '.agentic/step.json'), 'utf8')) as { heavy: boolean; since: string };
+    expect(heavy.heavy).toBe(true);
+    expect(Number.isFinite(Date.parse(heavy.since))).toBe(true);
+    step(project, '42-7', 'done', 'none');
     const plan = readFileSync(join(project, '.agentic/plan/42-7.md'), 'utf8');
-    expect(plan).toMatch(/## Progress\n- tdd:1 plan done — [0-9a-f]+ — none\n- tdd:3 skeleton done — [0-9a-f]+\n/);
+    expect(plan).toMatch(/## Progress\n- tdd:1 plan done — [0-9a-f]+\n- tdd:6 implement done — [0-9a-f]+ — none\n/);
     expect(existsSync(join(project, '.agentic/step.json'))).toBe(false);
   });
 
@@ -71,20 +89,39 @@ describe('the gating hook', () => {
     expect(compact({}).blocked).toBe(false);
   });
 
-  it('refuses the lead\'s automatic compaction mid-step, naming the step', () => {
-    writeFileSync(join(project, '.agentic/step.json'), JSON.stringify({ label: '42-7', name: 'tdd:6 implement' }));
-    const lead = compact({ transcript_path: transcript(150_000) });
-    expect(lead.status).toBe(0);
-    expect(lead.blocked).toBe(true);
-    expect(lead.stdout).toContain('tdd:6 implement');
-    expect(compact({ agent_type: 'orchestrator' }).blocked).toBe(true);
+  it('allows at the boundary before a heavy step once the context passed the heavy floor', () => {
+    marker(true);
+    expect(compact({ transcript_path: transcript(100_000, 1) }).blocked).toBe(false);
+    expect(compact({ transcript_path: transcript(60_000, 1) }).blocked).toBe(true);
   });
 
-  it('allows manual compaction, sub-agents, and a lead near the hard limit', () => {
-    writeFileSync(join(project, '.agentic/step.json'), JSON.stringify({ label: '42-7', name: 'tdd:6 implement' }));
+  it('refuses at the boundary before a light step until the context is near full', () => {
+    marker(false);
+    const light = compact({ transcript_path: transcript(100_000, 2) });
+    expect(light.status).toBe(0);
+    expect(light.blocked).toBe(true);
+    expect(light.stdout).toContain('tdd:6 implement');
+    expect(compact({ transcript_path: transcript(520_000, 2) }).blocked).toBe(false);
+  });
+
+  it('refuses inside a step, heavy or not, until the mid-step valve', () => {
+    marker(true);
+    const inside = compact({ transcript_path: transcript(600_000, 3) });
+    expect(inside.blocked).toBe(true);
+    expect(inside.stdout).toContain('in flight');
+    expect(compact({ agent_type: 'orchestrator', transcript_path: transcript(600_000, 3) }).blocked).toBe(true);
+    expect(compact({ transcript_path: transcript(860_000, 3) }).blocked).toBe(false);
+  });
+
+  it('treats a marker without a start time as mid-step', () => {
+    writeFileSync(join(project, '.agentic/step.json'), JSON.stringify({ label: '42-7', name: 'tdd:6 implement', heavy: true }));
+    expect(compact({ transcript_path: transcript(520_000, 0) }).blocked).toBe(true);
+  });
+
+  it('allows manual compaction and sub-agents', () => {
+    marker(false);
     expect(compact({ trigger: 'manual' }).blocked).toBe(false);
     expect(compact({ agent_type: 'test-writer' }).blocked).toBe(false);
-    expect(compact({ transcript_path: transcript(650_000) }).blocked).toBe(false);
   });
 });
 

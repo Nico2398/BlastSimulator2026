@@ -57,14 +57,22 @@ Verify all of it with `npm run validate:context`.
 
 ## Compaction
 
-Automatic compaction runs between pipeline steps, never inside one. No headless session can trigger a compaction; the runner makes one due early and holds it until a step boundary:
+The lead's automatic compaction runs at step boundaries only: before a heavy step, or when the context is near full. No headless session can request a compaction; Claude Code asks for one, and a hook decides.
 
-- **`CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000'`**, the smallest window, on both Claude steps of `claude-runner.yml`. A compaction is due as soon as a step has grown the context; the model's hard limit stays 1M.
-- **`npm run pipeline -- step <name> --label <label>`** marks a boundary: it records the finished step in the plan's `## Progress` and writes `.agentic/step.json` for the step now in flight. `step done` closes the last one.
-- **`.claude/hooks/compact-at-step-boundary.mjs`**, a `PreCompact` hook on `auto` in `.claude/settings.json`, refuses the lead's automatic compaction while `.agentic/step.json` exists. Claude Code asks again on every request, so the compaction runs on the first request after the next boundary. It allows manual `/compact`, sub-agents (`agent_type` set), sessions with no step marker, and a lead whose last prompt reached 600k tokens.
+- **`CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000'`** on both Claude steps of `claude-runner.yml` makes Claude Code start asking from about 60k tokens and ask again on every request it is refused. It decides nothing by itself; the model's hard limit stays 1M.
+- **`npm run pipeline -- step <name> --label <label> [--heavy]`** marks a boundary: it records the finished step in the plan's `## Progress` and writes `.agentic/step.json` (the step, its start, whether it is heavy). `step done` closes the last one.
+- **`.claude/hooks/compact-at-step-boundary.mjs`**, a `PreCompact` hook on `auto` in `.claude/settings.json`, holds the policy and its thresholds:
+
+  | Where the lead is | Compaction runs when the prompt has reached |
+  |-------------------|---------------------------------------------|
+  | The first two requests of a step marked `--heavy` | 80k |
+  | The first two requests of any other step | 500k |
+  | Inside a step | 850k (just below Claude Code's own ~967k) |
+
+  Manual `/compact`, sub-agents (`agent_type` set) and sessions with no step marker keep Claude Code's own rule.
 - **`.claude/hooks/restore-after-compact.mjs`**, a `SessionStart` hook on `compact`, prints the run state on disk right after the summary: the step in flight, open TDD cycles and their phase, the blind marker, the branch and uncommitted paths, the last commits, each plan's `## Progress`, the last `verify`. Outside a pipeline run it prints nothing.
 - **Blindness survives compaction** by construction: `blind-to-tests.mjs` reads the marker on every call, not the conversation.
-- Run metrics count `compactions` and `peakContextTokens` per agent: the window and the 600k valve change on that evidence.
+- Run metrics count `compactions` and `peakContextTokens` per agent: the thresholds change on that evidence.
 
 OpenCode compacts by its own rules and has neither hook: a gap recorded here, not closed.
 
