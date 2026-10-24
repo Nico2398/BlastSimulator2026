@@ -140,6 +140,18 @@
             "once": true
           }
         ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/restore-after-compact.mjs"
+            ]
+          }
+        ]
       }
     ]
   }

@@ -55,6 +55,17 @@ Delegation depends on configuration that is off by default:
 
 Verify all of it with `npm run validate:context`.
 
+## Compaction
+
+Claude Code compacts on its own; no session triggers it, and it can land on any turn. The runner sets the window and makes the timing harmless:
+
+- **`CLAUDE_CODE_AUTO_COMPACT_WINDOW: '300000'`** on both Claude steps of `claude-runner.yml`. It applies to the lead and every sub-agent. Raise it only on evidence from run metrics (`peakContextTokens`, `compactions` per agent).
+- **`.claude/hooks/restore-after-compact.mjs`**, a `SessionStart` hook with matcher `compact` in `.claude/settings.json`, prints the run state on disk right after the summary: open TDD cycles and their phase, the blind marker, the branch and uncommitted paths, the last commits, each plan's `## Progress`, the last `verify`. Outside a pipeline run it prints nothing.
+- **The lead checkpoints every step boundary** into the plan's `## Progress` (`agentic-pipeline-tdd`), so the state the hook restores is current.
+- **Blindness survives compaction** by construction: `blind-to-tests.mjs` reads the marker on every call, not the conversation.
+
+OpenCode compacts by its own rules and has no equivalent hook: a gap recorded here, not closed.
+
 ## Model and effort
 
 Claude runs on the `sonnet` alias (latest Sonnet), set through `claude_args` in `claude-runner.yml`. OpenCode's model is set in `.opencode/opencode.json` and in the runner's environment. Every agent inherits the session model; no agent definition pins a model of its own.

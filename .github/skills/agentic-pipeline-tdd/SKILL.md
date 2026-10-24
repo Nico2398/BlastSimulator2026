@@ -53,9 +53,12 @@ The script refuses every step out of order — no skeleton commit, a skeleton th
 - Files to change and why; the existing unit reused or generalized (`dev-design-principles`)
 - Decisions taken (`agentic-decision-autonomy`)
 - Channels owed
+
+## Progress
+- <step> done — <commit sha> — next: <step> — open: <failures, decisions pending> | none
 ```
 
-The test-writer receives the Contract and nothing else. The Contract says **what** the change must do, never how: an implementation detail in it reaches the tests and pins them to one design. The reviewer receives the whole plan.
+`## Progress` takes one line per finished step (`agentic-pipeline-full` and `agentic-pipeline-finalization` steps included); it is what `restore-after-compact.mjs` hands back after a compaction. The test-writer receives the Contract and nothing else. The Contract says **what** the change must do, never how: an implementation detail in it reaches the tests and pins them to one design. The reviewer receives the whole plan.
 
 ### The blind phase
 
