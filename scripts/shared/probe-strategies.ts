@@ -59,14 +59,14 @@ import { nextGradeTargets } from '../../src/core/economy/MineGrade.js';
 import { getExplosivesFreeCapacity } from '../../src/core/entities/BuildingWarehouse.js';
 import { onGroundMassKg } from '../../src/core/economy/Logistics.js';
 import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
-import { getBuildingDef, getUpgradeCost } from '../../src/core/entities/Building.js';
+import { getBuildingDef, getDefSize, getUpgradeCost, type BuildingTier } from '../../src/core/entities/Building.js';
 import { getVehicleDefByTier, getVehicleReservation, vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { computeVehicleUpgradeCost } from '../../src/core/entities/VehicleUpgrade.js';
 import { ROLE_LICENCE_REQUIRED, canDriveTier, countLicenceHolders, licenceLevelOfSkill } from '../../src/core/entities/VehicleDriverAssignment.js';
 import { isEnrolledInTraining } from '../../src/core/entities/EmployeeTraining.js';
 import {
   DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS,
-  VEHICLE_MAX_SLOPE_RATIO, WALL_BERM_MIN_WIDTH_M, WALL_SAFE_FACE_HEIGHT_M_BY_TIER,
+  VEHICLE_MAX_SLOPE_RATIO, WALL_BERM_MIN_WIDTH_M, WALL_SAFE_FACE_HEIGHT_M_BY_TIER, needRestSearchRadius,
 } from '../../src/core/config/balance.js';
 import { gradeDef } from '../../src/core/economy/MineGrade.js';
 import { fleetBestRigLimit } from '../../src/core/mining/RigLimits.js';
@@ -197,6 +197,19 @@ function rankDeposits(grid: VoxelGrid, span = SHOT_SPAN, depth: number = SHOT.de
   const anyOre = out.some(c => c.ore > 0);
   // Array.sort is stable and `out` is already in ascending x then z: ties keep that order.
   return out.sort((a, b) => (anyOre ? b.ore - a.ore : a.spread - b.spread));
+}
+
+/** Metres a building other than a depot keeps from every depot: haulers queue in the gap to dock. */
+const DEPOT_APPROACH_CLEAR_M = 6;
+
+/** Footprints of the site's haul depots (freight warehouses and spoil heaps), built or planned. */
+function depotSites(s: ProbeSession): Array<Pattern & { span: number }> {
+  return [...s.state.buildings.buildings, ...s.state.plannedBuildings]
+    .filter(b => b.type === 'freight_warehouse' || b.type === 'spoil_heap')
+    .map(b => {
+      const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, (b as { tier?: BuildingTier }).tier ?? 1));
+      return { x: b.x, z: b.z, span: Math.max(sizeX, sizeZ) };
+    });
 }
 
 /** Tile the crew works around: where the warehouse sits. */
@@ -389,8 +402,15 @@ interface RampOrder extends RampFootprintInput { slope: number }
  * Order a ramp from the open ground into the crater the shot at `at` (`span` wide) made, no steeper than
  * the vehicle cut ratio, the steepest the ramp tool accepts; the ramp's slope ratio and run when one was accepted, else null.
  * Shortest first; among ramps of one length, the one whose top lies nearest the haul depot, so the crater is entered
- * from the side its loads leave by at no extra digging.
+ * from the side its loads leave by at no extra digging. The top stands outside the shot's broken footprint: a rib of
+ * rock left standing between two holes reads as ground above the floor, and a ramp cut down from it takes the rib
+ * away, leaving its digger in a crater with no way out.
  */
+function insideShotFootprint(p: { x: number; z: number }, at: Pattern, span: number): boolean {
+  const within = (v: number, lo: number): boolean => v >= lo - RAMP_END_GAP && v <= lo + span + RAMP_END_GAP;
+  return within(p.x, at.x) && within(p.z, at.z);
+}
+
 function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = rampCutSlopeRatio(true)): RampOrder | null {
   const { grid } = s;
   const mid = span / 2;
@@ -410,6 +430,7 @@ function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = ra
     for (const lane of [...lanes].sort((a, b) => topToDepot(a, length) - topToDepot(b, length))) {
       const start = { x: lane.end.x - lane.dx * length, z: lane.end.z - lane.dz * length };
       if (start.x < 1 || start.z < 1 || start.x >= grid.sizeX - 1 || start.z >= grid.sizeZ - 1) continue;
+      if (insideShotFootprint(start, at, span)) continue;
       const depth = Math.round(getSmoothTerrainSurfaceY(grid, start.x, start.z) - floor);
       if (depth < 1 || depth / length > maxSlope) continue;
       if (s.run(`build_ramp start:${start.x},${start.z} end:${lane.end.x},${lane.end.z} depth:${depth}`).success) return { slope: depth / length, x: start.x, z: start.z, runM: length, dirX: lane.dx, dirZ: lane.dz };
@@ -440,12 +461,12 @@ function runOpening(s: ProbeSession): { at: Pattern; ramp: RampOrder } {
   return { at: shot.at, ramp };
 }
 
-/** Idle play: tick to the horizon, passing the contract board every interval. */
-function playOut(s: ProbeSession, onInterval?: () => void): never {
+/** Idle play: tick to the horizon, passing the contract board every interval (`contracts`: see `playContracts`). */
+function playOut(s: ProbeSession, onInterval?: () => void, contracts: { supply?: boolean } = {}): never {
   for (;;) {
     s.tick();
     if (s.state.tickCount % DECISION_INTERVAL_TICKS === 0) {
-      playContracts(s.run, s.state);
+      playContracts(s.run, s.state, contracts);
       onInterval?.();
     }
   }
@@ -627,7 +648,7 @@ function reinvestBuy(s: ProbeSession, m: ReinvestMemory): void {
   const { state } = s;
   if (countOf(s, 'research_center') === 0 && !state.plannedBuildings.some(p => p.type === 'research_center')
     && spendable(s) >= getBuildingDef('research_center', 1).constructionCost
-    && tryOnce(s, m, 'research_center', () => placeBuilding(s, 'research_center', rallyOf(s), null) !== null)) {
+    && tryOnce(s, m, 'research_center', () => placeBuilding(s, 'research_center', rallyOf(s), null, depotSites(s), DEPOT_APPROACH_CLEAR_M) !== null)) {
     return;
   }
   const warehouse = state.buildings.buildings.find(b => b.type === 'freight_warehouse');
@@ -689,8 +710,8 @@ const sandboxRun = (s: ProbeSession): boolean => !s.engine.ctx.campaignProfile.c
 export const ladderHoleDepthM = (s: ProbeSession): number => sandboxRun(s) ? LADDER_SANDBOX_HOLE_DEPTH_M : LADDER_CAMPAIGN_HOLE_DEPTH_M;
 /** A pit this close under the hole depth counts as dug: deepening then waits for a cleared crater instead of a fresh site. */
 const LADDER_FRESH_SHOT_DEPTH_SLACK_M = 0.5;
-/** Haulers the ladder buys while cash is idle: rubble clears at the fleet's pace, and a buried pit stalls every later shot. */
-const LADDER_MAX_HAULERS = 6;
+/** Haulers the ladder buys while cash is idle: rubble clears at the fleet's pace, and a buried pit stalls every later shot. Measured: 12 haulers sell 2-7x the ore of 6 on the seed-42 desert site. */
+const LADDER_MAX_HAULERS = 12;
 /** Shrink factors tried when a limit-sized pattern fits no free site, widest first. */
 const LADDER_SHRINK_STEPS = [1, 0.75, 0.5, 0.25] as const;
 const SOFTEST_SAFE_FACE_M = WALL_SAFE_FACE_HEIGHT_M_BY_TIER[1]!;
@@ -930,7 +951,7 @@ function earnLicence(s: ProbeSession, m: ReinvestMemory, role: VehicleRole, tier
   if (!school) {
     if (!state.plannedBuildings.some(p => p.type === 'driving_center')
       && spendable(s) >= getBuildingDef('driving_center', 1).constructionCost) {
-      tryOnce(s, m, 'driving_center', () => placeBuilding(s, 'driving_center', rallyOf(s), null) !== null);
+      tryOnce(s, m, 'driving_center', () => placeBuilding(s, 'driving_center', rallyOf(s), null, depotSites(s), DEPOT_APPROACH_CLEAR_M) !== null);
     }
     return false;
   }
@@ -1019,29 +1040,41 @@ function rebuildLostQuarters(s: ProbeSession, m: ReinvestMemory): void {
   tryOnce(s, m, 'quarters', () => placeBuilding(s, 'living_quarters', near, last) !== null);
 }
 
-/**
- * Metres the crater being worked may lie from the nearest living quarters before the ladder raises another beside it.
- * The crew rests every shift (`gameplay-employee-needs`), and past this the walk there and back rivals the shift:
- * drivers spent a third of their time on the way to rest and the pit stalled (#2089).
- */
-const LADDER_QUARTERS_REACH_M = 24;
+/** Metres inside the rest-building search radius a work spot's quarters must stand, so a worker a few steps off the spot still reaches them. */
+const LADDER_QUARTERS_REACH_MARGIN_M = 4;
 /** Living quarters the ladder raises at most. */
-const LADDER_MAX_QUARTERS = 3;
+const LADDER_MAX_QUARTERS = 4;
 
 /**
- * Another living quarters beside the crater being worked, when every one stands farther than LADDER_QUARTERS_REACH_M,
- * clear of every shot site by LADDER_BUILDING_KEEP_OUT_M so a later shot does not take it. With none left the crew
- * rests in place: rebuilding them sank the Shareholder Summit crew to a revolt.
+ * Living quarters within reach of where the crew's rests start. A worker farther than the rest search radius
+ * (`needRestSearchRadius`) from a free bed rests in place, for twice as long and only up to 70 of the gauge
+ * (`gameplay-employee-needs`), and a rest falls due every shift. A haul job ends at the depot, so the warehouses come
+ * first; the crater being worked (drilling, charging, digging) next. A hut by a crater stands clear of every shot site
+ * by LADDER_BUILDING_KEEP_OUT_M, a hut by a depot clear of its approach; a hut a shot destroyed is replaced the same
+ * way, by the warehouse first, where no shot reaches. Covered everywhere, idle cash upgrades them (a tier-2 hut rests a
+ * worker in fewer ticks).
  */
 function ladderQuarters(s: ProbeSession, m: LadderMemory): void {
   const quarters = [...s.state.buildings.buildings, ...s.state.plannedBuildings].filter(b => b.type === 'living_quarters');
-  if (quarters.length === 0 || quarters.length >= LADDER_MAX_QUARTERS || s.state.plannedBuildings.some(b => b.type === 'living_quarters')) return;
-  const centre = { x: m.crater.x + m.crater.span / 2, z: m.crater.z + m.crater.span / 2 };
-  if (quarters.some(q => Math.hypot(q.x - centre.x, q.z - centre.z) <= LADDER_QUARTERS_REACH_M)) return;
-  if (s.state.cash - getBuildingDef('living_quarters', 1).constructionCost < LADDER_UPGRADE_RESERVE) return;
+  if (s.state.plannedBuildings.some(b => b.type === 'living_quarters')) return;
+  const reach = needRestSearchRadius(s.grid.sizeX) - LADDER_QUARTERS_REACH_MARGIN_M;
+  const covered = (spot: Pattern): boolean => quarters.some(q => Math.hypot(q.x - spot.x, q.z - spot.z) <= reach);
   const shots = [...m.origins, ...m.barred];
-  tryOnce(s, m, `quarters_${craterKey(m.crater)}`,
-    () => placeBuilding(s, 'living_quarters', centre, null, shots, LADDER_BUILDING_KEEP_OUT_M) !== null);
+  const depots = depotSites(s);
+  const warehouses = s.state.buildings.buildings.filter(b => b.type === 'freight_warehouse').map(b => ({ x: b.x, z: b.z }));
+  const crater = { x: m.crater.x + m.crater.span / 2, z: m.crater.z + m.crater.span / 2 };
+  const spot = [...warehouses, crater].find(p => !covered(p));
+  const cost = getBuildingDef('living_quarters', 1).constructionCost;
+  if (spot !== undefined && quarters.length < LADDER_MAX_QUARTERS) {
+    if (s.state.cash - cost < LADDER_UPGRADE_RESERVE) return;
+    tryOnce(s, m, `quarters_${spot.x},${spot.z}`, () => {
+      const nearShot = shots.length > 0 && spot === crater;
+      return placeBuilding(s, 'living_quarters', spot, null, nearShot ? shots : depots, nearShot ? LADDER_BUILDING_KEEP_OUT_M : DEPOT_APPROACH_CLEAR_M) !== null;
+    });
+    return;
+  }
+  const hut = s.state.buildings.buildings.find(b => b.type === 'living_quarters' && b.tier < 3);
+  if (hut && s.state.cash - getUpgradeCost('living_quarters', (hut.tier + 1) as BuildingTier) >= LADDER_UPGRADE_RESERVE) upgradeBuilding(s, m, 'living_quarters');
 }
 
 /** Ecology under which another spoil heap is built, and the most the ladder builds: loose rubble past a heap's capacity drains it. */
@@ -1063,7 +1096,7 @@ function ladderSpoil(s: ProbeSession, m: ReinvestMemory): void {
   if (!needed || heaps >= LADDER_MAX_SPOIL_HEAPS
     || s.state.plannedBuildings.some(p => p.type === 'spoil_heap')
     || spendable(s) < getBuildingDef('spoil_heap', 1).constructionCost) return;
-  tryOnce(s, m, 'spoil_heap', () => placeBuilding(s, 'spoil_heap', rallyOf(s), null) !== null);
+  tryOnce(s, m, 'spoil_heap', () => placeBuilding(s, 'spoil_heap', rallyOf(s), null, depotSites(s), DEPOT_APPROACH_CLEAR_M) !== null);
 }
 
 /** Estimated cash a ramp dig costs (crew time and spoil); the ramp is ordered only when the reserve survives it. */
@@ -1112,7 +1145,7 @@ function ladderSafety(s: ProbeSession, m: ReinvestMemory): void {
     canAfford: s.state.cash - getBuildingDef('management_office', nextTier).constructionCost >= LADDER_UPGRADE_RESERVE,
   });
   if (decision === 'build_office' && !s.state.plannedBuildings.some(p => p.type === 'management_office')) {
-    tryOnce(s, m, 'management_office', () => placeBuilding(s, 'management_office', rallyOf(s), null) !== null);
+    tryOnce(s, m, 'management_office', () => placeBuilding(s, 'management_office', rallyOf(s), null, depotSites(s), DEPOT_APPROACH_CLEAR_M) !== null);
   } else if (decision === 'upgrade_office') {
     upgradeBuilding(s, m, 'management_office');
   }
@@ -1159,7 +1192,7 @@ function gatedLadderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
 function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
   const haulers = s.state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length;
   const cost = getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver;
-  if (haulers >= LADDER_MAX_HAULERS || s.state.cash - cost < LADDER_UPGRADE_RESERVE || onGroundMassKg(s.state.logistics) === 0) return;
+  if (haulers >= (s.config.maxHaulers ?? LADDER_MAX_HAULERS) || s.state.cash - cost < LADDER_UPGRADE_RESERVE || onGroundMassKg(s.state.logistics) === 0) return;
   tryOnce(s, m, 'hauler', () => buyHauler(s));
 }
 
@@ -1192,7 +1225,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     ladderEquipment(s, m);
     const need = ladderPlan(s, m);
     if (!Number.isFinite(need.cost)) upgradeBuilding(s, m, 'explosive_warehouse');
-  });
+  }, { supply: true });
 }
 
 const STRATEGIES: Record<StrategyId, StrategyFn> = {
@@ -1210,12 +1243,17 @@ function addsHire(c: EventConsequence | undefined): boolean {
   return (c.effects ?? []).some(e => e.type === 'employee_joins') || addsHire(c.altConsequence);
 }
 
-/** Answer a pending event the ladder's way (see decideLadderEventOption); a no-op when none is pending. */
+/**
+ * Answer a pending event the ladder's way (see decideLadderEventOption); a no-op when none is pending. A traffic jam
+ * on a ramp is answered by widening it, a careful player's cure for a one-lane chokepoint (the order is refused, and
+ * the jam rerouted instead, when the ramp cannot widen or the cash falls short).
+ */
 function answerLadderEvent(run: Run, state: GameState): void {
   const pending = state.events.pendingEvent;
   const def = pending ? getEventById(pending.eventId) : undefined;
   if (!def) return;
-  run(`event choose ${decideLadderEventOption(def.consequences.map(addsHire))}`);
+  const widen = def.consequences.findIndex(c => c.effectTag === 'widen_ramp');
+  run(`event choose ${widen !== -1 ? widen : decideLadderEventOption(def.consequences.map(addsHire))}`);
 }
 
 function createSession(config: ProbeRunConfig, observer: MetricsObserver): ProbeSession {

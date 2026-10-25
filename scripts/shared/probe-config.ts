@@ -13,6 +13,8 @@ export interface ProbeRunConfig {
   horizon: number;
   /** Explosive id for every shot; absent = the probe's reference krackle. */
   explosive?: string;
+  /** Most haulers the ladder buys; absent = LADDER_MAX_HAULERS. An experiment knob for fleet-size studies. */
+  maxHaulers?: number;
 }
 
 export interface ProbeOptions {

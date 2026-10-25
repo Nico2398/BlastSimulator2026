@@ -29,9 +29,12 @@ export function playTick(run: Run, state: GameState): void {
  * Ordinary contract play, the same actions the Contracts panel offers:
  * deliver stock against accepted ore_sale/rubble_disposal contracts, and
  * accept an offer only when current stock covers it in full (an
- * unfulfilled contract costs a penalty). ore_sale is preferred.
+ * unfulfilled contract costs a penalty). ore_sale is preferred. With
+ * `supply`, a covered supply offer is taken too (after ore_sale, before
+ * rubble): a mine hauling faster than the ore_sale board buys sells the rest
+ * there instead of filling its warehouse.
  */
-export function playContracts(run: Run, state: GameState): void {
+export function playContracts(run: Run, state: GameState, opts: { supply?: boolean } = {}): void {
   const stockOf = (materialId: string) => (
     materialId === '' ? state.logistics.storedMassKg : (state.collectedOre[materialId] ?? 0)
   );
@@ -43,6 +46,7 @@ export function playContracts(run: Run, state: GameState): void {
   for (let guard = 0; guard < 8; guard++) {
     const covered = (c: typeof state.contracts.available[number]) => stockOf(c.materialId) >= c.quantityKg;
     const offer = state.contracts.available.find((c) => c.type === 'ore_sale' && covered(c))
+      ?? (opts.supply ? state.contracts.available.find((c) => c.type === 'supply' && covered(c)) : undefined)
       ?? state.contracts.available.find((c) => c.type === 'rubble_disposal' && covered(c));
     if (!offer) return;
     if (!run(`contract accept ${offer.id}`).success) return;
