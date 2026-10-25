@@ -23,7 +23,7 @@ interface ProbeMetrics {
   ticksHaulWaitedOnFullStorage: number;
   boulderSoldShare: number | null;
   gradeReachedTick: Record<number, number>;
-  /** Deepest pit (m) the grade tracker had measured by each cash sample tick; absent off the progression ladder. */
+  /** Deepest pit (m) the grade tracker had measured by each cash sample tick; null past the run and throughout off the progression ladder. */
   pitDepthAt?: Record<number, number | null>;
   /** Cash at the tick each grade was first reached, by grade. */
   gradeCashAt: Record<number, number>;
