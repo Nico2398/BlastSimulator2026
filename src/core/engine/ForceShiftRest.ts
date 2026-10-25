@@ -407,7 +407,10 @@ export function forceShiftRestIfNeededByPolicy(
   // working on only ends in a collapse on that same drive (vehicle work whose
   // gauge no longer covers the trip) or the shift ran out between two jobs.
   if (!dest.worthwhile && !(vehicleJob && !covered) && !(betweenVehicleJobs && shiftExpired)) return;
-  if (dest.buildingId === undefined && isUnreachableBetweenInPlaceRests(state, emp)) return;
+  // Forced anyway, but the trip still costs more than the building gives back: rest where they stand. Driving a slow
+  // digger across the site to rest at a gauge the rest cannot raise only costs the ramp it was digging (#2089).
+  const target = dest.worthwhile ? dest : { targetX: emp.x, targetZ: emp.z, buildingId: undefined };
+  if (target.buildingId === undefined && isUnreachableBetweenInPlaceRests(state, emp)) return;
 
   // #678 follow-up: release the action this employee was actively working
   // (a drill_hole, dig_ramp_segment, or any other vehicle-gated task) back to
@@ -459,10 +462,10 @@ export function forceShiftRestIfNeededByPolicy(
 
   // Immediately claimed — status/holderId reflect that from creation (#547).
   const restAction = createRestPendingAction(state, {
-    targetX: dest.targetX,
-    targetZ: dest.targetZ,
+    targetX: target.targetX,
+    targetZ: target.targetZ,
     targetEmployeeId: emp.id,
-    payload: { needKey, triggeredBy: POLICY_REST_TRIGGER, buildingId: dest.buildingId },
+    payload: { needKey, triggeredBy: POLICY_REST_TRIGGER, buildingId: target.buildingId },
   }, emp.id);
 
   finishForceRest(state, emp, restAction, firedEvents, shiftRested, emitter);

@@ -18,7 +18,7 @@ import { computeRampSegmentDurationTicks, isRampCellPending } from '../mining/Ra
 import { computeLevelVolume } from '../mining/LevelGround.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, findVehicleReservedForAction, computeRigDurationTicks } from '../entities/Vehicle.js';
-import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulActionOreDensities, isAutoDebrisAction, resolveTrackedFragment, type FragmentLookup } from '../economy/HaulDispatch.js';
+import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulActionIsWarehouseBound, haulActionOreDensities, isAutoDebrisAction, resolveTrackedFragment, type FragmentLookup } from '../economy/HaulDispatch.js';
 import { fragmentHaulUrgency, oreHaulUrgency } from '../economy/OreDemand.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { thinDebrisCandidates } from './DebrisCandidateBins.js';
@@ -550,7 +550,7 @@ function selectWithinIndex(
       || (holesWait && buriedHoleBonusOf(state, a, fragmentOf) > 0)
     : undefined;
   const claimable = thinDebrisCandidates(
-    state, employee, candidates, a => isAutoDebrisAction(a.type), a => haulActionCarriesOre(state, a, fragmentOf), allowed, reachable, isUrgent,
+    state, employee, candidates, a => isAutoDebrisAction(a.type), a => haulActionIsWarehouseBound(state, a, fragmentOf), allowed, reachable, isUrgent,
   );
   if (claimable.length === 0) return null;
 
@@ -585,7 +585,7 @@ function selectWithinIndex(
  * resolve a cost during the search (blocked way). One pass over `costed`.
  */
 function oreHaulsOnly(state: GameState, costed: readonly CostedAction[], fragmentOf: FragmentLookup): CostedAction[] | null {
-  const oreWaits = costed.some(c => Number.isFinite(c.cost) && isUnheldGroundHaul(state, c.action, fragmentOf) && haulActionCarriesOre(state, c.action, fragmentOf));
+  const oreWaits = costed.some(c => Number.isFinite(c.cost) && isUnheldGroundHaul(state, c.action, fragmentOf) && haulActionIsWarehouseBound(state, c.action, fragmentOf));
   return oreWaits
     ? costed.filter(c => !isBarrenGroundHaul(state, c.action, fragmentOf) || buriedHoleBonusOf(state, c.action, fragmentOf) > 0)
     : null;
@@ -596,9 +596,9 @@ function isUnheldGroundHaul(state: GameState, action: PendingAction, fragmentOf:
   return action.type === 'haul_debris' && action.holderId === null && !haulActionIsLoaded(state, action, fragmentOf);
 }
 
-/** An unheld ground haul that carries no ore: it yields to ore hauls (#1870). */
+/** An unheld ground haul bound for a spoil heap (barren, or trace ore under the barren threshold): it yields to ore hauls (#1870). */
 function isBarrenGroundHaul(state: GameState, action: PendingAction, fragmentOf: FragmentLookup): boolean {
-  return isUnheldGroundHaul(state, action, fragmentOf) && !haulActionCarriesOre(state, action, fragmentOf);
+  return isUnheldGroundHaul(state, action, fragmentOf) && !haulActionIsWarehouseBound(state, action, fragmentOf);
 }
 
 /** Bounded per-tier search over `costed` (sorted: tier, then cost), see the notes inside. */

@@ -1046,6 +1046,13 @@ export const STUCK_THRESHOLD = 3;
 export const AGENT_OCCUPANCY_WAIT_TICKS = 10;
 
 /**
+ * Extra route cost (nav move-cost units, about one per cell) a reroute around a stuck blocker may add over the
+ * plain route before it is refused. The plain route is repathed every tick and ignores occupancy, so a longer
+ * detour is undone the tick after it is taken; a step or two around a blocker in the open stays well inside.
+ */
+export const REROUTE_CONTEST_MAX_DETOUR_COST = 6;
+
+/**
  * Largest ring radius `findNearestFreeCell`'s ring-search loop (Locomotion.ts)
  * will expand to before giving up. Replaces that loop's previously-hardcoded
  * literal `2` — a flat cap of 2 rings (searching at most a 5x5 neighbourhood)

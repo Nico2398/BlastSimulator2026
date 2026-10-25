@@ -2098,6 +2098,27 @@
       "commandOutcome": "either"
     },
     {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#2089: forced rests taken in place when the trip is not worthwhile play the crew faster, so two events now land within the eight ticks after the hires above and both pads end before the pool refreshes; one more day."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "employee hire role:driller",
       "interaction": [
         {

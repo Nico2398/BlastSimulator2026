@@ -26,6 +26,7 @@ Records why the rules in the `gameplay-employee-skills` skill exist: the issues 
 - Tier-first ranking: #1742.
 - `demolish_building` in tier 1: #1840. Loaded drivers never abandon the haul: #1709.
 - Before #1742 a reserved `haul_debris` starved a pool `charge_hole`.
+- Open pool skips `debris_out_of_reach`: a crater of unreachable rubble used up every bounded path attempt and its access ramp segment was never claimed (#2089).
 
 ## Hiring Candidate Pools
 

@@ -30,6 +30,7 @@ Records why the rules in the `gameplay-vehicle-fleet` skill exist: the issues th
 - Heaps are finite (`no_spoil_heap` / `spoil_heap_full`): #1892.
 - Barren yields to ore: #1870.
 - Barren rock on a planned hole is exempt from barren-yields-to-ore: the ladder probe could not deepen a crater while any ore lay elsewhere on the site (#2089).
+- Barren-yields-to-ore classifies by destination, so trace ore under the barren threshold yields too: #2089.
 
 ## Vehicle Repair
 
@@ -47,6 +48,7 @@ Records why the rules in the `gameplay-vehicle-fleet` skill exist: the issues th
 
 - Parked-vehicle yield to a free cell off the blocked mover's route (`pickYieldCell`): #1696.
 - Jams and chokepoints (`TrafficJams.ts`): #1208.
+- Long-detour reroute refused against a stuck blocker: three haulers gridlocked near a warehouse for ~290 ticks in the #1000 starved-backlog test once out-of-reach debris left the pool (#2089).
 
 ## Status
 

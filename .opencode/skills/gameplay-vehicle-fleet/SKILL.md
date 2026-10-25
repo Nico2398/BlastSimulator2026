@@ -274,8 +274,9 @@ and the claim gate all use the fragment's destination; a destroyed target heap f
 heap. Heaps are finite: a barren haul is blocked as `no_spoil_heap` (no heap placed) or `spoil_heap_full` (no heap has room for the fragment); the depot pick, the claim gate and delivery use `pickWarehouse` over `spoilHeapSites` like warehouses do.
 
 Barren yields to ore: `selectBestActionForEmployee` does not start an unheld, ground (not
-loaded) barren `haul_debris` while any unheld ore-bearing `haul_debris` is claimable (reachable,
-allowed, warehouse room). Barren still moves when no ore haul is claimable or none resolves a cost
+loaded) spoil-bound `haul_debris` while any unheld warehouse-bound one is claimable (reachable,
+allowed, warehouse room). The class is the destination (`haulActionIsWarehouseBound`, the
+`isBarrenFragment` threshold), so trace ore under the barren threshold yields like barren rock. Barren still moves when no ore haul is claimable or none resolves a cost
 (barren blocks the only way, `storage_full`, nothing left), and barren rock burying a planned drill hole
 never waits on ore: the player marked that ground for the next shot (`gameplay-blast-system`, Buried holes). Grade/demand weighting among ore hauls,
 loaded trips, tier ranking and `fragment_debris` are unchanged. Debris thinning budgets
@@ -404,6 +405,7 @@ Truck-worked charging stalls:
 - `outstandingChargeBlockedReason` returns the first outstanding `charge_hole` order that carries a reason; a claimed order has none, so the queue head is not the one to read.
 - `releaseDeadHoldersActions` (TickPipeline, before dispatch) returns any claim held by a dead employee to the pool, whatever killed them, so `OrderReachability` re-stamps it (`no_vehicle_in_fleet`, `no_dual_qualified_employee`). A destroyed vehicle already releases its driver's claim through the aborted drive leg.
 - A drive leg blocked by a parked, driverless vehicle crosses it (`handleAgentOccupancyBlock` step 2.5) instead of trying the avoid-all reroute first: plain drive pathing repaths every tick through the parked vehicle, which undoes a reroute step on the next tick and resets the stuck counters, so `MOVE_STUCK_ABANDON_TICKS` is never reached.
+- Against a stuck blocker (a head-on contest) the same undo applies to a long detour: an avoid-all reroute costing more than the plain route plus `REROUTE_CONTEST_MAX_DETOUR_COST` is refused, and the contest goes to the tie-break sidestep (the higher id steps to the nearest free cell). A step or two around a blocker in the open is still rerouted.
 
 ## Vehicle slope limit
 

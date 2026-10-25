@@ -292,6 +292,22 @@ export function haulActionOreDensities(
 }
 
 /**
+ * True iff `action` is haul_debris/fragment_debris and its referenced fragment
+ * is bound for a freight warehouse, not a spoil heap (`haulDestinationOf` at the
+ * site's ore grade scale): trace ore under the barren threshold is barren rock
+ * here, as it is at the depot. False for any other action type or a fragment id
+ * that no longer resolves.
+ */
+export function haulActionIsWarehouseBound(
+  state: GameState,
+  action: PendingAction,
+  lookup?: FragmentLookup,
+): boolean {
+  const densities = haulActionOreDensities(state, action, lookup);
+  return densities !== null && !isBarrenFragment(densities, oreGradeScaleOf(state.world));
+}
+
+/**
  * True iff `action` is haul_debris/fragment_debris and its referenced
  * fragment carries any ore (some oreDensities entry > 0). False for any
  * other action type or a fragment id that no longer resolves.

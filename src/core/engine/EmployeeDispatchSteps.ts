@@ -407,7 +407,12 @@ export function claimOnePoolCandidate(
     // blocks later work once the zone genuinely clears.
     !isEvacuationHoldActive(state, a) &&
     // #1130: see isActionPastStuckBackoff's own doc comment.
-    isActionPastStuckBackoff(state, a)
+    isActionPastStuckBackoff(state, a) &&
+    // The reachability sweep (OrderReachability.ts) already found no vehicle reaches it; the stamp clears on the
+    // sweep after a ramp connects it. Left in, a crater full of such rubble spends every bounded real-path attempt
+    // of the search (ACTION_SELECTION_MAX_PATH_ATTEMPTS) on its nearest pieces, and the work that can be done —
+    // a ramp segment into that very crater — is never reached (#2089).
+    a.blockedReason !== 'debris_out_of_reach'
   );
 
   const selection = selectBestActionForEmployee(

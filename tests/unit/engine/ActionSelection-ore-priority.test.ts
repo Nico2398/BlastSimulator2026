@@ -34,7 +34,7 @@ import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { hireEmployee, assignSkill, type Employee } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { ORE_HAUL_PRIORITY_BONUS_TICKS } from '../../../src/core/config/balance.js';
+import { ORE_HAUL_PRIORITY_BONUS_TICKS, SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../../../src/core/config/balance.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { haulBlockedReason } from '../../../src/core/economy/HaulDispatch.js';
@@ -421,6 +421,20 @@ describe('selectBestActionForEmployee — a barren haul waits while an ore haul 
     const { state, emp, barren, ore } = layout();
     const result = selectBestActionForEmployee(state, emp, [barren, ore])!;
     expect(result.totalTicks).toBeCloseTo(resolveActionCost(state, emp, ore)!.totalTicks, 10);
+  });
+
+  it('trace ore under the barren threshold goes to the heap, so it yields to real ore like barren rock does', () => {
+    const { state, emp, ore } = layout();
+    addBlastFragments(state.logistics, [makeFragment(3, NEAR_X, 1, { gloomium: SPOIL_BARREN_ORE_FRACTION_THRESHOLD / 2 })]);
+    const trace = makeHaulAction({ id: 3, targetX: NEAR_X, targetZ: 1, payload: { fragmentId: 3 } });
+    expect(selectBestActionForEmployee(state, emp, [trace, ore])!.action.id).toBe(ore.id);
+  });
+
+  it('ore just over the barren threshold is warehouse ore, and ranks on cost against other ore', () => {
+    const { state, emp, ore } = layout();
+    addBlastFragments(state.logistics, [makeFragment(3, NEAR_X, 1, { gloomium: SPOIL_BARREN_ORE_FRACTION_THRESHOLD * 2 })]);
+    const rich = makeHaulAction({ id: 3, targetX: NEAR_X, targetZ: 1, payload: { fragmentId: 3 } });
+    expect(selectBestActionForEmployee(state, emp, [rich, ore])!.action.id).toBe(rich.id);
   });
 
   it('a barren haul burying a planned hole on a progression site is not held back by the ore', () => {

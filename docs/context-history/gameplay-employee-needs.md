@@ -57,6 +57,7 @@ Records why the rules in the `gameplay-employee-needs` skill exist: the issues t
 - Pacing (#1709), original text: "the former 8-tick shift sent the driller to rest after every hole (a 3x3 plan with quarters beside it took 208 ticks). Now it drills in 140 ticks (zero collapses at 12 m and 25 m)."
 - Multi-hole plans and box-cut ramp completion: #945, #1090; livelock guard: #1118.
 - `ticksWorked` reset on any completed rest: #1669.
+- Forced but not-worthwhile rest taken in place: a 1 m/tick digger drove to a far hut for every rest (#2089).
 
 ## Walk-survival guard
 
