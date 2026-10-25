@@ -1,185 +1,122 @@
 ---
 name: agentic-pipeline-tdd
 description: >
-  Core TDD cycle: skeleton → tests → implementation → cherry-pick onto feature
-  branch. Used by full, multi, and fix-bug pipelines that need isolated TDD
-  with implementer branch blindness. Branch naming uses a <label> parameter.
+  The TDD cycle every code-producing pipeline runs: the lead plans and writes the
+  skeleton, a test-writer writes RED tests from the plan's Contract in a separate
+  worktree while the lead is blind to them, the lead implements, and `tdd join`
+  assembles the feature branch. Covers the plan format, the blind phase, the fix
+  loop, branch naming and volumetric fan-out.
 ---
 
-## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
-Branch isolation is critical. Implementer never sees test source.
+```
+[ ] = a step the lead runs itself  |  @agent = a delegation
+
+ 1. [plan]       Read the issue; locate the code it reaches (grep, then read the ranges).
+                 Write the plan to `.agentic/plan/<label>.md` in the format below.
+ 2. [start]      npm run pipeline -- tdd start --label <label> [--base <branch>] [--feature <branch>]
+                 → you are on pipeline/impl-<label>
+ 3. [skeleton]   The public API only: new types, signatures, stubs that throw
+                 `not implemented`, config constants, registrations. No logic, no tests.
+                 Commit: `skeleton: <what> (#<issue>)`.
+ 4. [split]      npm run pipeline -- tdd split --label <label>
+                 → prints the tests worktree; the blind phase opens
+ 5. @test-writer Brief: issue, label, worktree path, the plan's Contract section verbatim.
+                 Returns `RED: PROVEN` and a commit. `NOT PROVEN` → re-delegate once with
+                 the problems it named; still not proven → escalate.
+ 6. [implement]  Blind, on pipeline/impl-<label>: implement the Contract. Keep the existing
+                 suite green — `npm run pipeline -- verify --only static` and the single test
+                 files your change reaches. Commit: `implement: <what> (#<issue>)`.
+ 7. [join]       npm run pipeline -- tdd join --label <label>
+                 → pipeline/feature-<label> = base + skeleton + tests + implementation;
+                 the blind phase closes
+ 8. [green]      npm run long -- start verify -- npm run pipeline -- verify
+                 npm run long -- wait verify        (repeat while it exits 75)
+                 VERIFY: FAIL → the fix loop below
+```
+
+The script refuses every step out of order — no skeleton commit, a skeleton that writes tests, a join before RED or before an implementation commit, a dirty tree — and says what is missing.
+
+### The plan
+
+```markdown
+# Plan — #<issue> (<label>)
+
+## Contract
+- Criteria: C1 <checkable statement>, C2 … — from the issue's acceptance criteria and Verification list
+- API: <file>: <signature> — every symbol, console command and state field the skeleton declares
+- Edge cases and rejections: …
+- Tests go in: <paths> (mirroring the source path); scenario definitions when a player-facing flow changes
+
+## Approach
+- Files to change and why; the existing unit reused or generalized (`dev-design-principles`)
+- Decisions taken (`agentic-decision-autonomy`)
+- Channels owed
+
+## Progress
+- <step> done — <commit sha> — next: <step> — open: <failures, decisions pending> | none
+```
+
+`## Progress` is written by `npm run pipeline -- step`, one line per finished step, and is what `restore-after-compact.mjs` hands back after a compaction. The test-writer receives the Contract and nothing else. The Contract says **what** the change must do, never how: an implementation detail in it reaches the tests and pins them to one design. The reviewer receives the whole plan.
+
+### The blind phase
+
+From `split` until `join` the lead does not see the tests: `blind-to-tests.mjs` refuses every file and shell tool call that reaches the tests worktree or branch, from every session but the test-writer's, and the test-writer's report names files and criteria, never test content. The implementation is therefore shaped by the Contract alone, and the tests by the Contract alone.
+
+The test-writer works in its own worktree, so the two sides never share a working directory or an index.
+
+### The fix loop — after the join
+
+The lead now sees both sides. A RED test failing after the join means the implementation is wrong until shown otherwise: fix the implementation. Edit a RED test only when it contradicts the Contract as written, in its own commit `test-fix: <file> — <criterion> (#<issue>)`. `review-brief` lists every RED test edited after RED, and the reviewer rejects any edit the Contract does not support — this is the step where a test bent to fit the code would otherwise get in.
+
+Iterate on the single failing file (`npx vitest run <path>`), then re-run `verify` once over the whole change. At most seven fix iterations, and none starts once the loop budget is closed (`agentic-autonomous-pipeline`).
 
 ### Branch naming
 
-Caller provides a `<label>` and optionally `<base_branch>` (default: `main`). All TDD branches use it:
+Caller provides a `<label>` and optionally a base branch (default `main`):
 
-- `pipeline/tests-<label>` — skeleton + tests (forked from `<base_branch>`)
-- `pipeline/impl-<label>` — implementation (forked from skeleton commit)
-- `pipeline/feature-<label>` — deliverable (tests HEAD + cherry-picked impl)
+- `pipeline/impl-<label>` — skeleton + implementation, cut from the base
+- `pipeline/tests-<label>` — skeleton + tests, cut from the skeleton commit, in its own worktree
+- `pipeline/feature-<label>` — the deliverable and the PR head
 
-**`<label>` is `<issue>-<runId>`, never the issue number alone.** The run id makes
-every branch this run creates unique, so no run can inherit, collide with, or be
-refused by a branch an earlier run left behind.
+**`<label>` is `<issue>-<runId>`, never the issue number alone.** In GitHub Actions the runner states the three branch names in the trigger prompt — use exactly those; in a CLI session pick `local-$(openssl rand -hex 4)` once for the run.
 
-| Where the run is | `<runId>` |
-|------------------|-----------|
-| GitHub Actions | `$GITHUB_RUN_ID` — the runner also states the three branch names in the trigger prompt. Use exactly those |
-| A CLI session | `local-$(openssl rand -hex 4)`, chosen once at the start of the run and used for all three branches |
+- **Never reuse a branch from an earlier run, and never force-push over one.** `tdd start` refuses an existing label or branch.
+- Commit messages cite the **issue**, not the label: `<role>: <what> (#<issue>)`.
+- Everything that matches a branch — assignment, watchdog, rescue, auto-merge — accepts `pipeline/feature-<issue>` and `pipeline/feature-<issue>-<anything>` alike.
 
-Issue #554 is why. Run 160 timed out and its `pipeline/feature-554` was rescued
-into PR #603, which was closed unmerged; the branch stayed on the remote. Run 166
-built `pipeline/feature-554` again, from `main`, so the two histories diverged —
-and six hours of finished work died on `! [rejected] (non-fast-forward)` because
-the rescue push had nowhere to land. A unique name removes that class entirely:
-nothing to force, nothing to reconcile, nothing to lose.
-
-Rules that follow from it:
-
-- **Never reuse a branch from an earlier run, and never force-push over one.** A
-  branch that already exists under your `<label>` is your own, from an earlier
-  step of this same run.
-- Commit messages still cite the **issue**, not the label: `<agent>: <what> (#<issue>)`.
-- Everything that matches a branch — assignment, watchdog, rescue, auto-merge —
-  accepts `pipeline/feature-<issue>` and `pipeline/feature-<issue>-<anything>`
-  alike, so a branch predating this convention is still found.
-
-### Steps
-
-```
-[ ] = orchestrator-executed command  |  @agent = AI agent invocation
-
-  1. [setup-test-branch]     → create pipeline/tests-<label> from <base_branch> (default: main)
-  2. [branch-sanity]         → verify on pipeline/tests-<label>
-  3. @skeleton-writer        → Write empty stubs on tests branch.
-                             Parse output for `skeleton_commit_sha: <sha>` (expected format: `## RESULT: OK — skeleton_commit_sha: <sha>`).
-                             If not found → retry skeleton-writer (max 3 times).
-  4. [verify-skeleton-sha]   → confirm skeleton_commit_sha resolves: `git cat-file -t <sha>`. If invalid → retry @skeleton-writer.
-  5. [verify-commit]         → confirm skeleton commit exists; auto-commit if dirty
-  6. [setup-impl-branch]     → create pipeline/impl-<label> from skeleton_commit_sha
-  7. [switch-to-test]        → switch back to pipeline/tests-<label>
-  8. [branch-sanity]         → verify on pipeline/tests-<label>
-  9. @test-writer            → Write failing tests on tests branch (unit + integration + scenario)
- 10. [verify-commit]         → confirm test commit exists; auto-commit if dirty
- 11. [switch-to-impl]        → switch to pipeline/impl-<label>
- 12. [branch-sanity]         → verify on pipeline/impl-<label>
- 13. @implementer            → Minimum code to pass on impl branch (never sees test commits)
- 14. [verify-commit]         → confirm impl commit exists; auto-commit if dirty
- 15. [cherry-pick]           → cherry-pick impl branch HEAD onto feature branch:
-                               `git cherry-pick pipeline/impl-<label>` (branch ref, not SHA — picks all commits).
-                               If pipeline/feature-<label> exists → cherry-pick onto it
-                               If not → create pipeline/feature-<label> from tests HEAD, then cherry-pick
-                               if conflicts → @conflict-resolver → retry cherry-pick (max 3 retries)
-                               if still conflicts → human escalation
- 16. [git-verify]            → confirm clean state: git status, branch, last commits
-```
+A multi-pipeline section uses `<run-label>-s<K>` with `--feature pipeline/feature-<run-label>`, and `--base pipeline/feature-<run-label>` from the second section on: every section joins onto the one shared feature branch.
 
 ### ▶ Volumetric work goes out in parallel batches
 
-A step is **volumetric** when it is the same transformation applied to N
-independent files — scenario definitions to adapt to a new pacing, locale keys to
-add, call sites to migrate, screenshots to read back. Volumetric work done one
-file at a time is what spends a job budget: issue #554's run 166 edited 94 files
-sequentially and was cancelled at 360 minutes with the work unpushed, and #553's
-run before it ended the same way.
+A step is **volumetric** when it is the same transformation applied to N independent files — scenario definitions to adapt to a new pacing, locale keys to add, call sites to migrate, screenshots to read back.
 
 **At N ≥ 5 independent items, fan out. Do not iterate.**
 
-1. **Split** the items into batches of 5–10, disjoint by file. A file appears in
-   exactly one batch.
-2. **Delegate every batch in a single message**, foreground, and await them all in
-   that same turn — the same rule the reviewer fan-out in
-   `agentic-pipeline-review-pr` already runs under, and for the same reason: a
-   sub-agent whose result arrives after the turn ends is never delivered, and on a
-   runner there is no later turn. At most 8 batches in flight; queue the rest and
-   send the next message when they return.
-3. **Each batch agent edits its own files and commits nothing.** Two agents
-   committing in one worktree race over the index. The orchestrator commits once,
-   after every batch of the wave has returned.
-4. **Shared files are never batched.** `balance.ts`, `GameState.ts`, an i18n
-   locale, anything every item touches — the orchestrator edits those itself,
-   before the fan-out, and tells each batch what the new shape is.
-5. **Verify once over the whole set, not per batch.** One `npm run test`, one
-   scenario pass, after the wave — a batch that verifies itself pays the startup
-   cost N times over.
-6. **Report what each batch did**, so a failed batch is re-sent rather than the
-   whole wave repeated.
+1. **Split** the items into batches of 5–10, disjoint by file. A file appears in exactly one batch.
+2. **Delegate every batch in a single message**, foreground, and await them all in that same turn — a result that arrives after the turn ends is never delivered. At most 8 batches in flight; send the next message when they return.
+3. **Each batch agent edits its own files and commits nothing.** Two agents committing in one worktree race over the index. The lead commits once, after the wave.
+4. **Shared files are never batched.** `balance.ts`, `GameState.ts`, an i18n locale — the lead edits those first and tells each batch the new shape.
+5. **Verify once over the whole set** — one `verify` after the wave.
+6. **Report what each batch did**, so a failed batch is re-sent rather than the wave repeated.
 
-Which agent runs a batch is the same choice as for the sequential step:
-`@test-writer` for scenario definitions and tests, `@implementer` for call sites,
-`@visual-tester` for screenshots to capture and read back.
+| Work | Batch agent |
+|------|-------------|
+| Tests and scenario definitions, during step 5 | @test-writer in batch mode — it stops before `tdd red`, and the lead runs `npm run pipeline -- tdd red --label <label>` once for the wave (its output names files, counts and error codes only; a `RED NOT PROVEN` goes back to the batch that owns the named file) |
+| Production call sites, during step 6 | @batch-worker — blind like the lead |
+| Screenshots to capture and read back | @visual-tester |
 
-**Sequential is still right for a dependent chain.** Skeleton → tests →
-implementation is ordered by construction, and no fan-out changes that. It is the
-inside of one of those steps that parallelises.
+**Sequential is still right for a dependent chain.** Skeleton → tests → implementation is ordered by construction; it is the inside of one step that parallelises.
 
-**Retry counter:** resets at start of each TDD cycle invocation. Nested pipeline skills each have their own counter.
+### Failure handling
 
-### Failure loops
+| Failure | Next |
+|---------|------|
+| A script step refuses | Do what it names, re-run it |
+| RED not proven twice | Escalate: comment the problems, `ESCALATED: RED could not be proven` |
+| Join conflict | Resolve so both sides survive, `git add`, `git cherry-pick --continue`, re-run `tdd join` |
+| `VERIFY: FAIL` | The fix loop |
+| Seven failures of one step | Comment the history on the issue, stop with `ESCALATED: human intervention required` |
 
-| Failure at | Loops back to |
-|------------|--------------|
-| @skeleton-writer | @skeleton-writer (self-retry) |
-| @test-writer | @test-writer (self-retry) |
-| @implementer | @implementer (self-retry) |
-| [cherry-pick] / conflicts | @conflict-resolver → retry (max 3 tries) → escalate |
-| [git-verify] | Diagnose and fix — never proceed with dirty state |
-| Any × 7 | Human escalation: add PR/issue comment summarizing failure + history, then stop with `ESCALATED: human intervention required` |
-
-### Branch isolation
-
-| Agent | Branch | Sees test source? |
-|-------|--------|-------------------|
-| @skeleton-writer | tests_branch | No tests exist yet |
-| @test-writer | tests_branch | Yes |
-| @implementer | impl_branch | **No** — branch enforces this |
-
-### ▶ Parallel delegation needs a worktree per branch
-
-The test-writer and implementer steps are ordinarily sequential — the
-orchestrator switches branches between them, so only one of `pipeline/tests-<label>`
-and `pipeline/impl-<label>` is checked out in the main working directory at a time.
-**Delegating both in the same Agent-tool message** removes that ordering: both
-agents then run `git`/file-edit commands against whichever branch happens to be
-checked out, and their uncommitted edits interleave in one working directory
-under a single `HEAD` (issue #1230 — 11 implementer files and 2 test-writer files
-ended up uncommitted together this way; no data was lost only because someone
-inspected `git status` mid-run before either agent committed).
-
-**Sequential delegation needs no worktree.** The collision above is specifically
-a parallel-delegation hazard — a test-writer that finishes and commits before the
-implementer starts never shares a working directory with it.
-
-Before issuing a parallel delegation of the test-writer and implementer, the
-orchestrator:
-
-1. **Adds a worktree for every pipeline branch beyond the one already checked
-   out** in the main working directory: `git worktree add <path> <branch>` —
-   e.g. if `pipeline/tests-<label>` is checked out in the main working tree, add
-   a worktree for `pipeline/impl-<label>` (and vice versa).
-2. **Places the worktree as a sibling of the repo root**, outside the tracked
-   tree — e.g. `../pipeline-worktree-impl-<label>` — so nothing needs to be
-   gitignored and the worktree cannot collide with tracked files.
-3. **Tells each delegated agent, explicitly in its prompt/context, the absolute
-   directory it must operate in for every Bash call it makes** — its worktree
-   path, or the main working directory for the one agent not moved to a
-   worktree.
-4. **Removes the worktree** (`git worktree remove <path>`) once that branch's
-   work is committed and the orchestrator has cherry-picked what it needs onto
-   `pipeline/feature-<label>`, so worktrees don't accumulate across runs.
-
-### Non-Agentic Steps
-
-> Assumes `main` base branch. Override via `base_branch` parameter.
-
-| Step | Action |
-|------|--------|
-| setup-test-branch | `git checkout -b pipeline/tests-<label> <base_branch>` (default: `main`) |
-| setup-impl-branch | `git checkout -b pipeline/impl-<label> <skeleton_commit_sha>` |
-| switch-to-test | `git checkout pipeline/tests-<label>` |
-| switch-to-impl | `git checkout pipeline/impl-<label>` |
-| branch-sanity | `git branch --show-current` |
-| verify-commit | `git log --oneline -1` — auto-commit if dirty, use message `"<agent-name>: <step-context> (#<issue>)"` — the issue number, not the `<label>`: the run id belongs on branches, not in history |
-| verify-skeleton-sha | Bash: `git cat-file -t <skeleton_commit_sha> 2>/dev/null` / PS: `git cat-file -t <skeleton_commit_sha> 2>$null`. If not a valid object → abort, retry @skeleton-writer |
-| cherry-pick | `git cherry-pick pipeline/impl-<label>` — on feature branch; detect conflicts. If feature branch missing: `git checkout -b pipeline/feature-<label> pipeline/tests-<label>`, then cherry-pick |
-| git-verify | `git status --porcelain` (must be empty) → `git branch --show-current` → `git log --oneline -3` |
+History: docs/context-history/agentic-pipeline-tdd.md

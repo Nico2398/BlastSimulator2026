@@ -34,6 +34,7 @@ Path-scoped instructions in `.github/instructions/` carry the hard invariants fo
 
 ```bash
 npm run verify:env      # which verification channels are live
+npm run pipeline -- verify  # only the channels this branch's diff owes; cached per tree, one line per channel
 npm run validate        # TypeScript → coverage (thresholds) → full suite → build
 npm run test            # Vitest unit + integration
 npm run scenarios       # all scenarios, command mode, no browser
@@ -84,9 +85,9 @@ The project takes one human input: a GitHub issue. Filing one starts nothing, an
 
 What may be assigned is decided in one place, `.github/scripts/assignability.cjs`, and every rule in it fails closed: an issue is skipped when it already has an open pull request, when a declared dependency is open, abandoned, or closed with its pull request still unmerged, and when a dependency cannot be read at all. One open pull request does not skip it: a draft labelled `paused` is a halted run's deliberate handover, and the next run is told to continue that branch rather than build its own. Dependencies come from GitHub's own `blocked_by` relationships, which are the authority, unioned with the issue body's `Blocked by` section, which is read strictly so that quoting an issue does not block on it. Chaining from a halt is bounded by a cascade brake — `AGENTIC_BLOCKED_CHAIN_LIMIT` runs ending `blocked` or `paused` since the last pipeline merge parks the queue instead of working through the backlog. The same module caps how many issues run at once — `AGENTIC_MAX_PARALLEL_RUNS`, default one — and above one starts an issue beside the live runs only when its `scope:*` labels clash with none of theirs; `scope:global` and `scope:pipeline` run alone. `ready` means the Definition of Ready (`agentic-issue-creation`), which includes `agent-task` and at least one `scope:*` label — `agentic-intake.yml` takes `ready` off an issue that lacks them and the assigner refuses it — and `done` means the Definition of Done (`agentic-autonomous-pipeline`). Scopes only make collisions rare. What makes parallel runs safe is the merge gate, `agentic-auto-merge.yml`, the one workflow that merges: a pull request merges only when CI is green on a head that already contains `main`'s tip, a green head that is behind has `main` merged into it and is tested again, and a conflict goes back to an agent. Details in `agentic-autonomous-pipeline`.
 
-A session started by the autonomous pipeline — a GitHub Actions run woken by the configured agent mention in a pipeline assignment comment — is not an ordinary session. Its first action is to run as the orchestrator: classify the task, then delegate every step to specialists. Never implement a pipeline-assigned task directly, and never explore the codebase before the task has been classified. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
+A session started by the autonomous pipeline — a GitHub Actions run woken by the configured agent mention in a pipeline assignment comment — is not an ordinary session. Its first action is to run as the orchestrator: classify the task, then do the work, delegating only the steps that need a separate context — blind test-writing, independent review, screenshot inspection. Never implement a pipeline-assigned task directly, and never explore the codebase before the task has been classified. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
 
-That mandate is for a pipeline-dispatched run specifically. Any session that touches a numbered issue — including one opened directly against it, with no `/agentic-run` in sight — still owns getting its branch, PR and labels right before ending, whether or not it ever enters the orchestrator: `agentic-autonomous-pipeline`'s before-ending checklist binds regardless of entry point, including a hard-won rule about how GitHub's own merge-time parser reads a PR body — load that skill before your last message whenever your work discusses an issue you are not closing.
+That mandate is for a pipeline-dispatched run specifically. Any session that touches a numbered issue — including one opened directly against it, with no `/agentic-run` in sight — still owns getting its branch, PR and labels right before ending, whether or not it ever enters the orchestrator: `agentic-autonomous-pipeline`'s before-ending checklist binds regardless of entry point, including a rule about how GitHub's own merge-time parser reads a PR body — load that skill before your last message whenever your work discusses an issue you are not closing.
 
 ## ▶ Capability Gate — CHECK BEFORE ANY ACTION
 
@@ -119,7 +120,7 @@ Sort a finding by **size** and by **whether it is in your way**. Those two quest
 
 **Filing never halts you.** It does not hold your PR, downgrade it to draft, or leave your own issue non-terminal. Fix what your change exposes; file the rest. If your tools block `gh`, hand the finding to whoever invoked you.
 
-**One issue per run.** The gate is a cap as well as a filter: a run files at most one issue for what it found, on top of whatever a bypass, a pause or a scope cut structurally requires — those carry a `TODO(#N)` or a named remainder, and dropping them leaves the codebase pointing at nothing. Everything else goes in the follow-up comment. A pipeline that files as fast as it merges spends its throughput on itself; the measured cost of doing so is in `agentic-pipeline-finalization`.
+**One issue per run.** The gate is a cap as well as a filter: a run files at most one issue for what it found, on top of whatever a bypass, a pause or a scope cut structurally requires — those carry a `TODO(#N)` or a named remainder, and dropping them leaves the codebase pointing at nothing. Everything else goes in the follow-up comment. A pipeline that files as fast as it merges spends its throughput on itself.
 
 **A convention a machine can check is never issue material.** A convention worth holding is worth a lint test under `tests/unit/lint/` — enforce it there rather than re-discovering it once per pull request. File cohesion (single responsibility) is deliberately not one of these: no lint test owns it, so it is ordinary Follow-up Gate material like the table above, per `dev-coding-conventions`. What earns an issue is a defect — `agentic-issue-creation` holds the boundary.
 
@@ -128,3 +129,5 @@ Sort a finding by **size** and by **whether it is in your way**. Those two quest
 ## Communication Style
 
 Carried by the `communication-style` instructions file (`.github/instructions/communication-style.instructions.md`), which applies to every session. It is stated there once rather than restated here, so the three runtimes cannot drift apart on it.
+
+History: docs/context-history/entry-points.md

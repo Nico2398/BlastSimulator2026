@@ -30,13 +30,13 @@ The open-pr step passes `--draft` to `gh pr create` when evaluation is `draft`.
 
 "Could not run" means **nothing will ever report on it** — not that this session did not run it. A channel CI owns is not a draft case; see below.
 
-**These never make a PR a draft:** iteration counts of any kind (visual loop rounds, implementer do-overs, review findings addressed, cherry-pick retries), a fix that reached beyond the issue's framing, or a requirement the run had to default. Churn measures how hard the problem was. The channels measure whether the answer is right — see `agentic-decision-autonomy`.
+**These never make a PR a draft:** iteration counts of any kind (visual loop rounds, implementation do-overs, review findings addressed, cherry-pick retries), a fix that reached beyond the issue's framing, or a requirement the run had to default. Churn measures how hard the problem was. The channels measure whether the answer is right — see `agentic-decision-autonomy`.
 
 ## READY TO MERGE
 
 The line goes into the body the PR is **created with** — the last line of the body file `gh pr create --body-file` takes at the open-pr step (`.github/PULL_REQUEST_TEMPLATE/pipeline.md` ends on it), written in the same command that opens the PR. It is never a later edit, and there is no step after open-pr that adds it. `READY TO MERGE` sits on its own line with nothing else on it. That line is the only thing that hands a PR to the merge gate: `agentic-auto-merge` reads it, releases any workflow run parked as `action_required` on the PR head, and merges the PR once every channel is green on a head that contains `main`'s tip — merging `main` into a green head that is behind, and handing a conflict back to an agent. The account that opened the PR is never consulted — see `agentic-autonomous-pipeline`.
 
-This is the **default**, skipped only in the three draft cases above. When skipping, post a comment naming the channel or blocker and the remedy — never a summary of how much work the run took:
+This is the **default**, skipped only in the four draft cases above. When skipping, post a comment naming the channel or blocker and the remedy — never a summary of how much work the run took:
 
 ```
 gh pr comment <pr-url> --body "READY TO MERGE skipped — <channel or blocker>: <what fails, what would unblock it>"
@@ -56,8 +56,6 @@ So a channel this session cannot run but CI does — interaction-mode `visual`/`
 
 The merge gate merges a green PR. **It does not wake for a red one**: `agentic-auto-merge.yml` declines to run when the CI run it reacts to concluded `failure`, because a failed run has nothing to merge. So a red CI on a marked PR is not reported to anyone by the event that produced it, and the watchdog passes the issue over precisely because a PR is linked to it.
 
-PR #581 is what that cost. Every channel its session ran was green, the body was marked, and two interaction-mode shards were red in CI. Nothing merged, nothing chained, and issue #552 held `in-progress` with every assignment behind it, until a human looked.
-
 Marking hands the PR to the merge machinery. It does not hand off the *verdict*: the run that opened the PR owns every channel it deferred, right up to the report. `agentic-pipeline-finalization`'s `[await-ci]` step is where that is paid — `npm run ci:await -- --pr <number>` listens to the workflow runs on the head until they finish, and a red one is work, not an ending. **Never end a run on a marked PR whose CI has not reported.**
 
 Two things this does not change:
@@ -67,7 +65,7 @@ Two things this does not change:
 
 If the session dies before the wait returns, `agentic-ci-failure.yml` posts the failure back to the agent on the same PR, bounded by `AGENTIC_CI_FIX_ATTEMPT_LIMIT`, and parks the PR as a draft with the issue `blocked` when the limit is spent. That net exists for a crashed session and a dropped webhook. It is not the plan.
 
-**There is no third state.** Every pipeline PR leaves the run either marked or `--draft` (a paused handover being one kind of draft). A non-draft PR carrying no marker is invisible to the entire loop: `agentic-auto-merge` skips it, `auto-assign-next` chains from a merge that never happens, and the watchdog skips any issue that has a linked PR — so the issue holds `in-progress` and every assignment behind it waits until a human notices. PRs #507 and #508 both ended exactly there, both promising the marker "will follow once those jobs report". Nothing comes back to add it; the only session that could have is over. `agentic-auto-merge` now fails its step on a non-draft `pipeline/feature-*` PR with no marker, so the state is loud instead of silent — but the run must not create it in the first place.
+**There is no third state.** Every pipeline PR leaves the run either marked or `--draft` (a paused handover being one kind of draft). A non-draft PR carrying no marker is invisible to the entire loop: `agentic-auto-merge` skips it, `auto-assign-next` chains from a merge that never happens, and the watchdog skips any issue that has a linked PR — so the issue holds `in-progress` and every assignment behind it waits until a human notices. A marker promised for later never arrives: nothing comes back to add it, and the only session that could have is over. `agentic-auto-merge` fails its step on a non-draft `pipeline/feature-*` PR with no marker, so the state is loud instead of silent — but the run must not create it in the first place.
 
 ## The paused handover PR
 
@@ -90,9 +88,9 @@ Everything else about it is an ordinary PR, and it never carries `[skip ci]`.
 
 The `Scenarios (interaction mode)` browser job — sharded via the repo variable `SCENARIO_INTERACTION_SHARDS` (a plain integer; a small `shard-config` job turns it into the `[1..N]` matrix array, since the workflow expression language has no range primitive) — and the `Production build` job run on every push and every pull request. Nothing decides whether a change "earns" them.
 
-Both run unconditionally because a browser regression is only found where the browser runs, and `main` has no required check: a job optional on pull requests first ran on a change at the merge commit, which is where `main` went red (ten pushes in sixty, Sep 2026). No diff is exempt — the browser path depends on timing, and a one-line `src/core/` threshold change broke three interaction scenarios (#1068). Sharded and cost-balanced, the job costs a few minutes wall clock and runs alongside the unit suite rather than after it; a red shard found on the branch is fixed by the session that caused it.
+Both run unconditionally because a browser regression is only found where the browser runs, and `main` has no required check: a job optional on pull requests first runs on a change at the merge commit. No diff is exempt — the browser path depends on timing, so a one-line `src/core/` threshold change can break interaction scenarios. A red shard found on the branch is fixed by the session that caused it.
 
-What stays true: without a GPU the terrain material costs ~6.4 s/frame (#475), so the suite is CI's and never a session's — the `visual` channel in a session runs the one named scenario that exercises the change, which is the working loop and the stronger evidence for that change. And a run-level `success` is still not proof the shards ran: `scripts/lib/required-jobs.ts` and `agentic-auto-merge` ask the run's own jobs, so a shard that somehow never ran (PR #615's shape) is a red verdict, not a green one.
+What stays true: without a GPU the interaction suite is CI's and never a session's — the `visual` channel in a session runs the one named scenario that exercises the change, which is the working loop and the stronger evidence for that change. And a run-level `success` is still not proof the shards ran: `scripts/lib/required-jobs.ts` and `agentic-auto-merge` ask the run's own jobs, so a shard that somehow never ran is a red verdict, not a green one.
 
 **When player-reachability is owed and no scenario drives the flow**, CI running every scenario reports nothing about it — the scenarios never reach the change. Say so in the PR body, naming the flow and what does cover it. A goal-reaching flow worth pinning earns a new `role: 'player'` step in `scripts/scenario-defs/`, which CI then runs in interaction mode on every later pull request; a control on an existing panel is covered by the `visual` channel.
 
@@ -104,4 +102,6 @@ Which machine runs a channel is never a reason to withhold the marker, and never
 
 Rules:
 - **NEVER** include `[skip ci]` in any commit message on `pipeline/feature-*` branches
-- The `verify-commit` auto-commit message must NOT contain `[skip ci]`
+- No commit the run makes — the lead's, or the RED commit `tdd red` writes — carries `[skip ci]`
+
+History: docs/context-history/agentic-pipeline-pr-management.md

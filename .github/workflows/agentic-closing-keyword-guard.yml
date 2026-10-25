@@ -8,7 +8,7 @@ name: "Pipeline: guard against accidental issue-closing keywords"
 # insufficient: each fix was written by an agent that had just read the rule
 # and still produced the trigger pattern. This is the mechanical guard —
 # see `.github/scripts/check-closing-keywords.cjs` and
-# `.claude/skills/agentic-autonomous-pipeline/references/keyword-closing-postmortem.md`.
+# `docs/context-history/agentic-autonomous-pipeline.md` (section "SKILL.md — Before ending").
 #
 # Scans the PR title, PR body, and every commit message in the PR's range —
 # this repo's squash-merge default concatenates constituent commit messages

@@ -49,9 +49,9 @@ The project takes one human input: a GitHub issue. Filing one starts nothing, an
 
 What may be assigned is decided in one place, `.github/scripts/assignability.cjs`, and every rule in it fails closed: an issue is skipped when it already has an open pull request, when a declared dependency is open, abandoned, or closed with its pull request still unmerged, and when a dependency cannot be read at all. One open pull request does not skip it: a draft labelled `paused` is a halted run's deliberate handover, and the next run is told to continue that branch rather than build its own. Dependencies come from GitHub's own `blocked_by` relationships, which are the authority, unioned with the issue body's `Blocked by` section, which is read strictly so that quoting an issue does not block on it. Chaining from a halt is bounded by a cascade brake — `AGENTIC_BLOCKED_CHAIN_LIMIT` runs ending `blocked` or `paused` since the last pipeline merge parks the queue instead of working through the backlog. The same module caps how many issues run at once — `AGENTIC_MAX_PARALLEL_RUNS`, default one — and above one starts an issue beside the live runs only when its `scope:*` labels clash with none of theirs; `scope:global` and `scope:pipeline` run alone. `ready` means the Definition of Ready (`agentic-issue-creation`), which includes `agent-task` and at least one `scope:*` label — `agentic-intake.yml` takes `ready` off an issue that lacks them and the assigner refuses it — and `done` means the Definition of Done (`agentic-autonomous-pipeline`). Scopes only make collisions rare. What makes parallel runs safe is the merge gate, `agentic-auto-merge.yml`, the one workflow that merges: a pull request merges only when CI is green on a head that already contains `main`'s tip, a green head that is behind has `main` merged into it and is tested again, and a conflict goes back to an agent. Details in `agentic-autonomous-pipeline`.
 
-A session started by the autonomous pipeline — a GitHub Actions run woken by the `@claude` mention in a pipeline assignment comment — is not an ordinary session. Its first action is to hand the task to the `orchestrator` agent, which classifies it and delegates every step to specialists. Never implement a pipeline-assigned task in the main session, and never explore the codebase before the orchestrator has classified it. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
+A session started by the autonomous pipeline — a GitHub Actions run woken by the `@claude` mention in a pipeline assignment comment — is not an ordinary session. Its first action is to hand the task to the `orchestrator` agent, which classifies it, does the work itself, and delegates only the steps that need a separate context — blind test-writing, independent review, screenshot inspection. Never implement a pipeline-assigned task in the main session, and never explore the codebase before the orchestrator has classified it. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
 
-That mandate is for a pipeline-dispatched run specifically. Any session that touches a numbered issue — including one opened directly against it, with no `/agentic-run` in sight — still owns getting its branch, PR and labels right before ending, whether or not it ever enters the orchestrator: `agentic-autonomous-pipeline`'s before-ending checklist binds regardless of entry point, including a hard-won rule about how GitHub's own merge-time parser reads a PR body — load that skill before your last message whenever your work discusses an issue you are not closing.
+That mandate is for a pipeline-dispatched run specifically. Any session that touches a numbered issue — including one opened directly against it, with no `/agentic-run` in sight — still owns getting its branch, PR and labels right before ending, whether or not it ever enters the orchestrator: `agentic-autonomous-pipeline`'s before-ending checklist binds regardless of entry point, including a rule about how GitHub's own merge-time parser reads a PR body — load that skill before your last message whenever your work discusses an issue you are not closing.
 
 ## ▶ Verification Gate — RUN BEFORE CLAIMING ANY WORK DONE
 
@@ -85,15 +85,9 @@ Four independent channels prove a change works. Each catches what the others mis
 
 ### ▶ There is no later turn
 
-**A backgrounded command whose result you plan to collect later is a lost run.** The Bash tool caps one foreground call at 600 000 ms, and three of the commands this project requires sit at or past that ceiling, or close enough that a foreground call without an explicit matching timeout gets silently backgrounded by this harness's own shorter default before it ever gets near the cap — `npm run test` is ~270 s on a 4-core sandbox and longer on a 2-core runner (it has grown as the suite has; do not re-classify it as "fits" from an old measurement), `npm run scenarios` is ~90 s in a sandbox since the #1080-era hotspot fixes and was ~9 m 20 s before them, `npm run ci:await` waits as long as CI takes. So they have to be detached. *How* you come back for the result is what decides whether the run survives.
+**A backgrounded command whose result you plan to collect later is a lost run.** The Bash tool caps one foreground call at 600 000 ms, and three of the commands this project requires sit at or past that ceiling, or close enough that a foreground call without an explicit matching timeout gets silently backgrounded by this harness's own shorter default before it ever gets near the cap — `npm run test` is ~270 s on a 4-core sandbox and longer on a 2-core runner (do not re-classify it as "fits" from an old measurement), `npm run scenarios` is ~90 s in a sandbox, `npm run ci:await` waits as long as CI takes. So they have to be detached. *How* you come back for the result is what decides whether the run survives.
 
-An unattended session — a GitHub Actions runner, Claude Code on the web — gets **one turn**. When that turn ends the process exits. A background-task notification is delivered on a later turn, and there is no later turn, so it is never delivered at all. Everything not yet pushed dies with the VM. This is the same rule that already governs delegation (`require-foreground-agents.mjs`, issues #404 and #406), arriving through the shell instead of through a sub-agent. It cost three runs in four days:
-
-| PR | How the turn ended | Cost |
-|----|--------------------|------|
-| #604 | "Scenario verification is running in the background — pausing here until it reports back." | 3 h 11 m and $30.55 of finished TDD work, discarded. Its retry repeated it in 2 m 51 s. |
-| #594 | "Waiting for the background vitest run — will be notified automatically." | Both attempts, same sentence. |
-| #603 | Never ended the turn — hand-rolled `timeout 280 bash -c 'until ! ps -p <pid>…'` 40+ times instead. | The whole 360-minute job budget spent polling, then the job timeout, with no budget left to retry. |
+An unattended session — a GitHub Actions runner, Claude Code on the web — gets **one turn**. When that turn ends the process exits. A background-task notification is delivered on a later turn, and there is no later turn, so it is never delivered at all. Everything not yet pushed dies with the VM. This is the same rule that governs delegation (`require-foreground-agents.mjs`), arriving through the shell instead of through a sub-agent. Never end a turn on a backgrounded command, and never hand-roll a polling loop around one in its place.
 
 **The rule.** Run it in the foreground when it fits — pass an explicit `timeout` up to 600000. When it does not fit, use the one wrapper that can be waited on inside this turn:
 
@@ -106,9 +100,9 @@ npm run long -- wait scenarios      # blocks one bounded slice
 
 `wait` exits `75` while the command is still going. **That is not a failure and not a verdict** — call `wait` again, in this same turn, as many times as it takes, until it prints `FINISHED` and the command's own exit code. Then act on that code.
 
-Two hooks enforce this, because prose did not hold: `require-foreground-bash.mjs` refuses a `run_in_background` Bash call or raw `nohup`/`setsid`/`disown`/trailing-`&` detach, and `require-settled-turn.mjs` refuses to let a turn (or a sub-agent's turn) end while a `npm run long` handle is unfinished. A human at an interactive CLI, where a later turn genuinely exists, can set `AGENTIC_ALLOW_BACKGROUND_BASH=1`; no pipeline workflow sets it.
+Two hooks enforce this: `require-foreground-bash.mjs` refuses a `run_in_background` Bash call or raw `nohup`/`setsid`/`disown`/trailing-`&` detach, and `require-settled-turn.mjs` refuses to let a turn (or a sub-agent's turn) end while a `npm run long` handle is unfinished. A human at an interactive CLI, where a later turn genuinely exists, can set `AGENTIC_ALLOW_BACKGROUND_BASH=1`; no pipeline workflow sets it.
 
-**Slow is not stuck.** Without a GPU a browser-driven run costs minutes per scenario beat (#475) — long enough that a session watching one concludes it hung, kills it, and reports a stall that never happened. Wait for the run's own terminal line, in this turn, through `npm run long -- wait`, never by ending the turn on it. `dev-finishing-work` holds the cost breakdown, the rules for a run in flight, and which channels CI owns.
+**Slow is not stuck.** Without a GPU a browser-driven run costs minutes per scenario beat — long enough that a session watching one concludes it hung, kills it, and reports a stall that never happened. Wait for the run's own terminal line, in this turn, through `npm run long -- wait`, never by ending the turn on it. `dev-finishing-work` holds the cost breakdown, the rules for a run in flight, and which channels CI owns.
 
 ## ▶ Capability Gate
 
@@ -132,7 +126,7 @@ Sort a finding by **size** and by **whether it is in your way**. Those two quest
 
 **Filing never halts you.** It does not hold your PR, downgrade it to draft, or leave your own issue non-terminal. Fix what your change exposes; file the rest. If your tools block `gh`, hand the finding to whoever invoked you.
 
-**One issue per run.** The gate is a cap as well as a filter: a run files at most one issue for what it found, on top of whatever a bypass, a pause or a scope cut structurally requires — those carry a `TODO(#N)` or a named remainder, and dropping them leaves the codebase pointing at nothing. Everything else goes in the follow-up comment. A pipeline that files as fast as it merges spends its throughput on itself; the measured cost of doing so is in `agentic-pipeline-finalization`.
+**One issue per run.** The gate is a cap as well as a filter: a run files at most one issue for what it found, on top of whatever a bypass, a pause or a scope cut structurally requires — those carry a `TODO(#N)` or a named remainder, and dropping them leaves the codebase pointing at nothing. Everything else goes in the follow-up comment. A pipeline that files as fast as it merges spends its throughput on itself.
 
 **A convention a machine can check is never issue material.** A convention worth holding is worth a lint test under `tests/unit/lint/` — enforce it there rather than re-discovering it once per pull request. File cohesion (single responsibility) is deliberately not one of these: no lint test owns it, so it is ordinary Follow-up Gate material like the table above, per `dev-coding-conventions`. What earns an issue is a defect — `agentic-issue-creation` holds the boundary.
 
@@ -142,6 +136,7 @@ Sort a finding by **size** and by **whether it is in your way**. Those two quest
 
 ```bash
 npm run verify:env      # which verification channels are live
+npm run pipeline -- verify  # only the channels this branch's diff owes; cached per tree, one line per channel
 npm run validate        # TypeScript → coverage (thresholds) → full suite → build
 npm run test            # Vitest unit + integration
 npm run scenarios       # all scenarios, command mode, no browser
@@ -155,3 +150,5 @@ npm run check:dead-code # files and exports nothing imports
 ```
 
 Full command reference: `dev-testing-strategy` and `dev-visual-testing` skills.
+
+History: docs/context-history/entry-points.md

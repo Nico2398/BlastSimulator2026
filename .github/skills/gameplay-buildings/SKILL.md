@@ -44,7 +44,7 @@ Research task shape:
 - **Conditions** (prerequisites already met — e.g. a specific other building already at a given tier, or another research already completed) — every task beyond the first upgrade has these too.
 - **Exception — first upgrade (tier 1 → tier 2) of any building type:** cost only, no duration, no conditions.
 
-**Research Center speed and slots (#1936).** The tier of the best operating Research Center (no stacking across centers; `getResearchCenterProfile`) sets how fast and how many tasks run:
+**Research Center speed and slots.** The tier of the best operating Research Center (no stacking across centers; `getResearchCenterProfile`) sets how fast and how many tasks run:
 
 | Tier | Speed (ticks per tick) | Parallel slots |
 |------|------------------------|----------------|
@@ -52,24 +52,24 @@ Research task shape:
 | 2 | 1.5 | 2 |
 | 3 | 2 | 3 |
 
-(`RESEARCH_CENTER_SPEED_BY_TIER`, `RESEARCH_CENTER_SLOTS_BY_TIER`, `balance.ts`.) The first `slots` queued tasks (`getActiveResearchTasks`) each lose `speed` from `ticksRemaining` per tick; every task reaching 0 completes the same tick. `ticksRemaining` can be fractional, so every display shows `Math.ceil` of it. Cancel (no centre left, head task refunded) and the closed-centre pause (no progress) are unchanged.
+(`RESEARCH_CENTER_SPEED_BY_TIER`, `RESEARCH_CENTER_SLOTS_BY_TIER`, `balance.ts`.) The first `slots` queued tasks (`getActiveResearchTasks`) each lose `speed` from `ticksRemaining` per tick; every task reaching 0 completes the same tick. `ticksRemaining` can be fractional, so every display shows `Math.ceil` of it. Cancel (no centre left, head task refunded) and the closed-centre pause (no progress) also apply.
 
 `tickResearch` emits `research:completed` (tier unlocked) and `research:cancelled` (with refund); `wireResearchNotifications` raises the toasts. The Build Menu catalog row's research button shows cost and duration (`ui.build.queue_research_cost`); once queued it is replaced by live progress (`getResearchProgress`, `.bs-build-research-progress`). A placed building's research progress and Research action live in the inspector.
 
 Higher tiers: larger capacity, better performance, larger physical footprint.
-Upgrading: in place, see below (#1875). Costs the next tier's construction cost minus half the current tier's (#1905).
-`build destroy <id>` is a queued order, not instant: cost is charged at order time (full refund on cancel), a Building Destroyer with a licensed driver carries the demolition out (`gameplay-vehicle-fleet`; it ranks in the same tier as `charge_hole`, so it starts within a bounded wait even when every driver is hauling debris, #1840), and the building stays standing and operating until it finishes. A second order on a building already being demolished is refused. `maxBuildingTier` in serialized state is the highest standing tier (0 when none).
+Upgrading: in place, see below. Costs the next tier's construction cost minus half the current tier's.
+`build destroy <id>` is a queued order, not instant: cost is charged at order time (full refund on cancel), a Building Destroyer with a licensed driver carries the demolition out (`gameplay-vehicle-fleet`; it ranks in the same tier as `charge_hole`, so it starts within a bounded wait even when every driver is hauling debris), and the building stays standing and operating until it finishes. A second order on a building already being demolished is refused. `maxBuildingTier` in serialized state is the highest standing tier (0 when none).
 
-**Upgrade is in place (#1875).** `build upgrade <id>` needs what placing a new building of that tier needs: the tier's research, the money, room for the bigger footprint (`checkFootprintPlacement` over every occupant but the building itself, refusals name the blocker, #1830, #1008) and a free worker. No Building Destroyer, no demolition. Price = the next tier's `constructionCost` minus `BUILDING_UPGRADE_CREDIT_SHARE` (0.5, `balance.ts`) of the current tier's, rounded like `getMoveCost` (`getUpgradeCost(type, nextTier)`; a target tier <= 1 costs the full price). Freight warehouse T1->T2 28500, T2->T3 54000; living quarters 20000 / 37500; management office T1->T2 16000. T2->T3 applies the same rule one tier up. Charged at order time as `Upgrade <type> #id to T<n>`; the charge, `PlannedBuilding.cost` and the `place_building` payload cost are all this price, so a cancel or failure refunds exactly what was charged. New-build, Move and Demolish prices are unchanged. The order reserves a `PlannedBuilding` with `upgrade: true` under the SAME building id (footprint blocked from order time) and queues a `place_building` action; on completion `completeUpgrade` raises the standing building's tier, so id, stock, residents and assignments carry over. `isUpgradeOrdered` refuses a second upgrade, a Move and a Demolish while one is pending (`inspector.reason.upgrade_ordered`). Decisions: the building keeps standing and operating during the works (reverse: treat `upgrading` as non-operating in `computeBuildingStatus` / `syncBuildingServiceFlags`; status `upgrading`, "Upgrading to tier N · X%", shown as a badge on its placed Build-menu row, not as a separate site row); price is the next tier's construction cost minus half the current tier's (reverse: set `BUILDING_UPGRADE_CREDIT_SHARE` to 0 for the full next-tier price); hp is refilled to the new tier's max on completion (reverse: `completeUpgrade` in `BuildingUpgrade.ts`); a building gone or a footprint that no longer fits at completion refunds the order; saves from before this flow have their pending upgrade demolitions and orphaned rebuild sites cancelled and refunded in full on load (`cancelLegacyUpgradeOrders`).
-Demolish is confirmed (#1399) from the inspector via `ConfirmModal`: it names the building, the cost, that nothing is refunded and it cannot be undone, plus the kg of stored explosives lost when any.
+**Upgrade is in place.** `build upgrade <id>` needs what placing a new building of that tier needs: the tier's research, the money, room for the bigger footprint (`checkFootprintPlacement` over every occupant but the building itself, refusals name the blocker) and a free worker. No Building Destroyer, no demolition. Price = the next tier's `constructionCost` minus `BUILDING_UPGRADE_CREDIT_SHARE` (0.5, `balance.ts`) of the current tier's, rounded like `getMoveCost` (`getUpgradeCost(type, nextTier)`; a target tier <= 1 costs the full price). Freight warehouse T1->T2 28500, T2->T3 54000; living quarters 20000 / 37500; management office T1->T2 16000. T2->T3 applies the same rule one tier up. Charged at order time as `Upgrade <type> #id to T<n>`; the charge, `PlannedBuilding.cost` and the `place_building` payload cost are all this price, so a cancel or failure refunds exactly what was charged. New-build, Move and Demolish keep their own prices. The order reserves a `PlannedBuilding` with `upgrade: true` under the SAME building id (footprint blocked from order time) and queues a `place_building` action; on completion `completeUpgrade` raises the standing building's tier, so id, stock, residents and assignments carry over. `isUpgradeOrdered` refuses a second upgrade, a Move and a Demolish while one is pending (`inspector.reason.upgrade_ordered`). The building keeps standing and operating during the works (status `upgrading`, "Upgrading to tier N · X%", shown as a badge on its placed Build-menu row, not as a separate site row; operating state from `computeBuildingStatus` / `syncBuildingServiceFlags`); hp is refilled to the new tier's max on completion (`completeUpgrade` in `BuildingUpgrade.ts`); a building gone or a footprint that no longer fits at completion refunds the order; a save holding pending upgrade demolitions or orphaned rebuild sites of the legacy demolish-and-rebuild upgrade has them cancelled and refunded in full on load (`cancelLegacyUpgradeOrders`).
+Demolish is confirmed from the inspector via `ConfirmModal`: it names the building, the cost, that nothing is refunded and it cannot be undone, plus the kg of stored explosives lost when any.
 
-Build menu rows carry no action buttons (#1768); Move, Upgrade, Research and Demolish are inspector actions. Build menu rows (placed buildings and `.bs-build-site-row` construction sites) are selectable (#1759): a click routes through the shared selection path (`selectionRoute.ts`), and `UIManager.setListSelection` feeds `BuildMenu.setSelectedEntity` to highlight the row of the scene selection. Construction progress renders through `fractionOf` (`core/math/Fraction.ts`).
+Build menu rows carry no action buttons; Move, Upgrade, Research and Demolish are inspector actions. Build menu rows (placed buildings and `.bs-build-site-row` construction sites) are selectable: a click routes through the shared selection path (`selectionRoute.ts`), and `UIManager.setListSelection` feeds `BuildMenu.setSelectedEntity` to highlight the row of the scene selection. Construction progress renders through `fractionOf` (`core/math/Fraction.ts`).
 
 ## Training Buildings
 
 | Building | Skill Granted |
 |----------|--------------|
-| Driving Center | Vehicle licence — truck, excavator, drill rig, rock fragmenter; also the `repair` skill (vehicle repair, #1393). Roles arrive holding their own; the rock fragmenter licence is only earned here |
+| Driving Center | Vehicle licence — truck, excavator, drill rig, rock fragmenter; also the `repair` skill (vehicle repair). Roles arrive holding their own; the rock fragmenter licence is only earned here |
 | Blasting Academy | Explosives charging and blast sequencing |
 | Management Office | HR and commercial operations |
 | Geology Lab | Survey techniques and rock analysis |
@@ -94,7 +94,7 @@ building-specific:
   minimap, cannot be picked, and is still listed in the Crew panel.
 
 Occupants are stored on the building instance (`Building.occupantIds`) and saved with it; a save
-from before they existed loads with every building empty.
+without them loads with every building empty.
 
 ## Living Quarters Well-Being Effects
 
@@ -106,25 +106,25 @@ from before they existed loads with every building empty.
 
 Overcapacity (more employees than beds) → well-being penalty for all residents.
 
-Well-being score (#1692): the tier's `wellBeing` effect (+2 / +4 / +6) is a per-tick gain damped as the score nears 100, so a higher tier settles at a higher equilibrium and no tier pins it at the cap. Beds come from `getBedCapacity` (sum of capacity over operating Living Quarters); a crew beyond the beds adds a crowding drag proportional to the unhoused share, on top of the productivity penalty. Overwork and accidents drag it too; see `gameplay-employee-needs`.
-Inspector occupants (#1760): a Living Quarters shows beds used/total, resident rows (name link, rest time left), the site-wide housing multiplier and an overcapacity warning when the crew outnumbers the beds.
+Well-being score: the tier's `wellBeing` effect (+2 / +4 / +6) is a per-tick gain damped as the score nears 100, so a higher tier settles at a higher equilibrium and no tier pins it at the cap. Beds come from `getBedCapacity` (sum of capacity over operating Living Quarters); a crew beyond the beds adds a crowding drag proportional to the unhoused share, on top of the productivity penalty. Overwork and accidents drag it too; see `gameplay-employee-needs`.
+Inspector occupants: a Living Quarters shows beds used/total, resident rows (name link, rest time left), the site-wide housing multiplier and an overcapacity warning when the crew outnumbers the beds.
 Inspector schools: the four training buildings show seats used/total, trainee rows (skill, level, time left), who is walking in, and the courses taught at the tier; a course whose skill a higher-tier school on site offers instead (`availableTrainingOffers`) is marked superseded.
 Inspector Research Center: one live row per active task (`research-running0..N-1`: target tier name, percent, ticks left rounded up), pending tasks with their cost (`research-pending{i}`), a speed/slots line (`inspector.research_speed`), "paused" while the centre is closed, and an idle line when the queue is empty. Console `research status` prints the same speed/slots header and per-task lines.
 
 ## Warehouses
 
 **Explosive Warehouse:**
-- Optional risk/reward store (#1678). `buy explosive:<id> kg:<n>` puts explosive into stock at the **bulk price** (catalog `costPerKg` x `EXPLOSIVE_BULK_PRICE_FACTOR` 0.7 x the live `explosive_price` event factor); `buyExplosiveStock` in `ExplosiveStock.ts`.
+- Optional risk/reward store. `buy explosive:<id> kg:<n>` puts explosive into stock at the **bulk price** (catalog `costPerKg` x `EXPLOSIVE_BULK_PRICE_FACTOR` 0.7 x the live `explosive_price` event factor); `buyExplosiveStock` in `ExplosiveStock.ts`.
 - Stock is per explosive id (`Building.storedExplosives`, kg). Capacity (500 / 1,500 / 4,000 kg by tier) is shared across types and summed over operating warehouses; stores fill in placement order. Saves without the field load as empty.
-- Charge orders draw matching stock first, the remainder is paid in cash at the list price; stock is reserved at order time. No warehouse (or no matching stock) = today's flow and price, unchanged.
-- Delivery wait (#1895): the stock-covered part of a charge order loads at once; the cash-bought part arrives `EXPLOSIVE_DELIVERY_TICKS` (400, flat per order) after ordering and the hole cannot be charged before (`deliveryArrivalTick` on the `charge_hole` payload; `isHoleOrderClaimable`; blocked reason `explosives_in_transit`). This is the warehouse's payback: ~400 ticks saved per stocked pattern at ~1 pattern per 500 ticks. No wait without cash purchase; a cancel refunds as before.
+- Charge orders draw matching stock first, the remainder is paid in cash at the list price; stock is reserved at order time. No warehouse (or no matching stock) = the whole order is bought in cash at the list price.
+- Delivery wait: the stock-covered part of a charge order loads at once; the cash-bought part arrives `EXPLOSIVE_DELIVERY_TICKS` (400, flat per order) after ordering and the hole cannot be charged before (`deliveryArrivalTick` on the `charge_hole` payload; `isHoleOrderClaimable`; blocked reason `explosives_in_transit`). No wait without cash purchase; a cancel refunds as below.
 - Cancelling a charge order refunds in the currency paid: stock goes back to the warehouses; kg that no longer fit are refunded as cash at the bulk price (booked as a `refund`).
-- UI (#1685): the Blast Workshop Charge step lists each offered explosive's stock (`[data-stock]`), buys into stock in `STOCK_BUY_STEP_KG` (50 kg) steps (`[data-action="stock-buy"]`, disabled with a visible reason from the pure `buyStockBlockReason`), and shows how much of the current pattern is paid from stock (`[data-info="paid-from"]`). A selected Explosive Warehouse shows its stock and free kg in the inspector (`[data-info="warehouse-stock"]`).
-- Inspector contents (#1757, `storageContent.ts`): a Contents section for every storage building. Explosive Warehouse: a row per explosive held, used/capacity gauge, and the secondary-blast detonation radius while stocked (replaced by "stock unavailable" while closed). Freight Warehouse: gauge, free and in-transit-reserved kg, per-ore rows and a barren row from `warehouseStockByOre` (`FreightWarehouses.ts`, one pass over the stored fragments; `loseOrphanedStock` reuses it). Spoil Heap: spoil kg, used/capacity gauge and free kg. Rows of 0.5 kg or less are hidden.
-- Previews are net of stock at list price (`stockAwareChargesCost`): Charge All label, footer and Preflight cost read the cash part of the recorded orders (`recordedChargesCost`, from each charge's `fromStockKg`, absent = 0 in old saves). The blast report's `spent` is cash only; `spentFromStock` is the list value of the stock-supplied kg.
+- UI: the Blast Workshop Charge step lists each offered explosive's stock (`[data-stock]`), buys into stock in `STOCK_BUY_STEP_KG` (50 kg) steps (`[data-action="stock-buy"]`, disabled with a visible reason from the pure `buyStockBlockReason`), and shows how much of the current pattern is paid from stock (`[data-info="paid-from"]`). A selected Explosive Warehouse shows its stock and free kg in the inspector (`[data-info="warehouse-stock"]`).
+- Inspector contents (`storageContent.ts`): a Contents section for every storage building. Explosive Warehouse: a row per explosive held, used/capacity gauge, and the secondary-blast detonation radius while stocked (replaced by "stock unavailable" while closed). Freight Warehouse: gauge, free and in-transit-reserved kg, per-ore rows and a barren row from `warehouseStockByOre` (`FreightWarehouses.ts`, one pass over the stored fragments; `loseOrphanedStock` reuses it). Spoil Heap: spoil kg, used/capacity gauge and free kg. Rows of 0.5 kg or less are hidden.
+- Previews are net of stock at list price (`stockAwareChargesCost`): Charge All label, footer and Preflight cost read the cash part of the recorded orders (`recordedChargesCost`, from each charge's `fromStockKg`, absent = 0 in saves without it). The blast report's `spent` is cash only; `spentFromStock` is the list value of the stock-supplied kg.
 - Capacity scales with tier; an order for more kg than free space is refused entirely (whole-kg purchases only).
 - `plannedChargesCost` and UI cost previews stay at list price.
-- Decisions (#1678): bulk factor 0.7 applies together with the event price factor; a purchase over free capacity is refused whole, never partly filled; stock is reserved (consumed) at order time, not at loading; unrestockable kg on cancel are refunded as cash at the bulk price.
+- Bulk factor 0.7 applies together with the event price factor; a purchase over free capacity is refused whole, never partly filled; stock is reserved (consumed) at order time, not at loading; unrestockable kg on cancel are refunded as cash at the bulk price.
 - If destroyed by blast projection while containing explosives → **secondary blast event**
 
 **Freight Warehouse:**
@@ -132,7 +132,7 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
 - Primary income source via ore sale contracts
 - Capacity scales with tier; farther from pit = longer haulage trips = lower throughput
 - Capacity per tier: 25,000 / 72,000 / 200,000 kg, from `FREIGHT_WAREHOUSE_CAPACITY_KG` (`balance.ts`): tier 2 holds a typical good Dusty Hollow blast (~57,000-66,000 kg ore) with margin.
-- **Per-warehouse inventory** (#1372): every stored fragment carries the `warehouseId` it sits in
+- **Per-warehouse inventory**: every stored fragment carries the `warehouseId` it sits in
   (reserved while `in_transit`, null on the ground); each warehouse's stock and free room are derived
   from fragments (`FreightWarehouses.ts`). A hauler loads only when some warehouse has room for the
   fragment and unloads at the **nearest warehouse with room** (tie: lowest id; re-picked on arrival if
@@ -154,18 +154,15 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
 3. **Protected voxels:** voxels beneath building cannot be drilled or blasted (blocked with error)
 4. **Blast destruction:** if blast reaches voxels beneath building → building destroyed instantly (pre-flight warning reach is charge-derived: `gameplay-blast-system` "Pre-Flight building reach")
 5. **No overlap:** buildings cannot overlap each other
-5b. **Reserved terrain** (#1390): a footprint may not cover a built or planned ramp corridor, nor an ordered or drilled hole (`terrainReservations`, `PlacementReservations.ts`); order, move and upgrade are refused with a localized reason. Edge-adjacent is allowed.
-5c. **Cutoff warning** (#1391): a placement, move or upgrade that would strand ground from the crew warns, never refuses. `computePlacementCutoff` (`PlacementCutoff.ts`) floods from the crew (alive employees) before and after the footprint blocks (a move or upgrade also frees its old footprint), and counts cells reachable now but not after, excluding the footprint itself. Fewer than `PLACEMENT_CUTOFF_MIN_CELLS` cut cells, or no crew, means no warning. Reported: distinct `benchLevel`s cut, drill holes (drilled and planned), queued orders. `BuildMenu` shows the line and a "Place anyway?" confirm modal (`placementCutoffConfirm.ts`); confirming places. Console commands skip the check. The verdict is memoized per footprint and nav revision.
-6. **Ramps are not buildings** (#1298): a ramp is a dug terrain feature (`state.builtRamps`, see `gameplay-navmesh`), never in `state.buildings`. It takes the selection plumbing only (click picks it, corridor highlighted, inspector) and offers a widen action — no demolish, no tier upgrade, no move, no occupants.
+5b. **Reserved terrain**: a footprint may not cover a built or planned ramp corridor, nor an ordered or drilled hole (`terrainReservations`, `PlacementReservations.ts`); order, move and upgrade are refused with a localized reason. Edge-adjacent is allowed.
+5c. **Cutoff warning**: a placement, move or upgrade that would strand ground from the crew warns, never refuses. `computePlacementCutoff` (`PlacementCutoff.ts`) floods from the crew (alive employees) before and after the footprint blocks (a move or upgrade also frees its old footprint), and counts cells reachable now but not after, excluding the footprint itself. Fewer than `PLACEMENT_CUTOFF_MIN_CELLS` cut cells, or no crew, means no warning. Reported: distinct `benchLevel`s cut, drill holes (drilled and planned), queued orders. `BuildMenu` shows the line and a "Place anyway?" confirm modal (`placementCutoffConfirm.ts`); confirming places. Console commands skip the check. The verdict is memoized per footprint and nav revision.
+6. **Ramps are not buildings**: a ramp is a dug terrain feature (`state.builtRamps`, see `gameplay-navmesh`), never in `state.buildings`. It takes the selection plumbing only (click picks it, corridor highlighted, inspector) and offers a widen action — no demolish, no tier upgrade, no move, no occupants.
 
-**Spoil Heap (#1530):**
+**Spoil Heap:**
 - Cost $2000 (`constructionCost`), demolish $500, 2x2, no upkeep, finite capacity
-  `SPOIL_HEAP_CAPACITY_KG` = 50,000 kg (#1892; `spoilHeapSites` report the room left, `capacity - storedSpoilKg`,
+  `SPOIL_HEAP_CAPACITY_KG` = 50,000 kg (`spoilHeapSites` report the room left, `capacity - storedSpoilKg`,
   and in-transit reservations count against it like a warehouse's). Barren rock never uses freight storage.
-  Probe (desert_badlands seed 42, sandbox full kit, 3x3 krackle shot at 36,30, ramp, crews as played): the
-  heap held 3.7 t at +500 ticks after the blast, 24 t at +750 and was full at ~+1,230 (tick ~1,500 of the
-  opening); the issue's own measurement (54 t at t3,068) puts it near t3,000, so 50 t sits at the fast end of the
-  2,000-3,000 tick target and is the one lever (`SPOIL_HEAP_CAPACITY_KG`) to retune.
+  Target: one heap fills 2,000-3,000 ticks into the opening; `SPOIL_HEAP_CAPACITY_KG` is the one lever to retune.
 - **Barren** = a fragment whose summed ore density is at most `SPOIL_BARREN_ORE_FRACTION_THRESHOLD`
   (`isBarrenFragment`, `SpoilHeaps.ts`; an empty density map is barren). Barren fragments haul to the
   nearest heap (`pickSpoilHeap`: squared distance, tie lowest id), ore fragments to warehouses. On
@@ -178,8 +175,8 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
   `storage_full`. With heaps placed but none having room for the fragment they are blocked as
   `spoil_heap_full` ("build another heap or take a rubble contract"); the rock stays in the pit.
   `releaseBarrenStoredFragments` moves a stored barren fragment to a heap only when one has room for all of it;
-  otherwise it stays stored. Barren overflow (#2018, `barrenOverflowKg`) means no single heap has room for the smallest stored barren fragment (heaps fill in whole fragments, so residual room does not hide it) and barren is at least `BARREN_OVERFLOW_STORED_SHARE` of storage. A rubble contract (or `drawSpoilKg`) frees room and hauls resume. Rubble-disposal contracts take barren rock only: heap stock first, then barren stored fragments; ore-bearing stock is never consumed (#1871).
-- **Starting heap (#1574):** Dusty Hollow (`DUSTY_HOLLOW_STARTING_SITE`) and the tutorial
+  otherwise it stays stored. Barren overflow (`barrenOverflowKg`) means no single heap has room for the smallest stored barren fragment (heaps fill in whole fragments, so residual room does not hide it) and barren is at least `BARREN_OVERFLOW_STORED_SHARE` of storage. A rubble contract (or `drawSpoilKg`) frees room and hauls resume. Rubble-disposal contracts take barren rock only: heap stock first, then barren stored fragments; ore-bearing stock is never consumed.
+- **Starting heap:** Dusty Hollow (`DUSTY_HOLLOW_STARTING_SITE`) and the tutorial
   (`TUTORIAL_STARTING_SITE`) open with one free, active heap placed at tick 0, so the first blast's
   barren rock has a dump and no "place a spoil heap" notice appears. Later levels still build their own.
 - **Crewless** (`isCrewlessBuilding`): `build spoil_heap at:x,z` and the Build menu validate funds and
@@ -187,15 +184,15 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
   `place_building` action, works with an empty roster.
 - **Single tier** (`isSingleTierType`): tiers 2/3 alias tier 1; no upgrade or research UI and
   `build upgrade` is refused. The Build menu shows no capacity line.
-- **Leftover rock (#1690):** once an ore sale leaves a stored fragment barren, it leaves the warehouse
+- **Leftover rock:** once an ore sale leaves a stored fragment barren, it leaves the warehouse
   at once (`releaseBarrenStoredFragments`, `Logistics.ts`): removed from `fragments`, debited from
   `storedMassKg` and any residual `collectedOre`, credited to the first heap (`creditFirstSpoilHeap`).
   Rubble contracts still pay for it via the heap. With no heap it stays stored until a heap exists;
   the release also runs at the start of every ore sale and when a save loads.
 - Destroying a heap loses its spoil silently. A save with no `storedSpoilKg` reads as 0. No Blender
-  model yet: renders as a stand-in box (#1572).
+  model: renders as a stand-in box.
 
-## Vanity Projects (#1947)
+## Vanity Projects
 
 Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJECTS`; constants `VANITY_*` in `balance.ts`). Placed instantly like the spoil heap, charged on order. Effects are one-off deltas applied at completion by `applyVanityCompletion` (`VanityEffects.ts`), never per tick.
 
@@ -210,13 +207,13 @@ Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJE
 - **Board confidence** applies only where a board exists (`addBoardConfidence`, clamped 0..100).
 - **No refund**: demolish cost 0, nothing returned; the confirm modal says "Sunk cost, like the CEO's judgement."
 - **Build menu**: separate "Vanity" section after the regular rows (`data-build-section="vanity"`), present in the DOM only while a board is attached (label, container and rows absent otherwise; re-evaluated on every update).
-- **Rendering**: one Blender model each (`building_<type>_t1`, `buildings_vanity.py`, #1948); the gold tower is the tallest building model.
+- **Rendering**: one Blender model each (`building_<type>_t1`, `buildings_vanity.py`); the gold tower is the tallest building model.
 - **Console**: `sandbox start grade:N` starts a progression sandbox at grade N.
-- **Decisions**: a "touch" means sharing an edge (diagonal-only or a one-cell gap does not count); neighbour relations are the `nuisance` score (high = good), so -N lowers it.
+- **Definitions**: a "touch" means sharing an edge (diagonal-only or a one-cell gap does not count); neighbour relations are the `nuisance` score (high = good), so -N lowers it.
 
 ## Destruction Effects
 
-- Building destroyed by a blast → removed from grid immediately; a player demolition is removed when its Building Destroyer finishes (#1392)
+- Building destroyed by a blast → removed from grid immediately; a player demolition is removed when its Building Destroyer finishes
 - Employees inside → put out on its ring (any removal: destruction or demolition;
   an in-place upgrade removes nobody); a projection that destroys it injures them first
 - Stored contents lost. A Freight Warehouse's stock is lost with it (`loseOrphanedStock`): other
@@ -231,15 +228,14 @@ Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJE
     of the radius die (lawsuit pending, death count up); those further in are injured. Dead or already
     injured employees are skipped; occupants of a destroyed building or vehicle are injured.
   - Chain: another stocked warehouse destroyed by a detonation detonates once in turn (visited set).
-  - **Crater (#1896):** the detonation also breaks the ground where the warehouse stood, through the blast pipeline
+  - **Crater:** the detonation also breaks the ground where the warehouse stood, through the blast pipeline
     (`secondaryCraterPlan` -> `executeBlastSteps`, fired by `carveSecondaryCraters`): one hole at the floored footprint centre,
     `SECONDARY_BLAST_CRATER_HOLE_DEPTH_M` deep, charged with the whole stock (kg summed over all explosives, type = the one with
     most stored kg), no stemming. Its rock becomes hauling fragments; buildings and crew on cleared ground are destroyed as in
     the main blast; stocked warehouses it destroys chain, bounded by `SECONDARY_BLAST_CRATER_MAX_PASSES`.
-    Decisions: blast pipeline over a plain carve (fragments to haul, nav/render follow `terrain:updated` for free; reverse: a
-    direct voxel carve in `carveSecondaryCraters`); hole depth 3 m (`SECONDARY_BLAST_CRATER_HOLE_DEPTH_M`); heaviest explosive
-    sets the type (reverse: `secondaryCraterPlan`); crater fragments do not feed projection damage (the radius model already
-    covers it).
+    The crater goes through the blast pipeline, not a plain carve, so it leaves fragments to haul and nav/render follow
+    `terrain:updated`; hole depth 3 m (`SECONDARY_BLAST_CRATER_HOLE_DEPTH_M`); heaviest explosive sets the type
+    (`secondaryCraterPlan`); crater fragments do not feed projection damage (the radius model already covers it).
   - The blast report lists each detonation; the `blast` output carries one line per detonation.
   - **Demolition does not detonate**: `build destroy` of a stocked warehouse only reports the lost kg.
 - Well-being, Safety, Ecology score penalties applied
@@ -257,7 +253,7 @@ Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJE
 | Research Center | Unlocks building tiers | Occupied during each research task |
 | Training Buildings | Grants skill qualifications | Prevents unqualified-task errors |
 
-Safety score settles at a target set by buildings' `scoreEffects.safety` (Management Office raises, Explosive Warehouse lowers); see Scores in `gameplay-game-design` (#1977).
+Safety score settles at a target set by buildings' `scoreEffects.safety` (Management Office raises, Explosive Warehouse lowers); see Scores in `gameplay-game-design`.
 
 ## Types
 
@@ -268,4 +264,6 @@ Meanings the code does not state: `capacity` is role-specific (beds for Living Q
 
 Build catalog rows show a one-line purpose plus operating cost in $/h and a tooltip of absolute stats (footprint, capacity with unit, upkeep), built in `src/ui/catalogCardText.ts`; the tooltip follows the selected tier.
 
-Event closures (#1568): a live `out_of_service` modifier naming a building sets the derived `Building.outOfService` flag each tick (`syncBuildingServiceFlags`, after `tickModifiers`); the player's `active` choice is untouched. `isOperating(b)` (= active and not closed) gates ore/explosive/spoil storage, nearest-building lookups, well-being, training (`availableTrainingOffers` skips it, `enrolInTraining` refuses with `employees.train_school_closed`) and the Research Center (queueing blocked as `no_research_center`). A closed centre only pauses research progress; destroying or switching it off still cancels and refunds. `research_cost` scales the task cost at queue time (`scaledCost`); the stored `task.cost` is what cancel refunds.
+Event closures: a live `out_of_service` modifier naming a building sets the derived `Building.outOfService` flag each tick (`syncBuildingServiceFlags`, after `tickModifiers`); the player's `active` choice is untouched. `isOperating(b)` (= active and not closed) gates ore/explosive/spoil storage, nearest-building lookups, well-being, training (`availableTrainingOffers` skips it, `enrolInTraining` refuses with `employees.train_school_closed`) and the Research Center (queueing blocked as `no_research_center`). A closed centre only pauses research progress; destroying or switching it off still cancels and refunds. `research_cost` scales the task cost at queue time (`scaledCost`); the stored `task.cost` is what cancel refunds.
+
+History: docs/context-history/gameplay-buildings.md

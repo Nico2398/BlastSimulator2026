@@ -233,6 +233,12 @@ jobs:
           # absolute deadline goes to the retry, which therefore starts with its
           # loops already closed and does linear work only.
           AGENTIC_LOOP_DEADLINE_EPOCH: ${{ steps.clock.outputs.loop_deadline }}
+          # The smallest window only makes Claude Code ask for a compaction
+          # early; `compact-at-step-boundary.mjs` answers, allowing it at a step
+          # boundary before a heavy step or near the full window, never inside
+          # a step. `agentic-autonomous-pipeline`'s runtime-parity reference
+          # holds the thresholds.
+          CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000'
         # Pinned to a SHA, not the moving `v1` tag. The action hardcodes the
         # Claude Code build it installs (`base-action/action.yml`), so `v1`
         # silently changes the agent binary under every run: the tag moved to
@@ -401,6 +407,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           AGENTIC_LOOP_DEADLINE_EPOCH: ${{ steps.clock.outputs.loop_deadline }}
+          # The smallest window only makes Claude Code ask for a compaction
+          # early; `compact-at-step-boundary.mjs` answers, allowing it at a step
+          # boundary before a heavy step or near the full window, never inside
+          # a step. `agentic-autonomous-pipeline`'s runtime-parity reference
+          # holds the thresholds.
+          CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000'
         # Same pin as the first attempt, and it has to stay the same one: a
         # retry on a different agent build is a different run, not a second try.
         uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
@@ -445,6 +457,7 @@ jobs:
       # owns what happens next. This exists so the job log names the outcome of
       # the retry instead of leaving it to be inferred from the rescue comment.
       - name: Did the retry settle its issue?
+        id: state_retry
         if: always() && steps.claude_retry.outcome != 'skipped'
         uses: ./.github/actions/agentic-run-state
         with:
@@ -463,6 +476,67 @@ jobs:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           issue: ${{ steps.context.outputs.issue }}
           branch: ${{ steps.context.outputs.feature_branch }}
+
+      # What this run cost and how it spent it, so changes to the pipeline are
+      # decided on measurements: cost per model and per agent, context growth,
+      # cache hits, tools, skills, verify and RED counters. Read from Claude
+      # Code's own transcripts, which survive a timed-out step. Only numbers
+      # and fixed-vocabulary names leave the VM — never a transcript: this
+      # repository is public (see `show_full_output` above). `always()`: a
+      # failed or timed-out run is the one most worth measuring.
+      # `continue-on-error`: observability never decides a run's outcome.
+      # The tooling runs from this workflow's own commit, never from whatever
+      # branch the agent left checked out: an older branch may not have it, and
+      # a branch may have changed the sanitizer the records rely on.
+      - name: Export run metrics
+        id: metrics
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          ISSUE: ${{ steps.context.outputs.issue }}
+          ENTITY: ${{ steps.context.outputs.entity }}
+          STARTED_AT: ${{ steps.clock.outputs.started_at }}
+          CONCLUSION: ${{ steps.claude_retry.outcome != 'skipped' && steps.claude_retry.outcome || steps.claude.outcome }}
+          TERMINAL: ${{ steps.state_retry.outputs.terminal || steps.state.outputs.terminal }}
+        run: |
+          src="${RUNNER_TEMP}/agentic-metrics-src"
+          out="${RUNNER_TEMP}/agentic-metrics"
+          mkdir -p "$src"
+          git archive "$GITHUB_SHA" package.json scripts/agentic-metrics.ts scripts/lib/metrics .claude/skills .claude/agents | tar -x -C "$src"
+          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$src/scripts/agentic-metrics.ts" extract --out "$out" --since "$STARTED_AT" \
+            --issue "$ISSUE" --entity "$ENTITY" --conclusion "$CONCLUSION" --terminal "$TERMINAL" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --workflow "$GITHUB_WORKFLOW" --repo "$GITHUB_REPOSITORY" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "dir=${out}" >> "$GITHUB_OUTPUT"
+          echo "src=${src}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload run metrics
+        if: always() && steps.metrics.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentic-metrics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.metrics.outputs.dir }}
+          if-no-files-found: ignore
+          retention-days: 90
+
+      # Artifacts expire; `runs.jsonl` on the orphan `agentic-metrics` branch is
+      # the history `npm run metrics -- report` reads. GITHUB_TOKEN, deliberately:
+      # raising nothing is the point — a metrics commit must never start a
+      # workflow. Idempotent by session id, so a re-run job appends nothing twice.
+      - name: Append run metrics to the agentic-metrics branch
+        if: always() && steps.metrics.outcome == 'success'
+        continue-on-error: true
+        env:
+          METRICS_DIR: ${{ steps.metrics.outputs.dir }}
+          METRICS_SRC: ${{ steps.metrics.outputs.src }}
+          REMOTE: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+        run: |
+          if ! "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$METRICS_SRC/scripts/agentic-metrics.ts" publish --dir "$METRICS_DIR" --remote "$REMOTE"; then
+            echo "::warning::Run metrics were not appended to the agentic-metrics branch; the artifact still holds them."
+            exit 1
+          fi
 
       # No auto-merge step here any more. The merge gate
       # (`agentic-auto-merge.yml`) is the one thing that merges, under its own

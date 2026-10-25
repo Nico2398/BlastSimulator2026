@@ -76,6 +76,18 @@
         ]
       },
       {
+        "matcher": "Read|Grep|Glob|Bash|Monitor|Edit|MultiEdit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/blind-to-tests.mjs"
+            ]
+          }
+        ]
+      },
+      {
         "matcher": "AskUserQuestion",
         "hooks": [
           {
@@ -126,6 +138,32 @@
             "statusMessage": "Preparing verification channels",
             "timeout": 300,
             "once": true
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/restore-after-compact.mjs"
+            ]
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/compact-at-step-boundary.mjs"
+            ]
           }
         ]
       }

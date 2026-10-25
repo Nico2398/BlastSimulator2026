@@ -102,14 +102,10 @@ what you intended:
 edit the .py → npm run models:build -- <id> → capture → READ the image → name what is wrong → edit again
 ```
 
-**Budget at least two rebuilds.** Issue #1010 took three rounds, and every round was opened by
-something only the image could say. Round 1's dark concrete bunker was the wrong idea outright.
-Round 2 read as the cage it was meant to be, but its searchlight beam rendered as a white blob
-swallowing the tower and its tower cap was so shallow it read as a mortarboard. Round 3 fixed a
-mattress running 0.25 m out through the back wall, a toilet with its cistern facing into the room
-and its bowl tapered like a bucket, and a ball-and-chain a reader could only describe as "a black
-circle on the ground". None of that is visible in the Python, in the triangle count, or in a green
-`ModelAssets` run.
+**Budget at least two rebuilds.** Every round is opened by something only the image can say —
+the wrong idea outright, a part swallowing its neighbours, a part through a wall, a part facing
+backwards, a shape nobody can name. None of that is visible in the Python, in the triangle count,
+or in a green `ModelAssets` run.
 
 ### ▶ What to check, because "does it look good" fails nobody
 
@@ -117,9 +113,9 @@ Open the capture and answer these one at a time. Each one has cost a round.
 
 | Ask | The failure it catches |
 |-----|------------------------|
-| **Name every shape.** Can you say what each object *is* without reading the builder? | A prop that reads as nothing. #1010's ball and chain read as "a black circle" — its chain was too thin to see, so the sphere explained nothing, and cutting it beat enlarging it |
+| **Name every shape.** Can you say what each object *is* without reading the builder? | A prop that reads as nothing. A part too thin to see leaves the shape it explains unexplained; cutting the prop can beat enlarging it |
 | **Trace each part against its neighbours.** Does anything cross a wall, a floor, a roof, another part? | Geometry poking through — **Containment is arithmetic** below is how to catch it before the render does |
-| **Say which way each part faces.** Is its front where a real one's front would be? | A part built backwards. #1010's toilet had its cistern toward the room and its bowl toward the wall, and an inverted taper (`radius` wider than `radius2`) made the bowl read as a bucket |
+| **Say which way each part faces.** Is its front where a real one's front would be? | A part built backwards, or an inverted taper (`radius` wider than `radius2`) that makes a part read as something else |
 | **Look for anything dominating the frame.** Is one part swallowing the ones around it? | Scale and emissive blowouts. A beam cone of `radius2=0.38` over 1.1 m covered the whole tower; `0.16` over 0.55 m reads as a beam |
 | **Turn the camera onto what it nearly hides.** The roof, the interior, the far side, whatever a taller part stands in front of | A defect that ships because no capture ever pointed at it |
 
@@ -132,8 +128,7 @@ Check it in the builder, before the rebuild:
 |offset from the wall| > half the part's own size on that axis + its bevel
 ```
 
-`Mattress` at `back_y + 0.4` with a length of `1.3` fails that by 0.25 m, and the render is where
-it turned up. Run it on every part placed against a wall, a floor edge or another part.
+`Mattress` at `back_y + 0.4` with a length of `1.3` fails that by 0.25 m. Run it on every part placed against a wall, a floor edge or another part.
 
 ## Art direction
 
@@ -195,7 +190,7 @@ Budget by **how many copies are drawn**, not by how important the model feels. A
 | Rocks, houses | hundreds | 1 280 / 216 – 348 | |
 | `prop_twister` | a handful | 5.8 k | not instanced |
 
-File budget, asserted by `ModelAssets.test.ts`: **≤ 400 KB per `.glb`**, ≤ 4 MB gzipped across every asset (what a host actually serves), ≤ 16 MB raw. Current set: 97 models (sizes below measured at 90, before the charging trucks and vanity projects): 10.3 MB raw, 2.0 MB compressed.
+File budget, asserted by `ModelAssets.test.ts`: **≤ 400 KB per `.glb`**, ≤ 4 MB gzipped across every asset (what a host actually serves), ≤ 16 MB raw. Current set: 97 models; sizes measured at 90 models: 10.3 MB raw, 2.0 MB compressed.
 
 Where the triangles go:
 
@@ -232,3 +227,5 @@ The `.blend` files exist for hand iteration, and the next `models:build` overwri
 | `references/blender-helpers.md` | The `common.py` API — primitives, modifiers, hierarchy, materials, output — and the bpy gotchas the generators were built around |
 | `references/model-catalog.md` | Every model family, its builder module, its nodes and its caricature — the prose companion to `assets/models/manifest.json`'s per-id data |
 | `references/runtime-contract.md` | How the exported `.glb` is consumed: merge buckets, per-instance tints, instanced props, wind sway, wheel radius, the stand-in path |
+
+History: docs/context-history/dev-3d-models.md

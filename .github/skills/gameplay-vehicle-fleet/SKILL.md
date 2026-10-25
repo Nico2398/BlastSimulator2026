@@ -28,24 +28,24 @@ Six roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
 
 | Role | Tier 1 | Tier 2 | Tier 3 | Function |
 |------|--------|--------|--------|---------|
-| **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Carries out every building demolition (#1392; tier upgrades are done in place by a builder, #1875): `build destroy` queues a `demolish_building` action (`requiredVehicleRole: 'building_destroyer'`, no skill, self-dispatched like hauling). A licensed `driving.truck` driver (the Driver role's start licence) rides it to the building's approach ring; duration = `computeDemolitionDurationTicks(footprintCells, buildingTier, vehicleTier)` (`DEMOLITION_*` in `balance.ts`: grows with footprint and building tier, shrinks with vehicle tier). With no destroyer or no licensed driver the order is blocked (`no_vehicle_in_fleet` / `no_licensed_driver`, "needs a Building Destroyer"). Cancelling refunds the full order cost |
-| **Charging Truck** (#1645) | "Pour-Bucket Pete" | "Boom-Juice Hauler 5000" | "Kaboom Cruiser Deluxe" | Bulk explosive delivery: pumps emulsion down a blast hole. Every `charge_hole` order requires it (#1649, `requiredVehicleRole: 'charging_truck'`): an employee holding `blasting` + `driving.truck` (licence level >= tier) drives it to the hole and stays mounted; charging is never done on foot. Duration = `computeChargeDurationTicks` (`ChargePlan.ts`): tier-1 base / `VEHICLE_TIER_MULTIPLIERS[tier].workRate`, then proficiency. No truck, no licensed driver, too-low licence or nobody with both skills leaves the order waiting (`no_vehicle_in_fleet` / `no_licensed_driver` / `licence_level_too_low` / `no_dual_qualified_employee`). A freshly hired Blaster holds the tier-1 `driving.truck` licence, so it can charge with no course (#1667); tiers 2/3 still need Driving Center levels. Mid-charge work is protected from forced rest via `isMidVehicleGatedWork`. Every blasting opening (`BASE_STARTING_VEHICLES`: staffed site, Dusty Hollow) carries a tier-1 truck plus a blaster holding `blasting` + `driving.truck` (#1648); the tutorial buys the truck in its `buy-charging-truck` step and its scripted driller (Dale Drillson) arrives with `driving.truck` via `ScriptedCandidate.extraQualifications` Buyable (Fleet panel, `vehicle buy charging_truck`) and renders with its own model per tier |
+| **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Carries out every building demolition (tier upgrades are done in place by a builder): `build destroy` queues a `demolish_building` action (`requiredVehicleRole: 'building_destroyer'`, no skill, self-dispatched like hauling). A licensed `driving.truck` driver (the Driver role's start licence) rides it to the building's approach ring; duration = `computeDemolitionDurationTicks(footprintCells, buildingTier, vehicleTier)` (`DEMOLITION_*` in `balance.ts`: grows with footprint and building tier, shrinks with vehicle tier). With no destroyer or no licensed driver the order is blocked (`no_vehicle_in_fleet` / `no_licensed_driver`, "needs a Building Destroyer"). Cancelling refunds the full order cost |
+| **Charging Truck** | "Pour-Bucket Pete" | "Boom-Juice Hauler 5000" | "Kaboom Cruiser Deluxe" | Bulk explosive delivery: pumps emulsion down a blast hole. Every `charge_hole` order requires it (`requiredVehicleRole: 'charging_truck'`): an employee holding `blasting` + `driving.truck` (licence level >= tier) drives it to the hole and stays mounted; charging is never done on foot. Duration = `computeChargeDurationTicks` (`ChargePlan.ts`): tier-1 base / `VEHICLE_TIER_MULTIPLIERS[tier].workRate`, then proficiency. No truck, no licensed driver, too-low licence or nobody with both skills leaves the order waiting (`no_vehicle_in_fleet` / `no_licensed_driver` / `licence_level_too_low` / `no_dual_qualified_employee`). A freshly hired Blaster holds the tier-1 `driving.truck` licence, so it can charge with no course; tiers 2/3 still need Driving Center levels. Mid-charge work is protected from forced rest via `isMidVehicleGatedWork`. Every blasting opening (`BASE_STARTING_VEHICLES`: staffed site, Dusty Hollow) carries a tier-1 truck plus a blaster holding `blasting` + `driving.truck`; the tutorial buys the truck in its `buy-charging-truck` step and its scripted driller (Dale Drillson) arrives with `driving.truck` via `ScriptedCandidate.extraQualifications`. Buyable (Fleet panel, `vehicle buy charging_truck`) and renders with its own model per tier |
 | **Debris Hauler** | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | Hauls fragmented rock from blast zone to a Freight Warehouse (ore) or Spoil Heap (barren rock) |
 | **Drill Rig** | "Pokey McPoke" | "Bore Master" | "Helldriller" | Drills blast holes to specified depth and angle |
 | **Rock Digger** | "The Scratch" | "Scoop Sergeant" | "Rock Reaper" | Removes one voxel at a time; used for ramp shaping and access routes |
 | **Rock Fragmenter** | "Cracky" | "Smasher 2000" | "The Atomizer" | Breaks oversized debris boulders into transportable fragments |
 
-**Drill rig reach (#1679).** A rig's tier caps the deepest hole it can drill: `DRILL_RIG_MAX_DEPTH_M` = 12 / 24 / 40 m for tiers 1 / 2 / 3, minimum `DRILL_HOLE_MIN_DEPTH_M` = 1. The fleet's reach (`fleetDrillReachM`, `DrillPlan.ts`) is the best owned rig's value; with no rig owned it falls back to the tier-1 value (12 m). `drill_plan grid|add` and the saved-plan load refuse a deeper hole (`drillDepthRefusal`, `mining.drill_plan.refused_depth`) before any mutation; the Blast Workshop depth stepper is clamped to the reach and the Fleet tooltip lists it.
+**Drill rig reach.** A rig's tier caps the deepest hole it can drill: `DRILL_RIG_MAX_DEPTH_M` = 12 / 24 / 40 m for tiers 1 / 2 / 3, minimum `DRILL_HOLE_MIN_DEPTH_M` = 1. The fleet's reach (`fleetDrillReachM`, `DrillPlan.ts`) is the best owned rig's value; with no rig owned it falls back to the tier-1 value (12 m). `drill_plan grid|add` and the saved-plan load refuse a deeper hole (`drillDepthRefusal`, `mining.drill_plan.refused_depth`) before any mutation; the Blast Workshop depth stepper is clamped to the reach and the Fleet tooltip lists it.
 
-**Drill rig bore (#1934).** A rig's tier also caps the widest hole it can bore: `DRILL_RIG_MAX_DIAMETER_M` = 89 / 127 / 165 mm for tiers 1 / 2 / 3 (`minRigTierForDiameter`, `HoleDiameter.ts`). `fleetDrillDiameterM` is the best owned rig's value (tier-1 with none); `drill_plan grid|add` and saved-plan load refuse a wider hole (`drillDiameterRefusal`, `mining.drill_plan.refused_diameter`) before any mutation. A `drill_hole` order needs `max(depth tier, diameter tier)` (`minVehicleTierFor`, reads `payload.diameter` in metres). The Drill step diameter stepper (`data-field="diameter"`, mm) skips options above the fleet and clamps down if a rig is lost.
+**Drill rig bore.** A rig's tier also caps the widest hole it can bore: `DRILL_RIG_MAX_DIAMETER_M` = 89 / 127 / 165 mm for tiers 1 / 2 / 3 (`minRigTierForDiameter`, `HoleDiameter.ts`). `fleetDrillDiameterM` is the best owned rig's value (tier-1 with none); `drill_plan grid|add` and saved-plan load refuse a wider hole (`drillDiameterRefusal`, `mining.drill_plan.refused_diameter`) before any mutation. A `drill_hole` order needs `max(depth tier, diameter tier)` (`minVehicleTierFor`, reads `payload.diameter` in metres). The Drill step diameter stepper (`data-field="diameter"`, mm) skips options above the fleet and clamps down if a rig is lost.
 
-**Drill rig work rate (#1935).** `drill_hole` ticks = the tier-1 base (`computeDrillHoleDurationTicks`, stored unscaled in `payload.durationTicks`) divided by the reserved rig's `VEHICLE_TIER_MULTIPLIERS[tier].workRate` (1 / 1.4 / 2), then proficiency, need and LQ (`computeRigDurationTicks`, shared with `computeChargeDurationTicks`). An unreserved estimate uses tier 1; `payload.resumeTicks` stays raw.
+**Drill rig work rate.** `drill_hole` ticks = the tier-1 base (`computeDrillHoleDurationTicks`, stored unscaled in `payload.durationTicks`) divided by the reserved rig's `VEHICLE_TIER_MULTIPLIERS[tier].workRate` (1 / 1.4 / 2), then proficiency, need and LQ (`computeRigDurationTicks`, shared with `computeChargeDurationTicks`). An unreserved estimate uses tier 1; `payload.resumeTicks` stays raw.
 
-**Charging Truck decisions (#1645, defaulted).** Licence: the existing `driving.truck`, like the hauler and destroyer
+**Charging Truck stats.** Licence: the existing `driving.truck`, like the hauler and destroyer
 (no new `SkillCategory`, Driving Center course or starting qualification; Drivers already hold it). Base stats
 (`VEHICLE_BASE_STATS.charging_truck`): 28 000 $, workRate 6, capacity 500, speed 2, maxHp 115, upkeep 4, fuel 6 per tick
 (slower and a little dearer than the hauler, as a heavy tanker). Arrival task `loading` (`VEHICLE_ROLE_ARRIVAL_TASK`; the
-delivery task it does), one seat (`VEHICLE_SEAT_COUNT`). Reverse by changing those `balance.ts` entries.
+delivery task it does), one seat (`VEHICLE_SEAT_COUNT`). All are those `balance.ts` entries.
 
 ## Tier Stat Multipliers
 
@@ -76,20 +76,20 @@ Only a Debris Hauler carries cargo: `Vehicle.cargo`, a list of `{ fragmentId, ma
 | Drill Rig | `driving.drill_rig` |
 
 Roles arrive holding their own licences (`ROLE_STARTING_QUALIFICATIONS`, `balance.ts`): a Driller holds the
-drill-rig licence, a Driver the truck and excavator licences, a Blaster the tier-1 truck licence (#1667). The rock fragmenter licence is held by no role at
+drill-rig licence, a Driver the truck and excavator licences, a Blaster the tier-1 truck licence. The rock fragmenter licence is held by no role at
 hire — it is earned at the Driving Center (the tutorial's one course, after the first blast leaves oversized
 boulders), as are further licence levels and cross-training. A vehicle is not owned by a driver: any licensed
 employee may board any vehicle that is unoccupied and unclaimed. Nothing persists a driver
 assignment across tasks.
 
-**Licence level (#1524).** A licence carries a level 1-3 (`SkillQualification.licenceLevel`, absent = 1), separate
+**Licence level.** A licence carries a level 1-3 (`SkillQualification.licenceLevel`, absent = 1), separate
 from proficiency: XP never raises it, only a Driving Center course does (`TRAINING_LEVEL_FEE`,
 `TRAINING_LEVEL_TICKS_MULT`, `balance.ts`): a tier-N Driving Center caps the licence it teaches at level N. Driving a tier-N vehicle needs the role licence at level >= N
 (`licenceLevelOf`, `canDriveTier`, `countLicenceHolders` in `VehicleDriverAssignment.ts`); `canAssignDriver`
 refuses with 'Employee lacks licence level for this vehicle tier', `findFreeVehicleForRole` skips vehicles above
 the claimer's level. A vehicle order nobody can level-qualify for carries `licence_level_too_low` (when someone
 holds the licence at a lower level) with `blockedLicenceLevel` = the lowest tier in that role's fleet, else
-`no_licensed_driver`. The dealership shows each tier's required level and how many employees hold it. Licence proficiency neither gates tiers nor changes pay or speed (#1843); only `licenceLevel` matters.
+`no_licensed_driver`. The dealership shows each tier's required level and how many employees hold it. Licence proficiency neither gates tiers nor changes pay or speed; only `licenceLevel` matters.
 
 ## State Model
 
@@ -192,7 +192,7 @@ A `reposition` goal moves a vehicle with no work attached: parking the fleet cle
 
 ## Cost Model
 
-Ranking is tier first, then cost (`ACTION_RANK_TIER`, #1742; see `gameplay-employee-skills`): cost orders candidates only within a rank tier, so a cheap haul never outranks a `charge_hole` or a `demolish_building` (#1840; a loaded haul is still never abandoned, #1709). Reachability: a vehicle order whose target is a clearance-1 approach cell beside a building is reachable when a neighbouring cell lies in a vehicle component (`withDockingCells`, `DockingReach.ts`, one hop, O(1) per query); genuinely cut-off approaches still report `target_unreachable`.
+Ranking is tier first, then cost (`ACTION_RANK_TIER`; see `gameplay-employee-skills`): cost orders candidates only within a rank tier, so a cheap haul never outranks a `charge_hole` or a `demolish_building` (a loaded haul is still never abandoned). Reachability: a vehicle order whose target is a clearance-1 approach cell beside a building is reachable when a neighbouring cell lies in a vehicle component (`withDockingCells`, `DockingReach.ts`, one hop, O(1) per query); genuinely cut-off approaches still report `target_unreachable`.
 
 A queued action's cost is the itinerary's cost. For a vehicle-gated action claimed by an employee
 on foot that is exactly:
@@ -219,7 +219,7 @@ Two behaviours follow and are never special-cased:
   `level_ground` goals are excluded: their target cell becomes NavGrid-blocked once construction
   completes, which would strand a vehicle left standing on it.
 
-## Evacuation rescue of a parked vehicle (#1746)
+## Evacuation rescue of a parked vehicle
 
 When a blast is armed, a driverless vehicle in the danger zone is driven out by a free, licensed crew member drawn from the **whole roster**, wherever they stand: the licence holder counts as the crew member who parked it, so the driller who left the rig on the pattern and walked to the quarters is fetched back (`clearZone`, `Zone.ts`; `moveTo` + `planItinerary`, no separate path). Order of preference: an in-zone candidate, then the nearest idle licensed employee who can reach it. A rescuer already walking to the vehicle (`pendingDriverVehicleId`) is left alone and the vehicle is not stranded; an employee mid-walk to another vehicle or busy with work is never picked. A licensed employee who is resting is **awaited**: the vehicle goes in `awaitingRescuerVehicleIds` (neither ordered nor stranded) and the periodic re-evacuation orders them once the rest ends. Rest is never cut. A vehicle nobody can drive or reach, or with no safe destination, stays stranded, and Fire anyway still works.
 
@@ -254,7 +254,7 @@ break: [foot -> fragmenter, board] [drive -> boulder, effect 'split']
 Hauling is self-dispatching: each tick `HaulDispatch.ts` queues one `haul_debris` action per
 on-ground fragment not already covered (an oversized fragment queues `fragment_debris` instead).
 
-Multi-fragment cargo (#1370): after the primary `load` leg, `planFragmentTaskItinerary` adds one
+Multi-fragment cargo: after the primary `load` leg, `planFragmentTaskItinerary` adds one
 extra `load` leg (step `targetId` = fragment id) per nearby fragment chosen by `selectHaulBatch`
 (`HaulBatch.ts`). Candidates are on-ground, non-oversized, within `HAUL_BATCH_RADIUS_CELLS`
 (nearest first), with a queued, unclaimed `haul_debris`; at most `HAUL_BATCH_MAX_ITEMS` ride, and
@@ -268,12 +268,12 @@ haulers cannot oversubscribe storage. An interrupted or scrapped hauler returns 
 ground. A destination targeting a depot resolves through the building-approach-cell lookup
 (`gameplay-navmesh`), never the building's raw coordinates.
 
-Hauling destination (#1530): `haulDestinationOf` sends barren fragments (`isBarrenFragment`) to the
+Hauling destination: `haulDestinationOf` sends barren fragments (`isBarrenFragment`) to the
 nearest Spoil Heap and ore-bearing ones to a Freight Warehouse. The depot leg, the batch (never mixed)
 and the claim gate all use the fragment's destination; a destroyed target heap falls back to another
-heap. Heaps are finite (#1892): a barren haul is blocked as `no_spoil_heap` (no heap placed) or `spoil_heap_full` (no heap has room for the fragment); the depot pick, the claim gate and delivery use `pickWarehouse` over `spoilHeapSites` like warehouses do.
+heap. Heaps are finite: a barren haul is blocked as `no_spoil_heap` (no heap placed) or `spoil_heap_full` (no heap has room for the fragment); the depot pick, the claim gate and delivery use `pickWarehouse` over `spoilHeapSites` like warehouses do.
 
-Barren yields to ore (#1870): `selectBestActionForEmployee` does not start an unheld, ground (not
+Barren yields to ore: `selectBestActionForEmployee` does not start an unheld, ground (not
 loaded) barren `haul_debris` while any unheld ore-bearing `haul_debris` is claimable (reachable,
 allowed, warehouse room). Barren still moves when no ore haul is claimable or none resolves a cost
 (barren blocks the only way, `storage_full`, nothing left). Grade/demand weighting among ore hauls,
@@ -289,7 +289,7 @@ reasons clear on the next classification; `NotificationCenter` toasts each once 
 (not per action), and again if the reason changes. Capacity is re-derived from the warehouses
 after any building mutation and on load.
 
-## Vehicle Repair (#1393)
+## Vehicle Repair
 
 A damaged vehicle (`0 < hp < maxHp`, `isRepairable`) that nobody is sitting in and no order has reserved gets one self-dispatched `repair_vehicle` order per tick sync (`syncRepairDispatch`, `RepairDispatch.ts`, run beside `syncHaulDispatch`). The order is on foot (`requiredVehicleRole` null) and needs the `repair` skill, trained at the Driving Center. There is no Vehicle Depot building: repair happens in place, wherever the vehicle stands.
 
@@ -298,17 +298,17 @@ A damaged vehicle (`0 < hp < maxHp`, `isRepairable`) that nobody is sitting in a
 - A vehicle under a claimed repair order is not claimable by `findFreeVehicleForRole` / `findVehicleForClaim` until the repair completes or aborts.
 - Duration: `ceil(missingHp * REPAIR_BASE_TICKS_PER_HP)` base ticks, scaled by proficiency like any `payload.durationTicks` action. Each work tick restores `repairHpThisTick` (missing hp spread over the ticks left) and charges `REPAIR_PARTS_COST_PER_HP` per restored hp as an expense, so an interrupted repair resumes with the right remainder and is never double-charged. XP goes to `repair`.
 
-## Vehicle Upgrade (#1401)
+## Vehicle Upgrade
 
 An owned vehicle moves up one tier in place (`src/core/entities/VehicleUpgrade.ts`), up to `VEHICLE_MAX_TIER` (3, `balance.ts`).
 
 - **Cost:** `purchaseCost(next tier) - purchaseCost(current tier)` (`computeVehicleUpgradeCost`, null at max). Refused with `console.insufficient_funds` when cash is short; booked as an `equipment` expense.
 - **Effect:** `upgradeVehicle` mutates only `tier` and `hp`; hp is set to the new tier's `maxHp` (full restore even when damaged). Id, position, reservation and occupants are kept, so it is allowed while reserved, driven or carrying.
-- **Entry points:** console `vehicle upgrade <id>`; Inspector `upgrade_vehicle` action (shows cost, disabled with a reason at tier 3 or short cash; the Fleet panel rows carry no buttons since #1767, only Locate) (distinct from the building `upgrade` action).
+- **Entry points:** console `vehicle upgrade <id>`; Inspector `upgrade_vehicle` action (shows cost, disabled with a reason at tier 3 or short cash; the Fleet panel rows carry no buttons, only Locate) (distinct from the building `upgrade` action).
 - **Upgrade vs scrap:** scrap sells at the 40% residual and the vehicle is gone; upgrade keeps the vehicle and pays only the difference, so it is the intended way up a tier.
-- **Licence warning:** when no alive employee can drive the next tier (`rosterCanDriveVehicleTier`), the console appends `vehicle.upgrade_no_licensed` and the Inspector shows a warning row. `isLicensedForVehicleTier` is tier-aware (`canDriveTier`, #1524).
+- **Licence warning:** when no alive employee can drive the next tier (`rosterCanDriveVehicleTier`), the console appends `vehicle.upgrade_no_licensed` and the Inspector shows a warning row. `isLicensedForVehicleTier` is tier-aware (`canDriveTier`).
 
-## Vehicle inspector job, ETA and running cost (#1761)
+## Vehicle inspector job, ETA and running cost
 
 - `computeVehicleJob` (`VehicleStatus.ts`) reads the reserved action's payload for the target (fragment, hole, building, vehicle). The destination is the occupant's last itinerary leg; its building is the cargo's warehouse only for a loaded hauler. A working vehicle shows the remaining task ticks as ETA and no drive destination. A broken vehicle has no job; an idle one shows the `blockedReason` of a queued unclaimed order for its role.
 - **ETA** (`vehicleEtaTicks`): octile distance from the vehicle's live position to the first leg's destination, divided by the tier's speed (cells per tick) and rounded up, plus the remaining legs' `estTicks`. It shrinks as the vehicle approaches, unlike the plan-time `estTotalTicks`. 1 tick = 1 hour.
@@ -321,9 +321,9 @@ Vehicles cannot share a cell. A driver whose next drive step is occupied waits a
 attempts one vehicle-avoiding reroute, then reports stuck. Rock debris after a blast marks cells
 blocked until cleared.
 
-An idle parked vehicle (or idle driver's rig) that walls off a 1-wide pocket or corridor is moved to a free cell off the blocked mover's route (`pickYieldCell`, #1696) rather than the next corridor cell; see `gameplay-navmesh` (Path Following & Stuck State).
+An idle parked vehicle (or idle driver's rig) that walls off a 1-wide pocket or corridor is moved to a free cell off the blocked mover's route (`pickYieldCell`) rather than the next corridor cell; see `gameplay-navmesh` (Path Following & Stuck State).
 
-### Jams and chokepoints (`TrafficJams.ts`, #1208)
+### Jams and chokepoints (`TrafficJams.ts`)
 
 `findTrafficJams(ramps, employees, silencedUntil?, tick?)` is the one detector; the event, the Fleet
 panel banner, the alert pip, the ground markers and the console state dump all read it. An employee
@@ -382,43 +382,44 @@ vehicle's or a building's — or `locomotion`.
 
 ## Status
 
-The migration this page specifies is complete: phases 0a to 7 landed as #1083 to #1093. The
-tutorial box-cut, the case that started it, is asserted at no more than 2 rock-digger boardings for
-the whole ramp in both `tests/integration/needs.integration.test.ts` and the interaction-mode
-`scripts/scenario-defs/tutorial-boxcut-full.json`. The baseline measured before the migration was 3.
+The tutorial box-cut is asserted at no more than 2 rock-digger boardings for the whole ramp in both
+`tests/integration/needs.integration.test.ts` and the interaction-mode
+`scripts/scenario-defs/tutorial-boxcut-full.json`.
 
-Where the code still differs from this page, each difference has an owner:
+Where the code still differs from this page:
 
-| Deviation | Owner |
-|-----------|-------|
-| Only I8 is fatal. I4 and I5 fire in 14 command-mode scenarios; I1, I3, I6, I7 and I9 fire nowhere, and I2 fires only from hand-built test fixtures | #1115 |
-| A mounted employee keeps the vehicle for the whole rest, not just the drive there | #1122 |
+| Deviation |
+|-----------|
+| Only I8 is fatal. I4 and I5 fire in 14 command-mode scenarios; I1, I3, I6, I7 and I9 fire nowhere, and I2 fires only from hand-built test fixtures |
+| A mounted employee keeps the vehicle for the whole rest, not just the drive there |
 
-Remove a row when its issue lands.
+Remove a row when the code matches this page.
 
-Dealership cards show a one-line purpose plus running cost in $/h and a tooltip of absolute stats (speed, capacity, work rate, licence level shown = tier, per #1524), built in `src/ui/catalogCardText.ts`.
+Dealership cards show a one-line purpose plus running cost in $/h and a tooltip of absolute stats (speed, capacity, work rate, licence level shown = tier), built in `src/ui/catalogCardText.ts`.
 
-Event closures (#1568): a vehicle named by a live `out_of_service` modifier is never picked by `findFreeVehicleForRole`, and `findVehicleForClaim` releases an already-reserved closed vehicle's reservation and refuses the claim. A driver already mounted is not dismounted.
+Event closures: a vehicle named by a live `out_of_service` modifier is never picked by `findFreeVehicleForRole`, and `findVehicleForClaim` releases an already-reserved closed vehicle's reservation and refuses the claim. A driver already mounted is not dismounted.
 
-Truck-worked charging stalls (#1660), decisions taken:
+Truck-worked charging stalls:
 - `outstandingChargeBlockedReason` returns the first outstanding `charge_hole` order that carries a reason; a claimed order has none, so the queue head is not the one to read.
 - `releaseDeadHoldersActions` (TickPipeline, before dispatch) returns any claim held by a dead employee to the pool, whatever killed them, so `OrderReachability` re-stamps it (`no_vehicle_in_fleet`, `no_dual_qualified_employee`). A destroyed vehicle already releases its driver's claim through the aborted drive leg.
-- A drive leg blocked by a parked, driverless vehicle crosses it (`handleAgentOccupancyBlock` step 2.5) instead of trying the avoid-all reroute first: plain drive pathing repaths every tick through the parked vehicle, so a reroute step was undone next tick and reset the stuck counters, never reaching `MOVE_STUCK_ABANDON_TICKS`. Parking the truck clear of the blast zone is out of scope.
+- A drive leg blocked by a parked, driverless vehicle crosses it (`handleAgentOccupancyBlock` step 2.5) instead of trying the avoid-all reroute first: plain drive pathing repaths every tick through the parked vehicle, which undoes a reroute step on the next tick and resets the stuck counters, so `MOVE_STUCK_ABANDON_TICKS` is never reached.
 
-## Vehicle slope limit (#1938, #2045)
+## Vehicle slope limit
 
 On progression sites (`state.grade !== undefined`) every vehicle, of every role and tier, climbs at most 20° (`VEHICLE_MAX_SLOPE_DEGREES`): upgrading never makes a vehicle worse, and the need for a spiral haul road comes from pit depth, not tier. Walking and non-progression sites (campaign) stay at 30°.
 
-- `vehicleMaxSlopeRatio(progression)` (`Vehicle.ts`) is the one helper. `planItinerary` drive legs (`estimateLegDistance`'s `maxSlopeRatio`, ride alight point) and `Locomotion` drive legs (routes, reroutes, `advanceAlongPath`) both call it; foot legs always use 30°. Spawn on a progression sandbox (#2044): the rally flag, every starting building and vehicle share one component driveable at the vehicle limit that reaches the first-blast target; campaign levels keep 30° placement.
+- `vehicleMaxSlopeRatio(progression)` (`Vehicle.ts`) is the one helper. `planItinerary` drive legs (`estimateLegDistance`'s `maxSlopeRatio`, ride alight point) and `Locomotion` drive legs (routes, reroutes, `advanceAlongPath`) both call it; foot legs always use 30°. Spawn on a progression sandbox: the rally flag, every starting building and vehicle share one component driveable at the vehicle limit that reaches the first-blast target; campaign levels keep 30° placement.
 - `PathRequest.maxSlopeRatio` carries it into `findPath`; reachability caches are keyed by clearance and ratio; `fillPool` uses the site's single ratio.
 - No diagonal shortcut (`stepClimbRun`, see `gameplay-navmesh`): a nominal 20° means 20° along a ramp's axis. A straight ramp at the ceiling (about 19.6°, `rampCutSlopeRatio`) needs about 2.75 m of road per metre of depth.
 - A vehicle order unreachable on a progression site but reachable at 30° keeps `blockedReason: 'target_unreachable'` and gets `PendingAction.blockedDetail` (`order.blocked.ramp_too_steep`, params `id`, `grade`, `max`) naming the steepest blocking ramp: "Ramp #3 is 26°: too steep for vehicles (max 20°)." The detail is cleared once the order is reachable.
 - The ramp inspector shows grade and one climbable line (`describeRampClimbability`, `RampGrade.ts`): "Vehicles can climb it (max 20°)" or "Too steep for vehicles (max 20°)".
 - Console: `employee assign_skill <id> skill:driving.<role> level:N licence:1-3` sets the driver's licence level.
 
-## Dealer grade gate (#1928)
+## Dealer grade gate
 
 On progression sites (`state.grade` present) the dealer sells tier 2 from mine grade 2 (Licensed Quarry) and tier 3 from grade 4. Lever: `VEHICLE_TIER_UNLOCK_GRADE` in `src/core/config/balance.ts` ({1:0, 2:2, 3:4}). Helpers in `src/core/economy/VehicleTierGate.ts`: `vehicleTierGate(grade, tier)` (null = allowed; undefined grade = non-progression site, always allowed), `vehicleTierRefusalText`, `vehicleTierLockLabel`. Each distinct gated grade registers a `progression.unlock.vehicle_tier.<grade>` approval-letter line.
 
 - Gated: console `vehicle buy` (before the cash check) and `vehicle upgrade` (next tier, after the max-tier check); Fleet panel tier buttons (disabled, greyed, `data-locked="grade"`, `.bs-fleet-tier-lock` label; lock wins over affordability); Inspector Upgrade button.
 - Ungated: tier 1, starting kits, `purchaseVehicle` / `upgradeVehicle` themselves, scrap, repair, campaign levels.
+
+History: docs/context-history/gameplay-vehicle-fleet.md

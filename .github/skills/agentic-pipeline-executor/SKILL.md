@@ -1,24 +1,24 @@
 ---
 name: agentic-pipeline-executor
 description: >
-  Executor pipeline for the TDD orchestrator. Runs imperative commands via
-  @executor sub-agent using gh or shell. Use when the orchestrator classifies
-  a task as an imperative command (label, assign, close, etc.).
+  Executor pipeline: the lead runs an imperative command with gh or shell,
+  verifies it with a read, posts the result, and releases the assigned issue as
+  a non-diff deliverable. Use when the task is a command (label, assign, close,
+  file issues).
 ---
 
-## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
+## ▶ PROCEDURE — EXECUTE IN ORDER
 
-Simple command-execution pipeline. No code changes, no branch isolation.
+Command execution. No code changes, no branch, no sub-agent.
 
-| Step | Who | Action |
-|------|-----|--------|
-| 1 | @executor | Execute imperative command via `gh` or shell |
-| 2 | [post] | Post result as PR/issue comment via `gh pr comment` or `gh issue comment` |
-| 3 | [release] | Return the assigned issue to a terminal state — the executed command is the deliverable |
+| Step | Action |
+|------|--------|
+| 1 | [execute] Run the command with `gh` or shell, then confirm it took with a read (`gh issue view`, `gh pr view`, `git log`) |
+| 2 | [post] Post the result as a PR or issue comment |
+| 3 | [release] Return the assigned issue to a terminal state — the executed command is the deliverable |
 
 ### Rules
 
-- `@executor` runs commands directly — do not delegate to `@implementer` or other agents
 - **The executed command finishes the issue.** Assignment labels an issue `in-progress`, and the only things that take that label off are a merged pull request and the stall sweep that declares a run lost. A pipeline whose deliverable is a command rather than a diff therefore releases its own issue, or the queue keeps deferring behind a run that already succeeded and then reports it as a failure hours later.
 - Release applies to the issue this run was assigned, and only once the command has run and its result is posted. A command issued on a pull request has no issue lifecycle to close.
 - For destructive actions, prefer non-destructive alternatives:

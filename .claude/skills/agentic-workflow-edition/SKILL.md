@@ -11,7 +11,7 @@ description: >
 
 # Workflow Edition
 
-The Actions layer is the part of the pipeline with no agent in it. It runs when nobody is watching, its failures are silent by default, and every mechanism in it exists because a specific run was lost. Edit it accordingly.
+The Actions layer is the part of the pipeline with no agent in it. It runs when nobody is watching and its failures are silent by default. Edit it accordingly.
 
 What lives where — one concept per file, same as the context layer:
 
@@ -28,17 +28,11 @@ The system these files implement — entry points, labels, parallel runs, rescue
 
 **No verdict is decided on a duration.** Not "wait 10 minutes and call it stuck", not "if 60 minutes have passed, ask again", not "sleep until CI is probably done". Decide on events, on identity, and on state.
 
-A duration is a guess about a system that changes underneath it. Every interval that was ever tuned in this repository was tuned to the CI of that week, and each one broke the moment a shard count, a scenario suite or a runner queue moved:
-
-| What was timed | What it did instead of working |
-|----------------|-------------------------------|
-| `agentic-auto-merge`'s 10-minute settle poll | Reported PR #499 stuck while its browser shards had 35 minutes left to run, and was never swept again |
-| A 45-minute wait budget in `await-pr-ci` | Would report "still running" as an outcome — the exact ending that left PR #581's red CI unread |
-| A 60-minute per-commit cooldown in `agentic-ci-failure` | Long enough to stall once CI slows, short enough to double-ask when it speeds up |
+A duration is a guess about a system that changes underneath it: it breaks the moment a shard count, a scenario suite or a runner queue moves.
 
 What to reach for instead, in order of preference:
 
-1. **An event.** GitHub raises one for nearly everything worth reacting to. `workflow_run` on CI completing is what made auto-merge work: the moment the checks report is an event, not a time. If your reaction needs to happen "later", find the event that means later.
+1. **An event.** GitHub raises one for nearly everything worth reacting to. `workflow_run` on CI completing is what auto-merge reacts to: the moment the checks report is an event, not a time. If your reaction needs to happen "later", find the event that means later.
 2. **Identity.** "Have I already answered this?" is not a question about elapsed time. A workflow run has an id and a redelivered webhook carries the same one; a commit has a SHA. `agentic-ci-failure` writes the CI run id into its comment marker and answers each run once.
 3. **State you can read.** Is a run live? List the runs. Has CI reported? Read the runs on the head. Did a session settle its issue? Read the labels. `gateVerdict` in `agentic-auto-merge` is state alone — failed is red, anything unreported is pending, `total === 0` is pending rather than green, and "is `main` in this head" is asked of the compare API rather than inferred.
 4. **A counter with a brake.** When something must be bounded, bound it by *attempts*, not by minutes: `AGENTIC_BLOCKED_CHAIN_LIMIT`, `AGENTIC_CI_FIX_ATTEMPT_LIMIT`. A counter is exact, visible in the artifacts it counts, and does not drift.
@@ -59,8 +53,6 @@ Every one of these is in the tree today. Adding a sixth needs the same kind of a
 **The smell to catch in review:** a number of minutes appearing anywhere near a word like `stuck`, `stale`, `settle`, `cooldown`, `retry`, `give up`, or `probably`. If removing the number would leave the logic unable to decide, the logic is deciding on the wrong thing.
 
 ## ▶ Rule 2 — The token decides whether anything happens next
-
-Half of this layer's failures are one wrong token.
 
 | Need | Token | Because |
 |------|-------|---------|
@@ -95,7 +87,7 @@ Every workflow here can fire twice: webhooks redeliver, sweeps repeat, humans di
 
 - Mark what you wrote with an HTML comment (`<!-- agentic-ci-failure -->`) and read it back before writing again. Include the identity of the thing you were answering — a run id, a SHA — so "again" is distinguishable from "still".
 - `--force` on `gh label create`; `expected_head_sha` on `update-branch` and `sha` on a merge, so a second attempt against a head that moved is a refusal rather than a write onto something unchecked.
-- Branch on **state, not on messages**. `agentic-auto-merge` re-reads the PR and decides from `mergeable_state` plus the runs, because a refusal string it did not recognise once fell through to a warning and a green step — and PR #434 sat unmerged while both arming paths reported success.
+- Branch on **state, not on messages**. `agentic-auto-merge` re-reads the PR and decides from `mergeable_state` plus the runs, never from a refusal string: a string it does not recognise falls through to a warning and a green step while the PR sits unmerged.
 - When reading workflow runs on a head: keep the newest run per `workflow_id` (`cancel-in-progress` leaves superseded runs behind, and a stale `cancelled` reads as red forever), skip the workflow the code itself is running in (or it waits on itself), and treat `skipped`/`neutral` as passes.
 
 ## ▶ Rule 6 — Nothing here removes a line but you
@@ -112,7 +104,7 @@ So deletion is a rule, not a judgement call. **Nothing is minimal by default; it
 
 ### What dead looks like in this layer
 
-Each row is a real finding from the August 2026 sweep. None of them broke anything, and none of them would ever have failed a test.
+None of these shapes breaks anything, and none of them would ever fail a test.
 
 | Shape | How it got there |
 |-------|------------------|
@@ -126,10 +118,10 @@ Each row is a real finding from the August 2026 sweep. None of them broke anythi
 
 ### The comment budget
 
-The incident comments are load-bearing and stay — but they are 26% of the workflow and action lines in this tree and 44% of the decision modules, so they are also the part that grows fastest and is checked least. Two bounds:
+The incident comments are load-bearing and stay — but they are also the part that grows fastest and is checked least. Two bounds:
 
 - **An incident comment belongs to a mechanism.** When the mechanism goes, the comment goes with it. A paragraph about a run that was lost to code no longer present is a trap, not a record.
-- **One incident, one place.** #554's unique-branch-suffix story is told in `agentic-prompt`, `agentic-auto-merge`, `agentic-watchdog` and `agentic-ci-failure`. The mechanism's own file gets the story; the others get a pointer to it.
+- **One incident, one place.** An incident is never told in every file it touches. The mechanism's own file gets the story; the others get a pointer to it.
 
 ## Repository variables
 
@@ -141,12 +133,14 @@ The Actions layer has no runtime you can drive locally, so its channel is `logic
 
 1. Add or update the assertions in `tests/unit/config/autonomy-loop.test.ts`. Pin the trigger, the token, and every guard — each of them fails silently in production.
 2. Read the **shipped source**, never a copy of it. The existing tests lift `agentic-auto-merge`'s inline script out of its `action.yml` and evaluate the real function; a re-typed duplicate drifts and then passes forever.
-3. Where a predicate is deliberately inlined in more than one place — the deliverable-PR check exists in three, one of which (`agentic-watchdog.yml`) genuinely runs without a checkout, and the "is a runner session live" check exists in two (`agentic-recover-blocked`, `agentic-ci-failure.yml`) for the same reason — pin every copy so they cannot disagree. Pinning each copy's own content is not enough: #614 happened because both liveness copies were individually pinned and still drifted, one polling the full set of non-terminal Actions run statuses and the other only two of them, with nothing ever comparing them. Assert the copies equal each other, not only that each contains what it should.
+3. Where a predicate is deliberately inlined in more than one place — the deliverable-PR check exists in three, one of which (`agentic-watchdog.yml`) genuinely runs without a checkout, and the "is a runner session live" check exists in two (`agentic-recover-blocked`, `agentic-ci-failure.yml`) for the same reason — pin every copy so they cannot disagree. Pinning each copy's own content is not enough: copies pinned individually still drift when nothing compares them. Assert the copies equal each other, not only that each contains what it should.
 4. `npm run test` and `npm run typecheck`. A YAML parse check (`python3 -c "import yaml; yaml.safe_load(open(...))"`) catches an indentation error before a push does.
 5. State in the PR body which mechanism changed and which run it was lost to. Nothing about this layer is self-evident three months later.
 
 ## Write the incident into the file
 
-Every non-obvious mechanism here carries a comment naming the run that made it necessary — #404, #430, #434, #499, #507, #552, #581. That is not decoration: the guards look redundant, and each one was added after a queue stalled for a day. A comment that says *what* the code does can be deleted safely by anyone; a comment that says which PR was lost cannot.
+Every non-obvious mechanism here carries a comment naming the run that made it necessary. That is not decoration: the guards look redundant. A comment that says *what* the code does can be deleted safely by anyone; a comment that says which PR was lost cannot.
 
 That is a reason to keep the incident, not a licence to keep the file. Rule 6's comment budget bounds this: the record travels with the mechanism and is told once, in the mechanism's own file.
+
+History: docs/context-history/agentic-workflow-edition.md

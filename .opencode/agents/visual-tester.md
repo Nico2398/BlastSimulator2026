@@ -1,6 +1,6 @@
 ---
 model: opencode/mimo-v2.5-free
-reasoningEffort: high
+reasoningEffort: medium
 description:  Visual testing: Puppeteer scenario tests, screenshots, state dumps. Use when change affects rendering, UI, or visual presentation.
 mode: subagent
 permission:
@@ -29,14 +29,14 @@ Two paths invoke this agent:
 
 | Context | When | Branch | Expected output |
 |---------|------|--------|----------------|
-| Standard verification | End of full pipeline, after @validator | `pipeline/feature-<label>` | Pass/fail with evidence |
-| Visual feedback loop | Iterative loop with @implementer | `pipeline/feature-<label>` | **All failures in one pass**, ranked by severity |
+| Standard verification | After `verify` passes on the feature branch | `pipeline/feature-<label>` | Pass/fail with evidence |
+| Visual feedback loop | Re-check after the lead fixed what you reported | `pipeline/feature-<label>` | **All failures in one pass**, ranked by severity |
 
-In both contexts: run the scenarios the orchestrator names — never the whole suite on a runner without a GPU, per `dev-finishing-work` — inspect every screenshot (including multi-angle shots), and report ALL visual failures found.
+In both contexts: run the scenarios the lead names — never the whole suite on a runner without a GPU, per `dev-finishing-work` — inspect every screenshot (including multi-angle shots), and report ALL visual failures found. You are a separate context so that the screenshots stay out of the lead's: your report carries words, never images — per failure, the scenario and step, the screenshot path, what is on screen, and what was expected.
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
-1. Verify branch: `git branch --show-current` → must be the feature branch the orchestrator named, `pipeline/feature-<label>` (`<label>` is `<issue>-<runId>`)
+1. Verify branch: `git branch --show-current` → must be the feature branch the lead named, `pipeline/feature-<label>` (`<label>` is `<issue>-<runId>`)
 2. Confirm the channel is live: `npm run verify:env` → `visual` must report READY
 3. Start dev server if not running
 4. Run scenario tests (predefined or custom)
@@ -212,11 +212,11 @@ Browser exposes:
 - Reason: no browser resolved / dev server unreachable / screenshots not written
 - `npm run verify:env` visual channel status + remedy
 - Screenshots captured: {count or N/A}
-- The orchestrator MUST halt the pipeline and escalate. Do NOT proceed to qualimetry or finalization.
+- The lead MUST halt the pipeline and escalate. Do NOT proceed to review or the pull request.
 ```
 
 **Severity levels:** SEVERE (missing/corrupt geometry), MODERATE (wrong colors/overlays/effects), MINOR (state mismatch, cosmetic).
-In visual feedback loop: report all issues found. @implementer fixes all of them, then re-invoke for another round.
+In visual feedback loop: report all issues found. The lead fixes all of them, then re-invokes you for another round.
 
 ## Key References
 

@@ -28,7 +28,7 @@ A blast resolves in four steps, all inside `src/core/mining/`. Every tuning cons
 (`src/renderer/FragmentAnimator.ts`), so a headless run — console, scenario runner — reaches exactly
 the same state with no animation. Never move an outcome into the renderer.
 
-The blast plan overlay (ordered-hole ghosts, drilled/charged tubes) is redrawn from the state on every state replacement (save load) and level load, not only after planning commands; an empty state resets it so no old hole stays drawn or clickable (#1877).
+The blast plan overlay (ordered-hole ghosts, drilled/charged tubes) is redrawn from the state on every state replacement (save load) and level load, not only after planning commands; an empty state resets it so no old hole stays drawn or clickable.
 
 ## Voxel Data Model
 
@@ -49,12 +49,12 @@ per-voxel objects or string keys, which a blast revisits far too often to afford
   is priced into `stemmingEfficiency` instead. Clamped to the world floor so an over-deep hole
   cannot lose part of its charge.
 - **Hole fit.** Charge column (`amountKg / CHARGE_KG_PER_METRE`) plus stemming must fit the hole depth; `createCharge` refuses an overflow (`mining.charge.column_exceeds_hole`, quoting the max kg that fits, `maxChargeKgForHole`). The Charge step shows the same limit and disables Charge All; the stepper is never clamped.
-- **Hole diameter (#1934).** Each hole has a diameter, chosen per drill plan from `DRILL_HOLE_DIAMETER_OPTIONS_M` (89 / 127 / 165 mm, default 89). A hole holds `chargeKgPerMetre(d) = CHARGE_KG_PER_METRE * (d / 0.089)^2` kg per metre (2.0 / ~4.07 / ~6.87), so every fit check (`chargeColumnM`, `maxChargeKgForHole`, `chargeFitsHole`, `maxFittingChargeKg`, `createCharge`) and the energy column (`buildHoleSeeds`: cells = kg / kg-per-metre, min 1) take the hole's diameter. An explosive's catalog min/max kg per hole scale by `holeCapacityFactor` (`explosiveHoleLimits`), exactly 1 at 89 mm. A wider bore needs a stronger rig (`minRigTierForDiameter`, see `gameplay-vehicle-fleet`). Console `drill_plan grid|add diameter:` takes mm or m (`normaliseHoleDiameter`), anything else is refused listing the options. The Charge step bounds the amount by the narrowest drilled hole and fits against the tightest hole.
+- **Hole diameter.** Each hole has a diameter, chosen per drill plan from `DRILL_HOLE_DIAMETER_OPTIONS_M` (89 / 127 / 165 mm, default 89). A hole holds `chargeKgPerMetre(d) = CHARGE_KG_PER_METRE * (d / 0.089)^2` kg per metre (2.0 / ~4.07 / ~6.87), so every fit check (`chargeColumnM`, `maxChargeKgForHole`, `chargeFitsHole`, `maxFittingChargeKg`, `createCharge`) and the energy column (`buildHoleSeeds`: cells = kg / kg-per-metre, min 1) take the hole's diameter. An explosive's catalog min/max kg per hole scale by `holeCapacityFactor` (`explosiveHoleLimits`), exactly 1 at 89 mm. A wider bore needs a stronger rig (`minRigTierForDiameter`, see `gameplay-vehicle-fleet`). Console `drill_plan grid|add diameter:` takes mm or m (`normaliseHoleDiameter`), anything else is refused listing the options. The Charge step bounds the amount by the narrowest drilled hole and fits against the tightest hole.
 - **Absorption threshold** = rock mix weighted by `energyAbsorption`, × `fractureModifier`, ×
   `confinementFactor(distToAir)`. **Rock near a free face breaks for a fraction of the energy**
   (`UNCONFINED_THRESHOLD_FACTOR`, ramping to full over `CONFINEMENT_FULL_DEPTH`) — this is why bench
   blasting works at all.
-- **Explosive tier shortfall (#1358).** An explosive never refuses rock; rock harder than its
+- **Explosive tier shortfall.** An explosive never refuses rock; rock harder than its
   `minRockTier` just costs more. Per column, the nearest *charged* hole (horizontal distance) names
   the explosive; each rock voxel's threshold is multiplied by
   `TIER_SHORTFALL_THRESHOLD_FACTOR ** max(0, rockTier - minRockTier)` (`ExplosiveRockFit.ts`),
@@ -69,7 +69,7 @@ per-voxel objects or string keys, which a blast revisits far too often to afford
 - **Spread** goes to the 18 face-and-edge neighbours, weighted by 1/distance and biased toward
   neighbours nearer a free face (`FREE_FACE_BIAS`, via `freeFaceWeight`). Air above always pulls; a side
   or lower face pulls only within `FREE_FACE_LATERAL_RANGE_M` (4 m) of the rock, so an excavation beside
-  a pattern (an access ramp dug first) cannot drag energy off distant charges and leave pillars (#1793).
+  a pattern (an access ramp dug first) cannot drag energy off distant charges and leave pillars.
   Spread loses `transmissionLoss` (derived from rock
   porosity) at each step. Air neither absorbs nor carries: a void shields what is behind it.
 - **Energy is conserved.** `seeded == Σ effective + dissipated`. Keep it that way.
@@ -92,14 +92,14 @@ Four passes, in order:
    zone, with air above it, lifts rather than being crushed. Without this a charge carves a sealed
    cavity under intact ground at *any* size and the player sees nothing happen. Thicker burden still
    holds, which is what makes an over-buried charge visibly fail to break out.
-3. **Floor to grade (#1723)** — sub-drilling. `EnergyField.gradeY` is the world Y of the highest
+3. **Floor to grade** — sub-drilling. `EnergyField.gradeY` is the world Y of the highest
    charged hole bottom, plus `BLAST_GRADE_FLOOR_OFFSET_M` (null when nothing is charged; `seedEnergy`
    sets it). In every footprint column (one with at least one voxel already broken), `floorToGrade`
    breaks the standing rock below the column's topmost broken voxel down to `gradeY`, but never more
    than `BLAST_GRADE_MAX_CUT_M` below that column's lowest broken voxel, so a deep outlier hole
    cannot gouge the pit. A hole's one-voxel breakout under grade is left standing beside any column
    ending at grade, whichever pass broke it (neighbours read from a pre-lift snapshot; a cut clamped
-   above grade does not count), so the floor is flush; a lone hole keeps its pit. The lift floods: an 8-connected group of columns all ending exactly one voxel under grade lifts whole when any member neighbours a column at grade (pre-lift snapshot), so pockets between close holes (3 m spacing) are flush too; **enclosed pillars (#1825)**: an unbroken column with no 4-connected path of unbroken columns to the box shell (the centre of a square of four close holes, 4 m spacing) is floored too, from its highest solid voxel down to the region's floor (`max(gradeY, lowest bordering footprint column - BLAST_GRADE_MAX_CUT_M)`); air is skipped, and only a pillar bordered by a column whose broken zone reaches its own top (the cap lifted off) is floored, so a sealed shot that never broke out stays sealed (#1724); columns touching the shell, a ring with a gap, lone-hole pits and gradeY null are unchanged; a group with no grade neighbour stays, and deeper columns neither lift nor carry the fill. It returns the voxels it added (`FragmentationResult.gradedCount`). The
+   above grade does not count), so the floor is flush; a lone hole keeps its pit. The lift floods: an 8-connected group of columns all ending exactly one voxel under grade lifts whole when any member neighbours a column at grade (pre-lift snapshot), so pockets between close holes (3 m spacing) are flush too; **enclosed pillars**: an unbroken column with no 4-connected path of unbroken columns to the box shell (the centre of a square of four close holes, 4 m spacing) is floored too, from its highest solid voxel down to the region's floor (`max(gradeY, lowest bordering footprint column - BLAST_GRADE_MAX_CUT_M)`); air is skipped, and only a pillar bordered by a column whose broken zone reaches its own top (the cap lifted off) is floored, so a sealed shot that never broke out stays sealed; columns touching the shell, a ring with a gap, lone-hole pits and gradeY null are unchanged; a group with no grade neighbour stays, and deeper columns neither lift nor carry the fill. It returns the voxels it added (`FragmentationResult.gradedCount`). The
    marks join the mask, so fragments, cleared voxels, the pre-blast estimate and the ore report
    follow the real broken volume; energy is untouched. Without it a pattern leaves pits under the
    holes and 1-4 m ridges between them, steeper than `NAV_MAX_SLOPE_DEGREES`, and one ramp into the
@@ -165,7 +165,7 @@ rock is abandoned mid-arc.
   fell, whatever the terrain beside it does — otherwise flyrock trickles back into the pit it was
   thrown out of, and where flyrock lands is the whole reason it is dangerous.
 
-**Rock that fails to break out stays sealed (#1724).** A fragment whose origin lies in a void with
+**Rock that fails to break out stays sealed.** A fragment whose origin lies in a void with
 an intact solid voxel above it in its column never leaves it: it does not fly (`thrown: false`,
 never a projectile) and settles inside the void, on the first empty layer above the ground at or
 below where it broke, never above the cap. Piles are keyed by (column, layer); a column filled to the
@@ -175,7 +175,7 @@ thrown in from elsewhere still lands on top of the cap, and open columns resolve
 a blast that cleared rock but never broke out is reported (`mining.blast.no_breakout`,
 `BlastReport.brokeOut`) and capped to bad (`no_breakout`).
 
-**Breakout warning and sealed reporting (#2003).** `predictBreakout` (`BreakoutPrediction.ts`) runs the
+**Breakout warning and sealed reporting.** `predictBreakout` (`BreakoutPrediction.ts`) runs the
 executor's read-only energy pass and fragmentation (`liftUnderminedBurden`, per-hole diameter via
 `chargeKgPerMetre`) on a charged plan and reports broken voxels, sealed voxels (intact rock still above
 in the column), `sealedShare`, `tooDeepHoleIds` and the charged hole count, plus the `fragmented` set and `sealedKeys` (`isVoxelSealed`, the voxel-level twin of `isFragmentSealed`); it agrees with
@@ -183,28 +183,27 @@ in the column), `sealedShare`, `tooDeepHoleIds` and the charged hole count, plus
 `partial` when the sealed share reaches `BLAST_SEALED_SHARE_PARTIAL`. Both the Blast step
 (`breakout-check`) and the Pre-Flight modal (`preflight-breakout-warning`) show it at every software
 tier (a plan-against-ground check, not an analysis number); it never blocks firing, and advises
-shorter holes or an explosive that fills more of the hole, never wider holes. The thresholds
-(`BLAST_SEALED_SHARE_FAILURE` 0.75, `BLAST_SEALED_SHARE_PARTIAL` 0.25) are defaults chosen under
-`agentic-decision-autonomy`. After fragments land, `isFragmentSealed` splits the result:
+shorter holes or an explosive that fills more of the hole, never wider holes. The thresholds are
+`BLAST_SEALED_SHARE_FAILURE` 0.75 and `BLAST_SEALED_SHARE_PARTIAL` 0.25. After fragments land, `isFragmentSealed` splits the result:
 `BlastResult.totalOreValue` is broken-out ore only, `sealedOreValue` / `sealedFragmentCount` the rest,
 `reachableOversizedFragments` the oversize fragments not sealed. The report modal shows "Sealed
 underground" (a later shot breaking the cap can still free it) and limits the oversize hint to
 reachable fragments; the console report matches.
 
-Sealed rock gets no `haul_debris`/`fragment_debris` order (#1774) until its void opens to the surface (the column's top solid no longer above it); then it is ordinary debris.
+Sealed rock gets no `haul_debris`/`fragment_debris` order until its void opens to the surface (the column's top solid no longer above it); then it is ordinary debris.
 
-**Defaults break out (#1724).** `CHARGE_DEFAULT_AMOUNT_KG` (7) with `CHARGE_DEFAULT_STEMMING_M` (2.5)
+**Defaults break out.** `CHARGE_DEFAULT_AMOUNT_KG` (7) with `CHARGE_DEFAULT_STEMMING_M` (2.5)
 in the default 8 m, 4 m-spaced 3x3 pattern is the smallest charge that opens a crater with every
 hole's column lowered on the sandbox flat pad and on `tutorial_pit`, rating at least good, and it
 fits the hole (`amount / CHARGE_KG_PER_METRE + stemming <= depth`). The measured sweep sits beside
 the constants in `balance.ts`; 4 kg stays under `BURDEN_BREAKOUT_MAX` of cap and fails to break out.
 
-**Placement is physics-only (#1302).** Where fragments and debris land is decided by blast physics
+**Placement is physics-only.** Where fragments and debris land is decided by blast physics
 alone and is never adjusted, rejected or relocated for reachability. No reachability query lives in
 `src/core/mining` or fragment/physics code. Debris stranded outside the ground crew's reachable set
 belongs to the player: connect it (ramp, levelling, another blast) or leave it.
 
-**Levelling a crater (#1723).** A `level_ground` order's work target is the reachable column
+**Levelling a crater.** A `level_ground` order's work target is the reachable column
 (`employeeClimbReach`) of its rectangle nearest the rect's min corner (`pickReachableColumn`), so a
 rectangle the crew can partly reach starts instead of waiting `target_unreachable`; when none is
 reachable the target stays the corner and the order waits. The digger carves as it works
@@ -221,18 +220,19 @@ expose it as `muckPile`, so a browser harness and a headless run read the same n
 - **Standing on the blast** is fatal regardless of the charge — the ground is simply gone.
   `blastCommand` kills employees and destroys vehicles on any cleared column. Evacuating the zone
   first (`Zone.ts`) is the point of the safety drill.
-- **Stuck walker counts as stranded (#1990):** an armed blast never waits on an in-zone employee who
+- **Stuck walker counts as stranded:** an armed blast never waits on an in-zone employee who
   cannot move. `isStuckWalker` (`DetonationSequence.ts`) = `isMoveStuck` or `moveConsecutiveFailures >=
   DETONATION_STUCK_WALKER_FAILURE_TICKS` (10). `detonationPhase` lists such an employee among the
   stranded names (all stranded, none walking -> `stranded`; mixed stays `evacuating`), and
   `tickDetonation` latches them into `strandedEmployeeIds` every tick so a counter reset by re-evacuation
-  cannot revert the verdict. Employees only; vehicles keep the #1746/#1781 rescue logic. Fire anyway and
+  cannot revert the verdict. Employees only; vehicles keep the parked-vehicle rescue logic (`gameplay-vehicle-fleet`). Fire anyway and
   Cancel unchanged.
 - **Landing impacts** go through `Damage.processProjections`, keyed on where fragments came to rest
   and how fast they were going.
 - **Buildings** are destroyed when a cleared voxel falls under their footprint.
 
-- **Secondary crater (#1896):** a stocked Explosive Warehouse destroyed by accident fires its own one-hole blast through this pipeline; spec and decisions in `gameplay-buildings` (Destruction Effects).
+- **Secondary crater:** a stocked Explosive Warehouse destroyed by accident fires its own one-hole blast through this pipeline; spec in `gameplay-buildings` (Destruction Effects).
+
 ## Blast Report and Rating
 
 `BlastResult` carries `clearedVoxels`, `crackedVoxels`, fragment counts and sizes, `projectionCount`,
@@ -243,7 +243,7 @@ Rating is driven by **how far rock was actually thrown** (`THROW_DISTANCE_BAD` /
 in its own muck pile is a good blast however fast it left. `BlastReport.maxProjectionDistanceM` is that
 traced `maxThrowDistance`, so the report modal, console and rating agree.
 
-### Rating caps (#1349)
+### Rating caps
 
 `calculateRating` stays the base rule (`BlastResult.rating`). `buildBlastReport` then applies hard
 ceilings via `applyRatingCaps` (`BlastRatingCaps.ts`), so `BlastReport.rating` is the capped value;
@@ -257,8 +257,8 @@ Caps only lower; precedence, most severe first:
 | `fizzled_failure` | fizzled charges / charged holes >= `BLAST_FIZZLE_SHARE_FAILURE` (0.75; `fizzleShare`, 0 charged = 0) | bad |
 | `fizzled_partial` | same share >= `BLAST_FIZZLE_SHARE_PARTIAL` (0.25) | mediocre |
 | `no_breakout` | rock was cleared but no cleared voxel reached its column's pre-blast top (`BlastResult.brokeOut` false) | bad |
-| `sealed_failure` (#2003) | sealed fragments / fragments >= `BLAST_SEALED_SHARE_FAILURE` (0.75; `sealedShare`, 0 fragments = 0) | bad |
-| `sealed_partial` (#2003) | same share >= `BLAST_SEALED_SHARE_PARTIAL` (0.25) | mediocre |
+| `sealed_failure` | sealed fragments / fragments >= `BLAST_SEALED_SHARE_FAILURE` (0.75; `sealedShare`, 0 fragments = 0) | bad |
+| `sealed_partial` | same share >= `BLAST_SEALED_SHARE_PARTIAL` (0.25) | mediocre |
 | `wet_holes` | wet holes with at least one fizzled charge (wet holes whose charges fired no longer cap) | good |
 | `oversize` | oversized fragments / fragments strictly above `BLAST_OVERSIZE_SHARE_CAP` (0.30, 0 fragments = 0 share) | good |
 
@@ -306,17 +306,17 @@ voxel seed-list caching in fragment generation, a spatial hash in projectile gro
 surface queries under the arcs. Profile before and after touching any of them; a 16-hole blast
 budget is ~300 ms.
 
-## Loading a saved plan (#1342)
+## Loading a saved plan
 
-`blast_plan load name:X` queues orders; it never writes finished holes. Each saved hole becomes a planned hole (fresh unique id, `addHole` skips ids live in `drillHoles`/`plannedDrillHoles`) with one `drill_hole` order; each saved charge becomes one `charge_hole` order (cost deducted, `plannedChargesByHole` filled), Saved holes at an x,z already drilled or planned are skipped; orphan charges are skipped. Pre-checks (claim, `createCharge`, funds) are all-or-nothing. Charge-after-drill gate: `isHoleOrderClaimable` (ActionSelection.ts) keeps a `charge_hole` unclaimable while its hole is still in `plannedDrillHoles`, applied in targeted, pool and starvation claim paths. Removing the planned hole cancels and refunds its charge order.
+`blast_plan load name:X` queues orders; it never writes finished holes. Each saved hole becomes a planned hole (fresh unique id, `addHole` skips ids live in `drillHoles`/`plannedDrillHoles`) with one `drill_hole` order; each saved charge becomes one `charge_hole` order (cost deducted, `plannedChargesByHole` filled). Saved holes at an x,z already drilled or planned are skipped; orphan charges are skipped. Pre-checks (claim, `createCharge`, funds) are all-or-nothing. Charge-after-drill gate: `isHoleOrderClaimable` (ActionSelection.ts) keeps a `charge_hole` unclaimable while its hole is still in `plannedDrillHoles`, applied in targeted, pool and starvation claim paths. Removing the planned hole cancels and refunds its charge order.
 
-Hole ids are monotonic (`state.nextHoleId`, saved with the game, v29 migration backfills it) except `drill_plan grid`, which replaces the plan and restarts at H1; removing a hole never reuses an id (#1352).
+Hole ids are monotonic (`state.nextHoleId`, saved with the game, v29 migration backfills it) except `drill_plan grid`, which replaces the plan and restarts at H1; removing a hole never reuses an id.
 
-## Pattern charge settings (#1345)
+## Pattern charge settings
 
 `charge hole:* explosive:X amount:N stemming:M` stores the settings on the pattern (`state.patternCharge`, repeat overwrites) and orders every drilled hole not yet covered; a hole drilled later is charged automatically the moment it lands (`autoChargeHole`, called by the `drill_hole` completion). Logic lives in `src/core/mining/ChargeOrder.ts` (core), the console only parses and formats.
 
-- **Vehicle work (#1649).** Each `charge_hole` order needs a charging truck and a blasting + `driving.truck` crew member; without them it waits with an availability reason (see `gameplay-vehicle-fleet`).
+- **Vehicle work.** Each `charge_hole` order needs a charging truck and a blasting + `driving.truck` crew member; without them it waits with an availability reason (see `gameplay-vehicle-fleet`).
 - **Skip covered.** A hole is covered when charged or holding an outstanding `charge_hole` order; Charge All and auto-charge skip it. A cancelled order is not re-ordered automatically: run Charge All again.
 - **Funds per hole.** Cost is paid at order time, hole by hole. A hole the player cannot afford is listed in `state.chargeAwaitingFunds` (nothing ordered, nothing deducted) and retried once per tick (`settleAwaitingFundsCharges`, id order, walks only that list) until affordable. The call still succeeds: "ordered N, skipped M already charged, waiting K". UI: awaiting-funds chip per hole, a reason line, one warn toast per episode.
 - **Refusals.** `charge hole:*` with no drilled and no planned hole, or with everything drilled already covered and nothing planned, is refused (`mining.charge.nothing_to_charge`). Only planned holes: succeeds and stores the settings. `blast` with no drilled hole holding a loaded (or loading) charge is refused (`mining.blast.no_charged_holes`); nothing mutates.
@@ -324,12 +324,12 @@ Hole ids are monotonic (`state.nextHoleId`, saved with the game, v29 migration b
 - **Reset and edge cases.** `resetPlanState` (clear, post-blast) clears the pattern and the waiting list; removing a hole drops its id from the list. An explosive the level does not offer clears the pattern; a failing `createCharge` for one hole leaves it uncharged, never throws.
 - **Replacing a pattern.** `drill_plan grid` over drilled or charged holes is refused unless `confirm:true` (`mining.drill_plan.confirm_replace`, names the counts); the Drill step opens a ConfirmModal (`replacePatternConfirm.ts`) and re-runs with `confirm:true`. A plan of only ordered-not-yet-drilled holes needs no confirm.
 - **Tubing excluded.** `install_tubing` stays a separate per-hole action; it is not part of the pattern.
-- **Hole water (#1350).** Wetness is per-hole stored water (`state.holeWater`), not "is it raining now": it builds in rain and fades afterwards, slower in porous rock. Tubing blocks new water but does not remove old water; `drain_hole` does, at `HOLE_DRAIN_COST_PER_HOLE`, except an untubed hole in porous rock. Details in `gameplay-game-design` (Weather).
-- **Held detonation and rain exposure (#1957).** When the zone is clear but `fizzlingHoles` (wet holes carrying a water-sensitive charge) is non-empty, `detonationPhase` reports `held` instead of `ready`: the armed detonation stays pending, tick auto-fire does not fire, and `blast detonate` / the pre-flight modal show the holes with Cancel and Blast anyway (`blast` fires regardless). Evacuating and stranded take precedence. `rainExposedHoles` (charged, untubed, water-sensitive holes while it rains) drives the pre-flight, Fire-step and drain-button rain warnings; tubing or a water-resistant explosive clears them. All read from `GameState`, never re-simulated.
+- **Hole water.** Wetness is per-hole stored water (`state.holeWater`), not "is it raining now": it builds in rain and fades afterwards, slower in porous rock. Tubing blocks new water but does not remove old water; `drain_hole` does, at `HOLE_DRAIN_COST_PER_HOLE`, except an untubed hole in porous rock. Details in `gameplay-game-design` (Weather).
+- **Held detonation and rain exposure.** When the zone is clear but `fizzlingHoles` (wet holes carrying a water-sensitive charge) is non-empty, `detonationPhase` reports `held` instead of `ready`: the armed detonation stays pending, tick auto-fire does not fire, and `blast detonate` / the pre-flight modal show the holes with Cancel and Blast anyway (`blast` fires regardless). Evacuating and stranded take precedence. `rainExposedHoles` (charged, untubed, water-sensitive holes while it rains) drives the pre-flight, Fire-step and drain-button rain warnings; tubing or a water-resistant explosive clears them. All read from `GameState`, never re-simulated.
 
-## Undrilled holes at fire time (#1346)
+## Undrilled holes at fire time
 
-Firing with ordered-but-undrilled holes (`plannedDrillHoles`) warns in the preflight modal (`warn_undrilled`), never gates FIRE; a successful blast cancels every outstanding `drill_hole` order (`cancelOutstandingDrillActions`) and reports the count. Default chosen over blocking FIRE; refused blasts cancel nothing.
+Firing with ordered-but-undrilled holes (`plannedDrillHoles`) warns in the preflight modal (`warn_undrilled`), never gates FIRE; a successful blast cancels every outstanding `drill_hole` order (`cancelOutstandingDrillActions`) and reports the count. Refused blasts cancel nothing.
 
 ## Software Upgrades (Prediction Tools)
 
@@ -343,13 +343,13 @@ Firing with ordered-but-undrilled holes (`plannedDrillHoles`) warns in the prefl
 
 Previews run the **same** propagation the blast does (`buildPlanEnergyField`) and the same seeding
 and velocity maths. A preview that models the rock differently from the game is worse than no
-preview — never reintroduce a separate approximation. Previews also take the wet-hole set (`wetHoleIdsFor`, the same one `executeBlast` receives), so water-sensitive charges in holes holding water (`state.holeWater`, #1350) are predicted weakened.
+preview — never reintroduce a separate approximation. Previews also take the wet-hole set (`wetHoleIdsFor`, the same one `executeBlast` receives), so water-sensitive charges in holes holding water (`state.holeWater`) are predicted weakened.
 
 ### Detonation and Workshop steps
 
 No detonation sequence exists: every charge fires together at blast start (no per-hole order or delay). The Blast Workshop has 4 steps: Drill, Charge, Preview, Fire. A save carrying a stray `sequenceDelays` key ignores it.
 
-### Village vibration (#1343)
+### Village vibration
 
 Villages come from the level's structure set (`PlayableArea.villages()`, the same set the renderer
 draws; ids `village-<i>`, ground level). Both `executeBlast` and `previewVibrations` measure from the
@@ -375,37 +375,37 @@ points for an ordinary blast and ~5 for an oversized one.
   the muck pile behind each shot. Its camera looks *into* the site: a blast digs a hole, and from
   eye level the crater's rim hides everything in it. `setOrbit` takes **degrees**.
 
-## Charge cost: cash vs stock (#1685)
+## Charge cost: cash vs stock
 
 A charge order records `fromStockKg` (the part drawn from warehouse stock at order time) on `plannedChargesByHole`, carried into `chargesByHole` on loading. Every cost shown to the player is the cash part at list price (`recordedChargesCost`; forward preview `stockAwareChargesCost`). `BlastReport.spent` = cash, `BlastReport.spentFromStock` = list value of the stock kg. Detail in `gameplay-buildings`.
 
-## EST. ORE VALUE (#1703)
+## EST. ORE VALUE
 
 `estimateBlastOreValue(plan, surveys, grid, wetHoleIds)` (`BlastValueEstimate.ts`) values the ore the blast will actually break. It runs the blast's own propagation (`buildPlanEnergyField` + `identifyFragmentedVoxels`, the same code the preview and `executeBlast` use), so the broken volume matches; wet holes are treated as the blast treats them. Each broken 1 m voxel is read from the newest fresh survey covering its column at the voxel's own depth (`oresSurveyedAt`, see `gameplay-survey-system`): value += density x `ORE_DENSITY_KG_M3` x catalog `valuePerKg` x survey `confidence`. Ore a survey did not locate at that depth counts for nothing (aerial counts its top 2 m only). The grid supplies rock geometry only, never ore. Only ore predicted to break out counts: voxels in `predictBreakout`'s `sealedKeys` are excluded from the value and margin and reported apart as `BlastOreEstimate.sealedValue` / `sealedVoxels` (footer line `data-role="footer-sealed"`), matching `BlastResult.totalOreValue` vs `sealedOreValue`. Uncharged holes or an empty plan give 0. The footer and preflight modal memoise it (`oreEstimateMemo.ts`) on holes, charges, wet holes, survey ids/stale flags and the grid's dirty-chunk count.
 
 `BLAST_ESTIMATE_TOLERANCE` (0.35) is the working accuracy target: with a fresh seismic survey (or core samples on every column) covering the pattern, the estimate lands within +-35% of the actual ore value (seed 42, 3x3, spacing 4, depth 8: desert_badlands (32,22) boomite 8 kg, green_foothills (32,32) krackle 8 kg, alpine_granite (36,16) shatternite 4 kg). Measured: seismic 0.86/0.84/0.78; core samples 0.68/0.67/0.40 (alpine misses: dilute rustite rounds out of 1 m core bands); aerial about 0.2-0.26 by design.
 
-## BURIED HOLES (#1937)
+## BURIED HOLES
 
 Progression sites only (`isProgressionSite`; other sites are unchanged). A planned drill hole (`state.plannedDrillHoles`) is **buried** while any `on_ground` fragment covers its cell. A fragment covers cells from `position - halfExtents` to `position + halfExtents`, rounded with `Math.round` (the nav grid's convention), inclusive in x and z; a fragment without `halfExtents` covers one cell. `in_transit` and `stored` fragments never bury. `src/core/mining/BuriedHoles.ts` indexes covered cells once per tick (`buildBuriedCellIndex`, cache keyed on state, tick and fragment count) and answers per hole in O(1) (`buriedHolesOf`, `isHoleBuried`, `fragmentBuriesPlannedHole`). A buried hole's `drill_hole` order stays pending (not claimable, `isHoleOrderClaimable`) with `blockedReason` `buried_under_rubble`, cleared once the rubble is hauled away; a drill already in progress continues. A `haul_debris` of a fragment burying a planned hole gets `BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS` (64, `balance.ts`) off its sort key like the ore demand bonus (ranking only; set to 0 to reverse). The console `drill_plan show` tags such holes "buried"; the Blast Workshop Drill step shows "N planned (M buried)" and a warning "Buried" chip on their rows.
 
-**Buried holes wait for the player (#2082, #2095).** A `buried_under_rubble` hole is never removed or re-planned by core. When its rubble sits on a floor the vehicle network no longer reaches, nothing happens by itself: the player orders a ramp down (or levels the ground), and the existing rubble-first haul priority (`BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS`) then clears the holes and the driller resumes. See `gameplay-navmesh`, "Crater access is the player's job".
+**Buried holes wait for the player.** A `buried_under_rubble` hole is never removed or re-planned by core. When its rubble sits on a floor the vehicle network no longer reaches, nothing happens by itself: the player orders a ramp down (or levels the ground), and the existing rubble-first haul priority (`BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS`) then clears the holes and the driller resumes. See `gameplay-navmesh`, "Crater access is the player's job".
 
-## Pre-Flight building reach (#2030)
+## Pre-Flight building reach
 
-`buildingsInBlastReach` (`BlastPlan.ts`) warns of buildings the planned holes may hit (#2021 rows). Its default margin is charge-derived, not the hole spacing:
+`buildingsInBlastReach` (`BlastPlan.ts`) warns of buildings the planned holes may hit (the Pre-Flight building rows). Its default margin is charge-derived, not the hole spacing:
 
 - `holeBlastReachM(charge, depth) = BLAST_REACH_M_PER_SQRT_ENERGY * sqrt(computeInitialEnergy(charge, depth))` (`balance.ts`, 0.045 m per sqrt energy unit). Stemming efficiency and explosive energy are inside `computeInitialEnergy`; an undefined charge, unknown explosive or 0 kg gives 0.
 - Margin = max reach over all holes (simplification: one margin for the whole pattern, not per hole); an uncharged hole contributes 0. An explicit `marginM` overrides.
 - The margin grows the holes' bounding box (`computeDangerZone`); a footprint cell at distance D from the box edge is flagged when D <= reach (whole cell, inclusive edge).
 - Reference (3x3 grid, 4 m spacing, 8 m deep, 2.4 m stemming): Krackle 8 kg ~2.55 m, Shatternite 11 kg ~3.95 m, Dynatomics 11 kg ~5.38 m.
-- Flying rock (#1968) is not modelled; the reach covers breakage only.
+- Flying rock is not modelled; the reach covers breakage only.
 
-## WALL STABILITY (#1941)
+## WALL STABILITY
 
 Progression sites only (`isProgressionSite`; other sites and campaign levels never slump). After a blast that cleared voxels, `fireBlastSteps` runs `applyWallSlumps` (`src/console/commands/mining/wallSlump.ts`) after the occupancy update and before `warmOrderReachability`. Core rule in `src/core/mining/WallStability.ts`.
 
-- **Safe face height.** `RockType.safeFaceHeightM` comes from `hardnessTier` via `WALL_SAFE_FACE_HEIGHT_M_BY_TIER` (12/15/20/25/30 m); `getSafeFaceHeightM(rockId)` reads it (unknown rock = tier 1). Measured: the standard opening (3x3 holes, 8 m, 4 m spacing, floor up to 4 m deeper) leaves a tallest face of 10 m in the biomes where it breaks out (seeds 42/7/13), so no constant was lowered or raised.
+- **Safe face height.** `RockType.safeFaceHeightM` comes from `hardnessTier` via `WALL_SAFE_FACE_HEIGHT_M_BY_TIER` (12/15/20/25/30 m); `getSafeFaceHeightM(rockId)` reads it (unknown rock = tier 1). Measured: the standard opening (3x3 holes, 8 m, 4 m spacing, floor up to 4 m deeper) leaves a tallest face of 10 m in the biomes where it breaks out (seeds 42/7/13).
 - **Face.** A continuous strict drop between neighbouring columns along one of the four axis directions (column top = `computeVoxelColumnSurfaceY`, 1 m voxels). A flat step of `WALL_BERM_MIN_WIDTH_M` (3) columns, landing column included, ends a face; a 2 m flat does not. A rise or missing column also ends it. Height = crest top - toe top.
 - **Fails when** height is strictly greater than the safe height of the weakest rock (minimum over the dominant rock of every wall voxel). Exactly at the height never slumps.
 - **Slump.** Material above `toeY + safe` in the crest column, the `WALL_SLUMP_DEPTH_M - 1` columns behind it and the face's own columns is removed and re-deposited as fill on the floor: toe column first, then floor columns at toe level spreading outward (Chebyshev distance, then x, then z, within `WALL_SLUMP_PILE_SEARCH_RADIUS_M`), at most `WALL_SLUMP_PILE_MAX_HEIGHT_M` per column; any remainder stacks on the toe so volume is never lost. Fill voxels keep composition and ores (one-to-one). Never cuts below the toe level. `SlumpReport.volumeM3` is the count of 1 m voxels moved; `toeColumns` is the damage zone.
@@ -414,6 +414,8 @@ Progression sites only (`isProgressionSite`; other sites and campaign levels nev
 - **Effects.** Per slump: `terrain:updated` over the touched voxels (nav grid follows), employees/vehicles/buildings in the toe zone take blast-like damage (`processProjections` with a synthetic rockfall per toe column at `WALL_SLUMP_IMPACT_SPEED_MS`), `state.damage.wallSlumpCount` increments (serialized as `wallSlumpCount`), `mining:wall_slump` `{x, z, volumeM3}` (toe position) raises a warn notification ("The geologist did warn you."), and the blast report gains a `mining.blast.wall_slump` line.
 - Digs and ramp cuts do not trigger it in v1.
 
-## Wall warning prediction and overlay (#1943)
+## Wall warning prediction and overlay
 
 On progression sites the player sees an unstable wall before it falls. `predictWallFaces(plan, grid, wetHoleIds)` (`WallStability.ts`) runs the blast's own propagation and fragmentation read-only (`buildPlanEnergyField` + `identifyFragmentedVoxels`, wet holes honoured), scans a virtual surface with the broken voxels removed over the region `executeBlast` reports as cleared, and runs the slump pass's own face scan (`findFacesAtRisk`, default `WALL_WARN_RATIO` 0.8: warns from 80% of the safe height, so amber-band faces are listed with their `ratio` although they do not slump) so no second rule exists. The Blast Workshop Preview step (`preview-wall-warning`) and the Preflight modal (`preflight-wall-warning`) list each predicted face ("leaves a 22 m face in molite (safe: 15 m). It may slump."); neither gates detonation. The geology overlay (toggle `wall-overlay-toggle` in the Survey panel header, key W, off by default) tints the faces the armed plan would leave plus the site's current at-risk faces: amber from `WALL_WARN_RATIO` (0.8) of the safe height, red at or over it. Off progression sites there is no warning and no overlay entry.
+
+History: docs/context-history/gameplay-blast-system.md

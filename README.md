@@ -442,7 +442,7 @@ The assignment comment *is* the trigger, and it carries the whole assignment: th
 
 **Why the PAT matters:** GitHub does not trigger workflows from events created with `GITHUB_TOKEN`. An assignment comment posted with it wakes no runner, and a PR opened with it raises no `pull_request` event, so auto-merge and the next assignment never happen. Every comment and PR in the loop must come from `PAT_TOKEN_COPILOT_AUTOMATION`.
 
-Full architecture — branch isolation, cherry-pick, the halt conditions — lives in the `agentic-autonomous-pipeline` skill, which keeps the GitHub Actions loop itself (entry points, issue labels as state, parallel runs and scopes, the merge gate, rescue, watchdog) in `references/github-loop.md`.
+Full architecture — branch isolation and the blind phase, the halt conditions — lives in the `agentic-autonomous-pipeline` skill, which keeps the GitHub Actions loop itself (entry points, issue labels as state, parallel runs and scopes, the merge gate, rescue, watchdog) in `references/github-loop.md`.
 
 ---
 
