@@ -57,10 +57,14 @@ export function isStepClimbable(fromY: number | undefined, toY: number | undefin
 
 /** Horizontal run (m) a step of (dx, dz) must travel to climb at no more than `maxSlopeRatio` (#2045). */
 export function stepClimbRun(dx: number, dz: number, maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO): number {
+  const ax = Math.abs(dx);
+  const az = Math.abs(dz);
   // Below the walking limit the rise gate would let a diagonal step zigzag up a ramp
   // steeper than the axis limit (rise/run with run up to √2), so the run is the
   // longer axis: no diagonal shortcut for a limited request.
-  if (maxSlopeRatio < NAV_MAX_SLOPE_RATIO) return Math.max(Math.abs(dx), Math.abs(dz));
+  if (maxSlopeRatio < NAV_MAX_SLOPE_RATIO) return Math.max(ax, az);
+  // Unit steps (every A* neighbour) skip Math.hypot on the hot path.
+  if (ax <= 1 && az <= 1) return ax + az === 2 ? Math.SQRT2 : ax + az;
   return Math.hypot(dx, dz);
 }
 
@@ -77,8 +81,14 @@ export function stepClimbRun(dx: number, dz: number, maxSlopeRatio: number = NAV
  * steep axis step, so the shortcut stays closed there.
  */
 export function isGridStepClimbable(grid: NavGrid, x: number, z: number, nx: number, nz: number, maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO): boolean {
-  const from = grid.cellAt(x, z);
-  const to = grid.cellAt(nx, nz);
+  return isCellStepClimbable(grid, x, z, grid.cellAt(x, z), nx, nz, grid.cellAt(nx, nz), maxSlopeRatio);
+}
+
+/** `isGridStepClimbable` for a caller already holding both cells (`from` at (x, z), `to` at (nx, nz)): the A* hot loop. */
+export function isCellStepClimbable(
+  grid: NavGrid, x: number, z: number, from: NavCell | undefined, nx: number, nz: number, to: NavCell | undefined,
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
+): boolean {
   if (!to) return false;
   const dx = nx - x;
   const dz = nz - z;

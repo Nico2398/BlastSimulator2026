@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Pathfinding: A* route finding over the NavGrid
 // Part of the navmesh system.
 
-import { NavGrid, isGridStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
+import { NavGrid, isCellStepClimbable, isGridStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
 import { pathfindingNodeBudget, pathfindingRetryNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 as NEIGHBOUR_OFFSETS } from './NeighbourOffsets.js';
@@ -1048,6 +1048,7 @@ function findOrdinaryPath(
     }
 
     // Explore neighbours
+    const currentCell = grid.cellAt(cx, cz);
     for (const [dx, dz] of NEIGHBOUR_OFFSETS) {
       const nx = cx + dx;
       const nz = cz + dz;
@@ -1059,7 +1060,7 @@ function findOrdinaryPath(
       const skipClearance = (startPocket?.has(neighborIdxForPocket) ?? false) || (goalPocket?.has(neighborIdxForPocket) ?? false);
       if (!neighborCell || isImpassable(neighborCell, avoidVehicles, false, requiredClearance, skipClearance)) continue;
       if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(grid, cx, cz, nx, nz)) continue;
-      if (!isGridStepClimbable(grid, cx, cz, nx, nz, maxSlopeRatio)) continue;
+      if (!isCellStepClimbable(grid, cx, cz, currentCell, nx, nz, neighborCell, maxSlopeRatio)) continue;
 
       // Move cost
       const isDiagonal = dx !== 0 && dz !== 0;
