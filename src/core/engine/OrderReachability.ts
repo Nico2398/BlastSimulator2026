@@ -33,7 +33,7 @@ import {
 } from '../nav/NavGridReachability.js';
 import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
 import { dockedFrom, withDockingCells } from '../nav/DockingReach.js';
-import { buildingRingTouches } from '../nav/BuildingApproach.js';
+import { buildingRingCells, buildingRingTouches } from '../nav/BuildingApproach.js';
 import { haulDestinationOf } from '../economy/SpoilHeaps.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
@@ -542,14 +542,22 @@ export function strandedDebrisTargets(state: GameState): ReadonlyArray<{ x: numb
 }
 
 /**
- * Whether a vehicle can drive to (x, z) from the rally point, at the site's vehicle climb limit: the network a crater
- * access ramp must start on (#2082) and a parked vehicle is moved onto (#2045). Null without a nav grid or a rally point.
+ * Whether a vehicle can drive to (x, z) from the rally point or from a haul depot (a freight warehouse or spoil heap,
+ * docked onto from its ring), at the site's vehicle climb limit: the network a crater access ramp must start on (#2082)
+ * and a parked vehicle is moved onto (#2045). A depot anchors it too, because the road that matters is the one the
+ * loads travel: a building raised beside the rally can wall the rally into a pocket while the fleet hauls on (#2093).
+ * Null without a nav grid or a rally point.
  */
 export function siteVehicleReach(state: GameState): ((x: number, z: number) => boolean) | null {
   const cache = cacheFor(state);
   const rally = state.rallyPoint;
   if (cache === null || rally === undefined) return null;
   const ratio = vehicleMaxSlopeRatio(isProgressionSite(state));
-  const reach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom([rally]);
+  const rings = [...freightWarehouseSites(state.buildings), ...spoilHeapSites(state.buildings)].flatMap(site => {
+    const depot = state.buildings.buildings.find(b => b.id === site.id);
+    return depot === undefined ? [] : buildingRingCells(depot, getBuildingDef(depot.type, depot.tier));
+  });
+  const anchors = [rally, ...dockedFrom(cache.navGrid, rings, NAV_CLEARANCE_VEHICLE_CELLS)];
+  const reach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(anchors);
   return (x, z) => reach.has(x, z);
 }

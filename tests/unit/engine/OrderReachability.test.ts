@@ -48,6 +48,7 @@ import {
   classifyNewOrder,
   refreshOrderReachability,
   roleShortfall,
+  siteVehicleReach,
 } from '../../../src/core/engine/OrderReachability.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
@@ -1679,5 +1680,37 @@ describe('walk-only pins an employee can no longer serve (#2085)', () => {
     });
     classifyQueuedOrders(state);
     expect(state.pendingActions.find(a => a.id === id)!.targetEmployeeId).toBe(target.id);
+  });
+});
+
+describe('siteVehicleReach (#2093)', () => {
+  it('is the rally point\'s network', () => {
+    const state = makeState();
+    state.rallyPoint = { ...IN_A };
+    const reach = siteVehicleReach(state)!;
+    expect(reach(IN_A_TARGET.x, IN_A_TARGET.z)).toBe(true);
+    expect(reach(IN_B_TARGET.x, IN_B_TARGET.z)).toBe(false);
+  });
+
+  it('also holds the network a haul depot stands on, when a building walls the rally into a pocket', () => {
+    const state = makeState();
+    state.rallyPoint = { ...IN_A };
+    const r = placeBuilding(state.buildings, 'freight_warehouse', 14, 2, 64, 64);
+    if (!r.success) throw new Error(r.error);
+    const reach = siteVehicleReach(state)!;
+    expect(reach(IN_B_TARGET.x, IN_B_TARGET.z)).toBe(true);
+    expect(reach(IN_A_TARGET.x, IN_A_TARGET.z)).toBe(true);
+  });
+
+  it('a building nothing is hauled to anchors nothing', () => {
+    const state = makeState();
+    state.rallyPoint = { ...IN_A };
+    const r = placeBuilding(state.buildings, 'living_quarters', 14, 2, 64, 64);
+    if (!r.success) throw new Error(r.error);
+    expect(siteVehicleReach(state)!(IN_B_TARGET.x, IN_B_TARGET.z)).toBe(false);
+  });
+
+  it('is null without a rally point', () => {
+    expect(siteVehicleReach(makeState())).toBeNull();
   });
 });

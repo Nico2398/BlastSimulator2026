@@ -38,15 +38,21 @@ export function isOnBuildingRing(building: FootprintAnchor, def: BuildingDef, x:
   return x === minX || x === maxX || z === minZ || z === maxZ;
 }
 
-/** True when some cell of the one-cell ring around a building's footprint satisfies `has` (#2045). */
-export function buildingRingTouches(building: FootprintAnchor, def: BuildingDef, has: (x: number, z: number) => boolean): boolean {
+/** The cells of the one-cell ring around a building's footprint, in column then row order. */
+export function buildingRingCells(building: FootprintAnchor, def: BuildingDef): { x: number; z: number }[] {
   const { minX, maxX, minZ, maxZ } = ringBounds(building, def);
+  const cells: { x: number; z: number }[] = [];
   for (let x = minX; x <= maxX; x++) {
     for (let z = minZ; z <= maxZ; z++) {
-      if ((x === minX || x === maxX || z === minZ || z === maxZ) && has(x, z)) return true;
+      if (x === minX || x === maxX || z === minZ || z === maxZ) cells.push({ x, z });
     }
   }
-  return false;
+  return cells;
+}
+
+/** True when some cell of the one-cell ring around a building's footprint satisfies `has` (#2045). */
+export function buildingRingTouches(building: FootprintAnchor, def: BuildingDef, has: (x: number, z: number) => boolean): boolean {
+  return buildingRingCells(building, def).some(c => has(c.x, c.z));
 }
 
 /**
