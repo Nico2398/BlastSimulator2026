@@ -221,14 +221,20 @@ function haulableOreOnGroundKg(state: GameState): number {
  * around the shot `avoid`. Near the work matters: a crew rests at its Living Quarters, so a far
  * one costs walking time on payroll. Returns the spot or null.
  */
-function placeBuilding(s: ProbeSession, type: string, near: Pattern, avoid: Pattern | null): Pattern | null {
+function placeBuilding(
+  s: ProbeSession, type: string, near: Pattern, avoid: Pattern | null,
+  clearOf: readonly (Pattern & { span?: number })[] = [], clearM = 0,
+): Pattern | null {
   const { sizeX, sizeZ } = s.grid;
   const spots: Pattern[] = [];
+  // Within `clearM` of a footprint in `clearOf` (every shot site, say): a shot there could reach it.
+  const nearShot = (x: number, z: number): boolean => clearOf.some(o => x > o.x - clearM && x < o.x + (o.span ?? SHOT_SPAN) + clearM
+    && z > o.z - clearM && z < o.z + (o.span ?? SHOT_SPAN) + clearM);
   for (let z = BUILDING_SCAN_EDGE; z <= sizeZ - BUILDING_SCAN_EDGE; z += BUILDING_SCAN_STEP) {
     for (let x = BUILDING_SCAN_EDGE; x <= sizeX - BUILDING_SCAN_EDGE; x += BUILDING_SCAN_STEP) {
       const inKeepOut = avoid !== null && x > avoid.x - BUILDING_KEEP_OUT && x < avoid.x + SHOT_SPAN + BUILDING_KEEP_OUT
         && z > avoid.z - BUILDING_KEEP_OUT && z < avoid.z + SHOT_SPAN + BUILDING_KEEP_OUT;
-      if (!inKeepOut) spots.push({ x, z });
+      if (!inKeepOut && !nearShot(x, z)) spots.push({ x, z });
     }
   }
   const dist = (p: Pattern) => Math.hypot(p.x - near.x, p.z - near.z);
@@ -984,8 +990,7 @@ function replaceLostCrew(s: ProbeSession, m: ReinvestMemory): void {
  * Raise new living quarters when a shot destroyed the last ones: without them the reinvest crew only rests in place,
  * which tops out under the rest threshold, so nobody ever goes back to work. They go up beside the last shot, as the
  * opening's do, never at the rally: a crew walking across the site to rest every shift loses the shift. The ladder
- * keeps its own rule (`ladderQuarters`): on the Shareholder Summit a rebuilt hut stood in the next shot's way and the
- * losses sank the crew to a revolt.
+ * keeps its own rule (`ladderQuarters`).
  */
 function rebuildLostQuarters(s: ProbeSession, m: ReinvestMemory): void {
   const housed = s.state.buildings.buildings.some(b => b.type === 'living_quarters')
@@ -1005,15 +1010,20 @@ const LADDER_QUARTERS_REACH_M = 24;
 /** Living quarters the ladder raises at most. */
 const LADDER_MAX_QUARTERS = 3;
 
-/** Another living quarters beside the crater being worked, when every one stands farther than LADDER_QUARTERS_REACH_M. */
+/**
+ * Another living quarters beside the crater being worked, when every one stands farther than LADDER_QUARTERS_REACH_M,
+ * clear of every shot site by LADDER_BUILDING_KEEP_OUT_M so a later shot does not take it. With none left the crew
+ * rests in place: rebuilding them sank the Shareholder Summit crew to a revolt.
+ */
 function ladderQuarters(s: ProbeSession, m: LadderMemory): void {
   const quarters = [...s.state.buildings.buildings, ...s.state.plannedBuildings].filter(b => b.type === 'living_quarters');
-  // With none left the crew rests in place, as before the first was built; one still going up is on its way.
   if (quarters.length === 0 || quarters.length >= LADDER_MAX_QUARTERS || s.state.plannedBuildings.some(b => b.type === 'living_quarters')) return;
   const centre = { x: m.crater.x + m.crater.span / 2, z: m.crater.z + m.crater.span / 2 };
   if (quarters.some(q => Math.hypot(q.x - centre.x, q.z - centre.z) <= LADDER_QUARTERS_REACH_M)) return;
   if (s.state.cash - getBuildingDef('living_quarters', 1).constructionCost < LADDER_UPGRADE_RESERVE) return;
-  tryOnce(s, m, `quarters_${craterKey(m.crater)}`, () => placeBuilding(s, 'living_quarters', centre, m.crater) !== null);
+  const shots = [...m.origins, ...m.barred];
+  tryOnce(s, m, `quarters_${craterKey(m.crater)}`,
+    () => placeBuilding(s, 'living_quarters', centre, null, shots, LADDER_BUILDING_KEEP_OUT_M) !== null);
 }
 
 /** Ecology under which another spoil heap is built, and the most the ladder builds: loose rubble past a heap's capacity drains it. */
