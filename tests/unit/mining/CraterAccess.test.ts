@@ -138,6 +138,47 @@ describe('planCraterAccess', () => {
     expect(rampPathCells(rampPathOf(plan.def), 3).filter(c => building(c.x, c.z))).toEqual([]);
   });
 
+  describe('toward the haul depot (#2045)', () => {
+    const SMALL: Pit = { x0: 30, z0: 30, w: 10, h: 10, depth: 3 };
+    const s = () => surface(SMALL, outsidePit(SMALL));
+    const tripFrom = (def: { originX: number; originZ: number; length: number }, to: { x: number; z: number }) =>
+      def.length + Math.hypot(def.originX - to.x, def.originZ - to.z);
+
+    it('enters the crater from the side facing the depot, wherever the shortest ramp would start', () => {
+      const north = { x: 35, z: 0 };
+      const south = { x: 35, z: 79 };
+      const toNorth = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3, [], [], north);
+      const toSouth = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3, [], [], south);
+      expect(toNorth.ok && toSouth.ok).toBe(true);
+      if (!toNorth.ok || !toSouth.ok) return;
+      expect(toNorth.def.direction).toBe('south');
+      expect(toNorth.def.originZ).toBeLessThan(SMALL.z0);
+      expect(toSouth.def.direction).toBe('north');
+      expect(toSouth.def.originZ).toBeGreaterThanOrEqual(SMALL.z0 + SMALL.h);
+    });
+
+    it('never makes the trip to the depot longer than the shortest ramp does', () => {
+      for (const to of [{ x: 0, z: 0 }, { x: 79, z: 35 }, { x: 35, z: 79 }, { x: 5, z: 60 }]) {
+        const shortest = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3);
+        const facing = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3, [], [], to);
+        expect(shortest.ok && facing.ok).toBe(true);
+        if (!shortest.ok || !facing.ok) return;
+        expect(tripFrom(facing.def, to)).toBeLessThanOrEqual(tripFrom(shortest.def, to));
+      }
+    });
+
+    it('without a depot is the shortest ramp, unchanged', () => {
+      const plain = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3);
+      const nulled = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3, [], [], null);
+      expect(nulled).toEqual(plain);
+    });
+
+    it('still refuses a floor no ramp reaches', () => {
+      const plan = planCraterAccess(centreFloor(SMALL), surface(SMALL, () => false), MAX_RATIO, 3, [], [], { x: 0, z: 0 });
+      expect(plan.ok).toBe(false);
+    });
+  });
+
   it('never exceeds the longest ramp the game accepts', () => {
     const plan = planCraterAccess(centreFloor(PIT), surface(PIT, outsidePit(PIT)), MAX_RATIO, 3);
     expect(plan.ok).toBe(true);

@@ -67,26 +67,34 @@ export function retargetRampLayers(
 
 /**
  * Second chance for a lead layer `retargetRampLayers` left unreachable (#2082): the nearest reachable
- * column beside the layer's own cells, where the digger can stand and carve it. Only a queued lead is moved.
+ * column beside the layer's own cells, where the digger can stand and carve it, else beside the ramp's
+ * other segments — a digger left on a crater floor carves a ramp that lands flush beside it from its
+ * foot (#2045). Never a column of the ramp itself (`retargetRampLayers` probed those). Only a queued lead is moved.
  */
 export function retargetBesideRampLayers(
   state: Pick<GameState, 'plannedRamps' | 'pendingActions'>,
   canReach: (action: PendingAction, x: number, z: number) => boolean,
 ): number {
-  return retargetLeads(state, canReach, (_ramp, lead) => {
-    const own = distinctColumns(lead.cells);
-    const seen = new Set(own.map(c => `${c.x},${c.z}`));
-    const beside: Column[] = [];
-    for (const c of own) {
-      for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
-        const key = `${c.x + dx},${c.z + dz}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        beside.push({ x: c.x + dx, z: c.z + dz });
-      }
-    }
-    return [beside];
+  return retargetLeads(state, canReach, (ramp, lead) => {
+    const seen = new Set(distinctColumns(ramp.segments.flatMap(s => s.cells)).map(c => `${c.x},${c.z}`));
+    const besideOwn = besideColumns(distinctColumns(lead.cells), seen);
+    const besideOthers = besideColumns(distinctColumns(ramp.segments.flatMap(s => (s === lead ? [] : s.cells))), seen);
+    return [besideOwn, besideOthers];
   });
+}
+
+/** The 8-neighbours of `columns` not yet in `seen`, each once; every one returned is added to `seen`. */
+function besideColumns(columns: readonly Column[], seen: Set<string>): Column[] {
+  const beside: Column[] = [];
+  for (const c of columns) {
+    for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+      const key = `${c.x + dx},${c.z + dz}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      beside.push({ x: c.x + dx, z: c.z + dz });
+    }
+  }
+  return beside;
 }
 
 function distinctColumns(cells: readonly { x: number; z: number }[]): { x: number; z: number }[] {

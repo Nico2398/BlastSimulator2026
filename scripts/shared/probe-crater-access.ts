@@ -217,13 +217,29 @@ function signatureOf(state: GameState, floors: readonly StrandedFloor[], avoid: 
 /** Plans tried for one floor before it is given up: a plan that cuts the network is set aside and the floor planned again. */
 const ACCESS_PLAN_ATTEMPTS = 4;
 
-/** A plan down to `floor` whose dig keeps the vehicle network whole (`keepsVehicleNetwork`), or null. */
+/** Buildings a crater's loads are hauled to: ore to a freight warehouse, waste to a spoil heap. */
+const HAUL_DEPOTS: ReadonlySet<string> = new Set(['freight_warehouse', 'spoil_heap']);
+
+/** The haul depot nearest `floor`, where its access ramp should face; null on a site with none. */
+export function nearestHaulDepot(state: Pick<GameState, 'buildings'>, floor: { x: number; z: number }): { x: number; z: number } | null {
+  let best: { x: number; z: number } | null = null;
+  let bestDistance = Infinity;
+  for (const b of state.buildings.buildings) {
+    if (!HAUL_DEPOTS.has(b.type)) continue;
+    const distance = Math.hypot(b.x - floor.x, b.z - floor.z);
+    if (distance < bestDistance) { best = { x: b.x, z: b.z }; bestDistance = distance; }
+  }
+  return best;
+}
+
+/** A plan down to `floor`, facing its nearest depot, whose dig keeps the vehicle network whole (`keepsVehicleNetwork`), or null. */
 function planKeepingRoads(
   state: GameState, grid: VoxelGrid, floor: StrandedFloor, surface: AccessSurface, avoid: readonly RampFootprint[],
 ): { def: RampDef; cost: number } | null {
   const setAside = [...avoid];
+  const toward = nearestHaulDepot(state, floor);
   for (let attempt = 0; attempt < ACCESS_PLAN_ATTEMPTS; attempt++) {
-    const plan = planCraterAccess(floor, surface, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH, setAside, state.builtRamps);
+    const plan = planCraterAccess(floor, surface, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH, setAside, state.builtRamps, toward);
     if (!plan.ok) return null;
     if (keepsVehicleNetwork(state, grid, plan.def)) return plan;
     setAside.push(rampFootprint(plan.def, rampWidthOf(plan.def)));

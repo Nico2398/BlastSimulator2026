@@ -176,4 +176,21 @@ describe('retargetBesideRampLayers (#2082)', () => {
     const s = make([action(1, { status: 'assigned' })], [ramp(1, [1])]);
     expect(retargetBesideRampLayers(s, (_a, _x, z) => z === 9)).toBe(0);
   });
+
+  it('stands beside the ramp\'s foot when nothing beside the lead is reachable: a digger on the crater floor starts a flush ramp (#2045)', () => {
+    const r = ramp(1, [1, 2]);
+    // The lead runs along z=10 at the top; the foot layer along z=20 lands flush on a floor at z=21.
+    r.segments[1]!.cells = [10, 11, 12, 13, 14].map(x => ({ x, y: -1, z: 20 }));
+    const s = make([action(1), action(2, { targetZ: 20 })], [r]);
+    expect(retargetBesideRampLayers(s, (_a, _x, z) => z === 21)).toBe(1);
+    expect(targetOf(s, 1)).toEqual({ x: 12, z: 21 });
+  });
+
+  it('prefers a column beside the lead over one beside the foot', () => {
+    const r = ramp(1, [1, 2]);
+    r.segments[1]!.cells = [10, 11, 12, 13, 14].map(x => ({ x, y: -1, z: 20 }));
+    const s = make([action(1), action(2, { targetZ: 20 })], [r]);
+    expect(retargetBesideRampLayers(s, (_a, _x, z) => z === 21 || z === 11)).toBe(1);
+    expect(targetOf(s, 1)).toEqual({ x: 12, z: 11 });
+  });
 });

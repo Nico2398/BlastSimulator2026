@@ -2,8 +2,8 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  RAMP_SHOT_KEEP_OUT_M, buildRampCommand, hasLiveRampWork, keepsVehicleNetwork, newCraterAccessMemory, rampKeepOutZones, rampedAlready,
-  stuckRampFootprints,
+  RAMP_SHOT_KEEP_OUT_M, buildRampCommand, hasLiveRampWork, keepsVehicleNetwork, nearestHaulDepot, newCraterAccessMemory, rampKeepOutZones,
+  rampedAlready, stuckRampFootprints,
 } from '../../../scripts/shared/probe-crater-access.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
@@ -85,6 +85,26 @@ describe('rampedAlready (#2095)', () => {
     expect(rampedAlready(memory, { ...floor, x: 24, z: 17 })).toBe(true);
     expect(rampedAlready(memory, { ...floor, floorY: 3 })).toBe(false);
     expect(rampedAlready(memory, { ...floor, x: 60 })).toBe(false);
+  });
+});
+
+describe('nearestHaulDepot (#2045)', () => {
+  type Buildings = Parameters<typeof nearestHaulDepot>[0]['buildings'];
+  const site = (list: Array<{ type: string; x: number; z: number }>) => ({ buildings: { buildings: list } as unknown as Buildings });
+
+  it('is the freight warehouse or spoil heap nearest the floor', () => {
+    const state = site([{ type: 'freight_warehouse', x: 9, z: 10 }, { type: 'spoil_heap', x: 50, z: 50 }]);
+    expect(nearestHaulDepot(state, { x: 45, z: 40 })).toEqual({ x: 50, z: 50 });
+    expect(nearestHaulDepot(state, { x: 15, z: 15 })).toEqual({ x: 9, z: 10 });
+  });
+
+  it('ignores buildings nothing is hauled to', () => {
+    const state = site([{ type: 'living_quarters', x: 40, z: 40 }, { type: 'freight_warehouse', x: 0, z: 0 }]);
+    expect(nearestHaulDepot(state, { x: 41, z: 41 })).toEqual({ x: 0, z: 0 });
+  });
+
+  it('is null on a site with no depot', () => {
+    expect(nearestHaulDepot(site([{ type: 'living_quarters', x: 4, z: 4 }]), { x: 0, z: 0 })).toBeNull();
   });
 });
 

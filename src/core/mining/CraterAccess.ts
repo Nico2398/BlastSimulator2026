@@ -135,15 +135,20 @@ function overlapsAny(def: RampDef, width: RampWidth, avoid: readonly RampFootpri
 type Excluded = (def: RampDef) => boolean;
 
 /**
- * Shortest straight ramp ending on one of `feet` (floor-level tiles), starting on a reachable cell along one of four
- * axes whose grade stays within `limitRatio`. Lengths rise across every foot at once, so a foot at the crater's edge
- * beats a long road to its middle (#2045), and a built ramp's foot beats the rim; on equal length the earlier foot wins.
+ * Straight ramp ending on one of `feet` (floor-level tiles), starting on a reachable cell along one of four axes whose
+ * grade stays within `limitRatio`. Lengths rise across every foot at once, so a foot at the crater's edge beats a long
+ * road to its middle (#2045), and a built ramp's foot beats the rim; on equal length the earlier foot wins. With
+ * `toward` (where the floor's loads go), the ramp kept is the one with the shortest trip from its foot: its length
+ * plus the straight distance from its top to `toward`, so a crater is entered from the side facing the depot.
  */
 function planStraight(
   surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded, feet: ReadonlyArray<{ x: number; z: number }>,
+  toward: { x: number; z: number } | null,
 ): { plan: CraterAccessPlan | null; sawShallow: boolean } {
   let sawShallow = false;
-  for (let length = Math.max(1, width); length <= MAX_RAMP_LENGTH; length++) {
+  let best: { plan: CraterAccessPlan; trip: number } | null = null;
+  // A trip is never shorter than the ramp it climbs: past the best trip no longer ramp can win.
+  for (let length = Math.max(1, width); length <= MAX_RAMP_LENGTH && (best === null || length < best.trip); length++) {
     for (const foot of feet) {
       for (const direction of DIRECTIONS) {
         const o = RAMP_DIR_OFFSETS[direction];
@@ -160,14 +165,14 @@ function planStraight(
         if (excluded(def)) continue;
         const check = validateRampOrder(def, Infinity);
         if (!check.success) continue;
-        return {
-          plan: { ok: true, def, cost: check.cost, gradeDegrees: slopeDegreesForRatio(drop / length) },
-          sawShallow,
-        };
+        const plan: CraterAccessPlan = { ok: true, def, cost: check.cost, gradeDegrees: slopeDegreesForRatio(drop / length) };
+        if (toward === null) return { plan, sawShallow };
+        const trip = length + Math.hypot(sx - toward.x, sz - toward.z);
+        if (best === null || trip < best.trip) best = { plan, trip };
       }
     }
   }
-  return { plan: null, sawShallow };
+  return { plan: best?.plan ?? null, sawShallow };
 }
 
 /** Feet a straight plan may end on: the floor's own cell, then the floor-level cells within the cluster gap round it, nearest first. */
@@ -375,7 +380,11 @@ function spiralPlanFrom(
   return { ok: true, def, cost: computeRampCost(rampTotalLength(legs), width), gradeDegrees: p.gradeDegrees };
 }
 
-/** Plans a ramp from the reachable network down to `floor`, within `maxClimbRatio`. Failure is a result, not an exception. */
+/**
+ * Plans a ramp from the reachable network down to `floor`, within `maxClimbRatio`. With `toward` (where the floor's
+ * loads are hauled), a straight ramp is picked for the shortest haul rather than the shortest ramp. Failure is a
+ * result, not an exception.
+ */
 export function planCraterAccess(
   floor: StrandedFloor,
   surface: AccessSurface,
@@ -383,6 +392,7 @@ export function planCraterAccess(
   width: RampWidth,
   avoid: readonly RampFootprint[] = [],
   built: readonly DugRamp[] = [],
+  toward: { x: number; z: number } | null = null,
 ): CraterAccessPlan {
   const limitRatio = maxClimbRatio * CRATER_ACCESS_MAX_GRADE_MARGIN;
   if (!(limitRatio > 0) || !Number.isFinite(floor.floorY)) return { ok: false, reasonKey: `${KEY}no_start` };
@@ -405,7 +415,7 @@ export function planCraterAccess(
     return !validateRampOrder(order, Infinity).success || fillsOverRubble(order, surface, width);
   };
   const finish = (plan: CraterAccessPlan): CraterAccessPlan => (plan.ok ? { ...plan, def: landed(plan.def) } : plan);
-  const straight = planStraight(surface, limitRatio, width, excluded, floorFeet(floor, surface));
+  const straight = planStraight(surface, limitRatio, width, excluded, floorFeet(floor, surface), toward);
   if (straight.plan !== null) return finish(straight.plan);
   const spiral = planSpiral(floor, surface, limitRatio, width, excluded);
   if (spiral !== null) return finish(spiral);
