@@ -26,8 +26,9 @@
 //            e. buy a second hauler and hire its driver
 //            f. `permit apply` once `permit status` shows every target met
 //               (nextGradeTargets in src/core/economy/MineGrade.ts)
-//            g. a replacement for any core role nobody alive holds (replaceLostCrew): an event can
-//               take the only blaster, and every later charge order waits on one
+//            g. a replacement for any core role nobody alive holds, and new living quarters when a shot
+//               destroyed the last ones (replaceLostCrew): an event can take the only blaster, and every
+//               later charge order waits on one
 //            Calibration tasks extend this list; keep each rule one short block.
 //
 //   ladder   The full-ladder player (#1945). The reinvest opening, then every interval:
@@ -964,12 +965,21 @@ function ladderFragmenter(s: ProbeSession, m: ReinvestMemory): void {
   earnLicence(s, m, 'rock_fragmenter', 1);
 }
 
-/** Hire a replacement for any core role nobody alive holds (a blaster lost mid-shot stalls every charge order). */
+/**
+ * Hire a replacement for any core role nobody alive holds (a blaster lost mid-shot stalls every charge order), and
+ * raise new living quarters when a shot destroyed the last ones: without them the crew only rests in place, which tops
+ * out under the rest threshold, so nobody ever goes back to work.
+ */
 function replaceLostCrew(s: ProbeSession, m: ReinvestMemory): void {
   for (const role of ['blaster', 'driller', 'driver'] as const) {
     if (s.state.employees.employees.some(e => e.alive && e.role === role) || spendable(s) < HIRING_COSTS[role]) continue;
     tryOnce(s, m, `crew_${role}`, () => s.run(`employee hire role:${role}`).success);
   }
+  const housed = s.state.buildings.buildings.some(b => b.type === 'living_quarters')
+    || s.state.plannedBuildings.some(b => b.type === 'living_quarters');
+  if (housed || spendable(s) < getBuildingDef('living_quarters', 1).constructionCost) return;
+  const near = s.state.rallyPoint ?? { x: s.grid.sizeX >> 1, z: s.grid.sizeZ >> 1 };
+  tryOnce(s, m, 'quarters', () => placeBuilding(s, 'living_quarters', near, m.origins.at(-1) ?? null) !== null);
 }
 
 /** Ecology under which another spoil heap is built, and the most the ladder builds: loose rubble past a heap's capacity drains it. */
