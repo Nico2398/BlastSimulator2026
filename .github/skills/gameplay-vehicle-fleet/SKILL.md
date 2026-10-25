@@ -276,7 +276,8 @@ heap. Heaps are finite: a barren haul is blocked as `no_spoil_heap` (no heap pla
 Barren yields to ore: `selectBestActionForEmployee` does not start an unheld, ground (not
 loaded) barren `haul_debris` while any unheld ore-bearing `haul_debris` is claimable (reachable,
 allowed, warehouse room). Barren still moves when no ore haul is claimable or none resolves a cost
-(barren blocks the only way, `storage_full`, nothing left). Grade/demand weighting among ore hauls,
+(barren blocks the only way, `storage_full`, nothing left), and barren rock burying a planned drill hole
+never waits on ore: the player marked that ground for the next shot (`gameplay-blast-system`, Buried holes). Grade/demand weighting among ore hauls,
 loaded trips, tier ranking and `fragment_debris` are unchanged. Debris thinning budgets
 `DEBRIS_SELECTION_MAX_BINS` per destination class so a near barren heap never crowds out ore.
 

@@ -578,13 +578,17 @@ function selectWithinIndex(
 /**
  * Barren rock yields to ore (#1870): while an ore haul with a resolvable route is costed (it survived
  * the thinning, so it is reachable, allowed and has warehouse room), an unheld ground barren haul is
- * not started. Returns `costed` minus those barren hauls, or null when no ore haul waits (barren hauls
- * then compete as usual). The caller falls back to the full list when the ore hauls fail to resolve a
- * cost during the search (blocked way). One pass over `costed`.
+ * not started — unless it buries a planned hole (#1937): the player marked that ground for the next
+ * shot, and ore lying anywhere else on the site would otherwise hold the shot until every ore piece
+ * is gone. Returns `costed` minus the held-back barren hauls, or null when no ore haul waits (barren
+ * hauls then compete as usual). The caller falls back to the full list when the ore hauls fail to
+ * resolve a cost during the search (blocked way). One pass over `costed`.
  */
 function oreHaulsOnly(state: GameState, costed: readonly CostedAction[], fragmentOf: FragmentLookup): CostedAction[] | null {
   const oreWaits = costed.some(c => Number.isFinite(c.cost) && isUnheldGroundHaul(state, c.action, fragmentOf) && haulActionCarriesOre(state, c.action, fragmentOf));
-  return oreWaits ? costed.filter(c => !isBarrenGroundHaul(state, c.action, fragmentOf)) : null;
+  return oreWaits
+    ? costed.filter(c => !isBarrenGroundHaul(state, c.action, fragmentOf) || buriedHoleBonusOf(state, c.action, fragmentOf) > 0)
+    : null;
 }
 
 /** An unheld haul_debris order whose fragment is still on the ground (not loaded in a vehicle). */

@@ -29,6 +29,7 @@ Records why the rules in the `gameplay-vehicle-fleet` skill exist: the issues th
 - Hauling destination (barren to Spoil Heap, ore to Freight Warehouse): #1530.
 - Heaps are finite (`no_spoil_heap` / `spoil_heap_full`): #1892.
 - Barren yields to ore: #1870.
+- Barren rock on a planned hole is exempt from barren-yields-to-ore: the ladder probe could not deepen a crater while any ore lay elsewhere on the site (#2089).
 
 ## Vehicle Repair
 

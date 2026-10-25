@@ -39,6 +39,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { haulBlockedReason } from '../../../src/core/economy/HaulDispatch.js';
 import { refreshLogisticsCapacity } from '../../../src/core/engine/BuildingTaskHelpers.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 
 // #1090: haul_debris is requiredVehicleRole: 'debris_hauler' — planItinerary
 // now reports a vehicle-gated goal genuinely unresolvable (Infinity/null)
@@ -420,6 +421,26 @@ describe('selectBestActionForEmployee — a barren haul waits while an ore haul 
     const { state, emp, barren, ore } = layout();
     const result = selectBestActionForEmployee(state, emp, [barren, ore])!;
     expect(result.totalTicks).toBeCloseTo(resolveActionCost(state, emp, ore)!.totalTicks, 10);
+  });
+
+  it('a barren haul burying a planned hole on a progression site is not held back by the ore', () => {
+    const { state, emp, barren, ore } = layout();
+    state.grade = createGradeState();
+    state.plannedDrillHoles.push({ id: 'H1', x: NEAR_X, z: 0, depth: 6, diameter: 0.089 });
+    expect(selectBestActionForEmployee(state, emp, [barren, ore])!.action.id).toBe(barren.id);
+  });
+
+  it('a planned hole elsewhere keeps the barren haul waiting behind the ore', () => {
+    const { state, emp, barren, ore } = layout();
+    state.grade = createGradeState();
+    state.plannedDrillHoles.push({ id: 'H1', x: NEAR_X, z: 40, depth: 6, diameter: 0.089 });
+    expect(selectBestActionForEmployee(state, emp, [barren, ore])!.action.id).toBe(ore.id);
+  });
+
+  it('off a progression site a planned hole under barren rock changes nothing', () => {
+    const { state, emp, barren, ore } = layout();
+    state.plannedDrillHoles.push({ id: 'H1', x: NEAR_X, z: 0, depth: 6, diameter: 0.089 });
+    expect(selectBestActionForEmployee(state, emp, [barren, ore])!.action.id).toBe(ore.id);
   });
 
   it('the warehouse refuses the ore (isClaimable false): the driver takes the barren haul', () => {
