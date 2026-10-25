@@ -77,7 +77,7 @@ import { getEventById } from '../../src/core/events/EventPool.js';
 import type { EventConsequence } from '../../src/core/events/EventPool.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
-import { newCraterAccessMemory, playPitLogistics, rampKeepOutZones, type CraterAccessMemory } from './probe-crater-access.js';
+import { nearestHaulDepot, newCraterAccessMemory, playPitLogistics, rampKeepOutZones, type CraterAccessMemory } from './probe-crater-access.js';
 import {
   floorToKgResolution, limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
   type BuyRule, type LadderShot, type PermitLimit,
@@ -388,20 +388,26 @@ interface RampOrder extends RampFootprintInput { slope: number }
 /**
  * Order a ramp from the open ground into the crater the shot at `at` (`span` wide) made, no steeper than
  * the vehicle cut ratio, the steepest the ramp tool accepts; the ramp's slope ratio and run when one was accepted, else null.
+ * Shortest first; among ramps of one length, the one whose top lies nearest the haul depot, so the crater is entered
+ * from the side its loads leave by at no extra digging.
  */
 function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = rampCutSlopeRatio(true)): RampOrder | null {
   const { grid } = s;
   const mid = span / 2;
   const centre = { x: at.x + mid, z: at.z + mid };
   const floor = getSmoothTerrainSurfaceY(grid, centre.x, centre.z);
+  const depot = nearestHaulDepot(s.state, centre);
   const lanes = [
     { dx: -1, dz: 0, end: { x: at.x - RAMP_END_GAP, z: centre.z } },
     { dx: 1, dz: 0, end: { x: at.x + span + RAMP_END_GAP, z: centre.z } },
     { dx: 0, dz: -1, end: { x: centre.x, z: at.z - RAMP_END_GAP } },
     { dx: 0, dz: 1, end: { x: centre.x, z: at.z + span + RAMP_END_GAP } },
   ];
+  const topToDepot = (lane: typeof lanes[number], length: number): number => (depot === null ? 0
+    : Math.hypot(lane.end.x - lane.dx * length - depot.x, lane.end.z - lane.dz * length - depot.z));
   for (let length = 8; length <= RAMP_MAX_LENGTH; length++) {
-    for (const lane of lanes) {
+    // Array.sort is stable: without a depot the lanes keep their order.
+    for (const lane of [...lanes].sort((a, b) => topToDepot(a, length) - topToDepot(b, length))) {
       const start = { x: lane.end.x - lane.dx * length, z: lane.end.z - lane.dz * length };
       if (start.x < 1 || start.z < 1 || start.x >= grid.sizeX - 1 || start.z >= grid.sizeZ - 1) continue;
       const depth = Math.round(getSmoothTerrainSurfaceY(grid, start.x, start.z) - floor);
@@ -509,6 +515,17 @@ interface ShotPlan {
   order: () => Shot | null;
 }
 
+/**
+ * A hole no drill rig reaches never finishes, and the shot waits on it for good while payroll runs: once part of the
+ * pattern is drilled, the careful player drops the holes whose orders read `target_unreachable` and fires the rest.
+ */
+function dropUnreachableHoles(s: ProbeSession): void {
+  if (s.state.drillHoles.length === 0) return;
+  for (const a of s.state.pendingActions.filter(p => p.type === 'drill_hole' && p.blockedReason === 'target_unreachable')) {
+    s.run(`drill_plan remove hole:${String(a.payload['holeId'])}`);
+  }
+}
+
 function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan): void {
   if (m.yieldPending) { // the blast resolved on the first command after it fired
     m.lastYieldKg = haulableOreOnGroundKg(s.state);
@@ -543,6 +560,7 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan)
     }
     return;
   }
+  dropUnreachableHoles(s);
   if (shotReady(s.state)) {
     // A refused detonation (an event's blasting ban) keeps the charged pattern: it is tried again next interval.
     if (fireShot(s)) {
