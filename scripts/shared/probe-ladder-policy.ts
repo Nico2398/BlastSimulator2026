@@ -212,13 +212,35 @@ export interface LadderHoleDepthInput {
   currentCapM: number;
   /** Fresh-site hole depth (m); defaults to LADDER_FRESH_HOLE_DEPTH_M. */
   freshHoleDepthM?: number;
+  /** Deepest hole the shot's charge still breaks out of (`breakoutHoleDepthM`); none when omitted. */
+  breakoutDepthM?: number;
 }
 
-/** Hole depth (m) for the next ladder shot, within [min(LADDER_HOLE_MIN_DEPTH_M, rigMaxDepthM), rigMaxDepthM]; the minimum-depth floor lives here. */
+/**
+ * Burden (m) of intact rock over a hole's charge column that the charge still lifts. Measured beside
+ * CHARGE_DEFAULT_AMOUNT_KG: an 8 m hole breaks out with 5 kg (5.5 m of burden) and seals with 4.5 kg (5.75 m),
+ * so this keeps half a metre in hand.
+ */
+export const LADDER_MAX_BURDEN_M = 5;
+
+/**
+ * Deepest hole (m) a charge whose column is `chargeColumnM` long breaks out of. A deeper hole seals: the broken rock
+ * stays under an intact cap, the shot gains nothing, and the next shot drilled through it leaves a floor of pits and
+ * ridges no vehicle crosses (#2091).
+ */
+export function breakoutHoleDepthM(chargeColumnM: number): number {
+  return chargeColumnM + LADDER_MAX_BURDEN_M;
+}
+
+/**
+ * Hole depth (m) for the next ladder shot, within [min(LADDER_HOLE_MIN_DEPTH_M, rigMaxDepthM), rigMaxDepthM], and no
+ * deeper than its charge breaks out of; the minimum-depth floor lives here.
+ */
 export function decideLadderHoleDepth(input: LadderHoleDepthInput): number {
   const fresh = input.freshHoleDepthM ?? LADDER_FRESH_HOLE_DEPTH_M;
   let base = input.floorOpen ? Math.min(fresh, input.remainingDepthM + 1) : fresh;
   if (input.lastShotFailed) base = Math.min(base, Math.max(LADDER_HOLE_MIN_DEPTH_M, input.currentCapM - LADDER_HOLE_STEP_DOWN_M));
+  if (input.breakoutDepthM !== undefined) base = Math.min(base, Math.floor(input.breakoutDepthM));
   return Math.min(input.rigMaxDepthM, Math.max(LADDER_HOLE_MIN_DEPTH_M, base));
 }
 

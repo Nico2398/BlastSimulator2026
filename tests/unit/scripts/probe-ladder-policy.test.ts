@@ -23,6 +23,8 @@ import {
   type LadderShotGateInput,
   type LadderSafetyInput,
   decideLadderHoleDepth,
+  breakoutHoleDepthM,
+  LADDER_MAX_BURDEN_M,
   isDudShot,
   shouldBarCrater,
   judgeLadderShot,
@@ -436,12 +438,30 @@ const holeBase: LadderHoleDepthInput = {
   currentCapM: 8,
 };
 
+describe('breakoutHoleDepthM (#2091)', () => {
+  it('is the charge column plus the burden a charge still lifts', () => {
+    expect(breakoutHoleDepthM(2.2)).toBeCloseTo(2.2 + LADDER_MAX_BURDEN_M);
+  });
+
+  it('refuses the measured seal with half a metre in hand: 4.5 kg sealed an 8 m hole, 5 kg is held to 7.5 m, 7 kg keeps 8 m (2 kg/m)', () => {
+    expect(breakoutHoleDepthM(4.5 / 2)).toBeLessThan(8);
+    expect(breakoutHoleDepthM(5 / 2)).toBeCloseTo(7.5);
+    expect(breakoutHoleDepthM(7 / 2)).toBeGreaterThanOrEqual(8);
+  });
+});
+
 describe('decideLadderHoleDepth', () => {
   it('constants hold the spec values', () => {
     expect(LADDER_FRESH_HOLE_DEPTH_M).toBe(8);
     expect(LADDER_HOLE_MIN_DEPTH_M).toBe(4);
     expect(LADDER_HOLE_STEP_DOWN_M).toBe(2);
     expect(LADDER_DUD_SHOT_LIMIT).toBe(2);
+  });
+
+  it('never drills deeper than the charge breaks out of, nor under the minimum (#2091)', () => {
+    expect(decideLadderHoleDepth({ ...holeBase, freshHoleDepthM: 9, breakoutDepthM: 7.2 })).toBe(7);
+    expect(decideLadderHoleDepth({ ...holeBase, freshHoleDepthM: 9, breakoutDepthM: 20 })).toBe(9);
+    expect(decideLadderHoleDepth({ ...holeBase, breakoutDepthM: 1 })).toBe(LADDER_HOLE_MIN_DEPTH_M);
   });
 
   it('fresh site drills 8 m with a deep rig and ignores remaining depth', () => {

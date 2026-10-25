@@ -71,7 +71,7 @@ import {
 import { gradeDef } from '../../src/core/economy/MineGrade.js';
 import { fleetBestRigLimit } from '../../src/core/mining/RigLimits.js';
 import { rampCutSlopeRatio } from '../../src/core/mining/Ramp.js';
-import { explosiveHoleLimits, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
+import { chargeColumnM, explosiveHoleLimits, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
 import { getEventById } from '../../src/core/events/EventPool.js';
 import type { EventConsequence } from '../../src/core/events/EventPool.js';
@@ -86,7 +86,7 @@ import {
   decideLadderDeepen, decideFreshShotSite, decideBuriedPattern, decideLadderShotSide, siteHoldsOre, decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM,
   LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
   rampProtectionZones, shotOverlapsProtectedRamp,
-  decideLadderHoleDepth, judgeLadderShot,
+  decideLadderHoleDepth, breakoutHoleDepthM, judgeLadderShot,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
 import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
@@ -809,9 +809,18 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
     });
   const deepen = depthTargetOpen(s) && crater !== undefined;
   const pitM = state.grade?.deepestPitM ?? 0;
+  const rigDiameterM = fleetBestRigLimit(DRILL_RIG_MAX_DIAMETER_M, vehicles);
+  const limit: PermitLimit = PERMIT_LIMITS[Math.min(gradeOf(s), 5)]!;
+  const explosive = getExplosive(shotExplosive(s))!;
+  // The heaviest hole charge the permit and the hole allow sets how deep a hole it still breaks out of.
+  const unsized = limitSizedShot(limit, {
+    rows: 3, cols: 3, spacing: SHOT.spacing, depth: SHOT.depth, kgPerHole: SHOT.kg, stemming: SHOT.stemming, diameterM: 0,
+  }, rigDiameterM);
+  const holeKg = Math.min(unsized.kgPerHole, explosiveHoleLimits(explosive, unsized.diameterM).maxKg);
   const holeDepth = decideLadderHoleDepth({
     rigMaxDepthM: fleetBestRigLimit(DRILL_RIG_MAX_DEPTH_M, vehicles), remainingDepthM: nextGradeDepthM(state) - pitM,
     floorOpen: deepen, lastShotFailed: m.lastShotFailed, currentCapM: m.holeCapM, freshHoleDepthM: ladderHoleDepthM(s),
+    breakoutDepthM: breakoutHoleDepthM(chargeColumnM(holeKg, unsized.diameterM)),
   });
   // A ramp steeper than the fleet climbs reaches only so deep: shrink the holes to what the haulers still reach.
   const ramp = deepen && crater ? m.ramps[craterKey(crater)] : undefined;
@@ -820,13 +829,10 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
     rampSlopeRatio: ramp.slope, fleetClimbRatio: climb,
   }) === 'shrink';
   const depth = shrunk ? Math.max(1, Math.floor(reachableShotDepthM(ramp.runM, climb, holeDepth))) : holeDepth;
-  const rigDiameterM = fleetBestRigLimit(DRILL_RIG_MAX_DIAMETER_M, vehicles);
   const base: LadderShot = {
     rows: 3, cols: 3, spacing: SHOT.spacing, depth, kgPerHole: SHOT.kg, stemming: SHOT.stemming, diameterM: pickDiameter(rigDiameterM),
   };
-  const limit: PermitLimit = PERMIT_LIMITS[Math.min(gradeOf(s), 5)]!;
   const sized = limitSizedShot(limit, base, rigDiameterM);
-  const explosive = getExplosive(shotExplosive(s))!;
   /** Heaviest hole charge that stays inside the permit's total charge for an n x n pattern, the explosive's and the hole's own limits. */
   const kgFor = (n: number): number => floorToKgResolution(Math.min(
     limit.maxChargeKg / (n * n), explosiveHoleLimits(explosive, sized.diameterM).maxKg,
