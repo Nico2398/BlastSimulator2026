@@ -307,9 +307,12 @@ function overlapsShot(c: Pattern & { span?: number }, o: Pattern & { span?: numb
     && c.z <= o.z + (o.span ?? SHOT_SPAN) + gap && o.z <= c.z + (c.span ?? SHOT_SPAN) + gap;
 }
 
-/** Extra limits on a fresh shot site: ramp corridors kept clear, and used-up ground skipped. */
+/** Extra limits on a fresh shot site: protected ground kept clear, and used-up ground skipped. */
 export interface FreshSiteRules {
+  /** Skipped unless that would leave no site. */
   protectedZones: readonly ProtectedZone[];
+  /** Never shot over, whatever is left: the ramps the fleet reaches the pit by. No site is better than cutting the way in. */
+  forbiddenZones?: readonly ProtectedZone[];
 }
 
 /**
@@ -321,7 +324,9 @@ export function freshSites(
   grid: VoxelGrid, span: number, depth: number, earlier: readonly (Pattern & { span?: number })[], rules?: FreshSiteRules,
   keepOut: readonly ProtectedZone[] = [],
 ): Pattern[] {
-  const sites = ruledSites(grid, span, depth, earlier, rules);
+  const forbidden = rules?.forbiddenZones ?? [];
+  const sites = ruledSites(grid, span, depth, earlier, rules)
+    .filter(c => !shotOverlapsProtectedRamp({ x: c.x, z: c.z, span }, forbidden));
   const clear = sites.filter(c => !shotOverlapsProtectedRamp({ x: c.x, z: c.z, span }, keepOut));
   return clear.length > 0 ? clear : sites;
 }
@@ -810,6 +815,8 @@ interface CraterRubbleCounts {
   ordered: number;
   orderless: number;
   sealed: number;
+  /** Rubble whose haul order reads out of every vehicle's reach: the crater still wants a way in (also counted as sealed). */
+  outOfReach: number;
 }
 
 /** Ids of the on-ground fragments that carry ore (bound for a warehouse, not a spoil heap). */
@@ -829,18 +836,21 @@ function oreFragmentIds(state: GameState): Set<number> {
 export function craterRubbleCounts(state: GameState, crater: Pattern & { span: number }, ore?: ReadonlySet<number>): CraterRubbleCounts {
   const sealedIds = new Set<number>(sealedFragmentIdsOf(state) ?? []);
   const orderedIds = new Set<number>();
+  const outOfReachIds = new Set<number>();
   for (const a of state.pendingActions) {
     if (a.type !== 'haul_debris' && a.type !== 'fragment_debris') continue;
     const id = (a.payload as { fragmentId: number }).fragmentId;
     // A blocked order (blockedReason set, e.g. target out of reach) never clears: its rubble counts as sealed, not ordered.
     if (a.blockedReason) sealedIds.add(id);
     else orderedIds.add(id);
+    if (a.blockedReason === 'debris_out_of_reach') outOfReachIds.add(id);
   }
-  const counts: CraterRubbleCounts = { ordered: 0, orderless: 0, sealed: 0 };
+  const counts: CraterRubbleCounts = { ordered: 0, orderless: 0, sealed: 0, outOfReach: 0 };
   for (const f of state.logistics.fragments) {
     if (f.state !== 'on_ground' || !inCraterFringe(f.fragment.position.x, f.fragment.position.z, crater)) continue;
     const id = f.fragment.id;
     if (ore && !ore.has(id)) continue;
+    if (outOfReachIds.has(id)) counts.outOfReach++;
     if (sealedIds.has(id)) counts.sealed++;
     else if (orderedIds.has(id)) counts.ordered++;
     else counts.orderless++;
@@ -872,7 +882,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
       const counts = craterRubbleCounts(state, c, ore);
       return decideLadderDeepen({
         orderedRubbleCount: counts.ordered, orderlessRubbleCount: counts.orderless,
-        sealedRubbleCount: counts.sealed, haulPending: craterHaulPending(state, c, ore),
+        sealedRubbleCount: counts.sealed, outOfReachRubbleCount: counts.outOfReach, haulPending: craterHaulPending(state, c, ore),
       }) === 'deepen';
     });
   const deepen = depthTargetOpen(s) && crater !== undefined;
@@ -924,13 +934,14 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   });
   // A g2 shot throws rock far enough to destroy a building beside the site (a lost building sank well-being to a revolt at t8520, #2076).
   const buildingZones = state.buildings.buildings.map(b => ({ x: b.x - LADDER_BUILDING_KEEP_OUT_M, z: b.z - LADDER_BUILDING_KEEP_OUT_M, span: 2 * LADDER_BUILDING_KEEP_OUT_M + 1 }));
-  const protectedZones = [...rampProtectionZones(Object.values(m.ramps), LADDER_RAMP_PROTECT_MARGIN_M), ...buildingZones];
+  // A shot over a ramp cuts the fleet's way into a pit: on the seed-42 desert digger site one took the opening ramp's top
+  // and stranded the next crater's 1.7 kt of rubble. Ramps are never shot over; buildings are, when nothing else is left.
+  const rampZones = [...rampProtectionZones(Object.values(m.ramps), LADDER_RAMP_PROTECT_MARGIN_M), ...rampKeepOutZones(state)];
   // Orders no ramp reaches never get hauled: they are not work for the crew. Barren rock earns nothing.
-  const hauling = state.pendingActions.some(a => a.type === 'haul_debris' && a.blockedReason === null
-    && ore.has((a.payload as { fragmentId: number }).fragmentId));
+  const oreRunningOut = reachableOreRubbleKg(state) < fleetLoadKg(state) * LADDER_ORE_LOW_LOADS;
   return {
-    // Blast again to deepen a crater whose ore is out, to dig the first full-depth pit, or when no ore is left to haul (no income).
-    wanted: deepen || !hauling || (!m.lastShotFailed && pitM < ladderHoleDepthM(s) - LADDER_FRESH_SHOT_DEPTH_SLACK_M),
+    // Blast again to deepen a crater whose ore is out, to dig the first full-depth pit, or when the ore left to haul runs low (income about to stop).
+    wanted: deepen || oreRunningOut || (!m.lastShotFailed && pitM < ladderHoleDepthM(s) - LADDER_FRESH_SHOT_DEPTH_SLACK_M),
     cost: side === 0 ? Infinity : side * side * kg * explosive.costPerKg + RE_FIRE_CASH_CUSHION,
     order: () => {
       let ordered: Shot | null = null;
@@ -939,7 +950,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
         for (const step of LADDER_SHRINK_STEPS) {
           const n = Math.max(1, Math.round(side * step));
           const at = deepen && crater ? { x: crater.x + inset, z: crater.z + inset } : undefined;
-          ordered = orderShot(s, [...m.origins, ...m.barred], specFor(n), at, { protectedZones });
+          ordered = orderShot(s, [...m.origins, ...m.barred], specFor(n), at, { protectedZones: buildingZones, forbiddenZones: rampZones });
           if (ordered !== null) return true;
         }
         // The 64 m map holds few sites: when none is left, age out the oldest bar so a cleared crater can be deepened again.
@@ -1223,18 +1234,28 @@ function gatedLadderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
 }
 
 /**
- * Full tier-1 loads of reachable ore each hauler must have waiting before the ladder buys another. The driver's wage is
+ * Full loads of reachable ore each hauler must have waiting before the ladder buys another. The driver's wage is
  * most of a hauler's cost and barren rock pays none of it: past this the fleet outgrows the ore and only adds payroll.
  */
 const LADDER_HAULER_ORE_LOADS = 10;
+/**
+ * Full loads per hauler of reachable ore under which the ladder blasts again: the fleet is about to run out of ore.
+ * Never zero: a fragmenter splitting boulders keeps a few tonnes of ore on the board at all times.
+ */
+const LADDER_ORE_LOW_LOADS = 2;
+
+/** One full load of the whole hauler fleet (kg), each at its own tier. */
+function fleetLoadKg(state: GameState): number {
+  return state.vehicles.vehicles.filter(v => v.type === 'debris_hauler')
+    .reduce((kg, v) => kg + getVehicleDefByTier('debris_hauler', v.tier).capacity, 0);
+}
 
 /** Another hauler (and its driver) while cash sits idle and enough ore waits within reach (LADDER_HAULER_ORE_LOADS). */
 function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
   const haulers = s.state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length;
-  const def = getVehicleDefByTier('debris_hauler', 1);
-  const cost = def.purchaseCost + HIRING_COSTS.driver;
+  const cost = getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver;
   if (haulers >= (s.config.maxHaulers ?? LADDER_MAX_HAULERS) || s.state.cash - cost < LADDER_UPGRADE_RESERVE) return;
-  if (reachableOreRubbleKg(s.state) < haulers * def.capacity * LADDER_HAULER_ORE_LOADS) return;
+  if (reachableOreRubbleKg(s.state) < fleetLoadKg(s.state) * LADDER_HAULER_ORE_LOADS) return;
   tryOnce(s, m, 'hauler', () => buyHauler(s));
 }
 

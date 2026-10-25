@@ -312,6 +312,15 @@ describe('decideLadderDeepen', () => {
     expect(decideLadderDeepen({ ...deepenBase, orderlessRubbleCount: 1 })).toBe('wait');
   });
 
+  it('waits while rubble lies out of every vehicle\'s reach: the crater has no way in yet', () => {
+    expect(decideLadderDeepen({ ...deepenBase, outOfReachRubbleCount: 1 })).toBe('wait');
+  });
+
+  it('an absent out-of-reach count reads as none', () => {
+    const { outOfReachRubbleCount: _omit, ...rest } = { ...deepenBase, outOfReachRubbleCount: 0 };
+    expect(decideLadderDeepen(rest)).toBe('deepen');
+  });
+
   it('waits while a haul is pending', () => {
     expect(decideLadderDeepen({ ...deepenBase, haulPending: true })).toBe('wait');
   });

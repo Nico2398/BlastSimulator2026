@@ -44,7 +44,7 @@ describe('craterRubbleCounts', () => {
   });
 
   it('counts nothing for a clear crater', () => {
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 0 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 0, outOfReach: 0 });
   });
 
   it('classifies ordered, orderless and sealed fragments in one pass', () => {
@@ -55,32 +55,47 @@ describe('craterRubbleCounts', () => {
     withOrder(state, 1);
     withOrder(state, 4);
     sealedIds = new Set([3]);
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 2, orderless: 1, sealed: 1 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 2, orderless: 1, sealed: 1, outOfReach: 0 });
   });
 
   it('treats an undefined sealed set as empty', () => {
     withFragment(state, 1, 12, 12);
     sealedIds = undefined;
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 1, sealed: 0 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 1, sealed: 0, outOfReach: 0 });
   });
 
   it('treats an empty sealed set as empty', () => {
     withFragment(state, 1, 12, 12);
     withOrder(state, 1);
     sealedIds = new Set();
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 1, orderless: 0, sealed: 0 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 1, orderless: 0, sealed: 0, outOfReach: 0 });
+  });
+
+  it('counts rubble whose order is out of reach apart, and as sealed too', () => {
+    withFragment(state, 1, 12, 12);
+    withFragment(state, 2, 13, 13);
+    withOrder(state, 1, 'haul_debris', 'debris_out_of_reach');
+    withOrder(state, 2, 'haul_debris', 'spoil_heap_full');
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 2, outOfReach: 1 });
+  });
+
+  it('with an ore set, counts only the rubble it holds', () => {
+    withFragment(state, 1, 12, 12);
+    withFragment(state, 2, 13, 13);
+    withOrder(state, 1);
+    expect(craterRubbleCounts(state, crater, new Set([2]))).toEqual({ ordered: 0, orderless: 1, sealed: 0, outOfReach: 0 });
   });
 
   it('ignores fragments off the ground', () => {
     withFragment(state, 1, 12, 12, 'stored');
     withFragment(state, 2, 12, 12, 'in_transit');
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 0 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 0, outOfReach: 0 });
   });
 
   it('ignores fragments outside the crater footprint', () => {
     withFragment(state, 1, 50, 50);
     withFragment(state, 2, 12, 60);
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 0 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 0, outOfReach: 0 });
   });
 
   it('counts a fragment one tile outside the span as on the footprint', () => {
@@ -92,7 +107,7 @@ describe('craterRubbleCounts', () => {
   it('counts an unordered sealed fragment as sealed only', () => {
     withFragment(state, 1, 12, 12);
     sealedIds = new Set([1]);
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1, outOfReach: 0 });
   });
 });
 
@@ -106,26 +121,26 @@ describe('craterRubbleCounts blocked orders (#2062)', () => {
   it('a fragment_debris order counts as ordered', () => {
     withFragment(state, 1, 12, 12);
     withOrder(state, 1, 'fragment_debris');
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 1, orderless: 0, sealed: 0 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 1, orderless: 0, sealed: 0, outOfReach: 0 });
   });
 
   it('a blocked haul order counts as sealed, not ordered', () => {
     withFragment(state, 1, 12, 12);
     withOrder(state, 1, 'haul_debris', 'debris_out_of_reach');
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1, outOfReach: 1 });
   });
 
   it('a blocked fragment_debris order counts as sealed', () => {
     withFragment(state, 1, 12, 12);
     withOrder(state, 1, 'fragment_debris', 'target_unreachable');
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1, outOfReach: 0 });
   });
 
   it('an id both sealed and ordered counts once, as sealed', () => {
     withFragment(state, 1, 12, 12);
     withOrder(state, 1);
     sealedIds = new Set([1]);
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 0, orderless: 0, sealed: 1, outOfReach: 0 });
   });
 
   it('an unblocked and a blocked order mix are classified per fragment', () => {
@@ -133,7 +148,7 @@ describe('craterRubbleCounts blocked orders (#2062)', () => {
     withFragment(state, 2, 13, 13);
     withOrder(state, 1);
     withOrder(state, 2, 'haul_debris', 'debris_out_of_reach');
-    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 1, orderless: 0, sealed: 1 });
+    expect(craterRubbleCounts(state, crater)).toEqual({ ordered: 1, orderless: 0, sealed: 1, outOfReach: 1 });
   });
 
   it('does not mutate the sealed set it was given', () => {

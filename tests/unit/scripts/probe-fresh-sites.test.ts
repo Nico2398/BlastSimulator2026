@@ -65,6 +65,20 @@ describe('freshSites', () => {
     expect(sites.some(c => c.z > PATCH.hi)).toBe(true);
   });
 
+  it('never returns a site over a forbidden zone, even when that leaves none', () => {
+    const grid = gridWithPatch(true);
+    expect(freshSites(grid, SPAN, DEPTH, [], { protectedZones: [], forbiddenZones: [{ x: 0, z: 0, span: SIZE }] })).toEqual([]);
+  });
+
+  it('drops only the sites over a forbidden zone', () => {
+    const grid = gridWithPatch(true);
+    const all = freshSites(grid, SPAN, DEPTH, [], { protectedZones: [] });
+    const zone = { x: PATCH.lo, z: PATCH.lo, span: 1 };
+    const sites = freshSites(grid, SPAN, DEPTH, [], { protectedZones: [], forbiddenZones: [zone] });
+    expect(sites.length).toBeLessThan(all.length);
+    expect(sites.some(c => c.x === PATCH.lo && c.z === PATCH.lo)).toBe(false);
+  });
+
   it('falls back to every site when the keep-out zones cover them all', () => {
     const grid = gridWithPatch(true);
     expect(freshSites(grid, SPAN, DEPTH, [], undefined, [{ x: 0, z: 0, span: SIZE }])).toEqual(freshSites(grid, SPAN, DEPTH, []));

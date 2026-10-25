@@ -120,12 +120,17 @@ export interface LadderDeepenInput {
   orderlessRubbleCount: number;
   /** Rubble no hauler can reach whatever is ordered. Informational: ignored by the decision, sealed rubble never blocks deepening. */
   sealedRubbleCount: number;
+  /**
+   * Rubble whose haul order reads out of reach: no ramp leads into the crater yet (the player orders one). Blocks
+   * deepening: a shot fired into a crater nobody drives into buries its holes under rubble no one can clear. Absent = 0.
+   */
+  outOfReachRubbleCount?: number;
   haulPending: boolean;
 }
 
-/** Deepen when no ordered or reachable orderless rubble and no haul remains, whatever is sealed; else wait. */
+/** Deepen when no ordered, reachable orderless or out-of-reach rubble and no haul remains, whatever is sealed; else wait. */
 export function decideLadderDeepen(input: LadderDeepenInput): 'deepen' | 'wait' {
-  const clear = input.orderedRubbleCount === 0 && input.orderlessRubbleCount === 0;
+  const clear = input.orderedRubbleCount === 0 && input.orderlessRubbleCount === 0 && (input.outOfReachRubbleCount ?? 0) === 0;
   return clear && !input.haulPending ? 'deepen' : 'wait';
 }
 
