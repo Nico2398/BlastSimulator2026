@@ -10,15 +10,16 @@
 import { getStorageCapacity } from '../entities/Building.js';
 import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
-import type { GameState } from '../state/GameState.js';
+import { isProgressionSite, type GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { levelGroundRect } from '../mining/LevelGround.js';
-import { DEFAULT_GRID_SIZE } from '../config/balance.js';
+import { DEFAULT_GRID_SIZE, NAV_CLEARANCE_VEHICLE_CELLS } from '../config/balance.js';
 import { NavGrid, isCellOccupied } from '../nav/NavGrid.js';
 import { regionForColumns } from '../nav/NavGridSync.js';
 import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
 import { siteVehicleReach } from './OrderReachability.js';
+import { withDockingCells } from '../nav/DockingReach.js';
 import { loseOrphanedStock, type WarehouseLoss } from '../economy/FreightWarehouses.js';
 
 /** The rectangular region a building/footprint of `sizeX`x`sizeZ` occupies, anchored at (x, z). */
@@ -183,33 +184,38 @@ export function relocateFootprintOccupants(state: GameState, region: BlastRegion
 }
 
 /**
- * Where a parked vehicle a footprint caught goes: the nearest free cell of the site's vehicle network
- * (`siteVehicleReach`: reached from the rally point at the site's vehicle climb limit and clearance), so it can still
- * drive away (#2045). The corner-anchored search keeps to the corner's bench level, and at a vehicle limit under the
- * walking one that can set a hauler on a pocket no vehicle leaves. Without a network, that search (#1270).
+ * Where a parked vehicle a footprint caught goes: the nearest cell reachable from the world corner (#1270). On a
+ * progression site, where vehicles climb less than walkers, that cell can be a pocket no vehicle leaves: the
+ * corner-anchored search keeps to the corner's bench level (#2045). There the pick stands only when it lies on the
+ * site's vehicle network (`siteVehicleReach`, docking cells included); else the vehicle goes to the nearest free cell of
+ * the network, never onto a drill hole.
  */
 function parkedVehicleRelocation(state: GameState, navGrid: NavGrid, x: number, z: number): { x: number; z: number } {
-  const reach = siteVehicleReach(state);
-  if (reach !== null) {
-    const cx = Math.round(x);
-    const cz = Math.round(z);
-    const maxRing = Math.max(navGrid.width, navGrid.height);
-    for (let r = 1; r <= maxRing; r++) {
-      let best: { x: number; z: number } | null = null;
-      let bestDistSq = Infinity;
-      for (let dz = -r; dz <= r; dz++) {
-        for (let dx = -r; dx <= r; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
-          if (!reach(cx + dx, cz + dz) || isCellOccupied(navGrid.cellAt(cx + dx, cz + dz))) continue;
-          const distSq = dx * dx + dz * dz;
-          if (distSq < bestDistSq) {
-            bestDistSq = distSq;
-            best = { x: cx + dx, z: cz + dz };
-          }
+  const fallback = NavGrid.findNearestReachableCell(navGrid, 0, 0, x, z, true);
+  if (!isProgressionSite(state)) return fallback;
+  const network = siteVehicleReach(state);
+  if (network === null) return fallback;
+  const onNetwork = withDockingCells(navGrid, { has: network }, NAV_CLEARANCE_VEHICLE_CELLS);
+  if (onNetwork.has(fallback.x, fallback.z)) return fallback;
+  const cx = Math.round(x);
+  const cz = Math.round(z);
+  const maxRing = Math.max(navGrid.width, navGrid.height);
+  for (let r = 1; r <= maxRing; r++) {
+    let best: { x: number; z: number } | null = null;
+    let bestDistSq = Infinity;
+    for (let dz = -r; dz <= r; dz++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+        const cell = navGrid.cellAt(cx + dx, cz + dz);
+        if (!network(cx + dx, cz + dz) || cell?.type === 'drill_hole' || isCellOccupied(cell)) continue;
+        const distSq = dx * dx + dz * dz;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          best = { x: cx + dx, z: cz + dz };
         }
       }
-      if (best !== null) return best;
     }
+    if (best !== null) return best;
   }
-  return NavGrid.findNearestReachableCell(navGrid, 0, 0, x, z, true);
+  return fallback;
 }
