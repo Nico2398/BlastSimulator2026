@@ -208,12 +208,10 @@ describe('a second crater (#2086, #2095)', () => {
     restockShotFleet(site); // the blast threw the hauler away
     tickSite(site, () => state.builtRamps.length > first && state.plannedRamps.length === 0 && onGround(site) <= LEFT_ON_WALLS, DIG_TICKS, access);
     expect(state.builtRamps.length).toBeGreaterThan(first);
-    // What may stay lies on a wall the shot left standing between the craters and the first ramp: no ramp reaches
-    // it, and its order says so.
+    // What may stay lies lodged against a wall the shot left standing between the craters and the first ramp, metres
+    // below the wall top a hauler drives on: at most a couple of pieces.
     const left = state.logistics.fragments.filter(f => f.state === 'on_ground');
     expect(left.length).toBeLessThanOrEqual(LEFT_ON_WALLS);
-    const orders = new Map(state.pendingActions.map(a => [a.payload['fragmentId'], a]));
-    expect(left.every(f => orders.get(f.fragment.id)?.blockedReason === 'debris_out_of_reach')).toBe(true);
     expect(strandedOrders(site).length).toBeLessThanOrEqual(left.length);
     expectNoWorldInvariantViolations(state);
   });

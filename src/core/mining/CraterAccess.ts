@@ -135,39 +135,48 @@ function overlapsAny(def: RampDef, width: RampWidth, avoid: readonly RampFootpri
 type Excluded = (def: RampDef) => boolean;
 
 /**
- * Straight ramp ending on the floor tile, starting on the nearest reachable cell along one of four axes
- * whose grade stays within `limitRatio`. Shorter first, so a built ramp's foot beats the rim.
+ * Shortest straight ramp ending on one of `feet` (floor-level tiles), starting on a reachable cell along one of four
+ * axes whose grade stays within `limitRatio`. Lengths rise across every foot at once, so a foot at the crater's edge
+ * beats a long road to its middle (#2045), and a built ramp's foot beats the rim; on equal length the earlier foot wins.
  */
 function planStraight(
-  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded,
-  foot: { x: number; z: number } = { x: Math.round(floor.x), z: Math.round(floor.z) },
+  surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded, feet: ReadonlyArray<{ x: number; z: number }>,
 ): { plan: CraterAccessPlan | null; sawShallow: boolean } {
-  const fx = foot.x;
-  const fz = foot.z;
   let sawShallow = false;
   for (let length = Math.max(1, width); length <= MAX_RAMP_LENGTH; length++) {
-    for (const direction of DIRECTIONS) {
-      const o = RAMP_DIR_OFFSETS[direction];
-      const sx = fx - o.dx * length;
-      const sz = fz - o.dz * length;
-      if (!surface.contains(sx, sz) || !surface.reachableFrom(sx, sz)) continue;
-      const startGround = surface.heightAt(sx, sz);
-      const drop = startGround - landingGround(surface, { originX: sx, originZ: sz, direction, length, width });
-      if (!Number.isFinite(drop)) continue;
-      if (drop < RAMP_CRATER_MIN_DROP_M) { sawShallow = true; continue; }
-      if (drop / length > limitRatio) continue;
-      const def: RampDef = { originX: sx, originZ: sz, direction, length, targetDepth: drop, width };
-      if (findRampPathFault(rampPathOf(def), width) !== null) continue;
-      if (excluded(def)) continue;
-      const check = validateRampOrder(def, Infinity);
-      if (!check.success) continue;
-      return {
-        plan: { ok: true, def, cost: check.cost, gradeDegrees: slopeDegreesForRatio(drop / length) },
-        sawShallow,
-      };
+    for (const foot of feet) {
+      for (const direction of DIRECTIONS) {
+        const o = RAMP_DIR_OFFSETS[direction];
+        const sx = foot.x - o.dx * length;
+        const sz = foot.z - o.dz * length;
+        if (!surface.contains(sx, sz) || !surface.reachableFrom(sx, sz)) continue;
+        const startGround = surface.heightAt(sx, sz);
+        const drop = startGround - landingGround(surface, { originX: sx, originZ: sz, direction, length, width });
+        if (!Number.isFinite(drop)) continue;
+        if (drop < RAMP_CRATER_MIN_DROP_M) { sawShallow = true; continue; }
+        if (drop / length > limitRatio) continue;
+        const def: RampDef = { originX: sx, originZ: sz, direction, length, targetDepth: drop, width };
+        if (findRampPathFault(rampPathOf(def), width) !== null) continue;
+        if (excluded(def)) continue;
+        const check = validateRampOrder(def, Infinity);
+        if (!check.success) continue;
+        return {
+          plan: { ok: true, def, cost: check.cost, gradeDegrees: slopeDegreesForRatio(drop / length) },
+          sawShallow,
+        };
+      }
     }
   }
   return { plan: null, sawShallow };
+}
+
+/** Feet a straight plan may end on: the floor's own cell, then the floor-level cells within the cluster gap round it, nearest first. */
+function floorFeet(floor: StrandedFloor, surface: AccessSurface): { x: number; z: number }[] {
+  const feet = [{ x: Math.round(floor.x), z: Math.round(floor.z) }];
+  for (const cell of chebyshevRings(floor, CRATER_ACCESS_CLUSTER_GAP_CELLS)) {
+    if (atFloorLevel(surface, floor, cell.x, cell.z)) feet.push(cell);
+  }
+  return feet;
 }
 
 /** Cells on the Chebyshev ring perimeters round the floor's rounded cell, ring 1 to `maxRing`, nearest ring first. */
@@ -366,22 +375,6 @@ function spiralPlanFrom(
   return { ok: true, def, cost: computeRampCost(rampTotalLength(legs), width), gradeDegrees: p.gradeDegrees };
 }
 
-/**
- * Straight ramp ending on floor-level ground beside the representative cell (#2086). A start on a ledge or at the foot
- * of a built ramp rarely lies on an axis through that one cell; any cell within the cluster gap whose ground matches
- * the floor serves as the foot instead. Nearest foot first; cost walks the window, not the map.
- */
-function planOffsetStraight(
-  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded,
-): CraterAccessPlan | null {
-  for (const foot of chebyshevRings(floor, CRATER_ACCESS_CLUSTER_GAP_CELLS)) {
-    if (!atFloorLevel(surface, floor, foot.x, foot.z)) continue;
-    const { plan } = planStraight(floor, surface, limitRatio, width, excluded, foot);
-    if (plan !== null) return plan;
-  }
-  return null;
-}
-
 /** Plans a ramp from the reachable network down to `floor`, within `maxClimbRatio`. Failure is a result, not an exception. */
 export function planCraterAccess(
   floor: StrandedFloor,
@@ -412,11 +405,9 @@ export function planCraterAccess(
     return !validateRampOrder(order, Infinity).success || fillsOverRubble(order, surface, width);
   };
   const finish = (plan: CraterAccessPlan): CraterAccessPlan => (plan.ok ? { ...plan, def: landed(plan.def) } : plan);
-  const straight = planStraight(floor, surface, limitRatio, width, excluded);
+  const straight = planStraight(surface, limitRatio, width, excluded, floorFeet(floor, surface));
   if (straight.plan !== null) return finish(straight.plan);
   const spiral = planSpiral(floor, surface, limitRatio, width, excluded);
   if (spiral !== null) return finish(spiral);
-  const offset = planOffsetStraight(floor, surface, limitRatio, width, excluded);
-  if (offset !== null) return finish(offset);
   return { ok: false, reasonKey: `${KEY}${straight.sawShallow ? 'too_shallow' : 'no_start'}` };
 }
