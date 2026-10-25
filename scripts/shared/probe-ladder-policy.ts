@@ -50,7 +50,7 @@ export const LADDER_GATE_RUNWAY_TICKS = 1_500;
 export interface LadderShotGateInput {
   /** Current ladder grade. */
   grade: number;
-  /** Rubble (kg) lying in the pit, not yet hauled out. */
+  /** Ore-bearing rubble (kg) lying in the pit within a hauler's reach, not yet hauled out. */
   rubbleKg: number;
   cash: number;
   /** Payroll cost per tick. */
@@ -112,6 +112,7 @@ export function reachableShotDepthM(
   return Math.max(0, Math.min(holeDepthM, rampRunM * fleetClimbRatio));
 }
 
+/** The ladder counts ore-bearing rubble only: barren rock on the floor is cleared off the planned holes first. */
 export interface LadderDeepenInput {
   /** Rubble on the crater footprint that a haul order already covers. */
   orderedRubbleCount: number;
@@ -304,11 +305,13 @@ export function judgeLadderShot(input: LadderShotJudgeInput): LadderShotJudgment
   return { judged: true, lastShotFailed, dudStreak: bar ? 0 : streak, bar };
 }
 
-/** Ticks a pattern may stay buried under rubble before the ladder drops it. */
+/** Ticks a pattern's buried holes may go without one coming free before the ladder drops it. */
 export const LADDER_BURIED_DROP_TICKS = 500;
 
 interface BuriedPatternInput {
   buriedHoleCount: number;
+  /** Buried holes at the previous call; null on the first. */
+  previousBuriedHoleCount: number | null;
   buriedSinceTick: number | null;
   tick: number;
 }
@@ -319,13 +322,14 @@ interface BuriedPatternDecision {
 }
 
 /**
- * Contract: no buried holes -> wait, buriedSinceTick null; first buried call -> wait,
- * buriedSinceTick = tick; buried for >= LADDER_BURIED_DROP_TICKS -> drop, null; a count back to 0
- * resets buriedSinceTick to null.
+ * Contract: no buried holes -> wait, buriedSinceTick null; first buried call, or fewer buried holes than at the
+ * previous call (the crew is clearing them) -> wait, buriedSinceTick = tick; no hole freed for
+ * >= LADDER_BURIED_DROP_TICKS -> drop, null; a count back to 0 resets buriedSinceTick to null.
  */
 export function decideBuriedPattern(input: BuriedPatternInput): BuriedPatternDecision {
   if (input.buriedHoleCount === 0) return { action: 'wait', buriedSinceTick: null };
-  const since = input.buriedSinceTick ?? input.tick;
+  const freed = input.previousBuriedHoleCount !== null && input.buriedHoleCount < input.previousBuriedHoleCount;
+  const since = freed ? input.tick : input.buriedSinceTick ?? input.tick;
   if (input.tick - since >= LADDER_BURIED_DROP_TICKS) return { action: 'drop', buriedSinceTick: null };
   return { action: 'wait', buriedSinceTick: since };
 }

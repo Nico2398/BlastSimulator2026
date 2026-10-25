@@ -57,7 +57,6 @@ import { computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY } from '../../src/
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { nextGradeTargets } from '../../src/core/economy/MineGrade.js';
 import { getExplosivesFreeCapacity } from '../../src/core/entities/BuildingWarehouse.js';
-import { onGroundMassKg } from '../../src/core/economy/Logistics.js';
 import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
 import { getBuildingDef, getDefSize, getUpgradeCost, type BuildingTier } from '../../src/core/entities/Building.js';
 import { getVehicleDefByTier, getVehicleReservation, vehicleDriverId } from '../../src/core/entities/Vehicle.js';
@@ -90,6 +89,8 @@ import {
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
 import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
+import { haulDestinationOf } from '../../src/core/economy/SpoilHeaps.js';
+import { oreGradeScaleOf } from '../../src/core/economy/OreGrade.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
@@ -620,8 +621,11 @@ function dropUnreachablePattern(s: ProbeSession, m: LadderMemory): void {
   }
   // Holes the previous shot's rubble buried stay undrilled until hauled; a pattern buried for too long is dropped.
   const buried = s.state.pendingActions.filter(a => a.type === 'drill_hole' && a.blockedReason === 'buried_under_rubble');
-  const verdict = decideBuriedPattern({ buriedHoleCount: buried.length, buriedSinceTick: m.buriedSinceTick, tick: s.state.tickCount });
+  const verdict = decideBuriedPattern({
+    buriedHoleCount: buried.length, previousBuriedHoleCount: m.buriedHoleCount ?? null, buriedSinceTick: m.buriedSinceTick, tick: s.state.tickCount,
+  });
   m.buriedSinceTick = verdict.buriedSinceTick;
+  m.buriedHoleCount = buried.length;
   if (verdict.action !== 'drop') return;
   const x = Math.min(...buried.map(a => a.targetX));
   const z = Math.min(...buried.map(a => a.targetZ));
@@ -736,8 +740,10 @@ interface LadderMemory extends ReinvestMemory {
   maxGrade: number | null;
   /** Footprints around a hole no rig could reach: a fresh shot keeps clear of them, or it would pick the same site again. */
   barred: Array<Pattern & { span: number }>;
-  /** Tick since which a pattern's drill orders have stayed buried under rubble; null when none is. */
+  /** Tick since which a pattern's buried drill orders stopped coming free; null when none is buried. */
   buriedSinceTick: number | null;
+  /** Buried drill orders at the last look; unset before the first. */
+  buriedHoleCount?: number;
   /** Hole depth cap (m) in force for the last shot. */
   holeCapM: number;
   /** Whether the last judged shot gained no pit depth and no new ore. */
@@ -806,8 +812,21 @@ interface CraterRubbleCounts {
   sealed: number;
 }
 
-/** One pass over the crater's rubble: covered by a haul order, reachable without one, or sealed from every hauler. */
-export function craterRubbleCounts(state: GameState, crater: Pattern & { span: number }): CraterRubbleCounts {
+/** Ids of the on-ground fragments that carry ore (bound for a warehouse, not a spoil heap). */
+function oreFragmentIds(state: GameState): Set<number> {
+  const scale = oreGradeScaleOf(state.world);
+  const ids = new Set<number>();
+  for (const f of state.logistics.fragments) {
+    if (f.state === 'on_ground' && haulDestinationOf(f.fragment, scale) === 'warehouse') ids.add(f.fragment.id);
+  }
+  return ids;
+}
+
+/**
+ * One pass over the crater's rubble: covered by a haul order, reachable without one, or sealed from every hauler.
+ * `ore` set: only the rubble whose ids it holds counts.
+ */
+export function craterRubbleCounts(state: GameState, crater: Pattern & { span: number }, ore?: ReadonlySet<number>): CraterRubbleCounts {
   const sealedIds = new Set<number>(sealedFragmentIdsOf(state) ?? []);
   const orderedIds = new Set<number>();
   for (const a of state.pendingActions) {
@@ -821,6 +840,7 @@ export function craterRubbleCounts(state: GameState, crater: Pattern & { span: n
   for (const f of state.logistics.fragments) {
     if (f.state !== 'on_ground' || !inCraterFringe(f.fragment.position.x, f.fragment.position.z, crater)) continue;
     const id = f.fragment.id;
+    if (ore && !ore.has(id)) continue;
     if (sealedIds.has(id)) counts.sealed++;
     else if (orderedIds.has(id)) counts.ordered++;
     else counts.orderless++;
@@ -828,10 +848,10 @@ export function craterRubbleCounts(state: GameState, crater: Pattern & { span: n
   return counts;
 }
 
-/** A haul still pending over a crater's footprint (and a tile around it). */
-function craterHaulPending(state: GameState, crater: Pattern & { span: number }): boolean {
+/** A haul still pending over a crater's footprint (and a tile around it); `ore` set: only a haul of that rubble. */
+function craterHaulPending(state: GameState, crater: Pattern & { span: number }, ore?: ReadonlySet<number>): boolean {
   return state.pendingActions.some(a => a.type === 'haul_debris' && !a.blockedReason
-    && inCraterFringe(a.targetX, a.targetZ, crater));
+    && inCraterFringe(a.targetX, a.targetZ, crater) && (!ore || ore.has((a.payload as { fragmentId: number }).fragmentId)));
 }
 
 /**
@@ -843,14 +863,16 @@ function craterHaulPending(state: GameState, crater: Pattern & { span: number })
 function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const { state } = s;
   const vehicles = state.vehicles.vehicles;
-  // Deepen the latest crater whose rubble is cleared (holes under rubble never finish); none clear: a fresh site meanwhile.
+  // Deepen the latest crater whose ore is hauled out; none: a fresh site meanwhile. Barren rock left on the floor is
+  // no reason to wait: the crew clears the planned holes before any other barren rubble (gameplay-blast-system).
+  const ore = oreFragmentIds(state);
   const crater = [...m.origins].reverse().map(o => ({ x: o.x, z: o.z, span: o.span ?? SHOT_SPAN }))
     .filter(c => !m.barred.some(b => craterKey(b) === craterKey(c)))
     .find(c => {
-      const counts = craterRubbleCounts(state, c);
+      const counts = craterRubbleCounts(state, c, ore);
       return decideLadderDeepen({
         orderedRubbleCount: counts.ordered, orderlessRubbleCount: counts.orderless,
-        sealedRubbleCount: counts.sealed, haulPending: craterHaulPending(state, c),
+        sealedRubbleCount: counts.sealed, haulPending: craterHaulPending(state, c, ore),
       }) === 'deepen';
     });
   const deepen = depthTargetOpen(s) && crater !== undefined;
@@ -903,10 +925,11 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   // A g2 shot throws rock far enough to destroy a building beside the site (a lost building sank well-being to a revolt at t8520, #2076).
   const buildingZones = state.buildings.buildings.map(b => ({ x: b.x - LADDER_BUILDING_KEEP_OUT_M, z: b.z - LADDER_BUILDING_KEEP_OUT_M, span: 2 * LADDER_BUILDING_KEEP_OUT_M + 1 }));
   const protectedZones = [...rampProtectionZones(Object.values(m.ramps), LADDER_RAMP_PROTECT_MARGIN_M), ...buildingZones];
-  // Orders no ramp reaches never get hauled: they are not work for the crew.
-  const hauling = state.pendingActions.some(a => a.type === 'haul_debris' && a.blockedReason === null);
+  // Orders no ramp reaches never get hauled: they are not work for the crew. Barren rock earns nothing.
+  const hauling = state.pendingActions.some(a => a.type === 'haul_debris' && a.blockedReason === null
+    && ore.has((a.payload as { fragmentId: number }).fragmentId));
   return {
-    // Blast again to deepen a cleared crater, to dig the first full-depth pit, or when the crew has nothing left to haul (idle crew, no income).
+    // Blast again to deepen a crater whose ore is out, to dig the first full-depth pit, or when no ore is left to haul (no income).
     wanted: deepen || !hauling || (!m.lastShotFailed && pitM < ladderHoleDepthM(s) - LADDER_FRESH_SHOT_DEPTH_SLACK_M),
     cost: side === 0 ? Infinity : side * side * kg * explosive.costPerKg + RE_FIRE_CASH_CUSHION,
     order: () => {
@@ -940,13 +963,15 @@ function upgradeBuilding(s: ProbeSession, m: ReinvestMemory, type: string): bool
 
 /**
  * Earn `role`'s licence at `tier` the way a player does: a Driving Center of that tier, then a course for
- * an employee of the role that holds the licence at hire (hiring one when none is free). True once a
- * living employee holds it; otherwise one step towards it is taken, cash permitting.
+ * an employee of the role that holds the licence at hire. True once `holders` living employees hold it;
+ * otherwise one step towards it is taken, cash permitting. Only the first holder is hired for the course
+ * when nobody is free: later ones wait for a crew member between jobs, so a fleet upgrade grows no payroll.
  */
-function earnLicence(s: ProbeSession, m: ReinvestMemory, role: VehicleRole, tier: VehicleTier): boolean {
+function earnLicence(s: ProbeSession, m: ReinvestMemory, role: VehicleRole, tier: VehicleTier, holders = 1): boolean {
   const { state } = s;
   const skill = ROLE_LICENCE_REQUIRED[role];
-  if (countLicenceHolders(state.employees.employees, role, tier) > 0) return true;
+  const held = countLicenceHolders(state.employees.employees, role, tier);
+  if (held >= holders) return true;
   const school = state.buildings.buildings.find(b => b.type === 'driving_center');
   if (!school) {
     if (!state.plannedBuildings.some(p => p.type === 'driving_center')
@@ -965,6 +990,7 @@ function earnLicence(s: ProbeSession, m: ReinvestMemory, role: VehicleRole, tier
     && licenceLevelOfSkill(e.qualifications, skill) < tier);
   let trainee = idle;
   if (!trainee) {
+    if (held > 0) return false;
     if (spendable(s) < HIRING_COSTS[trainRole] + LADDER_CASH_RESERVE || (m.retryAt[`hire_${skill}`] ?? 0) > state.tickCount) return false;
     m.retryAt[`hire_${skill}`] = state.tickCount + LADDER_HIRE_COOLDOWN_TICKS;
     if (!s.run(`employee hire role:${trainRole}`).success) return false;
@@ -977,7 +1003,9 @@ function earnLicence(s: ProbeSession, m: ReinvestMemory, role: VehicleRole, tier
 
 /**
  * Upgrade one vehicle in place (no new driver on payroll) when the dealer's grade gate allows its next tier,
- * a licensed driver exists and cash stays above LADDER_UPGRADE_RESERVE after it.
+ * a licensed driver is left over for it and cash stays above LADDER_UPGRADE_RESERVE after it. One licence per
+ * upgraded vehicle: a fleet upgraded past its licensed drivers parks (at t5000 on green_foothills, 11 of 12
+ * tier-2 haulers stood driverless beside 300 t of ore waiting to be hauled).
  */
 function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
   const grade = gradeOf(s);
@@ -1000,7 +1028,8 @@ function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
   // The licence is earned for the first rule even before its upgrade is affordable.
   const bought = rules.find(r => r.id === pick?.id) ?? rules[0];
   if (!bought || s.state.cash < LADDER_UPGRADE_RESERVE) return;
-  if (!earnLicence(s, m, bought.role, bought.tier) || !pick) return;
+  const atTier = s.state.vehicles.vehicles.filter(v => v.type === bought.role && v.tier >= bought.tier).length;
+  if (!earnLicence(s, m, bought.role, bought.tier, atTier + 1) || !pick) return;
   tryOnce(s, m, `upgrade_${bought.vehicleId}`, () => s.run(`vehicle upgrade ${bought.vehicleId}`).success);
 }
 
@@ -1161,11 +1190,16 @@ function ladderPermit(s: ProbeSession, m: LadderMemory): void {
   }
 }
 
-/** Rock mass (kg) a hauler can still reach: on the ground with a haul order not blocked as out of reach. Rubble no ramp reaches stays put and must not hold shots forever. */
-function reachableRubbleKg(state: GameState): number {
+/**
+ * Mass (kg) of ore-bearing rock a hauler can still reach: on the ground with a haul order not blocked as out of reach.
+ * Rubble no ramp reaches stays put and must not hold shots forever; barren rock earns nothing while it waits.
+ */
+function reachableOreRubbleKg(state: GameState): number {
+  const ore = oreFragmentIds(state);
   const reachable = new Set<number>();
   for (const a of state.pendingActions) {
-    if (a.type === 'haul_debris' && a.blockedReason === null) reachable.add((a.payload as { fragmentId: number }).fragmentId);
+    const id = (a.payload as { fragmentId: number }).fragmentId;
+    if (a.type === 'haul_debris' && a.blockedReason === null && ore.has(id)) reachable.add(id);
   }
   let kg = 0;
   for (const f of state.logistics.fragments) if (f.state === 'on_ground' && reachable.has(f.fragment.id)) kg += f.fragment.mass;
@@ -1175,9 +1209,9 @@ function reachableRubbleKg(state: GameState): number {
 /** The ladder's shot plan, held (unaffordable) while the pit is buried or payroll runway is short. */
 function gatedLadderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const plan = ladderPlan(s, m);
-  const rubbleKg = reachableRubbleKg(s.state);
-  // No reachable rubble means no hauling work and no income: holding on the payroll runway alone would
-  // starve the idle-crew recovery shot while payroll drains, so the gate only applies with rubble to clear.
+  const rubbleKg = reachableOreRubbleKg(s.state);
+  // No reachable ore means no income: holding on the payroll runway alone would starve the recovery shot
+  // while payroll drains, so the gate only applies with ore to haul.
   if (rubbleKg === 0) return plan;
   const hold = decideLadderShotGate({
     grade: gradeOf(s),
@@ -1188,11 +1222,19 @@ function gatedLadderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   return hold ? { ...plan, cost: Infinity } : plan;
 }
 
-/** Another hauler (and its driver) while cash sits idle and the pit still holds rubble. */
+/**
+ * Full tier-1 loads of reachable ore each hauler must have waiting before the ladder buys another. The driver's wage is
+ * most of a hauler's cost and barren rock pays none of it: past this the fleet outgrows the ore and only adds payroll.
+ */
+const LADDER_HAULER_ORE_LOADS = 10;
+
+/** Another hauler (and its driver) while cash sits idle and enough ore waits within reach (LADDER_HAULER_ORE_LOADS). */
 function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
   const haulers = s.state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length;
-  const cost = getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver;
-  if (haulers >= (s.config.maxHaulers ?? LADDER_MAX_HAULERS) || s.state.cash - cost < LADDER_UPGRADE_RESERVE || onGroundMassKg(s.state.logistics) === 0) return;
+  const def = getVehicleDefByTier('debris_hauler', 1);
+  const cost = def.purchaseCost + HIRING_COSTS.driver;
+  if (haulers >= (s.config.maxHaulers ?? LADDER_MAX_HAULERS) || s.state.cash - cost < LADDER_UPGRADE_RESERVE) return;
+  if (reachableOreRubbleKg(s.state) < haulers * def.capacity * LADDER_HAULER_ORE_LOADS) return;
   tryOnce(s, m, 'hauler', () => buyHauler(s));
 }
 
