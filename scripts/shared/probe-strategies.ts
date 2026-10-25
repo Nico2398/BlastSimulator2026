@@ -26,9 +26,9 @@
 //            e. buy a second hauler and hire its driver
 //            f. `permit apply` once `permit status` shows every target met
 //               (nextGradeTargets in src/core/economy/MineGrade.ts)
-//            g. a replacement for any core role nobody alive holds, and new living quarters when a shot
-//               destroyed the last ones (replaceLostCrew): an event can take the only blaster, and every
-//               later charge order waits on one
+//            g. a replacement for any core role nobody alive holds (replaceLostCrew): an event can take the
+//               only blaster, and every later charge order waits on one; new living quarters beside the last
+//               shot when a shot destroyed the last ones (rebuildLostQuarters)
 //            Calibration tasks extend this list; keep each rule one short block.
 //
 //   ladder   The full-ladder player (#1945). The reinvest opening, then every interval:
@@ -643,6 +643,7 @@ function runReinvest(s: ProbeSession): void {
     reinvestBuy(s, m);
     reinvestPermit(s);
     replaceLostCrew(s, m);
+    rebuildLostQuarters(s, m);
   });
 }
 
@@ -971,21 +972,48 @@ function ladderFragmenter(s: ProbeSession, m: ReinvestMemory): void {
   earnLicence(s, m, 'rock_fragmenter', 1);
 }
 
-/**
- * Hire a replacement for any core role nobody alive holds (a blaster lost mid-shot stalls every charge order), and
- * raise new living quarters when a shot destroyed the last ones: without them the crew only rests in place, which tops
- * out under the rest threshold, so nobody ever goes back to work.
- */
+/** Hire a replacement for any core role nobody alive holds (a blaster lost mid-shot stalls every charge order). */
 function replaceLostCrew(s: ProbeSession, m: ReinvestMemory): void {
   for (const role of ['blaster', 'driller', 'driver'] as const) {
     if (s.state.employees.employees.some(e => e.alive && e.role === role) || spendable(s) < HIRING_COSTS[role]) continue;
     tryOnce(s, m, `crew_${role}`, () => s.run(`employee hire role:${role}`).success);
   }
+}
+
+/**
+ * Raise new living quarters when a shot destroyed the last ones: without them the reinvest crew only rests in place,
+ * which tops out under the rest threshold, so nobody ever goes back to work. They go up beside the last shot, as the
+ * opening's do, never at the rally: a crew walking across the site to rest every shift loses the shift. The ladder
+ * keeps its own rule (`ladderQuarters`): on the Shareholder Summit a rebuilt hut stood in the next shot's way and the
+ * losses sank the crew to a revolt.
+ */
+function rebuildLostQuarters(s: ProbeSession, m: ReinvestMemory): void {
   const housed = s.state.buildings.buildings.some(b => b.type === 'living_quarters')
     || s.state.plannedBuildings.some(b => b.type === 'living_quarters');
   if (housed || spendable(s) < getBuildingDef('living_quarters', 1).constructionCost) return;
-  const near = s.state.rallyPoint ?? { x: s.grid.sizeX >> 1, z: s.grid.sizeZ >> 1 };
-  tryOnce(s, m, 'quarters', () => placeBuilding(s, 'living_quarters', near, m.origins.at(-1) ?? null) !== null);
+  const last = m.origins.at(-1) ?? null;
+  const near = last ?? s.state.rallyPoint ?? { x: s.grid.sizeX >> 1, z: s.grid.sizeZ >> 1 };
+  tryOnce(s, m, 'quarters', () => placeBuilding(s, 'living_quarters', near, last) !== null);
+}
+
+/**
+ * Metres the crater being worked may lie from the nearest living quarters before the ladder raises another beside it.
+ * The crew rests every shift (`gameplay-employee-needs`), and past this the walk there and back rivals the shift:
+ * drivers spent a third of their time on the way to rest and the pit stalled (#2089).
+ */
+const LADDER_QUARTERS_REACH_M = 24;
+/** Living quarters the ladder raises at most. */
+const LADDER_MAX_QUARTERS = 3;
+
+/** Another living quarters beside the crater being worked, when every one stands farther than LADDER_QUARTERS_REACH_M. */
+function ladderQuarters(s: ProbeSession, m: LadderMemory): void {
+  const quarters = [...s.state.buildings.buildings, ...s.state.plannedBuildings].filter(b => b.type === 'living_quarters');
+  // With none left the crew rests in place, as before the first was built; one still going up is on its way.
+  if (quarters.length === 0 || quarters.length >= LADDER_MAX_QUARTERS || s.state.plannedBuildings.some(b => b.type === 'living_quarters')) return;
+  const centre = { x: m.crater.x + m.crater.span / 2, z: m.crater.z + m.crater.span / 2 };
+  if (quarters.some(q => Math.hypot(q.x - centre.x, q.z - centre.z) <= LADDER_QUARTERS_REACH_M)) return;
+  if (s.state.cash - getBuildingDef('living_quarters', 1).constructionCost < LADDER_UPGRADE_RESERVE) return;
+  tryOnce(s, m, `quarters_${craterKey(m.crater)}`, () => placeBuilding(s, 'living_quarters', centre, m.crater) !== null);
 }
 
 /** Ecology under which another spoil heap is built, and the most the ladder builds: loose rubble past a heap's capacity drains it. */
@@ -1121,6 +1149,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     playPitLogistics(s.run, s.state, s.grid, m.access);
     ladderPermit(s, m);
     replaceLostCrew(s, m);
+    ladderQuarters(s, m);
     ladderSpoil(s, m);
     ladderSafety(s, m);
     dropUnreachablePattern(s, m);
