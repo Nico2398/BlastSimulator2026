@@ -121,6 +121,8 @@ Injury is a timed state, not a permanent one. `injureEmployee` sets `injured`, s
 
 An armed blast fetches a licensed employee to drive a parked vehicle out of the danger zone, but never cuts their rest: a resting licence holder (`restTicksRemaining` or `pendingRestDuration` set) is awaited and ordered by the next periodic re-evacuation after the rest ends. An employee busy with work is not awaited; another free licence holder is used or the vehicle stays stranded. Detail in `gameplay-vehicle-fleet`.
 
+A living quarters inside a zone still being evacuated, or still threatened by a live plan, is no rest destination (`findNearestBuildingOfType`): the rest is taken in place. The zone lifts the moment its blast fires, so the crew back at work in the crater rests in the huts there again.
+
 ## Cost of Needs
 
 Flat per-visit cost, not tier-scaled (`NEED_REST_COSTS` in `src/core/config/balance.ts`):

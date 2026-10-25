@@ -26,7 +26,7 @@ import {
 // from EvacuationHold.ts if a caller needs the raw key again. See
 // EvacuationHold.ts for its own doc comment and both functions'.
 export {
-  isEvacuationHoldActive, clearResolvedEvacuationHolds,
+  isEvacuationHoldActive, clearResolvedEvacuationHolds, liftSpentZone,
 } from './EvacuationHold.js';
 
 /**

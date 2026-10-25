@@ -43,6 +43,7 @@ Records why the rules in the `gameplay-employee-needs` skill exist: the issues t
 ## Rest and the evacuation rescue
 
 - Evacuation rescue never cuts a rest: #1746.
+- Huts in a spent zone serve rests again once the blast fires (#2089).
 
 ## Cost of Needs
 

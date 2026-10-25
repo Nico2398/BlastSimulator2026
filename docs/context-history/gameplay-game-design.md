@@ -71,6 +71,7 @@ Records why the rules in `.claude/skills/gameplay-game-design/SKILL.md` exist: t
 ## Safety & Projection Profiles
 
 - Evacuation and detonation as one flow: #1362.
+- Fired blast lifts its spent zone: found on the seed-42 ladder probe, where the stale zone kept every hut refused as a rest destination (#2089).
 
 ## Campaign & World Map
 
