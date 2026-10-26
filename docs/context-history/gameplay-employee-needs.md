@@ -58,6 +58,7 @@ Records why the rules in the `gameplay-employee-needs` skill exist: the issues t
 - Multi-hole plans and box-cut ramp completion: #945, #1090; livelock guard: #1118.
 - `ticksWorked` reset on any completed rest: #1669.
 - Forced but not-worthwhile rest taken in place: a 1 m/tick digger drove to a far hut for every rest (#2089).
+- Rest destination skips quarters with no route; none reachable means resting in place: on the seed-42 full-kit ladder a driver left in a 70-cell crater pocket re-ordered a stuck walk to an unreachable hut every shift (#2091).
 
 ## Walk-survival guard
 
