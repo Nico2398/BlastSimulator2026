@@ -585,7 +585,7 @@ function planFragmentTaskItinerary(
   // A batch unloads at one depot; findNearbyHaulableFragments keeps it to the primary's destination (#1530).
   const destination = haulDestinationOf(tracked.fragment, oreGradeScaleOf(state.world));
   const candidates = fidelity === 'exact'
-    ? findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS)
+    ? findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS, employee.id)
     : [];
   const candidateById = new Map(candidates.map(c => [c.fragment.id, c]));
   const batch = candidates.length === 0 ? [] : selectHaulBatch(

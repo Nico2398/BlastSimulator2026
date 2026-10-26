@@ -31,6 +31,7 @@ Records why the rules in the `gameplay-vehicle-fleet` skill exist: the issues th
 - Barren yields to ore: #1870.
 - Barren rock on a planned hole is exempt from barren-yields-to-ore: the ladder probe could not deepen a crater while any ore lay elsewhere on the site (#2089).
 - Barren-yields-to-ore classifies by destination, so trace ore under the barren threshold yields too: #2089.
+- Batch extras skip pieces another truck plans to load: on the desert digger ladder (8 haulers, t2000-3500) the mean load rose from 2.1 t to 2.9 t and warehouse trips from 167 to 221; doubling 4 to 8 haulers went from +20% to +51% ore sold (#2089).
 
 ## Vehicle Repair
 

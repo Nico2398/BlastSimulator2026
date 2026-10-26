@@ -26,6 +26,8 @@ import { pickupFragment } from '../../../src/core/economy/Logistics.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { isHaulBlockedReason } from '../../../src/core/economy/HaulDispatch.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 import { refreshLogisticsCapacity } from '../../../src/core/engine/BuildingTaskHelpers.js';
 
 const SEED = 42;
@@ -850,6 +852,23 @@ describe('findNearbyHaulableFragments (#1370)', () => {
     const { state, ids } = setup([makeFragment(1, 5, 5), makeFragment(2, 6, 5), makeFragment(3, 7, 5)]);
     state.pendingActions.find(a => a.payload['fragmentId'] === 2)!.status = 'in_progress';
     expect(ids()).toEqual([3]);
+  });
+
+  it('excludes a piece another employee already plans to load, but not one the planner itself plans', () => {
+    const { state } = setup([makeFragment(1, 5, 5), makeFragment(2, 6, 5), makeFragment(3, 7, 5)]);
+    const rng = new Random(SEED);
+    const { employee: other } = hireEmployee(state.employees, 'driver', rng, 0, 0);
+    const { employee: planner } = hireEmployee(state.employees, 'driver', rng, 0, 1);
+    const pickup = (targetId: number) => ({
+      mode: 'drive' as const, vehicleId: 1, destX: 6, destZ: 5, arrival: 'exact' as const,
+      onArrive: { kind: 'effect' as const, effectId: 'haul_load' as const, targetId }, estTicks: 1,
+    });
+    other.itinerary = { legs: [pickup(2)], goal: { kind: 'reposition', x: 6, z: 5 }, workTicks: 0, estTotalTicks: 1 };
+    planner.itinerary = { legs: [pickup(3)], goal: { kind: 'reposition', x: 7, z: 5 }, workTicks: 0, estTotalTicks: 1 };
+    const primary = state.logistics.fragments.find(f => f.fragment.id === 1)!;
+
+    expect(findNearbyHaulableFragments(state, primary, 10, planner.id).map(t => t.fragment.id)).toEqual([3]);
+    expect(findNearbyHaulableFragments(state, primary, 10).map(t => t.fragment.id)).toEqual([]);
   });
 
   it('excludes fragments with no haul action at all', () => {
