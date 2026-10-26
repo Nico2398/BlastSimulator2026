@@ -1259,8 +1259,17 @@ function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
   tryOnce(s, m, 'hauler', () => buyHauler(s));
 }
 
+/**
+ * The ladder's shift policy. The default 20-tick shift sends a hauler driver to rest every 20 worked ticks, a third of
+ * the fleet's time on rest trips. Measured on the seed-42 desert digger site with 8 haulers (t1500-4500): the 30-tick
+ * shift sells 101 t of ore against 89 t and ends $1.3M richer with crew morale higher; continuous work at fatigue 50
+ * crashes morale to 31 and well-being to 82.
+ */
+const LADDER_SHIFT_POLICY = 'set_policy mode:shift_12h fatigue:60';
+
 function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const opened = runOpening(s);
+  s.run(LADDER_SHIFT_POLICY);
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {}, access: newCraterAccessMemory(),
