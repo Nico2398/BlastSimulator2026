@@ -20,7 +20,7 @@ import {
 import { claimPendingAction } from './TaskDispatch.js';
 import { beginRestTravel, resolveRestBuildingId } from './RestActionHelpers.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
-import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, lowestFleetTier, isLicensedForRole, minVehicleTierFor } from './VehicleReservation.js';
+import { reserveVehicle, findVehicleForClaim, findFreeVehicleForRole, withUnderRepairIndex, promoteVehicleGatedAction, lowestFleetTier, isLicensedForRole, minVehicleTierFor } from './VehicleReservation.js';
 import { canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { createFragmentLookup, createStorageFit, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
@@ -415,6 +415,8 @@ export function claimOnePoolCandidate(
     a.blockedReason !== 'debris_out_of_reach'
   );
 
+  if (!withUnderRepairIndex(state, () => anyPassesVehicleGates(state, employee, poolCandidates, deferVehicleGatedToIdleAlternative))) return null;
+
   const selection = selectBestActionForEmployee(
     state, employee, poolCandidates,
     // #552: see claimActionsTargetedAtEmployee's own comment on the same
@@ -441,6 +443,31 @@ export function claimOnePoolCandidate(
   if (vehicleCheck.vehicle) reserveVehicle(state.vehicles, vehicleCheck.vehicle.id, claimed.id);
 
   return selection;
+}
+
+/**
+ * Whether some candidate passes the two vehicle gates of claimOnePoolCandidate's claim check without a search: on
+ * foot, or with a vehicle reserved for it, or a free vehicle of its role (`findFreeVehicleForRole` at the lowest
+ * tier, so a stricter tier floor can only refuse more); and, when deferring, no idle licensed alternative. When none
+ * does, every claim check fails and the search can only come back empty. Busy drivers reserving ahead hit that most
+ * ticks (every hauler reserved, or idle drivers standing by): 78% of the non-empty searches on the seed-42 full-kit
+ * ladder at t6000, each a pass over thousands of haul orders.
+ */
+function anyPassesVehicleGates(state: GameState, employee: Employee, candidates: readonly PendingAction[], deferToIdle: boolean): boolean {
+  const freeOfRole = new Map<VehicleRole, boolean>();
+  const deferred = new Map<string, boolean>();
+  return candidates.some(a => {
+    const role = a.requiredVehicleRole;
+    if (role === null) return true;
+    let free = freeOfRole.get(role);
+    if (free === undefined) { free = findFreeVehicleForRole(state, role, employee) !== null; freeOfRole.set(role, free); }
+    if (!free && findVehicleReservedForAction(state.vehicles, a.id) === null) return false;
+    if (!deferToIdle) return true;
+    const key = `${role}|${a.requiredSkill ?? '-'}|${minVehicleTierFor(a)}`;
+    let alternative = deferred.get(key);
+    if (alternative === undefined) { alternative = hasIdleLicensedAlternative(state, a, employee); deferred.set(key, alternative); }
+    return !alternative;
+  });
 }
 
 /**

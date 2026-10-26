@@ -27,6 +27,7 @@ Records why the rules in the `gameplay-employee-skills` skill exist: the issues 
 - `demolish_building` in tier 1: #1840. Loaded drivers never abandon the haul: #1709.
 - Before #1742 a reserved `haul_debris` starved a pool `charge_hole`.
 - Open pool skips `debris_out_of_reach`: a crater of unreachable rubble used up every bounded path attempt and its access ramp segment was never claimed (#2089).
+- Pool search skipped when no candidate passes the vehicle gates: 78% of the non-empty searches on the seed-42 full-kit ladder at t6000 (busy drivers reserving ahead with every hauler reserved or an idle driver standing by); 62 to 48 ms a tick on the same 300 ticks, same trajectory.
 
 ## Hiring Candidate Pools
 
