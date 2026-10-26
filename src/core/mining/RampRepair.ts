@@ -10,7 +10,7 @@ import type { BuiltRamp, GameState } from '../state/GameState.js';
 import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../world/VoxelGrid.js';
 import { defineRampSegments, isRampCellPending, landRampOnGrid, validateRampOrder, type RampDef, type RampSegmentDef } from './Ramp.js';
 import { queueRampOrder } from './RampOrder.js';
-import { rampFootprint } from './RampWidening.js';
+import { findRampAtTile, rampFootprint } from './RampWidening.js';
 
 /** A refused repair: a plain-English fallback plus the key the console and UI translate. */
 interface RepairFailure {
@@ -73,18 +73,31 @@ function pendingSegments(grid: VoxelGrid, segments: readonly RampSegmentDef[]): 
 }
 
 /**
+ * `segments` without the cells another built ramp owns: a tile inside an older (lower-id) ramp's corridor is that
+ * ramp's ground (`findRampAtTile`). Two ramps sharing a row at different heights each re-cut it to their own line
+ * otherwise, and every repair damaged the other ramp again (#2091).
+ */
+function ownCells(segments: readonly RampSegmentDef[], ramp: BuiltRamp, builtRamps: readonly BuiltRamp[]): RampSegmentDef[] {
+  return segments.map(segment => ({
+    ...segment,
+    cells: segment.cells.filter(cell => (findRampAtTile(builtRamps, cell.x, cell.z)?.id ?? ramp.id) >= ramp.id),
+  }));
+}
+
+/**
  * What repairing `ramp` takes on `grid` now, without changing anything. Refused when the ramp is intact (its ground
  * strays from its line by no more than RAMP_REPAIR_TOLERANCE_M in shape) and when, landed on a floor a later shot
  * deepened, it no longer reaches that floor within the cut limit: the player then needs a longer ramp, not a repair.
  * A damaged ramp is re-cut whole: every cell off the line, however slightly, so the repaired floor is one line.
+ * Cells an older ramp in `builtRamps` covers are left to that ramp (`ownCells`).
  */
-export function quoteRampRepair(grid: VoxelGrid, ramp: BuiltRamp): RepairResult<RampRepairQuote> {
+export function quoteRampRepair(grid: VoxelGrid, ramp: BuiltRamp, builtRamps: readonly BuiltRamp[] = []): RepairResult<RampRepairQuote> {
   const def = landRampOnGrid(grid, { ...ramp.def, width: ramp.width });
   const geometry = validateRampOrder(def, Infinity);
   if (!geometry.success) {
     return failure(`Ramp #${ramp.id} no longer reaches its floor: build a longer ramp.`, 'mining.repair_ramp.out_of_reach', { id: ramp.id });
   }
-  const line = defineRampSegments(grid, def);
+  const line = ownCells(defineRampSegments(grid, def), ramp, builtRamps);
   const segments = offLineSpread(grid, line) > RAMP_REPAIR_TOLERANCE_M ? pendingSegments(grid, line) : [];
   const cells = segments.reduce((n, s) => n + s.cells.length, 0);
   if (cells === 0) return failure(`Ramp #${ramp.id} is intact: nothing to repair.`, 'mining.repair_ramp.intact', { id: ramp.id });
@@ -98,7 +111,7 @@ export function orderRampRepair(state: GameState, grid: VoxelGrid, rampId: numbe
   if (state.plannedRamps.some(p => p.repairOf === rampId || p.widenOf === rampId)) {
     return failure(`Ramp #${rampId} already has work under way`, 'mining.repair_ramp.in_progress', { id: rampId });
   }
-  const quote = quoteRampRepair(grid, ramp);
+  const quote = quoteRampRepair(grid, ramp, state.builtRamps);
   if (!quote.success) return quote;
   const { def, segments, cost, cells } = quote.data;
   if (state.cash < cost) return failure(`Insufficient funds: need ${cost}`, 'mining.repair_ramp.short_funds', { id: rampId, cost: formatMoney(cost) });

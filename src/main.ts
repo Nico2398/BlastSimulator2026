@@ -1353,7 +1353,7 @@ inspector.setRampRepairQuote(rampId => {
   if (repairQuotes?.revision !== revision) repairQuotes = { revision, byRamp: new Map() };
   const cached = repairQuotes.byRamp.get(rampId);
   if (cached) return cached;
-  const quote = quoteRampRepair(ctx.grid, ramp);
+  const quote = quoteRampRepair(ctx.grid, ramp, ctx.state!.builtRamps);
   const offer: RampRepairOffer = quote.success
     ? { kind: 'quote', cost: quote.data.cost }
     : { kind: 'refused', errorKey: quote.errorKey, ...(quote.errorParams ? { errorParams: quote.errorParams } : {}) };

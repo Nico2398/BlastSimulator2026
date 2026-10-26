@@ -97,6 +97,34 @@ describe('quoteRampRepair (#2045)', () => {
   });
 });
 
+describe('quoteRampRepair with overlapping ramps (#2091)', () => {
+  /** builtSite plus a second ramp beside it whose west column is the first ramp's east column (x = 11). */
+  function sharedColumnSite() {
+    const site = builtSite();
+    const beside = landRampOnGrid(site.grid, { ...DEF, originX: 12 });
+    expect(buildRamp(site.grid, beside, Infinity).success).toBe(true);
+    recordBuiltRamp(site.state, { id: 2, def: beside, footprint: rampFootprint(beside, 3), segments: [] });
+    const compId = site.grid.palette.intern(ROCK.composition);
+    setVoxelColumnSurfaceHeight(site.grid, 11, 12, computeVoxelColumnSurfaceHeight(site.grid, 11, 12) - RAMP_REPAIR_TOLERANCE_M * 3, compId);
+    return { ...site, newer: site.state.builtRamps[1]! };
+  }
+
+  it('a newer ramp leaves a tile an older ramp covers to that ramp: damage there is not its own', () => {
+    const { grid, state, newer } = sharedColumnSite();
+    expect(quoteRampRepair(grid, newer, state.builtRamps)).toMatchObject({ success: false, errorKey: 'mining.repair_ramp.intact' });
+  });
+
+  it('the older ramp still owns and repairs the shared tile', () => {
+    const { grid, state, ramp } = sharedColumnSite();
+    expect(quoteRampRepair(grid, ramp, state.builtRamps).success).toBe(true);
+  });
+
+  it('without the built ramps the newer ramp reads the shared tile as its own', () => {
+    const { grid, newer } = sharedColumnSite();
+    expect(quoteRampRepair(grid, newer).success).toBe(true);
+  });
+});
+
 describe('orderRampRepair (#2045)', () => {
   it('charges the quote and queues the work as a planned ramp tied to the built one', () => {
     const { grid, state, ramp } = builtSite();

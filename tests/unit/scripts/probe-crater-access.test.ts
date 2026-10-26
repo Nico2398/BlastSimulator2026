@@ -3,8 +3,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   RAMP_SHOT_KEEP_OUT_M, buildRampCommand, hasLiveRampWork, keepsVehicleNetwork, nearestHaulDepot, newCraterAccessMemory, rampKeepOutZones,
-  rampedAlready, stuckRampFootprints, stalledRampFootprints, ACCESS_RAMP_STALL_TICKS,
+  rampedAlready, stuckRampFootprints, stalledRampFootprints, ACCESS_RAMP_STALL_TICKS, needsNetworkDigger,
 } from '../../../scripts/shared/probe-crater-access.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { VoxelGrid, setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
@@ -94,6 +95,33 @@ describe('stalledRampFootprints (#2089)', () => {
     stalledRampFootprints({ plannedRamps: [planned(1, [10])], tickCount: 0 }, memory);
     stalledRampFootprints({ plannedRamps: [], tickCount: 1 }, memory);
     expect(memory.progress).toEqual({});
+  });
+});
+
+describe('needsNetworkDigger (#2091)', () => {
+  /** The network: everything west of x = 20. */
+  const reach = (x: number): boolean => x < 20;
+  function site(diggerX: number | null, segmentBlocked: boolean) {
+    const state = createGame({ seed: 42 });
+    if (diggerX !== null) purchaseVehicle(state.vehicles, 'rock_digger', diggerX, 5);
+    state.pendingActions.push(segment(1, segmentBlocked ? { blockedReason: 'target_unreachable' } : {}));
+    return state;
+  }
+
+  it('is true when a segment waits and the only digger is off the network', () => {
+    expect(needsNetworkDigger(site(30, true), reach)).toBe(true);
+  });
+
+  it('is true when a segment waits and the site owns no digger', () => {
+    expect(needsNetworkDigger(site(null, true), reach)).toBe(true);
+  });
+
+  it('is false while a digger stands on the network', () => {
+    expect(needsNetworkDigger(site(10, true), reach)).toBe(false);
+  });
+
+  it('is false while no segment is stuck', () => {
+    expect(needsNetworkDigger(site(30, false), reach)).toBe(false);
   });
 });
 

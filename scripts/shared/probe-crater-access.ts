@@ -15,7 +15,7 @@ import { rampFloorDepthAt, rampWidthOf, type RampDef } from '../../src/core/mini
 import { rampFootprint } from '../../src/core/mining/RampWidening.js';
 import { NavGrid, type NavCell } from '../../src/core/nav/NavGrid.js';
 import { computeClimbComponents } from '../../src/core/nav/NavGridReachability.js';
-import { vehicleMaxSlopeRatio } from '../../src/core/entities/Vehicle.js';
+import { getVehicleDefByTier, vehicleMaxSlopeRatio } from '../../src/core/entities/Vehicle.js';
 import { isProgressionSite } from '../../src/core/state/GameState.js';
 import { siteVehicleReach, strandedDebrisTargets } from '../../src/core/engine/OrderReachability.js';
 import { quoteRampRepair } from '../../src/core/mining/RampRepair.js';
@@ -349,7 +349,7 @@ function repairDamagedRamps(run: Run, state: GameState, grid: VoxelGrid, memory:
   for (const ramp of state.builtRamps) {
     if (memory.unrepairable.includes(ramp.id)) continue;
     if (state.plannedRamps.some(p => p.repairOf === ramp.id || p.widenOf === ramp.id)) continue;
-    const quote = quoteRampRepair(grid, ramp);
+    const quote = quoteRampRepair(grid, ramp, state.builtRamps);
     if (!quote.success || state.cash - quote.data.cost < reserve) continue;
     const ordered = run(`repair_ramp id:${ramp.id}`);
     if (ordered.success) outputs.push(ordered.output);
@@ -365,8 +365,28 @@ export function rampKeepOutZones(state: Pick<GameState, 'builtRamps'>): Protecte
   }));
 }
 
-/** The player's pit logistics for one decision interval: repair what a shot damaged, then open what it stranded. */
+/**
+ * True when a ramp segment waits on a digger and no rock digger stands on the site's vehicle network (`reach`): the
+ * only one was left on a crater floor, and every ramp out of that crater starts on the network, where it cannot reach.
+ * On the seed-42 full-kit ladder that stopped every ramp from t4900 on (#2091).
+ */
+export function needsNetworkDigger(state: Pick<GameState, 'pendingActions' | 'vehicles'>, reach: (x: number, z: number) => boolean): boolean {
+  if (!state.pendingActions.some(isStuckRampSegment)) return false;
+  return !state.vehicles.vehicles.some(v => v.type === 'rock_digger' && reach(Math.round(v.x), Math.round(v.z)));
+}
+
+/** Buys a rock digger when `needsNetworkDigger` holds and the cash keeps ACCESS_CASH_RESERVE_TICKS of payroll after it. */
+function replaceStrandedDigger(run: Run, state: GameState): void {
+  const reach = siteVehicleReach(state);
+  if (reach === null || !needsNetworkDigger(state, reach)) return;
+  const reserve = getOperatingCostPerHour(state).payroll * ACCESS_CASH_RESERVE_TICKS;
+  if (state.cash - getVehicleDefByTier('rock_digger', 1).purchaseCost < reserve) return;
+  run('vehicle buy rock_digger');
+}
+
+/** The player's pit logistics for one decision interval: repair what a shot damaged, open what it stranded, and buy a digger that can. */
 export function playPitLogistics(run: Run, state: GameState, grid: VoxelGrid, memory: CraterAccessMemory): void {
   repairDamagedRamps(run, state, grid, memory);
   orderCraterAccess(run, state, grid, memory);
+  replaceStrandedDigger(run, state);
 }
