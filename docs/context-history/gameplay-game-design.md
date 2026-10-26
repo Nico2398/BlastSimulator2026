@@ -72,6 +72,7 @@ Records why the rules in `.claude/skills/gameplay-game-design/SKILL.md` exist: t
 
 - Evacuation and detonation as one flow: #1362.
 - Fired blast lifts its spent zone: found on the seed-42 ladder probe, where the stale zone kept every hut refused as a rest destination (#2089).
+- A cancelled detonation lifts its zone too: on the seed-42 full-kit ladder two drivers stranded on a rib kept a cancelled zone "not clear", its holds kept 1,022 haul orders from every driver and the site went bankrupt at t4869 (#2089).
 
 ## Campaign & World Map
 
