@@ -3,11 +3,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   RAMP_SHOT_KEEP_OUT_M, buildRampCommand, hasLiveRampWork, keepsVehicleNetwork, nearestHaulDepot, newCraterAccessMemory, rampKeepOutZones,
-  rampedAlready, stuckRampFootprints, stalledRampFootprints, ACCESS_RAMP_STALL_TICKS, needsNetworkDigger, releaseOutreachedFloors,
+  rampedAlready, stuckRampFootprints, stalledRampFootprints, ACCESS_RAMP_STALL_TICKS, needsNetworkDigger, releaseOutreachedFloors, strandedCrew,
 } from '../../../scripts/shared/probe-crater-access.js';
 import { buildRamp, landRampOnGrid } from '../../../src/core/mining/Ramp.js';
 import { rampFootprint, recordBuiltRamp } from '../../../src/core/mining/RampWidening.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { Random } from '../../../src/core/math/Random.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { VoxelGrid, setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
@@ -232,6 +234,37 @@ describe('rampKeepOutZones (#2045)', () => {
 
   it('is empty with no built ramp', () => {
     expect(rampKeepOutZones({ builtRamps: [] })).toEqual([]);
+  });
+});
+
+describe('strandedCrew (#2091)', () => {
+  /** A plateau (x < 10, height 10) above a lowland (height 2) behind an 8 m cliff; the rally point on the plateau. */
+  function cliffSite() {
+    const grid = new VoxelGrid(30, 20);
+    const comp = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let z = 0; z < 20; z++) for (let x = 0; x < 30; x++) setVoxelColumnSurfaceHeight(grid, x, z, x < 10 ? 10 : 2, comp);
+    const state = createGame({ seed: 42 });
+    state.grade = createGradeState();
+    state.navGrid = NavGrid.buildNavGrid(grid, [], []);
+    state.rallyPoint = { x: 4, z: 4 };
+    return state;
+  }
+
+  it('lists crew on foot and vehicles below the cliff, not those on the plateau', () => {
+    const state = cliffSite();
+    const rng = new Random(42);
+    const { employee: below } = hireEmployee(state.employees, 'driver', rng, 20, 10);
+    hireEmployee(state.employees, 'driver', rng, 5, 10);
+    purchaseVehicle(state.vehicles, 'rock_digger', 22, 12);
+    purchaseVehicle(state.vehicles, 'rock_digger', 3, 12);
+    expect(strandedCrew(state)).toEqual([{ x: below.x, z: below.z }, { x: 22, z: 12 }]);
+  });
+
+  it('is empty with no rally point', () => {
+    const state = cliffSite();
+    delete state.rallyPoint;
+    hireEmployee(state.employees, 'driver', new Random(42), 20, 10);
+    expect(strandedCrew(state)).toEqual([]);
   });
 });
 

@@ -64,7 +64,7 @@ export function playContracts(run: Run, state: GameState, opts: { supply?: boole
 }
 
 /** Tiles a careful player clears around a charged pattern before firing. */
-const BLAST_ZONE_CLEAR_MARGIN = 16;
+export const BLAST_ZONE_CLEAR_MARGIN = 16;
 
 /** Order everyone out of the blast radius and wait until the zone reads clear, as the Blast panel's evacuate control does. */
 export function clearBlastZone(run: Run, state: GameState): void {

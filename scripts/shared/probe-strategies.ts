@@ -76,7 +76,7 @@ import { getEventById } from '../../src/core/events/EventPool.js';
 import type { EventConsequence } from '../../src/core/events/EventPool.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
-import { nearestHaulDepot, newCraterAccessMemory, playPitLogistics, rampKeepOutZones, type CraterAccessMemory } from './probe-crater-access.js';
+import { nearestHaulDepot, newCraterAccessMemory, playPitLogistics, rampKeepOutZones, strandedCrew, type CraterAccessMemory } from './probe-crater-access.js';
 import {
   floorToKgResolution, limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
   type BuyRule, type LadderShot, type PermitLimit,
@@ -91,6 +91,7 @@ import {
 import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
 import { fragmentBuriesPlannedHole } from '../../src/core/mining/BuriedHoles.js';
 import { siteVehicleReach } from '../../src/core/engine/OrderReachability.js';
+import { countZoneOccupants } from '../../src/core/entities/Zone.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { findBuildingApproachCell } from '../../src/core/nav/BuildingApproach.js';
 import { vehicleMaxSlopeRatio } from '../../src/core/entities/Vehicle.js';
@@ -98,7 +99,7 @@ import { isProgressionSite } from '../../src/core/state/GameState.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS } from '../../src/core/config/balance.js';
 import { haulDestinationOf } from '../../src/core/economy/SpoilHeaps.js';
 import { oreGradeScaleOf } from '../../src/core/economy/OreGrade.js';
-import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
+import { BLAST_ZONE_CLEAR_MARGIN, playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
 import { expandMatrix } from './probe-config.js';
@@ -433,17 +434,29 @@ function patternFootprint(state: GameState): Pattern & { span: number } {
   return { x, z, span: Math.max(Math.max(...xs) - x, Math.max(...zs) - z) + 1 };
 }
 
-/** Ticks an armed detonation may wait for the evacuation before it is disarmed. */
+/** Ticks an armed detonation may wait with nobody more leaving the zone before it is disarmed. */
 const FIRE_EVACUATION_MAX_TICKS = 150;
+/**
+ * Longest wait (ticks) for an evacuation that keeps emptying the zone. A deepening shot's zone took in 10 to 20 crew
+ * working the pit entrance on the seed-42 full-kit ladder; disarmed after a flat 150 ticks while they were still filing
+ * out, the same pattern was armed and cancelled for thousands of ticks.
+ */
+const FIRE_EVACUATION_CAP_TICKS = 900;
 
 /** Clear the zone and detonate a charged pattern. */
 function fireShot(s: ProbeSession): boolean {
   clearBlastZone(s.run, s.state);
   const r = s.run('blast detonate');
   if (!r.success) return false;
-  // Armed: wait for the evacuation. Someone who cannot leave the zone disarms the shot, a careful player never fires on crew.
-  for (let i = 0; i < FIRE_EVACUATION_MAX_TICKS && s.state.pendingDetonation !== null; i++) {
+  // Armed: wait for the evacuation while it makes progress. Someone who cannot leave the zone disarms the shot, a
+  // careful player never fires on crew.
+  let fewest = Infinity;
+  let idle = 0;
+  for (let i = 0; i < FIRE_EVACUATION_CAP_TICKS && s.state.pendingDetonation !== null && idle < FIRE_EVACUATION_MAX_TICKS; i++) {
     if (s.run('blast status').output.includes('cannot leave')) break;
+    const zone = s.state.zone.activeZone;
+    const left = zone === null ? 0 : countZoneOccupants(zone, s.state.vehicles, s.state.employees);
+    if (left < fewest) { fewest = left; idle = 0; } else idle++;
     s.tick();
   }
   if (s.state.pendingDetonation === null) return true;
@@ -550,6 +563,8 @@ interface ReinvestMemory {
   stalePatternSinceTick?: number;
   /** Detonations of the current shot disarmed because someone could not leave the blast zone; each one sends the whole crew out of work. */
   fireCancels?: number;
+  /** Tick since which firing waits on crew stranded in the charged pattern's blast zone (`holdFireForStranded`); unset while none is. */
+  fireHeldSinceTick?: number;
   /** Ramps the player repaired and dug down to stranded floors (#2095): the game does neither by itself. */
   access: CraterAccessMemory;
 }
@@ -630,6 +645,7 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan)
   const shot = m.shot;
   if (!shot && plan && shotReady(s.state) && s.state.pendingDetonation === null) {
     // A pattern abandoned after a refused or cancelled detonation still stands charged: fire it, or it blocks every later shot and the hauling its zone holds.
+    if (holdFireForStranded(s, m)) return;
     const footprint = patternFootprint(s.state); // read before the blast consumes the holes
     tryOnce(s, m, 'refire', () => {
       if (!fireShot(s)) {
@@ -662,6 +678,7 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan)
   }
   dropUnreachableHoles(s);
   if (shotReady(s.state)) {
+    if (holdFireForStranded(s, m)) return;
     // A refused detonation (an event's blasting ban) keeps the charged pattern: it is tried again next interval.
     if (fireShot(s)) {
       m.origins.push({ ...shot.at, span: shot.span });
@@ -676,6 +693,26 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan)
     m.shot = null;
     m.retryAt['shot'] = s.state.tickCount + PLACEMENT_RETRY_TICKS;
   }
+}
+
+/** Longest wait (ticks) for a ramp to free crew stranded in a charged pattern's blast zone before the shot is tried anyway. */
+const LADDER_FIRE_HOLD_MAX_TICKS = 1500;
+
+/**
+ * Whether firing waits: crew or a vehicle stranded where it cannot leave (`strandedCrew`) stands in the zone the charged
+ * pattern clears, and LADDER_FIRE_HOLD_MAX_TICKS have not passed. Arming evacuates everyone else and holds the work in
+ * the zone, the ramp out to them included: on the seed-42 full-kit ladder a deepening shot was armed and disarmed every
+ * 100 ticks from t16000 while the access ramp to two stranded diggers and their drivers never got dug (#2091).
+ */
+function holdFireForStranded(s: ProbeSession, m: ReinvestMemory): boolean {
+  const xs = s.state.drillHoles.map(h => h.x);
+  const zs = s.state.drillHoles.map(h => h.z);
+  const margin = BLAST_ZONE_CLEAR_MARGIN;
+  const inZone = xs.length > 0 && strandedCrew(s.state).some(p => p.x >= Math.min(...xs) - margin && p.x <= Math.max(...xs) + margin
+    && p.z >= Math.min(...zs) - margin && p.z <= Math.max(...zs) + margin);
+  if (!inZone) { delete m.fireHeldSinceTick; return false; }
+  m.fireHeldSinceTick ??= s.state.tickCount;
+  return s.state.tickCount - m.fireHeldSinceTick < LADDER_FIRE_HOLD_MAX_TICKS;
 }
 
 /** Disarmed detonations after which a shot site is given up: someone cannot leave its blast zone, and every try evacuates the crew. */

@@ -183,24 +183,28 @@ function accessSurface(state: GameState, grid: VoxelGrid): AccessSurface | null 
 }
 
 /**
- * Crew on foot the rally point's walkers cannot reach, and vehicles off its vehicle network, each counted as
- * ACCESS_MIN_STRANDED_ORDERS targets: reaching them is worth a ramp by itself. Two drivers and a digger left on a rib
- * between two craters disarmed every later shot whose zone took them in (they cannot leave it), and the game frees
- * no one (#2095): the player digs them out.
+ * Crew on foot the rally point's walkers cannot reach, and vehicles off its vehicle network: they cannot leave a blast
+ * zone. Two drivers and a digger left on a rib between two craters disarmed every later shot whose zone took them in,
+ * and the game frees no one (#2095): the player digs them out.
  */
-function strandedCrewTargets(state: GameState, surface: AccessSurface): Array<{ x: number; z: number; y: number }> {
+export function strandedCrew(state: GameState): Array<{ x: number; z: number }> {
   const nav = state.navGrid;
-  if (nav === null || state.rallyPoint === undefined) return [];
+  const reach = siteVehicleReach(state);
+  if (nav === null || state.rallyPoint === undefined || reach === null) return [];
   const walkers = computeClimbComponents(nav, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO).reachableFrom([state.rallyPoint]);
-  const out: Array<{ x: number; z: number; y: number }> = [];
-  const add = (x: number, z: number): void => { for (let i = 0; i < ACCESS_MIN_STRANDED_ORDERS; i++) out.push({ x, z, y: 0 }); };
+  const out: Array<{ x: number; z: number }> = [];
   for (const e of state.employees.employees) {
-    if (e.alive && e.locomotion.kind === 'on_foot' && !walkers.has(Math.round(e.x), Math.round(e.z))) add(e.x, e.z);
+    if (e.alive && e.locomotion.kind === 'on_foot' && !walkers.has(Math.round(e.x), Math.round(e.z))) out.push({ x: e.x, z: e.z });
   }
   for (const v of state.vehicles.vehicles) {
-    if (!surface.reachableFrom(Math.round(v.x), Math.round(v.z))) add(v.x, v.z);
+    if (!reach(Math.round(v.x), Math.round(v.z))) out.push({ x: v.x, z: v.z });
   }
   return out;
+}
+
+/** `strandedCrew`, each counted as ACCESS_MIN_STRANDED_ORDERS targets: reaching them is worth a ramp by itself. */
+function strandedCrewTargets(state: GameState): Array<{ x: number; z: number; y: number }> {
+  return strandedCrew(state).flatMap(p => Array.from({ length: ACCESS_MIN_STRANDED_ORDERS }, () => ({ x: p.x, z: p.z, y: 0 })));
 }
 
 /** A stranded floor, and whether crew or a vehicle stands stranded on it (they need a way out however shallow). */
@@ -211,7 +215,7 @@ type AccessFloor = StrandedFloor & { holdsCrew: boolean };
  * the terrain. A target the vehicle network reaches now is skipped: its stamp lags a ramp that just connected the crater.
  */
 function strandedFloors(state: GameState, grid: VoxelGrid, surface: AccessSurface): AccessFloor[] {
-  const crew = strandedCrewTargets(state, surface).filter(t => !surface.reachableFrom(Math.round(t.x), Math.round(t.z)));
+  const crew = strandedCrewTargets(state).filter(t => !surface.reachableFrom(Math.round(t.x), Math.round(t.z)));
   const holdsCrew = (f: StrandedFloor): boolean => crew.some(t =>
     Math.max(Math.abs(t.x - f.x), Math.abs(t.z - f.z)) <= CRATER_ACCESS_CLUSTER_GAP_CELLS);
   const cells = [...strandedDebrisTargets(state), ...crew]
