@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   RAMP_SHOT_KEEP_OUT_M, buildRampCommand, hasLiveRampWork, keepsVehicleNetwork, nearestHaulDepot, newCraterAccessMemory, rampKeepOutZones,
-  rampedAlready, stuckRampFootprints,
+  rampedAlready, stuckRampFootprints, stalledRampFootprints, ACCESS_RAMP_STALL_TICKS,
 } from '../../../scripts/shared/probe-crater-access.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
@@ -69,6 +69,31 @@ describe('stuckRampFootprints (#2095)', () => {
 
   it('lists nothing when no segment is stuck', () => {
     expect(stuckRampFootprints({ plannedRamps: [planned(1, [10])], pendingActions: [segment(10)] })).toEqual([]);
+  });
+});
+
+describe('stalledRampFootprints (#2089)', () => {
+  it('lists a planned ramp once it has finished no segment for ACCESS_RAMP_STALL_TICKS', () => {
+    const memory = newCraterAccessMemory();
+    const ramp = planned(1, [10, 11]);
+    expect(stalledRampFootprints({ plannedRamps: [ramp], tickCount: 100 }, memory)).toEqual([]);
+    expect(stalledRampFootprints({ plannedRamps: [ramp], tickCount: 100 + ACCESS_RAMP_STALL_TICKS - 1 }, memory)).toEqual([]);
+    expect(stalledRampFootprints({ plannedRamps: [ramp], tickCount: 100 + ACCESS_RAMP_STALL_TICKS }, memory)).toEqual([ramp.footprint]);
+  });
+
+  it('a finished segment restarts the clock', () => {
+    const memory = newCraterAccessMemory();
+    stalledRampFootprints({ plannedRamps: [planned(1, [10, 11])], tickCount: 0 }, memory);
+    const progressed = planned(1, [10, 11], [true, false]);
+    expect(stalledRampFootprints({ plannedRamps: [progressed], tickCount: ACCESS_RAMP_STALL_TICKS }, memory)).toEqual([]);
+    expect(stalledRampFootprints({ plannedRamps: [progressed], tickCount: 2 * ACCESS_RAMP_STALL_TICKS }, memory)).toEqual([progressed.footprint]);
+  });
+
+  it('forgets a ramp that is no longer planned', () => {
+    const memory = newCraterAccessMemory();
+    stalledRampFootprints({ plannedRamps: [planned(1, [10])], tickCount: 0 }, memory);
+    stalledRampFootprints({ plannedRamps: [], tickCount: 1 }, memory);
+    expect(memory.progress).toEqual({});
   });
 });
 

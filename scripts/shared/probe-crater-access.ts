@@ -63,10 +63,37 @@ export interface CraterAccessMemory {
   repairRevision: number;
   /** Built ramps whose repair got stuck out of every digger's reach and was cancelled: the player gives up on them. */
   unrepairable: number[];
+  /** Per planned ramp id: segments done at the last look, and since when that count has stood. */
+  progress: Record<number, { done: number; sinceTick: number }>;
 }
 
 export function newCraterAccessMemory(): CraterAccessMemory {
-  return { lastTick: -Infinity, failedSignature: null, served: [], avoid: [], repairRevision: -1, unrepairable: [] };
+  return { lastTick: -Infinity, failedSignature: null, served: [], avoid: [], repairRevision: -1, unrepairable: [], progress: {} };
+}
+
+/**
+ * Ticks a planned ramp may go without a finished segment before the player gives up on it like a stuck one. A digger
+ * that cannot reach the cut claims it, fails and releases it over and over with no blocked reason stamped: on the
+ * seed-42 full-kit ladder a repair and a widening did that for 1,000+ ticks, and while they stood as ramp work in hand
+ * no access ramp was planned, not even the one out to the stranded digger.
+ */
+export const ACCESS_RAMP_STALL_TICKS = 600;
+
+/** Footprints of planned ramps that finished no segment for ACCESS_RAMP_STALL_TICKS; records each ramp's progress. */
+export function stalledRampFootprints(
+  state: Pick<GameState, 'plannedRamps' | 'tickCount'>, memory: Pick<CraterAccessMemory, 'progress'>,
+): RampFootprint[] {
+  const stalled: RampFootprint[] = [];
+  const live = new Set<number>();
+  for (const ramp of state.plannedRamps) {
+    live.add(ramp.id);
+    const done = ramp.segments.filter(seg => seg.done).length;
+    const seen = memory.progress[ramp.id];
+    if (seen === undefined || seen.done !== done) memory.progress[ramp.id] = { done, sinceTick: state.tickCount };
+    else if (state.tickCount - seen.sinceTick >= ACCESS_RAMP_STALL_TICKS) stalled.push(ramp.footprint);
+  }
+  for (const id of Object.keys(memory.progress)) if (!live.has(Number(id))) delete memory.progress[Number(id)];
+  return stalled;
 }
 
 /** True when the probe already ordered a ramp down to `floor` (or one beside it at the same depth). */
@@ -76,11 +103,12 @@ export function rampedAlready(memory: Pick<CraterAccessMemory, 'served'>, floor:
 }
 
 /**
- * Cancels the probe's ramps that are stuck, remembering their footprints, and frees their floors for another plan. A
- * stuck repair is cancelled too, and its ramp left as it is: a shot cut it off from every digger.
+ * Cancels the probe's ramps that are stuck or stalled (`stalledRampFootprints`), remembering their footprints, and frees
+ * their floors for another plan. A stuck repair or widening is cancelled too, and its ramp left as it is: a shot cut it
+ * off from every digger.
  */
 function dropStuckRamps(run: Run, state: GameState, memory: CraterAccessMemory): void {
-  const stuck = new Set(stuckRampFootprints(state));
+  const stuck = new Set([...stuckRampFootprints(state), ...stalledRampFootprints(state, memory)]);
   if (stuck.size === 0) return;
   for (const served of [...memory.served]) {
     const ramp = state.plannedRamps.find(r => r.id === served.rampId);
@@ -93,6 +121,8 @@ function dropStuckRamps(run: Run, state: GameState, memory: CraterAccessMemory):
     run(`build_ramp cancel ${repair.id}`);
     memory.unrepairable.push(repair.repairOf!);
   }
+  // A widening (a traffic jam's answer) the crew cannot dig is dropped too; the ramp stays as it is.
+  for (const widen of state.plannedRamps.filter(p => p.widenOf !== undefined && stuck.has(p.footprint))) run(`build_ramp cancel ${widen.id}`);
 }
 
 /** True for a dig_ramp_segment order nobody holds that classification stamped blocked: it is going nowhere. */
