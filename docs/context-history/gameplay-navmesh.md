@@ -64,3 +64,7 @@ Records why the rules in the `gameplay-navmesh` skill exist: the issues that int
 - Access plans: modal floor, shortest straight ramp over every floor-level foot, then the shortest trip toward the haul depot; exclusions for dug ramps, rubble fill and building footprints: #2045.
 - The site's vehicle network is anchored on the haul depots as well as the rally point (a spoil heap walled the rally into a pocket and every plan read no_start): #2093.
 - A digger on a crater floor starts a flush ramp from beside its foot: #2045.
+
+## Search and approach caches
+
+- Failed terrain searches kept per nav grid revision, and the building main region likewise: a 12-hauler ladder run spent 59% of its A* time on repeated failed searches and a quarter of each tick re-labelling the grid for depot approaches (#2089).

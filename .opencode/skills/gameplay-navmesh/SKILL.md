@@ -57,6 +57,8 @@ h(a, b) = max(|dx|, |dz|) + (√2 − 1) * min(|dx|, |dz|)
 
 **Pathfinding budget:** the first search is capped at `pathfindingNodeBudget` (half the grid, at least 500 nodes) with the heuristic inflated by `ASTAR_HEURISTIC_WEIGHT`. When it runs out with frontier left it retries once on a whole-grid budget **with the plain, consistent heuristic** (octile × the cheapest move cost): no cell is expanded twice, so that retry is a complete search. The inflated weight re-opens cells, and on a 20° site a cross-map road out of a pit ran a whole-grid budget dry before it found the ramp. Only then → fallback to **direct line walk** (ignores non-`blocked`/`void` obstacles).
 
+**Failed searches are remembered per revision:** an `avoidVehicles: false` request reads terrain only (type, clearance, surface height, all of which bump `NavGrid.revision`), so `findPath` keeps the ones that found nothing, keyed by clamped endpoints, clearance and slope ratio, until the revision moves. A failed search explores the whole component, and the same unreachable pair is asked every tick. A request that avoids vehicles is always searched. Code that writes cells directly must call `bumpRevision`, or a stale failure is served.
+
 ## Ramps & Multi-Level Navigation
 
 Pit descends in bench levels. Employees + vehicles access lower benches via **ramps**, corridors dug N/S/E/W. A ramp is a **terrain feature, not a building**: it is never in `state.buildings`, has no tier or occupants, is not destructible, and never blocks the navmesh — it only appears as `ramp` cells bridging two bench levels.
@@ -158,7 +160,7 @@ actions (survey, place_building, ramp layers, ...) still get `target_unreachable
 
 ## Building Approach Cells
 
-A building's entire footprint — including its `entryPoint`/`exitPoint` markers, which are cosmetic door offsets, not a walkability guarantee — classifies `blocked`. `findPath` rejects an impassable goal outright, so nothing can path onto a building's raw (x, z). `findBuildingApproachCell(navGrid, building, def, fromX, fromZ)` (`src/core/nav/BuildingApproach.ts`) finds the nearest walkable ring cell just outside the footprint, closest to the mover. Any destination that targets a building — rest routing, hauling delivery, shift-cycle sleep — resolves through this, never the building's own coordinates.
+A building's entire footprint — including its `entryPoint`/`exitPoint` markers, which are cosmetic door offsets, not a walkability guarantee — classifies `blocked`. `findPath` rejects an impassable goal outright, so nothing can path onto a building's raw (x, z). `findBuildingApproachCell(navGrid, building, def, fromX, fromZ)` (`src/core/nav/BuildingApproach.ts`) finds the nearest walkable ring cell just outside the footprint, closest to the mover. Any destination that targets a building — rest routing, hauling delivery, shift-cycle sleep — resolves through this, never the building's own coordinates. The building's main region (the climb fill from the navigable cell nearest it) is kept per nav grid revision and building anchor: every haul candidate's cost asks for its depot's approach.
 
 ## Path Following & Stuck State
 

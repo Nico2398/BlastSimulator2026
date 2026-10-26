@@ -86,3 +86,16 @@ describe('findBuildingApproachCell', () => {
     expect(approach).toEqual({ x: 3, z: 4 });
   });
 });
+
+describe('findBuildingApproachCell — the main region is kept per nav grid revision', () => {
+  it('a ring cell joined to the main region through setCellAt becomes the approach', () => {
+    // (3,4) walled into a one-cell pocket: west (2,4), north (3,3), south (3,5), and the diagonals.
+    const walls = ['2,3', '2,4', '2,5', '3,3', '3,5'];
+    const g = grid(Object.fromEntries(walls.map(k => [k, { type: 'blocked' as const, moveCost: Infinity }])));
+    expect(findBuildingApproachCell(g, SCHOOL, DEF, 3, 4)).not.toEqual({ x: 3, z: 4 });
+
+    g.setCellAt(3, 3, { type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false });
+
+    expect(findBuildingApproachCell(g, SCHOOL, DEF, 3, 4)).toEqual({ x: 3, z: 4 });
+  });
+});

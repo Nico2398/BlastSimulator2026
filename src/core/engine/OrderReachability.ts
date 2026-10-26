@@ -345,12 +345,12 @@ function availabilityReason(
  * names the steepest built ramp too steep for vehicles (#1938, #2045).
  */
 function rampTooSteepDetail(
-  state: GameState,
   action: PendingAction,
   reachAtWalkingLimit: OrderReachability,
+  steepestRamp: () => ReturnType<typeof steepestBlockingRamp>,
 ): PendingAction['blockedDetail'] | undefined {
   if (action.requiredVehicleRole === null || !reachAtWalkingLimit.canReach(orderActorKey(action), action.targetX, action.targetZ)) return undefined;
-  const blocking = steepestBlockingRamp(state, VEHICLE_MAX_SLOPE_RATIO);
+  const blocking = steepestRamp();
   if (blocking === null) return undefined;
   return {
     key: 'order.blocked.ramp_too_steep',
@@ -378,6 +378,9 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
   const judgements = judgeActions(state, targets);
   const progression = isProgressionSite(state);
   let reachAtFlatLimit: OrderReachability | null = null; // built on the first red vehicle order of a progression site
+  // The same for every order of the pass; a site after a few blasts has hundreds of red haul orders.
+  let steepest: ReturnType<typeof steepestBlockingRamp> | undefined;
+  const steepestRamp = () => (steepest === undefined ? (steepest = steepestBlockingRamp(state, VEHICLE_MAX_SLOPE_RATIO)) : steepest);
   const fragmentOf = createFragmentLookup(state);
   const fits = createStorageFit(state);
   let flipped = false;
@@ -403,7 +406,7 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
       const role = action.requiredVehicleRole;
       if (role !== null && progression) {
         reachAtFlatLimit ??= buildOrderReachability(state, targets, NAV_MAX_SLOPE_RATIO);
-        const detail = rampTooSteepDetail(state, action, reachAtFlatLimit);
+        const detail = rampTooSteepDetail(action, reachAtFlatLimit, steepestRamp);
         if (detail !== undefined) action.blockedDetail = detail;
       }
       continue;

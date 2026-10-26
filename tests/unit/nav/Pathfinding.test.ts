@@ -279,6 +279,31 @@ describe('findPath — cell type costs', () => {
 // Group 4: Vehicle avoidance
 // ═══════════════════════════════════════════════════════════════════════════════
 
+describe('findPath — a failed terrain search holds until the nav grid revision moves', () => {
+  it('a route opened through setCellAt is found on the next request', () => {
+    const grid = makeFlatGrid(10, 3, 'walkable');
+    for (let z = 0; z < 3; z++) setCell(grid, 5, z, 'blocked');
+    const request = { agentId: 1, fromX: 0, fromZ: 1, toX: 9, toZ: 1, avoidVehicles: false };
+    expect(findPath(grid, request).found).toBe(false);
+    expect(findPath(grid, request).found).toBe(false);
+
+    grid.setCellAt(5, 1, makeCell('walkable'));
+
+    expect(findPath(grid, request).found).toBe(true);
+  });
+
+  it('a request that avoids vehicles is searched afresh each time: occupancy changes without a revision', () => {
+    const grid = makeFlatGrid(10, 1, 'walkable');
+    setCell(grid, 5, 0, 'walkable', { vehicleOccupied: true });
+    const request = { agentId: 1, fromX: 0, fromZ: 0, toX: 9, toZ: 0, avoidVehicles: true };
+    expect(findPath(grid, request).found).toBe(false);
+
+    grid.cells[0]![5]!.vehicleOccupied = false;
+
+    expect(findPath(grid, request).found).toBe(true);
+  });
+});
+
 describe('findPath — vehicle avoidance', () => {
   it('routes around a vehicleOccupied cell when avoidVehicles=true', () => {
     // 10×3 grid, cell (5,1) is vehicleOccupied

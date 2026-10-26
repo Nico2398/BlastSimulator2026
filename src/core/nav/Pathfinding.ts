@@ -879,6 +879,14 @@ function getStepCost(grid: NavGrid, ax: number, az: number, bx: number, bz: numb
 // ---------------------------------------------------------------------------
 
 /**
+ * Per nav grid: the revision these were recorded at, and the `avoidVehicles: false` searches that found no path.
+ * Such a search reads terrain only (type, clearance, surface height, all of which bump `NavGrid.revision`) and its
+ * clamped endpoints, so its answer holds until the revision moves. A failed search explores the whole component, and
+ * the same unreachable pair is asked again every tick (a stuck mover repaths, dispatch re-costs the candidate).
+ */
+const failedTerrainSearches = new WeakMap<NavGrid, { revision: number; keys: Set<string> }>();
+
+/**
  * Find the shortest path on a NavGrid using A* with 8-directional movement and octile heuristic.
  */
 export function findPath(grid: NavGrid, request: PathRequest): PathResult {
@@ -895,6 +903,25 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   const { avoidVehicles } = request;
   const requiredClearance = request.requiredClearance ?? NAV_CLEARANCE_EMPLOYEE_CELLS;
   const maxSlopeRatio = request.maxSlopeRatio ?? NAV_MAX_SLOPE_RATIO;
+  if (avoidVehicles) return searchPath(grid, request, sx, sz, gx, gz, requiredClearance, maxSlopeRatio);
+
+  let failed = failedTerrainSearches.get(grid);
+  if (failed === undefined || failed.revision !== grid.revision) {
+    failed = { revision: grid.revision, keys: new Set() };
+    failedTerrainSearches.set(grid, failed);
+  }
+  const key = `${sx},${sz},${gx},${gz},${requiredClearance},${maxSlopeRatio}`;
+  if (failed.keys.has(key)) return { found: false, waypoints: [], totalCost: 0 };
+  const result = searchPath(grid, request, sx, sz, gx, gz, requiredClearance, maxSlopeRatio);
+  if (!result.found) failed.keys.add(key);
+  return result;
+}
+
+function searchPath(
+  grid: NavGrid, request: PathRequest, sx: number, sz: number, gx: number, gz: number,
+  requiredClearance: number, maxSlopeRatio: number,
+): PathResult {
+  const { avoidVehicles } = request;
 
   // Computed once per call and threaded through every clearance check below
   // (start/goal pre-checks, the direct-line walk, and A*'s own neighbour
