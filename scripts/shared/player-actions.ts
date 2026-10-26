@@ -9,6 +9,7 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import { stateRubbleStockKg } from '../../src/core/economy/SpoilHeaps.js';
 import { pendingSpoilOverflowKg } from '../../src/core/economy/HaulDispatch.js';
 import { isPaidClearance } from '../../src/core/economy/Contract.js';
+import { getExplosivesFreeCapacity, getExplosivesInStock } from '../../src/core/entities/BuildingWarehouse.js';
 
 /** A console command runner, as `createRunner().runner.run` or a recording wrapper of it. */
 export type Run = (cmd: string) => { success: boolean; output: string };
@@ -95,4 +96,18 @@ export function stockWarehouse(run: Run, state: GameState, explosiveId: string, 
     for (let i = 0; i < 600 && state.plannedBuildings.length > 0; i++) playTick(run, state);
   }
   return run(`buy explosive:${explosiveId} kg:${kg}`);
+}
+
+/** Explosive store room (kg) for an order of `explosiveId`: its free space plus what it already holds of that explosive. */
+export function explosiveRoomKg(state: GameState, explosiveId: string): number {
+  return getExplosivesFreeCapacity(state.buildings) + getExplosivesInStock(state.buildings, explosiveId);
+}
+
+/**
+ * Bring the store up to `kg` of `explosiveId`, buying only the shortfall: stock an abandoned pattern left behind charges
+ * the next one, and buying the full charge again on top of it fills the store until no order fits (#2091).
+ */
+export function topUpWarehouse(run: Run, state: GameState, explosiveId: string, kg: number): { success: boolean; output: string } {
+  const shortKg = Math.max(0, kg - Math.floor(getExplosivesInStock(state.buildings, explosiveId)));
+  return shortKg > 0 ? stockWarehouse(run, state, explosiveId, shortKg) : { success: true, output: `${explosiveId} in stock` };
 }

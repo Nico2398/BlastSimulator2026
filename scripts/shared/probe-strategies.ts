@@ -56,7 +56,6 @@ import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { nextGradeTargets } from '../../src/core/economy/MineGrade.js';
-import { getExplosivesFreeCapacity } from '../../src/core/entities/BuildingWarehouse.js';
 import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
 import { getBuildingDef, getDefSize, getUpgradeCost, type BuildingTier } from '../../src/core/entities/Building.js';
 import { getVehicleDefByTier, getVehicleReservation, vehicleDriverId } from '../../src/core/entities/Vehicle.js';
@@ -99,7 +98,7 @@ import { isProgressionSite } from '../../src/core/state/GameState.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS } from '../../src/core/config/balance.js';
 import { haulDestinationOf } from '../../src/core/economy/SpoilHeaps.js';
 import { oreGradeScaleOf } from '../../src/core/economy/OreGrade.js';
-import { BLAST_ZONE_CLEAR_MARGIN, playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
+import { BLAST_ZONE_CLEAR_MARGIN, playContracts, playTick, clearBlastZone, explosiveRoomKg, topUpWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
 import { expandMatrix } from './probe-config.js';
@@ -410,7 +409,7 @@ function orderShot(s: ProbeSession, earlier: readonly (Pattern & { span?: number
   for (const c of candidates) {
     const cmd = `drill_plan grid rows:${spec.rows} cols:${spec.cols} spacing:${spec.spacing} depth:${spec.depth} start:${c.x},${c.z}${diameter}`;
     if (!s.run(cmd).success) continue;
-    if (!stockWarehouse(s.run, s.state, spec.explosive, totalKg).success) return null;
+    if (!topUpWarehouse(s.run, s.state, spec.explosive, totalKg).success) return null;
     const charge = `charge hole:* explosive:${spec.explosive} amount:${spec.kg} stemming:${spec.stemming}`;
     if (!s.run(charge).success) return null;
     return { at: { x: c.x, z: c.z }, span, startedTick: s.state.tickCount };
@@ -425,10 +424,10 @@ function shotReady(state: GameState): boolean {
     && state.drillHoles.every(h => state.chargesByHole[h.id] !== undefined);
 }
 
-/** Footprint (origin and span) of the drilled pattern standing in the ground. */
-function patternFootprint(state: GameState): Pattern & { span: number } {
-  const xs = state.drillHoles.map(h => h.x);
-  const zs = state.drillHoles.map(h => h.z);
+/** Footprint (origin and span) of the drilled pattern standing in the ground, or of other holes. */
+function patternFootprint(state: GameState, holes: readonly Pattern[] = state.drillHoles): Pattern & { span: number } {
+  const xs = holes.map(h => h.x);
+  const zs = holes.map(h => h.z);
   const x = Math.min(...xs);
   const z = Math.min(...zs);
   return { x, z, span: Math.max(Math.max(...xs) - x, Math.max(...zs) - z) + 1 };
@@ -735,6 +734,20 @@ function dropUnreachablePattern(s: ProbeSession, m: LadderMemory): void {
     delete m.stalePatternSinceTick;
     return;
   }
+  // Nothing drilled and every planned hole buried for good: the crater it deepens is given up, or the same pattern is
+  // ordered there again every time it goes stale (every 500 ticks from t13900 on the seed-42 full-kit ladder, #2091).
+  const forGood = holesBuriedForGood(s.state);
+  if (s.state.drillHoles.length === 0 && forGood.length > 0 && forGood.length === s.state.plannedDrillHoles.length) {
+    const holes = s.state.plannedDrillHoles;
+    const deepened = m.origins.map(o => ({ x: o.x, z: o.z, span: o.span ?? SHOT_SPAN })).filter(c => holes.some(h => inCraterFringe(h.x, h.z, c)));
+    for (const crater of deepened) if (!m.barred.some(b => craterKey(b) === craterKey(crater))) m.barred.push(crater);
+    // A fresh site deepens no crater: its own footprint is barred, as for any other abandoned shot.
+    if (deepened.length === 0) m.barred.push(patternFootprint(s.state, holes));
+    abandonPattern(s);
+    m.shot = null;
+    delete m.stalePatternSinceTick;
+    return;
+  }
   // Holes the previous shot's rubble buried stay undrilled until hauled; a pattern buried for too long is dropped.
   const buried = s.state.pendingActions.filter(a => a.type === 'drill_hole' && a.blockedReason === 'buried_under_rubble');
   const verdict = decideBuriedPattern({
@@ -979,6 +992,16 @@ function craterFloorReachable(state: GameState, crater: Pattern & { span: number
   return reached * 2 >= crater.span * crater.span;
 }
 
+/** Lowest ground (m) over a crater's hole footprint. */
+function craterFloorY(state: GameState, crater: Pattern & { span: number }): number {
+  let low = Infinity;
+  for (let z = crater.z; z <= crater.z + crater.span; z++) for (let x = crater.x; x <= crater.x + crater.span; x++) {
+    const y = state.navGrid?.cellAt(x, z)?.surfaceY;
+    if (y !== undefined && y < low) low = y;
+  }
+  return low;
+}
+
 function craterHaulPending(state: GameState, crater: Pattern & { span: number }, ore?: ReadonlySet<number>): boolean {
   return state.pendingActions.some(a => a.type === 'haul_debris' && !a.blockedReason
     && inCraterFringe(a.targetX, a.targetZ, crater) && (!ore || ore.has((a.payload as { fragmentId: number }).fragmentId)));
@@ -993,11 +1016,14 @@ function craterHaulPending(state: GameState, crater: Pattern & { span: number },
 function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const { state } = s;
   const vehicles = state.vehicles.vehicles;
-  // Deepen the latest crater whose ore is hauled out; none: a fresh site meanwhile. Barren rock left on the floor is
-  // no reason to wait: the crew clears the planned holes before any other barren rubble (gameplay-blast-system).
+  // Deepen the deepest crater whose ore is hauled out (the latest of equals); none: a fresh site meanwhile. Barren rock
+  // left on the floor is no reason to wait: the crew clears the planned holes before any other barren rubble
+  // (gameplay-blast-system). Deepening the latest crater instead fired 1x1 shots into a shallow 3x3 crater from t13600
+  // on the seed-42 full-kit ladder while its deepest pit stood 3.4 m short of grade 3 (#2091).
   const ore = oreFragmentIds(state);
   const crater = [...m.origins].reverse().map(o => ({ x: o.x, z: o.z, span: o.span ?? SHOT_SPAN }))
     .filter(c => !m.barred.some(b => craterKey(b) === craterKey(c)))
+    .map(c => ({ c, floorY: craterFloorY(state, c) })).sort((a, b) => a.floorY - b.floorY).map(({ c }) => c)
     .find(c => {
       const counts = craterRubbleCounts(state, c, ore);
       return decideLadderDeepen({
@@ -1038,14 +1064,18 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   ));
 
   // Deepen the latest crater whose rubble is cleared (holes under rubble never finish); none clear: a fresh site meanwhile.
-  const inset = deepen && shouldBench(state.grade?.deepestPitM ?? 0, SOFTEST_SAFE_FACE_M) ? BERM_GAP : 0;
+  // Past the safe face height the deepening pattern stands a berm inside the crater rim; a crater narrower than two
+  // berms is deepened at its middle, or the inset puts the pattern on its rim rubble (ordered again every interval
+  // from t13400 on the seed-42 full-kit ladder, #2091).
+  const bench = shouldBench(state.grade?.deepestPitM ?? 0, SOFTEST_SAFE_FACE_M);
+  const inset = deepen && bench ? Math.min(BERM_GAP, Math.floor(crater.span / 2)) : 0;
   const siteSide = Math.floor((Math.min(s.grid.sizeX, s.grid.sizeZ) - 2 * BUILDING_SCAN_EDGE - 1) / sized.spacing) + 1;
   const craterSide = Math.floor(((crater?.span ?? 0) - 2 * inset) / sized.spacing) + 1;
   const limitSide = Math.max(1, Math.min(sized.rows, deepen ? craterSide : siteSide));
   const wanted = decideLadderShotSide({
     limitSide, grade: gradeOf(s), lastShotFailed: m.lastShotFailed, sealedRubbleCount: craterRubbleCounts(state, m.crater).sealed,
   });
-  const free = getExplosivesFreeCapacity(state.buildings);
+  const free = explosiveRoomKg(state, shotExplosive(s));
   let side = wanted;
   while (side > 0 && side * side * (kgFor(side) + 0.1) > free) side--;
   const kg = kgFor(Math.max(side, 1));
