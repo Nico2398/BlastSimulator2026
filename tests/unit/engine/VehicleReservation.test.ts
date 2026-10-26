@@ -40,6 +40,7 @@ import {
   withUnderRepairIndex,
 } from '../../../src/core/engine/VehicleReservation.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 // reconcileVehicleReservations no longer performs the interruption itself
@@ -277,6 +278,59 @@ describe('drill_hole depth gates the rig tier (#1714)', () => {
       purchaseVehicle(b.state.vehicles, 'drill_rig', 9, 9, 3);
       expect(findVehicleForClaim(b.state, holeAction(b.state, 30), b.employee)).toEqual({ ok: false });
     });
+  });
+});
+
+// #2091: the nearest digger was the one a shot left on a crater floor; every claim took it, planned no route, and
+// the ramp out never started while a digger on the road stood idle.
+describe('findVehicleForClaim prefers a vehicle that can drive to the work (#2091)', () => {
+  /** 24 x 12 open ground, walled at x = 10 unless `wall` is false. */
+  function grid(wall: boolean): NavGrid {
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < 12; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < 24; x++) {
+        const blocked = wall && x === 10;
+        row.push({ type: blocked ? 'blocked' : 'walkable', moveCost: blocked ? Infinity : 1, benchLevel: 0, vehicleOccupied: false });
+      }
+      cells.push(row);
+    }
+    return new NavGrid(24, 12, cells);
+  }
+
+  function site(wall: boolean) {
+    const state = createGame({ seed: SEED });
+    state.navGrid = grid(wall);
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle: near } = purchaseVehicle(state.vehicles, 'drill_rig', 3, 5);
+    const { vehicle: far } = purchaseVehicle(state.vehicles, 'drill_rig', 16, 5);
+    return { state, employee, near, far };
+  }
+
+  const claimedId = (state: GameState, employee: Parameters<typeof findVehicleForClaim>[2], x: number) => {
+    const claim = findVehicleForClaim(state, makeAction(state, { id: 1, type: 'drill_hole', status: 'queued', targetX: x, targetZ: 6 }), employee);
+    return claim.ok ? claim.vehicle?.id : undefined;
+  };
+
+  it('takes the farther vehicle when only it can drive to the target', () => {
+    const { state, employee, far } = site(true);
+    expect(claimedId(state, employee, 18)).toBe(far.id);
+  });
+
+  it('keeps the nearest vehicle when it can drive to the target', () => {
+    const { state, employee, near } = site(true);
+    expect(claimedId(state, employee, 6)).toBe(near.id);
+  });
+
+  it('keeps the nearest vehicle when both can', () => {
+    const { state, employee, near } = site(false);
+    expect(claimedId(state, employee, 18)).toBe(near.id);
+  });
+
+  it('falls back to the nearest vehicle when none can', () => {
+    const { state, employee, near } = site(true);
+    expect(claimedId(state, employee, 10)).toBe(near.id);
   });
 });
 

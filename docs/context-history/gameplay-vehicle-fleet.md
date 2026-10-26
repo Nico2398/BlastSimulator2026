@@ -50,6 +50,7 @@ Records why the rules in the `gameplay-vehicle-fleet` skill exist: the issues th
 - Parked-vehicle yield to a free cell off the blocked mover's route (`pickYieldCell`): #1696.
 - Jams and chokepoints (`TrafficJams.ts`): #1208.
 - Long-detour reroute refused against a stuck blocker: three haulers gridlocked near a warehouse for ~290 ticks in the #1000 starved-backlog test once out-of-reach debris left the pool (#2089).
+- A claim prefers a vehicle that can drive to the work: on the seed-42 full-kit ladder every licensed driver was handed one of two diggers stranded on crater floors, planned no route, and the crater ramp's next segment stood unclaimed from t4500 on while a third digger idled on the road (#2091).
 
 ## Status
 

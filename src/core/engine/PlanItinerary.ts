@@ -276,7 +276,8 @@ export function hasFreeSeatFor(vehicle: Vehicle, employee: Employee): boolean {
  * names it outright (must still have a free seat); absent that, reuse the
  * reservation already made for `reservedActionId`, if any, otherwise the
  * cheapest free vehicle of `role` at or above `minTier` (the action's rig
- * floor, so cost and ETA use a rig that can reach). Shared by planItinerary's own generic
+ * floor, so cost and ETA use a rig that can reach), preferring one that can
+ * drive to `target`, the action's cell, as the claim does (findVehicleForClaim). Shared by planItinerary's own generic
  * vehicle-gated branch and planFragmentTaskItinerary below — both resolve a
  * goal's vehicle identically, differing only in what they build the
  * itinerary out of once they have it (#1091).
@@ -288,6 +289,7 @@ function resolveVehicleForGoal(
   via: number | undefined,
   reservedActionId: number | null,
   minTier: VehicleTier = 1,
+  target?: { x: number; z: number },
 ): Vehicle | null {
   if (via !== undefined) {
     const vehicle = state.vehicles.vehicles.find(v => v.id === via);
@@ -297,7 +299,7 @@ function resolveVehicleForGoal(
   const reserved = reservedActionId !== null
     ? findVehicleReservedForAction(state.vehicles, reservedActionId)
     : null;
-  return reserved ?? findFreeVehicleForRole(state, role, employee, minTier) ?? null;
+  return reserved ?? findFreeVehicleForRole(state, role, employee, minTier, target) ?? null;
 }
 
 /**
@@ -522,7 +524,7 @@ function planFragmentTaskItinerary(
   const role = action.requiredVehicleRole;
   if (role === null) return null; // defensive — both action types always carry a role
 
-  const vehicle = resolveVehicleForGoal(state, employee, role, opts?.via, action.id, minVehicleTierFor(action));
+  const vehicle = resolveVehicleForGoal(state, employee, role, opts?.via, action.id, minVehicleTierFor(action), { x: action.targetX, z: action.targetZ });
   if (!vehicle) return null;
 
   const fragmentId = action.payload['fragmentId'];
@@ -892,7 +894,10 @@ export function planItinerary(
   // does. Matches findVehicleForClaim's own real dispatch-time refusal in
   // this state.
   const gatedAction = opts?.action ?? state.pendingActions.find(a => a.id === resolved.actionId);
-  const vehicle = resolveVehicleForGoal(state, employee, role!, via, resolved.actionId, gatedAction === undefined ? 1 : minVehicleTierFor(gatedAction));
+  const vehicle = resolveVehicleForGoal(
+    state, employee, role!, via, resolved.actionId, gatedAction === undefined ? 1 : minVehicleTierFor(gatedAction),
+    gatedAction === undefined ? undefined : { x: gatedAction.targetX, z: gatedAction.targetZ },
+  );
   if (!vehicle) return null;
 
   const mount = buildMountLegs(state, employee, vehicle, fidelity);

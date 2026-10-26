@@ -132,6 +132,11 @@ A vehicle-gated action's claim on a vehicle is not stored on the vehicle. It liv
 (`Vehicle.ts`), so two employees never plan onto the same vehicle. It is released when the action
 that holds it ends, by any route.
 
+A claim takes the nearest qualifying free vehicle (`findFreeVehicleForRole`), preferring one whose
+vehicle network reaches the work's cell (`vehicleReachesCell`, `ReachCache.ts`); the planner prices
+the same pick (`resolveVehicleForGoal`). A digger a shot left on a crater floor is never handed a
+surface ramp segment while one on the road is free. With none that can reach, the nearest is taken.
+
 ### The Itinerary
 
 ```ts

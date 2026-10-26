@@ -52,6 +52,7 @@ import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
 // inside a function body, never at module-load time, so the cycle resolves
 // fine (#1115).
 import { releaseActionToOpenPool } from './TaskCancellation.js';
+import { vehicleReachesCell } from './ReachCache.js';
 
 /**
  * True when a `queued` (unclaimed) PendingAction exists whose
@@ -282,9 +283,12 @@ export function withUnderRepairIndex<T>(state: GameState, fn: () => T): T {
  * just-dismounted driver's vehicle (unrelated, farther, lower id) won the
  * tie-break over the released reservation's own vehicle (right next to the
  * idle employee actually claiming it). Read-only — never mutates. Returns
- * null when none qualify.
+ * null when none qualify. `target` (the work's cell) narrows the pick to the
+ * vehicles that can drive there, when any can.
  */
-export function findFreeVehicleForRole(state: GameState, role: VehicleRole, employee: Employee, minTier: VehicleTier = 1): Vehicle | null {
+export function findFreeVehicleForRole(
+  state: GameState, role: VehicleRole, employee: Employee, minTier: VehicleTier = 1, target?: { x: number; z: number },
+): Vehicle | null {
   if (!isLicensedForRole(employee, role)) return null;
 
   const closed = outOfServiceIds(state.events.activeModifiers, 'vehicle', state.tickCount);
@@ -300,12 +304,20 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
   );
   if (qualifying.length === 0) return null;
 
+  // With a `target`, a vehicle that can drive there is taken over one that cannot: the nearest digger may be the one
+  // a shot left on a crater floor, and a claim handed it plans no route and never starts, every tick (#2091). With
+  // none that can, the nearest is still the answer, as before.
+  const reaching = target === undefined || qualifying.length < 2
+    ? qualifying
+    : qualifying.filter(v => vehicleReachesCell(state, v, target.x, target.z));
+  const pool = reaching.length > 0 ? reaching : qualifying;
+
   // No continuity special-case (#1090): a mounted employee's own vehicle sits
   // at their exact position (I2), so it is already at distance 0 from them —
   // nothing else can tie that — and wins the distance-based tie-break below
   // on its own merits, with no separate branch needed.
   const distanceSquared = (v: Vehicle) => (v.x - employee.x) ** 2 + (v.z - employee.z) ** 2;
-  return qualifying.reduce((nearest, v) => {
+  return pool.reduce((nearest, v) => {
     const d = distanceSquared(v);
     const dNearest = distanceSquared(nearest);
     if (d < dNearest) return v;
@@ -380,7 +392,7 @@ export function findVehicleForClaim(
     return { ok: true, vehicle: alreadyReserved };
   }
 
-  const vehicle = findFreeVehicleForRole(state, action.requiredVehicleRole, employee, minVehicleTierFor(action));
+  const vehicle = findFreeVehicleForRole(state, action.requiredVehicleRole, employee, minVehicleTierFor(action), { x: action.targetX, z: action.targetZ });
   return vehicle === null ? { ok: false } : { ok: true, vehicle };
 }
 

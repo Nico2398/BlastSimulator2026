@@ -13,7 +13,6 @@
 // Temporary unavailability (injured, resting, training, busy) does not remove
 // an actor: alive and on the roster is enough.
 
-import type { NavGrid } from '../nav/NavGrid.js';
 import { isProgressionSite, type GameState, type PendingAction, type BlockedOrderReason, type GhostPreview } from '../state/GameState.js';
 import { findById } from '../state/IdIndex.js';
 import { isDrillHoleBuried } from '../mining/BuriedHoles.js';
@@ -26,11 +25,8 @@ import { clearWalkOnlyPin } from './TaskCancellation.js';
 import { canDriveTier, licenceLevelOf } from '../entities/VehicleDriverAssignment.js';
 import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup, createStorageFit } from '../economy/HaulDispatch.js';
 import { holdsRequiredSkill, isEligibleForWork } from '../entities/Employee.js';
-import {
-  computeClimbComponents,
-  type ClimbComponents,
-  type ReachableSet,
-} from '../nav/NavGridReachability.js';
+import type { ClimbComponents, ReachableSet } from '../nav/NavGridReachability.js';
+import { cacheFor, componentsOf, type ReachCache } from './ReachCache.js';
 import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
 import { dockedFrom, withDockingCells } from '../nav/DockingReach.js';
 import { buildingRingCells, buildingRingTouches } from '../nav/BuildingApproach.js';
@@ -85,43 +81,6 @@ function candidateEmployees(state: GameState, req: ActorRequirements): Employee[
     && holdsRequiredSkill(emp, req.requiredSkill)
     && (role === null || canDriveTier(emp, role, neededTier)),
   );
-}
-
-/**
- * Derived reachability per game state, never serialized. Valid for one nav grid
- * at one `revision`: labellings ignore occupancy, so only a cell write
- * invalidates. One labelling per clearance and climb limit, built the first time a pool needs it.
- */
-interface ReachCache {
-  navGrid: NavGrid;
-  revision: number;
-  components: Map<string, ClimbComponents>;
-}
-
-const reachCaches = new WeakMap<GameState, ReachCache>();
-
-function cacheFor(state: GameState): ReachCache | null {
-  const navGrid = state.navGrid;
-  if (navGrid === null) {
-    reachCaches.delete(state);
-    return null;
-  }
-  let cache = reachCaches.get(state);
-  if (cache === undefined || cache.navGrid !== navGrid || cache.revision !== navGrid.revision) {
-    cache = { navGrid, revision: navGrid.revision, components: new Map() };
-    reachCaches.set(state, cache);
-  }
-  return cache;
-}
-
-function componentsOf(cache: ReachCache, clearance: number, maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO): ClimbComponents {
-  const key = `${clearance}|${maxSlopeRatio}`;
-  let components = cache.components.get(key);
-  if (components === undefined) {
-    components = computeClimbComponents(cache.navGrid, clearance, maxSlopeRatio);
-    cache.components.set(key, components);
-  }
-  return components;
 }
 
 function fillPool(
