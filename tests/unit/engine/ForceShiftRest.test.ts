@@ -1429,6 +1429,48 @@ describe('forceShiftRestIfNeededByPolicy — vehicle work and the rest-trip budg
     expect(employee.activeActionId).toBe(1710);
   });
 
+  it('#2091: the first forced rest that cuts a drive short marks the job and heads for the quarters', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(45);
+    const action = claimDrillHole(state, employee, vehicle.id, 1720);
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = 40;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.destinationX).not.toBe(employee.x);
+    expect(action.payload['driveRests']).toBe(1);
+    expect(action.status).toBe('queued');
+  });
+
+  it('#2091: a drive a forced rest already cut short rests at the roadside, however far the quarters', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(45);
+    const action = claimDrillHole(state, employee, vehicle.id, 1721);
+    action.payload = { driveRests: 1 };
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = BUDGET - 1;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.destinationX).toBe(employee.x);
+    expect(employee.destinationZ).toBe(employee.z);
+    expect(action.payload['driveRests']).toBe(2);
+  });
+
+  it('#2091: at the roadside the drive goes on while fatigue still covers the arrival allowance', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(45);
+    const action = claimDrillHole(state, employee, vehicle.id, 1722);
+    action.payload = { driveRests: 1 };
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = BUDGET + 1;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBe(1722);
+  });
+
   it('#1709: 25 m quarters, fatigue just under the walk budget: rest starts, rig parked, worker on foot with fatigue left to arrive', () => {
     const { state, employee, vehicle } = mountedDrillerFixture(25);
     claimDrillHole(state, employee, vehicle.id, 1711);
