@@ -3394,3 +3394,11 @@ export const CRATER_ACCESS_SPIRAL_START_ATTEMPTS = 6;
  * for the ramp to count as reaching it: within one voxel layer, so the landed foot is flush with that floor (#2045).
  */
 export const CRATER_ACCESS_FLOOR_LEVEL_M = 0.5;
+/**
+ * Smallest drop (m) of a straight access ramp to a floor that holds stranded crew or vehicles (the planner's
+ * `minDropM`; other floors keep `RAMP_CRATER_MIN_DROP_M`). They need a way out however shallow: a strip a metre below
+ * the road between two cuts held a driver and a digger on the seed-42 full-kit ladder, and every shot near it was
+ * refused for the crew who could not leave (#2091). Below one voxel layer the drop is within the floor-level band
+ * (`CRATER_ACCESS_FLOOR_LEVEL_M`).
+ */
+export const CRATER_ACCESS_MIN_DROP_M = 1;

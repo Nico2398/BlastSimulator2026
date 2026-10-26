@@ -143,7 +143,7 @@ type Excluded = (def: RampDef) => boolean;
  */
 function planStraight(
   surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded, feet: ReadonlyArray<{ x: number; z: number }>,
-  toward: { x: number; z: number } | null,
+  toward: { x: number; z: number } | null, minDropM: number,
 ): { plan: CraterAccessPlan | null; sawShallow: boolean } {
   let sawShallow = false;
   let best: { plan: CraterAccessPlan; trip: number } | null = null;
@@ -158,7 +158,7 @@ function planStraight(
         const startGround = surface.heightAt(sx, sz);
         const drop = startGround - landingGround(surface, { originX: sx, originZ: sz, direction, length, width });
         if (!Number.isFinite(drop)) continue;
-        if (drop < RAMP_CRATER_MIN_DROP_M) { sawShallow = true; continue; }
+        if (drop < minDropM) { sawShallow = true; continue; }
         if (drop / length > limitRatio) continue;
         const def: RampDef = { originX: sx, originZ: sz, direction, length, targetDepth: drop, width };
         if (findRampPathFault(rampPathOf(def), width) !== null) continue;
@@ -382,8 +382,9 @@ function spiralPlanFrom(
 
 /**
  * Plans a ramp from the reachable network down to `floor`, within `maxClimbRatio`. With `toward` (where the floor's
- * loads are hauled), a straight ramp is picked for the shortest haul rather than the shortest ramp. Failure is a
- * result, not an exception.
+ * loads are hauled), a straight ramp is picked for the shortest haul rather than the shortest ramp. A straight ramp
+ * drops at least `minDropM`: a dug crater's depth by default, less for a floor worth a way in however shallow
+ * (`CRATER_ACCESS_MIN_DROP_M`). Failure is a result, not an exception.
  */
 export function planCraterAccess(
   floor: StrandedFloor,
@@ -393,6 +394,7 @@ export function planCraterAccess(
   avoid: readonly RampFootprint[] = [],
   built: readonly DugRamp[] = [],
   toward: { x: number; z: number } | null = null,
+  minDropM: number = RAMP_CRATER_MIN_DROP_M,
 ): CraterAccessPlan {
   const limitRatio = maxClimbRatio * CRATER_ACCESS_MAX_GRADE_MARGIN;
   if (!(limitRatio > 0) || !Number.isFinite(floor.floorY)) return { ok: false, reasonKey: `${KEY}no_start` };
@@ -415,7 +417,7 @@ export function planCraterAccess(
     return !validateRampOrder(order, Infinity).success || fillsOverRubble(order, surface, width);
   };
   const finish = (plan: CraterAccessPlan): CraterAccessPlan => (plan.ok ? { ...plan, def: landed(plan.def) } : plan);
-  const straight = planStraight(surface, limitRatio, width, excluded, floorFeet(floor, surface), toward);
+  const straight = planStraight(surface, limitRatio, width, excluded, floorFeet(floor, surface), toward, minDropM);
   if (straight.plan !== null) return finish(straight.plan);
   const spiral = planSpiral(floor, surface, limitRatio, width, excluded);
   if (spiral !== null) return finish(spiral);

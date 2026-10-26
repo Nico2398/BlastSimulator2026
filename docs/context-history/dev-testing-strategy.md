@@ -34,3 +34,4 @@ The ~6 s/frame software-rasterisation cost was measured in #475 — which is why
 
 - Holes no deeper than their charge breaks out of (a sealed grade-0 shot left an egg-crate floor no vehicle crosses): #2091.
 - Living quarters raised beside a far crater (drivers spent a third of their time walking to rest): #2089.
+- Served floors released once their ramp no longer reaches them (1,141 haul orders waited behind a ramp a deepening shot left short), holes buried under unhaulable rubble dropped (one held a deepening pattern re-ordered every 500 ticks), rubble contracts measured on the spoil heaps (four full heaps beside unread clearance offers): #2091.

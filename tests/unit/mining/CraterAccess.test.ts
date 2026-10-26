@@ -7,7 +7,7 @@ import {
 } from '../../../src/core/mining/CraterAccess.js';
 import { rampPathCells, rampPathOf, type RampFootprint } from '../../../src/core/mining/RampPath.js';
 import {
-  MAX_RAMP_LENGTH, NAV_MAX_SLOPE_RATIO, RAMP_CRATER_MIN_DROP_M, CRATER_ACCESS_FLOOR_LEVEL_M,
+  MAX_RAMP_LENGTH, NAV_MAX_SLOPE_RATIO, RAMP_CRATER_MIN_DROP_M, CRATER_ACCESS_FLOOR_LEVEL_M, CRATER_ACCESS_MIN_DROP_M,
 } from '../../../src/core/config/balance.js';
 
 interface Pit { x0: number; z0: number; w: number; h: number; depth: number }
@@ -208,6 +208,21 @@ describe('planCraterAccess', () => {
     const plan = planCraterAccess(centreFloor(shallow), surface(shallow, outsidePit(shallow)), MAX_RATIO, 3);
     expect(plan.ok).toBe(false);
     if (!plan.ok) expect(plan.reasonKey.length).toBeGreaterThan(0);
+  });
+
+  it('with a smaller minDropM plans a short ramp down to a floor shallower than a dug crater (#2091)', () => {
+    // A metre-deep strip behind cliffs strands the crew on it as surely as a deep pit does.
+    const shallow: Pit = { ...PIT, depth: CRATER_ACCESS_MIN_DROP_M };
+    expect(shallow.depth).toBeLessThan(RAMP_CRATER_MIN_DROP_M);
+    const plan = planCraterAccess(centreFloor(shallow), surface(shallow, outsidePit(shallow)), MAX_RATIO, 3, [], [], null, CRATER_ACCESS_MIN_DROP_M);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) expect(plan.def.targetDepth).toBeCloseTo(shallow.depth, 5);
+  });
+
+  it('with a smaller minDropM still refuses a drop below it: too shallow for a ramp', () => {
+    const shallow: Pit = { ...PIT, depth: CRATER_ACCESS_MIN_DROP_M / 2 };
+    const plan = planCraterAccess(centreFloor(shallow), surface(shallow, outsidePit(shallow)), MAX_RATIO, 3, [], [], null, CRATER_ACCESS_MIN_DROP_M);
+    expect(plan).toMatchObject({ ok: false, reasonKey: 'mining.crater_access.too_shallow' });
   });
 
   it('refuses when the only network cell is farther than the longest ramp', () => {

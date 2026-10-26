@@ -3,8 +3,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   RAMP_SHOT_KEEP_OUT_M, buildRampCommand, hasLiveRampWork, keepsVehicleNetwork, nearestHaulDepot, newCraterAccessMemory, rampKeepOutZones,
-  rampedAlready, stuckRampFootprints, stalledRampFootprints, ACCESS_RAMP_STALL_TICKS, needsNetworkDigger,
+  rampedAlready, stuckRampFootprints, stalledRampFootprints, ACCESS_RAMP_STALL_TICKS, needsNetworkDigger, releaseOutreachedFloors,
 } from '../../../scripts/shared/probe-crater-access.js';
+import { buildRamp, landRampOnGrid } from '../../../src/core/mining/Ramp.js';
+import { rampFootprint, recordBuiltRamp } from '../../../src/core/mining/RampWidening.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
@@ -134,10 +136,62 @@ describe('rampedAlready (#2095)', () => {
 
   it('a floor beside a ramped one at the same depth is the same floor; a deeper one is new', () => {
     const memory = newCraterAccessMemory();
-    memory.served.push({ floor, rampId: 3 });
+    memory.served.push({ floor, rampId: 3, footprint: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 } });
     expect(rampedAlready(memory, { ...floor, x: 24, z: 17 })).toBe(true);
     expect(rampedAlready(memory, { ...floor, floorY: 3 })).toBe(false);
     expect(rampedAlready(memory, { ...floor, x: 60 })).toBe(false);
+  });
+});
+
+describe('releaseOutreachedFloors (#2091)', () => {
+  const ROCK = { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  /** Surface at 15 for z < 25, a floor `drop` lower from there on. */
+  function siteGrid(drop: number): VoxelGrid {
+    const grid = new VoxelGrid(40, 50);
+    for (let z = 0; z < 50; z++) for (let x = 0; x < 40; x++) for (let y = 0; y <= (z < 25 ? 15 : 15 - drop); y++) grid.setVoxel(x, y, z, ROCK);
+    return grid;
+  }
+  const DEF: RampDef = { originX: 10, originZ: 0, direction: 'south', length: 25, targetDepth: 6, width: 3, cutSlopeRatio: Math.tan(20 * Math.PI / 180) * 0.98 };
+  const floor = { x: 10, z: 30, floorY: 9, orderCount: 40 };
+
+  /** A 6 m ramp down to the floor, built; the served entry for its floor. */
+  function servedSite() {
+    const grid = siteGrid(6);
+    const state = createGame({ seed: 42 });
+    const landed = landRampOnGrid(grid, DEF);
+    expect(buildRamp(grid, landed, Infinity).success).toBe(true);
+    const footprint = rampFootprint(landed, 3);
+    recordBuiltRamp(state, { id: 7, def: landed, footprint, segments: [] });
+    const memory = newCraterAccessMemory();
+    memory.served.push({ floor, rampId: 7, footprint });
+    return { grid, state, memory };
+  }
+
+  it('keeps a floor served while its built ramp still reaches it', () => {
+    const { grid, state, memory } = servedSite();
+    releaseOutreachedFloors(state, grid, memory);
+    expect(memory.served).toHaveLength(1);
+  });
+
+  it('keeps a floor served while its ramp is still being dug', () => {
+    const { state, memory } = servedSite();
+    state.builtRamps.length = 0;
+    state.plannedRamps.push(planned(7, [1]));
+    releaseOutreachedFloors(state, siteGrid(14), memory);
+    expect(memory.served).toHaveLength(1);
+  });
+
+  it('forgets the floor once a deeper shot put it out of the built ramp\'s reach', () => {
+    const { state, memory } = servedSite();
+    releaseOutreachedFloors(state, siteGrid(14), memory); // 14 m over 25 m is past the 20 degree limit
+    expect(memory.served).toHaveLength(0);
+  });
+
+  it('forgets the floor when its ramp is neither planned nor built', () => {
+    const { grid, state, memory } = servedSite();
+    state.builtRamps.length = 0;
+    releaseOutreachedFloors(state, grid, memory);
+    expect(memory.served).toHaveLength(0);
   });
 });
 

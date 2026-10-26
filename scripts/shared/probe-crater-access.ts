@@ -22,7 +22,7 @@ import { quoteRampRepair } from '../../src/core/mining/RampRepair.js';
 import { buildingFootprintOccupants } from '../../src/core/nav/NavGridSync.js';
 import { isBuildingFootprintCell } from '../../src/core/entities/Building.js';
 import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
-import { CRATER_ACCESS_CLUSTER_GAP_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS, NAV_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH, VEHICLE_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
+import { CRATER_ACCESS_CLUSTER_GAP_CELLS, CRATER_ACCESS_MIN_DROP_M, RAMP_CRATER_MIN_DROP_M, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS, NAV_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH, VEHICLE_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
 import type { ProtectedZone } from './probe-ladder-policy.js';
 
 type Run = (cmd: string) => { success: boolean; output: string };
@@ -44,8 +44,8 @@ export const RAMP_SHOT_KEEP_OUT_M = 4;
 const SAME_FLOOR_CELLS = CRATER_ACCESS_CLUSTER_GAP_CELLS * 2;
 const SAME_FLOOR_M = 1;
 
-/** A floor the probe ordered a ramp down to, and that ramp's planned-ramp id. */
-interface ServedFloor { floor: StrandedFloor; rampId: number }
+/** A floor the probe ordered a ramp down to, that ramp's planned-ramp id, and its footprint (how the built ramp is found again). */
+interface ServedFloor { floor: StrandedFloor; rampId: number; footprint: RampFootprint }
 
 /**
  * What the probe remembers between looks: the last look, a world it already failed to plan for, the floors it
@@ -125,6 +125,23 @@ function dropStuckRamps(run: Run, state: GameState, memory: CraterAccessMemory):
   for (const widen of state.plannedRamps.filter(p => p.widenOf !== undefined && stuck.has(p.footprint))) run(`build_ramp cancel ${widen.id}`);
 }
 
+/**
+ * Forgets a served floor once its ramp is neither being dug nor built and still reaching its floor: a later shot
+ * deepened that floor past the ramp (`quoteRampRepair` reads `out_of_reach`), or the ramp is gone. Its rubble then
+ * waits on a new way down; on the seed-42 full-kit ladder 1,141 haul orders did from t5800, behind a ramp a deepening
+ * shot left short. A built ramp that still reaches its floor keeps it served: what it left out of reach sits on a ledge.
+ */
+export function releaseOutreachedFloors(state: Pick<GameState, 'plannedRamps' | 'builtRamps'>, grid: VoxelGrid, memory: Pick<CraterAccessMemory, 'served'>): void {
+  const same = (a: RampFootprint, b: RampFootprint): boolean => a.minX === b.minX && a.maxX === b.maxX && a.minZ === b.minZ && a.maxZ === b.maxZ;
+  memory.served = memory.served.filter(({ rampId, footprint }) => {
+    if (state.plannedRamps.some(p => p.id === rampId)) return true;
+    const built = state.builtRamps.find(r => same(r.footprint, footprint));
+    if (built === undefined) return false;
+    const quote = quoteRampRepair(grid, built, state.builtRamps);
+    return quote.success || quote.errorKey !== 'mining.repair_ramp.out_of_reach';
+  });
+}
+
 /** True for a dig_ramp_segment order nobody holds that classification stamped blocked: it is going nowhere. */
 function isStuckRampSegment(a: PendingAction): boolean {
   return a.type === 'dig_ramp_segment' && a.holderId === null && a.status === 'queued' && (a.blockedReason ?? null) !== null;
@@ -186,12 +203,18 @@ function strandedCrewTargets(state: GameState, surface: AccessSurface): Array<{ 
   return out;
 }
 
+/** A stranded floor, and whether crew or a vehicle stands stranded on it (they need a way out however shallow). */
+type AccessFloor = StrandedFloor & { holdsCrew: boolean };
+
 /**
  * Floors of the stranded orders, most orders first, each target's y read from the terrain. A target the
  * vehicle network reaches now is skipped: its stamp lags a ramp that just connected the crater.
  */
-function strandedFloors(state: GameState, grid: VoxelGrid, surface: AccessSurface): StrandedFloor[] {
-  const cells = [...strandedDebrisTargets(state), ...strandedCrewTargets(state, surface)]
+function strandedFloors(state: GameState, grid: VoxelGrid, surface: AccessSurface): AccessFloor[] {
+  const crew = strandedCrewTargets(state, surface).filter(t => !surface.reachableFrom(Math.round(t.x), Math.round(t.z)));
+  const holdsCrew = (f: StrandedFloor): boolean => crew.some(t =>
+    Math.max(Math.abs(t.x - f.x), Math.abs(t.z - f.z)) <= CRATER_ACCESS_CLUSTER_GAP_CELLS);
+  const cells = [...strandedDebrisTargets(state), ...crew]
     .filter(t => !surface.reachableFrom(Math.round(t.x), Math.round(t.z)))
     .map(t => {
       const y = computeVoxelColumnSurfaceHeight(grid, Math.round(t.x), Math.round(t.z));
@@ -199,7 +222,8 @@ function strandedFloors(state: GameState, grid: VoxelGrid, surface: AccessSurfac
     });
   return clusterStrandedFloors(cells, CRATER_ACCESS_CLUSTER_GAP_CELLS)
     .filter(f => f.orderCount >= ACCESS_MIN_STRANDED_ORDERS)
-    .sort((a, b) => b.orderCount - a.orderCount);
+    .sort((a, b) => b.orderCount - a.orderCount)
+    .map(f => ({ ...f, holdsCrew: holdsCrew(f) }));
 }
 
 /** The console order that builds `def`: its waypoints as a path, its depth, width and any chosen grade. */
@@ -283,19 +307,33 @@ export function nearestHaulDepot(state: Pick<GameState, 'buildings'>, floor: { x
   return best;
 }
 
-/** A plan down to `floor`, facing its nearest depot, whose dig keeps the vehicle network whole (`keepsVehicleNetwork`), or null. */
+/** Longest ramp (m) the probe cuts to free crew stranded on ground shallower than a dug crater: a notch, never a trench. */
+const ACCESS_RESCUE_MAX_RUN_M = 10;
+
+/**
+ * A plan down to `floor`, facing its nearest depot, whose dig keeps the vehicle network whole (`keepsVehicleNetwork`), or
+ * null. Failing that, a floor holding stranded crew gets the shortest ramp down to it however shallow
+ * (`CRATER_ACCESS_MIN_DROP_M`), at most ACCESS_RESCUE_MAX_RUN_M long; rubble on a floor shallower than a dug crater is
+ * left. Shallow plans for every floor, and the 90 m trench one planned for a metre's drop, cost the Shareholder
+ * Summit ladder its win.
+ */
 function planKeepingRoads(
-  state: GameState, grid: VoxelGrid, floor: StrandedFloor, surface: AccessSurface, avoid: readonly RampFootprint[],
+  state: GameState, grid: VoxelGrid, floor: AccessFloor, surface: AccessSurface, avoid: readonly RampFootprint[],
 ): { def: RampDef; cost: number } | null {
-  const setAside = [...avoid];
-  const toward = nearestHaulDepot(state, floor);
-  for (let attempt = 0; attempt < ACCESS_PLAN_ATTEMPTS; attempt++) {
-    const plan = planCraterAccess(floor, surface, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH, setAside, state.builtRamps, toward);
-    if (!plan.ok) return null;
-    if (keepsVehicleNetwork(state, grid, plan.def)) return plan;
-    setAside.push(rampFootprint(plan.def, rampWidthOf(plan.def)));
-  }
-  return null;
+  const plan = (toward: { x: number; z: number } | null, minDropM: number): { def: RampDef; cost: number } | null => {
+    const setAside = [...avoid];
+    for (let attempt = 0; attempt < ACCESS_PLAN_ATTEMPTS; attempt++) {
+      const planned = planCraterAccess(floor, surface, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH, setAside, state.builtRamps, toward, minDropM);
+      if (!planned.ok) return null;
+      if (keepsVehicleNetwork(state, grid, planned.def)) return planned;
+      setAside.push(rampFootprint(planned.def, rampWidthOf(planned.def)));
+    }
+    return null;
+  };
+  const access = plan(nearestHaulDepot(state, floor), RAMP_CRATER_MIN_DROP_M);
+  if (access !== null || !floor.holdsCrew) return access;
+  const rescue = plan(null, CRATER_ACCESS_MIN_DROP_M);
+  return rescue !== null && rampTotalLength(rampPathOf(rescue.def).legs) <= ACCESS_RESCUE_MAX_RUN_M ? rescue : null;
 }
 
 /**
@@ -308,6 +346,7 @@ export function orderCraterAccess(run: Run, state: GameState, grid: VoxelGrid, m
   if (state.tickCount - memory.lastTick < ACCESS_RECHECK_TICKS && state.tickCount >= memory.lastTick) return null;
   memory.lastTick = state.tickCount;
   dropStuckRamps(run, state, memory);
+  releaseOutreachedFloors(state, grid, memory);
   if (hasLiveRampWork(state.pendingActions)) return null;
   const surface = accessSurface(state, grid);
   if (surface === null) return null;
@@ -326,7 +365,8 @@ export function orderCraterAccess(run: Run, state: GameState, grid: VoxelGrid, m
     const ordered = run(buildRampCommand(plan.def));
     if (ordered.success) {
       memory.failedSignature = null;
-      memory.served.push({ floor, rampId: state.plannedRamps.at(-1)!.id });
+      const ramp = state.plannedRamps.at(-1)!;
+      memory.served.push({ floor, rampId: ramp.id, footprint: ramp.footprint });
       return ordered.output;
     }
   }

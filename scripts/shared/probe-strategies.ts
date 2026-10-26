@@ -89,6 +89,7 @@ import {
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
 import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
+import { fragmentBuriesPlannedHole } from '../../src/core/mining/BuriedHoles.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { findBuildingApproachCell } from '../../src/core/nav/BuildingApproach.js';
 import { vehicleMaxSlopeRatio } from '../../src/core/entities/Vehicle.js';
@@ -593,14 +594,31 @@ interface ShotPlan {
 }
 
 /**
+ * Holes buried for good: drill orders stamped `buried_under_rubble` while no fragment burying a planned hole has an
+ * order a crew can still take (every one reads `debris_out_of_reach`). Nobody hauls that rubble, so the holes are
+ * never drilled; on the seed-42 full-kit ladder one such hole held a deepening pattern from t14000 on, and the
+ * ladder ordered the same pattern again every 500 ticks (#2091).
+ */
+export function holesBuriedForGood(state: GameState): string[] {
+  const buried = state.pendingActions.filter(a => a.type === 'drill_hole' && a.blockedReason === 'buried_under_rubble');
+  if (buried.length === 0) return [];
+  const burying = new Set(state.logistics.fragments.filter(f => f.state === 'on_ground' && fragmentBuriesPlannedHole(state, f.fragment.id))
+    .map(f => f.fragment.id));
+  const haulable = state.pendingActions.some(a => (a.type === 'haul_debris' || a.type === 'fragment_debris')
+    && burying.has(a.payload['fragmentId'] as number) && a.blockedReason !== 'debris_out_of_reach');
+  return haulable ? [] : buried.map(a => String(a.payload['holeId']));
+}
+
+/**
  * A hole no drill rig reaches never finishes, and the shot waits on it for good while payroll runs: once part of the
- * pattern is drilled, the careful player drops the holes whose orders read `target_unreachable` and fires the rest.
+ * pattern is drilled, the careful player drops the holes whose orders read `target_unreachable`, and those buried for
+ * good (`holesBuriedForGood`), and fires the rest.
  */
 function dropUnreachableHoles(s: ProbeSession): void {
   if (s.state.drillHoles.length === 0) return;
-  for (const a of s.state.pendingActions.filter(p => p.type === 'drill_hole' && p.blockedReason === 'target_unreachable')) {
-    s.run(`drill_plan remove hole:${String(a.payload['holeId'])}`);
-  }
+  const unreachable = s.state.pendingActions.filter(p => p.type === 'drill_hole' && p.blockedReason === 'target_unreachable')
+    .map(a => String(a.payload['holeId']));
+  for (const holeId of [...unreachable, ...holesBuriedForGood(s.state)]) s.run(`drill_plan remove hole:${holeId}`);
 }
 
 function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan): void {
