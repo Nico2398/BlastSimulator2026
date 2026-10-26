@@ -5,6 +5,7 @@ import {
   addExpense,
   getBalance,
   getFinancialReport,
+  getOperatingProfit,
 } from '../../../src/core/economy/Finance.js';
 
 describe('Finance system', () => {
@@ -66,5 +67,40 @@ describe('Finance system', () => {
     expect(report.totalIncome).toBe(200);
     expect(report.totalExpenses).toBe(75);
     expect(report.transactionCount).toBe(2);
+  });
+
+  describe('getOperatingProfit', () => {
+    function mixedLog() {
+      const state = createFinanceState(10000);
+      addIncome(state, 500.1, 'sales', 'Ore sale', 1);
+      addIncome(state, 70, 'refund', 'Refund', 1);
+      addExpense(state, 100.3, 'salaries', 'Wages', 2);
+      addExpense(state, 900, 'equipment', 'Bought drill', 2);
+      addExpense(state, 0.7, 'fuel', 'Diesel', 3);
+      return state;
+    }
+
+    it('reads the report\'s operating profit: refunds and capital spending left out', () => {
+      const state = mixedLog();
+      expect(getOperatingProfit(state)).toBe(getFinancialReport(state, 0).operatingProfit);
+      expect(getOperatingProfit(state)).toBeCloseTo(500.1 - 100.3 - 0.7, 9);
+    });
+
+    it('keeps reading the report as the log grows between calls', () => {
+      const state = mixedLog();
+      getOperatingProfit(state);
+      addIncome(state, 33.3, 'contracts', 'Contract', 4);
+      addExpense(state, 12.1, 'maintenance', 'Upkeep', 4);
+      expect(getOperatingProfit(state)).toBe(getFinancialReport(state, 0).operatingProfit);
+    });
+
+    it('starts over on a log that was replaced or cut short', () => {
+      const state = mixedLog();
+      getOperatingProfit(state);
+      state.transactions.length = 1;
+      expect(getOperatingProfit(state)).toBe(500.1);
+      state.transactions = [];
+      expect(getOperatingProfit(state)).toBe(0);
+    });
   });
 });

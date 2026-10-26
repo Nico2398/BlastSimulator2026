@@ -4,7 +4,7 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
-import { getFinancialReport } from '../economy/Finance.js';
+import { getOperatingProfit } from '../economy/Finance.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
 import { STAR_ECOLOGY_MIN } from '../config/balance.js';
 
@@ -64,8 +64,7 @@ export function createLevelStats(): LevelStats {
  * Call each tick (or at key moments like after a blast or transaction).
  */
 export function snapshotStats(stats: LevelStats, state: GameState): void {
-  const report = getFinancialReport(state.finances, 0);
-  stats.totalWealth = report.operatingProfit;
+  stats.totalWealth = getOperatingProfit(state.finances);
   stats.casualties = state.damage.deathCount;
   stats.blastsPerformed = state.damage.blastCount;
 
