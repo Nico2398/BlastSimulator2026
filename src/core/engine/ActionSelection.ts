@@ -254,9 +254,13 @@ function estimateWithBonus(
   return { cost: Math.max(0, rawCost - bonus) - demandBonus, bonus, demandBonus };
 }
 
-/** BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS for an unheld haul_debris of a fragment burying a planned hole, else 0 (#1937); ranking-only. */
+/**
+ * BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS for an unheld haul_debris or fragment_debris of a fragment burying a planned
+ * hole, else 0 (#1937); ranking-only. A boulder on a hole only leaves it once broken, and a fragmenter ranking it
+ * like any other kept the hole buried after the haulers had cleared the rest (#2089).
+ */
 function buriedHoleBonusOf(state: GameState, action: PendingAction, fragmentOf: FragmentLookup | undefined): number {
-  if (action.holderId !== null || action.type !== 'haul_debris') return 0;
+  if (action.holderId !== null || (action.type !== 'haul_debris' && action.type !== 'fragment_debris')) return 0;
   const tracked = resolveTrackedFragment(state, action, fragmentOf);
   return tracked !== undefined && trackedBuriesPlannedHole(state, tracked) ? BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS : 0;
 }

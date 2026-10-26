@@ -2698,5 +2698,13 @@ describe('buried planned holes (#1937)', () => {
       const { state, emp, pool } = scene(false, 10);
       expect(selectBestActionForEmployee(state, emp, pool)!.action.id).toBe(2);
     });
+
+    it('a boulder burying a planned hole outranks a nearer boulder: it only leaves the hole once broken (#2089)', () => {
+      const { state, emp } = scene(true, 10);
+      const split = (id: number, x: number) => makeAction({ id, type: 'fragment_debris', requiredVehicleRole: 'rock_fragmenter', targetX: x, targetZ: 0, payload: { fragmentId: id } });
+      expect(selectBestActionForEmployee(state, emp, [split(1, 15), split(2, 5)])!.action.id).toBe(1);
+      state.plannedDrillHoles.length = 0;
+      expect(selectBestActionForEmployee(state, emp, [split(1, 15), split(2, 5)])!.action.id).toBe(2);
+    });
   });
 });
