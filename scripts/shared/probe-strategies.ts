@@ -89,6 +89,11 @@ import {
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
 import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
+import { findPath } from '../../src/core/nav/Pathfinding.js';
+import { findBuildingApproachCell } from '../../src/core/nav/BuildingApproach.js';
+import { vehicleMaxSlopeRatio } from '../../src/core/entities/Vehicle.js';
+import { isProgressionSite } from '../../src/core/state/GameState.js';
+import { NAV_CLEARANCE_VEHICLE_CELLS } from '../../src/core/config/balance.js';
 import { haulDestinationOf } from '../../src/core/economy/SpoilHeaps.js';
 import { oreGradeScaleOf } from '../../src/core/economy/OreGrade.js';
 import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
@@ -231,6 +236,47 @@ function haulableOreOnGroundKg(state: GameState): number {
 // ── Building placement ──
 
 /**
+ * Cells a building that need not stand by the road keeps between its footprint and the trucks' road. On the seed-42
+ * desert digger ladder a research centre and quarters raised either side of the road from the pits to the warehouse
+ * left one vehicle lane and 3.8 of 8 haulers stood waiting at any tick. Ladder, 8 haulers, at t4500: seed 42 ends
+ * $12.2M against $11.6M, seed 7 $5.1M against $2.5M; green foothills seed 42 places the same buildings.
+ */
+const HAUL_ROAD_CLEAR_M = 3;
+
+/** Buildings that stand by the road: the depots it joins, and the quarters the crew rests in. */
+const ROADSIDE_TYPES: ReadonlySet<string> = new Set(['freight_warehouse', 'spoil_heap', 'living_quarters']);
+
+/** Waypoints of the trucks' road from every haul depot to every ramp top, built or ordered. */
+function haulRoadCells(s: ProbeSession): Pattern[] {
+  const nav = s.state.navGrid;
+  if (nav === null) return [];
+  const limits = { requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS, maxSlopeRatio: vehicleMaxSlopeRatio(isProgressionSite(s.state)) };
+  const tops = [...s.state.builtRamps, ...s.state.plannedRamps].map(r => ({ x: r.def.originX, z: r.def.originZ }));
+  const cells: Pattern[] = [];
+  for (const depot of s.state.buildings.buildings.filter(b => b.type === 'freight_warehouse' || b.type === 'spoil_heap')) {
+    const def = getBuildingDef(depot.type, depot.tier);
+    for (const top of tops) {
+      const from = findBuildingApproachCell(nav, depot, def, top.x, top.z);
+      const road = findPath(nav, { agentId: -1, fromX: from.x, fromZ: from.z, toX: top.x, toZ: top.z, avoidVehicles: false, ...limits });
+      if (road.found) cells.push(...road.waypoints);
+    }
+  }
+  return cells;
+}
+
+/** Anchors at which a `type` footprint would come within HAUL_ROAD_CLEAR_M of the road ("x,z" keys). */
+function anchorsBesideRoad(type: string, road: readonly Pattern[]): Set<string> {
+  const { sizeX, sizeZ } = getDefSize(getBuildingDef(type as never, 1));
+  const out = new Set<string>();
+  for (const c of road) {
+    for (let x = c.x - sizeX + 1 - HAUL_ROAD_CLEAR_M; x <= c.x + HAUL_ROAD_CLEAR_M; x++) {
+      for (let z = c.z - sizeZ + 1 - HAUL_ROAD_CLEAR_M; z <= c.z + HAUL_ROAD_CLEAR_M; z++) out.add(`${x},${z}`);
+    }
+  }
+  return out;
+}
+
+/**
  * Coarse scan for the nearest spot (to `near`) a `build` command accepts, outside the keep-out
  * around the shot `avoid`. Near the work matters: a crew rests at its Living Quarters, so a far
  * one costs walking time on payroll. Returns the spot or null.
@@ -253,7 +299,11 @@ function placeBuilding(
   }
   const dist = (p: Pattern) => Math.hypot(p.x - near.x, p.z - near.z);
   spots.sort((a, b) => dist(a) - dist(b));
-  for (const p of spots) {
+  // Off the road first; a site with nowhere else to build still gets the building. Depots are the road's ends, and
+  // quarters stay by the work: moved off the road, the drivers' rest walks took a fifth of their time.
+  const besideRoad = ROADSIDE_TYPES.has(type) ? new Set<string>() : anchorsBesideRoad(type, haulRoadCells(s));
+  const offRoad = spots.filter(p => !besideRoad.has(`${p.x},${p.z}`));
+  for (const p of [...offRoad, ...spots.filter(p => besideRoad.has(`${p.x},${p.z}`))]) {
     if (s.run(`build ${type} at:${p.x},${p.z} tier:1`).success) return p;
   }
   return null;
