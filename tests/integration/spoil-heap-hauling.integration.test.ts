@@ -807,6 +807,35 @@ describe('a full spoil heap stops barren hauls until a rubble contract clears it
     expect(added.some(tx => tx.type === 'income')).toBe(false);
   });
 
+  it('playContracts measures rubble on the heaps: a full heap covers a cheap clearance though the warehouse is empty', () => {
+    const { run, state } = fullHeapSite();
+    expect(state.logistics.storedMassKg).toBe(0);
+    const offer = rubbleContract(state, { quantityKg: 10_000 });
+    playContracts(run, state);
+    expect(state.contracts.available.some(c => c.id === offer.id)).toBe(false);
+    expect(totalSpoilRoomKg(state.buildings.buildings)).toBe(10_000);
+  });
+
+  it('playContracts leaves a paid clearance alone while no barren haul waits on a full heap', () => {
+    const { run, state } = fullHeapSite();
+    const offer = rubbleContract(state, { quantityKg: 10_000, pricePerKg: 0.04, playerPays: true });
+    playContracts(run, state);
+    expect(state.contracts.available.some(c => c.id === offer.id)).toBe(true);
+    expect(totalSpoilRoomKg(state.buildings.buildings)).toBe(0);
+  });
+
+  it('playContracts pays for a clearance once barren hauls wait on full heaps', () => {
+    const { run, state } = fullHeapSite();
+    addBlastFragments(state.logistics, [barren(9706, 5, 6, 900)], state.navGrid);
+    syncHaulDispatch(state);
+    run('tick 1');
+    expect(orderFor(state, 9706)?.blockedReason).toBe('spoil_heap_full');
+    const offer = rubbleContract(state, { quantityKg: 10_000, pricePerKg: 0.04, playerPays: true });
+    playContracts(run, state);
+    expect(state.contracts.available.some(c => c.id === offer.id)).toBe(false);
+    expect(totalSpoilRoomKg(state.buildings.buildings)).toBe(10_000);
+  });
+
   it('accepting a paid clearance is refused when cash cannot cover the fee', () => {
     const { state } = fullHeapSite();
     const ctx = { state } as unknown as Parameters<typeof contractCommand>[0];

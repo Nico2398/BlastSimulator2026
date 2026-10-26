@@ -6,6 +6,9 @@
 // and the progression probe can import it; scripts must not import from tests.
 
 import type { GameState } from '../../src/core/state/GameState.js';
+import { stateRubbleStockKg } from '../../src/core/economy/SpoilHeaps.js';
+import { pendingSpoilOverflowKg } from '../../src/core/economy/HaulDispatch.js';
+import { isPaidClearance } from '../../src/core/economy/Contract.js';
 
 /** A console command runner, as `createRunner().runner.run` or a recording wrapper of it. */
 export type Run = (cmd: string) => { success: boolean; output: string };
@@ -32,11 +35,13 @@ export function playTick(run: Run, state: GameState): void {
  * unfulfilled contract costs a penalty). ore_sale is preferred. With
  * `supply`, a covered supply offer is taken too (after ore_sale, before
  * rubble): a mine hauling faster than the ore_sale board buys sells the rest
- * there instead of filling its warehouse.
+ * there instead of filling its warehouse. Rubble is measured as the contract
+ * draws it, barren rock in storage and on the spoil heaps (`stateRubbleStockKg`);
+ * a clearance the mine pays for is taken only while barren hauls wait on full heaps.
  */
 export function playContracts(run: Run, state: GameState, opts: { supply?: boolean } = {}): void {
   const stockOf = (materialId: string) => (
-    materialId === '' ? state.logistics.storedMassKg : (state.collectedOre[materialId] ?? 0)
+    materialId === '' ? stateRubbleStockKg(state) : (state.collectedOre[materialId] ?? 0)
   );
   for (const active of [...state.contracts.active]) {
     if (active.type !== 'ore_sale' && active.type !== 'rubble_disposal') continue;
@@ -47,7 +52,8 @@ export function playContracts(run: Run, state: GameState, opts: { supply?: boole
     const covered = (c: typeof state.contracts.available[number]) => stockOf(c.materialId) >= c.quantityKg;
     const offer = state.contracts.available.find((c) => c.type === 'ore_sale' && covered(c))
       ?? (opts.supply ? state.contracts.available.find((c) => c.type === 'supply' && covered(c)) : undefined)
-      ?? state.contracts.available.find((c) => c.type === 'rubble_disposal' && covered(c));
+      ?? state.contracts.available.find((c) => c.type === 'rubble_disposal' && covered(c)
+        && (!isPaidClearance(c) || pendingSpoilOverflowKg(state) > 0));
     if (!offer) return;
     if (!run(`contract accept ${offer.id}`).success) return;
     const active = state.contracts.active.find((c) => c.id === offer.id);
