@@ -90,6 +90,7 @@ import {
 } from './probe-ladder-policy.js';
 import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
 import { fragmentBuriesPlannedHole } from '../../src/core/mining/BuriedHoles.js';
+import { siteVehicleReach } from '../../src/core/engine/OrderReachability.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { findBuildingApproachCell } from '../../src/core/nav/BuildingApproach.js';
 import { vehicleMaxSlopeRatio } from '../../src/core/entities/Vehicle.js';
@@ -932,6 +933,15 @@ export function craterRubbleCounts(state: GameState, crater: Pattern & { span: n
 }
 
 /** A haul still pending over a crater's footprint (and a tile around it); `ore` set: only a haul of that rubble. */
+/** Whether the site's vehicle network reaches at least half the cells of `crater`'s footprint (`siteVehicleReach`). */
+function craterFloorReachable(state: GameState, crater: Pattern & { span: number }): boolean {
+  const reach = siteVehicleReach(state);
+  if (reach === null) return true;
+  let reached = 0;
+  for (let z = crater.z; z < crater.z + crater.span; z++) for (let x = crater.x; x < crater.x + crater.span; x++) if (reach(x, z)) reached++;
+  return reached * 2 >= crater.span * crater.span;
+}
+
 function craterHaulPending(state: GameState, crater: Pattern & { span: number }, ore?: ReadonlySet<number>): boolean {
   return state.pendingActions.some(a => a.type === 'haul_debris' && !a.blockedReason
     && inCraterFringe(a.targetX, a.targetZ, crater) && (!ore || ore.has((a.payload as { fragmentId: number }).fragmentId)));
@@ -954,8 +964,8 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
     .find(c => {
       const counts = craterRubbleCounts(state, c, ore);
       return decideLadderDeepen({
-        orderedRubbleCount: counts.ordered, orderlessRubbleCount: counts.orderless,
-        sealedRubbleCount: counts.sealed, outOfReachRubbleCount: counts.outOfReach, haulPending: craterHaulPending(state, c, ore),
+        orderedRubbleCount: counts.ordered, orderlessRubbleCount: counts.orderless, sealedRubbleCount: counts.sealed,
+        outOfReachRubbleCount: counts.outOfReach, floorReachable: craterFloorReachable(state, c), haulPending: craterHaulPending(state, c, ore),
       }) === 'deepen';
     });
   const deepen = depthTargetOpen(s) && crater !== undefined;

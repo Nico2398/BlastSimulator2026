@@ -207,8 +207,8 @@ function strandedCrewTargets(state: GameState, surface: AccessSurface): Array<{ 
 type AccessFloor = StrandedFloor & { holdsCrew: boolean };
 
 /**
- * Floors of the stranded orders, most orders first, each target's y read from the terrain. A target the
- * vehicle network reaches now is skipped: its stamp lags a ramp that just connected the crater.
+ * Floors of the stranded orders, those holding stranded crew first, then most orders first, each target's y read from
+ * the terrain. A target the vehicle network reaches now is skipped: its stamp lags a ramp that just connected the crater.
  */
 function strandedFloors(state: GameState, grid: VoxelGrid, surface: AccessSurface): AccessFloor[] {
   const crew = strandedCrewTargets(state, surface).filter(t => !surface.reachableFrom(Math.round(t.x), Math.round(t.z)));
@@ -222,8 +222,9 @@ function strandedFloors(state: GameState, grid: VoxelGrid, surface: AccessSurfac
     });
   return clusterStrandedFloors(cells, CRATER_ACCESS_CLUSTER_GAP_CELLS)
     .filter(f => f.orderCount >= ACCESS_MIN_STRANDED_ORDERS)
-    .sort((a, b) => b.orderCount - a.orderCount)
-    .map(f => ({ ...f, holdsCrew: holdsCrew(f) }));
+    .map(f => ({ ...f, holdsCrew: holdsCrew(f) }))
+    // People first: crew who cannot leave a blast zone refuse every shot near them, whatever rubble waits elsewhere.
+    .sort((a, b) => Number(b.holdsCrew) - Number(a.holdsCrew) || b.orderCount - a.orderCount);
 }
 
 /** The console order that builds `def`: its waypoints as a path, its depth, width and any chosen grade. */
@@ -312,10 +313,9 @@ const ACCESS_RESCUE_MAX_RUN_M = 10;
 
 /**
  * A plan down to `floor`, facing its nearest depot, whose dig keeps the vehicle network whole (`keepsVehicleNetwork`), or
- * null. Failing that, a floor holding stranded crew gets the shortest ramp down to it however shallow
- * (`CRATER_ACCESS_MIN_DROP_M`), at most ACCESS_RESCUE_MAX_RUN_M long; rubble on a floor shallower than a dug crater is
- * left. Shallow plans for every floor, and the 90 m trench one planned for a metre's drop, cost the Shareholder
- * Summit ladder its win.
+ * null. A floor holding stranded crew gets the shortest ramp instead, however shallow (`CRATER_ACCESS_MIN_DROP_M`), a
+ * shallow one at most ACCESS_RESCUE_MAX_RUN_M long; rubble on a floor shallower than a dug crater is left. Shallow plans
+ * for every floor, and a 90 m trench planned for a metre's drop, cost the Shareholder Summit ladder its win.
  */
 function planKeepingRoads(
   state: GameState, grid: VoxelGrid, floor: AccessFloor, surface: AccessSurface, avoid: readonly RampFootprint[],
@@ -330,10 +330,11 @@ function planKeepingRoads(
     }
     return null;
   };
-  const access = plan(nearestHaulDepot(state, floor), RAMP_CRATER_MIN_DROP_M);
-  if (access !== null || !floor.holdsCrew) return access;
+  if (!floor.holdsCrew) return plan(nearestHaulDepot(state, floor), RAMP_CRATER_MIN_DROP_M);
   const rescue = plan(null, CRATER_ACCESS_MIN_DROP_M);
-  return rescue !== null && rampTotalLength(rampPathOf(rescue.def).legs) <= ACCESS_RESCUE_MAX_RUN_M ? rescue : null;
+  if (rescue === null) return null;
+  const shallow = rescue.def.targetDepth < RAMP_CRATER_MIN_DROP_M;
+  return !shallow || rampTotalLength(rampPathOf(rescue.def).legs) <= ACCESS_RESCUE_MAX_RUN_M ? rescue : null;
 }
 
 /**

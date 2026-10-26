@@ -312,12 +312,16 @@ describe('decideLadderDeepen', () => {
     expect(decideLadderDeepen({ ...deepenBase, orderlessRubbleCount: 1 })).toBe('wait');
   });
 
-  it('waits while rubble lies out of every vehicle\'s reach: the crater has no way in yet', () => {
-    expect(decideLadderDeepen({ ...deepenBase, outOfReachRubbleCount: 1 })).toBe('wait');
+  it('waits while no vehicle drives onto the crater floor: the crater has no way in yet', () => {
+    expect(decideLadderDeepen({ ...deepenBase, outOfReachRubbleCount: 1, floorReachable: false })).toBe('wait');
   });
 
-  it('an absent out-of-reach count reads as none', () => {
-    const { outOfReachRubbleCount: _omit, ...rest } = { ...deepenBase, outOfReachRubbleCount: 0 };
+  it('deepens a crater whose floor is driven onto although rubble lies out of reach on a ledge (#2091)', () => {
+    expect(decideLadderDeepen({ ...deepenBase, outOfReachRubbleCount: 37, floorReachable: true })).toBe('deepen');
+  });
+
+  it('an absent floor verdict reads as reachable', () => {
+    const { floorReachable: _omit, ...rest } = { ...deepenBase, floorReachable: true };
     expect(decideLadderDeepen(rest)).toBe('deepen');
   });
 

@@ -66,7 +66,7 @@ Records why the rules in the `gameplay-navmesh` skill exist: the issues that int
 - A digger on a crater floor starts a flush ramp from beside its foot: #2045.
 - A repair leaves tiles an older ramp covers to that ramp: a traffic-jam widening grew one ramp into its neighbour's lane, and on the seed-42 full-kit ladder the two re-ordered each other's repair every 50-100 ticks from t5500, which held every other ramp order (#2091).
 - The probe buys a digger when ramp work waits and none stands on the vehicle network (#2091).
-- Shallow rescue ramps (`minDropM`): a driver and a digger on a strip a metre below the road kept every later shot near them refused. Shallow plans for every floor, and a 90 m trench for a metre's drop, cost the Shareholder Summit ladder its win, hence crew floors only and the 10 m cap (#2091).
+- Shallow rescue ramps (`minDropM`): a driver and a digger on a strip a metre below the road kept every later shot near them refused. Shallow plans for every floor, and a 90 m trench for a metre's drop, cost the Shareholder Summit ladder its win, hence crew floors only and the 10 m cap; crew floors go first, with the shortest ramp, since the rescue waited behind three rubble floors while every shot was refused (#2091).
 
 ## Search and approach caches
 
