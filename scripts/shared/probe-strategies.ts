@@ -613,9 +613,13 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan)
     // A pattern abandoned after a refused or cancelled detonation still stands charged: fire it, or it blocks every later shot and the hauling its zone holds.
     const footprint = patternFootprint(s.state); // read before the blast consumes the holes
     tryOnce(s, m, 'refire', () => {
-      if (!fireShot(s)) return false;
+      if (!fireShot(s)) {
+        m.fireCancels = (m.fireCancels ?? 0) + 1;
+        return false;
+      }
       m.origins.push(footprint);
       m.yieldPending = true;
+      m.fireCancels = 0;
       return true;
     });
     return;
@@ -663,8 +667,9 @@ const LADDER_MAX_FIRE_CANCELS = 3;
  * Drop it at once and bar the hole's surroundings from later fresh sites.
  */
 function dropUnreachablePattern(s: ProbeSession, m: LadderMemory): void {
-  if (m.shot !== null && (m.fireCancels ?? 0) >= LADDER_MAX_FIRE_CANCELS) {
-    abandonShot(s, m, { ...m.shot.at, span: m.shot.span });
+  // An abandoned charged pattern refired in vain is given up the same way: left standing it blocks every later shot.
+  if ((m.fireCancels ?? 0) >= LADDER_MAX_FIRE_CANCELS && (m.shot !== null || shotReady(s.state))) {
+    abandonShot(s, m, m.shot !== null ? { ...m.shot.at, span: m.shot.span } : patternFootprint(s.state));
     m.fireCancels = 0;
     return;
   }
