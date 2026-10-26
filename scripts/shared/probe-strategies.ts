@@ -1127,17 +1127,28 @@ function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
   tryOnce(s, m, `upgrade_${bought.vehicleId}`, () => s.run(`vehicle upgrade ${bought.vehicleId}`).success);
 }
 
-/** A fragmenter as soon as boulders lie on the ground, and the licence its driver must earn at the Driving Center. */
+/**
+ * Boulder-breaking orders within reach per fragmenter above which the ladder buys another. One fragmenter faced 463 of
+ * them on the seed-42 full-kit ladder after grade 2 and broke one in 400 ticks; the boulders buried every new hole.
+ */
+const LADDER_BOULDERS_PER_FRAGMENTER = 100;
+/** Most fragmenters the ladder runs. */
+const LADDER_MAX_FRAGMENTERS = 3;
+
+/**
+ * A fragmenter as soon as boulders lie on the ground, another for every LADDER_BOULDERS_PER_FRAGMENTER breaking orders
+ * within reach, and a licensed driver for each at the Driving Center.
+ */
 function ladderFragmenter(s: ProbeSession, m: ReinvestMemory): void {
   const { state } = s;
-  const owned = state.vehicles.vehicles.some(v => v.type === 'rock_fragmenter');
-  if (!owned) {
-    if (!state.logistics.fragments.some(f => f.state === 'on_ground' && isOversized(f.fragment.volume))) return;
-    const cost = getVehicleDefByTier('rock_fragmenter', 1).purchaseCost;
-    if (state.cash - LADDER_UPGRADE_RESERVE < cost) return;
-    tryOnce(s, m, 'fragmenter', () => s.run('vehicle buy rock_fragmenter').success);
+  const owned = state.vehicles.vehicles.filter(v => v.type === 'rock_fragmenter').length;
+  const waiting = state.pendingActions.filter(a => a.type === 'fragment_debris' && a.blockedReason !== 'debris_out_of_reach').length;
+  const boulders = state.logistics.fragments.some(f => f.state === 'on_ground' && isOversized(f.fragment.volume));
+  const wanted = owned === 0 ? (boulders ? 1 : 0) : Math.min(LADDER_MAX_FRAGMENTERS, Math.max(owned, Math.ceil(waiting / LADDER_BOULDERS_PER_FRAGMENTER)));
+  if (owned < wanted && state.cash - LADDER_UPGRADE_RESERVE >= getVehicleDefByTier('rock_fragmenter', 1).purchaseCost) {
+    tryOnce(s, m, `fragmenter_${owned + 1}`, () => s.run('vehicle buy rock_fragmenter').success);
   }
-  earnLicence(s, m, 'rock_fragmenter', 1);
+  if (owned > 0 || wanted > 0) earnLicence(s, m, 'rock_fragmenter', 1, Math.max(1, owned));
 }
 
 /** Hire a replacement for any core role nobody alive holds (a blaster lost mid-shot stalls every charge order). */

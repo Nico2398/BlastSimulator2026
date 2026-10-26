@@ -36,3 +36,4 @@ The ~6 s/frame software-rasterisation cost was measured in #475 — which is why
 - Living quarters raised beside a far crater (drivers spent a third of their time walking to rest): #2089.
 - Served floors released once their ramp no longer reaches them (1,141 haul orders waited behind a ramp a deepening shot left short), holes buried under unhaulable rubble dropped (one held a deepening pattern re-ordered every 500 ticks), rubble contracts measured on the spoil heaps (four full heaps beside unread clearance offers): #2091.
 - Deepening gated on a driveable crater floor instead of zero out-of-reach rubble: ledge rubble held every crater at 9.9 m, 0.1 m short of grade 2, from t4500 (#2091).
+- A fragmenter per 100 breaking orders: one faced 463 boulders after grade 2 and broke one in 400 ticks while they buried every new hole; with the extra fragmenters grade 2 came at t7000 instead of t11000 and the pit reached 16.6 m (#2091).
