@@ -170,3 +170,13 @@ export function blockedKindLabel(kind: BlockedPhraseKind): string {
 export function describeBlockedReasons(counts: Partial<Record<BlockedOrderReason, number>>, max: number = BLOCKED_PHRASE_LINES, barrenOverflowKg = 0): string[] {
   return rankBlockedKinds(counts).slice(0, max).map((entry) => blockedPhrase(entry, barrenOverflowKg));
 }
+
+/** True for crew/fleet reasons whose many orders share one cause and toast once per group (#2099). */
+export function isGroupedBlockReason(_reason: BlockedOrderReason | null | undefined): boolean {
+  throw new Error('not implemented');
+}
+
+/** Notification body for `count` orders blocked by the same cause; count 1 equals buildBlockedOrderMessage (#2099). */
+export function buildGroupedBlockedOrderMessage(_action: PendingAction, _count: number): string {
+  throw new Error('not implemented');
+}
