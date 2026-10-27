@@ -1097,9 +1097,11 @@ async function selectNextAssignable(api, options = {}) {
         `#${issue.number}: waits — ${clashReason(claim, running)}. ` +
           `It holds its place on ${describeClaim(held)}: nothing younger that overlaps it there starts first.`
       );
+      // A hold on everything leaves nothing younger to start, but the walk goes
+      // on so the log names each issue it keeps waiting. It used to stop here:
+      // on 22 Oct 2026 #2066 (`scope:pipeline`) held everything behind live
+      // #2045, and #2068 never appeared in the log at all.
       holders.push({ number: issue.number, holds: WAITING_AHEAD, claim: held });
-      // A waiting issue that claims everything leaves nothing to find further on.
-      if (claim.exclusive) break;
       continue;
     }
 
