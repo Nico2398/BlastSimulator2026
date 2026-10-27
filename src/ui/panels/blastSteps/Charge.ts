@@ -38,6 +38,7 @@ import { drainBlockReason } from '../../../core/mining/HoleDrain.js';
 import { TUBING_COST, hasTubing } from '../../../core/mining/Tubing.js';
 import { MIN_STEMMING_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, HOLE_DRAIN_COST_PER_HOLE, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
+import { defaultChargeKg } from '../../../core/economy/PermitDefaults.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
@@ -91,6 +92,8 @@ export class ChargeStep {
   private playerPickedExplosive = false;
   private allowedIds: readonly string[] = resolveAvailableExplosives(null);
   private amountKg = CHARGE_DEFAULT_AMOUNT_KG;
+  /** False until the player steps the amount: until then the amount follows the permit (#2101). */
+  private playerAdjustedAmount = false;
   private stemmingM = CHARGE_DEFAULT_STEMMING_M;
   /** Diameters (m) of the narrowest and widest drilled holes: the max follows the first, the min the second (#1934). */
   private narrowestM = DRILL_HOLE_DEFAULT_DIAMETER_M;
@@ -208,6 +211,8 @@ export class ChargeStep {
       this.widestM = widest;
       this.clampAmount();
     }
+
+    this.followPermitDefault(state);
 
     this.allowedIds = resolveAvailableExplosives(state.campaign.activeLevelId);
     if (this.playerPickedExplosive && !this.allowedIds.includes(this.selectedExplosiveId)) this.playerPickedExplosive = false;
@@ -501,6 +506,17 @@ export class ChargeStep {
     return wrap;
   }
 
+  /** Until the player steps the amount, open at the permit-derived default for the planned and drilled holes (#2101). */
+  private followPermitDefault(state: GameState): void {
+    if (this.playerAdjustedAmount) return;
+    const all = [...state.drillHoles, ...state.plannedDrillHoles];
+    const shallowest = all.reduce<(typeof all)[number] | undefined>((a, h) => (a === undefined || h.depth < a.depth ? h : a), undefined);
+    this.amountKg = defaultChargeKg(
+      state.grade?.grade, all.length, shallowest?.depth ?? 0, this.stemmingM, shallowest?.diameter,
+    );
+    this.clampAmount();
+  }
+
   private clampAmount(): void {
     const explosive = getExplosive(this.selectedExplosiveId);
     if (!explosive) return;
@@ -516,6 +532,7 @@ export class ChargeStep {
   }
 
   private adjustAmount(delta: number): void {
+    this.playerAdjustedAmount = true;
     const explosive = getExplosive(this.selectedExplosiveId);
     this.amountKg = explosive ? this.withinHoleLimits(explosive, this.amountKg + delta) : Math.max(1, Math.min(100, this.amountKg + delta));
     this.amountValueEl.textContent = `${this.amountKg} kg`;
