@@ -61,6 +61,7 @@ export interface SerializableGameState {
   rampLegCount: number;
   /** Width of the first built ramp, 0 when none is built (#1298). */
   builtRampWidth: number;
+  builtRampFlow: 'both' | 'down' | 'up';
   /** Buildings ordered but not yet built (state.plannedBuildings.length) — proves a build order queues work instead of creating the building instantly (#556). */
   orderedBuildingCount: number;
   chargedCount: number;
@@ -226,6 +227,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     builtRampCount: s.builtRamps.length,
     rampLegCount: s.builtRamps[0] ? (s.builtRamps[0].def.legs?.length ?? 1) : 0,
     builtRampWidth: s.builtRamps[0]?.width ?? 0,
+    builtRampFlow: s.builtRamps[0]?.flow ?? 'both',
     orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
     researchQueueLength: s.buildings.researchQueue.length,

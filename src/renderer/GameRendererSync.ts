@@ -155,7 +155,7 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
   // Ramp arrows (#1211): each planned ramp keeps its arrow until its last
   // segment is dug. A dig lowers the ground the arrow sampled, so a terrain
   // change rebuilds the survivors.
-  deps.rampArrows?.sync(state.plannedRamps, terrainDirty);
+  deps.rampArrows?.sync(state.plannedRamps, terrainDirty, state.builtRamps);
 
   // The rally flag stands on whatever ground is left under its tile, so a dig
   // or a blast beneath it lowers it rather than leaving it floating.

@@ -50,7 +50,7 @@ export const LADDER_GATE_RUNWAY_TICKS = 1_500;
 export interface LadderShotGateInput {
   /** Current ladder grade. */
   grade: number;
-  /** Rubble (kg) lying in the pit, not yet hauled out. */
+  /** Ore-bearing rubble (kg) lying in the pit within a hauler's reach, not yet hauled out. */
   rubbleKg: number;
   cash: number;
   /** Payroll cost per tick. */
@@ -112,20 +112,49 @@ export function reachableShotDepthM(
   return Math.max(0, Math.min(holeDepthM, rampRunM * fleetClimbRatio));
 }
 
-export interface LadderDeepenInput {
-  /** Rubble on the crater footprint that a haul order already covers. */
-  orderedRubbleCount: number;
-  /** Rubble with no haul order that a hauler can reach (sealed rubble excluded). */
-  orderlessRubbleCount: number;
-  /** Rubble no hauler can reach whatever is ordered. Informational: ignored by the decision, sealed rubble never blocks deepening. */
-  sealedRubbleCount: number;
-  haulPending: boolean;
+interface LadderDeepenInput {
+  /**
+   * Whether the vehicle network reaches most of the crater floor. False blocks deepening: a shot fired into a crater
+   * nobody drives into buries its holes under rubble no one can clear (the player orders a ramp first). Absent = true.
+   */
+  floorReachable?: boolean;
 }
 
-/** Deepen when no ordered or reachable orderless rubble and no haul remains, whatever is sealed; else wait. */
+/**
+ * Deepen once a vehicle drives onto the crater floor, whatever rubble still lies on it: the crew hauls the rubble off
+ * the planned holes first (the buried-hole priority) and the rest waits. Waiting for the whole floor to be hauled held
+ * the seed-42 full-kit ladder at 13.6 m for good: its grade-2 bench left 3,300 ore-bearing fragments (#2091).
+ */
 export function decideLadderDeepen(input: LadderDeepenInput): 'deepen' | 'wait' {
-  const clear = input.orderedRubbleCount === 0 && input.orderlessRubbleCount === 0;
-  return clear && !input.haulPending ? 'deepen' : 'wait';
+  return input.floorReachable ?? true ? 'deepen' : 'wait';
+}
+
+/**
+ * Depth (m) a single full hole fired on a crater floor falls short of its own length. Measured on the seed-42 desert
+ * sandbox (#2091): a 10 m krackle hole on a 12.4 m floor broke out to 20.6 m, an 11 m one to 21.6 m.
+ */
+export const LADDER_SHAFT_BREAKOUT_LOSS_M = 2;
+
+interface ShaftInput {
+  /** Depth (m) of the crater floor the hole stands on. */
+  floorDepthM: number;
+  /** Depth (m) the next grade asks for; 0 when it asks none. */
+  nextGradeDepthM: number;
+  /** Deepest hole (m) the fleet's best rig drills. */
+  rigMaxDepthM: number;
+}
+
+/**
+ * Depth (m) of the one hole that takes a crater floor to the next grade's depth, or null when no grade asks a deeper
+ * pit or the rig cannot drill that deep. Every hole of a deepening pattern waits until the rubble over its cell is
+ * hauled, about a hundred fragments a cell under a grade-2 bench, so one hole is drilled thousands of ticks before a
+ * wide pattern (#2091). Its length is its own: the ramp's reach and the remaining-depth cap of a wide bench shrank it
+ * to 4 m, and a 4 m hole on a 13.6 m floor fired again and again short of grade 3.
+ */
+export function shaftHoleDepthM(input: ShaftInput): number | null {
+  if (input.nextGradeDepthM <= 0) return null;
+  const need = Math.max(LADDER_HOLE_MIN_DEPTH_M, Math.ceil(input.nextGradeDepthM - input.floorDepthM + LADDER_SHAFT_BREAKOUT_LOSS_M));
+  return need <= input.rigMaxDepthM ? need : null;
 }
 
 export interface FreshSiteInput {
@@ -160,6 +189,8 @@ export interface ProtectedZone {
   x: number;
   z: number;
   span: number;
+  /** Extent along z when it differs from `span` (a rectangle); a square without it. */
+  spanZ?: number;
 }
 
 /**
@@ -182,7 +213,7 @@ export function rampProtectionZones(ramps: readonly RampFootprintInput[], margin
 /** Whether a shot footprint overlaps any protected zone; boxes that merely touch do not. */
 export function shotOverlapsProtectedRamp(site: ProtectedZone, zones: readonly ProtectedZone[]): boolean {
   return zones.some(z => site.x < z.x + z.span && z.x < site.x + site.span
-    && site.z < z.z + z.span && z.z < site.z + site.span);
+    && site.z < z.z + (z.spanZ ?? z.span) && z.z < site.z + (site.spanZ ?? site.span));
 }
 
 /** Deepest hole (m) the ladder drills on a fresh site, where the floor is not yet open: deeper holes seal under the burden cap. */
@@ -210,13 +241,41 @@ export interface LadderHoleDepthInput {
   currentCapM: number;
   /** Fresh-site hole depth (m); defaults to LADDER_FRESH_HOLE_DEPTH_M. */
   freshHoleDepthM?: number;
+  /** Deepest hole the shot's charge still breaks out of (`breakoutHoleDepthM`); none when omitted. */
+  breakoutDepthM?: number;
 }
 
-/** Hole depth (m) for the next ladder shot, within [min(LADDER_HOLE_MIN_DEPTH_M, rigMaxDepthM), rigMaxDepthM]; the minimum-depth floor lives here. */
+/**
+ * Burden (m) of intact rock over a hole's charge column that the charge still lifts. Measured beside
+ * CHARGE_DEFAULT_AMOUNT_KG: an 8 m hole breaks out with 5 kg (5.5 m of burden) and seals with 4.5 kg (5.75 m),
+ * so this keeps half a metre in hand.
+ */
+export const LADDER_MAX_BURDEN_M = 5;
+
+/**
+ * Burden (m) a pattern of holes spaced within each other's breakage (`holeSpacingForChargeM`) lifts: neighbours share
+ * it. Measured with 10 kg of krackle (a 5 m column) 2 m apart (#2091): 11 m holes break out to a 10.7 m pit, 12 m seal.
+ */
+export const LADDER_TIGHT_BURDEN_M = 6;
+
+/**
+ * Deepest hole (m) a charge whose column is `chargeColumnM` long breaks out of under `burdenM` of rock. A deeper hole
+ * seals: the broken rock stays under an intact cap, the shot gains nothing, and the next shot drilled through it leaves
+ * a floor of pits and ridges no vehicle crosses (#2091).
+ */
+export function breakoutHoleDepthM(chargeColumnM: number, burdenM = LADDER_MAX_BURDEN_M): number {
+  return chargeColumnM + burdenM;
+}
+
+/**
+ * Hole depth (m) for the next ladder shot, within [min(LADDER_HOLE_MIN_DEPTH_M, rigMaxDepthM), rigMaxDepthM], and no
+ * deeper than its charge breaks out of; the minimum-depth floor lives here.
+ */
 export function decideLadderHoleDepth(input: LadderHoleDepthInput): number {
   const fresh = input.freshHoleDepthM ?? LADDER_FRESH_HOLE_DEPTH_M;
   let base = input.floorOpen ? Math.min(fresh, input.remainingDepthM + 1) : fresh;
   if (input.lastShotFailed) base = Math.min(base, Math.max(LADDER_HOLE_MIN_DEPTH_M, input.currentCapM - LADDER_HOLE_STEP_DOWN_M));
+  if (input.breakoutDepthM !== undefined) base = Math.min(base, Math.floor(input.breakoutDepthM));
   return Math.min(input.rigMaxDepthM, Math.max(LADDER_HOLE_MIN_DEPTH_M, base));
 }
 
@@ -280,11 +339,16 @@ export function judgeLadderShot(input: LadderShotJudgeInput): LadderShotJudgment
   return { judged: true, lastShotFailed, dudStreak: bar ? 0 : streak, bar };
 }
 
-/** Ticks a pattern may stay buried under rubble before the ladder drops it. */
+/** Ticks a pattern's buried holes may go without one coming free before the ladder drops it. */
 export const LADDER_BURIED_DROP_TICKS = 500;
 
 interface BuriedPatternInput {
   buriedHoleCount: number;
+  /** Buried holes at the previous call; null on the first. */
+  previousBuriedHoleCount: number | null;
+  /** Fragments covering the buried holes now, and at the previous call (null on the first); absent: holes only. */
+  buryingFragmentCount?: number;
+  previousBuryingFragmentCount?: number | null;
   buriedSinceTick: number | null;
   tick: number;
 }
@@ -295,13 +359,17 @@ interface BuriedPatternDecision {
 }
 
 /**
- * Contract: no buried holes -> wait, buriedSinceTick null; first buried call -> wait,
- * buriedSinceTick = tick; buried for >= LADDER_BURIED_DROP_TICKS -> drop, null; a count back to 0
- * resets buriedSinceTick to null.
+ * Contract: no buried holes -> wait, buriedSinceTick null; first buried call, or fewer buried holes or fewer fragments
+ * burying them than at the previous call (the crew is clearing them) -> wait, buriedSinceTick = tick; no progress for
+ * >= LADDER_BURIED_DROP_TICKS -> drop, null; a count back to 0 resets buriedSinceTick to null. A hole under a hundred
+ * fragments stays buried for hundreds of ticks while they are hauled off it one load at a time (#2091).
  */
 export function decideBuriedPattern(input: BuriedPatternInput): BuriedPatternDecision {
   if (input.buriedHoleCount === 0) return { action: 'wait', buriedSinceTick: null };
-  const since = input.buriedSinceTick ?? input.tick;
+  const fewerFragments = input.buryingFragmentCount !== undefined && input.previousBuryingFragmentCount != null
+    && input.buryingFragmentCount < input.previousBuryingFragmentCount;
+  const freed = (input.previousBuriedHoleCount !== null && input.buriedHoleCount < input.previousBuriedHoleCount) || fewerFragments;
+  const since = freed ? input.tick : input.buriedSinceTick ?? input.tick;
   if (input.tick - since >= LADDER_BURIED_DROP_TICKS) return { action: 'drop', buriedSinceTick: null };
   return { action: 'wait', buriedSinceTick: since };
 }
@@ -338,4 +406,30 @@ interface SiteOreInput {
 export function siteHoldsOre(input: SiteOreInput): boolean {
   if (input.bestSiteOre <= 0) return true;
   return input.oreKgUnderSite >= LADDER_SITE_ORE_SHARE * input.bestSiteOre && input.oreKgUnderSite >= LADDER_SITE_ORE_FLOOR;
+}
+
+/** Depot orders of one kind (spoil heaps, freight warehouses) the ladder keeps in flight at once: each takes its crew a while to raise. */
+export const LADDER_DEPOTS_AT_ONCE = 2;
+
+interface DepotsInput {
+  /** Mass (kg) of haul orders waiting on this kind of depot: blocked on full or missing storage. */
+  blockedKg: number;
+  /** What one new depot of this kind holds (kg). */
+  capacityKg: number;
+  built: number;
+  /** Ordered and not yet raised. */
+  planned: number;
+  /** Most of this kind the ladder raises. */
+  max: number;
+}
+
+/**
+ * How many more depots of one kind to order now: enough new room for every blocked haul, at most
+ * LADDER_DEPOTS_AT_ONCE in flight and `max` in all. A player whose trucks wait at full heaps builds more heaps; the
+ * room a pending order adds counts already, so the next is ordered only for rubble it does not cover.
+ */
+export function depotsToOrder(input: DepotsInput): number {
+  if (input.blockedKg <= 0 || input.capacityKg <= 0) return 0;
+  const wanted = Math.ceil(input.blockedKg / input.capacityKg) - input.planned;
+  return Math.max(0, Math.min(wanted, LADDER_DEPOTS_AT_ONCE - input.planned, input.max - input.built - input.planned));
 }

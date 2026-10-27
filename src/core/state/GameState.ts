@@ -72,6 +72,7 @@ import { createHiringPool, type HiringPoolState } from '../entities/HiringPool.j
 import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 import type { RampDef } from '../mining/Ramp.js';
+import type { RampFlow } from '../mining/RampFlow.js';
 import type { RampWidth, PitMaskShape } from '../config/balance.js';
 
 /** Save format version — increment when GameState shape changes. */
@@ -331,6 +332,8 @@ export interface BuiltRamp {
   def: RampDef;
   width: RampWidth;
   footprint: RampFootprint;
+  /** Traffic direction (`RampFlow.ts`): vehicles only descend ('down') or only climb ('up'); absent: both ways. */
+  flow?: RampFlow;
 }
 
 /** A ramp order in flight — its footprint is claimed and segments queue `dig_ramp_segment` actions as they're worked (#555). */
@@ -341,6 +344,8 @@ export interface PlannedRamp {
   segments: RampSegmentTracker[];
   /** Set when this order widens the built ramp with this id instead of cutting a new one (#1298). */
   widenOf?: number;
+  /** Set when this order repairs the built ramp with this id instead of cutting a new one (#2045). */
+  repairOf?: number;
 }
 
 /**

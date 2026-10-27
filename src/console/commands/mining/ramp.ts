@@ -4,8 +4,9 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame } from './shared.js';
+import { isProgressionSite } from '../../../core/state/GameState.js';
 import {
-  validateRampOrder, defineRampSegments, rampDefFromEndpoints, rampWidthOf,
+  validateRampOrder, defineRampSegments, rampCutSlopeRatio, rampDefFromEndpoints, rampWidthOf, landRampOnGrid,
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
 import { proposeRampSpiral, spiralSurfaceFrom, type RampSpiralProposal, type RampSpiralResult, type SpiralDir, type SpiralRequest } from '../../../core/mining/RampSpiral.js';
@@ -15,6 +16,8 @@ import { rampPathCells, legsFromWaypoints, firstOccupiedPathTile, rampPathOf, ra
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { isBuildingFootprintCell } from '../../../core/entities/Building.js';
 import { rampFootprint, orderRampWiden, validateWidenRamp, type WidenFailure } from '../../../core/mining/RampWidening.js';
+import { orderRampRepair } from '../../../core/mining/RampRepair.js';
+import { isRampFlowSetting, setRampFlow, RAMP_FLOW_SETTINGS } from '../../../core/mining/RampFlow.js';
 import { RAMP_DEFAULT_WIDTH, RAMP_WIDTH_OPTIONS, isRampWidth, type RampWidth } from '../../../core/config/balance.js';
 import { cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -79,8 +82,11 @@ export function buildRampCommand(
 }
 
 /** Validates, claims and queues the ordered `rampDef` (straight or multi-leg); the shared tail of every ramp order form. */
-function orderRampDef(ctx: MiningContext, rampDef: RampDef): CommandResult {
-  const { direction, length } = rampDef;
+function orderRampDef(ctx: MiningContext, ordered: RampDef): CommandResult {
+  const { direction, length } = ordered;
+  ordered.cutSlopeRatio = rampCutSlopeRatio(isProgressionSite(ctx.state!));
+  // A ramp ending on a dug floor lands on it (#2045): validated, and recorded, at the floor's real depth.
+  const rampDef = landRampOnGrid(ctx.grid!, ordered);
 
   // validateRampOrder runs first, before rampFootprint/cellsInRect build any
   // array — its finite/positive and MAX_RAMP_LENGTH checks are the sole
@@ -95,13 +101,12 @@ function orderRampDef(ctx: MiningContext, rampDef: RampDef): CommandResult {
   }
 
   const footprint = rampFootprint(rampDef, rampWidthOf(rampDef));
-  const pathCells = rampDef.legs ? rampPathCells(rampPathOf(rampDef), rampWidthOf(rampDef)) : null;
-  if (pathCells) {
-    const refusal = legHitsBuilding(ctx, pathCells);
-    if (refusal) return { success: false, output: refusal };
-  }
+  // Every corridor, straight or turning: a building raised on a ramp blocks it (#2045).
+  const corridor = rampPathCells(rampPathOf(rampDef), rampWidthOf(rampDef));
+  const refusal = legHitsBuilding(ctx, corridor);
+  if (refusal) return { success: false, output: refusal };
   const rampClaim = claimForAction(
-    ctx, pathCells ?? cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp',
+    ctx, rampDef.legs ? corridor : cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp',
   );
   if (!rampClaim.ok) return { success: false, output: rampClaim.output! };
 
@@ -153,7 +158,7 @@ function spiralRampCommand(
   const dir: SpiralDir = rawDir;
   const grid = ctx.grid!;
   const area = ctx.playableArea;
-  const request: SpiralRequest = { fromX: from.x, fromZ: from.z, depth, gradeDegrees: grade, width, dir };
+  const request: SpiralRequest = { fromX: from.x, fromZ: from.z, depth, gradeDegrees: grade, width, dir, cutSlopeRatio: rampCutSlopeRatio(isProgressionSite(ctx.state!)) };
   const result: RampSpiralResult = proposeRampSpiral(request, spiralSurfaceFrom(grid, area));
   if (!result.success) return { success: false, output: t(result.reasonKey, result.params) };
   const p: RampSpiralProposal = result.proposal;
@@ -213,7 +218,7 @@ function rampDefFromPath(
   return { success: true, def: rampDefFromLegs({ x: originX, z: originZ }, legs, depth, width) };
 }
 
-/** Refusal text when a corridor tile of a multi-leg ramp lies on a built or planned building, else null. */
+/** Refusal text when a corridor tile of a ramp lies on a built or planned building, else null. */
 function legHitsBuilding(ctx: MiningContext, cells: readonly RampPathCell[]): string | null {
   const occupants = buildingFootprintOccupants(ctx.state!);
   const hit = firstOccupiedPathTile(cells, (x, z) => occupants.some(o => isBuildingFootprintCell(o, x, z)));
@@ -280,4 +285,37 @@ export function widenRampCommand(
   const result = orderRampWiden(state, ctx.grid!, rampId, toWidth);
   if (!result.success) return widenRefused(rampId, result);
   return { success: true, output: t('mining.widen_ramp.ordered', { id: rampId, width: toWidth, cost: formatMoney(result.data.cost) }) };
+}
+
+/** `ramp_flow id:N flow:both|down|up` — sets a built ramp's traffic direction: two-way, down only or up only. */
+export function rampFlowCommand(
+  ctx: MiningContext,
+  _args: string[],
+  named: Record<string, string>,
+): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+  const rampId = parseInt(named['id'] ?? '', 10);
+  const flow = named['flow'] ?? '';
+  if (isNaN(rampId) || !isRampFlowSetting(flow)) {
+    return { success: false, output: t('mining.ramp_flow.usage', { options: RAMP_FLOW_SETTINGS.join('|') }) };
+  }
+  const result = setRampFlow(ctx.state!, rampId, flow);
+  if (!result.success) return { success: false, output: result.error };
+  return { success: true, output: t(`mining.ramp_flow.set_${flow}`, { id: rampId }) };
+}
+
+/** `repair_ramp id:N` — re-cuts a built ramp a blast damaged back to its line, landed on its floor as it is now (#2045). */
+export function repairRampCommand(
+  ctx: MiningContext,
+  _args: string[],
+  named: Record<string, string>,
+): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+  const rampId = parseInt(named['id'] ?? '', 10);
+  if (isNaN(rampId)) return { success: false, output: t('mining.repair_ramp.usage') };
+  const result = orderRampRepair(ctx.state!, ctx.grid!, rampId);
+  if (!result.success) return { success: false, output: t(result.errorKey, result.errorParams) };
+  return { success: true, output: t('mining.repair_ramp.ordered', { id: rampId, cells: result.data.cells, cost: formatMoney(result.data.cost) }) };
 }

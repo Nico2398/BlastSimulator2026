@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 // Ramp inspector content (#1769): width, depth, length and the Widen action with its cost.
 import { describe, it, expect } from 'vitest';
-import { rampContent, widenState, type WidenState } from '../../../../../src/ui/panels/inspector/rampContent.js';
-import type { InspectorLinks, InspectorView } from '../../../../../src/ui/panels/inspector/InspectorContent.js';
+import { rampContent, repairAction, trafficAction, widenState, type WidenState } from '../../../../../src/ui/panels/inspector/rampContent.js';
+import type { InspectorLinks, InspectorView, RampRepairOffer } from '../../../../../src/ui/panels/inspector/InspectorContent.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import type { BuiltRamp, GameState, PlannedRamp } from '../../../../../src/core/state/GameState.js';
 import { computeRampCost } from '../../../../../src/core/mining/Ramp.js';
@@ -91,7 +91,7 @@ describe('ramp inspector', () => {
 
   it('offers Widen labelled with its cost', () => {
     const view = viewOf(stateWith(rampOf(3)));
-    expect(view.actions.map(a => a.action)).toEqual(['widen']);
+    expect(view.actions.map(a => a.action)).toEqual(['widen', 'traffic']);
     expect(view.actions[0]!.label).toBe(`Widen · $${formatMoney(computeRampCost(12, 2))}`);
     expect(view.actions[0]!.disabled).toBeFalsy();
   });
@@ -109,8 +109,8 @@ describe('ramp inspector', () => {
     expect(a.title).toBeTruthy();
   });
 
-  it('offers no action at maximum width', () => {
-    expect(viewOf(stateWith(rampOf(7))).actions).toEqual([]);
+  it('offers no Widen at maximum width, only Traffic', () => {
+    expect(viewOf(stateWith(rampOf(7))).actions.map(a => a.action)).toEqual(['traffic']);
   });
 
   it('signature changes with width, affordability and widening', () => {
@@ -169,5 +169,75 @@ describe('multi-leg ramp inspector (#1939)', () => {
     const widen = viewOf(stateWith(multiRamp())).actions.find(a => a.action === 'widen');
     expect(widen === undefined || widen.disabled === true).toBe(true);
     if (widen) expect(widen.title).toBeTruthy();
+  });
+});
+
+describe('Repair action (#2045)', () => {
+  const offering = (offer: RampRepairOffer): InspectorLinks => ({ ...links, rampRepairQuote: () => offer });
+
+  it('is absent without terrain, and for an intact ramp', () => {
+    expect(repairAction(rampOf(3), [], 1_000_000, links)).toBeNull();
+    expect(repairAction(rampOf(3), [], 1_000_000, offering({ kind: 'refused', errorKey: 'mining.repair_ramp.intact', errorParams: { id: 1 } }))).toBeNull();
+  });
+
+  it('a damaged ramp offers Repair at its quoted cost, enabled when the cash covers it', () => {
+    const action = repairAction(rampOf(3), [], 1_000_000, offering({ kind: 'quote', cost: 420 }))!;
+    expect(action.action).toBe('repair');
+    expect(action.label).toBe(t('inspector.ramp.repair', { cost: formatMoney(420) }));
+    expect(action.disabled).toBe(false);
+  });
+
+  it('is disabled with the reason when the cash falls short', () => {
+    const action = repairAction(rampOf(3), [], 100, offering({ kind: 'quote', cost: 420 }))!;
+    expect(action.disabled).toBe(true);
+    expect(action.title).toBe(t('inspector.ramp.repair_short_funds', { cost: formatMoney(420) }));
+  });
+
+  it('is disabled with the refusal when the ramp no longer reaches its floor', () => {
+    const action = repairAction(rampOf(3), [], 1_000_000, offering({ kind: 'refused', errorKey: 'mining.repair_ramp.out_of_reach', errorParams: { id: 1 } }))!;
+    expect(action.disabled).toBe(true);
+    expect(action.title).toBe(t('mining.repair_ramp.out_of_reach', { id: 1 }));
+  });
+
+  it('is disabled while a repair of the ramp is under way, and Widen waits for it too', () => {
+    const r = rampOf(3);
+    const repairing: PlannedRamp = { id: 6, def: r.def, footprint: r.footprint, segments: [], repairOf: r.id };
+    const action = repairAction(r, [repairing], 1_000_000, offering({ kind: 'quote', cost: 420 }))!;
+    expect(action.disabled).toBe(true);
+    expect(action.title).toBe(t('inspector.ramp.repair_in_progress'));
+    expect(widenState(r, [repairing], 1_000_000).disabledReason).toBe(t('inspector.ramp.repair_in_progress'));
+  });
+
+  it('rides the ramp view next to Widen, and its state is part of the view signature', () => {
+    const s = stateWith(rampOf(3));
+    const plain = rampContent.view({ kind: 'ramp', id: 1 }, s, links)!;
+    const damaged = rampContent.view({ kind: 'ramp', id: 1 }, s, offering({ kind: 'quote', cost: 420 }))!;
+    expect(plain.actions.map(a => a.action)).toEqual(['widen', 'traffic']);
+    expect(damaged.actions.map(a => a.action)).toEqual(['widen', 'repair', 'traffic']);
+    expect(damaged.signature).not.toBe(plain.signature);
+  });
+});
+
+describe('Traffic action (one-way ramps)', () => {
+  it('reads Two-way on a ramp with no direction, and offers to make it down only', () => {
+    const view = viewOf(stateWith(rampOf(3)));
+    const action = view.actions.find(a => a.action === 'traffic')!;
+    expect(action.label).toBe(t('inspector.ramp.traffic_switch', { next: t('inspector.ramp.traffic_down') }));
+    expect(action.disabled).toBeFalsy();
+    expect(action.title).toBe(t('inspector.ramp.traffic_hint'));
+    expect(document.createElement('div').appendChild(view.sections[0]!).textContent).toContain(t('inspector.ramp.traffic_both'));
+  });
+
+  it('offers up only from down only, and two-way from up only', () => {
+    expect(trafficAction({ ...rampOf(3), flow: 'down' }).label).toBe(t('inspector.ramp.traffic_switch', { next: t('inspector.ramp.traffic_up') }));
+    expect(trafficAction({ ...rampOf(3), flow: 'up' }).label).toBe(t('inspector.ramp.traffic_switch', { next: t('inspector.ramp.traffic_both') }));
+  });
+
+  it('shows the ramp\'s direction and changes the view signature with it', () => {
+    const r = rampOf(3);
+    const twoWay = viewOf(stateWith(r));
+    const down = viewOf(stateWith({ ...r, flow: 'down' }));
+    expect(down.signature).not.toBe(twoWay.signature);
+    expect(document.createElement('div').appendChild(down.sections[0]!).textContent).toContain(t('inspector.ramp.traffic_down'));
   });
 });

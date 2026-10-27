@@ -13,7 +13,6 @@
 // Temporary unavailability (injured, resting, training, busy) does not remove
 // an actor: alive and on the roster is enough.
 
-import type { NavGrid } from '../nav/NavGrid.js';
 import { isProgressionSite, type GameState, type PendingAction, type BlockedOrderReason, type GhostPreview } from '../state/GameState.js';
 import { findById } from '../state/IdIndex.js';
 import { isDrillHoleBuried } from '../mining/BuriedHoles.js';
@@ -26,15 +25,16 @@ import { clearWalkOnlyPin } from './TaskCancellation.js';
 import { canDriveTier, licenceLevelOf } from '../entities/VehicleDriverAssignment.js';
 import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup, createStorageFit } from '../economy/HaulDispatch.js';
 import { holdsRequiredSkill, isEligibleForWork } from '../entities/Employee.js';
-import {
-  computeClimbComponents,
-  type ClimbComponents,
-  type ReachableSet,
-} from '../nav/NavGridReachability.js';
+import type { ClimbComponents, ReachableSet } from '../nav/NavGridReachability.js';
+import { cacheFor, componentsOf, type ReachCache } from './ReachCache.js';
 import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
-import { withDockingCells } from '../nav/DockingReach.js';
-import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
-import { slopeDegreesForTier, slowestVehicleTierSlopeRatio, tierSlopeRatio } from '../nav/ClimbLimit.js';
+import { dockedFrom, withDockingCells } from '../nav/DockingReach.js';
+import { buildingRingCells, buildingRingTouches } from '../nav/BuildingApproach.js';
+import { haulDestinationOf } from '../economy/SpoilHeaps.js';
+import { oreGradeScaleOf } from '../economy/OreGrade.js';
+import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
+import { getBuildingDef } from '../entities/Building.js';
+import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO, VEHICLE_MAX_SLOPE_RATIO, VEHICLE_MAX_SLOPE_DEGREES } from '../config/balance.js';
 import { steepestBlockingRamp } from '../mining/RampGrade.js';
 
 /** Identity of the actor pool able to serve an order (skill + vehicle role, or one named employee). */
@@ -83,43 +83,6 @@ function candidateEmployees(state: GameState, req: ActorRequirements): Employee[
   );
 }
 
-/**
- * Derived reachability per game state, never serialized. Valid for one nav grid
- * at one `revision`: labellings ignore occupancy, so only a cell write
- * invalidates. One labelling per clearance and climb limit, built the first time a pool needs it.
- */
-interface ReachCache {
-  navGrid: NavGrid;
-  revision: number;
-  components: Map<string, ClimbComponents>;
-}
-
-const reachCaches = new WeakMap<GameState, ReachCache>();
-
-function cacheFor(state: GameState): ReachCache | null {
-  const navGrid = state.navGrid;
-  if (navGrid === null) {
-    reachCaches.delete(state);
-    return null;
-  }
-  let cache = reachCaches.get(state);
-  if (cache === undefined || cache.navGrid !== navGrid || cache.revision !== navGrid.revision) {
-    cache = { navGrid, revision: navGrid.revision, components: new Map() };
-    reachCaches.set(state, cache);
-  }
-  return cache;
-}
-
-function componentsOf(cache: ReachCache, clearance: number, maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO): ClimbComponents {
-  const key = `${clearance}|${maxSlopeRatio}`;
-  let components = cache.components.get(key);
-  if (components === undefined) {
-    components = computeClimbComponents(cache.navGrid, clearance, maxSlopeRatio);
-    cache.components.set(key, components);
-  }
-  return components;
-}
-
 function fillPool(
   state: GameState,
   cache: ReachCache,
@@ -142,20 +105,10 @@ function fillPool(
     const driverId = vehicleDriverId(v);
     return (driverId !== null && candidateIds.has(driverId)) || onFoot.has(Math.round(v.x), Math.round(v.z));
   });
-  // Vehicles climb at their tier's limit: one labelling per distinct limit, and the best climber decides (#1938).
-  const progression = isProgressionSite(state);
-  const byRatio = new Map<number, Vehicle[]>();
-  for (const v of usable) {
-    const ratio = uniformRatio ?? vehicleMaxSlopeRatio(v, progression);
-    const group = byRatio.get(ratio);
-    if (group === undefined) byRatio.set(ratio, [v]);
-    else group.push(v);
-  }
-  const perRatio = [...byRatio].map(([ratio, group]) =>
-    componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(group));
-  const vehicleReach: Pick<ReachableSet, 'has'> = perRatio.length === 1
-    ? perRatio[0]!
-    : { has: (x, z) => perRatio.some(reach => reach.has(x, z)) };
+  // Every vehicle climbs at the site's one vehicle limit (#2045).
+  const ratio = uniformRatio ?? vehicleMaxSlopeRatio(isProgressionSite(state));
+  // A vehicle parked on a docking cell stands for the cells it docked from (#2045).
+  const vehicleReach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(dockedFrom(cache.navGrid, usable, NAV_CLEARANCE_VEHICLE_CELLS, ratio));
   // A clearance-1 approach cell beside a building is where a vehicle docks (#1840).
   // Role-agnostic: applies to every vehicle-gated order, not only demolition.
   return { hasActor: true, reachable: withDockingCells(cache.navGrid, vehicleReach, NAV_CLEARANCE_VEHICLE_CELLS) };
@@ -196,10 +149,7 @@ export function warmOrderReachability(state: GameState): void {
   const cache = cacheFor(state);
   if (cache === null) return;
   componentsOf(cache, NAV_CLEARANCE_EMPLOYEE_CELLS);
-  const progression = isProgressionSite(state);
-  for (const ratio of new Set(state.vehicles.vehicles.map(v => vehicleMaxSlopeRatio(v, progression)))) {
-    componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio);
-  }
+  componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, vehicleMaxSlopeRatio(isProgressionSite(state)));
 }
 
 export function buildOrderReachability(
@@ -222,6 +172,35 @@ export function buildOrderReachability(
 interface Judgement {
   verdict: OrderReachabilityVerdict;
   hasActor: boolean;
+}
+
+/**
+ * Whether a haul order's pool can also drive on to a depot for its rubble (a freight warehouse, or a spoil heap for
+ * barren rock): a hauler that reaches the rubble in a pit with no road out can load it and never unload it, so the
+ * order is out of reach until the player opens a way out (#2045). True for every other order, and while no depot of
+ * the kind stands (the order then reads no warehouse or no spoil heap). Memoised per pool and destination.
+ */
+function haulDepotReach(state: GameState, reach: OrderReachability): (action: PendingAction, key: OrderActorKey) => boolean {
+  const memo = new Map<string, boolean>();
+  const fragmentOf = createFragmentLookup(state);
+  const gradeScale = oreGradeScaleOf(state.world);
+  return (action, key) => {
+    if (action.type !== 'haul_debris') return true;
+    const tracked = fragmentOf(action.payload['fragmentId'] as number);
+    if (tracked === undefined) return true;
+    const destination = haulDestinationOf(tracked.fragment, gradeScale);
+    const memoKey = `${key}|${destination}`;
+    let reaches = memo.get(memoKey);
+    if (reaches === undefined) {
+      const sites = destination === 'spoil_heap' ? spoilHeapSites(state.buildings) : freightWarehouseSites(state.buildings);
+      reaches = sites.length === 0 || sites.some(site => {
+        const depot = state.buildings.buildings.find(b => b.id === site.id);
+        return depot !== undefined && buildingRingTouches(depot, getBuildingDef(depot.type, depot.tier), (x, z) => reach.canReach(key, x, z));
+      });
+      memo.set(memoKey, reaches);
+    }
+    return reaches;
+  };
 }
 
 /**
@@ -251,10 +230,11 @@ function judgeActions(state: GameState, targets: ReadonlyArray<PendingAction>): 
     if (repAction !== undefined) judged.push(repAction);
   }
   const reach = buildOrderReachability(state, judged);
+  const reachesDepot = haulDepotReach(state, reach);
   const judgementOf = (action: PendingAction): Judgement => {
     const key = orderActorKey(action);
     const hasActor = reach.hasActor(key);
-    const reachable = hasActor && reach.canReach(key, action.targetX, action.targetZ);
+    const reachable = hasActor && reach.canReach(key, action.targetX, action.targetZ) && reachesDepot(action, key);
     return { verdict: reachable ? 'reachable' : 'unreachable', hasActor };
   };
 
@@ -320,27 +300,23 @@ function availabilityReason(
 }
 
 /**
- * Why a vehicle order is unreachable on a progression site, when a tier-1 climb limit would reach it:
- * names the steepest built ramp too steep for the best-climbing vehicle that could serve it (#1938).
+ * Why a vehicle order is unreachable on a progression site, when the walking climb limit would reach it:
+ * names the steepest built ramp too steep for vehicles (#1938, #2045).
  */
 function rampTooSteepDetail(
-  state: GameState,
   action: PendingAction,
-  tier: VehicleTier,
-  reachAtFlatLimit: OrderReachability,
+  reachAtWalkingLimit: OrderReachability,
+  steepestRamp: () => ReturnType<typeof steepestBlockingRamp>,
 ): PendingAction['blockedDetail'] | undefined {
-  const role = action.requiredVehicleRole;
-  if (role === null || !reachAtFlatLimit.canReach(orderActorKey(action), action.targetX, action.targetZ)) return undefined;
-  const blocking = steepestBlockingRamp(state, tierSlopeRatio(tier));
+  if (action.requiredVehicleRole === null || !reachAtWalkingLimit.canReach(orderActorKey(action), action.targetX, action.targetZ)) return undefined;
+  const blocking = steepestRamp();
   if (blocking === null) return undefined;
   return {
     key: 'order.blocked.ramp_too_steep',
     params: {
       id: blocking.ramp.id,
       grade: Math.round(blocking.gradeDeg * 10) / 10,
-      tier,
-      role,
-      max: slopeDegreesForTier(tier),
+      max: VEHICLE_MAX_SLOPE_DEGREES,
     },
   };
 }
@@ -361,6 +337,9 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
   const judgements = judgeActions(state, targets);
   const progression = isProgressionSite(state);
   let reachAtFlatLimit: OrderReachability | null = null; // built on the first red vehicle order of a progression site
+  // The same for every order of the pass; a site after a few blasts has hundreds of red haul orders.
+  let steepest: ReturnType<typeof steepestBlockingRamp> | undefined;
+  const steepestRamp = () => (steepest === undefined ? (steepest = steepestBlockingRamp(state, VEHICLE_MAX_SLOPE_RATIO)) : steepest);
   const fragmentOf = createFragmentLookup(state);
   const fits = createStorageFit(state);
   let flipped = false;
@@ -384,10 +363,9 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
       action.blockedLicenceLevel = null;
       delete action.blockedDetail;
       const role = action.requiredVehicleRole;
-      const tier = role !== null && progression ? neededTierOf(role, orderTierFloor(action)) : null;
-      if (tier !== null) {
+      if (role !== null && progression) {
         reachAtFlatLimit ??= buildOrderReachability(state, targets, NAV_MAX_SLOPE_RATIO);
-        const detail = rampTooSteepDetail(state, action, tier, reachAtFlatLimit);
+        const detail = rampTooSteepDetail(action, reachAtFlatLimit, steepestRamp);
         if (detail !== undefined) action.blockedDetail = detail;
       }
       continue;
@@ -526,13 +504,22 @@ export function strandedDebrisTargets(state: GameState): ReadonlyArray<{ x: numb
 }
 
 /**
- * Whether the slowest vehicle tier can drive to (x, z) from the rally point: the network a crater
- * access ramp must start on (#2082). Always false without a nav grid or a rally point.
+ * Whether a vehicle can drive to (x, z) from the rally point or from a haul depot (a freight warehouse or spoil heap,
+ * docked onto from its ring), at the site's vehicle climb limit: the network a crater access ramp must start on (#2082)
+ * and a parked vehicle is moved onto (#2045). A depot anchors it too, because the road that matters is the one the
+ * loads travel: a building raised beside the rally can wall the rally into a pocket while the fleet hauls on (#2093).
+ * Null without a nav grid or a rally point.
  */
 export function siteVehicleReach(state: GameState): ((x: number, z: number) => boolean) | null {
   const cache = cacheFor(state);
   const rally = state.rallyPoint;
   if (cache === null || rally === undefined) return null;
-  const reach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, slowestVehicleTierSlopeRatio()).reachableFrom([rally]);
+  const ratio = vehicleMaxSlopeRatio(isProgressionSite(state));
+  const rings = [...freightWarehouseSites(state.buildings), ...spoilHeapSites(state.buildings)].flatMap(site => {
+    const depot = state.buildings.buildings.find(b => b.id === site.id);
+    return depot === undefined ? [] : buildingRingCells(depot, getBuildingDef(depot.type, depot.tier));
+  });
+  const anchors = [rally, ...dockedFrom(cache.navGrid, rings, NAV_CLEARANCE_VEHICLE_CELLS)];
+  const reach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(anchors);
   return (x, z) => reach.has(x, z);
 }

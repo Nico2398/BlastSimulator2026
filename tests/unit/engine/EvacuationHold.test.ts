@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import {
-  isEvacuationHoldActive, clearResolvedEvacuationHolds, discardStaleRestAction, releaseInZoneTaskQueueEntries,
+  isEvacuationHoldActive, clearResolvedEvacuationHolds, liftSpentZone, discardStaleRestAction, releaseInZoneTaskQueueEntries,
   isMidEvacuationDrive,
 } from '../../../src/core/engine/EvacuationHold.js';
 import type { ZoneBounds } from '../../../src/core/entities/Zone.js';
@@ -166,6 +166,44 @@ describe('clearResolvedEvacuationHolds', () => {
     hireEmployee(state.employees, 'driller', rng, 15, 15); // a LATER, unrelated re-entry into the same zone
 
     expect(isEvacuationHoldActive(state, state.pendingActions.find(a => a.id === 5)!)).toBe(false);
+  });
+});
+
+describe('liftSpentZone', () => {
+  it('lifts the zone and strips every hold marker, keeping the rest of the payload', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.zone.activeZone = holdZone;
+    const rng = new Random(EVACUATION_SEED);
+    hireEmployee(state.employees, 'driller', rng, 15, 15); // the crew back at work inside it
+    state.pendingActions.push(makeAction({ id: 1, payload: { evacuationHold: true, other: 'kept' } }));
+
+    liftSpentZone(state);
+
+    expect(state.zone.activeZone).toBeNull();
+    expect(state.pendingActions[0]!.payload).toEqual({ other: 'kept' });
+  });
+
+  it('is a no-op with no zone and nothing held (boundary)', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.pendingActions.push(makeAction({ id: 2, payload: { other: 'kept' } }));
+
+    liftSpentZone(state);
+
+    expect(state.zone.activeZone).toBeNull();
+    expect(state.pendingActions[0]!.payload).toEqual({ other: 'kept' });
+  });
+
+  it('leaves no stripped hold for a later zone over the same footprint to re-arm (rejection)', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.zone.activeZone = holdZone;
+    state.pendingActions.push(makeAction({ id: 3, payload: { evacuationHold: true } }));
+
+    liftSpentZone(state);
+    state.zone.activeZone = holdZone; // the next blast's zone
+    const rng = new Random(EVACUATION_SEED);
+    hireEmployee(state.employees, 'driller', rng, 15, 15);
+
+    expect(isEvacuationHoldActive(state, state.pendingActions[0]!)).toBe(false);
   });
 });
 

@@ -954,6 +954,43 @@ describe('resolveRestDestination (#1170)', () => {
     expect(result.targetX).toBe(expectedApproach.x);
     expect(result.targetZ).toBe(expectedApproach.z);
   });
+
+  // #2091: a crew member left in a crater pocket kept re-ordering a walk to a quarters it had no route to.
+  function walledOffFixture() {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    employee.fatigue = 0;
+    const grid = makeFlatNavGrid(50, 40);
+    blockColumn(grid, 15);
+    state.navGrid = grid;
+    const walledOff = placeBuilding(state.buildings, 'living_quarters', 18, 3, 100, 100, 1);
+    expect(walledOff.success).toBe(true);
+    return { state, employee, walledOff: walledOff.building! };
+  }
+
+  it('the nearest quarters has no route: resolves the next nearest one that has', () => {
+    const { state, employee, walledOff } = walledOffFixture();
+    const open = placeBuilding(state.buildings, 'living_quarters', 2, 28, 100, 100, 1);
+    expect(open.success).toBe(true);
+    expect(Math.hypot(walledOff.x - employee.x, walledOff.z - employee.z))
+      .toBeLessThan(Math.hypot(open.building!.x - employee.x, open.building!.z - employee.z));
+    const expectedApproach = resolveBuildingApproach(state, open.building!, employee.x, employee.z);
+
+    const result = resolveRestDestination(state, employee);
+
+    expect(result.buildingId).toBe(open.building!.id);
+    expect(result.targetX).toBe(expectedApproach.x);
+    expect(result.targetZ).toBe(expectedApproach.z);
+  });
+
+  it('no quarters has a route: rests in place, worthwhile', () => {
+    const { state, employee } = walledOffFixture();
+
+    const result = resolveRestDestination(state, employee);
+
+    expect(result).toEqual({ targetX: employee.x, targetZ: employee.z, buildingId: undefined, worthwhile: true });
+  });
 });
 
 describe('restTripFatigueCost (#1673)', () => {

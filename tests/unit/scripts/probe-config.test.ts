@@ -4,6 +4,7 @@ import {
   expandMatrix,
   PROBE_DEFAULTS,
   QUICK_HORIZON,
+  LADDER_REFERENCE_SITE,
 } from '../../../scripts/shared/probe-config.js';
 
 describe('probe-config parseArgs', () => {
@@ -66,6 +67,29 @@ describe('probe-config parseArgs', () => {
     expect(() => parseArgs(['--horizon', '0'])).toThrow(/0/);
     expect(() => parseArgs(['--horizon', '-5'])).toThrow(/-5/);
     expect(() => parseArgs(['--horizon', 'soon'])).toThrow(/soon/);
+  });
+});
+
+describe('probe-config ladder reference site', () => {
+  const reference = { seeds: [LADDER_REFERENCE_SITE.seed], biomes: [LADDER_REFERENCE_SITE.biome], kits: [LADDER_REFERENCE_SITE.kit] };
+
+  it('runs a ladder-only matrix on the one reference site', () => {
+    expect(parseArgs(['--strategy', 'ladder'])).toMatchObject(reference);
+    expect(parseArgs(['--strategy', 'ladder,stay_g1', '--horizon', '50000'])).toMatchObject(reference);
+    expect(expandMatrix(parseArgs(['--strategy', 'ladder']))).toHaveLength(1);
+  });
+
+  it('lets a named seed, biome or kit win, the rest staying on the reference site', () => {
+    expect(parseArgs(['--strategy', 'ladder', '--seed', '42,7,13'])).toMatchObject({ ...reference, seeds: [42, 7, 13] });
+    expect(parseArgs(['--strategy', 'ladder', '--biome', 'green_foothills'])).toMatchObject({ ...reference, biomes: ['green_foothills'] });
+    expect(parseArgs(['--strategy', 'ladder', '--kit', 'digger'])).toMatchObject({ ...reference, kits: ['digger'] });
+  });
+
+  it('keeps the full matrix when an early-game strategy runs too, and --quick its own site', () => {
+    const mixed = parseArgs(['--strategy', 'ladder,reinvest']);
+    expect(mixed.seeds).toEqual(PROBE_DEFAULTS.seeds);
+    expect(mixed.biomes).toEqual(PROBE_DEFAULTS.biomes);
+    expect(parseArgs(['--quick', '--strategy', 'ladder']).kits).toEqual(['digger']);
   });
 });
 

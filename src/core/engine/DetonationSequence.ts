@@ -7,6 +7,7 @@ import type { Employee } from '../entities/Employee.js';
 import { computeDangerZone, defineZone, isDangerZoneClear, isInZone } from '../entities/Zone.js';
 import { fizzlingHoles } from '../mining/WetHoles.js';
 import { evacuateZone } from './Evacuation.js';
+import { liftSpentZone } from './EvacuationHold.js';
 import { isActive } from '../events/ActiveModifiers.js';
 import { t } from '../i18n/I18n.js';
 import {
@@ -73,10 +74,14 @@ export function armDetonation(state: GameState): DetonationResult<PendingDetonat
   return { success: true, data: pending };
 }
 
-/** Cancel an armed detonation. True when one was armed. */
+/**
+ * Cancel an armed detonation. True when one was armed. The evacuation it ordered ends with it: the zone and its holds
+ * lift as after a fired blast, or anyone who cannot leave the zone keeps all of its work held for good (#2089).
+ */
 export function cancelDetonation(state: GameState): boolean {
   const wasArmed = state.pendingDetonation !== null;
   state.pendingDetonation = null;
+  if (wasArmed) liftSpentZone(state);
   return wasArmed;
 }
 
@@ -133,7 +138,7 @@ export function tickDetonation(state: GameState): DetonationPhase {
   const pending = state.pendingDetonation;
   if (pending === null) return { kind: 'idle' };
   if (state.drillHoles.length === 0) {
-    state.pendingDetonation = null;
+    cancelDetonation(state);
     return { kind: 'idle' };
   }
   latchStuckWalkers(state, pending);

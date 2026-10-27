@@ -97,12 +97,15 @@ export function createRestPendingAction(
  * is the one outcome that can never walk anyone back into a zone still being
  * cleared, or still armed. Self-deactivates the moment both conditions clear
  * — the routing this exists to stop only applies until then.
+ * `accept` narrows the candidates of `buildingType` further (a caller's own
+ * exclusion, such as a building with no route from the employee).
  */
 export function findNearestBuildingOfType(
   state: GameState,
   buildingType: BuildingType,
   empX: number,
   empZ: number,
+  accept: (b: Building) => boolean = () => true,
 ): Building | null {
   const zone = state.zone.activeZone;
   const evacuationInProgress = zone !== null && !(
@@ -118,7 +121,7 @@ export function findNearestBuildingOfType(
   const candidates = state.buildings.buildings.filter(b => {
     if (evacuationInProgress && isInZone(b.x, b.z, zone!)) return false;
     if (b.type === buildingType && isRestBuildingFull(state, b)) return false;
-    return true;
+    return b.type !== buildingType || accept(b);
   });
 
   return findNearestActiveBuildingOfType(
@@ -131,8 +134,9 @@ function findNearestLivingQuarters(
   state: GameState,
   empX: number,
   empZ: number,
+  accept?: (b: Building) => boolean,
 ): Building | null {
-  return findNearestBuildingOfType(state, 'living_quarters', empX, empZ);
+  return findNearestBuildingOfType(state, 'living_quarters', empX, empZ, accept);
 }
 
 /**
@@ -316,10 +320,6 @@ function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: numbe
  * for the whole trip. The one shared entry point every rest-creating path
  * calls.
  *
- * A walking rest trip crosses rubble (`crossFragments`, as an evacuation does, #2077): a
- * worker boxed in by fragments must be able to reach the quarters, else the rest walk fails
- * forever and the worker never returns to the haulers or diggers that would clear the rubble (#2085).
- *
  * `buildingId` (#1204): when given and the employee is on foot (including one
  * who just parked), routes through `moveTo(state, emp.id, { buildingId }, ...)`
  * so the employee walks to the living_quarters' ring and enters it unseen on
@@ -347,12 +347,12 @@ export function beginRestTravel(state: GameState, emp: Employee, x: number, z: n
     alightIfMounted(state, emp, emitter, { x, z });
   }
   const viaBuilding = !isMounted(emp.locomotion) && buildingId !== undefined
-    ? moveTo(state, emp.id, { buildingId }, { allowUnreachable: true, crossFragments: true }, emitter)
+    ? moveTo(state, emp.id, { buildingId }, { allowUnreachable: true }, emitter)
     : undefined;
   if (!viaBuilding?.success) {
     // Driven trip (#1122): see moveToAndFreeVehicleOnArrival.
     if (isMounted(emp.locomotion)) moveToAndFreeVehicleOnArrival(state, emp, x, z, emitter);
-    else moveTo(state, emp.id, { x, z }, { allowUnreachable: true, crossFragments: true }, emitter);
+    else moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
   }
   emp.pendingActionType = 'rest';
 }
@@ -435,26 +435,37 @@ export function restRoundTripWorthwhile(
 }
 
 /**
- * Resolves where an employee should go to rest (nearest living quarters + approach cell),
- * and whether that round trip is worth taking per `restRoundTripWorthwhile`.
+ * Resolves where an employee should go to rest (nearest living quarters they have a route
+ * to + approach cell), and whether that round trip is worth taking per `restRoundTripWorthwhile`.
  * Consolidates the building/approach/worthwhile resolution sequence used by both
  * forced-rest entry points in ForceShiftRest.ts.
+ *
+ * A quarters with no route from where the employee stands (a crater pocket a blast left them in)
+ * is skipped for the next nearest one: a walk there never starts, and each forced rest would
+ * re-order the same stuck walk instead of a rest (#2091).
  */
 export function resolveRestDestination(
   state: GameState,
   emp: Employee,
 ): { targetX: number; targetZ: number; buildingId: number | undefined; worthwhile: boolean } {
-  const building = findNearestLivingQuarters(state, emp.x, emp.z);
-  if (building === null) {
-    // No living_quarters exists at all — same fallback both forced-rest entry
-    // points already used (rest in place at the employee's own position),
-    // with nothing to weigh a round trip against.
-    return { targetX: emp.x, targetZ: emp.z, buildingId: undefined, worthwhile: true };
-  }
+  const unreachable = new Set<number>();
+  for (;;) {
+    const building = findNearestLivingQuarters(state, emp.x, emp.z, b => !unreachable.has(b.id));
+    if (building === null) {
+      // No living_quarters exists, or none has a route — same fallback both forced-rest entry
+      // points already used (rest in place at the employee's own position), with nothing to
+      // weigh a round trip against.
+      return { targetX: emp.x, targetZ: emp.z, buildingId: undefined, worthwhile: true };
+    }
 
-  const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
-  const worthwhile = restRoundTripWorthwhile(state, emp, building, approach.x, approach.z);
-  return { targetX: approach.x, targetZ: approach.z, buildingId: building.id, worthwhile };
+    const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
+    if (state.navGrid !== null && estimateLegDistance(state, 'exact', emp.id, emp.x, emp.z, approach.x, approach.z, false) === null) {
+      unreachable.add(building.id);
+      continue;
+    }
+    const worthwhile = restRoundTripWorthwhile(state, emp, building, approach.x, approach.z);
+    return { targetX: approach.x, targetZ: approach.z, buildingId: building.id, worthwhile };
+  }
 }
 
 /**

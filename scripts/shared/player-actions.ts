@@ -6,6 +6,10 @@
 // and the progression probe can import it; scripts must not import from tests.
 
 import type { GameState } from '../../src/core/state/GameState.js';
+import { stateRubbleStockKg } from '../../src/core/economy/SpoilHeaps.js';
+import { pendingSpoilOverflowKg } from '../../src/core/economy/HaulDispatch.js';
+import { isPaidClearance } from '../../src/core/economy/Contract.js';
+import { getExplosivesFreeCapacity, getExplosivesInStock } from '../../src/core/entities/BuildingWarehouse.js';
 
 /** A console command runner, as `createRunner().runner.run` or a recording wrapper of it. */
 export type Run = (cmd: string) => { success: boolean; output: string };
@@ -29,11 +33,16 @@ export function playTick(run: Run, state: GameState): void {
  * Ordinary contract play, the same actions the Contracts panel offers:
  * deliver stock against accepted ore_sale/rubble_disposal contracts, and
  * accept an offer only when current stock covers it in full (an
- * unfulfilled contract costs a penalty). ore_sale is preferred.
+ * unfulfilled contract costs a penalty). ore_sale is preferred. With
+ * `supply`, a covered supply offer is taken too (after ore_sale, before
+ * rubble): a mine hauling faster than the ore_sale board buys sells the rest
+ * there instead of filling its warehouse. Rubble is measured as the contract
+ * draws it, barren rock in storage and on the spoil heaps (`stateRubbleStockKg`);
+ * a clearance the mine pays for is taken only while barren hauls wait on full heaps.
  */
-export function playContracts(run: Run, state: GameState): void {
+export function playContracts(run: Run, state: GameState, opts: { supply?: boolean } = {}): void {
   const stockOf = (materialId: string) => (
-    materialId === '' ? state.logistics.storedMassKg : (state.collectedOre[materialId] ?? 0)
+    materialId === '' ? stateRubbleStockKg(state) : (state.collectedOre[materialId] ?? 0)
   );
   for (const active of [...state.contracts.active]) {
     if (active.type !== 'ore_sale' && active.type !== 'rubble_disposal') continue;
@@ -43,7 +52,9 @@ export function playContracts(run: Run, state: GameState): void {
   for (let guard = 0; guard < 8; guard++) {
     const covered = (c: typeof state.contracts.available[number]) => stockOf(c.materialId) >= c.quantityKg;
     const offer = state.contracts.available.find((c) => c.type === 'ore_sale' && covered(c))
-      ?? state.contracts.available.find((c) => c.type === 'rubble_disposal' && covered(c));
+      ?? (opts.supply ? state.contracts.available.find((c) => c.type === 'supply' && covered(c)) : undefined)
+      ?? state.contracts.available.find((c) => c.type === 'rubble_disposal' && covered(c)
+        && (!isPaidClearance(c) || pendingSpoilOverflowKg(state) > 0));
     if (!offer) return;
     if (!run(`contract accept ${offer.id}`).success) return;
     const active = state.contracts.active.find((c) => c.id === offer.id);
@@ -54,7 +65,7 @@ export function playContracts(run: Run, state: GameState): void {
 }
 
 /** Tiles a careful player clears around a charged pattern before firing. */
-const BLAST_ZONE_CLEAR_MARGIN = 16;
+export const BLAST_ZONE_CLEAR_MARGIN = 16;
 
 /** Order everyone out of the blast radius and wait until the zone reads clear, as the Blast panel's evacuate control does. */
 export function clearBlastZone(run: Run, state: GameState): void {
@@ -85,4 +96,18 @@ export function stockWarehouse(run: Run, state: GameState, explosiveId: string, 
     for (let i = 0; i < 600 && state.plannedBuildings.length > 0; i++) playTick(run, state);
   }
   return run(`buy explosive:${explosiveId} kg:${kg}`);
+}
+
+/** Explosive store room (kg) for an order of `explosiveId`: its free space plus what it already holds of that explosive. */
+export function explosiveRoomKg(state: GameState, explosiveId: string): number {
+  return getExplosivesFreeCapacity(state.buildings) + getExplosivesInStock(state.buildings, explosiveId);
+}
+
+/**
+ * Bring the store up to `kg` of `explosiveId`, buying only the shortfall: stock an abandoned pattern left behind charges
+ * the next one, and buying the full charge again on top of it fills the store until no order fits (#2091).
+ */
+export function topUpWarehouse(run: Run, state: GameState, explosiveId: string, kg: number): { success: boolean; output: string } {
+  const shortKg = Math.max(0, kg - Math.floor(getExplosivesInStock(state.buildings, explosiveId)));
+  return shortKg > 0 ? stockWarehouse(run, state, explosiveId, shortKg) : { success: true, output: `${explosiveId} in stock` };
 }

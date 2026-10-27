@@ -152,7 +152,30 @@ export function getFinancialReport(
   };
 }
 
-/** Operating profit over all transactions: income excluding 'refund' minus non-capital expenses. */
+/** One transaction's share of the operating profit: income outside 'refund', less expenses outside CAPITAL_EXPENSE_CATEGORIES. */
+function operatingProfitShare(t: Transaction): number {
+  if (t.type === 'income') return t.category !== 'refund' ? t.amount : 0;
+  return CAPITAL_EXPENSE_CATEGORIES.has(t.category as ExpenseCategory) ? 0 : -t.amount;
+}
+
+/** Per transaction log: the operating profit of its first `count` entries. The log is only ever appended to. */
+const operatingProfitSoFar = new WeakMap<Transaction[], { count: number; profit: number }>();
+
+/**
+ * Operating profit over all transactions: income excluding 'refund' minus non-capital expenses. Summed once per
+ * entry, in log order, so it reads the same as `getFinancialReport(state, 0).operatingProfit` without a pass over
+ * the whole log: it is asked every tick (the level stats snapshot), and the log grows by a few entries a tick.
+ */
 export function getOperatingProfit(state: FinanceState): number {
-  return getFinancialReport(state, 0).operatingProfit;
+  const log = state.transactions;
+  let sum = operatingProfitSoFar.get(log);
+  if (sum === undefined || sum.count > log.length) {
+    sum = { count: 0, profit: 0 };
+    operatingProfitSoFar.set(log, sum);
+  }
+  for (; sum.count < log.length; sum.count++) {
+    const share = operatingProfitShare(log[sum.count]!);
+    if (share !== 0) sum.profit += share;
+  }
+  return sum.profit;
 }

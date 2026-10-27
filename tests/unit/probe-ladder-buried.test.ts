@@ -11,40 +11,81 @@ import {
 
 describe('decideBuriedPattern', () => {
   it('waits with null when no holes are buried', () => {
-    expect(decideBuriedPattern({ buriedHoleCount: 0, buriedSinceTick: null, tick: 100 }))
+    expect(decideBuriedPattern({ buriedHoleCount: 0, previousBuriedHoleCount: null, buriedSinceTick: null, tick: 100 }))
       .toEqual({ action: 'wait', buriedSinceTick: null });
   });
 
   it('records the tick on the first buried call', () => {
-    expect(decideBuriedPattern({ buriedHoleCount: 3, buriedSinceTick: null, tick: 250 }))
+    expect(decideBuriedPattern({ buriedHoleCount: 3, previousBuriedHoleCount: null, buriedSinceTick: null, tick: 250 }))
       .toEqual({ action: 'wait', buriedSinceTick: 250 });
   });
 
   it('keeps waiting one tick before the drop threshold', () => {
     const since = 1000;
-    const d = decideBuriedPattern({ buriedHoleCount: 2, buriedSinceTick: since, tick: since + LADDER_BURIED_DROP_TICKS - 1 });
+    const d = decideBuriedPattern({ buriedHoleCount: 2, previousBuriedHoleCount: null, buriedSinceTick: since, tick: since + LADDER_BURIED_DROP_TICKS - 1 });
     expect(d).toEqual({ action: 'wait', buriedSinceTick: since });
   });
 
   it('drops exactly at the threshold and resets', () => {
     const since = 1000;
-    const d = decideBuriedPattern({ buriedHoleCount: 2, buriedSinceTick: since, tick: since + LADDER_BURIED_DROP_TICKS });
+    const d = decideBuriedPattern({ buriedHoleCount: 2, previousBuriedHoleCount: null, buriedSinceTick: since, tick: since + LADDER_BURIED_DROP_TICKS });
     expect(d).toEqual({ action: 'drop', buriedSinceTick: null });
   });
 
   it('drops when buried well past the threshold', () => {
-    const d = decideBuriedPattern({ buriedHoleCount: 1, buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS * 3 });
+    const d = decideBuriedPattern({ buriedHoleCount: 1, previousBuriedHoleCount: null, buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS * 3 });
     expect(d.action).toBe('drop');
     expect(d.buriedSinceTick).toBeNull();
   });
 
   it('resets when the count falls to 0 mid-wait', () => {
-    expect(decideBuriedPattern({ buriedHoleCount: 0, buriedSinceTick: 1000, tick: 1200 }))
+    expect(decideBuriedPattern({ buriedHoleCount: 0, previousBuriedHoleCount: null, buriedSinceTick: 1000, tick: 1200 }))
       .toEqual({ action: 'wait', buriedSinceTick: null });
   });
 
+  it('restarts the clock when a buried hole came free since the last call: the crew is clearing them', () => {
+    const d = decideBuriedPattern({ buriedHoleCount: 2, previousBuriedHoleCount: 3, buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS * 3 });
+    expect(d).toEqual({ action: 'wait', buriedSinceTick: LADDER_BURIED_DROP_TICKS * 3 });
+  });
+
+  it('drops when no hole came free for the whole threshold', () => {
+    const d = decideBuriedPattern({ buriedHoleCount: 3, previousBuriedHoleCount: 3, buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS });
+    expect(d.action).toBe('drop');
+  });
+
+  it('a count that grew (a later shot buried more) is no progress', () => {
+    const d = decideBuriedPattern({ buriedHoleCount: 4, previousBuriedHoleCount: 3, buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS });
+    expect(d.action).toBe('drop');
+  });
+
+  it('restarts the clock when fewer fragments bury the holes than at the last call: the crew is hauling them off (#2091)', () => {
+    const d = decideBuriedPattern({
+      buriedHoleCount: 1, previousBuriedHoleCount: 1, buryingFragmentCount: 80, previousBuryingFragmentCount: 81,
+      buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS * 3,
+    });
+    expect(d).toEqual({ action: 'wait', buriedSinceTick: LADDER_BURIED_DROP_TICKS * 3 });
+  });
+
+  it('drops when the burying fragments grew or held for the whole threshold (#2091)', () => {
+    for (const count of [81, 90]) {
+      const d = decideBuriedPattern({
+        buriedHoleCount: 1, previousBuriedHoleCount: 1, buryingFragmentCount: count, previousBuryingFragmentCount: 81,
+        buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS,
+      });
+      expect(d.action).toBe('drop');
+    }
+  });
+
+  it('a first fragment count is no progress yet', () => {
+    const d = decideBuriedPattern({
+      buriedHoleCount: 1, previousBuriedHoleCount: 1, buryingFragmentCount: 80, previousBuryingFragmentCount: null,
+      buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS,
+    });
+    expect(d.action).toBe('drop');
+  });
+
   it('does not drop when the count is 0 even past the threshold', () => {
-    expect(decideBuriedPattern({ buriedHoleCount: 0, buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS * 2 }).action)
+    expect(decideBuriedPattern({ buriedHoleCount: 0, previousBuriedHoleCount: null, buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS * 2 }).action)
       .toBe('wait');
   });
 });

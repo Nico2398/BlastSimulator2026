@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// BlastSimulator2026 — RampTool (#1942): multi-leg drawing, grade, readout, tier check, spiral.
+// BlastSimulator2026 — RampTool (#1942, #2045): multi-leg drawing, grade, readout, climbable line, spiral.
 //
 // Mirrors BuildMenu.test.ts's makeMockKit(), extended with the 'path' shape's waypoints. The tool only
 // collects clicks: every length, cost, grade and refusal asserted here comes from the core helpers.
@@ -12,8 +12,8 @@ import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../src/ui/scene/PlacementController.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { rampFootLine } from '../../../src/ui/rampFootLine.js';
-import { rampFloorDepthAt, rampGradeBoundsDegrees, validateRampOrder, type RampDef } from '../../../src/core/mining/Ramp.js';
-import { climbTiersFor, plannedRampGradeDegrees } from '../../../src/core/mining/RampGrade.js';
+import { rampGradeBoundsDegrees, rampCutSlopeRatio, validateRampOrder, type RampDef } from '../../../src/core/mining/Ramp.js';
+import { plannedRampGradeDegrees } from '../../../src/core/mining/RampGrade.js';
 import { proposeRampSpiral, type SpiralSurface } from '../../../src/core/mining/RampSpiral.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 
@@ -100,6 +100,12 @@ function setup(opts: {
 const A: Tile = { x: 15, z: 15 };
 const B: Tile = { x: 15, z: 27 };
 const C: Tile = { x: 25, z: 27 };
+// 12 + 13 m: long enough to drop 8 m under the 20 degree progression cut ceiling (22 m needs 20.0 degrees, over it).
+const C_LONG: Tile = { x: 28, z: 27 };
+const SWITCHBACK_LONG_DEF: RampDef = {
+  originX: 15, originZ: 15, direction: 'south', length: 25, targetDepth: 8, width: 3,
+  legs: [{ direction: 'south', length: 12 }, { direction: 'east', length: 13 }],
+};
 const SWITCHBACK_DEF: RampDef = {
   originX: 15, originZ: 15, direction: 'south', length: 22, targetDepth: 8, width: 3,
   legs: [{ direction: 'south', length: 12 }, { direction: 'east', length: 10 }],
@@ -341,17 +347,36 @@ describe('RampTool: auto spiral grade', () => {
     s.controller.simulateConfirm();
     const m = /grade:([\d.]+)/.exec(s.gameConsole.mock.calls[0]![0]);
     expect(Number(m![1])).toBeCloseTo(shown, 5);
-    const r = proposeRampSpiral({ fromX: RIM.x, fromZ: RIM.z, depth: 20, gradeDegrees: shown, width: 3, dir: 'cw' }, s.surface!);
+    const r = proposeRampSpiral({ fromX: RIM.x, fromZ: RIM.z, depth: 20, gradeDegrees: shown, width: 3, dir: 'cw', cutSlopeRatio: rampCutSlopeRatio(false) }, s.surface!);
     expect(r.success).toBe(true);
   });
 
-  it('steepens past the gentlest grade when the pit does not fit it, and shows that grade', () => {
-    const s = autoSpiral(20);
-    const lo = Math.ceil(rampGradeBoundsDegrees(1000, 20).min * 10) / 10;
-    const gentlest = proposeRampSpiral({ fromX: RIM.x, fromZ: RIM.z, depth: 20, gradeDegrees: lo, width: 3, dir: 'cw' }, s.surface!);
-    expect(gentlest.success).toBe(false);
-    expect(s.field('grade').value).toBeGreaterThan(lo);
+  it('on a progression site picks the steepest grade up to the vehicle limit that fits, not the gentlest', () => {
+    const s = setup({ progression: true });
+    s.controller.simulateWaypoints([RIM]);
+    while (s.field('depth').value < 20) s.field('depth').onInc();
+    s.action('ramp-spiral')!.onClick();
+    const hi = Math.floor(Math.atan(rampCutSlopeRatio(true)) * 180 / Math.PI * 10) / 10;
+    expect(s.field('grade').value).toBeCloseTo(hi, 5);
+    expect(s.field('grade').value).toBeLessThanOrEqual(20);
     expect(s.shown().confirmEnabled).toBe(true);
+    const gentle = Math.ceil(rampGradeBoundsDegrees(1000, 20).min * 10) / 10;
+    expect(s.field('grade').value).toBeGreaterThan(gentle);
+  });
+
+  it('on a progression site the ordered spiral grade never exceeds 20 degrees', () => {
+    const s = setup({ progression: true });
+    s.controller.simulateWaypoints([RIM]);
+    while (s.field('depth').value < 20) s.field('depth').onInc();
+    s.action('ramp-spiral')!.onClick();
+    s.controller.simulateConfirm();
+    const m = /grade:([\d.]+)/.exec(s.gameConsole.mock.calls[0]![0]);
+    expect(Number(m![1])).toBeLessThanOrEqual(20);
+  });
+
+  it('off a progression site the auto grade is the steepest too (29.5 degrees ceiling)', () => {
+    const s = autoSpiral(20);
+    expect(s.field('grade').value).toBeGreaterThan(25);
   });
 });
 
@@ -362,7 +387,7 @@ describe('RampTool: live readout', () => {
     const v = validateRampOrder(SWITCHBACK_DEF, s.state.cash);
     expect(v.success).toBe(true);
     expect(s.shown().readout).toEqual(describeRampPlan({
-      length: 22, legs: 2, cost: v.cost, gradeDeg: plannedRampGradeDegrees(SWITCHBACK_DEF), tiers: null,
+      length: 22, legs: 2, cost: v.cost, gradeDeg: plannedRampGradeDegrees(SWITCHBACK_DEF), climb: null,
     }));
   });
 
@@ -371,7 +396,7 @@ describe('RampTool: live readout', () => {
     s.controller.simulateWaypoints([{ x: 5, z: 5 }, { x: 5, z: 25 }]);
     const def: RampDef = { originX: 5, originZ: 5, direction: 'south', length: 20, targetDepth: 8, width: 3 };
     expect(s.shown().readout).toEqual(describeRampPlan({
-      length: 20, legs: 1, cost: validateRampOrder(def, s.state.cash).cost, gradeDeg: plannedRampGradeDegrees(def), tiers: null,
+      length: 20, legs: 1, cost: validateRampOrder(def, s.state.cash).cost, gradeDeg: plannedRampGradeDegrees(def), climb: null,
     }));
   });
 
@@ -383,7 +408,7 @@ describe('RampTool: live readout', () => {
     const def = { ...SWITCHBACK_DEF, width: 5 as const };
     expect(s.shown().readout).not.toEqual(before);
     expect(s.shown().readout).toEqual(describeRampPlan({
-      length: 22, legs: 2, cost: validateRampOrder(def, s.state.cash).cost, gradeDeg: plannedRampGradeDegrees(def), tiers: null,
+      length: 22, legs: 2, cost: validateRampOrder(def, s.state.cash).cost, gradeDeg: plannedRampGradeDegrees(def), climb: null,
     }));
   });
 
@@ -394,51 +419,89 @@ describe('RampTool: live readout', () => {
     const g = s.field('grade').value;
     const def = { ...SWITCHBACK_DEF, gradeDegrees: g };
     expect(s.shown().readout).toEqual(describeRampPlan({
-      length: 22, legs: 2, cost: validateRampOrder(def, s.state.cash).cost, gradeDeg: g, tiers: null,
+      length: 22, legs: 2, cost: validateRampOrder(def, s.state.cash).cost, gradeDeg: g, climb: null,
     }));
   });
 
-  it('has no tier line on a non-progression site', () => {
+  it('has no climbable line on a non-progression site', () => {
     const s = setup();
     s.controller.simulateWaypoints([A, B, C]);
-    expect((s.shown().readout ?? []).join('\n')).not.toContain('T1');
+    const text = (s.shown().readout ?? []).join('\n');
+    expect(text).not.toContain(t('ui.build.ramp_climbable', { max: 20 }));
+    expect(text).not.toContain(t('ui.build.ramp_not_climbable', { max: 20 }));
+    expect(text).not.toContain('T1');
   });
 
-  it('adds the tier line on a progression site, from the core climb helper', () => {
+  it('adds one climbable line on a progression site, naming the 20 degree limit', () => {
     const s = setup({ progression: true });
-    s.controller.simulateWaypoints([A, B, C]);
-    const g = plannedRampGradeDegrees(SWITCHBACK_DEF);
-    const v = validateRampOrder(SWITCHBACK_DEF, s.state.cash);
+    s.controller.simulateWaypoints([A, B, C_LONG]);
+    const g = plannedRampGradeDegrees({ ...SWITCHBACK_LONG_DEF, cutSlopeRatio: rampCutSlopeRatio(true) });
+    const v = validateRampOrder({ ...SWITCHBACK_LONG_DEF, cutSlopeRatio: rampCutSlopeRatio(true) }, s.state.cash);
     expect(s.shown().readout).toEqual(describeRampPlan({
-      length: 22, legs: 2, cost: v.cost, gradeDeg: g, tiers: climbTiersFor(g, true),
+      length: 25, legs: 2, cost: v.cost, gradeDeg: g, climb: { gradeDeg: g, climbable: g <= 20 + 1e-6, maxDeg: 20 },
     }));
-    expect(s.shown().readout!.join('\n')).toContain('T1');
+    expect(s.shown().readout!.join('\n')).not.toContain('T1');
   });
 
-  it('the tier line follows the stepped grade', () => {
+  it('the climbable line follows the stepped grade and never reads not-climbable at the ceiling', () => {
     const s = setup({ progression: true });
     s.controller.simulateWaypoints([A, B, C]);
-    const before = s.shown().readout!.join('\n');
-    for (let i = 0; i < 40; i++) s.field('grade').onInc();
+    for (let i = 0; i < 60; i++) s.field('grade').onInc();
+    expect(s.shown().readout!.join('\n')).toContain(t('ui.build.ramp_climbable', { max: 20 }));
+    expect(s.shown().readout!.join('\n')).not.toContain(t('ui.build.ramp_not_climbable', { max: 20 }));
+  });
+});
+
+describe('RampTool: grade ceiling follows the vehicle limit (#2045)', () => {
+  const ceiling = (ratio: number): number => Math.floor(Math.atan(ratio) * 180 / Math.PI * 10) / 10;
+
+  it('on a progression site the stepper stops under 20 degrees', () => {
+    const s = setup({ progression: true });
+    s.controller.simulateWaypoints([A, B, C_LONG]);
+    for (let i = 0; i < 60; i++) s.field('grade').onInc();
+    expect(s.field('grade').value).toBeLessThanOrEqual(20);
+    expect(s.field('grade').value).toBeCloseTo(ceiling(rampCutSlopeRatio(true)), 1);
+  });
+
+  it('on a progression site the ceiling is the core bound for the drawn length', () => {
+    const s = setup({ progression: true });
+    s.controller.simulateWaypoints([A, B, C_LONG]);
+    for (let i = 0; i < 60; i++) s.field('grade').onInc();
+    expect(s.field('grade').value).toBeLessThanOrEqual(rampGradeBoundsDegrees(25, 8, rampCutSlopeRatio(true)).max + 1e-9);
+  });
+
+  it('off a progression site the ceiling stays 29.5 degrees', () => {
+    const s = setup();
+    s.controller.simulateWaypoints([A, B, C]);
+    for (let i = 0; i < 60; i++) s.field('grade').onInc();
+    expect(s.field('grade').value).toBeGreaterThan(29);
+  });
+
+  it('a progression order at the ceiling is accepted by the core validator with the progression cut ratio', () => {
+    const s = setup({ progression: true });
+    s.controller.simulateWaypoints([A, B, C_LONG]);
+    for (let i = 0; i < 60; i++) s.field('grade').onInc();
     const g = s.field('grade').value;
-    const after = s.shown().readout!.join('\n');
-    expect(after).not.toBe(before);
-    expect(after).toContain(describeRampPlan({ length: 22, legs: 2, cost: 0, gradeDeg: g, tiers: climbTiersFor(g, true) }).at(-1)!);
+    expect(validateRampOrder({ ...SWITCHBACK_LONG_DEF, gradeDegrees: g, cutSlopeRatio: rampCutSlopeRatio(true) }, s.state.cash).success).toBe(true);
+    expect(s.shown().confirmEnabled).toBe(true);
+  });
+
+  it('the deepest depth the stepper offers is 55 m', () => {
+    const s = setup();
+    for (let i = 0; i < 80; i++) s.field('depth').onInc();
+    expect(s.field('depth').value).toBe(55);
   });
 });
 
 describe('RampTool: foot line over a multi-leg path', () => {
-  it('samples the last leg\'s start tile and the end tile, with the floor still to drop over that leg only', () => {
+  it('lands on the floor across the end row: the line names the depth from the origin\'s ground to that floor', () => {
     const calls: Array<[number, number]> = [];
-    const sampler = (x: number, z: number): number => { calls.push([x, z]); return x === 25 && z === 27 ? 6 : 10; };
-    const s = setup({ sampler });
+    const sampler = (x: number, z: number): number => { calls.push([x, z]); return Math.abs(x - C.x) <= 1 && Math.abs(z - C.z) <= 1 ? 6 : 10; };
+    const s = setup({ sampler, surface: null });
     s.controller.simulateWaypoints([A, B, C]);
-    expect(calls).toContainEqual([B.x, B.z]);
+    expect(calls).toContainEqual([A.x, A.z]);
     expect(calls).toContainEqual([C.x, C.z]);
-    const def = SWITCHBACK_DEF;
-    const total = 22;
-    const dropBefore = rampFloorDepthAt(total - 10, total, def.targetDepth, undefined);
-    const expected = rampFootLine(10, 6, def.targetDepth - dropBefore, 10);
+    const expected = rampFootLine(10, 6);
     expect(s.shown().subtitle).toBe(expected);
     expect(expected).not.toBe('');
   });
@@ -511,7 +574,7 @@ describe('RampTool: spiral button', () => {
     const r = proposeRampSpiral({ fromX: RIM.x, fromZ: RIM.z, depth: 20, gradeDegrees: grade, width: 3, dir: 'cw' }, s.surface!);
     if (!r.success) throw new Error('fixture must propose');
     expect(s.shown().readout).toEqual(describeRampPlan({
-      length: r.proposal.totalLength, legs: r.proposal.legs.length, cost: r.proposal.cost, gradeDeg: r.proposal.gradeDegrees, tiers: null,
+      length: r.proposal.totalLength, legs: r.proposal.legs.length, cost: r.proposal.cost, gradeDeg: r.proposal.gradeDegrees, climb: null,
     }));
   });
 

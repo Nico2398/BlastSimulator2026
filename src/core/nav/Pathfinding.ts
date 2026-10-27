@@ -1,9 +1,12 @@
 // BlastSimulator2026 — Pathfinding: A* route finding over the NavGrid
 // Part of the navmesh system.
 
-import { NavGrid, isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
+import { NavGrid, isCellStepClimbable, isGridStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
-import { pathfindingNodeBudget, pathfindingRetryNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
+import {
+  pathfindingNodeBudget, pathfindingRetryNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO,
+  RAMP_AGAINST_FLOW_COST_FACTOR, RAMP_FLOW_LEVEL_EPSILON_M,
+} from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 as NEIGHBOUR_OFFSETS } from './NeighbourOffsets.js';
 
 /**
@@ -21,7 +24,16 @@ export interface PathRequest {
   requiredClearance?: number;
   /** Steepest climbable rise/run for this agent; defaults to NAV_MAX_SLOPE_RATIO (#1938). */
   maxSlopeRatio?: number;
+  /** One-way ramp cells a vehicle route keeps to (`RampFlowField`); absent or null for none, and on foot. */
+  rampFlow?: RampFlowField | null;
 }
+
+/**
+ * One-way ramp cells, indexed like the grid (`(z - originZ) * width + (x - originX)`): 1 where vehicles only descend,
+ * -1 where they only climb, 0 elsewhere. A step against the flow costs `RAMP_AGAINST_FLOW_COST_FACTOR` times its plain
+ * cost: a route takes any other way the site offers, and the wrong way only when nothing else leads there.
+ */
+export type RampFlowField = Int8Array;
 
 /**
  * The result of a pathfinding attempt.
@@ -279,14 +291,12 @@ export interface FootPathFallbackResult extends PathResult {
  * failure, retries with vehicles unavoidable and rejects the relaxed route if
  * it crosses fragment debris (`pathCrossesFragmentOccupancy`). Shared by
  * PlanItinerary's cost estimation (exact: true) and Locomotion's runtime
- * execution (exact: false). `opts.crossFragments` accepts the relaxed route
- * through debris (evacuation walkers must get out of a rubble pocket).
+ * execution (exact: false).
  */
 export function findFootPathWithVehicleFallback(
   grid: NavGrid,
   request: PathRequest,
   exact: boolean,
-  opts?: { crossFragments?: boolean },
 ): FootPathFallbackResult {
   const pathfinder = exact ? findExactPath : findPath;
   const attempt = pathfinder(grid, request);
@@ -296,7 +306,7 @@ export function findFootPathWithVehicleFallback(
   }
 
   const relaxed = pathfinder(grid, { ...request, avoidVehicles: false });
-  if (!relaxed.found || (!opts?.crossFragments && pathCrossesFragmentOccupancy(grid, relaxed.waypoints))) {
+  if (!relaxed.found || pathCrossesFragmentOccupancy(grid, relaxed.waypoints)) {
     return { ...attempt, crossedVehicles: false };
   }
 
@@ -391,6 +401,22 @@ function cellIndex(grid: NavGrid, x: number, z: number): number {
   return (z - grid.originZ) * grid.width + (x - grid.originX);
 }
 
+/**
+ * Cost factor of the step (fromX, fromZ) -> (toX, toZ) under `flow`: `RAMP_AGAINST_FLOW_COST_FACTOR` when it climbs a
+ * descend-only ramp cell or descends a climb-only one, else 1. The destination's flow decides, else the origin's; a step
+ * within `RAMP_FLOW_LEVEL_EPSILON_M` of level (across a ramp) is neither.
+ */
+function rampFlowFactor(
+  grid: NavGrid, flow: RampFlowField | null, fromX: number, fromZ: number, from: NavCell | undefined, toX: number, toZ: number, to: NavCell,
+): number {
+  if (flow === null) return 1;
+  const dir = flow[cellIndex(grid, toX, toZ)] || flow[cellIndex(grid, fromX, fromZ)] || 0;
+  if (dir === 0 || from?.surfaceY === undefined || to.surfaceY === undefined) return 1;
+  const rise = to.surfaceY - from.surfaceY;
+  const against = dir > 0 ? rise > RAMP_FLOW_LEVEL_EPSILON_M : rise < -RAMP_FLOW_LEVEL_EPSILON_M;
+  return against ? RAMP_AGAINST_FLOW_COST_FACTOR : 1;
+}
+
 /** Inverse of `cellIndex`: the world coordinates a flat index refers to. */
 function cellCoords(grid: NavGrid, index: number): { x: number; z: number } {
   return {
@@ -467,6 +493,7 @@ export function directLineWalk(
   startPocket: Set<number> | null,
   goalPocket: Set<number> | null,
   maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
+  rampFlow: RampFlowField | null = null,
 ): PathResult | null {
   const dx = x1 - x0;
   const dz = z1 - z0;
@@ -480,7 +507,6 @@ export function directLineWalk(
   let totalCost = 0;
   let prevX = x0;
   let prevZ = z0;
-  let prevCell: NavCell | undefined;
 
   for (let i = 0; i <= steps; i++) {
     const t = steps > 0 ? i / steps : 0;
@@ -503,7 +529,7 @@ export function directLineWalk(
     if (i > 0) {
       const stepDx = clampedX - prevX;
       const stepDz = clampedZ - prevZ;
-      if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, Math.hypot(stepDx, stepDz), maxSlopeRatio)) return null;
+      if (!isGridStepClimbable(grid, prevX, prevZ, clampedX, clampedZ, maxSlopeRatio)) return null;
       const isDiagonal = stepDx !== 0 && stepDz !== 0;
       // Only a genuine single-cell diagonal move needs the corner check (#1197)
       // — a DDA step that jumps more than one cell (rounding artifact) is out
@@ -511,13 +537,13 @@ export function directLineWalk(
       if (Math.abs(stepDx) === 1 && Math.abs(stepDz) === 1 && !isDiagonalCornerClear(grid, prevX, prevZ, clampedX, clampedZ)) {
         return null;
       }
-      totalCost += isDiagonal ? cell.moveCost * Math.SQRT2 : cell.moveCost;
+      const flowFactor = rampFlowFactor(grid, rampFlow, prevX, prevZ, grid.cellAt(prevX, prevZ), clampedX, clampedZ, cell);
+      totalCost += (isDiagonal ? cell.moveCost * Math.SQRT2 : cell.moveCost) * flowFactor;
     }
 
     waypoints.push({ x: clampedX, z: clampedZ });
     prevX = clampedX;
     prevZ = clampedZ;
-    prevCell = cell;
   }
 
   return { found: true, waypoints, totalCost };
@@ -549,7 +575,7 @@ export function findRampConnections(grid: NavGrid, maxSlopeRatio: number = NAV_M
         const neighbor = grid.cellAt(nx, nz);
         if (!neighbor || neighbor.type === 'blocked' || neighbor.type === 'void') continue;
         // A cliff-adjacent ramp cell is no connection: the step must be walkable.
-        if (!isStepClimbable(cell.surfaceY, neighbor.surfaceY, Math.hypot(dx, dz), maxSlopeRatio)) continue;
+        if (!isGridStepClimbable(grid, x, z, nx, nz, maxSlopeRatio)) continue;
 
         const level = neighbor.benchLevel;
         // Keep first neighbor per level for determinism
@@ -883,6 +909,14 @@ function getStepCost(grid: NavGrid, ax: number, az: number, bx: number, bz: numb
 // ---------------------------------------------------------------------------
 
 /**
+ * Per nav grid: the revision these were recorded at, and the `avoidVehicles: false` searches that found no path.
+ * Such a search reads terrain only (type, clearance, surface height, all of which bump `NavGrid.revision`) and its
+ * clamped endpoints, so its answer holds until the revision moves. A failed search explores the whole component, and
+ * the same unreachable pair is asked again every tick (a stuck mover repaths, dispatch re-costs the candidate).
+ */
+const failedTerrainSearches = new WeakMap<NavGrid, { revision: number; keys: Set<string> }>();
+
+/**
  * Find the shortest path on a NavGrid using A* with 8-directional movement and octile heuristic.
  */
 export function findPath(grid: NavGrid, request: PathRequest): PathResult {
@@ -899,6 +933,25 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   const { avoidVehicles } = request;
   const requiredClearance = request.requiredClearance ?? NAV_CLEARANCE_EMPLOYEE_CELLS;
   const maxSlopeRatio = request.maxSlopeRatio ?? NAV_MAX_SLOPE_RATIO;
+  if (avoidVehicles) return searchPath(grid, request, sx, sz, gx, gz, requiredClearance, maxSlopeRatio);
+
+  let failed = failedTerrainSearches.get(grid);
+  if (failed === undefined || failed.revision !== grid.revision) {
+    failed = { revision: grid.revision, keys: new Set() };
+    failedTerrainSearches.set(grid, failed);
+  }
+  const key = `${sx},${sz},${gx},${gz},${requiredClearance},${maxSlopeRatio}`;
+  if (failed.keys.has(key)) return { found: false, waypoints: [], totalCost: 0 };
+  const result = searchPath(grid, request, sx, sz, gx, gz, requiredClearance, maxSlopeRatio);
+  if (!result.found) failed.keys.add(key);
+  return result;
+}
+
+function searchPath(
+  grid: NavGrid, request: PathRequest, sx: number, sz: number, gx: number, gz: number,
+  requiredClearance: number, maxSlopeRatio: number,
+): PathResult {
+  const { avoidVehicles } = request;
 
   // Computed once per call and threaded through every clearance check below
   // (start/goal pre-checks, the direct-line walk, and A*'s own neighbour
@@ -950,7 +1003,7 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   //    cycling through the same handful of cells for 20+ ticks while
   //    findMultiLevelPath kept returning a *found* path every tick, just a
   //    detour nowhere near the goal.
-  const ordinary = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, undefined, maxSlopeRatio);
+  const ordinary = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, undefined, maxSlopeRatio, undefined, request.rampFlow ?? null);
   if (ordinary.found) return ordinary;
 
   // 6. Ordinary search found no connection at all — if start and goal sit on
@@ -1003,11 +1056,13 @@ function findOrdinaryPath(
   goalPocket: Set<number> | null,
   budget: number = pathfindingNodeBudget(grid.width, grid.height),
   maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
+  heuristicWeight: number = ASTAR_HEURISTIC_WEIGHT,
+  rampFlow: RampFlowField | null = null,
 ): PathResult {
   // Fast path — try direct line before A* only if it's clearly optimal.
   //    Compare direct-line cost to heuristic lower bound (octile * MIN_WALKABLE_COST).
   //    If directLine is more than 10% above heuristic, it's suboptimal — use A*.
-  const directLine = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, maxSlopeRatio);
+  const directLine = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, maxSlopeRatio, rampFlow);
   if (directLine !== null) {
     const heuristicLowerBound = octileHeuristic(sx, sz, gx, gz) * MIN_WALKABLE_COST;
     if (directLine.totalCost <= heuristicLowerBound * DIRECT_LINE_TOLERANCE) return directLine;
@@ -1032,7 +1087,7 @@ function findOrdinaryPath(
   gScoreArr[startPos] = 0;
   stampArr[startPos] = currentStamp;
   cameFromArr[startPos] = -1;
-  const hStart = octileHeuristic(sx, sz, gx, gz) * ASTAR_HEURISTIC_WEIGHT;
+  const hStart = octileHeuristic(sx, sz, gx, gz) * heuristicWeight;
   openHeap.push({ key: tieBreakKey(hStart, startPos), pos: startPos, g: 0 });
 
   while (openHeap.size > 0 && exploredCount < budget) {
@@ -1051,6 +1106,7 @@ function findOrdinaryPath(
     }
 
     // Explore neighbours
+    const currentCell = grid.cellAt(cx, cz);
     for (const [dx, dz] of NEIGHBOUR_OFFSETS) {
       const nx = cx + dx;
       const nz = cz + dz;
@@ -1062,12 +1118,12 @@ function findOrdinaryPath(
       const skipClearance = (startPocket?.has(neighborIdxForPocket) ?? false) || (goalPocket?.has(neighborIdxForPocket) ?? false);
       if (!neighborCell || isImpassable(neighborCell, avoidVehicles, false, requiredClearance, skipClearance)) continue;
       if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(grid, cx, cz, nx, nz)) continue;
-      const currentCell = grid.cellAt(cx, cz)!;
-      if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, Math.hypot(dx, dz), maxSlopeRatio)) continue;
+      if (!isCellStepClimbable(grid, cx, cz, currentCell, nx, nz, neighborCell, maxSlopeRatio)) continue;
 
       // Move cost
       const isDiagonal = dx !== 0 && dz !== 0;
-      const stepCost = isDiagonal ? neighborCell.moveCost * Math.SQRT2 : neighborCell.moveCost;
+      const flowFactor = rampFlowFactor(grid, rampFlow, cx, cz, currentCell, nx, nz, neighborCell);
+      const stepCost = (isDiagonal ? neighborCell.moveCost * Math.SQRT2 : neighborCell.moveCost) * flowFactor;
       const tentativeG = bestG + stepCost;
 
       const neighborPos = cellIndex(grid, nx, nz);
@@ -1078,7 +1134,7 @@ function findOrdinaryPath(
         gScoreArr[neighborPos] = tentativeG;
         stampArr[neighborPos] = currentStamp;
         cameFromArr[neighborPos] = current.pos;
-        const h = octileHeuristic(nx, nz, gx, gz) * ASTAR_HEURISTIC_WEIGHT;
+        const h = octileHeuristic(nx, nz, gx, gz) * heuristicWeight;
         openHeap.push({ key: tieBreakKey(tentativeG + h, neighborPos), pos: neighborPos, g: tentativeG });
       }
     }
@@ -1086,15 +1142,20 @@ function findOrdinaryPath(
 
   // Budget exhausted with frontier left (not a genuine wall): a long switchback
   // can need more nodes than the base budget, so retry once with a bigger one.
+  // The retry searches on the true lower bound (a consistent heuristic), so no
+  // cell is expanded twice and a budget of the whole grid is a complete search:
+  // the inflated weight re-opens cells, and on a vehicle-limited site (#2045)
+  // a cross-map route out of a pit ran a whole-grid budget dry before it found
+  // the ramp, reading a connected haul as having no road back to the depot.
   const retryBudget = pathfindingRetryNodeBudget(grid.width, grid.height);
   if (openHeap.size > 0 && budget < retryBudget) {
-    const retried = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, retryBudget, maxSlopeRatio);
+    const retried = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, retryBudget, maxSlopeRatio, MIN_WALKABLE_COST, rampFlow);
     // The retry already ran the direct-line fallback on exhaustion.
     return retried;
   }
 
   // Budget exceeded or open set empty — try direct-line fallback
-  const fallback = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, maxSlopeRatio);
+  const fallback = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, maxSlopeRatio, rampFlow);
   if (fallback !== null) return fallback;
 
   return { found: false, waypoints: [], totalCost: 0 };

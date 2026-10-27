@@ -6,7 +6,7 @@ import {
   buildRamp,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
   computeRampSegmentCarveTarget, carveRampSegmentSlice, computeMinimumRampLength, isRampCellPending,
-  rampDefFromEndpoints, rampDefFromLegs, snapRampDepthToEndFloor, rampFootOffset, rampGradeBoundsDegrees, rampFloorDepthAt,
+  rampDefFromEndpoints, rampDefFromLegs, landRampOnEndFloor, landRampOnGrid, rampEndRowGround, rampFootOffset, rampGradeBoundsDegrees, rampFloorDepthAt,
   type RampDef, type RampDirection, type RampSegmentDef,
 } from '../../../src/core/mining/Ramp.js';
 import { rampCenterline, rampPathCells, RAMP_DIR_OFFSETS } from '../../../src/core/mining/RampPath.js';
@@ -14,7 +14,7 @@ import { RAMP_COST_PER_METER_PER_WIDTH } from '../../../src/core/config/balance.
 import { isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import {
   MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, RAMP_CUT_SLOPE_RATIO,
-  NAV_MAX_SLOPE_DEGREES, NAV_MAX_SLOPE_RATIO, RAMP_FLOOR_SNAP_REACH_M, RAMP_CRATER_MIN_DROP_M,
+  NAV_MAX_SLOPE_DEGREES, NAV_MAX_SLOPE_RATIO, RAMP_CRATER_MIN_DROP_M,
 } from '../../../src/core/config/balance.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -575,9 +575,12 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
     // band between them has zero contributing columns. Before #1152 the floor
     // was read per column, so it followed the canyon down and the ranges
     // always overlapped; a plateau/canyon/plateau fixture no longer gaps.
+    // Past the ramp's end (step 8) the ground rises back to the start height: the end tile is no dug floor,
+    // so the line keeps its own depth instead of landing on the bench (#2045).
     if (stepOffset <= 1) return 20;
     if (stepOffset <= 4) return 0;
-    return 15;
+    if (stepOffset <= 7) return 15;
+    return 20;
   }
 
   function makeSteppedGrid(): VoxelGrid {
@@ -1790,67 +1793,131 @@ describe('rampFootOffset (#1852)', () => {
   });
 });
 
-describe('snapRampDepthToEndFloor (#1852)', () => {
-  it('exposes the documented reach and crater-drop constants', () => {
-    expect(RAMP_FLOOR_SNAP_REACH_M).toBe(2);
+describe('landRampOnEndFloor (#1852, #2045)', () => {
+  const def = (targetDepth: number, gradeDegrees?: number): RampDef => ({
+    originX: 0, originZ: 0, direction: 'south', length: 20, targetDepth, ...(gradeDegrees === undefined ? {} : { gradeDegrees }),
+  });
+
+  it('exposes the documented crater-drop constant', () => {
     expect(RAMP_CRATER_MIN_DROP_M).toBe(2);
   });
 
-  it('snaps to startGround - endGround when the end is a crater floor within reach (red_canyon: 15, 8.5, depth 8 -> 6.5)', () => {
-    expect(snapRampDepthToEndFloor(15, 8.5, 8, 20)).toBeCloseTo(6.5, 6);
+  it('lands on startGround - endGround when the end is a crater floor (red_canyon: 15, 8.5, depth 8 -> 6.5)', () => {
+    expect(landRampOnEndFloor(def(8), 15, 8.5).targetDepth).toBeCloseTo(6.5, 6);
   });
 
-  it('the snapped depth leaves the foot within one slope step above the floor', () => {
-    const snapped = snapRampDepthToEndFloor(15, 8.5, 8, 20);
-    const offset = rampFootOffset(15, 8.5, snapped, 20);
+  it('a landed foot is within one slope step above the floor', () => {
+    const landed = landRampOnEndFloor(def(8), 15, 8.5).targetDepth;
+    const offset = rampFootOffset(15, 8.5, landed, 20);
     expect(offset).toBeGreaterThanOrEqual(0);
     expect(offset).toBeLessThan(NAV_MAX_SLOPE_RATIO);
   });
 
-  it('snaps to a deeper depth when the foot would stop above the floor', () => {
-    // start 15, floor 7, depth 7 over 16 steps: foot 15 - 7*15/16 = 8.44, 1.44 above the floor; depth 8 fits (min length 14.4)
-    expect(snapRampDepthToEndFloor(15, 7, 7, 16)).toBeCloseTo(8, 6);
+  it('lands however far the asked depth misses the floor, above or below it', () => {
+    expect(landRampOnEndFloor(def(8), 15, 4).targetDepth).toBeCloseTo(11, 6);
+    expect(landRampOnEndFloor(def(14), 15, 12).targetDepth).toBeCloseTo(3, 6);
   });
 
-  it('keeps the target depth on intact ground (end at the start height)', () => {
-    expect(snapRampDepthToEndFloor(15, 15, 8, 20)).toBe(8);
+  it('lands a chosen grade too: the grade is kept and the line runs level once it reaches the floor', () => {
+    const landed = landRampOnEndFloor(def(10, 15), 15, 9);
+    expect(landed.targetDepth).toBeCloseTo(6, 6);
+    expect(landed.gradeDegrees).toBe(15);
   });
 
-  it('keeps the target depth when the end is only 1.9 m below the start (not a crater, just under the drop floor)', () => {
-    expect(snapRampDepthToEndFloor(15, 15 - (RAMP_CRATER_MIN_DROP_M - 0.1), 2.5, 10)).toBe(2.5);
+  it('keeps the asked depth on intact ground (end at the start height)', () => {
+    expect(landRampOnEndFloor(def(8), 15, 15).targetDepth).toBe(8);
   });
 
-  it('snaps at exactly the minimum crater drop (boundary)', () => {
-    expect(snapRampDepthToEndFloor(15, 15 - RAMP_CRATER_MIN_DROP_M, 2.5, 10)).toBeCloseTo(RAMP_CRATER_MIN_DROP_M, 6);
+  it('keeps the asked depth when the end is only 1.9 m below the start (a trench, not a crater)', () => {
+    expect(landRampOnEndFloor(def(2.5), 15, 15 - (RAMP_CRATER_MIN_DROP_M - 0.1)).targetDepth).toBe(2.5);
   });
 
-  it('keeps the target depth when the end ground is higher than the start (uphill)', () => {
-    expect(snapRampDepthToEndFloor(15, 18, 8, 20)).toBe(8);
+  it('lands at exactly the minimum crater drop (boundary)', () => {
+    expect(landRampOnEndFloor(def(2.5), 15, 15 - RAMP_CRATER_MIN_DROP_M).targetDepth).toBeCloseTo(RAMP_CRATER_MIN_DROP_M, 6);
   });
 
-  it('keeps the target depth when the foot is more than the reach away from the floor', () => {
-    // foot 7.4, floor 4 -> offset 3.4 > 2
-    expect(snapRampDepthToEndFloor(15, 4, 8, 20)).toBe(8);
+  it('keeps the asked depth when the end ground is higher than the start (uphill)', () => {
+    expect(landRampOnEndFloor(def(8), 15, 18).targetDepth).toBe(8);
   });
 
-  it('keeps the target depth when the end ground is 0 or NaN (no usable floor reading)', () => {
-    expect(snapRampDepthToEndFloor(15, 0, 8, 20)).toBe(8);
-    expect(snapRampDepthToEndFloor(15, NaN, 8, 20)).toBe(8);
+  it('keeps the asked depth when the end ground is 0 or NaN (no usable floor reading)', () => {
+    expect(landRampOnEndFloor(def(8), 15, 0).targetDepth).toBe(8);
+    expect(landRampOnEndFloor(def(8), 15, NaN).targetDepth).toBe(8);
   });
 
-  it('keeps the target depth when the snapped depth is too steep for the ramp length', () => {
-    // start 15, floor 7, depth 7 over 13 steps: foot offset +1.54 (in reach), snapped depth 8 needs length 14.4 > 13
+  it('a floor the length cannot reach within the cut limit is refused once landed, never cut with a step', () => {
+    // start 15, floor 7: 8 m to drop over 13 m needs 14.4 m at the 30 degree cut
     expect(computeMinimumRampLength(8)).toBeGreaterThan(13);
-    expect(snapRampDepthToEndFloor(15, 7, 7, 13)).toBe(7);
+    const landed = landRampOnEndFloor({ ...def(7), length: 13 }, 15, 7);
+    expect(landed.targetDepth).toBeCloseTo(8, 6);
+    expect(validateRampOrder(landed, 1_000_000)).toMatchObject({ success: false, messageKey: 'mining.build_ramp.slope_too_steep' });
   });
 
-  it('snaps when the snapped depth just fits the length', () => {
-    const length = Math.ceil(computeMinimumRampLength(8)) + 1;
-    expect(snapRampDepthToEndFloor(15, 7, 7, length)).toBeCloseTo(8, 6);
+  it('a chosen grade too gentle to reach the floor is refused once landed', () => {
+    // 6 m over 20 m needs at least 16.7 degrees
+    const landed = landRampOnEndFloor(def(4, 10), 15, 9);
+    expect(validateRampOrder(landed, 1_000_000)).toMatchObject({ success: false, messageKey: 'mining.build_ramp.grade_too_gentle' });
   });
 });
 
-describe('defineRampSegments — ramp into a crater snaps to the end floor (#1852)', () => {
+describe('rampEndRowGround (#2045)', () => {
+  const def: RampDef = { originX: 10, originZ: 0, direction: 'south', length: 10, targetDepth: 5, width: 3 };
+
+  it('is the lowest ground when every end-row tile stands on its own level', () => {
+    const heights: Record<string, number> = { '9,10': 4.5, '10,10': 5.5, '11,10': 7.5 };
+    expect(rampEndRowGround(def, (x, z) => heights[`${x},${z}`] ?? 99)).toBe(4.5);
+  });
+
+  it('with an aim, is the level of the end row nearest it, however few tiles stand on it', () => {
+    const hole: Record<string, number> = { '9,10': 2.5, '10,10': 0.5, '11,10': 2.5 };
+    expect(rampEndRowGround(def, (x, z) => hole[`${x},${z}`] ?? 99, 0.8)).toBe(0.5);
+    expect(rampEndRowGround(def, (x, z) => hole[`${x},${z}`] ?? 99, 3)).toBe(2.5);
+  });
+
+  it('with no aim, is the level most of the end row shares: not a lump beside the floor, not a hole bottom in it', () => {
+    const lump: Record<string, number> = { '9,10': 4.5, '10,10': 6.5, '11,10': 4.5 };
+    expect(rampEndRowGround(def, (x, z) => lump[`${x},${z}`] ?? 99)).toBe(4.5);
+    const hole: Record<string, number> = { '9,10': 2.5, '10,10': 0.5, '11,10': 2.5 };
+    expect(rampEndRowGround(def, (x, z) => hole[`${x},${z}`] ?? 99)).toBe(2.5);
+  });
+
+  it('skips tiles it cannot read, and is NaN when it reads none', () => {
+    expect(rampEndRowGround(def, (x) => (x === 11 ? 6 : NaN))).toBe(6);
+    expect(Number.isNaN(rampEndRowGround(def, () => NaN))).toBe(true);
+  });
+});
+
+describe('landRampOnGrid (#2045)', () => {
+  function gridWithFloor(floorTop: number, lumpTop: number): VoxelGrid {
+    const grid = new VoxelGrid(30, 30);
+    for (let z = 0; z < 30; z++) {
+      for (let x = 0; x < 30; x++) {
+        const top = z < 20 ? 15 : (x === 10 ? lumpTop : floorTop);
+        for (let y = 0; y <= top; y++) {
+          grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+        }
+      }
+    }
+    return grid;
+  }
+  const ramp: RampDef = { originX: 10, originZ: 0, direction: 'south', length: 20, targetDepth: 4, width: 3 };
+
+  it('lands on the floor beside a lump on the end tile when the asked depth is as near the floor: 15.5 - 9.5 = 6 m', () => {
+    // Asked 5 m: the floor (6 m down) and the lump (4 m down) are a metre off either way; the floor holds more of the row.
+    expect(landRampOnGrid(gridWithFloor(9, 11), { ...ramp, targetDepth: 5 }).targetDepth).toBeCloseTo(6, 6);
+    expect(landRampOnGrid(gridWithFloor(9, 11), { ...ramp, targetDepth: 8 }).targetDepth).toBeCloseTo(6, 6);
+  });
+
+  it('lands on the level of the end row the asked depth reaches for: a lump when asked for the lump\'s depth', () => {
+    expect(landRampOnGrid(gridWithFloor(9, 11), ramp).targetDepth).toBeCloseTo(4, 6);
+  });
+
+  it('keeps the ordered depth when the end row is intact ground', () => {
+    expect(landRampOnGrid(gridWithFloor(15, 15), ramp).targetDepth).toBe(4);
+  });
+});
+
+describe('defineRampSegments — ramp into a crater lands on the end floor (#1852, #2045)', () => {
   const ORIGIN_X = 20;
   const ORIGIN_Z = 5;
   const LENGTH = 20;
@@ -1904,7 +1971,7 @@ describe('defineRampSegments — ramp into a crater snaps to the end floor (#185
     }
   });
 
-  it('the snapped line is the straight line of depth startGround - endGround (15.5 - 9.5 = 6)', () => {
+  it('the landed line is the straight line of depth startGround - endGround (15.5 - 9.5 = 6)', () => {
     const floors = floorByZ(defineRampSegments(makeCraterGrid(20, 9), ramp(8)));
     for (let step = 0; step < LENGTH; step++) {
       expect(floors.get(ORIGIN_Z + step)!, `step ${step}`).toBeCloseTo(START_GROUND - (step / LENGTH) * 6, 6);
@@ -1928,10 +1995,18 @@ describe('defineRampSegments — ramp into a crater snaps to the end floor (#185
     expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_GROUND - (19 / LENGTH) * 8, 6);
   });
 
-  it('a crater floor beyond the snap reach of the foot keeps the planned depth', () => {
-    // floor 15.5 - 11.5 = 4.5 (top voxel 4): foot 7.9 is 3.4 above it, past RAMP_FLOOR_SNAP_REACH_M
+  it('a crater floor far below the asked depth: the line still lands on it (15.5 - 4.5 = 11 m)', () => {
+    // floor 4.5 (top voxel 4): the asked 8 m would leave the foot 3.4 m above it
     const floors = floorByZ(defineRampSegments(makeCraterGrid(20, 4), ramp(8)));
-    expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_GROUND - (19 / LENGTH) * 8, 6);
+    expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_GROUND - (19 / LENGTH) * 11, 6);
+  });
+
+  it('a chosen grade lands too: it keeps its grade and runs level on the floor, the foot flush with it', () => {
+    // floor 9.5 (top voxel 9), 6 m down; 20 degrees reaches it after 16.5 m, the last steps run level
+    const floors = floorByZ(defineRampSegments(makeCraterGrid(20, 9), { ...ramp(10), gradeDegrees: 20 }));
+    const foot = floors.get(ORIGIN_Z + LENGTH - 1)!;
+    expect(foot).toBeCloseTo(9.5, 6);
+    expect(floors.get(ORIGIN_Z + 2)!).toBeCloseTo(START_GROUND - 2 * Math.tan(20 * Math.PI / 180), 6);
   });
 });
 

@@ -22,7 +22,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { forceShiftRestIfNeeded, forceShiftRestIfNeededByPolicy } from '../../../src/core/engine/ForceShiftRest.js';
-import { restTripFatigueCost } from '../../../src/core/engine/RestActionHelpers.js';
+import { restTripFatigueCost, resolveRestDestination } from '../../../src/core/engine/RestActionHelpers.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
 import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
 import type { ActionType, PendingAction } from '../../../src/core/state/GameState.js';
@@ -1429,6 +1429,48 @@ describe('forceShiftRestIfNeededByPolicy — vehicle work and the rest-trip budg
     expect(employee.activeActionId).toBe(1710);
   });
 
+  it('#2091: the first forced rest that cuts a drive short marks the job and heads for the quarters', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(45);
+    const action = claimDrillHole(state, employee, vehicle.id, 1720);
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = 40;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.destinationX).not.toBe(employee.x);
+    expect(action.payload['driveRests']).toBe(1);
+    expect(action.status).toBe('queued');
+  });
+
+  it('#2091: a drive a forced rest already cut short rests at the roadside, however far the quarters', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(45);
+    const action = claimDrillHole(state, employee, vehicle.id, 1721);
+    action.payload = { driveRests: 1 };
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = BUDGET - 1;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.destinationX).toBe(employee.x);
+    expect(employee.destinationZ).toBe(employee.z);
+    expect(action.payload['driveRests']).toBe(2);
+  });
+
+  it('#2091: at the roadside the drive goes on while fatigue still covers the arrival allowance', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(45);
+    const action = claimDrillHole(state, employee, vehicle.id, 1722);
+    action.payload = { driveRests: 1 };
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = BUDGET + 1;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBe(1722);
+  });
+
   it('#1709: 25 m quarters, fatigue just under the walk budget: rest starts, rig parked, worker on foot with fatigue left to arrive', () => {
     const { state, employee, vehicle } = mountedDrillerFixture(25);
     claimDrillHole(state, employee, vehicle.id, 1711);
@@ -1458,6 +1500,39 @@ describe('forceShiftRestIfNeededByPolicy — vehicle work and the rest-trip budg
     expect(employee.activeActionId).not.toBeNull();
     // The follow-up stays queued for whoever is free.
     expect(state.pendingActions.find(a => a.id === 1703)!.status).toBe('queued');
+  });
+
+  // #2089: forced although the trip is not worth it, the rest is taken where the worker stands, not at the far hut.
+  it('idle at a job boundary, shift expired, the round trip not worthwhile: the forced rest is taken in place', () => {
+    const { state, employee } = mountedDrillerFixture(85);
+    queueFollowUp(state, 1705);
+    employee.activeActionId = null;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = 95;
+    expect(resolveRestDestination(state, employee).worthwhile).toBe(false);
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    const rest = state.pendingActions.find(a => a.id === employee.activeActionId)!;
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
+    expect(rest.payload['buildingId']).toBeUndefined();
+    expect([rest.targetX, rest.targetZ]).toEqual([employee.x, employee.z]);
+  });
+
+  it('idle at a job boundary, shift expired, the round trip worthwhile: the forced rest still goes to the Living Quarters', () => {
+    const { state, employee } = mountedDrillerFixture(6);
+    queueFollowUp(state, 1706);
+    employee.activeActionId = null;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = 50;
+    const dest = resolveRestDestination(state, employee);
+    expect(dest.worthwhile).toBe(true);
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    const rest = state.pendingActions.find(a => a.id === employee.activeActionId)!;
+    expect(rest.payload['buildingId']).toBe(dest.buildingId);
+    expect([rest.targetX, rest.targetZ]).toEqual([dest.targetX, dest.targetZ]);
   });
 
   it('idle at a job boundary with a follow-up queued, shouldForceRest false: no rest', () => {

@@ -1154,6 +1154,42 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     expect(employee.z).toBe(0);
   });
 
+  it('a head-on contest with only a long way round sidesteps into a passing niche instead of oscillating on the detour', () => {
+    // A one-cell lane (z=1) closed into a ring by x=0, x=14 and z=7, with one niche (7,2) beside it. Around
+    // the ring is ~30 cells longer than the lane, so the avoid-occupied reroute is a detour the next tick's
+    // plain route undoes; the higher id must take the niche and let the other pass.
+    const state = createGame({ seed: SEED });
+    const grid = makeFlatNavGrid(15, 9);
+    const open = (x: number, z: number) => z === 1 || z === 7 || x === 0 || x === 14 || (x === 7 && z === 2);
+    for (let z = 0; z < 9; z++) {
+      for (let x = 0; x < 15; x++) {
+        if (!open(x, z)) grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+      }
+    }
+    state.navGrid = grid;
+    const rng = new Random(SEED);
+    const { employee: a } = hireEmployee(state.employees, 'driller', rng, 6, 1);
+    const { employee: b } = hireEmployee(state.employees, 'driller', rng, 7, 1);
+    expect(b.id).toBeGreaterThan(a.id);
+    expect(moveTo(state, a.id, { x: 12, z: 1 }).success).toBe(true);
+    expect(moveTo(state, b.id, { x: 2, z: 1 }).success).toBe(true);
+
+    const MAX_TICKS = AGENT_OCCUPANCY_WAIT_TICKS * 4;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && (a.itinerary !== null || b.itinerary !== null)) {
+      tickLocomotion(state);
+      expectNoSharedCells([a, b]);
+      ticks++;
+    }
+
+    expect(a.itinerary).toBeNull();
+    expect(b.itinerary).toBeNull();
+    expect(a.z).toBe(1);
+    expect(a.x).toBeGreaterThan(7);
+    expect(b.z).toBe(1);
+    expect(b.x).toBeLessThan(6);
+  });
+
   it('isolates handleAgentOccupancyBlock\'s tie-break sidestep: a mid-corridor blocker that is itself stuck yields to the higher-id agent', () => {
     // x: 4-10 is a genuinely one-cell-wide (z=1 only) corridor — the ONLY
     // lane through, so the reroute ladder step (step 1) can never find a

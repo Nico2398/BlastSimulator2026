@@ -100,7 +100,7 @@ export const KNOWN_COMMANDS = [
   'build', 'vehicle', 'stats', 'inspect', 'zone', 'research', 'permit',
   'tutorial_start', 'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
   'fragments', 'preview', 'blast_preview', 'install_tubing', 'drain_hole',
-  'build_ramp', 'ramp', 'widen_ramp', 'level_ground', 'set_policy', 'terrain_info', 'help',
+  'build_ramp', 'ramp', 'widen_ramp', 'repair_ramp', 'ramp_flow', 'level_ground', 'set_policy', 'terrain_info', 'help',
   'blast_plan', 'needs', 'save', 'load', 'sandbox', 'board',
 ];
 

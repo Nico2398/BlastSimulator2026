@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
-import { withDockingCells } from '../../../src/core/nav/DockingReach.js';
+import { dockedFrom, withDockingCells } from '../../../src/core/nav/DockingReach.js';
 
 const W = 12;
 const H = 12;
@@ -116,5 +116,46 @@ describe('withDockingCells (#1840)', () => {
     const set = withDockingCells(grid, { has: () => false }, 2);
     expect(set.has(5, 5)).toBe(false);
     expect(set.has(2, 2)).toBe(false);
+  });
+});
+
+describe('dockedFrom (#2045)', () => {
+  it('a source on clear ground stands where it is, rounded', () => {
+    expect(dockedFrom(makeGrid(), [{ x: 3.4, z: 2.6 }], 2)).toEqual([{ x: 3, z: 3 }]);
+  });
+
+  it('a vehicle parked on a docking cell stands for the clear cells beside it', () => {
+    // Column x = 5 is the thin ring beside a footprint at x >= 6.
+    const grid = makeGrid((x) => (x === 5 ? { clearance: 1 } : x >= 6 ? { type: 'blocked', moveCost: Infinity, clearance: 0 } : null));
+    const from = dockedFrom(grid, [{ x: 5, z: 5 }], 2);
+    expect(from.length).toBeGreaterThan(0);
+    expect(from.every(c => c.x === 4 && Math.abs(c.z - 5) <= 2)).toBe(true);
+  });
+
+  it('reaches the clear cells two thin cells deep, and stays put when none lies within two', () => {
+    const twoDeep = makeGrid((x) => (x === 5 || x === 6 ? { clearance: 1 } : x >= 7 ? { type: 'blocked', moveCost: Infinity, clearance: 0 } : null));
+    expect(dockedFrom(twoDeep, [{ x: 6, z: 5 }], 2).every(c => c.x === 4)).toBe(true);
+    const threeDeep = makeGrid((x) => (x >= 5 && x <= 7 ? { clearance: 1 } : x >= 8 ? { type: 'blocked', moveCost: Infinity, clearance: 0 } : null));
+    expect(dockedFrom(threeDeep, [{ x: 7, z: 5 }], 2)).toEqual([{ x: 7, z: 5 }]);
+  });
+});
+
+describe('dockedFrom with a climb limit', () => {
+  // Column x = 5 is the thin ring beside a footprint at x >= 6; the clear ground west of it lies `drop` metres lower.
+  const ledge = (drop: number) => makeGrid((x) => (
+    x === 5 ? { clearance: 1, surfaceY: drop } : x >= 6 ? { type: 'blocked', moveCost: Infinity, clearance: 0 } : { surfaceY: 0 }
+  ));
+  const ratio = Math.tan(20 * Math.PI / 180);
+
+  it('docks over a step the vehicle climbs, as without a limit', () => {
+    const from = dockedFrom(ledge(0.3), [{ x: 5, z: 5 }], 2, ratio);
+    expect(from.length).toBeGreaterThan(0);
+    expect(from.every(c => c.x === 4)).toBe(true);
+  });
+
+  it('a vehicle whose every way off its thin cell is too steep docks nowhere and stands where it is', () => {
+    // 0.38 m a tile: the stuck truck beside a quarters on the seed-42 ladder, 1.4 cm over the 20-degree limit.
+    expect(dockedFrom(ledge(0.38), [{ x: 5, z: 5 }], 2, ratio)).toEqual([{ x: 5, z: 5 }]);
+    expect(dockedFrom(ledge(0.38), [{ x: 5, z: 5 }], 2).every(c => c.x === 4)).toBe(true);
   });
 });

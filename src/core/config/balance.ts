@@ -1046,6 +1046,13 @@ export const STUCK_THRESHOLD = 3;
 export const AGENT_OCCUPANCY_WAIT_TICKS = 10;
 
 /**
+ * Extra route cost (nav move-cost units, about one per cell) a reroute around a stuck blocker may add over the
+ * plain route before it is refused. The plain route is repathed every tick and ignores occupancy, so a longer
+ * detour is undone the tick after it is taken; a step or two around a blocker in the open stays well inside.
+ */
+export const REROUTE_CONTEST_MAX_DETOUR_COST = 6;
+
+/**
  * Largest ring radius `findNearestFreeCell`'s ring-search loop (Locomotion.ts)
  * will expand to before giving up. Replaces that loop's previously-hardcoded
  * literal `2` — a flat cap of 2 rings (searching at most a 5x5 neighbourhood)
@@ -1277,14 +1284,11 @@ export const ACTION_STUCK_BACKOFF_TICKS = 60;
 export const NAV_BENCH_HEIGHT = 5;
 
 /**
- * Max slope, in degrees, an agent can step between adjacent NavGrid cells —
- * replaces `NAV_MAX_CLIMB_HEIGHT` (#1151). The old rule admitted a step of up
- * to 3 metres over a 1-metre cardinal run — arctan(3/1) ≈ 71° — purely
- * because 3 voxels happened to be shorter than that; nothing about 71° was a
- * deliberate slope decision. 30° makes the rule legible on its own terms:
- * gentler than this and a worker walks it, steeper and it has to be cut into
- * a ramp. One constant, applied identically to every agent kind — workers
- * and vehicles alike, no per-agent-kind variant.
+ * Max slope, in degrees, a walking agent steps between adjacent NavGrid cells,
+ * and the limit every vehicle keeps off progression sites (campaign, tutorial)
+ * (#1151). Gentler than this and a worker walks it, steeper and it has to be
+ * cut into a ramp. Vehicles on progression sites climb the lower
+ * `VEHICLE_MAX_SLOPE_DEGREES` instead (#2045).
  *
  * Measured reachability cost of the 30° cutoff (#1147 flood fill,
  * NEIGHBOUR_OFFSETS_8, seed 42, 64m sites): desert_badlands 100%,
@@ -1302,12 +1306,11 @@ export const NAV_MAX_SLOPE_DEGREES = 30;
  */
 export const NAV_MAX_SLOPE_RATIO = Math.tan(NAV_MAX_SLOPE_DEGREES * Math.PI / 180);
 
-/** Steepest slope (degrees) each vehicle tier climbs on a progression site (#1938). Tier 1 keeps the global limit. */
-export const VEHICLE_TIER_MAX_SLOPE_DEGREES: Record<VehicleTier, number> = {
-  1: NAV_MAX_SLOPE_DEGREES,
-  2: 24,
-  3: 18,
-};
+/** The one steepest slope (degrees) any vehicle climbs on a progression site (#2045). */
+export const VEHICLE_MAX_SLOPE_DEGREES = 20;
+
+/** tan(VEHICLE_MAX_SLOPE_DEGREES): rise per metre of run (#2045). */
+export const VEHICLE_MAX_SLOPE_RATIO = Math.tan(VEHICLE_MAX_SLOPE_DEGREES * Math.PI / 180);
 
 /**
  * Anti-noise floor, in metres, below which a graded cardinal-neighbour
@@ -1331,16 +1334,16 @@ export const NAV_RAMP_MIN_SLOPE_DELTA = NAV_MAX_SLOPE_RATIO * 0.95;
 /** Fraction of NAV_MAX_SLOPE_RATIO a freshly-cut ramp's floor is graded to — strictly
  * under 1 so the finished floor always tests as legally climbable with headroom for
  * float rounding across the ramp's full length (#1152). */
-const RAMP_CUT_SLOPE_MARGIN = 0.98;
+export const RAMP_CUT_SLOPE_MARGIN = 0.98;
 
 /** The actual rise-per-metre-of-run a ramp's floor is cut at (#1152). */
 export const RAMP_CUT_SLOPE_RATIO = NAV_MAX_SLOPE_RATIO * RAMP_CUT_SLOPE_MARGIN;
 
-/** Largest gap (m) between a ramp's planned foot and the end tile's floor that the depth snap bridges (#1852). */
-export const RAMP_FLOOR_SNAP_REACH_M = 2;
-
-/** An end tile counts as dug floor only when at least this far (m) below the start ground (#1852). */
+/** A ramp's end row counts as dug floor, which the ramp lands on, only when at least this far (m) below the start ground (#1852, #2045). */
 export const RAMP_CRATER_MIN_DROP_M = 2;
+
+/** End-row tiles within this many metres of one another stand on one level: the level most of the row shares is the floor a ramp lands on (#2045). */
+export const RAMP_LANDING_LEVEL_M = 0.5;
 
 /** Required clearance, in cells, for an employee on foot (#1154). */
 export const NAV_CLEARANCE_EMPLOYEE_CELLS = 1;
@@ -1430,8 +1433,25 @@ export function isRampWidth(n: number): n is RampWidth {
 export const RAMP_DEFAULT_WIDTH: RampWidth = 3;
 /** Ramp tool (#1942): depth the depth stepper starts at, the deepest it goes, and the degrees one grade press moves. */
 export const RAMP_DEFAULT_DEPTH_M = 8;
-export const RAMP_MAX_DEPTH_M = 40;
+export const RAMP_MAX_DEPTH_M = 55;
 export const RAMP_GRADE_STEP_DEGREES = 1;
+/** Ramp repair (#2045): cost per cell a repair cuts down to the ramp's line or fills back up to it. */
+export const RAMP_REPAIR_COST_PER_CELL = 10;
+/**
+ * One-way ramps: a vehicle step against a ramp's traffic direction costs this many times its plain cost. Large enough
+ * that a route takes any other ramp the site offers, so traffic on a down ramp and an up ramp flows one way each and
+ * nobody meets head-on; a step against the flow is still allowed, so a pit whose only ramp points the wrong way never
+ * strands its vehicles.
+ */
+export const RAMP_AGAINST_FLOW_COST_FACTOR = 40;
+/** One-way ramps: rise (m) over one step under which the step reads level (across the ramp), neither with nor against its flow. */
+export const RAMP_FLOW_LEVEL_EPSILON_M = 0.05;
+/**
+ * Ramp repair (#2045): a ramp is damaged only when its ground strays from its line by more than this (m) in shape — the
+ * spread of (ground - line) across its columns. A line re-anchored on a ground another order nudged sits off by the same
+ * hair everywhere and drives as before; a shot that cuts into a ramp or deepens its floor spreads it by far more.
+ */
+export const RAMP_REPAIR_TOLERANCE_M = 0.1;
 /** Ramp cost per meter of length per voxel of width; the default width costs the pre-#1298 flat $100/m. */
 export const RAMP_COST_PER_METER_PER_WIDTH = 100 / 3;
 
@@ -3370,24 +3390,24 @@ export const SHAREHOLDER_SUMMIT_BOARD: BoardConfig = {
   growth: 1.25,
 };
 
-// ── Crater access (#2082) ──
+// ── Crater access planner (#2082; pure, called by the progression probe since #2095) ──
 
-/** Stranded orders (debris_out_of_reach / buried_under_rubble) on one floor before a ramp is ordered down to it. */
-export const CRATER_ACCESS_MIN_STRANDED_ORDERS = 3;
-/** Ticks of payroll that cash must still cover after paying for a crater access ramp. */
-export const CRATER_ACCESS_CASH_RESERVE_TICKS = 200;
-/** Ticks between stranded-floor rescans, so the per-tick cost stays flat. */
-export const CRATER_ACCESS_RECHECK_TICKS = 50;
 /** Fraction of the maximum nav grade a crater access ramp may use (1 = right at the limit; below 1 keeps margin). */
 export const CRATER_ACCESS_MAX_GRADE_MARGIN = 0.9;
 /** Largest gap (cells, Chebyshev) between two stranded order targets that still belong to one crater floor. */
 export const CRATER_ACCESS_CLUSTER_GAP_CELLS = 6;
 /** Candidate pit-rim starts a crater access plan tries with the spiral backend before giving up. */
 export const CRATER_ACCESS_SPIRAL_START_ATTEMPTS = 6;
-/** Ticks a stranded floor may stay unplannable before its debris_out_of_reach auto-debris orders are cancelled. */
-export const CRATER_ACCESS_ABANDON_DEBRIS_TICKS = 600;
 /**
- * Ticks a driverless vehicle no licensed employee can walk to, or a worker cut off from the rest of the crew,
- * stays put before it is brought back to the crew (#2085). Long enough that a ramp being dug to the floor wins the race.
+ * Largest gap (m) between the ground a planned ramp lands on (the level most of its end row shares) and the stranded floor
+ * for the ramp to count as reaching it: within one voxel layer, so the landed foot is flush with that floor (#2045).
  */
-export const STRANDED_RECOVERY_TICKS = 300;
+export const CRATER_ACCESS_FLOOR_LEVEL_M = 0.5;
+/**
+ * Smallest drop (m) of a straight access ramp to a floor that holds stranded crew or vehicles (the planner's
+ * `minDropM`; other floors keep `RAMP_CRATER_MIN_DROP_M`). They need a way out however shallow: a strip a metre below
+ * the road between two cuts held a driver and a digger on the seed-42 full-kit ladder, and every shot near it was
+ * refused for the crew who could not leave (#2091). Below one voxel layer the drop is within the floor-level band
+ * (`CRATER_ACCESS_FLOOR_LEVEL_M`).
+ */
+export const CRATER_ACCESS_MIN_DROP_M = 1;

@@ -356,3 +356,23 @@ Pit depth was not recorded by the probe table, so it is not stated here.
 
 Verdict: 20 m / grade 3 still not reached within 14,000 ticks. The bankruptcy is gone, but the next stall is unmeasured. Cash is not the limit (9-10 M idle).
 Next step: a pit-depth and stall diagnosis.
+
+## 2026-10-27 record: grade 3 on the reference site, and the owner's decisions (#2089, #2091, #2093, #2076, #2063, #2072)
+
+Ladder probe, full kit, to t14000 (t16000 for seed 42), head `a3d8643` of PR #2096, balance unchanged:
+
+| site | g1 | g2 | g3 | pit | cash@6000 | cash@10000 | end |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| desert 42 (reference) | 938 | 1622 | **11836** (window 8,000-14,000: in) | 22.1 m at t5000 | 9.13 M | 5.09 M | no bankruptcy to t16000; $1.9M at t15000 |
+| desert 7 | 898 | 2192 | missed | – | 4.08 M | 2.74 M | bankrupt t12699 |
+| desert 13 | 868 | 1672 | missed | – | 6.43 M | 5.52 M | no bankruptcy |
+
+What took the reference site to grade 3 (each found by tracing the run): a truck parked 1.4 cm over the 20° limit was handed every claim and idled 10 of 13 drivers (core fix: a vehicle docks only over steps it climbs); storage on demand instead of four 50 t heaps; one deepening hole drilled to the next grade's depth (11.2 m → 22.1 m in one shot) instead of a bench whose rubble must all be hauled first; fresh sites weighed only among those a shot may take; the pit benched before the yard is shot. One-way ramps (`ramp_flow`) were added at the owner's request.
+
+**Fragility.** The same seed flips on small probe changes: a shaft capped at its breakout depth (11 m → 10 m, still enough for 20 m) changes the run from t6000 on and ends in a bankruptcy at t13979 without grade 3. Prospecting past the site edge plus depots beside far pits saved seed 7 ($5.8M at t10000) but bankrupted seed 13 (t12449) and cost seed 42 its grade 3; none of it is on the branch.
+
+**Decisions (owner-delegated, 2026-10-27).**
+- **One reference site for the ladder.** A ladder-only probe run plays desert_badlands, full kit, seed 42 (`LADDER_REFERENCE_SITE`) unless sites are named; the grade-3 bar is that site inside its window. Why: a spread of seeds would tie every probe change to chasing the heuristic player's luck on each seed, at half an hour a run, while the per-site guarantees the 20° limit needs (site exits, a drivable start reaching the first blast) already run in CI on every biome with five seeds each. The early-game matrix (`opening`, `reinvest`, three seeds) stays as it is: cheap, and consistent across sites when measured for the 20° limit.
+- **Long horizons are hand measurements, never CI checks.** The 50,000-tick survival and the grade 4-5 windows (15,000-25,000 and 30,000-45,000) cost hours a run and flip on small changes, so a CI gate would be slow noise. The windows stay design targets the probe summary reports against.
+
+**Open after grade 3** (measured, not tuned): the reference site had delivered 157 t of ore by t15000, all its ore within 20 m of the surface, and grade 4 asks 600 t. Ground past the site holds more (a drill order or a survey claims it free; the 32 m block south of the start holds about as much ore as the main deposit), and the probe never expands. Running costs past grade 3 are about $1,300 a tick (payroll $920; event payouts about 10%), with 14 drivers for 11 trucks idle half the time once ore runs short. These are probe-player and balance questions for whoever next measures grades 4-5; the windows are not verified.

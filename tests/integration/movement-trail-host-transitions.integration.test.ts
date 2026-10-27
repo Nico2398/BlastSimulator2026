@@ -93,7 +93,14 @@ describe('movement trail host transitions over the tutorial-interactive replay (
         }
         continue;
       }
-      for (let r = 0; r < resolveRepeatCount(step); r++) runTracked(step.command, `step ${i} (${step.command})`);
+      // A multi-tick batch is checked tick by tick: an idle worker standing in a mover's way is stepped off its route
+      // (a teleport, flagged on the trail, by design), and inside one long batch that would be pinned on an unrelated
+      // board/alight/enter/leave of the same batch.
+      const ticks = /^tick (\d+)$/.exec(step.command);
+      for (let r = 0; r < resolveRepeatCount(step); r++) {
+        if (ticks) for (let n = 0; n < Number(ticks[1]); n++) runTracked('tick 1', `step ${i} (${step.command}) tick ${n}`);
+        else runTracked(step.command, `step ${i} (${step.command})`);
+      }
     }
 
     expect(problems).toEqual([]);

@@ -49,10 +49,6 @@ const ASSIGNMENT_ALLOWLIST: Readonly<Record<string, string>> = {
   // Locomotion.ts itself uses. See relocateFootprintOccupants's own doc
   // comment.
   'src/core/engine/BuildingTaskHelpers.ts': 'one-time footprint-eviction relocation, not per-tick movement',
-  // Tow of a *driverless* vehicle no licensed employee can reach (#2085): an occupantless vehicle has no
-  // locomotion writer to move it, and the same occupancy helper keeps the nav flags in sync. A vehicle with
-  // anyone aboard is never touched. See recoverStranded's own doc comment.
-  'src/core/engine/StrandedVehicleRecovery.ts': 'one-off tow of a stranded driverless vehicle, not per-tick movement',
 };
 
 /** Identifier prefixes commonly used for a Vehicle-typed local/parameter in this codebase. */

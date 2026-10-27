@@ -67,9 +67,8 @@ const LIVE_EXPORTS = new Set<string>([
   'src/ui/panels/breakoutWarningText.ts:breakoutWarningText',
   // Wall overlay (#1943): the unit-tested tint rule; production applies it inside WallStabilityOverlay.show.
   'src/renderer/WallStabilityOverlay.ts:wallFaceTint',
-  // Ramp tool (#1942): the unit-tested contracts of the per-leg arrow layout and the tier-check line; production composes them inside buildRampArrow / describeRampPlan.
+  // Ramp tool (#1942): the unit-tested contracts of the per-leg arrow layout; production composes them inside buildRampArrow / describeRampPlan.
   'src/renderer/RampArrow.ts:rampLegSpecs',
-  'src/ui/describeRamp.ts:rampTierCheckLine',
   // Contracts market strip (#1931): unit-tested contracts; production composes them inside makeMarketStrip.
   // Progression probe reload gate (#1974): the unit-tested contract; production uses it inside the reinvest strategy.
   'scripts/shared/probe-strategies.ts:RELOAD_FRACTION',

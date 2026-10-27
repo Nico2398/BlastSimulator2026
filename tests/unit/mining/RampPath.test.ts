@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   legsFromWaypoints, rampLegsOf, rampTotalLength, rampCenterline, rampPathCells, rampFootprintRects,
-  rampBoundingFootprint, rampWaypoints, findRampPathFault, firstOccupiedPathTile,
+  rampBoundingFootprint, rampWaypoints, findRampPathFault, firstOccupiedPathTile, rampEndRow,
   type RampPathSpec,
 } from '../../../src/core/mining/RampPath.js';
 
@@ -210,5 +210,21 @@ describe('firstOccupiedPathTile', () => {
 
   it('is null for an empty cell list', () => {
     expect(firstOccupiedPathTile([], () => true)).toBeNull();
+  });
+});
+
+describe('rampEndRow (#2045)', () => {
+  it('is the width tiles one step past the foot of a straight ramp, across it', () => {
+    expect(rampEndRow({ originX: 10, originZ: 5, legs: [{ direction: 'south', length: 8 }] }, 3))
+      .toEqual([{ x: 9, z: 13 }, { x: 10, z: 13 }, { x: 11, z: 13 }]);
+  });
+
+  it('runs across the last leg of a turning ramp', () => {
+    const row = rampEndRow({ originX: 10, originZ: 5, legs: [{ direction: 'south', length: 8 }, { direction: 'east', length: 6 }] }, 5);
+    expect(row).toEqual([{ x: 16, z: 11 }, { x: 16, z: 12 }, { x: 16, z: 13 }, { x: 16, z: 14 }, { x: 16, z: 15 }]);
+  });
+
+  it('a width of 1 is the end tile alone', () => {
+    expect(rampEndRow({ originX: 0, originZ: 0, legs: [{ direction: 'west', length: 4 }] }, 1 as never)).toEqual([{ x: -4, z: 0 }]);
   });
 });

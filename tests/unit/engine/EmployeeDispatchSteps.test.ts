@@ -824,6 +824,43 @@ describe('claimOnePoolCandidate', () => {
   });
 });
 
+describe('claimOnePoolCandidate — out-of-reach debris', () => {
+  it('skips an order stamped debris_out_of_reach, even though it would otherwise win', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const stamped = makeAction({ id: 70, targetX: 1, targetZ: 1, blockedReason: 'debris_out_of_reach' });
+    state.pendingActions.push(stamped);
+
+    expect(claimOnePoolCandidate(state, employee)).toBeNull();
+    expect(stamped.status).toBe('queued');
+  });
+
+  it('a nearer stamped order leaves a farther claimable one to win', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const stamped = makeAction({ id: 71, targetX: 1, targetZ: 1, blockedReason: 'debris_out_of_reach' });
+    const open = makeAction({ id: 72, targetX: 6, targetZ: 6 });
+    state.pendingActions.push(stamped, open);
+
+    expect(claimOnePoolCandidate(state, employee)!.action.id).toBe(72);
+  });
+
+  it('claims the order once the sweep has cleared its stamp', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const stamped = makeAction({ id: 73, targetX: 1, targetZ: 1, blockedReason: 'debris_out_of_reach' });
+    state.pendingActions.push(stamped);
+    expect(claimOnePoolCandidate(state, employee)).toBeNull();
+
+    stamped.blockedReason = null;
+
+    expect(claimOnePoolCandidate(state, employee)!.action.id).toBe(73);
+  });
+});
+
 describe('reserveOnePoolActionAhead', () => {
   function pushActive(state: GameState, employeeId: number, id: number, type: PendingAction['type'] = 'general_work'): PendingAction {
     const action = makeAction({ id, type, status: 'in_progress', holderId: employeeId, targetX: 0, targetZ: 0 });

@@ -9,8 +9,8 @@ import {
   VEHICLE_SCRAP_RESIDUAL_FRACTION,
   NAV_CLEARANCE_VEHICLE_CELLS,
   NAV_MAX_SLOPE_RATIO,
+  VEHICLE_MAX_SLOPE_RATIO,
 } from '../config/balance.js';
-import { tierSlopeRatio, VEHICLE_TIER_LIST } from '../nav/ClimbLimit.js';
 import type { Employee } from './Employee.js';
 import { computeTaskDuration } from './EmployeeTaskDuration.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
@@ -71,6 +71,9 @@ interface BaseStats {
   readonly speed: number;
   readonly maxHp: number;
 }
+
+/** Every vehicle tier, lowest first. */
+const VEHICLE_TIER_LIST: readonly VehicleTier[] = [1, 2, 3];
 
 // ── Catalog builder ───────────────────────────────────────────────────────────
 
@@ -364,9 +367,9 @@ export function canReleaseDriver(
 // ── Licence mapping / driver assignment / loading rate ──
 // Moved to VehicleDriverAssignment.ts (#484), re-exported above.
 
-/** Steepest rise/run this vehicle climbs; progression sites use its tier's limit (#1938). */
-export function vehicleMaxSlopeRatio(vehicle: Pick<Vehicle, 'tier'>, progression: boolean): number {
-  return progression ? tierSlopeRatio(vehicle.tier) : NAV_MAX_SLOPE_RATIO;
+/** Steepest rise/run any vehicle climbs: one limit for every role and tier on progression sites (#2045). */
+export function vehicleMaxSlopeRatio(progression: boolean): number {
+  return progression ? VEHICLE_MAX_SLOPE_RATIO : NAV_MAX_SLOPE_RATIO;
 }
 
 /**

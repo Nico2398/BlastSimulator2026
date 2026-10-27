@@ -23,6 +23,8 @@ interface ProbeMetrics {
   ticksHaulWaitedOnFullStorage: number;
   boulderSoldShare: number | null;
   gradeReachedTick: Record<number, number>;
+  /** Deepest pit (m) the grade tracker had measured by each cash sample tick; null past the run and throughout off the progression ladder. */
+  pitDepthAt?: Record<number, number | null>;
   /** Cash at the tick each grade was first reached, by grade. */
   gradeCashAt: Record<number, number>;
   /** First tick every building type is owned at its max purchasable tier and every vehicle role at tier 3; null if never. */
@@ -122,15 +124,23 @@ export class MetricsObserver {
     secondHauler: getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver,
   };
 
+  private readonly pitDepthAt: Record<number, number | null> = {};
+
   constructor() {
-    for (const t of CASH_SAMPLE_TICKS) this.cashAt[t] = null;
+    for (const t of CASH_SAMPLE_TICKS) {
+      this.cashAt[t] = null;
+      this.pitDepthAt[t] = null;
+    }
   }
 
   onTick(state: GameState): void {
     this.lastState = state;
     const t = state.tickCount;
     for (const sample of CASH_SAMPLE_TICKS) {
-      if (this.cashAt[sample] === null && t >= sample) this.cashAt[sample] = state.cash;
+      if (this.cashAt[sample] === null && t >= sample) {
+        this.cashAt[sample] = state.cash;
+        this.pitDepthAt[sample] = state.grade?.deepestPitM ?? null;
+      }
     }
     if (state.cash < this.lowPointCash) { this.lowPointCash = state.cash; this.lowPointTick = t; }
     if (this.bankruptTick === null && (state.bankruptcy.bankrupt || state.levelEndReason === 'bankruptcy')) {
@@ -206,6 +216,7 @@ export class MetricsObserver {
   finalize(): ProbeMetrics {
     return {
       cashAt: { ...this.cashAt },
+      pitDepthAt: { ...this.pitDepthAt },
       lowPointCash: Number.isFinite(this.lowPointCash) ? this.lowPointCash : 0,
       lowPointTick: this.lowPointTick,
       bankruptTick: this.bankruptTick,

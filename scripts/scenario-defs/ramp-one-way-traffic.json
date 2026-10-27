@@ -1,0 +1,107 @@
+{
+  "name": "ramp-one-way-traffic",
+  "description": "One-way ramps: a player picks a built ramp's traffic direction in the inspector. A ramp is dug, the player clicks it in the scene, and the inspector offers a Traffic action beside Widen. Each click steps the ramp to the next setting: two-way, then down only (vehicles only drive down it), then up only. Pairing a down ramp with an up ramp keeps trucks from meeting head-on; the route preference itself is asserted by unit tests (PathfindingRampFlow). Contract for console-api state: builtRampFlow (the first built ramp's direction: both, down or up).",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "timeout": 30,
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 staffed:true" }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": { "builtRampCount": 0 }
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "description": "Staffed vehicles come unmanned (#551) - crew rock_digger #3 with driver #4 before ordering excavation work. Same bootstrap as ramp-width-select-widen.json.",
+      "interaction": [
+        { "type": "command", "command": "vehicle driver 3 4" }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "build_ramp origin:20,20 direction:south length:11 depth:6 width:3",
+      "timeout": 60,
+      "description": "Player arms the ramp tool, sets depth 6 and width 3, drags the 11-tile corridor and confirms (the same path as ramp-width-select-widen.json).",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
+        { "type": "clickSelector", "selector": "#bs-build-panel .bs-build-ramp-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "setStepper", "selector": "#bs-param-strip [data-field=\"depth\"]", "value": 6 },
+        { "type": "setStepper", "selector": "#bs-param-strip [data-field=\"width\"]", "value": 3 },
+        { "type": "dragTiles", "x1": 20, "z1": 20, "x2": 20, "z2": 31 },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "increased": ["orderedRampSegmentCount"]
+      }
+    },
+    {
+      "command": "wait_until field:builtRampCount equals:1 max_ticks:1200",
+      "timeout": 185,
+      "description": "Wait for every dig_ramp_segment to land; the finished ramp is recorded as a BuiltRamp, two-way.",
+      "interaction": [
+        { "type": "cameraFocus", "x": 20, "z": 25.5, "distance": 16 },
+        { "type": "waitUntil", "field": "builtRampCount", "equals": 1, "maxTicks": 1200, "timeoutMs": 180000 }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": { "builtRampCount": 1, "builtRampFlow": "both", "orderedRampSegmentCount": 0 }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 90,
+      "description": "Player clicks the dug ramp in the scene (viewport centre after a near top-down focusTile on the corridor midpoint). The inspector shows the ramp with a Traffic action.",
+      "interaction": [
+        { "type": "focusTile", "x": 20, "z": 25, "distance": 16, "pitch": 80 },
+        { "type": "click", "x": 640, "y": 360 },
+        { "type": "waitForSelector", "selector": "#bs-inspector [data-action=\"traffic\"]", "timeout": 60000 }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector [data-action=\"traffic\"]",
+        "note": "Ramp selected; Traffic offered."
+      }
+    },
+    {
+      "command": "ramp_flow id:1 flow:down",
+      "timeout": 30,
+      "description": "Player clicks Traffic: the two-way ramp becomes down only. The setting takes effect at once, with no tick.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-inspector [data-action=\"traffic\"]" }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": { "builtRampFlow": "down" }
+      }
+    },
+    {
+      "command": "ramp_flow id:1 flow:up",
+      "timeout": 30,
+      "description": "Player clicks Traffic again: the ramp becomes up only.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-inspector [data-action=\"traffic\"]" }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": { "builtRampFlow": "up" }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        { "type": "command", "command": "state full" }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45, "target": [20, 25.5], "distance": 18 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80, "target": [20, 25.5], "distance": 18 }
+  ]
+}

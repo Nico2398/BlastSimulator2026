@@ -944,3 +944,42 @@ describe('advanceAlongPath — live-position fallback rounds to the NavGrid cell
     expect(result.committed.originZ).toBe(0);
   });
 });
+
+describe('advanceAlongPath — waypoint skip takes no diagonal shortcut up a ramp for a limited mover (#2045)', () => {
+  const tanDeg = (d: number): number => Math.tan(d * Math.PI / 180);
+
+  function rampNav(gradeDeg: number): NavGrid {
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < 5; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < 8; x++) {
+        row.push({ type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false, surfaceY: x * tanDeg(gradeDeg), climbY: x * tanDeg(gradeDeg) });
+      }
+      cells.push(row);
+    }
+    return new NavGrid(8, 5, cells);
+  }
+
+  /** Agent stands in cell (1,0); the path's third waypoint (2,1) is a diagonal hop away. */
+  const input = (gradeDeg: number, maxSlopeRatio?: number): AdvanceAlongPathInput => baseInput({
+    x: 1.0, z: 0.3, walkSpeed: 0.2, destinationX: 2, destinationZ: 1,
+    path: { found: true, waypoints: [{ x: 0, z: 0 }, { x: 1, z: 0 }, { x: 2, z: 1 }] },
+    navGrid: rampNav(gradeDeg),
+    ...(maxSlopeRatio !== undefined && { maxSlopeRatio }),
+  });
+
+  it('a 20 degree mover does not skip to the diagonal waypoint of a 25 degree ramp', () => {
+    const result = advanceAlongPath(input(25, tanDeg(20)));
+    expect(result.x).toBeLessThanOrEqual(1 + 1e-9);
+  });
+
+  it('a walking mover on the same ramp still skips to the diagonal waypoint', () => {
+    const result = advanceAlongPath(input(25));
+    expect(result.x).toBeGreaterThan(1);
+  });
+
+  it('a 20 degree mover on a 20 degree ramp still skips: the hop is legal', () => {
+    const result = advanceAlongPath(input(20, tanDeg(20)));
+    expect(result.x).toBeGreaterThan(1);
+  });
+});

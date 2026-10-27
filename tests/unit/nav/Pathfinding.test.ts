@@ -17,11 +17,14 @@ import {
   findPath, findExactPath, octileHeuristic, getBenchLevel, findRampConnections, isImpassable,
   isDiagonalCornerClear, directLineWalk, pathCrossesFragmentOccupancy, findFootPathWithVehicleFallback,
 } from '../../../src/core/nav/Pathfinding.js';
-import { NavGrid, type NavCell, type NavCellType, isStepClimbable } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid, type NavCell, type NavCellType, isStepClimbable, isGridStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import {
   NAV_MAX_SLOPE_RATIO, NAV_CLEARANCE_MAX_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS,
 } from '../../../src/core/config/balance.js';
 import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+import { computeClimbComponents } from '../../../src/core/nav/NavGridReachability.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 const RAMP_WIDTH = RAMP_DEFAULT_WIDTH;
 
 
@@ -275,6 +278,31 @@ describe('findPath — cell type costs', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 4: Vehicle avoidance
 // ═══════════════════════════════════════════════════════════════════════════════
+
+describe('findPath — a failed terrain search holds until the nav grid revision moves', () => {
+  it('a route opened through setCellAt is found on the next request', () => {
+    const grid = makeFlatGrid(10, 3, 'walkable');
+    for (let z = 0; z < 3; z++) setCell(grid, 5, z, 'blocked');
+    const request = { agentId: 1, fromX: 0, fromZ: 1, toX: 9, toZ: 1, avoidVehicles: false };
+    expect(findPath(grid, request).found).toBe(false);
+    expect(findPath(grid, request).found).toBe(false);
+
+    grid.setCellAt(5, 1, makeCell('walkable'));
+
+    expect(findPath(grid, request).found).toBe(true);
+  });
+
+  it('a request that avoids vehicles is searched afresh each time: occupancy changes without a revision', () => {
+    const grid = makeFlatGrid(10, 1, 'walkable');
+    setCell(grid, 5, 0, 'walkable', { vehicleOccupied: true });
+    const request = { agentId: 1, fromX: 0, fromZ: 0, toX: 9, toZ: 0, avoidVehicles: true };
+    expect(findPath(grid, request).found).toBe(false);
+
+    grid.cells[0]![5]!.vehicleOccupied = false;
+
+    expect(findPath(grid, request).found).toBe(true);
+  });
+});
 
 describe('findPath — vehicle avoidance', () => {
   it('routes around a vehicleOccupied cell when avoidVehicles=true', () => {
@@ -2277,6 +2305,74 @@ describe('findPath — maxSlopeRatio per-agent climb limit (#1938)', () => {
   });
 });
 
+describe('findPath — no diagonal shortcut up a ramp for a limited request (#2045)', () => {
+  const tanDeg = (d: number): number => Math.tan(d * Math.PI / 180);
+  const LIMIT = tanDeg(20);
+  const LENGTH = 14;
+
+  /** A ramp `width` wide rising along +x at `gradeDeg` per metre; every cell is walkable. */
+  function rampGrid(width: number, gradeDeg: number): NavGrid {
+    const grid = makeFlatGrid(LENGTH, width, 'walkable');
+    for (let z = 0; z < width; z++) {
+      for (let x = 0; x < LENGTH; x++) setCell(grid, x, z, 'walkable', { surfaceY: x * tanDeg(gradeDeg), climbY: x * tanDeg(gradeDeg) });
+    }
+    return grid;
+  }
+  const climb = (grid: NavGrid, width: number, extra: { maxSlopeRatio?: number } = {}) =>
+    findPath(grid, { agentId: 1, fromX: 0, fromZ: Math.floor(width / 2), toX: LENGTH - 1, toZ: Math.floor(width / 2), avoidVehicles: false, ...extra });
+
+  for (const width of [3, 5, 7]) {
+    for (const grade of [21, 24, 27]) {
+      it(`a 20 degree request cannot climb a ${width}-wide ${grade} degree ramp by zigzag`, () => {
+        expect(climb(rampGrid(width, grade), width, { maxSlopeRatio: LIMIT }).found).toBe(false);
+      });
+    }
+
+    it(`a 20 degree request climbs a ${width}-wide 20 degree ramp`, () => {
+      const result = climb(rampGrid(width, 20), width, { maxSlopeRatio: LIMIT });
+      expect(result.found).toBe(true);
+      expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: LENGTH - 1, z: Math.floor(width / 2) });
+    });
+
+    it(`walking (default limit) still climbs a ${width}-wide ramp up to 30 degrees`, () => {
+      for (const grade of [21, 27, 30]) expect(climb(rampGrid(width, grade), width).found).toBe(true);
+    });
+  }
+
+  it('findExactPath refuses the zigzag too', () => {
+    const grid = rampGrid(5, 25);
+    expect(findExactPath(grid, { agentId: 1, fromX: 0, fromZ: 2, toX: LENGTH - 1, toZ: 2, avoidVehicles: false, maxSlopeRatio: LIMIT }).found).toBe(false);
+  });
+
+  it('a gentle 15 degree ramp is climbed at 20 degrees', () => {
+    expect(climb(rampGrid(3, 15), 3, { maxSlopeRatio: LIMIT }).found).toBe(true);
+  });
+
+  it('a 20 degree request still climbs terrain tilted 18 degrees along the diagonal (isGridStepClimbable)', () => {
+    // Each cardinal step rises tan(18)/sqrt(2); the diagonal step rises tan(18): fine for a 20 degree vehicle.
+    const grid = makeFlatGrid(LENGTH, LENGTH, 'walkable');
+    for (let z = 0; z < LENGTH; z++) {
+      for (let x = 0; x < LENGTH; x++) setCell(grid, x, z, 'walkable', { surfaceY: (x + z) * tanDeg(18) / Math.SQRT2 });
+    }
+    expect(isGridStepClimbable(grid, 0, 0, 1, 1, LIMIT)).toBe(true);
+    expect(findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: LENGTH - 1, toZ: LENGTH - 1, avoidVehicles: false, maxSlopeRatio: LIMIT }).found).toBe(true);
+  });
+
+  it('isGridStepClimbable refuses a diagonal across a 25 degree ramp but allows the cardinal 18 degree step', () => {
+    const steep = rampGrid(3, 25);
+    expect(isGridStepClimbable(steep, 0, 1, 1, 0, LIMIT)).toBe(false);
+    expect(isGridStepClimbable(steep, 0, 1, 1, 1, LIMIT)).toBe(false);
+    expect(isGridStepClimbable(steep, 0, 1, 1, 1)).toBe(true);
+    expect(isGridStepClimbable(rampGrid(3, 18), 0, 1, 1, 0, LIMIT)).toBe(true);
+  });
+
+  it('a downhill zigzag is refused symmetrically', () => {
+    const grid = rampGrid(3, 25);
+    const down = findPath(grid, { agentId: 1, fromX: LENGTH - 1, fromZ: 1, toX: 0, toZ: 1, avoidVehicles: false, maxSlopeRatio: LIMIT });
+    expect(down.found).toBe(false);
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Ramp-based multi-level routing engaged — branch coverage for the fallback
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2604,43 +2700,46 @@ describe('findFootPathWithVehicleFallback', () => {
     expect(result.crossedVehicles).toBe(false);
   });
 
-  describe('crossFragments (#2077)', () => {
-    function rubbleBoxedGrid(): NavGrid {
-      const grid = makeFlatGrid(3, 1);
-      setCell(grid, 1, 0, 'walkable', { fragmentOccupancy: 1 });
-      return grid;
+  it('rejects a route whose only way is across rubble, exact or not (#2094)', () => {
+    const grid = makeFlatGrid(3, 1);
+    setCell(grid, 1, 0, 'walkable', { fragmentOccupancy: 1 });
+    expect(findFootPathWithVehicleFallback(grid, request, false).found).toBe(false);
+    expect(findFootPathWithVehicleFallback(grid, request, true).found).toBe(false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// The whole-grid retry is a complete search (#2045)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('findPath: the whole-grid retry finds a long vehicle road out of a pit (#2045)', () => {
+  /** The nav grid a 20-degree probe run left: a pit floor whose only road out is a ramp on the side away from the depot. */
+  function pitSite(): NavGrid {
+    const fixture = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures/pit-route-navgrid.json'), 'utf8')) as { width: number; height: number; rows: string[] };
+    const TYPES: Record<string, NavCellType> = { w: 'walkable', b: 'blocked', r: 'ramp', d: 'drill_hole', v: 'void' };
+    const cells = fixture.rows.map(row => row.split(' ').map(code => {
+      const [head, clearance, bench] = code.split(':');
+      const surfaceY = head!.length > 1 ? Number(head!.slice(1)) / 100 : undefined;
+      return { ...makeCell(TYPES[head![0]!]!, Number(bench), surfaceY), ...(clearance !== '' && { clearance: Number(clearance) }) };
+    }));
+    return new NavGrid(fixture.width, fixture.height, cells);
+  }
+  const ratio = Math.tan(20 * Math.PI / 180);
+  const drive = (fromX: number, fromZ: number, toX: number, toZ: number) =>
+    ({ agentId: 1, fromX, fromZ, toX, toZ, avoidVehicles: false, requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS, maxSlopeRatio: ratio });
+
+  it('the climb labelling connects the pit floor to the warehouse dock', () => {
+    const grid = pitSite();
+    expect(computeClimbComponents(grid, NAV_CLEARANCE_VEHICLE_CELLS, ratio).canReach(52, 34, 37, 39)).toBe(true);
+    expect(findPath(grid, drive(52, 34, 5, 17)).found).toBe(true);
+  });
+
+  it('a hauler on the pit floor finds its road to the dock, up the far ramp and round the pit', () => {
+    const grid = pitSite();
+    for (const [x, z] of [[44, 30], [37, 39]] as const) {
+      const path = findExactPath(grid, drive(x, z, 5, 17));
+      expect(path.found, `${x},${z}`).toBe(true);
+      expect(path.waypoints.at(-1)).toEqual({ x: 5, z: 17 });
     }
-
-    it('returns the relaxed route across rubble when crossFragments is true (exact: false)', () => {
-      const result = findFootPathWithVehicleFallback(rubbleBoxedGrid(), request, false, { crossFragments: true });
-      expect(result.found).toBe(true);
-      expect(result.crossedVehicles).toBe(true);
-      expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: 2, z: 0 });
-    });
-
-    it('returns the relaxed route across rubble when crossFragments is true (exact: true)', () => {
-      const result = findFootPathWithVehicleFallback(rubbleBoxedGrid(), request, true, { crossFragments: true });
-      expect(result.found).toBe(true);
-      expect(result.crossedVehicles).toBe(true);
-    });
-
-    it('still rejects the rubble route by default', () => {
-      const result = findFootPathWithVehicleFallback(rubbleBoxedGrid(), request, false);
-      expect(result.found).toBe(false);
-      expect(result.crossedVehicles).toBe(false);
-    });
-
-    it('still rejects the rubble route when crossFragments is false or unset in opts', () => {
-      expect(findFootPathWithVehicleFallback(rubbleBoxedGrid(), request, false, { crossFragments: false }).found).toBe(false);
-      expect(findFootPathWithVehicleFallback(rubbleBoxedGrid(), request, false, {}).found).toBe(false);
-    });
-
-    it('does not make a genuinely walled-in start reachable', () => {
-      const grid = makeFlatGrid(3, 1);
-      setCell(grid, 1, 0, 'blocked');
-      const result = findFootPathWithVehicleFallback(grid, request, false, { crossFragments: true });
-      expect(result.found).toBe(false);
-      expect(result.crossedVehicles).toBe(false);
-    });
   });
 });

@@ -25,6 +25,10 @@ import {
 import * as reachability from './NavGridReachability.js';
 import { NEIGHBOUR_OFFSETS_4, NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 
+// Read once: the step checks below run per A* neighbour and per flood-fill cell, and a transpiled import is a getter
+// call on every read (a tenth of a 12-hauler tick under tsx).
+const WALK_SLOPE_RATIO = NAV_MAX_SLOPE_RATIO;
+
 /**
  * True when stepping between two cells whose column heights sit at `fromY`
  * and `toY` is a physically negotiable climb (#953), now a slope check
@@ -45,7 +49,7 @@ import { NEIGHBOUR_OFFSETS_4, NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js'
  * climb-aware flood fill, and the reachable-set pre-filter
  * `ActionSelection.selectBestActionForEmployee` screens candidates with.
  */
-export function isStepClimbable(fromY: number | undefined, toY: number | undefined, run: number, maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO): boolean {
+export function isStepClimbable(fromY: number | undefined, toY: number | undefined, run: number, maxSlopeRatio: number = WALK_SLOPE_RATIO): boolean {
   if (fromY === undefined || toY === undefined) return true;
   // Epsilon absorbs float round-trip error from `toY - fromY` (computed by
   // callers as e.g. `fromY + NAV_MAX_SLOPE_RATIO`) so the documented `<=`
@@ -53,6 +57,53 @@ export function isStepClimbable(fromY: number | undefined, toY: number | undefin
   // smaller than any real slope difference this gate cares about.
   const NAV_SLOPE_EPSILON = 1e-9;
   return Math.abs(fromY - toY) <= maxSlopeRatio * run + NAV_SLOPE_EPSILON;
+}
+
+/** Horizontal run (m) a step of (dx, dz) must travel to climb at no more than `maxSlopeRatio` (#2045). */
+export function stepClimbRun(dx: number, dz: number, maxSlopeRatio: number = WALK_SLOPE_RATIO): number {
+  const ax = Math.abs(dx);
+  const az = Math.abs(dz);
+  // Below the walking limit the rise gate would let a diagonal step zigzag up a ramp
+  // steeper than the axis limit (rise/run with run up to √2), so the run is the
+  // longer axis: no diagonal shortcut for a limited request.
+  if (maxSlopeRatio < WALK_SLOPE_RATIO) return Math.max(ax, az);
+  // Unit steps (every A* neighbour) skip Math.hypot on the hot path.
+  if (ax <= 1 && az <= 1) return ax + az === 2 ? Math.SQRT2 : ax + az;
+  return Math.hypot(dx, dz);
+}
+
+/**
+ * Climb legality of the grid step (x, z) -> (nx, nz) for a request limited to
+ * `maxSlopeRatio` (#2045). One gate for the planner, the reachability flood fill
+ * and the executor, so they never disagree.
+ *
+ * A limited request measures a diagonal step by its longer axis (`stepClimbRun`),
+ * so it cannot cut across a ramp. That under-credits genuinely tilted terrain,
+ * where a diagonal step rises `√2 ×` a cardinal one: a unit diagonal also passes
+ * when its true slope is within the limit AND both L-shaped cardinal routes
+ * through the corner cells are climbable. On a ramp one of those legs is the
+ * steep axis step, so the shortcut stays closed there.
+ */
+export function isGridStepClimbable(grid: NavGrid, x: number, z: number, nx: number, nz: number, maxSlopeRatio: number = WALK_SLOPE_RATIO): boolean {
+  return isCellStepClimbable(grid, x, z, grid.cellAt(x, z), nx, nz, grid.cellAt(nx, nz), maxSlopeRatio);
+}
+
+/** `isGridStepClimbable` for a caller already holding both cells (`from` at (x, z), `to` at (nx, nz)): the A* hot loop. */
+export function isCellStepClimbable(
+  grid: NavGrid, x: number, z: number, from: NavCell | undefined, nx: number, nz: number, to: NavCell | undefined,
+  maxSlopeRatio: number = WALK_SLOPE_RATIO,
+): boolean {
+  if (!to) return false;
+  const dx = nx - x;
+  const dz = nz - z;
+  if (isStepClimbable(from?.surfaceY, to.surfaceY, stepClimbRun(dx, dz, maxSlopeRatio), maxSlopeRatio)) return true;
+  if (maxSlopeRatio >= WALK_SLOPE_RATIO || Math.abs(dx) !== 1 || Math.abs(dz) !== 1) return false;
+  if (!isStepClimbable(from?.surfaceY, to.surfaceY, Math.SQRT2, maxSlopeRatio)) return false;
+  const cornerA = grid.cellAt(x + dx, z);
+  const cornerB = grid.cellAt(x, z + dz);
+  if (!cornerA || !cornerB) return false;
+  return isStepClimbable(from?.surfaceY, cornerA.surfaceY, 1, maxSlopeRatio) && isStepClimbable(cornerA.surfaceY, to.surfaceY, 1, maxSlopeRatio)
+    && isStepClimbable(from?.surfaceY, cornerB.surfaceY, 1, maxSlopeRatio) && isStepClimbable(cornerB.surfaceY, to.surfaceY, 1, maxSlopeRatio);
 }
 
 export type NavCellType = 'walkable' | 'blocked' | 'drill_hole' | 'ramp' | 'void';

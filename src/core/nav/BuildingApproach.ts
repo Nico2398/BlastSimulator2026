@@ -15,7 +15,7 @@ import type { NavGrid, NavCell } from './NavGrid.js';
 import type { BuildingDef } from '../entities/Building.js';
 import { getDefSize } from '../entities/Building.js';
 import { isImpassable } from './Pathfinding.js';
-import { findNearestNavigableCell, isTraversableCell, computeClimbReachableSet } from './NavGridReachability.js';
+import { findNearestNavigableCell, isTraversableCell, computeClimbReachableSet, type ReachableSet } from './NavGridReachability.js';
 
 /**
  * The x/z every ring computation in this file actually reads off a
@@ -24,6 +24,31 @@ import { findNearestNavigableCell, isTraversableCell, computeClimbReachableSet }
  * target at order time (#1200).
  */
 type FootprintAnchor = { x: number; z: number };
+
+/** Per nav grid: the revision the entries were built at, and each building anchor's main region (null: anchor not traversable). */
+const mainRegionCache = new WeakMap<NavGrid, { revision: number; byAnchor: Map<string, ReachableSet | null> }>();
+
+/**
+ * The climb-connected region around the navigable cell nearest the building (`findNearestNavigableCell`), or null
+ * when that cell is not traversable. Both read terrain only (type, clearance, surface height), which is what bumps
+ * `NavGrid.revision`, so the pair is kept per revision: every haul candidate's cost asks for its depot's approach,
+ * and each fresh answer labelled the whole grid twice.
+ */
+function buildingMainRegion(navGrid: NavGrid, building: FootprintAnchor): ReachableSet | null {
+  let entry = mainRegionCache.get(navGrid);
+  if (entry === undefined || entry.revision !== navGrid.revision) {
+    entry = { revision: navGrid.revision, byAnchor: new Map() };
+    mainRegionCache.set(navGrid, entry);
+  }
+  const key = `${building.x},${building.z}`;
+  let region = entry.byAnchor.get(key);
+  if (region === undefined) {
+    const anchor = findNearestNavigableCell(navGrid, building.x, building.z);
+    region = isTraversableCell(navGrid, anchor.x, anchor.z) ? computeClimbReachableSet(navGrid, anchor.x, anchor.z) : null;
+    entry.byAnchor.set(key, region);
+  }
+  return region;
+}
 
 /** The inclusive bounds of the one-cell ring around a building's footprint bounding box. */
 function ringBounds(building: FootprintAnchor, def: BuildingDef): { minX: number; maxX: number; minZ: number; maxZ: number } {
@@ -36,6 +61,23 @@ export function isOnBuildingRing(building: FootprintAnchor, def: BuildingDef, x:
   const { minX, maxX, minZ, maxZ } = ringBounds(building, def);
   if (x < minX || x > maxX || z < minZ || z > maxZ) return false;
   return x === minX || x === maxX || z === minZ || z === maxZ;
+}
+
+/** The cells of the one-cell ring around a building's footprint, in column then row order. */
+export function buildingRingCells(building: FootprintAnchor, def: BuildingDef): { x: number; z: number }[] {
+  const { minX, maxX, minZ, maxZ } = ringBounds(building, def);
+  const cells: { x: number; z: number }[] = [];
+  for (let x = minX; x <= maxX; x++) {
+    for (let z = minZ; z <= maxZ; z++) {
+      if (x === minX || x === maxX || z === minZ || z === maxZ) cells.push({ x, z });
+    }
+  }
+  return cells;
+}
+
+/** True when some cell of the one-cell ring around a building's footprint satisfies `has` (#2045). */
+export function buildingRingTouches(building: FootprintAnchor, def: BuildingDef, has: (x: number, z: number) => boolean): boolean {
+  return buildingRingCells(building, def).some(c => has(c.x, c.z));
 }
 
 /**
@@ -127,10 +169,7 @@ export function findBuildingApproachCell(
 ): { x: number; z: number } {
   if (!navGrid) return { x: building.x, z: building.z };
 
-  const mainAnchor = findNearestNavigableCell(navGrid, building.x, building.z);
-  const mainRegion = isTraversableCell(navGrid, mainAnchor.x, mainAnchor.z)
-    ? computeClimbReachableSet(navGrid, mainAnchor.x, mainAnchor.z)
-    : null;
+  const mainRegion = buildingMainRegion(navGrid, building);
 
   const tiers: Array<(x: number, z: number, cell: NavCell) => boolean> = [
     (x, z, cell) => isRingCandidateType(cell) && !cell.vehicleOccupied && !!mainRegion?.has(x, z),
@@ -170,9 +209,8 @@ export function isApproachCellStranded(
   z: number,
 ): boolean {
   if (!isTraversableCell(navGrid, x, z)) return true;
-  const mainAnchor = findNearestNavigableCell(navGrid, building.x, building.z);
-  if (!isTraversableCell(navGrid, mainAnchor.x, mainAnchor.z)) return false; // nothing to compare against
-  const mainRegion = computeClimbReachableSet(navGrid, mainAnchor.x, mainAnchor.z);
+  const mainRegion = buildingMainRegion(navGrid, building);
+  if (mainRegion === null) return false; // nothing to compare against
   return !mainRegion.has(x, z);
 }
 

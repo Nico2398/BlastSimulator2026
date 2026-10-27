@@ -3,8 +3,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { planCraterAccess, type AccessSurface, type StrandedFloor } from '../../../src/core/mining/CraterAccess.js';
-import { MAX_RAMP_LENGTH, RAMP_DEFAULT_WIDTH, RAMP_FLOOR_SNAP_REACH_M } from '../../../src/core/config/balance.js';
-import { slowestVehicleTierSlopeRatio } from '../../../src/core/nav/ClimbLimit.js';
+import { rampEndRow, rampPathCells, rampPathOf } from '../../../src/core/mining/RampPath.js';
+import { MAX_RAMP_LENGTH, RAMP_DEFAULT_WIDTH, CRATER_ACCESS_FLOOR_LEVEL_M } from '../../../src/core/config/balance.js';
+import { VEHICLE_MAX_SLOPE_RATIO } from '../../../src/core/config/balance.js';
 
 const SITE = 64;
 
@@ -29,7 +30,7 @@ function surface(boxes: readonly Box[], reachable: (x: number, z: number, h: num
 /** The network reaches every cell at or above `level` (the surface and any ramp already dug down to it). */
 const reachesDownTo = (level: number) => (_x: number, _z: number, h: number) => h >= level;
 
-const ratio = () => slowestVehicleTierSlopeRatio();
+const ratio = () => VEHICLE_MAX_SLOPE_RATIO;
 const plan = (floor: StrandedFloor, s: AccessSurface, built: Parameters<typeof planCraterAccess>[5] = []) =>
   planCraterAccess(floor, s, ratio(), RAMP_DEFAULT_WIDTH, [], built);
 
@@ -43,7 +44,7 @@ describe('planCraterAccess on wide limit-shot craters (#2086)', () => {
     const p = plan(wideFloor(), s);
     expect(p.ok).toBe(true);
     if (p.ok) {
-      expect(Math.abs(p.def.targetDepth - 10)).toBeLessThanOrEqual(RAMP_FLOOR_SNAP_REACH_M);
+      expect(Math.abs(p.def.targetDepth - 10)).toBeLessThanOrEqual(CRATER_ACCESS_FLOOR_LEVEL_M);
       expect(p.def.length).toBeLessThanOrEqual(MAX_RAMP_LENGTH);
     }
   });
@@ -77,7 +78,7 @@ describe('planCraterAccess on uneven floors (#2086)', () => {
     const s = surface([WIDE, RIDGE], reachesDownTo(0));
     const p = plan({ x: 32, z: 32, floorY: -10, orderCount: 200 }, s);
     expect(p.ok).toBe(true);
-    if (p.ok) expect(p.def.targetDepth).toBeGreaterThanOrEqual(10 - RAMP_FLOOR_SNAP_REACH_M);
+    if (p.ok) expect(p.def.targetDepth).toBeGreaterThanOrEqual(10 - CRATER_ACCESS_FLOOR_LEVEL_M);
   });
 
   it('plans for a floor on the high side of a stepped pit (two benches, 4 m apart)', () => {
@@ -114,7 +115,7 @@ describe('planCraterAccess beside a built ramp whose foot ends above the floor (
     const s = rampSurface();
     expect(s.reachableFrom(35, 38)).toBe(false);
     expect(inCorridor(35, 38)).toBe(false);
-    expect(s.heightAt(37, 31)).toBeGreaterThan(-15 + 2 * RAMP_FLOOR_SNAP_REACH_M);
+    expect(s.heightAt(37, 31)).toBeGreaterThan(-15 + 2 * CRATER_ACCESS_FLOOR_LEVEL_M);
   });
 
   it('plans a ramp down to the deepened floor from the built ramp or the rim', () => {
@@ -164,6 +165,19 @@ describe('planCraterAccess on nested craters (#2086)', () => {
         && def.direction === firstRamp.def.direction && def.length === firstRamp.def.length;
       expect(same).toBe(false);
     }
+  });
+
+  it('never cuts through a dug ramp\'s corridor or the floor its foot lands on (#2045)', () => {
+    const s = surface([OUTER, INNER], reachesDownTo(-8));
+    const p = plan({ x: 32, z: 32, floorY: -16, orderCount: 300 }, s, [firstRamp]);
+    expect(p.ok).toBe(true);
+    if (!p.ok) return;
+    const dug = new Set([
+      ...rampPathCells(rampPathOf(firstRamp.def), firstRamp.width),
+      ...rampEndRow(rampPathOf(firstRamp.def), firstRamp.width),
+    ].map(c => `${c.x},${c.z}`));
+    const cut = rampPathCells(rampPathOf(p.def), RAMP_DEFAULT_WIDTH).filter(c => dug.has(`${c.x},${c.z}`));
+    expect(cut).toEqual([]);
   });
 
   it('plans down a narrow 9-cell pit sunk 12 m below the outer floor (20 m deep overall)', () => {

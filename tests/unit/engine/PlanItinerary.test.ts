@@ -716,9 +716,9 @@ describe('hole-work legs are locked against destination-spreading (#1291)', () =
 });
 
 
-// ── Per-tier climb limit on progression sites (#1938) ──────────────────────────
+// ── One 20 degree climb limit for every tier on progression sites (#1938, #2045) ──────────────────────────
 
-describe('planItinerary — vehicle tier climb limit (#1938)', () => {
+describe('planItinerary — one vehicle climb limit (#1938, #2045)', () => {
   const tanDeg = (d: number): number => Math.tan(d * Math.PI / 180);
   const TARGET = { x: 20, z: bandCentreZ(0) };
 
@@ -752,28 +752,25 @@ describe('planItinerary — vehicle tier climb limit (#1938)', () => {
     return r.totalCost;
   };
 
-  it('a tier-3 hauler on a progression site is planned over the gentler of two ramps (cost matches an 18 degree path)', () => {
-    const p = pit([30, 15], 3, true);
-    const speed = getVehicleDefByTier('debris_hauler', 3).speed;
-    const ticks = driveTicks(p);
-    expect(ticks).not.toBeNull();
-    expect(ticks! * speed).toBeCloseTo(pathCost(p, tanDeg(18)), 5);
-    // The detour to the gentle ramp is real: longer than the steep route.
-    expect(pathCost(p, tanDeg(18))).toBeGreaterThan(pathCost(p));
-  });
+  for (const tier of [1, 2, 3] as const) {
+    it(`a tier-${tier} hauler on a progression site is planned over the gentler of two ramps (cost matches a 20 degree path)`, () => {
+      const p = pit([30, 15], tier, true);
+      const speed = getVehicleDefByTier('debris_hauler', tier).speed;
+      const ticks = driveTicks(p);
+      expect(ticks).not.toBeNull();
+      expect(ticks! * speed).toBeCloseTo(pathCost(p, tanDeg(20)), 5);
+      // The detour to the gentle ramp is real: longer than the steep route.
+      expect(pathCost(p, tanDeg(20))).toBeGreaterThan(pathCost(p));
+    });
 
-  it('a tier-1 hauler on the same progression site takes the steep short ramp', () => {
-    const p = pit([30, 15], 1, true);
-    const speed = getVehicleDefByTier('debris_hauler', 1).speed;
-    expect(driveTicks(p)! * speed).toBeCloseTo(pathCost(p), 5);
-  });
+    it(`a tier-${tier} hauler with only a 26 degree ramp has no itinerary at exact fidelity`, () => {
+      expect(driveTicks(pit([26], tier, true), 'exact')).toBeNull();
+    });
 
-  it('a tier-2 hauler is priced over the 20 degree ramp (24 degree limit), not the 30 degree one', () => {
-    const p = pit([30, 20], 2, true);
-    const speed = getVehicleDefByTier('debris_hauler', 2).speed;
-    expect(driveTicks(p)! * speed).toBeCloseTo(pathCost(p, tanDeg(24)), 5);
-    expect(pathCost(p, tanDeg(24))).toBeGreaterThan(pathCost(p));
-  });
+    it(`a tier-${tier} hauler with a 20 degree ramp has an itinerary`, () => {
+      expect(driveTicks(pit([20], tier, true), 'exact')).not.toBeNull();
+    });
+  }
 
   it('without a grade (campaign site) a tier-3 hauler still uses the steep ramp', () => {
     const p = pit([30, 15], 3, false);
@@ -781,23 +778,21 @@ describe('planItinerary — vehicle tier climb limit (#1938)', () => {
     expect(driveTicks(p)! * speed).toBeCloseTo(pathCost(p), 5);
   });
 
-  it('a tier-3 hauler with only a 30 degree ramp has no itinerary at exact fidelity; estimate stays the never-failing octile ranking heuristic', () => {
+  it('estimate stays the never-failing octile ranking heuristic where exact finds no route', () => {
     const p = pit([30], 3, true);
     expect(driveTicks(p, 'exact')).toBeNull();
     // 'estimate' never checks reachability (estimateLegDistance); the exact plan at dispatch is the gate.
     expect(driveTicks(p, 'estimate')).not.toBeNull();
   });
 
-  it('the same single steep ramp is fine for tier 1, and for tier 3 off a progression site', () => {
-    expect(driveTicks(pit([30], 1, true))).not.toBeNull();
-    expect(driveTicks(pit([30], 3, false))).not.toBeNull();
+  it('a single steep ramp is fine off a progression site, for any tier', () => {
+    for (const tier of [1, 2, 3] as const) expect(driveTicks(pit([30], tier, false))).not.toBeNull();
   });
 
   it('the estimate fidelity ignores the slope limit (octile heuristic) yet never undercuts the steep-route cost', () => {
     const p = pit([30, 15], 3, true);
     const exact = driveTicks(p, 'exact')!;
     const estimate = driveTicks(p, 'estimate')!;
-    // Estimates may use a coarser heuristic but must not undercut the steep-route cost.
     const steepTicks = pathCost(p) / getVehicleDefByTier('debris_hauler', 3).speed;
     expect(exact).toBeGreaterThan(steepTicks);
     expect(estimate).toBeGreaterThan(steepTicks - 1e-9);
@@ -830,8 +825,15 @@ describe('planItinerary — vehicle tier climb limit (#1938)', () => {
       expect(Math.abs(ticks - planned)).toBeLessThanOrEqual(2);
     });
 
-    it('a tier-1 hauler crosses the 30 degree corridor and arrives', () => {
+    it('a tier-1 hauler also avoids the 30 degree corridor now: one limit for every tier', () => {
       const p = pit([30, 15], 1, true);
+      const { visited } = drive(p);
+      expect(visited.some(onSteepRamp)).toBe(false);
+      expect(Math.hypot(p.vehicle.x - TARGET.x, p.vehicle.z - TARGET.z)).toBeLessThan(3);
+    });
+
+    it('off a progression site a tier-3 hauler crosses the 30 degree corridor and arrives', () => {
+      const p = pit([30, 15], 3, false);
       const { visited } = drive(p);
       expect(visited.some(onSteepRamp)).toBe(true);
       expect(Math.hypot(p.vehicle.x - TARGET.x, p.vehicle.z - TARGET.z)).toBeLessThan(3);

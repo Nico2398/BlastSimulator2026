@@ -62,6 +62,7 @@ Records why the rules in the `gameplay-blast-system` skill exist: the issues tha
 ## BURIED HOLES
 
 - Introduced by #1937.
+- The buried-hole bonus also ranks breaking a boulder on a planned hole: on the seed-42 full-kit ladder 13 boulders kept a deepening pattern buried after the haulers had cleared the rest, and every deepening shot was dropped (#2089).
 
 ## Pre-Flight building reach
 
@@ -78,3 +79,8 @@ Records why the rules in the `gameplay-blast-system` skill exist: the issues tha
 ## Crater access clears buried holes — provenance (merged from main)
 
 - Added with #2082. The Pre-Flight building reach section came with #2030.
+
+## Buried holes
+
+- Core no longer orders crater access for buried holes; the player does: #2095.
+- Buried-hole rubble exempt from barren-yields-to-ore (#2089).

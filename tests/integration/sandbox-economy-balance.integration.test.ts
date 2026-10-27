@@ -454,9 +454,11 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
    * The full kit's cash at tick 2000 on the scripted opening: today's run, #1747.
    * Re-measured for the calibrated sandbox (#1944: scale 0.08, 3x3 depth 5, 6 kg, shot at 36,30): 792,241.1 (seed 42, desert_badlands),
    * with a free explosive warehouse. Re-measured again once the warehouse is paid for and built by the crew through
-   * stockWarehouse (#1963, $20,000 and its build time before the order): 740,314.4. Floor is that measurement, rounded down.
+   * stockWarehouse (#1963, $20,000 and its build time before the order): 740,314.4. Re-measured once trace ore under the
+   * barren threshold, bound for the spoil heap, stopped counting as ore in barren-yields-to-ore (#2089): 735,908.7.
+   * Floor is that measurement, rounded down.
    */
-  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 740_314;
+  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 735_908;
 
   interface OpeningTrace {
     endedAtTick: number | null;

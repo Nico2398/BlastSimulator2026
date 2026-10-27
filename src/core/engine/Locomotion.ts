@@ -18,6 +18,7 @@ import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
 import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells, vehicleMaxSlopeRatio } from '../entities/Vehicle.js';
 import type { Leg, Itinerary } from './Itinerary.js';
 import { findPath, findFootPathWithVehicleFallback, type PathResult, type PathRequest } from '../nav/Pathfinding.js';
+import { rampFlowField } from '../mining/RampFlow.js';
 import { isStepClimbable, hasClearance, type NavGrid } from '../nav/NavGrid.js';
 import { advanceAlongPath, inFlightHopOrigin, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import { pickYieldCell } from '../nav/IdleYield.js';
@@ -31,6 +32,7 @@ import {
   AGENT_FREE_CELL_MAX_RETURN_COST,
   IDLE_YIELD_SEARCH_RADIUS_CELLS,
   BLOCK_EPISODE_ABANDON_LIMIT,
+  REROUTE_CONTEST_MAX_DETOUR_COST,
 } from '../config/balance.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { employeeWorkState } from './EmployeeDispatch.js';
@@ -438,7 +440,6 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
         state.navGrid,
         { agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles },
         false /* exact */,
-        { crossFragments: leg.crossesFragments === true },
       );
       path = footResult;
       if (footResult.crossedVehicles) {
@@ -829,19 +830,30 @@ function noteBlockEpisodeStep(emp: Employee, leg: Leg): number {
 }
 
 /** Per-vehicle pathing limits a drive leg's routes carry; empty for a foot leg. */
-type DriveLimits = Pick<PathRequest, 'requiredClearance' | 'maxSlopeRatio'>;
+type DriveLimits = Pick<PathRequest, 'requiredClearance' | 'maxSlopeRatio' | 'rampFlow'>;
 
-/** Clearance and climb limit of `vehicle`, the same pair the planner's drive-leg estimate uses (#1938). */
+/** Clearance, climb limit and one-way ramps of `vehicle`'s routes, the same the planner's drive-leg estimate uses (#1938). */
 function driveLimitsOf(state: GameState, vehicle: Vehicle): DriveLimits {
   return {
     requiredClearance: vehicleRequiredClearanceCells(vehicle),
-    maxSlopeRatio: vehicleMaxSlopeRatio(vehicle, isProgressionSite(state)),
+    maxSlopeRatio: vehicleMaxSlopeRatio(isProgressionSite(state)),
+    rampFlow: rampFlowField(state),
   };
 }
 
 /** True when there is no free cell at all or `cell` lies on the route (`routeCells` is computed on demand). */
 function isOnRoute(cell: { x: number; z: number } | null, routeCells: () => ReadonlySet<string>): boolean {
   return cell === null || routeCells().has(`${cell.x},${cell.z}`);
+}
+
+/** Cost of the mover's plain route to its leg destination, the one advanceLeg repaths every tick; Infinity when none. */
+function plainRouteCost(state: GameState, emp: Employee, leg: Leg, driveLimits: DriveLimits): number {
+  if (!state.navGrid) return Infinity;
+  const route = findPath(state.navGrid, {
+    agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
+    avoidVehicles: false, ...driveLimits,
+  });
+  return route.found ? route.totalCost : Infinity;
 }
 
 /** Cells ("x,z") of the mover's remaining direct route to its leg destination; empty when none is found. */
@@ -1043,11 +1055,19 @@ function handleAgentOccupancyBlock(
     // avoid-everything reroute away from it is undone the next tick and the
     // mover oscillates forever, its stuck counters reset by every reroute step.
     // Crossing the parked blocker (below) is the route plain pathing keeps taking.
-    const crossesParkedBlocker = isDrive
-      && idleParkedVehicleOf(state, occupancy.holderOf(blockedStep.x, blockedStep.z)) !== undefined;
-    const reroute = crossesParkedBlocker
+    const blocker = occupancy.holderOf(blockedStep.x, blockedStep.z);
+    const blockerEmp = blocker ? controllingEmployee(state, blocker) : undefined;
+    const crossesParkedBlocker = isDrive && idleParkedVehicleOf(state, blocker) !== undefined;
+    const avoiding = crossesParkedBlocker
       ? undefined
       : findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, driveLimits);
+    // Same undo against a stuck blocker, a head-on contest: a detour longer than the plain route by more than
+    // REROUTE_CONTEST_MAX_DETOUR_COST is walked one tick and abandoned the next, the pair never closer, so the
+    // contest falls to the tie-break sidestep below instead.
+    const reroute = avoiding?.found && blockerEmp?.isMoveStuck
+      && avoiding.totalCost > plainRouteCost(state, emp, leg, driveLimits) + REROUTE_CONTEST_MAX_DETOUR_COST
+      ? undefined
+      : avoiding;
     if (reroute?.found) {
       return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, reroute, occupancy, result);
     }
@@ -1058,8 +1078,6 @@ function handleAgentOccupancyBlock(
     // the blocker's (EmployeeDispatch.ts's own ascending-id convention — the
     // lower id always wins, so only the higher-id side ever gives way, and
     // the pair can never both step aside at once).
-    const blocker = occupancy.holderOf(blockedStep.x, blockedStep.z);
-    const blockerEmp = blocker ? controllingEmployee(state, blocker) : undefined;
     if (blockerEmp?.isMoveStuck && !isOnReturnTripLeg(blockerEmp) && emp.id > blockerEmp.id) {
       const freeCell = findNearestFreeCellForAgent(state, mover, emp.x, emp.z);
       if (freeCell) {

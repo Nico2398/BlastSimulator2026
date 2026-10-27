@@ -18,6 +18,8 @@ import { placeBuilding, getBuildingDef, getDefSize } from '../../../src/core/ent
 import { DEFAULT_GRID_SIZE } from '../../../src/core/config/balance.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
+import { siteVehicleReach } from '../../../src/core/engine/OrderReachability.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import type { BlastRegion } from '../../../src/core/mining/BlastExecution.js';
@@ -451,5 +453,31 @@ describe('relocateFootprintOccupants — vehicles (#1270)', () => {
     expect(vehicle.x).toBe(expected.x);
     expect(vehicle.z).toBe(expected.z);
     spy.mockRestore();
+  });
+
+  it('on a site with a vehicle network, moves a parked vehicle onto the network, never onto ground only walkers reach (#2045)', () => {
+    // West of x = 4 a terrace 0.5 m lower: a step a walker takes and a 20-degree vehicle does not. The rally point is
+    // east; the nearest free cell to the hauler, and the corner-anchored search's pick, is on the terrace.
+    const state = createGame({ seed: SEED });
+    state.grade = createGradeState();
+    const grid = new VoxelGrid(12, 12);
+    const compId = grid.palette.intern(VEHICLE_ROCK_COMPOSITION);
+    for (let z = 0; z < 12; z++) {
+      for (let x = 0; x < 12; x++) setVoxelColumnSurfaceHeight(grid, x, z, x < 4 ? 10 : 10.5, compId);
+    }
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    state.navGrid = nav;
+    state.rallyPoint = { x: 9, z: 9 };
+    const footprint: BlastRegion = { minX: 4, maxX: 6, minZ: 3, maxZ: 7 };
+    blockRegion(nav, footprint);
+    nav.bumpRevision();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 4, 5);
+    const network = siteVehicleReach(state)!;
+    expect(network(3, 5)).toBe(false);
+
+    relocateFootprintOccupants(state, footprint);
+
+    expect(insideRegion(vehicle.x, vehicle.z, footprint)).toBe(false);
+    expect(network(vehicle.x, vehicle.z)).toBe(true);
   });
 });

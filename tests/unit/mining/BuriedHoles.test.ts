@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   cellKey, buildBuriedCellIndex, isCellBuried, buriedHoleIds,
-  buriedHolesOf, isHoleBuried, fragmentBuriesPlannedHole,
+  buriedHolesOf, isHoleBuried, fragmentBuriesPlannedHole, rubbleCoverCounts,
 } from '../../../src/core/mining/BuriedHoles.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
@@ -199,6 +199,32 @@ describe('fragmentBuriesPlannedHole (#1937)', () => {
     expect(fragmentBuriesPlannedHole(state, 99)).toBe(false);
     state.logistics.fragments[0]!.state = 'in_transit';
     expect(fragmentBuriesPlannedHole(state, 1)).toBe(false);
+  });
+});
+
+describe('rubbleCoverCounts (#2091)', () => {
+  it('counts every on-ground fragment covering a cell, stacked ones included', () => {
+    const state = site();
+    addBlastFragments(state.logistics, [frag(1, 20, 20), frag(2, 20, 20), frag(3, 21, 20)]);
+    const counts = rubbleCoverCounts(state);
+    expect(counts.get(cellKey(20, 20))).toBe(2);
+    expect(counts.get(cellKey(21, 20))).toBe(1);
+  });
+
+  it('a wide fragment counts on every cell it covers', () => {
+    const state = site();
+    addBlastFragments(state.logistics, [frag(1, 10, 10, 1.2)]);
+    const counts = rubbleCoverCounts(state);
+    for (const x of [9, 10, 11]) expect(counts.get(cellKey(x, 10))).toBe(1);
+  });
+
+  it('leaves out fragments no longer on the ground, and cells no rubble covers', () => {
+    const state = site();
+    addBlastFragments(state.logistics, [frag(1, 20, 20)]);
+    state.logistics.fragments[0]!.state = 'in_transit';
+    const counts = rubbleCoverCounts(state);
+    expect(counts.get(cellKey(20, 20))).toBeUndefined();
+    expect(counts.size).toBe(0);
   });
 });
 

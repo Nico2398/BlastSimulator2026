@@ -22,6 +22,7 @@ import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /** Ticks of the standard opening before the save (#1747's opening at the issue's repro point). */
 // 1296 not 1304: ore saturation (#1930) and the continuous ramp anchor (#2043) shift haul timing, so ticks 1300-1304 land mid-step of vehicle 2 where the live occupancy cell lags the rounded position.
+// Back to 1296 from 1288 once huts inside a spent blast zone serve rests (#2089): 1288 lands mid-step of vehicle 5.
 const SAVE_AT_TICK = 1296;
 /** Ticks played after the save, in both the control run and the replay. The issue used 1000; 600 keeps the file near 60 s and the first divergence is at +10..+35. */
 const ROUND_TRIP_TICKS = 600;
@@ -47,7 +48,7 @@ function playStandardOpening(run: Run, ctx: GameContext, untilElapsed: number): 
   clearBlastZone(run, state);
   expect(run('blast detonate').success).toBe(true);
   // The ramp into the crater (x=39..41): digging it lowers columns beside cells whose type depends on them.
-  expect(run('build_ramp start:40,12 end:40,31 depth:8').success).toBe(true);
+  expect(run('build_ramp start:40,8 end:40,31 depth:8').success).toBe(true);
   playUntil(untilElapsed, () => false);
 }
 

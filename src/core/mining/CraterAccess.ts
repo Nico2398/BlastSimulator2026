@@ -1,15 +1,20 @@
-// BlastSimulator2026 — Crater access planning (#2082)
+// BlastSimulator2026 — Crater access planning (#2082, #2095)
 // Pure planner: finds floors stranded below the existing ramp network and proposes a ramp down to them.
-// Reads terrain only through the narrow AccessSurface seam; no GameState.
+// Reads terrain only through the narrow AccessSurface seam; no GameState. Nothing in the tick calls it:
+// opening a crater is the player's job, and the progression probe plays that player with it.
 
 import {
-  CRATER_ACCESS_CLUSTER_GAP_CELLS, CRATER_ACCESS_MAX_GRADE_MARGIN, CRATER_ACCESS_SPIRAL_START_ATTEMPTS, MAX_RAMP_LENGTH, RAMP_CRATER_MIN_DROP_M,
-  RAMP_FLOOR_SNAP_REACH_M, RAMP_SPIRAL_MAX_PIT_SPAN_M, RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth,
+  CRATER_ACCESS_CLUSTER_GAP_CELLS, CRATER_ACCESS_FLOOR_LEVEL_M, CRATER_ACCESS_MAX_GRADE_MARGIN, CRATER_ACCESS_SPIRAL_START_ATTEMPTS, MAX_RAMP_LENGTH,
+  RAMP_CRATER_MIN_DROP_M, RAMP_SPIRAL_MAX_PIT_SPAN_M, RAMP_SPIRAL_RIM_GAP_WIDTHS, type RampWidth,
 } from '../config/balance.js';
 import { slopeDegreesForRatio } from '../nav/ClimbLimit.js';
-import { computeRampCost, rampDefFromLegs, rampFootOffset, rampLengthForGrade, validateRampOrder, type RampDef } from './Ramp.js';
+import { modalLevel } from '../math/ModalLevel.js';
 import {
-  RAMP_DIR_OFFSETS, findRampPathFault, rampPathOf, rampTotalLength, rampWaypoints, type RampDirection, type RampFootprint, type RampLeg,
+  computeRampCost, landRampOnEndFloor, rampDefFromLegs, rampEndGroundsAt, rampEndRowGround, rampFloorDepthAt, rampLengthForGrade, validateRampOrder, type RampDef,
+} from './Ramp.js';
+import {
+  RAMP_DIR_OFFSETS, findRampPathFault, rampEndRow, rampPathCells, rampPathOf, rampTotalLength, rampWaypoints,
+  type RampDirection, type RampFootprint, type RampLeg,
 } from './RampPath.js';
 import { rampFootprint } from './RampWidening.js';
 import { isPitRim, proposeRampSpiral, type SpiralDir, type SpiralSurface } from './RampSpiral.js';
@@ -25,6 +30,8 @@ export interface StrandedFloor {
 /** Terrain seam: spiral surface plus a reachability query against the current vehicle network. */
 export interface AccessSurface extends SpiralSurface {
   reachableFrom(x: number, z: number): boolean;
+  /** True when rubble lies on tile (x, z); a plan never fills over it (#2045). None known when absent. */
+  holdsRubble?(x: number, z: number): boolean;
 }
 
 type CraterAccessPlan =
@@ -74,24 +81,28 @@ export function clusterStrandedFloors(
   return floors;
 }
 
-/** One floor: the member nearest the centroid stands for its x,z; the deepest member sets floorY. */
+/**
+ * One floor: the level most members sit on (`modalLevel`) sets floorY, and the member on that level nearest their
+ * centroid stands for its x,z. A charge leaves hole bottoms below the floor its rubble mostly lies on; a ramp down to
+ * a hole frees almost none of it. Only the members on that level count as its orders.
+ */
 function floorOf(cells: ReadonlyArray<{ x: number; z: number; y: number }>, members: readonly number[]): StrandedFloor {
+  const floorY = modalLevel(members.map(i => cells[i]!.y), CRATER_ACCESS_FLOOR_LEVEL_M);
+  const level = members.filter(i => cells[i]!.y >= floorY && cells[i]!.y - floorY <= CRATER_ACCESS_FLOOR_LEVEL_M);
   let sx = 0;
   let sz = 0;
-  let floorY = Infinity;
-  for (const i of members) {
+  for (const i of level) {
     sx += cells[i]!.x;
     sz += cells[i]!.z;
-    floorY = Math.min(floorY, cells[i]!.y);
   }
-  const mx = sx / members.length;
-  const mz = sz / members.length;
-  let best = cells[members[0]!]!;
-  for (const i of members) {
+  const mx = sx / level.length;
+  const mz = sz / level.length;
+  let best = cells[level[0]!]!;
+  for (const i of level) {
     const c = cells[i]!;
     if (Math.hypot(c.x - mx, c.z - mz) < Math.hypot(best.x - mx, best.z - mz)) best = c;
   }
-  return { x: best.x, z: best.z, floorY, orderCount: members.length };
+  return { x: best.x, z: best.z, floorY, orderCount: level.length };
 }
 
 /** A ramp already dug, as the planner compares it. */
@@ -99,6 +110,20 @@ type DugRamp = { def: RampDef; width: RampWidth };
 
 const rampKey = (def: RampDef, width: RampWidth): string =>
   `${JSON.stringify(rampPathOf(def))}|${def.targetDepth}|${width}`;
+
+/** Tiles a ramp's corridor covers, keyed `x,z`. */
+const corridorKeys = (def: RampDef, width: RampWidth): string[] =>
+  rampPathCells(rampPathOf(def), width).map(c => `${c.x},${c.z}`);
+
+/** Tiles a dug ramp needs left as they are: its corridor and the end row its foot lands on (#2045). */
+function dugRampTiles(built: readonly DugRamp[]): Set<string> {
+  const tiles = new Set<string>();
+  for (const b of built) {
+    for (const key of corridorKeys(b.def, b.width)) tiles.add(key);
+    for (const t of rampEndRow(rampPathOf(b.def), b.width)) tiles.add(`${t.x},${t.z}`);
+  }
+  return tiles;
+}
 
 /** True when the ramp's footprint shares a tile with any stuck ramp's footprint (inclusive rectangles). */
 function overlapsAny(def: RampDef, width: RampWidth, avoid: readonly RampFootprint[]): boolean {
@@ -110,40 +135,53 @@ function overlapsAny(def: RampDef, width: RampWidth, avoid: readonly RampFootpri
 type Excluded = (def: RampDef) => boolean;
 
 /**
- * Straight ramp ending on the floor tile, starting on the nearest reachable cell along one of four axes
- * whose grade stays within `limitRatio`. Shorter first, so a built ramp's foot beats the rim.
+ * Straight ramp ending on one of `feet` (floor-level tiles), starting on a reachable cell along one of four axes whose
+ * grade stays within `limitRatio`. Lengths rise across every foot at once, so a foot at the crater's edge beats a long
+ * road to its middle (#2045), and a built ramp's foot beats the rim; on equal length the earlier foot wins. With
+ * `toward` (where the floor's loads go), the ramp kept is the one with the shortest trip from its foot: its length
+ * plus the straight distance from its top to `toward`, so a crater is entered from the side facing the depot.
  */
 function planStraight(
-  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded,
-  foot: { x: number; z: number } = { x: Math.round(floor.x), z: Math.round(floor.z) },
+  surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded, feet: ReadonlyArray<{ x: number; z: number }>,
+  toward: { x: number; z: number } | null, minDropM: number,
 ): { plan: CraterAccessPlan | null; sawShallow: boolean } {
-  const fx = foot.x;
-  const fz = foot.z;
   let sawShallow = false;
-  for (let length = Math.max(1, width); length <= MAX_RAMP_LENGTH; length++) {
-    for (const direction of DIRECTIONS) {
-      const o = RAMP_DIR_OFFSETS[direction];
-      const sx = fx - o.dx * length;
-      const sz = fz - o.dz * length;
-      if (!surface.contains(sx, sz) || !surface.reachableFrom(sx, sz)) continue;
-      const startGround = surface.heightAt(sx, sz);
-      const drop = startGround - floor.floorY;
-      if (!Number.isFinite(drop)) continue;
-      if (drop < RAMP_CRATER_MIN_DROP_M) { sawShallow = true; continue; }
-      if (drop / length > limitRatio) continue;
-      if (Math.abs(rampFootOffset(startGround, floor.floorY, drop, length)) > RAMP_FLOOR_SNAP_REACH_M) continue;
-      const def: RampDef = { originX: sx, originZ: sz, direction, length, targetDepth: drop, width };
-      if (findRampPathFault(rampPathOf(def), width) !== null) continue;
-      if (excluded(def)) continue;
-      const check = validateRampOrder(def, Infinity);
-      if (!check.success) continue;
-      return {
-        plan: { ok: true, def, cost: check.cost, gradeDegrees: slopeDegreesForRatio(drop / length) },
-        sawShallow,
-      };
+  let best: { plan: CraterAccessPlan; trip: number } | null = null;
+  // A trip is never shorter than the ramp it climbs: past the best trip no longer ramp can win.
+  for (let length = Math.max(1, width); length <= MAX_RAMP_LENGTH && (best === null || length < best.trip); length++) {
+    for (const foot of feet) {
+      for (const direction of DIRECTIONS) {
+        const o = RAMP_DIR_OFFSETS[direction];
+        const sx = foot.x - o.dx * length;
+        const sz = foot.z - o.dz * length;
+        if (!surface.contains(sx, sz) || !surface.reachableFrom(sx, sz)) continue;
+        const startGround = surface.heightAt(sx, sz);
+        const drop = startGround - landingGround(surface, { originX: sx, originZ: sz, direction, length, width });
+        if (!Number.isFinite(drop)) continue;
+        if (drop < minDropM) { sawShallow = true; continue; }
+        if (drop / length > limitRatio) continue;
+        const def: RampDef = { originX: sx, originZ: sz, direction, length, targetDepth: drop, width };
+        if (findRampPathFault(rampPathOf(def), width) !== null) continue;
+        if (excluded(def)) continue;
+        const check = validateRampOrder(def, Infinity);
+        if (!check.success) continue;
+        const plan: CraterAccessPlan = { ok: true, def, cost: check.cost, gradeDegrees: slopeDegreesForRatio(drop / length) };
+        if (toward === null) return { plan, sawShallow };
+        const trip = length + Math.hypot(sx - toward.x, sz - toward.z);
+        if (best === null || trip < best.trip) best = { plan, trip };
+      }
     }
   }
-  return { plan: null, sawShallow };
+  return { plan: best?.plan ?? null, sawShallow };
+}
+
+/** Feet a straight plan may end on: the floor's own cell, then the floor-level cells within the cluster gap round it, nearest first. */
+function floorFeet(floor: StrandedFloor, surface: AccessSurface): { x: number; z: number }[] {
+  const feet = [{ x: Math.round(floor.x), z: Math.round(floor.z) }];
+  for (const cell of chebyshevRings(floor, CRATER_ACCESS_CLUSTER_GAP_CELLS)) {
+    if (atFloorLevel(surface, floor, cell.x, cell.z)) feet.push(cell);
+  }
+  return feet;
 }
 
 /** Cells on the Chebyshev ring perimeters round the floor's rounded cell, ring 1 to `maxRing`, nearest ring first. */
@@ -187,9 +225,41 @@ function footMeetsFloor(def: RampDef, floor: StrandedFloor, surface: AccessSurfa
   return false;
 }
 
-/** Floor-level ground: within the foot snap reach of the floor's depth. */
+/** Floor-level ground: within one voxel layer of the floor's depth (#2045). */
 const atFloorLevel = (surface: AccessSurface, floor: StrandedFloor, x: number, z: number): boolean =>
-  surface.contains(x, z) && Math.abs(surface.heightAt(x, z) - floor.floorY) <= RAMP_FLOOR_SNAP_REACH_M;
+  surface.contains(x, z) && Math.abs(surface.heightAt(x, z) - floor.floorY) <= CRATER_ACCESS_FLOOR_LEVEL_M;
+
+/** Ground the planner reads: the surface's, NaN off it. */
+const groundOf = (surface: AccessSurface) => (x: number, z: number): number => (surface.contains(x, z) ? surface.heightAt(x, z) : NaN);
+
+/** The level most of a ramp's end row shares (`rampEndRowGround` with no aim): the floor a plan cuts its depth down to. */
+const landingGround = (surface: AccessSurface, def: Parameters<typeof rampEndRowGround>[0]): number =>
+  rampEndRowGround(def, groundOf(surface));
+
+/**
+ * True when `def` lands on `floor`: the level most of its end row shares is floor-level, so the landed foot meets that
+ * floor across most of its width, not on one tile beside a hole or a lump.
+ */
+const landsOnFloor = (surface: AccessSurface, floor: StrandedFloor, def: RampDef): boolean =>
+  Math.abs(landingGround(surface, def) - floor.floorY) <= CRATER_ACCESS_FLOOR_LEVEL_M;
+
+/**
+ * True when the landed `def` would fill over rubble: a corridor tile holding rubble that its line passes more than one
+ * voxel layer above. Fill dumped there buries the rubble the ramp is meant to free (#2045).
+ */
+function fillsOverRubble(def: RampDef, surface: AccessSurface, width: RampWidth): boolean {
+  const holdsRubble = surface.holdsRubble;
+  if (holdsRubble === undefined) return false;
+  const path = rampPathOf(def);
+  const start = surface.heightAt(def.originX, def.originZ);
+  const total = rampTotalLength(path.legs);
+  for (const cell of rampPathCells(path, width)) {
+    if (!holdsRubble(cell.x, cell.z)) continue;
+    const line = start - rampFloorDepthAt(cell.step, total, def.targetDepth, def.gradeDegrees);
+    if (line - surface.heightAt(cell.x, cell.z) > CRATER_ACCESS_FLOOR_LEVEL_M) return true;
+  }
+  return false;
+}
 
 /** True when the corridor of a leg of `length` tiles from `from` along `direction` lies wholly inside the claimed area. */
 function legContained(surface: AccessSurface, from: { x: number; z: number }, direction: RampDirection, length: number, width: number): boolean {
@@ -311,22 +381,11 @@ function spiralPlanFrom(
 }
 
 /**
- * Straight ramp ending on floor-level ground beside the representative cell (#2086). A start on a ledge or at the foot
- * of a built ramp rarely lies on an axis through that one cell; any cell within the cluster gap whose ground matches
- * the floor serves as the foot instead. Nearest foot first; cost walks the window, not the map.
+ * Plans a ramp from the reachable network down to `floor`, within `maxClimbRatio`. With `toward` (where the floor's
+ * loads are hauled), a straight ramp is picked for the shortest haul rather than the shortest ramp. A straight ramp
+ * drops at least `minDropM`: a dug crater's depth by default, less for a floor worth a way in however shallow
+ * (`CRATER_ACCESS_MIN_DROP_M`). Failure is a result, not an exception.
  */
-function planOffsetStraight(
-  floor: StrandedFloor, surface: AccessSurface, limitRatio: number, width: RampWidth, excluded: Excluded,
-): CraterAccessPlan | null {
-  for (const foot of chebyshevRings(floor, CRATER_ACCESS_CLUSTER_GAP_CELLS)) {
-    if (!atFloorLevel(surface, floor, foot.x, foot.z)) continue;
-    const { plan } = planStraight(floor, surface, limitRatio, width, excluded, foot);
-    if (plan !== null) return plan;
-  }
-  return null;
-}
-
-/** Plans a ramp from the reachable network down to `floor`, within `maxClimbRatio`. Failure is a result, not an exception. */
 export function planCraterAccess(
   floor: StrandedFloor,
   surface: AccessSurface,
@@ -334,17 +393,33 @@ export function planCraterAccess(
   width: RampWidth,
   avoid: readonly RampFootprint[] = [],
   built: readonly DugRamp[] = [],
+  toward: { x: number; z: number } | null = null,
+  minDropM: number = RAMP_CRATER_MIN_DROP_M,
 ): CraterAccessPlan {
   const limitRatio = maxClimbRatio * CRATER_ACCESS_MAX_GRADE_MARGIN;
   if (!(limitRatio > 0) || !Number.isFinite(floor.floorY)) return { ok: false, reasonKey: `${KEY}no_start` };
   // A plan identical to a dug ramp carves nothing new: re-ordering it would loop forever on a floor it never reached (#2085).
   const builtKeys = new Set(built.map(b => rampKey(b.def, b.width)));
-  const excluded: Excluded = def => builtKeys.has(rampKey(def, width)) || overlapsAny(def, width, avoid);
-  const straight = planStraight(floor, surface, limitRatio, width, excluded);
-  if (straight.plan !== null) return straight.plan;
+  // A plan never cuts through a dug ramp or the floor its foot lands on: the cut would leave that ramp too steep (#2045).
+  const dug = dugRampTiles(built);
+  const cutsDug = (def: RampDef): boolean => dug.size > 0 && corridorKeys(def, width).some(key => dug.has(key));
+  // Nor over ground the surface leaves out (off the claimed area, under a building).
+  const leavesSurface = (def: RampDef): boolean => rampPathCells(rampPathOf(def), width).some(c => !surface.contains(c.x, c.z));
+  // A plan counts only when the ramp lands on this floor, flush (#2045), and still validates once landed.
+  const landed = (def: RampDef): RampDef => {
+    const ends = rampEndGroundsAt(def, groundOf(surface));
+    return landRampOnEndFloor(def, ends.start, ends.end);
+  };
+  const excluded: Excluded = def => {
+    if (builtKeys.has(rampKey(def, width)) || overlapsAny(def, width, avoid) || cutsDug(def) || leavesSurface(def)
+      || !landsOnFloor(surface, floor, def)) return true;
+    const order = landed(def);
+    return !validateRampOrder(order, Infinity).success || fillsOverRubble(order, surface, width);
+  };
+  const finish = (plan: CraterAccessPlan): CraterAccessPlan => (plan.ok ? { ...plan, def: landed(plan.def) } : plan);
+  const straight = planStraight(surface, limitRatio, width, excluded, floorFeet(floor, surface), toward, minDropM);
+  if (straight.plan !== null) return finish(straight.plan);
   const spiral = planSpiral(floor, surface, limitRatio, width, excluded);
-  if (spiral !== null) return spiral;
-  const offset = planOffsetStraight(floor, surface, limitRatio, width, excluded);
-  if (offset !== null) return offset;
+  if (spiral !== null) return finish(spiral);
   return { ok: false, reasonKey: `${KEY}${straight.sawShallow ? 'too_shallow' : 'no_start'}` };
 }

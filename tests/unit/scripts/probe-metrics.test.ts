@@ -92,6 +92,22 @@ describe('extended metrics (#1945)', () => {
     for (const t of [15000, 25000, 40000, 50000]) expect(m.cashAt).toHaveProperty(String(t), null);
   });
 
+  it('samples the deepest pit at the cash sample ticks, null before them (#2093)', () => {
+    const obs = new MetricsObserver();
+    const at = (tick: number, pit: number) => {
+      const s = synthetic({ tick }) as unknown as { grade: { deepestPitM: number } };
+      s.grade.deepestPitM = pit;
+      obs.onTick(s as never);
+    };
+    at(999, 2);
+    at(1000, 4.5);
+    at(3000, 10.4);
+    const m = obs.finalize();
+    expect(m.pitDepthAt?.[1000]).toBe(4.5);
+    expect(m.pitDepthAt?.[3000]).toBe(10.4);
+    expect(m.pitDepthAt?.[6000]).toBeNull();
+  });
+
   it('records the cash held when each grade was first reached', () => {
     const obs = new MetricsObserver();
     const at = (tick: number, grade: number, cash: number) => {

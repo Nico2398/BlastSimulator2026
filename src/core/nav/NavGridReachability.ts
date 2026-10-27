@@ -7,7 +7,7 @@
 // so `NavGrid.findNearestReachableCell` etc. remain the public entry points.
 
 import type { NavGrid, NavCell } from './NavGrid.js';
-import { isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
+import { isStepClimbable, isGridStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 import { NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { isDiagonalCornerClear } from './Pathfinding.js';
@@ -594,7 +594,6 @@ function isLegalStep(
   navGrid: NavGrid,
   x: number,
   z: number,
-  from: NavCell | null | undefined,
   nx: number,
   nz: number,
   to: NavCell,
@@ -605,7 +604,7 @@ function isLegalStep(
   const dx = nx - x;
   const dz = nz - z;
   if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(navGrid, x, z, nx, nz)) return false;
-  if (climbAware && !isStepClimbable(from?.surfaceY, to.surfaceY, Math.hypot(dx, dz), maxSlopeRatio)) return false;
+  if (climbAware && !isGridStepClimbable(navGrid, x, z, nx, nz, maxSlopeRatio)) return false;
   return hasClearance(to, requiredClearance);
 }
 
@@ -621,14 +620,13 @@ export function countLegalStepNeighbours(
   z: number,
   requiredClearance: number,
 ): number {
-  const from = navGrid.cellAt(x, z);
   let count = 0;
   for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
     const nx = x + dx;
     const nz = z + dz;
     if (!isTraversableCell(navGrid, nx, nz)) continue;
     const to = navGrid.cellAt(nx, nz)!;
-    if (isLegalStep(navGrid, x, z, from, nx, nz, to, true, requiredClearance)) count++;
+    if (isLegalStep(navGrid, x, z, nx, nz, to, true, requiredClearance)) count++;
   }
   return count;
 }
@@ -672,7 +670,6 @@ function floodFillFromSources(
     const idx = queueArr[head]!;
     const x = navGrid.originX + (idx % width);
     const z = navGrid.originZ + ((idx / width) | 0);
-    const cell = climbAware ? navGrid.cellAt(x, z) : null;
     for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
       const nx = x + dx;
       const nz = z + dz;
@@ -687,7 +684,7 @@ function floodFillFromSources(
       if (overrides && inRect(overrides.block, nx, nz)) continue;
       if (neighbourCell.type === 'blocked' && !(overrides && inRect(overrides.free, nx, nz))) continue;
       if (avoidOccupancy && isCellOccupied(neighbourCell)) continue;
-      if (!isLegalStep(navGrid, x, z, cell, nx, nz, neighbourCell, climbAware, requiredClearance, maxSlopeRatio)) continue;
+      if (!isLegalStep(navGrid, x, z, nx, nz, neighbourCell, climbAware, requiredClearance, maxSlopeRatio)) continue;
       visitedArr[neighborIdx] = 1;
       queueArr[count++] = neighborIdx;
     }
@@ -785,7 +782,6 @@ export function computeClimbComponents(
       const idx = stack[--top]!;
       const x = originX + (idx % width);
       const z = originZ + ((idx / width) | 0);
-      const cell = navGrid.cellAt(x, z);
       for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
         const nx = x + dx;
         const nz = z + dz;
@@ -793,7 +789,7 @@ export function computeClimbComponents(
         const nIdx = (nz - originZ) * width + (nx - originX);
         if (label[nIdx] !== 0) continue;
         const to = navGrid.cellAt(nx, nz);
-        if (!isGood(to) || !isLegalStep(navGrid, x, z, cell, nx, nz, to, true, requiredClearance, maxSlopeRatio)) continue;
+        if (!isGood(to) || !isLegalStep(navGrid, x, z, nx, nz, to, true, requiredClearance, maxSlopeRatio)) continue;
         label[nIdx] = next;
         stack[top++] = nIdx;
       }
@@ -818,14 +814,13 @@ export function computeClimbComponents(
       visit(own);
       return { x: fromX, z: fromZ };
     }
-    const from = navGrid.cellAt(fromX, fromZ);
     for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
       const nx = fromX + dx;
       const nz = fromZ + dz;
       const neighbour = labelAt(nx, nz);
       if (neighbour === 0) continue;
       const to = navGrid.cellAt(nx, nz);
-      if (to !== undefined && isLegalStep(navGrid, fromX, fromZ, from, nx, nz, to, true, requiredClearance, maxSlopeRatio)) visit(neighbour);
+      if (to !== undefined && isLegalStep(navGrid, fromX, fromZ, nx, nz, to, true, requiredClearance, maxSlopeRatio)) visit(neighbour);
     }
     return { x: fromX, z: fromZ };
   };

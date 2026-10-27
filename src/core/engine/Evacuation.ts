@@ -2,7 +2,7 @@
 // Finds safe destinations for entities standing inside a blast danger zone
 // and routes them out before the blast fires (#557).
 
-import type { GameState } from '../state/GameState.js';
+import { isProgressionSite, type GameState } from '../state/GameState.js';
 import type { ZoneBounds, EvacuationDestination, EvacuationResult } from '../entities/Zone.js';
 import { clearZone, isInZone } from '../entities/Zone.js';
 import { findPath } from '../nav/Pathfinding.js';
@@ -10,7 +10,7 @@ import { interruptActiveAction } from './TaskCancellation.js';
 import { releaseVehicleReservation } from './VehicleReservation.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
+import { vehicleDriverId, getVehicleReservation, vehicleMaxSlopeRatio, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
 import { isOnReturnTripLeg } from './Locomotion.js';
 import {
@@ -26,7 +26,7 @@ import {
 // from EvacuationHold.ts if a caller needs the raw key again. See
 // EvacuationHold.ts for its own doc comment and both functions'.
 export {
-  isEvacuationHoldActive, clearResolvedEvacuationHolds,
+  isEvacuationHoldActive, clearResolvedEvacuationHolds, liftSpentZone,
 } from './EvacuationHold.js';
 
 /**
@@ -156,11 +156,15 @@ function buildCandidates(fromX: number, fromZ: number, zone: ZoneBounds): Evacua
  * this returns null instead of the first geometric candidate.
  */
 export function findSafeEvacuationCell(
-  state: GameState, fromX: number, fromZ: number, zone: ZoneBounds,
+  state: GameState, fromX: number, fromZ: number, zone: ZoneBounds, vehicle?: Vehicle,
 ): EvacuationDestination | null {
   if (!state.navGrid) return null;
 
   const candidates = buildCandidates(fromX, fromZ, zone);
+  // A vehicle is driven out: its cell must be reached at the vehicle's clearance and climb limit (#2045), or the
+  // nearest cell a walker reaches is picked, the drive there fails and the vehicle reads stranded.
+  const drive = vehicle === undefined ? {}
+    : { requiredClearance: vehicleRequiredClearanceCells(vehicle), maxSlopeRatio: vehicleMaxSlopeRatio(isProgressionSite(state)) };
 
   for (const candidate of candidates) {
     const cell = state.navGrid.cellAt(candidate.x, candidate.z);
@@ -171,6 +175,7 @@ export function findSafeEvacuationCell(
       fromX, fromZ,
       toX: candidate.x, toZ: candidate.z,
       avoidVehicles: false,
+      ...drive,
     });
     if (path.found) return candidate;
   }
@@ -278,7 +283,7 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
     state,
     state.vehicles,
     state.employees,
-    (fromX, fromZ, z) => findSafeEvacuationCell(state, fromX, fromZ, z),
+    (fromX, fromZ, z, vehicle) => findSafeEvacuationCell(state, fromX, fromZ, z, vehicle),
     (employee, vehicle) => canEmployeeReachVehicleForEvacuation(state, employee, vehicle),
   );
 }

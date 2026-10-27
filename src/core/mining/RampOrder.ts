@@ -1,6 +1,6 @@
-// BlastSimulator2026 — Queueing a ramp excavation order (#555, #1298)
+// BlastSimulator2026 — Queueing a ramp excavation order (#555, #1298, #2045)
 // One place charges the order cost and queues one `dig_ramp_segment` action per
-// segment, shared by a fresh ramp order and a widen order.
+// segment, shared by a fresh ramp order, a widen order and a repair order.
 
 import type { GameState, PlannedRamp, RampFootprint } from '../state/GameState.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
@@ -31,7 +31,8 @@ export function queueRampOrder(
   segments: readonly RampSegmentDef[],
   cost: number,
   expenseLabel: string,
-  widenOf?: number,
+  /** The built ramp this order widens or repairs instead of cutting a new one. */
+  of: { widenOf?: number; repairOf?: number } = {},
 ): number | null {
   if (segments.length === 0) return null;
   state.cash -= cost;
@@ -39,7 +40,8 @@ export function queueRampOrder(
 
   const rampId = state.nextPlannedRampId++;
   const plannedRamp: PlannedRamp = { id: rampId, def, footprint, segments: [] };
-  if (widenOf !== undefined) plannedRamp.widenOf = widenOf;
+  if (of.widenOf !== undefined) plannedRamp.widenOf = of.widenOf;
+  if (of.repairOf !== undefined) plannedRamp.repairOf = of.repairOf;
 
   const segmentCost = cost / segments.length;
   for (const segment of segments) {

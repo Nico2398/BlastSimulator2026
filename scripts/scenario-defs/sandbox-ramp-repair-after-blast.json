@@ -1,0 +1,433 @@
+{
+  "name": "sandbox-ramp-repair-after-blast",
+  "description": "Keeping a ramp out of a shot, or repairing it after one, is the player's job (#2045): the game never repairs a ramp by itself. A shot on the end row of an 8 m ramp blows out its foot, and the ramp reads too steep for vehicles. The player clicks the ramp: the inspector offers Repair with its cost; clicking it re-cuts the ramp to its line, and the crew digs it.",
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+        }
+      ],
+      "description": "Progression site (kit:full): tier-1 drill rig only, so only 89 mm holes can be drilled at first.",
+      "expect": {
+        "equals": {
+          "mineGrade": {
+            "grade": 0,
+            "pendingTicksLeft": null
+          }
+        }
+      }
+    },
+    {
+      "command": "build explosive_warehouse at:8,8",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 8,
+          "z": 8
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Stock explosives up front so charging needs no delivery wait.",
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:400",
+      "role": "setup",
+      "description": "The explosive warehouse is built.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedBuildingCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "buy explosive:boomite kg:100",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        }
+      ],
+      "description": "Buy enough krackle for both blasts into the warehouse stock.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "build_ramp start:27,31 end:35,31 depth:2",
+      "role": "player",
+      "description": "Dig an 8 m ramp for a 2 m depth (14.0 degrees, under the 20 degree vehicle limit) towards the ground the next shot will open.",
+      "interaction": [
+        {
+          "type": "keypress",
+          "key": "Escape"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 2
+        },
+        {
+          "type": "focusTile",
+          "x": 32,
+          "z": 31,
+          "distance": 30,
+          "pitch": 75
+        },
+        {
+          "type": "dragTiles",
+          "x1": 27,
+          "z1": 31,
+          "x2": 35,
+          "z2": 31
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:builtRampCount equals:1 max_ticks:1500",
+      "role": "setup",
+      "description": "The crew digs the ramp.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "builtRampCount",
+          "equals": 1,
+          "maxTicks": 1500,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "builtRampCount": 1,
+          "orderedRampSegmentCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan add x:35 z:31 depth:2 diameter:89",
+      "role": "player",
+      "description": "Plan one hole on the ramp's end row: the shot will blow out the ramp's foot.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 2
+        },
+        {
+          "type": "focusTile",
+          "x": 35,
+          "z": 31
+        },
+        {
+          "type": "pickTile",
+          "x": 35,
+          "z": 31
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:1500",
+      "role": "setup",
+      "description": "The 89 mm hole is drilled.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:2 stemming:1",
+      "role": "player",
+      "description": "Load 2 kg into the hole.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 2
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 1
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "role": "setup",
+      "description": "The charge is loaded.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast detonate",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "description": "The shot cuts into the ramp's foot: the ramp now reads too steep for vehicles.",
+      "timeout": 90,
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "role": "setup",
+      "description": "Blast the first bench; the broken rock lies on the new crater floor as on-ground rubble.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "repair_ramp id:1",
+      "role": "player",
+      "timeout": 90,
+      "description": "Player clicks the ramp in the scene: the inspector offers Repair with its cost, because the shot left cells off the ramp's line (#2045). Clicking it orders the cut and fill, paid per cell.",
+      "interaction": [
+        {
+          "type": "focusTile",
+          "x": 29,
+          "z": 31,
+          "distance": 16,
+          "pitch": 80
+        },
+        {
+          "type": "click",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector [data-action=\"repair\"]",
+          "timeout": 60000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"repair\"]"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:1500",
+      "role": "setup",
+      "description": "The crew re-cuts the ramp to its line; it stays one built ramp.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "builtRampCount": 1,
+          "orderedRampSegmentCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "role": "observe",
+      "description": "One built ramp, repaired and climbable again (the climb readout is asserted in RampRepair.test.ts).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
+  ]
+}

@@ -12,6 +12,8 @@ import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { isInZone, computeDangerZone } from '../../../src/core/entities/Zone.js';
 import { setHoleWater } from '../../helpers/holeWater.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { isEvacuationHoldActive } from '../../../src/core/engine/Evacuation.js';
+import type { PendingAction } from '../../../src/core/state/GameState.js';
 import {
   BLAST_DANGER_MARGIN_M, DETONATION_REEVACUATE_INTERVAL_TICKS, DETONATION_STUCK_WALKER_FAILURE_TICKS,
 } from '../../../src/core/config/balance.js';
@@ -131,6 +133,33 @@ describe('cancelDetonation', () => {
     const state = chargedState();
     expect(cancelDetonation(state)).toBe(false);
     expect(state.pendingDetonation).toBeNull();
+  });
+
+  it('lifts the zone and its holds, even with a worker still inside (#2089)', () => {
+    const state = chargedState();
+    addWorker(state, 20, 22);
+    const work: PendingAction = {
+      id: 900, type: 'general_work', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 21, targetZ: 21, targetY: 0, payload: {},
+      targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+    state.pendingActions.push(work);
+    armDetonation(state);
+    expect(state.zone.activeZone).not.toBeNull();
+    expect(isEvacuationHoldActive(state, work)).toBe(true);
+
+    cancelDetonation(state);
+
+    expect(state.zone.activeZone).toBeNull();
+    expect(isEvacuationHoldActive(state, work)).toBe(false);
+  });
+
+  it('a cancel with nothing armed leaves an active zone alone', () => {
+    const state = chargedState();
+    armDetonation(state);
+    state.pendingDetonation = null;
+    expect(cancelDetonation(state)).toBe(false);
+    expect(state.zone.activeZone).not.toBeNull();
   });
 
   it('can re-arm after a cancel', () => {

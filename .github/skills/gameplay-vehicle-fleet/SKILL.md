@@ -132,6 +132,11 @@ A vehicle-gated action's claim on a vehicle is not stored on the vehicle. It liv
 (`Vehicle.ts`), so two employees never plan onto the same vehicle. It is released when the action
 that holds it ends, by any route.
 
+A claim takes the nearest qualifying free vehicle (`findFreeVehicleForRole`), preferring one whose
+vehicle network reaches the work's cell (`vehicleReachesCell`, `ReachCache.ts`); the planner prices
+the same pick (`resolveVehicleForGoal`). A digger a shot left on a crater floor is never handed a
+surface ramp segment while one on the road is free. With none that can reach, the nearest is taken.
+
 ### The Itinerary
 
 ```ts
@@ -257,7 +262,9 @@ on-ground fragment not already covered (an oversized fragment queues `fragment_d
 Multi-fragment cargo: after the primary `load` leg, `planFragmentTaskItinerary` adds one
 extra `load` leg (step `targetId` = fragment id) per nearby fragment chosen by `selectHaulBatch`
 (`HaulBatch.ts`). Candidates are on-ground, non-oversized, within `HAUL_BATCH_RADIUS_CELLS`
-(nearest first), with a queued, unclaimed `haul_debris`; at most `HAUL_BATCH_MAX_ITEMS` ride, and
+(nearest first), with a queued, unclaimed `haul_debris` that no other employee's itinerary already
+plans to load (a shared extra left the second truck to arrive at an empty spot, so loads fell as the
+fleet grew); at most `HAUL_BATCH_MAX_ITEMS` ride, and
 their cumulative mass stays within the tier capacity and `storageRoomKg`. The primary always rides,
 so a fragment heavier than the tier capacity rides alone (the load gauge clamps at 100%); an extra
 that overflows is skipped and a later, smaller one may still fit. On arrival an extra consumes its
@@ -274,9 +281,11 @@ and the claim gate all use the fragment's destination; a destroyed target heap f
 heap. Heaps are finite: a barren haul is blocked as `no_spoil_heap` (no heap placed) or `spoil_heap_full` (no heap has room for the fragment); the depot pick, the claim gate and delivery use `pickWarehouse` over `spoilHeapSites` like warehouses do.
 
 Barren yields to ore: `selectBestActionForEmployee` does not start an unheld, ground (not
-loaded) barren `haul_debris` while any unheld ore-bearing `haul_debris` is claimable (reachable,
-allowed, warehouse room). Barren still moves when no ore haul is claimable or none resolves a cost
-(barren blocks the only way, `storage_full`, nothing left). Grade/demand weighting among ore hauls,
+loaded) spoil-bound `haul_debris` while any unheld warehouse-bound one is claimable (reachable,
+allowed, warehouse room). The class is the destination (`haulActionIsWarehouseBound`, the
+`isBarrenFragment` threshold), so trace ore under the barren threshold yields like barren rock. Barren still moves when no ore haul is claimable or none resolves a cost
+(barren blocks the only way, `storage_full`, nothing left), and barren rock burying a planned drill hole
+never waits on ore: the player marked that ground for the next shot (`gameplay-blast-system`, Buried holes). Grade/demand weighting among ore hauls,
 loaded trips, tier ranking and `fragment_debris` are unchanged. Debris thinning budgets
 `DEBRIS_SELECTION_MAX_BINS` per destination class so a near barren heap never crowds out ore.
 
@@ -375,14 +384,6 @@ does. The path-scoped `vehicles` rule names these invariants; this is where they
 | I8 | Every fragment in `v.cargo` has logistics state `in_transit` |
 | I9 | `e.taskTicksRemaining !== null` implies `e.itinerary === null` (arrived, no longer travelling) |
 
-One more writer exists for a vehicle nobody can reach: `recoverStranded`
-(`StrandedVehicleRecovery.ts`, rule in `gameplay-navmesh`, "Crater access") tows a **driverless**
-vehicle that no licensed employee can walk to to a free
-cell beside the nearest licensed crew member after `STRANDED_RECOVERY_TICKS`. It never touches a
-vehicle with an occupant, so I2 and I4 hold. Reason: `fillPool` counts a vehicle as an order actor
-only when a candidate driver walks to it, so an unreachable only-digger can never dig the ramp that
-would free it.
-
 Three lint checks keep the writers singular. `tests/unit/lint/SingleVehicleMover.test.ts`: only
 `Locomotion.ts` assigns a vehicle's `x`/`z`, and nothing outside it pathfinds from a vehicle's
 position. `tests/unit/lint/SingleMountWriter.test.ts`: only `Mount.ts` assigns `occupantIds` — a
@@ -411,18 +412,18 @@ Truck-worked charging stalls:
 - `outstandingChargeBlockedReason` returns the first outstanding `charge_hole` order that carries a reason; a claimed order has none, so the queue head is not the one to read.
 - `releaseDeadHoldersActions` (TickPipeline, before dispatch) returns any claim held by a dead employee to the pool, whatever killed them, so `OrderReachability` re-stamps it (`no_vehicle_in_fleet`, `no_dual_qualified_employee`). A destroyed vehicle already releases its driver's claim through the aborted drive leg.
 - A drive leg blocked by a parked, driverless vehicle crosses it (`handleAgentOccupancyBlock` step 2.5) instead of trying the avoid-all reroute first: plain drive pathing repaths every tick through the parked vehicle, which undoes a reroute step on the next tick and resets the stuck counters, so `MOVE_STUCK_ABANDON_TICKS` is never reached.
+- Against a stuck blocker (a head-on contest) the same undo applies to a long detour: an avoid-all reroute costing more than the plain route plus `REROUTE_CONTEST_MAX_DETOUR_COST` is refused, and the contest goes to the tie-break sidestep (the higher id steps to the nearest free cell). A step or two around a blocker in the open is still rerouted.
 
-## Tier slope limit
+## Vehicle slope limit
 
-On progression sites (`state.grade !== undefined`) a vehicle climbs at most its tier's slope: tier 1 30°, tier 2 24°, tier 3 18° (`VEHICLE_TIER_MAX_SLOPE_DEGREES`), for every role. Walking and non-progression sites stay at 30°.
+On progression sites (`state.grade !== undefined`) every vehicle, of every role and tier, climbs at most 20° (`VEHICLE_MAX_SLOPE_DEGREES`): upgrading never makes a vehicle worse, and the need for a spiral haul road comes from pit depth, not tier. Walking and non-progression sites (campaign) stay at 30°.
 
-- `vehicleMaxSlopeRatio(vehicle, progression)` (`Vehicle.ts`) is the one helper. `planItinerary` drive legs (`estimateLegDistance`'s `maxSlopeRatio`, ride alight point) and `Locomotion` drive legs (routes, reroutes, `advanceAlongPath`) both call it; foot legs always use 30°. Spawn on a progression sandbox: the rally flag, every starting building and vehicle share one component driveable at the slowest tier (`slowestVehicleTierSlopeRatio`, 18°) that reaches the first-blast target; campaign levels keep 30° placement.
-- `PathRequest.maxSlopeRatio` carries it into `findPath`; reachability caches are keyed by clearance and ratio. `fillPool` groups usable vehicles by ratio and unions the per-ratio sets: the best climber decides.
-- A vehicle order unreachable on a progression site but reachable at 30° keeps `blockedReason: 'target_unreachable'` and gets `PendingAction.blockedDetail` (`order.blocked.ramp_too_steep`) naming the steepest blocking ramp: "Ramp #3 is 30°: too steep for a tier-3 hauler (max 18°)." The detail is cleared once the order is reachable.
-- The ramp inspector shows grade and the tiers that climb it (`describeRampClimb`, `RampGrade.ts`).
+- `vehicleMaxSlopeRatio(progression)` (`Vehicle.ts`) is the one helper. `planItinerary` drive legs (`estimateLegDistance`'s `maxSlopeRatio`, ride alight point) and `Locomotion` drive legs (routes, reroutes, `advanceAlongPath`) both call it; foot legs always use 30°. Spawn on a progression sandbox: the rally flag, every starting building and vehicle share one component driveable at the vehicle limit that reaches the first-blast target; campaign levels keep 30° placement.
+- `PathRequest.maxSlopeRatio` carries it into `findPath`; reachability caches are keyed by clearance and ratio; `fillPool` uses the site's single ratio.
+- No diagonal shortcut (`stepClimbRun`, see `gameplay-navmesh`): a nominal 20° means 20° along a ramp's axis. A straight ramp at the ceiling (about 19.6°, `rampCutSlopeRatio`) needs about 2.75 m of road per metre of depth.
+- A vehicle order unreachable on a progression site but reachable at 30° keeps `blockedReason: 'target_unreachable'` and gets `PendingAction.blockedDetail` (`order.blocked.ramp_too_steep`, params `id`, `grade`, `max`) naming the steepest blocking ramp: "Ramp #3 is 26°: too steep for vehicles (max 20°)." The detail is cleared once the order is reachable.
+- The ramp inspector shows grade and one climbable line (`describeRampClimbability`, `RampGrade.ts`): "Vehicles can climb it (max 20°)" or "Too steep for vehicles (max 20°)".
 - Console: `employee assign_skill <id> skill:driving.<role> level:N licence:1-3` sets the driver's licence level.
-
-**Per-step limit, diagonals included.** A diagonal step over an x-graded ramp has grade `atan(tan g / sqrt(2))`, so ramps at least 2 cells wide are climbable by a diagonal zigzag up to about `tan(limit) * sqrt(2)`. The inspector grade is the steepest cardinal step; its tiers line is conservative (see `gameplay-navmesh`).
 
 ## Dealer grade gate
 

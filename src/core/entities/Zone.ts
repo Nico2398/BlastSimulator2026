@@ -39,7 +39,8 @@ export interface EvacuationDestination { x: number; z: number }
  * given the zone it must clear. Returns null when no safe cell can be
  * found — the entity is stranded.
  */
-export type SafeDestinationFinder = (fromX: number, fromZ: number, zone: ZoneBounds) => EvacuationDestination | null;
+/** A safe cell outside `zone` reachable from (fromX, fromZ); for a vehicle being driven out, reachable by that vehicle. */
+export type SafeDestinationFinder = (fromX: number, fromZ: number, zone: ZoneBounds, vehicle?: Vehicle) => EvacuationDestination | null;
 
 /** Outcome of evacuating a zone: who made it out, and who is stranded. */
 export interface EvacuationResult {
@@ -138,7 +139,7 @@ export function clearZone(
 
     const driverId = vehicleDriverId(v);
     if (driverId !== null) {
-      const dest = findSafeDestination(v.x, v.z, zone);
+      const dest = findSafeDestination(v.x, v.z, zone, v);
       if (dest) {
         // Already driven — plain reposition; moveTo's own implicit
         // continuity (already mounted in `v`) plans straight to a drive
@@ -164,7 +165,7 @@ export function clearZone(
 
     // Driverless: find a safe destination first — a vehicle nobody can drive
     // anywhere is stranded regardless of who might be free to board it.
-    const dest = findSafeDestination(v.x, v.z, zone);
+    const dest = findSafeDestination(v.x, v.z, zone, v);
     if (!dest) {
       result.strandedVehicleIds.push(v.id);
       continue;
@@ -224,7 +225,7 @@ export function clearZone(
     if (inZoneDriverIds.has(emp.id)) continue;
 
     const dest = findSafeDestination(emp.x, emp.z, zone);
-    if (dest && moveTo(state, emp.id, { x: dest.x, z: dest.z }, { allowUnreachable: true, crossFragments: true }).success) {
+    if (dest && moveTo(state, emp.id, { x: dest.x, z: dest.z }, { allowUnreachable: true }).success) {
       result.orderedEmployeeIds.push(emp.id);
     } else {
       result.strandedEmployeeIds.push(emp.id);

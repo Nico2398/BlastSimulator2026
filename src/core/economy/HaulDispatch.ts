@@ -70,7 +70,6 @@ export function syncHaulDispatch(state: GameState, grid?: VoxelGrid | null): voi
     if (typeof fragmentId === 'number') coveredFragmentIds.add(fragmentId);
   }
 
-  const abandoned = abandonedFragmentIds.get(state);
   const sealedPositions: Vec3[] = [];
   const sealedIds = new Set<number>();
   lastSealedIds.set(state, sealedIds);
@@ -78,7 +77,6 @@ export function syncHaulDispatch(state: GameState, grid?: VoxelGrid | null): voi
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
     if (coveredFragmentIds.has(tracked.fragment.id)) continue;
-    if (abandoned?.has(tracked.fragment.id)) continue;
     if (grid && isFragmentSealed(grid, tracked.fragment.position)) {
       sealedPositions.push(tracked.fragment.position);
       sealedIds.add(tracked.fragment.id);
@@ -116,22 +114,6 @@ export function syncHaulDispatch(state: GameState, grid?: VoxelGrid | null): voi
   }
   lastHaulDispatch.set(state, haulDispatchSignature(state));
   lastSealedPositions.set(state, sealedPositions);
-}
-
-/** Fragments whose debris order was dropped as unreachable (#2085): no order is re-queued for them until cleared. Derived, never saved. */
-const abandonedFragmentIds = new WeakMap<GameState, Set<number>>();
-
-/** Stop `syncHaulDispatch` re-queuing orders for these fragments; the next pass is forced. */
-export function abandonDebrisFragments(state: GameState, fragmentIds: ReadonlyArray<number>): void {
-  if (fragmentIds.length === 0) return;
-  const set = abandonedFragmentIds.get(state) ?? new Set<number>();
-  for (const id of fragmentIds) set.add(id);
-  abandonedFragmentIds.set(state, set);
-}
-
-/** Lets abandoned fragments get orders again (a ramp now reaches their crater). */
-export function clearAbandonedDebris(state: GameState): void {
-  if (abandonedFragmentIds.delete(state)) lastHaulDispatch.delete(state);
 }
 
 /**
@@ -310,6 +292,22 @@ export function haulActionOreDensities(
 }
 
 /**
+ * True iff `action` is haul_debris/fragment_debris and its referenced fragment
+ * is bound for a freight warehouse, not a spoil heap (`haulDestinationOf` at the
+ * site's ore grade scale): trace ore under the barren threshold is barren rock
+ * here, as it is at the depot. False for any other action type or a fragment id
+ * that no longer resolves.
+ */
+export function haulActionIsWarehouseBound(
+  state: GameState,
+  action: PendingAction,
+  lookup?: FragmentLookup,
+): boolean {
+  const densities = haulActionOreDensities(state, action, lookup);
+  return densities !== null && !isBarrenFragment(densities, oreGradeScaleOf(state.world));
+}
+
+/**
  * True iff `action` is haul_debris/fragment_debris and its referenced
  * fragment carries any ore (some oreDensities entry > 0). False for any
  * other action type or a fragment id that no longer resolves.
@@ -354,13 +352,22 @@ export function findQueuedHaulAction(state: GameState, fragmentId: number): Pend
  * On-ground, non-oversized fragments within `radiusCells` (octile) of `primary`
  * whose haul_debris action is still queued and unclaimed, nearest first (id
  * breaks ties) (#1370). Only fragments sharing the primary's destination
- * (spoil heap vs warehouse) qualify, so a batch never mixes (#1530). One pass over the pool plus one over the fragments.
+ * (spoil heap vs warehouse) qualify, so a batch never mixes (#1530). A piece another employee's itinerary (anyone but
+ * `plannerId`) already plans to load is left out. One pass over the pool, the itineraries and the fragments.
  */
-export function findNearbyHaulableFragments(state: GameState, primary: TrackedFragment, radiusCells: number): TrackedFragment[] {
+export function findNearbyHaulableFragments(state: GameState, primary: TrackedFragment, radiusCells: number, plannerId?: number): TrackedFragment[] {
   const queued = new Set<number>();
   for (const a of state.pendingActions) {
     const fragmentId = a.payload['fragmentId'];
     if (isQueuedUnclaimedHaul(a) && typeof fragmentId === 'number') queued.add(fragmentId);
+  }
+  // A piece another truck already plans to pick up stays queued until it is loaded; left in, two trucks plan it and
+  // the second arrives to an empty spot, so the more trucks share a crater the emptier each one drives off.
+  for (const emp of state.employees.employees) {
+    if (emp.id === plannerId) continue;
+    for (const leg of emp.itinerary?.legs ?? []) {
+      if (leg.onArrive.kind === 'effect' && leg.onArrive.targetId !== undefined) queued.delete(leg.onArrive.targetId);
+    }
   }
   const { x, z } = primary.fragment.position;
   const gradeScale = oreGradeScaleOf(state.world);

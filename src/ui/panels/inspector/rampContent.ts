@@ -3,11 +3,12 @@ import { t } from '../../../core/i18n/I18n.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { computeRampCost, rampGradeBoundsDegrees } from '../../../core/mining/Ramp.js';
 import { nextRampWidth } from '../../../core/mining/RampWidening.js';
-import { describeRampClimb } from '../../../core/mining/RampGrade.js';
+import { describeRampClimbability } from '../../../core/mining/RampGrade.js';
+import { nextRampFlowSetting, rampFlowSetting } from '../../../core/mining/RampFlow.js';
 import type { RampLeg } from '../../../core/mining/RampPath.js';
 import { isProgressionSite, type BuiltRamp, type PlannedRamp } from '../../../core/state/GameState.js';
 import { describeRamp } from '../../describeRamp.js';
-import type { ActionSpec, KindContent } from './InspectorContent.js';
+import type { ActionSpec, InspectorLinks, KindContent } from './InspectorContent.js';
 import { kindLabel, sectionOf, syncSection, valueRow } from './inspectorWidgets.js';
 import { el } from '../../dom.js';
 
@@ -24,8 +25,31 @@ export function widenState(ramp: BuiltRamp, plannedRamps: readonly PlannedRamp[]
   const cost = computeRampCost(ramp.def.length, next - ramp.width);
   if (ramp.def.legs) return { cost, disabledReason: t('inspector.ramp.widen_multi_leg') };
   if (plannedRamps.some(p => p.widenOf === ramp.id)) return { cost, disabledReason: t('inspector.ramp.widen_in_progress') };
+  if (plannedRamps.some(p => p.repairOf === ramp.id)) return { cost, disabledReason: t('inspector.ramp.repair_in_progress') };
   if (cash < cost) return { cost, disabledReason: t('inspector.ramp.widen_short_funds', { cost: formatMoney(cost) }) };
   return { cost, disabledReason: null };
+}
+
+/**
+ * The Repair action for a built ramp a blast damaged (#2045): its cost, disabled with the reason when the cash
+ * or the ramp's reach falls short; none when the ramp is intact or no terrain can be read.
+ */
+export function repairAction(ramp: BuiltRamp, plannedRamps: readonly PlannedRamp[], cash: number, links: InspectorLinks): ActionSpec | null {
+  const base = { action: 'repair', labelKey: 'inspector.ramp.repair', icon: 'build', variant: 'ghost' } as const;
+  if (plannedRamps.some(p => p.repairOf === ramp.id)) {
+    return { ...base, label: t('inspector.action.repair'), disabled: true, title: t('inspector.ramp.repair_in_progress') };
+  }
+  const offer = links.rampRepairQuote?.(ramp.id);
+  if (offer === undefined || (offer.kind === 'refused' && offer.errorKey === 'mining.repair_ramp.intact')) return null;
+  if (offer.kind === 'refused') {
+    return { ...base, label: t('inspector.action.repair'), disabled: true, title: t(offer.errorKey, offer.errorParams) };
+  }
+  const cost = formatMoney(offer.cost);
+  const short = cash < offer.cost;
+  return {
+    ...base, label: t('inspector.ramp.repair', { cost }), disabled: short,
+    ...(short ? { title: t('inspector.ramp.repair_short_funds', { cost }) } : {}),
+  };
 }
 
 /** "2 · 12m south, 10m east": leg count, then each leg's length and heading. */
@@ -40,11 +64,25 @@ function designGradeText(def: BuiltRamp['def']): string {
   return t('shell.selection.ramp_grade', { grade: Math.round(grade) });
 }
 
+/**
+ * The Traffic action: one press moves the ramp to the next setting, two-way, down only, up only, then two-way again
+ * (`nextRampFlowSetting`); the hint says why a pit wants one ramp each way.
+ */
+export function trafficAction(ramp: BuiltRamp): ActionSpec {
+  const next = nextRampFlowSetting(rampFlowSetting(ramp));
+  return {
+    action: 'traffic', labelKey: 'inspector.ramp.traffic_switch', icon: 'chevR', variant: 'ghost',
+    label: t('inspector.ramp.traffic_switch', { next: t(`inspector.ramp.traffic_${next}`) }),
+    title: t('inspector.ramp.traffic_hint'),
+  };
+}
+
 function buildDimensions(ramp: BuiltRamp): HTMLElement {
   const meters = (n: number) => t('inspector.depth_value', { depth: n });
   const rows = [
+    valueRow(t('inspector.ramp.traffic'), t(`inspector.ramp.traffic_${rampFlowSetting(ramp)}`)),
     valueRow(t('inspector.ramp.width'), meters(ramp.width)),
-    valueRow(t('inspector.ramp.depth'), meters(ramp.def.targetDepth)),
+    valueRow(t('inspector.ramp.depth'), meters(Math.round(ramp.def.targetDepth * 10) / 10)),
     valueRow(t('inspector.ramp.length'), meters(ramp.def.length)),
   ];
   if (ramp.def.legs) {
@@ -57,13 +95,11 @@ function buildDimensions(ramp: BuiltRamp): HTMLElement {
 }
 
 export const rampContent: KindContent = {
-  view(entity, state) {
+  view(entity, state, links) {
     const ramp = state.builtRamps.find(r => r.id === entity.id);
     if (!ramp) return null;
-    const progression = isProgressionSite(state);
-    const desc = describeRamp(ramp, state.navGrid === null ? undefined : {
-      ...describeRampClimb(state.navGrid, ramp, progression),
-    });
+    const climb = describeRampClimbability(state.navGrid, ramp, isProgressionSite(state)) ?? undefined;
+    const desc = describeRamp(ramp, climb);
     const widen = widenState(ramp, state.plannedRamps, state.cash);
     const actions: ActionSpec[] = widen.cost === null ? [] : [{
       action: 'widen', labelKey: 'inspector.ramp.widen', icon: 'up', variant: 'ghost',
@@ -71,12 +107,15 @@ export const rampContent: KindContent = {
       disabled: widen.disabledReason !== null,
       ...(widen.disabledReason !== null ? { title: widen.disabledReason } : {}),
     }];
+    const repair = repairAction(ramp, state.plannedRamps, state.cash, links);
+    if (repair !== null) actions.push(repair);
+    actions.push(trafficAction(ramp));
     return {
       title: desc.title,
       sub: `#${ramp.id} · ${kindLabel('ramp')}`,
       icon: 'layers',
       status: desc.sub,
-      signature: `${ramp.id}:${ramp.width}:${ramp.def.legs?.map(l => `${l.direction}${l.length}`).join('/') ?? ''}:${ramp.def.gradeDegrees ?? ''}:${widen.disabledReason ?? 'ready'}`,
+      signature: `${ramp.id}:${rampFlowSetting(ramp)}:${ramp.width}:${ramp.def.legs?.map(l => `${l.direction}${l.length}`).join('/') ?? ''}:${ramp.def.gradeDegrees ?? ''}:${climb?.climbable ?? ''}:${widen.disabledReason ?? 'ready'}:${repair?.label ?? ''}:${repair?.disabled ?? ''}`,
       get sections() {
         const body = el('div', { className: 'bs-ramp-detail' });
         const section = buildDimensions(ramp);

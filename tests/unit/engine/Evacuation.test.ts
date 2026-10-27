@@ -5,7 +5,8 @@ import { setFreightRoom, sitesOf } from "../../helpers/freightWarehouse.js";
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
-import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { findSafeEvacuationCell, evacuateZone, isMidEvacuationWalk } from '../../../src/core/engine/Evacuation.js';
 import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
@@ -76,6 +77,33 @@ describe('findSafeEvacuationCell', () => {
     const zone: ZoneBounds = { x1: -100, z1: -100, x2: 100, z2: 100 };
 
     expect(findSafeEvacuationCell(state, 10, 10, zone)).toBeNull();
+  });
+
+  it('for a vehicle on a progression site, picks a cell the vehicle can drive to, not one only a walker reaches (#2045)', () => {
+    // West of x = 8 the ground stands 0.5 m higher along the whole map: a step a walker takes and a 20-degree vehicle
+    // does not. The zone's nearest edge, from (12, 15), lies past that step.
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.grade = createGradeState();
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < 40; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < 40; x++) {
+        const surfaceY = x < 8 ? 0.5 : 0;
+        row.push({ type: 'walkable', moveCost: 1, benchLevel: 0, vehicleOccupied: false, clearance: 2, surfaceY, climbY: surfaceY });
+      }
+      cells.push(row);
+    }
+    state.navGrid = new NavGrid(40, 40, cells);
+    const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 12, 15);
+
+    const onFoot = findSafeEvacuationCell(state, 12, 15, zone)!;
+    const driven = findSafeEvacuationCell(state, 12, 15, zone, vehicle)!;
+
+    expect(onFoot.x).toBeLessThan(8);
+    expect(driven).not.toBeNull();
+    expect(driven.x).toBeGreaterThanOrEqual(8);
+    expect(isInZone(driven.x, driven.z, zone)).toBe(false);
   });
 
   it('returns null with no NavGrid to route across', () => {

@@ -54,3 +54,22 @@ Records why the rules in the `gameplay-navmesh` skill exist: the issues that int
 ## Crater access — provenance (merged from main)
 
 - Crater access came with #2082; offset feet and spirals from a hollow start with #2086; stuck ramps, plans that would free nothing, abandoned debris and stranded recovery with #2085.
+
+## Pit logistics belong to the player
+
+- One 20° vehicle limit, no diagonal shortcut up a limited ramp, flush ramp ends, landing on the level the order reaches for, ramp repair and its shape tolerance: #2045.
+- Core crater access, abandoned-debris pruning and stranded recovery removed; core explains and the player acts: #2095.
+- Rubble blocks every walk again: #2094.
+- A haul needs a road on to its depot; docked vehicles stand for the cells they docked from: #2045.
+- Access plans: modal floor, shortest straight ramp over every floor-level foot, then the shortest trip toward the haul depot; exclusions for dug ramps, rubble fill and building footprints: #2045.
+- The site's vehicle network is anchored on the haul depots as well as the rally point (a spoil heap walled the rally into a pocket and every plan read no_start): #2093.
+- A digger on a crater floor starts a flush ramp from beside its foot: #2045.
+- A repair leaves tiles an older ramp covers to that ramp: a traffic-jam widening grew one ramp into its neighbour's lane, and on the seed-42 full-kit ladder the two re-ordered each other's repair every 50-100 ticks from t5500, which held every other ramp order (#2091).
+- The probe buys a digger when ramp work waits and none stands on the vehicle network (#2091).
+- Shallow rescue ramps (`minDropM`): a driver and a digger on a strip a metre below the road kept every later shot near them refused. Shallow plans for every floor, and a 90 m trench for a metre's drop, cost the Shareholder Summit ladder its win, hence crew floors only and the 10 m cap; crew floors go first, with the shortest ramp, since the rescue waited behind three rubble floors while every shot was refused (#2091).
+- One-way ramps (`BuiltRamp.flow`, `ramp_flow`, the inspector's Traffic action): a strong route preference, not a wall, so reachability is unchanged. Asked for after the grade-2 traffic study: one ramp per pit sent loaded and empty trucks head-on through the same corridor, and a down ramp paired with an up ramp keeps them flowing (#2091).
+- A vehicle parked on a thin cell stands for the cells it docked from only over steps it can climb: a truck left beside a quarters, 1.4 cm over the 20-degree limit on every way off, read as reaching the whole site, so every claim handed it out and 10 of 13 drivers idled on the seed-42 full-kit ladder (#2091).
+
+## Search and approach caches
+
+- Failed terrain searches kept per nav grid revision, and the building main region likewise: a 12-hauler ladder run spent 59% of its A* time on repeated failed searches and a quarter of each tick re-labelling the grid for depot approaches (#2089).

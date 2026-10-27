@@ -33,6 +33,7 @@ import { regionForColumns } from '../../../core/nav/NavGridSync.js';
 import { computeDangerZone } from '../../../core/entities/Zone.js';
 import { isActive } from '../../../core/events/ActiveModifiers.js';
 import { armDetonation, cancelDetonation, hasChargedHole, detonationPhase, type DetonationPhase } from '../../../core/engine/DetonationSequence.js';
+import { liftSpentZone } from '../../../core/engine/Evacuation.js';
 import { PERMIT_STRIKES_TO_SUSPEND, BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_NUISANCE_PER_PROJECTION } from '../../../core/config/balance.js';
 
 /** Report line for one warehouse whose stock a blast destroyed with it. */
@@ -325,8 +326,9 @@ export function* fireBlastSteps(
   state.lastBlastReport = report;
 
   yield;
-  // Clear drill plan after blast (holes are consumed)
+  // Clear drill plan after blast (holes are consumed), and the zone it was cleared for.
   resetPlanState(state);
+  liftSpentZone(state);
 
   // Leftover drill orders target holes the blast no longer waits for: cancel
   // them (preflight warns first, FIRE is not gated on them — #1346).

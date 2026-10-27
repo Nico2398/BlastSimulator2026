@@ -8,7 +8,8 @@
 import { isFootprintAction, isHoleAction, isProgressionSite, type GameState, type PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
-import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback } from '../nav/Pathfinding.js';
+import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback, type RampFlowField } from '../nav/Pathfinding.js';
+import { rampFlowField } from '../mining/RampFlow.js';
 import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_BATCH_MAX_ITEMS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole, minVehicleTierFor } from './VehicleReservation.js';
@@ -149,12 +150,13 @@ export function estimateLegDistance(
   avoidVehicles: boolean,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
   maxSlopeRatio?: number,
+  rampFlow: RampFlowField | null = null,
 ): number | null {
   if (fidelity === 'estimate' || state.navGrid === null) {
     return octileHeuristic(fromX, fromZ, toX, toZ);
   }
 
-  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance, ...(maxSlopeRatio !== undefined && { maxSlopeRatio }) });
+  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance, ...(maxSlopeRatio !== undefined && { maxSlopeRatio }), rampFlow });
   return path.found ? path.totalCost : null;
 }
 
@@ -206,7 +208,6 @@ function estimateFootLegDistance(
   fromX: number, fromZ: number,
   toX: number, toZ: number,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
-  crossFragments: boolean = false,
 ): number | null {
   if (fidelity === 'estimate' || state.navGrid === null) {
     return octileHeuristic(fromX, fromZ, toX, toZ);
@@ -215,7 +216,6 @@ function estimateFootLegDistance(
   const avoidVehicles = !isDestinationOccupied(state, toX, toZ);
   const path = findFootPathWithVehicleFallback(
     state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance }, true /* exact */,
-    { crossFragments },
   );
   return path.found ? path.totalCost : null;
 }
@@ -278,7 +278,8 @@ export function hasFreeSeatFor(vehicle: Vehicle, employee: Employee): boolean {
  * names it outright (must still have a free seat); absent that, reuse the
  * reservation already made for `reservedActionId`, if any, otherwise the
  * cheapest free vehicle of `role` at or above `minTier` (the action's rig
- * floor, so cost and ETA use a rig that can reach). Shared by planItinerary's own generic
+ * floor, so cost and ETA use a rig that can reach), preferring one that can
+ * drive to `target`, the action's cell, as the claim does (findVehicleForClaim). Shared by planItinerary's own generic
  * vehicle-gated branch and planFragmentTaskItinerary below — both resolve a
  * goal's vehicle identically, differing only in what they build the
  * itinerary out of once they have it (#1091).
@@ -290,6 +291,7 @@ function resolveVehicleForGoal(
   via: number | undefined,
   reservedActionId: number | null,
   minTier: VehicleTier = 1,
+  target?: { x: number; z: number },
 ): Vehicle | null {
   if (via !== undefined) {
     const vehicle = state.vehicles.vehicles.find(v => v.id === via);
@@ -299,7 +301,7 @@ function resolveVehicleForGoal(
   const reserved = reservedActionId !== null
     ? findVehicleReservedForAction(state.vehicles, reservedActionId)
     : null;
-  return reserved ?? findFreeVehicleForRole(state, role, employee, minTier) ?? null;
+  return reserved ?? findFreeVehicleForRole(state, role, employee, minTier, target) ?? null;
 }
 
 /**
@@ -439,7 +441,7 @@ function buildDriveLeg(
 ): Leg | null {
   const dist = estimateLegDistance(
     state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false,
-    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(vehicle, isProgressionSite(state)),
+    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(isProgressionSite(state)), rampFlowField(state),
   );
   const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, fromX, fromZ, toX, toZ);
   if (effectiveDist === null) return null;
@@ -480,11 +482,8 @@ function buildFootOnlyItinerary(
   targetZ: number,
   workTicks: number,
   allowUnreachable: boolean,
-  // Evacuation walkers (#2077): the relaxed route may cross rubble; stamped on
-  // the leg so the executor (Locomotion) plans with the same rule.
-  crossFragments: boolean = false,
 ): Itinerary | null {
-  const dist = estimateFootLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ, undefined, crossFragments);
+  const dist = estimateFootLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ);
   const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, employee.x, employee.z, targetX, targetZ);
   if (effectiveDist === null) return null;
 
@@ -499,7 +498,6 @@ function buildFootOnlyItinerary(
     // ring — mirrors #1203's identical enter_building step for training.
     onArrive: goal.kind === 'rest' ? { kind: 'enter_building', buildingId: goal.buildingId } : { kind: 'none' },
     estTicks: cellsToTravelTicks(effectiveDist, AGENT_WALK_SPEED),
-    ...(crossFragments ? { crossesFragments: true } : {}),
   };
 
   return { legs: [footLeg], goal, workTicks, estTotalTicks: footLeg.estTicks + workTicks };
@@ -528,7 +526,7 @@ function planFragmentTaskItinerary(
   const role = action.requiredVehicleRole;
   if (role === null) return null; // defensive — both action types always carry a role
 
-  const vehicle = resolveVehicleForGoal(state, employee, role, opts?.via, action.id, minVehicleTierFor(action));
+  const vehicle = resolveVehicleForGoal(state, employee, role, opts?.via, action.id, minVehicleTierFor(action), { x: action.targetX, z: action.targetZ });
   if (!vehicle) return null;
 
   const fragmentId = action.payload['fragmentId'];
@@ -591,7 +589,7 @@ function planFragmentTaskItinerary(
   // A batch unloads at one depot; findNearbyHaulableFragments keeps it to the primary's destination (#1530).
   const destination = haulDestinationOf(tracked.fragment, oreGradeScaleOf(state.world));
   const candidates = fidelity === 'exact'
-    ? findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS)
+    ? findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS, employee.id)
     : [];
   const candidateById = new Map(candidates.map(c => [c.fragment.id, c]));
   const batch = candidates.length === 0 ? [] : selectHaulBatch(
@@ -707,7 +705,9 @@ function resolveRideAlightPoint(
     return { x: fromX + dx * rideFraction, z: fromZ + dz * rideFraction };
   }
 
-  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX: targetX, toZ: targetZ, avoidVehicles: false, requiredClearance, maxSlopeRatio });
+  const path = findExactPath(state.navGrid, {
+    agentId, fromX, fromZ, toX: targetX, toZ: targetZ, avoidVehicles: false, requiredClearance, maxSlopeRatio, rampFlow: rampFlowField(state),
+  });
   if (!path.found || path.waypoints.length <= TRANSPORT_ALIGHT_FINISH_WALK_CELLS + 1) return null;
 
   const wp = path.waypoints[path.waypoints.length - 1 - TRANSPORT_ALIGHT_FINISH_WALK_CELLS]!;
@@ -759,7 +759,7 @@ export function buildTransportRideItinerary(
 
   const alight = resolveRideAlightPoint(
     state, fidelity, employee.id, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ,
-    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(vehicle, isProgressionSite(state)),
+    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(isProgressionSite(state)),
   );
   if (alight === null) return null;
 
@@ -840,7 +840,7 @@ export function planItinerary(
   // `allowUnreachable` (#1178, single-mover unification): threaded through to
   // buildDriveLeg's vehicle-gated drive leg below — a best-effort route
   // instead of a refusal when the target is unreachable right now.
-  opts?: { via?: number; action?: PendingAction; allowUnreachable?: boolean; crossFragments?: boolean },
+  opts?: { via?: number; action?: PendingAction; allowUnreachable?: boolean },
 ): Itinerary | null {
   // haul_debris/fragment_debris (#1091): these two action types need more
   // than the generic single-drive-leg-then-work shape the rest of this
@@ -871,7 +871,7 @@ export function planItinerary(
   );
 
   if (role === null && via === undefined) {
-    const footItinerary = buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks, opts?.allowUnreachable ?? false, opts?.crossFragments ?? false);
+    const footItinerary = buildFootOnlyItinerary(state, employee, goal, fidelity, resolved.targetX, resolved.targetZ, resolved.workTicks, opts?.allowUnreachable ?? false);
     if (footItinerary === null) return null;
 
     if (VEHICLE_TRANSPORT_PLANNING_ENABLED && goal.kind === 'work' && resolved.actionId !== null) {
@@ -898,7 +898,10 @@ export function planItinerary(
   // does. Matches findVehicleForClaim's own real dispatch-time refusal in
   // this state.
   const gatedAction = opts?.action ?? state.pendingActions.find(a => a.id === resolved.actionId);
-  const vehicle = resolveVehicleForGoal(state, employee, role!, via, resolved.actionId, gatedAction === undefined ? 1 : minVehicleTierFor(gatedAction));
+  const vehicle = resolveVehicleForGoal(
+    state, employee, role!, via, resolved.actionId, gatedAction === undefined ? 1 : minVehicleTierFor(gatedAction),
+    gatedAction === undefined ? undefined : { x: gatedAction.targetX, z: gatedAction.targetZ },
+  );
   if (!vehicle) return null;
 
   const mount = buildMountLegs(state, employee, vehicle, fidelity);

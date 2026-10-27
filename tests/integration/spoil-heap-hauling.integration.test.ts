@@ -18,7 +18,10 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import type { Contract } from '../../src/core/economy/Contract.js';
 import { addBlastFragments } from '../../src/core/economy/Logistics.js';
-import { syncHaulDispatch, haulBlockedReason } from '../../src/core/economy/HaulDispatch.js';
+import { syncHaulDispatch, haulBlockedReason, createFragmentLookup, createStorageFit, isAutoDebrisAction, isHaulOrFragmentActionClaimable, haulActionIsWarehouseBound } from '../../src/core/economy/HaulDispatch.js';
+import { thinDebrisCandidates } from '../../src/core/engine/DebrisCandidateBins.js';
+import { employeeClimbReach } from '../../src/core/engine/OrderReachability.js';
+import { findVehicleForClaim } from '../../src/core/engine/VehicleReservation.js';
 import { isBarrenFragment, totalSpoilKg, totalSpoilRoomKg } from '../../src/core/economy/SpoilHeaps.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { placeBuilding, getBuildingDef } from '../../src/core/entities/Building.js';
@@ -600,15 +603,30 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
         return t !== undefined && t.state === 'on_ground' && !isBarrenFragment(t.fragment.oreDensities) && haulBlockedReason(state, a) === null;
       });
     };
-    /** Idle debris haulers' reachable open ore hauls as of the last tick's end: what each driver's next choice could have been. */
+    /**
+     * Idle debris haulers' reachable open ore hauls as of the last tick's end: what each driver's next choice could have
+     * been. Only ore the search sees counts (the rule holds barren back while an ore haul survives the thinning, #1870):
+     * a search gives a kind up after its nearest bins when none of their rock can be taken (DebrisCandidateBins.ts), so
+     * a lone small fragment far beyond a band of ore too heavy for the room left is not one this driver could choose.
+     */
     const takeableOre = new Map<number, number>();
     const sampleTakeableOre = () => {
       takeableOre.clear();
       if (!tracking.on) return;
-      const ore = openOreHauls();
-      if (ore.length === 0) return;
+      const open = openOreHauls();
+      if (open.length === 0) return;
+      const fragmentOf = createFragmentLookup(state);
+      const fits = createStorageFit(state);
+      const climb = employeeClimbReach(state);
+      const pool = state.pendingActions.filter(a => a.status === 'queued' && a.targetEmployeeId === null && isAutoDebrisAction(a.type));
       for (const e of state.employees.employees) {
         if (e.activeActionId !== null || !state.vehicles.vehicles.some(v => v.type === 'debris_hauler' && vehicleDriverId(v) === e.id)) continue;
+        const reachable = (a: typeof pool[number]) => climb === null || climb.canReach(e.x, e.z, state.navGrid!.clampX(a.targetX), state.navGrid!.clampZ(a.targetZ));
+        const seen = new Set(thinDebrisCandidates(
+          state, e, pool, a => isAutoDebrisAction(a.type), a => haulActionIsWarehouseBound(state, a, fragmentOf),
+          a => isHaulOrFragmentActionClaimable(state, a, fragmentOf, fits) && findVehicleForClaim(state, a, e).ok, reachable,
+        ));
+        const ore = open.filter(o => seen.has(o));
         const probe = [...ore]
           .sort((x, y) => octileHeuristic(e.x, e.z, x.targetX, x.targetZ) - octileHeuristic(e.x, e.z, y.targetX, y.targetZ))
           .slice(0, ORE_PROBES)
@@ -787,6 +805,35 @@ describe('a full spoil heap stops barren hauls until a rubble contract clears it
     const added = state.finances.transactions.slice(txBefore);
     expect(added.some(tx => tx.type === 'expense' && tx.amount === 400)).toBe(true);
     expect(added.some(tx => tx.type === 'income')).toBe(false);
+  });
+
+  it('playContracts measures rubble on the heaps: a full heap covers a cheap clearance though the warehouse is empty', () => {
+    const { run, state } = fullHeapSite();
+    expect(state.logistics.storedMassKg).toBe(0);
+    const offer = rubbleContract(state, { quantityKg: 10_000 });
+    playContracts(run, state);
+    expect(state.contracts.available.some(c => c.id === offer.id)).toBe(false);
+    expect(totalSpoilRoomKg(state.buildings.buildings)).toBe(10_000);
+  });
+
+  it('playContracts leaves a paid clearance alone while no barren haul waits on a full heap', () => {
+    const { run, state } = fullHeapSite();
+    const offer = rubbleContract(state, { quantityKg: 10_000, pricePerKg: 0.04, playerPays: true });
+    playContracts(run, state);
+    expect(state.contracts.available.some(c => c.id === offer.id)).toBe(true);
+    expect(totalSpoilRoomKg(state.buildings.buildings)).toBe(0);
+  });
+
+  it('playContracts pays for a clearance once barren hauls wait on full heaps', () => {
+    const { run, state } = fullHeapSite();
+    addBlastFragments(state.logistics, [barren(9706, 5, 6, 900)], state.navGrid);
+    syncHaulDispatch(state);
+    run('tick 1');
+    expect(orderFor(state, 9706)?.blockedReason).toBe('spoil_heap_full');
+    const offer = rubbleContract(state, { quantityKg: 10_000, pricePerKg: 0.04, playerPays: true });
+    playContracts(run, state);
+    expect(state.contracts.available.some(c => c.id === offer.id)).toBe(false);
+    expect(totalSpoilRoomKg(state.buildings.buildings)).toBe(10_000);
   });
 
   it('accepting a paid clearance is refused when cash cannot cover the fee', () => {

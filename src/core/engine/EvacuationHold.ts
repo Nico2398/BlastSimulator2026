@@ -34,8 +34,8 @@ import type { Employee } from '../entities/Employee.js';
  * danger zone.
  *
  * Deliberately NOT a blanket "any pending action whose target falls in any
- * zone" rule evaluated fresh at claim time: `state.zone.activeZone` has no
- * way to become null again once set (defineZone only ever assigns it), so a
+ * zone" rule evaluated fresh at claim time: only a blast lifts
+ * `state.zone.activeZone` (liftSpentZone), so a
  * zone a player drew once, for an entirely unrelated reason (site-prep
  * clearing well before any blast plan exists — confirmed live via
  * safety-projection-visual.json's own `zone clear` step, issued before its
@@ -84,8 +84,8 @@ export function isEvacuationHoldActive(state: GameState, action: PendingAction):
  * still carries it, once the zone it was interrupted in has genuinely
  * resolved — see isEvacuationHoldActive's own doc comment for the two
  * conditions this mirrors. Without this, the marker would sit on the action
- * forever — `state.zone.activeZone` never becomes null again once set
- * (defineZone only ever assigns it), so a LATER, ordinary re-entry into the
+ * until a blast lifts the zone (liftSpentZone) — a zone drawn with `zone
+ * clear` and never blasted stays set — so a LATER, ordinary re-entry into the
  * same footprint (post-blast debris cleanup, say) would make
  * isEvacuationHoldActive read the zone as occupied again and re-arm a block
  * on an action with no remaining connection to the evacuation that created
@@ -104,8 +104,25 @@ export function clearResolvedEvacuationHolds(state: GameState): void {
   if (zone === null) return;
   if (!isZoneClearOfEmployees(zone, state.employees)) return;
   if (isZoneStillBlastThreatened(state.drillHoles, zone)) return;
+  stripEvacuationHolds(state.pendingActions);
+}
 
-  for (const action of state.pendingActions) {
+/**
+ * A fired blast spends the zone its evacuation cleared: lifts it, and the
+ * holds that evacuation stamped. Without this the zone stays active for the
+ * rest of the session, and the crew working the crater afterwards keeps it
+ * "not clear" for good — every living_quarters inside it is refused as a rest
+ * destination (findNearestBuildingOfType, RestActionHelpers.ts), so the whole
+ * crew rests in the dirt beside its own huts. The holds go with the zone
+ * rather than outliving it: the next blast's zone would re-arm them.
+ */
+export function liftSpentZone(state: GameState): void {
+  stripEvacuationHolds(state.pendingActions);
+  state.zone.activeZone = null;
+}
+
+function stripEvacuationHolds(actions: PendingAction[]): void {
+  for (const action of actions) {
     if (action.payload[EVACUATION_HOLD_KEY] !== true) continue;
     const { [EVACUATION_HOLD_KEY]: _removed, ...rest } = action.payload;
     action.payload = rest;

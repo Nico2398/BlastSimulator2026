@@ -29,6 +29,9 @@ Records why the rules in the `gameplay-vehicle-fleet` skill exist: the issues th
 - Hauling destination (barren to Spoil Heap, ore to Freight Warehouse): #1530.
 - Heaps are finite (`no_spoil_heap` / `spoil_heap_full`): #1892.
 - Barren yields to ore: #1870.
+- Barren rock on a planned hole is exempt from barren-yields-to-ore: the ladder probe could not deepen a crater while any ore lay elsewhere on the site (#2089).
+- Barren-yields-to-ore classifies by destination, so trace ore under the barren threshold yields too: #2089.
+- Batch extras skip pieces another truck plans to load: on the desert digger ladder (8 haulers, t2000-3500) the mean load rose from 2.1 t to 2.9 t and warehouse trips from 167 to 221; doubling 4 to 8 haulers went from +20% to +51% ore sold (#2089).
 
 ## Vehicle Repair
 
@@ -46,6 +49,8 @@ Records why the rules in the `gameplay-vehicle-fleet` skill exist: the issues th
 
 - Parked-vehicle yield to a free cell off the blocked mover's route (`pickYieldCell`): #1696.
 - Jams and chokepoints (`TrafficJams.ts`): #1208.
+- Long-detour reroute refused against a stuck blocker: three haulers gridlocked near a warehouse for ~290 ticks in the #1000 starved-backlog test once out-of-reach debris left the pool (#2089).
+- A claim prefers a vehicle that can drive to the work: on the seed-42 full-kit ladder every licensed driver was handed one of two diggers stranded on crater floors, planned no route, and the crater ramp's next segment stood unclaimed from t4500 on while a third digger idled on the road (#2091).
 
 ## Status
 
@@ -67,3 +72,8 @@ Records why the rules in the `gameplay-vehicle-fleet` skill exist: the issues th
 ## Stranded vehicle recovery — provenance (merged from main)
 
 - `recoverStranded` came with #2085.
+
+## One vehicle slope limit
+
+- Every vehicle tier climbs the same 20° on a progression site, and a limited request has no diagonal shortcut up a ramp: #2045.
+- Stranded vehicle recovery removed with core crater access: #2095.

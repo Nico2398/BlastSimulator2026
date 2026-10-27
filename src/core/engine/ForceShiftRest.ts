@@ -219,6 +219,20 @@ function fatigueCoversTripToRest(state: GameState, emp: Employee, destX: number,
   return emp.fatigue - cost >= NEED_REST_ARRIVAL_FATIGUE_FLOOR + NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE;
 }
 
+/** Payload key counting the forced rests that cut a vehicle job's drive short before it arrived. */
+const DRIVE_RESTS_KEY = 'driveRests';
+
+/**
+ * Whether a forced rest already cut short the drive to the vehicle job `emp` holds. A drive longer than one charge
+ * carries from the quarters never converges by turning back: the driver re-crosses the threshold at the same point of
+ * the same route every time (a drill rig 60 ticks from its hole, round the pit by its west ramp, turned back for
+ * 6,000 ticks on the seed-42 full-kit ladder, #2091). Such a drive is rested at the roadside instead.
+ */
+function driveCutShortBefore(state: GameState, emp: Employee): boolean {
+  const action = state.pendingActions.find(a => a.id === emp.activeActionId);
+  return action !== undefined && Number(action.payload[DRIVE_RESTS_KEY] ?? 0) > 0;
+}
+
 /**
  * Site-policy-aware variant of forceShiftRestIfNeeded (#678) — consults
  * SitePolicy.shouldForceRest so the site policy (default or player-applied)
@@ -392,8 +406,11 @@ export function forceShiftRestIfNeededByPolicy(
   // Resolve the rest destination and whether the round trip is worth its
   // fatigue cost BEFORE any side effect (interruptActiveAction below) touches
   // the employee's active work — see forceShiftRestIfNeeded's own comment on
-  // the identical ordering requirement (#1170).
-  const dest = resolveRestDestination(state, emp);
+  // the identical ordering requirement (#1170). A drive a forced rest already cut short once rests at the roadside.
+  const midDrive = midVehicleWork && !isMidClaimedTaskExecution(emp);
+  const dest = midDrive && driveCutShortBefore(state, emp)
+    ? { targetX: emp.x, targetZ: emp.z, buildingId: undefined, worthwhile: true }
+    : resolveRestDestination(state, emp);
   // Idle gap between two same-role jobs (#1090): the follow-up is about to be claimed.
   const betweenVehicleJobs = emp.activeActionId === null && hasClaimableSameRoleFollowUp(state, emp);
   const vehicleJob = midVehicleWork || betweenVehicleJobs;
@@ -407,7 +424,10 @@ export function forceShiftRestIfNeededByPolicy(
   // working on only ends in a collapse on that same drive (vehicle work whose
   // gauge no longer covers the trip) or the shift ran out between two jobs.
   if (!dest.worthwhile && !(vehicleJob && !covered) && !(betweenVehicleJobs && shiftExpired)) return;
-  if (dest.buildingId === undefined && isUnreachableBetweenInPlaceRests(state, emp)) return;
+  // Forced anyway, but the trip still costs more than the building gives back: rest where they stand. Driving a slow
+  // digger across the site to rest at a gauge the rest cannot raise only costs the ramp it was digging (#2089).
+  const target = dest.worthwhile ? dest : { targetX: emp.x, targetZ: emp.z, buildingId: undefined };
+  if (target.buildingId === undefined && isUnreachableBetweenInPlaceRests(state, emp)) return;
 
   // #678 follow-up: release the action this employee was actively working
   // (a drill_hole, dig_ramp_segment, or any other vehicle-gated task) back to
@@ -427,6 +447,8 @@ export function forceShiftRestIfNeededByPolicy(
   // no-op in that case (TaskDispatch.ts), so this call is unconditional here
   // rather than gated on activeActionId !== null.
   const priorActionId = emp.activeActionId;
+  const cutShort = midDrive ? state.pendingActions.find(a => a.id === priorActionId) : undefined;
+  if (cutShort !== undefined) cutShort.payload = { ...cutShort.payload, [DRIVE_RESTS_KEY]: Number(cutShort.payload[DRIVE_RESTS_KEY] ?? 0) + 1 };
   interruptActiveAction(state, emp, priorActionId);
 
   // Single gauge now (#928) — fatigue is the only need this policy ever
@@ -459,10 +481,10 @@ export function forceShiftRestIfNeededByPolicy(
 
   // Immediately claimed — status/holderId reflect that from creation (#547).
   const restAction = createRestPendingAction(state, {
-    targetX: dest.targetX,
-    targetZ: dest.targetZ,
+    targetX: target.targetX,
+    targetZ: target.targetZ,
     targetEmployeeId: emp.id,
-    payload: { needKey, triggeredBy: POLICY_REST_TRIGGER, buildingId: dest.buildingId },
+    payload: { needKey, triggeredBy: POLICY_REST_TRIGGER, buildingId: target.buildingId },
   }, emp.id);
 
   finishForceRest(state, emp, restAction, firedEvents, shiftRested, emitter);

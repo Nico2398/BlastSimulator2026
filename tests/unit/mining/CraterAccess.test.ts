@@ -7,7 +7,7 @@ import {
 } from '../../../src/core/mining/CraterAccess.js';
 import { rampPathCells, rampPathOf, type RampFootprint } from '../../../src/core/mining/RampPath.js';
 import {
-  MAX_RAMP_LENGTH, NAV_MAX_SLOPE_RATIO, RAMP_CRATER_MIN_DROP_M, RAMP_FLOOR_SNAP_REACH_M,
+  MAX_RAMP_LENGTH, NAV_MAX_SLOPE_RATIO, RAMP_CRATER_MIN_DROP_M, CRATER_ACCESS_FLOOR_LEVEL_M, CRATER_ACCESS_MIN_DROP_M,
 } from '../../../src/core/config/balance.js';
 
 interface Pit { x0: number; z0: number; w: number; h: number; depth: number }
@@ -69,6 +69,15 @@ describe('clusterStrandedFloors', () => {
     expect(floor!.z).toBeLessThanOrEqual(12);
   });
 
+  it('names the level most of its orders sit on, not a hole bottom below it, and counts only those (#2045)', () => {
+    const floorCells = [{ x: 10, z: 10, y: 2.5 }, { x: 11, z: 10, y: 2.5 }, { x: 12, z: 10, y: 2.6 }, { x: 13, z: 10, y: 2.5 }];
+    const hole = { x: 11, z: 11, y: 0.5 };
+    const [floor] = clusterStrandedFloors([hole, ...floorCells], 2);
+    expect(floor!.floorY).toBeCloseTo(2.5, 5);
+    expect(floor!.orderCount).toBe(4);
+    expect(floor!.z).toBe(10);
+  });
+
   it('counts a single isolated cell as a floor of one order', () => {
     const floors = clusterStrandedFloors([{ x: 5, z: 5, y: -3 }], 2);
     expect(floors).toHaveLength(1);
@@ -110,7 +119,64 @@ describe('planCraterAccess', () => {
     const first = cells[0]!;
     const last = cells[cells.length - 1]!;
     expect(s.reachableFrom(first.x, first.z)).toBe(true);
-    expect(Math.abs(s.heightAt(last.x, last.z) - -PIT.depth)).toBeLessThanOrEqual(RAMP_FLOOR_SNAP_REACH_M);
+    expect(Math.abs(s.heightAt(last.x, last.z) - -PIT.depth)).toBeLessThanOrEqual(CRATER_ACCESS_FLOOR_LEVEL_M);
+  });
+
+  it('never runs a corridor over ground the surface leaves out, such as a building (#2045)', () => {
+    const open = planCraterAccess(centreFloor(PIT), surface(PIT, outsidePit(PIT)), MAX_RATIO, 3);
+    expect(open.ok).toBe(true);
+    if (!open.ok) return;
+    // A building on the open plan's corridor, part way down it.
+    const cells = rampPathCells(rampPathOf(open.def), 3);
+    const site = cells[Math.floor(cells.length / 2)]!;
+    const building = (x: number, z: number) => Math.abs(x - site.x) <= 2 && Math.abs(z - site.z) <= 2;
+    const base = surface(PIT, outsidePit(PIT));
+    const s: AccessSurface = { ...base, contains: (x, z) => base.contains(x, z) && !building(x, z) };
+    const plan = planCraterAccess(centreFloor(PIT), s, MAX_RATIO, 3);
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(rampPathCells(rampPathOf(plan.def), 3).filter(c => building(c.x, c.z))).toEqual([]);
+  });
+
+  describe('toward the haul depot (#2045)', () => {
+    const SMALL: Pit = { x0: 30, z0: 30, w: 10, h: 10, depth: 3 };
+    const s = () => surface(SMALL, outsidePit(SMALL));
+    const tripFrom = (def: { originX: number; originZ: number; length: number }, to: { x: number; z: number }) =>
+      def.length + Math.hypot(def.originX - to.x, def.originZ - to.z);
+
+    it('enters the crater from the side facing the depot, wherever the shortest ramp would start', () => {
+      const north = { x: 35, z: 0 };
+      const south = { x: 35, z: 79 };
+      const toNorth = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3, [], [], north);
+      const toSouth = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3, [], [], south);
+      expect(toNorth.ok && toSouth.ok).toBe(true);
+      if (!toNorth.ok || !toSouth.ok) return;
+      expect(toNorth.def.direction).toBe('south');
+      expect(toNorth.def.originZ).toBeLessThan(SMALL.z0);
+      expect(toSouth.def.direction).toBe('north');
+      expect(toSouth.def.originZ).toBeGreaterThanOrEqual(SMALL.z0 + SMALL.h);
+    });
+
+    it('never makes the trip to the depot longer than the shortest ramp does', () => {
+      for (const to of [{ x: 0, z: 0 }, { x: 79, z: 35 }, { x: 35, z: 79 }, { x: 5, z: 60 }]) {
+        const shortest = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3);
+        const facing = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3, [], [], to);
+        expect(shortest.ok && facing.ok).toBe(true);
+        if (!shortest.ok || !facing.ok) return;
+        expect(tripFrom(facing.def, to)).toBeLessThanOrEqual(tripFrom(shortest.def, to));
+      }
+    });
+
+    it('without a depot is the shortest ramp, unchanged', () => {
+      const plain = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3);
+      const nulled = planCraterAccess(centreFloor(SMALL), s(), MAX_RATIO, 3, [], [], null);
+      expect(nulled).toEqual(plain);
+    });
+
+    it('still refuses a floor no ramp reaches', () => {
+      const plan = planCraterAccess(centreFloor(SMALL), surface(SMALL, () => false), MAX_RATIO, 3, [], [], { x: 0, z: 0 });
+      expect(plan.ok).toBe(false);
+    });
   });
 
   it('never exceeds the longest ramp the game accepts', () => {
@@ -142,6 +208,21 @@ describe('planCraterAccess', () => {
     const plan = planCraterAccess(centreFloor(shallow), surface(shallow, outsidePit(shallow)), MAX_RATIO, 3);
     expect(plan.ok).toBe(false);
     if (!plan.ok) expect(plan.reasonKey.length).toBeGreaterThan(0);
+  });
+
+  it('with a smaller minDropM plans a short ramp down to a floor shallower than a dug crater (#2091)', () => {
+    // A metre-deep strip behind cliffs strands the crew on it as surely as a deep pit does.
+    const shallow: Pit = { ...PIT, depth: CRATER_ACCESS_MIN_DROP_M };
+    expect(shallow.depth).toBeLessThan(RAMP_CRATER_MIN_DROP_M);
+    const plan = planCraterAccess(centreFloor(shallow), surface(shallow, outsidePit(shallow)), MAX_RATIO, 3, [], [], null, CRATER_ACCESS_MIN_DROP_M);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) expect(plan.def.targetDepth).toBeCloseTo(shallow.depth, 5);
+  });
+
+  it('with a smaller minDropM still refuses a drop below it: too shallow for a ramp', () => {
+    const shallow: Pit = { ...PIT, depth: CRATER_ACCESS_MIN_DROP_M / 2 };
+    const plan = planCraterAccess(centreFloor(shallow), surface(shallow, outsidePit(shallow)), MAX_RATIO, 3, [], [], null, CRATER_ACCESS_MIN_DROP_M);
+    expect(plan).toMatchObject({ ok: false, reasonKey: 'mining.crater_access.too_shallow' });
   });
 
   it('refuses when the only network cell is farther than the longest ramp', () => {

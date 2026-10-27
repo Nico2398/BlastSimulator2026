@@ -24,6 +24,8 @@ import { formatGameDuration } from '../formatGameDuration.js';
 import { buildBlockedOrderMessage, countBlockedReasons, describeBlockedReasons, isFailureBlock, isInTransitBlock } from './blockedOrders.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { isHaulBlockedReason } from '../../core/economy/HaulDispatch.js';
+import { findStrandedCrew, type StrandedCrew } from '../../core/engine/StrandedCrew.js';
+import { vehicleDisplayName } from '../fleetDetailSections.js';
 import type { UiCues } from '../../audio/ui/UiCues.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
@@ -102,6 +104,10 @@ export class NotificationCenter {
   private transitWarned = false;
   /** Haul reasons already toasted; one toast per reason while it persists, not per haul action (#1369). */
   private readonly warnedHaulReasons = new Set<BlockedOrderReason>();
+  /** Vehicles (`v<id>`) and employees (`e<id>`) already toasted as cut off (#2095); forgotten once they are reachable again. */
+  private readonly warnedCutOff = new Set<string>();
+  /** Cut-off crew of the last tick it was computed for; one reachability read per tick, not per frame. */
+  private cutOff: { tick: number; crew: StrandedCrew } | null = null;
 
   /** Interface cue sink; unset in headless runs and tests. */
   private cues: Pick<UiCues, 'notification'> | null = null;
@@ -185,6 +191,7 @@ export class NotificationCenter {
     if (stuckCount > 0) {
       pips.push({ kind: 'crew', icon: 'crew', label: String(stuckCount), tone: 'warn', tip: t('notification.pip.crew_stuck_tip', { count: stuckCount }) });
     }
+    this.updateCutOff(state, pips);
     const jams = findTrafficJams(state.builtRamps, state.employees.employees);
     if (jams.length > 0) {
       const where = jams.map(j => t(`traffic.chokepoint.${j.kind === 'ramp_head' ? 'ramp' : j.kind}`)).join(', ');
@@ -310,6 +317,45 @@ export class NotificationCenter {
     }
 
     return pips;
+  }
+
+  /**
+   * Crew cut off from the site (#2095): the game never fetches them back, so it says what is cut off.
+   * One toast per vehicle or employee when it is cut off, one pip naming all of them while it lasts.
+   */
+  private updateCutOff(state: GameState, pips: AlertPip[]): void {
+    if (this.cutOff?.tick !== state.tickCount) this.cutOff = { tick: state.tickCount, crew: findStrandedCrew(state) };
+    const { vehicleIds, employeeIds } = this.cutOff.crew;
+    const names: string[] = [];
+    const current = new Set<string>();
+    for (const id of vehicleIds) {
+      const vehicle = state.vehicles.vehicles.find(v => v.id === id);
+      if (vehicle === undefined) continue;
+      const name = t('notification.cut_off_vehicle_name', { vehicle: vehicleDisplayName(vehicle.type, vehicle.tier), id });
+      names.push(name);
+      this.warnCutOff(current, `v${id}`, t('notification.cut_off_vehicle', { name }));
+    }
+    for (const id of employeeIds) {
+      const employee = state.employees.employees.find(e => e.id === id);
+      if (employee === undefined) continue;
+      names.push(employee.name);
+      this.warnCutOff(current, `e${id}`, t('notification.cut_off_employee', { name: employee.name }));
+    }
+    for (const key of this.warnedCutOff) if (!current.has(key)) this.warnedCutOff.delete(key);
+    if (names.length === 0) return;
+    pips.push({
+      kind: 'fleet', icon: 'warn', tone: 'warn',
+      label: t('notification.pip.cut_off_label', { count: names.length }),
+      tip: t('notification.pip.cut_off_tip', { names: names.join(', ') }),
+    });
+  }
+
+  /** Toasts `body` the first time `key` is seen cut off in this episode. */
+  private warnCutOff(current: Set<string>, key: string, body: string): void {
+    current.add(key);
+    if (this.warnedCutOff.has(key)) return;
+    this.warnedCutOff.add(key);
+    this.notify({ severity: 'warn', icon: 'warn', title: t('notification.title.cut_off'), body });
   }
 
   /**

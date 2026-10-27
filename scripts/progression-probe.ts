@@ -10,8 +10,11 @@
 //
 // `--strategy ladder` plays the whole permit ladder (limit-sized blasts, benching, tier-2/3 equipment,
 // a gentle ramp, grade-ups as soon as eligible); `stay_g1` is the same without applying past grade 1.
-// Reaching grade 5 takes `--horizon 50000`. Ladder runs also print a per-grade summary (median tick and
-// cash at each grade against the target windows) after the table.
+// A ladder-only run plays the one reference site (`LADDER_REFERENCE_SITE`: desert_badlands, full kit,
+// seed 42) unless `--seed`, `--biome` or `--kit` name others. The grade-3 bar is that site reaching
+// grade 3 inside its window (8,000-14,000 ticks), about half an hour to `--horizon 14000`. Reaching
+// grade 5 takes `--horizon 50000`, hours of run time: a measurement, never a CI check. Ladder runs also
+// print a per-grade summary (median tick and cash at each grade against the target windows) after the table.
 //
 // The full default matrix (24 runs to 10000 ticks) outlives one foreground Bash
 // call, so run it detached and wait inside the same turn, always with an

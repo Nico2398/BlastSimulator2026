@@ -1,9 +1,9 @@
-// BlastSimulator2026 — Integration: an armed blast names a walker who cannot move out (#1990, #2077).
-// Constructed state (#1937 stops the sandbox route at drilling): an employee inside the danger zone on a
-// cell surrounded by fragment debris, with a ring of genuinely blocked cells beyond the debris. Evacuation
-// walkers cross rubble (#2077), so only the blocked ring strands him. No route exists at all, so the
-// real console tick loop (move -> tickDetonation) must name him as stranded within the bound
-// instead of "1 left".
+// BlastSimulator2026 — Integration: an armed blast names a walker who cannot move out (#1990, #2094).
+// Constructed state (#1937 stops the sandbox route at drilling): an employee inside the danger zone, on a
+// cell ringed by fragment debris. Rubble is an obstacle to every walk, evacuation included (#2094): the
+// strict foot route finds nothing and the vehicle-relaxed fallback is rejected for crossing debris, so the
+// real console tick loop (move -> tickDetonation) must name him as stranded within the bound instead of
+// "1 left". The shot then stays armed until the player fires anyway or cancels and clears a path.
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
@@ -22,7 +22,6 @@ import { armDetonation, detonationPhase } from '../../src/core/engine/Detonation
 const SIZE = 80;
 const CENTER = 20; // hole and employee; danger zone is the box (5,5)-(35,35)
 const DEBRIS_RADIUS = 4;
-const BLOCKED_RING_RADIUS = 5;
 
 function flatNav(): NavGrid {
   const vg = new VoxelGrid(SIZE, SIZE);
@@ -37,13 +36,11 @@ function flatNav(): NavGrid {
   return NavGrid.buildNavGrid(vg, [], []);
 }
 
-/** Debris on every cell within DEBRIS_RADIUS of the centre, a blocked ring just outside it (#2077: rubble alone no longer strands). */
+/** Debris on every cell within DEBRIS_RADIUS of the centre: rubble alone rings the walker in. */
 function boxIn(nav: NavGrid): void {
-  for (let dx = -BLOCKED_RING_RADIUS; dx <= BLOCKED_RING_RADIUS; dx++) {
-    for (let dz = -BLOCKED_RING_RADIUS; dz <= BLOCKED_RING_RADIUS; dz++) {
-      const ring = Math.max(Math.abs(dx), Math.abs(dz));
-      if (ring <= DEBRIS_RADIUS) nav.addFragmentOccupant(CENTER + dx, CENTER + dz);
-      else nav.cellAt(CENTER + dx, CENTER + dz)!.type = 'blocked';
+  for (let dx = -DEBRIS_RADIUS; dx <= DEBRIS_RADIUS; dx++) {
+    for (let dz = -DEBRIS_RADIUS; dz <= DEBRIS_RADIUS; dz++) {
+      nav.addFragmentOccupant(CENTER + dx, CENTER + dz);
     }
   }
 }
@@ -63,7 +60,7 @@ function boxedInArmedState() {
   return { run: (cmd: string) => runner.run(cmd), state, walker };
 }
 
-describe('Detonation with a walker boxed in by debris and a blocked ring (#1990, #2077)', () => {
+describe('Detonation with a walker boxed in by rubble (#1990, #2094)', () => {
   it('names the boxed-in employee as stranded within the failure bound plus one re-evacuation interval', () => {
     const { run, state, walker } = boxedInArmedState();
     const budget = DETONATION_STUCK_WALKER_FAILURE_TICKS + DETONATION_REEVACUATE_INTERVAL_TICKS + 1;
@@ -73,15 +70,25 @@ describe('Detonation with a walker boxed in by debris and a blocked ring (#1990,
     expect(walker.alive).toBe(true);
     expect(Math.round(walker.x)).toBe(CENTER); // he never got out
     expect(Math.round(walker.z)).toBe(CENTER);
-    // A blocked ring has no route at all: clearZone cannot order the walk, so he is named stranded outright.
-    expect(state.pendingDetonation!.strandedEmployeeIds).toContain(walker.id);
     expect(detonationPhase(state)).toEqual({ kind: 'stranded', names: [walker.name] });
   });
 
-  it('stays stranded (never silently waiting) over many more re-evacuation intervals', () => {
+  it('stays armed and stranded for 500+ ticks: nothing cancels it, nothing walks him through the rubble', () => {
     const { run, state, walker } = boxedInArmedState();
-    for (let i = 0; i < 6 * DETONATION_REEVACUATE_INTERVAL_TICKS; i++) run('tick 1');
+    expect(run('tick 520')).toMatchObject({ success: true });
+    expect(state.pendingDetonation).not.toBeNull();
     expect(detonationPhase(state)).toEqual({ kind: 'stranded', names: [walker.name] });
     expect(state.pendingDetonation!.strandedEmployeeIds).toContain(walker.id);
+    expect(Math.round(walker.x)).toBe(CENTER);
+    expect(Math.round(walker.z)).toBe(CENTER);
+  });
+
+  it('fires when the player fires anyway', () => {
+    const { run, state } = boxedInArmedState();
+    expect(run('tick 30')).toMatchObject({ success: true });
+    expect(detonationPhase(state).kind).toBe('stranded');
+    expect(run('blast')).toMatchObject({ success: true });
+    expect(state.pendingDetonation).toBeNull();
+    expect(state.lastBlastReport).not.toBeNull();
   });
 });

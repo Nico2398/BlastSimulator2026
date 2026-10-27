@@ -29,3 +29,19 @@ The ~6 s/frame software-rasterisation cost was measured in #475 — which is why
 ## Progression probe — provenance (merged from main)
 
 - The probe came with #1922 and its ladder strategy with #1945; buried-pattern dropping, `decideLadderShotSide` g2 sizing and the ore-poor / building-adjacent skips with #2076.
+
+## Progression probe ladder
+
+- Holes no deeper than their charge breaks out of (a sealed grade-0 shot left an egg-crate floor no vehicle crosses): #2091.
+- Living quarters raised beside a far crater (drivers spent a third of their time walking to rest): #2089.
+- Served floors released once their ramp no longer reaches them (1,141 haul orders waited behind a ramp a deepening shot left short), holes buried under unhaulable rubble dropped (one held a deepening pattern re-ordered every 500 ticks), rubble contracts measured on the spoil heaps (four full heaps beside unread clearance offers): #2091.
+- Deepening gated on a driveable crater floor instead of zero out-of-reach rubble: ledge rubble held every crater at 9.9 m, 0.1 m short of grade 2, from t4500 (#2091).
+- A fragmenter per 100 breaking orders: one faced 463 boulders after grade 2 and broke one in 400 ticks while they buried every new hole; with the extra fragmenters grade 2 came at t7000 instead of t11000 and the pit reached 16.6 m (#2091).
+- Evacuation waits while it progresses, and a pattern is held unfired over stranded crew: a deepening shot was armed and disarmed every 100 ticks from t16000 with 10-20 crew in its zone, holding the access ramp to two stranded diggers (#2091).
+- Explosive bought only for the shortfall over stock, shots sized on free room plus that stock: abandoned patterns' krackle filled the 500 kg store and sized every shot to nothing from t16000 (#2091).
+- Deepest eligible crater deepened first, berm inset clamped to half its span, a buried-for-good pattern's crater (or fresh footprint) barred: an inset 1x1 pattern landed on a span-0 crater's rim rubble and was re-ordered every interval from t13400 while the deepest pit stood idle (#2091).
+- Full holes spaced by their charge, the most the permit allows, fresh ground drilled to 11 m: the permit spread over the most holes left 7.5 kg holes 4 m apart, a shaft round each and full-height rock between, and the sandbox ladder stood at 9.9 m until t8322; it now reaches grade 2 by t2000 (#2091).
+- Ramps kept off drilled patterns, reroute over widening while access waits, only access-ramp work counted live, waiting ramps not judged stalled: a ramp dug across a pattern threw flyrock, widenings re-ordered on every jam, and the stall rule cancelled access ramps queued behind another (#2091).
+- A pattern stranding only unmanned vehicles is fired anyway: disarmed instead, it was armed 56 times from t4870 and each arming evacuated the crew digging the ramp out to them (#2091).
+- Ladder reference site (`LADDER_REFERENCE_SITE`): a ladder-only probe run plays one site unless sites are named. Owner decision: a seed spread costs a run maintenance energy that buys little, since ladder outcomes turn on small policy changes (a shaft 1 m shorter flipped seed 42 from grade 3 at t11836 to bankruptcy at t13979) and per-site guarantees already run in the sandbox integration tests. Long horizons (50,000 ticks, grades 4-5) are hand measurements, never CI checks (#2063, #2072, #2076, #2089).
+- Previous ending of the probe paragraph: "on seed 42 desert_badlands it reaches grade 2 by t2000 with a 12.5 m pit, 13.6 m by t3000, and no grade 3: a second bench needs the first bench's rubble (about 7 kt, 8,800 fragments) hauled off the crater floor, and the site hauls about 250 fragments per 1,000 ticks whatever the fleet size" (#2091).

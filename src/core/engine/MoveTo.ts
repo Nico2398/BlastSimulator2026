@@ -14,9 +14,6 @@ import { t } from '../i18n/I18n.js';
 
 type MoveResult = { success: true } | { success: false; error: string };
 
-/** Options forwarded to planItinerary (`via` applies only to (x, z) and action targets). */
-type MoveOpts = { via?: number; allowUnreachable?: boolean; crossFragments?: boolean };
-
 /** Walk to (x, z), optionally via a named vehicle (a hint, not a command). */
 export function moveTo(
   state: GameState,
@@ -25,7 +22,7 @@ export function moveTo(
   // `allowUnreachable` (#1178, single-mover unification): forwarded straight
   // to planItinerary's own opts — a best-effort route instead of a refusal
   // when the target is unreachable right now.
-  opts?: MoveOpts,
+  opts?: { via?: number; allowUnreachable?: boolean },
   emitter?: EventEmitter,
 ): MoveResult;
 /** Walk to a vehicle and board it — no destination beyond the vehicle itself. */
@@ -47,7 +44,7 @@ export function moveTo(
   state: GameState,
   employeeId: number,
   target: { actionId: number },
-  opts?: MoveOpts,
+  opts?: { via?: number; allowUnreachable?: boolean },
   emitter?: EventEmitter,
 ): MoveResult;
 /**
@@ -75,14 +72,14 @@ export function moveTo(
   // `allowUnreachable` (#1204): threaded through to planItinerary — the same
   // best-effort-route opt-in `beginRestTravel` already uses for the (x, z)
   // overload above.
-  opts?: Omit<MoveOpts, 'via'>,
+  opts?: { allowUnreachable?: boolean },
   emitter?: EventEmitter,
 ): MoveResult;
 export function moveTo(
   state: GameState,
   employeeId: number,
   target: { x: number; z: number } | { vehicleId: number } | { actionId: number } | { buildingId: number },
-  opts?: MoveOpts,
+  opts?: { via?: number; allowUnreachable?: boolean },
   emitter?: EventEmitter,
 ): MoveResult {
   const employee = state.employees.employees.find(e => e.id === employeeId);
@@ -107,7 +104,7 @@ export function moveTo(
     // buildFootOnlyItinerary) sets the enter_building arrival step itself,
     // including the "already on the ring" case (a zero-distance foot leg that
     // arrives, and so applies its enter step, the same tick).
-    const itinerary = planItinerary(state, employee, { kind: 'rest', buildingId: building.id }, 'exact', { allowUnreachable: opts?.allowUnreachable ?? false, crossFragments: opts?.crossFragments ?? false });
+    const itinerary = planItinerary(state, employee, { kind: 'rest', buildingId: building.id }, 'exact', { allowUnreachable: opts?.allowUnreachable ?? false });
     const last = itinerary?.legs[itinerary.legs.length - 1];
     if (!itinerary || !last || last.mode !== 'foot' || (last.onArrive.kind !== 'none' && last.onArrive.kind !== 'enter_building')) {
       return { success: false, error: t('move_to.no_route_available') };
@@ -147,7 +144,7 @@ export function moveTo(
     const action = state.pendingActions.find(a => a.id === target.actionId);
     if (!action) return { success: false, error: t('move_to.no_route_available') };
 
-    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { ...(opts?.via !== undefined ? { via: opts.via } : {}), ...(opts?.allowUnreachable !== undefined ? { allowUnreachable: opts.allowUnreachable } : {}), ...(opts?.crossFragments !== undefined ? { crossFragments: opts.crossFragments } : {}), action });
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { ...(opts?.via !== undefined ? { via: opts.via } : {}), ...(opts?.allowUnreachable !== undefined ? { allowUnreachable: opts.allowUnreachable } : {}), action });
     if (itinerary === null) return { success: false, error: t('move_to.no_route_available') };
 
     employee.itinerary = itinerary;

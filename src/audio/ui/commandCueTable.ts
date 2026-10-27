@@ -54,6 +54,9 @@ export const COMMAND_CUES: Readonly<Record<string, VerbRule>> = {
   build_ramp: CANCELLABLE_ORDER,
   ramp: { subs: { spiral: ORDER }, otherwise: null },
   widen_ramp: CANCELLABLE_ORDER,
+  repair_ramp: CANCELLABLE_ORDER,
+  // Steps a setting, like a policy: nothing is ordered or paid.
+  ramp_flow: { otherwise: { cue: 'ui_tab' } },
   level_ground: CANCELLABLE_ORDER,
   drain_hole: { otherwise: ORDER },
   install_tubing: { otherwise: ORDER },
