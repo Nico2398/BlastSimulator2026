@@ -452,6 +452,14 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
       ],
       "description": "Blast 1: arm the sequence; the crew evacuates the pattern before it fires, so nobody is lost.",

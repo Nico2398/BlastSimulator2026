@@ -447,6 +447,14 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
       ],
       "description": "Fire the second bench of site B.",
@@ -660,6 +668,14 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
       ],
       "description": "Fire the second bench of site A.",
