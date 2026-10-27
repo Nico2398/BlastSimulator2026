@@ -139,7 +139,7 @@ export function relocateFootprintOccupants(state: GameState, region: BlastRegion
     // travel obeys (#954) gates the cell relocated onto, so this sweep
     // never "rescues" someone from a newly-blocked footprint straight into
     // another occupied cell. See NavGrid.findNearestReachableCell's doc.
-    const nearest = NavGrid.findNearestReachableCell(state.navGrid, 0, 0, emp.x, emp.z, true);
+    const nearest = employeeRelocation(state.navGrid, region, emp.x, emp.z);
     emp.x = nearest.x;
     emp.z = nearest.z;
     // A mounted employee's vehicle is deliberately left untouched here: the
@@ -181,6 +181,41 @@ export function relocateFootprintOccupants(state: GameState, region: BlastRegion
     vehicle.z = nearest.z;
     updateVehicleCellOccupancy(state, vehicle, true, true, vx, vz);
   }
+}
+
+/**
+ * Where an employee a footprint caught goes (#2097): the nearest free cell outside `region` that the employee's own
+ * cell connects to. The employee's cell counts as the flood anchor even though the footprint just blocked it, so the
+ * set is what they could already walk to — never the world corner's component, which on many maps is a pocket. A
+ * footprint that seals them in leaves no such cell; they then take the nearest traversable cell to where they stood
+ * (the cut-off alert, `findStrandedCrew`, names them if that cell is cut off).
+ */
+function employeeRelocation(navGrid: NavGrid, region: BlastRegion, x: number, z: number): { x: number; z: number } {
+  const cx = Math.round(x);
+  const cz = Math.round(z);
+  const reach = NavGrid.computeClimbReachableSet(navGrid, cx, cz);
+  const maxRing = Math.max(navGrid.width, navGrid.height);
+  for (let r = 1; r <= maxRing; r++) {
+    let best: { x: number; z: number } | null = null;
+    let bestDistSq = Infinity;
+    for (let dz = -r; dz <= r; dz++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+        const tx = cx + dx;
+        const tz = cz + dz;
+        if (isInRegion(tx, tz, region) || !reach.has(tx, tz)) continue;
+        const cell = navGrid.cellAt(tx, tz);
+        if (!cell || !Number.isFinite(cell.moveCost) || isCellOccupied(cell)) continue;
+        const distSq = (tx - x) ** 2 + (tz - z) ** 2;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          best = { x: tx, z: tz };
+        }
+      }
+    }
+    if (best !== null) return best;
+  }
+  return NavGrid.findNearestReachableCell(navGrid, x, z, x, z, true);
 }
 
 /**
