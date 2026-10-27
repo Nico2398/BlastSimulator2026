@@ -58,6 +58,32 @@ describe('decideBuriedPattern', () => {
     expect(d.action).toBe('drop');
   });
 
+  it('restarts the clock when fewer fragments bury the holes than at the last call: the crew is hauling them off (#2091)', () => {
+    const d = decideBuriedPattern({
+      buriedHoleCount: 1, previousBuriedHoleCount: 1, buryingFragmentCount: 80, previousBuryingFragmentCount: 81,
+      buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS * 3,
+    });
+    expect(d).toEqual({ action: 'wait', buriedSinceTick: LADDER_BURIED_DROP_TICKS * 3 });
+  });
+
+  it('drops when the burying fragments grew or held for the whole threshold (#2091)', () => {
+    for (const count of [81, 90]) {
+      const d = decideBuriedPattern({
+        buriedHoleCount: 1, previousBuriedHoleCount: 1, buryingFragmentCount: count, previousBuryingFragmentCount: 81,
+        buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS,
+      });
+      expect(d.action).toBe('drop');
+    }
+  });
+
+  it('a first fragment count is no progress yet', () => {
+    const d = decideBuriedPattern({
+      buriedHoleCount: 1, previousBuriedHoleCount: 1, buryingFragmentCount: 80, previousBuryingFragmentCount: null,
+      buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS,
+    });
+    expect(d.action).toBe('drop');
+  });
+
   it('does not drop when the count is 0 even past the threshold', () => {
     expect(decideBuriedPattern({ buriedHoleCount: 0, previousBuriedHoleCount: null, buriedSinceTick: 0, tick: LADDER_BURIED_DROP_TICKS * 2 }).action)
       .toBe('wait');

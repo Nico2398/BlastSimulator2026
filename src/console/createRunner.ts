@@ -26,6 +26,7 @@ import {
   rampCommand,
   widenRampCommand,
   repairRampCommand,
+  rampFlowCommand,
   levelGroundCommand,
   weatherCommand,
   tubingCommand,
@@ -230,6 +231,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('repair_ramp', 'Repair a built ramp a blast damaged (id:N)', (args, named) =>
     repairRampCommand(ctx, args, named),
+  );
+  runner.register('ramp_flow', 'Set a built ramp\'s traffic: two-way, down only or up only (id:N flow:both|down|up)', (args, named) =>
+    rampFlowCommand(ctx, args, named),
   );
   runner.register('level_ground', 'Level a rectangular area (minX:0 maxX:10 minZ:0 maxZ:10)', (args, named) =>
     levelGroundCommand(ctx, args, named),

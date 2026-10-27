@@ -14,7 +14,7 @@ export type InspectorKind = EntityPick['kind'];
 /** Every action an Inspector button can fire; main.ts decides what each does. */
 export type InspectorAction =
   | 'dispatch_here' | 'move_here' | 'upgrade_vehicle' | 'scrap_vehicle'
-  | 'upgrade' | 'move' | 'demolish' | 'widen' | 'repair' | 'locate' | 'research';
+  | 'upgrade' | 'move' | 'demolish' | 'widen' | 'repair' | 'traffic' | 'locate' | 'research';
 
 /** One action button the Inspector renders for the current entity. */
 export interface ActionSpec {

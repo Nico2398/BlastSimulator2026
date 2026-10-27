@@ -4,6 +4,7 @@ import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { computeRampCost, rampGradeBoundsDegrees } from '../../../core/mining/Ramp.js';
 import { nextRampWidth } from '../../../core/mining/RampWidening.js';
 import { describeRampClimbability } from '../../../core/mining/RampGrade.js';
+import { nextRampFlowSetting, rampFlowSetting } from '../../../core/mining/RampFlow.js';
 import type { RampLeg } from '../../../core/mining/RampPath.js';
 import { isProgressionSite, type BuiltRamp, type PlannedRamp } from '../../../core/state/GameState.js';
 import { describeRamp } from '../../describeRamp.js';
@@ -63,9 +64,23 @@ function designGradeText(def: BuiltRamp['def']): string {
   return t('shell.selection.ramp_grade', { grade: Math.round(grade) });
 }
 
+/**
+ * The Traffic action: one press moves the ramp to the next setting, two-way, down only, up only, then two-way again
+ * (`nextRampFlowSetting`); the hint says why a pit wants one ramp each way.
+ */
+export function trafficAction(ramp: BuiltRamp): ActionSpec {
+  const next = nextRampFlowSetting(rampFlowSetting(ramp));
+  return {
+    action: 'traffic', labelKey: 'inspector.ramp.traffic_switch', icon: 'chevR', variant: 'ghost',
+    label: t('inspector.ramp.traffic_switch', { next: t(`inspector.ramp.traffic_${next}`) }),
+    title: t('inspector.ramp.traffic_hint'),
+  };
+}
+
 function buildDimensions(ramp: BuiltRamp): HTMLElement {
   const meters = (n: number) => t('inspector.depth_value', { depth: n });
   const rows = [
+    valueRow(t('inspector.ramp.traffic'), t(`inspector.ramp.traffic_${rampFlowSetting(ramp)}`)),
     valueRow(t('inspector.ramp.width'), meters(ramp.width)),
     valueRow(t('inspector.ramp.depth'), meters(Math.round(ramp.def.targetDepth * 10) / 10)),
     valueRow(t('inspector.ramp.length'), meters(ramp.def.length)),
@@ -94,12 +109,13 @@ export const rampContent: KindContent = {
     }];
     const repair = repairAction(ramp, state.plannedRamps, state.cash, links);
     if (repair !== null) actions.push(repair);
+    actions.push(trafficAction(ramp));
     return {
       title: desc.title,
       sub: `#${ramp.id} · ${kindLabel('ramp')}`,
       icon: 'layers',
       status: desc.sub,
-      signature: `${ramp.id}:${ramp.width}:${ramp.def.legs?.map(l => `${l.direction}${l.length}`).join('/') ?? ''}:${ramp.def.gradeDegrees ?? ''}:${climb?.climbable ?? ''}:${widen.disabledReason ?? 'ready'}:${repair?.label ?? ''}:${repair?.disabled ?? ''}`,
+      signature: `${ramp.id}:${rampFlowSetting(ramp)}:${ramp.width}:${ramp.def.legs?.map(l => `${l.direction}${l.length}`).join('/') ?? ''}:${ramp.def.gradeDegrees ?? ''}:${climb?.climbable ?? ''}:${widen.disabledReason ?? 'ready'}:${repair?.label ?? ''}:${repair?.disabled ?? ''}`,
       get sections() {
         const body = el('div', { className: 'bs-ramp-detail' });
         const section = buildDimensions(ramp);

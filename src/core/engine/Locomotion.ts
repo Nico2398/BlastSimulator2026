@@ -18,6 +18,7 @@ import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
 import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells, vehicleMaxSlopeRatio } from '../entities/Vehicle.js';
 import type { Leg, Itinerary } from './Itinerary.js';
 import { findPath, findFootPathWithVehicleFallback, type PathResult, type PathRequest } from '../nav/Pathfinding.js';
+import { rampFlowField } from '../mining/RampFlow.js';
 import { isStepClimbable, hasClearance, type NavGrid } from '../nav/NavGrid.js';
 import { advanceAlongPath, inFlightHopOrigin, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import { pickYieldCell } from '../nav/IdleYield.js';
@@ -829,13 +830,14 @@ function noteBlockEpisodeStep(emp: Employee, leg: Leg): number {
 }
 
 /** Per-vehicle pathing limits a drive leg's routes carry; empty for a foot leg. */
-type DriveLimits = Pick<PathRequest, 'requiredClearance' | 'maxSlopeRatio'>;
+type DriveLimits = Pick<PathRequest, 'requiredClearance' | 'maxSlopeRatio' | 'rampFlow'>;
 
-/** Clearance and climb limit of `vehicle`, the same pair the planner's drive-leg estimate uses (#1938). */
+/** Clearance, climb limit and one-way ramps of `vehicle`'s routes, the same the planner's drive-leg estimate uses (#1938). */
 function driveLimitsOf(state: GameState, vehicle: Vehicle): DriveLimits {
   return {
     requiredClearance: vehicleRequiredClearanceCells(vehicle),
     maxSlopeRatio: vehicleMaxSlopeRatio(isProgressionSite(state)),
+    rampFlow: rampFlowField(state),
   };
 }
 

@@ -26,6 +26,26 @@ function gridWithPatch(withOre: boolean): VoxelGrid {
 const touchesPatch = (c: { x: number; z: number }): boolean =>
   c.x <= PATCH.hi && c.x + SPAN >= PATCH.lo && c.z <= PATCH.hi && c.z + SPAN >= PATCH.lo;
 
+/** The patch above at ore density 10, and a poorer one (density 1) at POOR: a tenth of the rich patch, under LADDER_SITE_ORE_SHARE. */
+const POOR = { lo: 24, hi: 28 };
+function gridWithRichAndPoor(): VoxelGrid {
+  const grid = new VoxelGrid(SIZE, SIZE);
+  const inside = (p: { lo: number; hi: number }, x: number, z: number): boolean => x >= p.lo && x <= p.hi && z >= p.lo && z <= p.hi;
+  for (let x = 0; x < SIZE; x++) {
+    for (let z = 0; z < SIZE; z++) {
+      for (let y = 0; y < GROUND_TOP; y++) {
+        const top = y >= GROUND_TOP - DEPTH;
+        const ore = top && inside(PATCH, x, z) ? { cruite_ore: 10 } : top && inside(POOR, x, z) ? { cruite_ore: 1 } : undefined;
+        grid.fillVoxel(x, y, z, 1, ore);
+      }
+    }
+  }
+  return grid;
+}
+
+const touchesPoor = (c: { x: number; z: number }): boolean =>
+  c.x <= POOR.hi && c.x + SPAN >= POOR.lo && c.z <= POOR.hi && c.z + SPAN >= POOR.lo;
+
 describe('freshSites', () => {
   it('without rules returns every free site, barren ones included', () => {
     const sites = freshSites(gridWithPatch(true), SPAN, DEPTH, []);
@@ -49,8 +69,9 @@ describe('freshSites', () => {
     const all = freshSites(grid, SPAN, DEPTH, [], { protectedZones: [] });
     const zone = { x: PATCH.lo, z: PATCH.lo, span: 1 };
     const sites = freshSites(grid, SPAN, DEPTH, [], { protectedZones: [zone] });
+    expect(all.some(c => c.x === PATCH.lo && c.z === PATCH.lo)).toBe(true);
     expect(sites.length).toBeGreaterThan(0);
-    expect(sites.length).toBeLessThan(all.length);
+    expect(sites.every(touchesPatch)).toBe(true);
     expect(sites.some(c => c.x === PATCH.lo && c.z === PATCH.lo)).toBe(false);
   });
 
@@ -75,7 +96,9 @@ describe('freshSites', () => {
     const all = freshSites(grid, SPAN, DEPTH, [], { protectedZones: [] });
     const zone = { x: PATCH.lo, z: PATCH.lo, span: 1 };
     const sites = freshSites(grid, SPAN, DEPTH, [], { protectedZones: [], forbiddenZones: [zone] });
-    expect(sites.length).toBeLessThan(all.length);
+    expect(all.some(c => c.x === PATCH.lo && c.z === PATCH.lo)).toBe(true);
+    expect(sites.length).toBeGreaterThan(0);
+    expect(sites.every(touchesPatch)).toBe(true);
     expect(sites.some(c => c.x === PATCH.lo && c.z === PATCH.lo)).toBe(false);
   });
 
@@ -89,5 +112,25 @@ describe('freshSites', () => {
     const all = freshSites(grid, SPAN, DEPTH, [], { protectedZones: [] });
     const everything = { x: 0, z: 0, span: SIZE };
     expect(freshSites(grid, SPAN, DEPTH, [], { protectedZones: [everything] })).toEqual(all);
+  });
+
+  it('keeps only the rich patch while it may be shot, the poorer one read as not worth a shot', () => {
+    const sites = freshSites(gridWithRichAndPoor(), SPAN, DEPTH, [], { protectedZones: [] });
+    expect(sites.length).toBeGreaterThan(0);
+    expect(sites.every(touchesPatch)).toBe(true);
+  });
+
+  it('weighs the sites a shot may take on their own when the rich patch lies in a forbidden zone', () => {
+    const forbiddenZones = [{ x: PATCH.lo - SPAN - 1, z: PATCH.lo - SPAN - 1, span: PATCH.hi - PATCH.lo + 2 * SPAN + 3 }];
+    const sites = freshSites(gridWithRichAndPoor(), SPAN, DEPTH, [], { protectedZones: [], forbiddenZones });
+    expect(sites.length).toBeGreaterThan(0);
+    expect(sites.every(touchesPoor)).toBe(true);
+  });
+
+  it('takes the poorer patch before shooting over a protected building by the rich one', () => {
+    const protectedZones = [{ x: PATCH.lo - SPAN - 1, z: PATCH.lo - SPAN - 1, span: PATCH.hi - PATCH.lo + 2 * SPAN + 3 }];
+    const sites = freshSites(gridWithRichAndPoor(), SPAN, DEPTH, [], { protectedZones });
+    expect(sites.length).toBeGreaterThan(0);
+    expect(sites.every(touchesPoor)).toBe(true);
   });
 });

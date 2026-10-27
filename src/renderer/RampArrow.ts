@@ -17,6 +17,7 @@
 
 import * as THREE from 'three';
 import { rampWidthOf, type RampDef } from '../core/mining/Ramp.js';
+import type { RampWidth } from '../core/config/balance.js';
 import { rampFootprint } from '../core/mining/RampWidening.js';
 import { RAMP_DIR_OFFSETS, rampLegsOf, rampPathOf, rampWaypoints } from '../core/mining/RampPath.js';
 import type { RampFootprint } from '../core/state/GameState.js';
@@ -24,6 +25,8 @@ import { markSceneOverlay } from './post/SceneOverlay.js';
 import { bilinearSurfaceHeight, type SurfaceHeightSampler } from './GroundTint.js';
 
 export const RAMP_ARROW_COLOR = 0xffd21f;
+/** A finished one-way ramp's arrow: cyan, so it never reads as a ramp still being dug. */
+export const RAMP_FLOW_ARROW_COLOR = 0x35d0ff;
 const UNDERLAY_COLOR = 0x1a1408;
 
 /** Drawn after the ghost cubes (GHOST_RENDER_ORDER) so a pending layer never covers the arrow. */
@@ -76,6 +79,13 @@ export function rampArrowLayout(ramp: LegArrowSpec): RampArrowLayout | null {
 interface RampArrowOptions {
   /** Body and outline colour; defaults to RAMP_ARROW_COLOR. A refused preview passes its refusal red. */
   color?: number;
+  /** Point the arrow up the ramp, foot to top (an up-only ramp's traffic), instead of down it. */
+  reverse?: boolean;
+}
+
+/** `layout` pointing the other way: tail and tip swapped, the same corridor. */
+function reversedLayout(layout: RampArrowLayout): RampArrowLayout {
+  return { tail: layout.tip, tip: layout.tail, dir: { dx: -layout.dir.dx, dz: -layout.dir.dz }, corridor: layout.corridor };
 }
 
 /**
@@ -85,8 +95,9 @@ interface RampArrowOptions {
 export function buildRampArrow(
   ramp: RampArrowSpec, sampler: SurfaceHeightSampler, options: RampArrowOptions = {},
 ): THREE.Group | null {
-  const layouts = rampLegSpecs(ramp).map(rampArrowLayout);
-  if (layouts.some(l => l === null)) return null;
+  const legs = rampLegSpecs(ramp).map(rampArrowLayout);
+  if (legs.some(l => l === null)) return null;
+  const layouts = options.reverse ? legs.map(l => reversedLayout(l!)) : legs;
   const color = options.color ?? RAMP_ARROW_COLOR;
   const group = new THREE.Group();
   group.name = 'ramp-arrow';
@@ -213,14 +224,25 @@ interface PlannedRampArrow {
   segments: ReadonlyArray<{ done: boolean }>;
 }
 
+/** A finished ramp; the layer draws its traffic arrow when it is one-way. */
+interface BuiltRampArrow {
+  id: number;
+  def: RampArrowSpec;
+  width: RampWidth;
+  flow?: 'down' | 'up';
+}
+
 /**
  * One arrow per ramp order still being dug. A ramp keeps its arrow until its
- * last segment is done; a finished ramp keeps none (the minimap tints it).
+ * last segment is done; a finished two-way ramp keeps none (the minimap tints
+ * it). A finished one-way ramp shows its traffic: a cyan arrow down it, or up
+ * it for an up-only ramp.
  */
 export class RampArrowLayer {
   private readonly scene: THREE.Scene;
   private readonly sampler: SurfaceHeightSampler;
   private readonly arrows = new Map<number, THREE.Group>();
+  private readonly flowArrows = new Map<number, { key: string; group: THREE.Group }>();
 
   constructor(scene: THREE.Scene, sampler: SurfaceHeightSampler) {
     this.scene = scene;
@@ -231,7 +253,8 @@ export class RampArrowLayer {
    * Reconcile against the current ramp orders. `terrainChanged` rebuilds the
    * arrows that stay, so they re-sample the ground a dig just lowered.
    */
-  sync(ramps: ReadonlyArray<PlannedRampArrow>, terrainChanged = false): void {
+  sync(ramps: ReadonlyArray<PlannedRampArrow>, terrainChanged = false, built: ReadonlyArray<BuiltRampArrow> = []): void {
+    this.syncFlowArrows(built, terrainChanged);
     const pending = ramps.filter(r => r.segments.some(s => !s.done));
     const keep = new Set(pending.map(r => r.id));
     for (const [id, group] of this.arrows) {
@@ -246,9 +269,34 @@ export class RampArrowLayer {
     }
   }
 
+  /** Traffic arrows on finished one-way ramps; one rebuilt when its direction, width or line changes, or the ground does. */
+  private syncFlowArrows(built: ReadonlyArray<BuiltRampArrow>, terrainChanged: boolean): void {
+    const wanted = new Map(built.filter(r => r.flow !== undefined)
+      .map(r => [r.id, { ramp: r, key: `${r.flow}:${r.width}:${r.def.originX},${r.def.originZ}:${r.def.direction}:${r.def.length}` }]));
+    for (const [id, drawn] of this.flowArrows) {
+      if (wanted.get(id)?.key === drawn.key && !terrainChanged) continue;
+      this.scene.remove(drawn.group);
+      disposeRampArrow(drawn.group);
+      this.flowArrows.delete(id);
+    }
+    for (const [id, { ramp, key }] of wanted) {
+      if (this.flowArrows.has(id)) continue;
+      const group = buildRampArrow({ ...ramp.def, width: ramp.width }, this.sampler, { color: RAMP_FLOW_ARROW_COLOR, reverse: ramp.flow === 'up' });
+      if (!group) continue;
+      group.name = 'ramp-flow-arrow';
+      this.scene.add(group);
+      this.flowArrows.set(id, { key, group });
+    }
+  }
+
   /** Number of ramp arrows currently drawn. */
   get count(): number {
     return this.arrows.size;
+  }
+
+  /** The traffic arrow drawn on finished one-way ramp `id`, or null. */
+  getFlowArrow(id: number): THREE.Group | null {
+    return this.flowArrows.get(id)?.group ?? null;
   }
 
   /** The drawn arrow for ramp order `id`, or null. */
@@ -258,6 +306,11 @@ export class RampArrowLayer {
 
   dispose(): void {
     for (const [id, group] of this.arrows) this.remove(id, group);
+    for (const drawn of this.flowArrows.values()) {
+      this.scene.remove(drawn.group);
+      disposeRampArrow(drawn.group);
+    }
+    this.flowArrows.clear();
   }
 
   private remove(id: number, group: THREE.Group): void {

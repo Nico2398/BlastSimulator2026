@@ -126,6 +126,20 @@ export function trackedBuriesPlannedHole(state: GameState, tracked: TrackedFragm
   return buries;
 }
 
+/**
+ * How many haulable on-ground fragments cover each cell (packed by `cellKey`); cells no rubble covers are absent.
+ * What a hole drilled there waits on: every one of them is hauled or broken before it can be drilled.
+ */
+export function rubbleCoverCounts(state: GameState): ReadonlyMap<number, number> {
+  const sealed = sealedFragmentIdsOf(state);
+  const counts = new Map<number, number>();
+  for (const tracked of state.logistics.fragments) {
+    if (!isHaulableRubble(tracked, sealed)) continue;
+    forEachCoveredCell(footprintOf(tracked), key => counts.set(key, (counts.get(key) ?? 0) + 1));
+  }
+  return counts;
+}
+
 const fragmentIdOf = (tracked: TrackedFragment): number => tracked.fragment.id;
 
 /** True when the on-ground fragment `fragmentId` covers at least one planned hole. */

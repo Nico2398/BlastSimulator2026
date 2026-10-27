@@ -4536,6 +4536,13 @@
   "economy.contract.market_header": "Ore markets:",
   "economy.contract.market_line": "  {ore}: {pct}% saturated | price {trend}% vs base ({from} -> {to}/kg)",
   "economy.contract.market_none": "No ore markets to watch on this site.",
+  "inspector.action.traffic": "Traffic",
+  "inspector.ramp.traffic": "Traffic",
+  "inspector.ramp.traffic_both": "Two-way",
+  "inspector.ramp.traffic_down": "Down only",
+  "inspector.ramp.traffic_hint": "One-way ramps keep trucks from meeting head-on: pair a down ramp with an up ramp. A vehicle only drives the wrong way when no other ramp leads there.",
+  "inspector.ramp.traffic_switch": "Traffic: {next}",
+  "inspector.ramp.traffic_up": "Up only",
   "notification.market.glut": "Analysts blame you for the {ore} glut.",
   "notification.wall_slump.body": "Wall slump at ({x}, {z}). The geologist did warn you.",
   "notification.wall_slump.title": "Collapse",
@@ -4564,5 +4571,10 @@
   "mining.blast.rating_cap_sealed_failure": "Rating capped (most broken rock stayed sealed): base {base}",
   "mining.blast.rating_cap_sealed_partial": "Rating capped (part of the broken rock stayed sealed): base {base}",
   "mining.blast.sealed_ore_value": "Sealed ore value: ${value} (a later shot breaking the cap can still free it)",
-  "mining.blast.sealed_fragments": "Sealed fragments: {count} of {total}"
+  "mining.blast.sealed_fragments": "Sealed fragments: {count} of {total}",
+  "mining.ramp_flow.not_found": "No built ramp #{id}.",
+  "mining.ramp_flow.set_both": "Ramp #{id}: two-way traffic.",
+  "mining.ramp_flow.set_down": "Ramp #{id}: one way, vehicles only drive down it.",
+  "mining.ramp_flow.set_up": "Ramp #{id}: one way, vehicles only drive up it.",
+  "mining.ramp_flow.usage": "Usage: ramp_flow id:<ramp-id> flow:{options}"
 }

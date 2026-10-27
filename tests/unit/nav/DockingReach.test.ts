@@ -139,3 +139,23 @@ describe('dockedFrom (#2045)', () => {
     expect(dockedFrom(threeDeep, [{ x: 7, z: 5 }], 2)).toEqual([{ x: 7, z: 5 }]);
   });
 });
+
+describe('dockedFrom with a climb limit', () => {
+  // Column x = 5 is the thin ring beside a footprint at x >= 6; the clear ground west of it lies `drop` metres lower.
+  const ledge = (drop: number) => makeGrid((x) => (
+    x === 5 ? { clearance: 1, surfaceY: drop } : x >= 6 ? { type: 'blocked', moveCost: Infinity, clearance: 0 } : { surfaceY: 0 }
+  ));
+  const ratio = Math.tan(20 * Math.PI / 180);
+
+  it('docks over a step the vehicle climbs, as without a limit', () => {
+    const from = dockedFrom(ledge(0.3), [{ x: 5, z: 5 }], 2, ratio);
+    expect(from.length).toBeGreaterThan(0);
+    expect(from.every(c => c.x === 4)).toBe(true);
+  });
+
+  it('a vehicle whose every way off its thin cell is too steep docks nowhere and stands where it is', () => {
+    // 0.38 m a tile: the stuck truck beside a quarters on the seed-42 ladder, 1.4 cm over the 20-degree limit.
+    expect(dockedFrom(ledge(0.38), [{ x: 5, z: 5 }], 2, ratio)).toEqual([{ x: 5, z: 5 }]);
+    expect(dockedFrom(ledge(0.38), [{ x: 5, z: 5 }], 2).every(c => c.x === 4)).toBe(true);
+  });
+});

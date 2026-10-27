@@ -8,7 +8,8 @@
 import { isFootprintAction, isHoleAction, isProgressionSite, type GameState, type PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
-import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback } from '../nav/Pathfinding.js';
+import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback, type RampFlowField } from '../nav/Pathfinding.js';
+import { rampFlowField } from '../mining/RampFlow.js';
 import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_BATCH_MAX_ITEMS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole, minVehicleTierFor } from './VehicleReservation.js';
@@ -149,12 +150,13 @@ export function estimateLegDistance(
   avoidVehicles: boolean,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
   maxSlopeRatio?: number,
+  rampFlow: RampFlowField | null = null,
 ): number | null {
   if (fidelity === 'estimate' || state.navGrid === null) {
     return octileHeuristic(fromX, fromZ, toX, toZ);
   }
 
-  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance, ...(maxSlopeRatio !== undefined && { maxSlopeRatio }) });
+  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance, ...(maxSlopeRatio !== undefined && { maxSlopeRatio }), rampFlow });
   return path.found ? path.totalCost : null;
 }
 
@@ -439,7 +441,7 @@ function buildDriveLeg(
 ): Leg | null {
   const dist = estimateLegDistance(
     state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false,
-    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(isProgressionSite(state)),
+    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(isProgressionSite(state)), rampFlowField(state),
   );
   const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, fromX, fromZ, toX, toZ);
   if (effectiveDist === null) return null;
@@ -703,7 +705,9 @@ function resolveRideAlightPoint(
     return { x: fromX + dx * rideFraction, z: fromZ + dz * rideFraction };
   }
 
-  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX: targetX, toZ: targetZ, avoidVehicles: false, requiredClearance, maxSlopeRatio });
+  const path = findExactPath(state.navGrid, {
+    agentId, fromX, fromZ, toX: targetX, toZ: targetZ, avoidVehicles: false, requiredClearance, maxSlopeRatio, rampFlow: rampFlowField(state),
+  });
   if (!path.found || path.waypoints.length <= TRANSPORT_ALIGHT_FINISH_WALK_CELLS + 1) return null;
 
   const wp = path.waypoints[path.waypoints.length - 1 - TRANSPORT_ALIGHT_FINISH_WALK_CELLS]!;

@@ -3,11 +3,12 @@ import {
   decideLadderEventOption,
   decideLadderReach,
   decideLadderDeepen,
+  shaftHoleDepthM,
+  LADDER_SHAFT_BREAKOUT_LOSS_M,
   decideFreshShotSite,
   rampProtectionZones,
   shotOverlapsProtectedRamp,
   LADDER_RAMP_PROTECT_MARGIN_M,
-  type LadderDeepenInput,
   type FreshSiteInput,
   type ProtectedZone,
   type RampFootprintInput,
@@ -33,6 +34,8 @@ import {
   LADDER_HOLE_MIN_DEPTH_M,
   LADDER_HOLE_STEP_DOWN_M,
   LADDER_DUD_SHOT_LIMIT,
+  LADDER_DEPOTS_AT_ONCE,
+  depotsToOrder,
   type LadderHoleDepthInput,
   type LadderShotJudgeInput,
 } from '../../../scripts/shared/probe-ladder-policy';
@@ -289,49 +292,40 @@ describe('reachableShotDepthM', () => {
   });
 });
 
-const deepenBase: LadderDeepenInput = {
-  orderedRubbleCount: 0,
-  orderlessRubbleCount: 0,
-  sealedRubbleCount: 0,
-  haulPending: false,
-};
-
-describe('decideLadderDeepen', () => {
-  it('deepens a clear crater', () => {
-    expect(decideLadderDeepen(deepenBase)).toBe('deepen');
-  });
-
-  it('deepens although sealed rubble remains: no hauler can reach it, waiting would stall forever', () => {
-    expect(decideLadderDeepen({ ...deepenBase, sealedRubbleCount: 40 })).toBe('deepen');
-  });
-
-  it('waits while ordered rubble remains', () => {
-    expect(decideLadderDeepen({ ...deepenBase, orderedRubbleCount: 1 })).toBe('wait');
-  });
-
-  it('waits while reachable orderless rubble remains', () => {
-    expect(decideLadderDeepen({ ...deepenBase, orderlessRubbleCount: 1 })).toBe('wait');
+describe('decideLadderDeepen (#2091)', () => {
+  it('deepens a crater whose floor a vehicle drives onto', () => {
+    expect(decideLadderDeepen({ floorReachable: true })).toBe('deepen');
   });
 
   it('waits while no vehicle drives onto the crater floor: the crater has no way in yet', () => {
-    expect(decideLadderDeepen({ ...deepenBase, outOfReachRubbleCount: 1, floorReachable: false })).toBe('wait');
-  });
-
-  it('deepens a crater whose floor is driven onto although rubble lies out of reach on a ledge (#2091)', () => {
-    expect(decideLadderDeepen({ ...deepenBase, outOfReachRubbleCount: 37, floorReachable: true })).toBe('deepen');
+    expect(decideLadderDeepen({ floorReachable: false })).toBe('wait');
   });
 
   it('an absent floor verdict reads as reachable', () => {
-    const { floorReachable: _omit, ...rest } = { ...deepenBase, floorReachable: true };
-    expect(decideLadderDeepen(rest)).toBe('deepen');
+    expect(decideLadderDeepen({})).toBe('deepen');
+  });
+});
+
+describe('shaftHoleDepthM (#2091)', () => {
+  const base = { floorDepthM: 12.4, nextGradeDepthM: 20, rigMaxDepthM: 15 };
+
+  it('drills the next grade\'s depth less the floor, plus the measured shortfall: a 10 m hole on a 12.4 m floor broke out to 20.6 m', () => {
+    expect(shaftHoleDepthM(base)).toBe(Math.ceil(20 - 12.4 + LADDER_SHAFT_BREAKOUT_LOSS_M));
+    expect(shaftHoleDepthM(base)).toBe(10);
   });
 
-  it('waits while a haul is pending', () => {
-    expect(decideLadderDeepen({ ...deepenBase, haulPending: true })).toBe('wait');
+  it('is never shorter than the shortest ladder hole, on a floor already near the depth', () => {
+    expect(shaftHoleDepthM({ ...base, floorDepthM: 19.9 })).toBe(LADDER_HOLE_MIN_DEPTH_M);
+    expect(shaftHoleDepthM({ ...base, floorDepthM: 25 })).toBe(LADDER_HOLE_MIN_DEPTH_M);
   });
 
-  it('waits on a pending haul even with sealed rubble only', () => {
-    expect(decideLadderDeepen({ ...deepenBase, sealedRubbleCount: 5, haulPending: true })).toBe('wait');
+  it('is null when the rig cannot drill that deep, and drills exactly to the rig\'s limit', () => {
+    expect(shaftHoleDepthM({ ...base, rigMaxDepthM: 9 })).toBeNull();
+    expect(shaftHoleDepthM({ ...base, rigMaxDepthM: 10 })).toBe(10);
+  });
+
+  it('is null when the next grade asks no depth', () => {
+    expect(shaftHoleDepthM({ ...base, nextGradeDepthM: 0 })).toBeNull();
   });
 });
 
@@ -636,5 +630,37 @@ describe('judgeLadderShot', () => {
   it('a null report is not a dud', () => {
     const r = judgeLadderShot({ ...judgeBase, report: null, dudStreak: 1 });
     expect(r).toMatchObject({ judged: true, dudStreak: 0, bar: false });
+  });
+});
+
+describe('depotsToOrder', () => {
+  const heap = { capacityKg: 50_000, built: 3, planned: 0, max: 24 };
+
+  it('orders nothing while no haul waits on storage, whatever the count', () => {
+    expect(depotsToOrder({ ...heap, blockedKg: 0 })).toBe(0);
+    expect(depotsToOrder({ ...heap, blockedKg: 0, built: 0 })).toBe(0);
+  });
+
+  it('orders one depot for blocked rubble one depot holds, and more for more, up to the in-flight limit', () => {
+    expect(depotsToOrder({ ...heap, blockedKg: 1 })).toBe(1);
+    expect(depotsToOrder({ ...heap, blockedKg: 50_000 })).toBe(1);
+    expect(depotsToOrder({ ...heap, blockedKg: 50_001 })).toBe(2);
+    expect(depotsToOrder({ ...heap, blockedKg: 4_000_000 })).toBe(LADDER_DEPOTS_AT_ONCE);
+  });
+
+  it('counts the room pending orders add, and never exceeds the in-flight limit', () => {
+    expect(depotsToOrder({ ...heap, blockedKg: 50_000, planned: 1 })).toBe(0);
+    expect(depotsToOrder({ ...heap, blockedKg: 4_000_000, planned: LADDER_DEPOTS_AT_ONCE })).toBe(0);
+    expect(depotsToOrder({ ...heap, blockedKg: 4_000_000, planned: LADDER_DEPOTS_AT_ONCE - 1 })).toBe(1);
+  });
+
+  it('stops at the cap, counting what is ordered', () => {
+    expect(depotsToOrder({ ...heap, blockedKg: 4_000_000, built: 24 })).toBe(0);
+    expect(depotsToOrder({ ...heap, blockedKg: 4_000_000, built: 23, planned: 1 })).toBe(0);
+    expect(depotsToOrder({ ...heap, blockedKg: 4_000_000, built: 23 })).toBe(1);
+  });
+
+  it('orders nothing for a depot that holds nothing', () => {
+    expect(depotsToOrder({ ...heap, blockedKg: 1, capacityKg: 0 })).toBe(0);
   });
 });

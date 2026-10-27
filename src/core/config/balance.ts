@@ -1438,6 +1438,15 @@ export const RAMP_GRADE_STEP_DEGREES = 1;
 /** Ramp repair (#2045): cost per cell a repair cuts down to the ramp's line or fills back up to it. */
 export const RAMP_REPAIR_COST_PER_CELL = 10;
 /**
+ * One-way ramps: a vehicle step against a ramp's traffic direction costs this many times its plain cost. Large enough
+ * that a route takes any other ramp the site offers, so traffic on a down ramp and an up ramp flows one way each and
+ * nobody meets head-on; a step against the flow is still allowed, so a pit whose only ramp points the wrong way never
+ * strands its vehicles.
+ */
+export const RAMP_AGAINST_FLOW_COST_FACTOR = 40;
+/** One-way ramps: rise (m) over one step under which the step reads level (across the ramp), neither with nor against its flow. */
+export const RAMP_FLOW_LEVEL_EPSILON_M = 0.05;
+/**
  * Ramp repair (#2045): a ramp is damaged only when its ground strays from its line by more than this (m) in shape — the
  * spread of (ground - line) across its columns. A line re-anchored on a ground another order nudged sits off by the same
  * hair everywhere and drives as before; a shot that cuts into a ramp or deepens its floor spreads it by far more.

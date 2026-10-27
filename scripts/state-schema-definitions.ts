@@ -47,6 +47,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   builtRampCount: { type: 'number', description: 'Finished ramps (state.builtRamps.length, #1298)' },
   rampLegCount: { type: 'number', description: 'Legs of the first built ramp, 0 when none is built (#1942)' },
   builtRampWidth: { type: 'number', description: 'Width in voxels of the first built ramp, 0 when none is built (#1298)' },
+  builtRampFlow: { type: 'string', description: 'Traffic direction of the first built ramp: both, down or up; both when none is built' },
   orderedBuildingCount: { type: 'number', description: 'Buildings ordered but not yet built (state.plannedBuildings.length, #556)' },
   chargedCount: { type: 'number' },
   researchQueueLength: { type: 'number', description: 'Research tasks queued at a Research Center, in progress or pending (state.buildings.researchQueue.length)' },

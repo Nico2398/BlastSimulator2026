@@ -82,6 +82,7 @@ import { scrapConfirmConfig } from './ui/panels/inspector/vehicleDetailParts.js'
 import { SelectionOverlay } from './renderer/SelectionOverlay.js';
 import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRegion.js';
 import { nextRampWidth } from './core/mining/RampWidening.js';
+import { nextRampFlowSetting, rampFlowSetting } from './core/mining/RampFlow.js';
 import { quoteRampRepair } from './core/mining/RampRepair.js';
 import { spiralSurfaceFrom } from './core/mining/RampSpiral.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
@@ -828,6 +829,7 @@ window.__gameState = () => {
     builtRampCount: s.builtRamps.length,
     rampLegCount: s.builtRamps[0] ? (s.builtRamps[0].def.legs?.length ?? 1) : 0,
     builtRampWidth: s.builtRamps[0]?.width ?? 0,
+    builtRampFlow: s.builtRamps[0]?.flow ?? 'both',
     // Buildings ordered but not yet built (state.plannedBuildings.length) --
     // mirrors serializeGameState's own field (console-api.ts), same
     // rationale as orderedHoleCount/orderedRampSegmentCount above (#556).
@@ -1420,6 +1422,11 @@ inspector.setActionHandler((action, entity) => {
     case 'repair':
       reportIfFailed(t('inspector.action.repair'), window.__gameConsole(`repair_ramp id:${entity.id}`));
       break;
+    case 'traffic': {
+      const ramp = ctx.state?.builtRamps.find(r => r.id === entity.id);
+      if (ramp) reportIfFailed(t('inspector.action.traffic'), window.__gameConsole(`ramp_flow id:${entity.id} flow:${nextRampFlowSetting(rampFlowSetting(ramp))}`));
+      break;
+    }
     case 'demolish': {
       const placedBuilding = ctx.state?.buildings.buildings.find(x => x.id === entity.id);
       if (!placedBuilding) break;

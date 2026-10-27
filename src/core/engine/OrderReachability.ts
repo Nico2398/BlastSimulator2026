@@ -108,7 +108,7 @@ function fillPool(
   // Every vehicle climbs at the site's one vehicle limit (#2045).
   const ratio = uniformRatio ?? vehicleMaxSlopeRatio(isProgressionSite(state));
   // A vehicle parked on a docking cell stands for the cells it docked from (#2045).
-  const vehicleReach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(dockedFrom(cache.navGrid, usable, NAV_CLEARANCE_VEHICLE_CELLS));
+  const vehicleReach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(dockedFrom(cache.navGrid, usable, NAV_CLEARANCE_VEHICLE_CELLS, ratio));
   // A clearance-1 approach cell beside a building is where a vehicle docks (#1840).
   // Role-agnostic: applies to every vehicle-gated order, not only demolition.
   return { hasActor: true, reachable: withDockingCells(cache.navGrid, vehicleReach, NAV_CLEARANCE_VEHICLE_CELLS) };

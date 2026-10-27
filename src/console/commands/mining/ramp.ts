@@ -17,6 +17,7 @@ import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { isBuildingFootprintCell } from '../../../core/entities/Building.js';
 import { rampFootprint, orderRampWiden, validateWidenRamp, type WidenFailure } from '../../../core/mining/RampWidening.js';
 import { orderRampRepair } from '../../../core/mining/RampRepair.js';
+import { isRampFlowSetting, setRampFlow, RAMP_FLOW_SETTINGS } from '../../../core/mining/RampFlow.js';
 import { RAMP_DEFAULT_WIDTH, RAMP_WIDTH_OPTIONS, isRampWidth, type RampWidth } from '../../../core/config/balance.js';
 import { cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -284,6 +285,24 @@ export function widenRampCommand(
   const result = orderRampWiden(state, ctx.grid!, rampId, toWidth);
   if (!result.success) return widenRefused(rampId, result);
   return { success: true, output: t('mining.widen_ramp.ordered', { id: rampId, width: toWidth, cost: formatMoney(result.data.cost) }) };
+}
+
+/** `ramp_flow id:N flow:both|down|up` — sets a built ramp's traffic direction: two-way, down only or up only. */
+export function rampFlowCommand(
+  ctx: MiningContext,
+  _args: string[],
+  named: Record<string, string>,
+): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+  const rampId = parseInt(named['id'] ?? '', 10);
+  const flow = named['flow'] ?? '';
+  if (isNaN(rampId) || !isRampFlowSetting(flow)) {
+    return { success: false, output: t('mining.ramp_flow.usage', { options: RAMP_FLOW_SETTINGS.join('|') }) };
+  }
+  const result = setRampFlow(ctx.state!, rampId, flow);
+  if (!result.success) return { success: false, output: result.error };
+  return { success: true, output: t(`mining.ramp_flow.set_${flow}`, { id: rampId }) };
 }
 
 /** `repair_ramp id:N` — re-cuts a built ramp a blast damaged back to its line, landed on its floor as it is now (#2045). */

@@ -67,6 +67,8 @@ Records why the rules in the `gameplay-navmesh` skill exist: the issues that int
 - A repair leaves tiles an older ramp covers to that ramp: a traffic-jam widening grew one ramp into its neighbour's lane, and on the seed-42 full-kit ladder the two re-ordered each other's repair every 50-100 ticks from t5500, which held every other ramp order (#2091).
 - The probe buys a digger when ramp work waits and none stands on the vehicle network (#2091).
 - Shallow rescue ramps (`minDropM`): a driver and a digger on a strip a metre below the road kept every later shot near them refused. Shallow plans for every floor, and a 90 m trench for a metre's drop, cost the Shareholder Summit ladder its win, hence crew floors only and the 10 m cap; crew floors go first, with the shortest ramp, since the rescue waited behind three rubble floors while every shot was refused (#2091).
+- One-way ramps (`BuiltRamp.flow`, `ramp_flow`, the inspector's Traffic action): a strong route preference, not a wall, so reachability is unchanged. Asked for after the grade-2 traffic study: one ramp per pit sent loaded and empty trucks head-on through the same corridor, and a down ramp paired with an up ramp keeps them flowing (#2091).
+- A vehicle parked on a thin cell stands for the cells it docked from only over steps it can climb: a truck left beside a quarters, 1.4 cm over the 20-degree limit on every way off, read as reaching the whole site, so every claim handed it out and 10 of 13 drivers idled on the seed-42 full-kit ladder (#2091).
 
 ## Search and approach caches
 

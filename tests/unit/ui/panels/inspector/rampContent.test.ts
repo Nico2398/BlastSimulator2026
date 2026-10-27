@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Ramp inspector content (#1769): width, depth, length and the Widen action with its cost.
 import { describe, it, expect } from 'vitest';
-import { rampContent, repairAction, widenState, type WidenState } from '../../../../../src/ui/panels/inspector/rampContent.js';
+import { rampContent, repairAction, trafficAction, widenState, type WidenState } from '../../../../../src/ui/panels/inspector/rampContent.js';
 import type { InspectorLinks, InspectorView, RampRepairOffer } from '../../../../../src/ui/panels/inspector/InspectorContent.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import type { BuiltRamp, GameState, PlannedRamp } from '../../../../../src/core/state/GameState.js';
@@ -91,7 +91,7 @@ describe('ramp inspector', () => {
 
   it('offers Widen labelled with its cost', () => {
     const view = viewOf(stateWith(rampOf(3)));
-    expect(view.actions.map(a => a.action)).toEqual(['widen']);
+    expect(view.actions.map(a => a.action)).toEqual(['widen', 'traffic']);
     expect(view.actions[0]!.label).toBe(`Widen · $${formatMoney(computeRampCost(12, 2))}`);
     expect(view.actions[0]!.disabled).toBeFalsy();
   });
@@ -109,8 +109,8 @@ describe('ramp inspector', () => {
     expect(a.title).toBeTruthy();
   });
 
-  it('offers no action at maximum width', () => {
-    expect(viewOf(stateWith(rampOf(7))).actions).toEqual([]);
+  it('offers no Widen at maximum width, only Traffic', () => {
+    expect(viewOf(stateWith(rampOf(7))).actions.map(a => a.action)).toEqual(['traffic']);
   });
 
   it('signature changes with width, affordability and widening', () => {
@@ -212,8 +212,32 @@ describe('Repair action (#2045)', () => {
     const s = stateWith(rampOf(3));
     const plain = rampContent.view({ kind: 'ramp', id: 1 }, s, links)!;
     const damaged = rampContent.view({ kind: 'ramp', id: 1 }, s, offering({ kind: 'quote', cost: 420 }))!;
-    expect(plain.actions.map(a => a.action)).toEqual(['widen']);
-    expect(damaged.actions.map(a => a.action)).toEqual(['widen', 'repair']);
+    expect(plain.actions.map(a => a.action)).toEqual(['widen', 'traffic']);
+    expect(damaged.actions.map(a => a.action)).toEqual(['widen', 'repair', 'traffic']);
     expect(damaged.signature).not.toBe(plain.signature);
+  });
+});
+
+describe('Traffic action (one-way ramps)', () => {
+  it('reads Two-way on a ramp with no direction, and offers to make it down only', () => {
+    const view = viewOf(stateWith(rampOf(3)));
+    const action = view.actions.find(a => a.action === 'traffic')!;
+    expect(action.label).toBe(t('inspector.ramp.traffic_switch', { next: t('inspector.ramp.traffic_down') }));
+    expect(action.disabled).toBeFalsy();
+    expect(action.title).toBe(t('inspector.ramp.traffic_hint'));
+    expect(document.createElement('div').appendChild(view.sections[0]!).textContent).toContain(t('inspector.ramp.traffic_both'));
+  });
+
+  it('offers up only from down only, and two-way from up only', () => {
+    expect(trafficAction({ ...rampOf(3), flow: 'down' }).label).toBe(t('inspector.ramp.traffic_switch', { next: t('inspector.ramp.traffic_up') }));
+    expect(trafficAction({ ...rampOf(3), flow: 'up' }).label).toBe(t('inspector.ramp.traffic_switch', { next: t('inspector.ramp.traffic_both') }));
+  });
+
+  it('shows the ramp\'s direction and changes the view signature with it', () => {
+    const r = rampOf(3);
+    const twoWay = viewOf(stateWith(r));
+    const down = viewOf(stateWith({ ...r, flow: 'down' }));
+    expect(down.signature).not.toBe(twoWay.signature);
+    expect(document.createElement('div').appendChild(down.sections[0]!).textContent).toContain(t('inspector.ramp.traffic_down'));
   });
 });

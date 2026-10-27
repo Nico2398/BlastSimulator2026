@@ -62,6 +62,6 @@ export function vehicleReachesCell(state: GameState, vehicle: Pick<Vehicle, 'x' 
   if (cache === null) return true;
   const ratio = vehicleMaxSlopeRatio(isProgressionSite(state));
   const reach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio)
-    .reachableFrom(dockedFrom(cache.navGrid, [vehicle], NAV_CLEARANCE_VEHICLE_CELLS));
+    .reachableFrom(dockedFrom(cache.navGrid, [vehicle], NAV_CLEARANCE_VEHICLE_CELLS, ratio));
   return withDockingCells(cache.navGrid, reach, NAV_CLEARANCE_VEHICLE_CELLS).has(x, z);
 }

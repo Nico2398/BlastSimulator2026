@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
-  rampArrowLayout, buildRampArrow, RampArrowLayer, RAMP_ARROW_COLOR, RAMP_ARROW_RENDER_ORDER,
+  rampArrowLayout, buildRampArrow, RampArrowLayer, RAMP_ARROW_COLOR, RAMP_ARROW_RENDER_ORDER, RAMP_FLOW_ARROW_COLOR,
 } from '../../../src/renderer/RampArrow.js';
 import { GHOST_RENDER_ORDER } from '../../../src/renderer/GhostMesh.js';
 import { rampDefFromEndpoints } from '../../../src/core/mining/Ramp.js';
@@ -164,6 +164,54 @@ describe('RampArrowLayer', () => {
     expect(bodyVertices(layer.getArrow(1)!)[0]!.y).toBeCloseTo(2.12);
     layer.dispose();
     expect(layer.count).toBe(0);
+    expect(scene.children).toHaveLength(0);
+  });
+});
+
+describe('one-way ramp arrows', () => {
+  const def = { originX: 0, originZ: 0, direction: 'south' as const, length: 6 };
+  const built = (flow?: 'down' | 'up') => ({ id: 4, def, width: 3 as const, ...(flow && { flow }) });
+  /** Tip of the arrow body: the vertex farthest along z for an arrow down a south ramp, nearest for one up it. */
+  const tipZ = (group: THREE.Group, down: boolean): number => {
+    const zs = bodyVertices(group).map(v => v.z);
+    return down ? Math.max(...zs) : Math.min(...zs);
+  };
+
+  it('points up the ramp when reversed', () => {
+    const down = buildRampArrow(def, flat)!;
+    const up = buildRampArrow(def, flat, { reverse: true })!;
+    expect(tipZ(down, true)).toBeGreaterThan(5);
+    expect(tipZ(up, false)).toBeLessThan(1);
+  });
+
+  it('draws a cyan arrow on a finished one-way ramp only, down or up its traffic', () => {
+    const scene = new THREE.Scene();
+    const layer = new RampArrowLayer(scene, flat);
+    layer.sync([], false, [built()]);
+    expect(layer.getFlowArrow(4)).toBeNull();
+    layer.sync([], false, [built('down')]);
+    const down = layer.getFlowArrow(4)!;
+    expect(((down.getObjectByName('ramp-arrow-body') as THREE.Mesh).material as THREE.MeshBasicMaterial).color.getHex()).toBe(RAMP_FLOW_ARROW_COLOR);
+    expect(tipZ(down, true)).toBeGreaterThan(5);
+    layer.sync([], false, [built('up')]);
+    const up = layer.getFlowArrow(4)!;
+    expect(up).not.toBe(down);
+    expect(tipZ(up, false)).toBeLessThan(1);
+    layer.sync([], false, [built()]);
+    expect(layer.getFlowArrow(4)).toBeNull();
+    expect(scene.children).toHaveLength(0);
+  });
+
+  it('keeps an unchanged arrow, and rebuilds it when the ground changed', () => {
+    const scene = new THREE.Scene();
+    const layer = new RampArrowLayer(scene, flat);
+    layer.sync([], false, [built('down')]);
+    const first = layer.getFlowArrow(4);
+    layer.sync([], false, [built('down')]);
+    expect(layer.getFlowArrow(4)).toBe(first);
+    layer.sync([], true, [built('down')]);
+    expect(layer.getFlowArrow(4)).not.toBe(first);
+    layer.dispose();
     expect(scene.children).toHaveLength(0);
   });
 });
