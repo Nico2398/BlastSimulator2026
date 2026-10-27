@@ -7,7 +7,7 @@
 // of its orders read out of reach it plans a ramp down to the stranded floor with the pure
 // `planCraterAccess` planner and orders it (`build_ramp`).
 
-import type { GameState, PendingAction } from '../../src/core/state/GameState.js';
+import type { GameState, PendingAction, PlannedRamp } from '../../src/core/state/GameState.js';
 import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { clusterStrandedFloors, planCraterAccess, type AccessSurface, type StrandedFloor } from '../../src/core/mining/CraterAccess.js';
 import { rampPathCells, rampPathOf, rampTotalLength, rampWaypoints, type RampFootprint } from '../../src/core/mining/RampPath.js';
@@ -63,12 +63,14 @@ export interface CraterAccessMemory {
   repairRevision: number;
   /** Built ramps whose repair got stuck out of every digger's reach and was cancelled: the player gives up on them. */
   unrepairable: number[];
+  /** Built ramps whose widening got stuck and was cancelled: a later jam on them is rerouted, not widened again. */
+  unwidenable: number[];
   /** Per planned ramp id: segments done at the last look, and since when that count has stood. */
   progress: Record<number, { done: number; sinceTick: number }>;
 }
 
 export function newCraterAccessMemory(): CraterAccessMemory {
-  return { lastTick: -Infinity, failedSignature: null, served: [], avoid: [], repairRevision: -1, unrepairable: [], progress: {} };
+  return { lastTick: -Infinity, failedSignature: null, served: [], avoid: [], repairRevision: -1, unrepairable: [], unwidenable: [], progress: {} };
 }
 
 /**
@@ -81,15 +83,21 @@ export const ACCESS_RAMP_STALL_TICKS = 600;
 
 /** Footprints of planned ramps that finished no segment for ACCESS_RAMP_STALL_TICKS; records each ramp's progress. */
 export function stalledRampFootprints(
-  state: Pick<GameState, 'plannedRamps' | 'tickCount'>, memory: Pick<CraterAccessMemory, 'progress'>,
+  state: Pick<GameState, 'plannedRamps' | 'pendingActions' | 'tickCount'>, memory: Pick<CraterAccessMemory, 'progress'>,
 ): RampFootprint[] {
   const stalled: RampFootprint[] = [];
   const live = new Set<number>();
+  // A ramp nobody works while a digger works another is waiting its turn, not stalled: its clock restarts. Its access
+  // ramp into a 10 m crater was cancelled that way while the one digger driver widened another (#2091).
+  const claimed = new Set(state.pendingActions.filter(a => a.type === 'dig_ramp_segment' && a.holderId !== null).map(a => a.id));
+  const worked = (ramp: PlannedRamp): boolean => ramp.segments.some(seg => !seg.done && claimed.has(seg.actionId));
+  const anyWorked = state.plannedRamps.some(worked);
   for (const ramp of state.plannedRamps) {
     live.add(ramp.id);
     const done = ramp.segments.filter(seg => seg.done).length;
     const seen = memory.progress[ramp.id];
-    if (seen === undefined || seen.done !== done) memory.progress[ramp.id] = { done, sinceTick: state.tickCount };
+    const waiting = anyWorked && !worked(ramp);
+    if (seen === undefined || seen.done !== done || waiting) memory.progress[ramp.id] = { done, sinceTick: state.tickCount };
     else if (state.tickCount - seen.sinceTick >= ACCESS_RAMP_STALL_TICKS) stalled.push(ramp.footprint);
   }
   for (const id of Object.keys(memory.progress)) if (!live.has(Number(id))) delete memory.progress[Number(id)];
@@ -121,8 +129,13 @@ function dropStuckRamps(run: Run, state: GameState, memory: CraterAccessMemory):
     run(`build_ramp cancel ${repair.id}`);
     memory.unrepairable.push(repair.repairOf!);
   }
-  // A widening (a traffic jam's answer) the crew cannot dig is dropped too; the ramp stays as it is.
-  for (const widen of state.plannedRamps.filter(p => p.widenOf !== undefined && stuck.has(p.footprint))) run(`build_ramp cancel ${widen.id}`);
+  // A widening (a traffic jam's answer) the crew cannot dig is dropped too; the ramp stays as it is, and is not widened
+  // again: the jam that asked for it keeps the cut under traffic (one ramp was widened and dropped five times from t2000
+  // on the seed-42 full-kit ladder while no other ramp could be planned, #2091).
+  for (const widen of state.plannedRamps.filter(p => p.widenOf !== undefined && stuck.has(p.footprint))) {
+    run(`build_ramp cancel ${widen.id}`);
+    memory.unwidenable.push(widen.widenOf!);
+  }
 }
 
 /**
@@ -147,9 +160,15 @@ function isStuckRampSegment(a: PendingAction): boolean {
   return a.type === 'dig_ramp_segment' && a.holderId === null && a.status === 'queued' && (a.blockedReason ?? null) !== null;
 }
 
-/** True while some ramp the probe ordered is still being dug: one way in at a time. */
-export function hasLiveRampWork(pending: ReadonlyArray<PendingAction>): boolean {
-  return pending.some(a => a.type === 'dig_ramp_segment' && !isStuckRampSegment(a));
+/**
+ * True while some access ramp the probe ordered is still being dug: one way in at a time. A repair or a widening is
+ * not a way in, and does not hold the next one back: a widening re-ordered on every jam held every access ramp back
+ * from t2000 on the seed-42 full-kit ladder while a 10 m crater full of ore waited for its road (#2091).
+ */
+export function hasLiveRampWork(state: Pick<GameState, 'pendingActions' | 'plannedRamps'>): boolean {
+  const access = new Set(state.plannedRamps.filter(p => p.repairOf === undefined && p.widenOf === undefined)
+    .flatMap(p => p.segments.map(seg => seg.actionId)));
+  return state.pendingActions.some(a => a.type === 'dig_ramp_segment' && access.has(a.id) && !isStuckRampSegment(a));
 }
 
 /** Footprints of planned ramps whose every remaining segment is stuck; a new plan steers clear of them. */
@@ -352,12 +371,12 @@ export function orderCraterAccess(run: Run, state: GameState, grid: VoxelGrid, m
   memory.lastTick = state.tickCount;
   dropStuckRamps(run, state, memory);
   releaseOutreachedFloors(state, grid, memory);
-  if (hasLiveRampWork(state.pendingActions)) return null;
+  if (hasLiveRampWork(state)) return null;
   const surface = accessSurface(state, grid);
   if (surface === null) return null;
   const floors = strandedFloors(state, grid, surface).filter(f => !rampedAlready(memory, f));
   if (floors.length === 0) { memory.failedSignature = null; return null; }
-  const avoid = [...stuckRampFootprints(state), ...memory.avoid];
+  const avoid = [...stuckRampFootprints(state), ...memory.avoid, ...patternKeepOut(state)];
   const signature = signatureOf(state, floors, avoid);
   if (signature === memory.failedSignature) return null;
 
@@ -400,6 +419,19 @@ function repairDamagedRamps(run: Run, state: GameState, grid: VoxelGrid, memory:
     if (ordered.success) outputs.push(ordered.output);
   }
   return outputs;
+}
+
+/**
+ * Ground a new ramp keeps off: the holes ordered or drilled, grown by RAMP_SHOT_KEEP_OUT_M, as a shot keeps off a ramp.
+ * A ramp dug between a pattern's drilling and its firing left a cut beside the holes for the rock to fly out of: 151
+ * pieces, the farthest 48 m, on the seed-42 full-kit ladder at t3148 (#2091).
+ */
+export function patternKeepOut(state: Pick<GameState, 'drillHoles' | 'plannedDrillHoles'>): RampFootprint[] {
+  const holes = [...state.drillHoles, ...state.plannedDrillHoles];
+  if (holes.length === 0) return [];
+  const m = RAMP_SHOT_KEEP_OUT_M;
+  const xs = holes.map(h => h.x), zs = holes.map(h => h.z);
+  return [{ minX: Math.min(...xs) - m, maxX: Math.max(...xs) + m, minZ: Math.min(...zs) - m, maxZ: Math.max(...zs) + m }];
 }
 
 /** Ground a shot keeps off: every built ramp's footprint grown by RAMP_SHOT_KEEP_OUT_M on each side. */

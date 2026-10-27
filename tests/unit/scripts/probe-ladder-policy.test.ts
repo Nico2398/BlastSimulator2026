@@ -25,6 +25,7 @@ import {
   decideLadderHoleDepth,
   breakoutHoleDepthM,
   LADDER_MAX_BURDEN_M,
+  LADDER_TIGHT_BURDEN_M,
   isDudShot,
   shouldBarCrater,
   judgeLadderShot,
@@ -460,6 +461,11 @@ describe('breakoutHoleDepthM (#2091)', () => {
     expect(breakoutHoleDepthM(4.5 / 2)).toBeLessThan(8);
     expect(breakoutHoleDepthM(5 / 2)).toBeCloseTo(7.5);
     expect(breakoutHoleDepthM(7 / 2)).toBeGreaterThanOrEqual(8);
+  });
+
+  it('takes the burden a tight pattern lifts: a 5 m krackle column 2 m apart breaks out of 11 m, as measured', () => {
+    expect(breakoutHoleDepthM(5, LADDER_TIGHT_BURDEN_M)).toBeCloseTo(11);
+    expect(breakoutHoleDepthM(5, LADDER_TIGHT_BURDEN_M)).toBeGreaterThan(breakoutHoleDepthM(5));
   });
 });
 

@@ -33,9 +33,10 @@
 //
 //   ladder   The full-ladder player (#1945). The reinvest opening, then every interval:
 //            a. contracts, and `permit apply` the moment shouldApplyPermit allows it
-//            b. a limit-sized blast for the current grade (limitSizedShot), at the widest hole the
-//               best drill rig bores (pickDiameter); while a depth target is open it deepens the
-//               crater, insetting the footprint by a berm once the pit is taller than the stability limit
+//            b. a blast for the current grade: every hole fully charged in the bore with the longest charge
+//               column (deepestBreakoutDiameter), as many holes as the permit allows (fullHoleSide), spaced by
+//               the charge (holeSpacingForChargeM); while a depth target is open it deepens the crater,
+//               insetting the footprint by a berm once the pit is taller than the stability limit
 //            c. Research Center, tier-2 Freight Warehouse, second hauler (as reinvest); a replacement for any
 //               core role nobody alive holds; another spoil heap while ecology sags
 //            d. frugal equipment: `vehicle upgrade` in place (rig, hauler, digger; no new driver on payroll) once the
@@ -43,7 +44,8 @@
 //               licensed driver exists. The licence is earned as a player does: a Driving Center of the needed
 //               tier, then `employee train` of a fresh hire (earnLicence)
 //            e. a rock_fragmenter as soon as boulders lie on the ground, plus its licence course (earnLicence)
-//            A charged pattern whose evacuation strands someone is disarmed (`blast cancel`) and retried.
+//            A charged pattern whose evacuation strands crew is disarmed (`blast cancel`) and retried; one that
+//            strands only vehicles is fired anyway (`blast`).
 //   stay_g1  ladder that never applies for a permit past grade 1.
 //            A buy rule that cannot act (unaffordable, cooling down, failed) falls through to the
 //            next. Deposits are ranked on ground-truth ore, not a survey.
@@ -63,7 +65,7 @@ import { computeVehicleUpgradeCost } from '../../src/core/entities/VehicleUpgrad
 import { ROLE_LICENCE_REQUIRED, canDriveTier, countLicenceHolders, licenceLevelOfSkill } from '../../src/core/entities/VehicleDriverAssignment.js';
 import { isEnrolledInTraining } from '../../src/core/entities/EmployeeTraining.js';
 import {
-  DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS,
+  DRILL_HOLE_DIAMETER_OPTIONS_M, DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M, DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS,
   VEHICLE_MAX_SLOPE_RATIO, WALL_BERM_MIN_WIDTH_M, WALL_SAFE_FACE_HEIGHT_M_BY_TIER, needRestSearchRadius,
 } from '../../src/core/config/balance.js';
 import { gradeDef } from '../../src/core/economy/MineGrade.js';
@@ -77,20 +79,20 @@ import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
 import { nearestHaulDepot, newCraterAccessMemory, playPitLogistics, rampKeepOutZones, strandedCrew, type CraterAccessMemory } from './probe-crater-access.js';
 import {
-  floorToKgResolution, limitSizedShot, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
+  floorToKgResolution, fullHoleSide, holeSpacingForChargeM, mayBuyVehicleTier, nextBuy, pickDiameter, shouldApplyPermit, shouldBench,
   type BuyRule, type LadderShot, type PermitLimit,
 } from './probe-ladder.js';
 import {
   decideLadderDeepen, decideFreshShotSite, decideBuriedPattern, decideLadderShotSide, siteHoldsOre, decideLadderEventOption, decideLadderRamp, decideLadderReach, reachableShotDepthM,
   LADDER_GATE_MIN_GRADE, LADDER_RAMP_PROTECT_MARGIN_M, LADDER_SITE_ORE_FLOOR, decideLadderSafety, decideLadderShotGate,
   rampProtectionZones, shotOverlapsProtectedRamp,
-  decideLadderHoleDepth, breakoutHoleDepthM, judgeLadderShot,
+  decideLadderHoleDepth, breakoutHoleDepthM, judgeLadderShot, LADDER_TIGHT_BURDEN_M,
   type ProtectedZone, type RampFootprintInput,
 } from './probe-ladder-policy.js';
 import { pendingSpoilOverflowKg, sealedFragmentIdsOf } from '../../src/core/economy/HaulDispatch.js';
 import { fragmentBuriesPlannedHole } from '../../src/core/mining/BuriedHoles.js';
 import { siteVehicleReach } from '../../src/core/engine/OrderReachability.js';
-import { countZoneOccupants } from '../../src/core/entities/Zone.js';
+import { countZoneOccupants, isInZone } from '../../src/core/entities/Zone.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { findBuildingApproachCell } from '../../src/core/nav/BuildingApproach.js';
 import { vehicleMaxSlopeRatio } from '../../src/core/entities/Vehicle.js';
@@ -167,6 +169,8 @@ export interface ProbeSession {
   tick(): void;
   /** Tick until `done()`; throws `opening_failed:<step>` after OPENING_STEP_MAX_TICKS. */
   waitFor(step: string, done: () => boolean): void;
+  /** The ladder's pit-logistics memory, read when it answers a traffic jam; unset before the ladder starts. */
+  ladderAccess?: CraterAccessMemory;
 }
 
 type StrategyFn = (s: ProbeSession) => void;
@@ -442,6 +446,12 @@ const FIRE_EVACUATION_MAX_TICKS = 150;
  */
 const FIRE_EVACUATION_CAP_TICKS = 900;
 
+/** Whether anyone alive stands in the active blast zone. */
+function crewInZone(state: GameState): boolean {
+  const zone = state.zone.activeZone;
+  return zone !== null && state.employees.employees.some(e => e.alive && isInZone(e.x, e.z, zone));
+}
+
 /** Clear the zone and detonate a charged pattern. */
 function fireShot(s: ProbeSession): boolean {
   clearBlastZone(s.run, s.state);
@@ -452,7 +462,13 @@ function fireShot(s: ProbeSession): boolean {
   let fewest = Infinity;
   let idle = 0;
   for (let i = 0; i < FIRE_EVACUATION_CAP_TICKS && s.state.pendingDetonation !== null && idle < FIRE_EVACUATION_MAX_TICKS; i++) {
-    if (s.run('blast status').output.includes('cannot leave')) break;
+    if (s.run('blast status').output.includes('cannot leave')) {
+      // Only unmanned vehicles stranded: the player fires anyway and writes them off. Disarmed instead, the same shot was
+      // armed again every interval and each arming evacuated the crew digging the ramp out to them: 53 cancels from
+      // t4870 on the seed-42 full-kit ladder (#2091).
+      if (!crewInZone(s.state)) return s.run('blast').success && s.state.pendingDetonation === null;
+      break;
+    }
     const zone = s.state.zone.activeZone;
     const left = zone === null ? 0 : countZoneOccupants(zone, s.state.vehicles, s.state.employees);
     if (left < fewest) { fewest = left; idle = 0; } else idle++;
@@ -830,17 +846,14 @@ function runReinvest(s: ProbeSession): void {
 
 /** Cash the ladder keeps back from every purchase and permit fee: payroll and upkeep keep running. */
 const LADDER_CASH_RESERVE = 5_000;
-/** Deepest hole the ladder drills in a campaign level (m), kept under the softest rock's safe face height (#1941). */
-const LADDER_CAMPAIGN_HOLE_DEPTH_M = 11;
 /**
- * Deepest hole the sandbox ladder drills (m). Measured (#2066): a grade-1 charge under 10-11 m of cover buries its rubble
- * sealed and the pit stays at 5 m (10 m holes stall at 9.99 m); 9 m opens the crater and deepens it. Campaign levels keep
- * the old depth: the Shareholder Summit competent run (volcanic_flats) ends in a worker revolt with 9 m holes.
+ * Deepest hole the ladder drills on fresh ground (m), kept under the softest rock's safe face height (#1941). A fully
+ * charged pattern spaced by its charge breaks out of it (`LADDER_TIGHT_BURDEN_M`): 11 m holes leave a 10.7 m pit, past
+ * the 10 m grade 2 asks. 9 m holes 4 m apart had stalled the sandbox ladder at 9.9 m for thousands of ticks (#2091).
  */
-const LADDER_SANDBOX_HOLE_DEPTH_M = 9;
+export const LADDER_HOLE_DEPTH_M = 11;
 /** Sandbox run: no campaign level is active. */
 const sandboxRun = (s: ProbeSession): boolean => !s.engine.ctx.campaignProfile.campaign.activeLevelId;
-export const ladderHoleDepthM = (s: ProbeSession): number => sandboxRun(s) ? LADDER_SANDBOX_HOLE_DEPTH_M : LADDER_CAMPAIGN_HOLE_DEPTH_M;
 /** A pit this close under the hole depth counts as dug: deepening then waits for a cleared crater instead of a fresh site. */
 const LADDER_FRESH_SHOT_DEPTH_SLACK_M = 0.5;
 /** Haulers the ladder buys while cash is idle: rubble clears at the fleet's pace, and a buried pit stalls every later shot. Measured: 12 haulers sell 2-7x the ore of 6 on the seed-42 desert site. */
@@ -992,6 +1005,18 @@ function craterFloorReachable(state: GameState, crater: Pattern & { span: number
   return reached * 2 >= crater.span * crater.span;
 }
 
+/**
+ * Bore, of those the best rig drills, whose fullest charge of `explosive` stands the longest column (it breaks out of the
+ * deepest hole); the widest of equals, which carries the most charge. A wider bore spreads the same kilograms shorter:
+ * 0.165 m holes break out of 9 m of krackle where 0.089 and 0.127 m holes break out of 11 m.
+ */
+function deepestBreakoutDiameter(explosive: Parameters<typeof explosiveHoleLimits>[0], rigMaxDiameterM: number): number {
+  const bores = DRILL_HOLE_DIAMETER_OPTIONS_M.filter(d => d <= rigMaxDiameterM + DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M);
+  if (bores.length === 0) return pickDiameter(rigMaxDiameterM);
+  const column = (d: number): number => Math.round(chargeColumnM(floorToKgResolution(explosiveHoleLimits(explosive, d).maxKg), d) * 10) / 10;
+  return bores.reduce((best, d) => (column(d) > column(best) || (column(d) === column(best) && d > best) ? d : best));
+}
+
 /** Lowest ground (m) over a crater's hole footprint. */
 function craterFloorY(state: GameState, crater: Pattern & { span: number }): number {
   let low = Infinity;
@@ -1036,15 +1061,15 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const rigDiameterM = fleetBestRigLimit(DRILL_RIG_MAX_DIAMETER_M, vehicles);
   const limit: PermitLimit = PERMIT_LIMITS[Math.min(gradeOf(s), 5)]!;
   const explosive = getExplosive(shotExplosive(s))!;
-  // The heaviest hole charge the permit and the hole allow sets how deep a hole it still breaks out of.
-  const unsized = limitSizedShot(limit, {
-    rows: 3, cols: 3, spacing: SHOT.spacing, depth: SHOT.depth, kgPerHole: SHOT.kg, stemming: SHOT.stemming, diameterM: 0,
-  }, rigDiameterM);
-  const holeKg = Math.min(unsized.kgPerHole, explosiveHoleLimits(explosive, unsized.diameterM).maxKg);
+  // Each hole takes the fullest charge it holds, in the bore whose charge column is longest, so the pattern breaks out
+  // of the deepest holes; the permit then sets how many holes, and the charge how close they stand. Spreading the
+  // permit over its most holes left 7.5 kg holes 4 m apart: a shaft round each hole, full-height rock between (#2091).
+  const diameterM = deepestBreakoutDiameter(explosive, rigDiameterM);
+  const fullKg = floorToKgResolution(explosiveHoleLimits(explosive, diameterM).maxKg);
   const holeDepth = decideLadderHoleDepth({
     rigMaxDepthM: fleetBestRigLimit(DRILL_RIG_MAX_DEPTH_M, vehicles), remainingDepthM: nextGradeDepthM(state) - pitM,
-    floorOpen: deepen, lastShotFailed: m.lastShotFailed, currentCapM: m.holeCapM, freshHoleDepthM: ladderHoleDepthM(s),
-    breakoutDepthM: breakoutHoleDepthM(chargeColumnM(holeKg, unsized.diameterM)),
+    floorOpen: deepen, lastShotFailed: m.lastShotFailed, currentCapM: m.holeCapM, freshHoleDepthM: LADDER_HOLE_DEPTH_M,
+    breakoutDepthM: breakoutHoleDepthM(chargeColumnM(fullKg, diameterM), LADDER_TIGHT_BURDEN_M),
   });
   // A ramp steeper than the fleet climbs reaches only so deep: shrink the holes to what the haulers still reach.
   const ramp = deepen && crater ? m.ramps[craterKey(crater)] : undefined;
@@ -1053,10 +1078,10 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
     rampSlopeRatio: ramp.slope, fleetClimbRatio: climb,
   }) === 'shrink';
   const depth = shrunk ? Math.max(1, Math.floor(reachableShotDepthM(ramp.runM, climb, holeDepth))) : holeDepth;
-  const base: LadderShot = {
-    rows: 3, cols: 3, spacing: SHOT.spacing, depth, kgPerHole: SHOT.kg, stemming: SHOT.stemming, diameterM: pickDiameter(rigDiameterM),
+  const fullSide = fullHoleSide(limit, fullKg);
+  const sized: LadderShot = {
+    rows: fullSide, cols: fullSide, spacing: holeSpacingForChargeM(fullKg), depth, kgPerHole: fullKg, stemming: SHOT.stemming, diameterM,
   };
-  const sized = limitSizedShot(limit, base, rigDiameterM);
   /** Heaviest hole charge that stays inside the permit's total charge for an n x n pattern, the explosive's and the hole's own limits. */
   const kgFor = (n: number): number => floorToKgResolution(Math.min(
     limit.maxChargeKg / (n * n), explosiveHoleLimits(explosive, sized.diameterM).maxKg,
@@ -1091,7 +1116,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const oreRunningOut = reachableOreRubbleKg(state) < fleetLoadKg(state) * LADDER_ORE_LOW_LOADS;
   return {
     // Blast again to deepen a crater whose ore is out, to dig the first full-depth pit, or when the ore left to haul runs low (income about to stop).
-    wanted: deepen || oreRunningOut || (!m.lastShotFailed && pitM < ladderHoleDepthM(s) - LADDER_FRESH_SHOT_DEPTH_SLACK_M),
+    wanted: deepen || oreRunningOut || (!m.lastShotFailed && pitM < LADDER_HOLE_DEPTH_M - LADDER_FRESH_SHOT_DEPTH_SLACK_M),
     cost: side === 0 ? Infinity : side * side * kg * explosive.costPerKg + RE_FIRE_CASH_CUSHION,
     order: () => {
       let ordered: Shot | null = null;
@@ -1435,10 +1460,11 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
     researchOrdered: false, retryAt: {}, access: newCraterAccessMemory(),
     crater: { ...opened.at, span: SHOT_SPAN }, ramps: {}, rampedFloorM: 0, maxGrade, barred: [], buriedSinceTick: null,
-    holeCapM: ladderHoleDepthM(s), lastShotFailed: false, dudStreak: 0, judgedShots: 1,
+    holeCapM: LADDER_HOLE_DEPTH_M, lastShotFailed: false, dudStreak: 0, judgedShots: 1,
     before: { pitM: 0, oreKg: 0 },
   };
   recordRamp(m, opened.at, opened.ramp);
+  s.ladderAccess = m.access;
   playOut(s, () => {
     playPitLogistics(s.run, s.state, s.grid, m.access);
     ladderPermit(s, m);
@@ -1481,12 +1507,20 @@ function addsHire(c: EventConsequence | undefined): boolean {
  * on a ramp is answered by widening it, a careful player's cure for a one-lane chokepoint (the order is refused, and
  * the jam rerouted instead, when the ramp cannot widen or the cash falls short).
  */
-function answerLadderEvent(run: Run, state: GameState): void {
+function answerLadderEvent(run: Run, state: GameState, access?: CraterAccessMemory): void {
   const pending = state.events.pendingEvent;
   const def = pending ? getEventById(pending.eventId) : undefined;
   if (!def) return;
-  const widen = def.consequences.findIndex(c => c.effectTag === 'widen_ramp');
-  run(`event choose ${widen !== -1 ? widen : decideLadderEventOption(def.consequences.map(addsHire))}`);
+  // A ramp whose widening already got stuck under the jam's own traffic is rerouted around instead, and so is any jam
+  // while an access ramp waits to be dug: the one digger driver widened a busy ramp while a 10 m crater full of ore
+  // waited for its road (#2091).
+  const rampId = pending?.jam?.rampId ?? null;
+  const accessWaiting = state.plannedRamps.some(p => p.repairOf === undefined && p.widenOf === undefined);
+  const given = rampId !== null && (accessWaiting || (access?.unwidenable.includes(rampId) ?? false));
+  const option = (tag: string): number => def.consequences.findIndex(c => c.effectTag === tag);
+  const widen = given ? -1 : option('widen_ramp');
+  const reroute = given ? option('reroute_vehicles') : -1;
+  run(`event choose ${widen !== -1 ? widen : reroute !== -1 ? reroute : decideLadderEventOption(def.consequences.map(addsHire))}`);
 }
 
 function createSession(config: ProbeRunConfig, observer: MetricsObserver): ProbeSession {
@@ -1504,7 +1538,7 @@ function createSession(config: ProbeRunConfig, observer: MetricsObserver): Probe
       return result;
     },
     tick: () => {
-      if (config.strategy === 'ladder' || config.strategy === 'stay_g1') answerLadderEvent(session.run, session.state);
+      if (config.strategy === 'ladder' || config.strategy === 'stay_g1') answerLadderEvent(session.run, session.state, session.ladderAccess);
       playTick(session.run, session.state);
     },
     waitFor: (step, done) => {

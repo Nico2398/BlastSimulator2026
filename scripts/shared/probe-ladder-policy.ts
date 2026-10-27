@@ -234,12 +234,18 @@ export interface LadderHoleDepthInput {
 export const LADDER_MAX_BURDEN_M = 5;
 
 /**
- * Deepest hole (m) a charge whose column is `chargeColumnM` long breaks out of. A deeper hole seals: the broken rock
- * stays under an intact cap, the shot gains nothing, and the next shot drilled through it leaves a floor of pits and
- * ridges no vehicle crosses (#2091).
+ * Burden (m) a pattern of holes spaced within each other's breakage (`holeSpacingForChargeM`) lifts: neighbours share
+ * it. Measured with 10 kg of krackle (a 5 m column) 2 m apart (#2091): 11 m holes break out to a 10.7 m pit, 12 m seal.
  */
-export function breakoutHoleDepthM(chargeColumnM: number): number {
-  return chargeColumnM + LADDER_MAX_BURDEN_M;
+export const LADDER_TIGHT_BURDEN_M = 6;
+
+/**
+ * Deepest hole (m) a charge whose column is `chargeColumnM` long breaks out of under `burdenM` of rock. A deeper hole
+ * seals: the broken rock stays under an intact cap, the shot gains nothing, and the next shot drilled through it leaves
+ * a floor of pits and ridges no vehicle crosses (#2091).
+ */
+export function breakoutHoleDepthM(chargeColumnM: number, burdenM = LADDER_MAX_BURDEN_M): number {
+  return chargeColumnM + burdenM;
 }
 
 /**

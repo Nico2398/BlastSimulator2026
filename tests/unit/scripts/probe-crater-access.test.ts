@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  RAMP_SHOT_KEEP_OUT_M, buildRampCommand, hasLiveRampWork, keepsVehicleNetwork, nearestHaulDepot, newCraterAccessMemory, rampKeepOutZones,
+  RAMP_SHOT_KEEP_OUT_M, buildRampCommand, hasLiveRampWork, keepsVehicleNetwork, nearestHaulDepot, newCraterAccessMemory, patternKeepOut, rampKeepOutZones,
   rampedAlready, stuckRampFootprints, stalledRampFootprints, ACCESS_RAMP_STALL_TICKS, needsNetworkDigger, releaseOutreachedFloors, strandedCrew,
 } from '../../../scripts/shared/probe-crater-access.js';
 import { buildRamp, landRampOnGrid } from '../../../src/core/mining/Ramp.js';
@@ -49,15 +49,37 @@ describe('buildRampCommand (#2095)', () => {
   });
 });
 
-describe('hasLiveRampWork (#2095)', () => {
-  it('is false with no ramp work and true while a segment can be dug', () => {
-    expect(hasLiveRampWork([])).toBe(false);
-    expect(hasLiveRampWork([segment(1)])).toBe(true);
-    expect(hasLiveRampWork([segment(1, { status: 'in_progress', holderId: 7, blockedReason: 'target_unreachable' })])).toBe(true);
+describe('hasLiveRampWork (#2095, #2091)', () => {
+  const access = planned(1, [1]);
+  it('is false with no ramp work and true while an access ramp segment can be dug', () => {
+    expect(hasLiveRampWork({ plannedRamps: [], pendingActions: [] })).toBe(false);
+    expect(hasLiveRampWork({ plannedRamps: [access], pendingActions: [segment(1)] })).toBe(true);
+    expect(hasLiveRampWork({
+      plannedRamps: [access], pendingActions: [segment(1, { status: 'in_progress', holderId: 7, blockedReason: 'target_unreachable' })],
+    })).toBe(true);
   });
 
   it('a queued, unheld segment stamped blocked is stuck, not live work', () => {
-    expect(hasLiveRampWork([segment(1, { blockedReason: 'target_unreachable' })])).toBe(false);
+    expect(hasLiveRampWork({ plannedRamps: [access], pendingActions: [segment(1, { blockedReason: 'target_unreachable' })] })).toBe(false);
+  });
+
+  it('a repair or a widening being dug is not a way in and holds no access ramp back', () => {
+    const repair = { ...planned(2, [2]), repairOf: 5 };
+    const widen = { ...planned(3, [3]), widenOf: 6 };
+    expect(hasLiveRampWork({ plannedRamps: [repair, widen], pendingActions: [segment(2), segment(3)] })).toBe(false);
+  });
+});
+
+describe('patternKeepOut (#2091)', () => {
+  it('is nothing with no hole ordered or drilled', () => {
+    expect(patternKeepOut({ drillHoles: [], plannedDrillHoles: [] })).toEqual([]);
+  });
+
+  it('covers every hole, ordered or drilled, grown by RAMP_SHOT_KEEP_OUT_M', () => {
+    const hole = (x: number, z: number) => ({ id: `${x},${z}`, x, z, depth: 10, diameter: 0.089 });
+    const m = RAMP_SHOT_KEEP_OUT_M;
+    expect(patternKeepOut({ drillHoles: [hole(10, 20)], plannedDrillHoles: [hole(14, 24)] }))
+      .toEqual([{ minX: 10 - m, maxX: 14 + m, minZ: 20 - m, maxZ: 24 + m }]);
   });
 });
 
@@ -81,23 +103,35 @@ describe('stalledRampFootprints (#2089)', () => {
   it('lists a planned ramp once it has finished no segment for ACCESS_RAMP_STALL_TICKS', () => {
     const memory = newCraterAccessMemory();
     const ramp = planned(1, [10, 11]);
-    expect(stalledRampFootprints({ plannedRamps: [ramp], tickCount: 100 }, memory)).toEqual([]);
-    expect(stalledRampFootprints({ plannedRamps: [ramp], tickCount: 100 + ACCESS_RAMP_STALL_TICKS - 1 }, memory)).toEqual([]);
-    expect(stalledRampFootprints({ plannedRamps: [ramp], tickCount: 100 + ACCESS_RAMP_STALL_TICKS }, memory)).toEqual([ramp.footprint]);
+    expect(stalledRampFootprints({ plannedRamps: [ramp], pendingActions: [], tickCount: 100 }, memory)).toEqual([]);
+    expect(stalledRampFootprints({ plannedRamps: [ramp], pendingActions: [], tickCount: 100 + ACCESS_RAMP_STALL_TICKS - 1 }, memory)).toEqual([]);
+    expect(stalledRampFootprints({ plannedRamps: [ramp], pendingActions: [], tickCount: 100 + ACCESS_RAMP_STALL_TICKS }, memory)).toEqual([ramp.footprint]);
   });
 
   it('a finished segment restarts the clock', () => {
     const memory = newCraterAccessMemory();
-    stalledRampFootprints({ plannedRamps: [planned(1, [10, 11])], tickCount: 0 }, memory);
+    stalledRampFootprints({ plannedRamps: [planned(1, [10, 11])], pendingActions: [], tickCount: 0 }, memory);
     const progressed = planned(1, [10, 11], [true, false]);
-    expect(stalledRampFootprints({ plannedRamps: [progressed], tickCount: ACCESS_RAMP_STALL_TICKS }, memory)).toEqual([]);
-    expect(stalledRampFootprints({ plannedRamps: [progressed], tickCount: 2 * ACCESS_RAMP_STALL_TICKS }, memory)).toEqual([progressed.footprint]);
+    expect(stalledRampFootprints({ plannedRamps: [progressed], pendingActions: [], tickCount: ACCESS_RAMP_STALL_TICKS }, memory)).toEqual([]);
+    expect(stalledRampFootprints({ plannedRamps: [progressed], pendingActions: [], tickCount: 2 * ACCESS_RAMP_STALL_TICKS }, memory)).toEqual([progressed.footprint]);
+  });
+
+  it('a ramp nobody works while another is dug is waiting its turn: its clock restarts (#2091)', () => {
+    const memory = newCraterAccessMemory();
+    const waiting = planned(1, [10, 11]);
+    const dug = planned(2, [20, 21]);
+    const working = [segment(20, { status: 'in_progress', holderId: 7 })];
+    stalledRampFootprints({ plannedRamps: [waiting, dug], pendingActions: [], tickCount: 0 }, memory);
+    expect(stalledRampFootprints({ plannedRamps: [waiting, dug], pendingActions: working, tickCount: ACCESS_RAMP_STALL_TICKS }, memory))
+      .toEqual([dug.footprint]);
+    expect(stalledRampFootprints({ plannedRamps: [waiting, dug], pendingActions: [], tickCount: 2 * ACCESS_RAMP_STALL_TICKS - 1 }, memory))
+      .toEqual([dug.footprint]);
   });
 
   it('forgets a ramp that is no longer planned', () => {
     const memory = newCraterAccessMemory();
-    stalledRampFootprints({ plannedRamps: [planned(1, [10])], tickCount: 0 }, memory);
-    stalledRampFootprints({ plannedRamps: [], tickCount: 1 }, memory);
+    stalledRampFootprints({ plannedRamps: [planned(1, [10])], pendingActions: [], tickCount: 0 }, memory);
+    stalledRampFootprints({ plannedRamps: [], pendingActions: [], tickCount: 1 }, memory);
     expect(memory.progress).toEqual({});
   });
 });

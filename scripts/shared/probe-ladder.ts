@@ -54,6 +54,26 @@ export function limitSizedShot(limit: PermitLimit, base: LadderShot, maxDiameter
   return { ...base, rows: side, cols: side, kgPerHole: perHole, diameterM: pickDiameter(maxDiameterM) };
 }
 
+/**
+ * Hole spacing (m) at which holes charged with `kgPerHole` break one floor between them instead of a shaft round each
+ * hole. Measured with krackle in 10-11 m holes on the seed-42 desert sandbox (#2091): 7.5 and 10 kg in 0.089 m holes
+ * break a flat floor 2 m apart and leave full-height ridges 3 and 4 m apart; 20 kg in 0.127 m holes breaks one 4 m apart.
+ */
+export function holeSpacingForChargeM(kgPerHole: number): number {
+  return Math.min(MAX_HOLE_SPACING_M, Math.max(MIN_HOLE_SPACING_M, Math.floor(kgPerHole / KG_PER_SPACING_M)));
+}
+
+/** Charge (kg) per metre of spacing a hole's breakage spans: 10 kg holes 2 m apart, 20 kg holes 4 m apart. */
+const KG_PER_SPACING_M = 5;
+const MIN_HOLE_SPACING_M = 2;
+const MAX_HOLE_SPACING_M = 4;
+
+/** Side of the largest square pattern of holes each charged with `kgPerHole` that `limit` allows; at least 1. */
+export function fullHoleSide(limit: PermitLimit, kgPerHole: number): number {
+  const holes = Math.min(limit.maxHoles, Math.floor(limit.maxChargeKg / kgPerHole));
+  return Math.max(1, Math.floor(Math.sqrt(holes)));
+}
+
 /** Widest hole diameter not above the rig cap; the smallest option if none fits. */
 export function pickDiameter(rigMaxDiameterM: number): number {
   const options = [...DRILL_HOLE_DIAMETER_OPTIONS_M].sort((a, b) => a - b);

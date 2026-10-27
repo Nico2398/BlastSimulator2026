@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   GRADE_TARGET_WINDOWS,
+  fullHoleSide,
   gradeVerdicts,
+  holeSpacingForChargeM,
   limitSizedShot,
   mayBuyVehicleTier,
   nextBuy,
@@ -63,6 +65,37 @@ describe('limitSizedShot', () => {
   it('never exceeds the rig diameter cap', () => {
     const s = limitSizedShot(PERMIT_LIMITS[3]!, { ...BASE, diameterM: 0.165 }, 0.127);
     expect(s.diameterM).toBeLessThanOrEqual(0.127);
+  });
+});
+
+describe('holeSpacingForChargeM (#2091)', () => {
+  it('spaces 10 kg holes 2 m apart and 20 kg holes 4 m apart, as measured', () => {
+    expect(holeSpacingForChargeM(10)).toBe(2);
+    expect(holeSpacingForChargeM(20)).toBe(4);
+    expect(holeSpacingForChargeM(15)).toBe(3);
+  });
+
+  it('never goes under 2 m, however light the charge', () => {
+    expect(holeSpacingForChargeM(7.5)).toBe(2);
+    expect(holeSpacingForChargeM(0)).toBe(2);
+  });
+
+  it('never goes past 4 m, however heavy the charge', () => {
+    expect(holeSpacingForChargeM(100)).toBe(4);
+  });
+});
+
+describe('fullHoleSide (#2091)', () => {
+  it('fills the hole count when the charge limit allows it: grade 2 fits 36 holes of 10 kg in 800 kg', () => {
+    expect(fullHoleSide(PERMIT_LIMITS[2]!, 10)).toBe(6);
+  });
+
+  it('is held by the charge limit when it binds first: grade 1 fits 12 holes of 10 kg in 120 kg, a 3x3', () => {
+    expect(fullHoleSide(PERMIT_LIMITS[1]!, 10)).toBe(3);
+  });
+
+  it('is at least one hole when even one full hole is over the limit', () => {
+    expect(fullHoleSide(PERMIT_LIMITS[0]!, 50)).toBe(1);
   });
 });
 
