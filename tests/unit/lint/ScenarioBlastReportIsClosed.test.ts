@@ -44,7 +44,7 @@ function findOpenReportViolations(file: string, steps: readonly ScenarioStepDef[
         continue;
       }
       if (open && ACTING_TYPES.has(action.type)) {
-        const isFireAnyway = action.type === 'clickIfPresent' && selector === FIRE_ANYWAY_SELECTOR;
+        const isFireAnyway = (action.type === 'clickIfPresent' || action.type === 'clickSelector') && selector === FIRE_ANYWAY_SELECTOR;
         if (!isFireAnyway) violations.push({ file, stepIndex, command: step.command, actionType: action.type });
       }
       if (firesBlast && action.type === 'clickSelector' && selector === FIRE_SELECTOR) open = true;
