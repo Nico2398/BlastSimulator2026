@@ -101,3 +101,4 @@ Records why the rules in `.claude/skills/gameplay-game-design/SKILL.md` exist: t
 - Campaign levels with `progression` (Shareholder Summit): #1949.
 - Original wording: "#1945 measured the ladder probe (seed 42, desert_badlands): grade 1 at t978 (digger) / t1088 (full), grade 2 at t3762 (digger); grades 3-5 not yet reached by any policy, so no value above was re-tuned".
 - Permit panel: #1924. Workshop: #1925. Permit events: #1927. Approval ceremony: #1926.
+- Previous wording of the probe line: "The ladder probe (seed 42, desert_badlands) reaches grade 1 at t978 (digger) / t1088 (full), grade 2 at t3762 (digger); grades 3-5 are reached by no policy (delivered ore is ~9 kg/tick, so grade 3's 150 t lies ~16,700 ticks after grade 2)". Replaced once the reference site reached grade 3 at t11836 (#2089, #2091, #2093); the windows were made hand-measured design targets, not CI checks, by owner decision (#2063, #2072, #2076).
