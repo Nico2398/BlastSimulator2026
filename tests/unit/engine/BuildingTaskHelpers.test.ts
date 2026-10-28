@@ -626,6 +626,21 @@ describe('relocateFootprintOccupants — employees (#2097)', () => {
     expect({ x: emp.x, z: emp.z }).toEqual(expected);
   });
 
+  it('prefers a free cell on the employee\'s own bench level over a nearer cell across a bench boundary', () => {
+    const state = makeNavState(() => BASE_HEIGHT);
+    const footprint: BlastRegion = { minX: 4, maxX: 6, minZ: 4, maxZ: 6 };
+    blockRegion(state.navGrid!, footprint);
+    const emp = hireAt(state, 4, 5);
+    const ownLevel = state.navGrid!.cellAt(4, 5)!.benchLevel;
+    // The nearest free cell, (3, 5), sits on another bench.
+    state.navGrid!.cellAt(3, 5)!.benchLevel = ownLevel + 1;
+
+    relocateFootprintOccupants(state, footprint);
+
+    expect(state.navGrid!.cellAt(emp.x, emp.z)!.benchLevel).toBe(ownLevel);
+    expect(insideRegion(emp.x, emp.z, footprint)).toBe(false);
+  });
+
   it('a footprint that seals the employee in: ends on a traversable cell near where they stood, never the corner', () => {
     const state = makeNavState(() => BASE_HEIGHT);
     // Ring of blocked cells one wider than the footprint walls the inside off from every free cell.

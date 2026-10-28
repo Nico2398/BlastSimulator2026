@@ -136,10 +136,8 @@ export function relocateFootprintOccupants(state: GameState, region: BlastRegion
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
     if (!isInRegion(emp.x, emp.z, region)) continue;
-    // avoidOccupancy: true — same fragment-/vehicle-occupancy rule foot
-    // travel obeys (#954) gates the cell relocated onto, so this sweep
-    // never "rescues" someone from a newly-blocked footprint straight into
-    // another occupied cell. See NavGrid.findNearestReachableCell's doc.
+    // Occupied cells are skipped (the #954 rule foot travel obeys), so this
+    // sweep never "rescues" someone straight into another occupied cell.
     const nearest = employeeRelocation(state.navGrid, region, emp.x, emp.z);
     emp.x = nearest.x;
     emp.z = nearest.z;
@@ -186,10 +184,11 @@ export function relocateFootprintOccupants(state: GameState, region: BlastRegion
 
 /**
  * Where an employee a footprint caught goes (#2097): the nearest free cell outside `region` that the employee's own
- * cell connects to. The flood runs with the footprint freed, so the
- * set is what they could already walk to before the block — never the world corner's component, which on many maps is a pocket. A
- * footprint that seals them in leaves no such cell; they then take the nearest traversable cell to where they stood
- * (the cut-off alert, `findStrandedCrew`, names them if that cell is cut off).
+ * cell connects to, preferring their own bench level (a cross-bench cell is reachable only through ramp routing that
+ * can oscillate, #458 D13). The flood runs with the footprint freed, so the set is what they could already walk to
+ * before the block, never the world corner's component, which on many maps is a pocket. A footprint that seals them
+ * in leaves no such cell; they then take the nearest traversable cell to where they stood (the cut-off alert,
+ * `findStrandedCrew`, names them if that cell is cut off).
  */
 function employeeRelocation(navGrid: NavGrid, region: BlastRegion, x: number, z: number): { x: number; z: number } {
   const cx = Math.round(x);
@@ -198,13 +197,18 @@ function employeeRelocation(navGrid: NavGrid, region: BlastRegion, x: number, z:
   const reach = computeClimbReachableSetFromSources(navGrid, [{ x: cx, z: cz }], NAV_CLEARANCE_EMPLOYEE_CELLS, {
     free: { minX: region.minX, maxX: region.maxX + 1, minZ: region.minZ, maxZ: region.maxZ + 1 },
   });
+  const ownLevel = navGrid.cellAt(cx, cz)?.benchLevel;
   const maxRing = Math.max(navGrid.width, navGrid.height);
+  let best: { x: number; z: number } | null = null;
+  let bestDistSq = Infinity;
   for (let r = 1; r <= maxRing; r++) {
-    let best: { x: number; z: number } | null = null;
-    let bestDistSq = Infinity;
+    // Cells at Chebyshev distance r are at least r away; a later ring cannot beat a pick already closer than that.
+    if (best !== null && bestDistSq <= r * r) break;
+    let bestSameLevel: { x: number; z: number } | null = null;
+    let bestSameLevelDistSq = Infinity;
     for (let dz = -r; dz <= r; dz++) {
-      for (let dx = -r; dx <= r; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+      const step = Math.abs(dz) === r ? 1 : 2 * r;
+      for (let dx = -r; dx <= r; dx += step) {
         const tx = cx + dx;
         const tz = cz + dz;
         if (isInRegion(tx, tz, region) || !reach.has(tx, tz)) continue;
@@ -215,11 +219,15 @@ function employeeRelocation(navGrid: NavGrid, region: BlastRegion, x: number, z:
           bestDistSq = distSq;
           best = { x: tx, z: tz };
         }
+        if (cell.benchLevel === ownLevel && distSq < bestSameLevelDistSq) {
+          bestSameLevelDistSq = distSq;
+          bestSameLevel = { x: tx, z: tz };
+        }
       }
     }
-    if (best !== null) return best;
+    if (bestSameLevel !== null) return bestSameLevel;
   }
-  return NavGrid.findNearestReachableCell(navGrid, x, z, x, z, true);
+  return best ?? NavGrid.findNearestReachableCell(navGrid, x, z, x, z, true);
 }
 
 /**
