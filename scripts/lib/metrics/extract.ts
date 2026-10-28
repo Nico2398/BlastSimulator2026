@@ -135,6 +135,13 @@ export function usageTokens(usage: Record<string, unknown> | undefined): TokenCo
   };
 }
 
+/**
+ * USD per million weighted tokens, used only when a run died before Claude
+ * Code wrote its `cost-state`. Measured: `cost-state` ÷ weighted tokens was
+ * 2.00–2.18 on the first seven sonnet-5-5 runs. A model not listed is unpriced.
+ */
+const ESTIMATE_USD_PER_WEIGHTED_MTOK: Record<string, number> = { 'claude-sonnet-5-5': 2.0 };
+
 const weighted = (t: TokenCounts): number =>
   t.input * WEIGHT.input + t.output * WEIGHT.output + t.cacheWrite5m * WEIGHT.cacheWrite5m + t.cacheWrite1h * WEIGHT.cacheWrite1h + t.cacheRead * WEIGHT.cacheRead;
 
@@ -372,9 +379,13 @@ export function extractMetrics(session: SessionTranscript, context: RunContext, 
     acc.metrics.costUSD = round(cost, 4);
   }
   if (run.cost.source === 'estimated') {
-    // No `cost-state` (the process died first): leave totalUSD at 0 rather than invent prices.
+    // No `cost-state` (the process died first): price the tokens at the measured rate.
     for (const acc of all) for (const [model, tokens] of acc.byModel) {
       const entry = (run.cost.byModel[model] ??= { costUSD: 0, input: 0, output: 0, thinking: 0, cacheRead: 0, cacheWrite: 0 });
+      const usd = ((ESTIMATE_USD_PER_WEIGHTED_MTOK[model] ?? 0) * weighted(tokens)) / 1e6;
+      entry.costUSD = round(entry.costUSD + usd, 4);
+      acc.metrics.costUSD = round(acc.metrics.costUSD + usd, 4);
+      run.cost.totalUSD = round(run.cost.totalUSD + usd, 4);
       entry.input += tokens.input;
       entry.output += tokens.output;
       entry.thinking += tokens.thinking;
