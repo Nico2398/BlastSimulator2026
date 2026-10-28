@@ -400,21 +400,6 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitUntil",
-          "field": "chargedCount",
-          "equals": 0,
-          "maxTicks": 600,
-          "timeoutMs": 120000
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
         }
       ],
       "description": "The hole is consumed and rubble lies where it stood.",
@@ -432,6 +417,14 @@
           "equals": 0,
           "maxTicks": 600,
           "timeoutMs": 300000
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
       ],
       "timeout": 330,
