@@ -675,21 +675,6 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitUntil",
-          "field": "chargedCount",
-          "equals": 0,
-          "maxTicks": 600,
-          "timeoutMs": 120000
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
         }
       ],
       "description": "Fire the second bench of site A.",
@@ -707,6 +692,14 @@
           "equals": 0,
           "maxTicks": 600,
           "timeoutMs": 300000
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
       ],
       "timeout": 330,
