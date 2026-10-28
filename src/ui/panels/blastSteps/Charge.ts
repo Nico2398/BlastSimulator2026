@@ -514,6 +514,9 @@ export class ChargeStep {
     this.amountKg = defaultChargeKg(
       state.grade?.grade, all.length, shallowest?.depth ?? 0, this.stemmingM, shallowest?.diameter,
     );
+    // The hole-limit clamp can land on a fractional kg; the default stays whole so one stepper click reaches whole values.
+    this.clampAmount();
+    this.amountKg = Math.floor(this.amountKg);
     this.clampAmount();
   }
 

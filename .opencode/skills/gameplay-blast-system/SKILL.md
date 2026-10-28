@@ -198,7 +198,7 @@ hole's column lowered on the sandbox flat pad and on `tutorial_pit`, rating at l
 fits the hole (`amount / CHARGE_KG_PER_METRE + stemming <= depth`). The measured sweep sits beside
 the constants in `balance.ts`; 4 kg stays under `BURDEN_BREAKOUT_MAX` of cap and fails to break out.
 
-**Defaults follow the permit (#2101).** Those 8 m / 7 kg defaults hold only on a site without a
+**Defaults follow the permit.** Those 8 m / 7 kg defaults hold only on a site without a
 permit (tutorial, campaign levels without a grade). With a permit, `PermitDefaults.ts` derives
 them: the Charge step opens at the largest whole kg that fits the shallowest planned hole at the
 default stemming and keeps the pattern within `permitLimitsFor(grade).maxChargeKg` (4 kg at grade 0
