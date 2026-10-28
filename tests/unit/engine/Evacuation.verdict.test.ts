@@ -9,6 +9,7 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { evacuateZone, vehicleEvacuationVerdict } from '../../../src/core/engine/Evacuation.js';
 import type { ZoneBounds } from '../../../src/core/entities/Zone.js';
 import { hireEmployee, assignSkill, type Employee } from '../../../src/core/entities/Employee.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { purchaseVehicle, type Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
 
@@ -179,6 +180,7 @@ describe('vehicleEvacuationVerdict agrees with evacuateZone strandedVehicleIds (
     ['driverless, licensed driver outside', f => { licensedDriver(f, 40, 40); }],
     ['driverless, licensed driver resting outside', f => { licensedDriver(f, 40, 40).restTicksRemaining = 30; }],
     ['driverless, licensed driver about to rest outside', f => { licensedDriver(f, 40, 40).pendingRestDuration = 30; }],
+    ['driverless, reserved for an action, licensed driver outside', f => { licensedDriver(f, 40, 40); reserveVehicle(f.state.vehicles, f.vehicle.id, 999); }],
     ['driverless, nobody', () => { /* empty */ }],
     ['driverless, only unlicensed crew', f => { hireEmployee(f.state.employees, 'driller', f.rng, 40, 40); }],
     ['driverless, licensed driver unreachable', f => { licensedDriver(f, 45, 45); }, { grid: walkableGrid(GRID_SIZE, { from: 28, to: 31 }) }],
