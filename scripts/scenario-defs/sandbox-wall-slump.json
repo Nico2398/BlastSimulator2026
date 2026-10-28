@@ -449,6 +449,11 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
+        },
+        {
           "type": "waitForSelector",
           "selector": "[data-action=\"report-close\"]"
         },
@@ -668,6 +673,11 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
         },
         {
           "type": "waitForSelector",
