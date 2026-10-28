@@ -24,6 +24,7 @@ import type { GameConsoleFn } from '../../gameConsole.js';
 import type { ConfirmModalConfig } from '../ConfirmModal.js';
 import { planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
 import { gridHoleLimitWarning } from '../permitPreview.js';
+import { defaultGridDepthM } from '../../../core/economy/PermitDefaults.js';
 import { buildReplacePatternConfirm } from '../../replacePatternConfirm.js';
 import {
   DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, MAX_DRILL_GRID_HOLES, DRILL_GRID_DEFAULT_DEPTH_M,
@@ -54,6 +55,8 @@ export class DrillStep {
 
   private gridSpacing = DEFAULT_SPACING_M;
   private gridDepth = DEFAULT_DEPTH_M;
+  /** False until the player steps the depth: until then it follows the permit grade (#2101). */
+  private playerAdjustedDepth = false;
   private gridDiameter = DEFAULT_DIAMETER_M;
   private lastGridPattern: { rows: number; cols: number } | null = null;
 
@@ -146,6 +149,7 @@ export class DrillStep {
 
   update(state: GameState, _weather?: WeatherState): void {
     this.lastState = state;
+    if (!this.playerAdjustedDepth) this.gridDepth = Math.min(defaultGridDepthM(state.grade?.grade), this.reachM());
     const holes = state.drillHoles;
     const ordered = state.plannedDrillHoles;
     const totalCount = holes.length + ordered.length;
@@ -348,6 +352,7 @@ export class DrillStep {
     min: number, max: number, refresh: () => void,
   ) {
     const step = (delta: number, bound: (a: number, b: number) => number, limit: number) => () => {
+      if (prop === 'gridDepth') this.playerAdjustedDepth = true;
       this[prop] = bound(limit, this[prop] + delta); this.lastSignature = ''; refresh();
     };
     return {

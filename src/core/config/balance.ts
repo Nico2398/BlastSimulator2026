@@ -556,6 +556,11 @@ export const DRILL_GRID_DEFAULT_SPACING_M = 4;
  *  steps it (#1069), same reasoning as DRILL_GRID_DEFAULT_SPACING_M; 8 m matches the tutorial's
  *  scripted plan (#1330). */
 export const DRILL_GRID_DEFAULT_DEPTH_M = 8;
+/** Grid default depth (m) per permit grade (#2101): the depth where the permit-derived
+ *  default charge still breaks out on the softest sandbox rock. 5 m at grade 0 matches the
+ *  probe's SHOT. A grade with no entry keeps DRILL_GRID_DEFAULT_DEPTH_M; a site without a
+ *  permit never reads this map. */
+export const DRILL_GRID_DEFAULT_DEPTH_BY_GRADE_M: Readonly<Record<number, number>> = { 0: 5 };
 
 /** Ticks to load a charge at the reference amount (#554). */
 export const CHARGE_HOLE_BASE_DURATION_TICKS = 4;
