@@ -93,7 +93,7 @@ export function collectInZoneDriverIds(zone: ZoneBounds, vehicles: VehicleState)
 }
 
 /** What the evacuation does with one driverless in-zone vehicle (#2100). */
-export type DriverlessEvacuationPlan =
+type DriverlessEvacuationPlan =
   | { kind: 'stranded' }
   | { kind: 'awaiting' }
   | { kind: 'in_progress' }
