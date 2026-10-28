@@ -234,6 +234,119 @@ describe('pickScene', () => {
     expect(result.entity).toEqual(expect.objectContaining({ kind: 'building', id: 1 }));
     bm.dispose();
   });
+
+  // ── #2098: raw-ground picks see through people and vehicles ─────────────
+
+  function makeEmployeeMesh(scene: THREE.Scene, x: number, z: number, surfaceY: number): CharacterMesh {
+    const cm = new CharacterMesh(scene);
+    cm.addEmployee({ id: 9, name: 'Test', role: 'driller', salary: 100, morale: 50, unionized: false, injured: false, alive: true, x, z } as never, surfaceY);
+    scene.updateMatrixWorld(true);
+    return cm;
+  }
+
+  function makeVehicleMesh(scene: THREE.Scene, x: number, z: number, surfaceY: number): VehicleMesh {
+    const vm = new VehicleMesh(scene);
+    const vehicle = { id: 3, type: 'debris_hauler', x, z, hp: 100, tier: 1, cargo: [], occupantIds: [] } as never;
+    vm.addVehicle(vehicle, { vehicles: [vehicle], nextId: 4, driverBoardingCount: 0, reservations: [] } as never, [], surfaceY);
+    scene.updateMatrixWorld(true);
+    return vm;
+  }
+
+  it('raw-ground picks (selectRamps=false) see through an employee to the terrain beneath', () => {
+    const scene = new THREE.Scene();
+    const tm = makeSolidTerrain(8, 4, 8);
+    const cm = makeEmployeeMesh(scene, 5.5, 5.5, 4);
+    const camera = makeTopDownCamera(5.5, 5.5, 60);
+    const renderer = makeFakeRenderer({ pickables: cm.pickables(), terrainMeshes: tm.meshes });
+
+    const result = pickScene(0, 0, camera, renderer, undefined, false);
+    expect(result.entity).toBeNull();
+    expect(result.terrain).toEqual(expect.objectContaining({ tileX: 5, tileZ: 5 }));
+    cm.dispose();
+    tm.dispose();
+  });
+
+  it('raw-ground picks (selectRamps=false) see through a vehicle to the terrain beneath', () => {
+    const scene = new THREE.Scene();
+    const tm = makeSolidTerrain(8, 4, 8);
+    const vm = makeVehicleMesh(scene, 5.5, 5.5, 4);
+    const camera = makeTopDownCamera(5.5, 5.5, 60);
+    const renderer = makeFakeRenderer({ pickables: vm.pickables(), terrainMeshes: tm.meshes });
+
+    const result = pickScene(0, 0, camera, renderer, undefined, false);
+    expect(result.entity).toBeNull();
+    expect(result.terrain).toEqual(expect.objectContaining({ tileX: 5, tileZ: 5 }));
+    vm.dispose();
+    tm.dispose();
+  });
+
+  it('selecting picks (default) still return an employee standing on terrain', () => {
+    const scene = new THREE.Scene();
+    const tm = makeSolidTerrain(8, 4, 8);
+    const cm = makeEmployeeMesh(scene, 5.5, 5.5, 4);
+    const camera = makeTopDownCamera(5.5, 5.5, 60);
+    const renderer = makeFakeRenderer({ pickables: cm.pickables(), terrainMeshes: tm.meshes });
+
+    const result = pickScene(0, 0, camera, renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'employee', id: 9 }));
+    cm.dispose();
+    tm.dispose();
+  });
+
+  it('selecting picks with selectRamps=true explicit still return a vehicle standing on terrain', () => {
+    const scene = new THREE.Scene();
+    const tm = makeSolidTerrain(8, 4, 8);
+    const vm = makeVehicleMesh(scene, 5.5, 5.5, 4);
+    const camera = makeTopDownCamera(5.5, 5.5, 60);
+    const renderer = makeFakeRenderer({ pickables: vm.pickables(), terrainMeshes: tm.meshes });
+
+    const result = pickScene(0, 0, camera, renderer, undefined, true);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'vehicle', id: 3 }));
+    vm.dispose();
+    tm.dispose();
+  });
+
+  it('raw-ground picks still stop at a building', () => {
+    const scene = new THREE.Scene();
+    const tm = makeSolidTerrain(8, 4, 8);
+    const bm = new BuildingMesh(scene);
+    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true, occupantIds: [] }, 4);
+    scene.updateMatrixWorld(true);
+    const camera = makeTopDownCamera(5.3, 5.3, 60);
+    const renderer = makeFakeRenderer({ pickables: bm.pickables(), terrainMeshes: tm.meshes });
+
+    const result = pickScene(0, 0, camera, renderer, undefined, false);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'building', id: 1 }));
+    bm.dispose();
+    tm.dispose();
+  });
+
+  it('raw-ground picks skip an employee in front of a building and return the building', () => {
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene);
+    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true, occupantIds: [] }, 0);
+    const cm = makeEmployeeMesh(scene, 5, 5, 8); // hovers above the building, nearer the camera
+    const camera = makeTopDownCamera(5, 5, 60);
+    const renderer = makeFakeRenderer({ pickables: [...bm.pickables(), ...cm.pickables()] });
+
+    expect(pickScene(0, 0, camera, renderer).entity).toEqual(expect.objectContaining({ kind: 'employee', id: 9 }));
+    const raw = pickScene(0, 0, camera, renderer, undefined, false);
+    expect(raw.entity).toEqual(expect.objectContaining({ kind: 'building', id: 1 }));
+    bm.dispose();
+    cm.dispose();
+  });
+
+  it('raw-ground picks over an employee with no terrain beneath return an empty pick', () => {
+    const scene = new THREE.Scene();
+    const cm = makeEmployeeMesh(scene, 5.5, 5.5, 0);
+    const camera = makeTopDownCamera(5.5, 5.5, 60);
+    const renderer = makeFakeRenderer({ pickables: cm.pickables() });
+
+    const result = pickScene(0, 0, camera, renderer, undefined, false);
+    expect(result.entity).toBeNull();
+    expect(result.terrain).toBeNull();
+    cm.dispose();
+  });
 });
 
 describe('ScenePicking (class — canvas wiring, debounce, click-vs-drag)', () => {

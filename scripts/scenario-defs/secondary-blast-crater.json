@@ -277,6 +277,14 @@
           "equals": 0,
           "maxTicks": 600,
           "timeoutMs": 190000
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
       ]
     },
