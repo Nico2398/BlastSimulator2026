@@ -481,7 +481,7 @@ describe('PreflightModal — button names (#1749)', () => {
 
   const cases: Array<['en' | 'fr', string, string, string]> = [
     ['en', 'Blast', 'Blast anyway', 'Cancel blast'],
-    ['fr', 'Blast', 'Blast quand même', 'Annuler le blast'],
+    ['fr', 'Tirer', 'Tirer quand même', 'Annuler le blast'],
   ];
 
   it.each(cases)('[%s] the pre-flight confirm button reads "%s"', (locale, detonate) => {

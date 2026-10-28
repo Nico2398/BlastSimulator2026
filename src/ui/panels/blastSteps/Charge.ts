@@ -22,7 +22,7 @@
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import type { ColumnRock } from '../../../core/mining/ExplosiveRockFit.js';
 import { t } from '../../../core/i18n/I18n.js';
-import { el, stepper, sectionHeader, reasonLine, button, scrollBoundedSection } from '../../dom.js';
+import { el, stepper, reasonLine, button, scrollBoundedSection } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature, drainReasonText, drainRainReasonText, type HoleDrainView } from './ChargeHoleList.js';
@@ -168,7 +168,8 @@ export class ChargeStep {
     this.transitBannerEl.dataset['info'] = 'delivery-transit';
     this.holeList = new ChargeHoleList(holeId => this.chargeHole(holeId), holeId => this.runAndNotify(`drain_hole hole:${holeId}`));
 
-    const tubingHeader = sectionHeader(t('ui.blast_workshop.charge.tubing_section'));
+    const tubingHeader = el('div', { className: 'bsx-section' });
+    tubingHeader.append(this.locale.bindText(el('span', { className: 'bsx-section-label' }), 'ui.blast_workshop.charge.tubing_section'), el('span', { className: 'bsx-section-rule' }));
     this.tubingCardEl = el('div');
     this.drainEl = el('div');
 
@@ -190,6 +191,7 @@ export class ChargeStep {
   refreshLocale(): void {
     this.locale.refresh();
     this.holeList.refreshLocale();
+    this.stockBlock.refreshLocale();
     this.lastSignature = '';
   }
 
