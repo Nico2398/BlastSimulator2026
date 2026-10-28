@@ -239,6 +239,12 @@ jobs:
           # a step. `agentic-autonomous-pipeline`'s runtime-parity reference
           # holds the thresholds.
           CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000'
+          # An API key gets a 5-minute prompt cache. A run waits longer than
+          # that on every suite slice and every delegation, and each wait made
+          # the next request write its whole context to the cache again: cache
+          # writes were most of a run's cost. One hour outlives both.
+          CLAUDE_CODE_PROMPT_CACHE_TTL: '1h'
+          CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL: '1h'
         # Pinned to a SHA, not the moving `v1` tag. The action hardcodes the
         # Claude Code build it installs (`base-action/action.yml`), so `v1`
         # silently changes the agent binary under every run: the tag moved to
@@ -413,6 +419,12 @@ jobs:
           # a step. `agentic-autonomous-pipeline`'s runtime-parity reference
           # holds the thresholds.
           CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000'
+          # An API key gets a 5-minute prompt cache. A run waits longer than
+          # that on every suite slice and every delegation, and each wait made
+          # the next request write its whole context to the cache again: cache
+          # writes were most of a run's cost. One hour outlives both.
+          CLAUDE_CODE_PROMPT_CACHE_TTL: '1h'
+          CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL: '1h'
         # Same pin as the first attempt, and it has to stay the same one: a
         # retry on a different agent build is a different run, not a second try.
         uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237

@@ -23,10 +23,11 @@
  * @module pipeline
  */
 
-import { GitError } from './lib/pipeline/git.js';
+import { GitError, mainRoot } from './lib/pipeline/git.js';
 import { CHANNEL_ORDER, type Channel } from './lib/pipeline/paths.js';
 import { reviewBrief } from './lib/pipeline/review-brief.js';
-import { step, StepError } from './lib/pipeline/steps.js';
+import { step, StepError, stepFor } from './lib/pipeline/steps.js';
+import { readState } from './lib/pipeline/tdd-state.js';
 import { joinCycle, PipelineError, red, split, start, status } from './lib/pipeline/tdd.js';
 import { verify } from './lib/pipeline/verify.js';
 
@@ -82,10 +83,12 @@ function run(argv: string[]): number {
 
   if (command === 'tdd') {
     const label = required(values, 'label');
-    if (sub === 'start') print(start(cwd, { label, base: one(values, 'base'), feature: one(values, 'feature') }));
-    else if (sub === 'split') print(split(cwd, label));
-    else if (sub === 'join') print(joinCycle(cwd, label));
-    else if (sub === 'status') print(status(cwd, label));
+    if (sub === 'start') print([...start(cwd, { label, base: one(values, 'base'), feature: one(values, 'feature') }), ...stepFor(cwd, 'tdd start', label)]);
+    else if (sub === 'split') print([...split(cwd, label), ...stepFor(cwd, 'tdd split', label)]);
+    else if (sub === 'join') {
+      const lines = joinCycle(cwd, label);
+      print(readState(mainRoot(cwd), label)?.phase === 'joined' ? [...lines, ...stepFor(cwd, 'tdd join', label)] : lines);
+    } else if (sub === 'status') print(status(cwd, label));
     else if (sub === 'red') {
       const result = red(cwd, { label, commit: !flags.has('no-commit'), detail: flags.has('detail') });
       print(result.lines);
@@ -110,7 +113,8 @@ function run(argv: string[]): number {
     return 0;
   }
   if (command === 'review-brief') {
-    print(reviewBrief(cwd, { base: one(values, 'base'), labels: values.get('label') }));
+    const labels = values.get('label');
+    print([...reviewBrief(cwd, { base: one(values, 'base'), labels }), ...(labels?.[0] ? stepFor(cwd, 'review-brief', labels[0]) : [])]);
     return 0;
   }
   throw new PipelineError(USAGE);
