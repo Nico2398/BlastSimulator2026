@@ -2534,6 +2534,7 @@
   "ui.finances.category.mafia": "Mafia",
   "ui.finances.category.needs": "Worker Needs",
   "ui.finances.category.smuggling": "Smuggling",
+  "ui.finances.category.events": "Events",
   "ui.operations.title": "Operations",
   "ui.operations.logistics": "Logistics",
   "ui.operations.on_ground": "On the Ground",
