@@ -58,6 +58,6 @@ describe('blast button terminology (#1749)', () => {
 
   it.each(TUTORIAL_KEYS)('%s teaches the Blast button in both locales', (key) => {
     expect(EN[key], `en ${key}`).toContain('Blast');
-    expect(FR[key], `fr ${key}`).toMatch(/Tir|blast/i);
+    expect(FR[key], `fr ${key}`).toMatch(/Tir/);
   });
 });

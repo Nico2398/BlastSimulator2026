@@ -55,7 +55,6 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.settings.english', // "English"
   'ui.settings.french',  // "Français"
 
-
   // ── True French/English cognates ──
   'need.fatigue',               // "Fatigue"
   'proficiency.2',              // "Novice"
