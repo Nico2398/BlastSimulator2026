@@ -3849,6 +3849,7 @@
   "ui.blast_workshop.fire.no_plan": "Drill a plan first.",
   "ui.blast_workshop.fire.tag_in_zone": "IN ZONE",
   "ui.blast_workshop.fire.tag_stranded": "STRANDED - NO DRIVER",
+  "ui.blast_workshop.fire.tag_fetched": "IN ZONE - A DRIVER WILL MOVE IT",
   "ui.blast_workshop.fire.preflight_section": "Pre-Flight",
   "ui.blast_workshop.fire.check_dry": "All {count} holes dry or tubed",
   "ui.blast_workshop.fire.check_wet": "{count} holes are full of water",

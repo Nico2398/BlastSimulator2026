@@ -305,3 +305,11 @@ function canEmployeeReachVehicleForEvacuation(state: GameState, employee: Employ
   });
   return path.found;
 }
+
+/** What evacuateZone will do with an in-zone vehicle (#2100). */
+export type VehicleEvacuationVerdict = 'driver_aboard' | 'will_be_fetched' | 'stranded';
+
+/** Pure: the verdict evacuateZone reaches for `vehicle` in `zone`, without ordering anyone. */
+export function vehicleEvacuationVerdict(_state: GameState, _vehicle: Vehicle, _zone: ZoneBounds): VehicleEvacuationVerdict {
+  throw new Error('not implemented');
+}

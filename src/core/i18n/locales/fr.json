@@ -3849,6 +3849,7 @@
   "ui.blast_workshop.fire.no_plan": "Forez d'abord un plan.",
   "ui.blast_workshop.fire.tag_in_zone": "DANS LA ZONE",
   "ui.blast_workshop.fire.tag_stranded": "BLOQUÉ - SANS CHAUFFEUR",
+  "ui.blast_workshop.fire.tag_fetched": "DANS LA ZONE - UN CONDUCTEUR LA DEPLACERA",
   "ui.blast_workshop.fire.preflight_section": "Contrôle avant tir",
   "ui.blast_workshop.fire.check_dry": "Les {count} trous sont secs ou tubés",
   "ui.blast_workshop.fire.check_wet": "{count} trous prennent l'eau",
