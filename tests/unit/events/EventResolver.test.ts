@@ -520,3 +520,72 @@ describe('resolveEvent — spread declarative effects (#1538)', () => {
     expect(fx.state.events.lastOutcome!.resultKey).toBe(`event.${def!.id}.res${opt}_alt`);
   });
 });
+
+describe('Event cash ledger category (#2102)', () => {
+  function makeCashEvent(): EventDef {
+    return {
+      id: 'test_cash_category',
+      category: 'union',
+      titleKey: 'event.test.title',
+      descKey: 'event.test.desc',
+      options: [
+        { labelKey: 'event.test.opt0', resultKey: 'event.test_cash_category.res0' },
+        { labelKey: 'event.test.opt1', resultKey: 'event.test_cash_category.res1' },
+        { labelKey: 'event.test.opt2', resultKey: 'event.test_cash_category.res2' },
+      ],
+      consequences: [
+        { cashDelta: -60000 },
+        { cashDelta: 30000 },
+        { scoreDelta: { wellBeing: 1 } },
+      ],
+      weightCoeff: () => 1,
+      canFire: () => true,
+    };
+  }
+
+  function resolveOption(optionIndex: number) {
+    clearEvents();
+    registerEvents([makeCashEvent()]);
+    const eventSystem = createEventSystemState();
+    eventSystem.pendingEvent = { eventId: 'test_cash_category', firedAtTick: 10 };
+    const finances = createFinanceState(100000);
+    resolveEvent(eventSystem, finances, createScoreState(), optionIndex, 10, new Random(42));
+    return finances;
+  }
+
+  it('books a cash loss as an events expense', () => {
+    const finances = resolveOption(0);
+    const expenses = finances.transactions.filter(t => t.type === 'expense');
+    expect(expenses).toHaveLength(1);
+    expect(expenses[0]!.category).toBe('events');
+    expect(expenses[0]!.amount).toBe(60000);
+    expect(expenses[0]!.description).toBe('Event: test_cash_category');
+    expect(finances.cash).toBe(40000);
+  });
+
+  it('books no fines expense for an event cash loss', () => {
+    const finances = resolveOption(0);
+    expect(finances.transactions.filter(t => t.category === 'fines')).toHaveLength(0);
+  });
+
+  it('books a cash gain as events income', () => {
+    const finances = resolveOption(1);
+    const incomes = finances.transactions.filter(t => t.type === 'income');
+    expect(incomes).toHaveLength(1);
+    expect(incomes[0]!.category).toBe('events');
+    expect(incomes[0]!.amount).toBe(30000);
+    expect(incomes[0]!.description).toBe('Event: test_cash_category');
+    expect(finances.cash).toBe(130000);
+  });
+
+  it('books no contracts income for an event cash gain', () => {
+    const finances = resolveOption(1);
+    expect(finances.transactions.filter(t => t.category === 'contracts')).toHaveLength(0);
+  });
+
+  it('books no transaction when the option moves no cash', () => {
+    const finances = resolveOption(2);
+    expect(finances.transactions).toHaveLength(0);
+    expect(finances.cash).toBe(100000);
+  });
+});

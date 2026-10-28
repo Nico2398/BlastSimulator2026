@@ -173,6 +173,26 @@ describe('ActiveModifiers.tickModifiers', () => {
     expect(world.cash).toBeCloseTo(1000 - 240 / TICKS_PER_DAY);
   });
 
+  it('books a recurring charge as an events expense, never fines (#2102)', () => {
+    const list = makeList();
+    addModifier(list, { ...mod({ kind: 'recurring_charge', magnitude: 240, endTick: 100 }), sourceEventId: 'charge_src' }, 1);
+    const world = tickWorld(list);
+    tickModifiers(world);
+    const expenses = world.finances.transactions.filter(t => t.type === 'expense');
+    expect(expenses).toHaveLength(1);
+    expect(expenses[0]!.category).toBe('events');
+    expect(expenses[0]!.description).toBe('Event charge: charge_src');
+    expect(world.finances.transactions.filter(t => t.category === 'fines')).toHaveLength(0);
+  });
+
+  it('books no events expense for a lapsed recurring charge (#2102)', () => {
+    const list = makeList();
+    addModifier(list, mod({ kind: 'recurring_charge', magnitude: 240, endTick: 10 }), 1);
+    const world = tickWorld(list);
+    tickModifiers(world);
+    expect(world.finances.transactions).toHaveLength(0);
+  });
+
   it('drifts morale of living employees only', () => {
     const list = makeList();
     addModifier(list, mod({ kind: 'morale_drift', magnitude: -2, endTick: 100 }), 1);
