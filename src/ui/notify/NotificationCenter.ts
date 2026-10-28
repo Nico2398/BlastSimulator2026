@@ -21,7 +21,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { stateRubbleStockKg, stateBarrenOverflowKg } from '../../core/economy/SpoilHeaps.js';
 import { contractShortOfStock, outstandingPenalty } from '../../core/economy/Contract.js';
 import { formatGameDuration } from '../formatGameDuration.js';
-import { buildBlockedOrderMessage, countBlockedReasons, describeBlockedReasons, isFailureBlock, isInTransitBlock } from './blockedOrders.js';
+import { buildBlockedOrderMessage, buildGroupedBlockedOrderMessage, blockedGroupKey, isGroupedBlockReason, countBlockedReasons, describeBlockedReasons, isFailureBlock, isInTransitBlock } from './blockedOrders.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { isHaulBlockedReason } from '../../core/economy/HaulDispatch.js';
 import { findStrandedCrew, type StrandedCrew } from '../../core/engine/StrandedCrew.js';
@@ -104,6 +104,8 @@ export class NotificationCenter {
   private transitWarned = false;
   /** Haul reasons already toasted; one toast per reason while it persists, not per haul action (#1369). */
   private readonly warnedHaulReasons = new Set<BlockedOrderReason>();
+  /** Crew/fleet block groups already toasted this episode (#2099). */
+  private readonly warnedBlockGroups = new Set<string>();
   /** Vehicles (`v<id>`) and employees (`e<id>`) already toasted as cut off (#2095); forgotten once they are reachable again. */
   private readonly warnedCutOff = new Set<string>();
   /** Cut-off crew of the last tick it was computed for; one reachability read per tick, not per frame. */
@@ -249,6 +251,23 @@ export class NotificationCenter {
     for (const reason of this.warnedHaulReasons) {
       if (!haulActions.has(reason)) this.warnedHaulReasons.delete(reason);
     }
+    // Hundreds of orders waiting on the same missing crew or vehicle (#2099): one toast per group, with the count.
+    const blockGroups = new Map<string, { action: PendingAction; count: number }>();
+    for (const a of blockedActions) {
+      if (!isGroupedBlockReason(a.blockedReason)) continue;
+      const key = blockedGroupKey(a);
+      const group = blockGroups.get(key);
+      if (group === undefined) blockGroups.set(key, { action: a, count: 1 });
+      else group.count++;
+    }
+    for (const [key, { action, count }] of blockGroups) {
+      if (this.warnedBlockGroups.has(key)) continue;
+      this.warnedBlockGroups.add(key);
+      this.notify({ severity: 'warn', icon: 'warn', title: t('notification.title.order_blocked'), body: buildGroupedBlockedOrderMessage(action, count) });
+    }
+    for (const key of this.warnedBlockGroups) {
+      if (!blockGroups.has(key)) this.warnedBlockGroups.delete(key);
+    }
     // Explosives in transit (#1895): one grouped toast per waiting episode, no pip.
     const [firstInTransit] = inTransit;
     if (firstInTransit === undefined) {
@@ -266,7 +285,7 @@ export class NotificationCenter {
     }
     for (const action of blockedActions) {
       const reason = action.blockedReason as BlockedOrderReason;
-      if (isHaulBlockedReason(reason)) continue;
+      if (isHaulBlockedReason(reason) || isGroupedBlockReason(reason)) continue;
       if (this.warnedBlockedOrders.get(action.id) === reason) continue;
       const alreadyWarnedForRamp = (siblingActionIds.get(action.id) ?? [])
         .some(id => this.warnedBlockedOrders.get(id) === reason);

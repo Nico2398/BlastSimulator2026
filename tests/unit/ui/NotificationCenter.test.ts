@@ -1160,3 +1160,259 @@ describe('NotificationCenter explosives-in-transit toast (#1966)', () => {
     expect(entry.body).not.toContain('tick');
   });
 });
+
+describe('NotificationCenter grouped crew/fleet blocked orders (#2099)', () => {
+  type Overrides = Partial<PendingAction>;
+  function order(id: number, overrides: Overrides = {}): PendingAction {
+    return {
+      id, type: 'fragment_debris', requiredSkill: 'driving.rock_fragmenter', requiredVehicleRole: 'rock_fragmenter',
+      targetX: id, targetZ: 0, targetY: 0, payload: { fragmentId: id }, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0, blockedReason: 'no_vehicle_in_fleet',
+      ...overrides,
+    };
+  }
+  function pile(from: number, count: number, overrides: Overrides = {}): PendingAction[] {
+    return Array.from({ length: count }, (_, i) => order(from + i, overrides));
+  }
+  const blockedEntries = (c: NotificationCenter) => c.getLog().filter(e => e.title === t('notification.title.order_blocked'));
+  const locale = (name: string) => JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), 'src/core/i18n/locales', `${name}.json`), 'utf8'),
+  ) as Record<string, string>;
+
+  afterEach(() => { setLocale('en'); });
+
+  it('raises ONE notify call for 400 fragment orders blocked by no_vehicle_in_fleet (C1)', () => {
+    const center = new NotificationCenter();
+    const spy = vi.spyOn(center, 'notify');
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 400));
+    center.update(state);
+    const blockedCalls = spy.mock.calls.filter(([n]) => n.title === t('notification.title.order_blocked'));
+    expect(blockedCalls).toHaveLength(1);
+    expect(blockedEntries(center)).toHaveLength(1);
+  });
+
+  it('the single grouped toast carries the order count and names the missing role (C1, C4)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 400));
+    center.update(state);
+    const body = blockedEntries(center)[0]!.body;
+    expect(body).toContain('400');
+    expect(body).toContain(t('vehicle_type.rock_fragmenter'));
+    expect(body).not.toContain('notification.');
+  });
+
+  it.each<NonNullable<PendingAction['blockedReason']>>([
+    'no_qualified_employee', 'no_dual_qualified_employee', 'no_vehicle_in_fleet',
+    'no_licensed_driver', 'licence_level_too_low', 'no_reaching_vehicle',
+  ])('groups 50 orders blocked by %s into one toast (C1)', (reason) => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 50, { blockedReason: reason, blockedLicenceLevel: 2 }));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+    expect(blockedEntries(center)[0]!.body).toContain('50');
+  });
+
+  it('does not re-notify on repeated updates of the same group (C1)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 40));
+    center.update(state);
+    center.update(state);
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+  });
+
+  it('raises no further call when a 401st order joins the same group on a later tick (C2)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 400));
+    center.update(state);
+    state.pendingActions.push(order(401));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+  });
+
+  it('raises no further call when a group of 1 grows into a group of many (C2)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(order(1));
+    center.update(state);
+    state.pendingActions.push(...pile(2, 30));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+  });
+
+  it('raises no further call when part of the group is resolved while the rest stays blocked (C2)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    const orders = pile(1, 20);
+    state.pendingActions.push(...orders);
+    center.update(state);
+    for (const a of orders.slice(0, 10)) a.blockedReason = null;
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+  });
+
+  it('toasts again once when the group fully clears and later comes back (C3)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    const orders = pile(1, 25);
+    state.pendingActions.push(...orders);
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+    for (const a of orders) a.blockedReason = null;
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+    for (const a of orders) a.blockedReason = 'no_vehicle_in_fleet';
+    center.update(state);
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('toasts again when every order of the group leaves the queue and a new one is blocked (C3)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 5));
+    center.update(state);
+    state.pendingActions.length = 0;
+    center.update(state);
+    state.pendingActions.push(order(100));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('a new reason for the same orders toasts its own call (C3)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    const orders = pile(1, 30);
+    state.pendingActions.push(...orders);
+    center.update(state);
+    for (const a of orders) a.blockedReason = 'no_licensed_driver';
+    center.update(state);
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('a different order type with the same reason and role toasts its own call (C3)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 30));
+    state.pendingActions.push(...pile(100, 30, { type: 'level_ground' }));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('a different required vehicle role with the same type and reason toasts its own call (C3)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 30));
+    state.pendingActions.push(...pile(100, 30, { requiredVehicleRole: 'rock_digger', requiredSkill: 'driving.excavator' }));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('a different required skill with the same type and reason toasts its own call (C3)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 20, { type: 'drill_hole', requiredVehicleRole: null, requiredSkill: 'blasting', blockedReason: 'no_qualified_employee' }));
+    state.pendingActions.push(...pile(100, 20, { type: 'drill_hole', requiredVehicleRole: null, requiredSkill: 'geology', blockedReason: 'no_qualified_employee' }));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('a second group appearing later toasts once without repeating the first (C3)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 30));
+    center.update(state);
+    state.pendingActions.push(...pile(100, 30, { type: 'level_ground', requiredVehicleRole: 'rock_digger', requiredSkill: 'driving.excavator' }));
+    center.update(state);
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('a group of 1 uses the existing single-order wording (C4)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    const single = order(1);
+    state.pendingActions.push(single);
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+    expect(blockedEntries(center)[0]!.body).toBe(buildBlockedOrderMessage(single));
+  });
+
+  it('a group of many uses wording different from the single-order text (C4)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    const single = order(1);
+    state.pendingActions.push(single, ...pile(2, 5));
+    center.update(state);
+    const body = blockedEntries(center)[0]!.body;
+    expect(body).not.toBe(buildBlockedOrderMessage(single));
+    expect(body).toContain('6');
+  });
+
+  it('the grouped toast is localized in French with the count (C4)', () => {
+    setLocale('fr');
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 12));
+    center.update(state);
+    const body = blockedEntries(center)[0]!.body;
+    expect(body).toContain('12');
+    expect(body).not.toContain('notification.');
+    setLocale('en');
+    const enCenter = new NotificationCenter();
+    enCenter.update(state);
+    expect(body).not.toBe(blockedEntries(enCenter)[0]!.body);
+  });
+
+  it('en.json and fr.json carry the same notification keys, grouped ones included (C4)', () => {
+    const en = Object.keys(locale('en')).filter(k => k.startsWith('notification.')).sort();
+    const fr = Object.keys(locale('fr')).filter(k => k.startsWith('notification.')).sort();
+    expect(fr).toEqual(en);
+  });
+
+  it('per-order reason target_unreachable keeps one toast per building order (C5)', () => {
+    const center = new NotificationCenter();
+    const spy = vi.spyOn(center, 'notify');
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 3, {
+      type: 'place_building', requiredSkill: null, requiredVehicleRole: null, blockedReason: 'target_unreachable',
+    }));
+    center.update(state);
+    const blockedCalls = spy.mock.calls.filter(([n]) => n.title === t('notification.title.order_blocked'));
+    expect(blockedCalls).toHaveLength(3);
+  });
+
+  it('per-order reason buried_under_rubble keeps one toast per order (C5)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 4, {
+      type: 'charge_hole', requiredSkill: 'blasting', requiredVehicleRole: 'charging_truck', blockedReason: 'buried_under_rubble',
+    }));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(4);
+  });
+
+  it('grouped orders still count in the BLOCKED orders pip (C5)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 37));
+    const pip = center.update(state).find(p => p.kind === 'orders');
+    expect(pip).toBeDefined();
+    expect(pip!.label).toContain('37');
+  });
+
+  it('groups only queued orders: held orders do not count toward or trigger a toast (rejection)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push(...pile(1, 5, { status: 'in_progress', holderId: 1 }));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(0);
+  });
+});
+
