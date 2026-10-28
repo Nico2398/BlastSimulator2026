@@ -14,8 +14,9 @@ import { isProgressionSite, type GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { levelGroundRect } from '../mining/LevelGround.js';
-import { DEFAULT_GRID_SIZE, NAV_CLEARANCE_VEHICLE_CELLS } from '../config/balance.js';
+import { DEFAULT_GRID_SIZE, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS } from '../config/balance.js';
 import { NavGrid, isCellOccupied } from '../nav/NavGrid.js';
+import { computeClimbReachableSetFromSources } from '../nav/NavGridReachability.js';
 import { regionForColumns } from '../nav/NavGridSync.js';
 import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
 import { siteVehicleReach } from './OrderReachability.js';
@@ -185,15 +186,18 @@ export function relocateFootprintOccupants(state: GameState, region: BlastRegion
 
 /**
  * Where an employee a footprint caught goes (#2097): the nearest free cell outside `region` that the employee's own
- * cell connects to. The employee's cell counts as the flood anchor even though the footprint just blocked it, so the
- * set is what they could already walk to — never the world corner's component, which on many maps is a pocket. A
+ * cell connects to. The flood runs with the footprint freed, so the
+ * set is what they could already walk to before the block — never the world corner's component, which on many maps is a pocket. A
  * footprint that seals them in leaves no such cell; they then take the nearest traversable cell to where they stood
  * (the cut-off alert, `findStrandedCrew`, names them if that cell is cut off).
  */
 function employeeRelocation(navGrid: NavGrid, region: BlastRegion, x: number, z: number): { x: number; z: number } {
   const cx = Math.round(x);
   const cz = Math.round(z);
-  const reach = NavGrid.computeClimbReachableSet(navGrid, cx, cz);
+  // The footprint is already blocked: flood with it freed, i.e. what the employee could reach before the block.
+  const reach = computeClimbReachableSetFromSources(navGrid, [{ x: cx, z: cz }], NAV_CLEARANCE_EMPLOYEE_CELLS, {
+    free: { minX: region.minX, maxX: region.maxX + 1, minZ: region.minZ, maxZ: region.maxZ + 1 },
+  });
   const maxRing = Math.max(navGrid.width, navGrid.height);
   for (let r = 1; r <= maxRing; r++) {
     let best: { x: number; z: number } | null = null;
