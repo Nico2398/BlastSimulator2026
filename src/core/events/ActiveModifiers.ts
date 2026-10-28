@@ -174,7 +174,7 @@ export function tickModifiers(state: ModifierTickState): void {
   pruneExpired(list, state.tickCount);
   for (const m of list) {
     if (m.kind === 'recurring_charge') {
-      deductExpense(state, m.magnitude / TICKS_PER_DAY, 'fines', `Event charge: ${m.sourceEventId}`);
+      deductExpense(state, m.magnitude / TICKS_PER_DAY, 'events', `Event charge: ${m.sourceEventId}`);
     } else if (m.kind === 'morale_drift') {
       for (const emp of state.employees.employees) {
         if (emp.alive) emp.morale = clampScore(emp.morale + m.magnitude);
