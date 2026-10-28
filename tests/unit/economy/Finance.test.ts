@@ -3,6 +3,7 @@ import {
   createFinanceState,
   addIncome,
   addExpense,
+  chargeFine,
   getBalance,
   getFinancialReport,
   getOperatingProfit,
@@ -102,5 +103,23 @@ describe('Finance system', () => {
       state.transactions = [];
       expect(getOperatingProfit(state)).toBe(0);
     });
+  });
+});
+
+describe('chargeFine ledger category (#2102)', () => {
+  it('still books a fines expense, not events', () => {
+    const state = { cash: 1000, finances: createFinanceState(1000) };
+    chargeFine(state, 400, 'Safety fine', 3);
+    expect(state.cash).toBe(600);
+    expect(state.finances.transactions).toHaveLength(1);
+    expect(state.finances.transactions[0]!.category).toBe('fines');
+    expect(state.finances.transactions[0]!.type).toBe('expense');
+  });
+
+  it('books nothing for a non-positive fine', () => {
+    const state = { cash: 1000, finances: createFinanceState(1000) };
+    chargeFine(state, 0, 'Nothing', 3);
+    expect(state.cash).toBe(1000);
+    expect(state.finances.transactions).toHaveLength(0);
   });
 });
