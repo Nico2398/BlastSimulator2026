@@ -9,10 +9,10 @@ const EN = enLocale as Record<string, string>;
 const FR = frLocale as Record<string, string>;
 
 const EXACT: Array<[string, string, string]> = [
-  ['ui.blast_workshop.step.fire', 'Blast', 'Blast'],
-  ['ui.blast_workshop.footer.fire', 'Blast', 'Blast'],
-  ['ui.blast_workshop.preflight.detonate', 'Blast', 'Blast'],
-  ['ui.blast_workshop.preflight.fire_anyway', 'Blast anyway', 'Blast quand même'],
+  ['ui.blast_workshop.step.fire', 'Blast', 'Tir'],
+  ['ui.blast_workshop.footer.fire', 'Blast', 'Tirer'],
+  ['ui.blast_workshop.preflight.detonate', 'Blast', 'Tirer'],
+  ['ui.blast_workshop.preflight.fire_anyway', 'Blast anyway', 'Tirer quand même'],
   ['ui.blast_workshop.preflight.cancel_detonation', 'Cancel blast', 'Annuler le blast'],
 ];
 
@@ -31,10 +31,10 @@ const RENAMED_KEYS = [
 const TUTORIAL_KEYS = RENAMED_KEYS.filter((k) => k.startsWith('tutorial.'));
 
 // Capitalised verbs/nouns are button names; lowercase imperatives are checked too.
-// FR is case-sensitive on purpose: the button name "Tir" is gone, but the generic
-// lowercase noun "tir" (a blast, as in "le tir part") is ordinary prose and allowed.
+// French buttons are "Tir"/"Tirer" again (#2103, consistent with "Atelier de tir"); only
+// the English button names stay "Blast". French keeps the Déclencher ban.
 const EN_OLD = /\b(fire|firing|detonate|detonation)\b/i;
-const FR_OLD = /\b(Tir|Tirer|Tirez|tirer|tirez)\b|[Dd][ée]clench/;
+const FR_OLD = /[Dd][ée]clench/;
 
 describe('blast button terminology (#1749)', () => {
   it('there are 13 renamed keys', () => {
@@ -51,13 +51,13 @@ describe('blast button terminology (#1749)', () => {
     expect(EN[key], `en ${key}: ${EN[key]}`).not.toMatch(EN_OLD);
   });
 
-  it.each(RENAMED_KEYS)('%s no longer names Tir/Tirer/Déclencher (fr)', (key) => {
+  it.each(RENAMED_KEYS)('%s no longer names Déclencher (fr)', (key) => {
     expect(typeof FR[key]).toBe('string');
     expect(FR[key], `fr ${key}: ${FR[key]}`).not.toMatch(FR_OLD);
   });
 
   it.each(TUTORIAL_KEYS)('%s teaches the Blast button in both locales', (key) => {
     expect(EN[key], `en ${key}`).toContain('Blast');
-    expect(FR[key], `fr ${key}`).toContain('Blast');
+    expect(FR[key], `fr ${key}`).toMatch(/Tir|blast/i);
   });
 });

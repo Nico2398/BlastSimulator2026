@@ -5,7 +5,8 @@
 import { formatGameClock } from '../../formatGameClock.js';
 import { formatGameDuration } from '../../formatGameDuration.js';
 import { t } from '../../../core/i18n/I18n.js';
-import { el, stepper, sectionHeader, button } from '../../dom.js';
+import { LocaleTextRegistry } from '../../localeText.js';
+import { el, stepper, button } from '../../dom.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { stockAwareChargesCost } from '../../../core/mining/ChargePlan.js';
@@ -83,6 +84,7 @@ export class ChargeStockBlock {
   private readonly valueEl: HTMLElement;
   private readonly buyHostEl: HTMLElement;
   private readonly paidEl: HTMLElement;
+  private readonly locale = new LocaleTextRegistry();
   private buyKg = STOCK_BUY_STEP_KG;
   private blocked = false;
 
@@ -98,12 +100,14 @@ export class ChargeStockBlock {
     this.buyHostEl = el('div');
     this.buyHostEl.style.cssText = 'display:flex;flex-direction:column;gap:4px';
     this.paidEl = el('div');
-    this.el.append(sectionHeader(t('ui.blast_workshop.charge.stock_section')), this.rowsEl, field, this.buyHostEl, this.paidEl);
+    const stockHeader = el('div', { className: 'bsx-section' });
+    stockHeader.append(this.locale.bindText(el('span', { className: 'bsx-section-label' }), 'ui.blast_workshop.charge.stock_section'), el('span', { className: 'bsx-section-rule' }));
+    this.el.append(stockHeader, this.rowsEl, field, this.buyHostEl, this.paidEl);
   }
 
   /** Re-apply the static header text under the active locale. */
   refreshLocale(): void {
-    throw new Error('not implemented');
+    this.locale.refresh();
   }
 
   get root(): HTMLElement { return this.el; }
