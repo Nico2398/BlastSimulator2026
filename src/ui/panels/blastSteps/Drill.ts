@@ -352,8 +352,8 @@ export class DrillStep {
     min: number, max: number, refresh: () => void,
   ) {
     const step = (delta: number, bound: (a: number, b: number) => number, limit: number) => () => {
-      this[prop] = bound(limit, this[prop] + delta); this.lastSignature = ''; refresh();
       if (prop === 'gridDepth') this.playerAdjustedDepth = true;
+      this[prop] = bound(limit, this[prop] + delta); this.lastSignature = ''; refresh();
     };
     return {
       key, label, value: this[prop], format: (v: number) => `${v} m`,
