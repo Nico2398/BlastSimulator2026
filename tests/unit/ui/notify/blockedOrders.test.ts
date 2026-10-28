@@ -3,9 +3,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   blockedPhraseKind, countBlockedReasons, rankBlockedKinds, blockedPhrase, blockedKindLabel,
-  describeBlockedReasons, BLOCKED_PHRASE_LINES,
+  describeBlockedReasons, BLOCKED_PHRASE_LINES, isGroupedBlockReason, buildGroupedBlockedOrderMessage,
+  buildBlockedOrderMessage,
 } from '../../../../src/ui/notify/blockedOrders.js';
-import type { BlockedOrderReason } from '../../../../src/core/state/GameState.js';
+import type { BlockedOrderReason, PendingAction } from '../../../../src/core/state/GameState.js';
 import { setLocale } from '../../../../src/core/i18n/I18n.js';
 
 beforeEach(() => setLocale('en'));
@@ -222,3 +223,95 @@ describe('barren-overflow storage phrase (#2018)', () => {
     expect(line).not.toContain('{');
   });
 });
+
+describe('isGroupedBlockReason (#2099)', () => {
+  it.each<BlockedOrderReason>([
+    'no_qualified_employee', 'no_dual_qualified_employee', 'no_vehicle_in_fleet',
+    'no_licensed_driver', 'licence_level_too_low', 'no_reaching_vehicle',
+  ])('is true for crew/fleet reason %s', (r) => {
+    expect(isGroupedBlockReason(r)).toBe(true);
+  });
+
+  it.each<BlockedOrderReason>([
+    'storage_full', 'no_freight_warehouse', 'no_spoil_heap', 'spoil_heap_full',
+    'target_unreachable', 'buried_under_rubble', 'debris_out_of_reach', 'explosives_in_transit',
+  ])('is false for per-order or site reason %s', (r) => {
+    expect(isGroupedBlockReason(r)).toBe(false);
+  });
+
+  it('is false for null and undefined', () => {
+    expect(isGroupedBlockReason(null)).toBe(false);
+    expect(isGroupedBlockReason(undefined)).toBe(false);
+  });
+});
+
+describe('buildGroupedBlockedOrderMessage (#2099)', () => {
+  function action(overrides: Partial<PendingAction> = {}): PendingAction {
+    return {
+      id: 1, type: 'fragment_debris', requiredSkill: 'driving.rock_fragmenter', requiredVehicleRole: 'rock_fragmenter',
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0, blockedReason: 'no_vehicle_in_fleet',
+      ...overrides,
+    };
+  }
+  const REASONS: BlockedOrderReason[] = [
+    'no_qualified_employee', 'no_dual_qualified_employee', 'no_vehicle_in_fleet',
+    'no_licensed_driver', 'licence_level_too_low', 'no_reaching_vehicle',
+  ];
+
+  it.each(REASONS)('count 1 is identical to buildBlockedOrderMessage for %s', (reason) => {
+    const a = action({ blockedReason: reason, blockedLicenceLevel: 2 });
+    expect(buildGroupedBlockedOrderMessage(a, 1)).toBe(buildBlockedOrderMessage(a));
+  });
+
+  it.each(REASONS)('count 406 carries the count and no raw i18n key for %s', (reason) => {
+    const msg = buildGroupedBlockedOrderMessage(action({ blockedReason: reason, blockedLicenceLevel: 2 }), 406);
+    expect(msg).toContain('406');
+    expect(msg).not.toContain('notification.');
+  });
+
+  it.each(REASONS)('count 406 differs from the single-order wording for %s', (reason) => {
+    const a = action({ blockedReason: reason, blockedLicenceLevel: 2 });
+    expect(buildGroupedBlockedOrderMessage(a, 406)).not.toBe(buildBlockedOrderMessage(a));
+  });
+
+  it('names the missing vehicle role for no_vehicle_in_fleet', () => {
+    const msg = buildGroupedBlockedOrderMessage(action(), 406);
+    expect(msg).toContain('Rock Fragmenter');
+  });
+
+  it.each<BlockedOrderReason>(['no_licensed_driver', 'licence_level_too_low', 'no_reaching_vehicle', 'no_dual_qualified_employee'])(
+    'names the vehicle role for %s',
+    (reason) => {
+      const msg = buildGroupedBlockedOrderMessage(action({ blockedReason: reason, blockedLicenceLevel: 2 }), 7);
+      expect(msg).toContain('Rock Fragmenter');
+    },
+  );
+
+  it('names the required skill for no_qualified_employee', () => {
+    const msg = buildGroupedBlockedOrderMessage(
+      action({ type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: null, blockedReason: 'no_qualified_employee' }), 9);
+    expect(msg).toContain('9');
+    expect(msg).toContain('Blasting');
+  });
+
+  it('two different counts give two different messages', () => {
+    const a = action();
+    expect(buildGroupedBlockedOrderMessage(a, 3)).not.toBe(buildGroupedBlockedOrderMessage(a, 4));
+  });
+
+  it('count 2 (smallest group) carries the count', () => {
+    expect(buildGroupedBlockedOrderMessage(action(), 2)).toContain('2');
+  });
+
+  it('French wording carries the count and differs from English', () => {
+    const a = action();
+    const en = buildGroupedBlockedOrderMessage(a, 25);
+    setLocale('fr');
+    const fr = buildGroupedBlockedOrderMessage(a, 25);
+    expect(fr).toContain('25');
+    expect(fr).not.toContain('notification.');
+    expect(fr).not.toBe(en);
+  });
+});
+

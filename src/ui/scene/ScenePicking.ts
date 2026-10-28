@@ -51,10 +51,11 @@ export function pickScene(
   const entityTargets = renderer.pickables();
   const terrainTargets = [...(renderer.terrain?.meshes ?? []), ...(renderer.landscape?.meshes ?? [])];
   const allHits = raycaster.intersectObjects([...entityTargets, ...terrainTargets], true);
-  // Raw-ground callers (placement, tile picking) see through loose rubble: a
-  // crater full of fragments is still a tile a player can order a ramp or a
-  // drill plan onto, so fragments must not occlude the ground beneath them.
-  const hits = selectRamps ? allHits : allHits.filter(h => h.object.userData['entityKind'] !== 'fragment');
+  // Raw-ground callers (placement, tile picking) see through loose rubble and
+  // through crew and vehicles: a crater full of fragments, or a tile someone
+  // stands on, is still a tile a player can order a ramp or a drill plan onto.
+  // Buildings keep occluding.
+  const hits = selectRamps ? allHits : allHits.filter(h => !isTransientOccluder(h.object));
   const closest = hits[0];
   if (!closest) return EMPTY_PICK;
 
@@ -74,6 +75,13 @@ export function pickScene(
   }
 
   return { entity: null, terrain };
+}
+
+/** Movable or loose things a raw-ground pick looks through: fragments, employees, vehicles. */
+function isTransientOccluder(object: THREE.Object3D): boolean {
+  if (object.userData['entityKind'] === 'fragment') return true;
+  const tagged = resolveTaggedAncestor(object);
+  return tagged !== null && (tagged.kind === 'employee' || tagged.kind === 'vehicle');
 }
 
 function resolveHitToEntity(hit: THREE.Intersection, renderer: GameRenderer): EntityPick | null {

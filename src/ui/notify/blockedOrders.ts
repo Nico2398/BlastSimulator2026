@@ -170,3 +170,45 @@ export function blockedKindLabel(kind: BlockedPhraseKind): string {
 export function describeBlockedReasons(counts: Partial<Record<BlockedOrderReason, number>>, max: number = BLOCKED_PHRASE_LINES, barrenOverflowKg = 0): string[] {
   return rankBlockedKinds(counts).slice(0, max).map((entry) => blockedPhrase(entry, barrenOverflowKg));
 }
+
+const GROUPED_BLOCK_REASONS: ReadonlySet<BlockedOrderReason> = new Set<BlockedOrderReason>([
+  'no_qualified_employee', 'no_dual_qualified_employee', 'no_vehicle_in_fleet',
+  'no_licensed_driver', 'licence_level_too_low', 'no_reaching_vehicle',
+]);
+
+/** True for crew/fleet reasons whose many orders share one cause and toast once per group (#2099). */
+export function isGroupedBlockReason(reason: BlockedOrderReason | null | undefined): boolean {
+  return reason != null && GROUPED_BLOCK_REASONS.has(reason);
+}
+
+/** Group identity of a crew/fleet block: orders sharing it share one toast per episode (#2099). */
+export function blockedGroupKey(action: Pick<PendingAction, 'type' | 'blockedReason' | 'requiredVehicleRole' | 'requiredSkill' | 'blockedLicenceLevel'>): string {
+  return [action.type, action.blockedReason, action.requiredVehicleRole ?? '', action.requiredSkill ?? '', action.blockedLicenceLevel ?? ''].join('|');
+}
+
+/** Notification body for `count` orders blocked by the same cause; count 1 equals buildBlockedOrderMessage (#2099). */
+export function buildGroupedBlockedOrderMessage(action: PendingAction, count: number): string {
+  if (count <= 1) return buildBlockedOrderMessage(action);
+  const order = t(ACTION_LABEL_KEY[action.type]);
+  const n = count.toLocaleString('en-US');
+  const role = t(`vehicle_type.${action.requiredVehicleRole}`);
+  const level = action.blockedLicenceLevel ?? 1;
+  switch (action.blockedReason) {
+    case 'no_vehicle_in_fleet':
+      return t('notification.order_blocked_group_no_vehicle', { count: n, order, role });
+    case 'no_licensed_driver':
+      return t('notification.order_blocked_group_no_driver', { count: n, order, role });
+    case 'licence_level_too_low':
+      return t('notification.order_blocked_group_licence_level', { count: n, order, licence: role, level });
+    case 'no_reaching_vehicle':
+      return t('notification.order_blocked_group_no_reaching_vehicle', { count: n, order, tier: level, role });
+    case 'no_qualified_employee':
+      return action.requiredSkill !== null
+        ? t('notification.order_blocked_group_no_employee', { count: n, order, skill: t(`skill.${action.requiredSkill}`) })
+        : t('notification.order_blocked_group_no_staff', { count: n, order });
+    case 'no_dual_qualified_employee':
+      return t('notification.order_blocked_group_no_dual_employee', { count: n, order, licence: role, skill: t(`skill.${action.requiredSkill}`) });
+    default:
+      return buildBlockedOrderMessage(action);
+  }
+}
