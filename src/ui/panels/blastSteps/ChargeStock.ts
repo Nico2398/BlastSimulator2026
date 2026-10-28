@@ -101,6 +101,11 @@ export class ChargeStockBlock {
     this.el.append(sectionHeader(t('ui.blast_workshop.charge.stock_section')), this.rowsEl, field, this.buyHostEl, this.paidEl);
   }
 
+  /** Re-apply the static header text under the active locale. */
+  refreshLocale(): void {
+    throw new Error('not implemented');
+  }
+
   get root(): HTMLElement { return this.el; }
   get stepKg(): number { return this.buyKg; }
 
