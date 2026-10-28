@@ -198,6 +198,14 @@ hole's column lowered on the sandbox flat pad and on `tutorial_pit`, rating at l
 fits the hole (`amount / CHARGE_KG_PER_METRE + stemming <= depth`). The measured sweep sits beside
 the constants in `balance.ts`; 4 kg stays under `BURDEN_BREAKOUT_MAX` of cap and fails to break out.
 
+**Defaults follow the permit (#2101).** Those 8 m / 7 kg defaults hold only on a site without a
+permit (tutorial, campaign levels without a grade). With a permit, `PermitDefaults.ts` derives
+them: the Charge step opens at the largest whole kg that fits the shallowest planned hole at the
+default stemming and keeps the pattern within `permitLimitsFor(grade).maxChargeKg` (4 kg at grade 0
+with 9 holes), and the Drill grid opens at `DRILL_GRID_DEFAULT_DEPTH_BY_GRADE_M[grade]` (5 m at grade 0,
+else 8 m). Both yield the moment the player steps the matching stepper; the over-permit warning stays.
+The default explosive is unchanged (Boomite).
+
 **Placement is physics-only.** Where fragments and debris land is decided by blast physics
 alone and is never adjusted, rejected or relocated for reachability. No reachability query lives in
 `src/core/mining` or fragment/physics code. Debris stranded outside the ground crew's reachable set
