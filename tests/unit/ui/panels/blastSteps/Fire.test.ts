@@ -10,6 +10,8 @@ import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
 import { addReachBuildings, addReachPattern } from '../../../../helpers/blastReachFixture.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
 import { purchaseVehicle } from '../../../../../src/core/entities/Vehicle.js';
+import { NavGrid } from '../../../../../src/core/nav/NavGrid.js';
+import { VoxelGrid } from '../../../../../src/core/world/VoxelGrid.js';
 import type { Employee } from '../../../../../src/core/entities/Employee.js';
 import type { GameState } from '../../../../../src/core/state/GameState.js';
 
@@ -17,6 +19,17 @@ const holeCounter = { nextHoleId: 1 };
 
 function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
+}
+
+/** A flat, fully walkable NavGrid so evacuation has a safe destination for a driven vehicle. */
+function withNavGrid(state: GameState, size = 80): void {
+  const vg = new VoxelGrid(size, size);
+  for (let x = 0; x < size; x++) {
+    for (let z = 0; z < size; z++) {
+      vg.setVoxel(x, 0, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+    }
+  }
+  state.navGrid = NavGrid.buildNavGrid(vg, [], []);
 }
 
 function makeStep(): { step: FireStep; container: HTMLElement } {
@@ -92,6 +105,7 @@ describe('FireStep', () => {
     addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 21, 21);
     vehicle.occupantIds = [1]; // driver aboard — not stranded
+    withNavGrid(state);
 
     step.update(state, 'sunny');
 
@@ -104,6 +118,7 @@ describe('FireStep', () => {
     addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
     const { vehicle: driven } = purchaseVehicle(state.vehicles, 'debris_hauler', 21, 21);
     driven.occupantIds = [1];
+    withNavGrid(state);
     const { vehicle: driverless } = purchaseVehicle(state.vehicles, 'rock_digger', 22, 22);
     driverless.occupantIds = [];
 

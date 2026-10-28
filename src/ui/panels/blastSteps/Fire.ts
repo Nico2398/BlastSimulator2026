@@ -22,7 +22,7 @@ import { computeDangerZone, isInZone, type ZoneBounds } from '../../../core/enti
 import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
 import { buildingsInBlastReach, type BuildingAtRisk } from '../../../core/mining/BlastPlan.js';
 import { buildingRiskText } from '../buildingRiskText.js';
-import { vehicleDriverId } from '../../../core/entities/Vehicle.js';
+import { vehicleEvacuationVerdict, type VehicleEvacuationVerdict } from '../../../core/engine/Evacuation.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
@@ -32,12 +32,18 @@ import { assembleBlastPlan } from '../../../core/mining/BlastPlan.js';
 import { permitPreview, type PermitPreview } from '../permitPreview.js';
 
 
+const OCCUPANT_TAG_KEYS: Record<VehicleEvacuationVerdict, string> = {
+  stranded: 'ui.blast_workshop.fire.tag_stranded',
+  will_be_fetched: 'ui.blast_workshop.fire.tag_fetched',
+  driver_aboard: 'ui.blast_workshop.fire.tag_in_zone',
+};
+
 interface Occupant {
   icon: IconName;
   name: string;
   sub: string;
-  /** True for a vehicle stranded in the zone with no driver aboard — clearZone/evacuateZone report it via strandedVehicleIds rather than moving it. */
-  strandedNoDriver: boolean;
+  /** What evacuateZone will do with a vehicle (null for a person). Only 'stranded' means it is left behind (#2100). */
+  verdict: VehicleEvacuationVerdict | null;
 }
 
 export class FireStep {
@@ -121,12 +127,12 @@ export class FireStep {
         icon: e.collapsing ? 'collapse' : 'crew',
         name: e.name,
         sub: t(`role.${e.role}`),
-        strandedNoDriver: false,
+        verdict: null,
       });
     }
     for (const v of state.vehicles.vehicles) {
       if (!isInZone(v.x, v.z, zone)) continue;
-      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), sub: `#${v.id}`, strandedNoDriver: vehicleDriverId(v) === null });
+      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), sub: `#${v.id}`, verdict: vehicleEvacuationVerdict(state, v, zone) });
     }
     return result;
   }
@@ -138,7 +144,7 @@ export class FireStep {
       if (e.alive && isInZone(e.x, e.z, zone)) keys.push(`e${e.id}`);
     }
     for (const v of state.vehicles.vehicles) {
-      if (isInZone(v.x, v.z, zone)) keys.push(`v${v.id}:${vehicleDriverId(v) === null ? 'nodriver' : 'driver'}`);
+      if (isInZone(v.x, v.z, zone)) keys.push(`v${v.id}:${vehicleEvacuationVerdict(state, v, zone)}`);
     }
     return keys;
   }
@@ -171,7 +177,7 @@ export class FireStep {
         el('span', { text: o.sub, attrs: { style: 'font:400 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),
       ] }),
       el('span', {
-        text: t(o.strandedNoDriver ? 'ui.blast_workshop.fire.tag_stranded' : 'ui.blast_workshop.fire.tag_in_zone'),
+        text: t(OCCUPANT_TAG_KEYS[o.verdict ?? 'driver_aboard']),
         attrs: { style: 'margin-left:auto;font:700 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-critical-text)' },
       }),
     );
@@ -181,7 +187,7 @@ export class FireStep {
   private renderChecklist(holeCount: number, wetCount: number, exposedCount: number, occupants: Occupant[], permit: PermitPreview | null, atRisk: BuildingAtRisk[], breakoutText: string | null): void {
     const dryOk = wetCount === 0;
     const occupantCount = occupants.length;
-    const strandedCount = occupants.filter(o => o.strandedNoDriver).length;
+    const strandedCount = occupants.filter(o => o.verdict === 'stranded').length;
     const zoneOk = occupantCount === 0;
     this.checklistEl.replaceChildren(
       !dryOk || exposedCount === 0

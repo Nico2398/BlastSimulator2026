@@ -3,8 +3,8 @@
 // and routes them out before the blast fires (#557).
 
 import { isProgressionSite, type GameState } from '../state/GameState.js';
-import type { ZoneBounds, EvacuationDestination, EvacuationResult } from '../entities/Zone.js';
-import { clearZone, isInZone } from '../entities/Zone.js';
+import type { ZoneBounds, EvacuationDestination, EvacuationResult, SafeDestinationFinder } from '../entities/Zone.js';
+import { clearZone, isInZone, collectInZoneDriverIds, planDriverlessEvacuation } from '../entities/Zone.js';
 import { findPath } from '../nav/Pathfinding.js';
 import { interruptActiveAction } from './TaskCancellation.js';
 import { releaseVehicleReservation } from './VehicleReservation.js';
@@ -309,7 +309,27 @@ function canEmployeeReachVehicleForEvacuation(state: GameState, employee: Employ
 /** What evacuateZone will do with an in-zone vehicle (#2100). */
 export type VehicleEvacuationVerdict = 'driver_aboard' | 'will_be_fetched' | 'stranded';
 
-/** Pure: the verdict evacuateZone reaches for `vehicle` in `zone`, without ordering anyone. */
-export function vehicleEvacuationVerdict(_state: GameState, _vehicle: Vehicle, _zone: ZoneBounds): VehicleEvacuationVerdict {
-  throw new Error('not implemented');
+/**
+ * Pure: the verdict evacuateZone reaches for `vehicle` in `zone`, without ordering anyone.
+ * Runs the same per-vehicle decision as `clearZone` (planDriverlessEvacuation),
+ * walking earlier in-zone vehicles first so a driver already claimed by one is
+ * not counted free for the next. Awaiting a resting licence holder counts as
+ * `will_be_fetched`: the periodic re-evacuation sends them once rested.
+ */
+export function vehicleEvacuationVerdict(state: GameState, vehicle: Vehicle, zone: ZoneBounds): VehicleEvacuationVerdict {
+  const findDest: SafeDestinationFinder = (fromX, fromZ, z, v) => findSafeEvacuationCell(state, fromX, fromZ, z, v);
+  if (vehicleDriverId(vehicle) !== null) {
+    return findDest(vehicle.x, vehicle.z, zone, vehicle) ? 'driver_aboard' : 'stranded';
+  }
+  const reach = (e: Employee, v: Vehicle): boolean => canEmployeeReachVehicleForEvacuation(state, e, v);
+  const inZoneDriverIds = collectInZoneDriverIds(zone, state.vehicles);
+  const boarding = new Set<number>();
+  for (const v of state.vehicles.vehicles) {
+    if (!isInZone(v.x, v.z, zone) || vehicleDriverId(v) !== null) continue;
+    const plan = planDriverlessEvacuation(v, zone, state.vehicles, state.employees, boarding, inZoneDriverIds, findDest, reach);
+    if (v.id === vehicle.id) return plan.kind === 'stranded' ? 'stranded' : 'will_be_fetched';
+    if (plan.kind === 'drive') boarding.add(plan.driver.id);
+  }
+  // `vehicle` not found in the zone: nothing is ordered for it, so it is not stranded by the evacuation.
+  return 'driver_aboard';
 }
