@@ -199,10 +199,10 @@ function applyConsequence(
   if (c.cashDelta) {
     cashChange = c.cashDelta;
     if (c.cashDelta > 0) {
-      addIncome(finances, c.cashDelta, 'contracts', `Event: ${eventId}`, tick);
+      addIncome(finances, c.cashDelta, 'events', `Event: ${eventId}`, tick);
       effects.push(`Gained $${c.cashDelta}`);
     } else {
-      addExpense(finances, Math.abs(c.cashDelta), 'fines', `Event: ${eventId}`, tick);
+      addExpense(finances, Math.abs(c.cashDelta), 'events', `Event: ${eventId}`, tick);
       effects.push(`Lost $${Math.abs(c.cashDelta)}`);
     }
   }

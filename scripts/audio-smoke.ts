@@ -85,14 +85,14 @@ interface PageWatch {
   readonly consoleErrors: string[];
 }
 
-/** Open `url` in a fresh small page, collecting page errors and console errors (the missing favicon is not one). */
+/** Open `url` in a fresh small page, collecting page errors and console errors. */
 async function openPage(browser: Browser, url: string): Promise<{ page: Page; watch: PageWatch }> {
   const page = await browser.newPage();
   await page.setViewport(VIEWPORT);
   const watch: PageWatch = { pageErrors: [], consoleErrors: [] };
   page.on('pageerror', error => watch.pageErrors.push(String(error)));
   page.on('console', (message) => {
-    if (message.type() !== 'error' || message.location().url?.endsWith('/favicon.ico') === true) return;
+    if (message.type() !== 'error') return;
     watch.consoleErrors.push(message.text());
   });
   await page.goto(url, { waitUntil: 'domcontentloaded' });
