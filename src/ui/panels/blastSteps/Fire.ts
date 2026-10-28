@@ -22,7 +22,7 @@ import { computeDangerZone, isInZone, type ZoneBounds } from '../../../core/enti
 import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
 import { buildingsInBlastReach, type BuildingAtRisk } from '../../../core/mining/BlastPlan.js';
 import { buildingRiskText } from '../buildingRiskText.js';
-import { vehicleDriverId } from '../../../core/entities/Vehicle.js';
+import { evacuationVerdictsForZone, type VehicleEvacuationVerdict } from '../../../core/engine/Evacuation.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
@@ -32,12 +32,18 @@ import { assembleBlastPlan } from '../../../core/mining/BlastPlan.js';
 import { permitPreview, type PermitPreview } from '../permitPreview.js';
 
 
+const OCCUPANT_TAG_KEYS: Record<VehicleEvacuationVerdict, string> = {
+  stranded: 'ui.blast_workshop.fire.tag_stranded',
+  will_be_fetched: 'ui.blast_workshop.fire.tag_fetched',
+  driver_aboard: 'ui.blast_workshop.fire.tag_in_zone',
+};
+
 interface Occupant {
   icon: IconName;
   name: string;
   sub: string;
-  /** True for a vehicle stranded in the zone with no driver aboard — clearZone/evacuateZone report it via strandedVehicleIds rather than moving it. */
-  strandedNoDriver: boolean;
+  /** What evacuateZone will do with a vehicle (null for a person). Only 'stranded' means it is left behind (#2100). */
+  verdict: VehicleEvacuationVerdict | null;
 }
 
 export class FireStep {
@@ -87,7 +93,8 @@ export class FireStep {
     const wet = wetHoles(state);
     const exposed = rainExposedHoles(state);
 
-    const occupantKeys = zone ? this.occupantKeys(state, zone) : [];
+    const verdicts = zone ? evacuationVerdictsForZone(state, zone) : new Map<number, VehicleEvacuationVerdict>();
+    const occupantKeys = zone ? this.occupantKeys(state, zone, verdicts) : [];
     const permit = state.drillHoles.length === 0 ? null : permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount);
     const atRisk = buildingsInBlastReach(state.drillHoles, state.chargesByHole, state.buildings.buildings);
     const breakoutText = state.drillHoles.length === 0 ? null : breakoutWarningFor(
@@ -101,7 +108,7 @@ export class FireStep {
     const span = zone ? Math.round(Math.max(zone.x2 - zone.x1, zone.z2 - zone.z1)) : 0;
     this.zoneHeaderLabelEl.textContent = t('ui.blast_workshop.fire.danger_zone', { span });
 
-    const occupants = zone ? this.occupants(state, zone) : [];
+    const occupants = zone ? this.occupants(state, zone, verdicts) : [];
     this.renderZoneList(occupants, zone !== null);
     this.renderChecklist(state.drillHoles.length, wet.length, exposed.length, occupants, permit, atRisk, breakoutText);
   }
@@ -113,7 +120,7 @@ export class FireStep {
 
   dispose(): void { this.el.remove(); }
 
-  private occupants(state: GameState, zone: ZoneBounds): Occupant[] {
+  private occupants(state: GameState, zone: ZoneBounds, verdicts: ReadonlyMap<number, VehicleEvacuationVerdict>): Occupant[] {
     const result: Occupant[] = [];
     for (const e of state.employees.employees) {
       if (!e.alive || !isInZone(e.x, e.z, zone)) continue;
@@ -121,24 +128,24 @@ export class FireStep {
         icon: e.collapsing ? 'collapse' : 'crew',
         name: e.name,
         sub: t(`role.${e.role}`),
-        strandedNoDriver: false,
+        verdict: null,
       });
     }
     for (const v of state.vehicles.vehicles) {
       if (!isInZone(v.x, v.z, zone)) continue;
-      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), sub: `#${v.id}`, strandedNoDriver: vehicleDriverId(v) === null });
+      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), sub: `#${v.id}`, verdict: verdicts.get(v.id) ?? 'driver_aboard' });
     }
     return result;
   }
 
   /** Cheap identity for the update() signature — full names/subs aren't needed just to detect a change. */
-  private occupantKeys(state: GameState, zone: ZoneBounds): string[] {
+  private occupantKeys(state: GameState, zone: ZoneBounds, verdicts: ReadonlyMap<number, VehicleEvacuationVerdict>): string[] {
     const keys: string[] = [];
     for (const e of state.employees.employees) {
       if (e.alive && isInZone(e.x, e.z, zone)) keys.push(`e${e.id}`);
     }
     for (const v of state.vehicles.vehicles) {
-      if (isInZone(v.x, v.z, zone)) keys.push(`v${v.id}:${vehicleDriverId(v) === null ? 'nodriver' : 'driver'}`);
+      if (isInZone(v.x, v.z, zone)) keys.push(`v${v.id}:${verdicts.get(v.id)}`);
     }
     return keys;
   }
@@ -171,7 +178,7 @@ export class FireStep {
         el('span', { text: o.sub, attrs: { style: 'font:400 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),
       ] }),
       el('span', {
-        text: t(o.strandedNoDriver ? 'ui.blast_workshop.fire.tag_stranded' : 'ui.blast_workshop.fire.tag_in_zone'),
+        text: t(OCCUPANT_TAG_KEYS[o.verdict ?? 'driver_aboard']),
         attrs: { style: 'margin-left:auto;font:700 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-critical-text)' },
       }),
     );
@@ -181,7 +188,7 @@ export class FireStep {
   private renderChecklist(holeCount: number, wetCount: number, exposedCount: number, occupants: Occupant[], permit: PermitPreview | null, atRisk: BuildingAtRisk[], breakoutText: string | null): void {
     const dryOk = wetCount === 0;
     const occupantCount = occupants.length;
-    const strandedCount = occupants.filter(o => o.strandedNoDriver).length;
+    const strandedCount = occupants.filter(o => o.verdict === 'stranded').length;
     const zoneOk = occupantCount === 0;
     this.checklistEl.replaceChildren(
       !dryOk || exposedCount === 0

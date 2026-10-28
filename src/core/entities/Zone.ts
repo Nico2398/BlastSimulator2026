@@ -82,6 +82,79 @@ function orderDriverClear(
   return ordered;
 }
 
+/** Employees already driving some in-zone vehicle. */
+export function collectInZoneDriverIds(zone: ZoneBounds, vehicles: VehicleState): Set<number> {
+  const ids = new Set<number>();
+  for (const v of vehicles.vehicles) {
+    const driverId = vehicleDriverId(v);
+    if (driverId !== null && isInZone(v.x, v.z, zone)) ids.add(driverId);
+  }
+  return ids;
+}
+
+/** What the evacuation does with one driverless in-zone vehicle (#2100). */
+type DriverlessEvacuationPlan =
+  | { kind: 'stranded' }
+  | { kind: 'awaiting' }
+  | { kind: 'in_progress' }
+  | { kind: 'drive'; driver: Employee; dest: { x: number; z: number } };
+
+/**
+ * The single decision for a driverless vehicle: shared by `clearZone` (which
+ * then orders the driver) and the pure verdict query the UI reads, so the
+ * pre-flight tag can never disagree with what the evacuation does.
+ * `boardingEmployeeIds` holds drivers already picked for earlier vehicles.
+ * Order: no safe destination -> stranded; an in-zone driver, else a reachable
+ * free licensed rescuer anywhere; a rescuer already walking over keeps walking;
+ * a resting licence holder -> awaiting; nobody licensed -> stranded.
+ */
+export function planDriverlessEvacuation(
+  v: Vehicle,
+  zone: ZoneBounds,
+  vehicles: VehicleState,
+  employees: EmployeeState,
+  boardingEmployeeIds: ReadonlySet<number>,
+  inZoneDriverIds: ReadonlySet<number>,
+  findSafeDestination: SafeDestinationFinder,
+  canEmployeeReachVehicle: EvacuationDriverReachabilityCheck,
+): DriverlessEvacuationPlan {
+  // A vehicle nobody can drive anywhere is stranded regardless of who might be free to board it.
+  const dest = findSafeDestination(v.x, v.z, zone, v);
+  if (!dest) return { kind: 'stranded' };
+
+  const candidateEmployeeIds = employees.employees
+    .filter(e =>
+      e.alive
+      && isInZone(e.x, e.z, zone)
+      && !boardingEmployeeIds.has(e.id)
+      && !inZoneDriverIds.has(e.id)
+      // Mirrors isIdleForReposition's pendingDriverVehicleId reading
+      // (VehicleDriverAssignment.ts): an employee mid-walk to board a
+      // DIFFERENT vehicle is excluded (#1042); one walking to THIS vehicle is
+      // a legitimate candidate (#1122).
+      && (e.pendingDriverVehicleId === null || e.pendingDriverVehicleId === v.id),
+    )
+    .map(e => e.id);
+
+  const inZoneDriver = findBestEvacuationDriver(v, vehicles, employees, candidateEmployeeIds, canEmployeeReachVehicle);
+  // A rescuer already walking to `v` keeps walking: neither re-ordered nor stranded.
+  if (!inZoneDriver && employees.employees.some(e => e.alive && e.pendingDriverVehicleId === v.id)) {
+    return { kind: 'in_progress' };
+  }
+  // Any free licensed crew member qualifies, wherever they stand (#1648, #1746).
+  let driver: Employee | null = inZoneDriver;
+  if (!driver) {
+    const rescuer = findAvailableDriverForReposition(v, vehicles, employees);
+    driver = rescuer !== null && canEmployeeReachVehicle(rescuer, v) ? rescuer : null;
+  }
+  if (!driver) {
+    return findRestingLicensedDriver(v, vehicles, employees, canEmployeeReachVehicle) !== null
+      ? { kind: 'awaiting' }
+      : { kind: 'stranded' };
+  }
+  return { kind: 'drive', driver, dest };
+}
+
 /**
  * Clear the zone: order all employees and vehicles out to a safe cell found
  * by `findSafeDestination`. See Evacuation.ts for the real pathfinding-aware
@@ -107,19 +180,6 @@ export function clearZone(
     awaitingRescuerVehicleIds: [],
   };
 
-  // Only consulted when nobody inside can drive `v` out (#1648, #1746). Any
-  // free licensed crew member qualifies, wherever they stand: the one who
-  // parked `v` and walked off is outside the zone by then. Returns the rescuer
-  // to order, or null with `v` reported awaiting (a licence holder is resting;
-  // the periodic re-evacuation picks `v` up once the rest ends), already being
-  // fetched, or stranded by the caller.
-  const reachableRescuer = (v: Vehicle): Employee | null => {
-    const rescuer = findAvailableDriverForReposition(v, vehicles, employees);
-    return rescuer !== null && canEmployeeReachVehicle(rescuer, v) ? rescuer : null;
-  };
-  const isBeingFetched = (v: Vehicle): boolean =>
-    employees.employees.some(e => e.alive && e.pendingDriverVehicleId === v.id);
-
   // Employees picked to board a vehicle this call — tracked so a later
   // vehicle in the same zone doesn't also pick them, and so the foot-
   // evacuation loop below skips them.
@@ -128,11 +188,7 @@ export function clearZone(
   // Employees already driving some OTHER in-zone vehicle, computed once up
   // front — neither the vehicle loop's candidate list nor the employee loop
   // needs to rescan the vehicle list per employee to know this.
-  const inZoneDriverIds = new Set<number>();
-  for (const v of vehicles.vehicles) {
-    const driverId = vehicleDriverId(v);
-    if (driverId !== null && isInZone(v.x, v.z, zone)) inZoneDriverIds.add(driverId);
-  }
+  const inZoneDriverIds = collectInZoneDriverIds(zone, vehicles);
 
   for (const v of vehicles.vehicles) {
     if (!isInZone(v.x, v.z, zone)) continue;
@@ -163,44 +219,20 @@ export function clearZone(
       continue;
     }
 
-    // Driverless: find a safe destination first — a vehicle nobody can drive
-    // anywhere is stranded regardless of who might be free to board it.
-    const dest = findSafeDestination(v.x, v.z, zone, v);
-    if (!dest) {
+    const plan = planDriverlessEvacuation(
+      v, zone, vehicles, employees, boardingEmployeeIds, inZoneDriverIds,
+      findSafeDestination, canEmployeeReachVehicle,
+    );
+    if (plan.kind === 'stranded') {
       result.strandedVehicleIds.push(v.id);
       continue;
     }
-
-    const candidateEmployeeIds = employees.employees
-      .filter(e =>
-        e.alive
-        && isInZone(e.x, e.z, zone)
-        && !boardingEmployeeIds.has(e.id)
-        && !inZoneDriverIds.has(e.id)
-        // Mirrors isIdleForReposition's own pendingDriverVehicleId reading
-        // (VehicleDriverAssignment.ts): an employee already mid-walk to
-        // board a DIFFERENT vehicle is excluded (that walk must survive this
-        // call untouched, #1042), but one already walking to board THIS
-        // exact vehicle (e.pendingDriverVehicleId === v.id) is a legitimate
-        // candidate for it — self-matching is safe because reselecting the
-        // same employee for the same vehicle changes nothing they're not
-        // already doing (#1122).
-        && (e.pendingDriverVehicleId === null || e.pendingDriverVehicleId === v.id),
-      )
-      .map(e => e.id);
-
-    const inZoneDriver = findBestEvacuationDriver(v, vehicles, employees, candidateEmployeeIds, canEmployeeReachVehicle);
-    // A rescuer already walking to `v` keeps walking: neither re-ordered nor stranded.
-    if (!inZoneDriver && isBeingFetched(v)) continue;
-    const driver = inZoneDriver ?? reachableRescuer(v);
-    if (!driver) {
-      if (findRestingLicensedDriver(v, vehicles, employees, canEmployeeReachVehicle) !== null) {
-        result.awaitingRescuerVehicleIds.push(v.id);
-        continue;
-      }
-      result.strandedVehicleIds.push(v.id);
+    if (plan.kind === 'awaiting') {
+      result.awaitingRescuerVehicleIds.push(v.id);
       continue;
     }
+    if (plan.kind === 'in_progress') continue;
+    const { driver, dest } = plan;
 
     // One itinerary covers the whole rescue (#1092): walk to `v`, board it,
     // drive it clear, step off. `via` names the vehicle so the planner
