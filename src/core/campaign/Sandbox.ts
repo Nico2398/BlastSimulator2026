@@ -232,13 +232,15 @@ export function sandboxBiomeTraits(biomeId: string): SandboxBiomeTraits {
 }
 
 /** What a kit hands the player at the start (#1686). */
-interface SandboxKitDetails {
+export interface SandboxKitDetails {
   id: SandboxKitId;
   labelKey: string;
   startingCash: number;
   crew: readonly { role: EmployeeRole; count: number }[];
   vehicles: readonly { role: VehicleRole; tier: VehicleTier; count: number }[];
   buildings: readonly { type: BuildingType; tier: BuildingTier; count: number }[];
+  /** Explosive stock the kit's starting buildings hold, summed per explosive (#2118). */
+  stock: readonly { explosiveId: string; kg: number }[];
 }
 
 /** Collapse a list of slots into one entry per distinct key, counting repeats in first-seen order. */
@@ -267,5 +269,6 @@ export function sandboxKitDetails(id: SandboxKitId): SandboxKitDetails {
     crew: groupSlots(employees.map(e => ({ role: e.role })), e => e.role),
     vehicles: groupSlots(vehicles.map(v => ({ role: v.role, tier: v.tier })), v => `${v.role}:${v.tier}`),
     buildings: groupSlots(buildings.map(b => ({ type: b.type, tier: b.tier })), b => `${b.type}:${b.tier}`),
+    stock: [], // TODO skeleton: summed from the buildings' stock slots
   };
 }

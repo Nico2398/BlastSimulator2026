@@ -1594,7 +1594,15 @@ export interface StartingSiteVehicleSlot {
 export interface StartingBuildingSlot {
   readonly type: BuildingType;
   readonly tier: BuildingTier;
+  /** Explosive kg stored in the building as it is placed (#2118); only an explosive warehouse holds any. */
+  readonly stock?: Readonly<Record<string, number>>;
 }
+
+/** Explosive the sandbox kits' starter warehouse holds (#2118): water-resistant, offered by the grade-0 charge step. */
+export const SANDBOX_STARTER_EXPLOSIVE_ID = 'krackle';
+
+/** Kg of it: about two permit-sized shots (#2118). */
+export const SANDBOX_STARTER_EXPLOSIVE_KG = 100;
 
 /**
  * Driller, blaster and truck driver: the crew every starting site opens with.

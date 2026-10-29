@@ -18,6 +18,8 @@ export interface ProbeRunConfig {
   maxHaulers?: number;
   /** How pending events are answered; absent = 'first'. */
   eventPolicy?: EventPolicy;
+  /** Ticks the crew idles on payroll before the strategy's first order (#2118); absent = 0. */
+  startDelay?: number;
 }
 
 export interface ProbeOptions {
@@ -29,6 +31,7 @@ export interface ProbeOptions {
   quick: boolean;
   jsonPath: string | null;
   eventPolicy: EventPolicy;
+  startDelay: number;
 }
 
 export const QUICK_HORIZON = 3000;
@@ -42,6 +45,7 @@ export const PROBE_DEFAULTS: ProbeOptions = {
   quick: false,
   jsonPath: null,
   eventPolicy: 'first',
+  startDelay: 0,
 };
 
 const QUICK_SEED = 42;
