@@ -28,13 +28,14 @@ export function cheapestEventOption(consequences: ReadonlyArray<{ cashDelta?: nu
  * `tick` refuses to advance while an event is pending, so every headless tick loop answers it first.
  * The one home of that rule: playTick, the probe and command-mode `waitUntil` all go through it.
  */
-export function resolvePendingEvent(run: Run, state: Pick<GameState, 'events'> | null | undefined): void {
+export function resolvePendingEvent(run: Run, state: Pick<GameState, 'events'> | null | undefined, policy: EventPolicy = 'first'): void {
+  void policy;
   if (state?.events.pendingEvent) run('event choose 0');
 }
 
 /** One ordinary player tick: resolve a pending event, then let time pass. */
-export function playTick(run: Run, state: GameState): void {
-  resolvePendingEvent(run, state);
+export function playTick(run: Run, state: GameState, policy: EventPolicy = 'first'): void {
+  resolvePendingEvent(run, state, policy);
   run('tick 1');
 }
 

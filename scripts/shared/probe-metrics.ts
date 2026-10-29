@@ -44,6 +44,12 @@ interface ProbeMetrics {
   gradeCashAt: Record<number, number>;
   /** First tick every building type is owned at its max purchasable tier and every vehicle role at tier 3; null if never. */
   catalogBoughtTick: number | null;
+  /** Tick of the first sale income in the ledger (#2117). */
+  firstSaleTick: number | null;
+  /** Sales over all costs from the first sale on, null without a sale (#2117). */
+  salesCostRatio: number | null;
+  /** Sales over all costs per 1,500-tick window from t1000 (#2117). */
+  salesCostWindows: Array<number | null>;
   /** Share of boulder-origin ore that was delivered or sold (no longer in the world), null without boulder ore. */
   boulderOreSoldShare: number | null;
   affordableTick: {
@@ -243,6 +249,9 @@ export class MetricsObserver {
       gradeReachedTick: { ...this.gradeReachedTick },
       gradeCashAt: { ...this.gradeCashAt },
       catalogBoughtTick: this.catalogBoughtTick,
+      firstSaleTick: null,
+      salesCostRatio: null,
+      salesCostWindows: [],
       boulderOreSoldShare: this.boulderOreSoldShare(),
       affordableTick: { ...this.affordableTick },
     };
