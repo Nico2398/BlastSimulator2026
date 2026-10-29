@@ -7,7 +7,54 @@ import { accumulateOreMass } from '../../src/core/mining/BlastOreReport.js';
 import { BUILDING_TIERS, getAllBuildingTypes, getBuildingDef, getUpgradeCost, isSingleTierType } from '../../src/core/entities/Building.js';
 import { getAllVehicleRoles, getVehicleDefByTier } from '../../src/core/entities/Vehicle.js';
 import { HIRING_COSTS } from '../../src/core/config/balance.js';
+import type { Transaction } from '../../src/core/economy/Finance.js';
 import type { ProbeRunConfig } from './probe-config.js';
+
+/** Ledger sums after the first sale: sales (contracts + sales + bonus income) against all expenses (#2117). */
+interface SalesCosts {
+  firstSaleTick: number | null;
+  sales: number;
+  costs: number;
+  ratio: number | null;
+}
+
+/** Sales and costs from the first sale on, read from a ledger; `endTick` (exclusive) closes the window when given. */
+export function salesCostsAfterFirstSale(transactions: readonly Transaction[], endTick?: number): SalesCosts {
+  let firstSaleTick: number | null = null;
+  for (const t of transactions) {
+    if (isSale(t) && (firstSaleTick === null || t.tick < firstSaleTick)) firstSaleTick = t.tick;
+  }
+  if (firstSaleTick === null) return { firstSaleTick, sales: 0, costs: 0, ratio: null };
+  const { sales, costs } = sumLedger(transactions, firstSaleTick, endTick ?? Infinity);
+  return { firstSaleTick, sales, costs, ratio: costs > 0 ? sales / costs : null };
+}
+
+const SALE_CATEGORIES: ReadonlySet<string> = new Set(['contracts', 'sales', 'bonus']);
+const isSale = (t: Transaction): boolean => t.type === 'income' && SALE_CATEGORIES.has(t.category);
+
+/** Sales income and all expenses with `from <= tick < to`. */
+function sumLedger(transactions: readonly Transaction[], from: number, to: number): { sales: number; costs: number } {
+  let sales = 0;
+  let costs = 0;
+  for (const t of transactions) {
+    if (t.tick < from || t.tick >= to) continue;
+    if (isSale(t)) sales += t.amount;
+    else if (t.type === 'expense') costs += t.amount;
+  }
+  return { sales, costs };
+}
+
+/** First tick of each window the sales-over-costs ratio is read in, and the window length. */
+export const SALES_COST_WINDOW_STARTS = [1000, 2500, 4000, 5500] as const;
+const SALES_COST_WINDOW_TICKS = 1500;
+
+/** Sales over all costs per window; null where a window has no costs. */
+function salesCostWindows(transactions: readonly Transaction[]): Array<number | null> {
+  return SALES_COST_WINDOW_STARTS.map((start) => {
+    const { sales, costs } = sumLedger(transactions, start, start + SALES_COST_WINDOW_TICKS);
+    return costs > 0 ? sales / costs : null;
+  });
+}
 
 /** Ticks at which cash is sampled for the report. */
 export const CASH_SAMPLE_TICKS = [1000, 3000, 6000, 10000, 15000, 25000, 40000, 50000] as const;
@@ -29,6 +76,12 @@ interface ProbeMetrics {
   gradeCashAt: Record<number, number>;
   /** First tick every building type is owned at its max purchasable tier and every vehicle role at tier 3; null if never. */
   catalogBoughtTick: number | null;
+  /** Tick of the first sale income in the ledger (#2117). */
+  firstSaleTick: number | null;
+  /** Sales over all costs from the first sale on, null without a sale (#2117). */
+  salesCostRatio: number | null;
+  /** Sales over all costs per 1,500-tick window from t1000 (#2117). */
+  salesCostWindows: Array<number | null>;
   /** Share of boulder-origin ore that was delivered or sold (no longer in the world), null without boulder ore. */
   boulderOreSoldShare: number | null;
   affordableTick: {
@@ -214,6 +267,8 @@ export class MetricsObserver {
   }
 
   finalize(): ProbeMetrics {
+    const transactions = this.lastState?.finances?.transactions ?? [];
+    const ledger = salesCostsAfterFirstSale(transactions);
     return {
       cashAt: { ...this.cashAt },
       pitDepthAt: { ...this.pitDepthAt },
@@ -228,6 +283,9 @@ export class MetricsObserver {
       gradeReachedTick: { ...this.gradeReachedTick },
       gradeCashAt: { ...this.gradeCashAt },
       catalogBoughtTick: this.catalogBoughtTick,
+      firstSaleTick: ledger.firstSaleTick,
+      salesCostRatio: ledger.ratio,
+      salesCostWindows: salesCostWindows(transactions),
       boulderOreSoldShare: this.boulderOreSoldShare(),
       affordableTick: { ...this.affordableTick },
     };

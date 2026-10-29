@@ -7,7 +7,7 @@ import {
   oreContractBasePrice,
 } from '../../../src/core/economy/Market.js';
 import { getAllOres, getOre } from '../../../src/core/world/OreCatalog.js';
-import { ORE_PRICES, PRODUCTION_ORE_PRICES, RUBBLE_DISPOSAL_PRICE_RANGE } from '../../../src/core/config/balance.js';
+import { ORE_PRICES, PRODUCTION_ORE_PRICES, RUBBLE_DISPOSAL_PRICE_RANGE, SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER } from '../../../src/core/config/balance.js';
 
 const ORE_IDS = Object.keys(ORE_PRICES);
 
@@ -92,5 +92,82 @@ describe('production market', () => {
     const legacy = resolveMarket('legacy');
     expect(prod.oreSaleQtyKg.max).toBeGreaterThan(legacy.oreSaleQtyKg.max * 3);
     expect(prod.rubbleQtyKg.max).toBeGreaterThan(legacy.rubbleQtyKg.max * 10);
+  });
+});
+
+/** The production table before #2117, literally. */
+const OLD_PRODUCTION_PRICES: Record<string, number> = {
+  dirtite: 105,
+  rustite: 192.5,
+  blingite: 297.5,
+  gloomium: 420,
+  sparkium: 595,
+  craktonite: 840,
+  absurdium: 1172.5,
+  treranium: 1680,
+};
+
+describe('production ore prices after the 0.6 cut (#2117)', () => {
+  const NEW_PRICES: Record<string, number> = {
+    dirtite: 63,
+    rustite: 115.5,
+    blingite: 178.5,
+    gloomium: 252,
+    sparkium: 357,
+    craktonite: 504,
+    absurdium: 703.5,
+    treranium: 1008,
+  };
+
+  it('prices each ore at 0.6 of the previous table', () => {
+    for (const [id, price] of Object.entries(NEW_PRICES)) {
+      expect(PRODUCTION_ORE_PRICES[id], id).toBeCloseTo(price, 6);
+      expect(PRODUCTION_ORE_PRICES[id], id).toBeCloseTo(OLD_PRODUCTION_PRICES[id]! * 0.6, 6);
+    }
+  });
+
+  it('prices exactly the same eight ores', () => {
+    expect(Object.keys(PRODUCTION_ORE_PRICES).sort()).toEqual(Object.keys(NEW_PRICES).sort());
+  });
+
+  it('the production market sells and contracts at the cut prices', () => {
+    for (const [id, price] of Object.entries(NEW_PRICES)) {
+      expect(oreValuePerKg(id, 'production'), id).toBeCloseTo(price, 6);
+      expect(oreContractBasePrice(id, 'production'), id).toBeCloseTo(price, 6);
+    }
+  });
+
+  it('keeps the rarity order and the ratios between ores', () => {
+    const ids = Object.keys(NEW_PRICES);
+    for (let i = 1; i < ids.length; i++) {
+      const [a, b] = [ids[i - 1]!, ids[i]!];
+      expect(PRODUCTION_ORE_PRICES[b]!).toBeGreaterThan(PRODUCTION_ORE_PRICES[a]!);
+      expect(PRODUCTION_ORE_PRICES[b]! / PRODUCTION_ORE_PRICES[a]!).toBeCloseTo(OLD_PRODUCTION_PRICES[b]! / OLD_PRODUCTION_PRICES[a]!, 6);
+    }
+  });
+
+  it('an unknown ore still falls back to the cheapest ore, now 63', () => {
+    expect(oreValuePerKg('nonsense', 'production')).toBeCloseTo(63, 6);
+  });
+
+  it('leaves the legacy catalog untouched', () => {
+    expect(oreContractBasePrice('nonsense', 'legacy')).toBe(10);
+  });
+});
+
+describe('Shareholder Summit contract prices (#2117)', () => {
+  it('multiplier compensates the cut: 1.5 / 0.6 = 2.5', () => {
+    expect(SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER).toBeCloseTo(2.5, 9);
+  });
+
+  it('pays per ore what the old table paid at 1.5x', () => {
+    for (const [id, oldPrice] of Object.entries(OLD_PRODUCTION_PRICES)) {
+      const effective = oreContractBasePrice(id, 'production') * SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER;
+      expect(effective, id).toBeCloseTo(oldPrice * 1.5, 6);
+    }
+  });
+
+  it('spot price of the cheapest ore at the summit multiplier equals 105 x 1.5', () => {
+    expect(oreContractBasePrice('dirtite', 'production') * SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER).toBeCloseTo(157.5, 6);
   });
 });

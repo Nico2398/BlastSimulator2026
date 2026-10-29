@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Progression probe options: defaults, CLI parsing and matrix expansion (#1922)
 
 import type { SandboxKitId } from '../../src/core/config/balance.js';
+import type { EventPolicy } from './player-actions.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
 
 export type StrategyId = 'opening' | 'reinvest' | 'ladder' | 'stay_g1';
@@ -15,6 +16,8 @@ export interface ProbeRunConfig {
   explosive?: string;
   /** Most haulers the ladder buys; absent = LADDER_MAX_HAULERS. An experiment knob for fleet-size studies. */
   maxHaulers?: number;
+  /** How pending events are answered; absent = 'first'. */
+  eventPolicy?: EventPolicy;
 }
 
 export interface ProbeOptions {
@@ -25,6 +28,7 @@ export interface ProbeOptions {
   horizon: number;
   quick: boolean;
   jsonPath: string | null;
+  eventPolicy: EventPolicy;
 }
 
 export const QUICK_HORIZON = 3000;
@@ -37,6 +41,7 @@ export const PROBE_DEFAULTS: ProbeOptions = {
   horizon: 10000,
   quick: false,
   jsonPath: null,
+  eventPolicy: 'first',
 };
 
 const QUICK_SEED = 42;
@@ -54,6 +59,7 @@ export const LADDER_REFERENCE_SITE: { seed: number; biome: string; kit: SandboxK
 };
 
 const KIT_IDS: readonly SandboxKitId[] = ['digger', 'full'];
+const EVENT_POLICIES: readonly EventPolicy[] = ['first', 'cheapest'];
 const STRATEGY_IDS: readonly StrategyId[] = ['opening', 'reinvest', 'ladder', 'stay_g1'];
 
 function parseList(flag: string, raw: string | undefined): string[] {
@@ -103,6 +109,12 @@ export function parseArgs(argv: readonly string[]): ProbeOptions {
         horizonGiven = true;
         break;
       }
+      case '--event-policy': {
+        const raw = argv[++i];
+        if (raw === undefined || raw.startsWith('--')) throw new Error('--event-policy needs a value');
+        opts.eventPolicy = pickFromSet(flag, raw, EVENT_POLICIES);
+        break;
+      }
       case '--quick':
         opts.quick = true;
         break;
@@ -138,7 +150,7 @@ export function expandMatrix(opts: ProbeOptions): ProbeRunConfig[] {
     for (const kit of opts.kits) {
       for (const seed of opts.seeds) {
         for (const strategy of opts.strategies) {
-          runs.push({ seed, biome, kit, strategy, horizon: opts.horizon });
+          runs.push({ seed, biome, kit, strategy, horizon: opts.horizon, ...(opts.eventPolicy === 'first' ? {} : { eventPolicy: opts.eventPolicy }) });
         }
       }
     }

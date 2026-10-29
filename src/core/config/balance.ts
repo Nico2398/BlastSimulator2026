@@ -2964,20 +2964,24 @@ export const LEGACY_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
  * and the first contract (~$20-35k, filled around tick 600) must lift cash back over the
  * bankruptcy line before 150k of starting cash burns out. At this level the kit's steady
  * income is ~2-2.5x crew cost and the whole reference shot is worth ~2.3x the crew over
- * SANDBOX_REFERENCE_SHOT_CYCLE_TICKS (target 1.5-3x).
+ * SANDBOX_REFERENCE_SHOT_CYCLE_TICKS (target 1.5-3x). #2117 scaled all of this by 0.6: the shot is now worth ~1.15x
+ * the crew (pinned 0.9-1.8x).
  * #1944: the sandbox ore grade scale (0.08) thins ore ~12x, so prices were raised 5x (the old
  * 21-336 ladder above is the pre-#1944 pitch); the quoted figures predate it. Probe numbers:
  * docs/plans/issue-1944-sandbox-yield.md.
+ * #2117: x0.6 (the old ladder ran 105-1,680). Read off the ledger (sales over all costs after the first sale, events
+ * answered by their cheapest option) the old level paid ~3.5x its costs and banked ~$6M by t6000 against a ~$1.5M
+ * catalog; reinvesting now sits near 2x. Rarity order and price ratios are unchanged.
  */
 export const PRODUCTION_ORE_PRICES: Record<string, number> = {
-  dirtite: 105,
-  rustite: 192.5,
-  blingite: 297.5,
-  gloomium: 420,
-  sparkium: 595,
-  craktonite: 840,
-  absurdium: 1172.5,
-  treranium: 1680,
+  dirtite: 63,
+  rustite: 115.5,
+  blingite: 178.5,
+  gloomium: 252,
+  sparkium: 357,
+  craktonite: 504,
+  absurdium: 703.5,
+  treranium: 1008,
 };
 
 /**
@@ -3418,9 +3422,10 @@ export const SHAREHOLDER_SUMMIT_STARTING_CASH = 900_000;
  * Every contract's price on the summit: investors pay a growth premium. Hard rock at the 0.08 ore grade scale yields
  * ~3-5 t of ore a quarter against ~$290/tick of payroll; at Treranium's 0.85 the ladder only breaks even and goes
  * bankrupt by tick 7500. Measured on the ladder (to $1.5M): 1.5 wins at tick 7931 (~5.3 quarters), 1.75 at 5551,
- * 2.0 at 3621 (too easy).
+ * 2.0 at 3621 (too easy). The figures are against the pre-#2117 sandbox price table: #2117 cut that table by 0.6 and
+ * raised this multiplier from 1.5 to 2.5 (1.5 / 0.6), so price x multiplier, the summit's effective price, is unchanged.
  */
-export const SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER = 1.5;
+export const SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER = 2.5;
 /** Operating profit that completes the level; the ladder reaches it at tick 7931 (see the price multiplier). */
 export const SHAREHOLDER_SUMMIT_PROFIT_TARGET = 1_500_000;
 /**

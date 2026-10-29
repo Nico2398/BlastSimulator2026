@@ -33,7 +33,6 @@
     "src/core/campaign/Sandbox.ts:SandboxFieldKind",
     "src/core/campaign/SuccessTracker.ts:StarRating",
     "src/core/economy/Finance.ts:FinancialReport",
-    "src/core/economy/Finance.ts:Transaction",
     "src/core/economy/FragmentTaskLifecycle.ts:findRequestVehicle",
     "src/core/economy/HaulDispatch.ts:HaulActionPayload",
     "src/core/economy/Logistics.ts:FragmentCounts",

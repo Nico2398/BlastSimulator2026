@@ -8,7 +8,7 @@ import type { RunResult } from '../../scripts/shared/probe-metrics.js';
 const METRIC_KEYS = [
   'cashAt', 'lowPointCash', 'lowPointTick', 'bankruptTick', 'firstBlastSoldShareAt6000',
   'blastsFired', 'warehouseFullTick', 'ticksHaulWaitedOnFullStorage', 'boulderSoldShare',
-  'gradeReachedTick', 'affordableTick',
+  'gradeReachedTick', 'affordableTick', 'firstSaleTick', 'salesCostRatio', 'salesCostWindows',
 ];
 
 /** Collect every leaf value with its path. */
@@ -34,6 +34,9 @@ function expectFiniteOrAllowedNull(r: RunResult, horizon: number): void {
         path === 'boulderOreSoldShare' ||
         path === 'catalogBoughtTick' ||
         path === 'bankruptTick' ||
+        path === 'firstSaleTick' ||
+        path === 'salesCostRatio' ||
+        path.startsWith('salesCostWindows.') ||
         path === 'warehouseFullTick' ||
         path.startsWith('affordableTick.');
       expect(allowed, `unexpected null at ${path}`).toBe(true);

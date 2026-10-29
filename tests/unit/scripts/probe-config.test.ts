@@ -146,3 +146,42 @@ describe('probe-config ladder strategies (#1945)', () => {
     expect(PROBE_DEFAULTS.horizon).toBe(10000);
   });
 });
+
+describe('probe-config --event-policy (#2117)', () => {
+  it('defaults to first', () => {
+    expect(PROBE_DEFAULTS.eventPolicy).toBe('first');
+    expect(parseArgs([]).eventPolicy).toBe('first');
+  });
+
+  it('parses first and cheapest', () => {
+    expect(parseArgs(['--event-policy', 'first']).eventPolicy).toBe('first');
+    expect(parseArgs(['--event-policy', 'cheapest']).eventPolicy).toBe('cheapest');
+  });
+
+  it('combines with other flags in either order', () => {
+    const o = parseArgs(['--event-policy', 'cheapest', '--seed', '7', '--quick']);
+    expect(o.eventPolicy).toBe('cheapest');
+    expect(o.seeds).toEqual([7]);
+    expect(parseArgs(['--quick', '--event-policy', 'cheapest']).eventPolicy).toBe('cheapest');
+  });
+
+  it('throws on an unknown policy naming it', () => {
+    expect(() => parseArgs(['--event-policy', 'priciest'])).toThrow(/priciest/);
+  });
+
+  it('throws when the value is missing', () => {
+    expect(() => parseArgs(['--event-policy'])).toThrow(/--event-policy/);
+    expect(() => parseArgs(['--event-policy', '--quick'])).toThrow();
+  });
+
+  it('expandMatrix carries a cheapest policy into every run', () => {
+    const runs = expandMatrix(parseArgs(['--event-policy', 'cheapest']));
+    expect(runs).toHaveLength(24);
+    expect(runs.every(r => r.eventPolicy === 'cheapest')).toBe(true);
+  });
+
+  it('expandMatrix leaves every run on first by default', () => {
+    const runs = expandMatrix(PROBE_DEFAULTS);
+    expect(runs.every(r => (r.eventPolicy ?? 'first') === 'first')).toBe(true);
+  });
+});
