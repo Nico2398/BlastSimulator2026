@@ -66,7 +66,7 @@
           "type": "waitForProperty",
           "selector": "#bs-sandbox-kit-opening",
           "property": "textContent",
-          "expectedValue": "Opens with: crew: 1\u00d7 Driller, 1\u00d7 Blaster, 3\u00d7 Driver; vehicles: 1\u00d7 Drill Rig (Pokey McPoke), 1\u00d7 Debris Hauler (Dumpster on Wheels), 1\u00d7 Charging Truck (Pour-Bucket Pete), 1\u00d7 Rock Digger (The Scratch), 1\u00d7 Rock Fragmenter (Cracky); buildings: 1\u00d7 Freight Warehouse (The Pile), 1\u00d7 Spoil Heap (The Dump)",
+          "expectedValue": "Opens with: crew: 1\u00d7 Driller, 1\u00d7 Blaster, 3\u00d7 Driver; vehicles: 1\u00d7 Drill Rig (Pokey McPoke), 1\u00d7 Debris Hauler (Dumpster on Wheels), 1\u00d7 Charging Truck (Pour-Bucket Pete), 1\u00d7 Rock Digger (The Scratch), 1\u00d7 Rock Fragmenter (Cracky); buildings: 1\u00d7 Freight Warehouse (The Pile), 1\u00d7 Spoil Heap (The Dump), 1\u00d7 Explosive Warehouse (Boom Closet)",
           "timeoutMs": 5000
         },
         {
