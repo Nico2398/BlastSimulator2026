@@ -21,7 +21,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "buildingCount": 2
+          "buildingCount": 3
         }
       },
       "interaction": [
@@ -153,13 +153,13 @@
       ]
     },
     {
-      "command": "wait_until field:buildingCount equals:3 max_ticks:400",
+      "command": "wait_until field:buildingCount equals:4 max_ticks:400",
       "description": "The crew builds the warehouse.",
       "timeout": 130,
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 3,
+          "buildingCount": 4,
           "orderedBuildingCount": 0
         }
       },
@@ -167,7 +167,7 @@
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 3,
+          "equals": 4,
           "maxTicks": 400,
           "timeoutMs": 130000
         }
@@ -279,7 +279,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "buildingCount": 2
+          "buildingCount": 3
         }
       },
       "interaction": [
