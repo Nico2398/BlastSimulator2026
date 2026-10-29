@@ -686,7 +686,7 @@ function floodFillFromSources(
       if (avoidOccupancy && isCellOccupied(neighbourCell)) continue;
       // A freed cell is hypothetically open ground: its recorded clearance is the blocked patch's 0, so it is
       // stepped on at no clearance requirement (#2119).
-      const stepClearance = overrides && inRect(overrides.free, nx, nz) ? 0 : requiredClearance;
+      const stepClearance = overrides?.freeWaivesClearance && inRect(overrides.free, nx, nz) ? 0 : requiredClearance;
       if (!isLegalStep(navGrid, x, z, nx, nz, neighbourCell, climbAware, stepClearance, maxSlopeRatio)) continue;
       visitedArr[neighborIdx] = 1;
       queueArr[count++] = neighborIdx;
@@ -707,11 +707,13 @@ function reachSourceCellZ(navGrid: NavGrid, z: number): number {
 
 /**
  * Hypothetical edits to the fill (#1391): `block` cells (min-inclusive,
- * max-exclusive) count as impassable, `free` cells as passable (their stale clearance waived, #2119).
+ * max-exclusive) count as impassable, `free` cells as passable.
  */
 export interface FillOverrides {
   block?: Rect;
   free?: Rect;
+  /** Step onto `free` cells at no clearance requirement: a blocked patch left them a stale 0 (#2119). */
+  freeWaivesClearance?: boolean;
 }
 
 /**
