@@ -3317,6 +3317,10 @@ export const STARTER_DEPOSIT_MAX_DISTANCE_M = 25;
 /** Where the starting crew spawns (cells): the starter deposit sits on the ring cells nearest it, beside the opening buildings. */
 export const STARTER_DEPOSIT_ANCHOR_X = 10;
 export const STARTER_DEPOSIT_ANCHOR_Z = 5;
+/** Cells the rally flag lands around (it varies with the terrain, seeds 1-10 measured); the deposit must be climbable from every one. */
+export const STARTER_DEPOSIT_CREW_STARTS: ReadonlyArray<readonly [number, number]> = [
+  [STARTER_DEPOSIT_ANCHOR_X, STARTER_DEPOSIT_ANCHOR_Z], [4, 9], [4, 2], [15, 2], [9, 2], [12, 8], [11, 8],
+];
 /** Preferred distance (m) from that corner to the deposit centre: clear of the buildings, well inside the 10-25 m brief. */
 export const STARTER_DEPOSIT_CREW_DISTANCE_M = 18;
 export const STARTER_DEPOSIT_POCKET_RADIUS_M = 8;

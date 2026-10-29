@@ -4,7 +4,7 @@
 // scripted bonus: a soft weathered-rock pocket carrying real voxel ore, found by a survey like any other.
 
 import {
-  STARTER_DEPOSIT_ANCHOR_X, STARTER_DEPOSIT_ANCHOR_Z, STARTER_DEPOSIT_CREW_DISTANCE_M, STARTER_DEPOSIT_MAX_DISTANCE_M, STARTER_DEPOSIT_MIN_DISTANCE_M, STARTER_DEPOSIT_ORE_CORE_RADIUS_M,
+  STARTER_DEPOSIT_ANCHOR_X, STARTER_DEPOSIT_ANCHOR_Z, STARTER_DEPOSIT_CREW_DISTANCE_M, STARTER_DEPOSIT_CREW_STARTS, STARTER_DEPOSIT_MAX_DISTANCE_M, STARTER_DEPOSIT_MIN_DISTANCE_M, STARTER_DEPOSIT_ORE_CORE_RADIUS_M,
   STARTER_DEPOSIT_ORE_DEPTH_M, STARTER_DEPOSIT_ORE_DENSITY, STARTER_DEPOSIT_POCKET_DEPTH_M,
   STARTER_DEPOSIT_POCKET_RADIUS_M, SANDBOX_FLAT_PAD_SIZE, SANDBOX_FLAT_PAD_MAX_SPREAD, ORE_GRADE_SCALE_DEFAULT, VEHICLE_MAX_SLOPE_RATIO,
 } from '../config/balance.js';
@@ -23,8 +23,6 @@ export interface StarterDeposit {
   readonly radius: number;
 }
 
-/** Cells the rally flag lands around (it varies with the terrain); the deposit must be climbable from every one. */
-const CREW_STARTS: ReadonlyArray<readonly [number, number]> = [[STARTER_DEPOSIT_ANCHOR_X, STARTER_DEPOSIT_ANCHOR_Z], [4, 9], [4, 2], [15, 2], [9, 2]];
 /** Hole offsets (m) of the 3x3 reference shot around its centre. */
 const HOLE_OFFSETS = [-4, 0, 4] as const;
 const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -89,10 +87,13 @@ function reachableFromCrew(worldGen: WorldGenContext, sizeX: number, sizeZ: numb
   return seen;
 }
 
-/** Whether every hole cell of the 3x3 reference shot centred on (x, z) is in every set of `reach`. */
-function holesReachable(reach: readonly Set<number>[], x: number, z: number): boolean {
-  for (const dx of HOLE_OFFSETS) for (const dz of HOLE_OFFSETS) for (const r of reach) if (!r.has((x + dx) * 65_536 + z + dz)) return false;
-  return true;
+/** How many sets of `reach` miss a hole cell of the 3x3 reference shot centred on (x, z). */
+function unreachableStarts(reach: readonly Set<number>[], x: number, z: number): number {
+  let missed = 0;
+  for (const r of reach) {
+    if (HOLE_OFFSETS.some(dx => HOLE_OFFSETS.some(dz => !r.has((x + dx) * 65_536 + z + dz)))) missed++;
+  }
+  return missed;
 }
 
 /**
@@ -108,7 +109,7 @@ export function pickStarterDeposit(
   const cx = Math.floor(config.sizeX / 2), cz = Math.floor(config.sizeZ / 2);
   const reach = STARTER_DEPOSIT_POCKET_RADIUS_M + 1;
   const surfaceY = surfaceYMemo(worldGen);
-  const climbable = CREW_STARTS.map(([sx, sz]) => reachableFromCrew(worldGen, config.sizeX, config.sizeZ, sx, sz));
+  const climbable = STARTER_DEPOSIT_CREW_STARTS.map(([sx, sz]) => reachableFromCrew(worldGen, config.sizeX, config.sizeZ, sx, sz));
   let best: { x: number; z: number; score: number } | null = null;
   const span = STARTER_DEPOSIT_MAX_DISTANCE_M;
   for (let dx = -span; dx <= span; dx++) {
@@ -121,7 +122,7 @@ export function pickStarterDeposit(
       const spread = footprintSpread(surfaceY, x, z);
       const toCrew = Math.hypot(x - STARTER_DEPOSIT_ANCHOR_X, z - STARTER_DEPOSIT_ANCHOR_Z);
       // Flat footprints rank by distance to the crew corner; any unflat one ranks behind every flat one.
-      const score = (spread <= SANDBOX_FLAT_PAD_MAX_SPREAD ? 0 : 1e6 * spread) + (holesReachable(climbable, x, z) ? 0 : 1e4)
+      const score = (spread <= SANDBOX_FLAT_PAD_MAX_SPREAD ? 0 : 1e6 * spread) + 1e4 * unreachableStarts(climbable, x, z)
         + Math.abs(toCrew - STARTER_DEPOSIT_CREW_DISTANCE_M) + cellJitter(config.seed, x, z);
       if (!best || score < best.score) best = { x, z, score };
     }
