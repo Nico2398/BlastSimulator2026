@@ -29,7 +29,7 @@ const SEED = 42;
 // opens the deposit centred near (40,33).
 const SHOT_START = '36,30';
 // Re-measured (#2115): the one driver also crews the fragmenter, so the west ramp finishes at ~684 ticks (east ~435), was under 600.
-const RAMP_SETUP_TICKS = 800;
+const RAMP_SETUP_TICKS = 750;
 const HAUL_WINDOW_TICKS = 800;
 const MIN_HAULED_SHARE = 0.3;
 const MIN_ORDERED_SHARE = 0.8;

@@ -16,7 +16,7 @@ import { getBuildingDef, getDefSize } from '../../src/core/entities/Building.js'
 import { makeFootprintRegion } from '../../src/core/engine/BuildingTaskHelpers.js';
 import { tickResolvingEvents, tickUntil } from './helpers.js';
 
-// Seed re-measured (#2115): on seed 5 the digger kit's fragmenter shifts the spawn row and the rig is left unmounted beside the warehouse.
+// TODO(#2119): seed 5 leaves the rig unmounted beside the warehouse with the digger kit (fragmenter shifts the spawn row, #2115); seed 1 until fixed.
 const HOLE = { x: 30, z: 36 } as const;
 const ARRIVAL_RADIUS = 4;
 const MAX_ARRIVAL_TICKS = 200;
