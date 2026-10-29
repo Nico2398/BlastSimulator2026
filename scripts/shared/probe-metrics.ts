@@ -11,7 +11,7 @@ import type { Transaction } from '../../src/core/economy/Finance.js';
 import type { ProbeRunConfig } from './probe-config.js';
 
 /** Ledger sums after the first sale: sales (contracts + sales + bonus income) against all expenses (#2117). */
-export interface SalesCosts {
+interface SalesCosts {
   firstSaleTick: number | null;
   sales: number;
   costs: number;
@@ -46,7 +46,7 @@ function sumLedger(transactions: readonly Transaction[], from: number, to: numbe
 
 /** First tick of each window the sales-over-costs ratio is read in, and the window length. */
 export const SALES_COST_WINDOW_STARTS = [1000, 2500, 4000, 5500] as const;
-export const SALES_COST_WINDOW_TICKS = 1500;
+const SALES_COST_WINDOW_TICKS = 1500;
 
 /** Sales over all costs per window; null where a window has no costs. */
 function salesCostWindows(transactions: readonly Transaction[]): Array<number | null> {
