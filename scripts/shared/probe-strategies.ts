@@ -100,6 +100,8 @@ import { vehicleMaxSlopeRatio } from '../../src/core/entities/Vehicle.js';
 import { isProgressionSite } from '../../src/core/state/GameState.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS } from '../../src/core/config/balance.js';
 import { haulDestinationOf } from '../../src/core/economy/SpoilHeaps.js';
+import { terrainConfigOf } from '../../src/console/commands/world.js';
+import { resolveStarterDeposit } from '../../src/core/world/StarterDeposit.js';
 import { oreGradeScaleOf } from '../../src/core/economy/OreGrade.js';
 import { BLAST_ZONE_CLEAR_MARGIN, playContracts, playTick, clearBlastZone, explosiveRoomKg, topUpWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
@@ -212,6 +214,15 @@ function rankDeposits(grid: VoxelGrid, span = SHOT_SPAN, depth: number = SHOT.de
   const anyOre = out.some(c => c.ore > 0);
   // Array.sort is stable and `out` is already in ascending x then z: ties keep that order.
   return out.sort((a, b) => (anyOre ? b.ore - a.ore : a.spread - b.spread));
+}
+
+/**
+ * Origin of the reference shot centred on the site's starter deposit (#2116, #2123), or null when the site has none.
+ * The probe reads it as it reads ore: ground truth standing in for the survey.
+ */
+export function starterShotOrigin(state: GameState, span: number = SHOT_SPAN): Pattern | null {
+  void state; void span; void terrainConfigOf; void resolveStarterDeposit;
+  throw new Error('not implemented');
 }
 
 /** Metres a building other than a depot keeps from every depot: haulers queue in the gap to dock. */
