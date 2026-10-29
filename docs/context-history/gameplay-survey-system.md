@@ -31,3 +31,5 @@ Records why the rules in the `gameplay-survey-system` skill exist: the issues th
 ## Survey Visibility Rules
 
 - Survey price scaled by `survey_cost` modifiers: #1568.
+
+- #2116: sandbox sites (oreDeposits on) get a world-gen starter deposit, a soft weathered pocket with 10-20 t of dirtite or rustite beside the opening buildings.

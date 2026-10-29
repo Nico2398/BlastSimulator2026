@@ -12,6 +12,7 @@ import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } fro
 import { WorldNoiseFields } from './NoiseFields.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
 import { OreVeinSampler } from './OreVeins.js';
+import { pickStarterDeposit, starterPocketAt, type StarterDeposit } from './StarterDeposit.js';
 
 /**
  * Version of the terrain generator's algorithm — stamped into every save's
@@ -122,6 +123,8 @@ export interface TerrainContext {
   biome: BiomeDef;
   strata: StrataSampler;
   oreVeins: OreVeinSampler;
+  /** The sandbox starter deposit (#2116); null when ore deposits are off. */
+  starterDeposit: StarterDeposit | null;
 }
 
 /** Dominant climate-weighted biome at the playable centre — what terrain generation lands on. */
@@ -172,7 +175,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
   const strata = new StrataSampler(seed, profile);
   const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true, ...(oreGradeScale !== undefined ? { gradeScale: oreGradeScale } : {}) });
 
-  return { worldGen, biome, strata, oreVeins };
+  return { worldGen, biome, strata, oreVeins, starterDeposit: pickStarterDeposit(config, worldGen, biome.borderWidth) };
 }
 
 export { surfaceDensityAt };
@@ -195,7 +198,7 @@ function generateColumnRange(
   yLo: number,
   yHi: number,
 ): void {
-  const { worldGen, biome, strata, oreVeins } = terrain;
+  const { worldGen, biome, strata, oreVeins, starterDeposit: starter } = terrain;
   const { sizeX, sizeZ } = config;
 
   const surfaceH = sampleSurfaceHeightY(worldGen, x, z);
@@ -210,9 +213,10 @@ function generateColumnRange(
     // Depth is still measured from the rounded surface, so which stratum a
     // voxel belongs to is unchanged by the sub-voxel surface placement.
     const depth = Math.max(0, surfaceY - y);
-    const composition = strata.compositionAt(x, y, z, depth, boundaries);
+    const pocket = starter && !inBorder ? starterPocketAt(starter, x, z, depth, config.oreGradeScale) : null;
+    const composition = pocket ? pocket.composition : strata.compositionAt(x, y, z, depth, boundaries);
     const compId = grid.palette.intern(composition);
-    const oreDensities = inBorder ? {} : oreVeins.densitiesAt(x, y, z, depth, composition, biome.oreRichness);
+    const oreDensities = inBorder ? {} : pocket ? pocket.oreDensities : oreVeins.densitiesAt(x, y, z, depth, composition, biome.oreRichness);
 
     grid.writeGeneratedVoxel(x, y, z, compId, oreDensities, density);
   }

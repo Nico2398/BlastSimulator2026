@@ -3308,6 +3308,34 @@ export const SANDBOX_ORE_DEPTH_WINDOWS: Readonly<Record<string, readonly [number
   absurdium: [30, 55],
 };
 
+/**
+ * Sandbox starter deposit (#2116): one shallow, close, breakable, sellable deposit per site.
+ * Distances are metres from the site centre; the yield band is what the reference shot centred on it must yield.
+ */
+export const STARTER_DEPOSIT_MIN_DISTANCE_M = 10;
+export const STARTER_DEPOSIT_MAX_DISTANCE_M = 25;
+/** Where the starting crew spawns (cells): the starter deposit sits on the ring cells nearest it, beside the opening buildings. */
+export const STARTER_DEPOSIT_ANCHOR_X = 10;
+export const STARTER_DEPOSIT_ANCHOR_Z = 5;
+/** Cells the rally flag lands around (it varies with the terrain, seeds 1-10 measured); the deposit must be climbable from every one. */
+export const STARTER_DEPOSIT_CREW_STARTS: ReadonlyArray<readonly [number, number]> = [
+  [STARTER_DEPOSIT_ANCHOR_X, STARTER_DEPOSIT_ANCHOR_Z], [4, 9], [4, 2], [15, 2], [9, 2], [12, 8], [11, 8],
+];
+/** Preferred distance (m) from that corner to the deposit centre: clear of the buildings, well inside the 10-25 m brief. */
+export const STARTER_DEPOSIT_CREW_DISTANCE_M = 18;
+export const STARTER_DEPOSIT_POCKET_RADIUS_M = 8;
+/** Depth (m below the surface) the soft weathered pocket reaches. */
+export const STARTER_DEPOSIT_POCKET_DEPTH_M = 8;
+/** Ore fills the pocket's inner core of this radius (m) down to this depth (m); covers the reference shot with margin. */
+export const STARTER_DEPOSIT_ORE_CORE_RADIUS_M = 6;
+export const STARTER_DEPOSIT_ORE_DEPTH_M = 6;
+/** Stored ore density (0-1) of the pocket before the site grade scale. */
+export const STARTER_DEPOSIT_ORE_DENSITY = 0.14;
+export const STARTER_DEPOSIT_YIELD_KG_MIN = 10_000;
+export const STARTER_DEPOSIT_YIELD_KG_MAX = 20_000;
+/** Half the voxels the reference shot clears on desert_badlands seed 42 (~690). */
+export const STARTER_DEPOSIT_MIN_CLEARED_VOXELS = 345;
+
 /** Board of directors (#1946). */
 export const BOARD_QUARTER_TICKS = 720;
 export const BOARD_TARGET_GROWTH = 1.25;

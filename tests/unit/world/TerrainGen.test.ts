@@ -603,11 +603,13 @@ describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
       expect(oreSignature(generateTerrain({ ...cfg, oreDeposits: false }))).toBe(oreSignature(generateTerrain(cfg)));
     });
 
-    it('true generates different ore than absent, but identical rock', () => {
+    it('true generates different ore than absent, but identical rock outside the starter pocket (#2116)', () => {
       const on = generateTerrain({ ...cfg, oreDeposits: true });
       const off = generateTerrain(cfg);
+      const pocket = buildTerrainContext({ ...cfg, oreDeposits: true }).starterDeposit;
       expect(oreSignature(on)).not.toBe(oreSignature(off));
       for (let x = 0; x < 64; x += 4) for (let z = 0; z < 64; z += 4) for (let y = 0; y < 40; y += 3) {
+        if (pocket && Math.hypot(x - pocket.x, z - pocket.z) <= pocket.radius + 1) continue;
         expect(on.dominantRockAt(x, y, z)).toBe(off.dominantRockAt(x, y, z));
       }
     });
