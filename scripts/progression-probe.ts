@@ -2,6 +2,11 @@
 //
 //   npm run probe:progression -- [--seed 42,7] [--biome a,b] [--kit digger,full]
 //        [--strategy opening,reinvest,ladder,stay_g1] [--horizon N] [--quick] [--json path]
+//        [--event-policy first|cheapest]
+//
+// `--event-policy` picks how pending events are answered: `first` (default, option 0) or `cheapest` (the option with
+// the highest cashDelta; #2117). The table's `first sale` / `sales/costs` columns read the ledger: sales (contracts +
+// sales + bonus income) over all expenses from the first sale on, and the group median row adds the 10th percentile.
 //
 // Plays the reference strategies headlessly through the console core and prints
 // a markdown table (stdout, deterministic) of the economy curve; timing goes to

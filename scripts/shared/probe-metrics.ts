@@ -20,8 +20,40 @@ export interface SalesCosts {
 
 /** Sales and costs from the first sale on, read from a ledger; `endTick` (exclusive) closes the window when given. */
 export function salesCostsAfterFirstSale(transactions: readonly Transaction[], endTick?: number): SalesCosts {
-  void transactions; void endTick;
-  throw new Error('not implemented');
+  let firstSaleTick: number | null = null;
+  for (const t of transactions) {
+    if (isSale(t) && (firstSaleTick === null || t.tick < firstSaleTick)) firstSaleTick = t.tick;
+  }
+  if (firstSaleTick === null) return { firstSaleTick, sales: 0, costs: 0, ratio: null };
+  const { sales, costs } = sumLedger(transactions, firstSaleTick, endTick ?? Infinity);
+  return { firstSaleTick, sales, costs, ratio: costs > 0 ? sales / costs : null };
+}
+
+const SALE_CATEGORIES: ReadonlySet<string> = new Set(['contracts', 'sales', 'bonus']);
+const isSale = (t: Transaction): boolean => t.type === 'income' && SALE_CATEGORIES.has(t.category);
+
+/** Sales income and all expenses with `from <= tick < to`. */
+function sumLedger(transactions: readonly Transaction[], from: number, to: number): { sales: number; costs: number } {
+  let sales = 0;
+  let costs = 0;
+  for (const t of transactions) {
+    if (t.tick < from || t.tick >= to) continue;
+    if (isSale(t)) sales += t.amount;
+    else if (t.type === 'expense') costs += t.amount;
+  }
+  return { sales, costs };
+}
+
+/** First tick of each window the sales-over-costs ratio is read in, and the window length. */
+export const SALES_COST_WINDOW_STARTS = [1000, 2500, 4000, 5500] as const;
+export const SALES_COST_WINDOW_TICKS = 1500;
+
+/** Sales over all costs per window; null where a window has no costs. */
+function salesCostWindows(transactions: readonly Transaction[]): Array<number | null> {
+  return SALES_COST_WINDOW_STARTS.map((start) => {
+    const { sales, costs } = sumLedger(transactions, start, start + SALES_COST_WINDOW_TICKS);
+    return costs > 0 ? sales / costs : null;
+  });
 }
 
 /** Ticks at which cash is sampled for the report. */
@@ -235,6 +267,8 @@ export class MetricsObserver {
   }
 
   finalize(): ProbeMetrics {
+    const transactions = this.lastState?.finances?.transactions ?? [];
+    const ledger = salesCostsAfterFirstSale(transactions);
     return {
       cashAt: { ...this.cashAt },
       pitDepthAt: { ...this.pitDepthAt },
@@ -249,9 +283,9 @@ export class MetricsObserver {
       gradeReachedTick: { ...this.gradeReachedTick },
       gradeCashAt: { ...this.gradeCashAt },
       catalogBoughtTick: this.catalogBoughtTick,
-      firstSaleTick: null,
-      salesCostRatio: null,
-      salesCostWindows: [],
+      firstSaleTick: ledger.firstSaleTick,
+      salesCostRatio: ledger.ratio,
+      salesCostWindows: salesCostWindows(transactions),
       boulderOreSoldShare: this.boulderOreSoldShare(),
       affordableTick: { ...this.affordableTick },
     };

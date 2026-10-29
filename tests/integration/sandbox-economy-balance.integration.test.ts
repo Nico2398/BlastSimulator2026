@@ -371,14 +371,15 @@ function startPlayLoop(kit: string, horizon: number, afterTick: (elapsed: number
 }
 
 describe('sandbox economy: reference shot vs crew cost', () => {
-  it('ore of the ordinary desert 3x3 shot sells for 1.5-3x the crew cost over its drill-charge-fire-haul cycle', () => {
+  it('ore of the ordinary desert 3x3 shot sells for 0.9-1.8x the crew cost over its drill-charge-fire-haul cycle', () => {
     expect(SANDBOX_REFERENCE_CREW_COST_PER_TICK).toBeGreaterThan(0);
     expect(SANDBOX_REFERENCE_SHOT_CYCLE_TICKS).toBeGreaterThan(0);
     const { ctx } = startSandbox(DESERT, 42);
     const result = fireReferenceShot(ctx);
     const ratio = result.totalOreValue / (SANDBOX_REFERENCE_CREW_COST_PER_TICK * SANDBOX_REFERENCE_SHOT_CYCLE_TICKS);
-    expect(ratio).toBeGreaterThanOrEqual(1.5);
-    expect(ratio).toBeLessThanOrEqual(3);
+    // Re-measured for the x0.6 price table (#2117): 1.153, was 1.92 at the old prices; the 1.5-3x band scales with it.
+    expect(ratio).toBeGreaterThanOrEqual(0.9);
+    expect(ratio).toBeLessThanOrEqual(1.8);
   });
 });
 
@@ -456,9 +457,10 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
    * with a free explosive warehouse. Re-measured again once the warehouse is paid for and built by the crew through
    * stockWarehouse (#1963, $20,000 and its build time before the order): 740,314.4. Re-measured once trace ore under the
    * barren threshold, bound for the spoil heap, stopped counting as ore in barren-yields-to-ore (#2089): 735,908.7.
+   * Re-measured for the x0.6 production ore prices (#2117): 373,449.0.
    * Floor is that measurement, rounded down.
    */
-  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 735_908;
+  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 373_449;
 
   interface OpeningTrace {
     endedAtTick: number | null;

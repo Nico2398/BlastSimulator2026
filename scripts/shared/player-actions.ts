@@ -8,6 +8,7 @@
 import type { GameState } from '../../src/core/state/GameState.js';
 import { stateRubbleStockKg } from '../../src/core/economy/SpoilHeaps.js';
 import { pendingSpoilOverflowKg } from '../../src/core/economy/HaulDispatch.js';
+import { getEventById } from '../../src/core/events/EventPool.js';
 import { isPaidClearance } from '../../src/core/economy/Contract.js';
 import { getExplosivesFreeCapacity, getExplosivesInStock } from '../../src/core/entities/BuildingWarehouse.js';
 
@@ -19,18 +20,24 @@ export type EventPolicy = 'first' | 'cheapest';
 
 /** Index of the option with the highest `cashDelta` (missing = 0; lowest index on ties; 0 when empty). */
 export function cheapestEventOption(consequences: ReadonlyArray<{ cashDelta?: number }>): number {
-  void consequences;
-  throw new Error('not implemented');
+  let best = 0;
+  for (let i = 1; i < consequences.length; i++) {
+    if ((consequences[i]!.cashDelta ?? 0) > (consequences[best]!.cashDelta ?? 0)) best = i;
+  }
+  return best;
 }
 
 /**
- * Resolve a pending event with its first option (`event choose 0`); a no-op when none is pending.
+ * Resolve a pending event with its first option (`event choose 0`), or with the one that keeps the most cash when the
+ * policy is `cheapest` (#2117); a no-op when none is pending.
  * `tick` refuses to advance while an event is pending, so every headless tick loop answers it first.
  * The one home of that rule: playTick, the probe and command-mode `waitUntil` all go through it.
  */
 export function resolvePendingEvent(run: Run, state: Pick<GameState, 'events'> | null | undefined, policy: EventPolicy = 'first'): void {
-  void policy;
-  if (state?.events.pendingEvent) run('event choose 0');
+  const pending = state?.events.pendingEvent;
+  if (!pending) return;
+  const def = policy === 'cheapest' ? getEventById(pending.eventId) : undefined;
+  run(`event choose ${def ? cheapestEventOption(def.consequences) : 0}`);
 }
 
 /** One ordinary player tick: resolve a pending event, then let time pass. */

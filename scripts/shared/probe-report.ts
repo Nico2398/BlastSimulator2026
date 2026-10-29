@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Progression probe report: markdown table and JSON (#1922)
 
 import type { ProbeOptions } from './probe-config.js';
-import { CASH_SAMPLE_TICKS, type RunResult } from './probe-metrics.js';
+import { CASH_SAMPLE_TICKS, SALES_COST_WINDOW_STARTS, type RunResult } from './probe-metrics.js';
 import { GRADE_TARGET_WINDOWS, gradeVerdicts, type GradeVerdict } from './probe-ladder.js';
 
 type Cell = number | string | null;
@@ -33,7 +33,8 @@ const HEADERS = [
   ...CASH_SAMPLE_TICKS.map(t => `cash@${t}`),
   'low cash', 'low tick', 'bankrupt', 'firstBlastSold@6000', 'blasts',
   'warehouseFull tick', 'haulWait ticks', 'boulderSold', 'boulderOreSold', 'grades', 'grade cash', 'catalog bought',
-  'affordable warehouseT2', 'affordable researchCenter', 'affordable secondHauler', 'end',
+  'affordable warehouseT2', 'affordable researchCenter', 'affordable secondHauler',
+  'first sale', 'sales/costs', 'sales/costs p10', ...SALES_COST_WINDOW_STARTS.map(t => `sales/costs@${t}`), 'end',
 ];
 
 function row(r: RunResult): string[] {
@@ -45,6 +46,7 @@ function row(r: RunResult): string[] {
     share(m.firstBlastSoldShareAt6000), cell(m.blastsFired),
     cell(m.warehouseFullTick), cell(m.ticksHaulWaitedOnFullStorage), share(m.boulderSoldShare), share(m.boulderOreSoldShare), grades(r), gradeCash(r), cell(m.catalogBoughtTick),
     cell(m.affordableTick.warehouseT2), cell(m.affordableTick.researchCenter), cell(m.affordableTick.secondHauler),
+    cell(m.firstSaleTick), cell(m.salesCostRatio, 2), NONE, ...SALES_COST_WINDOW_STARTS.map((_, i) => cell(m.salesCostWindows[i] ?? null, 2)),
     r.endReason ?? `t${r.endTick}`,
   ];
 }
@@ -54,6 +56,16 @@ function median(values: number[]): number | null {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = sorted.length >> 1;
   return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
+/** The `q` quantile (0-1) by linear interpolation between ranks; null for no values. */
+function percentile(values: number[], q: number): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const pos = (sorted.length - 1) * q;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  return sorted[lo]! + (sorted[hi]! - sorted[lo]!) * (pos - lo);
 }
 
 /** Median of a metric over runs, ignoring runs where it is null. */
@@ -74,7 +86,11 @@ function medianRow(runs: RunResult[]): string[] {
     cell(med(runs, r => r.metrics.catalogBoughtTick)),
     cell(med(runs, r => r.metrics.affordableTick.warehouseT2)),
     cell(med(runs, r => r.metrics.affordableTick.researchCenter)),
-    cell(med(runs, r => r.metrics.affordableTick.secondHauler)), NONE,
+    cell(med(runs, r => r.metrics.affordableTick.secondHauler)),
+    cell(med(runs, r => r.metrics.firstSaleTick)), cell(med(runs, r => r.metrics.salesCostRatio), 2),
+    cell(percentile(runs.map(r => r.metrics.salesCostRatio).filter((v): v is number => v !== null), 0.1), 2),
+    ...SALES_COST_WINDOW_STARTS.map((_, i) => cell(med(runs, r => r.metrics.salesCostWindows[i] ?? null), 2)),
+    NONE,
   ];
 }
 

@@ -1655,7 +1655,7 @@ function createSession(config: ProbeRunConfig, observer: MetricsObserver): Probe
     },
     tick: () => {
       if (config.strategy === 'ladder' || config.strategy === 'stay_g1') answerLadderEvent(session.run, session.state, session.ladderAccess);
-      playTick(session.run, session.state);
+      playTick(session.run, session.state, config.eventPolicy);
     },
     waitFor: (step, done) => {
       const started = session.state.tickCount;
