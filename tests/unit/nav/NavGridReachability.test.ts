@@ -238,6 +238,15 @@ describe('computeClimbReachableSetFromSources fill overrides (#1391)', () => {
     expect(set.has(10, 4)).toBe(false);
   });
 
+  it('freeWaivesClearance steps onto freed cells that kept a stale zero clearance (#2119)', () => {
+    const grid = makeGrid((x, z) => (x === 10 && z === 5 ? { ...BLOCKED, clearance: 0 } : x === 10 ? BLOCKED : null));
+    const free = { free: rect(10, 5, 11, 6) };
+    expect(computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, free).has(25, 5)).toBe(false);
+    const set = computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, { ...free, freeWaivesClearance: true });
+    expect(set.has(10, 5)).toBe(true);
+    expect(set.has(25, 5)).toBe(true);
+  });
+
   it('block wins over free where they overlap', () => {
     const grid = makeGrid((x) => (x === 10 ? BLOCKED : null));
     const set = computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, {
