@@ -1744,6 +1744,9 @@ export const TUTORIAL_STARTING_BUILDINGS_NEAR = { x: 4, z: 19 } as const;
 /** Sandbox starting-kit ids (#1671, #1891): 'digger' = rock digger and driver, 'full' = adds a rock fragmenter and its driver. Starting kits are keyed by it. */
 export type SandboxKitId = 'digger' | 'full';
 
+/** Sandbox Digger kit's single driver (#2115): excavator and rock-fragmenter licences. */
+export const SANDBOX_DIGGER_KIT_DRIVER: StartingSiteEmployeeSlot = DIGGER_KIT_DRIVER;
+
 const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
   role: 'driver',
   qualifications: [{ category: 'driving.rock_fragmenter', proficiencyLevel: 1 }],
