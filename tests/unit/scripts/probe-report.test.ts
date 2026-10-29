@@ -21,6 +21,9 @@ function makeResult(seed: number, over: Partial<RunResult['metrics']> = {}): Run
       catalogBoughtTick: null,
       boulderOreSoldShare: null,
       affordableTick: { warehouseT2: 1500, researchCenter: null, secondHauler: 2000 },
+      firstSaleTick: null,
+      salesCostRatio: null,
+      salesCostWindows: [null, null, null, null],
       ...over,
     },
     endTick: 3000,
@@ -111,5 +114,115 @@ describe('probe-report toJson extended metrics (#1945)', () => {
 
   it('serializes deterministically', () => {
     expect(toJson([extended], opts)).toBe(toJson([extended], opts));
+  });
+});
+
+describe('probe-report sales/costs columns (#2117)', () => {
+  const cells = (l: string): string[] => l.split('|').slice(1, -1).map(c => c.trim());
+  const col = (table: string, name: string): { header: string[]; at: number } => {
+    const header = cells(table.split('\n')[0]!);
+    return { header, at: header.indexOf(name) };
+  };
+  const rows = (table: string) => table.split('\n').filter(l => l.trim()).slice(2).map(cells);
+
+  const pair = [
+    makeResult(1, { firstSaleTick: 1200, salesCostRatio: 1 }),
+    makeResult(2, { firstSaleTick: 1800, salesCostRatio: 3 }),
+  ];
+  const table = formatTable(pair);
+
+  it('has first sale, sales/costs and sales/costs p10 columns', () => {
+    const { header } = col(table, 'first sale');
+    expect(header).toContain('first sale');
+    expect(header).toContain('sales/costs');
+    expect(header).toContain('sales/costs p10');
+  });
+
+  it('shows the first sale tick and the ratio with 2 decimals per run, p10 as -', () => {
+    const [run1, run2] = rows(table);
+    const fs = col(table, 'first sale').at;
+    const sc = col(table, 'sales/costs').at;
+    const p10 = col(table, 'sales/costs p10').at;
+    expect(run1![fs]).toBe('1200');
+    expect(run1![sc]).toBe('1.00');
+    expect(run1![p10]).toBe('-');
+    expect(run2![fs]).toBe('1800');
+    expect(run2![sc]).toBe('3.00');
+    expect(run2![p10]).toBe('-');
+  });
+
+  it('rounds the ratio to 2 decimals', () => {
+    const t = formatTable([makeResult(1, { salesCostRatio: 2 / 3 })]);
+    expect(rows(t)[0]![col(t, 'sales/costs').at]).toBe('0.67');
+  });
+
+  it('shows null as - in a per-run row', () => {
+    const t = formatTable([makeResult(1)]);
+    const r = rows(t)[0]!;
+    expect(r[col(t, 'first sale').at]).toBe('-');
+    expect(r[col(t, 'sales/costs').at]).toBe('-');
+  });
+
+  it('the median row carries the medians of both and the 10th percentile of the ratio', () => {
+    const median = rows(table)[2]!;
+    expect(median[0]).toBe('median(2)');
+    expect(median[col(table, 'first sale').at]).toBe('1500');
+    expect(median[col(table, 'sales/costs').at]).toBe('2.00');
+    // linear interpolation between ranks: 1 + 0.1 * (3 - 1)
+    expect(median[col(table, 'sales/costs p10').at]).toBe('1.20');
+  });
+
+  it('interpolates p10 across five runs', () => {
+    const five = [1, 2, 3, 4, 5].map(v => makeResult(v, { firstSaleTick: v * 100, salesCostRatio: v }));
+    const t = formatTable(five);
+    const median = rows(t)[5]!;
+    expect(median[0]).toBe('median(5)');
+    expect(median[col(t, 'sales/costs').at]).toBe('3.00');
+    // position 0.1 * 4 = 0.4 -> 1 + 0.4 * (2 - 1)
+    expect(median[col(t, 'sales/costs p10').at]).toBe('1.40');
+    expect(median[col(t, 'first sale').at]).toBe('300');
+  });
+
+  it('ignores runs without a ratio in the medians and the percentile', () => {
+    const t = formatTable([
+      makeResult(1, { firstSaleTick: 1000, salesCostRatio: 1 }),
+      makeResult(2),
+      makeResult(3, { firstSaleTick: 2000, salesCostRatio: 3 }),
+    ]);
+    const median = rows(t)[3]!;
+    expect(median[col(t, 'first sale').at]).toBe('1500');
+    expect(median[col(t, 'sales/costs').at]).toBe('2.00');
+    expect(median[col(t, 'sales/costs p10').at]).toBe('1.20');
+  });
+
+  it('shows - in the median row when no run has a sale', () => {
+    const t = formatTable([makeResult(1), makeResult(2)]);
+    const median = rows(t)[2]!;
+    expect(median[col(t, 'first sale').at]).toBe('-');
+    expect(median[col(t, 'sales/costs').at]).toBe('-');
+    expect(median[col(t, 'sales/costs p10').at]).toBe('-');
+  });
+
+  it('a single run with a ratio has p10 equal to that ratio in its median row', () => {
+    const t = formatTable([
+      makeResult(1, { firstSaleTick: 900, salesCostRatio: 2.5 }),
+      makeResult(2),
+    ]);
+    const median = rows(t)[2]!;
+    expect(median[col(t, 'sales/costs').at]).toBe('2.50');
+    expect(median[col(t, 'sales/costs p10').at]).toBe('2.50');
+  });
+
+  it('keeps every row as wide as the header', () => {
+    const lines = table.split('\n').filter(l => l.trim());
+    for (const l of lines) expect(cells(l)).toHaveLength(cells(lines[0]!).length);
+  });
+
+  it('toJson carries the new metrics', () => {
+    const parsed = JSON.parse(toJson([makeResult(1, { firstSaleTick: 1200, salesCostRatio: 1.5, salesCostWindows: [1, null, 2, 3] })], PROBE_DEFAULTS));
+    const m = parsed.results[0].metrics;
+    expect(m.firstSaleTick).toBe(1200);
+    expect(m.salesCostRatio).toBe(1.5);
+    expect(m.salesCostWindows).toEqual([1, null, 2, 3]);
   });
 });
