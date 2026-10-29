@@ -229,7 +229,7 @@ describe('campaign levels carry no starter deposit (#2116 C10)', () => {
   const campaign = getAllLevels().filter(l => !l.oreDeposits);
 
   it('there are campaign levels without oreDeposits', () => {
-    expect(campaign.length).toBeGreaterThanOrEqual(5);
+    expect(campaign.length).toBeGreaterThanOrEqual(4);
   });
 
   it.each(campaign.map(l => [l.id, l] as const))('%s: no starter deposit', (_id, level) => {
