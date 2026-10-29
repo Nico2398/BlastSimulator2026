@@ -196,6 +196,7 @@ function employeeRelocation(navGrid: NavGrid, region: BlastRegion, x: number, z:
   // The footprint is already blocked: flood with it freed, i.e. what the employee could reach before the block.
   const reach = computeClimbReachableSetFromSources(navGrid, [{ x: cx, z: cz }], NAV_CLEARANCE_EMPLOYEE_CELLS, {
     free: { minX: region.minX, maxX: region.maxX + 1, minZ: region.minZ, maxZ: region.maxZ + 1 },
+    freeWaivesClearance: true,
   });
   const ownLevel = navGrid.cellAt(cx, cz)?.benchLevel;
   const maxRing = Math.max(navGrid.width, navGrid.height);
