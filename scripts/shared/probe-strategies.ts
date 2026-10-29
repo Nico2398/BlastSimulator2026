@@ -1693,6 +1693,8 @@ export function runProbe(config: ProbeRunConfig, start?: (engine: RunnerWithCont
       ? start(session.engine)
       : runCommand(session.engine, `sandbox start biome:${config.biome} kit:${config.kit} seed:${config.seed}`).success;
     if (!opened) throw new ProbeStop('opening_failed:sandbox_start');
+    // The crew idles on payroll before the strategy's first order; events still get the run's policy (#2118).
+    for (let i = 0; i < (config.startDelay ?? 0); i++) session.tick();
     STRATEGIES[config.strategy](session);
   } catch (err) {
     if (!(err instanceof ProbeStop)) throw err;

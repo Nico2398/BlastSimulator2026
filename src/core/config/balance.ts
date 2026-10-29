@@ -1773,16 +1773,21 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
  * unhaulable without one) and one driver licensed for both. 'full' adds a
  * dedicated fragmenter driver.
  */
+const SANDBOX_STARTING_BUILDINGS: readonly StartingBuildingSlot[] = [
+  ...DIGGER_STARTING_SITE.buildings,
+  { type: 'explosive_warehouse', tier: 1, stock: { [SANDBOX_STARTER_EXPLOSIVE_ID]: SANDBOX_STARTER_EXPLOSIVE_KG } },
+];
+
 export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxKitId, StartingSiteComposition>> = {
   digger: {
     employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_DIGGER_KIT_DRIVER],
     vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }, { role: 'rock_fragmenter', tier: 1 }],
-    buildings: DIGGER_STARTING_SITE.buildings,
+    buildings: SANDBOX_STARTING_BUILDINGS,
   },
   full: {
     employees: [...BASE_STARTING_EMPLOYEES, DIGGER_KIT_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
     vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }, { role: 'rock_fragmenter', tier: 1 }],
-    buildings: DIGGER_STARTING_SITE.buildings,
+    buildings: SANDBOX_STARTING_BUILDINGS,
   },
 };
 
@@ -1799,10 +1804,14 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxKitId, StartingSiteC
  * keep that trough at or above ~15% of the start (digger ~55k at the worst seed). Full stays
  * above digger. Bisected earlier (#1747): the old 150k / 120k went bankrupt at ~t609 / ~t582.
  * Rerun and numbers: docs/plans/issue-1944-sandbox-yield.md.
+ *
+ * +150k (#2118): 480k / 520k. The opening charge now draws from the starter
+ * warehouse's stock, so the first shot waits no delivery, and a slow-start run
+ * (`probe:progression --start-delay`) keeps a cash cushion. Full stays above digger.
  */
 export const SANDBOX_STARTING_CASH: Readonly<Record<SandboxKitId, number>> = {
-  digger: 330_000,
-  full: 370_000,
+  digger: 480_000,
+  full: 520_000,
 };
 
 /**

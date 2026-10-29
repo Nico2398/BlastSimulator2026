@@ -270,9 +270,11 @@ export class SandboxPanel {
       vehicles: list(details.vehicles.map(v => `${v.count}× ${t(`vehicle_type.${v.role}`)} (${vehicleDisplayName(v.role, v.tier)})`)),
       buildings: list(details.buildings.map(b => `${b.count}× ${buildingDisplayName(b.type, b.tier)}`)),
     });
+    const stock = details.stock.map(s => t('sandbox.detail.stock', { name: t(`explosive.${s.explosiveId}.name`), kg: s.kg }));
     this.kitBlock.replaceChildren(
       detailLine('bs-sandbox-kit-cash', t('sandbox.detail.cash', { cash: formatMoney(details.startingCash) })),
       detailLine('bs-sandbox-kit-opening', opening),
+      ...(stock.length > 0 ? [detailLine('bs-sandbox-kit-stock', stock.join('; '))] : []),
     );
   }
 

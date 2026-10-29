@@ -3683,6 +3683,7 @@
   "sandbox.detail.cash": "Starting cash: ${cash}",
   "sandbox.detail.opens_with": "Opens with: crew: {crew}; vehicles: {vehicles}; buildings: {buildings}",
   "sandbox.detail.none": "none",
+  "sandbox.detail.stock": "{name}: {kg} kg in stock",
   "sandbox.terrain.flat": "flat",
   "sandbox.terrain.rolling": "rolling hills",
   "sandbox.terrain.steep": "steep and rugged",

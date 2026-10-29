@@ -15,7 +15,7 @@ import { getRock } from '../world/RockCatalog.js';
 import { sandboxOresYieldedByRocks, sandboxOreWindow } from '../world/SandboxDeepOre.js';
 import { getOre } from '../world/OreCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, SANDBOX_STARTING_CASH, type SandboxKitId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET, SANDBOX_ORE_GRADE_SCALE } from '../config/balance.js';
+import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, SANDBOX_STARTING_CASH, type SandboxKitId, type StartingSiteComposition, type StartingBuildingSlot, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET, SANDBOX_ORE_GRADE_SCALE } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
 import type { EmployeeRole } from '../entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
@@ -269,6 +269,17 @@ export function sandboxKitDetails(id: SandboxKitId): SandboxKitDetails {
     crew: groupSlots(employees.map(e => ({ role: e.role })), e => e.role),
     vehicles: groupSlots(vehicles.map(v => ({ role: v.role, tier: v.tier })), v => `${v.role}:${v.tier}`),
     buildings: groupSlots(buildings.map(b => ({ type: b.type, tier: b.tier })), b => `${b.type}:${b.tier}`),
-    stock: [], // TODO skeleton: summed from the buildings' stock slots
+    stock: sumStock(buildings),
   };
+}
+
+/** Sum the explosive stock of the starting slots per explosive, in first-seen order (#2118). */
+function sumStock(slots: readonly StartingBuildingSlot[]): { explosiveId: string; kg: number }[] {
+  const totals = new Map<string, number>();
+  for (const slot of slots) {
+    for (const [explosiveId, kg] of Object.entries(slot.stock ?? {})) {
+      totals.set(explosiveId, (totals.get(explosiveId) ?? 0) + kg);
+    }
+  }
+  return [...totals].map(([explosiveId, kg]) => ({ explosiveId, kg }));
 }

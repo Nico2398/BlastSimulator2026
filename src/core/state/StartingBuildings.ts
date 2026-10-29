@@ -180,6 +180,7 @@ export function placeStartingBuildings(
           );
           if (result.success) {
             levelBuildingFootprint(grid, cell.x, cell.z, sizeX, sizeZ);
+            if (slot.stock && result.building) result.building.storedExplosives = { ...slot.stock };
             // The largest-tier rect starts at the same corner, so it already covers the current footprint.
             taken.push(largestAt(cell.x, cell.z));
             placed++;

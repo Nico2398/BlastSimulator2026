@@ -2,7 +2,10 @@
 //
 //   npm run probe:progression -- [--seed 42,7] [--biome a,b] [--kit digger,full]
 //        [--strategy opening,reinvest,ladder,stay_g1] [--horizon N] [--quick] [--json path]
-//        [--event-policy first|cheapest]
+//        [--event-policy first|cheapest] [--start-delay N]
+//
+// `--start-delay N` (default 0) idles the crew on payroll N ticks before the strategy's first order, events answered
+// by the event policy: a slow-starting player (#2118).
 //
 // `--event-policy` picks how pending events are answered: `first` (default, option 0) or `cheapest` (the option with
 // the highest cashDelta; #2117) in the main play loop only: the ladder strategies and the blast-zone clearing waits answer by their own rules. The table's `first sale` / `sales/costs` columns read the ledger: sales (contracts +
