@@ -5,7 +5,7 @@
 //        [--event-policy first|cheapest]
 //
 // `--event-policy` picks how pending events are answered: `first` (default, option 0) or `cheapest` (the option with
-// the highest cashDelta; #2117). The table's `first sale` / `sales/costs` columns read the ledger: sales (contracts +
+// the highest cashDelta; #2117) in the main play loop only: the ladder strategies and the blast-zone clearing waits answer by their own rules. The table's `first sale` / `sales/costs` columns read the ledger: sales (contracts +
 // sales + bonus income) over all expenses from the first sale on, and the group median row adds the 10th percentile.
 //
 // Plays the reference strategies headlessly through the console core and prints
