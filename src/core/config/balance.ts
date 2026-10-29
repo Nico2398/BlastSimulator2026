@@ -1741,8 +1741,17 @@ export const TUTORIAL_RALLY_POINT = { x: 15, z: 17 } as const;
  */
 export const TUTORIAL_STARTING_BUILDINGS_NEAR = { x: 4, z: 19 } as const;
 
-/** Sandbox starting-kit ids (#1671, #1891): 'digger' = rock digger and driver, 'full' = adds a rock fragmenter and its driver. Starting kits are keyed by it. */
+/** Sandbox starting-kit ids (#1671, #1891): 'digger' = rock digger and rock fragmenter, one driver licensed for both (#2115: cheaper to run, clears boulders more slowly), 'full' = adds a dedicated fragmenter driver. Starting kits are keyed by it. */
 export type SandboxKitId = 'digger' | 'full';
+
+/** Sandbox Digger kit's single driver (#2115): excavator and rock-fragmenter licences. */
+export const SANDBOX_DIGGER_KIT_DRIVER: StartingSiteEmployeeSlot = {
+  role: 'driver',
+  qualifications: [
+    { category: 'driving.excavator', proficiencyLevel: 1 },
+    { category: 'driving.rock_fragmenter', proficiencyLevel: 1 },
+  ],
+};
 
 const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
   role: 'driver',
@@ -1752,11 +1761,16 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
 /**
  * Free starting kit per sandbox kit (#1671, #1891): every kit can drill,
  * charge, fire, haul and sell its first blast with no purchases. 'digger' is a
- * rock digger, a ramp into the crater, and its dedicated excavator-licensed
- * driver (#1874). 'full' adds a rock fragmenter and its licensed driver.
+ * rock digger, a ramp into the crater, a rock fragmenter (#2115: boulders are
+ * unhaulable without one) and one driver licensed for both. 'full' adds a
+ * dedicated fragmenter driver.
  */
 export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxKitId, StartingSiteComposition>> = {
-  digger: DIGGER_STARTING_SITE,
+  digger: {
+    employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_DIGGER_KIT_DRIVER],
+    vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }, { role: 'rock_fragmenter', tier: 1 }],
+    buildings: DIGGER_STARTING_SITE.buildings,
+  },
   full: {
     employees: [...BASE_STARTING_EMPLOYEES, DIGGER_KIT_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
     vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }, { role: 'rock_fragmenter', tier: 1 }],

@@ -77,7 +77,7 @@ describe('sandbox mode', () => {
   it('defaults to the digger kit when no kit is given', () => {
     runner.run('sandbox start biome:desert_badlands seed:1');
     expect(ctx.state!.cash).toBe(SANDBOX_KITS.digger.startingCash);
-    expect(ctx.state!.vehicles.vehicles.some(v => v.type === 'rock_fragmenter')).toBe(false);
+    expect(ctx.state!.vehicles.vehicles.some(v => v.type === 'rock_fragmenter')).toBe(true);
   });
 
   it.each([

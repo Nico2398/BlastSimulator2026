@@ -423,15 +423,13 @@ describe('SandboxPanel', () => {
     expect(full.trim()).not.toBe('');
     expect(full).not.toBe(digger);
 
-    // The full kit adds a rock fragmenter over the digger kit.
+    // Both kits hold a rock fragmenter (#2115); they differ by the full kit's dedicated driver.
     const names = (id: SandboxKitId) => sandboxKitDetails(id).vehicles
       .map(v => t(getVehicleDefByTier(v.role, v.tier).nameKey));
     for (const name of names('digger')) expect(digger, name).toContain(name);
     for (const name of names('full')) expect(full, name).toContain(name);
-    const diggerOnly = new Set(names('digger'));
-    const extra = names('full').filter(n => !diggerOnly.has(n));
-    expect(extra.length).toBeGreaterThan(0);
-    for (const name of extra) expect(digger, name).not.toContain(name);
+    const driversIn = (id: SandboxKitId) => sandboxKitDetails(id).crew.find(e => e.role === 'driver')?.count ?? 0;
+    expect(driversIn('full')).toBeGreaterThan(driversIn('digger'));
   });
 
   it('digger kit line lists the rock digger (#1874)', () => {
@@ -443,12 +441,12 @@ describe('SandboxPanel', () => {
     expect(shown).toContain(`${digger!.count}× ${t('vehicle_type.rock_digger')} (${vehicleDisplayName('rock_digger', digger!.tier)})`);
   });
 
-  it('full kit line lists the rock fragmenter, digger kit line does not (#1891)', () => {
+  it('both kit lines list the rock fragmenter (#1891, #2115)', () => {
     panel.show();
     changeSelect('kit', 'full');
     expect(text('bs-sandbox-kit-opening')).toContain(t('vehicle_type.rock_fragmenter'));
     changeSelect('kit', 'digger');
-    expect(text('bs-sandbox-kit-opening')).not.toContain(t('vehicle_type.rock_fragmenter'));
+    expect(text('bs-sandbox-kit-opening')).toContain(t('vehicle_type.rock_fragmenter'));
   });
 
   it('renders a kit select with one option per kit and no difficulty control (#1891)', () => {

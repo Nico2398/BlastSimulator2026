@@ -23,7 +23,7 @@ import { isValidOreGradeScale } from '../../../src/core/economy/OreGrade.js';
 import { getLevel, getAllLevels } from '../../../src/core/campaign/Level.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
-import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE, SANDBOX_ORE_GRADE_SCALE, ORE_GRADE_SCALE_DEFAULT } from '../../../src/core/config/balance.js';
+import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE, SANDBOX_DIGGER_KIT_DRIVER, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SANDBOX_ORE_GRADE_SCALE, ORE_GRADE_SCALE_DEFAULT } from '../../../src/core/config/balance.js';
 import { resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
 import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 
@@ -368,26 +368,6 @@ describe('sandbox starting site per kit (#1671, #1891)', () => {
   const skillsOf = (id: SandboxKitId) =>
     new Set(siteOf(id)!.employees.flatMap(e => e.qualifications.map(q => q.category)));
 
-  /** One key per slot, so a kit compares as a multiset. */
-  const slotKeys = (id: SandboxKitId): string[] => {
-    const site = siteOf(id)!;
-    return [
-      ...site.employees.map(e => `e:${e.role}:${e.qualifications.map(q => `${q.category}${q.proficiencyLevel}`).sort().join('+')}`),
-      ...site.vehicles.map(v => `v:${v.role}:${v.tier}`),
-      ...site.buildings.map(b => `b:${b.type}:${b.tier}`),
-    ];
-  };
-
-  const isSubMultiset = (small: string[], big: string[]): boolean => {
-    const pool = [...big];
-    for (const k of small) {
-      const i = pool.indexOf(k);
-      if (i < 0) return false;
-      pool.splice(i, 1);
-    }
-    return true;
-  };
-
   it.each(SANDBOX_KIT_ORDER)('%s level defines a startingSite', (id) => {
     expect(siteOf(id)).toBeDefined();
     expect(SANDBOX_KITS[id].startingSite).toBe(siteOf(id));
@@ -417,14 +397,12 @@ describe('sandbox starting site per kit (#1671, #1891)', () => {
     expect(types).toContain('spoil_heap');
   });
 
-  it('digger kit is a subset of the full kit, which adds exactly a rock fragmenter and its driver (#1891)', () => {
-    expect(isSubMultiset(slotKeys('digger'), slotKeys('full'))).toBe(true);
-    const extra = [...slotKeys('full')];
-    for (const k of slotKeys('digger')) extra.splice(extra.indexOf(k), 1);
-    expect(extra.sort()).toEqual([
-      'e:driver:driving.rock_fragmenter1',
-      'v:rock_fragmenter:1',
-    ].sort());
+  it('digger kit is the full kit less its fragmenter driver: same fleet and buildings, one fewer crew (#2115)', () => {
+    const digger = siteOf('digger')!;
+    const full = siteOf('full')!;
+    expect(digger.vehicles.map(v => `${v.role}:${v.tier}`).sort()).toEqual(full.vehicles.map(v => `${v.role}:${v.tier}`).sort());
+    expect(digger.buildings).toEqual(full.buildings);
+    expect(digger.employees).toHaveLength(full.employees.length - 1);
   });
 
   it('keeps cash at 330k digger / 370k full alongside the kit', () => {
@@ -439,10 +417,54 @@ describe('sandbox starting site per kit (#1671, #1891)', () => {
     expect(SANDBOX_STARTING_CASH.full).toBe(370_000);
   });
 
-  it('digger kit includes a rock digger and a driver holding driving.excavator (#1874)', () => {
+  it('digger kit includes a rock digger and a rock fragmenter (#1874, #2115)', () => {
     expect(siteOf('digger')!.vehicles.some(v => v.role === 'rock_digger' && v.tier === 1)).toBe(true);
-    expect(skillsOf('digger').has('driving.excavator')).toBe(true);
-    expect(skillsOf('digger').has('driving.rock_fragmenter')).toBe(false);
+    expect(siteOf('digger')!.vehicles.some(v => v.role === 'rock_fragmenter' && v.tier === 1)).toBe(true);
+    expect(siteOf('digger')!.vehicles).toHaveLength(5);
+  });
+
+  it('digger kit has exactly one excavator driver and it also holds the rock fragmenter licence (#2115)', () => {
+    const site = siteOf('digger')!;
+    const withCat = (cat: string) => site.employees.filter(e => e.qualifications.some(q => q.category === cat));
+    expect(withCat('driving.excavator')).toHaveLength(1);
+    expect(withCat('driving.rock_fragmenter')).toHaveLength(1);
+    expect(withCat('driving.excavator')[0]).toBe(withCat('driving.rock_fragmenter')[0]);
+    expect(withCat('driving.excavator')[0]!.role).toBe('driver');
+  });
+
+  it('digger kit has four crew, no dedicated third driver (#2115)', () => {
+    const site = siteOf('digger')!;
+    expect(site.employees).toHaveLength(4);
+    expect(site.employees.map(e => e.role).sort()).toEqual(['blaster', 'driller', 'driver', 'driver']);
+  });
+
+  it('SANDBOX_DIGGER_KIT_DRIVER holds both the excavator and the rock fragmenter licence, and is the digger kit driver (#2115)', () => {
+    const cats = SANDBOX_DIGGER_KIT_DRIVER.qualifications.map(q => q.category).sort();
+    expect(SANDBOX_DIGGER_KIT_DRIVER.role).toBe('driver');
+    expect(cats).toEqual(['driving.excavator', 'driving.rock_fragmenter']);
+    expect(siteOf('digger')!.employees).toContainEqual(SANDBOX_DIGGER_KIT_DRIVER);
+  });
+
+  it('full kit keeps a dedicated third driver and five crew (#2115)', () => {
+    const site = siteOf('full')!;
+    expect(site.employees).toHaveLength(5);
+    expect(site.vehicles).toHaveLength(5);
+    expect(site.employees.filter(e => e.role === 'driver')).toHaveLength(3);
+    expect(site.employees.filter(e => e.qualifications.some(q => q.category === 'driving.rock_fragmenter'))).toHaveLength(1);
+    expect(site.employees.filter(e => e.qualifications.some(q => q.category === 'driving.excavator'))).toHaveLength(1);
+    const fragDriver = site.employees.find(e => e.qualifications.some(q => q.category === 'driving.rock_fragmenter'))!;
+    expect(fragDriver.qualifications.some(q => q.category === 'driving.excavator')).toBe(false);
+  });
+
+  it('the campaign digger kits keep four vehicles, four crew and an excavator-only driver (#2115)', () => {
+    for (const site of [GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE]) {
+      expect(site.vehicles).toHaveLength(4);
+      expect(site.vehicles.some(v => v.role === 'rock_fragmenter')).toBe(false);
+      expect(site.employees).toHaveLength(4);
+      expect(site.employees.some(e => e.qualifications.some(q => q.category === 'driving.rock_fragmenter'))).toBe(false);
+      expect(site.employees.filter(e => e.qualifications.some(q => q.category === 'driving.excavator'))).toHaveLength(1);
+    }
+    expect(SANDBOX_STARTING_SITES.digger).not.toBe(GRUMPSTONE_RIDGE_STARTING_SITE);
   });
 
   it('full kit adds a rock fragmenter and a driving.rock_fragmenter driver (#1891)', () => {

@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { recordProfit } from '../../src/core/campaign/Campaign.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
-import { STARTING_SITE_STAFFED_COMPOSITION, FREIGHT_WAREHOUSE_CAPACITY_KG, SANDBOX_STARTING_SITES } from '../../src/core/config/balance.js';
+import { STARTING_SITE_STAFFED_COMPOSITION, FREIGHT_WAREHOUSE_CAPACITY_KG, GRUMPSTONE_RIDGE_STARTING_SITE } from '../../src/core/config/balance.js';
 import { getStorageCapacity } from '../../src/core/entities/Building.js';
 
 function startLevel(levelId: string, args = '') {
@@ -147,7 +147,7 @@ describe('other levels and the tutorial are unchanged (#1363)', () => {
 
   it.each(['grumpstone_ridge', 'treranium_depths'])('%s opens with the level kit, not bare (#1672)', (levelId) => {
     const { state } = startLevel(levelId);
-    const kit = SANDBOX_STARTING_SITES.digger;
+    const kit = GRUMPSTONE_RIDGE_STARTING_SITE;
     expect(state.employees.employees.map((e) => e.role).sort()).toEqual(kit.employees.map((e) => e.role).sort());
     expect(state.vehicles.vehicles.map((v) => v.type).sort()).toEqual(kit.vehicles.map((v) => v.role).sort());
     expect(state.buildings.buildings.map((b) => b.type).sort()).toEqual(['freight_warehouse', 'spoil_heap']);
