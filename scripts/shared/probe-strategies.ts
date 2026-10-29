@@ -580,16 +580,17 @@ function rockBreaks(grid: VoxelGrid, at: Pattern): boolean {
 }
 
 /** The opening's shot site and the slope ratio of the ramp it dug. */
-function runOpening(s: ProbeSession): { at: Pattern; ramp: RampOrder } {
+function runOpening(s: ProbeSession, sandboxOpening = true): { at: Pattern; ramp: RampOrder } {
   const fail = (step: string): never => { throw new ProbeStop(`opening_failed:${step}`); };
 
   const ranked = rankDeposits(s.grid)[0];
-  const starter = ranked && rockBreaks(s.grid, ranked) ? null : starterShotOrigin(s.state);
+  const starter = !sandboxOpening || (ranked && rockBreaks(s.grid, ranked)) ? null : starterShotOrigin(s.state);
   const site = starter ?? (ranked ? { x: ranked.x, z: ranked.z } : { x: s.grid.sizeX >> 1, z: s.grid.sizeZ >> 1 });
   if (!placeBuilding(s, 'living_quarters', site, site)) fail('living_quarters');
 
   // Raised beside the quarters, in the crew's reach: the stock helper builds on the first free cell, in the grid corner, which the crew never reached on some alpine sites.
-  if (!s.state.buildings.buildings.some(b => b.type === 'explosive_warehouse')) {
+  // Not the ladder's: its measured windows (and the Shareholder Summit win) were set with the stock helper's warehouse and the richest site.
+  if (sandboxOpening && !s.state.buildings.buildings.some(b => b.type === 'explosive_warehouse')) {
     if (!placeBuilding(s, 'explosive_warehouse', site, site)) fail('explosive_warehouse');
     s.waitFor('explosive_warehouse', () => s.state.buildings.buildings.some(b => b.type === 'explosive_warehouse'));
   }
@@ -1615,7 +1616,7 @@ function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
 const LADDER_SHIFT_POLICY = 'set_policy mode:shift_12h fatigue:60';
 
 function runLadder(s: ProbeSession, maxGrade: number | null): void {
-  const opened = runOpening(s);
+  const opened = runOpening(s, false);
   s.run(LADDER_SHIFT_POLICY);
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
