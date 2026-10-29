@@ -76,6 +76,7 @@ import { chargeColumnM, explosiveHoleLimits, maxFittingChargeKg } from '../../sr
 import { getLevel } from '../../src/core/campaign/Level.js';
 import { getEventById } from '../../src/core/events/EventPool.js';
 import type { EventConsequence } from '../../src/core/events/EventPool.js';
+import { getRock } from '../../src/core/world/RockCatalog.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
 import { nearestHaulDepot, newCraterAccessMemory, playPitLogistics, rampKeepOutZones, strandedCrew, type CraterAccessMemory } from './probe-crater-access.js';
@@ -218,7 +219,9 @@ function rankDeposits(grid: VoxelGrid, span = SHOT_SPAN, depth: number = SHOT.de
 
 /**
  * Origin of the reference shot centred on the site's starter deposit (#2116, #2123), or null when the site has none.
- * The probe reads it as it reads ore: ground truth standing in for the survey.
+ * The probe reads it as it reads ore: ground truth standing in for the survey. The opening shoots it when the richest
+ * deposit's rock is too hard for the reference charge (`rockBreaks`); shot first elsewhere it sold too little to carry the
+ * payroll (desert_badlands: 4 of 10 digger seeds reached t4000 on the richest, 0 on the starter).
  */
 export function starterShotOrigin(state: GameState, span: number = SHOT_SPAN): Pattern | null {
   const config = terrainConfigOf(state);
@@ -553,12 +556,35 @@ function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = ra
 
 // ── Opening ──
 
+/**
+ * Mean energy absorption of the rock under the 9x9 footprint at `at`, down to the hole depth, up to which the
+ * reference charge breaks the ground. The richest deposits of tropical_karst and volcanic_flats sit in obstiite and
+ * gnarlite (2200 and 2600): the shot broke nothing, no fragment was ever sold and the payroll bankrupted all 20 seeds.
+ * alpine_granite (clunkite, stubite: 1100 and 1300) breaks and sells.
+ */
+const BREAKABLE_ABSORPTION_MAX = 2000;
+
+function rockBreaks(grid: VoxelGrid, at: Pattern): boolean {
+  let total = 0, count = 0;
+  for (let dx = 0; dx <= SHOT_SPAN; dx++) {
+    for (let dz = 0; dz <= SHOT_SPAN; dz++) {
+      const top = computeVoxelColumnSurfaceY(grid, at.x + dx, at.z + dz);
+      if (top === null) continue;
+      for (let d = 0; d < SHOT.depth; d++) {
+        total += getRock(grid.dominantRockAt(at.x + dx, top - d, at.z + dz))?.energyAbsorption ?? 0;
+        count++;
+      }
+    }
+  }
+  return count === 0 || total / count <= BREAKABLE_ABSORPTION_MAX;
+}
+
 /** The opening's shot site and the slope ratio of the ramp it dug. */
 function runOpening(s: ProbeSession): { at: Pattern; ramp: RampOrder } {
   const fail = (step: string): never => { throw new ProbeStop(`opening_failed:${step}`); };
 
-  const starter = starterShotOrigin(s.state);
   const ranked = rankDeposits(s.grid)[0];
+  const starter = ranked && rockBreaks(s.grid, ranked) ? null : starterShotOrigin(s.state);
   const site = starter ?? (ranked ? { x: ranked.x, z: ranked.z } : { x: s.grid.sizeX >> 1, z: s.grid.sizeZ >> 1 });
   if (!placeBuilding(s, 'living_quarters', site, site)) fail('living_quarters');
 
