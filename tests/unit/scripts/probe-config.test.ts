@@ -185,3 +185,64 @@ describe('probe-config --event-policy (#2117)', () => {
     expect(runs.every(r => (r.eventPolicy ?? 'first') === 'first')).toBe(true);
   });
 });
+
+describe('probe-config --start-delay (#2118)', () => {
+  it('defaults to 0 and the defaults stay equal to a bare parse', () => {
+    expect(PROBE_DEFAULTS.startDelay).toBe(0);
+    expect(parseArgs([]).startDelay).toBe(0);
+    expect(parseArgs([])).toEqual(PROBE_DEFAULTS);
+  });
+
+  it('parses a positive integer', () => {
+    expect(parseArgs(['--start-delay', '400']).startDelay).toBe(400);
+    expect(parseArgs(['--start-delay', '1']).startDelay).toBe(1);
+  });
+
+  it('accepts an explicit 0', () => {
+    expect(parseArgs(['--start-delay', '0']).startDelay).toBe(0);
+  });
+
+  it('combines with other flags in any order', () => {
+    const a = parseArgs(['--quick', '--start-delay', '250', '--horizon', '900']);
+    const b = parseArgs(['--horizon', '900', '--start-delay', '250', '--quick']);
+    expect(a.startDelay).toBe(250);
+    expect(b.startDelay).toBe(250);
+    expect(a).toEqual(b);
+  });
+
+  it('throws on a negative value naming it', () => {
+    expect(() => parseArgs(['--start-delay', '-5'])).toThrow(/-5/);
+  });
+
+  it('throws on a non-integer value naming it', () => {
+    expect(() => parseArgs(['--start-delay', '1.5'])).toThrow(/1\.5/);
+    expect(() => parseArgs(['--start-delay', 'soon'])).toThrow(/soon/);
+  });
+
+  it('throws when the value is missing', () => {
+    expect(() => parseArgs(['--start-delay'])).toThrow(/start-delay/);
+    expect(() => parseArgs(['--start-delay', '--quick'])).toThrow();
+  });
+
+  it('expandMatrix puts startDelay on every run only when above 0', () => {
+    const runs = expandMatrix(parseArgs(['--start-delay', '300']));
+    expect(runs).toHaveLength(24);
+    for (const run of runs) expect(run.startDelay).toBe(300);
+  });
+
+  it('expandMatrix leaves the key off a run at the default 0', () => {
+    for (const run of expandMatrix(PROBE_DEFAULTS)) expect(run).not.toHaveProperty('startDelay');
+    for (const run of expandMatrix(parseArgs(['--start-delay', '0']))) expect(run).not.toHaveProperty('startDelay');
+  });
+
+  it('a default run config is unchanged by the new option', () => {
+    expect(expandMatrix(PROBE_DEFAULTS)[0]).toEqual({
+      biome: 'desert_badlands', kit: 'digger', seed: 42, strategy: 'opening', horizon: 10000,
+    });
+  });
+
+  it('startDelay and the event policy ride the same run config', () => {
+    const runs = expandMatrix(parseArgs(['--start-delay', '120', '--event-policy', 'cheapest']));
+    expect(runs[0]).toMatchObject({ startDelay: 120, eventPolicy: 'cheapest' });
+  });
+});

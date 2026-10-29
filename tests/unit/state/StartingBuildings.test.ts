@@ -373,3 +373,56 @@ describe('placeStartingBuildings — warehouse upgrade room (#1830)', () => {
     expect(run()).toEqual(run());
   });
 });
+
+describe('placeStartingBuildings — slot stock (#2118)', () => {
+  const STOCKED: StartingBuildingSlot = { type: 'explosive_warehouse', tier: 1, stock: { krackle: 100 } };
+
+  it('places an explosive warehouse already holding the slot stock', () => {
+    const buildings = createBuildingState();
+    expect(placeStartingBuildings(buildings, makeFlatGrid(40), [STOCKED], { x: 20, z: 20 })).toBe(1);
+    const b = buildings.buildings[0]!;
+    expect(b.type).toBe('explosive_warehouse');
+    expect(b.active).toBe(true);
+    expect(b.storedExplosives?.['krackle']).toBe(100);
+  });
+
+  it('holds several explosives when the slot names several', () => {
+    const buildings = createBuildingState();
+    placeStartingBuildings(buildings, makeFlatGrid(40), [{ type: 'explosive_warehouse', tier: 1, stock: { krackle: 40, boomite: 25 } }], { x: 20, z: 20 });
+    expect(buildings.buildings[0]!.storedExplosives).toEqual({ krackle: 40, boomite: 25 });
+  });
+
+  it('a slot without stock leaves the building empty', () => {
+    const buildings = createBuildingState();
+    placeStartingBuildings(buildings, makeFlatGrid(40), [{ type: 'explosive_warehouse', tier: 1 }, WAREHOUSE], { x: 20, z: 20 });
+    for (const b of buildings.buildings) {
+      expect(Object.values(b.storedExplosives ?? {}).reduce((a, c) => a + c, 0), b.type).toBe(0);
+    }
+  });
+
+  it('stocks only the slot that names stock when several buildings are placed', () => {
+    const buildings = createBuildingState();
+    expect(placeStartingBuildings(buildings, makeFlatGrid(60), [WAREHOUSE, STOCKED, { type: 'spoil_heap', tier: 1 }], { x: 30, z: 30 })).toBe(3);
+    const stocked = buildings.buildings.filter(b => Object.values(b.storedExplosives ?? {}).some(kg => kg > 0));
+    expect(stocked).toHaveLength(1);
+    expect(stocked[0]!.type).toBe('explosive_warehouse');
+  });
+
+  it('copies the stock: spending it never edits the slot, and a second placement starts full again', () => {
+    const stock = { krackle: 100 };
+    const slot: StartingBuildingSlot = { type: 'explosive_warehouse', tier: 1, stock };
+    const first = createBuildingState();
+    placeStartingBuildings(first, makeFlatGrid(40), [slot], { x: 20, z: 20 });
+    first.buildings[0]!.storedExplosives!['krackle'] = 0;
+    expect(stock.krackle).toBe(100);
+    const second = createBuildingState();
+    placeStartingBuildings(second, makeFlatGrid(40), [slot], { x: 20, z: 20 });
+    expect(second.buildings[0]!.storedExplosives?.['krackle']).toBe(100);
+  });
+
+  it('charges no cash: placement takes no cash argument and the sandbox opens at the kit cash', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('sandbox start biome:desert_badlands kit:digger seed:3').success).toBe(true);
+    expect(ctx.state!.cash).toBe(480_000);
+  });
+});

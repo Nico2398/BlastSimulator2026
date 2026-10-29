@@ -117,12 +117,12 @@ describe('sandboxCommand — unknown kit', () => {
 
 describe('sandboxCommand — kit and legacy difficulty alias (#1891)', () => {
   it.each([
-    [{ kit: 'full' }, 370_000],
-    [{ kit: 'digger' }, 330_000],
-    [{ difficulty: 'easy' }, 370_000],
-    [{ difficulty: 'normal' }, 330_000],
-    [{ difficulty: 'hard' }, 330_000],
-    [{ kit: ' FULL ' }, 370_000],
+    [{ kit: 'full' }, 520_000],
+    [{ kit: 'digger' }, 480_000],
+    [{ difficulty: 'easy' }, 520_000],
+    [{ difficulty: 'normal' }, 480_000],
+    [{ difficulty: 'hard' }, 480_000],
+    [{ kit: ' FULL ' }, 520_000],
   ])('%j starts with cash %i', (named, cash) => {
     const ctx = freshCtx();
     const result = sandboxCommand(ctx, ['start'], named as Record<string, string>);
@@ -134,28 +134,28 @@ describe('sandboxCommand — kit and legacy difficulty alias (#1891)', () => {
     const ctx = freshCtx();
     const result = sandboxCommand(ctx, ['start'], { kit: 'digger', difficulty: 'easy' });
     expect(result.success).toBe(true);
-    expect(ctx.state!.cash).toBe(330_000);
+    expect(ctx.state!.cash).toBe(480_000);
   });
 
   it('a valid kit with an invalid difficulty still starts (kit wins)', () => {
     const ctx = freshCtx();
     const result = sandboxCommand(ctx, ['start'], { kit: 'full', difficulty: 'insane' });
     expect(result.success).toBe(true);
-    expect(ctx.state!.cash).toBe(370_000);
+    expect(ctx.state!.cash).toBe(520_000);
   });
 });
 
 // ── start-success message ─────────────────────────────────────────────────
 // SANDBOX_DEFAULTS (biome: desert_badlands, kit: digger, seed: 12345)
 // produce the level def sandboxLevelDef(config) resolves to: 64x64 grid
-// (datum SANDBOX_DATUM), $330,000 starting cash — captured directly off a
+// (datum SANDBOX_DATUM), $480,000 starting cash — captured directly off a
 // real sandboxCommand run (#861), not re-derived from Sandbox.ts's config
 // tables by hand. #1191 dropped the message's `{gridY}x` segment entirely.
 
 describe('sandboxCommand — start-success message', () => {
   // #1891: the message names the kit, never a difficulty. Exact wording is the
   // implementer's; the facts it must carry are pinned here.
-  const FACTS = ['Sandbox started.', '64x64', 'desert_badlands', 'seed 12345', '$330,000'];
+  const FACTS = ['Sandbox started.', '64x64', 'desert_badlands', 'seed 12345', '$480,000'];
   const expectMessage = (output: string, staffed: boolean): void => {
     for (const fact of FACTS) expect(output).toContain(fact);
     expect(output).not.toMatch(/difficult/i);

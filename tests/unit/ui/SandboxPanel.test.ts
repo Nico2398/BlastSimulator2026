@@ -629,3 +629,72 @@ describe('SandboxPanel', () => {
     expect(root.classList.contains('bsx-root') || root.closest('.bsx-root') !== null).toBe(true);
   });
 });
+
+describe('SandboxPanel kit stock line (#2118)', () => {
+  let panel: SandboxPanel;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    panel = new SandboxPanel(container);
+  });
+
+  const stockLine = () => document.getElementById('bs-sandbox-kit-stock');
+  const changeKit = (value: string) => {
+    const sel = document.getElementById('bs-sandbox-kit') as HTMLSelectElement;
+    sel.value = value;
+    sel.dispatchEvent(new Event('change'));
+  };
+
+  it('shows the stock line for the default kit as soon as the panel opens', () => {
+    panel.show();
+    expect(stockLine()).toBeTruthy();
+    expect(stockLine()!.textContent).toBe('Krackle: 100 kg in stock');
+  });
+
+  it.each(SANDBOX_KIT_ORDER)('shows "Krackle: 100 kg in stock" for the %s kit', (kit) => {
+    panel.show();
+    changeKit(kit);
+    expect(stockLine()!.textContent).toBe('Krackle: 100 kg in stock');
+  });
+
+  it('the line follows the kit details stock', () => {
+    panel.show();
+    for (const kit of SANDBOX_KIT_ORDER) {
+      changeKit(kit);
+      for (const s of sandboxKitDetails(kit).stock) {
+        expect(stockLine()!.textContent, kit).toContain(`${s.kg} kg`);
+        expect(stockLine()!.textContent, kit).toContain(t(`explosive.${s.explosiveId}.name`));
+      }
+    }
+  });
+
+  it('keeps the cash and opening lines beside the stock line', () => {
+    panel.show();
+    expect(document.getElementById('bs-sandbox-kit-cash')).toBeTruthy();
+    expect(document.getElementById('bs-sandbox-kit-opening')).toBeTruthy();
+    expect((document.getElementById('bs-sandbox-kit-cash')!.textContent ?? '').replace(/\D/g, '')).toContain('480000');
+  });
+
+  it('is localized in French: a translated line that still names the explosive and the 100 kg', () => {
+    const prev = getLocale();
+    try {
+      setLocale('en');
+      panel.show();
+      const english = stockLine()!.textContent;
+      setLocale('fr');
+      document.body.innerHTML = '';
+      const c = document.createElement('div');
+      document.body.appendChild(c);
+      new SandboxPanel(c).show();
+      const french = stockLine()!.textContent ?? '';
+      expect(french).not.toBe(english);
+      expect(french).toContain(t('explosive.krackle.name'));
+      expect(french).toContain('100');
+      expect(french).not.toContain('sandbox.detail');
+    } finally {
+      setLocale(prev);
+    }
+  });
+});
