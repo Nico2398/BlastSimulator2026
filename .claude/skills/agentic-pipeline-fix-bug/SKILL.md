@@ -18,6 +18,8 @@ description: >
  3. Finalization   → `agentic-pipeline-finalization`.
 ```
 
+**A failing test the issue names is the reproduction.** When the issue points at an existing test that fails on `main` today (often one parked behind a `TODO(#<issue>)`, a skip, or a pin moved off the failing case), the TDD cycle still runs, and that test is its first RED: the test-writer re-enables it unchanged in the tests worktree and adds only what the Contract asks beyond it. Never skip `tdd split` because a test already exists, and never write a new test outside the tests worktree.
+
 No refactor phase: a bug fix changes what the bug needs and nothing else. A fix whose root cause sits in code the issue did not name is still this run's fix; a neighbouring defect it reveals is a finding (`agentic-pipeline-finalization`'s follow-up register).
 
 ### Failure loops
