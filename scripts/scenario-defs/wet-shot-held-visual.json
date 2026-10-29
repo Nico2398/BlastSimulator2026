@@ -42,9 +42,9 @@
       "role": "setup"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:15,15 diameter:0.089",
+      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:42,15 diameter:0.089",
       "timeout": 60,
-      "description": "Order a 3x3 grid by dragging (15,15)-(19,19) at 2 m spacing.",
+      "description": "Order a 3x3 grid by dragging (42,15)-(46,19) at 2 m spacing.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -79,9 +79,9 @@
         },
         {
           "type": "dragTiles",
-          "x1": 15,
+          "x1": 42,
           "z1": 15,
-          "x2": 19,
+          "x2": 46,
           "z2": 19
         },
         {
