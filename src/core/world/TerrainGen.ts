@@ -12,6 +12,7 @@ import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } fro
 import { WorldNoiseFields } from './NoiseFields.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
 import { OreVeinSampler } from './OreVeins.js';
+import { resolveStarterDeposit, type StarterDeposit } from './StarterDeposit.js';
 
 /**
  * Version of the terrain generator's algorithm — stamped into every save's
@@ -122,6 +123,8 @@ export interface TerrainContext {
   biome: BiomeDef;
   strata: StrataSampler;
   oreVeins: OreVeinSampler;
+  /** The sandbox starter deposit (#2116); null when ore deposits are off. */
+  starterDeposit: StarterDeposit | null;
 }
 
 /** Dominant climate-weighted biome at the playable centre — what terrain generation lands on. */
@@ -172,7 +175,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
   const strata = new StrataSampler(seed, profile);
   const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true, ...(oreGradeScale !== undefined ? { gradeScale: oreGradeScale } : {}) });
 
-  return { worldGen, biome, strata, oreVeins };
+  return { worldGen, biome, strata, oreVeins, starterDeposit: resolveStarterDeposit(config) };
 }
 
 export { surfaceDensityAt };

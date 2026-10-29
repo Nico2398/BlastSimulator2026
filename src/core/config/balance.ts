@@ -3308,6 +3308,18 @@ export const SANDBOX_ORE_DEPTH_WINDOWS: Readonly<Record<string, readonly [number
   absurdium: [30, 55],
 };
 
+/**
+ * Sandbox starter deposit (#2116): one shallow, close, breakable, sellable deposit per site.
+ * Distances are metres from the site centre; the yield band is what the reference shot centred on it must yield.
+ */
+export const STARTER_DEPOSIT_MIN_DISTANCE_M = 10;
+export const STARTER_DEPOSIT_MAX_DISTANCE_M = 25;
+export const STARTER_DEPOSIT_POCKET_RADIUS_M = 10;
+export const STARTER_DEPOSIT_YIELD_KG_MIN = 10_000;
+export const STARTER_DEPOSIT_YIELD_KG_MAX = 20_000;
+/** Half the voxels the reference shot clears on desert_badlands seed 42 (~690). */
+export const STARTER_DEPOSIT_MIN_CLEARED_VOXELS = 345;
+
 /** Board of directors (#1946). */
 export const BOARD_QUARTER_TICKS = 720;
 export const BOARD_TARGET_GROWTH = 1.25;
