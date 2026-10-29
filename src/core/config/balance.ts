@@ -3345,6 +3345,11 @@ export const STARTER_DEPOSIT_CREW_STARTS: ReadonlyArray<readonly [number, number
 /** Preferred distance (m) from that corner to the deposit centre: clear of the buildings, well inside the 10-25 m brief. */
 export const STARTER_DEPOSIT_CREW_DISTANCE_M = 18;
 export const STARTER_DEPOSIT_POCKET_RADIUS_M = 8;
+/**
+ * Half-width (m) of the square around the deposit centre that starting buildings keep clear (#2118): the 3x3 reference
+ * pattern spans +-4 m, plus two cells for a vehicle to drive up to the corner holes.
+ */
+export const STARTER_DEPOSIT_KEEP_CLEAR_HALF_M = 6;
 /** Depth (m below the surface) the soft weathered pocket reaches. */
 export const STARTER_DEPOSIT_POCKET_DEPTH_M = 8;
 /** Ore fills the pocket's inner core of this radius (m) down to this depth (m); covers the reference shot with margin. */

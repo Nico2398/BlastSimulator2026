@@ -128,6 +128,10 @@ function largestTierSize(type: BuildingType): { sizeX: number; sizeZ: number } {
  *
  * With `drivable` (#2044) a candidate must also pass it; every pass is tried
  * with it before the same pass without it.
+ *
+ * With `keepClear` (#2118) a candidate whose footprint overlaps that rect is refused in the
+ * first rounds (the sandbox's starter deposit must stay open to a vehicle); only the rounds
+ * that follow, for a site with no other room, ignore it.
  */
 export function placeStartingBuildings(
   buildings: BuildingState,
@@ -136,6 +140,7 @@ export function placeStartingBuildings(
   near: { x: number; z: number },
   rallyPoint?: { x: number; z: number },
   drivable?: (x: number, z: number) => boolean,
+  keepClear?: Rect,
 ): number {
   const bounds = siteBoundsForGrid(grid);
   const cx = Math.round(near.x);
@@ -168,7 +173,10 @@ export function placeStartingBuildings(
       () => true,
     ];
     // With a drivability rule every pass is tried with it first (#2044).
-    const passes = drivable ? [...basePasses.map(p => (x: number, z: number) => drivable(x, z) && p(x, z)), ...basePasses] : basePasses;
+    const drivablePasses = drivable ? [...basePasses.map(p => (x: number, z: number) => drivable(x, z) && p(x, z)), ...basePasses] : basePasses;
+    const clearOfRect = (x: number, z: number): boolean =>
+      !keepClear || !rectsOverlap({ minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ }, keepClear);
+    const passes = keepClear ? [...drivablePasses.map(p => (x: number, z: number) => clearOfRect(x, z) && p(x, z)), ...drivablePasses] : drivablePasses;
 
     search: for (const accepts of passes) {
       for (let r = 0; r <= maxRadius; r++) {

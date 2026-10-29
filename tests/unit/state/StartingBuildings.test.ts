@@ -425,4 +425,20 @@ describe('placeStartingBuildings — slot stock (#2118)', () => {
     expect(runner.run('sandbox start biome:desert_badlands kit:digger seed:3').success).toBe(true);
     expect(ctx.state!.cash).toBe(480_000);
   });
+
+  it('keeps clear of a keep-clear rect when the site has room elsewhere (#2118)', () => {
+    const buildings = createBuildingState();
+    const keepClear = { minX: 14, minZ: 14, maxX: 27, maxZ: 27 };
+    placeStartingBuildings(buildings, makeFlatGrid(60), [WAREHOUSE], { x: 20, z: 20 }, undefined, undefined, keepClear);
+    const b = buildings.buildings[0]!;
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef('freight_warehouse', 1));
+    const overlaps = b.x < keepClear.maxX && b.x + sizeX > keepClear.minX && b.z < keepClear.maxZ && b.z + sizeZ > keepClear.minZ;
+    expect(overlaps).toBe(false);
+  });
+
+  it('still places the building when a keep-clear rect covers the whole site (#2118)', () => {
+    const buildings = createBuildingState();
+    const keepClear = { minX: 0, minZ: 0, maxX: 40, maxZ: 40 };
+    expect(placeStartingBuildings(buildings, makeFlatGrid(40), [WAREHOUSE], { x: 20, z: 20 }, undefined, undefined, keepClear)).toBe(1);
+  });
 });
