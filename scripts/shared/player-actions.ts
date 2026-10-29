@@ -14,6 +14,15 @@ import { getExplosivesFreeCapacity, getExplosivesInStock } from '../../src/core/
 /** A console command runner, as `createRunner().runner.run` or a recording wrapper of it. */
 export type Run = (cmd: string) => { success: boolean; output: string };
 
+/** How a probe answers a pending event: `first` is option 0, `cheapest` the option with the highest cashDelta (#2117). */
+export type EventPolicy = 'first' | 'cheapest';
+
+/** Index of the option with the highest `cashDelta` (missing = 0; lowest index on ties; 0 when empty). */
+export function cheapestEventOption(consequences: ReadonlyArray<{ cashDelta?: number }>): number {
+  void consequences;
+  throw new Error('not implemented');
+}
+
 /**
  * Resolve a pending event with its first option (`event choose 0`); a no-op when none is pending.
  * `tick` refuses to advance while an event is pending, so every headless tick loop answers it first.

@@ -7,7 +7,22 @@ import { accumulateOreMass } from '../../src/core/mining/BlastOreReport.js';
 import { BUILDING_TIERS, getAllBuildingTypes, getBuildingDef, getUpgradeCost, isSingleTierType } from '../../src/core/entities/Building.js';
 import { getAllVehicleRoles, getVehicleDefByTier } from '../../src/core/entities/Vehicle.js';
 import { HIRING_COSTS } from '../../src/core/config/balance.js';
+import type { Transaction } from '../../src/core/economy/Finance.js';
 import type { ProbeRunConfig } from './probe-config.js';
+
+/** Ledger sums after the first sale: sales (contracts + sales + bonus income) against all expenses (#2117). */
+export interface SalesCosts {
+  firstSaleTick: number | null;
+  sales: number;
+  costs: number;
+  ratio: number | null;
+}
+
+/** Sales and costs from the first sale on, read from a ledger; `endTick` (exclusive) closes the window when given. */
+export function salesCostsAfterFirstSale(transactions: readonly Transaction[], endTick?: number): SalesCosts {
+  void transactions; void endTick;
+  throw new Error('not implemented');
+}
 
 /** Ticks at which cash is sampled for the report. */
 export const CASH_SAMPLE_TICKS = [1000, 3000, 6000, 10000, 15000, 25000, 40000, 50000] as const;

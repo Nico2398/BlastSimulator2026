@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Progression probe options: defaults, CLI parsing and matrix expansion (#1922)
 
 import type { SandboxKitId } from '../../src/core/config/balance.js';
+import type { EventPolicy } from './player-actions.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
 
 export type StrategyId = 'opening' | 'reinvest' | 'ladder' | 'stay_g1';
@@ -15,6 +16,8 @@ export interface ProbeRunConfig {
   explosive?: string;
   /** Most haulers the ladder buys; absent = LADDER_MAX_HAULERS. An experiment knob for fleet-size studies. */
   maxHaulers?: number;
+  /** How pending events are answered; absent = 'first'. */
+  eventPolicy?: EventPolicy;
 }
 
 export interface ProbeOptions {
@@ -25,6 +28,7 @@ export interface ProbeOptions {
   horizon: number;
   quick: boolean;
   jsonPath: string | null;
+  eventPolicy: EventPolicy;
 }
 
 export const QUICK_HORIZON = 3000;
@@ -37,6 +41,7 @@ export const PROBE_DEFAULTS: ProbeOptions = {
   horizon: 10000,
   quick: false,
   jsonPath: null,
+  eventPolicy: 'first',
 };
 
 const QUICK_SEED = 42;
