@@ -56,6 +56,8 @@ export interface AgentMetrics {
   /** Prompt size of its last request — where the context ended. */
   finalContextTokens: number;
   compactions: number;
+  /** The context size each compaction started from (Claude Code's `preTokens`), in order. */
+  compactedAtTokens: number[];
   wallSeconds: number;
   models: Record<string, number>;
   effort: Record<string, number>;
@@ -229,7 +231,11 @@ function accumulate(
       acc.first = Math.min(acc.first ?? time, time);
       acc.last = Math.max(acc.last ?? time, time);
     }
-    if (record.type === 'system' && typeof record.subtype === 'string' && record.subtype.includes('compact')) acc.metrics.compactions++;
+    if (record.type === 'system' && typeof record.subtype === 'string' && record.subtype.includes('compact')) {
+      acc.metrics.compactions++;
+      const pre = (record.compactMetadata as { preTokens?: unknown } | undefined)?.preTokens;
+      if (typeof pre === 'number' && Number.isFinite(pre)) acc.metrics.compactedAtTokens.push(Math.round(pre));
+    }
     if (record.type === 'assistant' && record.message) {
       const id = record.message.id ?? `${order.length}`;
       if (!latest.has(id)) order.push(id);
@@ -286,7 +292,7 @@ function newAgent(agent: string): AgentAccumulator {
   return {
     metrics: {
       agent, invocations: 0, requests: 0, tokens: zero(), costUSD: 0, peakContextTokens: 0, finalContextTokens: 0,
-      compactions: 0, wallSeconds: 0, models: {}, effort: {}, tools: {},
+      compactions: 0, compactedAtTokens: [], wallSeconds: 0, models: {}, effort: {}, tools: {},
     },
     byModel: new Map(),
   };

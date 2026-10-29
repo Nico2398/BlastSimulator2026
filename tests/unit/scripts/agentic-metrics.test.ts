@@ -50,7 +50,7 @@ function session(): SessionTranscript {
       ], '2026-10-24T00:10:00Z'),
       toolResult('Changed vs main\nPASS (cached: this exact tree already passed) static\nVERIFY: PASS'),
       toolResult('Blind phase for 1-2: the tests …', true),
-      { type: 'system', subtype: 'compact_boundary', timestamp: '2026-10-24T00:11:00Z' },
+      { type: 'system', subtype: 'compact_boundary', timestamp: '2026-10-24T00:11:00Z', compactMetadata: { trigger: 'auto', preTokens: 120000, postTokens: 9000 } },
       {
         type: 'cost-state', totalCostUSD: 3, totalAPIDuration: 60000, totalToolDuration: 120000, totalLinesAdded: 40, totalLinesRemoved: 4,
         modelUsage: { 'claude-sonnet-5-5': { inputTokens: 1, outputTokens: 1, cacheReadInputTokens: 1, cacheCreationInputTokens: 1, costUSD: 3 } },
@@ -117,6 +117,7 @@ describe('extractMetrics', () => {
     expect(main.peakContextTokens).toBe(1505);
     expect(main.finalContextTokens).toBe(1505);
     expect(main.compactions).toBe(1);
+    expect(main.compactedAtTokens).toEqual([120000]);
     expect(main.effort).toEqual({ medium: 2 });
   });
 
@@ -206,6 +207,7 @@ describe('reports', () => {
     const summary = runSummary(run);
     expect(summary).toContain('**$3.00**');
     expect(summary).toContain('| test-writer |');
+    expect(summary).toContain('| 1 (at 120k) |');
   });
 
   it('aggregates runs by pipeline, outcome and agent', () => {
