@@ -28,7 +28,8 @@ const SEED = 42;
 // barren, so a shot there can never feed storage or the ore tally. This one
 // opens the deposit centred near (40,33).
 const SHOT_START = '36,30';
-const RAMP_SETUP_TICKS = 600;
+// Re-measured (#2115): the one driver also crews the fragmenter, so the west ramp finishes at ~684 ticks (east ~435), was under 600.
+const RAMP_SETUP_TICKS = 800;
 const HAUL_WINDOW_TICKS = 800;
 const MIN_HAULED_SHARE = 0.3;
 const MIN_ORDERED_SHARE = 0.8;
@@ -85,6 +86,11 @@ function openingKitHaul(side: 'west' | 'east') {
   for (const f of haulable) accumulateOreMass(haulableOre, f.fragment.volume, f.fragment.oreDensities);
   const haulableOreKg = Object.values(haulableOre).reduce((a, b) => a + b, 0);
 
+  // Counted from the blast (#2115): the kit's fragmenter breaks the boulders up during
+  // the ramp, so the warehouse can fill before the ramp is done.
+  const baseline = oreKg(state);
+  const storedBefore = state.logistics.storedMassKg;
+
   // Ramp depth is measured from the start surface and must land on the crater
   // floor (~9.5 m): the west start sits near 16.5 m, the east one near 13.4 m (floor 10.5).
   const ramp = RAMP_ORDER[side];
@@ -104,8 +110,6 @@ function openingKitHaul(side: 'west' | 'east') {
   };
   const rampTicks = tickWhile(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), RAMP_SETUP_TICKS, sample);
 
-  const baseline = oreKg(state);
-  const storedBefore = state.logistics.storedMassKg;
   tickWhile(run, state, () => false, HAUL_WINDOW_TICKS, sample);
   const hauledOreKg = oreKg(state) - baseline;
   const storedKg = state.logistics.storedMassKg - storedBefore;
