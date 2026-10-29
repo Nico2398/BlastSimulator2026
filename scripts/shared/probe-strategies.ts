@@ -221,8 +221,9 @@ function rankDeposits(grid: VoxelGrid, span = SHOT_SPAN, depth: number = SHOT.de
  * The probe reads it as it reads ore: ground truth standing in for the survey.
  */
 export function starterShotOrigin(state: GameState, span: number = SHOT_SPAN): Pattern | null {
-  void state; void span; void terrainConfigOf; void resolveStarterDeposit;
-  throw new Error('not implemented');
+  const config = terrainConfigOf(state);
+  const starter = config ? resolveStarterDeposit(config) : null;
+  return starter ? { x: starter.x - span / 2, z: starter.z - span / 2 } : null;
 }
 
 /** Metres a building other than a depot keeps from every depot: haulers queue in the gap to dock. */
@@ -556,11 +557,18 @@ function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = ra
 function runOpening(s: ProbeSession): { at: Pattern; ramp: RampOrder } {
   const fail = (step: string): never => { throw new ProbeStop(`opening_failed:${step}`); };
 
+  const starter = starterShotOrigin(s.state);
   const ranked = rankDeposits(s.grid)[0];
-  const site = ranked ? { x: ranked.x, z: ranked.z } : { x: s.grid.sizeX >> 1, z: s.grid.sizeZ >> 1 };
+  const site = starter ?? (ranked ? { x: ranked.x, z: ranked.z } : { x: s.grid.sizeX >> 1, z: s.grid.sizeZ >> 1 });
   if (!placeBuilding(s, 'living_quarters', site, site)) fail('living_quarters');
 
-  const shot = orderShot(s);
+  // Raised beside the quarters, in the crew's reach: the stock helper builds on the first free cell, in the grid corner, which the crew never reached on some alpine sites.
+  if (!s.state.buildings.buildings.some(b => b.type === 'explosive_warehouse')) {
+    if (!placeBuilding(s, 'explosive_warehouse', site, site)) fail('explosive_warehouse');
+    s.waitFor('explosive_warehouse', () => s.state.buildings.buildings.some(b => b.type === 'explosive_warehouse'));
+  }
+
+  const shot = orderShot(s, [], undefined, starter ?? undefined);
   if (!shot) return fail('shot');
   s.waitFor('shot', () => shotReady(s.state));
   if (!fireShot(s)) fail('blast');
