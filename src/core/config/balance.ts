@@ -3314,11 +3314,16 @@ export const SANDBOX_ORE_DEPTH_WINDOWS: Readonly<Record<string, readonly [number
  */
 export const STARTER_DEPOSIT_MIN_DISTANCE_M = 10;
 export const STARTER_DEPOSIT_MAX_DISTANCE_M = 25;
-export const STARTER_DEPOSIT_POCKET_RADIUS_M = 10;
+/** Where the starting crew spawns (cells): the starter deposit sits on the ring cells nearest it, beside the opening buildings. */
+export const STARTER_DEPOSIT_ANCHOR_X = 10;
+export const STARTER_DEPOSIT_ANCHOR_Z = 5;
+/** Preferred distance (m) from that corner to the deposit centre: clear of the buildings, well inside the 10-25 m brief. */
+export const STARTER_DEPOSIT_CREW_DISTANCE_M = 18;
+export const STARTER_DEPOSIT_POCKET_RADIUS_M = 8;
 /** Depth (m below the surface) the soft weathered pocket reaches. */
 export const STARTER_DEPOSIT_POCKET_DEPTH_M = 8;
 /** Ore fills the pocket's inner core of this radius (m) down to this depth (m); covers the reference shot with margin. */
-export const STARTER_DEPOSIT_ORE_CORE_RADIUS_M = 8;
+export const STARTER_DEPOSIT_ORE_CORE_RADIUS_M = 6;
 export const STARTER_DEPOSIT_ORE_DEPTH_M = 6;
 /** Stored ore density (0-1) of the pocket before the site grade scale. */
 export const STARTER_DEPOSIT_ORE_DENSITY = 0.14;

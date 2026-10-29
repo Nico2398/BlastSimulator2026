@@ -4,11 +4,12 @@
 // scripted bonus: a soft weathered-rock pocket carrying real voxel ore, found by a survey like any other.
 
 import {
-  STARTER_DEPOSIT_MAX_DISTANCE_M, STARTER_DEPOSIT_MIN_DISTANCE_M, STARTER_DEPOSIT_ORE_CORE_RADIUS_M,
+  STARTER_DEPOSIT_ANCHOR_X, STARTER_DEPOSIT_ANCHOR_Z, STARTER_DEPOSIT_CREW_DISTANCE_M, STARTER_DEPOSIT_MAX_DISTANCE_M, STARTER_DEPOSIT_MIN_DISTANCE_M, STARTER_DEPOSIT_ORE_CORE_RADIUS_M,
   STARTER_DEPOSIT_ORE_DEPTH_M, STARTER_DEPOSIT_ORE_DENSITY, STARTER_DEPOSIT_POCKET_DEPTH_M,
-  STARTER_DEPOSIT_POCKET_RADIUS_M, SANDBOX_FLAT_PAD_SIZE, ORE_GRADE_SCALE_DEFAULT,
+  STARTER_DEPOSIT_POCKET_RADIUS_M, SANDBOX_FLAT_PAD_SIZE, SANDBOX_FLAT_PAD_MAX_SPREAD, ORE_GRADE_SCALE_DEFAULT, VEHICLE_MAX_SLOPE_RATIO,
 } from '../config/balance.js';
 import { subSeed } from '../math/Hash.js';
+import { isStepClimbable, stepClimbRun } from '../nav/NavGrid.js';
 import { getAllRocks } from './RockCatalog.js';
 import { buildTerrainContext, isInBorderZone, type TerrainConfig } from './TerrainGen.js';
 import { sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
@@ -22,8 +23,11 @@ export interface StarterDeposit {
   readonly radius: number;
 }
 
-/** Cell step of the candidate scan and of the footprint height sampling, in metres. */
-const SCAN_STEP_M = 2;
+/** Cells the rally flag lands around (it varies with the terrain); the deposit must be climbable from every one. */
+const CREW_STARTS: ReadonlyArray<readonly [number, number]> = [[STARTER_DEPOSIT_ANCHOR_X, STARTER_DEPOSIT_ANCHOR_Z], [4, 9], [4, 2], [15, 2], [9, 2]];
+/** Hole offsets (m) of the 3x3 reference shot around its centre. */
+const HOLE_OFFSETS = [-4, 0, 4] as const;
+const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 const STARTER_ORES = ['dirtite', 'rustite'] as const;
 
 /** The softest rock of the catalog: the pocket's weathered host. */
@@ -38,13 +42,24 @@ function cellJitter(seed: number, x: number, z: number): number {
   return (subSeed(seed, `starter:${x}:${z}`) % 10_000) / 10_000;
 }
 
+/** Surface voxel Y of a cell, memoised: neighbouring footprints share most of their cells. */
+function surfaceYMemo(worldGen: WorldGenContext): (x: number, z: number) => number {
+  const memo = new Map<number, number>();
+  return (x, z) => {
+    const key = x * 65_536 + z;
+    let y = memo.get(key);
+    if (y === undefined) { y = Math.floor(sampleSurfaceHeightY(worldGen, x, z)); memo.set(key, y); }
+    return y;
+  };
+}
+
 /** Surface height spread (voxels) of the shot footprint centred on (cx, cz). */
-function footprintSpread(worldGen: WorldGenContext, cx: number, cz: number): number {
+function footprintSpread(surfaceY: (x: number, z: number) => number, cx: number, cz: number): number {
   const half = (SANDBOX_FLAT_PAD_SIZE - 1) / 2;
   let lo = Infinity, hi = -Infinity;
-  for (let dx = -half; dx <= half; dx += SCAN_STEP_M) {
-    for (let dz = -half; dz <= half; dz += SCAN_STEP_M) {
-      const y = Math.round(sampleSurfaceHeightY(worldGen, cx + dx, cz + dz));
+  for (let dx = -half; dx <= half; dx++) {
+    for (let dz = -half; dz <= half; dz++) {
+      const y = surfaceY(cx + dx, cz + dz);
       lo = Math.min(lo, y); hi = Math.max(hi, y);
     }
   }
@@ -52,9 +67,39 @@ function footprintSpread(worldGen: WorldGenContext, cx: number, cz: number): num
 }
 
 /**
- * Pick the deposit for a built site: the flattest footprint on the ring
- * STARTER_DEPOSIT_MIN..MAX_DISTANCE_M from the site centre, seeded tie-break.
- * The starting buildings are placed after generation near the same centre, so the ring anchors there.
+ * Cells a vehicle climbing at its slope limit reaches from the crew corner over the grid, flood-filled on the
+ * continuous surface height; keyed like `surfaceYMemo`. Mirrors the nav grid's climb gate without building one.
+ */
+function reachableFromCrew(worldGen: WorldGenContext, sizeX: number, sizeZ: number, startX: number, startZ: number): Set<number> {
+  const height = (x: number, z: number) => sampleSurfaceHeightY(worldGen, x, z);
+  const seen = new Set<number>();
+  const stack: Array<[number, number]> = [[startX, startZ]];
+  seen.add(startX * 65_536 + startZ);
+  while (stack.length > 0) {
+    const [x, z] = stack.pop()!;
+    const h = height(x, z);
+    for (const [dx, dz] of NEIGHBOURS) {
+      const nx = x + dx, nz = z + dz;
+      if (nx < 0 || nz < 0 || nx >= sizeX || nz >= sizeZ || seen.has(nx * 65_536 + nz)) continue;
+      if (!isStepClimbable(h, height(nx, nz), stepClimbRun(dx, dz, VEHICLE_MAX_SLOPE_RATIO), VEHICLE_MAX_SLOPE_RATIO)) continue;
+      seen.add(nx * 65_536 + nz);
+      stack.push([nx, nz]);
+    }
+  }
+  return seen;
+}
+
+/** Whether every hole cell of the 3x3 reference shot centred on (x, z) is in every set of `reach`. */
+function holesReachable(reach: readonly Set<number>[], x: number, z: number): boolean {
+  for (const dx of HOLE_OFFSETS) for (const dz of HOLE_OFFSETS) for (const r of reach) if (!r.has((x + dx) * 65_536 + z + dz)) return false;
+  return true;
+}
+
+/**
+ * Pick the deposit for a built site, on the ring STARTER_DEPOSIT_MIN..MAX_DISTANCE_M from the site centre.
+ * The starting crew spawns in the corner by the grid origin and the buildings are placed beside its rally
+ * flag after generation, so among footprints flat enough to shoot from and climbable from that corner at the vehicle slope limit, the candidate
+ * nearest STARTER_DEPOSIT_CREW_DISTANCE_M from that corner wins (seeded tie-break); a site with no flat footprint on the ring takes the flattest one.
  */
 export function pickStarterDeposit(
   config: TerrainConfig, worldGen: WorldGenContext, borderWidth: number,
@@ -62,16 +107,22 @@ export function pickStarterDeposit(
   if (config.oreDeposits !== true) return null;
   const cx = Math.floor(config.sizeX / 2), cz = Math.floor(config.sizeZ / 2);
   const reach = STARTER_DEPOSIT_POCKET_RADIUS_M + 1;
+  const surfaceY = surfaceYMemo(worldGen);
+  const climbable = CREW_STARTS.map(([sx, sz]) => reachableFromCrew(worldGen, config.sizeX, config.sizeZ, sx, sz));
   let best: { x: number; z: number; score: number } | null = null;
   const span = STARTER_DEPOSIT_MAX_DISTANCE_M;
-  for (let dx = -span; dx <= span; dx += SCAN_STEP_M) {
-    for (let dz = -span; dz <= span; dz += SCAN_STEP_M) {
+  for (let dx = -span; dx <= span; dx++) {
+    for (let dz = -span; dz <= span; dz++) {
       const dist = Math.hypot(dx, dz);
       if (dist < STARTER_DEPOSIT_MIN_DISTANCE_M || dist > STARTER_DEPOSIT_MAX_DISTANCE_M) continue;
       const x = cx + dx, z = cz + dz;
       if (isInBorderZone(x - reach, z - reach, config.sizeX, config.sizeZ, borderWidth)
         || isInBorderZone(x + reach, z + reach, config.sizeX, config.sizeZ, borderWidth)) continue;
-      const score = footprintSpread(worldGen, x, z) + cellJitter(config.seed, x, z);
+      const spread = footprintSpread(surfaceY, x, z);
+      const toCrew = Math.hypot(x - STARTER_DEPOSIT_ANCHOR_X, z - STARTER_DEPOSIT_ANCHOR_Z);
+      // Flat footprints rank by distance to the crew corner; any unflat one ranks behind every flat one.
+      const score = (spread <= SANDBOX_FLAT_PAD_MAX_SPREAD ? 0 : 1e6 * spread) + (holesReachable(climbable, x, z) ? 0 : 1e4)
+        + Math.abs(toCrew - STARTER_DEPOSIT_CREW_DISTANCE_M) + cellJitter(config.seed, x, z);
       if (!best || score < best.score) best = { x, z, score };
     }
   }
