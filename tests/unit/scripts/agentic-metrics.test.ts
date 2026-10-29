@@ -170,13 +170,26 @@ describe('extractMetrics', () => {
     expect(main.finalContextTokens).toBe(1505);
   });
 
-  it('reports no cost rather than inventing one when cost-state is missing', () => {
+  // A run killed by the timeout writes no cost-state: its tokens are priced
+  // at the measured rate (2 USD per million weighted tokens for sonnet-5-5).
+  it('estimates the cost from the tokens when cost-state is missing', () => {
     const partial = session();
     partial.records = partial.records.filter((record) => record.type !== 'cost-state');
     const estimated = extractMetrics(partial, {}, VOCAB);
     expect(estimated.cost.source).toBe('estimated');
-    expect(estimated.cost.totalUSD).toBe(0);
+    // 20 input + 400 output ×5 + 1000 read ×0.1 + 2000 1-hour writes ×2 = 6120 weighted.
+    expect(estimated.cost.totalUSD).toBeCloseTo(0.0122, 4);
     expect(estimated.cost.byModel['claude-sonnet-5-5']!.output).toBe(400);
+    expect(estimated.agents.reduce((sum, agent) => sum + agent.costUSD, 0)).toBeCloseTo(0.0122, 3);
+  });
+
+  it('leaves a model with no measured rate unpriced', () => {
+    const partial = session();
+    partial.records = partial.records.filter((record) => record.type !== 'cost-state');
+    for (const record of [...partial.records, ...partial.subagents[0]!.records]) {
+      if (record.message && 'model' in record.message) record.message.model = 'claude-unknown-9';
+    }
+    expect(extractMetrics(partial, {}, VOCAB).cost.totalUSD).toBe(0);
   });
 });
 

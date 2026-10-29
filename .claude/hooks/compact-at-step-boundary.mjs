@@ -8,10 +8,14 @@
 //   at a boundary, the next step heavy   allow when the prompt reached HEAVY_FLOOR
 //   at a boundary, otherwise             allow when the prompt reached NEAR_FULL
 //
+//   a sub-agent, or no step in flight    allow when the prompt reached NEAR_FULL
+//
 // A boundary is the first BOUNDARY_REQUESTS requests after
 // `npm run pipeline -- step` wrote `.agentic/step.json`; `--heavy` marks the
-// step ahead as heavy. Manual `/compact`, sub-agents, sessions with no step
-// marker, and a transcript ending on an API error keep Claude Code's own rule.
+// step ahead as heavy. NEAR_FULL is capped at 80% of a small model's window.
+// Manual `/compact`, an unreadable transcript or one ending on an API error,
+// and a session the runner did not shrink (no CLAUDE_CODE_AUTO_COMPACT_WINDOW:
+// Claude Code then asks only near full on its own) are always allowed.
 //
 // The payload names the session's main transcript and no agent: a forked
 // orchestrator and its sub-agents write `<session>/subagents/agent-<id>.jsonl`.
@@ -30,6 +34,7 @@ const NEAR_FULL = 500_000;
 const MID_STEP_VALVE = 850_000;
 const BOUNDARY_REQUESTS = 2;
 const LEAD_AGENT_TYPES = new Set(['', 'orchestrator']);
+const SMALL_WINDOW = 200_000;
 
 const payload = parsePayload(readStdin()) ?? {};
 const project = process.env.CLAUDE_PROJECT_DIR || process.cwd();
@@ -84,7 +89,7 @@ function askingAgent(mainPath) {
 
 /** The last real prompt size, whether the transcript ends on an API error, and responses since `sinceMs`. */
 function readTranscript(path, sinceMs) {
-  const result = { prompt: 0, errored: false, requestsSince: Number.POSITIVE_INFINITY };
+  const result = { prompt: 0, model: '', errored: false, requestsSince: Number.POSITIVE_INFINITY };
   if (typeof path !== 'string' || !existsSync(path)) return result;
   const ids = new Set();
   const counted = Number.isFinite(sinceMs);
@@ -101,6 +106,7 @@ function readTranscript(path, sinceMs) {
     result.errored = record.message.model === '<synthetic>';
     const usage = record.message.usage;
     if (result.errored || !usage) continue;
+    result.model = typeof record.message.model === 'string' ? record.message.model : '';
     result.prompt = (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
     if (counted && Date.parse(record.timestamp) > sinceMs) ids.add(record.message.id);
   }
@@ -109,15 +115,21 @@ function readTranscript(path, sinceMs) {
 }
 
 if (payload.trigger !== 'auto') allow();
-if (!existsSync(markerPath)) allow();
+if (!process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW) allow();
 const agent = askingAgent(payload.transcript_path);
-if (!LEAD_AGENT_TYPES.has(agent.type)) allow();
+const stepInFlight = existsSync(markerPath);
+const marker = (stepInFlight && readJson(markerPath)) || {}; // An unreadable marker still means a step is in flight.
+const { prompt, model, errored, requestsSince } = readTranscript(agent.path, Date.parse(marker.since));
+// No readable prompt size: nothing to judge by, so Claude Code's own rule holds.
+if (errored || prompt === 0 || prompt >= MID_STEP_VALVE) allow();
 
-const marker = readJson(markerPath) ?? {}; // An unreadable marker still means a step is in flight.
-const { prompt, errored, requestsSince } = readTranscript(agent.path, Date.parse(marker.since));
+if (!stepInFlight || !LEAD_AGENT_TYPES.has(agent.type)) {
+  const nearFull = /haiku/i.test(model) ? Math.min(NEAR_FULL, 0.8 * SMALL_WINDOW) : NEAR_FULL;
+  if (prompt >= nearFull) allow();
+  refuse(`${Math.round(prompt / 1000)}k tokens: outside a step boundary, compaction waits until ${nearFull / 1000}k.`);
+}
+
 const name = typeof marker.name === 'string' ? marker.name : 'a pipeline step';
-
-if (errored || prompt >= MID_STEP_VALVE) allow();
 if (requestsSince < BOUNDARY_REQUESTS) {
   if (marker.heavy === true && prompt >= HEAVY_FLOOR) allow();
   if (prompt >= NEAR_FULL) allow();

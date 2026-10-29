@@ -55,4 +55,11 @@ describe('run metrics export', () => {
     expect(append).toContain('continue-on-error: true');
     expect(append).toContain('::warning::');
   });
+
+  // Measured on the first runs: a 5-minute cache expired on every long wait
+  // and delegation, and the rewrites were most of each run's cost.
+  it('keeps a 1-hour prompt cache on both Claude steps, lead and sub-agents', () => {
+    expect(runner.match(/CLAUDE_CODE_PROMPT_CACHE_TTL: '1h'/g)).toHaveLength(2);
+    expect(runner.match(/CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL: '1h'/g)).toHaveLength(2);
+  });
 });

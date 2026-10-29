@@ -13,7 +13,7 @@ import { execFileSync } from 'child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { step, withProgressLine } from '../../../scripts/lib/pipeline/steps.js';
+import { step, stepFor, withProgressLine } from '../../../scripts/lib/pipeline/steps.js';
 import { hookScript, runHook, type HookRegistry } from '../../helpers/claudeHooks';
 
 const ROOT = join(import.meta.dirname, '../../..');
@@ -35,13 +35,13 @@ const SINCE = '2026-10-24T10:00:00.000Z';
 type TranscriptRecord = { type: string; timestamp: string; message: { id: string; model?: string; usage?: object } };
 
 /** Records whose last prompt is `promptTokens`, with `afterSince` API responses after SINCE. */
-function records(promptTokens: number, afterSince: number): TranscriptRecord[] {
+function records(promptTokens: number, afterSince: number, model = 'claude-sonnet-5-5'): TranscriptRecord[] {
   const usage = { input_tokens: 10, cache_read_input_tokens: promptTokens - 10, cache_creation_input_tokens: 0 };
-  const list: TranscriptRecord[] = [{ type: 'assistant', timestamp: '2026-10-24T09:59:00.000Z', message: { id: 'before', usage } }];
+  const list: TranscriptRecord[] = [{ type: 'assistant', timestamp: '2026-10-24T09:59:00.000Z', message: { id: 'before', model, usage } }];
   for (let i = 0; i < afterSince; i += 1) {
     const timestamp = new Date(Date.parse(SINCE) + (i + 1) * 1000).toISOString();
     // A response streamed as two records shares one message id and counts once.
-    list.push({ type: 'assistant', timestamp, message: { id: `m${i}`, usage } }, { type: 'assistant', timestamp, message: { id: `m${i}`, usage } });
+    list.push({ type: 'assistant', timestamp, message: { id: `m${i}`, model, usage } }, { type: 'assistant', timestamp, message: { id: `m${i}`, model, usage } });
   }
   return list;
 }
@@ -57,11 +57,11 @@ function transcript(promptTokens: number, afterSince = 0): string {
 }
 
 /** A sub-agent transcript of the session above, written after it, as a fork or a delegation writes one. */
-function agentTranscript(agentType: string, promptTokens: number, afterSince = 0): void {
+function agentTranscript(agentType: string, promptTokens: number, afterSince = 0, model?: string): void {
   const dir = join(project, 'session', 'subagents');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `agent-a${agentType}.meta.json`), JSON.stringify({ agentType }));
-  const path = writeRecords(join(dir, `agent-a${agentType}.jsonl`), records(promptTokens, afterSince));
+  const path = writeRecords(join(dir, `agent-a${agentType}.jsonl`), records(promptTokens, afterSince, model));
   const later = new Date(Date.now() + 60_000);
   utimesSync(path, later, later);
 }
@@ -70,8 +70,8 @@ function marker(heavy: boolean): void {
   writeFileSync(join(project, '.agentic/step.json'), JSON.stringify({ label: '42-7', name: 'tdd:6 implement', since: SINCE, heavy }));
 }
 
-function compact(fields: Record<string, unknown>) {
-  const result = runHook(HOOK, JSON.stringify({ hook_event_name: 'PreCompact', trigger: 'auto', ...fields }), { CLAUDE_PROJECT_DIR: project });
+function compact(fields: Record<string, unknown>, env: NodeJS.ProcessEnv = { CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000' }) {
+  const result = runHook(HOOK, JSON.stringify({ hook_event_name: 'PreCompact', trigger: 'auto', ...fields }), { CLAUDE_PROJECT_DIR: project, ...env });
   return { status: result.status, blocked: result.stdout.includes('"decision":"block"'), stdout: result.stdout };
 }
 
@@ -87,6 +87,15 @@ describe('step boundaries', () => {
     const plan = readFileSync(join(project, '.agentic/plan/42-7.md'), 'utf8');
     expect(plan).toMatch(/## Progress\n- tdd:1 plan done — [0-9a-f]+\n- tdd:6 implement done — [0-9a-f]+ — none\n/);
     expect(existsSync(join(project, '.agentic/step.json'))).toBe(false);
+  });
+
+  it('lets the pipeline commands open their own steps, the heavy ones marked heavy', () => {
+    stepFor(project, 'tdd start', '42-7');
+    stepFor(project, 'tdd split', '42-7');
+    expect(JSON.parse(readFileSync(join(project, '.agentic/step.json'), 'utf8'))).toMatchObject({ name: 'tdd: implement', heavy: true });
+    stepFor(project, 'tdd join', '42-7');
+    expect(JSON.parse(readFileSync(join(project, '.agentic/step.json'), 'utf8'))).toMatchObject({ name: 'verify and finalize', heavy: false });
+    expect(readFileSync(join(project, '.agentic/plan/42-7.md'), 'utf8')).toMatch(/- tdd: plan and skeleton done — [0-9a-f]+\n- tdd: implement done — /);
   });
 
   it('appends under an existing Progress section, before the next heading', () => {
@@ -105,7 +114,13 @@ describe('the gating hook', () => {
     mkdirSync(join(project, '.agentic'), { recursive: true });
   });
 
-  it('allows a compaction when no step is in flight', () => {
+  it('outside a step, waits until the context is near full', () => {
+    expect(compact({ transcript_path: transcript(100_000, 3) }).stdout).toContain('waits until 500k');
+    expect(compact({ transcript_path: transcript(520_000, 3) }).blocked).toBe(false);
+  });
+
+  it('leaves a session the runner did not shrink, or one with no readable transcript, to Claude Code', () => {
+    expect(compact({ transcript_path: transcript(100_000, 3) }, { CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' }).blocked).toBe(false);
     expect(compact({}).blocked).toBe(false);
   });
 
@@ -150,12 +165,15 @@ describe('the gating hook', () => {
     expect(compact({ transcript_path: main }).blocked).toBe(false);
   });
 
-  it('allows a sub-agent, whether the payload names it or only its transcript does', () => {
-    marker(false);
+  it('holds a sub-agent to the near-full rule by its own transcript, capped for a small window', () => {
+    marker(true);
     const main = transcript(20_000, 0);
-    agentTranscript('test-writer', 150_000, 5);
+    agentTranscript('visual-tester', 150_000, 0);
+    expect(compact({ transcript_path: main }).stdout).toContain('waits until 500k');
+    agentTranscript('visual-tester', 520_000, 0);
     expect(compact({ transcript_path: main }).blocked).toBe(false);
-    expect(compact({ agent_type: 'test-writer' }).blocked).toBe(false);
+    agentTranscript('Explore', 170_000, 0, 'claude-haiku-5-5');
+    expect(compact({ transcript_path: main }).blocked).toBe(false);
   });
 
   it('skips API-error records for the prompt size, and allows when the transcript ends on one', () => {

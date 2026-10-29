@@ -7,6 +7,8 @@
  * `compact-at-step-boundary.mjs` reads it to allow the lead's automatic
  * compaction only in the first requests of a step, and only when the step
  * ahead is heavy or the context is near full. `step done` closes the last.
+ * The pipeline commands that start a step open it themselves (`stepFor`),
+ * so those boundaries do not depend on the lead remembering to mark them.
  *
  * @module pipeline/steps
  */
@@ -79,4 +81,18 @@ export function step(cwd: string, label: string, name: string, note?: string, he
   writeFileSync(stepPath(root), `${JSON.stringify(marker)}\n`);
   lines.push(`Step in flight: ${name}${heavy ? ' (heavy: compaction may run before it starts)' : ''}.`);
   return lines;
+}
+
+/** The step each pipeline command opens when it finishes. */
+const COMMAND_STEPS = {
+  'tdd start': { name: 'tdd: plan and skeleton', heavy: false },
+  'tdd split': { name: 'tdd: implement', heavy: true },
+  'tdd join': { name: 'verify and finalize', heavy: false },
+  'review-brief': { name: 'review: apply findings', heavy: true },
+} as const;
+
+/** Close the step in flight and open the one `command` starts. */
+export function stepFor(cwd: string, command: keyof typeof COMMAND_STEPS, label: string): string[] {
+  const next = COMMAND_STEPS[command];
+  return step(cwd, label, next.name, undefined, next.heavy);
 }
