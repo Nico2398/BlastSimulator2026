@@ -232,7 +232,7 @@ export function sandboxBiomeTraits(biomeId: string): SandboxBiomeTraits {
 }
 
 /** What a kit hands the player at the start (#1686). */
-export interface SandboxKitDetails {
+interface SandboxKitDetails {
   id: SandboxKitId;
   labelKey: string;
   startingCash: number;

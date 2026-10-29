@@ -783,7 +783,7 @@ describe('sandbox economy: the kit-only opening, no explosive warehouse (#1963)'
     expect(state.levelEnded, `level ended (${label()})`).toBe(false);
     expect(elapsed(), `horizon not reached (${label()})`).toBeGreaterThanOrEqual(HORIZON);
     expect(commands.some((c) => c.startsWith('build explosive_warehouse')), 'no explosive warehouse ordered').toBe(false);
-    expect(state.buildings.buildings.some((b) => b.type === 'explosive_warehouse'), `an explosive warehouse exists (${label()})`).toBe(false);
+    expect(state.buildings.buildings.filter((b) => b.type === 'explosive_warehouse').length, `only the starter explosive warehouse exists (${label()}, #2118)`).toBe(1);
     expect(commands.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 600_000);
 
