@@ -256,6 +256,8 @@ export interface GhostPreview {
   footprint?: ReadonlyArray<readonly [number, number]>;
   /** True while no qualified actor can path to the target (#1306). */
   unreachable?: boolean;
+  /** True while the underlying queued action carries any `blockedReason`: nobody will work it as things stand. Drawn red like `unreachable`. */
+  blocked?: boolean;
   /** For a `place_building` ghost: what is being built, so the renderer can draw its model (#1306). */
   building?: { type: BuildingType; tier: BuildingTier; x: number; z: number };
 }

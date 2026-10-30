@@ -500,6 +500,69 @@ describe('classifyQueuedOrders (#1306)', () => {
     });
   });
 
+  // Any blockedReason reads red, not only an unreachable target: an order a
+  // capable crew can reach but will not work (explosives in transit, nowhere
+  // to unload) left the crew idle under a blue ghost.
+  describe('blocked ghost flag', () => {
+    const licence = ROLE_LICENCE_REQUIRED.charging_truck;
+    const chargeOrder = (state: GameState) => {
+      hire(state, IN_A, ['blasting', licence]);
+      purchaseVehicle(state.vehicles, 'charging_truck', 0, 0);
+      dispatchChargeAction(
+        state, { id: 'H1', x: IN_A_TARGET.x, z: IN_A_TARGET.z },
+        { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
+      );
+      return state.pendingActions.find(a => a.type === 'charge_hole')!;
+    };
+
+    it('is set at dispatch on a reachable charge order whose explosives are in transit, and cleared once they arrive', () => {
+      const state = makeState();
+      const action = chargeOrder(state);
+      expect(action.blockedReason).toBe('explosives_in_transit');
+      expect(ghostOf(state, action.id).unreachable).toBe(false);
+      expect(ghostOf(state, action.id).blocked).toBe(true);
+
+      const revision = state.ghostPreviewsRevision;
+      state.tickCount += EXPLOSIVE_DELIVERY_TICKS;
+      classifyQueuedOrders(state);
+      expect(action.blockedReason ?? null).toBeNull();
+      expect(ghostOf(state, action.id).blocked).toBe(false);
+      expect(state.ghostPreviewsRevision).toBeGreaterThan(revision);
+    });
+
+    it('is set on a reachable haul order with no warehouse to unload in', () => {
+      const state = makeState();
+      hire(state, IN_A, [ROLE_LICENCE_REQUIRED.debris_hauler]);
+      purchaseVehicle(state.vehicles, 'debris_hauler', IN_A.x + 1, IN_A.z);
+      addBlastFragments(state.logistics, [{
+        id: 1, position: { x: IN_A_TARGET.x, y: 0, z: IN_A_TARGET.z }, volume: 0.3, mass: 400, rockId: 'cruite',
+        oreDensities: { blingite: 0.5 }, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+        halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: 1, origin: { x: IN_A_TARGET.x, y: 0, z: IN_A_TARGET.z },
+      }]);
+      const id = queue(state, 'haul_debris', IN_A_TARGET, { requiredVehicleRole: 'debris_hauler', payload: { fragmentId: 1 } });
+      classifyQueuedOrders(state);
+      expect(state.pendingActions.find(a => a.id === id)!.blockedReason).toBe('no_freight_warehouse');
+      expect(ghostOf(state, id).blocked).toBe(true);
+    });
+
+    it('stays false on a reachable, staffed, unblocked order', () => {
+      const state = makeState();
+      hire(state, IN_A);
+      const id = queue(state, 'survey', IN_A_TARGET);
+      classifyQueuedOrders(state);
+      expect(ghostOf(state, id).blocked).toBe(false);
+    });
+
+    it('is cleared once the order is claimed', () => {
+      const state = makeState();
+      const action = chargeOrder(state);
+      ghostOf(state, action.id).claimed = true;
+      action.status = 'assigned';
+      classifyQueuedOrders(state);
+      expect(ghostOf(state, action.id).blocked).toBe(false);
+    });
+  });
+
   it('stamps target_unreachable on a stranded order whose actors exist, and clears it once reachable', () => {
     const state = makeState();
     hire(state, IN_A);
