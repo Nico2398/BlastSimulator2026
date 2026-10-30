@@ -3412,7 +3412,7 @@
   "tutorial.waiting.building": "Order placed — waiting for the crew to finish building it.",
   "tutorial.waiting.training": "Course booked — waiting for the driver to walk to the training course.",
   "tutorial.waiting.drilling": "Order placed — waiting for the crew to finish drilling.",
-  "tutorial.waiting.charging": "Order placed — waiting for the crew to finish charging the holes.",
+  "tutorial.waiting.charging": "Order placed — the explosives are on their way; the crew charges the holes once they arrive.",
   "tutorial.waiting.surveying": "Order placed — waiting for the surveyor to report back.",
   "tutorial.waiting.excavating": "Order placed — waiting for the crew to finish digging the ramp.",
   "tutorial.waiting.hauling": "Order placed — waiting for the hauler to bring it in.",

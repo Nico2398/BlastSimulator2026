@@ -3412,7 +3412,7 @@
   "tutorial.waiting.building": "Ordre lancé — en attente que l'équipe finisse la construction.",
   "tutorial.waiting.training": "Formation réservée — en attente que le chauffeur rejoigne le cours.",
   "tutorial.waiting.drilling": "Ordre lancé — en attente que l'équipe finisse le forage.",
-  "tutorial.waiting.charging": "Ordre lancé — en attente que l'équipe finisse de charger les trous.",
+  "tutorial.waiting.charging": "Ordre lancé — les explosifs sont en route ; l'équipe charge les trous dès leur arrivée.",
   "tutorial.waiting.surveying": "Ordre lancé — en attente du rapport du prospecteur.",
   "tutorial.waiting.excavating": "Ordre lancé — en attente que l'équipe finisse de creuser la rampe.",
   "tutorial.waiting.hauling": "Ordre lancé — en attente que le camion ramène le chargement.",
