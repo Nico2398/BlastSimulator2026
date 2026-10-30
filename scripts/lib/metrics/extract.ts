@@ -15,7 +15,7 @@
 import { bashCategory } from './bash-category.js';
 import type { SessionTranscript, TranscriptRecord } from './transcripts.js';
 
-const METRICS_SCHEMA = 1;
+const METRICS_SCHEMA = 2;
 
 /**
  * Relative price of each token kind against a fresh input token. Stable across
@@ -93,6 +93,13 @@ export interface RunMetrics extends RunContext {
   agents: AgentMetrics[];
   skills: Record<string, number>;
   bash: Record<string, number>;
+  /**
+   * Seconds between each tool call and its result, by tool — a Bash call by its
+   * category, a `long wait` by the category of the command it waits on. Read from
+   * the transcript, so a run killed before it wrote `cost-state` still says where
+   * its time went. Sub-agent calls overlap the lead's `Agent` call.
+   */
+  toolSeconds: Record<string, number>;
   pipeline: {
     pipelineSkill?: string | undefined;
     delegations: Record<string, number>;
@@ -149,7 +156,7 @@ const weighted = (t: TokenCounts): number =>
 
 const promptSize = (t: TokenCounts): number => t.input + t.cacheRead + t.cacheWrite5m + t.cacheWrite1h;
 
-interface ToolUse { name: string; input: Record<string, unknown> }
+interface ToolUse { id?: string | undefined; name: string; input: Record<string, unknown> }
 
 function contentBlocks(record: TranscriptRecord): Record<string, unknown>[] {
   const content = record.message?.content;
@@ -159,10 +166,14 @@ function contentBlocks(record: TranscriptRecord): Record<string, unknown>[] {
 function toolUses(record: TranscriptRecord): ToolUse[] {
   return contentBlocks(record)
     .filter((block) => block.type === 'tool_use' && typeof block.name === 'string')
-    .map((block) => ({ name: block.name as string, input: (block.input ?? {}) as Record<string, unknown> }));
+    .map((block) => ({
+      id: typeof block.id === 'string' ? block.id : undefined,
+      name: block.name as string,
+      input: (block.input ?? {}) as Record<string, unknown>,
+    }));
 }
 
-function toolResultTexts(record: TranscriptRecord): { text: string; isError: boolean }[] {
+function toolResultTexts(record: TranscriptRecord): { id?: string | undefined; text: string; isError: boolean }[] {
   return contentBlocks(record)
     .filter((block) => block.type === 'tool_result')
     .map((block) => {
@@ -172,7 +183,7 @@ function toolResultTexts(record: TranscriptRecord): { text: string; isError: boo
         : Array.isArray(content)
           ? content.map((part) => (part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string' ? (part as { text: string }).text : '')).join('\n')
           : '';
-      return { text, isError: block.is_error === true };
+      return { id: typeof block.tool_use_id === 'string' ? block.tool_use_id : undefined, text, isError: block.is_error === true };
     });
 }
 
@@ -210,6 +221,21 @@ function inVocabulary(name: unknown, ...sets: ReadonlySet<string>[]): string {
 /** Model names come from the API and Claude Code's own cost state, not from what a session typed. */
 const SAFE_NAME = /^[A-Za-z0-9:_-]{1,64}$/;
 
+/** `npm run long -- start <name> -- <command>` / `wait <name>`: the name is free text, so only its command's category is kept. */
+const LONG_START = /\bnpm\s+run\s+(?:-s\s+)?long\s+--\s+start\s+(\S+)\s+--\s+(.+)$/;
+const LONG_WAIT = /\bnpm\s+run\s+(?:-s\s+)?long\s+--\s+wait\s+(\S+)/;
+
+/** The key a tool call's duration is recorded under; `longRuns` maps a long-run name to its command's category. */
+function timingKey(use: ToolUse, vocab: Vocabulary, longRuns: Map<string, string>): string {
+  if (use.name !== 'Bash' || typeof use.input.command !== 'string') return toolName(use.name);
+  const command = use.input.command;
+  const start = LONG_START.exec(command);
+  if (start) longRuns.set(start[1]!, bashCategory(start[2]!, vocab.scripts));
+  const category = bashCategory(command, vocab.scripts);
+  const wait = LONG_WAIT.exec(command);
+  return category === 'npm run long wait' && wait ? `npm run long wait (${longRuns.get(wait[1]!) ?? 'other'})` : category;
+}
+
 interface AgentAccumulator {
   metrics: AgentMetrics;
   byModel: Map<string, TokenCounts>;
@@ -222,8 +248,10 @@ function accumulate(
   records: TranscriptRecord[],
   run: RunMetrics,
   vocab: Vocabulary,
+  longRuns: Map<string, string>,
 ): void {
   const latest = new Map<string, TranscriptRecord>();
+  const pending = new Map<string, { key: string; at: number }>();
   const order: string[] = [];
   for (const record of records) {
     const time = record.timestamp ? Date.parse(record.timestamp) : NaN;
@@ -242,6 +270,7 @@ function accumulate(
       latest.set(id, record);
       for (const use of toolUses(record)) {
         bump(acc.metrics.tools, toolName(use.name));
+        if (use.id !== undefined && Number.isFinite(time)) pending.set(use.id, { key: timingKey(use, vocab, longRuns), at: time });
         if (use.name === 'Skill') {
           const skill = inVocabulary(use.input.skill, vocab.skills);
           bump(run.skills, skill);
@@ -259,6 +288,11 @@ function accumulate(
     }
     if (record.type === 'user') {
       for (const result of toolResultTexts(record)) {
+        const started = result.id !== undefined ? pending.get(result.id) : undefined;
+        if (started && Number.isFinite(time)) {
+          bump(run.toolSeconds, started.key, Math.max(0, Math.round((time - started.at) / 1000)));
+          pending.delete(result.id!);
+        }
         if (result.isError) run.pipeline.toolErrors++;
         if (/Blind phase for /.test(result.text)) run.pipeline.blindRefusals++;
         if (/hook (error|blocked)|PreToolUse:\w+ hook/i.test(result.text)) run.pipeline.hookRefusals++;
@@ -317,6 +351,7 @@ export function extractMetrics(session: SessionTranscript, context: RunContext, 
     agents: [],
     skills: {},
     bash: {},
+    toolSeconds: {},
     pipeline: {
       delegations: {}, longWaitPolls: 0, verifyRuns: 0, verifyPass: 0, verifyCachedChannels: 0,
       redProven: 0, redNotProven: 0, blindRefusals: 0, hookRefusals: 0, toolErrors: 0,
@@ -330,11 +365,12 @@ export function extractMetrics(session: SessionTranscript, context: RunContext, 
   };
   const main = agentFor('main');
   main.metrics.invocations = 1;
-  accumulate(main, session.records, run, vocab);
+  const longRuns = new Map<string, string>();
+  accumulate(main, session.records, run, vocab, longRuns);
   for (const sub of session.subagents) {
     const acc = agentFor(inVocabulary(sub.agentType, vocab.agents, BUILT_IN_AGENTS));
     acc.metrics.invocations++;
-    accumulate(acc, sub.records, run, vocab);
+    accumulate(acc, sub.records, run, vocab, longRuns);
   }
 
   const all = [...agents.values()];

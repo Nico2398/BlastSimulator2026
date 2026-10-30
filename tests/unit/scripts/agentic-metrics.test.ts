@@ -184,6 +184,41 @@ describe('extractMetrics', () => {
     expect(estimated.agents.reduce((sum, agent) => sum + agent.costUSD, 0)).toBeCloseTo(0.0122, 3);
   });
 
+  // A run killed by the timeout writes no cost-state, so its durations come
+  // from the transcript: each tool call's result time minus its call time.
+  it('times each tool call, a long wait by the command it waits on', () => {
+    const use = (id: string, name: string, input: Record<string, unknown>, at: string) =>
+      assistant(id, usage(1, 0, 0, 1), [{ type: 'tool_use', id: `t-${id}`, name, input }], at);
+    const result = (id: string, at: string): TranscriptRecord =>
+      ({ type: 'user', timestamp: at, message: { content: [{ type: 'tool_result', tool_use_id: `t-${id}`, content: 'ok' }] } });
+    const timed: SessionTranscript = {
+      sessionId: 'timed',
+      records: [
+        use('a', 'Bash', { command: 'npm run long -- start v1 -- npm run pipeline -- verify' }, '2026-10-24T00:00:00Z'),
+        result('a', '2026-10-24T00:00:02Z'),
+        use('b', 'Bash', { command: 'npm run long -- wait v1' }, '2026-10-24T00:00:10Z'),
+        result('b', '2026-10-24T00:09:10Z'),
+        use('c', 'Bash', { command: 'npm run long -- wait v1' }, '2026-10-24T00:09:20Z'),
+        result('c', '2026-10-24T00:12:20Z'),
+        use('d', 'Bash', { command: 'npm run long -- wait SECRET-name' }, '2026-10-24T00:13:00Z'),
+        result('d', '2026-10-24T00:13:30Z'),
+        use('e', 'Read', { file_path: '/x' }, '2026-10-24T00:14:00Z'),
+        result('e', '2026-10-24T00:14:01Z'),
+        use('f', 'Grep', { pattern: 'never answered' }, '2026-10-24T00:15:00Z'),
+      ],
+      subagents: [],
+    };
+    const run = extractMetrics(timed, {}, VOCAB);
+    expect(run.toolSeconds).toEqual({
+      'npm run long start': 2,
+      'npm run long wait (npm run pipeline verify)': 720,
+      'npm run long wait (other)': 30,
+      Read: 1,
+    });
+    expect(JSON.stringify(run)).not.toContain('SECRET');
+    expect(runSummary(run)).toContain('Time in tools: npm run long wait (npm run pipeline verify) 12 min');
+  });
+
   it('leaves a model with no measured rate unpriced', () => {
     const partial = session();
     partial.records = partial.records.filter((record) => record.type !== 'cost-state');
