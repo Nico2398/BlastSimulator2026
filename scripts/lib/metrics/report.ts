@@ -23,7 +23,7 @@ function top(counter: Record<string, number>, n: number): string {
 
 function agentRow(agent: AgentMetrics): string {
   const prompt = agent.tokens.input + agent.tokens.cacheRead + agent.tokens.cacheWrite5m + agent.tokens.cacheWrite1h;
-  return `| ${agent.agent} | ${agent.invocations} | ${agent.requests} | ${usd(agent.costUSD)} | ${k(agent.peakContextTokens)} | ${k(agent.finalContextTokens)} | ${k(agent.tokens.output)} (${k(agent.tokens.thinking)} thinking) | ${prompt > 0 ? pct(agent.tokens.cacheRead / prompt) : '—'} | ${agent.compactions} | ${top(agent.effort, 3)} |`;
+  return `| ${agent.agent} | ${agent.invocations} | ${agent.requests} | ${usd(agent.costUSD)} | ${k(agent.peakContextTokens)} | ${k(agent.finalContextTokens)} | ${k(agent.tokens.output)} (${k(agent.tokens.thinking)} thinking) | ${prompt > 0 ? pct(agent.tokens.cacheRead / prompt) : '—'} | ${agent.compactions}${agent.compactedAtTokens?.length ? ` (at ${agent.compactedAtTokens.map(k).join(', ')})` : ''} | ${top(agent.effort, 3)} |`;
 }
 
 export function runSummary(run: RunMetrics): string {

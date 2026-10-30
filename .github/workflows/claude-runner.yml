@@ -370,6 +370,18 @@ jobs:
           # is the line that says which failure it was.
           echo "::error::The agent never started. claude-code-action reported a successful install but left no executable at ${CLAUDE_BIN} (SDK errorClass: executable_not_found). This is an infrastructure failure, not a task the agent could not do — the prompt was never read, so nothing about this issue is proven. Re-running is safe. If it recurs, the pinned claude-code-action SHA in this workflow is the thing to move."
 
+      # A step timeout ends the step, not the agent it started: the attempt's
+      # `claude` process can go on working, and pushing, beside whatever
+      # comes next. Stopped here, before the settle check reads the issue and
+      # before a retry or the rescue touches its branch. The stopper comes
+      # from this workflow's commit, not the branch the agent left checked out.
+      - name: Stop what the first attempt left running
+        if: always() && steps.claude.outcome != 'skipped'
+        shell: bash
+        run: |
+          git -C "$GITHUB_WORKSPACE" show "$GITHUB_SHA:.github/scripts/agent-processes.cjs" > "$RUNNER_TEMP/agent-processes.cjs"
+          node "$RUNNER_TEMP/agent-processes.cjs" stop claude
+
       # `always()`: a crashed, failed, timed-out or early-ended attempt is
       # exactly the case this gate exists to catch. A cancelled job (the
       # 360-minute outer bound) reaches it with no clock left, and the budget
@@ -464,6 +476,13 @@ jobs:
             ${{ steps.context.outputs.prompt }}
           claude_args: '--permission-mode bypassPermissions --model sonnet --effort medium'
           show_full_output: true
+
+      - name: Stop what the retry left running
+        if: always() && steps.claude_retry.outcome != 'skipped'
+        shell: bash
+        run: |
+          git -C "$GITHUB_WORKSPACE" show "$GITHUB_SHA:.github/scripts/agent-processes.cjs" > "$RUNNER_TEMP/agent-processes.cjs"
+          node "$RUNNER_TEMP/agent-processes.cjs" stop claude
 
       # Reported, not acted on: the rescue step below reads the state itself and
       # owns what happens next. This exists so the job log names the outcome of
