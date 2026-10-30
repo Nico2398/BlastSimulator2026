@@ -74,7 +74,7 @@ describe('economy.ts usage strings — English literal + fr divergence', () => {
     {
       name: 'contract accept — no id/material selector',
       englishLiteral:
-        'Usage: contract accept <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] [fillable:true]',
+        'Usage: contract accept <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] [fillable:true] [wins:true]',
       run: (ctx) => contractCommand(ctx, ['accept'], {}),
     },
     {
