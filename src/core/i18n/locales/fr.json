@@ -3085,7 +3085,7 @@
   "tutorial.step_buydrillrig": "Achetez une Foreuse dans le panneau Flotte.",
   "tutorial.step_buyrockdigger": "Achetez une Pelleteuse dans le panneau Flotte.",
   "tutorial.step_buychargingtruck": "Achetez un Camion de chargement dans le panneau Flotte.",
-  "tutorial.step_explosivewarehouse.title": "Construire un Entrepôt d'explosifs",
+  "tutorial.step_explosivewarehouse.title": "Ériger un Entrepôt d'explosifs",
   "tutorial.step_explosivewarehouse": "Les explosifs achetés au moment de commander les charges mettent {duration} à arriver, et l'équipe attend sans rien faire. Construisez un Placard à Boums, l'entrepôt d'explosifs, pour garder des explosifs en stock.",
   "tutorial.step_stockexplosives.title": "Stocker des Explosifs",
   "tutorial.step_stockexplosives": "Achetez au moins {kg} kg de Boumite pour l'entrepôt : {holes} trous × {perHole} kg. Les explosifs en stock se chargent immédiatement.",
