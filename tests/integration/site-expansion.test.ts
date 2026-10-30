@@ -189,6 +189,22 @@ describe('site expansion — ore exists in claimed ground outside the original r
     expect(solid).toBeGreaterThan(0);
     expect(ore).toBeGreaterThan(0);
   });
+
+  it('a survey straddling the starting edge finds ore along it, not a barren seam where the site used to end', () => {
+    // The tutorial's own survey point: its disc crosses the 32x32 site's east and south edges.
+    const ctx = makeCtx();
+    hireSurveyor(ctx);
+    expect(surveyCommand(ctx, ['seismic'], { x: '23', z: '23' }).success).toBe(true);
+    tickCommand(ctx, ['30'], {});
+    const survey = ctx.state!.surveyResults[0];
+    expect(survey).toBeDefined();
+    const columns = Object.keys(survey!.estimates).map(k => k.split(',').map(Number) as [number, number]);
+    // The last five columns before each edge, inside the original rectangle.
+    const eastStrip = columns.filter(([x, z]) => x >= 27 && x < 32 && z < 27);
+    const southStrip = columns.filter(([x, z]) => z >= 27 && z < 32 && x < 27);
+    expect(eastStrip.length).toBeGreaterThan(0);
+    expect(southStrip.length).toBeGreaterThan(0);
+  });
 });
 
 describe('site expansion — bridging a target that is not edge-adjacent', () => {

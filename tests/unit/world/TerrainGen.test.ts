@@ -3,7 +3,7 @@ import {
   generateTerrain, surfaceDensityAt, buildTerrainContext, createChunkSource,
   requireValidGenDimension, requireValidGenDatum, requireValidPitMask, requireValidOreGradeScale, MAX_TERRAIN_GEN_DIMENSION,
   climateBiasLandingOn, resolveGeneratedBiome,
-  isInBorderZone, TERRAIN_GENERATOR_VERSION,
+  TERRAIN_GENERATOR_VERSION,
   type TerrainConfig,
 } from '../../../src/core/world/TerrainGen.js';
 import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
@@ -58,14 +58,34 @@ describe('TerrainGen — structure', () => {
     expect(airCount).toBe(32);
   });
 
-  it('ore density is zero in the neutral border zone', () => {
-    const grid = generateTerrain(makeConfig(42));
-    for (let y = 0; y < 5; y++) {
-      const v = grid.getVoxel(0, y, 0)!;
-      if (v.density > 0) {
-        expect(Object.keys(v.oreDensities).length).toBe(0);
+  // The starting rectangle used to strip ore from a 5-cell ring along its edge. Every site can
+  // grow past that edge, so once it did the ring sat mid-site as a barren seam a survey showed
+  // as an empty L between ore on both sides.
+  it('the ring just inside the starting edge holds ore by the same rules as the interior', () => {
+    const config = makeConfig(42);
+    const ctx = buildTerrainContext(config);
+    const grid = generateTerrain(config);
+    const ring = 5;
+    let checked = 0;
+    let withOre = 0;
+    for (let x = 0; x < 32; x++) for (let z = 0; z < 32; z++) {
+      if (x >= ring && x < 32 - ring && z >= ring && z < 32 - ring) continue;
+      const h = sampleSurfaceHeightY(ctx.worldGen, x, z);
+      const top = Math.round(h);
+      const boundaries = ctx.strata.boundariesAt(x, z);
+      for (let y = top - 24; y <= top; y++) {
+        if (surfaceDensityAt(y, h) <= 0) continue;
+        const depth = Math.max(0, top - y);
+        const composition = ctx.strata.compositionAt(x, y, z, depth, boundaries);
+        const expected = ctx.oreVeins.densitiesAt(x, y, z, depth, composition, ctx.biome.oreRichness);
+        const actual = grid.oresAt(x, y, z) ?? {};
+        expect(JSON.stringify(actual), `ores ${x},${y},${z}`).toBe(JSON.stringify(expected));
+        checked++;
+        if (Object.keys(actual).length > 0) withOre++;
       }
     }
+    expect(checked).toBeGreaterThan(1000);
+    expect(withOre).toBeGreaterThan(0);
   });
 
   it('ore density distribution roughly matches rock type probabilities over large sample', () => {
@@ -546,7 +566,7 @@ describe('climateBiasLandingOn (#1668)', () => {
 });
 
 
-// #1670: ground outside the original site rectangle must carry ore, not be neutral border.
+// #1670: ground outside the original site rectangle must carry ore, not be barren.
 describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
   const big = (): TerrainConfig => ({
     ...makeConfig(42, 'alpine_granite'), sizeX: 64, datum: Math.floor(64 * 0.55), sizeZ: 64,
@@ -574,15 +594,6 @@ describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
   function claimOutside(grid: VoxelGrid): void {
     for (const [cx, cz] of [[6, 1], [6, 2], [-2, 1], [-2, 2], [1, -2], [2, -2]] as const) grid.addChunk(cx, cz);
   }
-
-  it('isInBorderZone is false outside the rectangle and true in the ring just inside', () => {
-    expect(isInBorderZone(-1, 10, 64, 64, 5)).toBe(false);
-    expect(isInBorderZone(100, 10, 64, 64, 5)).toBe(false);
-    expect(isInBorderZone(10, -3, 64, 64, 5)).toBe(false);
-    expect(isInBorderZone(10, 64, 64, 64, 5)).toBe(false);
-    expect(isInBorderZone(2, 10, 64, 64, 5)).toBe(true);
-    expect(isInBorderZone(61, 10, 64, 64, 5)).toBe(true);
-  });
 
   it('generator version stays 1', () => {
     expect(TERRAIN_GENERATOR_VERSION).toBe(1);
@@ -657,16 +668,6 @@ describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
     for (const [x, z] of [[100, 20], [101, 33], [-25, 20], [30, -25]] as const) {
       for (let y = 0; y < 30; y += 3) {
         expect(a.getVoxel(x, y, z)!.oreDensities).toEqual(b.getVoxel(x, y, z)!.oreDensities);
-      }
-    }
-  });
-
-  it('ore stays absent in the ring just inside the rectangle', () => {
-    const grid = generateTerrain(big());
-    for (const [x, z] of [[0, 0], [63, 63], [2, 30], [30, 61]] as const) {
-      for (let y = 0; y < 20; y++) {
-        const v = grid.getVoxel(x, y, z)!;
-        if (v.density > 0) expect(Object.keys(v.oreDensities).length).toBe(0);
       }
     }
   });

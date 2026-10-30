@@ -2,8 +2,8 @@
 // ore pocket on every sandbox site (ore deposits on) and nowhere else.
 
 import { describe, it, expect } from 'vitest';
-import { resolveStarterDeposit, type StarterDeposit } from '../../../src/core/world/StarterDeposit.js';
-import { buildTerrainContext, generateTerrain, isInBorderZone, surfaceDensityAt, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
+import { resolveStarterDeposit, isInStartingEdgeMargin, type StarterDeposit } from '../../../src/core/world/StarterDeposit.js';
+import { buildTerrainContext, generateTerrain, surfaceDensityAt, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
 import { sampleSurfaceHeightY } from '../../../src/core/world/WorldGen.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
@@ -13,6 +13,7 @@ import {
   STARTER_DEPOSIT_MAX_DISTANCE_M,
   STARTER_DEPOSIT_MIN_DISTANCE_M,
   STARTER_DEPOSIT_POCKET_RADIUS_M,
+  STARTER_DEPOSIT_EDGE_MARGIN_M,
 } from '../../../src/core/config/balance.js';
 import { sandboxTerrainConfig } from '../../helpers/sandboxSite.js';
 
@@ -107,12 +108,11 @@ describe('TerrainContext.starterDeposit (#2116)', () => {
     expect(SELLABLE).toContain(deposit(sandboxTerrainConfig(biome, seed)).oreId);
   });
 
-  it.each(cases)('pocket %s seed %i: sits wholly inside the playable grid, clear of the ore-free border zone', (biome, seed) => {
+  it.each(cases)('pocket %s seed %i: sits wholly inside the playable grid, clear of the starting edge margin', (biome, seed) => {
     const config = sandboxTerrainConfig(biome, seed);
     const d = deposit(config);
-    const { biome: b } = buildTerrainContext(config);
     for (const [dx, dz] of [[-HALF, -HALF], [HALF, -HALF], [-HALF, HALF], [HALF, HALF], [0, 0]] as const) {
-      expect(isInBorderZone(d.x + dx, d.z + dz, config.sizeX, config.sizeZ, b.borderWidth), `footprint cell ${dx},${dz}`).toBe(false);
+      expect(isInStartingEdgeMargin(d.x + dx, d.z + dz, config.sizeX, config.sizeZ), `footprint cell ${dx},${dz}`).toBe(false);
       expect(d.x + dx).toBeGreaterThanOrEqual(0);
       expect(d.x + dx).toBeLessThan(config.sizeX);
       expect(d.z + dz).toBeGreaterThanOrEqual(0);
@@ -197,12 +197,11 @@ describe('terrain outside the pocket is unchanged (#2116 C11)', () => {
       const h = sampleSurfaceHeightY(ctx.worldGen, x, z);
       const top = Math.round(h);
       const boundaries = ctx.strata.boundariesAt(x, z);
-      const inBorder = isInBorderZone(x, z, config.sizeX, config.sizeZ, ctx.biome.borderWidth);
       for (let y = top - 6; y <= top; y++) {
         if (surfaceDensityAt(y, h) <= 0) continue;
         const depth = Math.max(0, top - y);
         const composition = ctx.strata.compositionAt(x, y, z, depth, boundaries);
-        const expected = inBorder ? {} : ctx.oreVeins.densitiesAt(x, y, z, depth, composition, ctx.biome.oreRichness);
+        const expected = ctx.oreVeins.densitiesAt(x, y, z, depth, composition, ctx.biome.oreRichness);
         expect(JSON.stringify(grid.oresAt(x, y, z) ?? {}), `ores ${x},${y},${z}`).toBe(JSON.stringify(expected));
         checked++;
       }
@@ -210,18 +209,15 @@ describe('terrain outside the pocket is unchanged (#2116 C11)', () => {
     expect(checked).toBeGreaterThan(1000);
   });
 
-  it('the border zone stays ore-free', () => {
-    const config = sandboxTerrainConfig('green_foothills', 42);
-    const ctx = buildTerrainContext(config);
-    const grid = generateTerrain(config);
-    let border = 0;
-    for (let x = 0; x < config.sizeX; x++) for (let z = 0; z < config.sizeZ; z++) {
-      if (!isInBorderZone(x, z, config.sizeX, config.sizeZ, ctx.biome.borderWidth)) continue;
-      border++;
-      const top = surfaceY(grid, x, z);
-      for (let y = top - 4; y <= top; y++) expect(grid.oresAt(x, y, z), `${x},${y},${z}`).toBeUndefined();
-    }
-    expect(border).toBeGreaterThan(0);
+  it('isInStartingEdgeMargin is true in the ring just inside the starting rectangle and false elsewhere', () => {
+    const m = STARTER_DEPOSIT_EDGE_MARGIN_M;
+    expect(isInStartingEdgeMargin(0, 10, 64, 64)).toBe(true);
+    expect(isInStartingEdgeMargin(m - 1, 10, 64, 64)).toBe(true);
+    expect(isInStartingEdgeMargin(64 - m, 10, 64, 64)).toBe(true);
+    expect(isInStartingEdgeMargin(m, m, 64, 64)).toBe(false);
+    expect(isInStartingEdgeMargin(64 - m - 1, 64 - m - 1, 64, 64)).toBe(false);
+    expect(isInStartingEdgeMargin(-1, 10, 64, 64)).toBe(false);
+    expect(isInStartingEdgeMargin(10, 64, 64, 64)).toBe(false);
   });
 });
 

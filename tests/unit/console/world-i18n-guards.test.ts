@@ -162,16 +162,17 @@ describe('inspectCommand — air-case message', () => {
 });
 
 // ── inspectCommand — result-case message ─────────────────────────────────
-// seed 42 size 32 at (10,5,3) is a solid cruite voxel with no ores — captured
+// seed 42 size 32 at (19,5,13) is a solid cruite voxel with no ores — captured
 // directly off a real inspectCommand run (#861), not re-derived from
-// RockCatalog/VoxelGrid by hand.
+// RockCatalog/VoxelGrid by hand. Interior on purpose: the site's edge columns
+// carry ore like any other ground.
 
 describe('inspectCommand — result-case message', () => {
-  const RESULT_EN = '(10,5,3): cruite | composition: cruite 100% | density: 1 | fracture mod: 1\nOres: none';
+  const RESULT_EN = '(19,5,13): cruite | composition: cruite 100% | density: 1 | fracture mod: 1\nOres: none';
 
   it('matches the exact English literal by default', () => {
     const ctx = makeCtx();
-    const result = inspectCommand(ctx, ['10,5,3'], {});
+    const result = inspectCommand(ctx, ['19,5,13'], {});
     expect(result.success).toBe(true);
     expect(result.output).toBe(RESULT_EN);
   });
@@ -179,7 +180,7 @@ describe('inspectCommand — result-case message', () => {
   it('differs from the English literal under locale fr', () => {
     const ctx = makeCtx();
     setLocale('fr');
-    const result = inspectCommand(ctx, ['10,5,3'], {});
+    const result = inspectCommand(ctx, ['19,5,13'], {});
     expect(result.success).toBe(true);
     expect(result.output).not.toBe(RESULT_EN);
   });

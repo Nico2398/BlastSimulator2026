@@ -306,6 +306,28 @@ describe('Contract system', () => {
       });
     });
 
+    describe('winsShortfall', () => {
+      const offer = (id: number, quantityKg: number, pricePerKg: number) =>
+        ({ id, type: 'ore_sale', materialId: 'rustite', quantityKg, pricePerKg } as never);
+
+      it('skips an earlier fillable offer whose payout falls short and takes the one that covers it', () => {
+        const pool = [offer(1, 170, 1000), offer(2, 300, 1000)];
+        expect(findContract(pool, { materialId: 'rustite', fillable: true }, { rustite: 425 })).toBe(pool[0]);
+        expect(findContract(pool, { materialId: 'rustite', winsShortfall: 200_000 }, { rustite: 425 })).toBe(pool[1]);
+      });
+
+      it('a payout exactly equal to the shortfall wins', () => {
+        const pool = [offer(1, 200, 1000)];
+        expect(findContract(pool, { winsShortfall: 200_000 }, { rustite: 200 })).toBe(pool[0]);
+      });
+
+      it('is null when the paying offer cannot be filled, or no offer pays enough', () => {
+        const pool = [offer(1, 170, 1000), offer(2, 300, 1000)];
+        expect(findContract(pool, { winsShortfall: 200_000 }, { rustite: 299 })).toBeNull();
+        expect(findContract(pool, { winsShortfall: Infinity }, { rustite: 999 })).toBeNull();
+      });
+    });
+
     it('returns null when no selector field is set — nothing to search for', () => {
       const state = createContractState();
       generateContracts(state, new Random(42), 0, 1, ALL_ORES, Infinity);
