@@ -26,7 +26,11 @@ export interface StarterDeposit {
 /** Hole offsets (m) of the 3x3 reference shot around its centre. */
 const HOLE_OFFSETS = [-4, 0, 4] as const;
 const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-const STARTER_ORES = ['dirtite', 'rustite'] as const;
+/**
+ * The pocket's ore. It was dirtite or rustite by seed; a dirtite pocket sold for 55% of a rustite one, and the dirtite
+ * sites held the sandbox sales/costs low tail (#2126).
+ */
+const STARTER_ORE = 'rustite';
 
 /** The softest rock of the catalog: the pocket's weathered host. */
 function softestRockId(): string {
@@ -128,8 +132,7 @@ export function pickStarterDeposit(
     }
   }
   if (!best) return null;
-  const oreId = STARTER_ORES[subSeed(config.seed, 'starter:ore') % STARTER_ORES.length]!;
-  return { x: best.x, z: best.z, oreId, radius: STARTER_DEPOSIT_POCKET_RADIUS_M };
+  return { x: best.x, z: best.z, oreId: STARTER_ORE, radius: STARTER_DEPOSIT_POCKET_RADIUS_M };
 }
 
 /** The starter deposit of a site, or null when the site has ore deposits off (campaign levels). */

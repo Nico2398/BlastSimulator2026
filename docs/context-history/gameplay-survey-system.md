@@ -33,3 +33,4 @@ Records why the rules in the `gameplay-survey-system` skill exist: the issues th
 - Survey price scaled by `survey_cost` modifiers: #1568.
 
 - #2116: sandbox sites (oreDeposits on) get a world-gen starter deposit, a soft weathered pocket with 10-20 t of dirtite or rustite beside the opening buildings.
+- #2126: the starter deposit carries rustite only (a dirtite pocket sold for 55% as much) at `STARTER_DEPOSIT_ORE_DENSITY` 0.30 (was 0.14), so the poorest seeds can carry their payroll. Previous text: "carrying dirtite or rustite (seeded) in a 6 m core to 6 m depth, ... the reference grade-0 shot on it yields 12.9-17.1 t (median 16.5 t) at sandbox grade scale over six biomes x seeds 1-5, 42, 12345."

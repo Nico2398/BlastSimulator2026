@@ -1,7 +1,9 @@
 // BlastSimulator2026 — Unit tests: the probe's explosive store sizing and top-up (#2091)
 
 import { describe, it, expect } from 'vitest';
-import { explosiveRoomKg, topUpWarehouse, cheapestEventOption, resolvePendingEvent, playTick, type Run } from '../../../scripts/shared/player-actions.js';
+import {
+  explosiveRoomKg, topUpWarehouse, stockWarehouse, clearBlastZone, cheapestEventOption, outcomeCostsCrew, resolvePendingEvent, playTick, type Run,
+} from '../../../scripts/shared/player-actions.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { placeBuilding, getBuildingDef } from '../../../src/core/entities/Building.js';
 import { storeExplosives } from '../../../src/core/entities/BuildingWarehouse.js';
@@ -81,6 +83,38 @@ describe('cheapestEventOption (#2117)', () => {
   });
 });
 
+describe('cheapestEventOption keeps the crew (#2126)', () => {
+  const quits = { effects: [{ type: 'employee_leaves' }] };
+
+  it('passes over a free option that makes an employee quit', () => {
+    expect(cheapestEventOption([{ cashDelta: -4000 }, { ...quits }, { cashDelta: -1500 }])).toBe(2);
+  });
+
+  it('passes over an option whose fallback makes an employee quit', () => {
+    expect(cheapestEventOption([{ altConsequence: { ...quits } }, { cashDelta: -800 }])).toBe(1);
+  });
+
+  it('reads other effects as harmless', () => {
+    expect(cheapestEventOption([{ cashDelta: -200 }, { effects: [{ type: 'work_stoppage' }] }])).toBe(1);
+  });
+
+  it('falls back to the cheapest of all when every option costs crew', () => {
+    expect(cheapestEventOption([{ cashDelta: -10, ...quits }, { cashDelta: 5, ...quits }])).toBe(1);
+  });
+});
+
+describe('outcomeCostsCrew (#2126)', () => {
+  it('is true for an employee_leaves effect, directly or in the fallback', () => {
+    expect(outcomeCostsCrew({ effects: [{ type: 'employee_leaves' }] })).toBe(true);
+    expect(outcomeCostsCrew({ altConsequence: { altConsequence: { effects: [{ type: 'employee_leaves' }] } } })).toBe(true);
+  });
+
+  it('is false without one, and for no outcome', () => {
+    expect(outcomeCostsCrew({ cashDelta: -5, effects: [{ type: 'employee_injured' }] })).toBe(false);
+    expect(outcomeCostsCrew(undefined)).toBe(false);
+  });
+});
+
 /** A two-or-more option event whose option 0 is the costly one, registered under a test-only id. */
 function registerEvent(id: string, consequences: EventDef['consequences']): void {
   registerEvents([{
@@ -156,5 +190,68 @@ describe('playTick with a policy (#2117)', () => {
     const { run, cmds } = recorder();
     playTick(run, withPending(null), 'cheapest');
     expect(cmds).toEqual(['tick 1']);
+  });
+});
+
+/** A site with no explosive warehouse yet, an event pending and a warehouse order the next tick raises. */
+function bareSiteWithEvent(eventId: string): GameState {
+  const state = {
+    buildings: { buildings: [] }, navGrid: { width: 16, height: 16 }, plannedBuildings: [], drillHoles: [{ x: 20, z: 30 }],
+    events: { pendingEvent: { eventId } },
+  } as unknown as GameState;
+  return state;
+}
+
+/** A runner that accepts every command, raises an ordered building on its first tick and reads the zone clear after one tick. */
+function siteRunner(state: GameState): { run: Run; cmds: string[] } {
+  const cmds: string[] = [];
+  let ticks = 0;
+  const run: Run = (cmd: string) => {
+    cmds.push(cmd);
+    if (cmd.startsWith('build ')) state.plannedBuildings.push({} as GameState['plannedBuildings'][number]);
+    if (cmd === 'tick 1') { ticks++; state.plannedBuildings.length = 0; }
+    return { success: true, output: cmd === 'zone status' ? (ticks > 0 ? 'Zone CLEAR' : 'Zone NOT CLEAR') : '' };
+  };
+  return { run, cmds };
+}
+
+describe('the waits inside an action answer events by the run policy (#2126)', () => {
+  registerEvent('t2126_wait_event', [{ cashDelta: -40000, effects: [{ type: 'employee_leaves' }] }, { cashDelta: -3000 }]);
+
+  it('clearBlastZone answers with the policy while the zone empties', () => {
+    const state = bareSiteWithEvent('t2126_wait_event');
+    const { run, cmds } = siteRunner(state);
+    clearBlastZone(run, state, 'cheapest');
+    expect(cmds).toEqual(['zone clear x1:4 y1:14 x2:36 y2:46', 'zone status', 'event choose 1', 'tick 1', 'zone status']);
+  });
+
+  it('clearBlastZone defaults to first', () => {
+    const state = bareSiteWithEvent('t2126_wait_event');
+    const { run, cmds } = siteRunner(state);
+    clearBlastZone(run, state);
+    expect(cmds).toContain('event choose 0');
+  });
+
+  it('clearBlastZone sends nothing without a drilled hole, whatever the policy', () => {
+    const state = bareSiteWithEvent('t2126_wait_event');
+    state.drillHoles.length = 0;
+    const { run, cmds } = siteRunner(state);
+    clearBlastZone(run, state, 'cheapest');
+    expect(cmds).toEqual([]);
+  });
+
+  it('stockWarehouse answers with the policy while its warehouse goes up', () => {
+    const state = bareSiteWithEvent('t2126_wait_event');
+    const { run, cmds } = siteRunner(state);
+    expect(stockWarehouse(run, state, 'krackle', 10, 'cheapest').success).toBe(true);
+    expect(cmds).toEqual(['build explosive_warehouse at:1,1 tier:1', 'event choose 1', 'tick 1', 'buy explosive:krackle kg:10']);
+  });
+
+  it('topUpWarehouse passes the policy on to the stocking', () => {
+    const state = bareSiteWithEvent('t2126_wait_event');
+    const { run, cmds } = siteRunner(state);
+    expect(topUpWarehouse(run, state, 'krackle', 10, 'cheapest').success).toBe(true);
+    expect(cmds).toContain('event choose 1');
+    expect(cmds).not.toContain('event choose 0');
   });
 });

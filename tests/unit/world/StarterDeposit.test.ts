@@ -103,8 +103,10 @@ describe('TerrainContext.starterDeposit (#2116)', () => {
     expect(dist).toBeLessThanOrEqual(STARTER_DEPOSIT_MAX_DISTANCE_M);
   });
 
-  it.each(cases)('C6 %s seed %i: the ore is sellable (dirtite or rustite)', (biome, seed) => {
-    expect(SELLABLE).toContain(deposit(sandboxTerrainConfig(biome, seed)).oreId);
+  it.each(cases)('C6 %s seed %i: the ore is sellable rustite (#2126)', (biome, seed) => {
+    const { oreId } = deposit(sandboxTerrainConfig(biome, seed));
+    expect(SELLABLE).toContain(oreId);
+    expect(oreId).toBe('rustite');
   });
 
   it.each(cases)('pocket %s seed %i: sits wholly inside the playable grid, clear of the ore-free border zone', (biome, seed) => {
