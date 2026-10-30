@@ -66,7 +66,7 @@ describe('sandbox start kit:digger opens with a fragmenter and a dual-licensed d
   it('keeps the documented starting cash', () => {
     const { state } = start('digger');
     expect(state.cash).toBe(SANDBOX_KITS.digger.startingCash);
-    expect(state.cash).toBe(330_000);
+    expect(state.cash).toBe(480_000);
   });
 
   it('staffed:false still opens a bare site', () => {
@@ -93,7 +93,7 @@ describe('sandbox start kit:full is unchanged (#2115)', () => {
   it('keeps the documented starting cash', () => {
     const { state } = start('full');
     expect(state.cash).toBe(SANDBOX_KITS.full.startingCash);
-    expect(state.cash).toBe(370_000);
+    expect(state.cash).toBe(520_000);
   });
 });
 

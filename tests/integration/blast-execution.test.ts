@@ -867,7 +867,9 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     expect(after, 'rig must survive').toBeDefined();
     expect(after!.hp).toBe(maxHp);
     expect(s.state().damage.accidents.some(a => a.type === 'vehicle_destroyed')).toBe(false);
-    expect(s.state().scores.safety).toBe(safetyBefore);
+    // The starter warehouse (#2118) shifts the building-set safety target, so the score still creeps towards it
+    // (~6e-5 over the run); an accident would cost 10, so two decimals still pins "no safety hit".
+    expect(s.state().scores.safety).toBeCloseTo(safetyBefore, 2);
   }, 240_000);
 
   it('quarters ~30 m away: the rig ends outside the danger zone before the shot (#1746)', () => {

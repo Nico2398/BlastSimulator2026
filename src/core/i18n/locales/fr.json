@@ -3683,6 +3683,7 @@
   "sandbox.detail.cash": "Trésorerie de départ : {cash} $",
   "sandbox.detail.opens_with": "Départ avec : équipe : {crew} ; véhicules : {vehicles} ; bâtiments : {buildings}",
   "sandbox.detail.none": "aucun",
+  "sandbox.detail.stock": "{name} : {kg} kg en stock",
   "sandbox.terrain.flat": "plat",
   "sandbox.terrain.rolling": "collines ondulées",
   "sandbox.terrain.steep": "escarpé et accidenté",

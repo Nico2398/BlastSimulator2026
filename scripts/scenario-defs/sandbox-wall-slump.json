@@ -83,6 +83,10 @@
           "step": 2
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
           "type": "awaitUsable",
           "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
         },
@@ -376,6 +380,10 @@
         },
         {
           "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
@@ -578,6 +586,10 @@
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2.5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
         },
         {
           "type": "clickSelector",

@@ -514,8 +514,8 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
 
   it('the full kit starts with strictly more cash than the digger kit', () => {
     expect(SANDBOX_STARTING_CASH.full).toBeGreaterThan(SANDBOX_STARTING_CASH.digger);
-    expect(SANDBOX_STARTING_CASH.digger).toBe(330_000);
-    expect(SANDBOX_STARTING_CASH.full).toBe(370_000);
+    expect(SANDBOX_STARTING_CASH.digger).toBe(480_000);
+    expect(SANDBOX_STARTING_CASH.full).toBe(520_000);
   });
 
   // At the calibrated ore scale (#1944) the digger kit has too little reachable ore to pay its crew without the
@@ -783,7 +783,7 @@ describe('sandbox economy: the kit-only opening, no explosive warehouse (#1963)'
     expect(state.levelEnded, `level ended (${label()})`).toBe(false);
     expect(elapsed(), `horizon not reached (${label()})`).toBeGreaterThanOrEqual(HORIZON);
     expect(commands.some((c) => c.startsWith('build explosive_warehouse')), 'no explosive warehouse ordered').toBe(false);
-    expect(state.buildings.buildings.some((b) => b.type === 'explosive_warehouse'), `an explosive warehouse exists (${label()})`).toBe(false);
+    expect(state.buildings.buildings.filter((b) => b.type === 'explosive_warehouse').length, `only the starter explosive warehouse exists (${label()}, #2118)`).toBe(1);
     expect(commands.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 600_000);
 

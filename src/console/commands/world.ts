@@ -14,13 +14,14 @@ import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
 import type { Rect } from '../../core/world/WorldGen.js';
+import { resolveStarterDeposit } from '../../core/world/StarterDeposit.js';
 import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import { getDominantRockId, computeVoxelColumnSurfaceY, computeColumnRangeY } from '../../core/world/VoxelGrid.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
-import { DEFAULT_GRID_SIZE, type StartingBuildingSlot, type PitMaskShape } from '../../core/config/balance.js';
+import { DEFAULT_GRID_SIZE, STARTER_DEPOSIT_KEEP_CLEAR_HALF_M, type StartingBuildingSlot, type PitMaskShape } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, type CampaignProfile } from '../../persistence/CampaignProfile.js';
@@ -333,7 +334,8 @@ function generateGridWithBuildings(ctx: GameContext, params: RegenerateParams, a
     const near = params.startingBuildingsNear ?? flag;
     const buildingsBefore = structuredClone(ctx.state.buildings);
     if (placeStartingBuildings(ctx.state.buildings, ctx.grid, params.startingBuildings, near, flag,
-      params.vehicleSlopeRatio !== undefined && ctx.state.navGrid ? drivableApproachFilter(ctx.state.navGrid, params.vehicleSlopeRatio, flag) : undefined) > 0) {
+      params.vehicleSlopeRatio !== undefined && ctx.state.navGrid ? drivableApproachFilter(ctx.state.navGrid, params.vehicleSlopeRatio, flag) : undefined,
+      starterDepositKeepClear(config)) > 0) {
       refreshLogisticsCapacity(ctx.state);
       buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
       if (params.vehicleSlopeRatio !== undefined) {
@@ -356,6 +358,14 @@ function generateGridWithBuildings(ctx: GameContext, params: RegenerateParams, a
     }
   }
   return null;
+}
+
+/** The square starting buildings keep clear around the site's starter deposit (#2118); undefined where there is none. */
+function starterDepositKeepClear(config: TerrainConfig): Rect | undefined {
+  const deposit = resolveStarterDeposit(config);
+  if (!deposit) return undefined;
+  const h = STARTER_DEPOSIT_KEEP_CLEAR_HALF_M;
+  return { minX: deposit.x - h, minZ: deposit.z - h, maxX: deposit.x + h + 1, maxZ: deposit.z + h + 1 };
 }
 
 /** Lays the starting crew out on the grid `generateGridWithBuildings` built, then publishes it. */

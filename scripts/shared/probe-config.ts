@@ -18,6 +18,8 @@ export interface ProbeRunConfig {
   maxHaulers?: number;
   /** How pending events are answered; absent = 'first'. */
   eventPolicy?: EventPolicy;
+  /** Ticks the crew idles on payroll before the strategy's first order (#2118); absent = 0. */
+  startDelay?: number;
 }
 
 export interface ProbeOptions {
@@ -29,6 +31,7 @@ export interface ProbeOptions {
   quick: boolean;
   jsonPath: string | null;
   eventPolicy: EventPolicy;
+  startDelay: number;
 }
 
 export const QUICK_HORIZON = 3000;
@@ -42,6 +45,7 @@ export const PROBE_DEFAULTS: ProbeOptions = {
   quick: false,
   jsonPath: null,
   eventPolicy: 'first',
+  startDelay: 0,
 };
 
 const QUICK_SEED = 42;
@@ -115,6 +119,14 @@ export function parseArgs(argv: readonly string[]): ProbeOptions {
         opts.eventPolicy = pickFromSet(flag, raw, EVENT_POLICIES);
         break;
       }
+      case '--start-delay': {
+        const raw = argv[++i];
+        if (raw === undefined || raw.startsWith('--')) throw new Error('--start-delay needs a value');
+        const delay = parseInt10(flag, raw);
+        if (delay < 0) throw new Error(`--start-delay: "${raw}" must not be negative`);
+        opts.startDelay = delay;
+        break;
+      }
       case '--quick':
         opts.quick = true;
         break;
@@ -150,7 +162,7 @@ export function expandMatrix(opts: ProbeOptions): ProbeRunConfig[] {
     for (const kit of opts.kits) {
       for (const seed of opts.seeds) {
         for (const strategy of opts.strategies) {
-          runs.push({ seed, biome, kit, strategy, horizon: opts.horizon, ...(opts.eventPolicy === 'first' ? {} : { eventPolicy: opts.eventPolicy }) });
+          runs.push({ seed, biome, kit, strategy, horizon: opts.horizon, ...(opts.eventPolicy === 'first' ? {} : { eventPolicy: opts.eventPolicy }), ...(opts.startDelay > 0 ? { startDelay: opts.startDelay } : {}) });
         }
       }
     }
