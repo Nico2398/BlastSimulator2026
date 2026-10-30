@@ -60,7 +60,7 @@ Verify all of it with `npm run validate:context`.
 The lead's automatic compaction runs at step boundaries only: before a heavy step, or when the context is near full. No headless session can request a compaction; Claude Code asks for one, and a hook decides.
 
 - **`CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000'`** on both Claude steps of `claude-runner.yml` makes Claude Code start asking from about 60k tokens and ask again on every request it is refused. It decides nothing by itself; the model's hard limit stays 1M.
-- **`npm run pipeline -- step <name> --label <label> [--heavy]`** marks a boundary: it records the finished step in the plan's `## Progress` and writes `.agentic/step.json` (the step, its start, whether it is heavy). `step done` closes the last one. `tdd start` (plan and skeleton), `tdd split` (implement, heavy), a completed `tdd join` (verify and finalize) and `review-brief` (apply findings, heavy) open their step themselves.
+- **`npm run pipeline -- step <name> --label <label> [--heavy]`** marks a boundary: it records the finished step in the plan's `## Progress` and writes `.agentic/step.json` (the step, its start, whether it is heavy). `step done` closes the last one. `tdd start` (plan and skeleton), `tdd split` (tests), a proven `tdd red` (implement, heavy), a completed `tdd join` (verify and finalize) and `review-brief` (apply findings, heavy) open their step themselves.
 - **`.claude/hooks/compact-at-step-boundary.mjs`**, a `PreCompact` hook on `auto` in `.claude/settings.json`, holds the policy and its thresholds:
 
   | Who asks, where | Compaction runs when the prompt has reached |
