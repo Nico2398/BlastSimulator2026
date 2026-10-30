@@ -86,6 +86,10 @@
           "step": 2
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
           "type": "awaitUsable",
           "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
         },
@@ -346,6 +350,10 @@
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 1
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
         },
         {
           "type": "clickSelector",
