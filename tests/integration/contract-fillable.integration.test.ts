@@ -9,8 +9,9 @@ import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 import { ORE_DENSITY_KG_M3 } from '../../src/core/config/balance.js';
 import { ensureFreightWarehouse } from '../helpers/freightWarehouse.js';
+import { getProfitShortfall } from '../../src/core/campaign/LevelObjective.js';
 
-function addOffer(ctx: GameContext, materialId: string, quantityKg: number): Contract {
+function addOffer(ctx: GameContext, materialId: string, quantityKg: number, pricePerKg = 10): Contract {
   const state = ctx.state!.contracts;
   const c: Contract = {
     id: state.nextId++,
@@ -19,7 +20,7 @@ function addOffer(ctx: GameContext, materialId: string, quantityKg: number): Con
     description: `[fixture] ${quantityKg} kg ${materialId}`,
     quantityKg,
     deliveredKg: 0,
-    pricePerKg: 10,
+    pricePerKg,
     deadlineTicks: 500,
     acceptedAtTick: 0,
     penaltyAmount: 100,
@@ -208,5 +209,41 @@ describe('contract fillable:true (#1338)', () => {
       expect(ctx.state!.collectedOre['blingite']).toBe(5000);
       expect(ctx.state!.logistics.storedMassKg).toBe(5000);
     });
+  });
+});
+
+describe('contract accept wins:true', () => {
+  let ctx: GameContext;
+  let shortfall: number;
+  beforeEach(() => {
+    ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
+    ctx.state!.contracts.available = [];
+    ensureFreightWarehouse(ctx);
+    ctx.state!.campaign.activeLevelId = 'tutorial_pit';
+    shortfall = getProfitShortfall('tutorial_pit', ctx.state!.finances);
+  });
+
+  it('has a finite profit shortfall to cover on a campaign level', () => {
+    expect(shortfall).toBeGreaterThan(0);
+    expect(Number.isFinite(shortfall)).toBe(true);
+  });
+
+  it('accepts the fillable offer that covers the shortfall, skipping an earlier fillable one that does not', () => {
+    const small = addOffer(ctx, 'rustite', 100, (shortfall / 100) * 0.5);
+    const winner = addOffer(ctx, 'rustite', 200, shortfall / 200);
+    store(ctx, 'rustite', 300);
+    const r = contractCommand(ctx, ['accept'], { type: 'ore_sale', material: 'rustite', fillable: 'true', wins: 'true' });
+    expect(r.success).toBe(true);
+    expect(ctx.state!.contracts.active.map(c => c.id)).toEqual([winner.id]);
+    expect(ctx.state!.contracts.available.some(c => c.id === small.id)).toBe(true);
+  });
+
+  it('refuses with a clear message when no fillable offer covers the shortfall', () => {
+    addOffer(ctx, 'rustite', 100, (shortfall / 100) * 0.5);
+    store(ctx, 'rustite', 300);
+    const r = contractCommand(ctx, ['accept'], { type: 'ore_sale', wins: 'true' });
+    expect(r.success).toBe(false);
+    expect(r.output.toLowerCase()).toContain('winning');
+    expect(ctx.state!.contracts.active).toHaveLength(0);
   });
 });

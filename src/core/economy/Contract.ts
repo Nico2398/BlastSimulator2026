@@ -396,6 +396,12 @@ export interface ContractSelector {
    * none covered means no match (#1338).
    */
   fillable?: boolean;
+  /**
+   * Match only an offer that wins on its own (`isWinningSaleOffer`): a fillable
+   * ore_sale whose full payout covers this profit shortfall. The console's
+   * `wins:true`, mirroring the Contracts panel's `data-contract-wins`.
+   */
+  winsShortfall?: number;
 }
 
 /**
@@ -532,14 +538,16 @@ export function findContract(
   collectedOre: Readonly<Record<string, number>> = {},
   rubbleStockKg = 0,
 ): Contract | null {
-  if (selector.id === undefined && selector.type === undefined && selector.materialId === undefined && !selector.fillable) {
+  if (selector.id === undefined && selector.type === undefined && selector.materialId === undefined && !selector.fillable
+    && selector.winsShortfall === undefined) {
     return null;
   }
   return pool.find(c =>
     (selector.id === undefined || c.id === selector.id)
     && (selector.type === undefined || c.type === selector.type)
     && (selector.materialId === undefined || c.materialId === selector.materialId)
-    && (!selector.fillable || isFillableSaleOffer(c, collectedOre, rubbleStockKg)),
+    && (!selector.fillable || isFillableSaleOffer(c, collectedOre, rubbleStockKg))
+    && (selector.winsShortfall === undefined || isWinningSaleOffer(c, collectedOre, selector.winsShortfall)),
   ) ?? null;
 }
 
