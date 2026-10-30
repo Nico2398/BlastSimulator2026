@@ -3345,6 +3345,8 @@ export const STARTER_DEPOSIT_CREW_STARTS: ReadonlyArray<readonly [number, number
 /** Preferred distance (m) from that corner to the deposit centre: clear of the buildings, well inside the 10-25 m brief. */
 export const STARTER_DEPOSIT_CREW_DISTANCE_M = 18;
 export const STARTER_DEPOSIT_POCKET_RADIUS_M = 8;
+/** Cells the pocket's footprint keeps from the starting rectangle's edge (#2116 placement rule, not an ore rule). */
+export const STARTER_DEPOSIT_EDGE_MARGIN_M = 5;
 /**
  * Half-width (m) of the square around the deposit centre that starting buildings keep clear (#2118): the 3x3 reference
  * pattern spans +-4 m, plus two cells for a vehicle to drive up to the corner holes.

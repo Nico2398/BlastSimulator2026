@@ -2,7 +2,8 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
-import { getBalance, getFinancialReport } from '../../core/economy/Finance.js';
+import { getBalance, getFinancialReport, type FinanceState } from '../../core/economy/Finance.js';
+import { getProfitShortfall } from '../../core/campaign/LevelObjective.js';
 import {
   generateContracts,
   acceptContract,
@@ -96,7 +97,11 @@ const CONTRACT_TYPES: readonly ContractType[] = ['ore_sale', 'rubble_disposal', 
  * that survives the offer pool rotating (#597 — see `ContractSelector`'s
  * doc comment in `Contract.ts`). Returns `null` when neither form is given.
  */
-function parseContractSelector(args: string[], named: Record<string, string>): ContractSelector | null {
+function parseContractSelector(
+  args: string[],
+  named: Record<string, string>,
+  profitShortfall: () => number,
+): ContractSelector | null {
   const idRaw = args[1] ?? named['id'];
   const id = idRaw !== undefined ? parseInt(idRaw, 10) : NaN;
   if (!isNaN(id)) return { id };
@@ -107,9 +112,11 @@ function parseContractSelector(args: string[], named: Record<string, string>): C
     : undefined;
   const materialId = named['material'];
   const fillable = named['fillable'] === 'true';
-  if (type === undefined && materialId === undefined && !fillable) return null;
+  const wins = named['wins'] === 'true';
+  if (type === undefined && materialId === undefined && !fillable && !wins) return null;
   return {
     ...(fillable ? { fillable } : {}),
+    ...(wins ? { winsShortfall: profitShortfall() } : {}),
     ...(type !== undefined ? { type } : {}),
     ...(materialId !== undefined ? { materialId } : {}),
   };
@@ -127,11 +134,18 @@ function resolveContract(
   args: string[],
   named: Record<string, string>,
   usage: string,
-  stock: { collectedOre: Readonly<Record<string, number>>; logistics: { fragments: readonly StoredFragmentLike[] }; buildings: { buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[] } },
+  stock: {
+    collectedOre: Readonly<Record<string, number>>;
+    logistics: { fragments: readonly StoredFragmentLike[] };
+    buildings: { buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[] };
+    campaign: { activeLevelId: string | null };
+    finances: FinanceState;
+  },
 ): Contract | CommandResult {
-  const selector = parseContractSelector(args, named);
+  const selector = parseContractSelector(args, named, () => getProfitShortfall(stock.campaign.activeLevelId, stock.finances));
   if (!selector) return { success: false, output: usage };
   const contract = findContract(pool, selector, stock.collectedOre, stateRubbleStockKg(stock));
+  if (!contract && selector.winsShortfall !== undefined) return { success: false, output: t('economy.contract.none_winning') };
   if (!contract && selector.fillable) return { success: false, output: t('economy.contract.none_fillable') };
   if (!contract) return { success: false, output: `Contract ${describeContractSelector(selector)} not found.` };
   return contract;

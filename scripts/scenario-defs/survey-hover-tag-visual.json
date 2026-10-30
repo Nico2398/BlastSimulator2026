@@ -42,12 +42,12 @@
       ]
     },
     {
-      "command": "employee assign_skill 1 skill:geology level:3",
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for tighter survey estimates -- the player-facing path is `employee train`.",
+      "command": "employee assign_skill 1 skill:geology level:5",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for tighter survey estimates -- the player-facing path is `employee train`. Level 5, not 3: the hover beat needs the rested-on column to carry an estimate, and at level 3 the seismic noise rounds even the richest columns near the centre to 0 a few times in a thousand draws (the centre tile (20,20) about one in four).",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 skill:geology level:3"
+          "command": "employee assign_skill 1 skill:geology level:5"
         }
       ],
       "role": "bootstrap"
@@ -259,14 +259,14 @@
     },
     {
       "command": "state",
-      "description": "Rest the cursor on the surveyed tile (20,20) with the overlay on: after the dwell the tag appears with tile coords, ore and FRESH.",
+      "description": "Rest the cursor on the surveyed tile (19,24) with the overlay on: after the dwell the tag appears with tile coords, ore and FRESH. The camera centres on the tile's middle (19.5, 24.5), not an integer corner where any of four tiles can sit under the cursor, and (19,24) holds an estimate in every one of 1000 seeded level-5 draws; the old (20,20) corner held one about three times in four, so the beat passed or failed on the survey's noise.",
       "role": "player",
       "timeout": 60,
       "interaction": [
         {
           "type": "cameraFocus",
-          "x": 20,
-          "z": 20,
+          "x": 19.5,
+          "z": 24.5,
           "distance": 25
         },
         {
@@ -381,7 +381,7 @@
     },
     {
       "command": "state",
-      "description": "Toggle the survey overlay off with its header button, then rest on the surveyed tile again: no tag. Fixed wait: the tag must STAY hidden, and the absence of an appearance has no condition to poll; 700 ms is past HOVER_TAG_DWELL_MS (400).",
+      "description": "Toggle the survey overlay off with its header button, then rest on the surveyed tile (19,24) again: no tag. Fixed wait: the tag must STAY hidden, and the absence of an appearance has no condition to poll; 700 ms is past HOVER_TAG_DWELL_MS (400).",
       "role": "player",
       "timeout": 60,
       "interaction": [
@@ -399,8 +399,8 @@
         },
         {
           "type": "cameraFocus",
-          "x": 20,
-          "z": 20,
+          "x": 19.5,
+          "z": 24.5,
           "distance": 25
         },
         {

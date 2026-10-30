@@ -23,8 +23,6 @@ export interface BiomeDef {
   readonly dominantRocks: readonly string[];
   /** Ore richness multiplier (1.0 = normal). */
   readonly oreRichness: number;
-  /** Width in voxels of the ore-free ring just inside the starting rectangle's edge (none outside it). */
-  readonly borderWidth: number;
   /** Forest placement density base, 0-1 (#458 T1.4/A15) — scaled further by per-point noise. */
   readonly forestDensity: number;
 }
@@ -41,7 +39,6 @@ const BIOMES: readonly BiomeDef[] = [
     pvAmplitude: 18,
     dominantRocks: ['cruite', 'sandite', 'molite'],
     oreRichness: 0.8,
-    borderWidth: 5,
     forestDensity: 0.06,
   },
   {
@@ -55,7 +52,6 @@ const BIOMES: readonly BiomeDef[] = [
     pvAmplitude: 35,
     dominantRocks: ['sandite', 'molite', 'cruite'],
     oreRichness: 0.9,
-    borderWidth: 5,
     forestDensity: 0.04,
   },
   {
@@ -69,7 +65,6 @@ const BIOMES: readonly BiomeDef[] = [
     pvAmplitude: 55,
     dominantRocks: ['grumpite', 'clunkite', 'stubite', 'obstiite'],
     oreRichness: 1.0,
-    borderWidth: 5,
     forestDensity: 0.35,
   },
   {
@@ -83,7 +78,6 @@ const BIOMES: readonly BiomeDef[] = [
     pvAmplitude: 25,
     dominantRocks: ['grumpite', 'clunkite', 'sandite'],
     oreRichness: 0.9,
-    borderWidth: 5,
     forestDensity: 0.55,
   },
   {
@@ -97,7 +91,6 @@ const BIOMES: readonly BiomeDef[] = [
     pvAmplitude: 40,
     dominantRocks: ['obstiite', 'gnarlite', 'absurdite', 'titanite'],
     oreRichness: 1.5,
-    borderWidth: 5,
     forestDensity: 0.7,
   },
   {
@@ -111,7 +104,6 @@ const BIOMES: readonly BiomeDef[] = [
     pvAmplitude: 15,
     dominantRocks: ['obstiite', 'gnarlite', 'titanite'],
     oreRichness: 1.2,
-    borderWidth: 5,
     forestDensity: 0.03,
   },
 ] as const;
