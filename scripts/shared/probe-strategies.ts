@@ -221,8 +221,8 @@ function rankDeposits(grid: VoxelGrid, span = SHOT_SPAN, depth: number = SHOT.de
  * Origin of the reference shot centred on the site's starter deposit (#2116, #2123), or null when the site has none.
  * The probe reads it as it reads ore: ground truth standing in for the survey. The opening shoots it when the richest
  * deposit's rock is too hard for the reference charge (`rockBreaks`); shot first elsewhere it sold too little to carry the
- * payroll. The earlier attempt made desert_badlands worse because the stock helper raised the explosive warehouse in the grid
- * corner, out of the crew's reach; the opening now builds it beside the quarters, so the starter opening sells there too.
+ * payroll. Where the richest deposit breaks (desert_badlands, alpine_granite) the opening keeps it: starter-first sold less there, so
+ * the starter is the fallback for unbreakable richest rock (tropical_karst, volcanic_flats). The explosive warehouse is raised beside the quarters either way.
  */
 export function starterShotOrigin(state: GameState, span: number = SHOT_SPAN): Pattern | null {
   const config = terrainConfigOf(state);
