@@ -92,10 +92,12 @@ describe('step boundaries', () => {
   it('lets the pipeline commands open their own steps, the heavy ones marked heavy', () => {
     stepFor(project, 'tdd start', '42-7');
     stepFor(project, 'tdd split', '42-7');
+    expect(JSON.parse(readFileSync(join(project, '.agentic/step.json'), 'utf8'))).toMatchObject({ name: 'tdd: tests', heavy: false });
+    stepFor(project, 'tdd red', '42-7');
     expect(JSON.parse(readFileSync(join(project, '.agentic/step.json'), 'utf8'))).toMatchObject({ name: 'tdd: implement', heavy: true });
     stepFor(project, 'tdd join', '42-7');
     expect(JSON.parse(readFileSync(join(project, '.agentic/step.json'), 'utf8'))).toMatchObject({ name: 'verify and finalize', heavy: false });
-    expect(readFileSync(join(project, '.agentic/plan/42-7.md'), 'utf8')).toMatch(/- tdd: plan and skeleton done — [0-9a-f]+\n- tdd: implement done — /);
+    expect(readFileSync(join(project, '.agentic/plan/42-7.md'), 'utf8')).toMatch(/- tdd: plan and skeleton done — [0-9a-f]+\n- tdd: tests done — [0-9a-f]+\n- tdd: implement done — /);
   });
 
   it('appends under an existing Progress section, before the next heading', () => {

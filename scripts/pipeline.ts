@@ -91,7 +91,8 @@ function run(argv: string[]): number {
     } else if (sub === 'status') print(status(cwd, label));
     else if (sub === 'red') {
       const result = red(cwd, { label, commit: !flags.has('no-commit'), detail: flags.has('detail') });
-      print(result.lines);
+      const proven = result.verdict.red && !flags.has('no-commit');
+      print(proven ? [...result.lines, ...stepFor(cwd, 'tdd red', label)] : result.lines);
       return result.verdict.red ? 0 : 1;
     } else throw new PipelineError(USAGE);
     return 0;
