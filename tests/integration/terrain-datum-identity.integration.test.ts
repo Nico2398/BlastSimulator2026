@@ -27,7 +27,9 @@
 //
 // ── IMPORTANT — regenerating a baseline ─────────────────────────────────
 // These hashes were computed by the planner against `main`'s pre-#1190 code
-// with `fingerprintTerrainConfig`'s exact sampling scheme. If a genuinely
+// with `fingerprintTerrainConfig`'s exact sampling scheme, then re-baselined
+// once when the ore-free ring inside the starting rectangle's edge was removed
+// (the sampled edge columns now carry ore like the interior). If a genuinely
 // intentional generation change ever needs a new baseline:
 //   git checkout main -- src/core/world/TerrainGen.ts src/core/world/WorldGen.ts \
 //     src/core/world/VoxelGrid.ts src/core/world/Strata.ts src/core/world/OreVeins.ts
@@ -58,7 +60,7 @@ const CASES: Case[] = [
       sizeX: 32, sizeZ: 32, datum: datumFromSizeY(20),
       seed: 42, climateBias: [0.7, -0.6],
     },
-    expectedHash: '8a0c35f273975c1ceb2e861ee483d6a7c728e731ab2c79ef1c02acb2d1edf2e7',
+    expectedHash: '0b9c2961efbcf21b2a016deca49ce6a8e06fe910c4ea719c625d4711c87e8941',
   },
   {
     name: 'dusty_hollow',
@@ -66,7 +68,7 @@ const CASES: Case[] = [
       sizeX: 96, sizeZ: 96, datum: datumFromSizeY(40),
       seed: 1138, climateBias: [0.7, -0.6],
     },
-    expectedHash: '577a77e6ac072f136844c9aaebae5063a30b3ec417e9915a92ff85fdb71dfbb1',
+    expectedHash: 'cb99177d8807811cc8c8baf804d9266521c24c75108b3e77ec967fc6b01e99d1',
   },
   {
     name: 'grumpstone_ridge',
@@ -74,7 +76,7 @@ const CASES: Case[] = [
       sizeX: 128, sizeZ: 128, datum: datumFromSizeY(56),
       seed: 2277, climateBias: [-0.7, 0.1],
     },
-    expectedHash: '433c6c26194101d72b5a8ed7826d1db91faa83cbacca995dcd9fad3021e64a5d',
+    expectedHash: 'e3eb9d9c1173574661e46253007f8e3d86ed290666841644e604fd4fc5daf903',
   },
   {
     name: 'treranium_depths',
@@ -82,7 +84,7 @@ const CASES: Case[] = [
       sizeX: 160, sizeZ: 160, datum: datumFromSizeY(64),
       seed: 3666, climateBias: [0.6, 0.7], mixedRockHardness: true,
     },
-    expectedHash: 'edb4bf7d2bf2b3dbf2816c93ff8f28a16ae6563ea5fef1bf9d01861d01f91542',
+    expectedHash: '43f240e7309f83eb0a02667f56e4979eca2e906acddf93f42546ea7ddca9762f',
   },
   {
     name: 'sandbox_default',
@@ -90,7 +92,7 @@ const CASES: Case[] = [
       sizeX: 64, sizeZ: 64, datum: datumFromSizeY(32),
       seed: 12345, climateBias: [0.7, -0.6],
     },
-    expectedHash: '877802432f9ae73a17fe762d60ac2d047202413e8df0d1fac1e406d6d23494f6',
+    expectedHash: 'd4be1b56dbc6df208aab156e0f64c57e70126abfc922be33dc7517e3c79a4c17',
   },
   {
     name: 'new_game_24',
@@ -98,7 +100,7 @@ const CASES: Case[] = [
       sizeX: 24, sizeZ: 24, datum: datumFromSizeY(24),
       seed: 42, climateBias: [0.7, -0.6], // new_game defaults, biome desert_badlands
     },
-    expectedHash: '66b3726c78503c56c5b0dd1c8ac82582322b0a71b1b48813b11f8607da540054',
+    expectedHash: '2559885b4151782898588552ccf925eb0e6191f31c35320e9b899c87183f02d2',
   },
   {
     name: 'new_game_32',
@@ -106,7 +108,7 @@ const CASES: Case[] = [
       sizeX: 32, sizeZ: 32, datum: datumFromSizeY(32),
       seed: 42, climateBias: [0.7, -0.6], // new_game defaults
     },
-    expectedHash: 'b38f54f51593dea36f8b09ae6f075308902f4fee2c89b78001e6f244cc3567c0',
+    expectedHash: '5aefc7e8b23bf1ce6973a62921792deba40bc70266363b1766a9d0ae16b56421',
   },
   {
     name: 'new_game_48',
@@ -114,7 +116,7 @@ const CASES: Case[] = [
       sizeX: 48, sizeZ: 48, datum: datumFromSizeY(48),
       seed: 42, climateBias: [0.7, -0.6], // new_game defaults
     },
-    expectedHash: '5133807d1bc7b1a44ed90e8f4096f2f896f58f4e364514963ecb4eb7b3d684d9',
+    expectedHash: 'aea6a58084f2cdde78e7f3a6d00f6617fb8eb854abc98a8b588118c3e5533925',
   },
   {
     name: 'new_game_64',
@@ -122,7 +124,7 @@ const CASES: Case[] = [
       sizeX: 64, sizeZ: 64, datum: datumFromSizeY(64),
       seed: 42, climateBias: [0.7, -0.6], // new_game defaults
     },
-    expectedHash: 'ae083e742dfb6f91b944e49cd94f4a32630753100fa84b8e2be96d6aa7411ad3',
+    expectedHash: '9be0fc05aec5a60e1f5921ed7b860c9f18c744875d0f010a48b277b5fec93f2c',
   },
 ];
 
