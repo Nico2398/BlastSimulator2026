@@ -38,6 +38,7 @@ import {
   ORE_PRICES,
   TUTORIAL_HIRING_SCRIPT,
   TUTORIAL_ORE_SALE_OFFER, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { earliestChargeDeliveryTick } from '../../src/core/mining/ExplosiveStock.js';
 import { REGION } from '../../src/ui/tutorialStages.js';
 import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, deliverExplosivesNow, type Run, fundForDeliveryWait } from '../helpers/playthrough.js';
 
@@ -759,8 +760,9 @@ describe('full tutorial playthrough ends WON by following the cards then playing
     for (const step of TUTORIAL_STEPS) {
       if (step.id === 'free-play') return;
       const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
-      // The charge card waits out the explosives delivery too (#1895).
-      const maxTicks = Math.max(500, (step.tickBudget ?? 20) * 25) + (step.id === 'charge' ? EXPLOSIVE_DELIVERY_TICKS : 0);
+      // No delivery allowance for the charge card: the stock-explosives card
+      // stocked its Boomite, so nothing waits on EXPLOSIVE_DELIVERY_TICKS (#1895).
+      const maxTicks = Math.max(500, (step.tickBudget ?? 20) * 25);
       const complete = () => step.isComplete(state, snapshot);
 
       // Charge only once the drill queue has drained, as a patient player
@@ -796,6 +798,9 @@ describe('full tutorial playthrough ends WON by following the cards then playing
       // the way a player would, by picking the hired driver.
       const driver = state.employees.employees.find((e) => e.role === 'driver');
       for (const cmd of step.commands ?? []) run(cmd.replace('<driverId>', String(driver?.id ?? '')));
+      if (step.id === 'charge') {
+        expect(earliestChargeDeliveryTick(state), 'the tutorial charge waits on a delivery instead of loading from stock').toBeNull();
+      }
 
       if (step.id === 'sell-ore') {
         // #1335: the step is "accept the one fillable ore offer, deliver it".

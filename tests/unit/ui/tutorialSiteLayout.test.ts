@@ -43,9 +43,10 @@ import { NavGrid, isStepClimbable, type NavCell } from '../../../src/core/nav/Na
 import { findPath, octileHeuristic } from '../../../src/core/nav/Pathfinding.js';
 
 /**
- * The three tutorial pins, in the order the tutorial rail actually orders
+ * The four tutorial pins, in the order the tutorial rail actually orders
  * their construction (tutorialSteps.ts: 'build-living-quarters' first, then
- * 'build-driving-center', then 'build-storage' for freight_warehouse).
+ * 'build-explosive-warehouse', then 'build-driving-center', then
+ * 'build-storage' for freight_warehouse).
  * checkFootprintPlacement's occupancy check is pairwise against whatever is
  * already on the ground, so exercising the pins in this order matches what a
  * real playthrough actually checks rather than an arbitrary order that could
@@ -53,6 +54,7 @@ import { findPath, octileHeuristic } from '../../../src/core/nav/Pathfinding.js'
  */
 const PINS: ReadonlyArray<{ name: string; type: BuildingType; tier: BuildingTier; region: TileRegion }> = [
   { name: 'livingQuarters', type: 'living_quarters', tier: 1, region: REGION.livingQuarters },
+  { name: 'explosiveWarehouse', type: 'explosive_warehouse', tier: 1, region: REGION.explosiveWarehouse },
   { name: 'drivingCenter', type: 'driving_center', tier: 1, region: REGION.drivingCenter },
   { name: 'warehouse', type: 'freight_warehouse', tier: 1, region: REGION.warehouse },
 ];
@@ -234,7 +236,7 @@ describe('tutorial site layout rule (#1040)', () => {
 
   // ── The actual layout rule, against the three real tutorial pins ───────
 
-  describe('the three tutorial building pins', () => {
+  describe('the tutorial building pins', () => {
     let ctx: MiningContext;
     let bounds: { width: number; depth: number; originX: number; originZ: number };
     const occupants: FootprintOccupant[] = [];
@@ -278,7 +280,7 @@ describe('tutorial site layout rule (#1040)', () => {
       expect(isTutorialSiteHazardClear(rect)).toBe(true);
     });
 
-    it('every pair of the three pins sits within the compact-cluster span', () => {
+    it('every pair of pins sits within the compact-cluster span', () => {
       const rects = PINS.map((pin) => tutorialSiteFootprintRect(pin.type, pin.tier, pin.region));
 
       for (let i = 0; i < rects.length; i++) {
