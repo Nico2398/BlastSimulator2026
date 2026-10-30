@@ -175,7 +175,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
   const strata = new StrataSampler(seed, profile);
   const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true, ...(oreGradeScale !== undefined ? { gradeScale: oreGradeScale } : {}) });
 
-  return { worldGen, biome, strata, oreVeins, starterDeposit: pickStarterDeposit(config, worldGen, biome.borderWidth) };
+  return { worldGen, biome, strata, oreVeins, starterDeposit: pickStarterDeposit(config, worldGen) };
 }
 
 export { surfaceDensityAt };
@@ -199,12 +199,10 @@ function generateColumnRange(
   yHi: number,
 ): void {
   const { worldGen, biome, strata, oreVeins, starterDeposit: starter } = terrain;
-  const { sizeX, sizeZ } = config;
 
   const surfaceH = sampleSurfaceHeightY(worldGen, x, z);
   const surfaceY = Math.round(surfaceH);
   const boundaries = strata.boundariesAt(x, z);
-  const inBorder = isInBorderZone(x, z, sizeX, sizeZ, biome.borderWidth);
 
   for (let y = yLo; y <= yHi; y++) {
     const density = surfaceDensityAt(y, surfaceH);
@@ -213,10 +211,10 @@ function generateColumnRange(
     // Depth is still measured from the rounded surface, so which stratum a
     // voxel belongs to is unchanged by the sub-voxel surface placement.
     const depth = Math.max(0, surfaceY - y);
-    const pocket = starter && !inBorder ? starterPocketAt(starter, x, z, depth, config.oreGradeScale) : null;
+    const pocket = starter ? starterPocketAt(starter, x, z, depth, config.oreGradeScale) : null;
     const composition = pocket ? pocket.composition : strata.compositionAt(x, y, z, depth, boundaries);
     const compId = grid.palette.intern(composition);
-    const oreDensities = inBorder ? {} : pocket ? pocket.oreDensities : oreVeins.densitiesAt(x, y, z, depth, composition, biome.oreRichness);
+    const oreDensities = pocket ? pocket.oreDensities : oreVeins.densitiesAt(x, y, z, depth, composition, biome.oreRichness);
 
     grid.writeGeneratedVoxel(x, y, z, compId, oreDensities, density);
   }
@@ -230,13 +228,13 @@ function generateColumnRange(
  *      heightmap reads from (LandscapeMap.ts, #458 T2.1), so the two representations cannot disagree
  *      at their shared boundary.
  *   2. Fill voxels below surface from a depth-stratified rock profile (Strata.ts, #458 T1.3/A11)
- *   3. Distribute ore veins using per-ore anisotropic noise (OreVeins.ts, #458 T1.3/A12)
- *   4. Clear ores in the neutral border ring just inside the starting rectangle's edge
- *      (ground claimed outside that rectangle gets ore by the same rules as steps 2-3)
+ *   3. Distribute ore veins using per-ore anisotropic noise (OreVeins.ts, #458 T1.3/A12),
+ *      by the same rules everywhere: the starting rectangle has no ore-free edge ring, because
+ *      every site can grow past that edge and a ring would be left as a barren seam mid-site
  *
  * Height blends every biome's shaping by climate weight, evaluated per
  * column — a real gradient at a climate transition, not a seam. Rock/ore
- * generation (steps 2-4) still uses ONE dominant biome for the whole grid
+ * generation (steps 2-3) still uses ONE dominant biome for the whole grid
  * (the highest-weighted biome at the grid's own centre) rather than
  * blending per column — full per-column biome-blended strata is out of
  * scope for T1.3 (no accept criterion calls for it) and would belong to a
@@ -278,24 +276,6 @@ export function createChunkSource(terrain: TerrainContext, config: TerrainConfig
       }
     },
   };
-}
-
-/**
- * Check if a position is in the neutral border zone: a column inside
- * `[0, sizeX) x [0, sizeZ)` within `borderWidth` of the rectangle's edge. Columns
- * outside the rectangle (expansion-claimed ground, #1670) are never in it. Exported so
- * `tests/helpers/terrainFingerprint.ts`'s fingerprint can classify a sampled
- * column the same way generation itself does, rather than reimplementing
- * this predicate a second time (#1190 review).
- */
-export function isInBorderZone(
-  x: number, z: number,
-  sizeX: number, sizeZ: number,
-  borderWidth: number,
-): boolean {
-  if (x < 0 || x >= sizeX || z < 0 || z >= sizeZ) return false;
-  return x < borderWidth || x >= sizeX - borderWidth
-    || z < borderWidth || z >= sizeZ - borderWidth;
 }
 
 /**

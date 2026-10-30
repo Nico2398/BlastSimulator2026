@@ -6,12 +6,12 @@
 import {
   STARTER_DEPOSIT_ANCHOR_X, STARTER_DEPOSIT_ANCHOR_Z, STARTER_DEPOSIT_CREW_DISTANCE_M, STARTER_DEPOSIT_CREW_STARTS, STARTER_DEPOSIT_MAX_DISTANCE_M, STARTER_DEPOSIT_MIN_DISTANCE_M, STARTER_DEPOSIT_ORE_CORE_RADIUS_M,
   STARTER_DEPOSIT_ORE_DEPTH_M, STARTER_DEPOSIT_ORE_DENSITY, STARTER_DEPOSIT_POCKET_DEPTH_M,
-  STARTER_DEPOSIT_POCKET_RADIUS_M, SANDBOX_FLAT_PAD_SIZE, SANDBOX_FLAT_PAD_MAX_SPREAD, ORE_GRADE_SCALE_DEFAULT, VEHICLE_MAX_SLOPE_RATIO,
+  STARTER_DEPOSIT_POCKET_RADIUS_M, STARTER_DEPOSIT_EDGE_MARGIN_M, SANDBOX_FLAT_PAD_SIZE, SANDBOX_FLAT_PAD_MAX_SPREAD, ORE_GRADE_SCALE_DEFAULT, VEHICLE_MAX_SLOPE_RATIO,
 } from '../config/balance.js';
 import { subSeed } from '../math/Hash.js';
 import { isStepClimbable, stepClimbRun } from '../nav/NavGrid.js';
 import { getAllRocks } from './RockCatalog.js';
-import { buildTerrainContext, isInBorderZone, type TerrainConfig } from './TerrainGen.js';
+import { buildTerrainContext, type TerrainConfig } from './TerrainGen.js';
 import { sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
 import type { VoxelRockComposition } from './VoxelGrid.js';
 
@@ -101,14 +101,23 @@ function unreachableStarts(reach: readonly Set<number>[], x: number, z: number):
 }
 
 /**
+ * True when (x, z) lies inside the starting rectangle `[0, sizeX) x [0, sizeZ)` within
+ * STARTER_DEPOSIT_EDGE_MARGIN_M of its edge; a cell outside the rectangle is not in the margin.
+ * Keeps the pocket off the opening site's edge. Placement only: ore generates there like anywhere else.
+ */
+export function isInStartingEdgeMargin(x: number, z: number, sizeX: number, sizeZ: number): boolean {
+  if (x < 0 || x >= sizeX || z < 0 || z >= sizeZ) return false;
+  const m = STARTER_DEPOSIT_EDGE_MARGIN_M;
+  return x < m || x >= sizeX - m || z < m || z >= sizeZ - m;
+}
+
+/**
  * Pick the deposit for a built site, on the ring STARTER_DEPOSIT_MIN..MAX_DISTANCE_M from the site centre.
  * The starting crew spawns in the corner by the grid origin and the buildings are placed beside its rally
  * flag after generation, so among footprints flat enough to shoot from and climbable from that corner at the vehicle slope limit, the candidate
  * nearest STARTER_DEPOSIT_CREW_DISTANCE_M from that corner wins (seeded tie-break); a site with no flat footprint on the ring takes the flattest one.
  */
-export function pickStarterDeposit(
-  config: TerrainConfig, worldGen: WorldGenContext, borderWidth: number,
-): StarterDeposit | null {
+export function pickStarterDeposit(config: TerrainConfig, worldGen: WorldGenContext): StarterDeposit | null {
   if (config.oreDeposits !== true) return null;
   const cx = Math.floor(config.sizeX / 2), cz = Math.floor(config.sizeZ / 2);
   const reach = STARTER_DEPOSIT_POCKET_RADIUS_M + 1;
@@ -121,8 +130,8 @@ export function pickStarterDeposit(
       const dist = Math.hypot(dx, dz);
       if (dist < STARTER_DEPOSIT_MIN_DISTANCE_M || dist > STARTER_DEPOSIT_MAX_DISTANCE_M) continue;
       const x = cx + dx, z = cz + dz;
-      if (isInBorderZone(x - reach, z - reach, config.sizeX, config.sizeZ, borderWidth)
-        || isInBorderZone(x + reach, z + reach, config.sizeX, config.sizeZ, borderWidth)) continue;
+      if (isInStartingEdgeMargin(x - reach, z - reach, config.sizeX, config.sizeZ)
+        || isInStartingEdgeMargin(x + reach, z + reach, config.sizeX, config.sizeZ)) continue;
       const spread = footprintSpread(surfaceY, x, z);
       const toCrew = Math.hypot(x - STARTER_DEPOSIT_ANCHOR_X, z - STARTER_DEPOSIT_ANCHOR_Z);
       // Flat footprints rank by distance to the crew corner; any unflat one ranks behind every flat one.

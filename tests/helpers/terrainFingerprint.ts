@@ -21,7 +21,7 @@
 //   # itself to make a diverging hash pass.
 
 import { createHash } from 'crypto';
-import { buildTerrainContext, surfaceDensityAt, isInBorderZone, type TerrainConfig } from '../../src/core/world/TerrainGen.js';
+import { buildTerrainContext, surfaceDensityAt, type TerrainConfig } from '../../src/core/world/TerrainGen.js';
 import { sampleSurfaceHeightY } from '../../src/core/world/WorldGen.js';
 import { getDominantRockId } from '../../src/core/world/VoxelGrid.js';
 
@@ -60,7 +60,6 @@ export function fingerprintTerrainConfig(config: TerrainConfig, step = 8): strin
       const surfaceH = sampleSurfaceHeightY(worldGen, x, z);
       const surfaceY = Math.round(surfaceH);
       const boundaries = strata.boundariesAt(x, z);
-      const inBorder = isInBorderZone(x, z, sizeX, sizeZ, biome.borderWidth);
 
       for (const offset of SAMPLE_OFFSETS) {
         const y = surfaceY + offset;
@@ -68,7 +67,7 @@ export function fingerprintTerrainConfig(config: TerrainConfig, step = 8): strin
         const depth = Math.max(0, surfaceY - y);
         const composition = strata.compositionAt(x, y, z, depth, boundaries);
         const dominantRockId = getDominantRockId(composition);
-        const ores = inBorder ? {} : oreVeins.densitiesAt(x, y, z, depth, composition, biome.oreRichness);
+        const ores = oreVeins.densitiesAt(x, y, z, depth, composition, biome.oreRichness);
 
         hash.update(`${x},${y},${z}:${density}:${dominantRockId}:${serializeOres(ores)}`);
       }
