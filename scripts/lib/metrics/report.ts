@@ -21,6 +21,11 @@ function top(counter: Record<string, number>, n: number): string {
   return Object.entries(counter).sort((a, b) => b[1] - a[1]).slice(0, n).map(([name, count]) => `${name} ×${count}`).join(', ') || '—';
 }
 
+/** The `n` largest entries of a seconds counter, as minutes. Records before schema 2 carry none. */
+function topTime(counter: Record<string, number> | undefined, n: number): string {
+  return Object.entries(counter ?? {}).sort((a, b) => b[1] - a[1]).slice(0, n).map(([name, s]) => `${name} ${minutes(s)}`).join(', ') || '—';
+}
+
 function agentRow(agent: AgentMetrics): string {
   const prompt = agent.tokens.input + agent.tokens.cacheRead + agent.tokens.cacheWrite5m + agent.tokens.cacheWrite1h;
   return `| ${agent.agent} | ${agent.invocations} | ${agent.requests} | ${usd(agent.costUSD)} | ${k(agent.peakContextTokens)} | ${k(agent.finalContextTokens)} | ${k(agent.tokens.output)} (${k(agent.tokens.thinking)} thinking) | ${prompt > 0 ? pct(agent.tokens.cacheRead / prompt) : '—'} | ${agent.compactions}${agent.compactedAtTokens?.length ? ` (at ${agent.compactedAtTokens.map(k).join(', ')})` : ''} | ${top(agent.effort, 3)} |`;
@@ -41,6 +46,7 @@ export function runSummary(run: RunMetrics): string {
     `- Delegations: ${top(p.delegations, 8)}`,
     `- Skills loaded: ${top(run.skills, 12)}`,
     `- Shell: ${top(run.bash, 12)}`,
+    `- Time in tools: ${topTime(run.toolSeconds, 8)}`,
     `- Pipeline: verify ${p.verifyRuns} runs (${p.verifyPass} green, ${p.verifyCachedChannels} channels from cache) · RED proven ${p.redProven}, not proven ${p.redNotProven} · blind refusals ${p.blindRefusals} · hook refusals ${p.hookRefusals} · tool errors ${p.toolErrors} · long-run polls ${p.longWaitPolls}`,
   ].join('\n');
 }
@@ -102,5 +108,8 @@ export function aggregateReport(runs: RunMetrics[]): string {
     `- RED: ${sum((r) => r.pipeline.redProven)} proven, ${sum((r) => r.pipeline.redNotProven)} not proven · blind refusals ${sum((r) => r.pipeline.blindRefusals)} · hook refusals ${sum((r) => r.pipeline.hookRefusals)}`,
     `- long-run polls: median ${median(runs.map((r) => r.pipeline.longWaitPolls))} per session · tool errors: median ${median(runs.map((r) => r.pipeline.toolErrors))}`,
   );
+  const time: Record<string, number> = {};
+  for (const run of runs) for (const [key, seconds] of Object.entries(run.toolSeconds ?? {})) time[key] = (time[key] ?? 0) + seconds;
+  lines.push(`- time in tools, all sessions: ${topTime(time, 10)}`);
   return lines.join('\n');
 }
