@@ -86,7 +86,9 @@ export function step(cwd: string, label: string, name: string, note?: string, he
 /** The step each pipeline command opens when it finishes. */
 const COMMAND_STEPS = {
   'tdd start': { name: 'tdd: plan and skeleton', heavy: false },
-  'tdd split': { name: 'tdd: implement', heavy: true },
+  'tdd split': { name: 'tdd: tests', heavy: false },
+  // Opened when RED is proven, so the lead's first request after the test-writer returns is the boundary.
+  'tdd red': { name: 'tdd: implement', heavy: true },
   'tdd join': { name: 'verify and finalize', heavy: false },
   'review-brief': { name: 'review: apply findings', heavy: true },
 } as const;
