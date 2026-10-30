@@ -76,6 +76,7 @@ import { chargeColumnM, explosiveHoleLimits, maxFittingChargeKg } from '../../sr
 import { getLevel } from '../../src/core/campaign/Level.js';
 import { getEventById } from '../../src/core/events/EventPool.js';
 import type { EventConsequence } from '../../src/core/events/EventPool.js';
+import { getRock } from '../../src/core/world/RockCatalog.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import type { VehicleRole, VehicleTier } from '../../src/core/entities/Vehicle.js';
 import { nearestHaulDepot, newCraterAccessMemory, playPitLogistics, rampKeepOutZones, strandedCrew, type CraterAccessMemory } from './probe-crater-access.js';
@@ -100,6 +101,8 @@ import { vehicleMaxSlopeRatio } from '../../src/core/entities/Vehicle.js';
 import { isProgressionSite } from '../../src/core/state/GameState.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS } from '../../src/core/config/balance.js';
 import { haulDestinationOf } from '../../src/core/economy/SpoilHeaps.js';
+import { terrainConfigOf } from '../../src/console/commands/world.js';
+import { resolveStarterDeposit } from '../../src/core/world/StarterDeposit.js';
 import { oreGradeScaleOf } from '../../src/core/economy/OreGrade.js';
 import { BLAST_ZONE_CLEAR_MARGIN, playContracts, playTick, clearBlastZone, explosiveRoomKg, topUpWarehouse, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
@@ -212,6 +215,19 @@ function rankDeposits(grid: VoxelGrid, span = SHOT_SPAN, depth: number = SHOT.de
   const anyOre = out.some(c => c.ore > 0);
   // Array.sort is stable and `out` is already in ascending x then z: ties keep that order.
   return out.sort((a, b) => (anyOre ? b.ore - a.ore : a.spread - b.spread));
+}
+
+/**
+ * Origin of the reference shot centred on the site's starter deposit (#2116, #2123), or null when the site has none.
+ * The probe reads it as it reads ore: ground truth standing in for the survey. The opening shoots it when the richest
+ * deposit's rock is too hard for the reference charge (`rockBreaks`); shot first elsewhere it sold too little to carry the
+ * payroll. Where the richest deposit breaks (desert_badlands, alpine_granite) the opening keeps it: starter-first sold less there, so
+ * the starter is the fallback for unbreakable richest rock (tropical_karst, volcanic_flats). The explosive warehouse is raised beside the quarters either way.
+ */
+export function starterShotOrigin(state: GameState, span: number = SHOT_SPAN): Pattern | null {
+  const config = terrainConfigOf(state);
+  const starter = config ? resolveStarterDeposit(config) : null;
+  return starter ? { x: starter.x - span / 2, z: starter.z - span / 2 } : null;
 }
 
 /** Metres a building other than a depot keeps from every depot: haulers queue in the gap to dock. */
@@ -541,15 +557,46 @@ function orderRamp(s: ProbeSession, at: Pattern, span = SHOT_SPAN, maxSlope = ra
 
 // ── Opening ──
 
+/**
+ * Mean energy absorption of the rock under the 9x9 footprint at `at`, down to the hole depth, up to which the
+ * reference charge breaks the ground. The richest deposits of tropical_karst and volcanic_flats sit in obstiite and
+ * gnarlite (2200 and 2600): the shot broke nothing, no fragment was ever sold and the payroll bankrupted all 20 seeds.
+ * alpine_granite (clunkite, stubite: 1100 and 1300) breaks and sells.
+ */
+const BREAKABLE_ABSORPTION_MAX = 2000;
+
+function rockBreaks(grid: VoxelGrid, at: Pattern): boolean {
+  let total = 0, count = 0;
+  for (let dx = 0; dx <= SHOT_SPAN; dx++) {
+    for (let dz = 0; dz <= SHOT_SPAN; dz++) {
+      const top = computeVoxelColumnSurfaceY(grid, at.x + dx, at.z + dz);
+      if (top === null) continue;
+      for (let d = 0; d < SHOT.depth; d++) {
+        total += getRock(grid.dominantRockAt(at.x + dx, top - d, at.z + dz))?.energyAbsorption ?? 0;
+        count++;
+      }
+    }
+  }
+  return count === 0 || total / count <= BREAKABLE_ABSORPTION_MAX;
+}
+
 /** The opening's shot site and the slope ratio of the ramp it dug. */
-function runOpening(s: ProbeSession): { at: Pattern; ramp: RampOrder } {
+function runOpening(s: ProbeSession, sandboxOpening = true): { at: Pattern; ramp: RampOrder } {
   const fail = (step: string): never => { throw new ProbeStop(`opening_failed:${step}`); };
 
   const ranked = rankDeposits(s.grid)[0];
-  const site = ranked ? { x: ranked.x, z: ranked.z } : { x: s.grid.sizeX >> 1, z: s.grid.sizeZ >> 1 };
+  const starter = !sandboxOpening || (ranked && rockBreaks(s.grid, ranked)) ? null : starterShotOrigin(s.state);
+  const site = starter ?? (ranked ? { x: ranked.x, z: ranked.z } : { x: s.grid.sizeX >> 1, z: s.grid.sizeZ >> 1 });
   if (!placeBuilding(s, 'living_quarters', site, site)) fail('living_quarters');
 
-  const shot = orderShot(s);
+  // Raised beside the quarters, in the crew's reach: the stock helper builds on the first free cell, in the grid corner, which the crew never reached on some alpine sites.
+  // Not the ladder's: its measured windows (and the Shareholder Summit win) were set with the stock helper's warehouse and the richest site.
+  if (sandboxOpening && !s.state.buildings.buildings.some(b => b.type === 'explosive_warehouse')) {
+    if (!placeBuilding(s, 'explosive_warehouse', site, site)) fail('explosive_warehouse');
+    s.waitFor('explosive_warehouse', () => s.state.buildings.buildings.some(b => b.type === 'explosive_warehouse'));
+  }
+
+  const shot = orderShot(s, [], undefined, starter ?? undefined);
   if (!shot) return fail('shot');
   s.waitFor('shot', () => shotReady(s.state));
   if (!fireShot(s)) fail('blast');
@@ -1570,7 +1617,7 @@ function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
 const LADDER_SHIFT_POLICY = 'set_policy mode:shift_12h fatigue:60';
 
 function runLadder(s: ProbeSession, maxGrade: number | null): void {
-  const opened = runOpening(s);
+  const opened = runOpening(s, false);
   s.run(LADDER_SHIFT_POLICY);
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
