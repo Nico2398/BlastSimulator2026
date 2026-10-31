@@ -216,7 +216,7 @@ function siteRunner(state: GameState): { run: Run; cmds: string[] } {
 }
 
 describe('the waits inside an action answer events by the run policy (#2126)', () => {
-  registerEvent('t2126_wait_event', [{ cashDelta: -40000, effects: [{ type: 'employee_leaves' }] }, { cashDelta: -3000 }]);
+  registerEvent('t2126_wait_event', [{ cashDelta: -40000, effects: [{ type: 'employee_leaves', pick: 'random' }] }, { cashDelta: -3000 }]);
 
   it('clearBlastZone answers with the policy while the zone empties', () => {
     const state = bareSiteWithEvent('t2126_wait_event');

@@ -149,9 +149,9 @@ describe('freshSites minOre (#2126)', () => {
     expect(freshSites(gridWithPatch(true), SPAN, DEPTH, [], { protectedZones: [], minOre: FULL_PATCH_ORE + 1 })).toEqual([]);
   });
 
-  it('changes nothing when unset', () => {
+  it('changes nothing at a floor of 0: every site holds at least no ore', () => {
     const grid = gridWithPatch(true);
-    expect(freshSites(grid, SPAN, DEPTH, [], { protectedZones: [], minOre: undefined })).toEqual(freshSites(grid, SPAN, DEPTH, [], { protectedZones: [] }));
+    expect(freshSites(grid, SPAN, DEPTH, [], { protectedZones: [], minOre: 0 })).toEqual(freshSites(grid, SPAN, DEPTH, [], { protectedZones: [] }));
   });
 });
 
