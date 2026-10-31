@@ -844,6 +844,7 @@ window.__gameState = () => {
     surveyCount: s.surveyResults.length,
     pendingActionCount: s.pendingActions.length,
     unreachableGhostCount: s.ghostPreviews.filter(g => g.unreachable === true).length,
+    redGhostCount: s.ghostPreviews.filter(g => !g.claimed && (g.unreachable === true || g.blocked === true)).length,
     buildingCount: s.buildings.buildings.length,
     maxBuildingTier: getMaxBuildingTier(s.buildings),
     vehicleCount: s.vehicles.vehicles.length,

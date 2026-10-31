@@ -63,6 +63,7 @@ function makePendingAction(overrides: Partial<{
   return {
     id: overrides.id ?? 1,
     requiredSkill: (overrides.requiredSkill === undefined ? 'blasting' : overrides.requiredSkill) as SkillCategory | null,
+    requiredVehicleRole: null,
     targetX: overrides.targetX ?? 10,
     targetZ: overrides.targetZ ?? 20,
     payload: overrides.payload ?? {},

@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Ghost Mesh Renderer
-// Renders pending-action previews as blue translucent pulsing meshes.
+// Renders pending-action previews as blue translucent pulsing meshes, red while blocked.
 // Each GhostPreview maps to a semi-transparent box at the target grid position.
 // Opacity pulses between min and max to signal "waiting for worker" state.
 
@@ -147,7 +147,7 @@ interface InstancedGhost {
   targetY: number;
   /** The look it was slotted with, to skip a preview whose flags did not change. */
   claimed: boolean;
-  unreachable: boolean;
+  red: boolean;
   /** The `sync` pass that last saw its preview. */
   seen: number;
 }
@@ -157,6 +157,11 @@ interface InstancedGhost {
  * draw as instanced cubes: never a building, never a footprint, never a site
  * other UI anchors to.
  */
+/** Red while nobody will work the order: no capable actor reaches it (#1306), or it carries any other block. */
+function isRedGhost(preview: GhostPreview): boolean {
+  return preview.unreachable === true || preview.blocked === true;
+}
+
 function isInstancedGhost(preview: GhostPreview): boolean {
   return (preview.type === 'haul_debris' || preview.type === 'fragment_debris')
     && preview.footprint === undefined && preview.building === undefined;
@@ -175,7 +180,7 @@ export class GhostMesh {
   private readonly material: THREE.MeshPhongMaterial;
   /** Material for claimed ghosts (#547) — dimmer, slower pulse, still blue. */
   private readonly claimedMaterial: THREE.MeshPhongMaterial;
-  /** Material for unclaimed ghosts no capable actor can reach (#1306) — red, same pulse as unclaimed. */
+  /** Material for unclaimed ghosts nobody will work: unreachable (#1306) or otherwise blocked — red, same pulse as unclaimed. */
   private readonly unreachableMaterial: THREE.MeshPhongMaterial;
   /**
    * The one cube every footprint-less ghost shares: a blast queues a haul
@@ -196,13 +201,13 @@ export class GhostMesh {
   /** A claimed ghost is never red — an employee is already on the way (#1306). */
   private materialFor(preview: GhostPreview): THREE.MeshPhongMaterial {
     if (preview.claimed) return this.claimedMaterial;
-    return preview.unreachable === true ? this.unreachableMaterial : this.material;
+    return isRedGhost(preview) ? this.unreachableMaterial : this.material;
   }
 
   /**
    * Sync ghost meshes against the current ghost preview list.
    * Adds meshes for new previews and removes meshes for gone ones. A preview
-   * whose `claimed`/`unreachable` flag flips in place (same id, existing mesh)
+   * whose `claimed`/`unreachable`/`blocked` flag flips in place (same id, existing mesh)
    * swaps that mesh's material rather than recreating it (#547, #1306).
    * Call after syncFromContext() whenever ghostPreviews may have changed.
    *
@@ -274,25 +279,25 @@ export class GhostMesh {
   ): void {
     const existing = this.instanced.get(preview.id);
     const claimed = preview.claimed === true;
-    const unreachable = preview.unreachable === true;
+    const red = isRedGhost(preview);
     const moved = surfaceY !== null && resnap;
     if (existing !== undefined) {
       existing.seen = gen;
       existing.preview = preview;
-      if (!moved && existing.claimed === claimed && existing.unreachable === unreachable) return;
+      if (!moved && existing.claimed === claimed && existing.red === red) return;
       existing.claimed = claimed;
-      existing.unreachable = unreachable;
+      existing.red = red;
     }
     const batch = this.batchFor(this.materialFor(preview));
     if (existing === undefined) {
       const targetY = surfaceY?.(preview.targetX, preview.targetZ) ?? preview.targetY;
       const slot = batch.add(preview.id, preview.targetX, targetY + GHOST_SIZE / 2, preview.targetZ);
-      this.instanced.set(preview.id, { batch, slot, preview, targetY, claimed, unreachable, seen: gen });
+      this.instanced.set(preview.id, { batch, slot, preview, targetY, claimed, red, seen: gen });
       return;
     }
     if (moved) existing.targetY = surfaceY(preview.targetX, preview.targetZ);
     if (existing.batch === batch && !moved) return;
-    // Claimed, unreachable, or the ground under it changed: re-slot it.
+    // Claimed, turned red or blue, or the ground under it changed: re-slot it.
     existing.batch.remove(existing.slot);
     existing.batch = batch;
     existing.slot = batch.add(preview.id, preview.targetX, existing.targetY + GHOST_SIZE / 2, preview.targetZ);

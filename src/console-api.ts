@@ -73,6 +73,8 @@ export interface SerializableGameState {
   pendingActionCount: number;
   /** Ghost previews drawn red because no actor able to perform their action can reach them (#1306). */
   unreachableGhostCount: number;
+  /** Unclaimed ghost previews drawn red for any reason: unreachable, or their action carries a blockedReason. */
+  redGhostCount: number;
   buildingCount: number;
   /** Highest tier among standing buildings, 0 when none (#1392). */
   maxBuildingTier: number;
@@ -234,6 +236,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     surveyCount: s.surveyResults.length,
     pendingActionCount: s.pendingActions.length,
     unreachableGhostCount: s.ghostPreviews.filter(g => g.unreachable === true).length,
+    redGhostCount: s.ghostPreviews.filter(g => !g.claimed && (g.unreachable === true || g.blocked === true)).length,
     buildingCount: s.buildings.buildings.length,
     maxBuildingTier: getMaxBuildingTier(s.buildings),
     vehicleCount: s.vehicles.vehicles.length,

@@ -1524,6 +1524,56 @@ describe('decideClock', () => {
       expect(decideClock(s, 0, budget, true).hold).toBe(false);
     });
   });
+
+  // A cash-bought charge order sits in pendingActions until its explosives
+  // arrive (#1895); nobody works it meanwhile, so the work signature never
+  // moves. Holding the clock on it stopped the ticks that bring the delivery
+  // in: the tutorial's charge step softlocked with the crew idle.
+  describe('charge order waiting on its explosives delivery (#1895)', () => {
+    const CHARGE_BUDGET = 20; // the 'charge' step's own tickBudget
+    const ARRIVAL = 400;
+
+    function awaitingDelivery(tick: number): GameState {
+      const s = state();
+      s.tickCount = tick;
+      s.pendingActions = [
+        { id: 1, type: 'charge_hole', payload: { holeId: 'H1', deliveryArrivalTick: ARRIVAL } },
+        { id: 2, type: 'charge_hole', payload: { holeId: 'H2', deliveryArrivalTick: ARRIVAL } },
+      ] as unknown as GameState['pendingActions'];
+      s.employees.employees = [
+        { activeActionId: null, pendingDriverVehicleId: null, destinationX: null, destinationZ: null, trainingState: null } as never,
+      ];
+      return s;
+    }
+
+    it('never holds a waitsOnWork step while the delivery is in transit, however long it takes', () => {
+      let progress: ClockProgress = { signature: null, tick: 0 };
+      for (let tick = 0; tick < ARRIVAL; tick++) {
+        const decision = decideClock(awaitingDelivery(tick), 0, CHARGE_BUDGET, true, progress);
+        expect(decision.hold, `tick ${tick}`).toBe(false);
+        progress = { signature: decision.progressSignature, tick: decision.lastProgressTick };
+      }
+    });
+
+    it('boundary: does not hold on the arrival tick, so the crew can pick the order up', () => {
+      let progress: ClockProgress = { signature: null, tick: 0 };
+      for (let tick = 0; tick <= ARRIVAL; tick++) {
+        const decision = decideClock(awaitingDelivery(tick), 0, CHARGE_BUDGET, true, progress);
+        progress = { signature: decision.progressSignature, tick: decision.lastProgressTick };
+        if (tick === ARRIVAL) expect(decision.hold).toBe(false);
+      }
+    });
+
+    it('holds again once the explosives have arrived and nobody takes the order for WORK_GRACE_TICKS', () => {
+      const s = awaitingDelivery(ARRIVAL + WORK_GRACE_TICKS);
+      const signature = decideClock(awaitingDelivery(ARRIVAL), 0, CHARGE_BUDGET, true).progressSignature;
+      expect(decideClock(s, 0, CHARGE_BUDGET, true, { signature, tick: ARRIVAL }).hold).toBe(true);
+    });
+
+    it('still holds a step that only waits on a click', () => {
+      expect(decideClock(awaitingDelivery(CHARGE_BUDGET + 5), 0, CHARGE_BUDGET, false).hold).toBe(true);
+    });
+  });
 });
 
 describe('sell-ore step does not wait on the RNG (#1600)', () => {

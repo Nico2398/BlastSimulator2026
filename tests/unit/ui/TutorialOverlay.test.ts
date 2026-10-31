@@ -12,6 +12,13 @@ import { buildTutorialCard } from '../../../src/ui/tutorialOverlayDom.js';
 import { shouldAutoStartTutorial } from '../../../src/ui/tutorialTrigger.js';
 import type { ConfirmModalConfig } from '../../../src/ui/panels/ConfirmModal.js';
 
+/** Index of the step with `id`; fails loudly when the id is gone rather than pointing at the wrong step. */
+function stepIndexOf(id: string): number {
+  const index = TUTORIAL_STEPS.findIndex((s) => s.id === id);
+  if (index < 0) throw new Error(`no tutorial step ${id}`);
+  return index;
+}
+
 function createMockState(): GameState {
   return createGame({ seed: 42, mineType: 'tutorial' });
 }
@@ -262,8 +269,8 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('progress display', () => {
-    it('shows step counter "1 / 28" at step 0 and has progress bar fill', () => {
-      // Total comes from TUTORIAL_STEPS (28 today); update the literal when a step is added or removed.
+    it('shows step counter "1 / 30" at step 0 and has progress bar fill', () => {
+      // Total comes from TUTORIAL_STEPS (30 today); update the literal when a step is added or removed.
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
@@ -271,7 +278,7 @@ describe('TutorialOverlay (12.4)', () => {
       const els = Array.from(container.querySelectorAll('*'));
       const ctr = els.find(el => /\d\s*\/\s*\d/.test(el.textContent ?? ''));
       expect(ctr).toBeDefined();
-      expect(ctr?.textContent).toMatch(/1\s*\/\s*28/);
+      expect(ctr?.textContent).toMatch(/1\s*\/\s*30/);
       expect(container.querySelector('.bs-tutorial-progress-fill')).not.toBeNull();
     });
   });
@@ -619,20 +626,12 @@ describe('TutorialOverlay (12.4)', () => {
       tut.setGameConsole(gameConsole);
       tut.start(state);
 
-      // Set to the scores step so advanceToNextStep goes to event-fire-resolve
-      // (index 17/18 in the current 28-length array (#1648 added buy-charging-truck): #1344 removed the sequence step; #553's tutorial fix
-      // added three drill-rig-licensing steps, #555 added two more
-      // rock-digger-licensing steps, #681 added
-      // build-living-quarters/set-early-policy earlier in the sequence, #557
-      // inserted evacuate-zone right before blast, #905 inserted
-      // toggle-survey-overlay right after survey, #923 had inserted
-      // speed-up-for-dig/speed-normal-after-dig inside the box-cut wait, and
-      // #1015 removed that pair again — the speed bar needs no step of its
-      // own any more).
-      tut.stepIndex = 17;
+      // Set to the scores step so advanceToNextStep goes to event-fire-resolve,
+      // located by id so a step inserted earlier in the sequence moves nothing here.
+      tut.stepIndex = stepIndexOf('scores');
       tut.advanceToNextStep();
 
-      expect(tut.stepIndex).toBe(18);
+      expect(tut.stepIndex).toBe(stepIndexOf('event-fire-resolve'));
       expect(gameConsole).toHaveBeenCalledWith('tick 3');
     });
 
@@ -645,7 +644,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // createGame() defaults events.pendingEvent to null
-      tut.stepIndex = 17;
+      tut.stepIndex = stepIndexOf('scores');
       tut.advanceToNextStep();
 
       expect(gameConsole).toHaveBeenCalledWith('event fire tutorial_synergy_consultant');
@@ -658,12 +657,9 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
       // Do NOT call setGameConsole — gameConsole stays null
 
-      // Index 13 is 'charge' in the current 29-length array (#1015 removed
-      // speed-up-for-dig/speed-normal-after-dig, shifting everything from
-      // drill-plan onward down by 2).
-      tut.stepIndex = 13;
+      tut.stepIndex = stepIndexOf('charge');
       expect(() => tut.advanceToNextStep()).not.toThrow();
-      expect(tut.stepIndex).toBe(14);
+      expect(tut.stepIndex).toBe(stepIndexOf('charge') + 1);
     });
   });
 
@@ -693,8 +689,8 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       tut.start(createMockState());
 
-      // Directly set to congratulations step (last step, index 27 of 28).
-      tut.stepIndex = 27;
+      // Directly set to congratulations step (the last step).
+      tut.stepIndex = TUTORIAL_STEPS.length - 1;
       tut.render();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;

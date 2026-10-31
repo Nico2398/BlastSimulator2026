@@ -664,6 +664,50 @@ function makeFakeShader() {
   };
 }
 
+describe('blocked (red) ghosts: any reason nobody will work the order', () => {
+  it('a blocked but reachable preview wears the red material', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    const [, , red] = gm.materials;
+    gm.sync([makePreview(1, { unreachable: false, blocked: true })]);
+    expect((scene.children[0] as THREE.Mesh).material).toBe(red);
+    gm.dispose();
+  });
+
+  it('flips back to blue in place when the block clears', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    const [blue] = gm.materials;
+    gm.sync([makePreview(1, { blocked: true })]);
+    const mesh = scene.children[0] as THREE.Mesh;
+    gm.sync([makePreview(1, { blocked: false })]);
+    expect(scene.children[0]).toBe(mesh);
+    expect(mesh.material).toBe(blue);
+    gm.dispose();
+  });
+
+  it('an instanced debris ghost moves to the red batch when blocked, and back', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    const [blue, , red] = gm.materials;
+    gm.sync([makePreview(1, { type: 'haul_debris', blocked: true })]);
+    expect(gm.batchOf(red!)!.count).toBe(1);
+    gm.sync([makePreview(1, { type: 'haul_debris', blocked: false })]);
+    expect(gm.batchOf(red!)!.count).toBe(0);
+    expect(gm.batchOf(blue!)!.count).toBe(1);
+    gm.dispose();
+  });
+
+  it('a claimed preview is never red, even when flagged blocked', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    const [, claimed] = gm.materials;
+    gm.sync([makePreview(1, { claimed: true, blocked: true })]);
+    expect((scene.children[0] as THREE.Mesh).material).toBe(claimed);
+    gm.dispose();
+  });
+});
+
 describe('unreachable (red) ghosts (#1306)', () => {
   it('an unreachable preview is drawn with a red-dominant, transparent material', () => {
     const scene = new THREE.Scene();

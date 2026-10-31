@@ -127,6 +127,9 @@ export const PICKER_CANVAS = 'body.bs-placement-armed #game-canvas';
  * after the rail's next 250ms pass was swallowed by `pointer-events: none`.
  */
 const SURVEY_RUN = '#bs-survey-run';
+/** The Blast Workshop Charge step's buy-into-stock button and its kg stepper (#1685). */
+const STOCK_BUY = '#bs-blast-panel [data-action="stock-buy"]';
+const STOCK_KG_STEPPER = '#bs-blast-panel [data-field="stock-kg"] .bsx-stepper-btn';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
 // Only an ore offer the pit can fill in full: rubble, supply and unfillable
 // offers' Accept stays visible but outside the rails allow set (#1335).
@@ -179,7 +182,7 @@ function pickerStages(
  * margin onto these corners, so the player aims at a drawn outline and cannot
  * miss.
  *
- * The three tutorial building pins (warehouse, drivingCenter, livingQuarters)
+ * The four tutorial building pins (warehouse, drivingCenter, livingQuarters, explosiveWarehouse)
  * are the tier-1 footprint rects of their building defs, anchored at the
  * origin (x1, z1) the building is placed at (`tutorialSiteFootprintRect`),
  * and are derived, not picked ad hoc: flat for the building's full footprint
@@ -254,6 +257,11 @@ export const REGION = {
   // then driving_center, then freight_warehouse) with each one checked
   // against the prior pins already placed.
   livingQuarters: tutorialSiteFootprintRect('living_quarters', 1, { x1: 8, z1: 15, x2: 8, z2: 15 }),
+  // Same derivation as the pins above. Ordered right after drill-plan, between
+  // living_quarters and driving_center, so it leaves one free column (x=6) to
+  // the freight warehouse at (2,12)-(5,15) and two free rows (z=13-14) to
+  // driving_center (6,15) and living_quarters (8,15).
+  explosiveWarehouse: tutorialSiteFootprintRect('explosive_warehouse', 1, { x1: 7, z1: 11, x2: 7, z2: 11 }),
 } satisfies Record<string, TileRegion>;
 
 /** World edge (tiles) after the seismic survey grows the world from 32 to 48. */
@@ -425,6 +433,26 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       spentWhen: (state) => state.plannedDrillHoles.length > 0,
       waitingKey: 'tutorial.waiting.drilling',
     }),
+  ],
+
+  'build-explosive-warehouse': [
+    { target: TOOLBAR_TARGET.build, hintKey: 'tutorial.stage.open_build' },
+    {
+      target: '#bs-build-panel [data-build-type="explosive_warehouse"] .bs-build-buy-btn',
+      hintKey: 'tutorial.stage.build_explosive_warehouse',
+    },
+    ...pickerStages('tutorial.stage.build_site', REGION.explosiveWarehouse, {
+      spentWhen: (state) => hasPlannedBuildingOfType(state, 'explosive_warehouse'),
+      waitingKey: 'tutorial.waiting.building',
+    }),
+  ],
+
+  // The stock block sits on the Charge step the workshop opens on once every
+  // hole is drilled. Buying twice at the default 50 kg, or once after +, both
+  // reach the pattern's need; the step completes on the stock, not the clicks.
+  'stock-explosives': [
+    { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
+    { target: STOCK_BUY, hintKey: 'tutorial.stage.stock_buy', also: [STOCK_KG_STEPPER] },
   ],
 
   // #1596: no amount/stemming steppers -- the panel defaults equal the
