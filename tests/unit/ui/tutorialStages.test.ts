@@ -462,6 +462,7 @@ describe('spentWhen / waitingKey wiring (#1014)', () => {
     'box-cut': 'tutorial.waiting.excavating',
     'haul-debris': 'tutorial.waiting.hauling',
     'build-living-quarters': 'tutorial.waiting.building',
+    'build-explosive-warehouse': 'tutorial.waiting.building',
     'build-driving-center': 'tutorial.waiting.building',
     'build-storage': 'tutorial.waiting.building',
     'sell-ore': 'tutorial.waiting.delivering',

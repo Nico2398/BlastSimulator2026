@@ -93,7 +93,7 @@ const SERIALIZED_FIELDS = [
   'boardConfidence',
   'mineGrade', 'unseenApprovalGrade', 'trafficJamCount', 'trafficJams', 'pendingEvent', 'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather', 'wallSlumpCount',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
-  'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount', 'wetHoleCount',
+  'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'redGhostCount', 'researchQueueLength', 'chargedCount', 'wetHoleCount',
   'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'rampLegCount', 'builtRampWidth', 'builtRampFlow', 'vehicleCount', 'vehicleBoardingCount', 'vehicleLoaded', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue', 'insideBuildingCount',
   'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'fillableDirtiteSaleOffered', 'fillableRustiteSaleOffered', 'winningRustiteSaleOffered', 'rubbleDisposalOffered', 'supplyOffered', 'blastBanned', 'blingiteSaleOffered', 'fillableSaleOffered', 'deathCount',
@@ -155,6 +155,21 @@ describe('console-api', () => {
         { id: 904, ...base },
       );
       expect(serializeGameState(ctx)!['unreachableGhostCount']).toBe(2);
+    });
+
+    it('redGhostCount counts unclaimed ghosts that are unreachable or blocked', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const ctx = runner.ctx as MiningContext;
+      expect(serializeGameState(ctx)!['redGhostCount']).toBe(0);
+      const base = { type: 'charge_hole' as const, targetX: 1, targetZ: 1, targetY: 0, claimed: false };
+      ctx.state!.ghostPreviews.push(
+        { id: 901, ...base, unreachable: true },
+        { id: 902, ...base, blocked: true },
+        { id: 903, ...base, unreachable: true, blocked: true },
+        { id: 904, ...base, claimed: true, blocked: true },
+        { id: 905, ...base, unreachable: false, blocked: false },
+      );
+      expect(serializeGameState(ctx)!['redGhostCount']).toBe(3);
     });
 
     it('reports the seed and mine type the game was created with', () => {

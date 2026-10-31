@@ -168,6 +168,10 @@ const LEVELS: readonly LevelDef[] = [
     // (~$200-300/tick, ~$80k+), and a player clicking between steps spends more
     // ticks than the scripted run: at $400,000 the tutorial could no longer pay for
     // the freight_warehouse its build-storage stage requires. Same precedent as #1550.
+    // Since then the build-explosive-warehouse and stock-explosives steps stock the
+    // first charge before it is ordered, so the scripted run no longer idles through
+    // that delivery; the explosive warehouse ($20,000, $12/tick) and its 100 kg of
+    // Boomite (~$840) are paid from the same margin, left unchanged.
     startingCash: 500000,
     availableExplosives: ['pop_rock', 'boomite'],
     unlockThreshold: 5000,

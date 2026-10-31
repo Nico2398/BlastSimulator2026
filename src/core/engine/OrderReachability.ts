@@ -2,6 +2,7 @@
 //
 // A queued action is "unreachable" (its ghost reads red) when none of the actors
 // able to perform THAT action can reach its target, or no such actor exists.
+// Any other blockedReason reads red too: the ghost's `blocked` flag.
 // Actors are worked out per action from its own requirements (skill, vehicle
 // role) and grouped by that key. Every pool is answered from a labelling of
 // the grid into climb components — one per clearance, kept until the grid
@@ -324,7 +325,7 @@ function rampTooSteepDetail(
 const actionIdOf = (action: PendingAction): number => action.id;
 const ghostIdOf = (ghost: GhostPreview): number => ghost.id;
 
-/** Stamp blockedReason and the ghost's red flag for `targets`; returns ids needing the unqualified modal. */
+/** Stamp blockedReason and the ghost's red flags for `targets`; returns ids needing the unqualified modal. */
 function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<number> {
   const unqualifiedIds = new Set<number>();
   const tierByRole = new Map<string, VehicleTier | null>();
@@ -343,6 +344,14 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
   const fragmentOf = createFragmentLookup(state);
   const fits = createStorageFit(state);
   let flipped = false;
+  // Every reason reads red, not only an unreachable target: a reachable order
+  // nobody will work (explosives in transit, nowhere to unload) idles the crew too.
+  const stampBlocked = (ghost: GhostPreview | undefined, action: PendingAction): void => {
+    if (ghost === undefined) return;
+    const blocked = action.blockedReason != null;
+    if ((ghost.blocked === true) !== blocked) flipped = true;
+    ghost.blocked = blocked;
+  };
 
   for (const action of targets) {
     const judgement = judgements.get(action.id);
@@ -368,6 +377,7 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
         const detail = rampTooSteepDetail(action, reachAtFlatLimit, steepestRamp);
         if (detail !== undefined) action.blockedDetail = detail;
       }
+      stampBlocked(ghost, action);
       continue;
     }
     delete action.blockedDetail;
@@ -392,6 +402,7 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
       : reason === 'licence_level_too_low' ? neededTierOf(action.requiredVehicleRole, orderTierFloor(action))
       : reason === 'no_reaching_vehicle' ? orderTierFloor(action)
       : null;
+    stampBlocked(ghost, action);
   }
   if (flipped) state.ghostPreviewsRevision++;
   return unqualifiedIds;
@@ -449,7 +460,7 @@ function releaseUnservableWalkPins(state: GameState): void {
 
 /**
  * Classify every queued, unclaimed action: stamp `blockedReason`, flip each
- * ghost's `unreachable` flag (bumping `ghostPreviewsRevision` only on a flip),
+ * ghost's `unreachable`/`blocked` flags (bumping `ghostPreviewsRevision` only on a flip),
  * and report the actions no eligible employee could ever perform.
  * A claimed ghost is never red. `debrisPerCall` (the tick's pass) judges only
  * that many auto-debris orders per call, rotating through them — see
@@ -460,8 +471,9 @@ export function classifyQueuedOrders(state: GameState, debrisPerCall = Infinity)
   retargetQueuedRampLayers(state);
   let flipped = false;
   for (const ghost of state.ghostPreviews) {
-    if (ghost.claimed && ghost.unreachable === true) {
+    if (ghost.claimed && (ghost.unreachable === true || ghost.blocked === true)) {
       ghost.unreachable = false;
+      ghost.blocked = false;
       flipped = true;
     }
   }
