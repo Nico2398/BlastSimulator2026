@@ -2982,7 +2982,8 @@ export const LEGACY_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
  * bankruptcy line before 150k of starting cash burns out. At this level the kit's steady
  * income is ~2-2.5x crew cost and the whole reference shot is worth ~2.3x the crew over
  * SANDBOX_REFERENCE_SHOT_CYCLE_TICKS (target 1.5-3x). #2117 scaled all of this by 0.6: the shot is now worth ~1.15x
- * the crew (pinned 0.9-1.8x).
+ * the crew (pinned 0.9-1.8x). That shot lands on the starter deposit's flat pad (#2116); its pocket became rustite at
+ * 0.30 (#2126) and the shot is now worth ~4.5x the crew (pinned 3.5-6x).
  * #1944: the sandbox ore grade scale (0.08) thins ore ~12x, so prices were raised 5x (the old
  * 21-336 ladder above is the pre-#1944 pitch); the quoted figures predate it. Probe numbers:
  * docs/plans/issue-1944-sandbox-yield.md.
@@ -3357,10 +3358,14 @@ export const STARTER_DEPOSIT_POCKET_DEPTH_M = 8;
 /** Ore fills the pocket's inner core of this radius (m) down to this depth (m); covers the reference shot with margin. */
 export const STARTER_DEPOSIT_ORE_CORE_RADIUS_M = 6;
 export const STARTER_DEPOSIT_ORE_DEPTH_M = 6;
-/** Stored ore density (0-1) of the pocket before the site grade scale. */
-export const STARTER_DEPOSIT_ORE_DENSITY = 0.14;
-export const STARTER_DEPOSIT_YIELD_KG_MIN = 10_000;
-export const STARTER_DEPOSIT_YIELD_KG_MAX = 20_000;
+/**
+ * Stored ore density (0-1) of the pocket before the site grade scale. 0.14 sold too little for the poorest seeds to carry
+ * their payroll: on desert_badlands seeds 1 and 12 the best shallow shot site holds 12-24 t, against 50-120 t on most (#2126).
+ */
+export const STARTER_DEPOSIT_ORE_DENSITY = 0.30;
+/** Ore (kg) the reference shot centred on the pocket yields: measured 27.6-36.7 t, median 35.5 t, over six biomes x seeds 1-9, 42 and 12345 (#2126). */
+export const STARTER_DEPOSIT_YIELD_KG_MIN = 20_000;
+export const STARTER_DEPOSIT_YIELD_KG_MAX = 42_000;
 /** Half the voxels the reference shot clears on desert_badlands seed 42 (~690). */
 export const STARTER_DEPOSIT_MIN_CLEARED_VOXELS = 345;
 

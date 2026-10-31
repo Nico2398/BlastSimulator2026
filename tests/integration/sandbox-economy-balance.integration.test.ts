@@ -8,7 +8,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRunner } from '../../src/console/createRunner.js';
-import type { GameContext } from '../../src/console/commands/world.js';
+import { terrainConfigOf, type GameContext } from '../../src/console/commands/world.js';
+import { resolveStarterDeposit } from '../../src/core/world/StarterDeposit.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
@@ -272,14 +273,20 @@ describe('sandbox economy: richness is bounded across biome and depth', () => {
   const BAND_M = 5;
   const MAX_DEPTH_M = 55;
 
-  /** Mean market value ($/m3) per depth band below the surface, over a lattice of columns. */
+  /**
+   * Mean market value ($/m3) per depth band below the surface, over a lattice of columns. The starter deposit's pocket is
+   * left out: it is shallow by design (#2116), not depth grade, and since #2126 it alone out-pays the band below it.
+   */
   function valuePerM3Bands(biome: string): number[] {
     const { ctx } = startSandbox(biome, 42);
     const grid = ctx.grid!;
+    const pocket = resolveStarterDeposit(terrainConfigOf(ctx.state!)!);
+    const inPocket = (x: number, z: number) => pocket !== null && Math.hypot(x - pocket.x, z - pocket.z) <= pocket.radius;
     const bands = new Array<number>(MAX_DEPTH_M / BAND_M).fill(0);
     let columns = 0;
     for (let x = 8; x < grid.sizeX - 8; x += 6) {
       for (let z = 8; z < grid.sizeZ - 8; z += 6) {
+        if (inPocket(x, z)) continue;
         const top = computeVoxelColumnSurfaceY(grid, x, z);
         if (top === null) continue;
         columns++;
@@ -371,15 +378,16 @@ function startPlayLoop(kit: string, horizon: number, afterTick: (elapsed: number
 }
 
 describe('sandbox economy: reference shot vs crew cost', () => {
-  it('ore of the ordinary desert 3x3 shot sells for 0.9-1.8x the crew cost over its drill-charge-fire-haul cycle', () => {
+  it('ore of the ordinary desert 3x3 shot sells for 3.5-6x the crew cost over its drill-charge-fire-haul cycle', () => {
     expect(SANDBOX_REFERENCE_CREW_COST_PER_TICK).toBeGreaterThan(0);
     expect(SANDBOX_REFERENCE_SHOT_CYCLE_TICKS).toBeGreaterThan(0);
     const { ctx } = startSandbox(DESERT, 42);
     const result = fireReferenceShot(ctx);
     const ratio = result.totalOreValue / (SANDBOX_REFERENCE_CREW_COST_PER_TICK * SANDBOX_REFERENCE_SHOT_CYCLE_TICKS);
-    // Re-measured for the x0.6 price table (#2117): 1.153, was 1.92 at the old prices; the 1.5-3x band scales with it.
-    expect(ratio).toBeGreaterThanOrEqual(0.9);
-    expect(ratio).toBeLessThanOrEqual(1.8);
+    // The flattest desert pad is the starter deposit's (#2116). Re-measured when the pocket became rustite at 0.30 (#2126):
+    // 4.531, was 1.153 for its dirtite at 0.14 (#2117 prices); the 0.9-1.8x band scales with it.
+    expect(ratio).toBeGreaterThanOrEqual(3.5);
+    expect(ratio).toBeLessThanOrEqual(6);
   });
 });
 

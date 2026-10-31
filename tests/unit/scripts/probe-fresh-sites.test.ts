@@ -134,3 +134,24 @@ describe('freshSites', () => {
     expect(sites.every(touchesPoor)).toBe(true);
   });
 });
+
+describe('freshSites minOre (#2126)', () => {
+  /** A site whose whole footprint lies on the patch: (SPAN + 1)^2 columns, DEPTH layers of ore density 1. */
+  const FULL_PATCH_ORE = (SPAN + 1) ** 2 * DEPTH;
+
+  it('keeps only the sites holding at least minOre', () => {
+    const sites = freshSites(gridWithPatch(true), SPAN, DEPTH, [], { protectedZones: [], minOre: FULL_PATCH_ORE });
+    expect(sites.map(c => [c.x, c.z])).toEqual([[PATCH.lo, PATCH.lo]]);
+  });
+
+  it('never returns a site under the floor, even when that leaves none', () => {
+    expect(freshSites(gridWithPatch(false), SPAN, DEPTH, [], { protectedZones: [], minOre: 1 })).toEqual([]);
+    expect(freshSites(gridWithPatch(true), SPAN, DEPTH, [], { protectedZones: [], minOre: FULL_PATCH_ORE + 1 })).toEqual([]);
+  });
+
+  it('changes nothing at a floor of 0: every site holds at least no ore', () => {
+    const grid = gridWithPatch(true);
+    expect(freshSites(grid, SPAN, DEPTH, [], { protectedZones: [], minOre: 0 })).toEqual(freshSites(grid, SPAN, DEPTH, [], { protectedZones: [] }));
+  });
+});
+

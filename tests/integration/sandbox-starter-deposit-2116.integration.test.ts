@@ -3,8 +3,9 @@
 // Every sandbox site opens with one close, shallow, reachable, sellable ore
 // pocket: it sits near the starting buildings, the digger can drive to it,
 // the reference grade-0 shot (3x3 holes, 4 m apart, 5 m deep, Krackle 4 kg,
-// 2.5 m stemming) centred on it breaks out a crater and yields 10-20 t of ore,
-// and finding it still takes a survey - nothing in the game state marks it.
+// 2.5 m stemming) centred on it breaks out a crater and yields its sized band of
+// ore (STARTER_DEPOSIT_YIELD_KG_*, #2126), and finding it still takes a survey -
+// nothing in the game state marks it.
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
@@ -117,7 +118,7 @@ describe('sandbox starter deposit: reachable at the vehicle slope limit without 
   }, TIMEOUT);
 });
 
-describe('sandbox starter deposit: the reference shot breaks it and yields 10-20 t', () => {
+describe('sandbox starter deposit: the reference shot breaks it and yields its sized band', () => {
   it.each(cases)('C7/C8 %s seed %i: clears a crater, yields a sellable, haulable ore band', (biome, seed) => {
     const d = depositOf(sandboxTerrainConfig(biome, seed));
     const ctx = startSandbox(biome, seed);

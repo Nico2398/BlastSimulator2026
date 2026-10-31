@@ -75,6 +75,7 @@ import { rampCutSlopeRatio } from '../../src/core/mining/Ramp.js';
 import { chargeColumnM, explosiveHoleLimits, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
 import { getEventById } from '../../src/core/events/EventPool.js';
+import { isActive } from '../../src/core/events/ActiveModifiers.js';
 import type { EventConsequence } from '../../src/core/events/EventPool.js';
 import { getRock } from '../../src/core/world/RockCatalog.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
@@ -258,6 +259,28 @@ function haulableOreOnGroundKg(state: GameState): number {
   );
 }
 
+/**
+ * Haulable ore on the ground no hauler can reach yet (its haul order reads `debris_out_of_reach`) left out, kg. The
+ * reinvest reload gate waits on this: ore stranded in a crater until a ramp reaches it is not ore the next shot competes
+ * with, and counting it held desert_badlands full seed 8 at two blasts while 17-20 t sat out of reach for 3,000 ticks (#2126).
+ */
+export function reachableHaulableOreKg(state: Pick<GameState, 'logistics' | 'pendingActions'>): number {
+  const stranded = new Set<unknown>();
+  for (const a of state.pendingActions) {
+    if (a.type === 'haul_debris' && a.blockedReason === 'debris_out_of_reach') stranded.add(a.payload['fragmentId']);
+  }
+  return fragmentOreKg(
+    state.logistics.fragments
+      .filter(f => f.state === 'on_ground' && !isOversized(f.fragment.volume) && !stranded.has(f.fragment.id))
+      .map(f => f.fragment),
+  );
+}
+
+/** Ore the reload gate weighs: the reinvest strategy leaves stranded ore out (`reachableHaulableOreKg`), the ladder keeps its own measure. */
+function reloadOreKg(s: ProbeSession, m: ReinvestMemory): number {
+  return m.reloadOnReachableOre ? reachableHaulableOreKg(s.state) : haulableOreOnGroundKg(s.state);
+}
+
 // ── Building placement ──
 
 /**
@@ -331,9 +354,25 @@ function placeBuilding(
   const besideRoad = ROADSIDE_TYPES.has(type) ? new Set<string>() : anchorsBesideRoad(type, haulRoadCells(s));
   const offRoad = spots.filter(p => !besideRoad.has(`${p.x},${p.z}`));
   for (const p of [...offRoad, ...spots.filter(p => besideRoad.has(`${p.x},${p.z}`))]) {
-    if (s.run(`build ${type} at:${p.x},${p.z} tier:1`).success) return p;
+    if (!s.run(`build ${type} at:${p.x},${p.z} tier:1`).success) continue;
+    const unreachable = unreachableNewestBuildOrder(s.state);
+    if (unreachable === null) return p;
+    s.run(`employee cancel ${unreachable}`);
   }
   return null;
+}
+
+/**
+ * Id of the newest planned building's `place_building` order when no builder can climb to its site (its ghost reads
+ * red, `target_unreachable`), else null. `build` accepts a site its crew cannot reach: on green_foothills digger seed 5
+ * the research centre went down on a terrace above the crew, its order waited all run, the freight warehouse never got
+ * its tier-2 research and the haul queue stood at `storage_full` for 3,300 of 6,000 ticks (#2126). A careful player
+ * cancels the red order (refunded) and places the building elsewhere.
+ */
+export function unreachableNewestBuildOrder(state: Pick<GameState, 'plannedBuildings' | 'pendingActions'>): number | null {
+  const newest = state.plannedBuildings[state.plannedBuildings.length - 1];
+  const order = newest && state.pendingActions.find(a => a.id === newest.actionId);
+  return order?.type === 'place_building' && order.blockedReason === 'target_unreachable' ? order.id : null;
 }
 
 // ── The shot: drill and charge together, clear, fire ──
@@ -390,6 +429,8 @@ export interface FreshSiteRules {
   protectedZones: readonly ProtectedZone[];
   /** Never shot over, whatever is left: the ramps the fleet reaches the pit by. No site is better than cutting the way in. */
   forbiddenZones?: readonly ProtectedZone[];
+  /** Least ore (summed voxel densities, as `rankDeposits` counts it) a site must hold to be shot at all; none when unset. */
+  minOre?: number;
 }
 
 /**
@@ -417,7 +458,8 @@ function ruledSites(
   allowed: (c: Pattern) => boolean = () => true,
 ): Pattern[] {
   const free = rankDeposits(grid, span, depth)
-    .filter(c => allowed(c) && !earlier.some(o => overlapsShot({ ...c, span }, o, earlier.length > 0 ? BERM_GAP : 0)));
+    .filter(c => allowed(c) && c.ore >= (rules?.minOre ?? -Infinity)
+      && !earlier.some(o => overlapsShot({ ...c, span }, o, earlier.length > 0 ? BERM_GAP : 0)));
   if (!rules) return free;
   const groundOreKgRemaining = free.reduce((sum, c) => sum + c.ore, 0);
   const floored = free.filter(c => decideFreshShotSite({
@@ -433,17 +475,31 @@ function ruledSites(
   return rich.length > 0 ? rich : pool;
 }
 
-/** Order `spec` at `at`, or on the best free deposit when `at` is not given. */
-function orderShot(s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = { ...SHOT, explosive: shotExplosive(s) }, at?: Pattern, rules?: FreshSiteRules): Shot | null {
+/** Every building's footprint and `clearM` around it: ground a careful player does not shoot. */
+function buildingGroundZones(state: GameState, clearM: number): ProtectedZone[] {
+  return state.buildings.buildings.map(b => {
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, b.tier));
+    return { x: b.x - clearM, z: b.z - clearM, span: Math.max(sizeX, sizeZ) + 2 * clearM };
+  });
+}
+
+/**
+ * Order `spec` at `at`, or on the best free deposit when `at` is not given, skipping the `keepOut` zones (the built ramps by
+ * default) unless nothing else is left.
+ */
+function orderShot(
+  s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = { ...SHOT, explosive: shotExplosive(s) }, at?: Pattern,
+  rules?: FreshSiteRules, keepOut: readonly ProtectedZone[] = rampKeepOutZones(s.state),
+): Shot | null {
   const span = spanOf(spec);
-  const candidates = at ? [at] : freshSites(s.grid, span, spec.depth, earlier, rules, rampKeepOutZones(s.state)).slice(0, DEPOSIT_CANDIDATES_TRIED);
+  const candidates = at ? [at] : freshSites(s.grid, span, spec.depth, earlier, rules, keepOut).slice(0, DEPOSIT_CANDIDATES_TRIED);
   // The stock buy takes whole kg; round up so the pattern's charge is covered.
   const totalKg = Math.ceil(spec.rows * spec.cols * spec.kg);
   const diameter = spec.diameterM === undefined ? '' : ` diameter:${spec.diameterM}`;
   for (const c of candidates) {
     const cmd = `drill_plan grid rows:${spec.rows} cols:${spec.cols} spacing:${spec.spacing} depth:${spec.depth} start:${c.x},${c.z}${diameter}`;
     if (!s.run(cmd).success) continue;
-    if (!topUpWarehouse(s.run, s.state, spec.explosive, totalKg).success) return null;
+    if (!topUpWarehouse(s.run, s.state, spec.explosive, totalKg, s.config.eventPolicy).success) return null;
     const charge = `charge hole:* explosive:${spec.explosive} amount:${spec.kg} stemming:${spec.stemming}`;
     if (!s.run(charge).success) return null;
     return { at: { x: c.x, z: c.z }, span, startedTick: s.state.tickCount };
@@ -476,6 +532,11 @@ const FIRE_EVACUATION_MAX_TICKS = 150;
  */
 const FIRE_EVACUATION_CAP_TICKS = 900;
 
+/** Whether an event's blasting ban refuses every detonation now. */
+function blastBanned(state: GameState): boolean {
+  return isActive(state.events.activeModifiers, 'blast_ban', state.tickCount);
+}
+
 /** Whether anyone alive stands in the active blast zone. */
 function crewInZone(state: GameState): boolean {
   const zone = state.zone.activeZone;
@@ -484,7 +545,7 @@ function crewInZone(state: GameState): boolean {
 
 /** Clear the zone and detonate a charged pattern. */
 function fireShot(s: ProbeSession): boolean {
-  clearBlastZone(s.run, s.state);
+  clearBlastZone(s.run, s.state, s.config.eventPolicy);
   const r = s.run('blast detonate');
   if (!r.success) return false;
   // Armed: wait for the evacuation while it makes progress. Someone who cannot leave the zone disarms the shot, a
@@ -599,7 +660,12 @@ function runOpening(s: ProbeSession, sandboxOpening = true): { at: Pattern; ramp
   const shot = orderShot(s, [], undefined, starter ?? undefined);
   if (!shot) return fail('shot');
   s.waitFor('shot', () => shotReady(s.state));
-  if (!fireShot(s)) fail('blast');
+  // A blasting ban an event imposed (12-48 h) refuses the detonation: the player fires once it lifts. Given up at once,
+  // it ended 4 of the 72 runs of the #2126 matrix before their first blast.
+  while (!fireShot(s)) {
+    if (!blastBanned(s.state)) fail('blast');
+    s.waitFor('blast', () => !blastBanned(s.state));
+  }
   s.tick(); // the blast resolves on the next command
   const ramp = orderRamp(s, shot.at);
   if (ramp === null) return fail('ramp');
@@ -643,6 +709,12 @@ interface ReinvestMemory {
   fireHeldSinceTick?: number;
   /** Ramps the player repaired and dug down to stranded floors (#2095): the game does neither by itself. */
   access: CraterAccessMemory;
+  /** Vehicle roles the opening left in the fleet; one destroyed later is bought again (`replaceLostVehicles`). */
+  keptRoles?: VehicleRole[];
+  /** The reload gate weighs only ore a hauler can reach (`reloadOreKg`); set by the reinvest strategy. */
+  reloadOnReachableOre?: boolean;
+  /** Footprints of shots given up (`giveUpShot`, the ladder's `abandonShot`); later fresh sites keep clear of them. */
+  barred?: Array<Pattern & { span: number }>;
 }
 
 function spendable(s: ProbeSession): number {
@@ -661,10 +733,30 @@ function tryOnce(s: ProbeSession, m: ReinvestMemory, key: string, attempt: () =>
   return ok;
 }
 
+/**
+ * Fresh-site rules of a reinvest shot: never ground without ore, which only costs. Out of ore-bearing sites, red_canyon
+ * digger seed 1 fired four barren shots in a row from t3500, three of them catastrophic, and went bankrupt (#2126).
+ */
+const REINVEST_SITE_RULES: FreshSiteRules = { protectedZones: [], minOre: LADDER_SITE_ORE_FLOOR };
+
+/** Metres around a building's footprint a reinvest shot keeps clear of while another site is left. */
+const REINVEST_BUILDING_CLEAR_M = 1;
+
+/**
+ * Ground a reinvest shot keeps clear of while another site is left: the built ramps, and every building's footprint with
+ * REINVEST_BUILDING_CLEAR_M around it. red_canyon digger seed 1 drilled its third shot across its depots and lost every
+ * building to a catastrophic blast (#2126). The ring stays narrow, and the opening is not held to it: the kit's buildings
+ * stand two cells off the starter deposit's reference shot by design (#2118), and the ladder's 6 m ring cost
+ * green_foothills full seed 6 its best sites.
+ */
+function reinvestKeepOut(state: GameState): ProtectedZone[] {
+  return [...rampKeepOutZones(state), ...buildingGroundZones(state, REINVEST_BUILDING_CLEAR_M)];
+}
+
 /** Order the next shot unless a recent attempt failed; null when none was ordered. */
 function orderShotOnce(s: ProbeSession, m: ReinvestMemory): Shot | null {
   let ordered: Shot | null = null;
-  tryOnce(s, m, 'shot', () => (ordered = orderShot(s, m.origins)) !== null);
+  tryOnce(s, m, 'shot', () => (ordered = orderShot(s, [...m.origins, ...(m.barred ?? [])], undefined, undefined, REINVEST_SITE_RULES, reinvestKeepOut(s.state))) !== null);
   return ordered as Shot | null; // assigned inside the closure, which TS narrowing cannot see
 }
 
@@ -717,7 +809,7 @@ function dropUnreachableHoles(s: ProbeSession): void {
 
 function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan): void {
   if (m.yieldPending) { // the blast resolved on the first command after it fired
-    m.lastYieldKg = haulableOreOnGroundKg(s.state);
+    m.lastYieldKg = reloadOreKg(s, m);
     m.yieldPending = false;
   }
   const shot = m.shot;
@@ -749,13 +841,15 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan)
       }
     }
     const next = plan?.() ?? { cost: SHOT_EXPLOSIVE_KG + RE_FIRE_CASH_CUSHION, order: () => orderShotOnce(s, m) };
-    if (idle && spendable(s) >= next.cost && (next.wanted === true || gradeNeedsBlast(s) || shouldReload(haulableOreOnGroundKg(s.state), m.lastYieldKg))) {
+    if (idle && spendable(s) >= next.cost && (next.wanted === true || gradeNeedsBlast(s) || shouldReload(reloadOreKg(s, m), m.lastYieldKg))) {
       m.shot = next.order();
     }
     return;
   }
   dropUnreachableHoles(s);
   if (shotReady(s.state)) {
+    // The reinvest player waits a blasting ban out rather than evacuate the crew for a detonation it refuses (#2126).
+    if (!plan && blastBanned(s.state)) return;
     if (holdFireForStranded(s, m)) return;
     // A refused detonation (an event's blasting ban) keeps the charged pattern: it is tried again next interval.
     if (fireShot(s)) {
@@ -765,12 +859,25 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory, plan?: () => ShotPlan)
       m.fireCancels = 0;
     } else {
       m.fireCancels = (m.fireCancels ?? 0) + 1;
-      if (s.state.tickCount - shot.startedTick > OPENING_STEP_MAX_TICKS) m.shot = null;
+      if (!plan && m.fireCancels >= MAX_FIRE_CANCELS) giveUpShot(s, m, shot);
+      else if (s.state.tickCount - shot.startedTick > OPENING_STEP_MAX_TICKS) m.shot = null;
     }
   } else if (s.state.tickCount - shot.startedTick > OPENING_STEP_MAX_TICKS) {
     m.shot = null;
     m.retryAt['shot'] = s.state.tickCount + PLACEMENT_RETRY_TICKS;
   }
+}
+
+/**
+ * Give the reinvest shot up after MAX_FIRE_CANCELS disarmed detonations, as the ladder does (`dropUnreachablePattern`): clear
+ * the pattern and keep later sites off its footprint. On red_canyon full seed 5 a blaster and the fragmenter could not leave
+ * the third shot's zone, and from t4320 to the horizon every arming evacuated the crew and was cancelled (#2126).
+ */
+function giveUpShot(s: ProbeSession, m: ReinvestMemory, shot: Shot): void {
+  abandonPattern(s);
+  (m.barred ??= []).push({ ...shot.at, span: shot.span });
+  m.shot = null;
+  m.fireCancels = 0;
 }
 
 /** Longest wait (ticks) for a ramp to free crew stranded in a charged pattern's blast zone before the shot is tried anyway. */
@@ -794,7 +901,7 @@ function holdFireForStranded(s: ProbeSession, m: ReinvestMemory): boolean {
 }
 
 /** Disarmed detonations after which a shot site is given up: someone cannot leave its blast zone, and every try evacuates the crew. */
-const LADDER_MAX_FIRE_CANCELS = 3;
+const MAX_FIRE_CANCELS = 3;
 
 /**
  * A pattern with a hole no drill rig reaches never finishes and keeps every later shot from being ordered.
@@ -802,7 +909,7 @@ const LADDER_MAX_FIRE_CANCELS = 3;
  */
 function dropUnreachablePattern(s: ProbeSession, m: LadderMemory): void {
   // An abandoned charged pattern refired in vain is given up the same way: left standing it blocks every later shot.
-  if ((m.fireCancels ?? 0) >= LADDER_MAX_FIRE_CANCELS && (m.shot !== null || shotReady(s.state))) {
+  if ((m.fireCancels ?? 0) >= MAX_FIRE_CANCELS && (m.shot !== null || shotReady(s.state))) {
     abandonShot(s, m, m.shot !== null ? { ...m.shot.at, span: m.shot.span } : patternFootprint(s.state));
     m.fireCancels = 0;
     return;
@@ -876,9 +983,29 @@ function reinvestBuy(s: ProbeSession, m: ReinvestMemory): void {
   }
   const haulers = state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length;
   const haulerCost = getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver;
-  if (haulers < 2 && spendable(s) >= haulerCost) {
-    tryOnce(s, m, 'hauler', () => buyHauler(s));
+  if (haulers < reinvestHaulersWanted(openHaulOrders(state)) && spendable(s) >= haulerCost) {
+    tryOnce(s, m, `hauler_${haulers + 1}`, () => buyHauler(s));
   }
+}
+
+/** Haulers the reinvest strategy runs at most. */
+export const REINVEST_MAX_HAULERS = 4;
+/** Open haul orders one hauler is given before the reinvest strategy buys another. */
+export const REINVEST_HAUL_ORDERS_PER_HAULER = 150;
+
+/** Haul orders a hauler could take now: queued and not blocked. */
+function openHaulOrders(state: Pick<GameState, 'pendingActions'>): number {
+  return state.pendingActions.filter(a => a.type === 'haul_debris' && a.status === 'queued' && !a.blockedReason).length;
+}
+
+/**
+ * Haulers the reinvest strategy wants for `openOrders` waiting hauls: two, as before, and one more per
+ * REINVEST_HAUL_ORDERS_PER_HAULER up to REINVEST_MAX_HAULERS. Two haulers move under half of a reference shot's haulable
+ * ore in 4,000 ticks, so 66 of 72 runs fired exactly two blasts in 6,000 and the sites that sold the least went
+ * bankrupt on payroll while their ore waited on the ground (#2126).
+ */
+export function reinvestHaulersWanted(openOrders: number): number {
+  return Math.min(REINVEST_MAX_HAULERS, Math.max(2, Math.ceil(openOrders / REINVEST_HAUL_ORDERS_PER_HAULER)));
 }
 
 /** Buy a hauler and hire a driver for it (assigned on arrival by the crew's own dispatch). */
@@ -893,19 +1020,58 @@ function reinvestPermit(s: ProbeSession): void {
 }
 
 function runReinvest(s: ProbeSession): void {
+  const kit = fleetRoles(s.state); // read before the opening, whose shot can already write a stranded vehicle off
   const first = runOpening(s).at;
   const m: ReinvestMemory = {
-    shot: null, origins: [first], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
-    researchOrdered: false, retryAt: {}, access: newCraterAccessMemory(),
+    shot: null, origins: [first], lastYieldKg: reachableHaulableOreKg(s.state), yieldPending: false,
+    researchOrdered: false, retryAt: {}, access: newCraterAccessMemory(), keptRoles: kit, reloadOnReachableOre: true,
   };
   playOut(s, () => {
     playPitLogistics(s.run, s.state, s.grid, m.access);
     reinvestShot(s, m);
     reinvestBuy(s, m);
+    keepStorageFlowing(s, m);
     reinvestPermit(s);
     replaceLostCrew(s, m);
+    replaceLostVehicles(s, m);
+    keepFleetLicensed(s, m);
     rebuildLostQuarters(s, m);
   });
+}
+
+/** Vehicle roles in the fleet, each once, in fleet order. */
+export function fleetRoles(state: Pick<GameState, 'vehicles'>): VehicleRole[] {
+  return [...new Set(state.vehicles.vehicles.map(v => v.type))];
+}
+
+/** Roles the fleet ran after the opening (`kept`) that it no longer has a single vehicle of. */
+export function lostVehicleRoles(state: Pick<GameState, 'vehicles'>, kept: readonly VehicleRole[]): VehicleRole[] {
+  const now = new Set(fleetRoles(state));
+  return kept.filter(role => !now.has(role));
+}
+
+/**
+ * Buy back a kit vehicle a shot or an event destroyed, as a careful player would. The opening fires on a stranded unmanned
+ * vehicle and writes it off (`fireShot`); on green_foothills digger seed 1 that was the only drill rig, every later drill
+ * order waited at `no_vehicle_in_fleet` and the run never blasted again (#2126).
+ */
+function replaceLostVehicles(s: ProbeSession, m: ReinvestMemory): void {
+  for (const role of lostVehicleRoles(s.state, m.keptRoles ?? [])) {
+    if (spendable(s) < getVehicleDefByTier(role, 1).purchaseCost) continue;
+    tryOnce(s, m, `vehicle_${role}`, () => s.run(`vehicle buy ${role}`).success);
+  }
+}
+
+/**
+ * Keep someone licensed for every vehicle role the fleet runs (`earnLicence`: a Driving Center course, a fresh hire when
+ * nobody idle can go). An event that makes an employee quit can take the only holder, and `replaceLostCrew`'s plain hire
+ * does not bring the licence back: on red_canyon full seed 4 the fragmenter's driver quit at t930 and about 1,400
+ * boulders waited at `no_licensed_driver` for the rest of the run (#2126).
+ */
+function keepFleetLicensed(s: ProbeSession, m: ReinvestMemory): void {
+  for (const role of fleetRoles(s.state)) {
+    if (countLicenceHolders(s.state.employees.employees, role, 1) === 0) earnLicence(s, m, role, 1);
+  }
 }
 
 
@@ -1209,10 +1375,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const buildingZones = state.buildings.buildings.map(b => ({ x: b.x - LADDER_BUILDING_KEEP_OUT_M, z: b.z - LADDER_BUILDING_KEEP_OUT_M, span: 2 * LADDER_BUILDING_KEEP_OUT_M + 1 }));
   // A building's own ground and the ring around it are never shot, whatever is left: a 5x5 fallback over the yard took
   // two warehouses, their ore and the research centre on the seed-42 full-kit ladder.
-  const buildingGround = state.buildings.buildings.map(b => {
-    const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, b.tier));
-    return { x: b.x - LADDER_BUILDING_HARD_CLEAR_M, z: b.z - LADDER_BUILDING_HARD_CLEAR_M, span: Math.max(sizeX, sizeZ) + 2 * LADDER_BUILDING_HARD_CLEAR_M };
-  });
+  const buildingGround = buildingGroundZones(state, LADDER_BUILDING_HARD_CLEAR_M);
   // A shot over a ramp cuts the fleet's way into a pit: on the seed-42 desert digger site one took the opening ramp's top
   // and stranded the next crater's 1.7 kt of rubble. Ramps are never shot over; a building's surroundings are, when nothing
   // else is left, its own ground never.
@@ -1456,16 +1619,17 @@ const ORE_STORAGE_BLOCKS: ReadonlySet<string> = new Set(['storage_full', 'no_fre
  * Storage the way a player keeps trucks moving: a hauler waiting at a full heap or warehouse is a depot short. Spoil
  * heaps are raised for the barren rubble blocked on them (and while ecology sags), close together by the warehouse
  * with a truck lane between; ore blocked on full warehouses first upgrades one (a tier-3 warehouse holds eight
- * tier-1s), then raises another.
+ * tier-1s), then raises another. Reinvest keeps it too: on green_foothills digger seed 12 the tier-1 warehouse filled
+ * with the starter pocket's low-grade rock, 400-535 hauls waited on it from t900 and the run went bankrupt (#2126).
  */
-function ladderStorage(s: ProbeSession, m: LadderMemory): void {
+function keepStorageFlowing(s: ProbeSession, m: ReinvestMemory): void {
   const all = [...s.state.buildings.buildings, ...s.state.plannedBuildings];
   const heaps = s.state.buildings.buildings.filter(b => b.type === 'spoil_heap').length;
   const plannedHeaps = s.state.plannedBuildings.filter(p => p.type === 'spoil_heap').length;
   const barrenKg = pendingSpoilOverflowKg(s.state) + (s.state.scores.ecology < LADDER_ECOLOGY_FLOOR && plannedHeaps === 0 ? 1 : 0);
   const newHeaps = depotsToOrder({ blockedKg: barrenKg, capacityKg: SPOIL_HEAP_CAPACITY_KG, built: heaps, planned: plannedHeaps, max: LADDER_MAX_SPOIL_HEAPS });
   const lanes = depotSites(s).map(d => ({ ...d, clearM: DEPOT_LANE_CLEAR_M }));
-  const shots = [...m.origins, ...m.barred].map(o => ({ ...o, clearM: LADDER_BUILDING_KEEP_OUT_M }));
+  const shots = [...m.origins, ...(m.barred ?? [])].map(o => ({ ...o, clearM: LADDER_BUILDING_KEEP_OUT_M }));
   if (newHeaps > 0 && spendable(s) >= getBuildingDef('spoil_heap', 1).constructionCost) {
     tryOnce(s, m, `spoil_heap_${heaps + plannedHeaps}`, () => placeBuilding(s, 'spoil_heap', rallyOf(s), null, [...lanes, ...shots]) !== null);
   }
@@ -1633,7 +1797,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     ladderPermit(s, m);
     replaceLostCrew(s, m);
     ladderQuarters(s, m);
-    ladderStorage(s, m);
+    keepStorageFlowing(s, m);
     ladderSafety(s, m);
     dropUnreachablePattern(s, m);
     reinvestShot(s, m, () => gatedLadderPlan(s, m));

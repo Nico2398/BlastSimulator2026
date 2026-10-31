@@ -8,7 +8,9 @@
 // by the event policy: a slow-starting player (#2118).
 //
 // `--event-policy` picks how pending events are answered: `first` (default, option 0) or `cheapest` (the option with
-// the highest cashDelta; #2117) in the main play loop only: the ladder strategies and the blast-zone clearing waits answer by their own rules. The table's `first sale` / `sales/costs` columns read the ledger: sales (contracts +
+// the highest cashDelta among those that cost no crew; #2117, #2126) on every tick of the `opening` and `reinvest`
+// strategies, blast-zone and explosive-store waits included; the ladder strategies answer by their own rules in their
+// main loop. The table's `first sale` / `sales/costs` columns read the ledger: sales (contracts +
 // sales + bonus income) over all expenses from the first sale on, and the group median row adds the 10th percentile.
 //
 // Plays the reference strategies headlessly through the console core and prints

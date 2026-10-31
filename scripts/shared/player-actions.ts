@@ -15,16 +15,36 @@ import { getExplosivesFreeCapacity, getExplosivesInStock } from '../../src/core/
 /** A console command runner, as `createRunner().runner.run` or a recording wrapper of it. */
 export type Run = (cmd: string) => { success: boolean; output: string };
 
-/** How a probe answers a pending event: `first` is option 0, `cheapest` the option with the highest cashDelta (#2117). */
+/** How a probe answers a pending event: `first` is option 0, `cheapest` the cheapest option that keeps the crew (#2117, #2126). */
 export type EventPolicy = 'first' | 'cheapest';
 
-/** Index of the option with the highest `cashDelta` (missing = 0; lowest index on ties; 0 when empty). */
-export function cheapestEventOption(consequences: ReadonlyArray<{ cashDelta?: number }>): number {
-  let best = 0;
-  for (let i = 1; i < consequences.length; i++) {
-    if ((consequences[i]!.cashDelta ?? 0) > (consequences[best]!.cashDelta ?? 0)) best = i;
+/** The part of an event outcome the `cheapest` policy reads. */
+interface OptionOutcome {
+  readonly cashDelta?: number;
+  readonly effects?: ReadonlyArray<{ readonly type: string }>;
+  readonly altConsequence?: OptionOutcome;
+}
+
+/** True when an outcome, or the fallback it may roll into, takes an employee off the crew (`employee_leaves`). */
+export function outcomeCostsCrew(outcome: OptionOutcome | undefined): boolean {
+  if (!outcome) return false;
+  return (outcome.effects ?? []).some(e => e.type === 'employee_leaves') || outcomeCostsCrew(outcome.altConsequence);
+}
+
+/**
+ * Index of the option with the highest `cashDelta` (missing = 0; lowest index on ties; 0 when empty) among those that
+ * cost no crew, or among all of them when every option does. A free answer that makes an employee quit is not the cheap
+ * one: the reinvest probe lost its only licensed fragmenter driver that way and left every later boulder unbroken (#2126).
+ */
+export function cheapestEventOption(consequences: ReadonlyArray<OptionOutcome>): number {
+  const keepsCrew = consequences.map(c => !outcomeCostsCrew(c));
+  const eligible = keepsCrew.some(Boolean) ? keepsCrew : consequences.map(() => true);
+  let best = -1;
+  for (let i = 0; i < consequences.length; i++) {
+    if (!eligible[i]) continue;
+    if (best === -1 || (consequences[i]!.cashDelta ?? 0) > (consequences[best]!.cashDelta ?? 0)) best = i;
   }
-  return best;
+  return Math.max(0, best);
 }
 
 /**
@@ -84,15 +104,18 @@ export function playContracts(run: Run, state: GameState, opts: { supply?: boole
 /** Tiles a careful player clears around a charged pattern before firing. */
 export const BLAST_ZONE_CLEAR_MARGIN = 16;
 
-/** Order everyone out of the blast radius and wait until the zone reads clear, as the Blast panel's evacuate control does. */
-export function clearBlastZone(run: Run, state: GameState): void {
+/**
+ * Order everyone out of the blast radius and wait until the zone reads clear, as the Blast panel's evacuate control does.
+ * Events that come up meanwhile are answered by `policy`, the run's own (#2126).
+ */
+export function clearBlastZone(run: Run, state: GameState, policy: EventPolicy = 'first'): void {
   const xs = state.drillHoles.map((h) => h.x);
   const zs = state.drillHoles.map((h) => h.z);
   if (xs.length === 0) return;
   const m = BLAST_ZONE_CLEAR_MARGIN;
   run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
   const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
-  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
+  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state, policy);
 }
 
 /**
@@ -101,7 +124,7 @@ export function clearBlastZone(run: Run, state: GameState): void {
  * Builds a warehouse on the first free cell when the site has none (the kits carry none) and waits for the
  * crew to raise it, then buys. Returns the buy command's result so a caller can assert it.
  */
-export function stockWarehouse(run: Run, state: GameState, explosiveId: string, kg: number): { success: boolean; output: string } {
+export function stockWarehouse(run: Run, state: GameState, explosiveId: string, kg: number, policy: EventPolicy = 'first'): { success: boolean; output: string } {
   if (!state.buildings.buildings.some((b) => b.type === 'explosive_warehouse')) {
     const grid = state.navGrid!;
     let ordered = false;
@@ -110,7 +133,7 @@ export function stockWarehouse(run: Run, state: GameState, explosiveId: string, 
         ordered = run(`build explosive_warehouse at:${x},${z} tier:1`).success;
       }
     }
-    for (let i = 0; i < 600 && state.plannedBuildings.length > 0; i++) playTick(run, state);
+    for (let i = 0; i < 600 && state.plannedBuildings.length > 0; i++) playTick(run, state, policy);
   }
   return run(`buy explosive:${explosiveId} kg:${kg}`);
 }
@@ -124,7 +147,7 @@ export function explosiveRoomKg(state: GameState, explosiveId: string): number {
  * Bring the store up to `kg` of `explosiveId`, buying only the shortfall: stock an abandoned pattern left behind charges
  * the next one, and buying the full charge again on top of it fills the store until no order fits (#2091).
  */
-export function topUpWarehouse(run: Run, state: GameState, explosiveId: string, kg: number): { success: boolean; output: string } {
+export function topUpWarehouse(run: Run, state: GameState, explosiveId: string, kg: number, policy: EventPolicy = 'first'): { success: boolean; output: string } {
   const shortKg = Math.max(0, kg - Math.floor(getExplosivesInStock(state.buildings, explosiveId)));
-  return shortKg > 0 ? stockWarehouse(run, state, explosiveId, shortKg) : { success: true, output: `${explosiveId} in stock` };
+  return shortKg > 0 ? stockWarehouse(run, state, explosiveId, shortKg, policy) : { success: true, output: `${explosiveId} in stock` };
 }
