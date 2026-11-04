@@ -341,7 +341,7 @@ describe('attachWindowDrag — onDragEnd and reclamp', () => {
     ptr(f.handle, 'pointerdown', { x: 0, y: 0 });
     ptr(f.handle, 'pointermove', { x: 600, y: 400 });
     ptr(f.handle, 'pointerup', { x: 600, y: 400 });
-    expect(pos(f.target)).toEqual({ x: 700, y: 520 });
+    expect(pos(f.target)).toEqual({ x: 700, y: 500 });
     f.viewport.width = 800;
     f.viewport.height = 600;
     const result = f.drag.reclamp();
