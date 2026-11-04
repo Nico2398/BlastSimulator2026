@@ -66,6 +66,14 @@ function pos(root: HTMLElement): { x: number; y: number } {
   return { x: parseFloat(root.style.left), y: parseFloat(root.style.top) };
 }
 
+/** Drag by (70,30) and prove it moved off the dock; returns the placed spot. */
+function dragAndPlace(header: HTMLElement, root: HTMLElement): { x: number; y: number } {
+  const dock = defaultInspectorPosition();
+  dragBy(header, 70, 30);
+  expect(pos(root)).toEqual({ x: dock.x + 70, y: dock.y + 30 });
+  return pos(root);
+}
+
 function twoEmployees() {
   const state = createGame({ seed: 1, mineType: 'desert' });
   const a = hireEmployee(state.employees, 'driller', new Random(1)).employee;
@@ -181,8 +189,7 @@ describe('Inspector — a dragged position stays', () => {
     const { bar, root, header } = makeBar();
     const { state, a, b } = twoEmployees();
     bar.show(entity('employee', a.id), state);
-    dragBy(header, 70, 30);
-    const placed = pos(root);
+    const placed = dragAndPlace(header, root);
     bar.show(entity('employee', b.id), state);
     expect(pos(root)).toEqual(placed);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
@@ -194,8 +201,7 @@ describe('Inspector — a dragged position stays', () => {
     const { bar, root, header } = makeBar();
     const { state, a } = twoEmployees();
     bar.show(entity('employee', a.id), state);
-    dragBy(header, 70, 30);
-    const placed = pos(root);
+    const placed = dragAndPlace(header, root);
     bar.update(state);
     bar.update(state);
     expect(pos(root)).toEqual(placed);
@@ -205,8 +211,7 @@ describe('Inspector — a dragged position stays', () => {
     const { bar, root, header } = makeBar();
     const { state, a } = twoEmployees();
     bar.show(entity('employee', a.id), state);
-    dragBy(header, 70, 30);
-    const placed = pos(root);
+    const placed = dragAndPlace(header, root);
     bar.hide();
     expect(bar.open).toBe(false);
     bar.show(entity('employee', a.id), state);
@@ -218,8 +223,7 @@ describe('Inspector — a dragged position stays', () => {
     const { bar, root, header } = makeBar();
     const { state, a } = twoEmployees();
     bar.show(entity('employee', a.id), state);
-    dragBy(header, 70, 30);
-    const placed = pos(root);
+    const placed = dragAndPlace(header, root);
     header.querySelector<HTMLButtonElement>('[data-panel-close]')!.click();
     bar.show(entity('employee', a.id), state);
     expect(pos(root)).toEqual(placed);
