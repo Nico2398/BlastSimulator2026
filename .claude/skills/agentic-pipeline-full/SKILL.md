@@ -31,7 +31,7 @@ Refactor and context upkeep run **before** review, so the reviewer reads the dif
 
 ### Docs-only path
 
-A change that touches no executable code — skills, rules, agent definitions, README, docs — has no behaviour to test and no TDD cycle: `git checkout -b pipeline/feature-<label> main`, make the change, commit, `npm run pipeline -- verify` (it runs the `context` channel), then finalization. The moment the change needs a script, hook or workflow edit it is code, and takes the TDD cycle.
+A change that touches no executable code — skills, rules, agent definitions, README, docs — has no behaviour to test and no TDD cycle: `git checkout -b pipeline/feature-<label> main`, write `.agentic/plan/<label>.md` (its Contract and Approach, `agentic-pipeline-tdd`'s format — the reviewer reads it and `open-pr` posts it), make the change, commit, `npm run pipeline -- verify` (it runs the `context` channel), then finalization. The moment the change needs a script, hook or workflow edit it is code, and takes the TDD cycle.
 
 ### Visual feedback loop
 

@@ -236,6 +236,15 @@ function timingKey(use: ToolUse, vocab: Vocabulary, longRuns: Map<string, string
   return category === 'npm run long wait' && wait ? `npm run long wait (${longRuns.get(wait[1]!) ?? 'other'})` : category;
 }
 
+/**
+ * The pipeline a run took is the one its lead classified the task into: a
+ * sub-agent loads pipeline skills for their conventions (the reviewer reads
+ * `agentic-pipeline-review-pr`'s output contract), and the lead loads the cycle
+ * and finalization skills every code pipeline shares.
+ */
+const LEAD_AGENTS = new Set(['main', 'orchestrator']);
+const SUPPORT_SKILLS = new Set(['agentic-pipeline-tdd', 'agentic-pipeline-finalization', 'agentic-pipeline-pr-management']);
+
 interface AgentAccumulator {
   metrics: AgentMetrics;
   byModel: Map<string, TokenCounts>;
@@ -274,7 +283,9 @@ function accumulate(
         if (use.name === 'Skill') {
           const skill = inVocabulary(use.input.skill, vocab.skills);
           bump(run.skills, skill);
-          if (run.pipeline.pipelineSkill === undefined && skill.startsWith('agentic-pipeline-')) run.pipeline.pipelineSkill = skill;
+          if (run.pipeline.pipelineSkill === undefined && LEAD_AGENTS.has(acc.metrics.agent) && skill.startsWith('agentic-pipeline-') && !SUPPORT_SKILLS.has(skill)) {
+            run.pipeline.pipelineSkill = skill;
+          }
         }
         if (use.name === 'Agent' || use.name === 'Task') {
           bump(run.pipeline.delegations, inVocabulary(use.input.subagent_type ?? 'general-purpose', vocab.agents, BUILT_IN_AGENTS));

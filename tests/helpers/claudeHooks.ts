@@ -36,6 +36,8 @@ const VERDICT_ENV = [
   'AGENTIC_LOOP_DEADLINE_EPOCH',
   'AGENTIC_STOP_BLOCK_LIMIT',
   'CLAUDE_PROJECT_DIR',
+  // A CI runner exports it, and require-open-pr-command.mjs only acts when it is set.
+  'GITHUB_ACTIONS',
 ];
 
 export interface HookRun {

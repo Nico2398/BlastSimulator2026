@@ -121,6 +121,22 @@ describe('extractMetrics', () => {
     expect(main.effort).toEqual({ medium: 2 });
   });
 
+  // VRoom #219: the reviewer's transcript was read before the lead's and loads
+  // review-pr for its output contract; the lead loads tdd too. The run is `full`.
+  it('takes the pipeline from the lead, never from a sub-agent or a shared skill', () => {
+    const skill = (id: string, name: string) => assistant(id, usage(1, 0, 0, 1), [{ type: 'tool_use', name: 'Skill', input: { skill: name } }]);
+    const vocab = { ...VOCAB, skills: new Set(['agentic-pipeline-full', 'agentic-pipeline-tdd', 'agentic-pipeline-review-pr']), agents: new Set(['reviewer', 'orchestrator']) };
+    const led: SessionTranscript = {
+      sessionId: 'led',
+      records: [],
+      subagents: [
+        { agentType: 'reviewer', spawnDepth: 2, records: [skill('r1', 'agentic-pipeline-review-pr')] },
+        { agentType: 'orchestrator', spawnDepth: 1, records: [skill('o1', 'agentic-pipeline-tdd'), skill('o2', 'agentic-pipeline-full')] },
+      ],
+    };
+    expect(extractMetrics(led, {}, vocab).pipeline.pipelineSkill).toBe('agentic-pipeline-full');
+  });
+
   it('reads the pipeline counters', () => {
     expect(run.pipeline).toMatchObject({
       pipelineSkill: 'agentic-pipeline-full',

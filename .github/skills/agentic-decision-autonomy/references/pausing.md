@@ -6,7 +6,7 @@ Read this before halting a run on a dependency. The decision of *whether* to pau
 
 1. **File the blocker** as an ordinary issue, per `agentic-issue-creation`, with `agent-task` and the `scope:*` labels of the code it touches. It gets `ready` when it meets that skill's Definition of Ready, which after hitting it head-on it usually does — you know what is wrong, where, and how to tell it is fixed.
 2. **Set it as your issue's dependency** — write the `## Blocked by` section, per `agentic-issue-creation`'s dependency section. `handle-failure.yml`'s `reconcile-dependencies` job derives the `blocked_by` relationship from that section when the `paused` label lands, so the section is the one half you write here and the relationship follows on its own. Setting the relationship yourself as well is harmless and still correct — it is what `assignability.cjs` treats as authoritative. `blockedByFor` reads the union of the two, so the section alone already holds the queue.
-3. **Save whatever you finished.** With commits, push `pipeline/feature-<label>` and open a **draft** pull request against `main`, labelled `paused`, carrying `Closes #<your issue>` and no `READY TO MERGE`. Its body states what is done, what remains, and what the blocker changes — layout below. With no commits, skip this; there is nothing to hand over.
+3. **Save whatever you finished.** With commits, open a **draft** pull request against `main` with `npm run pipeline -- open-pr --paused`: it pushes `pipeline/feature-<label>`, labels the draft `paused` on the create call and posts the plan comment. The body carries `Closes #<your issue>` and no `READY TO MERGE`. Its body states what is done, what remains, and what the blocker changes — layout below. With no commits, skip this; there is nothing to hand over.
 4. **Return your issue to the queue:** add `ready`, add `paused`, remove `in-progress`. Your issue already meets the Definition of Ready — it was assigned — unless it predates scope labels: add its `scope:*` labels first in that case, or `agentic-intake.yml` takes `ready` straight back off and the pause strands. `agentic-intake.yml` keeps the label defined, but create it idempotently first rather than assuming, so a repository that has never paused does not fail the step:
 
    ```bash
@@ -23,7 +23,7 @@ What then happens without anyone watching: `assignability.cjs` skips your issue 
 
 ## The handover PR body
 
-`.github/PULL_REQUEST_TEMPLATE/paused.md` is the layout: `Closes #<your issue>`, the paused line naming the blocker, then `## Done`, `## Remaining`, `## What #<blocker> changes` and `## Resuming`. Copy it outside the working tree, fill every `<…>` placeholder, and pass it with `--body-file` on the same `gh pr create` call that carries `--draft --label "paused"`.
+`.github/PULL_REQUEST_TEMPLATE/paused.md` is the layout: `Closes #<your issue>`, the paused line naming the blocker, then `## Done`, `## Remaining`, `## What #<blocker> changes` and `## Resuming`. Copy it outside the working tree, fill every `<…>` placeholder, and pass it with `--body-file` to `npm run pipeline -- open-pr --paused`.
 
 ## Two ways a pause is undone by accident
 

@@ -72,6 +72,13 @@
             "args": [
               "${CLAUDE_PROJECT_DIR}/.claude/hooks/require-foreground-bash.mjs"
             ]
+          },
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/require-open-pr-command.mjs"
+            ]
           }
         ]
       },
