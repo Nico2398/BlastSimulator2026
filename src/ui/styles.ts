@@ -182,6 +182,8 @@ body.bs-tutorial-card #bs-param-strip { bottom: var(--bsx-tutorial-card-clearanc
 /* The header is the drag handle (#2137): grab cursor, no text selection or touch scroll while moving. */
 #bs-inspector .bs-inspector-handle { cursor: grab; user-select: none; touch-action: none; }
 #bs-inspector .bs-inspector-handle button { cursor: pointer; }
+/* A window the player moved may land under the tool rail: draw it just above, so its header buttons stay clickable. */
+#bs-inspector.bs-inspector-moved { z-index: calc(var(--bsx-z-rail) + 1); }
 body.bs-tutorial-card #bs-inspector { --bs-inspector-bottom: var(--bsx-tutorial-card-clearance, 210px); }
 /* While a placement tool owns the canvas (e.g. the inspector's Move pick) the
    body sections fold away: header, status and the action row stay, so the tall

@@ -85,7 +85,7 @@ export class Inspector {
     this.actionsEl.style.cssText = 'flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px;border-top:1px solid var(--bsx-hairline)';
 
     parts.header.classList.add('bs-inspector-handle');
-    this.drag = attachWindowDrag({ handle: parts.header, target: this.root, onDragEnd: () => this.reclamp() });
+    this.drag = attachWindowDrag({ handle: parts.header, target: this.root, onDragEnd: () => { this.root.classList.add('bs-inspector-moved'); this.reclamp(); } });
     window.addEventListener('resize', this.onResize);
     this.root.append(parts.header, this.statusEl, this.bodyEl, this.actionsEl);
     container.appendChild(this.root);
