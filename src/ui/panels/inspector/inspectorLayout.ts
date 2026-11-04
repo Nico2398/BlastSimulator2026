@@ -40,6 +40,11 @@ export function defaultInspectorPosition(): WindowPoint {
 }
 
 /** Clamp a window's top-left so it stays fully inside the viewport and below the top bar. */
-export function clampWindowPosition(_pos: WindowPoint, _size: WindowSize, _viewport: WindowSize): WindowPoint {
-  throw new Error('not implemented');
+export function clampWindowPosition(pos: WindowPoint, size: WindowSize, viewport: WindowSize): WindowPoint {
+  const maxX = viewport.width - size.width;
+  const maxY = viewport.height - size.height;
+  return {
+    x: Math.max(0, Math.min(pos.x, maxX)),
+    y: Math.max(INSPECTOR_MIN_TOP_PX, Math.min(pos.y, maxY)),
+  };
 }

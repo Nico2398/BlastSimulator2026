@@ -20,6 +20,7 @@ import { iconEl } from '../icons.js';
 import { contentFor, type InspectorAction, type ActionSpec, type InspectorView, type InspectorLinks, type RampRepairOffer } from '../panels/inspector/InspectorContent.js';
 import { shellLayoutRegistry } from './LayoutRegistry.js';
 import { writeText } from '../panels/inspector/inspectorWidgets.js';
+import { attachWindowDrag, type WindowDrag } from './windowDrag.js';
 import { inspectorBounds } from '../panels/inspector/inspectorLayout.js';
 
 /** The text an action button shows: its literal label, else the translated key. */
@@ -47,6 +48,8 @@ export class Inspector {
   private lastState: GameState | null = null;
   private shownSignature: string | null = null;
   private shownIcon: string | null = null;
+  private readonly drag: WindowDrag;
+  private readonly onResize = (): void => this.reclamp();
 
   private readonly links: InspectorLinks = {
     select: (kind, id) => this.onSelect?.({ kind, id, point: new Vector3(), distance: 0 }),
@@ -81,6 +84,9 @@ export class Inspector {
     this.actionsEl = el('div');
     this.actionsEl.style.cssText = 'flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px;border-top:1px solid var(--bsx-hairline)';
 
+    parts.header.classList.add('bs-inspector-handle');
+    this.drag = attachWindowDrag({ handle: parts.header, target: this.root, onDragEnd: () => this.reclamp() });
+    window.addEventListener('resize', this.onResize);
     this.root.append(parts.header, this.statusEl, this.bodyEl, this.actionsEl);
     container.appendChild(this.root);
     shellLayoutRegistry.register({ id: 'inspector', layer: 'hud', bounds: inspectorBounds });
@@ -111,6 +117,7 @@ export class Inspector {
     this.lastState = state;
     this.shownSignature = null;
     this.render(state);
+    this.reclamp();
   }
 
   /** Per-frame refresh: structure rebuilds on a signature change, values are written in place. */
@@ -134,6 +141,8 @@ export class Inspector {
   }
 
   dispose(): void {
+    this.drag.dispose();
+    window.removeEventListener('resize', this.onResize);
     this.root.remove();
     shellLayoutRegistry.unregister('inspector');
   }
@@ -169,6 +178,12 @@ export class Inspector {
       this.syncDisabled(view);
     }
     this.root.style.display = 'flex';
+  }
+
+  /** Keep a dragged window fully visible; its height cap follows its new top edge. */
+  private reclamp(): void {
+    const pos = this.drag.reclamp();
+    if (pos) this.root.style.maxHeight = `calc(100vh - ${pos.y}px - var(--bs-inspector-bottom))`;
   }
 
   private rebuild(view: InspectorView): void {
