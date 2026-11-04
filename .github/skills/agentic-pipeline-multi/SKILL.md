@@ -13,8 +13,9 @@ description: >
  1. [decompose]   Split the task into N ordered sections:
                   { id, title, task_type, acceptance_criteria }, task_type one of
                   feature, fix-bug, ask, executor, review-pr. One issue for all of them.
- 2. [plan-all]    One plan file per code section (`agentic-pipeline-tdd`'s format), and a
-                  TODO list naming the order: "Section 1 → … → Section N. Single PR."
+ 2. [plan-all]    `.agentic/plan/<run-label>.md` naming the sections and their order:
+                  "Section 1 → … → Section N. Single PR." One plan file per code section,
+                  `<run-label>-s<K>.md` (`agentic-pipeline-tdd`'s format); `open-pr` posts them all.
  3. For each section K:
       code (feature, fix-bug) → `agentic-pipeline-tdd` with
           label     = <run-label>-s<K>

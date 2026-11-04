@@ -566,6 +566,16 @@ const SETTINGS_HOOKS = [
       'a background task — #604 threw away 3h11m of finished work that way',
   },
   {
+    script: '.claude/hooks/require-open-pr-command.mjs',
+    event: 'PreToolUse',
+    /** It reads every shell command for a direct `gh pr create`. */
+    tools: ['Bash'],
+    why:
+      'a PR opened by hand skipped its plan comment and put READY TO MERGE mid-body (VRoom PR 228); ' +
+      '`npm run pipeline -- open-pr` checks the body and posts the plan in one step, and only a ' +
+      'settings.json hook reaches the orchestrator `/agentic-run` forks into',
+  },
+  {
     script: '.claude/hooks/report-loop-budget.mjs',
     event: 'PreToolUse',
     /** It speaks before every delegation, so the matcher must cover them. */

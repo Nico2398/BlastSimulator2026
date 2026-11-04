@@ -26,7 +26,7 @@ A PR is `draft` in exactly four cases:
 | `ready` (default) | PR created as normal, `READY TO MERGE` in body triggers auto-merge |
 | `draft` | PR created with `--draft` flag, `READY TO MERGE` NOT included |
 
-The open-pr step passes `--draft` to `gh pr create` when evaluation is `draft`.
+The open-pr step passes `--draft` to `npm run pipeline -- open-pr` when evaluation is `draft`.
 
 "Could not run" means **nothing will ever report on it** — not that this session did not run it. A channel CI owns is not a draft case; see below.
 
@@ -34,7 +34,7 @@ The open-pr step passes `--draft` to `gh pr create` when evaluation is `draft`.
 
 ## READY TO MERGE
 
-The line goes into the body the PR is **created with** — the last line of the body file `gh pr create --body-file` takes at the open-pr step (`.github/PULL_REQUEST_TEMPLATE/pipeline.md` ends on it), written in the same command that opens the PR. It is never a later edit, and there is no step after open-pr that adds it. `READY TO MERGE` sits on its own line with nothing else on it. That line is the only thing that hands a PR to the merge gate: `agentic-auto-merge` reads it, releases any workflow run parked as `action_required` on the PR head, and merges the PR once every channel is green on a head that contains `main`'s tip — merging `main` into a green head that is behind, and handing a conflict back to an agent. The account that opened the PR is never consulted — see `agentic-autonomous-pipeline`.
+The line goes into the body the PR is **created with** — the last line of the body file `npm run pipeline -- open-pr --body-file` takes at the open-pr step, which refuses it anywhere else (`.github/PULL_REQUEST_TEMPLATE/pipeline.md` ends on it), written in the same command that opens the PR. It is never a later edit, and there is no step after open-pr that adds it. `READY TO MERGE` sits on its own line with nothing else on it. That line is the only thing that hands a PR to the merge gate: `agentic-auto-merge` reads it, releases any workflow run parked as `action_required` on the PR head, and merges the PR once every channel is green on a head that contains `main`'s tip — merging `main` into a green head that is behind, and handing a conflict back to an agent. The account that opened the PR is never consulted — see `agentic-autonomous-pipeline`.
 
 This is the **default**, skipped only in the four draft cases above. When skipping, post a comment naming the channel or blocker and the remedy — never a summary of how much work the run took:
 

@@ -16,6 +16,7 @@
  *   npm run pipeline -- verify [--base origin/main] [--only static,logic] [--no-cache]
  *   npm run pipeline -- review-brief [--base origin/main] [--label <label>]...
  *   npm run pipeline -- step <name> --label <label> [--heavy] [--note "<what is open>"]   (`step done` closes the last)
+ *   npm run pipeline -- open-pr --label <label> --title <title> --body-file <file> [--draft | --paused]
  *
  * `verify` outlives one Bash call on a full change: run it through
  * `npm run long -- start verify -- npm run pipeline -- verify`.
@@ -24,6 +25,7 @@
  */
 
 import { GitError, mainRoot } from './lib/pipeline/git.js';
+import { OpenPrError, openPr } from './lib/pipeline/open-pr.js';
 import { CHANNEL_ORDER, type Channel } from './lib/pipeline/paths.js';
 import { reviewBrief } from './lib/pipeline/review-brief.js';
 import { step, StepError, stepFor } from './lib/pipeline/steps.js';
@@ -35,7 +37,8 @@ const USAGE = `Usage:
   npm run pipeline -- tdd start|split|red|join|status --label <label> [--base <ref>] [--feature <branch>] [--no-commit]
   npm run pipeline -- verify [--base <ref>] [--only <channel,...>] [--no-cache]
   npm run pipeline -- review-brief [--base <ref>] [--label <label>]...
-  npm run pipeline -- step <name>|done --label <label> [--heavy] [--note <text>]`;
+  npm run pipeline -- step <name>|done --label <label> [--heavy] [--note <text>]
+  npm run pipeline -- open-pr --label <label> --title <title> --body-file <file> [--draft | --paused]`;
 
 /** Values of `--name value` (repeatable) and the presence of bare `--flag`s. */
 export function parseArgs(argv: string[]): { positional: string[]; values: Map<string, string[]>; flags: Set<string> } {
@@ -46,7 +49,7 @@ export function parseArgs(argv: string[]): { positional: string[]; values: Map<s
     const arg = argv[i]!;
     if (!arg.startsWith('--')) {
       positional.push(arg);
-    } else if (['--no-commit', '--no-cache', '--heavy', '--detail'].includes(arg)) {
+    } else if (['--no-commit', '--no-cache', '--heavy', '--detail', '--draft', '--paused'].includes(arg)) {
       flags.add(arg.slice(2));
     } else {
       const value = argv[++i];
@@ -113,6 +116,13 @@ function run(argv: string[]): number {
     print(step(cwd, required(values, 'label'), name, one(values, 'note'), flags.has('heavy')));
     return 0;
   }
+  if (command === 'open-pr') {
+    print(openPr(cwd, {
+      label: required(values, 'label'), title: required(values, 'title'), bodyFile: required(values, 'body-file'),
+      draft: flags.has('draft'), paused: flags.has('paused'),
+    }));
+    return 0;
+  }
   if (command === 'review-brief') {
     const labels = values.get('label');
     print([...reviewBrief(cwd, { base: one(values, 'base'), labels }), ...(labels?.[0] ? stepFor(cwd, 'review-brief', labels[0]) : [])]);
@@ -125,7 +135,7 @@ if (process.argv[1] !== undefined && process.argv[1].endsWith('pipeline.ts')) {
   try {
     process.exitCode = run(process.argv.slice(2));
   } catch (error) {
-    if (!(error instanceof PipelineError) && !(error instanceof GitError) && !(error instanceof StepError)) throw error;
+    if (!(error instanceof PipelineError) && !(error instanceof GitError) && !(error instanceof StepError) && !(error instanceof OpenPrError)) throw error;
     console.error(error.message);
     process.exitCode = 2;
   }

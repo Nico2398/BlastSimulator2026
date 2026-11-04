@@ -22,6 +22,11 @@ The pull request already exists, its branch already carries the work, and its is
                        `pipeline/feature-<N>-<runId>`. Not that → wrong pipeline, stop.
                        Read `<head>` off the PR; it is the branch the run that opened it built.
                        Draft or closed → already escalated, comment saying so and stop.
+                       The plan the run worked from is the PR comment opening with
+                       `<!-- agentic-run-plan -->` (posted by `open-pr`): `gh api
+                       "repos/{owner}/{repo}/issues/<number>/comments" --paginate --jq '.[] |
+                       select(.body | startswith("<!-- agentic-run-plan -->")) | .body'`.
+                       It is the Contract the fix is held to; none (an older PR) → the body and diff.
  2. [checkout]     → `git fetch origin && git checkout <head> &&
                        git reset --hard origin/<head>`
                        Never create the branch, never branch from `main`, never cherry-pick.
