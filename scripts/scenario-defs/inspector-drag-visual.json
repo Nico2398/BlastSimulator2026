@@ -117,10 +117,7 @@
           "type": "screenshot"
         }
       ],
-      "role": "player",
-      "expect": {
-        "note": "The click itself proves the close button is reachable; the screenshot shows no inspector."
-      }
+      "role": "player"
     }
   ]
 }
