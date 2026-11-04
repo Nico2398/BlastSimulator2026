@@ -14,8 +14,8 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SHELL_ROOT = join(process.cwd(), 'src/ui/shell');
-/** The registry module itself declares the mechanism; it doesn't register with itself. */
-const EXCLUDED_FILES = ['LayoutRegistry.ts'];
+/** The registry module itself declares the mechanism; windowDrag.ts is a drag helper, not a region. Neither registers. */
+const EXCLUDED_FILES = ['LayoutRegistry.ts', 'windowDrag.ts'];
 
 /**
  * Screen-edge regions that live outside src/ui/shell/ (#983). The MiniMap is

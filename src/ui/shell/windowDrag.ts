@@ -5,7 +5,7 @@
 import { clampWindowPosition } from '../panels/inspector/inspectorLayout.js';
 import type { WindowPoint, WindowSize } from '../panels/inspector/inspectorLayout.js';
 
-export interface WindowDragOptions {
+interface WindowDragOptions {
   /** The element the pointer grabs (a window header). */
   readonly handle: HTMLElement;
   /** The fixed-position window that moves. */
