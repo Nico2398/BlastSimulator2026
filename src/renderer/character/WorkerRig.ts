@@ -66,6 +66,8 @@ export interface WorkerRig {
   finger: number;
   /** Which hand holds the tool, when there is one. */
   toolSide: Side | null;
+  /** The leg an injured worker favours: the free hand's side, so that hand can clutch it. */
+  limpSide: Side;
   limbs: Record<Side, LimbBones>;
   rest: Record<Side, LimbRest>;
   /** Rest height of the hips joint. */
@@ -121,7 +123,7 @@ export function workerRig(root: THREE.Object3D): WorkerRig | null {
   }
   return {
     poser, hips: id('Hips'), spine: id('Spine'), chest: id('Chest'), neck: id('Neck'), head: id('Head'),
-    tool, toolSide, hat: opt('Hat'), mouth: opt('Mouth'), gasp: opt('Gasp'), finger: opt('Finger'),
+    tool, toolSide, limpSide: toolSide === 'R' ? 'L' : 'R', hat: opt('Hat'), mouth: opt('Mouth'), gasp: opt('Gasp'), finger: opt('Finger'),
     limbs, rest, hipHeight: v(id('Hips')).y, gripOffset,
   };
 }

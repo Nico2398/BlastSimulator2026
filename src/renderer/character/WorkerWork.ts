@@ -76,55 +76,87 @@ function dir(x: number, y: number, z: number, out: THREE.Vector3): THREE.Vector3
 export function carryTool(rig: WorkerRig, role: string, temp: Temperament, t: number, phase: number, walk: number, seed: number): void {
   const P = rig.poser;
   const sw = Math.cos(TAU * phase) * walk;
+  const lag = Math.cos(TAU * (phase - 0.12)) * walk;
   const R = rig.rest.R.sign;
+  const L = rig.rest.L.sign;
+  const still = walk < 0.5;
   switch (role) {
     case 'manager': {
-      // Mug held level out in front of the belly; a sip now and then while standing.
+      // Mug held level out in front of the belly; a sip now and then while standing,
+      // the other fist planted on his hip.
       const sip = (1 - walk) * smooth((Math.sin(t * 0.45 + seed) - 0.75) * 5);
       const hand = body(rig, lerp(0.3, 0.2, sip), lerp(0.22, 0.5, sip) + 0.012 * sw, R * lerp(0.17, 0.07, sip), _grip);
       reach(rig, 'R', hand, dir(1, -0.1 - 0.5 * sip, -0.1 * R, _f), dir(-0.1, 1, 0, _t), dir(-0.3, -1, 0.6 * R, _pole));
       if (sip > 0.01) P.addRot(rig.head, 0, 0, 0.25 * sip);
+      if (still) handOnHip(rig, 'L', 0.03);
       // His free arm swings with an extra strut.
-      if (walk > 0) P.addRot(rig.limbs.L.upperArm, 0, 0, sw * 10 * DEG);
+      else P.addRot(rig.limbs.L.upperArm, 0, 0, sw * 10 * DEG);
       break;
     }
     case 'surveyor': {
-      // Clipboard held up across the chest, tilted back toward his face, out where it can be seen.
-      const L = rig.rest.L.sign;
-      const hand = body(rig, 0.25, 0.22 + 0.008 * sw, L * 0.1, _grip);
+      // Clipboard held up across the chest, tilted back toward his face; hugged higher and
+      // closer while he stands reading it.
+      const hold = still ? 1 : 0;
+      const hand = body(rig, lerp(0.25, 0.2, hold), lerp(0.22, 0.3, hold) + 0.008 * sw, L * lerp(0.1, 0.05, hold), _grip);
       reach(rig, 'L', hand, dir(0.1, 0.12, -L, _f), dir(0.55, 0.84, 0, _t), dir(-0.3, -1, 0.5 * L, _pole));
+      if (still) P.addRot(rig.head, 0, -L * 0.12, -0.1);
       break;
     }
     case 'driver': {
-      // Wrench slung over the shoulder while standing, its jaw out past the brim; swung at the side while walking.
-      if (walk < 0.98) {
-        const hand = body(rig, 0.1, 0.43, R * 0.24, _grip);
-        reach(rig, 'R', hand, dir(0.1, 0.25, -R, _f), dir(-0.7, 0.6, 0.25 * R, _t), dir(0.4, -1, 0.5 * R, _pole));
+      // Wrench slung along the top of his shoulder while he stands, the other fist on his hip;
+      // swung at his side, a beat behind the arm, as he walks.
+      if (still) {
+        const hand = body(rig, -0.03, 0.4, R * 0.31, _grip);
+        reach(rig, 'R', hand, dir(-0.4, 0.2, -R, _f), dir(-0.7, 0.6, 0.25 * R, _t), dir(0.4, -1, 0.5 * R, _pole));
+        handOnHip(rig, 'L', 0.0);
+      } else {
+        // The shaft runs along the fist's thumb side: thumb down, it hangs along his leg.
+        hangArm(rig, 'R', temp, sw * 16 * DEG + 4 * DEG, 8 * DEG, 20 * DEG);
+        P.orientBasis(rig.limbs.R.hand, rig.rest.R.finger, rig.rest.R.thumb, _f.set(0.8, 0.1, -0.5 * R), _t.set(0.2 - 0.35 * lag, -1, 0.05 * R));
       }
       break;
     }
     case 'driller': {
-      // The drill is heavy: its arm barely swings, held a touch out and up so the bit clears the ground.
-      hangArm(rig, 'R', temp, sw * 8 * DEG + 6 * DEG, 8 * DEG, 32 * DEG);
-      P.rot(rig.limbs.R.hand, 0, 0.2, 0.25);
-      P.addRot(rig.spine, -R * 4 * DEG * (1 - walk * 0.5), 0, 0);
+      // The drill hangs heavy and plumb from his fist, bit down, swinging a beat behind the
+      // arm; he leans away from its weight, the shoulder dragged down, the free arm out.
+      hangArm(rig, 'R', temp, sw * 8 * DEG + 4 * DEG, 14 * DEG, (10 + 6 * walk) * DEG);
+      P.orientBasis(rig.limbs.R.hand, rig.rest.R.finger, rig.rest.R.thumb, _f.set(-0.25 * lag, -1, 0.04 * R), _t.set(1, 0, 0));
+      leanFrom(rig, 'R', 8);
       break;
     }
     case 'blaster': {
-      // Detonator dangling by its handle off a near-straight arm, lifted clear of the knees
-      // when he hurries. Fist, plunger rod and box hang plumb as one piece — the rod rides
-      // in the fist — and swing a beat behind the arm.
+      // Detonator dangling by its handle off a near-straight arm. Fist, plunger rod and box
+      // hang plumb as one piece — the rod rides in the fist — and swing a beat behind the arm.
       hangArm(rig, 'L', temp, sw * 10 * DEG + 6 * DEG + walk * 14 * DEG, 10 * DEG, (12 + 14 * walk + 6 * Math.abs(sw)) * DEG);
-      const lag = Math.cos(TAU * (phase - 0.12)) * walk;
       _f.set(-0.3 * lag, -1, 0.05 * Math.sin(t * 1.3));
       _t.set(1, 0, 0);
       P.orientBasis(rig.limbs.L.hand, rig.rest.L.finger, rig.rest.L.thumb, _f, _t);
       if (rig.tool >= 0) P.orientBasis(rig.tool, rig.rest.L.finger, rig.rest.L.thumb, _f, _t);
+      leanFrom(rig, 'L', 6);
       break;
     }
     default:
       break;
   }
+}
+
+/** Lean the trunk away from a heavy load in hand `s` (degrees), that shoulder dragged down, the other arm out. */
+function leanFrom(rig: WorkerRig, s: Side, degrees: number): void {
+  const P = rig.poser;
+  const sign = rig.rest[s].sign;
+  const other: Side = s === 'L' ? 'R' : 'L';
+  P.addRot(rig.spine, -sign * degrees * DEG, 0, 0);
+  P.addRot(rig.limbs[s].shoulder, -sign * 0.1, 0, 0);
+  P.addRot(rig.limbs[other].upperArm, -rig.rest[other].sign * degrees * 1.5 * DEG, 0, 0);
+}
+
+/** Fist on the hip, elbow out: the knuckles just above and outside the hip joint, `fwd` forward of it. */
+function handOnHip(rig: WorkerRig, s: Side, fwd: number): void {
+  const P = rig.poser;
+  const sign = rig.rest[s].sign;
+  const hip = P.pos(rig.limbs[s].thigh, _v);
+  _w.set(hip.x + fwd, hip.y + HIP_HAND_UP, hip.z + sign * HIP_HAND_OUT);
+  reach(rig, s, _w, dir(-0.2, -1, -sign * 0.5, _f), dir(1, 0, 0, _t), dir(-0.6, 0.1, sign, _pole));
 }
 
 // ------------------------------------------------------------------ work
@@ -172,33 +204,31 @@ export function poseWork(rig: WorkerRig, role: string, temp: Temperament, t: num
       break;
     }
     case 'blaster': {
-      // He hoists the whole detonator to his belly, up on his toes; a held breath; then
-      // slams it down onto the rock and the plunger with it — knees bent, arms locked —
-      // and his head snaps up grinning.
+      // The box sits on the rock. He hauls the plunger up, coiled over it on his toes — a
+      // held breath — then throws his whole weight down onto it, knees buckling, and his
+      // head snaps up grinning.
       const cyc = (t / 1.9 + seed * 0.1) % 1;
-      const bar = keyed(cyc, [[0, 0.16], [0.3, 0.6], [0.5, 0.62], [0.58, 0.3], [0.63, 0.16], [0.85, 0.16], [1, 0.16]]);
-      const up = smooth((bar - 0.3) / 0.3);
-      const jolt = keyed(cyc, [[0, 0], [0.6, 0], [0.64, 1], [0.74, 0], [1, 0]]);
-      P.shift(rig.hips, -0.03 - 0.05 * (1 - up), lerp(-0.22, -0.02, up), 0);
-      P.rot(rig.spine, 0, 0, -lerp(30, 6, up) * DEG);
-      P.rot(rig.chest, 0, 0, -lerp(12, 2, up) * DEG);
-      P.rot(rig.neck, 0, 0, lerp(-2, 6, up) * DEG);
-      P.rot(rig.head, 0.06 * Math.sin(t * 9) * jolt, 0.1 * Math.sin(t * 2), (-4 + 12 * jolt) * DEG);
+      const bar = keyed(cyc, [[0, PLUNGER_IN], [0.3, PLUNGER_OUT], [0.52, PLUNGER_OUT + 0.01], [0.6, PLUNGER_IN],
+        [0.85, PLUNGER_IN], [1, PLUNGER_IN]]);
+      const up = smooth((bar - PLUNGER_IN) / (PLUNGER_OUT - PLUNGER_IN));
+      const jolt = keyed(cyc, [[0, 0], [0.58, 0], [0.62, 1], [0.74, 0], [1, 0]]);
+      P.shift(rig.hips, -0.04 - 0.03 * (1 - up), lerp(-0.27, -0.16, up) - 0.03 * jolt, 0);
+      P.rot(rig.spine, 0, 0, -lerp(30, 22, up) * DEG);
+      P.rot(rig.chest, 0, 0, -lerp(16, 6, up) * DEG);
+      P.rot(rig.neck, 0, 0, lerp(4, 10, up) * DEG);
+      P.rot(rig.head, 0.06 * Math.sin(t * 9) * jolt, 0.1 * Math.sin(t * 2), (6 + 16 * jolt) * DEG);
       if (rig.hat >= 0) P.shiftRest(rig.hat, 0, 0.05 * jolt, 0);
       for (const s of SIDES) {
         const r = rig.rest[s];
         // Up on his toes for the wind-up; one heel kicks on the slam.
-        const heel = -0.5 * up - (s === 'R' ? 0.6 * jolt : 0);
+        const heel = -0.45 * up - (s === 'R' ? 0.6 * jolt : 0);
         placeFoot(rig, s, s === 'R' ? -0.06 : 0.02, 0, heel, r.sign * (temp.stance + 0.1), true);
       }
-      // The box hangs from the bar while he lifts; once its floor meets the rock it stays put
-      // and the bar keeps going — into the box.
-      const ground = 0;
-      const barPos = _grip.set(0.3, ground + bar, 0.0);
+      // Only the plunger moves: the box stays on the ground and the rod slides into it.
+      const barPos = _grip.set(0.3, bar, 0.0);
       reach(rig, 'L', barPos, dir(0, -1, 0, _f), dir(1, 0, 0, _v), dir(-0.4, 0.3, L, _pole));
       if (rig.tool >= 0) {
-        const floor = Math.max(ground, barPos.y - DETONATOR_FLOOR);
-        P.placeAt(rig.tool, _w.set(barPos.x, floor + DETONATOR_FLOOR, barPos.z));
+        P.placeAt(rig.tool, _w.set(barPos.x, DETONATOR_FLOOR, barPos.z));
         P.orientBasis(rig.tool, rig.rest.L.finger, rig.rest.L.thumb, _f.set(0, -1, 0), _pole.set(1, 0, 0));
       }
       const other = _knee.copy(barPos).setY(barPos.y + 0.02);
@@ -294,8 +324,14 @@ export function poseWork(rig: WorkerRig, role: string, temp: Temperament, t: num
   }
 }
 
+/** A fist planted on the hip: above and outside the hip joint (m). */
+const HIP_HAND_UP = 0.1;
+const HIP_HAND_OUT = 0.13;
 /** Detonator: the grip (T-bar) above the box's floor with the plunger up (worker_props DETONATOR_TOP + DETONATOR_BOX). */
 const DETONATOR_FLOOR = 0.3;
+/** The plunger's stroke: the T-bar's height with the rod pulled out, and pushed home just above the lid (17 cm). */
+const PLUNGER_OUT = DETONATOR_FLOOR;
+const PLUNGER_IN = 0.2;
 /** A wheel hub's height off the ground, where the kneeling driver's nut sits. */
 const WHEEL_HUB = 0.36;
 /** Drill: from the fist's grip to the bit's tip, along the fingers and along the thumb (worker_props._drill). */

@@ -11,6 +11,7 @@ import { fetchModelBytes, preloadModels } from './renderer/models/ModelLoader.js
 import { createToonMaterial } from './renderer/models/CartoonMaterial.js';
 import { WorkerAnimator, type WorkerSignals } from './renderer/character/WorkerAnimator.js';
 import { workerRig } from './renderer/character/WorkerRig.js';
+import { AGENT_WALK_SPEED } from './core/config/balance.js';
 
 declare global {
   interface Window {
@@ -45,9 +46,9 @@ const POSE_STEP_S = 1 / 60;
 function signalsFor(motion: string): WorkerSignals {
   const base: WorkerSignals = { speed: 0, turn: 0, working: false, collapsing: false, evacuating: false, injured: false, fatigue: 90 };
   switch (motion) {
-    case 'walk': return { ...base, speed: poseSpeed ?? 2 };
+    case 'walk': return { ...base, speed: poseSpeed ?? AGENT_WALK_SPEED };
     case 'run': return { ...base, speed: poseSpeed ?? 4.8 };
-    case 'panic': return { ...base, speed: poseSpeed ?? 4, evacuating: true };
+    case 'panic': return { ...base, speed: poseSpeed ?? AGENT_WALK_SPEED, evacuating: true };
     case 'limp': return { ...base, speed: poseSpeed ?? 1.6, injured: true };
     case 'work': return { ...base, working: true };
     case 'tired': return { ...base, fatigue: 4, speed: poseSpeed ?? 0 };

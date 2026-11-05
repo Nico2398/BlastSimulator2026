@@ -1,11 +1,12 @@
 // BlastSimulator2026 — Worker motion
 // The crew's body language, posed procedurally every frame on the skeleton:
-// a walk that vaults over a straight standing leg and turns into a run with
-// a flight phase, a contrapposto idle that shifts its weight from leg to leg,
-// an exhausted slump, arms-up panic while evacuating, and the collapse when
-// fatigue wins — tool dropped, hat knocked off. Every function poses the
-// whole rig from rest into the poser; WorkerAnimator blends the results and
-// adds the face.
+// a quick short-legged walk that turns into a run with a flight phase, a
+// limp that lurches onto the bad leg, a contrapposto idle that shifts its
+// weight from leg to leg in each role's own posture, an exhausted sag onto
+// the knees, a fleeing panic — hunched, glancing back, one hand clamping the
+// hat on — and the collapse when fatigue wins: tool dropped, hat knocked off,
+// hands coming to rest. Every function poses the whole rig from rest into
+// the poser; WorkerAnimator blends the results and adds the face.
 //
 // Rig space: +X the worker's front, +Y up, +Z its right (the left side is −Z).
 // RigPoser sign guide: about Z (+) a hanging limb swings forward and an upright
@@ -35,14 +36,21 @@ export interface Temperament {
   lean: number;
   /** Bounce on the toes while standing, metres (the blaster can't keep still). */
   fidget: number;
+  /** Lying on his back, how far above the hips joint the front of his belly is, metres. */
+  belly: number;
 }
 
 export const TEMPERAMENT: Record<string, Temperament> = {
-  driller: { armSpread: 16, waddle: 0.018, roll: 5, bounce: 0.016, armSwing: 24, stance: 0.045, lean: 4, fidget: 0 },
-  blaster: { armSpread: 10, waddle: 0.01, roll: 4, bounce: 0.024, armSwing: 28, stance: 0.01, lean: 9, fidget: 0.012 },
-  driver: { armSpread: 21, waddle: 0.024, roll: 6, bounce: 0.012, armSwing: 22, stance: 0.04, lean: 0, fidget: 0 },
-  surveyor: { armSpread: 9, waddle: 0.01, roll: 4, bounce: 0.018, armSwing: 24, stance: 0.0, lean: 6, fidget: 0 },
-  manager: { armSpread: 24, waddle: 0.034, roll: 8, bounce: 0.01, armSwing: 22, stance: 0.03, lean: -6, fidget: 0 },
+  // Heavy and planted: wide stance, fists held off the thighs.
+  driller: { armSpread: 28, waddle: 0.022, roll: 4, bounce: 0.02, armSwing: 22, stance: 0.085, lean: 5, fidget: 0, belly: 0.17 },
+  // Twitchy and hunched, up on his toes.
+  blaster: { armSpread: 12, waddle: 0.01, roll: 4, bounce: 0.035, armSwing: 30, stance: 0.015, lean: 14, fidget: 0.022, belly: 0.11 },
+  // Swagger: lats out, rolling shoulders.
+  driver: { armSpread: 30, waddle: 0.03, roll: 10, bounce: 0.012, armSwing: 20, stance: 0.06, lean: -2, fidget: 0, belly: 0.16 },
+  // Stiff and narrow, knees together, peering forward.
+  surveyor: { armSpread: 8, waddle: 0.008, roll: 3, bounce: 0.022, armSwing: 12, stance: -0.012, lean: 8, fidget: 0, belly: 0.11 },
+  // The strut: leaning back behind his belly, hips rolling.
+  manager: { armSpread: 30, waddle: 0.042, roll: 8, bounce: 0.008, armSwing: 14, stance: 0.03, lean: -14, fidget: 0, belly: 0.2 },
 };
 const BIND_ARM_SPREAD = 24;
 
@@ -155,6 +163,11 @@ function torso(rig: WorkerRig, hipY: number, hipZ: number, hipX: number, roll: n
 // ------------------------------------------------------------- locomotion
 
 /** Walk ↔ run, feet planted on the ground for the whole stance. */
+/** Limp: how late in the cycle the bad leg lands, how much shorter it stays down, and how far the hips drop onto it. */
+const LIMP_LATE = 0.08;
+const LIMP_SHORT = 0.3;
+const LIMP_DIP = 0.07;
+
 export function poseGait(rig: WorkerRig, temp: Temperament, g: GaitState): void {
   const P = rig.poser.reset();
   const run = g.run;
@@ -172,25 +185,32 @@ export function poseGait(rig: WorkerRig, temp: Temperament, g: GaitState): void 
   const walkY = -0.006 - (g.crouch - 0.006) * vault;
   const press = 0.5 + 0.5 * Math.cos(2 * TAU * (phi - duty / 2));
   const runY = 0.025 * reach - (g.crouch * 0.5 + 0.025 * reach) * press;
-  const limpDip = g.limp * 0.035 * Math.max(0, Math.cos(TAU * (phi - 0.5 - duty / 2)));
-  const hipY = lerp(walkY, runY, run) - limpDip - shuffle * 0.03;
+  // A limp: the bad leg lands late and leaves early, and the body lurches down and over
+  // it each time it takes the weight.
+  const bad = rig.limpSide;
+  const badSign = rig.rest[bad].sign;
+  const offOf = (s: Side): number => (s === 'L' ? 0 : 0.5) + (s === bad ? LIMP_LATE * g.limp : 0);
+  const dutyOf = (s: Side): number => duty * (1 - (s === bad ? LIMP_SHORT * g.limp : 0));
+  const ub = frac(phi + offOf(bad));
+  const onBad = g.limp * (ub < dutyOf(bad) ? Math.sin(Math.PI * ub / dutyOf(bad)) : 0);
+  const hipY = lerp(walkY, runY, run) - LIMP_DIP * onBad - shuffle * 0.03;
   const sway = (temp.waddle * (1 - run * 0.6) + shuffle * 0.012) * Math.min(1, reach * 1.5);
-  const hipZ = -sway * Math.cos(TAU * (phi - duty / 2));
+  const hipZ = -sway * Math.cos(TAU * (phi - duty / 2)) + badSign * 0.03 * onBad;
   const yaw = -lerp(7, 11, run) * DEG * reach * Math.cos(TAU * phi);
   const bank = Math.max(-0.22, Math.min(0.22, -g.turn * 0.05 * (0.5 + run)));
-  const roll = lerp(temp.roll, 3, run) * DEG * reach * Math.cos(TAU * (phi - duty / 2)) + bank;
-  const lean = (temp.lean + lerp(4, 10, run) * reach + shuffle * 16) * DEG;
+  const roll = lerp(temp.roll, 3, run) * DEG * reach * Math.cos(TAU * (phi - duty / 2)) + bank + badSign * 10 * DEG * onBad;
+  const lean = (temp.lean + lerp(4, 20, run) * reach + shuffle * 16) * DEG;
   torso(rig, hipY, hipZ, 0, roll, yaw, lean, 14 * DEG * run * reach);
   // Head stays level and steady: undo most of the sway, nod a little on each step.
   P.rot(rig.neck, -roll * 0.4, yaw * 0.4, lean * 0.4);
-  P.rot(rig.head, -roll * 0.2, g.turn * 0.12, lean * 0.3 + 0.03 * Math.cos(2 * TAU * (phi - 0.12)) * reach - shuffle * 0.2);
+  P.rot(rig.head, -roll * 0.2, g.turn * 0.12, lean * 0.3 + 0.03 * Math.cos(2 * TAU * (phi - 0.12)) * reach - shuffle * 0.2 - 0.14 * onBad);
 
   // Legs.
   const lift = lerp(0.05, 0.38 * L, run) * Math.min(1, reach * 1.4) * (1 - shuffle * 0.6);
   for (const s of SIDES) {
-    const off = s === 'L' ? 0 : 0.5;
-    const u = frac(phi + off);
-    const limping = s === 'R' ? g.limp : 0;
+    const u = frac(phi + offOf(s));
+    const duty = dutyOf(s);
+    const limping = s === bad ? g.limp : 0;
     const zOff = rig.rest[s].sign * temp.stance * 0.5;
     let x: number;
     let y = 0;
@@ -210,7 +230,8 @@ export function poseGait(rig: WorkerRig, temp: Temperament, g: GaitState): void 
       // Running, the foot tucks briefly, then the knee drives up and the foot reaches out ahead.
       const kick = run * 0.07 * L * Math.sin(Math.PI * Math.min(1, w * 2.2)) * (1 - w);
       x = -S * duty / 2 + S * duty * smooth(Math.pow(w, lerp(1, 0.7, run))) - kick;
-      y = lift * Math.pow(Math.sin(Math.PI * w), lerp(0.85, 0.55, run)) * (1 - limping * 0.5);
+      // The bad leg swings stiff and low, the toe nearly dragging.
+      y = lift * Math.pow(Math.sin(Math.PI * w), lerp(0.85, 0.55, run)) * (1 - limping * 0.7);
       pitch = lerp(toeOff - run * 0.4, heelUp, smooth((w - 0.2) / 0.7));
     }
     placeFoot(rig, s, x, y, pitch, zOff, toeFlat);
@@ -233,29 +254,57 @@ export function poseGait(rig: WorkerRig, temp: Temperament, g: GaitState): void 
 }
 
 /**
- * Panic overlay: both arms flung up and out in a wide V, flailing out of step
- * (tool and all), head thrown back and shaking, the hat bouncing off his head.
- * Wide rather than straight up, so the arms show past the hat from above.
+ * Panic overlay: fleeing hunched forward, the face turned up and glancing back
+ * over a shoulder at what he is running from, one hand clamping the bouncing
+ * hat on, the other flailing high and out of step (tool and all). The arms
+ * stay wide of the hat, so they read from above.
  */
 export function panicBody(rig: WorkerRig, t: number, seed: number): void {
   const P = rig.poser;
-  P.addRot(rig.chest, 0, 0.15 * Math.sin(t * 9 + seed), 12 * DEG);
-  P.addRot(rig.head, 0.12 * Math.sin(t * 7 + seed), 0.5 * Math.sin(t * 3.1 + seed), 14 * DEG);
+  P.addRot(rig.chest, 0, 0.12 * Math.sin(t * 9 + seed), -8 * DEG);
+  const back = keyed(frac(t / 1.3 + seed * 0.37), [[0, 0], [0.12, 1], [0.45, 1], [0.6, 0], [1, 0]]);
+  const look = (Math.sin(seed * 7.1) >= 0 ? 1 : -1) * back;
+  P.addRot(rig.neck, 0, 0.55 * look, 6 * DEG);
+  P.addRot(rig.head, 0.1 * Math.sin(t * 7 + seed), 0.6 * look + 0.12 * Math.sin(t * 3.1 + seed), 22 * DEG);
+  const hop = Math.max(0, Math.sin(t * TAU * 2.6 + seed));
   if (rig.hat >= 0) {
-    const hop = Math.max(0, Math.sin(t * TAU * 2.6 + seed));
-    P.shiftRest(rig.hat, 0, 0.1 * hop, 0);
-    P.rot(rig.hat, 0.25 * hop * Math.sin(t * 5 + seed), 0, -0.2 * hop);
+    P.shiftRest(rig.hat, 0, 0.035 * hop, 0);
+    P.rot(rig.hat, 0.1 * hop * Math.sin(t * 5 + seed), 0, -0.08 * hop);
   }
+  const hatHand: Side = rig.toolSide === 'L' ? 'R' : 'L';
   for (const s of SIDES) {
     const b = rig.limbs[s];
-    const sign = rig.rest[s].sign;
-    const w = Math.sin(t * TAU * 3.6 + (s === 'L' ? 0 : 2.1) + seed);
-    // The bind pose hangs the arm 24° out: 112° ± 18° more puts it 44° above the
-    // horizontal, flailing. Its elbow is bent 14° forward at rest; undo most of it.
-    P.rot(b.upperArm, -sign * (112 + 18 * w) * DEG, 0, (-6 + 8 * Math.sin(t * 11 + seed + (s === 'L' ? 0 : 1))) * DEG);
-    P.rot(b.forearm, 0, 0, (14 + 14 * Math.max(0, w)) * DEG);
+    const r = rig.rest[s];
+    const sign = r.sign;
+    if (s === hatHand && rig.hat >= 0) {
+      // Fingers hooked over the brim at the side, the elbow up and out.
+      const brim = P.pos(rig.hat, _a).add(_b.set(0.02, 0.0, sign * HAT_GRAB));
+      basis(r.finger, r.thumb, _c.set(0.15, 1, -sign * 0.35), X, _q);
+      P.ik2(b.upperArm, b.forearm, b.hand, brim.addScaledVector(_c.normalize(), -0.07), _d.set(0, 0.25, sign));
+      P.orient(b.hand, _q);
+      continue;
+    }
+    // Aimed in the world, up and out at an uneven beat, so however far he hunches into
+    // the run the arm still flails above his shoulder and wide of the hat.
+    const w = Math.sin(t * TAU * 3.1 + seed) + 0.4 * Math.sin(t * TAU * 5.3 + seed * 2);
+    _c.set(0.08 + 0.12 * Math.sin(t * 7 + seed), 0.8 + 0.18 * w, sign * (0.55 + 0.12 * Math.sin(t * 5.3 + seed))).normalize();
+    const hand = P.pos(b.upperArm, _a).addScaledVector(_c, r.armLength * 0.9);
+    P.ik2(b.upperArm, b.forearm, b.hand, hand, _d.set(-0.3, -0.2, sign));
     P.rot(b.hand, -sign * 0.5 * w, 0, 0);
   }
+}
+
+/** An injured worker presses his free hand onto the thigh of the leg he is favouring. */
+export function clutchThigh(rig: WorkerRig, amount: number): void {
+  if (amount <= 0.3) return;
+  const P = rig.poser;
+  const s = rig.limpSide;
+  const b = rig.limbs[s];
+  const sign = rig.rest[s].sign;
+  const hip = P.pos(b.thigh, _a);
+  const knee = P.pos(b.shin, _b);
+  const target = hip.lerp(knee, 0.45).add(_c.set(0.07, 0.04, sign * 0.02));
+  P.ik2(b.upperArm, b.forearm, b.hand, target, _d.set(-0.3, 0, sign));
 }
 
 /** The manager's pointing finger, curled back into his fist (`amount` 1) or out (0). */
@@ -277,21 +326,24 @@ export function tiredTilt(rig: WorkerRig, tired: number, t: number, seed: number
  * hips and shoulders tilted against each other; breathing, looking around,
  * shifting to the other leg every few seconds. `tired` slumps it all.
  */
-export function poseIdle(rig: WorkerRig, temp: Temperament, t: number, seed: number, tired: number): void {
+export function poseIdle(rig: WorkerRig, temp: Temperament, t: number, seed: number, tired: number, limp = 0): void {
   const P = rig.poser.reset();
   const breath = Math.sin(TAU * t / lerp(3.4, 2.4, tired));
   // A big sigh now and then when spent: the chest heaves up, then drops.
   const sigh = tired * keyed(frac(t / 5.5 + seed * 0.1), [[0, 0], [0.08, 1], [0.2, -0.4], [0.32, 0]]);
   // Weight: a soft square wave, so he stands on one leg for a while, then shifts.
-  const w = Math.max(-1, Math.min(1, Math.sin(TAU * t / lerp(9, 14, frac(seed)) + seed * 2.3) * 2.4)) * (1 - tired * 0.5);
+  // An injured man stands off his bad leg.
+  const w = lerp(Math.max(-1, Math.min(1, Math.sin(TAU * t / lerp(9, 14, frac(seed)) + seed * 2.3) * 2.4)) * (1 - tired * 0.5),
+    -rig.rest[rig.limpSide].sign, Math.min(1, limp * 1.5));
   const sway = tired * Math.sin(TAU * t * 0.3 + seed) * 6 * DEG;
   const fidget = temp.fidget * Math.abs(Math.sin(t * TAU * 1.6 + seed));
   const stagger = tired * 0.06 * Math.sin(TAU * t * 0.3 + seed * 1.3);
   const hipZ = 0.034 * w + stagger;
-  const hipY = -0.012 - 0.004 * breath - tired * 0.045 - Math.abs(w) * 0.006 + fidget;
-  const lean = (temp.lean * 0.6 + tired * 26) * DEG;
+  // Spent, he sinks into his knees and props himself on them rather than bowing from the waist.
+  const hipY = -0.012 - 0.004 * breath - tired * TIRED_SINK - Math.abs(w) * 0.006 + fidget;
+  const lean = (temp.lean + tired * 30) * DEG;
   const roll = -6 * DEG * w + sway;
-  torso(rig, hipY, hipZ, -tired * 0.02, roll, 0.05 * wobble(t * 0.4, seed), lean);
+  torso(rig, hipY, hipZ, -tired * 0.05, roll, 0.05 * wobble(t * 0.4, seed), lean);
   P.addRot(rig.chest, 3 * DEG * w, 0, -(breath * lerp(1.6, 4, tired) + sigh * 6) * DEG - tired * 10 * DEG);
   // Shoulders rise on the in-breath, sag forward when tired.
   for (const s of SIDES) {
@@ -303,8 +355,9 @@ export function poseIdle(rig: WorkerRig, temp: Temperament, t: number, seed: num
   const lookUp = smooth((Math.sin(t * 0.21 + seed * 4.1) - 0.82) * 6) * (1 - tired);
   // The neck takes back most of the slump, so a spent worker's half-shut eyes still face the camera.
   P.rot(rig.neck, -roll * 0.4, look * 0.18, lean * (0.2 + 0.45 * tired));
+  // Held a little up, so the face shows under the brim from the game camera.
   P.rot(rig.head, -roll * 0.4 + sway * 0.5, look * 0.28 * (1 - tired * 0.6),
-    -0.05 + 0.05 * wobble(t * 0.5, seed + 3.1) + lookUp * 0.32 - tired * 0.12);
+    HEAD_UP + 0.05 * wobble(t * 0.5, seed + 3.1) + lookUp * 0.32 - tired * 0.04);
   // The standing leg straight under the weight, the other knee bent with the heel up and the toe out.
   for (const s of SIDES) {
     const sign = rig.rest[s].sign;
@@ -319,15 +372,31 @@ export function poseIdle(rig: WorkerRig, temp: Temperament, t: number, seed: num
     hangArm(rig, s, temp, (6 + breath * 1.5) * DEG + side * w * 2 * DEG + tired * 20 * DEG,
       tired * 10 * DEG, (14 + breath * 2 - tired * 6) * DEG);
   }
+  // Spent: both hands come down onto the knees, elbows out, and he hangs off his arms.
+  const prop = smooth((tired - 0.3) / 0.35);
+  if (prop > 0) {
+    for (const s of SIDES) {
+      const b = rig.limbs[s];
+      const sign = rig.rest[s].sign;
+      const knee = P.pos(b.shin, _a).add(_b.set(0.06, 0.05, sign * 0.015));
+      const hand = P.pos(b.hand, _c).lerp(knee, prop);
+      P.ik2(b.upperArm, b.forearm, b.hand, hand, _d.set(-0.2, 0.2, sign));
+    }
+  }
 }
 
 // -------------------------------------------------------------- collapse
 
+/** Idle: how far a spent worker's hips sink into his knees (m), and the head's habitual tilt up toward the camera (rad). */
+const TIRED_SINK = 0.1;
+const HEAD_UP = 0.06;
+
 /** Where a collapsed worker's hat lands: behind and beside his head, upside down. */
 const HAT_REST = new THREE.Vector3(-0.95, 0.2, 0.3);
-/** Lying down: a resting hand's height off the ground, and above the hips when it lies on the belly (m). */
+/** How far out from the hat bone a hand holding the hat on grips its brim (m). */
+const HAT_GRAB = 0.15;
+/** Lying down: a resting hand's height off the ground (m); on the belly it rests at the build's `belly`. */
 const COLLAPSE_HAND_Y = 0.04;
-const COLLAPSE_BELLY = 0.12;
 
 /**
  * Fatigue wins: knees buckle, he sits down hard, flops onto his back with his
@@ -377,7 +446,7 @@ export function poseCollapse(rig: WorkerRig, temp: Temperament, c: number, seed:
       const sign = rig.rest[s].sign;
       const across = sign !== odd;
       const shoulder = P.pos(b.upperArm, _b);
-      if (across) _c.set(lerp(hips.x, shoulder.x, 0.35), hips.y + COLLAPSE_BELLY, -sign * 0.02);
+      if (across) _c.set(lerp(hips.x, shoulder.x, 0.35), hips.y + temp.belly, -sign * 0.02);
       else _c.set(shoulder.x - 0.14, COLLAPSE_HAND_Y, shoulder.z + sign * 0.2);
       P.pos(b.hand, _d).lerp(_c, settle);
       // The belly arm's elbow drops out to the side; the flung arm lies flat, its hand up

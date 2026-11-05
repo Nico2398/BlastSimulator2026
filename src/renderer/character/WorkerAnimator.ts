@@ -3,15 +3,16 @@
 // him — moving or standing, on a task, exhausted, collapsed, evacuating —
 // and crossfades between those motions so nothing ever pops. Speed comes
 // from how far the mesh actually travelled this frame, smoothed: the walk's
-// cadence and stride follow it so feet stay planted, and it shades into a
-// run at fast-forward speeds. Each worker gets his own seed, so a crew never
+// cadence and stride follow it so feet stay planted. An errand is a brisk
+// walk at any game speed; fleeing slows the cadence into a run with a flight
+// phase, and so does fast-forward past what the legs can hurry. Each worker gets his own seed, so a crew never
 // breathes, blinks or glances in lockstep.
 
 import type { PoseBuffer } from './RigPoser.js';
 import { blendPose } from './RigPoser.js';
 import type { WorkerRig } from './WorkerRig.js';
 import {
-  curlFinger, type GaitState, lerp, panicBody, poseCollapse, poseFace, poseGait, poseIdle, smooth, TEMPERAMENT, type Temperament,
+  clutchThigh, curlFinger, type GaitState, lerp, panicBody, poseCollapse, poseFace, poseGait, poseIdle, smooth, TEMPERAMENT, type Temperament,
   tiredTilt,
 } from './WorkerMotion.js';
 import { carryTool, poseWork } from './WorkerWork.js';
@@ -44,16 +45,21 @@ const MOVE_OFF = 0.12;
 const STOP_HOLD_S = 0.22;
 /** Crossfade rate between motions, 1/s. */
 const BLEND_RATE = 5;
-/** Cadence: full gait cycles (two steps) per second, as a function of the pace at 1× game speed. */
-const CADENCE_BASE = 1.2;
-const CADENCE_PER_MPS = 0.6;
-const CADENCE_MAX = 3.4;
+/**
+ * Cadence: full gait cycles (two steps) per second, as a function of the pace at 1× game speed.
+ * An errand is a quick scurry on short legs, fast enough that each foot stays down over half
+ * the cycle; fleeing takes longer, slower strides with a flight phase between them.
+ */
+const CADENCE_BASE = 1.6;
+const CADENCE_PER_MPS = 0.9;
+const CADENCE_MAX = 4.2;
+const CADENCE_FLEE = 0.74;
 /** Leg length the cadence constants are tuned for; shorter legs swing faster, like shorter pendulums. */
 const CADENCE_LEG = 0.34;
 /** Fast-forward hurries the legs up to this many times their 1× cadence; past it the stride stretches. */
 const HURRY_MAX = 2;
 /** Without an evacuation, a gait never takes more than this much of the run's arm pump and lean. */
-const ERRAND_RUN_LOOK = 0.35;
+const ERRAND_RUN_LOOK = 0.6;
 /** Hip sink at rest pace and at a full-speed stride, metres. */
 const CROUCH_SLOW = 0.02;
 const CROUCH_FAST = 0.05;
@@ -162,7 +168,8 @@ export class WorkerAnimator {
     const scale = Math.max(1, s.timeScale ?? 1);
     const pace = v / scale;
     const legs = Math.sqrt(CADENCE_LEG / this.legLength);
-    const cadence = Math.min(CADENCE_MAX, (CADENCE_BASE + CADENCE_PER_MPS * pace) * legs) * Math.min(scale, HURRY_MAX) * lerp(1, 0.8, this.tired);
+    const cadence = Math.min(CADENCE_MAX, (CADENCE_BASE + CADENCE_PER_MPS * pace) * legs) * Math.min(scale, HURRY_MAX)
+      * lerp(1, 0.8, this.tired) * lerp(1, CADENCE_FLEE, this.panic);
     const strideTarget = Math.min(STRIDE_MAX_LEGS * this.legLength, v / cadence);
     this.stride += (strideTarget - this.stride) * Math.min(1, dt * 8);
     // A foot can only be on the ground as far as the leg reaches from the sunk hips;
@@ -216,14 +223,16 @@ export class WorkerAnimator {
             turn: s.turn, limp: this.limp, tired: this.tired,
           };
           poseGait(rig, temp, g);
-          if (carry) carryTool(rig, role, temp, time, this.phase, 1 - run * 0.5, seed);
+          if (carry) carryTool(rig, role, temp, time, this.phase, 1, seed);
           if (this.panic > 0.5) panicBody(rig, time, seed);
+          else clutchThigh(rig, this.limp);
           break;
         }
         case 'idle':
-          poseIdle(rig, temp, time, seed, this.tired);
+          poseIdle(rig, temp, time, seed, this.tired, this.limp);
           if (carry) carryTool(rig, role, temp, time, 0, 0, seed);
           if (this.panic > 0.5) panicBody(rig, time, seed);
+          else clutchThigh(rig, this.limp);
           break;
         case 'work':
           poseWork(rig, role, temp, this.workTime, seed);

@@ -51,11 +51,12 @@ describe('WorkerAnimator', () => {
       for (let i = 0; i < 240; i++) {
         a.update(DT, s);
         ground += speed * DT;
-        // Stance of the left foot after the heel-strike roll, through heel-off: the toe joint
-        // is the pivot the heel peels about, so it stays put until the foot lifts.
+        // Stance of the left foot once the heel-strike roll has laid it flat (by 0.15 of the
+        // cycle at any duty), through heel-off: the toe joint is the pivot the heel peels
+        // about, so it stays put until the foot lifts.
         const ph = a.gaitPhase;
         const toe = world(root, 'ToeL');
-        if (ph > 0.1 && ph < 0.38 && toe.y < 0.04) {
+        if (ph > 0.15 && ph < 0.38 && toe.y < 0.04) {
           const x = toe.x + ground;
           if (prev !== null) { worst = Math.max(worst, Math.abs(x - prev)); samples++; }
           prev = x;
@@ -142,18 +143,21 @@ describe('WorkerAnimator', () => {
     expect(checked).toBeGreaterThan(10);
   });
 
-  it('panicking, both arms fling up and out past the shoulders', () => {
+  it('panicking, he holds his hat on with one hand and flings the other up and out past the shoulder', () => {
     const { root, rig } = worker('driller');
     const a = new WorkerAnimator(rig, 'driller', 5);
+    // The driller's tool is in his right hand, so the left one holds the hat.
     for (let i = 0; i < 240; i++) {
       a.update(DT, { ...STILL, evacuating: true });
       if (i < 90 || i % 15) continue;
-      for (const side of ['L', 'R']) {
-        const shoulder = world(root, `UpperArm${side}`);
-        const hand = world(root, `Hand${side}`);
-        expect(hand.y, `${side} frame ${i}`).toBeGreaterThan(shoulder.y);
-        expect(Math.abs(hand.z), `${side} frame ${i}`).toBeGreaterThan(Math.abs(shoulder.z) + 0.05);
-      }
+      const hat = world(root, 'Hat');
+      const onHat = world(root, 'HandL');
+      expect(onHat.distanceTo(hat), `hat hand frame ${i}`).toBeLessThan(0.22);
+      expect(onHat.y, `hat hand frame ${i}`).toBeGreaterThan(world(root, 'UpperArmL').y);
+      const shoulder = world(root, 'UpperArmR');
+      const flung = world(root, 'HandR');
+      expect(flung.y, `flung hand frame ${i}`).toBeGreaterThan(shoulder.y);
+      expect(Math.abs(flung.z), `flung hand frame ${i}`).toBeGreaterThan(Math.abs(shoulder.z) + 0.05);
     }
   });
 
