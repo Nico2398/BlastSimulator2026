@@ -18,8 +18,15 @@ import { fractionOf } from '../../../core/math/Fraction.js';
 import { entityLink, kindLabel, liveRow, sectionOf, setLive } from './inspectorWidgets.js';
 
 /** One plain sentence stating what a building is for (#2138). */
-export function buildingRoleText(_type: BuildingType): string {
-  throw new Error('not implemented');
+export function buildingRoleText(type: BuildingType): string {
+  return t(`building.${type}.role`);
+}
+
+/** Role line, first in the details section. */
+function roleRow(type: BuildingType): HTMLElement {
+  const row = el('div', { text: buildingRoleText(type) });
+  row.style.cssText = 'font-size:11px;line-height:1.35';
+  return row;
 }
 
 /** Lifecycle status line: operating, closed by an event, demolition ordered, upgrading or under construction. */
@@ -172,7 +179,7 @@ function siteView(state: GameState, id: number, status: BuildingStatus, links: I
     status: text,
     signature: `site:${site.type}:${site.tier}:${status.kind}:${builderSignature(status, builder)}`,
     get sections() {
-      const rows: HTMLElement[] = [liveRow(t('inspector.status'), 'status', text)];
+      const rows: HTMLElement[] = [roleRow(site.type), liveRow(t('inspector.status'), 'status', text)];
       if (builder) rows.push(builderRow(builder, links));
       rows.push(liveRow(t('inspector.position'), 'position', `(${site.x}, ${site.z})`));
       return [sectionOf(t('inspector.section.details'), rows)];
@@ -211,6 +218,7 @@ export const buildingContent: KindContent = {
       signature: `${b.type}:${b.tier}:${status.kind}:${builderSignature(status, builder)}:${capacity}:${b.occupantIds.join(',')}:${occupantNames.join('|')}:${extras.map(x => x?.rowSignature ?? '').join('|')}`,
       get sections() {
         const rows: HTMLElement[] = [
+          roleRow(b.type),
           liveRow(t('inspector.status'), 'status', text),
           ...(builder ? [builderRow(builder, links)] : []),
           hpRow(hp, hpFraction),
