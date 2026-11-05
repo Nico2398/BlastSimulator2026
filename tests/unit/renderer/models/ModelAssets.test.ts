@@ -16,6 +16,24 @@ import { BUILDING_DEFS } from '../../../../src/core/entities/BuildingDefs.js';
 import { getFootprintSize, isSingleTierType } from '../../../../src/core/entities/Building.js';
 import type { BuildingTier, BuildingType } from '../../../../src/core/entities/Building.js';
 import { loadedModelLibrary, MODEL_DIR } from '../../../helpers/models.js';
+import { workerRig } from '../../../../src/renderer/character/WorkerRig.js';
+import { GARMENT_COLORS, GARMENT_TINT, ROLE_COLORS, ROLE_TINT } from '../../../../src/renderer/CharacterMesh.js';
+
+/** Largest per-channel gap (0..1, sRGB) between an exported colour and the palette, from the sRGB↔linear round trip. */
+const COLOR_ROUND_TRIP = 2 / 255;
+
+function expectSameColor(actual: THREE.Color, hex: number, label: string): void {
+  const want = new THREE.Color(hex);
+  const got = actual.clone();
+  for (const c of ['r', 'g', 'b'] as const) expect(Math.abs(got[c] - want[c]), `${label} ${c}`).toBeLessThan(COLOR_ROUND_TRIP);
+}
+
+/** Bones every worker skeleton has (assets/models/blender/workers.py), the ones the animator poses. */
+const WORKER_BONES = [
+  'Hips', 'Spine', 'Chest', 'Neck', 'Head', 'LidL', 'LidR', 'BrowL', 'BrowR',
+  'ShoulderL', 'ShoulderR', 'UpperArmL', 'UpperArmR', 'ForearmL', 'ForearmR', 'HandL', 'HandR',
+  'ThighL', 'ThighR', 'ShinL', 'ShinR', 'FootL', 'FootR', 'ToeL', 'ToeR',
+] as const;
 
 /** One .glb may not exceed this (KB) — a single model that big is a modelling mistake, not a budget call. */
 const MAX_ASSET_KB = 400;
@@ -59,17 +77,26 @@ describe('public/models', () => {
     for (const id of allModelIds()) expect(library.has(id), id).toBe(true);
   });
 
-  it('every worker has the six animatable nodes, a role tint and a minion silhouette', () => {
+  it('every worker is a skinned character on the crew skeleton, with the role, garment, skin and hair tints, standing at minion height', () => {
     for (const role of EMPLOYEE_ROLES) {
       const inst = library.instantiate(workerModelId(role), { size: [1, 1, 1] });
-      for (const node of ['Head', 'Torso', 'ArmL', 'ArmR', 'LegL', 'LegR']) {
-        expect(inst.node(node), `${role} ${node}`).not.toBeNull();
-      }
-      expect([...inst.tints.keys()]).toEqual(['TintRole']);
+      expect(inst.skinned, role).toBe(true);
+      for (const bone of WORKER_BONES) expect(inst.node(bone), `${role} ${bone}`).toBeInstanceOf(THREE.Bone);
+      // Every role carries its tool on a bone of its own, and the animator can name the whole rig.
+      expect(inst.node('Tool'), `${role} Tool`).toBeInstanceOf(THREE.Bone);
+      expect(workerRig(inst.root), `${role} rig`).not.toBeNull();
+      expect([...inst.tints.keys()].sort()).toEqual(['TintGarment', 'TintHair', 'TintRole', 'TintSkin']);
+      // The exported defaults are the renderer's palette, so a worker looks the same before and after its first tint.
+      expectSameColor(inst.tints.get(GARMENT_TINT)!.color, GARMENT_COLORS[role], `${role} garment`);
+      expectSameColor(inst.tints.get(ROLE_TINT)!.color, ROLE_COLORS[role], `${role} role`);
+      // The hat can be knocked off and the panic mouth swapped in: their bones are part of the crew rig.
+      for (const bone of ['Hat', 'Mouth', 'Gasp']) expect(inst.node(bone), `${role} ${bone}`).toBeInstanceOf(THREE.Bone);
       const size = inst.bounds.getSize(new THREE.Vector3());
       expect(size.y, `${role} height`).toBeGreaterThan(1.1);
       expect(size.y, `${role} height`).toBeLessThan(1.6);
       expect(inst.bounds.min.y, `${role} stands on the ground`).toBeCloseTo(0, 1);
+      // Faces +X: the nose is in front of the skull centre.
+      expect(inst.bounds.max.x, `${role} faces +X`).toBeGreaterThan(-inst.bounds.min.x * 0.5);
     }
   });
 

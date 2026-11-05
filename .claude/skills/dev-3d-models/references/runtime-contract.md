@@ -28,12 +28,21 @@ collected and bucketed by material:
 | Everything else | One merged mesh, each part's colour baked into a vertex-colour attribute |
 
 Then one inverted-hull outline mesh over the union of those surfaces. So a
-node costs `1 + tints + emissive colours` draws plus its outline: a worker
-drops from ~40 draws to ~14, a building to 3.
+node costs `1 + tints + emissive colours` draws plus its outline: a vehicle
+drops from dozens of draws to a handful, a building to 3.
 
 Merging requires identical attribute sets, which is why the export carries
 position and normal only — no UVs, no textures, no vertex colours from
 Blender.
+
+### Skinned models
+
+A scene holding a `SkinnedMesh` (the crew) keeps its armature node and bone
+hierarchy instead: every primitive under it is merged into the same buckets,
+each a `SkinnedMesh` on the shared skeleton, plus one skinned outline hull
+drawn thicker than the world's (`CHARACTER_OUTLINE`). Parts named `Face*` stay
+out of the hull: a face detail is smaller than the line around it. Bones stay findable by
+name through `node()`.
 
 ## Instantiate (`ModelLibrary`)
 
@@ -46,12 +55,29 @@ name. A model missing from the library returns a stand-in box of the caller's
 The scene attaches its cascaded-shadow shader through
 `setMaterialSetup()`, which also runs on every per-instance clone.
 
+A skinned prototype is cloned with `SkeletonUtils.clone`, so each worker owns
+its bones; its surfaces never raycast (that would skin every vertex on the
+CPU). Picking hits invisible boxes instead, one per bone and parented to it,
+so a worker is clickable in any pose. Level setup compiles the skinned
+shader variants in advance (`warmupShaders`).
+
 ## Animate
 
 - Root yaw: `headingFromDelta(dx, dz)` turns the model toward travel, which is
   why every worker and vehicle faces **+X** at rest.
-- Workers swing `ArmL`/`ArmR`/`LegL`/`LegR` and wobble `Head` on the pivots
-  the `pivot()` Empties define.
+- Workers are posed bone by bone every frame by `src/renderer/character/`:
+  `RigPoser` (FK over the rest pose, two-bone IK, orientation solves),
+  `WorkerMotion` and `WorkerWork` (walk/run with planted feet, idle, tired,
+  panic, collapse, each role's carry and work loop, the face), and
+  `WorkerAnimator`, which picks and crossfades them from the employee's state
+  and the mesh's own speed. Nothing is baked: stride and cadence follow the
+  speed, and no two workers move in step. Cadence follows the pace a worker
+  would walk at 1× game speed and swings faster on shorter legs, like a
+  pendulum; fast-forward hurries it at most 2×, past which the stride
+  stretches. A planted foot stays put: the heel peels about the toe joint.
+- Task bars and pictograms float above each model's own top, read from its
+  bounds (`overlayHeight`), so a tall surveyor and a short manager both clear
+  their hats.
 - Vehicles spin each `Wheel*` node by `distance / radius`, where the radius is
   **measured from the node's own bounds** — a bicycle wheel and a monster tyre
   both roll true, with no per-model constant. Axles run along the model's

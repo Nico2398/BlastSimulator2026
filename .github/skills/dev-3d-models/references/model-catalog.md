@@ -8,17 +8,25 @@ The per-id data — nodes, parts, materials, size, triangles, builder module —
 is generated into `assets/models/manifest.json`; read that entry before
 editing a model.
 
-## Workers — `workers.py`
+## Workers — `workers.py`, `worker_face.py`, `worker_props.py`
 
 `worker_<role>` for `driller`, `blaster`, `driver`, `surveyor`, `manager`.
 
-One model per role, no tiers. Big round head on an egg body, stubby capsule
-limbs, oversized boots and hands, hard hat in the role colour, and the tool of
-the trade in hand. Manager gets a tie and a coffee mug; surveyor a hi-vis
-stripe.
+One skinned model per role, no tiers: a continuous body on the crew skeleton,
+about three heads tall, a big expressive head under a hard hat in the role
+colour, and the tool of the trade in hand.
 
-Nodes: `Head`, `Torso`, `ArmL`, `ArmR`, `LegL`, `LegR`. Tint: `TintRole`
-(overalls and hat, recoloured per role and injury). Height 1.1–1.6 m.
+| Role | Caricature | Tool |
+|------|------------|------|
+| driller | The muscle: barrel chest, Popeye forearms, square bearded jaw, denim overalls over a tee, headlamp and red ear defenders | Chunky yellow rock drill with an auger bit |
+| blaster | The lunatic: wiry and stooped, narrow head, pointed chin, singed hair bursting under an askew hat, goggles, scorched ash-khaki coverall, dynamite on a leather bandolier and a bundle strapped to his back | Red plunger detonator box, dangling by its T-handle |
+| driver | The slab: door-wide shoulders, no neck, wide flat head, walrus moustache, gold-rimmed shades, orange hi-vis vest | Steel open-end wrench with an orange grip, carried on the shoulder |
+| surveyor | The nerd: tall and narrow, long neck, egg head, buck teeth, round glasses, striped teal jumper, a red-and-white survey staff slung across his back | Big clipboard and a pencil |
+| manager | The fat cat: short legs, belly out, jowls, waxed handlebar moustache, cigar, charcoal-navy suit, red tie, hard hat with a gold band, a pointing finger on its own bone | Diner coffee mug |
+
+Bones: see the skinned-workers row of the runtime contract. Tints: `TintRole`
+(hat and accents), `TintGarment` (clothes; injury), `TintSkin`, `TintHair`.
+Height 1.1–1.6 m.
 
 ## Vehicles — `vehicles_t1.py` / `vehicles.py` / `vehicles_t3.py`
 

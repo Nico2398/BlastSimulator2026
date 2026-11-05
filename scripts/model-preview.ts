@@ -9,6 +9,8 @@
  *   npx tsx scripts/model-preview.ts worker_driller        # one model
  *   npx tsx scripts/model-preview.ts --views "front:35:20;back:215:20;top:35:70" vehicle_drill_rig_t2
  *   npx tsx scripts/model-preview.ts --sheet               # also tile the captures into one contact sheet
+ *   npx tsx scripts/model-preview.ts worker_driller --query "fy=0.86" --zoom 3 --tag face   # extra viewer params
+ *   npx tsx scripts/model-preview.ts worker_driller --query "pose=walk" --times 2,2.06,2.12 --tag walk   # a motion, frame by frame
  *
  * Output: screenshots/models/<id>-<view>.png (and screenshots/models/sheet.png).
  */
@@ -35,6 +37,12 @@ interface Options {
   size: number;
   zoom: number;
   sheet: boolean;
+  /** Extra model-viewer URL parameters (`fy=0.86&pose=walk&t=0.25`), passed through verbatim. */
+  query: string;
+  /** Suffix for the capture file names, so differently framed captures of one view do not overwrite each other. */
+  tag: string;
+  /** Posed workers: simulated seconds to capture, one frame each (`&t=` per capture). */
+  times: number[];
 }
 
 function parseViews(spec: string): View[] {
@@ -46,7 +54,10 @@ function parseViews(spec: string): View[] {
 
 function parseArgs(): Options {
   const args = process.argv.slice(2);
-  const options: Options = { models: [], views: parseViews(DEFAULT_VIEWS), port: 5173, size: 640, zoom: 1, sheet: false };
+  const options: Options = {
+    models: [], views: parseViews(DEFAULT_VIEWS), port: 5173, size: 640, zoom: 1, sheet: false, query: '', tag: '',
+    times: [],
+  };
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;
     if (a === '--views') options.views = parseViews(args[++i] ?? DEFAULT_VIEWS);
@@ -54,6 +65,9 @@ function parseArgs(): Options {
     else if (a === '--size') options.size = Number(args[++i]);
     else if (a === '--zoom') options.zoom = Number(args[++i]);
     else if (a === '--sheet') options.sheet = true;
+    else if (a === '--query') options.query = args[++i] ?? '';
+    else if (a === '--tag') options.tag = args[++i] ?? '';
+    else if (a === '--times') options.times = (args[++i] ?? '').split(',').filter(Boolean).map(Number);
     else options.models.push(a);
   }
   if (options.models.length === 0) {
@@ -75,15 +89,18 @@ async function capture(options: Options): Promise<string[]> {
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: options.size, height: options.size });
+    const frames: Array<number | null> = options.times.length ? options.times : [null];
     for (const model of options.models) {
-      for (const view of options.views) {
-        const url = `http://localhost:${options.port}/model-viewer.html?model=${model}&yaw=${view.yaw}&pitch=${view.pitch}&zoom=${options.zoom}`;
+      for (const view of options.views) for (const [fi, time] of frames.entries()) {
+        const at = time === null ? '' : `&t=${time}`;
+        const url = `http://localhost:${options.port}/model-viewer.html?model=${model}&yaw=${view.yaw}&pitch=${view.pitch}&zoom=${options.zoom}${options.query ? `&${options.query}` : ''}${at}`;
         await page.goto(url, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => (window as unknown as { __viewerReady?: boolean }).__viewerReady !== undefined, { timeout: READY_TIMEOUT_MS });
         const ready = await page.evaluate(() => (window as unknown as { __viewerReady?: boolean }).__viewerReady);
         if (!ready) console.warn(`  ${model}: asset failed to load (stand-in box captured)`);
         await settleFrames(page, 3);
-        const file = resolve(OUT_DIR, `${model}-${view.name}.png`);
+        const frame = time === null ? '' : `-f${String(fi).padStart(2, '0')}`;
+        const file = resolve(OUT_DIR, `${model}-${view.name}${options.tag ? `-${options.tag}` : ''}${frame}.png`);
         await page.screenshot({ path: file });
         files.push(file);
         console.log(`captured ${model} ${view.name}`);

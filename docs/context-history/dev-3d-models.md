@@ -29,3 +29,23 @@ File sizes were measured at 90 models, before the charging trucks and vanity pro
 ## references/model-catalog.md
 
 The vanity-project models came from #1948.
+
+## Skinned workers
+
+The crew used to be rigid parts on pivot Empties (`Head`, `Torso`, `ArmL`…) swung by `CharacterMesh`: a floating
+head on an egg body, capsule limbs, no elbows or knees, which players read as robots. They were rebuilt as one
+skinned body per role on a skeleton (`character.py`), posed procedurally at runtime (`src/renderer/character/`).
+Motion is computed, not baked: baked clips for eight motions would have added 100–200 KB per worker and pushed every
+worker past the 400 KB asset budget, and a fixed clip cannot match its stride to the mesh's actual speed. Float skin
+weights alone took a worker to 480 KB, which is why `export_glb` rewrites them as normalized u8. `boolean()` now
+applies and deletes its cutter because the Blender 5 glTF exporter shipped a hidden cutter as a stray box in the
+driver's wrench. Two rounds of independent critique (design, modeling, animation, readability) drove the second
+pass: smaller raised hats, a garment tint apart from the role tint, per-role heads and bodies, lids that shut fully,
+a panic face, the dropped tool and knocked-off hat on collapse, and a thicker character outline.
+
+## Rebuild determinism
+
+The pipeline claimed byte-identical rebuilds and did not deliver them: under Blender 5's `bpy`, two builds of an
+unchanged model produced the same vertices and triangles in a different face order, so every rebuild rewrote the
+index buffers of every model, workers and vehicles alike. `finish()` now sorts faces before saving and exporting.
+Only the workers were rebuilt with it; the rest of the set picks it up on its next rebuild.

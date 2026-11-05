@@ -5,7 +5,9 @@ import * as THREE from 'three';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import type { MovementTrail } from '../../../src/core/entities/MovementTrail.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
-import { ROLE_COLORS, ROLE_TINT } from '../../../src/renderer/CharacterMesh.js';
+import {
+  GARMENT_COLORS, GARMENT_TINT, HAIR_COLORS, HAIR_TINT, paletteFor, ROLE_COLORS, ROLE_TINT, SKIN_TINT, SKIN_TONES,
+} from '../../../src/renderer/CharacterMesh.js';
 import { loadedModelLibrary } from '../../helpers/models.js';
 import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
 
@@ -124,21 +126,20 @@ describe('CharacterMesh', () => {
     cm.dispose();
   });
 
-  it('setEvacuating makes character blink after time update', () => {
+  it('an evacuating worker is never hidden — his panic is the cue, not a strobe', async () => {
     const scene = new THREE.Scene();
-    const cm = new CharacterMesh(scene);
+    const cm = new CharacterMesh(scene, await loadedModelLibrary(['worker_driller']));
     const emp = makeEmployee(1);
     cm.addEmployee(emp);
     cm.setEvacuating(1, true);
-    // After update with enough time, visibility state may change
-    // Just verify no crash and visibility eventually becomes false
-    let anyInvisible = false;
+    const gasp = cm.getInstance(1)!.node('Gasp')!;
+    const rest = gasp.position.clone();
     for (let i = 0; i < 120; i++) {
       cm.update([emp], 1 / 60);
-      const group = scene.children[0] as THREE.Group;
-      if (!group.visible) anyInvisible = true;
+      expect(cm.getGroup(1)!.visible).toBe(true);
     }
-    expect(anyInvisible).toBe(true);
+    // The gaping mouth has come out of the skull.
+    expect(gasp.position.distanceTo(rest)).toBeGreaterThan(0.02);
     cm.dispose();
   });
 
@@ -428,44 +429,113 @@ describe('CharacterMesh', () => {
 describe('CharacterMesh — model animation (real assets)', () => {
   const load = () => loadedModelLibrary(['worker_driller', 'worker_manager']);
 
-  it('draws the exported worker with its six pivot nodes and the role tint', async () => {
+  it('draws the exported worker as a skinned character with the role tint and per-employee skin and hair tones', async () => {
     const scene = new THREE.Scene();
     const cm = new CharacterMesh(scene, await load());
     cm.addEmployee(makeEmployee(1, { role: 'manager' }));
     const inst = cm.getInstance(1)!;
     expect(inst.isFallback).toBe(false);
-    for (const n of ['Head', 'Torso', 'ArmL', 'ArmR', 'LegL', 'LegR']) expect(inst.node(n)).not.toBeNull();
+    expect(inst.skinned).toBe(true);
+    for (const n of ['Hips', 'Head', 'HandL', 'ThighR', 'LidL']) expect(inst.node(n)).toBeInstanceOf(THREE.Bone);
     expect(inst.tints.get(ROLE_TINT)!.color.getHex()).toBe(ROLE_COLORS.manager);
+    expect(inst.tints.get(GARMENT_TINT)!.color.getHex()).toBe(GARMENT_COLORS.manager);
+    expect(inst.tints.get(SKIN_TINT)!.color.getHex()).toBe(paletteFor(1, SKIN_TONES, 1));
+    expect(inst.tints.get(HAIR_TINT)!.color.getHex()).toBe(paletteFor(1, HAIR_COLORS, 2));
     cm.dispose();
   });
 
-  it('turns to face the direction of travel and swings legs and arms while walking, then settles at rest', async () => {
+  it('spreads a crew across the skin and hair palettes, the same way every time', () => {
+    const skins = new Set<number>();
+    for (let id = 1; id <= 40; id++) {
+      skins.add(paletteFor(id, SKIN_TONES, 1));
+      expect(paletteFor(id, SKIN_TONES, 1)).toBe(paletteFor(id, SKIN_TONES, 1));
+      expect(SKIN_TONES).toContain(paletteFor(id, SKIN_TONES, 1));
+      expect(HAIR_COLORS).toContain(paletteFor(id, HAIR_COLORS, 2));
+    }
+    expect(skins.size).toBeGreaterThan(SKIN_TONES.length - 2);
+  });
+
+  /** Forward position of a bone relative to the hips, in the worker's own frame (he faces +X before yaw). */
+  function forwardOfHips(group: THREE.Group, inst: ReturnType<CharacterMesh['getInstance']> & object, bone: string): number {
+    group.updateMatrixWorld(true);
+    const p = inst.node(bone)!.getWorldPosition(new THREE.Vector3());
+    const h = inst.node('Hips')!.getWorldPosition(new THREE.Vector3());
+    const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(group.quaternion);
+    return p.sub(h).dot(fwd);
+  }
+
+  it('turns to face the direction of travel and walks in alternating strides, then settles into a standing idle', async () => {
     const scene = new THREE.Scene();
     const cm = new CharacterMesh(scene, await load());
     const emp = makeEmployee(1, { x: 0, z: 0 });
     cm.addEmployee(emp, 0);
     const group = cm.getGroup(1)!;
     const inst = cm.getInstance(1)!;
-    const legL = inst.node('LegL')!;
-    const armL = inst.node('ArmL')!;
 
     // Walk toward +Z: the model faces +X at rest, so it must turn to -π/2.
-    emp.z = 4;
-    let maxSwing = 0;
-    for (let i = 0; i < 20; i++) {
-      cm.update([emp], 0.05);
-      maxSwing = Math.max(maxSwing, Math.abs(legL.rotation.z));
+    emp.z = 6;
+    let minL = Infinity, maxL = -Infinity, opposed = 0, frames = 0;
+    for (let i = 0; i < 50; i++) {
+      cm.update([emp], 1 / 30);
+      if (i < 15) continue;
+      const l = forwardOfHips(group, inst, 'FootL');
+      const r = forwardOfHips(group, inst, 'FootR');
+      minL = Math.min(minL, l);
+      maxL = Math.max(maxL, l);
+      if (Math.abs(l - r) > 0.05) { frames++; if (Math.sign(l) !== Math.sign(r)) opposed++; }
     }
     expect(group.rotation.y).toBeCloseTo(-Math.PI / 2, 1);
-    expect(maxSwing).toBeGreaterThan(0.1);
-    // Arms counter-swing the legs.
-    expect(Math.sign(armL.rotation.z)).toBe(-Math.sign(legL.rotation.z));
+    // A real stride: the foot travels well in front of and behind the hips…
+    expect(maxL - minL).toBeGreaterThan(0.2);
+    // …and the two feet are on opposite sides of the hips through the stride.
+    expect(opposed / Math.max(1, frames)).toBeGreaterThan(0.6);
 
-    // Arrived: the gait blends out and the limbs return to rest.
-    for (let i = 0; i < 40; i++) cm.update([emp], 0.05);
-    expect(legL.rotation.z).toBeCloseTo(0, 5);
-    expect(armL.rotation.z).toBeCloseTo(0, 5);
-    expect(inst.root.position.y).toBeCloseTo(0, 5);
+    // Arrived: the gait blends out; the feet come back under the hips (the free foot of a
+    // weight-shifted stance rests a few centimetres forward, never a stride away).
+    for (let i = 0; i < 90; i++) cm.update([emp], 1 / 30);
+    expect(Math.abs(forwardOfHips(group, inst, 'FootL'))).toBeLessThan(0.08);
+    expect(Math.abs(forwardOfHips(group, inst, 'FootR'))).toBeLessThan(0.08);
+    expect(group.rotation.y).toBeCloseTo(-Math.PI / 2, 1);
+    cm.dispose();
+  });
+
+  it('plays the role\'s work loop while a task ticks down: the driller braces the drill out in front', async () => {
+    const scene = new THREE.Scene();
+    const cm = new CharacterMesh(scene, await load());
+    const emp = makeEmployee(1, { role: 'driller', taskTicksRemaining: 6 });
+    cm.addEmployee(emp, 0);
+    const group = cm.getGroup(1)!;
+    const inst = cm.getInstance(1)!;
+    const idleReach = forwardOfHips(group, inst, 'HandR');
+    for (let i = 0; i < 45; i++) cm.update([emp], 1 / 30);
+    expect(forwardOfHips(group, inst, 'HandR')).toBeGreaterThan(idleReach + 0.15);
+    cm.dispose();
+  });
+
+  it('a collapsing worker ends up on the ground', async () => {
+    const scene = new THREE.Scene();
+    const cm = new CharacterMesh(scene, await load());
+    const emp = makeEmployee(1, { collapsing: true, fatigue: 0 });
+    cm.addEmployee(emp, 0);
+    const inst = cm.getInstance(1)!;
+    for (let i = 0; i < 90; i++) cm.update([emp], 1 / 30);
+    cm.getGroup(1)!.updateMatrixWorld(true);
+    expect(inst.node('Hips')!.getWorldPosition(new THREE.Vector3()).y).toBeLessThan(0.25);
+    expect(inst.node('Head')!.getWorldPosition(new THREE.Vector3()).y).toBeLessThan(0.45);
+    cm.dispose();
+  });
+
+  it('two idle workers do not breathe and glance in lockstep', async () => {
+    const scene = new THREE.Scene();
+    const cm = new CharacterMesh(scene, await load());
+    const a = makeEmployee(1, { x: 0 });
+    const b = makeEmployee(2, { x: 3 });
+    cm.addEmployee(a, 0);
+    cm.addEmployee(b, 0);
+    for (let i = 0; i < 40; i++) cm.update([a, b], 1 / 30);
+    const qa = cm.getInstance(1)!.node('Head')!.quaternion;
+    const qb = cm.getInstance(2)!.node('Head')!.quaternion;
+    expect(qa.angleTo(qb)).toBeGreaterThan(0.01);
     cm.dispose();
   });
 
@@ -483,8 +553,9 @@ describe('CharacterMesh — model animation (real assets)', () => {
     const inst = cm.getInstance(1)!;
     expect(inst.isFallback).toBe(false);
     expect(inst.node('Head')).not.toBeNull();
-    // The injury tint carries over to the real model.
-    expect(inst.tints.get(ROLE_TINT)!.color.getHex()).not.toBe(ROLE_COLORS.driller);
+    // The injury tint carries over to the real model: the garment goes red, the hat keeps the role colour.
+    expect(inst.tints.get(GARMENT_TINT)!.color.getHex()).not.toBe(GARMENT_COLORS.driller);
+    expect(inst.tints.get(ROLE_TINT)!.color.getHex()).toBe(ROLE_COLORS.driller);
     expect(cm.getGroup(1)!.children).toEqual([inst.root]);
     cm.dispose();
   });

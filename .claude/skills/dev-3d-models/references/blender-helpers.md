@@ -39,7 +39,7 @@ Left live in the `.blend`, applied on export.
 | `solidify(ob, thickness, offset)` | Gives a surface walls (tarps, sheet metal, tent cloth) |
 | `taper(ob, factor, axis)` / `bend(ob, angle_deg, axis)` | Simple Deform: cone a tower, curve a palm trunk |
 | `cast(ob, factor, shape)` | Pulls a mesh toward a sphere/cylinder — softens a boxy blob |
-| `boolean(ob, cutter, op)` | Exact-solver cut. The cutter is hidden from render and viewport so it never exports as a stray node |
+| `boolean(ob, cutter, op)` | Exact-solver cut, applied at once; the cutter is deleted. Modifiers already on `ob` stay live and act on the cut shape |
 | `displace(ob, strength, noise_scale, seed)` | Procedural cloud noise along normals — lumpy rock, bumpy canopy. Samples GLOBAL coordinates, so two parts in different places get different noise, and `seed` shifts the field |
 
 ## Hierarchy
@@ -77,7 +77,7 @@ assign_by(ob, mat, lambda c: c.z > 1.2)   # by face-centre predicate
 | Helper | Does |
 |--------|------|
 | `save_blend(name)` | Writes `assets/models/blend/<name>.blend`, compressed, modifiers live |
-| `export_glb(name)` | Writes `public/models/<name>.glb`: modifiers applied, +Y up, no UVs, no images, no animations, no cameras or lights |
+| `export_glb(name)` | Writes `public/models/<name>.glb`: modifiers applied, +Y up, no UVs, no images, no animations, no cameras or lights. A scene holding an armature also exports its skin, compacted by `compact_skinned_glb`: weights as normalized u8, accessors sharing one buffer view per kind |
 | `finish(name)` | Both of the above, then prints triangles, glb KB and blend KB |
 | `finish_far(name, ratio=0.12)` | Adds a Decimate to every mesh and exports `<name>_far` — the distant tree LOD. Runs after `finish()`, so the `.blend` keeps full detail. `build.py` calls it for every `prop_tree_*` |
 
@@ -100,15 +100,36 @@ Mechanics that matter here:
   produces belongs to the object it is on, so put that object under the right
   animation node.
 
+## Characters (`character.py`)
+
+The skinned crew is built with its own toolkit; workers.py, worker_face.py and
+worker_props.py hold the art on top of it.
+
+| Helper | Does |
+|--------|------|
+| `loft(name, sections, …)` | Sweeps a Catmull-Rom chain of `Section(c, w, d, p)` (centre, half-width, half-depth, superellipse exponent) into one closed tube with rounded caps. Returns per-vertex and per-face position along it, ring centres and each face's ring, so a material edge or a skin blend lands on an edge loop |
+| `lathe(name, profile, deform=)` | Revolves `[(radius, z), …]` about Z; `deform` reshapes it vertex by vertex (a hat's peak, its ridge) |
+| `ellipsoid(name, radii, deform=)` | UV ellipsoid reshaped per vertex (skulls, eyes, decals) |
+| `prune(ob, keep)` | Deletes faces none of whose corners pass `keep` — the hidden half of an eyeball |
+| `Skeleton(name, specs)` | Armature from `BoneSpec(name, head, tail, parent)`; `attach(ob)` bakes the part's transform and adds the Armature modifier |
+| `bind_rigid` / `bind_chain` / `bind_by` | Vertex groups: one bone; a smoothstep crossfade along a loft at each joint; any function of position |
+| `bake_transform(ob)` | Folds location, rotation (quaternion included) and scale into the mesh — a skinned part must carry its shape in mesh space |
+
 ## Gotchas the generators were built around
 
+- bmesh primitives emit the same vertices and faces in a face order that
+  changes from one process to the next, and the export's triangle order
+  follows it. `finish()` sorts every mesh's faces first
+  (`canonical_face_order`), which is what makes a rebuild byte-identical;
+  a new output path goes through it too.
 - `matrix_world` only refreshes on a depsgraph update, so it reads as identity
   on a freshly created Empty. `parent()` and `apply_transform()` use
   `matrix_basis` instead. Do the same in new helpers.
 - `apply_transform(ob)` bakes rotation and scale into the mesh. Required
   before an Array, whose offset is expressed in local axes.
-- A Boolean cutter must stay hidden (`boolean()` does this) or it exports as a
-  visible stray node.
+- The glTF exporter exports every object in the scene, hidden or not, and
+  whatever collection it is in. A helper object that must not ship (a cutter)
+  is applied and deleted before export, as `boolean()` does.
 - `bpy` must be imported before `bmesh`; `bpy` registers it.
 - Randomness in a builder is seeded (`random.Random(100 + variant)`), so a
   rebuild is reproducible. Keep any new randomness seeded.

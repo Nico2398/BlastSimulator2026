@@ -26,8 +26,16 @@ const FILL_COLOR  = 0x4fc76b; // --bsx-positive
 
 const BAR_WIDTH  = 0.6;  // world units — proportionate to CharacterMesh's ~0.4-wide capsule
 const BAR_HEIGHT = 0.08;
-/** Height above the anchor's local origin — clears the worker model's hard hat (ridge top ~1.33). */
-export const BAR_Y_OFFSET = 1.55;
+/** Height above the anchor's local origin when the anchor does not say — clears a stand-in worker box. */
+const BAR_Y_OFFSET = 1.55;
+/** userData key on a worker's anchor group: the height that clears that worker's own hard hat. */
+export const OVERLAY_Y_KEY = 'overlayY';
+
+/** Where a worker-anchored overlay sits: above this worker's hat when his mesh says how tall it is. */
+export function overlayHeight(anchor: THREE.Object3D): number {
+  const y = anchor.userData[OVERLAY_Y_KEY];
+  return typeof y === 'number' ? y : BAR_Y_OFFSET;
+}
 /** Height above a construction site's ghost-mesh anchor — clears the ghost volume so the bar isn't occluded by it (#1012). */
 const SITE_BAR_Y_OFFSET = GHOST_SIZE / 2 + 0.5;
 const FILL_Z_OFFSET = 0.001; // keep fill in front of track, avoid z-fighting
@@ -124,7 +132,7 @@ export class TaskProgressBar {
       }
 
       // getOrCreateBar snaps a fresh bar immediately, no easing-in from zero.
-      const bar = this.getOrCreateBar(this.bars, employee.id, BAR_Y_OFFSET, fraction);
+      const bar = this.getOrCreateBar(this.bars, employee.id, overlayHeight(anchor), fraction);
       // Retarget (no-op for a fresh bar, since it's already snapped above) and
       // reparent. dt=0 makes a forward retarget a no-op for an existing bar
       // (actual easing happens per-frame in update()) but still snaps
