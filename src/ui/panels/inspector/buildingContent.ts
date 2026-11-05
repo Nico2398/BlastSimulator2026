@@ -2,7 +2,7 @@
 import { t } from '../../../core/i18n/I18n.js';
 import {
   getBuildingDef, getBuildingPeopleCapacity, nonZeroScoreEffects,
-  type Building,
+  type Building, type BuildingType,
 } from '../../../core/entities/Building.js';
 import { computeBuildingStatus, type BuildingStatus } from '../../../core/entities/BuildingStatus.js';
 import { factorFor } from '../../../core/events/ActiveModifiers.js';
@@ -16,6 +16,11 @@ import { residentsSection, schoolSection } from './occupantsContent.js';
 import { researchSection } from './researchContent.js';
 import { fractionOf } from '../../../core/math/Fraction.js';
 import { entityLink, kindLabel, liveRow, sectionOf, setLive } from './inspectorWidgets.js';
+
+/** One plain sentence stating what a building is for (#2138). */
+export function buildingRoleText(_type: BuildingType): string {
+  throw new Error('not implemented');
+}
 
 /** Lifecycle status line: operating, closed by an event, demolition ordered, upgrading or under construction. */
 function statusText(status: BuildingStatus, builderName: string | undefined): string {
