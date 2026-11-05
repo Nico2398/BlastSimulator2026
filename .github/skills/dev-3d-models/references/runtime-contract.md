@@ -73,8 +73,12 @@ shader variants in advance (`warmupShaders`).
   and the mesh's own speed. Nothing is baked: stride and cadence follow the
   speed, and no two workers move in step. Cadence follows the pace a worker
   would walk at 1× game speed and swings faster on shorter legs, like a
-  pendulum; fast-forward hurries it at most 2×, past which the stride
-  stretches. A planted foot stays put: the heel peels about the toe joint.
+  pendulum: an errand is a brisk walk with each foot down over half the
+  cycle, and fleeing slows it into a run with a flight phase. Fast-forward
+  hurries the cadence at most 2×, past which the stride stretches. A planted
+  foot stays put: the heel peels about the toe joint. Carried tools hang
+  plumb from the fist, and an injured worker favours the leg on his free
+  hand's side (`WorkerRig.freeSide`), so that hand can clutch it.
 - Task bars and pictograms float above each model's own top, read from its
   bounds (`overlayHeight`), so a tall surveyor and a short manager both clear
   their hats.

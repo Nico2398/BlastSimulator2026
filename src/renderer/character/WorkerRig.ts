@@ -23,6 +23,9 @@ interface LimbBones {
   toe: number;
   lid: number;
   brow: number;
+  /** The fingers' two segments (the block that curls round a grip), or -1 on a rig without them. */
+  fingers: number;
+  tips: number;
 }
 
 /** How far the gasp mouth waits inside the skull (worker_face.GASP_HIDE). */
@@ -46,6 +49,8 @@ interface LimbRest {
   armLength: number;
   /** Elevation (radians) of the lid's front edge when the eye rests open — how far it turns to shut. */
   lidOpen: number;
+  /** Axis the fingers curl about, from their bent rest chain (rig space), or null without finger bones. */
+  fingerHinge: THREE.Vector3 | null;
 }
 
 export interface WorkerRig {
@@ -66,8 +71,8 @@ export interface WorkerRig {
   finger: number;
   /** Which hand holds the tool, when there is one. */
   toolSide: Side | null;
-  /** The leg an injured worker favours: the free hand's side, so that hand can clutch it. */
-  limpSide: Side;
+  /** The hand that holds no tool. An injured worker favours the leg on this side, so that hand can clutch it. */
+  freeSide: Side;
   limbs: Record<Side, LimbBones>;
   rest: Record<Side, LimbRest>;
   /** Rest height of the hips joint. */
@@ -79,6 +84,18 @@ export interface WorkerRig {
 /** Heel contact sits this far behind the ankle — the boot's back, in metres. */
 const HEEL_BACK = 0.06;
 
+/**
+ * The fingers are bound curled round the grip: the bend from the proximal
+ * segment into the tips defines the axis they curl about (as an elbow's does).
+ */
+function fingerHinge(poser: RigPoser, b: LimbBones, q: THREE.Quaternion): THREE.Vector3 | null {
+  if (b.fingers < 0 || b.tips < 0) return null;
+  const proximal = poser.restPos(b.tips, new THREE.Vector3()).sub(poser.restPos(b.fingers, new THREE.Vector3()));
+  const distal = new THREE.Vector3(0, 1, 0).applyQuaternion(poser.restRotation(b.tips, q));
+  const h = proximal.cross(distal);
+  return h.lengthSq() > 1e-12 ? h.normalize() : null;
+}
+
 /** Name the crew skeleton's bones; null when the model is not a worker rig. */
 export function workerRig(root: THREE.Object3D): WorkerRig | null {
   const poser = RigPoser.fromModel(root);
@@ -88,11 +105,12 @@ export function workerRig(root: THREE.Object3D): WorkerRig | null {
   const rest = {} as Record<Side, LimbRest>;
   const v = (i: number): THREE.Vector3 => poser.restPos(i, new THREE.Vector3());
   const q = new THREE.Quaternion();
+  const opt = (n: string): number => (poser.has(n) ? id(n) : -1);
   for (const s of SIDES) {
     const b: LimbBones = {
       shoulder: id(`Shoulder${s}`), upperArm: id(`UpperArm${s}`), forearm: id(`Forearm${s}`), hand: id(`Hand${s}`),
       thigh: id(`Thigh${s}`), shin: id(`Shin${s}`), foot: id(`Foot${s}`), toe: id(`Toe${s}`),
-      lid: id(`Lid${s}`), brow: id(`Brow${s}`),
+      lid: id(`Lid${s}`), brow: id(`Brow${s}`), fingers: opt(`Fingers${s}`), tips: opt(`FingerTips${s}`),
     };
     limbs[s] = b;
     const ankle = v(b.foot);
@@ -110,10 +128,10 @@ export function workerRig(root: THREE.Object3D): WorkerRig | null {
       armLength: poser.restLength(b.upperArm, b.forearm) + poser.restLength(b.forearm, b.hand),
       // A bone's local +Y runs head to tail; the lid bone's tail marks its edge's resting elevation.
       lidOpen: Math.asin(Math.max(-1, Math.min(1, new THREE.Vector3(0, 1, 0).applyQuaternion(poser.restRotation(b.lid, q)).y))),
+      fingerHinge: fingerHinge(poser, b, q),
     };
   }
   const tool = poser.has('Tool') ? id('Tool') : -1;
-  const opt = (n: string): number => (poser.has(n) ? id(n) : -1);
   let toolSide: Side | null = null;
   const gripOffset = new THREE.Vector3();
   if (tool >= 0) {
@@ -123,7 +141,7 @@ export function workerRig(root: THREE.Object3D): WorkerRig | null {
   }
   return {
     poser, hips: id('Hips'), spine: id('Spine'), chest: id('Chest'), neck: id('Neck'), head: id('Head'),
-    tool, toolSide, limpSide: toolSide === 'R' ? 'L' : 'R', hat: opt('Hat'), mouth: opt('Mouth'), gasp: opt('Gasp'), finger: opt('Finger'),
+    tool, toolSide, freeSide: toolSide === 'R' ? 'L' : 'R', hat: opt('Hat'), mouth: opt('Mouth'), gasp: opt('Gasp'), finger: opt('Finger'),
     limbs, rest, hipHeight: v(id('Hips')).y, gripOffset,
   };
 }

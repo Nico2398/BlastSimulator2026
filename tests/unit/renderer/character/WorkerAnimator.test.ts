@@ -175,6 +175,71 @@ describe('WorkerAnimator', () => {
     }
   });
 
+  it('an errand is a walk, one foot always down; fleeing is a run with both feet off the ground between steps', () => {
+    for (const role of ['driller', 'surveyor', 'manager']) {
+      const lowestFoot = (root: THREE.Group): number =>
+        Math.min(world(root, 'ToeL').y, world(root, 'ToeR').y, world(root, 'FootL').y - 0.06, world(root, 'FootR').y - 0.06);
+      for (const [evacuating, flight] of [[false, false], [true, true]] as const) {
+        const { root, rig } = worker(role);
+        const a = new WorkerAnimator(rig, role, 7);
+        for (let i = 0; i < 180; i++) a.update(DT, { ...STILL, speed: 2, evacuating });
+        let airborne = 0;
+        for (let i = 0; i < 120; i++) {
+          a.update(DT, { ...STILL, speed: 2, evacuating });
+          if (lowestFoot(root) > 0.05) airborne++;
+        }
+        if (flight) expect(airborne, `${role} fleeing`).toBeGreaterThan(5);
+        else expect(airborne, `${role} on an errand`).toBe(0);
+      }
+    }
+  });
+
+  it("carries the driller's drill hanging plumb from his fist while he walks", () => {
+    const bind = worker('driller').root;
+    bind.updateMatrixWorld(true);
+    const handBind = bind.getObjectByName('HandR')!.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const fingers = world(bind, 'HandR').sub(world(bind, 'ForearmR')).normalize();
+    const { root, rig } = worker('driller');
+    const a = new WorkerAnimator(rig, 'driller', 3);
+    for (let i = 0; i < 240; i++) {
+      a.update(DT, { ...STILL, speed: 2 });
+      if (i < 60 || i % 10) continue;
+      root.updateMatrixWorld(true);
+      const turned = root.getObjectByName('HandR')!.getWorldQuaternion(new THREE.Quaternion()).multiply(handBind);
+      expect(fingers.clone().applyQuaternion(turned).y, `frame ${i}`).toBeLessThan(-0.9);
+    }
+  });
+
+  it("keeps the blaster's detonator box on the ground while the plunger strokes", () => {
+    const { root, rig } = worker('blaster');
+    const a = new WorkerAnimator(rig, 'blaster', 3);
+    const boxY: number[] = [];
+    const handY: number[] = [];
+    for (let i = 0; i < 300; i++) {
+      a.update(DT, { ...STILL, working: true });
+      if (i < 60) continue;
+      boxY.push(world(root, 'Tool').y);
+      handY.push(world(root, 'HandL').y);
+    }
+    expect(Math.max(...boxY) - Math.min(...boxY)).toBeLessThan(0.005);
+    expect(Math.max(...handY) - Math.min(...handY)).toBeGreaterThan(0.07);
+  });
+
+  it('spent, he props both hands on his knees; injured, he presses his free hand to the leg he favours', () => {
+    const { root, rig } = worker('driller');
+    const tired = new WorkerAnimator(rig, 'driller', 3);
+    for (let i = 0; i < 240; i++) tired.update(DT, { ...STILL, fatigue: 2 });
+    for (const side of ['L', 'R']) {
+      expect(world(root, `Hand${side}`).distanceTo(world(root, `Shin${side}`)), `${side} hand on knee`).toBeLessThan(0.14);
+    }
+    const hurt = worker('driller');
+    const limp = new WorkerAnimator(hurt.rig, 'driller', 3);
+    for (let i = 0; i < 240; i++) limp.update(DT, { ...STILL, injured: true });
+    const s = hurt.rig.freeSide;
+    const thigh = world(hurt.root, `Thigh${s}`).lerp(world(hurt.root, `Shin${s}`), 0.45);
+    expect(world(hurt.root, `Hand${s}`).distanceTo(thigh)).toBeLessThan(0.14);
+  });
+
   it('ignores a zero or negative time step', () => {
     const { root, rig } = worker();
     const a = new WorkerAnimator(rig, 'driller', 1);

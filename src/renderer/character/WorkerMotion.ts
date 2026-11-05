@@ -187,7 +187,7 @@ export function poseGait(rig: WorkerRig, temp: Temperament, g: GaitState): void 
   const runY = 0.025 * reach - (g.crouch * 0.5 + 0.025 * reach) * press;
   // A limp: the bad leg lands late and leaves early, and the body lurches down and over
   // it each time it takes the weight.
-  const bad = rig.limpSide;
+  const bad = rig.freeSide;
   const badSign = rig.rest[bad].sign;
   const offOf = (s: Side): number => (s === 'L' ? 0 : 0.5) + (s === bad ? LIMP_LATE * g.limp : 0);
   const dutyOf = (s: Side): number => duty * (1 - (s === bad ? LIMP_SHORT * g.limp : 0));
@@ -271,7 +271,7 @@ export function panicBody(rig: WorkerRig, t: number, seed: number): void {
     P.shiftRest(rig.hat, 0, 0.035 * hop, 0);
     P.rot(rig.hat, 0.1 * hop * Math.sin(t * 5 + seed), 0, -0.08 * hop);
   }
-  const hatHand: Side = rig.toolSide === 'L' ? 'R' : 'L';
+  const hatHand = rig.freeSide;
   for (const s of SIDES) {
     const b = rig.limbs[s];
     const r = rig.rest[s];
@@ -298,7 +298,7 @@ export function panicBody(rig: WorkerRig, t: number, seed: number): void {
 export function clutchThigh(rig: WorkerRig, amount: number): void {
   if (amount <= 0.3) return;
   const P = rig.poser;
-  const s = rig.limpSide;
+  const s = rig.freeSide;
   const b = rig.limbs[s];
   const sign = rig.rest[s].sign;
   const hip = P.pos(b.thigh, _a);
@@ -306,6 +306,24 @@ export function clutchThigh(rig: WorkerRig, amount: number): void {
   const target = hip.lerp(knee, 0.45).add(_c.set(0.07, 0.04, sign * 0.02));
   P.ik2(b.upperArm, b.forearm, b.hand, target, _d.set(-0.3, 0, sign));
 }
+
+/**
+ * Close hand `s` by `amount`: 1 is the fist it is bound in round a grip, 0 the
+ * fingers out straight, below 0 splayed back. A rig without finger bones keeps
+ * its fist.
+ */
+export function curlHand(rig: WorkerRig, s: Side, amount: number): void {
+  const b = rig.limbs[s];
+  const hinge = rig.rest[s].fingerHinge;
+  if (!hinge || b.fingers < 0) return;
+  const open = 1 - Math.max(-0.3, Math.min(1, amount));
+  rig.poser.rotQ(b.fingers, _q.setFromAxisAngle(hinge, -open * FINGER_OPEN));
+  rig.poser.rotQ(b.tips, _q.setFromAxisAngle(hinge, -open * TIP_OPEN));
+}
+
+/** How far the fingers' two segments turn to open a fist out flat (rad). */
+const FINGER_OPEN = 75 * DEG;
+const TIP_OPEN = 60 * DEG;
 
 /** The manager's pointing finger, curled back into his fist (`amount` 1) or out (0). */
 export function curlFinger(rig: WorkerRig, amount: number): void {
@@ -334,7 +352,7 @@ export function poseIdle(rig: WorkerRig, temp: Temperament, t: number, seed: num
   // Weight: a soft square wave, so he stands on one leg for a while, then shifts.
   // An injured man stands off his bad leg.
   const w = lerp(Math.max(-1, Math.min(1, Math.sin(TAU * t / lerp(9, 14, frac(seed)) + seed * 2.3) * 2.4)) * (1 - tired * 0.5),
-    -rig.rest[rig.limpSide].sign, Math.min(1, limp * 1.5));
+    -rig.rest[rig.freeSide].sign, Math.min(1, limp * 1.5));
   const sway = tired * Math.sin(TAU * t * 0.3 + seed) * 6 * DEG;
   const fidget = temp.fidget * Math.abs(Math.sin(t * TAU * 1.6 + seed));
   const stagger = tired * 0.06 * Math.sin(TAU * t * 0.3 + seed * 1.3);

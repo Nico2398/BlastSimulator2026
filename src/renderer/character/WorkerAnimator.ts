@@ -10,9 +10,9 @@
 
 import type { PoseBuffer } from './RigPoser.js';
 import { blendPose } from './RigPoser.js';
-import type { WorkerRig } from './WorkerRig.js';
+import { SIDES, type WorkerRig } from './WorkerRig.js';
 import {
-  clutchThigh, curlFinger, type GaitState, lerp, panicBody, poseCollapse, poseFace, poseGait, poseIdle, smooth, TEMPERAMENT, type Temperament,
+  clutchThigh, curlFinger, curlHand, type GaitState, lerp, panicBody, poseCollapse, poseFace, poseGait, poseIdle, smooth, TEMPERAMENT, type Temperament,
   tiredTilt,
 } from './WorkerMotion.js';
 import { carryTool, poseWork } from './WorkerWork.js';
@@ -185,6 +185,26 @@ export class WorkerAnimator {
     this.compose(s);
   }
 
+  /**
+   * How open each hand is: a tool hand stays a fist, a free hand hangs relaxed,
+   * clenches on a hip, opens on the knees, splays when he flings it up in a
+   * panic, and both fall open once he is out cold.
+   */
+  private poseHands(m: Motion, carry: boolean): void {
+    const { rig, role } = this;
+    for (const s of SIDES) {
+      const holding = rig.toolSide === s;
+      let amount = holding ? 1 : 0.55;
+      if (m === 'collapse') amount = lerp(amount, 0.15, smooth((this.collapseTime / COLLAPSE_S - 0.4) / 0.35));
+      else if (m === 'work') amount = 1;
+      else if (this.panic > 0.5) amount = holding ? 1 : rig.freeSide === s && rig.hat >= 0 ? 0.45 : -0.2;
+      else if (this.limp > 0.3 && s === rig.freeSide) amount = 0.35;
+      else if (m === 'idle' && this.tired > 0.5) amount = holding ? 1 : 0.3;
+      else if (m === 'idle' && carry && !holding && (role === 'manager' || role === 'driver')) amount = 1;
+      curlHand(rig, s, amount);
+    }
+  }
+
   private updateBlink(dt: number): void {
     if (this.blinkT >= 0) {
       this.blinkT += dt;
@@ -243,6 +263,7 @@ export class WorkerAnimator {
       }
       // The manager's pointing finger stays curled into the fist unless he is pointing on the job.
       if (!(m === 'work' && role === 'manager')) curlFinger(rig, 1);
+      this.poseHands(m, carry);
       if (m !== 'collapse' && m !== 'work') tiredTilt(rig, this.tired, time, seed);
       const out = m === 'collapse';
       poseFace(rig, out ? 1 : blink, droop, out ? 0 : alarm, out ? 0.7 : smooth((alarm - 0.3) / 0.4));
