@@ -1,0 +1,123 @@
+{
+  "name": "inspector-drag-visual",
+  "description": "The entity inspector is a draggable window (#2137). A player selects an employee, grabs the inspector header with the mouse and drags it to the right of the screen; the window follows the pointer, is clamped to stay on screen, and keeps its new position when another entity is selected.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32 cash:300000 staffed:true",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32 cash:300000 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 300000,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "description": "Clicking employee 4 in the scene docks the inspector right of the left column (header at x 388, y 100 on the 1280x720 viewport).",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "employee",
+          "id": 4
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-employee-detail"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-employee-detail"
+      }
+    },
+    {
+      "command": "employee list",
+      "description": "Grab the header on its title area and drag towards the lower right corner: the window follows, then clamps against the right screen edge.",
+      "interaction": [
+        {
+          "type": "mousemove",
+          "x": 470,
+          "y": 123
+        },
+        {
+          "type": "mousedown",
+          "x": 470,
+          "y": 123
+        },
+        {
+          "type": "mousemove",
+          "x": 700,
+          "y": 250
+        },
+        {
+          "type": "mousemove",
+          "x": 1000,
+          "y": 400
+        },
+        {
+          "type": "mouseup",
+          "x": 1000,
+          "y": 400
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-employee-detail"
+      }
+    },
+    {
+      "command": "employee list",
+      "description": "Selecting another employee keeps the dragged position.",
+      "interaction": [
+        {
+          "type": "clickEntity",
+          "kind": "employee",
+          "id": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"2\"] .bs-employee-detail"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"2\"] .bs-employee-detail"
+      }
+    },
+    {
+      "command": "employee list",
+      "description": "The dragged window's header buttons stay reachable above the tool rail: a real click on close dismisses it.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-panel-close]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player"
+    }
+  ]
+}

@@ -27,3 +27,24 @@ export function inspectorBounds(viewport: Viewport): Rect {
     height: viewport.height - INSPECTOR_TOP_PX - INSPECTOR_BOTTOM_PX,
   };
 }
+
+export interface WindowPoint { readonly x: number; readonly y: number; }
+export interface WindowSize { readonly width: number; readonly height: number; }
+
+/** Highest a dragged inspector may sit: its top edge never goes under the top bar. */
+export const INSPECTOR_MIN_TOP_PX = TOPBAR_HEIGHT_PX;
+
+/** Where the inspector docks for a player who never drags. */
+export function defaultInspectorPosition(): WindowPoint {
+  return { x: INSPECTOR_LEFT_PX, y: INSPECTOR_TOP_PX };
+}
+
+/** Clamp a window's top-left so it stays fully inside the viewport and below the top bar. */
+export function clampWindowPosition(pos: WindowPoint, size: WindowSize, viewport: WindowSize): WindowPoint {
+  const maxX = viewport.width - size.width;
+  const maxY = viewport.height - size.height;
+  return {
+    x: Math.max(0, Math.min(pos.x, maxX)),
+    y: Math.max(INSPECTOR_MIN_TOP_PX, Math.min(pos.y, maxY)),
+  };
+}
