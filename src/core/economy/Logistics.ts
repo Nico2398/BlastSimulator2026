@@ -7,7 +7,7 @@ import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
 import type { WarehouseSite } from '../entities/BuildingWarehouse.js';
 import { pickWarehouse, warehouseFreeKg, warehouseUsedKgMap } from './FreightWarehouses.js';
-import { creditSpoilHeaps, totalSpoilRoomKg, drawSpoilKg, haulDestinationOf, isStoredBarren, rubbleStockKg } from './SpoilHeaps.js';
+import { creditSpoilHeaps, totalSpoilRoomKg, drawSpoilKg, haulDestinationOf, isBarrenFragment, isStoredBarren, rubbleStockKg } from './SpoilHeaps.js';
 import type { Building } from '../entities/Building.js';
 import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
@@ -573,11 +573,13 @@ export function releaseBarrenStoredFragments(
     releasedKg += tracked.fragment.mass;
     released.add(tracked);
   }
-  if (released.size === 0) return 0;
-  clampCollectedOre(collectedOre);
-  state.fragments = state.fragments.filter(f => !released.has(f));
-  state.storedMassKg = Math.max(0, state.storedMassKg - releasedKg);
-  return releasedKg;
+  if (released.size > 0) {
+    clampCollectedOre(collectedOre);
+    state.fragments = state.fragments.filter(f => !released.has(f));
+    state.storedMassKg = Math.max(0, state.storedMassKg - releasedKg);
+  }
+  // Overflow ore stored whole (no heap room at unload) sheds its barren share once a heap frees up (#2142).
+  return releasedKg + concentrateStoredOre(state, buildings, gradeScale);
 }
 
 /**
@@ -587,19 +589,43 @@ export function releaseBarrenStoredFragments(
  * whole remainder or there is no remainder.
  */
 export function concentrateStoredFragment(
-  _state: LogisticsState,
-  _tracked: TrackedFragment,
-  _buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
-  _reservedKg: ReadonlyMap<number, number> = new Map(),
+  state: LogisticsState,
+  tracked: TrackedFragment,
+  buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
+  reservedKg: ReadonlyMap<number, number> = new Map(),
 ): number {
-  throw new Error('not implemented');
+  if (tracked.state !== 'stored') return 0;
+  const fragment = tracked.fragment;
+  const densitySum = Object.values(fragment.oreDensities).reduce((a, b) => a + Math.max(0, b), 0);
+  if (!(densitySum > 0) || !(fragment.volume > 0)) return 0;
+  // Same physical share extractOreFromFragment uses: densities summing past 1 are normalised.
+  const oreShare = densitySum / Math.max(1, densitySum);
+  const remainderKg = fragment.mass * (1 - oreShare);
+  if (remainderKg <= FRAGMENT_SPLIT_EPSILON_KG) return 0;
+  if (!creditSpoilHeaps(buildings, remainderKg, reservedKg)) return 0;
+
+  const removedVolume = fragment.volume * (1 - oreShare);
+  const densities: Record<string, number> = {};
+  for (const [id, d] of Object.entries(fragment.oreDensities)) {
+    if (d > 0) densities[id] = d / oreShare; // ore kg unchanged: volume shrinks by oreShare
+  }
+  fragment.oreDensities = densities;
+  shrinkStoredFragment(state, fragment, remainderKg, removedVolume);
+  return remainderKg;
 }
 
 /** concentrateStoredFragment over every stored ore-bearing fragment, oldest first; returns kg moved to heaps (#2142). */
 export function concentrateStoredOre(
-  _state: LogisticsState,
-  _buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
-  _gradeScale = ORE_GRADE_SCALE_DEFAULT,
+  state: LogisticsState,
+  buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): number {
-  throw new Error('not implemented');
+  if (totalSpoilRoomKg(buildings) <= 0) return 0;
+  const reservedKg = warehouseUsedKgMap(state);
+  let movedKg = 0;
+  for (const tracked of state.fragments) {
+    if (tracked.state !== 'stored' || isBarrenFragment(tracked.fragment.oreDensities, gradeScale)) continue;
+    movedKg += concentrateStoredFragment(state, tracked, buildings, reservedKg);
+  }
+  return movedKg;
 }

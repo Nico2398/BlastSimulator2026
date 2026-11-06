@@ -29,7 +29,8 @@ import type { FragmentData } from '../mining/BlastExecution.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
 import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
-import { pickupFragment, reserveFragmentIds, deliverToDepot, deliverToSpoilHeap, type TrackedFragment } from '../economy/Logistics.js';
+import { pickupFragment, reserveFragmentIds, deliverToDepot, deliverToSpoilHeap, concentrateStoredFragment, type TrackedFragment } from '../economy/Logistics.js';
+import { warehouseUsedKgMap } from '../economy/FreightWarehouses.js';
 import { creditSpoilKg, haulDestinationOf } from '../economy/SpoilHeaps.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { findQueuedHaulAction } from '../economy/HaulDispatch.js';
@@ -157,7 +158,11 @@ function deliverCargoItem(
     if (heap) creditSpoilKg(heap, dumped.massKg);
     return true;
   }
-  return deliverToDepot(state.logistics, fragmentId, state.collectedOre, warehouses, atX, atZ);
+  if (!deliverToDepot(state.logistics, fragmentId, state.collectedOre, warehouses, atX, atZ)) return false;
+  // Ore concentrated on arrival (#2142): the warehouse keeps the ore, the barren remainder goes to a heap.
+  const stored = state.logistics.fragments.find(f => f.fragment.id === fragmentId && f.state === 'stored');
+  if (stored) concentrateStoredFragment(state.logistics, stored, state.buildings.buildings, warehouseUsedKgMap(state.logistics));
+  return true;
 }
 
 /**
