@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
 import type { VehicleState } from '../core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../core/entities/EmployeeActivity.js';
-import { BAR_Y_OFFSET } from './TaskProgressBar.js';
+import { overlayHeight } from './TaskProgressBar.js';
 import { faceCamera } from './Billboard.js';
 import { EmployeeBillboardRoster, forEachEmployeeActivity } from './EmployeeBillboardRoster.js';
 import { createCanvas2d } from './createCanvas2d.js';
@@ -283,7 +283,7 @@ export class EmployeePictograms {
       let pictogram = this.pictograms.get(employee.id);
       if (!pictogram) {
         const mesh = new THREE.Mesh(this.geometry, this.materials[kind]);
-        mesh.position.set(0, BAR_Y_OFFSET, 0);
+        mesh.position.set(0, overlayHeight(anchor), 0);
         anchor.add(mesh);
         pictogram = { mesh, kind };
         this.pictograms.set(employee.id, pictogram);
@@ -295,6 +295,7 @@ export class EmployeePictograms {
         if (pictogram.mesh.parent !== anchor) {
           anchor.add(pictogram.mesh);
         }
+        pictogram.mesh.position.y = overlayHeight(anchor);
       }
     });
 

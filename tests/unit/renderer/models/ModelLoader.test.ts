@@ -1,21 +1,38 @@
 // ModelLoader — .glb bytes → library prototypes, from disk and over fetch
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import * as THREE from 'three';
 import { ModelLibrary } from '../../../../src/renderer/models/ModelLibrary.js';
 import { fetchModelBytes, parseModel, preloadModels, yieldToEventLoop, PRELOAD_SLICE_MS } from '../../../../src/renderer/models/ModelLoader.js';
 import { allModelIds } from '../../../../src/renderer/models/ModelIds.js';
 import { readModelBytes } from '../../../helpers/models.js';
 
 describe('parseModel', () => {
-  it('parses an exported worker into a prototype with the six animatable nodes and the role tint', async () => {
+  it('parses an exported worker into a skinned prototype: the armature, its named bones, the crew tints', async () => {
     const proto = await parseModel(await readModelBytes('/models/worker_driller.glb'));
-    const names = proto.root.children.map(c => c.name).sort();
-    expect(names).toEqual(['ArmL', 'ArmR', 'Head', 'LegL', 'LegR', 'Torso']);
-    expect(proto.tintNames).toEqual(['TintRole']);
+    expect(proto.skinned).toBe(true);
+    const rig = proto.root.getObjectByName('Rig')!;
+    expect(rig.parent).toBe(proto.root);
+    for (const bone of ['Hips', 'Head', 'HandL', 'HandR', 'ThighL', 'ThighR']) {
+      expect(proto.root.getObjectByName(bone), bone).toBeInstanceOf(THREE.Bone);
+    }
+    expect(proto.tintNames).toEqual(expect.arrayContaining(['TintRole', 'TintSkin']));
+    const surfaces = rig.children.filter(c => c instanceof THREE.Mesh);
+    expect(surfaces.length).toBeGreaterThan(1);
+    expect(surfaces.every(m => m instanceof THREE.SkinnedMesh)).toBe(true);
     // Stands on the ground, a little over a metre tall, facing +X.
     expect(proto.bounds.min.y).toBeCloseTo(0, 1);
     expect(proto.bounds.max.y).toBeGreaterThan(1.1);
     expect(proto.bounds.max.y).toBeLessThan(1.6);
+  });
+
+  it('parses a vehicle into a rigid prototype of named animatable nodes', async () => {
+    const proto = await parseModel(await readModelBytes('/models/vehicle_debris_hauler_t2.glb'));
+    expect(proto.skinned).toBe(false);
+    const names = proto.root.children.map(c => c.name);
+    expect(names).toContain('Body');
+    expect(names.some(n => n.startsWith('Wheel'))).toBe(true);
+    proto.root.traverse(obj => expect(obj).not.toBeInstanceOf(THREE.SkinnedMesh));
   });
 
   it('rejects bytes that are not a glTF', async () => {

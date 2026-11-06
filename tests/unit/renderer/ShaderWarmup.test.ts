@@ -2,7 +2,8 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
-import { warmupShaders } from '../../../src/renderer/ShaderWarmup.js';
+import { skinnedMaterialsOf, warmupShaders } from '../../../src/renderer/ShaderWarmup.js';
+import { loadedModelLibrary } from '../../helpers/models.js';
 import { GhostMesh } from '../../../src/renderer/GhostMesh.js';
 
 type WarmupRenderer = Parameters<typeof warmupShaders>[0];
@@ -53,6 +54,29 @@ describe('warmupShaders', () => {
     const children = calls[0]!.holder.children as THREE.Mesh[];
     expect(children.filter(c => !(c instanceof THREE.InstancedMesh)).map(c => c.material)).toEqual([plain, both]);
     expect(children.filter(c => c instanceof THREE.InstancedMesh).map(c => c.material)).toEqual([both]);
+  });
+
+  it('compiles the skinned variant on a SkinnedMesh bound to a skeleton, for the crew', () => {
+    const toon = new THREE.MeshToonMaterial();
+    const { renderer, calls } = fakeRenderer();
+
+    warmupShaders(renderer, new THREE.PerspectiveCamera(), new THREE.Scene(), [], null, [], [toon]);
+
+    const skinned = calls[0]!.holder.children.filter(c => c instanceof THREE.SkinnedMesh) as THREE.SkinnedMesh[];
+    expect(skinned.map(c => c.material)).toEqual([toon]);
+    expect(skinned[0]!.skeleton.bones).toHaveLength(1);
+    expect(skinned[0]!.geometry.getAttribute('skinIndex').itemSize).toBe(4);
+    expect(skinned[0]!.geometry.getAttribute('skinWeight').getX(0)).toBe(1);
+  });
+
+  it('skinnedMaterialsOf collects a worker prototype\'s surface and outline materials once each', async () => {
+    const lib = await loadedModelLibrary(['worker_driller', 'worker_blaster']);
+    const roots = ['worker_driller', 'worker_blaster'].map(id => lib.prototype(id)!.root);
+    const mats = skinnedMaterialsOf(roots);
+    expect(mats.some(m => m instanceof THREE.ShaderMaterial)).toBe(true); // the skinned outline
+    expect(mats.filter(m => m instanceof THREE.MeshToonMaterial).length).toBeGreaterThanOrEqual(4);
+    expect(new Set(mats).size).toBe(mats.length);
+    expect(skinnedMaterialsOf([new THREE.Group()])).toEqual([]);
   });
 
   it('skips the compile when there is nothing to warm', () => {

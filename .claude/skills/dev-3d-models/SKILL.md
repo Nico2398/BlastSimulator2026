@@ -28,7 +28,7 @@ assets/models/blender/<family>.py   source of truth — edit here
 | `assets/models/blend/<id>.blend` | Blender file for hand iteration, modifiers unapplied | yes |
 | `public/models/<id>.glb` | What the browser fetches and what the tests parse | yes |
 
-`build.py` holds the registry that routes an id to its builder. Vehicles: `_t1` → `vehicles_t1.py`, `_t2` → `vehicles.py`, `_t3` → `vehicles_t3.py`. Buildings: `buildings_t1.py` / `buildings_t3.py` when they define the type, else `buildings.py` for every tier. A single-tier type (`SINGLE_TIER_TYPES` in `buildings.py`, mirroring `isSingleTierType`) registers tier 1 only. Workers → `workers.py`, props → `props.py`.
+`build.py` holds the registry that routes an id to its builder. Vehicles: `_t1` → `vehicles_t1.py`, `_t2` → `vehicles.py`, `_t3` → `vehicles_t3.py`. Buildings: `buildings_t1.py` / `buildings_t3.py` when they define the type, else `buildings.py` for every tier. A single-tier type (`SINGLE_TIER_TYPES` in `buildings.py`, mirroring `isSingleTierType`) registers tier 1 only. Workers → `workers.py` (with `worker_face.py` and `worker_props.py`, on the `character.py` toolkit), props → `props.py`.
 
 Buildings read their footprint from `building-defs.json`, dumped from the game's own `BuildingDefs` by `npm run models:defs` (which `models:build` runs first), so both sides agree on size.
 
@@ -59,7 +59,7 @@ The builder describes intent; Blender computes the result. An effect a modifier 
 | Rounded edges | `bevel()` | loop cuts or hand-chamfered corners |
 | A lumpy natural surface — rock, canopy, spoil | `displace()` with a seed | dozens of hand-jittered spheres |
 | A curved trunk, a tapered tower | `bend()`, `taper()` | a stack of shifted segments |
-| A hole, notch or cut — a window in a wall, a door in a slab | `boolean()` with a hidden cutter | modelling around the hole face by face |
+| A hole, notch or cut — a window in a wall, a door in a slab | `boolean()` (bakes the cut, deletes the cutter) | modelling around the hole face by face |
 | Sheet thickness — tarp, panel, tent wall | `solidify()` | two parallel surfaces plus edge strips |
 | A swept or extruded profile — track outline, roof section, blade | `prism()` with a computed point list | many small boxes approximating the curve |
 | A distant LOD | `finish_far()`'s decimate | a second, hand-simplified model |
@@ -139,7 +139,8 @@ Check it in the builder, before the rebuild:
 - Silhouette first. The gameplay camera sits far above; a joke or a feature that only exists as surface detail is invisible. Model it as a shape or leave it out.
 - Detail thinner than ~3 cm disappears under the outline hull. Below that, merge it into its parent shape.
 - Colour lives in material slots. The exporter writes no UVs and no images — there are no textures to hide behind, so a colour break is a material, a face selection (`assign_by`) or a separate part.
-- Faces have eyes. Workers get big whites, offset pupils, a highlight and brows; that is what makes them minions rather than mannequins.
+- Faces have eyes. Workers get big whites, an iris looking up toward the camera, a highlight, brows, and lids on their own bones that blink and shut; that is what makes them people rather than mannequins.
+- Characters bend. A worker is one continuous skinned body — lofted torso and limbs that fold at the elbow and knee — never rigid parts on pivots. Body type, head shape and nose differ per role, so the crew reads as a cast.
 - Judge in the game's pipeline (`models:preview`), never in a Blender viewport render. The toon ramp is three flat bands plus a near-black outline: a shape that only reads under smooth studio lighting does not read in the game.
 
 ## ▶ Tiers carry the satire
@@ -165,9 +166,10 @@ Break one of these and the model loads but misbehaves — a vehicle drives sidew
 | Scale | 1 Blender unit = 1 game unit = one voxel. Blender is Z-up; the exporter converts to glTF Y-up |
 | Origin | Ground contact at z = 0. `bounds.min.y ≈ 0` is asserted |
 | Facing | Workers and vehicles face **+X**; the renderer yaws the root toward travel. Buildings are centred on their footprint, doors row at **+Y** (game −Z) |
-| Animation nodes | Direct children of the scene root, and only those, are animatable: `Head`, `Torso`, `ArmL`, `ArmR`, `LegL`, `LegR`, `Wheel*`, `Flywheel`, `Body`. Build them with `pivot(name, location, parts)` — the Empty's location is the rotation pivot. Everything else lives under `Body` |
+| Animation nodes | Rigid families: direct children of the scene root, and only those, are animatable: `Wheel*`, `Flywheel`, `Body` and role parts. Build them with `pivot(name, location, parts)` — the Empty's location is the rotation pivot. Everything else lives under `Body` |
+| Skinned workers | One armature (`character.Skeleton`): `Hips`, `Spine`, `Chest`, `Neck`, `Head`, `Hat`, `Mouth`, `Gasp`, `Lid*`, `Brow*`, `Shoulder*`, `UpperArm*`, `Forearm*`, `Hand*`, `Thigh*`, `Shin*`, `Foot*`, `Toe*`, `Tool`, and the manager's `Finger`. Every part carries an Armature modifier and vertex groups — `bind_chain` blends a limb across its joints, `bind_rigid` pins a hat, an eye, a tool. The bind pose is a relaxed A-pose with knees and elbows slightly bent (the IK reads each bend axis from it). A lid bone points along its lid's resting edge, and the lid is a shell of revolution about that axis, concentric with an eye white that is round in side profile, so turning it never changes its clearance; the shell's sweep is sized from the runtime's lid limits — `worker_face.LID_SHUT` mirrors `WorkerMotion`'s `LID_SHUT`, and `LID_WIDE` must stay under the room the shell leaves. A brow bone sits at its brow's outer end, and the brow is conformed over the skull and both lids. Parts named `Face*` — eyes, lids, brows, mouth, lenses — draw without the outline hull, which would blot them out at game distance. No clips are exported: `src/renderer/character/` poses the bones every frame |
 | Wheels | Pivot at the hub centre, axle along Blender **Y**. The renderer measures the rolling radius from the node's own bounds, so any wheel size turns true |
-| Tint materials | A material named `Tint*` is cloned and recoloured per instance: `TintRole` (worker overalls and hat), `TintBody` (vehicle paint, building walls), `TintRock`, `TintGrass` (biome colours). Every model of its family must expose the one its renderer asks for |
+| Tint materials | A material named `Tint*` is cloned and recoloured per instance: `TintRole` (worker hard hat and accents), `TintGarment` (worker clothes; red on injury), `TintSkin` and `TintHair` (per employee), `TintBody` (vehicle paint, building walls), `TintRock`, `TintGrass` (biome colours). Every model of its family must expose the ones its renderer asks for |
 | Emissive | A material with an emission colour stays its own mesh and glows. Use it for the tier-3 neon, beacons and lamps |
 | Everything else | Merged into one vertex-coloured mesh per node. Plain colours are free; keep them in material slots, not geometry tricks |
 | Props | One `Body` node, no animation nodes — they are drawn instanced. Trees and grass are bent by a height-based wind shader, so the base sits at the origin and the canopy above it |
@@ -180,7 +182,7 @@ Budget by **how many copies are drawn**, not by how important the model feels. A
 
 | Family | Copies per level | Triangles (measured) | Notes |
 |--------|------------------|----------------------|-------|
-| Workers | tens | 9.7 k – 10.5 k | 13 merged meshes each |
+| Workers | tens | 13.6 k – 15.2 k | skinned: one mesh per material bucket, 6–7 draws with the outline; skin weights shipped as normalized u8 to stay under 400 KB |
 | Vehicles t1 / t2 / t3 | tens | 5.8 k – 11.4 k / 9.6 k – 11.1 k / 12.1 k – 17.6 k | tier 3 is the heaviest by design |
 | Buildings t1 / t2 / t3 | tens | 3.0 k – 6.7 k / 3.2 k – 6.3 k / 7.2 k – 13.2 k | 3 merged meshes each |
 | Trees (near) | thousands | 84 – 1 292 | test ceiling 1 600 |
@@ -207,6 +209,7 @@ Where the triangles go:
 |---------|---------|--------|
 | logic | `npm run test -- ModelAssets` | Every catalogued id exists, parses, fits the size budget, carries its nodes, tints, ground contact, tier heights and footprint |
 | visual | `npm run models:preview -- <id>` then Read the PNGs | The model reads through the game's toon ramp, outline and shadows |
+| visual | `npm run models:preview -- worker_<role> --query "pose=walk" --times 3,3.06,3.12 --tag walk` | A worker's motion, frame by frame (`pose` = `walk`, `run`, `idle`, `work`, `tired`, `panic`, `limp`, `collapse`; `fy=0.82` frames the face) |
 | visual | `npm run screenshot -- --name <n> --commands "…" --focus-entity "…"` | The model reads in place, at the game camera's distance, beside its neighbours |
 | static | `npm run typecheck` | Only when TypeScript changed alongside the asset |
 

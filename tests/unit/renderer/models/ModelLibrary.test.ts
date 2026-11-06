@@ -2,8 +2,9 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
-import { ModelLibrary, modelLibrary } from '../../../../src/renderer/models/ModelLibrary.js';
-import { buildPrototype, TINT_KEY } from '../../../../src/renderer/models/ModelMerge.js';
+import { ModelLibrary, modelLibrary, PICK_KEY } from '../../../../src/renderer/models/ModelLibrary.js';
+import { buildPrototype, HULL_KEY, TINT_KEY } from '../../../../src/renderer/models/ModelMerge.js';
+import { loadedModelLibrary } from '../../../helpers/models.js';
 
 function protoWithTint(): ReturnType<typeof buildPrototype> {
   const scene = new THREE.Group();
@@ -96,5 +97,96 @@ describe('ModelLibrary', () => {
     expect(lib.has('a')).toBe(false);
     expect(lib.revision).toBe(r0 + 2);
     expect(dispose).not.toHaveBeenCalled();
+  });
+});
+
+describe('ModelLibrary — the exported assets', () => {
+  const ids = ['worker_driller', 'vehicle_drill_rig_t2', 'building_explosive_warehouse_t2'];
+
+  it('instantiates a rigid vehicle and building as before: plain nodes of plain meshes, no bones, no pick proxy', async () => {
+    const lib = await loadedModelLibrary(ids);
+    for (const id of ids.slice(1)) {
+      const proto = lib.prototype(id)!;
+      expect(proto.skinned, id).toBe(false);
+      const inst = lib.instantiate(id, { size: [1, 1, 1] });
+      expect(inst.skinned, id).toBe(false);
+      expect(inst.root.children.map(c => c.name)).toEqual(proto.root.children.map(c => c.name));
+      expect(inst.root.getObjectByName(`${id}.pick`)).toBeUndefined();
+      inst.root.traverse(obj => {
+        expect(obj).not.toBeInstanceOf(THREE.Bone);
+        expect(obj).not.toBeInstanceOf(THREE.SkinnedMesh);
+      });
+      // Every node holds its merged surfaces then exactly one hull, named after it.
+      for (const node of inst.root.children) {
+        const meshes = node.children.filter((c): c is THREE.Mesh => c instanceof THREE.Mesh);
+        if (meshes.length === 0) continue;
+        expect(meshes.filter(m => m.userData[HULL_KEY]).map(m => m.name)).toEqual([`${node.name}.outline`]);
+        expect(meshes.at(-1)!.userData[HULL_KEY]).toBe(true);
+        for (const m of meshes) expect(m.name.startsWith(`${node.name}.`)).toBe(true);
+      }
+    }
+  });
+
+  it('instantiates the skinned worker: named bones, one skeleton per instance, the crew tints, a pick proxy', async () => {
+    const lib = await loadedModelLibrary(ids);
+    const a = lib.instantiate('worker_driller', { size: [0.6, 1.4, 0.6], tint: 'TintRole' });
+    const b = lib.instantiate('worker_driller', { size: [0.6, 1.4, 0.6], tint: 'TintRole' });
+    expect(a.skinned).toBe(true);
+    for (const bone of ['Hips', 'Spine', 'Chest', 'Neck', 'Head', 'HandL', 'HandR', 'ThighL', 'FootR']) {
+      expect(a.node(bone), bone).toBeInstanceOf(THREE.Bone);
+    }
+    const skinned: THREE.SkinnedMesh[] = [];
+    a.root.traverse(obj => { if (obj instanceof THREE.SkinnedMesh) skinned.push(obj); });
+    expect(skinned.length).toBeGreaterThan(1);
+    expect(new Set(skinned.map(m => m.skeleton)).size).toBe(1);
+    expect(skinned.filter(m => m.userData[HULL_KEY])).toHaveLength(1);
+    for (const tint of ['TintRole', 'TintSkin', 'TintHair']) {
+      expect(a.tints.get(tint), tint).toBeDefined();
+      expect(a.tints.get(tint)).not.toBe(b.tints.get(tint));
+    }
+    // Pick boxes ride the bones they cover.
+    const headBox = a.root.getObjectByName('worker_driller.pick.Head')!;
+    expect(headBox.userData[PICK_KEY]).toBe(true);
+    expect(headBox.parent).toBe(a.node('Head'));
+    // Posing one worker leaves the other at rest.
+    a.node('ThighL')!.rotation.x += 1;
+    expect(b.node('ThighL')!.quaternion.equals(lib.prototype('worker_driller')!.root.getObjectByName('ThighL')!.quaternion))
+      .toBe(true);
+  });
+
+  it('picks a collapsed worker anywhere along his body: the pick boxes follow the pose (a bind-pose box missed his head)', async () => {
+    const lib = await loadedModelLibrary(['worker_driller']);
+    const inst = lib.instantiate('worker_driller', { size: [1, 1, 1] });
+    inst.node('Hips')!.rotation.z = Math.PI / 2; // flat on his back along +X/−X
+    inst.root.updateMatrixWorld(true);
+    const head = inst.node('Head')!.getWorldPosition(new THREE.Vector3());
+    // Straight down onto where his head now lies, far outside the standing bounds' footprint.
+    expect(Math.abs(head.x)).toBeGreaterThan(inst.bounds.max.x);
+    const ray = new THREE.Raycaster(new THREE.Vector3(head.x, 5, head.z), new THREE.Vector3(0, -1, 0));
+    const hits = ray.intersectObject(inst.root, true);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.every(h => h.object.userData[PICK_KEY] === true)).toBe(true);
+    // And empty air above his standing height no longer selects him.
+    const above = new THREE.Raycaster(new THREE.Vector3(0, 5, 0), new THREE.Vector3(0, -1, 0), 0, 5 - 1.0);
+    expect(above.intersectObject(inst.root, true)).toHaveLength(0);
+  });
+
+  it('culls the worker against a sphere that still holds it lying face-down with its arms flung out', async () => {
+    const lib = await loadedModelLibrary(['worker_driller']);
+    const inst = lib.instantiate('worker_driller', { size: [1, 1, 1] });
+    inst.node('Hips')!.rotation.z = -Math.PI / 2; // collapsed forward along its +X facing
+    inst.node('ShoulderL')!.rotation.x += Math.PI / 2;
+    inst.node('ShoulderR')!.rotation.x -= Math.PI / 2;
+    inst.root.updateMatrixWorld(true);
+    const hull = inst.root.getObjectByName('Rig.outline') as THREE.SkinnedMesh;
+    const sphere = hull.boundingSphere.clone().applyMatrix4(hull.matrixWorld);
+    const v = new THREE.Vector3();
+    let outside = 0;
+    const count = hull.geometry.getAttribute('position').count;
+    for (let i = 0; i < count; i++) {
+      hull.getVertexPosition(i, v).applyMatrix4(hull.matrixWorld);
+      if (!sphere.containsPoint(v)) outside++;
+    }
+    expect(outside).toBe(0);
   });
 });

@@ -48,7 +48,8 @@ import { createLandscapeChunkStreamer, type LandscapeChunkStreamer } from './ter
 import type { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
-import { warmupShaders } from './ShaderWarmup.js';
+import { skinnedMaterialsOf, warmupShaders } from './ShaderWarmup.js';
+import { EMPLOYEE_ROLES, workerModelId } from './models/ModelIds.js';
 import { RampArrowLayer } from './RampArrow.js';
 import { TrafficJamMarkerLayer } from './TrafficJamMarkerLayer.js';
 import { RallyFlagMesh } from './RallyFlagMesh.js';
@@ -230,9 +231,14 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   // Ghosts first appear mid-game — haul orders the moment a blast lands —
   // so compile their materials now, with every light in place, rather than
   // on that frame (#1603). Nothing after this adds a light.
+  // The crew is skinned, a program variant nothing else in the level uses:
+  // compile it now too, or the first worker on screen (the first hire, on a
+  // level with no starting crew) stalls that frame.
+  const crew = EMPLOYEE_ROLES.map(r => modelLibrary.prototype(workerModelId(r))?.root).filter(r => r !== undefined);
   warmupShaders(
     deps.sm.renderer, deps.sm.camera, scene, deps.ghosts.materials, deps.sm.postPipeline.sceneTarget,
     deps.ghosts.materials, // debris ghosts draw instanced (GhostInstanceBatch.ts)
+    skinnedMaterialsOf(crew),
   );
 }
 

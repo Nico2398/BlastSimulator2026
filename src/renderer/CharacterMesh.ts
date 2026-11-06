@@ -1,9 +1,11 @@
 // BlastSimulator2026 — Character Meshes
-// Each employee is a worker minion from the model library (one .glb per
+// Each employee is a skinned worker from the model library (one .glb per
 // role, built in assets/models/blender/workers.py). The role colour tints
-// the overalls and hard hat; injured workers go dark red; dead are removed.
-// Workers turn to face where they walk and waddle while moving — legs and
-// arms swing on the model's own pivot nodes, no skeleton needed.
+// the garment and hard hat; injured workers go dark red; dead are removed.
+// Skin and hair tones vary per employee. Workers turn to face where they
+// walk, and a WorkerAnimator poses the skeleton every frame — a planted-foot
+// walk that becomes a run, a breathing idle, the role's work loop, an
+// exhausted slump, panic while evacuating, the collapse.
 
 import * as THREE from 'three';
 import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
@@ -16,6 +18,9 @@ import {
 import { headingFromDelta, turnToward } from './Heading.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { workerModelId } from './models/ModelIds.js';
+import { WorkerAnimator } from './character/WorkerAnimator.js';
+import { workerRig } from './character/WorkerRig.js';
+import { OVERLAY_Y_KEY } from './TaskProgressBar.js';
 
 // ---------- Role colors (bright, distinct) ----------
 // Exported for the Crew panel's roster avatars (redesign P6) — same hue as
@@ -30,46 +35,88 @@ export const ROLE_COLORS: Record<EmployeeRole, number> = {
 
 // ---------- Status overrides ----------
 const INJURED_COLOR  = 0x993333; // dark red
-const EVACUATING_BLINK_RATE = 3; // blinks per second when evacuating (visual hint)
+/** How far above a worker's own hat top his status icon and progress bar float. */
+const OVERLAY_CLEARANCE = 0.25;
 
 /** Material every worker model exposes for its overalls and hat. */
 export const ROLE_TINT = 'TintRole';
+/** Materials for skin and hair, toned per employee, and for the main garment. */
+export const SKIN_TINT = 'TintSkin';
+export const HAIR_TINT = 'TintHair';
+export const GARMENT_TINT = 'TintGarment';
+
+/**
+ * Each role's garment, apart in value from its role-coloured hard hat so a
+ * worker is not one blob of colour (assets/models/blender/workers.py ships the
+ * same values). Injury turns the garment dark red; the hat keeps the role.
+ */
+export const GARMENT_COLORS: Record<EmployeeRole, number> = {
+  driller: 0x34507e,  // denim overalls
+  blaster: 0x9a8f80,  // scorched ash-khaki coverall
+  driver: 0xff7a1a,   // orange hi-vis vest
+  surveyor: 0x2fa58c, // field-teal jacket
+  manager: 0x343a52,  // charcoal-navy suit
+};
+
+/** Skin tones a crew is drawn from, light to deep. */
+export const SKIN_TONES: readonly number[] = [0xF5D0B0, 0xEAB98E, 0xD9A06F, 0xC68A55, 0xA86B3C, 0x8D5524, 0x6B3F22];
+/** Hair, brow and beard colours. */
+export const HAIR_COLORS: readonly number[] = [0x2A1A12, 0x4A2F1F, 0x6E4224, 0x9A6332, 0x1E1E22, 0x7C7670, 0xB8894A];
+
+/** Stable per-employee pick from a palette (ids are small consecutive integers, so mix them first). */
+export function paletteFor(id: number, palette: readonly number[], salt: number): number {
+  return palette[paletteIndex(id, palette.length, salt)]!;
+}
+
+function paletteIndex(id: number, length: number, salt: number): number {
+  let h = Math.imul(id + 1, 0x9E3779B1) ^ Math.imul(salt, 0x85EBCA77);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2C1B3C6D);
+  h ^= h >>> 12;
+  return (h >>> 0) % length;
+}
+
+/** HSL lightness of a 0xRRGGBB colour, 0..1. */
+function lightness(hex: number): number {
+  const r = (hex >> 16) & 0xff;
+  const g = (hex >> 8) & 0xff;
+  const b = hex & 0xff;
+  return (Math.max(r, g, b) + Math.min(r, g, b)) / 510;
+}
+
+/** How far apart in lightness hair (and with it brows, beard, moustache) must be from the skin it sits on. */
+const HAIR_CONTRAST = 0.14;
+
+/**
+ * An employee's hair colour: their stable pick from HAIR_COLORS, stepping on through the
+ * palette until it stands apart from `skin` — otherwise a dark-haired, deep-skinned face
+ * reads as one brown blob under the hat, brows and moustache lost in it.
+ */
+export function hairFor(id: number, skin: number): number {
+  const start = paletteIndex(id, HAIR_COLORS.length, 2);
+  for (let k = 0; k < HAIR_COLORS.length; k++) {
+    const hair = HAIR_COLORS[(start + k) % HAIR_COLORS.length]!;
+    if (Math.abs(lightness(hair) - lightness(skin)) >= HAIR_CONTRAST) return hair;
+  }
+  return HAIR_COLORS.reduce((a, b) => (Math.abs(lightness(b) - lightness(skin)) > Math.abs(lightness(a) - lightness(skin)) ? b : a));
+}
 /** Stand-in box while the worker asset is not loaded: roughly a minion's envelope. */
 const FALLBACK_SIZE = [0.55, 1.2, 0.55] as const;
 
-// ---------- Walk cycle ----------
-/** Below this ground speed (m/s) a worker stands still. */
-const WALK_SPEED_MIN = 0.05;
-/** Strides per second. */
-const WALK_CYCLE_HZ = 2.4;
-/** Leg / arm swing amplitude (radians) at full stride. */
-const LEG_SWING = 0.6;
-const ARM_SWING = 0.5;
-/** Body bounce per stride (m) and head wobble (radians). */
-const BOB_HEIGHT = 0.035;
-const HEAD_WOBBLE = 0.08;
-/** How fast the gait blends in/out (per second) and how fast a worker turns (rad/s). */
-const STRIDE_BLEND_RATE = 6;
+// ---------- Facing ----------
+/** Below this ground speed (m/s) a worker keeps his heading. */
+const TURN_SPEED_MIN = 0.05;
+/** How fast a worker turns toward where he walks (rad/s). */
 const TURN_RATE = 9;
-
-interface WorkerNodes {
-  head: THREE.Object3D | null;
-  armL: THREE.Object3D | null;
-  armR: THREE.Object3D | null;
-  legL: THREE.Object3D | null;
-  legR: THREE.Object3D | null;
-}
 
 interface CharacterEntry {
   group: THREE.Group;
   instance: ModelInstance;
-  nodes: WorkerNodes;
+  /** Poses the skeleton; null for the stand-in box, which has none. */
+  animator: WorkerAnimator | null;
   employee: Employee;
   evacuating: boolean;
   tween: MovementTween;
-  /** Walk-cycle phase (radians) and how much of the gait is blended in (0..1). */
-  phase: number;
-  stride: number;
   /** Full trail length the span pace is measured against (#1589). */
   fullTrailLength: number;
   /** True while the mesh plays its last spans up to a host marker before removal (#1589). */
@@ -81,13 +128,29 @@ interface CharacterEntry {
 /** Most visible spans a retiring mesh plays; trips in between are skipped. */
 const MAX_RETIRING_SPANS = 2;
 
+/**
+ * Role and injury colours: the hat (and accents) keep the role colour, the
+ * garment its own — dark red when hurt. The stand-in box has only the role
+ * tint, so on it the injury shows there instead.
+ */
+function applyStatusTints(instance: ModelInstance, employee: Employee): void {
+  const garment = instance.tints.get(GARMENT_TINT);
+  const role = instance.tints.get(ROLE_TINT);
+  if (garment) {
+    garment.color.setHex(employee.injured ? INJURED_COLOR : GARMENT_COLORS[employee.role]);
+    role?.color.setHex(ROLE_COLORS[employee.role]);
+  } else {
+    role?.color.setHex(employee.injured ? INJURED_COLOR : ROLE_COLORS[employee.role]);
+  }
+}
+
 // ---------- Main class ----------
 
 export class CharacterMesh {
   private readonly scene: THREE.Scene;
   private readonly library: ModelLibrary;
   private readonly characters = new Map<number, CharacterEntry>();
-  private time = 0;
+  private timeScale = 1;
 
   constructor(scene: THREE.Scene, library: ModelLibrary = modelLibrary) {
     this.scene = scene;
@@ -99,7 +162,7 @@ export class CharacterMesh {
     const exitSpan = exitSpanOf(trail);
     const start = exitSpan?.points[0] ?? employee;
     const group = new THREE.Group();
-    const { instance, nodes } = this.attachModel(group, employee);
+    const { instance, animator } = this.attachModel(group, employee);
     group.position.set(start.x, surfaceY, start.z);
     tagPickable(group, 'employee', employee.id);
     this.scene.add(group);
@@ -112,8 +175,8 @@ export class CharacterMesh {
       startSpanPlayback(tween, [exitSpan], fullTrailLength);
     }
     this.characters.set(employee.id, {
-      group, instance, nodes, employee, evacuating: false,
-      tween, phase: 0, stride: 0, fullTrailLength, retiring: false, gapHidden: false,
+      group, instance, animator, employee, evacuating: false,
+      tween, fullTrailLength, retiring: false, gapHidden: false,
     });
   }
 
@@ -124,9 +187,11 @@ export class CharacterMesh {
    * @param heightAt - Optional terrain height sampler, called with the same
    *   eased (x, z) the tween produces so a character's Y follows the slope
    *   under its feet every frame instead of the last synced cell (#1038).
+   * @param timeScale - The game-speed multiplier: at 4× a worker covers four
+   *   times the ground, and his legs should hurry, not break into a run.
    */
-  update(employees: Employee[], dt: number, heightAt?: (x: number, z: number) => number): void {
-    this.time += dt;
+  update(employees: Employee[], dt: number, heightAt?: (x: number, z: number) => number, timeScale = 1): void {
+    this.timeScale = timeScale;
 
     for (const emp of employees) {
       const entry = this.characters.get(emp.id);
@@ -154,17 +219,11 @@ export class CharacterMesh {
       this.animateGait(entry, eased.x - fromX, eased.z - fromZ, dt);
 
       // Body colour for injury state
-      const roleColor = ROLE_COLORS[emp.role];
-      const targetColor = emp.injured ? INJURED_COLOR : roleColor;
-      entry.instance.tints.get(ROLE_TINT)?.color.setHex(targetColor);
+      applyStatusTints(entry.instance, emp);
 
-      // Blink when evacuating (alpha toggling is expensive; use scale instead)
-      if (entry.evacuating) {
-        const blink = Math.sin(this.time * Math.PI * 2 * EVACUATING_BLINK_RATE) > 0;
-        entry.group.visible = blink;
-      } else {
-        entry.group.visible = true;
-      }
+      // An evacuating worker is never hidden: his panic run, raised arm and
+      // gaping mouth (WorkerAnimator) are the cue.
+      entry.group.visible = true;
     }
   }
 
@@ -263,9 +322,9 @@ export class CharacterMesh {
       if (!entry.instance.isFallback || !this.library.has(workerModelId(entry.employee.role))) continue;
       entry.group.remove(entry.instance.root);
       entry.instance.dispose();
-      const { instance, nodes } = this.attachModel(entry.group, entry.employee);
+      const { instance, animator } = this.attachModel(entry.group, entry.employee);
       entry.instance = instance;
-      entry.nodes = nodes;
+      entry.animator = animator;
     }
   }
 
@@ -297,19 +356,17 @@ export class CharacterMesh {
     this.clearAll();
   }
 
-  private attachModel(group: THREE.Group, employee: Employee): { instance: ModelInstance; nodes: WorkerNodes } {
+  private attachModel(group: THREE.Group, employee: Employee): { instance: ModelInstance; animator: WorkerAnimator | null } {
     const instance = this.library.instantiate(workerModelId(employee.role), { size: FALLBACK_SIZE, tint: ROLE_TINT });
-    const color = employee.injured ? INJURED_COLOR : ROLE_COLORS[employee.role];
-    instance.tints.get(ROLE_TINT)?.color.setHex(color);
+    applyStatusTints(instance, employee);
+    const skin = paletteFor(employee.id, SKIN_TONES, 1);
+    instance.tints.get(SKIN_TINT)?.color.setHex(skin);
+    instance.tints.get(HAIR_TINT)?.color.setHex(hairFor(employee.id, skin));
     group.add(instance.root);
-    const nodes: WorkerNodes = {
-      head: instance.node('Head'),
-      armL: instance.node('ArmL'),
-      armR: instance.node('ArmR'),
-      legL: instance.node('LegL'),
-      legR: instance.node('LegR'),
-    };
-    return { instance, nodes };
+    group.userData[OVERLAY_Y_KEY] = instance.bounds.max.y + OVERLAY_CLEARANCE;
+    const rig = instance.isFallback ? null : workerRig(instance.root);
+    const animator = rig ? new WorkerAnimator(rig, employee.role, employee.id) : null;
+    return { instance, animator };
   }
 
   private tweenTargetIs(entry: CharacterEntry, emp: Employee): boolean {
@@ -351,28 +408,27 @@ export class CharacterMesh {
     return step.finished;
   }
 
-  /** Face the direction of travel and swing limbs while moving; settle back to rest when still. */
+  /** Face the direction of travel, then let the animator pose the body for what the worker is doing. */
   private animateGait(entry: CharacterEntry, dx: number, dz: number, dt: number): void {
     if (dt <= 0) return;
     const speed = Math.hypot(dx, dz) / dt;
-    const moving = speed > WALK_SPEED_MIN;
-    if (moving) {
-      entry.group.rotation.y = turnToward(entry.group.rotation.y, headingFromDelta(dx, dz), TURN_RATE * dt);
-      entry.phase += dt * WALK_CYCLE_HZ * Math.PI * 2;
+    const before = entry.group.rotation.y;
+    if (speed > TURN_SPEED_MIN) {
+      entry.group.rotation.y = turnToward(before, headingFromDelta(dx, dz), TURN_RATE * dt);
     }
-    const target = moving ? 1 : 0;
-    entry.stride += Math.sign(target - entry.stride) * Math.min(Math.abs(target - entry.stride), STRIDE_BLEND_RATE * dt);
-    if (!moving && entry.stride === 0) entry.phase = 0;
-
-    const swing = Math.sin(entry.phase) * entry.stride;
-    const { head, armL, armR, legL, legR } = entry.nodes;
-    // Legs swing forward/back around Z (the model faces +X); arms counter-swing.
-    if (legL) legL.rotation.z = swing * LEG_SWING;
-    if (legR) legR.rotation.z = -swing * LEG_SWING;
-    if (armL) armL.rotation.z = -swing * ARM_SWING;
-    if (armR) armR.rotation.z = swing * ARM_SWING;
-    // Bounce twice per stride cycle and wobble the head side to side once.
-    entry.instance.root.position.y = Math.abs(Math.sin(entry.phase)) * BOB_HEIGHT * entry.stride;
-    if (head) head.rotation.x = Math.sin(entry.phase / 2) * HEAD_WOBBLE * entry.stride;
+    if (!entry.animator) return;
+    let turn = entry.group.rotation.y - before;
+    turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+    const emp = entry.employee;
+    entry.animator.update(dt, {
+      speed,
+      timeScale: this.timeScale,
+      turn: turn / dt,
+      working: emp.taskTicksRemaining !== null && emp.taskTicksRemaining > 0,
+      collapsing: emp.collapsing,
+      evacuating: entry.evacuating,
+      injured: emp.injured,
+      fatigue: emp.fatigue,
+    });
   }
 }
