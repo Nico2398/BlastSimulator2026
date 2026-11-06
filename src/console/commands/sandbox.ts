@@ -14,6 +14,7 @@ import {
   randomSandboxSeed,
   SANDBOX_KITS,
   sandboxLevelDef,
+  recordSandboxStarterSurvey,
   type SandboxConfig,
 } from '../../core/campaign/Sandbox.js';
 import { getAllBiomes, getBiome } from '../../core/world/BiomeCatalog.js';
@@ -23,6 +24,7 @@ import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
+import { resolveStarterDeposit } from '../../core/world/StarterDeposit.js';
 import { vehicleMaxSlopeRatio } from '../../core/entities/Vehicle.js';
 import { isStaffedComposition, resolveStartingSite } from '../../core/state/StartingBuildings.js';
 import { staffedSuffix, parseOptionalStaffedFlag } from './commandUtils.js';
@@ -147,6 +149,18 @@ export function sandboxCommand(
     ...(level.progression ? { vehicleSlopeRatio: vehicleMaxSlopeRatio(true) } : {}),
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   });
+
+  // A previous owner left a free seismic survey over the starter deposit (#2148).
+  if (ctx.grid) {
+    const deposit = resolveStarterDeposit({
+      sizeX: level.gridX, datum: level.datum, sizeZ: level.gridZ, seed: config.seed, climateBias: level.climateBias,
+      mixedRockHardness: level.mixedRockHardness,
+      ...(level.oreDeposits !== undefined ? { oreDeposits: level.oreDeposits } : {}),
+      ...(level.pitMask ? { pitMask: level.pitMask } : {}),
+      ...(level.oreGradeScale !== undefined ? { oreGradeScale: level.oreGradeScale } : {}),
+    });
+    recordSandboxStarterSurvey(ctx.state, ctx.grid, deposit);
+  }
 
   if (level.market) ctx.state.contracts.market = level.market;
   if (level.progression) {

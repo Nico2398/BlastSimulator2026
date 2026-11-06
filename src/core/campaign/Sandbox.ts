@@ -23,7 +23,11 @@ import type { BuildingType, BuildingTier } from '../entities/Building.js';
 import type { LevelDef } from './Level.js';
 import type { GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import type { SurveyResult } from '../mining/SurveyCalc.js';
+import { estimateSurveyResult, type SurveyResult } from '../mining/SurveyCalc.js';
+import { Random } from '../math/Random.js';
+
+/** Surveyor id on the free starter survey: no employee, the previous owner did it. */
+const SANDBOX_PREVIOUS_OWNER_SURVEYOR_ID = -1;
 
 /** Level id a sandbox site runs under. Deliberately not in the campaign catalog. */
 export const SANDBOX_LEVEL_ID = 'sandbox';
@@ -293,9 +297,20 @@ function sumStock(slots: readonly StartingBuildingSlot[]): { explosiveId: string
  * Returns the recorded result, or null when the site has no starter deposit.
  */
 export function recordSandboxStarterSurvey(
-  _state: GameState,
-  _grid: VoxelGrid,
-  _deposit: { x: number; z: number } | null,
+  state: GameState,
+  grid: VoxelGrid,
+  deposit: { x: number; z: number } | null,
 ): SurveyResult | null {
-  throw new Error('not implemented');
+  if (!deposit) return null;
+  const result = estimateSurveyResult(grid, {
+    id: state.nextSurveyId++,
+    method: 'seismic',
+    centerX: deposit.x,
+    centerZ: deposit.z,
+    surveyorId: SANDBOX_PREVIOUS_OWNER_SURVEYOR_ID,
+    skillLevel: 1,
+    completedTick: state.tickCount,
+  }, new Random(state.seed + state.tickCount));
+  state.surveyResults.push(result);
+  return result;
 }
