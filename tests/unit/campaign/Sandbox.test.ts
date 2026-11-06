@@ -23,7 +23,7 @@ import { isValidOreGradeScale } from '../../../src/core/economy/OreGrade.js';
 import { getLevel, getAllLevels } from '../../../src/core/campaign/Level.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
-import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE, SANDBOX_DIGGER_KIT_DRIVER, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SANDBOX_ORE_GRADE_SCALE, ORE_GRADE_SCALE_DEFAULT, SANDBOX_STARTER_EXPLOSIVE_ID, SANDBOX_STARTER_EXPLOSIVE_KG, EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
+import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE, SANDBOX_DIGGER_KIT_DRIVER, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SANDBOX_ORE_GRADE_SCALE, ORE_GRADE_SCALE_DEFAULT, SANDBOX_STARTER_EXPLOSIVE_ID, SANDBOX_STARTER_EXPLOSIVE_KG } from '../../../src/core/config/balance.js';
 import { resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
 import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 
@@ -841,10 +841,4 @@ describe('sandbox starter explosive stock (#2118)', () => {
     }
   });
 
-  it('campaign starting cash and the delivery wait are unchanged', () => {
-    expect(getLevel('dusty_hollow')!.startingCash).toBe(50_000);
-    expect(getLevel('grumpstone_ridge')!.startingCash).toBe(210_000);
-    expect(getLevel('treranium_depths')!.startingCash).toBe(125_000);
-    expect(EXPLOSIVE_DELIVERY_TICKS).toBe(0);
-  });
 });

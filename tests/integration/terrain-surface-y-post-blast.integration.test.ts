@@ -17,7 +17,6 @@ import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { getTerrainSurfaceY } from '../../src/renderer/GameRendererTerrain.js';
 import { getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 /** Mirrors weather-blast.integration.test.ts's drill-to-completion helper. */
@@ -31,12 +30,11 @@ function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, max
 }
 
 /** Mirrors weather-blast.integration.test.ts's charge-to-completion helper. */
-function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 300): void {
+function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = 300): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100; emp.ticksWorked = 0;
     }
-    // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
     fundForDeliveryWait(ctx.state!);
     tickResolvingEvents(cmd => runner.run(cmd));
   }

@@ -31,7 +31,7 @@ import {
   SANDBOX_STARTING_CASH,
   SANDBOX_REFERENCE_CREW_COST_PER_TICK,
   SANDBOX_REFERENCE_SHOT_CYCLE_TICKS,
-  TICKS_PER_DAY, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+  TICKS_PER_DAY } from '../../src/core/config/balance.js';
 import { FORBIDDEN_COMMAND, playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from '../helpers/playthrough.js';
 
 const DESERT = 'desert_badlands';
@@ -418,7 +418,7 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
     // A player pays for and builds the warehouse (#1963): no free placeBuilding.
     expect(stockWarehouse(logged, state, 'krackle', 54).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:6 stemming:2');
-    playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     expect(logged('blast').success).toBe(true);
     // The crater floor joins the haul network; the crew sleeps in a bunkhouse (without one the morale spiral ends in a revolt).
@@ -507,7 +507,7 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
     // A player pays for and builds the warehouse (#1963): no free placeBuilding.
     expect(stockWarehouse(logged, state, 'krackle', 54).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:6 stemming:2');
-    playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     if (!over()) {
       trace.cashAtFirstBlast = state.cash;
@@ -587,7 +587,7 @@ describe('sandbox economy: a supply contract can be filled (#1789)', () => {
     // A player pays for and builds the warehouse (#1963): no free placeBuilding.
     expect(stockWarehouse(logged, state, 'krackle', 72).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:8 stemming:2');
-    playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     expect(logged('blast').success).toBe(true);
 
@@ -637,7 +637,7 @@ describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => 
     // A player pays for and builds the warehouse (#1963): no free placeBuilding.
     expect(stockWarehouse(logged, state, 'krackle', 72).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:8 stemming:2');
-    playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     expect(logged('blast').success).toBe(true);
     playUntil(HORIZON, () => false);
@@ -710,7 +710,7 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
     // A player pays for and builds the warehouse (#1963): no free placeBuilding.
     expect(stockWarehouse(logged, state, 'krackle', 72).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:8 stemming:2');
-    playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     expect(logged('blast').success).toBe(true);
     armed = true;
@@ -776,10 +776,9 @@ describe('sandbox economy: the kit-only opening, no explosive warehouse (#1963)'
     const drill = logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:5 start:${SHOT_START}`);
     expect(drill.success, `drill_plan: ${drill.output}`).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    // The kit owns no explosive warehouse and this test builds none: the order waits EXPLOSIVE_DELIVERY_TICKS (#1895).
     const charge = logged('charge hole:* explosive:krackle amount:4 stemming:2');
     expect(charge.success, `charge (${label()}): ${charge.output}`).toBe(true);
-    playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     const blast = logged('blast');
     expect(blast.success, `blast (${label()}): ${blast.output}`).toBe(true);

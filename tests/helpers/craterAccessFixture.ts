@@ -13,7 +13,6 @@ import { addBlastFragments } from '../../src/core/economy/Logistics.js';
 import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { GENERATED_TERRAIN_GRID_SIZE_Y } from './gameContext.js';
 import { buyChargingTruck, hireDriver, makeRubbleFragment, tickUntilFresh } from './blastFixtures.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 const FLAT_ROCK = { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 };
 
@@ -138,7 +137,7 @@ export function fireLimitShot(site: CraterSite, shot: LimitShot): void {
   const charged = run(`charge hole:* explosive:${shot.explosive} amount:${shot.kgPerHole} stemming:2`) as { success: boolean; output: string };
   expect(charged.output).toBeTruthy();
   if (!charged.success) throw new Error(charged.output);
-  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 6000 + EXPLOSIVE_DELIVERY_TICKS);
+  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 6000);
   if (Object.keys(state.plannedChargesByHole).length !== 0) {
     throw new Error(`charging stalled: ${Object.keys(state.plannedChargesByHole).length} holes; orders=${JSON.stringify(state.pendingActions.filter(a => a.type.includes('charge')).map(a => `${a.type}/${a.status}/${a.blockedReason}/${a.targetX},${a.targetZ}`).slice(0, 4))}`);
   }

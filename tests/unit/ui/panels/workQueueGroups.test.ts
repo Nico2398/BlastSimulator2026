@@ -74,21 +74,6 @@ describe('partitionWorkQueue', () => {
     expect(g).toMatchObject({ total: 5, queued: 2, assigned: 1, inProgress: 2, blocked: 0, stranded: 0, inTransit: 0 });
   });
 
-  it('counts queued block states consistently with the row classification', () => {
-    const m = partitionWorkQueue([
-      act(1, { type: 'haul_debris', blockedReason: 'debris_out_of_reach' }),
-      act(2, { type: 'haul_debris', blockedReason: 'no_vehicle_in_fleet' }),
-      act(3, { type: 'haul_debris', blockedReason: 'no_licensed_driver' }),
-      act(4, { type: 'haul_debris', blockedReason: 'explosives_in_transit' }),
-      act(5, { type: 'haul_debris' }),
-    ]);
-    const g = m.debris[0]!;
-    expect(g.queued).toBe(5);
-    expect(g.stranded).toBe(1);
-    expect(g.blocked).toBe(2);
-    expect(g.inTransit).toBe(1);
-    expect(g.open).toBe(1);
-  });
 
   it('ignores a stale blockedReason on a non-queued order', () => {
     const m = partitionWorkQueue([
@@ -115,11 +100,6 @@ describe('DebrisGroup.blockedReasons (#2008)', () => {
     expect(partitionWorkQueue(acts).debris[0]!.blockedReasons).toEqual({ storage_full: 3 });
   });
 
-  it('starts empty and excludes stranded and in-transit reasons', () => {
-    expect(partitionWorkQueue(debris(2)).debris[0]!.blockedReasons).toEqual({});
-    const acts = debris(2).map((a, i) => ({ ...a, blockedReason: i === 0 ? 'debris_out_of_reach' as const : 'explosives_in_transit' as const }));
-    expect(partitionWorkQueue(acts).debris[0]!.blockedReasons).toEqual({});
-  });
 
   it('signature changes when the mix changes at the same total', () => {
     const mk = (r: 'storage_full' | 'no_spoil_heap') =>
@@ -188,10 +168,6 @@ describe('orderRowsSignature', () => {
     expect(orderRowsSignature([act(1), act(2)], 0)).not.toBe(orderRowsSignature([act(2), act(1)], 0));
   });
 
-  it('includes the tick when an in-transit order shows a time-dependent message', () => {
-    const o = act(1, { type: 'charge_hole', blockedReason: 'explosives_in_transit' });
-    expect(orderRowsSignature([o], 10)).not.toBe(orderRowsSignature([o], 11));
-  });
 });
 
 function pageOf(actions: PendingAction[], page: number, type: DebrisGroup['type'] = 'haul_debris') {

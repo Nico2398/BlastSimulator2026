@@ -125,7 +125,6 @@ describe('tutorialSteps', () => {
       // no dedicated lesson.
       'drill-plan',
       // Stocked explosives load at once; bought at charge time they take
-      // EXPLOSIVE_DELIVERY_TICKS to arrive with the crew idle (#1895).
       'build-explosive-warehouse',
       'stock-explosives',
       'charge',
@@ -443,7 +442,6 @@ describe('tutorialSteps', () => {
   });
 
   // ── explosives stocked before the first charge ───────────────────────────
-  // A cash-bought charge waits EXPLOSIVE_DELIVERY_TICKS with the crew idle
   // (#1895); stock in an explosive warehouse loads at once.
   describe('explosive warehouse and stock before charge', () => {
     const ids = TUTORIAL_STEPS.map((s) => s.id);
@@ -476,9 +474,8 @@ describe('tutorialSteps', () => {
       expect(build.commands).toEqual(['build explosive_warehouse at:7,11']);
     });
 
-    it('build-explosive-warehouse names the delivery wait it avoids', () => {
-      const params = step('build-explosive-warehouse').textParamsFor!(createGame({ seed: 42 }));
-      expect(String(params['duration'])).toMatch(/16/);
+    it('build-explosive-warehouse no longer supplies a delivery countdown', () => {
+      expect(step('build-explosive-warehouse').textParamsFor).toBeUndefined();
     });
 
     it('stock-explosives is complete only once Boomite stock covers every drilled hole at the default charge', () => {

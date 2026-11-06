@@ -20,7 +20,7 @@ import { computeDangerZone, isInZone } from '../../src/core/entities/Zone.js';
 import {
   BLAST_DANGER_MARGIN_M, NAV_MAX_SLOPE_RATIO,
   DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M,
-  CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+  CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M } from '../../src/core/config/balance.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { buildBlastReport } from '../../src/core/mining/BlastExecution.js';
 
@@ -243,7 +243,7 @@ describe('Blast execution — confirmed-but-undrilled holes are not blastable (#
 
     // #554: charging is real work too — drain the ordered charges the same
     // way the drill plan above was drained before blasting.
-    tickFunded(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 800);
+    tickFunded(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
     expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
     expect(Object.keys(state.chargesByHole).length).toBeGreaterThan(0);
 
@@ -280,8 +280,7 @@ describe('Blast execution — outstanding (not yet landed) charge orders are not
     const result = run('blast');
 
     expect(result.success).toBe(false);
-    // #1966: ordered explosives still in delivery read "in transit", not "missing".
-    expect(result.output.toLowerCase()).toContain('in transit');
+    expect(result.output.toLowerCase()).toContain('still loading');
     expect(result.output.toLowerCase()).not.toContain('missing charge');
     expect(Object.keys(state.chargesByHole)).toHaveLength(0);
   });
@@ -305,7 +304,7 @@ describe('Blast execution — #1346', () => {
     tickFunded(run, state, () => state.plannedDrillHoles.length === 0, 2000);
     expect(state.drillHoles.length).toBeGreaterThanOrEqual(3);
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
-    tickFunded(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 3000);
+    tickFunded(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 3000);
     for (const x of [12, 15, 18]) expect(run(`drill_plan add x:${x} z:20 depth:8`).success).toBe(true);
     expect(state.plannedDrillHoles.length).toBeGreaterThan(0);
     const ids = state.drillHoles.map(h => h.id);
@@ -388,7 +387,7 @@ describe('Blast execution — #1346', () => {
     const state = ctx.state!;
     tickFunded(run, state, () => state.plannedDrillHoles.length === 0, 2000);
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
-    tickFunded(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 2000);
+    tickFunded(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 2000);
 
     const result = run('blast');
 
@@ -415,7 +414,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     const topUp = () => { state().cash = Math.max(state().cash, 100000); for (const e of state().employees.employees) e.fatigue = 100; };
     for (let i = 0; i < 600 && state().plannedDrillHoles.length > 0; i++) { topUp(); tickResolvingEvents(run); }
     expect(run('charge hole:* explosive:krackle amount:8 stemming:2').success).toBe(true);
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 2000 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); tickResolvingEvents(run); }
+    for (let i = 0; i < 2000 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); tickResolvingEvents(run); }
     expect(state().drillHoles.length).toBeGreaterThan(0);
     expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
     return { run, ctx, state, topUp, engine };
@@ -830,7 +829,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     for (let i = 0; i < 2500 && !(state().plannedDrillHoles.length === 0 && state().drillHoles.length >= 9); i++) { topUp(); tickResolvingEvents(run); }
     expect(state().drillHoles.length).toBeGreaterThanOrEqual(9);
     expect(run('charge hole:* explosive:krackle amount:8 stemming:2').success).toBe(true);
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 3000 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); tickResolvingEvents(run); }
+    for (let i = 0; i < 3000 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); tickResolvingEvents(run); }
     expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
     return { run, state, topUp };
   }
@@ -1029,7 +1028,7 @@ describe('Blast execution — haulers keep hauling reachable debris past a crate
     tickFunded(run, state(), () => state().plannedDrillHoles.length === 0 && state().drillHoles.length >= 9, 1500);
     expect(state().drillHoles.length).toBeGreaterThanOrEqual(9);
     expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5').success).toBe(true);
-    tickFunded(run, state(), () => Object.keys(state().plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 2500);
+    tickFunded(run, state(), () => Object.keys(state().plannedChargesByHole).length === 0, 2500);
     expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
 
     expect(run('blast detonate').success).toBe(true);
@@ -1196,7 +1195,7 @@ describe('Blast execution — the tutorial plan opens the box cut (#1724)', () =
     tickWhile(() => ctx.state!.plannedDrillHoles.length > 0, 1500);
     expect(ctx.state!.drillHoles.length).toBe(9);
     expect(run(`charge hole:* explosive:boomite amount:${CHARGE_DEFAULT_AMOUNT_KG} stemming:${CHARGE_DEFAULT_STEMMING_M}`).success).toBe(true);
-    tickWhile(() => Object.keys(ctx.state!.plannedChargesByHole).length > 0, EXPLOSIVE_DELIVERY_TICKS + 3000);
+    tickWhile(() => Object.keys(ctx.state!.plannedChargesByHole).length > 0, 3000);
     expect(Object.keys(ctx.state!.plannedChargesByHole)).toHaveLength(0);
 
     const grid = ctx.grid!;

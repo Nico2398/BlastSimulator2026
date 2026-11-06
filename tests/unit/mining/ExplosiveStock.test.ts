@@ -5,11 +5,9 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import { placeBuilding, getBuildingDef } from '../../../src/core/entities/Building.js';
 import { getExplosivesInStock } from '../../../src/core/entities/BuildingWarehouse.js';
 import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
-import { EXPLOSIVE_BULK_PRICE_FACTOR, EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
+import { EXPLOSIVE_BULK_PRICE_FACTOR } from '../../../src/core/config/balance.js';
 import {
-  bulkPricePerKg, drawStockForOrder, buyExplosiveStock, returnOrderStock, explosivePriceFactor, buyStockBlockReason,
-  orderDeliveryTicks, readOrderDeliveryTick, isChargeDeliveryPending, chargeDeliveryArrivalByHole,
-} from '../../../src/core/mining/ExplosiveStock.js';
+  bulkPricePerKg, drawStockForOrder, buyExplosiveStock, returnOrderStock, explosivePriceFactor, buyStockBlockReason } from '../../../src/core/mining/ExplosiveStock.js';
 
 function makeState(cash = 100_000, warehouses = 1, tier: 1 | 2 | 3 = 1): GameState {
   const state = createGame({ seed: 42, startingCash: cash });
@@ -281,92 +279,5 @@ describe('buyStockBlockReason (#1685)', () => {
     expect(state.cash).toBe(cash);
     expect(getExplosivesInStock(state.buildings)).toBe(0);
     expect(state.finances.transactions).toHaveLength(0);
-  });
-});
-
-describe('orderDeliveryTicks (#1895)', () => {
-  it('is 0 when nothing is bought with cash', () => {
-    expect(orderDeliveryTicks(0)).toBe(0);
-  });
-
-  it('is the flat delivery wait for any positive cash-bought kg, however small', () => {
-    expect(orderDeliveryTicks(0.001)).toBe(EXPLOSIVE_DELIVERY_TICKS);
-    expect(orderDeliveryTicks(1)).toBe(EXPLOSIVE_DELIVERY_TICKS);
-  });
-
-  it('is flat: a huge order waits no longer than a small one', () => {
-    expect(orderDeliveryTicks(10_000)).toBe(orderDeliveryTicks(1));
-  });
-
-  it('is 0 for a negative amount', () => {
-    expect(orderDeliveryTicks(-5)).toBe(0);
-  });
-});
-
-describe('readOrderDeliveryTick (#1895)', () => {
-  it('reads the arrival tick from the payload', () => {
-    expect(readOrderDeliveryTick({ payload: { deliveryArrivalTick: 450 } })).toBe(450);
-  });
-
-  it('is undefined when the payload has no arrival tick', () => {
-    expect(readOrderDeliveryTick({ payload: {} })).toBeUndefined();
-  });
-
-  it('is undefined for a non-numeric payload value', () => {
-    expect(readOrderDeliveryTick({ payload: { deliveryArrivalTick: 'soon' } })).toBeUndefined();
-  });
-});
-
-describe('isChargeDeliveryPending (#1895)', () => {
-  const charge = { type: 'charge_hole', payload: { deliveryArrivalTick: 450 } } as const;
-
-  it('does not delay a legacy order with a future arrival tick', () => {
-    expect(isChargeDeliveryPending(charge, 449)).toBe(false);
-    expect(isChargeDeliveryPending(charge, 450)).toBe(false);
-  });
-
-  it('is false without an arrival tick or for other action types', () => {
-    expect(isChargeDeliveryPending({ type: 'charge_hole', payload: {} }, 0)).toBe(false);
-    expect(isChargeDeliveryPending({ type: 'drill_hole', payload: { deliveryArrivalTick: 450 } }, 0)).toBe(false);
-  });
-});
-
-describe('chargeDeliveryArrivalByHole (#1966)', () => {
-  function order(id: number, payload: Record<string, unknown>, type = 'charge_hole'): GameState['pendingActions'][number] {
-    return { id, type, payload } as unknown as GameState['pendingActions'][number];
-  }
-
-  it('ignores legacy arrival ticks on pending orders', () => {
-    const map = chargeDeliveryArrivalByHole({
-      tickCount: 100,
-      pendingActions: [order(1, { holeId: 'H1', deliveryArrivalTick: 500 }), order(2, { holeId: 'H2', deliveryArrivalTick: 520 })],
-    });
-    expect(map.size).toBe(0);
-  });
-
-  it('is empty with no pending actions', () => {
-    expect(chargeDeliveryArrivalByHole({ tickCount: 0, pendingActions: [] }).size).toBe(0);
-  });
-
-  it('ignores an order whose delivery already arrived', () => {
-    const map = chargeDeliveryArrivalByHole({
-      tickCount: 500,
-      pendingActions: [order(1, { holeId: 'H1', deliveryArrivalTick: 500 }), order(2, { holeId: 'H2', deliveryArrivalTick: 501 })],
-    });
-    expect(map.has('H1')).toBe(false);
-    expect(map.has('H2')).toBe(false);
-  });
-
-  it('ignores an order without an arrival tick (stock-covered) and non-charge actions', () => {
-    const map = chargeDeliveryArrivalByHole({
-      tickCount: 0,
-      pendingActions: [order(1, { holeId: 'H1' }), order(2, { holeId: 'H2', deliveryArrivalTick: 400 }, 'drill_hole')],
-    });
-    expect(map.size).toBe(0);
-  });
-
-  it('ignores an order without a holeId', () => {
-    const map = chargeDeliveryArrivalByHole({ tickCount: 0, pendingActions: [order(1, { deliveryArrivalTick: 400 })] });
-    expect(map.size).toBe(0);
   });
 });

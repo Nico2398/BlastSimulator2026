@@ -712,6 +712,21 @@ export function deserialize(json: string): GameState {
   }
 
   dropMalformedBlockedDetails(obj);
+  // Old saves can hold charge orders blocked by the removed delivery system.
+  const pending = obj['pendingActions'];
+  if (Array.isArray(pending)) {
+    for (const action of pending) {
+      if (action?.blockedReason === 'explosives_in_transit') {
+        action.blockedReason = null;
+        const ghosts = obj['ghostPreviews'];
+        if (Array.isArray(ghosts)) {
+          const ghost = ghosts.find(g => g?.id === action.id);
+          if (ghost) ghost.blocked = false;
+        }
+      }
+      if (action?.type === 'charge_hole' && action.payload) delete action.payload.deliveryArrivalTick;
+    }
+  }
 
   // v2 → v3: waitingTicks added to Vehicle interface.
   // Older saves may have vehicles without this field — default to 0.

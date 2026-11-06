@@ -7,7 +7,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
 import { consumeStoredOre } from '../../src/core/economy/Logistics.js';
 import { ORE_DENSITY_KG_M3 } from '../../src/core/config/balance.js';
@@ -36,7 +35,7 @@ function openingBlast(extra: string) {
   expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${SHOT_START}`)).toMatchObject({ success: true });
   tickWhile(run, state, () => state.plannedDrillHoles.length === 0, 1500);
   expect(run('charge hole:* explosive:krackle amount:6 stemming:2')).toMatchObject({ success: true });
-  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 1500);
+  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
   expect(run('blast detonate')).toMatchObject({ success: true });
   tickWhile(run, state, () => state.lastBlastReport !== null, 600);
   expect(state.lastBlastReport).not.toBeNull();

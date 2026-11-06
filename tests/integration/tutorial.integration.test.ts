@@ -37,8 +37,7 @@ import {
   CHARGE_DEFAULT_STEMMING_M,
   ORE_PRICES,
   TUTORIAL_HIRING_SCRIPT,
-  TUTORIAL_ORE_SALE_OFFER, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
-import { earliestChargeDeliveryTick } from '../../src/core/mining/ExplosiveStock.js';
+  TUTORIAL_ORE_SALE_OFFER } from '../../src/core/config/balance.js';
 import { REGION } from '../../src/ui/tutorialStages.js';
 import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, deliverExplosivesNow, type Run, fundForDeliveryWait } from '../helpers/playthrough.js';
 
@@ -213,7 +212,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     deliverExplosivesNow(ctx.state!); // the subject is automatic hauling after the blast, not the delivery wait (#1895)
     // #554: charging is real work too — drain the ordered charges the same
     // way the drill plan above was drained before blasting.
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
@@ -263,7 +262,7 @@ describe('the tutorial no longer refuses to fire on an occupied zone (#1362)', (
       tickResolvingEvents(runCmd);
     }
     expect(runCmd('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
@@ -522,7 +521,7 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
     const step = TUTORIAL_STEPS.find(s => s.id === 'charge')!;
     let sawPartialCharge = false;
 
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
@@ -603,7 +602,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
     // 4. charge
     const chargeStep = TUTORIAL_STEPS.find((s) => s.id === 'charge')!;
     expect(run(chargeStep.commands![0]!).success).toBe(true);
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
       fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of state.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
@@ -706,7 +705,7 @@ describe('panel default parameters on the tutorial square rate good or better (#
       `charge hole:* explosive:boomite amount:${CHARGE_DEFAULT_AMOUNT_KG} stemming:${CHARGE_DEFAULT_STEMMING_M}`,
     );
     expect(charge.success, charge.output).toBe(true);
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
       fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of state.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
       tickResolvingEvents(run);
@@ -761,7 +760,6 @@ describe('full tutorial playthrough ends WON by following the cards then playing
       if (step.id === 'free-play') return;
       const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
       // No delivery allowance for the charge card: the stock-explosives card
-      // stocked its Boomite, so nothing waits on EXPLOSIVE_DELIVERY_TICKS (#1895).
       const maxTicks = Math.max(500, (step.tickBudget ?? 20) * 25);
       const complete = () => step.isComplete(state, snapshot);
 
@@ -799,7 +797,6 @@ describe('full tutorial playthrough ends WON by following the cards then playing
       const driver = state.employees.employees.find((e) => e.role === 'driver');
       for (const cmd of step.commands ?? []) run(cmd.replace('<driverId>', String(driver?.id ?? '')));
       if (step.id === 'charge') {
-        expect(earliestChargeDeliveryTick(state), 'the tutorial charge waits on a delivery instead of loading from stock').toBeNull();
       }
 
       if (step.id === 'sell-ore') {

@@ -23,7 +23,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { recordProfit } from '../../src/core/campaign/Campaign.js';
-import { FREIGHT_WAREHOUSE_CAPACITY_KG, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
 import { getBuildingDef } from '../../src/core/entities/Building.js';
 import { isBarrenFragment } from '../../src/core/economy/SpoilHeaps.js';
 import { haulBlockedReason } from '../../src/core/economy/HaulDispatch.js';
@@ -94,7 +94,7 @@ function fireReferenceShot(cols: number, chargeKg: number): Shot {
   tickUntil(run, state, 600, () => state.plannedDrillHoles.length === 0);
   fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
   run(`charge hole:* explosive:boomite amount:${chargeKg} stemming:2`);
-  tickUntil(run, state, EXPLOSIVE_DELIVERY_TICKS + 600, () => Object.keys(state.plannedChargesByHole).length === 0);
+  tickUntil(run, state, 600, () => Object.keys(state.plannedChargesByHole).length === 0);
   run('sequence auto');
   clearBlastZone(run, state);
   // A dry day: the shot must not depend on which weather window the rig reached the holes in.

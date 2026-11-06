@@ -1,58 +1,26 @@
 // @vitest-environment jsdom
-// BlastSimulator2026 — Charge step stock view: delivery fields (#1895)
-
 import { describe, it, expect } from 'vitest';
-import { createGame, type GameState } from '../../../../src/core/state/GameState.js';
+import { createGame } from '../../../../src/core/state/GameState.js';
 import { placeBuilding } from '../../../../src/core/entities/Building.js';
 import { buyExplosiveStock } from '../../../../src/core/mining/ExplosiveStock.js';
-import { dispatchChargeAction } from '../../../../src/core/mining/ChargeOrder.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../../../src/core/config/balance.js';
-import { buildStockView } from '../../../../src/ui/panels/blastSteps/ChargeStock.js';
-
-function makeState(): GameState {
-  const state = createGame({ seed: 42, startingCash: 100_000 });
-  state.cash = 100_000;
-  state.finances.cash = 100_000;
-  return state;
-}
-
-function withWarehouse(state: GameState, kg: number): void {
-  placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
-  expect(buyExplosiveStock(state, 'boomite', kg).success).toBe(true);
-}
-
-describe('buildStockView delivery fields (#1895)', () => {
-  it('reports the uncovered kg and delivery wait when stock is short', () => {
-    const view = buildStockView(makeState(), ['boomite'], 'boomite', 10, 4, 5);
-    expect(view.uncoveredKg).toBe(20);
-    expect(view.deliveryTicks).toBe(EXPLOSIVE_DELIVERY_TICKS);
-  });
-
-  it('has no uncovered kg and no wait when stock covers the pattern', () => {
-    const state = makeState();
-    withWarehouse(state, 100);
+import { buildStockView, ChargeStockBlock } from '../../../../src/ui/panels/blastSteps/ChargeStock.js';
+describe('charge stock preview without delivery', () => {
+  it('shows the cash shortfall and renders no delivery hints', () => {
+    const state = createGame({ seed: 42, startingCash: 100_000 });
     const view = buildStockView(state, ['boomite'], 'boomite', 10, 4, 5);
-    expect(view.uncoveredKg).toBe(0);
-    expect(view.deliveryTicks).toBe(0);
+    expect(view.paidCash).toBeGreaterThan(0);
+    expect(view.paidFromStockKg).toBe(0);
+    const block = new ChargeStockBlock(() => {}, () => {});
+    block.render(view);
+    expect(block.root.querySelector('[data-info="paid-from"]')).not.toBeNull();
+    expect(block.root.querySelector('[data-info="delivery-hint"]')).toBeNull();
   });
-
-  it('counts only the shortfall as uncovered', () => {
-    const state = makeState();
-    withWarehouse(state, 12);
+  it('uses prepaid warehouse stock without an additional explosive bill', () => {
+    const state = createGame({ seed: 42, startingCash: 100_000 });
+    placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
+    expect(buyExplosiveStock(state, 'boomite', 100).success).toBe(true);
     const view = buildStockView(state, ['boomite'], 'boomite', 10, 4, 5);
-    expect(view.uncoveredKg).toBe(8);
-    expect(view.deliveryTicks).toBe(EXPLOSIVE_DELIVERY_TICKS);
-  });
-
-  it('inTransitUntilTick is null with no order in transit', () => {
-    expect(buildStockView(makeState(), ['boomite'], 'boomite', 10, 1, 5).inTransitUntilTick).toBeNull();
-  });
-
-  it('has no in-transit order after ordering', () => {
-    const state = makeState();
-    state.tickCount = 30;
-    dispatchChargeAction(state, { id: 'H1', x: 10, z: 10 }, { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
-    const view = buildStockView(state, ['boomite'], 'boomite', 10, 1, 5);
-    expect(view.inTransitUntilTick).toBeNull();
+    expect(view.paidCash).toBe(0);
+    expect(view.paidFromStockKg).toBe(20);
   });
 });

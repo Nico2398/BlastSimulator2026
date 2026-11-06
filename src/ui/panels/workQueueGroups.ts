@@ -1,7 +1,7 @@
 /** Pure grouping model for the Operations work queue (#1972): auto-debris orders collapse into one row per type. */
 import type { PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { isAutoDebrisAction, type AutoDebrisActionType } from '../../core/economy/HaulDispatch.js';
-import { classifyQueuedBlock, isInTransitBlock, rankBlockedKinds, tallyBlockedReason } from '../notify/blockedOrders.js';
+import { classifyQueuedBlock, rankBlockedKinds, tallyBlockedReason } from '../notify/blockedOrders.js';
 
 export const DEBRIS_GROUP_PAGE_SIZE = 25;
 
@@ -64,14 +64,12 @@ export function debrisGroupSignature(group: DebrisGroup): string {
 }
 
 /** Signature of a list of order rows (player orders, or one expanded debris page); `tick` included for time-dependent display. */
-export function orderRowsSignature(rows: readonly PendingAction[], tick: number): string {
+export function orderRowsSignature(rows: readonly PendingAction[], _tick: number): string {
   let sig = '';
-  let inTransit = false;
   for (const a of rows) {
     sig += `${a.id}:${a.status}:${a.holderId}:${a.blockedReason ?? ''};`;
-    if (a.status === 'queued' && isInTransitBlock(a)) inTransit = true;
   }
-  return inTransit ? `${sig}@${tick}` : sig;
+  return sig;
 }
 
 /** Number of pages a group of `total` orders spans. */

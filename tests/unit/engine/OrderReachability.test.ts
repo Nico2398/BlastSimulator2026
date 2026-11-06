@@ -50,7 +50,6 @@ import {
   roleShortfall,
   siteVehicleReach,
 } from '../../../src/core/engine/OrderReachability.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { installGradedRamps, bandCentreZ } from '../../helpers/gradedRamps.js';
@@ -443,7 +442,6 @@ describe('classifyQueuedOrders (#1306)', () => {
         state, { id: 'H1', x: IN_A_TARGET.x, z: IN_A_TARGET.z },
         { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
       );
-      state.tickCount += EXPLOSIVE_DELIVERY_TICKS; // explosives have arrived (#1895)
     };
 
     it('requires the charging truck role', () => {
@@ -515,20 +513,6 @@ describe('classifyQueuedOrders (#1306)', () => {
       return state.pendingActions.find(a => a.type === 'charge_hole')!;
     };
 
-    it('is set at dispatch on a reachable charge order whose explosives are in transit, and cleared once they arrive', () => {
-      const state = makeState();
-      const action = chargeOrder(state);
-      expect(action.blockedReason).toBe('explosives_in_transit');
-      expect(ghostOf(state, action.id).unreachable).toBe(false);
-      expect(ghostOf(state, action.id).blocked).toBe(true);
-
-      const revision = state.ghostPreviewsRevision;
-      state.tickCount += EXPLOSIVE_DELIVERY_TICKS;
-      classifyQueuedOrders(state);
-      expect(action.blockedReason ?? null).toBeNull();
-      expect(ghostOf(state, action.id).blocked).toBe(false);
-      expect(state.ghostPreviewsRevision).toBeGreaterThan(revision);
-    });
 
     it('is set on a reachable haul order with no warehouse to unload in', () => {
       const state = makeState();

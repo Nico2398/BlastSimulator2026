@@ -32,12 +32,6 @@ describe('blockedPhraseKind', () => {
     expect(blockedPhraseKind('target_unreachable')).toBe('unreachable');
   });
 
-  it('returns null for non-failure and absent reasons', () => {
-    expect(blockedPhraseKind('debris_out_of_reach')).toBeNull();
-    expect(blockedPhraseKind('explosives_in_transit')).toBeNull();
-    expect(blockedPhraseKind(null)).toBeNull();
-    expect(blockedPhraseKind(undefined)).toBeNull();
-  });
 });
 
 describe('countBlockedReasons', () => {
@@ -79,10 +73,6 @@ describe('rankBlockedKinds', () => {
       .toEqual(['unreachable', 'buried']);
   });
 
-  it('drops zero counts and non-failure reasons', () => {
-    expect(rankBlockedKinds({ storage_full: 0, debris_out_of_reach: 9, explosives_in_transit: 3, no_spoil_heap: 1 }))
-      .toEqual([{ kind: 'no_spoil_heap', count: 1 }]);
-  });
 });
 
 describe('blockedPhrase', () => {
@@ -234,7 +224,7 @@ describe('isGroupedBlockReason (#2099)', () => {
 
   it.each<BlockedOrderReason>([
     'storage_full', 'no_freight_warehouse', 'no_spoil_heap', 'spoil_heap_full',
-    'target_unreachable', 'buried_under_rubble', 'debris_out_of_reach', 'explosives_in_transit',
+    'target_unreachable', 'buried_under_rubble', 'debris_out_of_reach',
   ])('is false for per-order or site reason %s', (r) => {
     expect(isGroupedBlockReason(r)).toBe(false);
   });

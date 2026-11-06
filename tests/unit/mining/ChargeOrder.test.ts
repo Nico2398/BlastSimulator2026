@@ -3,7 +3,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 import { buyExplosiveStock } from '../../../src/core/mining/ExplosiveStock.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import {
@@ -11,7 +10,6 @@ import {
   chargeFundsFailureAmount, isHoleChargeCovered, autoChargeHole, settleAwaitingFundsCharges,
   chargePatternHoles, outstandingChargeBlockedReason,
 } from '../../../src/core/mining/ChargeOrder.js';
-import { earliestChargeDeliveryTick } from '../../../src/core/mining/ExplosiveStock.js';
 
 const BOOMITE_5KG = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
 const COST_5KG = 60; // boomite $12/kg x 5 kg
@@ -352,7 +350,6 @@ describe('dispatchChargeAction delivery wait (#1895)', () => {
     const state = stockedState(100);
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     expect(arrival(state)).toBeUndefined();
-    expect(earliestChargeDeliveryTick(state)).toBeNull();
   });
 
   it('does not stamp an arrival when nothing is stocked', () => {
@@ -409,29 +406,5 @@ describe('dispatchChargeAction delivery wait (#1895)', () => {
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     expect(chargeActions(state)).toHaveLength(1);
     expect(arrival(state)).toBeUndefined();
-  });
-});
-
-describe('earliestChargeDeliveryTick (#1895)', () => {
-  it('is null with no charge orders', () => {
-    expect(earliestChargeDeliveryTick(makeState())).toBeNull();
-  });
-
-  it('has no arrival for new orders', () => {
-    const state = makeState();
-    state.tickCount = 100;
-    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    state.tickCount = 300;
-    dispatchChargeAction(state, hole(2), BOOMITE_5KG);
-    state.tickCount = 150;
-    expect(earliestChargeDeliveryTick(state)).toBeNull();
-  });
-
-  it('ignores orders whose arrival has already passed', () => {
-    const state = makeState();
-    state.tickCount = 0;
-    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    state.tickCount = EXPLOSIVE_DELIVERY_TICKS + 1;
-    expect(earliestChargeDeliveryTick(state)).toBeNull();
   });
 });

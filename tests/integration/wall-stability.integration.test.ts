@@ -19,7 +19,6 @@ import { applyWallSlumps } from '../../src/console/commands/mining/wallSlump.js'
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { drain } from '../../src/core/engine/Steps.js';
 import { findOverheightFaces, runWallStability, gridSurface } from '../../src/core/mining/WallStability.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
 import { setLocale, t } from '../../src/core/i18n/I18n.js';
 
@@ -126,7 +125,7 @@ function blastBesidePit(startCmd: string, mutate?: (state: GameState) => void): 
   expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${ox},${oz}`)).toMatchObject({ success: true });
   for (let i = 0; i < 800 && state.plannedDrillHoles.length > 0; i++) { refresh(state); run('tick 1'); }
   expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
-  for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 800 && Object.keys(state.plannedChargesByHole).length > 0; i++) { refresh(state); run('tick 1'); }
+  for (let i = 0; i < 800 && Object.keys(state.plannedChargesByHole).length > 0; i++) { refresh(state); run('tick 1'); }
   terrainEvents.length = 0;
   expect(run('blast detonate')).toMatchObject({ success: true });
   for (let i = 0; i < 400 && state.lastBlastReport === null; i++) { refresh(state); run('tick 1'); }

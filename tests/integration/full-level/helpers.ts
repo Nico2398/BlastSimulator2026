@@ -10,7 +10,7 @@ import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
-import { VEHICLE_BASE_STATS, EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
+import { VEHICLE_BASE_STATS } from '../../../src/core/config/balance.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 
@@ -159,7 +159,7 @@ export function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): vo
  * Resolves pending events and tops up employee need gauges each tick, same
  * reasoning as driveDrillPlanToCompletion above.
  */
-export function driveChargePlanToCompletion(ctx: GameContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 400): void {
+export function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): void {
   runTickLoop(ctx, maxTicks, {
     topUpNeeds: true,
     topUpCash: true,
@@ -257,7 +257,7 @@ export function performBlast(ctx: GameContext, originX: number, originZ: number,
     amount: '5kg',
     stemming: '2m',
   });
-  driveChargePlanToCompletion(ctx, driveTicks + EXPLOSIVE_DELIVERY_TICKS);
+  driveChargePlanToCompletion(ctx, driveTicks);
   const result = blastCommand(ctx as any, [], {});
   return result.output;
 }

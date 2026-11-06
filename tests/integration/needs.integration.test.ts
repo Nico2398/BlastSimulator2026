@@ -36,7 +36,7 @@ import {
   NEED_DRAIN_RATES,
   MAX_NEED_GAUGE,
   SHIFT_DURATIONS_TICKS,
-  NEED_REST_NO_BUILDING_CAP, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+  NEED_REST_NO_BUILDING_CAP } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -1799,7 +1799,7 @@ describe('#1801 — the debris-hauler driver on long hauls recovers morale under
     until(800, () => state.plannedDrillHoles.length === 0);
     fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
     run('charge hole:* explosive:krackle amount:8 stemming:2');
-    until(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    until(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     // The delivery wait (#1895) now outlasts the harsh control's patience: it revolts before the shot is loaded.
     if (!revolt) {
       clearBlastZone(run, state);

@@ -209,7 +209,7 @@ Each has: energy yield, cost, water sensitivity, charge limits, minimum rock tie
 Examples: Pop-Rock (starter), Big Bada Boom (mid), Dynatomics (endgame).
 Cost: costPerKg x kg is charged when the charge order is placed (finance category `explosives`) and refunded in full if the order is cancelled; firing the blast charges nothing.
 
-**Explosives:** Charge orders are paid when placed and are available immediately; warehouse stock was paid for when purchased and is drawn first. Cancellation refunds an unfilled order.
+**Explosives:** Charge orders are paid when placed and are available immediately; warehouse stock was paid for when purchased and is drawn first. Cancellation refunds an unfilled order. This follows the upfront-payment alternative in the #2143 discussion; pay-on-fill is intentionally not implemented.
 
 Level explosive lists (`availableExplosives`) are enforced in the Charge step and console `charge` (single, `hole:*`, saved-plan queue); sandbox/new_game (no known level) use the full catalog.
 

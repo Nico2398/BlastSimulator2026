@@ -15,8 +15,6 @@ import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { oreEstimateView, oreValueColor, oreValueText } from './oreEstimateDisplay.js';
 import { OreEstimateMemo } from './oreEstimateMemo.js';
-import { chargeDeliveryArrivalByHole } from '../../core/mining/ExplosiveStock.js';
-import { formatGameClock } from '../formatGameClock.js';
 import { permitPreview, type PermitPreview } from './permitPreview.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 
@@ -103,7 +101,7 @@ export class BlastFooter {
   update(state: GameState): void {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const errors = validateBlastPlan(
-      plan, new Set(Object.keys(state.plannedChargesByHole)), chargeDeliveryArrivalByHole(state),
+      plan, new Set(Object.keys(state.plannedChargesByHole)),
     );
     const hasHoles = plan.holes.length > 0;
     const fireOk = hasHoles && errors.length === 0;
@@ -121,11 +119,7 @@ export class BlastFooter {
     const reason = !hasHoles
       ? t('ui.blast_workshop.footer.fire_reason_no_holes')
       : errors[0]
-        ? errors[0].arrivalTick !== undefined
-          ? t('ui.blast_workshop.footer.fire_reason_awaiting_delivery', {
-            hole: errors[0].holeId, when: formatGameClock(errors[0].arrivalTick),
-          })
-          : t('ui.blast_workshop.footer.fire_reason_invalid', { hole: errors[0].holeId, issue: t(errors[0].issue) })
+        ? t('ui.blast_workshop.footer.fire_reason_invalid', { hole: errors[0].holeId, issue: t(errors[0].issue) })
         : null;
 
     const permit = permitPreview(state.grade, plan, state.tickCount);

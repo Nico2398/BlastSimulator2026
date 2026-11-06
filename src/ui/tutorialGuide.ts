@@ -10,7 +10,6 @@ import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
 import type { Vehicle, VehicleState } from '../core/entities/Vehicle.js';
 import { getVehicleReservation } from '../core/entities/Vehicle.js';
-import { earliestChargeDeliveryTick } from '../core/mining/ExplosiveStock.js';
 import type { TutorialStage } from './tutorialStages.js';
 
 /** Marks the body while the tutorial holds the rails. */
@@ -489,10 +488,7 @@ export function decideClock(
   // itself is what stops the ticking that would finish the course (#903).
   // Unlike a stalled walk or a blocked haul, a course in progress is never
   // "stuck": it either keeps counting down or it is already done.
-  // A charge order whose explosives are still in transit (#1895) is the same:
-  // nobody works it until its fixed arrival tick, so its signature never moves,
-  // and holding the clock would stop the very ticks that bring it in.
-  if (trainingActive || earliestChargeDeliveryTick(state) !== null) {
+  if (trainingActive) {
     const signature = workSignature(state);
     return { hold: false, spent, progressSignature: signature, lastProgressTick: tickCount, trainingActive };
   }
