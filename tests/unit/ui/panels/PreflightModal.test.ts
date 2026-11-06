@@ -626,8 +626,8 @@ describe('PreflightModal ore estimate: surveyed ground and nothing broken (#1967
   });
 });
 
-describe('PreflightModal delivery wait (#1966)', () => {
-  function inTransitState(): GameState {
+describe('PreflightModal has no delivery wait (#2143)', () => {
+  function orderedState(): GameState {
     const state = makeState();
     state.tickCount = 280;
     state.cash = 100_000;
@@ -639,23 +639,23 @@ describe('PreflightModal delivery wait (#1966)', () => {
 
   afterEach(() => setLocale('en'));
 
-  it('warns that explosives are on the way, with day, hour and duration and no tick', () => {
+  it('shows no arrival day, hour, duration or tick for an ordered charge', () => {
     const { modal } = makeModal();
     modal.show();
-    modal.update(inTransitState(), 'sunny');
+    modal.update(orderedState(), 'sunny');
 
     const text = modal.root.textContent ?? '';
-    expect(text).toContain('Day 29, 08:00');
-    expect(text).toContain(formatGameDuration(400));
+    expect(text).not.toContain('Day 29, 08:00');
+    expect(text).not.toContain(formatGameDuration(400));
+    expect(text).not.toMatch(/on the way|on their way|arriv/i);
     expect(text).not.toContain('tick');
   });
 
-  it('does not show the loading warning for a hole that is only waiting for delivery', () => {
+  it('shows the loading warning for a hole whose charge order is outstanding', () => {
     const { modal } = makeModal();
     modal.show();
-    modal.update(inTransitState(), 'sunny');
-    expect(modal.root.textContent).not.toContain(t('ui.blast_workshop.preflight.warn_charge_loading', { count: 1 }));
-    expect(modal.root.textContent).not.toContain('still being charged');
+    modal.update(orderedState(), 'sunny');
+    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.warn_charge_loading', { count: 1 }));
   });
 
   it('keeps the loading warning for a hole that is really loading', () => {
@@ -668,12 +668,12 @@ describe('PreflightModal delivery wait (#1966)', () => {
     expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.warn_charge_loading', { count: 1 }));
   });
 
-  it('shows the French clock in French', () => {
+  it('shows no French arrival clock either', () => {
     setLocale('fr');
     const { modal } = makeModal();
     modal.show();
-    modal.update(inTransitState(), 'sunny');
-    expect(modal.root.textContent).toContain('Jour 29, 08h00');
+    modal.update(orderedState(), 'sunny');
+    expect(modal.root.textContent).not.toContain('Jour 29, 08h00');
   });
 });
 

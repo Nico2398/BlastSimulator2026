@@ -24,7 +24,6 @@ import { getLevel } from '../../../src/core/campaign/Level.js';
 import { getOperatingProfit } from '../../../src/core/economy/Finance.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, clearBlastZone, PLAYER_BLAST_VERB, type Run } from '../../helpers/playthrough.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 
 /** Cash credited to the bare site for the payroll of the extra ticks truck-worked charging takes (#1649). */
 const TRUCK_CHARGING_PAYROLL_HEADROOM = 15000;
@@ -133,7 +132,7 @@ function playLevel1(run: Run, state: GameState, style: PlayStyle): void {
     // #1774: 7 kg (CHARGE_DEFAULT_AMOUNT_KG) breaks the 8 m holes out to the surface; 5 kg left the rubble sealed under
     // its cap, where no haul order reaches it, so nothing was sold.
     run('charge hole:* explosive:boomite amount:7 stemming:2');
-    tickUntil(run, state, EXPLOSIVE_DELIVERY_TICKS + 600, () => done() || Object.keys(state.plannedChargesByHole).length === 0);
+    tickUntil(run, state, 600, () => done() || Object.keys(state.plannedChargesByHole).length === 0);
     if (done()) return;
     run('sequence auto');
     clearBlastZone(run, state);

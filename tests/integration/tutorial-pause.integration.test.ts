@@ -18,7 +18,6 @@ import { createRunner } from '../../src/console/createRunner.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
 import { TutorialRails } from '../../src/ui/tutorialRails.js';
 import { makeGameContext } from '../helpers/gameContext.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -155,7 +154,7 @@ describe('Tutorial pause behaviour (#371)', () => {
     expect(runner.run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
     // #554: charging is real work too — drain the ordered charges the same
     // way the drill plan above was drained before blasting.
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100;

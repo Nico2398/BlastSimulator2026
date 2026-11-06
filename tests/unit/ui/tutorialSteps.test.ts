@@ -124,8 +124,7 @@ describe('tutorialSteps', () => {
       // gone, since the speed bar is always player-controlled now and needs
       // no dedicated lesson.
       'drill-plan',
-      // Stocked explosives load at once; bought at charge time they take
-      // EXPLOSIVE_DELIVERY_TICKS to arrive with the crew idle (#1895).
+      // Stocked explosives are drawn at load time, before any cash is spent (#2143).
       'build-explosive-warehouse',
       'stock-explosives',
       'charge',
@@ -443,8 +442,7 @@ describe('tutorialSteps', () => {
   });
 
   // ── explosives stocked before the first charge ───────────────────────────
-  // A cash-bought charge waits EXPLOSIVE_DELIVERY_TICKS with the crew idle
-  // (#1895); stock in an explosive warehouse loads at once.
+  // Stock in an explosive warehouse is drawn at load time ahead of cash (#2143).
   describe('explosive warehouse and stock before charge', () => {
     const ids = TUTORIAL_STEPS.map((s) => s.id);
     const step = (id: string) => TUTORIAL_STEPS.find((s) => s.id === id)!;

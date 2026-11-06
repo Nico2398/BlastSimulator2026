@@ -797,18 +797,6 @@ describe('countQueuedByBlock (#1810)', () => {
     expect(countQueuedByBlock([q(null, 'assigned'), q('no_vehicle_in_fleet', 'in_progress')]))
       .toEqual({ open: 0, blocked: 0, stranded: 0 });
   });
-
-  it('does not count an in-transit charge order as blocked or stranded (#1895)', () => {
-    const counts = countQueuedByBlock([q('explosives_in_transit'), q('explosives_in_transit')]);
-    expect(counts.blocked).toBe(0);
-    expect(counts.stranded).toBe(0);
-  });
-
-  it('in-transit does not disturb the counts of real blocks (#1895)', () => {
-    const counts = countQueuedByBlock([q('explosives_in_transit'), q('no_vehicle_in_fleet'), q('debris_out_of_reach')]);
-    expect(counts.blocked).toBe(1);
-    expect(counts.stranded).toBe(1);
-  });
 });
 
 
@@ -883,15 +871,13 @@ describe('OperationsPanel — grouped debris queue (#1972)', () => {
     expect(text).toContain(t('ui.operations.work_queue_debris_status_part_stranded', { count: 2 }));
   });
 
-  it('counts blocked and in-transit orders in the summary', () => {
+  it('counts blocked orders in the summary', () => {
     const state = makeState();
     debrisOrders(state, 'haul_debris', 5, 100);
     state.pendingActions[0]!.blockedReason = 'no_vehicle_in_fleet';
-    state.pendingActions[1]!.blockedReason = 'explosives_in_transit';
     const { panel } = openPanel(state);
     const text = summary(panel, 'haul_debris').textContent ?? '';
     expect(text).toContain(t('ui.operations.work_queue_debris_status_part_blocked', { count: 1 }));
-    expect(text).toContain(t('ui.operations.work_queue_debris_status_part_in_transit', { count: 1 }));
   });
 
   it('debris group header names the main blocked reason (#2008)', () => {

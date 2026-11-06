@@ -1,4 +1,4 @@
-// BlastSimulator2026 — Unit tests: a charge order is not claimable until its explosives arrive (#1895)
+// BlastSimulator2026 — Unit tests: a charge order is claimable once its hole is drilled and its cash part is covered (#2143, was the #1895 delivery gate)
 
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
@@ -12,34 +12,39 @@ function chargeAction(payload: Record<string, unknown>): PendingAction {
   } as PendingAction;
 }
 
-function stateAt(tick: number): GameState {
-  const state = createGame({ seed: 42, startingCash: 10_000 });
+function stateAt(tick: number, cash = 10_000): GameState {
+  const state = createGame({ seed: 42, startingCash: cash });
+  state.cash = cash;
   state.tickCount = tick;
   return state;
 }
 
-describe('isHoleOrderClaimable delivery gate (#1895)', () => {
-  it('is false before the arrival tick', () => {
-    expect(isHoleOrderClaimable(stateAt(399), chargeAction({ holeId: 'H1', deliveryArrivalTick: 400 }))).toBe(false);
+const PAYLOAD = { holeId: 'H1', explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+
+describe('isHoleOrderClaimable without a delivery gate (#2143)', () => {
+  it('is true at tick 0 on an empty warehouse', () => {
+    expect(isHoleOrderClaimable(stateAt(0), chargeAction(PAYLOAD))).toBe(true);
   });
 
-  it('is true at the arrival tick', () => {
-    expect(isHoleOrderClaimable(stateAt(400), chargeAction({ holeId: 'H1', deliveryArrivalTick: 400 }))).toBe(true);
+  it('ignores a leftover deliveryArrivalTick stamp in the payload', () => {
+    expect(isHoleOrderClaimable(stateAt(5), chargeAction({ ...PAYLOAD, deliveryArrivalTick: 400 }))).toBe(true);
   });
 
-  it('is true after the arrival tick', () => {
-    expect(isHoleOrderClaimable(stateAt(900), chargeAction({ holeId: 'H1', deliveryArrivalTick: 400 }))).toBe(true);
+  it('is true at any later tick', () => {
+    expect(isHoleOrderClaimable(stateAt(900), chargeAction(PAYLOAD))).toBe(true);
   });
 
-  it('is true at once with no arrival stamp', () => {
-    expect(isHoleOrderClaimable(stateAt(0), chargeAction({ holeId: 'H1' }))).toBe(true);
+  it('is false when the cash part of the load exceeds cash', () => {
+    expect(isHoleOrderClaimable(stateAt(0, 59), chargeAction(PAYLOAD))).toBe(false);
   });
 
-  it('old actions without the field stay claimable', () => {
-    expect(isHoleOrderClaimable(stateAt(0), chargeAction({}))).toBe(true);
+  it('is true when cash equals the cost exactly (boundary)', () => {
+    expect(isHoleOrderClaimable(stateAt(0, 60), chargeAction(PAYLOAD))).toBe(true);
   });
 
-  it('is false while in transit even without a holeId', () => {
-    expect(isHoleOrderClaimable(stateAt(5), chargeAction({ deliveryArrivalTick: 400 }))).toBe(false);
+  it('is false while the hole is still waiting to be drilled, whatever the cash', () => {
+    const state = stateAt(0);
+    state.plannedDrillHoles.push({ id: 'H1', x: 5, z: 5, depth: 8, diameter: 0.089 } as GameState['plannedDrillHoles'][number]);
+    expect(isHoleOrderClaimable(state, chargeAction(PAYLOAD))).toBe(false);
   });
 });

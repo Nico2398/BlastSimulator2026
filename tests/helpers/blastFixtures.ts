@@ -8,7 +8,6 @@ import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { MiningContext } from '../../src/console/commands/mining/types.js';
 import { tickResolvingEvents } from '../integration/helpers.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /** Keeps every living employee's fatigue topped up so a long drill/haul run is never derailed by a needs collapse mid-drive (mirrors blast-report-modal-save-load.integration.test.ts's fireBlast helper). */
 function refreshFatigue(state: GameState): void {
@@ -107,7 +106,7 @@ export function drillGridChargeAndBlast(opts: {
   expect(state.drillHoles.length).toBe(holeCount);
 
   expect(run(`charge hole:* explosive:boomite amount:${opts.amount} stemming:2`)).toMatchObject({ success: true });
-  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, tickCap + EXPLOSIVE_DELIVERY_TICKS);
+  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, tickCap);
   expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
 
   expect(run('blast')).toMatchObject({ success: true });

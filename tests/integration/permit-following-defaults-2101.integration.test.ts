@@ -17,7 +17,6 @@ import { preFireCheck } from '../../src/core/economy/PermitLimits.js';
 import {
   CHARGE_DEFAULT_STEMMING_M,
   DRILL_HOLE_DEFAULT_DIAMETER_M,
-  EXPLOSIVE_DELIVERY_TICKS,
   SANDBOX_FLAT_PAD_SIZE,
 } from '../../src/core/config/balance.js';
 import { fundForDeliveryWait, clearBlastZone } from '../helpers/playthrough.js';
@@ -87,7 +86,7 @@ function playDefaultShot(seed: number, kit: 'full' | 'digger'): Played {
   run(`drill_plan grid rows:${GRID_SIDE} cols:${GRID_SIDE} spacing:${SPACING_M} depth:${depthM} start:${pad.x0 + 1},${pad.z0 + 1}`);
   tickWhile(run, state, () => state.plannedDrillHoles.length === 0, 1500);
   run(`charge hole:* explosive:${DEFAULT_EXPLOSIVE} amount:${chargeKg}kg stemming:${CHARGE_DEFAULT_STEMMING_M}m`);
-  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 1500);
+  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
 
   const holesAtFire = state.drillHoles.length;
   const chargesAtFire = { ...state.chargesByHole };
