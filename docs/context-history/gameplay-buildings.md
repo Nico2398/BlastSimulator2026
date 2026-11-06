@@ -67,3 +67,5 @@ Records why the rules in the `gameplay-buildings` skill exist: the issues that i
 ## Types
 
 - Event closures (`out_of_service` modifier): #1568.
+
+- Ore concentrated on warehouse arrival; spoil heap sized to one shot (1,500 t): #2142.

@@ -1889,7 +1889,7 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.55379094495751,
+          "wellBeing": 98.57921283431693,
           "safety": 50,
           "ecology": 98.59524933152728,
           "nuisance": 46.61312332881822
@@ -2691,8 +2691,8 @@
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 97.73292112394476,
-          "safety": 50.00007088669017,
+          "wellBeing": 97.88470939467054,
+          "safety": 50.0000001176043,
           "ecology": 99.55611269906477,
           "nuisance": 49.0152817476619
         },
@@ -3413,7 +3413,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3439,7 +3439,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3462,7 +3462,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3484,53 +3484,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        },
-        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1774 merged with main: pins re-measured on the merged tree (command mode, deterministic); deaths, wellBeing, safety, ecology and nuisance shift with main's changes to haul/blast timing. No behaviour defect; the level still ends as a win. #1871 re-pinned: selling stored ore through ore_sale contracts (rubble contracts take barren rock only) shifts hauling and crew timing; command mode, deterministic, no behaviour defect."
-      },
-      "commandOutcome": "either",
-      "note": "#2043: re-measured (timing butterfly) -- ramps now anchor on the continuous ground height, so carving shifts the clock and RNG stream; the extra casualty is a blast casualty (same blast-zone and projection deaths as before, different victims), and the total of 5 deaths at the end is unchanged."
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 7,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ],
-        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1774 merged with main: pins re-measured on the merged tree (command mode, deterministic); deaths, wellBeing, safety, ecology and nuisance shift with main's changes to haul/blast timing. No behaviour defect; the level still ends as a win. #1871 re-pinned: selling stored ore through ore_sale contracts (rubble contracts take barren rock only) shifts hauling and crew timing; command mode, deterministic, no behaviour defect."
-      },
-      "note": "#2043: re-measured (timing butterfly) -- ramps now anchor on the continuous ground height, so carving shifts the clock and RNG stream; the extra casualty is a blast casualty (same blast-zone and projection deaths as before, different victims), and the total of 5 deaths at the end is unchanged."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3554,7 +3508,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3576,7 +3530,53 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        },
+        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1774 merged with main: pins re-measured on the merged tree (command mode, deterministic); deaths, wellBeing, safety, ecology and nuisance shift with main's changes to haul/blast timing. No behaviour defect; the level still ends as a win. #1871 re-pinned: selling stored ore through ore_sale contracts (rubble contracts take barren rock only) shifts hauling and crew timing; command mode, deterministic, no behaviour defect."
+      },
+      "commandOutcome": "either",
+      "note": "#2043: re-measured (timing butterfly) -- ramps now anchor on the continuous ground height, so carving shifts the clock and RNG stream; the extra casualty is a blast casualty (same blast-zone and projection deaths as before, different victims), and the total of 5 deaths at the end is unchanged."
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 2,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ],
+        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1774 merged with main: pins re-measured on the merged tree (command mode, deterministic); deaths, wellBeing, safety, ecology and nuisance shift with main's changes to haul/blast timing. No behaviour defect; the level still ends as a win. #1871 re-pinned: selling stored ore through ore_sale contracts (rubble contracts take barren rock only) shifts hauling and crew timing; command mode, deterministic, no behaviour defect."
+      },
+      "note": "#2043: re-measured (timing butterfly) -- ramps now anchor on the continuous ground height, so carving shifts the clock and RNG stream; the extra casualty is a blast casualty (same blast-zone and projection deaths as before, different victims), and the total of 5 deaths at the end is unchanged."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3605,7 +3605,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3626,7 +3626,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3657,7 +3657,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -3699,7 +3699,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3722,14 +3722,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 84.2296915648262,
-          "safety": 2.9404,
-          "ecology": 75.87527611050294,
-          "nuisance": 26.03586828097751
+          "wellBeing": 94.77890324631932,
+          "safety": 0,
+          "ecology": 99.95,
+          "nuisance": 46.362573851438476
         },
         "changedBy": {
           "tickCount": 0
@@ -3749,7 +3749,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3772,7 +3772,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3924,7 +3924,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3979,7 +3979,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4002,7 +4002,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4025,7 +4025,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4124,7 +4124,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 2,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4248,7 +4248,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4273,7 +4273,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4295,7 +4295,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4317,7 +4317,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4338,7 +4338,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4361,7 +4361,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4382,7 +4382,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4410,7 +4410,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4429,7 +4429,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4452,7 +4452,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4482,7 +4482,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -4524,7 +4524,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4548,14 +4548,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 95.70533491030928,
-          "safety": 0,
-          "ecology": 86.36798188970309,
-          "nuisance": 28.52385061780983
+          "wellBeing": 95.65804975560397,
+          "safety": 1.98,
+          "ecology": 99.95,
+          "nuisance": 46.02735992480058
         },
         "changedBy": {
           "tickCount": 0
@@ -4575,14 +4575,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 8,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 95.70533491030928,
-          "safety": 0,
-          "ecology": 86.36798188970309,
-          "nuisance": 28.52385061780983
+          "wellBeing": 95.65804975560397,
+          "safety": 1.98,
+          "ecology": 99.95,
+          "nuisance": 46.02735992480058
         },
         "changedBy": {
           "tickCount": 0

@@ -17,6 +17,8 @@ import {
   onGroundMassKg,
   onGroundFragmentData,
   releaseBarrenStoredFragments,
+  concentrateStoredFragment,
+  concentrateStoredOre,
   type LogisticsState,
 } from '../../../src/core/economy/Logistics.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG, ORE_DENSITY_KG_M3 } from '../../../src/core/config/balance.js';
@@ -1213,7 +1215,7 @@ describe('consumeStoredOre releases barren leftover rock to the spoil heap (#169
     expect(state.storedMassKg + totalSpoilKg([heap])).toBeCloseTo(before - 500, 6);
   });
 
-  it('a partial sale keeps the fragment with the right remaining mass and releases nothing', () => {
+  it('a partial sale keeps the fragment, shrunk to its remaining ore, and sends the rock to the heap (#2142)', () => {
     const { state, collectedOre } = singleOreStorage();
     const heap = heapStub();
 
@@ -1222,9 +1224,10 @@ describe('consumeStoredOre releases barren leftover rock to the spoil heap (#169
     expect(result.success).toBe(true);
     const frag = state.fragments.find(f => f.fragment.id === 1)!;
     expect(frag.state).toBe('stored');
-    expect(frag.fragment.mass).toBeCloseTo(750, 6);
-    expect(state.storedMassKg).toBeCloseTo(750, 6);
-    expect(heap.storedSpoilKg).toBe(0);
+    // 750 kg stay after the sale (250 ore + 500 rock); the release also concentrates the leftover ore (#2142): the rock goes to the heap.
+    expect(frag.fragment.mass).toBeCloseTo(250, 6);
+    expect(state.storedMassKg).toBeCloseTo(250, 6);
+    expect(heap.storedSpoilKg).toBeCloseTo(500, 6);
     expect(collectedOre.oreA).toBeCloseTo(200, 6);
   });
 
@@ -1281,7 +1284,10 @@ describe('consumeStoredOre releases barren leftover rock to the spoil heap (#169
     const collectedOre: Record<string, number> = { oreA: 400, oreB: 8 };
     const heap = heapStub();
 
-    consumeStoredOre(state, collectedOre, 'oreA', 400, [heap]);
+    // No heap at the sale: the fragment is not concentrated first (#2142), so the oreB trace is what remains of it.
+    consumeStoredOre(state, collectedOre, 'oreA', 400, []);
+    expect(state.fragments).toHaveLength(1);
+    releaseBarrenStoredFragments(state, collectedOre, [heap]);
 
     expect(state.fragments).toHaveLength(0);
     expect(collectedOre.oreA).toBeCloseTo(0, 6);
@@ -1341,14 +1347,15 @@ describe('releaseBarrenStoredFragments (#1690)', () => {
 
     const released = releaseBarrenStoredFragments(state, collectedOre, [heap]);
 
+    // `released` counts only the barren fragments moved whole; fragment 3 (ore, density 0.5) is also concentrated (#2142): 250 kg of rock to the heap.
     expect(released).toBeCloseTo(1000, 6);
-    expect(heap.storedSpoilKg).toBeCloseTo(1000, 6);
+    expect(heap.storedSpoilKg).toBeCloseTo(1250, 6);
     expect(state.fragments.map(f => f.fragment.id)).toEqual([3]);
-    expect(state.storedMassKg).toBeCloseTo(500, 6);
+    expect(state.storedMassKg).toBeCloseTo(250, 6);
     expect(collectedOre.dirtite).toBeCloseTo(0.2 * 0.5 * 2500, 6);
   });
 
-  it('returns 0 and changes nothing when no stored fragment is barren', () => {
+  it('returns 0 and releases nothing when no stored fragment is barren; the ore fragment is only concentrated (#2142)', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     putInStorage(state, makeStoredFragment(1, 500, 0.2, { dirtite: 0.5 }));
     const collectedOre: Record<string, number> = { dirtite: 250 };
@@ -1356,9 +1363,9 @@ describe('releaseBarrenStoredFragments (#1690)', () => {
 
     expect(releaseBarrenStoredFragments(state, collectedOre, [heap])).toBe(0);
     expect(state.fragments).toHaveLength(1);
-    expect(state.storedMassKg).toBe(500);
+    expect(state.storedMassKg).toBeCloseTo(250, 6);
     expect(collectedOre).toEqual({ dirtite: 250 });
-    expect(heap.storedSpoilKg).toBe(0);
+    expect(heap.storedSpoilKg).toBeCloseTo(250, 6);
   });
 
   it('does not release into room an in-transit haul has reserved on the heap (#1892)', () => {
@@ -1660,7 +1667,9 @@ describe('storage paths at a scaled grade (#1932)', () => {
     expect(b).toBe(a);
     expect(b).toBe(700);
     expect(scaled.fragments.map(f => f.fragment.id)).toEqual([3]);
-    expect(scaled.storedMassKg).toBe(500);
+    // Fragment 3 is ore at both scales and keeps only its ore (#2142): 0.5 x 500 kg unscaled, 0.1 x 500 kg at 0.2.
+    expect(unscaled.storedMassKg).toBeCloseTo(250, 6);
+    expect(scaled.storedMassKg).toBeCloseTo(50, 6);
   });
 
   it('consumeStoredOre rubble draws only fragments barren at the scale', () => {
@@ -1669,5 +1678,414 @@ describe('storage paths at a scaled grade (#1932)', () => {
     expect(result.success).toBe(true);
     expect(state.fragments.map(f => f.fragment.id)).toEqual([3]);
     expect(consumeStoredOre(state, {}, '', 1, [], SCALE).success).toBe(false);
+  });
+});
+
+// ── ore concentration: a stored ore fragment keeps only its ore mass (#2142) ──
+
+describe('concentrateStoredFragment / concentrateStoredOre (#2142)', () => {
+  type Heap = HeapStub & { id?: number };
+  const heapCap = (): number => getBuildingDef('spoil_heap', 1).capacity;
+  const heapWithRoom = (roomKg: number, id?: number): Heap => ({ ...heapStub(heapCap() - roomKg), ...(id === undefined ? {} : { id }) });
+  /** A stored fragment whose mass is volume x 2500, so its ore kg is mass x density. */
+  const stored = (id: number, mass: number, oreDensities: Record<string, number>): FragmentData =>
+    makeStoredFragment(id, mass, mass / ORE_DENSITY_KG_M3, oreDensities);
+  const oreKgIn = (f: FragmentData, ore: string): number => f.volume * (f.oreDensities[ore] ?? 0) * ORE_DENSITY_KG_M3;
+  const trackedOf = (state: LogisticsState, id: number) => state.fragments.find(f => f.fragment.id === id)!;
+  /** One 1000 kg fragment, 500 kg of it oreA, in storage. */
+  function oneOre(densities: Record<string, number> = { oreA: 0.5 }, mass = 1000) {
+    const state = createLogisticsState(TEST_STORAGE_KG);
+    putInStorage(state, stored(1, mass, densities));
+    return { state, tracked: trackedOf(state, 1) };
+  }
+
+  describe('concentrateStoredFragment', () => {
+    it('shrinks the fragment to its ore mass, debits storedMassKg, credits the heap and returns the remainder', () => {
+      const { state, tracked } = oneOre();
+      const heap = heapWithRoom(10_000);
+      const before = heap.storedSpoilKg;
+
+      const moved = concentrateStoredFragment(state, tracked, [heap]);
+
+      expect(moved).toBeCloseTo(500, 6);
+      expect(tracked.fragment.mass).toBeCloseTo(500, 6);
+      expect(state.storedMassKg).toBeCloseTo(500, 6);
+      expect(heap.storedSpoilKg - before).toBeCloseTo(500, 6);
+    });
+
+    it('keeps the fragment stored, in its warehouse and tracked under the same id', () => {
+      const { state, tracked } = oneOre();
+      concentrateStoredFragment(state, tracked, [heapWithRoom(10_000)]);
+
+      expect(state.fragments).toHaveLength(1);
+      expect(trackedOf(state, 1)).toBe(tracked);
+      expect(tracked.state).toBe('stored');
+      expect(tracked.warehouseId).toBe(1);
+    });
+
+    it('leaves the ore kg inside the fragment unchanged', () => {
+      const { state, tracked } = oneOre();
+      const before = oreKgIn(tracked.fragment, 'oreA');
+      expect(before).toBeCloseTo(500, 6);
+
+      concentrateStoredFragment(state, tracked, [heapWithRoom(10_000)]);
+
+      expect(oreKgIn(tracked.fragment, 'oreA')).toBeCloseTo(before, 6);
+      expect(tracked.fragment.volume).toBeLessThan(0.4);
+    });
+
+    it('keeps every ore of a mixed fragment at its exact kg', () => {
+      const { state, tracked } = oneOre({ oreA: 0.3, oreB: 0.2 });
+
+      const moved = concentrateStoredFragment(state, tracked, [heapWithRoom(10_000)]);
+
+      expect(moved).toBeCloseTo(500, 6);
+      expect(oreKgIn(tracked.fragment, 'oreA')).toBeCloseTo(300, 6);
+      expect(oreKgIn(tracked.fragment, 'oreB')).toBeCloseTo(200, 6);
+      expect(tracked.fragment.mass).toBeCloseTo(500, 6);
+    });
+
+    it('conserves mass: what the warehouse loses is what the heap gains', () => {
+      const { state, tracked } = oneOre({ oreA: 0.2 }, 800);
+      const heap = heapWithRoom(10_000);
+      const stateBefore = state.storedMassKg;
+      const heapBefore = heap.storedSpoilKg;
+
+      const moved = concentrateStoredFragment(state, tracked, [heap]);
+
+      expect(moved).toBeCloseTo(640, 6);
+      expect(stateBefore - state.storedMassKg).toBeCloseTo(moved, 6);
+      expect(heap.storedSpoilKg - heapBefore).toBeCloseTo(moved, 6);
+    });
+
+    it('does nothing and returns 0 with no heap', () => {
+      const { state, tracked } = oneOre();
+
+      expect(concentrateStoredFragment(state, tracked, [])).toBe(0);
+      expect(concentrateStoredFragment(state, tracked, [{ type: 'freight_warehouse', tier: 1, storedSpoilKg: 0 }])).toBe(0);
+      expect(tracked.fragment.mass).toBe(1000);
+      expect(tracked.fragment.volume).toBeCloseTo(0.4, 9);
+      expect(state.storedMassKg).toBe(1000);
+    });
+
+    it('does nothing when no heap holds the whole remainder', () => {
+      const { state, tracked } = oneOre();
+      const heap = heapWithRoom(499);
+
+      expect(concentrateStoredFragment(state, tracked, [heap])).toBe(0);
+      expect(heap.storedSpoilKg).toBe(heapCap() - 499);
+      expect(tracked.fragment.mass).toBe(1000);
+      expect(state.storedMassKg).toBe(1000);
+    });
+
+    it('moves the remainder into a heap whose room is exactly the remainder (boundary)', () => {
+      const { state, tracked } = oneOre();
+      const heap = heapWithRoom(500);
+
+      expect(concentrateStoredFragment(state, tracked, [heap])).toBeCloseTo(500, 6);
+      expect(heap.storedSpoilKg).toBeCloseTo(heapCap(), 6);
+    });
+
+    it('never splits the remainder across heaps: a full first heap is skipped, the second takes all of it', () => {
+      const { state, tracked } = oneOre();
+      const first = heapWithRoom(300);
+      const second = heapWithRoom(10_000);
+
+      expect(concentrateStoredFragment(state, tracked, [first, second])).toBeCloseTo(500, 6);
+      expect(first.storedSpoilKg).toBe(heapCap() - 300);
+      expect(second.storedSpoilKg).toBeCloseTo(heapCap() - 10_000 + 500, 6);
+    });
+
+    it('credits the first heap that has room when several do', () => {
+      const { state, tracked } = oneOre();
+      const first = heapWithRoom(10_000);
+      const second = heapWithRoom(10_000);
+
+      concentrateStoredFragment(state, tracked, [first, second]);
+
+      expect(first.storedSpoilKg).toBeCloseTo(heapCap() - 10_000 + 500, 6);
+      expect(second.storedSpoilKg).toBe(heapCap() - 10_000);
+    });
+
+    it('counts room net of the kg reserved on the heap by in-flight hauls', () => {
+      const { state, tracked } = oneOre();
+      const heap = heapWithRoom(800, 7);
+
+      expect(concentrateStoredFragment(state, tracked, [heap], new Map([[7, 400]]))).toBe(0);
+      expect(heap.storedSpoilKg).toBe(heapCap() - 800);
+      expect(concentrateStoredFragment(state, tracked, [heap], new Map([[7, 300]]))).toBeCloseTo(500, 6);
+    });
+
+    it('leaves a pure-ore fragment (no remainder) untouched and returns 0', () => {
+      const { state, tracked } = oneOre({ oreA: 1 });
+      const heap = heapWithRoom(10_000);
+
+      expect(concentrateStoredFragment(state, tracked, [heap])).toBe(0);
+      expect(tracked.fragment.mass).toBe(1000);
+      expect(state.storedMassKg).toBe(1000);
+      expect(heap.storedSpoilKg).toBe(heapCap() - 10_000);
+    });
+
+    it('leaves a fragment whose densities sum past 1 untouched and returns 0', () => {
+      const { state, tracked } = oneOre({ oreA: 0.7, oreB: 0.6 });
+      const heap = heapWithRoom(10_000);
+
+      expect(concentrateStoredFragment(state, tracked, [heap])).toBe(0);
+      expect(tracked.fragment.mass).toBe(1000);
+      expect(state.storedMassKg).toBe(1000);
+      expect(heap.storedSpoilKg).toBe(heapCap() - 10_000);
+    });
+
+    it('does not touch a fragment that is not stored', () => {
+      for (const fragmentState of ['on_ground', 'in_transit'] as const) {
+        const state = createLogisticsState(TEST_STORAGE_KG);
+        const tracked = { fragment: stored(1, 1000, { oreA: 0.5 }), state: fragmentState, vehicleId: null, warehouseId: null };
+        state.fragments.push(tracked);
+        const heap = heapWithRoom(10_000);
+
+        expect(concentrateStoredFragment(state, tracked, [heap]), fragmentState).toBe(0);
+        expect(tracked.fragment.mass, fragmentState).toBe(1000);
+        expect(heap.storedSpoilKg, fragmentState).toBe(heapCap() - 10_000);
+      }
+    });
+
+    it('is idempotent: a second call on the same fragment moves nothing', () => {
+      const { state, tracked } = oneOre();
+      const heap = heapWithRoom(10_000);
+      concentrateStoredFragment(state, tracked, [heap]);
+      const heapAfterFirst = heap.storedSpoilKg;
+
+      expect(concentrateStoredFragment(state, tracked, [heap])).toBeCloseTo(0, 6);
+      expect(heap.storedSpoilKg).toBeCloseTo(heapAfterFirst, 6);
+      expect(state.storedMassKg).toBeCloseTo(500, 6);
+    });
+  });
+
+  describe('concentrateStoredOre', () => {
+    it('concentrates every stored ore fragment and returns the total kg moved', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      putInStorage(state, stored(1, 1000, { oreA: 0.5 }));
+      putInStorage(state, stored(2, 800, { oreB: 0.25 }));
+      const heap = heapWithRoom(100_000);
+
+      const moved = concentrateStoredOre(state, [heap]);
+
+      expect(moved).toBeCloseTo(500 + 600, 6);
+      expect(trackedOf(state, 1).fragment.mass).toBeCloseTo(500, 6);
+      expect(trackedOf(state, 2).fragment.mass).toBeCloseTo(200, 6);
+      expect(state.storedMassKg).toBeCloseTo(700, 6);
+      expect(heap.storedSpoilKg - (heapCap() - 100_000)).toBeCloseTo(1100, 6);
+    });
+
+    it('goes oldest first: with room for one remainder, the earlier fragment is concentrated', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      putInStorage(state, stored(1, 1000, { oreA: 0.5 }));
+      putInStorage(state, stored(2, 1000, { oreA: 0.5 }));
+
+      const moved = concentrateStoredOre(state, [heapWithRoom(600)]);
+
+      expect(moved).toBeCloseTo(500, 6);
+      expect(trackedOf(state, 1).fragment.mass).toBeCloseTo(500, 6);
+      expect(trackedOf(state, 2).fragment.mass).toBe(1000);
+    });
+
+    it('a later, smaller remainder still fits after an earlier one left too little room for the next big one', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      putInStorage(state, stored(1, 1000, { oreA: 0.5 }));
+      putInStorage(state, stored(2, 1000, { oreA: 0.5 }));
+      putInStorage(state, stored(3, 400, { oreA: 0.5 }));
+
+      const moved = concentrateStoredOre(state, [heapWithRoom(750)]);
+
+      expect(moved).toBeCloseTo(700, 6);
+      expect(trackedOf(state, 1).fragment.mass).toBeCloseTo(500, 6);
+      expect(trackedOf(state, 2).fragment.mass).toBe(1000);
+      expect(trackedOf(state, 3).fragment.mass).toBeCloseTo(200, 6);
+    });
+
+    it('returns 0 and changes nothing with no heap or on empty storage', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      expect(concentrateStoredOre(state, [heapWithRoom(10_000)])).toBe(0);
+      putInStorage(state, stored(1, 1000, { oreA: 0.5 }));
+
+      expect(concentrateStoredOre(state, [])).toBe(0);
+      expect(trackedOf(state, 1).fragment.mass).toBe(1000);
+      expect(state.storedMassKg).toBe(1000);
+    });
+
+    it('leaves pure-ore and over-dense fragments untouched', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      putInStorage(state, stored(1, 1000, { oreA: 1 }));
+      putInStorage(state, stored(2, 1000, { oreA: 0.7, oreB: 0.6 }));
+
+      expect(concentrateStoredOre(state, [heapWithRoom(100_000)])).toBe(0);
+      expect(state.storedMassKg).toBe(2000);
+    });
+
+    it('ignores on-ground and in-transit fragments', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      state.fragments.push({ fragment: stored(1, 1000, { oreA: 0.5 }), state: 'on_ground', vehicleId: null, warehouseId: null });
+      state.fragments.push({ fragment: stored(2, 1000, { oreA: 0.5 }), state: 'in_transit', vehicleId: 'v1', warehouseId: 1 });
+
+      expect(concentrateStoredOre(state, [heapWithRoom(100_000)])).toBe(0);
+      expect(state.fragments.map(f => f.fragment.mass)).toEqual([1000, 1000]);
+    });
+
+    it('does not spend heap room an in-flight haul has reserved', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      putInStorage(state, stored(1, 1000, { oreA: 0.5 }));
+      state.fragments.push({ fragment: stored(2, 700, {}), state: 'in_transit', vehicleId: 'v1', warehouseId: 7 });
+      const heap = heapWithRoom(1000, 7);
+
+      expect(concentrateStoredOre(state, [heap])).toBe(0);
+      expect(heap.storedSpoilKg).toBe(heapCap() - 1000);
+      expect(trackedOf(state, 1).fragment.mass).toBe(1000);
+    });
+
+    it('leaves barren stored fragments to releaseBarrenStoredFragments', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      putInStorage(state, stored(1, 1000, { oreA: 0.01 }));
+      const heap = heapWithRoom(100_000);
+
+      expect(concentrateStoredOre(state, [heap])).toBe(0);
+      expect(trackedOf(state, 1).fragment.mass).toBe(1000);
+      expect(heap.storedSpoilKg).toBe(heapCap() - 100_000);
+    });
+
+    it('reads the grade scale: a fragment barren at scale 1 is ore, and concentrated, at scale 0.5', () => {
+      const build = () => {
+        const state = createLogisticsState(TEST_STORAGE_KG);
+        putInStorage(state, stored(1, 1000, { oreA: 0.015 }));
+        return state;
+      };
+      const unscaled = build();
+      expect(concentrateStoredOre(unscaled, [heapWithRoom(100_000)], 1)).toBe(0);
+      const scaled = build();
+
+      expect(concentrateStoredOre(scaled, [heapWithRoom(100_000)], 0.5)).toBeCloseTo(985, 6);
+      expect(trackedOf(scaled, 1).fragment.mass).toBeCloseTo(15, 6);
+    });
+
+    it('is idempotent', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      putInStorage(state, stored(1, 1000, { oreA: 0.5 }));
+      const heap = heapWithRoom(100_000);
+      concentrateStoredOre(state, [heap]);
+
+      expect(concentrateStoredOre(state, [heap])).toBeCloseTo(0, 6);
+      expect(state.storedMassKg).toBeCloseTo(500, 6);
+    });
+  });
+
+  describe('selling after concentration still delivers the exact kg', () => {
+    it('a partial sale takes exactly the requested ore kg and debits collectedOre by it', () => {
+      const { state, tracked } = oneOre();
+      const collectedOre: Record<string, number> = { oreA: 500 };
+      const heap = heapWithRoom(100_000);
+      concentrateStoredFragment(state, tracked, [heap]);
+
+      const result = consumeStoredOre(state, collectedOre, 'oreA', 200, [heap]);
+
+      expect(result.success).toBe(true);
+      expect(result.consumedKg).toBeCloseTo(200, 6);
+      expect(collectedOre.oreA).toBeCloseTo(300, 6);
+      expect(oreKgIn(trackedOf(state, 1).fragment, 'oreA')).toBeCloseTo(300, 6);
+      expect(state.storedMassKg).toBeCloseTo(300, 6);
+    });
+
+    it('selling all of the concentrated ore empties storage and leaves nothing for the heap', () => {
+      const { state, tracked } = oneOre();
+      const collectedOre: Record<string, number> = { oreA: 500 };
+      const heap = heapWithRoom(100_000);
+      concentrateStoredFragment(state, tracked, [heap]);
+      const heapBefore = heap.storedSpoilKg;
+
+      const result = consumeStoredOre(state, collectedOre, 'oreA', 500, [heap]);
+
+      expect(result.success).toBe(true);
+      expect(result.consumedKg).toBeCloseTo(500, 6);
+      expect(state.fragments).toHaveLength(0);
+      expect(state.storedMassKg).toBeCloseTo(0, 6);
+      expect(collectedOre.oreA).toBeCloseTo(0, 6);
+      expect(heap.storedSpoilKg).toBeCloseTo(heapBefore, 6);
+    });
+
+    it('a mixed fragment sells one ore at its exact kg and keeps the other', () => {
+      const { state, tracked } = oneOre({ oreA: 0.3, oreB: 0.2 });
+      const collectedOre: Record<string, number> = { oreA: 300, oreB: 200 };
+      const heap = heapWithRoom(100_000);
+      concentrateStoredFragment(state, tracked, [heap]);
+
+      const result = consumeStoredOre(state, collectedOre, 'oreA', 300, [heap]);
+
+      expect(result.consumedKg).toBeCloseTo(300, 6);
+      expect(collectedOre.oreA).toBeCloseTo(0, 6);
+      expect(collectedOre.oreB).toBeCloseTo(200, 6);
+      expect(oreKgIn(trackedOf(state, 1).fragment, 'oreB')).toBeCloseTo(200, 6);
+    });
+
+    it('rejects a sale larger than the ore that is there', () => {
+      const { state, tracked } = oneOre();
+      const collectedOre: Record<string, number> = { oreA: 500 };
+      concentrateStoredFragment(state, tracked, [heapWithRoom(100_000)]);
+
+      expect(consumeStoredOre(state, collectedOre, 'oreA', 501, []).success).toBe(false);
+      expect(collectedOre.oreA).toBe(500);
+    });
+  });
+
+  describe('releaseBarrenStoredFragments also concentrates (#2142)', () => {
+    it('once a heap exists, stored ore fragments shrink to their ore and the remainder is credited', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      putInStorage(state, stored(1, 1000, { oreA: 0.5 }));
+      const collectedOre: Record<string, number> = { oreA: 500 };
+      const heap = heapWithRoom(100_000);
+
+      releaseBarrenStoredFragments(state, collectedOre, [heap]);
+
+      expect(trackedOf(state, 1).fragment.mass).toBeCloseTo(500, 6);
+      expect(state.storedMassKg).toBeCloseTo(500, 6);
+      expect(heap.storedSpoilKg - (heapCap() - 100_000)).toBeCloseTo(500, 6);
+      expect(collectedOre.oreA).toBeCloseTo(500, 6);
+    });
+
+    it('with no heap it stays whole', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      putInStorage(state, stored(1, 1000, { oreA: 0.5 }));
+
+      releaseBarrenStoredFragments(state, { oreA: 500 }, []);
+
+      expect(trackedOf(state, 1).fragment.mass).toBe(1000);
+      expect(state.storedMassKg).toBe(1000);
+    });
+
+    it('still removes barren fragments and concentrates the ore ones in the same pass', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      putInStorage(state, stored(1, 400, {}));
+      putInStorage(state, stored(2, 1000, { oreA: 0.5 }));
+      const heap = heapWithRoom(100_000);
+
+      releaseBarrenStoredFragments(state, { oreA: 500 }, [heap]);
+
+      expect(state.fragments.map(f => f.fragment.id)).toEqual([2]);
+      expect(trackedOf(state, 2).fragment.mass).toBeCloseTo(500, 6);
+      expect(state.storedMassKg).toBeCloseTo(500, 6);
+      expect(heap.storedSpoilKg - (heapCap() - 100_000)).toBeCloseTo(900, 6);
+    });
+
+    it('a sale of ore also concentrates the stored ore it did not touch', () => {
+      const state = createLogisticsState(TEST_STORAGE_KG);
+      putInStorage(state, stored(1, 1000, { oreA: 0.5 }));
+      putInStorage(state, stored(2, 1000, { oreB: 0.5 }));
+      const collectedOre: Record<string, number> = { oreA: 500, oreB: 500 };
+      const heap = heapWithRoom(100_000);
+
+      const result = consumeStoredOre(state, collectedOre, 'oreA', 500, [heap]);
+
+      expect(result.consumedKg).toBeCloseTo(500, 6);
+      expect(trackedOf(state, 2).fragment.mass).toBeCloseTo(500, 6);
+      expect(collectedOre.oreB).toBeCloseTo(500, 6);
+      expect(state.storedMassKg).toBeCloseTo(500, 6);
+    });
   });
 });

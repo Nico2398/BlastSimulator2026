@@ -150,7 +150,7 @@ describe('hauling barren rock to a spoil heap (#1530)', () => {
     expect(vehicle.cargo).toEqual([]);
   });
 
-  it('an ore fragment still goes to the warehouse and leaves the heap empty', () => {
+  it('an ore fragment still goes to the warehouse; only its barren half is sent on to the heap (#2142)', () => {
     const { run, state, vehicle } = haulSite();
     addBlastFragments(state.logistics, [rich(9101, 5, 6, 900)], state.navGrid);
     syncHaulDispatch(state);
@@ -160,9 +160,10 @@ describe('hauling barren rock to a spoil heap (#1530)', () => {
     tickUntil(run, () => stateOf(state, 9101)?.state === 'stored', 1500);
 
     expect(stateOf(state, 9101)!.state).toBe('stored');
-    expect(state.logistics.storedMassKg).toBe(storedBefore + 900);
+    // The fragment is 50% ore: the warehouse keeps 450 kg, the other 450 kg of rock is credited to the heap on arrival.
+    expect(state.logistics.storedMassKg).toBe(storedBefore + 450);
     expect(state.collectedOre['blingite']).toBeGreaterThan(0);
-    expect(totalSpoilKg(state.buildings.buildings)).toBe(0);
+    expect(totalSpoilKg(state.buildings.buildings)).toBe(450);
   });
 
   it('a heap trip is not limited by free warehouse room: barren rock beyond the tier-1 warehouse capacity dumps at the heap', () => {
@@ -330,6 +331,7 @@ describe('seeded blast with a heap and a warehouse (#1530)', () => {
   it('warehouse mass equals the ore-bearing delivered fragments; heap mass equals the barren delivered fragments', () => {
     const { run, state } = drillChargeAndBlast(18, 10, 3, 5_000_000);
     const initial = new Map(state.logistics.fragments.map(f => [f.fragment.id, f.fragment]));
+    const initialMass = new Map(state.logistics.fragments.map(f => [f.fragment.id, f.fragment.mass])); // the fragments shrink in place when concentrated (#2142)
     expect([...initial.values()].some(f => isBarrenFragment(f.oreDensities))).toBe(true);
     expect([...initial.values()].some(f => !isBarrenFragment(f.oreDensities))).toBe(true);
 
@@ -362,7 +364,10 @@ describe('seeded blast with a heap and a warehouse (#1530)', () => {
       if (isBarrenFragment(f.oreDensities) && !onGroundIds.has(id)) deliveredBarrenKg += f.mass;
     }
     expect(deliveredBarrenKg).toBeGreaterThan(0);
-    expect(totalSpoilKg(state.buildings.buildings)).toBeCloseTo(deliveredBarrenKg, 3);
+    // The heap also holds the barren remainder of every delivered ore fragment (#2142): its initial mass less what the warehouse kept.
+    let concentratedKg = 0;
+    for (const f of stored) concentratedKg += initialMass.get(f.fragment.id)! - f.fragment.mass;
+    expect(totalSpoilKg(state.buildings.buildings)).toBeCloseTo(deliveredBarrenKg + concentratedKg, 3);
     expectNoWorldInvariantViolations(state);
   });
 });
@@ -438,7 +443,8 @@ describe('rock left after an ore sale leaves the warehouse as spoil (#1690)', ()
     tickUntil(run, () => stateOf(state, 9801)?.state === 'stored', 1500);
 
     expect(stateOf(state, 9801)!.state).toBe('stored');
-    expect(state.logistics.storedMassKg).toBeCloseTo(MASS, 3);
+    // The ore fragment is 50% ore: the warehouse keeps half of it (#2142).
+    expect(state.logistics.storedMassKg).toBeCloseTo(MASS / 2, 3);
   });
 
   it('the heap keeps growing while the warehouse cycles: barren rock hauled after the sale adds to the released rock', () => {
@@ -506,7 +512,8 @@ describe('barren rock yields to ore hauls (#1870): small site', () => {
     tickUntil(run, () => stateOf(state, 9810)?.state === 'stored', 4000);
 
     expect(stateOf(state, 9810)?.state).toBe('stored');
-    expect(totalSpoilKg(state.buildings.buildings)).toBe(0);
+    // Only the ore piece's own barren half (200 of 400 kg, concentrated on arrival, #2142) is on the heap: no barren pile was hauled.
+    expect(totalSpoilKg(state.buildings.buildings)).toBe(200);
     expect(near.every(f => stateOf(state, f.id)?.state === 'on_ground')).toBe(true);
   });
 
@@ -519,7 +526,7 @@ describe('barren rock yields to ore hauls (#1870): small site', () => {
     tickUntil(run, () => near.every(f => stateOf(state, f.id) === undefined) && stateOf(state, 9830)?.state === 'stored', 8000);
 
     expect(stateOf(state, 9830)?.state).toBe('stored');
-    expect(totalSpoilKg(state.buildings.buildings)).toBe(1200);
+    expect(totalSpoilKg(state.buildings.buildings)).toBe(1200 + 200); // three barren piles plus the ore piece's own barren half (#2142)
   });
 
   it('control: barren rock alone is still cleared to the heap by the driver', () => {

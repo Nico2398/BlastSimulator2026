@@ -2362,8 +2362,9 @@ describe('deserialize — stored barren fragments are released to the heap (#169
     const restored = deserialize(legacySave(true));
     const heap = restored.buildings.buildings.find(b => b.type === 'spoil_heap')!;
     expect(restored.logistics.fragments.map(f => f.fragment.id)).toEqual([2]);
-    expect(restored.logistics.storedMassKg).toBeCloseTo(500, 6);
-    expect(heap.storedSpoilKg).toBeCloseTo(800, 6);
+    // The ore fragment (500 kg, density 0.5) is concentrated on load too (#2142): 250 kg of ore stay, 250 kg of rock join the heap.
+    expect(restored.logistics.storedMassKg).toBeCloseTo(250, 6);
+    expect(heap.storedSpoilKg).toBeCloseTo(1050, 6);
     expect(restored.collectedOre['dirtite']).toBeCloseTo(250, 6);
   });
 
