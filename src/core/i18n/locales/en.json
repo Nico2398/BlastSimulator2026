@@ -4569,7 +4569,7 @@
   "mining.ramp_spiral.not_on_rim": "The start tile is not on the rim of a pit. Pick a tile next to the drop.",
   "mining.crater_access.no_start": "No reachable ground to start an access ramp from.",
   "mining.crater_access.too_shallow": "The crater floor is too shallow for an access ramp.",
-  "mining.access_ramp.no_plan": "No access ramp can be planned into the stranded crater.",
+  "mining.crater_access.severs_network": "A ramp there would cut the vehicle network off from the rest of the site.",
   "mining.build_ramp.suggest_none": "No access ramp to propose: nothing is out of reach, or one is already being dug. Draw your own with the ramp tool (build_ramp).",
   "mining.build_ramp.suggest_manual": "Draw one yourself with the ramp tool (build_ramp).",
   "mining.build_ramp.suggest_preview": "Proposed access ramp: {length} m, ${cost}, frees {orders} orders. Order it with: build_ramp suggest order ({line})",

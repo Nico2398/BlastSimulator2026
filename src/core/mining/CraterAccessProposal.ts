@@ -11,9 +11,6 @@ export type AccessRampProposal =
   | { ok: true; def: RampDef; cost: number; length: number; orderCount: number; line: string }
   | { ok: false; reasonKey: string };
 
-/** Reason shown when orders are stranded but no ramp can be planned into their crater. */
-const ACCESS_NO_PLAN_KEY = 'mining.access_ramp.no_plan';
-
 /** True while an access ramp (not a repair or a widening) still has segments to dig. */
 function accessRampBeingDug(state: Pick<GameState, 'plannedRamps'>): boolean {
   return state.plannedRamps.some(p => p.repairOf === undefined && p.widenOf === undefined && p.segments.some(s => !s.done));
@@ -28,13 +25,16 @@ export function proposeAccessRamp(state: GameState, grid: VoxelGrid): AccessRamp
   if (surface === null) return null;
   const floors = strandedFloors(state, grid, surface);
   if (floors.length === 0 || accessRampBeingDug(state)) return null;
+  // The refusal told when no floor can be ramped is the top floor's.
+  let refusalKey: string | null = null;
   for (const floor of floors) {
-    const plan = planKeepingRoads(state, grid, floor, surface, []);
-    if (plan === null) continue;
+    const why = { reasonKey: 'mining.crater_access.no_start' };
+    const plan = planKeepingRoads(state, grid, floor, surface, [], why);
+    if (plan === null) { refusalKey ??= why.reasonKey; continue; }
     return {
       ok: true, def: plan.def, cost: plan.cost, length: rampTotalLength(rampPathOf(plan.def).legs),
       orderCount: floor.orderCount, line: buildRampCommand(plan.def),
     };
   }
-  return { ok: false, reasonKey: ACCESS_NO_PLAN_KEY };
+  return { ok: false, reasonKey: refusalKey ?? 'mining.crater_access.no_start' };
 }

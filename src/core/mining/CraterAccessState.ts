@@ -178,15 +178,17 @@ const ACCESS_RESCUE_MAX_RUN_M = 10;
  */
 export function planKeepingRoads(
   state: GameState, grid: VoxelGrid, floor: AccessFloor, surface: AccessSurface, avoid: readonly RampFootprint[],
+  refusal?: { reasonKey: string },
 ): { def: RampDef; cost: number } | null {
   const plan = (toward: { x: number; z: number } | null, minDropM: number): { def: RampDef; cost: number } | null => {
     const setAside = [...avoid];
     for (let attempt = 0; attempt < ACCESS_PLAN_ATTEMPTS; attempt++) {
       const planned = planCraterAccess(floor, surface, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH, setAside, state.builtRamps, toward, minDropM);
-      if (!planned.ok) return null;
+      if (!planned.ok) { if (refusal) refusal.reasonKey = planned.reasonKey; return null; }
       if (keepsVehicleNetwork(state, grid, planned.def)) return planned;
       setAside.push(rampFootprint(planned.def, rampWidthOf(planned.def)));
     }
+    if (refusal) refusal.reasonKey = 'mining.crater_access.severs_network';
     return null;
   };
   if (!floor.holdsCrew) return plan(nearestHaulDepot(state, floor), RAMP_CRATER_MIN_DROP_M);

@@ -4569,7 +4569,7 @@
   "mining.ramp_spiral.not_on_rim": "La case de départ n'est pas sur le bord d'une fosse. Choisissez une case contre le vide.",
   "mining.crater_access.no_start": "Aucun terrain accessible pour amorcer une rampe d'accès.",
   "mining.crater_access.too_shallow": "Le fond du cratère est trop peu profond pour une rampe d'accès.",
-  "mining.access_ramp.no_plan": "Aucune rampe d'accès ne peut être tracée jusqu'au cratère isolé.",
+  "mining.crater_access.severs_network": "Une rampe à cet endroit couperait le réseau des véhicules du reste du site.",
   "mining.build_ramp.suggest_none": "Aucune rampe d'accès à proposer : rien n'est hors d'atteinte, ou une rampe est déjà en creusement. Tracez la vôtre avec l'outil rampe (build_ramp).",
   "mining.build_ramp.suggest_manual": "Tracez-en une vous-même avec l'outil rampe (build_ramp).",
   "mining.build_ramp.suggest_preview": "Rampe d'accès proposée : {length} m, {cost} $, libère {orders} ordres. Commandez-la avec : build_ramp suggest order ({line})",
