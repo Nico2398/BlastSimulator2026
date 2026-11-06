@@ -30,7 +30,9 @@ describe('Shareholder Summit — competent strategy wins', () => {
       { seed: 42, biome: 'volcanic_flats', kit: 'digger', strategy: 'ladder', horizon },
       (engine) => {
         _unlockShareholderSummit(engine.ctx.campaignProfile.campaign);
-        return runCommand(engine, `campaign start level:${LEVEL_ID}`).success;
+        const started = runCommand(engine, `campaign start level:${LEVEL_ID}`).success;
+        engine.ctx.state!.contracts.autoSell = false; // the scripted ladder trades by contract (#2145)
+        return started;
       },
     );
 

@@ -22,6 +22,7 @@ function closedSite() {
   const run = (cmd: string) => runner.run(cmd);
   expect(run('new_game seed:42 size:48 cash:500000')).toMatchObject({ success: true });
   const state = ctx.state!;
+  state.contracts.autoSell = false; state.contracts.autoClearRubble = false; // stock under test must not be sold off or cleared (#2145)
   const id = addFreightWarehouseToState(state, 20, 20, 1);
   stockWarehouse(state, id, storedFragment(1, MASS, { iron: ORE_KG / MASS }));
   addModifier(

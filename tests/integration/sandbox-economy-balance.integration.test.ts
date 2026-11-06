@@ -48,6 +48,7 @@ function startSandbox(biome: string, seed: number, kit = 'digger', extra = ''): 
   const { runner, ctx } = createRunner();
   const res = runner.run(`sandbox start biome:${biome} kit:${kit} seed:${seed} ${extra}`.trim());
   expect(res.success, res.output).toBe(true);
+  ctx.state!.contracts.autoSell = false; ctx.state!.contracts.autoClearRubble = false; // stock under test must not be sold off (#2145)
   return { run: (c) => runner.run(c), ctx };
 }
 

@@ -356,6 +356,7 @@ describe('Blast-destroyed Freight Warehouse stock loss (#1372)', () => {
   it('emits logistics:warehouse_stock_lost with the lost kg and prints the console line', () => {
     const ctx = makeCtx();
     const state = ctx.state!;
+    state.contracts.autoSell = false; state.contracts.autoClearRubble = false; // stock under test must not be sold off or cleared (#2145)
     const id = addFreightWarehouseToState(state, 14, 14);
     state.logistics.fragments.push({
       fragment: {
