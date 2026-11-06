@@ -45,6 +45,12 @@ interface ManifestModel {
   emissive: string[];
   materials: string[];
   nodes: Record<string, ManifestNode>;
+  /**
+   * Skinned models only: every bone the renderer can pose, mapped to its
+   * parent bone (null for a root bone), in hierarchy order. A rigid model
+   * has no such key.
+   */
+  bones?: Record<string, string | null>;
 }
 
 interface ModelManifest {
@@ -108,8 +114,20 @@ function triangleCount(geometry: THREE.BufferGeometry): number {
   return count / 3;
 }
 
+/** Every bone under `scene`, depth first, with its parent bone; null when the model has no skeleton. */
+function skeletonOf(scene: THREE.Object3D): Record<string, string | null> | null {
+  const bones: Record<string, string | null> = {};
+  let found = false;
+  scene.traverse(obj => {
+    if (!(obj instanceof THREE.Bone)) return;
+    bones[obj.name] = obj.parent instanceof THREE.Bone ? obj.parent.name : null;
+    found = true;
+  });
+  return found ? bones : null;
+}
+
 /** Read one exported asset into its manifest entry. */
-async function describeModel(id: string, dir = MODELS_DIR): Promise<ManifestModel> {
+export async function describeModel(id: string, dir = MODELS_DIR): Promise<ManifestModel> {
   const file = resolve(dir, `${id}.glb`);
   const buffer = readFileSync(file);
   const scene = await parse(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
@@ -137,13 +155,17 @@ async function describeModel(id: string, dir = MODELS_DIR): Promise<ManifestMode
         if (e.r + e.g + e.b > 0) emissive.add(material.name);
       }
       child.geometry.computeBoundingBox();
-      bounds.union((child.geometry.boundingBox as THREE.Box3).clone().applyMatrix4(child.matrixWorld));
+      // A skinned primitive's own transform is ignored when it is drawn: its
+      // bind matrix alone places its vertices in the bind pose.
+      const toScene = child instanceof THREE.SkinnedMesh ? child.bindMatrix : child.matrixWorld;
+      bounds.union((child.geometry.boundingBox as THREE.Box3).clone().applyMatrix4(toScene));
     });
     triangles += nodeTriangles;
     nodes[node.name] = { triangles: Math.round(nodeTriangles), parts: [...parts].sort() };
   }
 
   const size = bounds.getSize(new THREE.Vector3());
+  const bones = skeletonOf(scene);
   return {
     builder: builderModule(id),
     triangles: Math.round(triangles),
@@ -154,6 +176,7 @@ async function describeModel(id: string, dir = MODELS_DIR): Promise<ManifestMode
     emissive: [...emissive].sort(),
     materials: [...materials].sort(),
     nodes,
+    ...(bones ? { bones } : {}),
   };
 }
 

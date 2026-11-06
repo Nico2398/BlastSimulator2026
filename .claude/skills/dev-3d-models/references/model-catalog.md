@@ -8,17 +8,25 @@ The per-id data — nodes, parts, materials, size, triangles, builder module —
 is generated into `assets/models/manifest.json`; read that entry before
 editing a model.
 
-## Workers — `workers.py`
+## Workers — `workers.py`, `worker_face.py`, `worker_props.py`
 
 `worker_<role>` for `driller`, `blaster`, `driver`, `surveyor`, `manager`.
 
-One model per role, no tiers. Big round head on an egg body, stubby capsule
-limbs, oversized boots and hands, hard hat in the role colour, and the tool of
-the trade in hand. Manager gets a tie and a coffee mug; surveyor a hi-vis
-stripe.
+One skinned model per role, no tiers: a continuous body on the crew skeleton,
+about three heads tall, a big expressive head under a hard hat in the role
+colour, and the tool of the trade in hand.
 
-Nodes: `Head`, `Torso`, `ArmL`, `ArmR`, `LegL`, `LegR`. Tint: `TintRole`
-(overalls and hat, recoloured per role and injury). Height 1.1–1.6 m.
+| Role | Caricature | Tool |
+|------|------------|------|
+| driller | The muscle: barrel chest, Popeye forearms, square bearded jaw, denim overalls over a tee, work gloves, the standard ridged hard hat with a big headlamp, red ear defenders on arms clipped to it | Cartoon pneumatic jackhammer, carried by one end of its T-handle; at rest he leans on it |
+| blaster | The lunatic: wiry and stooped, narrow head, pointed chin, wild lashed eyes, singed hair puffing out past the brim of a dented hat worn askew, goggles, soot on his cheeks, ash-khaki coverall, dynamite on a leather bandolier and a bundle strapped to his back | Red plunger detonator box, dangling by its T-handle |
+| driver | The slab: door-wide shoulders, no neck, wide flat head, a bump cap with a long trucker visor and a reflective plate, gold-rimmed shades low on the nose, stubble, a smirk and a toothpick, an open hi-vis vest | Oversize steel wrench with an orange grip, slung on the shoulder |
+| surveyor | The nerd: tall and narrow, long neck, egg head, buck teeth, round glasses, a pith helmet with a target sticker, teal sweater vest over a white shirt with a pocket protector, olive trousers, a red-and-white survey staff slung across his back | Big clipboard and a pencil |
+| manager | The fat cat: short legs, belly out, jowls, heavy smug lids, waxed handlebar moustache, cigar, a bowler with a tall gold band and badge, charcoal-navy suit with lapels and a straining gold button, red tie, a gold watch chain, a pointing finger on its own bone | Diner coffee mug |
+
+Bones: see the skinned-workers row of the runtime contract. Tints: `TintRole`
+(hat and accents), `TintGarment` (clothes; injury), `TintSkin`, `TintHair`.
+Height 1.1–1.6 m.
 
 ## Vehicles — `vehicles_t1.py` / `vehicles.py` / `vehicles_t3.py`
 

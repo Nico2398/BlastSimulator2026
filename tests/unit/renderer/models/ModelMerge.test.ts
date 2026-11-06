@@ -36,6 +36,7 @@ function makeScene(): THREE.Group {
 describe('buildPrototype', () => {
   it('keeps one node per top-level child, with its name and transform', () => {
     const proto = buildPrototype(makeScene());
+    expect(proto.skinned).toBe(false);
     expect(proto.root.children.map(c => c.name)).toEqual(['Body', 'WheelFL']);
     expect(proto.root.children[0]!.position.y).toBeCloseTo(0.5);
     expect(proto.root.children[1]!.position.toArray()).toEqual([1, 0.4, 1]);

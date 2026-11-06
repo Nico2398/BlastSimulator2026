@@ -289,15 +289,23 @@ def cast(ob: bpy.types.Object, factor: float = 0.5, shape: str = 'SPHERE') -> bp
     return m
 
 
-def boolean(ob: bpy.types.Object, cutter: bpy.types.Object, op: str = 'DIFFERENCE') -> bpy.types.BooleanModifier:
+def boolean(ob: bpy.types.Object, cutter: bpy.types.Object, op: str = 'DIFFERENCE') -> None:
+    """Cut `ob` with `cutter`, baking the result into `ob`'s mesh and deleting the cutter.
+
+    The cut is applied at once rather than left as a live modifier: the glTF
+    exporter in Blender 5 exports a cutter however it is hidden (hidden,
+    render-disabled, or in a view-layer-excluded collection), and a stray
+    cutter ships as a visible box. Modifiers already on `ob` (a Bevel) stay
+    live and act on the cut shape.
+    """
     m = ob.modifiers.new('Boolean', 'BOOLEAN')
     m.operation = op
     m.object = cutter
     m.solver = 'EXACT'
-    cutter.hide_render = True
-    cutter.hide_viewport = True
-    cutter.display_type = 'WIRE'
-    return m
+    with bpy.context.temp_override(object=ob, active_object=ob, selected_objects=[ob], selected_editable_objects=[ob]):
+        bpy.ops.object.modifier_move_to_index(modifier=m.name, index=0)
+        bpy.ops.object.modifier_apply(modifier=m.name)
+    bpy.data.objects.remove(cutter, do_unlink=True)
 
 
 # ----------------------------------------------------------- hierarchy ---
@@ -371,9 +379,27 @@ def save_blend(name: str) -> str:
 
 
 def export_glb(name: str) -> str:
-    """Export the whole scene as one binary glTF with modifiers applied, Y-up, no textures."""
+    """Export the whole scene as one binary glTF with modifiers applied, Y-up, no textures.
+
+    A scene holding an armature (the worker crew, built by character.py) is a
+    skinned character: its export also carries the skin and the bones, and is
+    then compacted (`compact_skinned_glb`). It carries no clips — the renderer
+    poses the bones itself. Every other model exports with skins, animations
+    and extras off.
+    """
     os.makedirs(GLB_DIR, exist_ok=True)
     path = os.path.join(GLB_DIR, f'{name}.glb')
+    skinned = any(o.type == 'ARMATURE' for o in bpy.context.scene.objects)
+    extra = dict(
+        export_animation_mode='ACTIONS',
+        export_force_sampling=True,
+        export_optimize_animation_size=True,
+        export_def_bones=True,
+        export_all_influences=False,
+        export_reset_pose_bones=True,
+        export_frame_range=False,
+        export_anim_slide_to_zero=True,
+    ) if skinned else {}
     bpy.ops.export_scene.gltf(
         filepath=path,
         export_format='GLB',
@@ -384,15 +410,152 @@ def export_glb(name: str) -> str:
         export_materials='EXPORT',
         export_image_format='NONE',
         export_attributes=False,
-        export_animations=False,
-        export_skins=False,
+        export_animations=skinned,
+        export_skins=skinned,
         export_morph=False,
         export_lights=False,
         export_cameras=False,
-        export_extras=False,
+        export_extras=skinned,
         use_selection=False,
+        **extra,
     )
+    if skinned:
+        compact_skinned_glb(path)
     return path
+
+
+def compact_skinned_glb(path: str) -> None:
+    """Shrink a skinned character's .glb in place, losslessly where it can be.
+
+    Two passes, both glTF core and both read natively by three.js:
+    * Skin weights: Blender writes WEIGHTS_0 as four floats per vertex — the
+      biggest attribute in a skinned character. They are rewritten as
+      normalized unsigned bytes, rounded so each vertex's still sum to
+      exactly 255; 1/255 steps are far finer than any visible blend.
+    * Buffer views: Blender writes one view per accessor, and for a character
+      of many parts their JSON outweighs the weights. Accessors of one kind
+      are packed into a shared view instead, each at its own offset, and
+      float32 bounds and transforms are written with the nine digits that
+      name them exactly.
+    Deterministic, so a rebuild stays byte-identical.
+    """
+    import json
+    import struct
+
+    with open(path, 'rb') as f:
+        data = f.read()
+    json_len = struct.unpack_from('<I', data, 12)[0]
+    gltf = json.loads(data[20:20 + json_len])
+    bin_start = 20 + json_len + 8
+    bin_len = struct.unpack_from('<I', data, 20 + json_len)[0]
+    blob = data[bin_start:bin_start + bin_len]
+    views = gltf['bufferViews']
+    accessors = gltf['accessors']
+
+    def view_bytes(i: int) -> bytes:
+        v = views[i]
+        off = v.get('byteOffset', 0)
+        return blob[off:off + v['byteLength']]
+
+    weight_ids = sorted({p['attributes']['WEIGHTS_0'] for mesh in gltf.get('meshes', []) for p in mesh['primitives']
+                         if 'WEIGHTS_0' in p['attributes']})
+    new_views: list[tuple[dict, bytes]] = [(dict(v), view_bytes(i)) for i, v in enumerate(views)]
+    for a in weight_ids:
+        acc = accessors[a]
+        if acc['componentType'] != 5126:
+            continue
+        raw = view_bytes(acc['bufferView'])
+        stride = views[acc['bufferView']].get('byteStride', 16)
+        base = acc.get('byteOffset', 0)
+        out = bytearray()
+        for k in range(acc['count']):
+            w = struct.unpack_from('<4f', raw, base + k * stride)
+            total = sum(w) or 1.0
+            scaled = [x / total * 255 for x in w]
+            q = [int(math.floor(x)) for x in scaled]
+            short = 255 - sum(q)
+            order = sorted(range(4), key=lambda i: (-(scaled[i] - q[i]), i))
+            for i in order[:short]:
+                q[i] += 1
+            out += bytes(q)
+        new_views.append(({'buffer': 0, 'byteLength': len(out), 'target': 34962}, bytes(out)))
+        acc['bufferView'] = len(new_views) - 1
+        acc['byteOffset'] = 0
+        acc['componentType'] = 5121
+        acc['normalized'] = True
+        acc.pop('min', None)
+        acc.pop('max', None)
+
+    # Pack every tightly packed accessor of one kind (target, component, type)
+    # into a single shared buffer view at its own offset. Blender writes a view
+    # per accessor — hundreds of them for a character of many parts — and the
+    # JSON describing them outweighed the weights it was meant to shrink.
+    comp_size = {5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4}
+    n_comp = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4, 'MAT2': 4, 'MAT3': 9, 'MAT4': 16}
+    groups: dict[tuple, tuple[dict, bytearray]] = {}
+    for idx, acc in enumerate(accessors):
+        if 'bufferView' not in acc:
+            continue
+        v, raw = new_views[acc['bufferView']]
+        if v.get('byteStride'):
+            key = ('own', acc['bufferView'])
+            view, blob_out = groups.setdefault(key, (dict(v), bytearray()))
+            if not blob_out:
+                blob_out += raw
+            continue
+        size = comp_size[acc['componentType']] * n_comp[acc['type']] * acc['count']
+        start = acc.get('byteOffset', 0)
+        key = (v.get('target'), acc['componentType'], acc['type'])
+        view, blob_out = groups.setdefault(key, ({'buffer': 0, **({'target': v['target']} if 'target' in v else {})}, bytearray()))
+        while len(blob_out) % 4:
+            blob_out.append(0)
+        acc['byteOffset'] = len(blob_out)
+        blob_out += raw[start:start + size]
+        acc['bufferView'] = key
+    packed = bytearray()
+    final_views = []
+    index_of: dict[tuple, int] = {}
+    for key, (view, blob_out) in groups.items():
+        while len(packed) % 4:
+            packed.append(0)
+        view = dict(view)
+        view['byteOffset'] = len(packed)
+        view['byteLength'] = len(blob_out)
+        packed += blob_out
+        index_of[key] = len(final_views)
+        final_views.append(view)
+    while len(packed) % 4:
+        packed.append(0)
+    for acc in accessors:
+        if 'bufferView' in acc:
+            k = acc['bufferView']
+            acc['bufferView'] = index_of[k if isinstance(k, tuple) else ('own', k)]
+            if acc.get('byteOffset') == 0:
+                acc.pop('byteOffset')
+    gltf['bufferViews'] = final_views
+    gltf['buffers'][0]['byteLength'] = len(packed)
+
+    # The data is float32: nine significant digits name each value exactly,
+    # where Python's float64 repr spends seventeen.
+    def f32(x):
+        return float('%.9g' % struct.unpack('<f', struct.pack('<f', x))[0]) if isinstance(x, float) else x
+    for acc in accessors:
+        for key in ('min', 'max'):
+            if key in acc:
+                acc[key] = [f32(x) for x in acc[key]]
+    for node in gltf.get('nodes', []):
+        for key in ('translation', 'rotation', 'scale'):
+            if key in node:
+                node[key] = [f32(x) for x in node[key]]
+    js = json.dumps(gltf, separators=(',', ':')).encode('utf8')
+    js += b' ' * ((4 - len(js) % 4) % 4)
+    total = 12 + 8 + len(js) + 8 + len(packed)
+    with open(path, 'wb') as f:
+        f.write(struct.pack('<4sII', b'glTF', 2, total))
+        f.write(struct.pack('<I4s', len(js), b'JSON'))
+        f.write(js)
+        f.write(struct.pack('<I4s', len(packed), b'BIN\x00'))
+        f.write(packed)
 
 
 def finish_far(name: str, ratio: float = 0.12) -> None:
@@ -416,8 +579,31 @@ def finish_far(name: str, ratio: float = 0.12) -> None:
     print(f'[models] {name}_far: {tris} tris, {os.path.getsize(glb) // 1024} KB glb')
 
 
+def canonical_face_order() -> None:
+    """Put every mesh's faces in one fixed order, so an unchanged model rebuilds byte for byte.
+
+    bmesh primitives emit the same vertices and the same faces in a different
+    face order from one process to the next, and the exported triangle order
+    follows the face order. Vertex order is stable, so sorting faces by their
+    vertices settles it.
+    """
+    for ob in all_meshes():
+        bm = bmesh.new()
+        bm.from_mesh(ob.data)
+        bm.verts.index_update()
+        bm.faces.index_update()
+        order = sorted(bm.faces, key=lambda f: (sorted(v.index for v in f.verts), f.material_index))
+        rank = [0] * len(order)
+        for i, f in enumerate(order):
+            rank[f.index] = i
+        bm.faces.sort(key=lambda f: rank[f.index])
+        bm.to_mesh(ob.data)
+        bm.free()
+
+
 def finish(name: str) -> None:
     """Save the editable source and write the game asset, then report sizes."""
+    canonical_face_order()
     bpy.context.view_layer.update()
     blend = save_blend(name)
     glb = export_glb(name)

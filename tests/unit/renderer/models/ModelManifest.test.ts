@@ -4,7 +4,7 @@
 // still matches what public/models/ actually holds.
 
 import { describe, it, expect } from 'vitest';
-import { buildModelManifest, readModelManifest } from '../../../../scripts/shared/model-manifest.js';
+import { buildModelManifest, describeModel, readModelManifest } from '../../../../scripts/shared/model-manifest.js';
 import { allModelIds } from '../../../../src/renderer/models/ModelIds.js';
 
 describe('assets/models/manifest.json', () => {
@@ -44,6 +44,31 @@ describe('assets/models/manifest.json', () => {
     expect(models['prop_grass_0']!.builder).toBe('props.py');
     for (const id of ['ceo_statue', 'golf_course', 'executive_helipad', 'gold_tower']) {
       expect(models[`building_${id}_t1`]!.builder, id).toBe('buildings_vanity.py');
+    }
+  });
+});
+
+describe('model manifest entries', () => {
+  it('lists a skinned model\'s bones with their parents, root first', async () => {
+    const entry = await describeModel('worker_driller');
+    const bones = entry.bones!;
+    expect(bones).toBeDefined();
+    expect(Object.keys(bones)[0]).toBe('Hips');
+    expect(bones['Hips']).toBeNull();
+    expect(bones['Head']).toBe('Neck');
+    expect(bones['HandL']).toBe('ForearmL');
+    expect(bones['ThighR']).toBe('Hips');
+    // Every parent named is itself a bone listed before its child.
+    const order = Object.keys(bones);
+    for (const [bone, parent] of Object.entries(bones)) {
+      if (parent !== null) expect(order.indexOf(parent), bone).toBeLessThan(order.indexOf(bone));
+    }
+    expect(entry.groundY).toBeCloseTo(0, 1);
+  });
+
+  it('gives a rigid model no bones key at all', async () => {
+    for (const id of ['vehicle_drill_rig_t2', 'building_ruin', 'prop_grass_0']) {
+      expect(Object.keys(await describeModel(id)), id).not.toContain('bones');
     }
   });
 });

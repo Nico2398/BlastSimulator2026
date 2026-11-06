@@ -5972,492 +5972,652 @@
     },
     "worker_blaster": {
       "builder": "workers.py",
-      "triangles": 10154,
-      "glbKb": 197,
+      "triangles": 14692,
+      "glbKb": 387,
       "size": [
-        0.72,
-        1.31,
-        0.75
+        0.54,
+        1.51,
+        0.92
       ],
       "groundY": 0,
       "tints": [
-        "TintRole"
+        "TintGarment",
+        "TintHair",
+        "TintRole",
+        "TintSkin"
       ],
       "emissive": [],
       "materials": [
-        "Belt",
+        "Ash",
         "Boot",
-        "Brow",
-        "Cheek",
+        "BootToe",
         "Dark",
+        "DetonatorLabel",
+        "DetonatorRed",
+        "Dynamite",
+        "DynamitePaper",
         "EyeWhite",
-        "Glove",
-        "Lens",
+        "Fuse",
+        "GoggleLens",
+        "Iris",
+        "Lash",
+        "Leather",
         "Metal",
-        "Pupil",
-        "Red",
-        "Skin",
-        "SkinShade",
-        "TintRole"
+        "Mouth",
+        "Singed",
+        "Sole",
+        "Soot",
+        "Teeth",
+        "TintGarment",
+        "TintHair",
+        "TintRole",
+        "TintSkin",
+        "Tongue",
+        "Wire0",
+        "Wire1"
       ],
       "nodes": {
-        "Torso": {
-          "triangles": 1712,
+        "Rig": {
+          "triangles": 14692,
           "parts": [
-            "TorsoBelt",
-            "TorsoBody",
-            "TorsoBuckle",
-            "TorsoButton",
-            "TorsoPouch"
-          ]
-        },
-        "Head": {
-          "triangles": 4950,
-          "parts": [
-            "HeadBrow",
-            "HeadCheek",
-            "HeadEye",
-            "HeadGoggle",
-            "HeadGoggleBridge",
-            "HeadGoggleLens",
-            "HeadGoggleStrap",
-            "HeadHatBrim",
-            "HeadHatDome",
-            "HeadHatRidge",
-            "HeadHatVisor",
+            "ArmL",
+            "ArmR",
+            "BootL",
+            "BootR",
+            "BootShaftL",
+            "BootShaftR",
+            "CuffL",
+            "CuffR",
+            "FaceEyeL",
+            "FaceEyeR",
+            "FaceGasp",
+            "FaceIrisL",
+            "FaceIrisR",
+            "FaceLashL",
+            "FaceLashR",
+            "FaceLidL",
+            "FaceLidR",
+            "FaceMouth",
+            "FaceShineL",
+            "FaceShineR",
+            "FaceSoot",
+            "HandL",
+            "HandR",
+            "HatGoggles",
+            "HatShell",
+            "HeadBrowL",
+            "HeadBrowR",
+            "HeadEarL",
+            "HeadEarR",
+            "HeadHair",
             "HeadNose",
-            "HeadPupil",
-            "HeadShine",
-            "HeadSkull"
-          ]
-        },
-        "ArmL": {
-          "triangles": 860,
-          "parts": [
-            "ArmCuff",
-            "ArmHand",
-            "ArmUpper"
-          ]
-        },
-        "ArmR": {
-          "triangles": 1152,
-          "parts": [
-            "ArmCuff",
-            "ArmHand",
-            "ArmUpper",
-            "PropDetBox",
-            "PropPlunger",
-            "PropPlungerKnob"
-          ]
-        },
-        "LegL": {
-          "triangles": 740,
-          "parts": [
-            "LegBoot",
-            "LegSole",
-            "LegUpper"
-          ]
-        },
-        "LegR": {
-          "triangles": 740,
-          "parts": [
-            "LegBoot",
-            "LegSole",
-            "LegUpper"
+            "HeadPuffs",
+            "HeadSkull",
+            "LegL",
+            "LegR",
+            "Neck",
+            "SoleL",
+            "SoleR",
+            "ThumbL",
+            "ThumbR",
+            "ToolBox",
+            "ToolPlunger",
+            "Torso",
+            "TorsoDynamite"
           ]
         }
+      },
+      "bones": {
+        "Hips": null,
+        "Spine": "Hips",
+        "Chest": "Spine",
+        "Neck": "Chest",
+        "Head": "Neck",
+        "Hat": "Head",
+        "Mouth": "Head",
+        "Gasp": "Head",
+        "LidL": "Head",
+        "BrowL": "Head",
+        "LidR": "Head",
+        "BrowR": "Head",
+        "ShoulderL": "Chest",
+        "UpperArmL": "ShoulderL",
+        "ForearmL": "UpperArmL",
+        "HandL": "ForearmL",
+        "FingersL": "HandL",
+        "FingerTipsL": "FingersL",
+        "Tool": "HandL",
+        "ShoulderR": "Chest",
+        "UpperArmR": "ShoulderR",
+        "ForearmR": "UpperArmR",
+        "HandR": "ForearmR",
+        "FingersR": "HandR",
+        "FingerTipsR": "FingersR",
+        "ThighL": "Hips",
+        "ShinL": "ThighL",
+        "FootL": "ShinL",
+        "ToeL": "FootL",
+        "ThighR": "Hips",
+        "ShinR": "ThighR",
+        "FootR": "ShinR",
+        "ToeR": "FootR"
       }
     },
     "worker_driller": {
       "builder": "workers.py",
-      "triangles": 10342,
-      "glbKb": 200,
+      "triangles": 15216,
+      "glbKb": 387,
       "size": [
-        0.76,
-        1.31,
-        0.75
+        0.59,
+        1.39,
+        0.91
       ],
-      "groundY": 0,
+      "groundY": -0.01,
       "tints": [
-        "TintRole"
+        "TintGarment",
+        "TintHair",
+        "TintRole",
+        "TintSkin"
       ],
       "emissive": [
         "Lamp"
       ],
       "materials": [
-        "Belt",
         "Boot",
-        "Brow",
-        "Cheek",
+        "BootToe",
         "Dark",
+        "DrillYellow",
+        "EarDefender",
         "EyeWhite",
         "Glove",
+        "Iris",
         "Lamp",
+        "Lash",
         "Metal",
-        "Pupil",
-        "Skin",
-        "SkinShade",
+        "Mouth",
+        "Shirt",
+        "Sole",
         "Steel",
-        "TintRole"
+        "Teeth",
+        "TintGarment",
+        "TintHair",
+        "TintRole",
+        "TintSkin",
+        "Tongue"
       ],
       "nodes": {
-        "Torso": {
-          "triangles": 1712,
+        "Rig": {
+          "triangles": 15216,
           "parts": [
-            "TorsoBelt",
-            "TorsoBody",
-            "TorsoBuckle",
-            "TorsoButton",
-            "TorsoPouch"
-          ]
-        },
-        "Head": {
-          "triangles": 5090,
-          "parts": [
-            "HeadBrow",
-            "HeadCheek",
-            "HeadEye",
-            "HeadHatBrim",
-            "HeadHatDome",
-            "HeadHatRidge",
-            "HeadHatVisor",
-            "HeadLamp",
-            "HeadLampLens",
-            "HeadMuff",
-            "HeadMuffBand",
-            "HeadMuffPad",
+            "ArmL",
+            "ArmR",
+            "BootL",
+            "BootR",
+            "BootShaftL",
+            "BootShaftR",
+            "CuffL",
+            "CuffR",
+            "FaceEyeL",
+            "FaceEyeR",
+            "FaceGasp",
+            "FaceIrisL",
+            "FaceIrisR",
+            "FaceLashL",
+            "FaceLashR",
+            "FaceLidL",
+            "FaceLidR",
+            "FaceMouth",
+            "FaceShineL",
+            "FaceShineR",
+            "GloveCuffL",
+            "GloveCuffR",
+            "HandL",
+            "HandR",
+            "HatGear",
+            "HatShell",
+            "HeadBeard",
+            "HeadBrowL",
+            "HeadBrowR",
+            "HeadEarL",
+            "HeadEarR",
+            "HeadHair",
+            "HeadMoustache",
             "HeadNose",
-            "HeadPupil",
-            "HeadShine",
-            "HeadSkull"
-          ]
-        },
-        "ArmL": {
-          "triangles": 860,
-          "parts": [
-            "ArmCuff",
-            "ArmHand",
-            "ArmUpper"
-          ]
-        },
-        "ArmR": {
-          "triangles": 1200,
-          "parts": [
-            "ArmCuff",
-            "ArmHand",
-            "ArmUpper",
-            "PropDrillBit",
-            "PropDrillBody",
-            "PropDrillGrip"
-          ]
-        },
-        "LegL": {
-          "triangles": 740,
-          "parts": [
-            "LegBoot",
-            "LegSole",
-            "LegUpper"
-          ]
-        },
-        "LegR": {
-          "triangles": 740,
-          "parts": [
-            "LegBoot",
-            "LegSole",
-            "LegUpper"
+            "HeadSkull",
+            "LegL",
+            "LegR",
+            "Neck",
+            "SoleL",
+            "SoleR",
+            "ThumbL",
+            "ThumbR",
+            "ToolJackhammer",
+            "Torso",
+            "TorsoStraps"
           ]
         }
+      },
+      "bones": {
+        "Hips": null,
+        "Spine": "Hips",
+        "Chest": "Spine",
+        "Neck": "Chest",
+        "Head": "Neck",
+        "Hat": "Head",
+        "Mouth": "Head",
+        "Gasp": "Head",
+        "LidL": "Head",
+        "BrowL": "Head",
+        "LidR": "Head",
+        "BrowR": "Head",
+        "ShoulderL": "Chest",
+        "UpperArmL": "ShoulderL",
+        "ForearmL": "UpperArmL",
+        "HandL": "ForearmL",
+        "FingersL": "HandL",
+        "FingerTipsL": "FingersL",
+        "ShoulderR": "Chest",
+        "UpperArmR": "ShoulderR",
+        "ForearmR": "UpperArmR",
+        "HandR": "ForearmR",
+        "FingersR": "HandR",
+        "FingerTipsR": "FingersR",
+        "Tool": "HandR",
+        "ThighL": "Hips",
+        "ShinL": "ThighL",
+        "FootL": "ShinL",
+        "ToeL": "FootL",
+        "ThighR": "Hips",
+        "ShinR": "ThighR",
+        "FootR": "ShinR",
+        "ToeR": "FootR"
       }
     },
     "worker_driver": {
       "builder": "workers.py",
-      "triangles": 9734,
-      "glbKb": 181,
+      "triangles": 14188,
+      "glbKb": 355,
       "size": [
-        0.72,
-        1.31,
-        0.75
+        0.71,
+        1.28,
+        0.84
       ],
       "groundY": 0,
       "tints": [
-        "TintRole"
+        "TintGarment",
+        "TintHair",
+        "TintRole",
+        "TintSkin"
       ],
       "emissive": [],
       "materials": [
-        "Belt",
         "Boot",
-        "Brow",
-        "Cheek",
+        "BootToe",
         "Dark",
-        "DriverGlove",
         "EyeWhite",
-        "Metal",
-        "Pupil",
-        "Skin",
-        "SkinShade",
-        "TintRole"
+        "Glove",
+        "Iris",
+        "Jeans",
+        "Lash",
+        "Mouth",
+        "Reflective",
+        "Rubber",
+        "ShadeFrame",
+        "ShadeGlint",
+        "ShadeLens",
+        "Shirt",
+        "Sole",
+        "Teeth",
+        "TintGarment",
+        "TintHair",
+        "TintRole",
+        "TintSkin",
+        "Toothpick",
+        "WrenchSteel"
       ],
       "nodes": {
-        "Torso": {
-          "triangles": 1712,
+        "Rig": {
+          "triangles": 14188,
           "parts": [
-            "TorsoBelt",
-            "TorsoBody",
-            "TorsoBuckle",
-            "TorsoButton",
-            "TorsoPouch"
-          ]
-        },
-        "Head": {
-          "triangles": 4606,
-          "parts": [
-            "HeadBrow",
-            "HeadCheek",
-            "HeadEye",
-            "HeadHatBrim",
-            "HeadHatDome",
-            "HeadHatRidge",
-            "HeadHatVisor",
+            "ArmL",
+            "ArmR",
+            "BootL",
+            "BootR",
+            "BootShaftL",
+            "BootShaftR",
+            "CuffL",
+            "CuffR",
+            "FaceEyeL",
+            "FaceEyeR",
+            "FaceGasp",
+            "FaceIrisL",
+            "FaceIrisR",
+            "FaceLashL",
+            "FaceLashR",
+            "FaceLidL",
+            "FaceLidR",
+            "FaceMouth",
+            "FaceShades",
+            "FaceShineL",
+            "FaceShineR",
+            "GloveCuffL",
+            "GloveCuffR",
+            "HandL",
+            "HandR",
+            "HatShell",
+            "HeadBeard",
+            "HeadBrowL",
+            "HeadBrowR",
+            "HeadEarL",
+            "HeadEarR",
+            "HeadHair",
             "HeadNose",
-            "HeadPupil",
-            "HeadShade",
-            "HeadShadeArm",
-            "HeadShadeBridge",
-            "HeadShine",
-            "HeadSkull"
-          ]
-        },
-        "ArmL": {
-          "triangles": 1076,
-          "parts": [
-            "ArmCuff",
-            "ArmHand",
-            "ArmUpper",
-            "PropWrench",
-            "PropWrenchJaw"
-          ]
-        },
-        "ArmR": {
-          "triangles": 860,
-          "parts": [
-            "ArmCuff",
-            "ArmHand",
-            "ArmUpper"
-          ]
-        },
-        "LegL": {
-          "triangles": 740,
-          "parts": [
-            "LegBoot",
-            "LegSole",
-            "LegUpper"
-          ]
-        },
-        "LegR": {
-          "triangles": 740,
-          "parts": [
-            "LegBoot",
-            "LegSole",
-            "LegUpper"
+            "HeadSkull",
+            "LegL",
+            "LegR",
+            "Neck",
+            "SoleL",
+            "SoleR",
+            "ThumbL",
+            "ThumbR",
+            "ToolWrench",
+            "Torso"
           ]
         }
+      },
+      "bones": {
+        "Hips": null,
+        "Spine": "Hips",
+        "Chest": "Spine",
+        "Neck": "Chest",
+        "Head": "Neck",
+        "Hat": "Head",
+        "Mouth": "Head",
+        "Gasp": "Head",
+        "LidL": "Head",
+        "BrowL": "Head",
+        "LidR": "Head",
+        "BrowR": "Head",
+        "ShoulderL": "Chest",
+        "UpperArmL": "ShoulderL",
+        "ForearmL": "UpperArmL",
+        "HandL": "ForearmL",
+        "FingersL": "HandL",
+        "FingerTipsL": "FingersL",
+        "ShoulderR": "Chest",
+        "UpperArmR": "ShoulderR",
+        "ForearmR": "UpperArmR",
+        "HandR": "ForearmR",
+        "FingersR": "HandR",
+        "FingerTipsR": "FingersR",
+        "Tool": "HandR",
+        "ThighL": "Hips",
+        "ShinL": "ThighL",
+        "FootL": "ShinL",
+        "ToeL": "FootL",
+        "ThighR": "Hips",
+        "ShinR": "ThighR",
+        "FootR": "ShinR",
+        "ToeR": "FootR"
       }
     },
     "worker_manager": {
       "builder": "workers.py",
-      "triangles": 10054,
-      "glbKb": 192,
+      "triangles": 14396,
+      "glbKb": 353,
       "size": [
-        0.72,
-        1.31,
+        0.51,
+        1.24,
         0.75
       ],
       "groundY": 0,
       "tints": [
-        "TintRole"
+        "TintGarment",
+        "TintHair",
+        "TintRole",
+        "TintSkin"
       ],
-      "emissive": [],
+      "emissive": [
+        "Ember"
+      ],
       "materials": [
-        "Belt",
         "Boot",
-        "Brow",
-        "Cheek",
+        "BootToe",
+        "Cigar",
         "Coffee",
-        "Dark",
+        "Ember",
         "EyeWhite",
-        "HatWhite",
-        "Metal",
+        "Gold",
+        "HatBandGold",
+        "Iris",
+        "Lash",
+        "Mouth",
         "Mug",
-        "Pupil",
-        "Shirt",
-        "Skin",
-        "SkinShade",
+        "ShirtWhite",
+        "Sole",
+        "Teeth",
         "Tie",
-        "TintRole"
+        "TintGarment",
+        "TintHair",
+        "TintRole",
+        "TintSkin"
       ],
       "nodes": {
-        "Torso": {
-          "triangles": 2312,
+        "Rig": {
+          "triangles": 14396,
           "parts": [
-            "TorsoBelt",
-            "TorsoBody",
-            "TorsoBuckle",
-            "TorsoButton",
-            "TorsoCollar",
-            "TorsoPouch",
-            "TorsoTie",
-            "TorsoTieKnot"
-          ]
-        },
-        "Head": {
-          "triangles": 4198,
-          "parts": [
-            "HeadBadge",
-            "HeadBrow",
-            "HeadCheek",
-            "HeadEye",
-            "HeadHatBrim",
-            "HeadHatDome",
-            "HeadHatRidge",
-            "HeadHatVisor",
+            "ArmL",
+            "ArmR",
+            "BootL",
+            "BootR",
+            "BootShaftL",
+            "BootShaftR",
+            "CuffL",
+            "CuffR",
+            "FaceEyeL",
+            "FaceEyeR",
+            "FaceGasp",
+            "FaceIrisL",
+            "FaceIrisR",
+            "FaceLashL",
+            "FaceLashR",
+            "FaceLidL",
+            "FaceLidR",
+            "FaceMouth",
+            "FaceShineL",
+            "FaceShineR",
+            "HandFingerL",
+            "HandL",
+            "HandR",
+            "HatShell",
+            "HeadBrowL",
+            "HeadBrowR",
+            "HeadCigar",
+            "HeadEarL",
+            "HeadEarR",
+            "HeadHair",
+            "HeadMoustache",
             "HeadNose",
-            "HeadPupil",
-            "HeadShine",
-            "HeadSkull"
-          ]
-        },
-        "ArmL": {
-          "triangles": 860,
-          "parts": [
-            "ArmCuff",
-            "ArmHand",
-            "ArmUpper"
-          ]
-        },
-        "ArmR": {
-          "triangles": 1204,
-          "parts": [
-            "ArmCuff",
-            "ArmHand",
-            "ArmUpper",
-            "PropCoffee",
-            "PropMug",
-            "PropMugHandle"
-          ]
-        },
-        "LegL": {
-          "triangles": 740,
-          "parts": [
-            "LegBoot",
-            "LegSole",
-            "LegUpper"
-          ]
-        },
-        "LegR": {
-          "triangles": 740,
-          "parts": [
-            "LegBoot",
-            "LegSole",
-            "LegUpper"
+            "HeadSkull",
+            "LegL",
+            "LegR",
+            "Neck",
+            "SoleL",
+            "SoleR",
+            "ThumbL",
+            "ThumbR",
+            "ToolMug",
+            "Torso",
+            "TorsoSuit"
           ]
         }
+      },
+      "bones": {
+        "Hips": null,
+        "Spine": "Hips",
+        "Chest": "Spine",
+        "Neck": "Chest",
+        "Head": "Neck",
+        "Hat": "Head",
+        "Mouth": "Head",
+        "Gasp": "Head",
+        "LidL": "Head",
+        "BrowL": "Head",
+        "LidR": "Head",
+        "BrowR": "Head",
+        "ShoulderL": "Chest",
+        "UpperArmL": "ShoulderL",
+        "ForearmL": "UpperArmL",
+        "HandL": "ForearmL",
+        "FingersL": "HandL",
+        "FingerTipsL": "FingersL",
+        "Finger": "HandL",
+        "ShoulderR": "Chest",
+        "UpperArmR": "ShoulderR",
+        "ForearmR": "UpperArmR",
+        "HandR": "ForearmR",
+        "FingersR": "HandR",
+        "FingerTipsR": "FingersR",
+        "Tool": "HandR",
+        "ThighL": "Hips",
+        "ShinL": "ThighL",
+        "FootL": "ShinL",
+        "ToeL": "FootL",
+        "ThighR": "Hips",
+        "ShinR": "ThighR",
+        "FootR": "ShinR",
+        "ToeR": "FootR"
       }
     },
     "worker_surveyor": {
       "builder": "workers.py",
-      "triangles": 10514,
-      "glbKb": 195,
+      "triangles": 13604,
+      "glbKb": 352,
       "size": [
-        0.72,
-        1.31,
-        0.78
+        0.53,
+        1.57,
+        0.8
       ],
       "groundY": 0,
       "tints": [
-        "TintRole"
+        "TintGarment",
+        "TintHair",
+        "TintRole",
+        "TintSkin"
       ],
       "emissive": [],
       "materials": [
         "Belt",
         "Boot",
-        "Brow",
-        "Cheek",
+        "BootToe",
         "Dark",
         "EyeWhite",
-        "HiVis",
+        "FaceMouthSoft",
+        "FieldOlive",
+        "GlassesGlint",
+        "GlassesRim",
+        "Iris",
+        "Lash",
         "Metal",
+        "Mouth",
         "Paper",
-        "Pupil",
-        "Skin",
-        "SkinShade",
-        "TintRole"
+        "PenBlue",
+        "PencilWood",
+        "PencilYellow",
+        "PocketProtector",
+        "ShirtWhite",
+        "Sole",
+        "StaffRed",
+        "StaffWhite",
+        "Teeth",
+        "TintGarment",
+        "TintHair",
+        "TintRole",
+        "TintSkin"
       ],
       "nodes": {
-        "Torso": {
-          "triangles": 2160,
+        "Rig": {
+          "triangles": 13604,
           "parts": [
-            "TorsoBelt",
-            "TorsoBody",
-            "TorsoBuckle",
-            "TorsoButton",
-            "TorsoHiVis",
-            "TorsoPouch"
-          ]
-        },
-        "Head": {
-          "triangles": 4926,
-          "parts": [
-            "HeadBrow",
-            "HeadCheek",
-            "HeadEye",
-            "HeadHatBrim",
-            "HeadHatDome",
-            "HeadHatRidge",
-            "HeadHatVisor",
+            "ArmL",
+            "ArmR",
+            "BootL",
+            "BootR",
+            "BootShaftL",
+            "BootShaftR",
+            "CuffL",
+            "CuffR",
+            "FaceEyeL",
+            "FaceEyeR",
+            "FaceGasp",
+            "FaceGlasses",
+            "FaceIrisL",
+            "FaceIrisR",
+            "FaceLashL",
+            "FaceLashR",
+            "FaceLidL",
+            "FaceLidR",
+            "FaceMouth",
+            "FaceShineL",
+            "FaceShineR",
+            "HandL",
+            "HandPencil",
+            "HandR",
+            "HatShell",
+            "HeadBrowL",
+            "HeadBrowR",
+            "HeadEarL",
+            "HeadEarR",
+            "HeadHair",
             "HeadNose",
-            "HeadPupil",
-            "HeadShine",
             "HeadSkull",
-            "HeadSpecArm",
-            "HeadSpecBridge",
-            "HeadSpecRing"
-          ]
-        },
-        "ArmL": {
-          "triangles": 1088,
-          "parts": [
-            "ArmCuff",
-            "ArmHand",
-            "ArmUpper",
-            "PropClip",
-            "PropClipboard",
-            "PropPaper"
-          ]
-        },
-        "ArmR": {
-          "triangles": 860,
-          "parts": [
-            "ArmCuff",
-            "ArmHand",
-            "ArmUpper"
-          ]
-        },
-        "LegL": {
-          "triangles": 740,
-          "parts": [
-            "LegBoot",
-            "LegSole",
-            "LegUpper"
-          ]
-        },
-        "LegR": {
-          "triangles": 740,
-          "parts": [
-            "LegBoot",
-            "LegSole",
-            "LegUpper"
+            "LegL",
+            "LegR",
+            "Neck",
+            "SoleL",
+            "SoleR",
+            "ThumbL",
+            "ThumbR",
+            "ToolClipboard",
+            "Torso",
+            "TorsoGear"
           ]
         }
+      },
+      "bones": {
+        "Hips": null,
+        "Spine": "Hips",
+        "Chest": "Spine",
+        "Neck": "Chest",
+        "Head": "Neck",
+        "Hat": "Head",
+        "Mouth": "Head",
+        "Gasp": "Head",
+        "LidL": "Head",
+        "BrowL": "Head",
+        "LidR": "Head",
+        "BrowR": "Head",
+        "ShoulderL": "Chest",
+        "UpperArmL": "ShoulderL",
+        "ForearmL": "UpperArmL",
+        "HandL": "ForearmL",
+        "FingersL": "HandL",
+        "FingerTipsL": "FingersL",
+        "Tool": "HandL",
+        "ShoulderR": "Chest",
+        "UpperArmR": "ShoulderR",
+        "ForearmR": "UpperArmR",
+        "HandR": "ForearmR",
+        "FingersR": "HandR",
+        "FingerTipsR": "FingersR",
+        "ThighL": "Hips",
+        "ShinL": "ThighL",
+        "FootL": "ShinL",
+        "ToeL": "FootL",
+        "ThighR": "Hips",
+        "ShinR": "ThighR",
+        "FootR": "ShinR",
+        "ToeR": "FootR"
       }
     }
   }

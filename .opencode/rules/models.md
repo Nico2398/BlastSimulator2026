@@ -18,8 +18,8 @@ A hand edit made in a `.blend` is ported back into its Python builder before the
 
 - 1 Blender unit = 1 game unit. Z-up in Blender, exported +Y up. Origin at the ground contact point.
 - Workers and vehicles face +X; buildings are centred on their footprint with the door row at +Y.
-- Only direct children of the scene root are animation nodes (`Head`, `Torso`, `ArmL`, `ArmR`, `LegL`, `LegR`, `Wheel*`, `Flywheel`, `Body`). Build them with `pivot()`.
-- Materials named `Tint*` are recoloured per instance; emissive materials stay separate and glow; every other colour is baked to vertex colours. No UVs, no textures, no animations in the export.
+- Rigid models animate through the direct children of the scene root (`Wheel*`, `Flywheel`, `Body`, role parts), built with `pivot()`. Workers are the one skinned family: an armature built with `character.py`, whose bones the renderer poses every frame.
+- Materials named `Tint*` are recoloured per instance; emissive materials stay separate and glow; every other colour is baked to vertex colours. No UVs, no textures, no animation clips in the export — motion is posed at runtime.
 - Each tier is its own model — tier 1 improvised junk, tier 2 the plain machine, tier 3 corporate excess — and a building is taller than the tier below it.
 - Instanced props (trees, grass, bushes, rocks, houses) are a single `Body` node with the base at the origin.
 - `assets/models/manifest.json` is generated, never hand-edited, and a module docstring naming a model's nodes and caricature stays true when the model changes.

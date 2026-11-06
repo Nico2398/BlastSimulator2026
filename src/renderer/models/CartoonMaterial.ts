@@ -17,6 +17,13 @@ const OUTLINE_THICKNESS_PX = 1.7;
 const OUTLINE_MAX_WORLD = 0.035;
 
 /**
+ * The crew's outline: half as thick again as the world's, so a worker stands
+ * out from the scenery around him, and pushed back a touch so the line only
+ * traces his silhouette — not every sleeve, tie and brim lying on his body.
+ */
+export const CHARACTER_OUTLINE = { thicknessPx: 2.5, maxWorld: 0.05, depthPush: 0.012 } as const;
+
+/**
  * Render-target height every outline material reads to convert pixels to
  * world units. One shared uniform: the scene owner updates it on resize.
  */
@@ -92,6 +99,8 @@ transformed.xz += uWind * sway;
 
 /** Per-hull overrides of the outline defaults. */
 interface OutlineOptions {
+  /** Line width on screen, in render-target pixels (default OUTLINE_THICKNESS_PX). */
+  thicknessPx?: number;
   /** Thickness cap in world metres (default: sized for entity models at gameplay distance). */
   maxWorld?: number;
   /**
@@ -109,13 +118,14 @@ interface OutlineOptions {
  * along its normal in view space by a screen-constant width. Cheap (one extra
  * draw per node), needs no post pass, and ignores lighting entirely. Works
  * on an InstancedMesh too (three defines USE_INSTANCING and supplies
- * `instanceMatrix`), and can carry the vegetation sway so an outline bends
- * with its canopy.
+ * `instanceMatrix`) and on a SkinnedMesh (three defines USE_SKINNING and
+ * binds the skeleton's bone texture), and can carry the vegetation sway so an
+ * outline bends with its canopy.
  */
 export function createOutlineMaterial(sway?: SwayOptions, options: OutlineOptions = {}): THREE.ShaderMaterial {
   const uniforms: Record<string, THREE.IUniform> = {
     color: { value: new THREE.Color(OUTLINE_COLOR) },
-    thicknessPx: { value: OUTLINE_THICKNESS_PX },
+    thicknessPx: { value: options.thicknessPx ?? OUTLINE_THICKNESS_PX },
     maxWorld: { value: options.maxWorld ?? OUTLINE_MAX_WORLD },
     viewportHeight: OUTLINE_UNIFORMS.viewportHeight,
   };
@@ -134,9 +144,16 @@ export function createOutlineMaterial(sway?: SwayOptions, options: OutlineOption
       uniform float viewportHeight;
       ${sway ? 'uniform float uTime; uniform vec2 uWind; uniform float uCanopyHeight;' : ''}
       ${depthPush > 0 ? 'uniform float depthPush;' : ''}
+      #include <skinning_pars_vertex>
       void main() {
         vec3 transformed = position;
         vec3 objectNormal = normal;
+        // Pose the hull with the same bones as its surfaces, before it is
+        // pushed out along the (posed) normal. Each chunk is empty unless
+        // three drew this material on a SkinnedMesh.
+        #include <skinbase_vertex>
+        #include <skinnormal_vertex>
+        #include <skinning_vertex>
         #ifdef USE_INSTANCING
           float instanceWorldX = instanceMatrix[3].x;
         #else

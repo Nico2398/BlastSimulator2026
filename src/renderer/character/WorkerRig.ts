@@ -1,0 +1,157 @@
+// BlastSimulator2026 — Worker rig
+// Names every bone of the crew skeleton (assets/models/blender/workers.py)
+// once, and measures the body it was built for — leg length, hip height,
+// where the feet stand, which way each hand's fingers and thumb point — so
+// the motion code works for the stocky driller and the lanky surveyor alike
+// without a per-role constant.
+
+import * as THREE from 'three';
+import { RigPoser } from './RigPoser.js';
+
+export type Side = 'L' | 'R';
+export const SIDES: readonly Side[] = ['L', 'R'];
+
+/** Bone indices of one side's limbs. */
+interface LimbBones {
+  shoulder: number;
+  upperArm: number;
+  forearm: number;
+  hand: number;
+  thigh: number;
+  shin: number;
+  foot: number;
+  toe: number;
+  lid: number;
+  brow: number;
+  /** The fingers' two segments (the block that curls round a grip), or -1 on a rig without them. */
+  fingers: number;
+  tips: number;
+}
+
+/** How far the gasp mouth waits inside the skull (worker_face.GASP_HIDE). */
+export const GASP_HIDE = 0.04;
+
+/** Rest-pose measurements of one side, rig space (+X front, +Y up, +Z right). */
+interface LimbRest {
+  /** -1 on the left (−Z), +1 on the right. */
+  sign: number;
+  hip: THREE.Vector3;
+  ankle: THREE.Vector3;
+  /** Ball of the foot — the toe joint itself, which stays put while the heel peels and the toe lies flat — and the heel's ground contact. */
+  ball: THREE.Vector3;
+  heel: THREE.Vector3;
+  shoulder: THREE.Vector3;
+  wrist: THREE.Vector3;
+  /** Rest direction of the fingers (wrist → fingertips) and of the thumb. */
+  finger: THREE.Vector3;
+  thumb: THREE.Vector3;
+  legLength: number;
+  armLength: number;
+  /** Elevation (radians) of the lid's front edge when the eye rests open — how far it turns to shut. */
+  lidOpen: number;
+  /** The axis a lid turns about to shut: square to its bone, which is yawed out with the eye (rig space). */
+  lidHinge: THREE.Vector3;
+  /** Axis the fingers curl about, from their bent rest chain (rig space), or null without finger bones. */
+  fingerHinge: THREE.Vector3 | null;
+}
+
+export interface WorkerRig {
+  poser: RigPoser;
+  hips: number;
+  spine: number;
+  chest: number;
+  neck: number;
+  head: number;
+  /** The role's tool bone (child of the tool hand), or -1. */
+  tool: number;
+  /** The hard hat's bone (child of the head) — knocked off in a collapse. */
+  hat: number;
+  /** The everyday mouth and the gaping one parked inside the skull (WorkerMotion swaps them). */
+  mouth: number;
+  gasp: number;
+  /** The manager's pointing finger (child of HandL), or -1. */
+  finger: number;
+  /** Which hand holds the tool, when there is one. */
+  toolSide: Side | null;
+  /** The hand that holds no tool. An injured worker favours the leg on this side, so that hand can clutch it. */
+  freeSide: Side;
+  limbs: Record<Side, LimbBones>;
+  rest: Record<Side, LimbRest>;
+  /** Rest height of the hips joint. */
+  hipHeight: number;
+  /** Rest head of the tool bone relative to its hand's wrist (rig space). */
+  gripOffset: THREE.Vector3;
+}
+
+/** Heel contact sits this far behind the ankle — the boot's back, in metres. */
+const HEEL_BACK = 0.06;
+
+/**
+ * The fingers are bound curled round the grip: the bend from the proximal
+ * segment into the tips defines the axis they curl about (as an elbow's does).
+ */
+function fingerHinge(poser: RigPoser, b: LimbBones, q: THREE.Quaternion): THREE.Vector3 | null {
+  if (b.fingers < 0 || b.tips < 0) return null;
+  const proximal = poser.restPos(b.tips, new THREE.Vector3()).sub(poser.restPos(b.fingers, new THREE.Vector3()));
+  const distal = new THREE.Vector3(0, 1, 0).applyQuaternion(poser.restRotation(b.tips, q));
+  const h = proximal.cross(distal);
+  return h.lengthSq() > 1e-12 ? h.normalize() : null;
+}
+
+/** Horizontal axis square to a lid bone's resting edge, so turning about it (−) brings the edge down. */
+function lidHinge(poser: RigPoser, lid: number, q: THREE.Quaternion): THREE.Vector3 {
+  const edge = new THREE.Vector3(0, 1, 0).applyQuaternion(poser.restRotation(lid, q)).setY(0);
+  if (edge.lengthSq() < 1e-10) edge.set(1, 0, 0);
+  return edge.normalize().cross(new THREE.Vector3(0, 1, 0)).normalize();
+}
+
+/** Name the crew skeleton's bones; null when the model is not a worker rig. */
+export function workerRig(root: THREE.Object3D): WorkerRig | null {
+  const poser = RigPoser.fromModel(root);
+  if (!poser || !poser.has('Hips') || !poser.has('ThighL') || !poser.has('HandR')) return null;
+  const id = (n: string): number => poser.id(n);
+  const limbs = {} as Record<Side, LimbBones>;
+  const rest = {} as Record<Side, LimbRest>;
+  const v = (i: number): THREE.Vector3 => poser.restPos(i, new THREE.Vector3());
+  const q = new THREE.Quaternion();
+  const opt = (n: string): number => (poser.has(n) ? id(n) : -1);
+  for (const s of SIDES) {
+    const b: LimbBones = {
+      shoulder: id(`Shoulder${s}`), upperArm: id(`UpperArm${s}`), forearm: id(`Forearm${s}`), hand: id(`Hand${s}`),
+      thigh: id(`Thigh${s}`), shin: id(`Shin${s}`), foot: id(`Foot${s}`), toe: id(`Toe${s}`),
+      lid: id(`Lid${s}`), brow: id(`Brow${s}`), fingers: opt(`Fingers${s}`), tips: opt(`FingerTips${s}`),
+    };
+    limbs[s] = b;
+    const ankle = v(b.foot);
+    const ball = v(b.toe);
+    const elbow = v(b.forearm);
+    const wrist = v(b.hand);
+    const finger = wrist.clone().sub(elbow).normalize();
+    const thumb = new THREE.Vector3(1, 0, 0).addScaledVector(finger, -finger.x).normalize();
+    rest[s] = {
+      sign: ankle.z < 0 ? -1 : 1,
+      hip: v(b.thigh), ankle, ball,
+      heel: new THREE.Vector3(ankle.x - HEEL_BACK, 0, ankle.z),
+      shoulder: v(b.upperArm), wrist, finger, thumb,
+      legLength: poser.restLength(b.thigh, b.shin) + poser.restLength(b.shin, b.foot),
+      armLength: poser.restLength(b.upperArm, b.forearm) + poser.restLength(b.forearm, b.hand),
+      // A bone's local +Y runs head to tail; the lid bone's tail marks its edge's resting elevation.
+      lidOpen: Math.asin(Math.max(-1, Math.min(1, new THREE.Vector3(0, 1, 0).applyQuaternion(poser.restRotation(b.lid, q)).y))),
+      lidHinge: lidHinge(poser, b.lid, q),
+      fingerHinge: fingerHinge(poser, b, q),
+    };
+  }
+  const tool = poser.has('Tool') ? id('Tool') : -1;
+  let toolSide: Side | null = null;
+  const gripOffset = new THREE.Vector3();
+  if (tool >= 0) {
+    const toolPos = v(tool);
+    toolSide = toolPos.distanceTo(rest.L.wrist) < toolPos.distanceTo(rest.R.wrist) ? 'L' : 'R';
+    gripOffset.copy(toolPos).sub(rest[toolSide].wrist);
+  }
+  return {
+    poser, hips: id('Hips'), spine: id('Spine'), chest: id('Chest'), neck: id('Neck'), head: id('Head'),
+    tool, toolSide, freeSide: toolSide === 'R' ? 'L' : 'R', hat: opt('Hat'), mouth: opt('Mouth'), gasp: opt('Gasp'), finger: opt('Finger'),
+    limbs, rest, hipHeight: v(id('Hips')).y, gripOffset,
+  };
+}
