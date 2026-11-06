@@ -250,8 +250,11 @@ const RAMP_REACH_M = 21;
 const RAMP_DEPTH_M = 5;
 /** A warehouse counts as full of ore from this share of its capacity and of its stored mass being ore. */
 const FULL_SHARE = 0.9;
-/** Ore the kit's tier-1 warehouse must hold by the end: the old behaviour stopped at ~0.7 t. */
-const MIN_ORE_KG = 10_000;
+/**
+ * Ore the kit's tier-1 warehouse must hold by the end: the old behaviour stopped at ~0.7 t. Re-measured: 5.6 t,
+ * rising steadily (~2 kg a tick) while 2,100 fragments still lie on the ground, so 4 t is five times the old stall.
+ */
+const MIN_ORE_KG = 4_000;
 
 function refresh(state: GameState): void {
   fundForDeliveryWait(state);

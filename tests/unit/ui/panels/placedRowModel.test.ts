@@ -3,6 +3,7 @@ import { placedRowModel, siteRowModel } from '../../../../src/ui/panels/placedRo
 import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState, PlannedBuilding } from '../../../../src/core/state/GameState.js';
 import { getBuildingDef, type Building, type BuildingType, type BuildingTier } from '../../../../src/core/entities/Building.js';
+import { SPOIL_HEAP_CAPACITY_KG } from '../../../../src/core/config/balance.js';
 
 function mk(overrides: Partial<Building> & Pick<Building, 'id' | 'type'>): Building {
   return { tier: 1 as BuildingTier, x: 5, z: 5, hp: getBuildingDef(overrides.type, 1).maxHp, active: true, occupantIds: [], ...overrides };
@@ -96,11 +97,11 @@ describe('placedRowModel — utilization (#1759)', () => {
   });
 
   it('spoil heap shows its fill against the finite capacity (#1892)', () => {
-    const b = mk({ id: 1, type: 'spoil_heap', storedSpoilKg: 25_000 });
+    const b = mk({ id: 1, type: 'spoil_heap', storedSpoilKg: SPOIL_HEAP_CAPACITY_KG / 2 });
     const u = placedRowModel(b, stateWith(b)).utilization;
     expect(u).not.toBeNull();
-    expect(u!.text).toContain('25000');
-    expect(u!.text).toContain('50000');
+    expect(u!.text).toContain(String(SPOIL_HEAP_CAPACITY_KG / 2));
+    expect(u!.text).toContain(String(SPOIL_HEAP_CAPACITY_KG));
     expect(u!.fraction).toBeCloseTo(0.5);
   });
 });

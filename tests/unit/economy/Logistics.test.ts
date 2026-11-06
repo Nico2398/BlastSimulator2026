@@ -1215,7 +1215,7 @@ describe('consumeStoredOre releases barren leftover rock to the spoil heap (#169
     expect(state.storedMassKg + totalSpoilKg([heap])).toBeCloseTo(before - 500, 6);
   });
 
-  it('a partial sale keeps the fragment with the right remaining mass and releases nothing', () => {
+  it('a partial sale keeps the fragment, shrunk to its remaining ore, and sends the rock to the heap (#2142)', () => {
     const { state, collectedOre } = singleOreStorage();
     const heap = heapStub();
 
@@ -1224,9 +1224,10 @@ describe('consumeStoredOre releases barren leftover rock to the spoil heap (#169
     expect(result.success).toBe(true);
     const frag = state.fragments.find(f => f.fragment.id === 1)!;
     expect(frag.state).toBe('stored');
-    expect(frag.fragment.mass).toBeCloseTo(750, 6);
-    expect(state.storedMassKg).toBeCloseTo(750, 6);
-    expect(heap.storedSpoilKg).toBe(0);
+    // 750 kg stay after the sale (250 ore + 500 rock); the release also concentrates the leftover ore (#2142): the rock goes to the heap.
+    expect(frag.fragment.mass).toBeCloseTo(250, 6);
+    expect(state.storedMassKg).toBeCloseTo(250, 6);
+    expect(heap.storedSpoilKg).toBeCloseTo(500, 6);
     expect(collectedOre.oreA).toBeCloseTo(200, 6);
   });
 
@@ -1283,7 +1284,10 @@ describe('consumeStoredOre releases barren leftover rock to the spoil heap (#169
     const collectedOre: Record<string, number> = { oreA: 400, oreB: 8 };
     const heap = heapStub();
 
-    consumeStoredOre(state, collectedOre, 'oreA', 400, [heap]);
+    // No heap at the sale: the fragment is not concentrated first (#2142), so the oreB trace is what remains of it.
+    consumeStoredOre(state, collectedOre, 'oreA', 400, []);
+    expect(state.fragments).toHaveLength(1);
+    releaseBarrenStoredFragments(state, collectedOre, [heap]);
 
     expect(state.fragments).toHaveLength(0);
     expect(collectedOre.oreA).toBeCloseTo(0, 6);
@@ -1343,14 +1347,15 @@ describe('releaseBarrenStoredFragments (#1690)', () => {
 
     const released = releaseBarrenStoredFragments(state, collectedOre, [heap]);
 
+    // `released` counts only the barren fragments moved whole; fragment 3 (ore, density 0.5) is also concentrated (#2142): 250 kg of rock to the heap.
     expect(released).toBeCloseTo(1000, 6);
-    expect(heap.storedSpoilKg).toBeCloseTo(1000, 6);
+    expect(heap.storedSpoilKg).toBeCloseTo(1250, 6);
     expect(state.fragments.map(f => f.fragment.id)).toEqual([3]);
-    expect(state.storedMassKg).toBeCloseTo(500, 6);
+    expect(state.storedMassKg).toBeCloseTo(250, 6);
     expect(collectedOre.dirtite).toBeCloseTo(0.2 * 0.5 * 2500, 6);
   });
 
-  it('returns 0 and changes nothing when no stored fragment is barren', () => {
+  it('returns 0 and releases nothing when no stored fragment is barren; the ore fragment is only concentrated (#2142)', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     putInStorage(state, makeStoredFragment(1, 500, 0.2, { dirtite: 0.5 }));
     const collectedOre: Record<string, number> = { dirtite: 250 };
@@ -1358,9 +1363,9 @@ describe('releaseBarrenStoredFragments (#1690)', () => {
 
     expect(releaseBarrenStoredFragments(state, collectedOre, [heap])).toBe(0);
     expect(state.fragments).toHaveLength(1);
-    expect(state.storedMassKg).toBe(500);
+    expect(state.storedMassKg).toBeCloseTo(250, 6);
     expect(collectedOre).toEqual({ dirtite: 250 });
-    expect(heap.storedSpoilKg).toBe(0);
+    expect(heap.storedSpoilKg).toBeCloseTo(250, 6);
   });
 
   it('does not release into room an in-transit haul has reserved on the heap (#1892)', () => {
@@ -1662,7 +1667,9 @@ describe('storage paths at a scaled grade (#1932)', () => {
     expect(b).toBe(a);
     expect(b).toBe(700);
     expect(scaled.fragments.map(f => f.fragment.id)).toEqual([3]);
-    expect(scaled.storedMassKg).toBe(500);
+    // Fragment 3 is ore at both scales and keeps only its ore (#2142): 0.5 x 500 kg unscaled, 0.1 x 500 kg at 0.2.
+    expect(unscaled.storedMassKg).toBeCloseTo(250, 6);
+    expect(scaled.storedMassKg).toBeCloseTo(50, 6);
   });
 
   it('consumeStoredOre rubble draws only fragments barren at the scale', () => {

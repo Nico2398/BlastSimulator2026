@@ -579,7 +579,8 @@ export function releaseBarrenStoredFragments(
     state.storedMassKg = Math.max(0, state.storedMassKg - releasedKg);
   }
   // Overflow ore stored whole (no heap room at unload) sheds its barren share once a heap frees up (#2142).
-  return releasedKg + concentrateStoredOre(state, buildings, gradeScale);
+  concentrateStoredOre(state, buildings, gradeScale);
+  return releasedKg;
 }
 
 /**
