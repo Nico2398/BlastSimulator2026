@@ -501,7 +501,7 @@ export class ChargeStep {
     wrap.append(messageRow, actionRow);
     // A shortage is a warning only while water is a threat: a wet hole, or rain within the day (#2149).
     if (insufficientStock && (wetUntubed > 0 || rainSoon)) {
-      wrap.appendChild(reasonLine(t('ui.blast_workshop.charge.tubing_reason', { stock: inventory, need: untubedIds.length })));
+      wrap.appendChild(reasonLine(t(untubedIds.length === 1 ? 'ui.blast_workshop.charge.tubing_reason_one' : 'ui.blast_workshop.charge.tubing_reason', { stock: inventory, need: untubedIds.length })));
     }
     return wrap;
   }
