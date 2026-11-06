@@ -100,7 +100,6 @@ export class NotificationCenter {
   private readonly warnedBlockedOrders = new Map<number, BlockedOrderReason>();
   /** True while a charge-awaiting-funds episode has already been toasted (#1345). */
   private chargeFundsWarned = false;
-  /** True while an explosives-in-transit episode has already been toasted (#1895); reset once nothing waits, so the next delivery wait toasts again. */
   /** Haul reasons already toasted; one toast per reason while it persists, not per haul action (#1369). */
   private readonly warnedHaulReasons = new Set<BlockedOrderReason>();
   /** Crew/fleet block groups already toasted this episode (#2099). */

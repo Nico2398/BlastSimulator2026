@@ -345,7 +345,7 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
   const fits = createStorageFit(state);
   let flipped = false;
   // Every reason reads red, not only an unreachable target: a reachable order
-  // nobody will work (explosives in transit, nowhere to unload) idles the crew too.
+  // nobody will work (an unaffordable charge, nowhere to unload) idles the crew too.
   const stampBlocked = (ghost: GhostPreview | undefined, action: PendingAction): void => {
     if (ghost === undefined) return;
     const blocked = action.blockedReason != null;
