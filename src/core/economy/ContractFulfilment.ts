@@ -6,7 +6,7 @@ import { deliverMaterials, isAutoDeliverable, isPaidClearance, remainingKg, sort
 import { addExpense, addIncome, type FinanceState } from './Finance.js';
 import { consumeStoredOre, type LogisticsState } from './Logistics.js';
 import { rubbleStockKg } from './SpoilHeaps.js';
-import type { ContractType } from './Contract.js';
+import type { Contract, ContractType } from './Contract.js';
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { recordOreDelivery } from './MineGrade.js';
@@ -36,6 +36,8 @@ interface DeliveryOutcome {
 /** One automatic delivery, tagged with its contract. */
 export interface AutoDelivery extends DeliveryOutcome {
   contractId: number;
+  /** True when the contract was accepted automatically; its cashflow carries its own label (#2145). */
+  auto?: boolean;
 }
 
 /**
@@ -144,4 +146,29 @@ export function settleDelivery(
   state.saturation ??= {};
   const sale = recordOreSale(state.saturation, oreId, delivery.kg, tick, state.grade.grade);
   if (sale.crossed) emitter?.emit('progression:ore_glut', { oreId, saturation: sale.after });
+}
+
+/** One automatic sale of unclaimed stored ore (#2145). */
+export interface AutoSale {
+  oreId: string;
+  kg: number;
+  payment: number;
+}
+
+/**
+ * Sell stored ore no active contract claims, once it has stayed unclaimed for AUTO_SALE_DWELL_TICKS (#2145).
+ * Performs the whole sale on `state`: draws the ore down, books `sales` income, records saturation and mine grade.
+ * Sells nothing when `state.contracts.autoSell === false`.
+ */
+export function autoSellUnclaimedOre(_state: GameState, _tick: number): AutoSale[] {
+  throw new Error('not implemented');
+}
+
+/**
+ * Accept every available rubble clearance that pays the player and fits `rubbleStockKg` of barren rock,
+ * stock shared across the accepted offers (#2145). Paid clearances are never taken.
+ * Accepts nothing when `contracts.autoClearRubble === false`. Returns the accepted contracts, flagged `autoAccepted`.
+ */
+export function autoAcceptRubbleClearances(_contracts: ContractState, _rubbleStockKg: number, _tick: number): Contract[] {
+  throw new Error('not implemented');
 }

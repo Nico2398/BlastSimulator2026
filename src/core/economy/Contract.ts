@@ -60,6 +60,8 @@ export interface Contract {
   playerPays?: boolean;
   /** Buyer tier that posted the offer. Absent means the legacy untiered market. */
   buyerTier?: BuyerTierId;
+  /** True when automatic rubble clearance accepted this contract, not the player (#2145). */
+  autoAccepted?: boolean;
 }
 
 // ── Negotiation outcome (types live here, not in Negotiation.ts, so
@@ -90,6 +92,12 @@ export interface ContractState {
   lastNegotiation: { contractId: number; success: boolean; changes: NegotiationChange[] } | null;
   /** Market pricing this contract board; absent = 'legacy' (#1681). */
   market?: MarketId;
+  /** Automatic sale of unclaimed stored ore; absent = the level's default (on, off on the tutorial) (#2145). */
+  autoSell?: boolean;
+  /** Automatic acceptance of paying rubble clearances; absent = the level's default (#2145). */
+  autoClearRubble?: boolean;
+  /** Tick each ore was first seen unclaimed in storage, for the automatic-sale dwell (#2145). */
+  autoSaleSince?: Record<string, number>;
 }
 
 export function createContractState(): ContractState {

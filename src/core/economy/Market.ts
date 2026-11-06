@@ -88,3 +88,8 @@ export function oreContractBasePrice(oreId: string, id: MarketId = 'legacy'): nu
   if (id === 'production') return oreValuePerKg(oreId, id);
   return (ORE_PRICES as Record<string, number>)[oreId] ?? 10;
 }
+
+/** Dollars per kg an automatic sale of unclaimed ore pays: AUTO_SALE_PRICE_FACTOR of the market's ore value, cut by the ore's saturation (0..1) (#2145). */
+export function autoSalePricePerKg(_oreId: string, _id: MarketId, _saturation: number): number {
+  throw new Error('not implemented');
+}
