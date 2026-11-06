@@ -143,9 +143,16 @@ export const SETUP_COMMAND_ALLOWLIST = [
 /** Time control is a player affordance (the speed button), so it is separate. */
 export const TIME_COMMAND_ALLOWLIST = ['tick', 'time'] as const;
 
+/**
+ * Setup-time automation switches: `contract auto sell|rubble on|off` configures the world a scripted run starts from,
+ * so a scenario that trades by hand can turn the automatic sale / clearance off. The panel has the same toggles for a player.
+ */
+const SETUP_COMMAND_PATTERN = /^contract\s+auto\s+(sell|rubble)\s+(on|off)$/;
+
 /** True when `command`'s first token may appear in a `role: 'setup'` step. */
 export function isAllowedSetupCommand(command: string): boolean {
   const token = command.trim().split(/\s+/)[0] ?? '';
   return (SETUP_COMMAND_ALLOWLIST as readonly string[]).includes(token)
-    || (TIME_COMMAND_ALLOWLIST as readonly string[]).includes(token);
+    || (TIME_COMMAND_ALLOWLIST as readonly string[]).includes(token)
+    || SETUP_COMMAND_PATTERN.test(command.trim());
 }
