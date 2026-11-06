@@ -587,7 +587,8 @@ export function releaseBarrenStoredFragments(
  * Concentrate one stored ore-bearing fragment (#2142): keep only the ore's mass in the
  * warehouse and credit the barren remainder to the first spoil heap with room (net of
  * `reservedKg`). Returns kg moved to a heap; 0 (nothing changed) when no heap holds the
- * whole remainder or there is no remainder.
+ * whole remainder or there is no remainder. A barren fragment (densities summing to 0) is
+ * a no-op: nothing to concentrate.
  */
 export function concentrateStoredFragment(
   state: LogisticsState,
