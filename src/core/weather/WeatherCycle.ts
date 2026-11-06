@@ -173,3 +173,13 @@ export function rainIntensity(state: WeatherState): number {
     default: return 0;
   }
 }
+
+/** True when it rains now or at any of the next `ticks` ticks of the forecast; the live cycle is untouched. */
+export function rainWithinTicks(cycle: WeatherCycleState, ticks: number, biomeId?: string): boolean {
+  if (isRaining(cycle.current)) return true;
+  const sim: WeatherCycleState = { ...cycle, history: [] };
+  for (let tick = 0; tick < ticks; tick++) {
+    if (isRaining(tickWeather(sim, biomeId))) return true;
+  }
+  return false;
+}
