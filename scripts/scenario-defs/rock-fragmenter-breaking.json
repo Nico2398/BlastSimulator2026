@@ -20,6 +20,28 @@
       }
     },
     {
+      "command": "contract auto sell off",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract auto sell off"
+        }
+      ],
+      "description": "This scenario watches cash fall from upkeep; automatic ore sale and rubble clearance (#2145) would add income."
+    },
+    {
+      "command": "contract auto rubble off",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract auto rubble off"
+        }
+      ],
+      "description": "This scenario watches cash fall from upkeep; automatic ore sale and rubble clearance (#2145) would add income."
+    },
+    {
       "command": "set_policy mode:continuous fatigue:0",
       "interaction": [
         {
