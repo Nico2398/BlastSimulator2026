@@ -30,6 +30,16 @@ function setup(spacing: number) {
 const chargeOrders = (s: GameState) => s.pendingActions.filter(a => a.type === 'charge_hole');
 
 describe('charging truck, far holes (#1660 symptom 1)', () => {
+  it('funds charge orders upfront and assigns work without a delivery wait', () => {
+    const { run, state } = setup(4);
+    const orders = chargeOrders(state);
+    expect(orders).toHaveLength(2);
+    expect(orders.every(order => (order.payload['orderCost'] as number) > 0)).toBe(true);
+    expect(orders.every(order => order.payload['deliveryArrivalTick'] === undefined)).toBe(true);
+    tickFunded(run, state, () => chargeOrders(state).some(order => order.holderId !== null), 100);
+    expect(chargeOrders(state).some(order => order.holderId !== null)).toBe(true);
+  });
+
   it('spacing 5 charges both holes within 600 ticks', () => {
     const { run, state } = setup(5);
     tickFunded(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 600);
