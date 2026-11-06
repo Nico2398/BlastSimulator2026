@@ -18,6 +18,7 @@ import { completeVehicleGatedAction } from './VehicleReservation.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../mining/SurveyCalc.js';
 import { landDrilledHole } from '../mining/DrillPlan.js';
 import { landLoadedCharge } from '../mining/ChargePlan.js';
+import { loadChargeExplosive } from '../mining/ExplosiveStock.js';
 import { prefetchBlastZone } from '../mining/BlastExecution.js';
 import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
 import { recordBuiltRamp } from '../mining/RampWidening.js';
@@ -215,7 +216,9 @@ export function applyTaskCompletion(
       const planned = state.plannedChargesByHole[holeId];
       if (planned) {
         delete state.plannedChargesByHole[holeId];
-        const loaded = landLoadedCharge(planned);
+        // Pay on fill (#2143): stock draws and cash book now, not at order time.
+        const { fromStockKg } = loadChargeExplosive(state, planned.explosiveId, planned.amountKg);
+        const loaded = landLoadedCharge({ ...planned, ...(fromStockKg > 0 && { fromStockKg }) });
         state.chargesByHole[holeId] = loaded;
         report.chargeLoaded = { holeId, explosiveId: loaded.explosiveId, amountKg: loaded.amountKg };
         // Generate the rock this hole will blast now, while charging, rather

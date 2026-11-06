@@ -1,7 +1,7 @@
 /** Pure grouping model for the Operations work queue (#1972): auto-debris orders collapse into one row per type. */
 import type { PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { isAutoDebrisAction, type AutoDebrisActionType } from '../../core/economy/HaulDispatch.js';
-import { classifyQueuedBlock, isInTransitBlock, rankBlockedKinds, tallyBlockedReason } from '../notify/blockedOrders.js';
+import { classifyQueuedBlock, rankBlockedKinds, tallyBlockedReason } from '../notify/blockedOrders.js';
 
 export const DEBRIS_GROUP_PAGE_SIZE = 25;
 
@@ -17,7 +17,6 @@ export interface DebrisGroup {
   inProgress: number;
   blocked: number;
   stranded: number;
-  inTransit: number;
   /** Queued orders per blocked reason (failure reasons drive the cause line). */
   blockedReasons: Partial<Record<BlockedOrderReason, number>>;
 }
@@ -38,7 +37,7 @@ export function partitionWorkQueue(actions: readonly PendingAction[]): WorkQueue
     }
     let g = groups.get(a.type);
     if (!g) {
-      g = { type: a.type, ids: [], total: 0, queued: 0, open: 0, assigned: 0, inProgress: 0, blocked: 0, stranded: 0, inTransit: 0, blockedReasons: {} };
+      g = { type: a.type, ids: [], total: 0, queued: 0, open: 0, assigned: 0, inProgress: 0, blocked: 0, stranded: 0, blockedReasons: {} };
       groups.set(a.type, g);
     }
     g.ids.push(a.id);
@@ -60,18 +59,14 @@ export function partitionWorkQueue(actions: readonly PendingAction[]): WorkQueue
 
 /** Counts-only signature of a group (no ids). */
 export function debrisGroupSignature(group: DebrisGroup): string {
-  return `${group.type}:${group.total}:${group.queued}:${group.open}:${group.assigned}:${group.inProgress}:${group.blocked}:${group.stranded}:${group.inTransit}:${rankBlockedKinds(group.blockedReasons).map(e => `${e.kind}=${e.count}`).join(',')}`;
+  return `${group.type}:${group.total}:${group.queued}:${group.open}:${group.assigned}:${group.inProgress}:${group.blocked}:${group.stranded}:${rankBlockedKinds(group.blockedReasons).map(e => `${e.kind}=${e.count}`).join(',')}`;
 }
 
-/** Signature of a list of order rows (player orders, or one expanded debris page); `tick` included for time-dependent display. */
-export function orderRowsSignature(rows: readonly PendingAction[], tick: number): string {
+/** Signature of a list of order rows (player orders, or one expanded debris page). */
+export function orderRowsSignature(rows: readonly PendingAction[]): string {
   let sig = '';
-  let inTransit = false;
-  for (const a of rows) {
-    sig += `${a.id}:${a.status}:${a.holderId}:${a.blockedReason ?? ''};`;
-    if (a.status === 'queued' && isInTransitBlock(a)) inTransit = true;
-  }
-  return inTransit ? `${sig}@${tick}` : sig;
+  for (const a of rows) sig += `${a.id}:${a.status}:${a.holderId}:${a.blockedReason ?? ''};`;
+  return sig;
 }
 
 /** Number of pages a group of `total` orders spans. */
