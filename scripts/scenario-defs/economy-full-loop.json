@@ -1140,10 +1140,10 @@
           "employeeCount": 4,
           "buildingCount": 2,
           "vehicleCount": 2,
-          "activeContractCount": 0,
+          "activeContractCount": 1,
           "surveyCount": 1
         },
-        "note": "#1895: activeContractCount is 0, not 1: the delivery wait gives the haulers a longer run before the sale, so the 200 kg delivery fills the fillable ore_sale offer in full and completes it."
+        "note": "#2142: activeContractCount is 1: re-measured after ore concentration on arrival (the warehouse keeps only the ore of each load) shifted hauling and the contract board's draws: the 200 kg sale now part-fills its offer and one contract stays active. Supersedes #1895."
       }
     }
   ]

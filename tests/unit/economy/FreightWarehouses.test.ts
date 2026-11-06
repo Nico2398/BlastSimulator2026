@@ -11,6 +11,8 @@ import {
   splitStoredFragmentMass,
   sellFragment,
   returnFragmentToGround,
+  concentrateStoredFragment,
+  concentrateStoredOre,
   type LogisticsState,
 } from '../../../src/core/economy/Logistics.js';
 import {
@@ -442,5 +444,100 @@ describe('loseOrphanedStock result is unchanged by the shared breakdown (#1757)'
     expect(losses[0]!.oreKg.dirtite).toBeCloseTo(oreContributionKg(200 / 2500, 0.3) + oreContributionKg(60 / 2500, 0.5) + oreContributionKg(40 / 2500, 0.25), 6);
     expect(losses[0]!.oreKg.blingite).toBeCloseTo(oreContributionKg(200 / 2500, 0.1), 6);
     for (const [id, kg] of Object.entries(before.oreKg)) expect(losses[0]!.oreKg[id]).toBeCloseTo(kg, 6);
+  });
+});
+
+describe('ore concentration keeps the ore in its warehouse and frees the rest (#2142)', () => {
+  const heap = (id = 90) => ({ id, type: 'spoil_heap' as const, tier: 1 as const, storedSpoilKg: 0 });
+  const ROOMY: WarehouseSite = { id: 10, x: 0, z: 0, capacityKg: 1000 };
+  const richMass = 800;
+
+  function stockedWithOre(): { l: LogisticsState; ore: Record<string, number> } {
+    const ore: Record<string, number> = {};
+    const l = createLogisticsState(ROOMY.capacityKg);
+    addBlastFragments(l, [realFrag(1, richMass, { dirtite: 0.25 })]);
+    expect(haul(l, 1, ore, [ROOMY])).toBe(true);
+    return { l, ore };
+  }
+
+  it('the fragment stays in the same warehouse, which then stores only its ore mass', () => {
+    const { l } = stockedWithOre();
+    expect(warehouseStoredKg(l, ROOMY.id)).toBe(richMass);
+
+    const moved = concentrateStoredFragment(l, l.fragments[0]!, [heap()]);
+
+    expect(moved).toBeCloseTo(600, 6);
+    expect(wid(l, 1)).toBe(ROOMY.id);
+    expect(warehouseStoredKg(l, ROOMY.id)).toBeCloseTo(200, 6);
+    expect(l.storedMassKg).toBeCloseTo(200, 6);
+  });
+
+  it('the warehouse gains the freed room, so a hauler that did not fit before now does', () => {
+    const { l } = stockedWithOre();
+    expect(warehouseFreeKg(l, ROOMY)).toBeCloseTo(200, 6);
+    expect(pickWarehouse(l, [ROOMY], 0, 0, 700)).toBeNull();
+
+    concentrateStoredFragment(l, l.fragments[0]!, [heap()]);
+
+    expect(warehouseFreeKg(l, ROOMY)).toBeCloseTo(800, 6);
+    expect(pickWarehouse(l, [ROOMY], 0, 0, 700)?.id).toBe(ROOMY.id);
+    expect(pickWarehouse(l, [ROOMY], 0, 0, 900)).toBeNull();
+  });
+
+  it('warehouseStockByOre reports the same ore kg and no barren share afterwards', () => {
+    const { l } = stockedWithOre();
+    const before = warehouseStockByOre(l, ROOMY.id);
+    expect(before.barrenKg).toBeGreaterThan(0);
+
+    concentrateStoredFragment(l, l.fragments[0]!, [heap()]);
+    const after = warehouseStockByOre(l, ROOMY.id);
+
+    expect(after.oreKg.dirtite).toBeCloseTo(before.oreKg.dirtite!, 6);
+    expect(after.oreKg.dirtite).toBeCloseTo(oreContributionKg(richMass / 2500, 0.25), 6);
+    expect(after.barrenKg).toBeCloseTo(0, 6);
+    expect(after.storedKg).toBeCloseTo(after.oreKg.dirtite!, 6);
+  });
+
+  it('collectedOre, filled at delivery, is not changed by concentrating', () => {
+    const { l, ore } = stockedWithOre();
+    const before = { ...ore };
+    expect(before.dirtite).toBeCloseTo(200, 6);
+
+    concentrateStoredOre(l, [heap()]);
+
+    expect(ore).toEqual(before);
+  });
+
+  it('a warehouse one fragment from full takes another after the first is concentrated', () => {
+    const ore: Record<string, number> = {};
+    const site: WarehouseSite = { id: 10, x: 0, z: 0, capacityKg: 1000 };
+    const l = createLogisticsState(1000);
+    addBlastFragments(l, [realFrag(1, 1000, { dirtite: 0.25 }), realFrag(2, 700, { dirtite: 0.25 })]);
+    expect(haul(l, 1, ore, [site])).toBe(true);
+    expect(pickupFragment(l, 2, 'v1', [site], 0, 0)).toBe(false);
+
+    concentrateStoredOre(l, [heap()]);
+
+    expect(pickupFragment(l, 2, 'v1', [site], 0, 0)).toBe(true);
+    expect(warehouseFreeKg(l, site)).toBeCloseTo(50, 6);
+  });
+
+  it('with no heap, nothing is concentrated and the warehouse stays as full as before', () => {
+    const { l } = stockedWithOre();
+
+    expect(concentrateStoredOre(l, [])).toBe(0);
+    expect(warehouseStoredKg(l, ROOMY.id)).toBe(richMass);
+    expect(warehouseStockByOre(l, ROOMY.id).barrenKg).toBeGreaterThan(0);
+  });
+
+  it('selling the concentrated ore leaves the warehouse empty (no stray barren)', () => {
+    const { l, ore } = stockedWithOre();
+    concentrateStoredOre(l, [heap()]);
+
+    const sold = consumeStoredOre(l, ore, 'dirtite', 200, [heap()]);
+
+    expect(sold.consumedKg).toBeCloseTo(200, 6);
+    expect(warehouseStoredKg(l, ROOMY.id)).toBeCloseTo(0, 6);
+    expect(l.storedMassKg).toBeCloseTo(0, 6);
   });
 });

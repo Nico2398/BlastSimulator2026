@@ -3074,8 +3074,14 @@ export const PRODUCTION_ORE_SALE_PRICE_FACTOR = { min: 0.9, max: 1.1 } as const;
 export const PRODUCTION_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
 /** Rubble disposal pay (dollars/kg): cents, since the volume is huge. */
 export const PRODUCTION_RUBBLE_PRICE_PER_KG = { min: 0.01, max: 0.03 } as const;
-/** Barren rock (kg) one spoil heap holds before it is full (#1892). */
-export const SPOIL_HEAP_CAPACITY_KG = 50_000;
+/**
+ * Barren rock (kg) one spoil heap holds before it is full (#1892), sized to one opening shot (#2142).
+ * Measured on the ordinary 3x3 desert shot (5 m holes, 4 m spacing, krackle 4 kg, sandbox default ore
+ * grade): the broken rock is 1,423.8 t (seed 42) to 1,434.3 t (seed 12345), of which 28.4-33.5 t is ore,
+ * so the barren remainder concentration sends to a heap is 1,395-1,401 t. 1,500 t holds that with ~7%
+ * slack: one heap takes a whole opening shot.
+ */
+export const SPOIL_HEAP_CAPACITY_KG = 1_500_000;
 /** Largest share of the site's barren stock a cheap rubble clearance asks for (#1892). */
 export const RUBBLE_CHEAP_STOCK_SHARE_MAX = 0.5;
 /** Largest share of the site's barren stock a paid rubble clearance asks for (#1892). */
