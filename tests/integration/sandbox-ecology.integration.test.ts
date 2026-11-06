@@ -149,7 +149,7 @@ describe('sandbox ecology under ordinary play (#1733)', () => {
     const { state } = site;
     const windows: Array<{ pre: number; startSample: number }> = [];
     let notBefore = 0;
-    while (!state.levelEnded && state.tickCount < RUN_TICKS) {
+    while (!state.levelEnded && state.tickCount < RUN_TICKS && notBefore < RUN_TICKS) { // no pattern is begun whose shot would fall past the run (#2143: charging no longer waits on delivery, so shots drift)
       const pre = fireOrdinaryPattern(site, notBefore);
       windows.push({ pre, startSample: site.samples.length });
       notBefore = state.tickCount + BLAST_INTERVAL;
