@@ -22,6 +22,17 @@
       }
     },
     {
+      "command": "contract auto sell off",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract auto sell off"
+        }
+      ],
+      "description": "The scripted contract deliveries need the stored ore; automatic sale (#2145) would sell it first."
+    },
+    {
       "command": "permit status",
       "role": "observe",
       "interaction": [

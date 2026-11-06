@@ -606,3 +606,62 @@ describe('Shareholder Summit level (#1949)', () => {
     }
   });
 });
+
+// ── autoFulfilmentEnabled (#2145) ───────────────────────────────────────────
+
+import { autoFulfilmentEnabled } from '../../../src/core/campaign/Level.js';
+
+describe('autoFulfilmentEnabled (#2145)', () => {
+  const KEYS = ['autoSell', 'autoClearRubble'] as const;
+  const gameIn = (levelId: string | null) => {
+    const state = createGame({ seed: 42 });
+    state.campaign.activeLevelId = levelId;
+    return state;
+  };
+
+  it('only the tutorial level teaches contracts by hand', () => {
+    expect(getLevel('tutorial_pit')!.manualContracts).toBe(true);
+    for (const level of getAllLevels().filter(l => l.id !== 'tutorial_pit')) {
+      expect(level.manualContracts, level.id).toBeFalsy();
+    }
+  });
+
+  it.each(KEYS)('%s defaults on with no active level', (key) => {
+    expect(autoFulfilmentEnabled(gameIn(null), key)).toBe(true);
+  });
+
+  it.each(KEYS)('%s defaults on in a campaign level', (key) => {
+    expect(autoFulfilmentEnabled(gameIn('dusty_hollow'), key)).toBe(true);
+  });
+
+  it.each(KEYS)('%s defaults on in the sandbox', (key) => {
+    expect(autoFulfilmentEnabled(gameIn(SANDBOX_LEVEL_ID), key)).toBe(true);
+  });
+
+  it.each(KEYS)('%s defaults off in the tutorial', (key) => {
+    expect(autoFulfilmentEnabled(gameIn('tutorial_pit'), key)).toBe(false);
+  });
+
+  it.each(KEYS)('an explicit true on %s wins over the tutorial default', (key) => {
+    const state = gameIn('tutorial_pit');
+    state.contracts[key] = true;
+    expect(autoFulfilmentEnabled(state, key)).toBe(true);
+  });
+
+  it.each(KEYS)('an explicit false on %s wins over the default on', (key) => {
+    const state = gameIn('dusty_hollow');
+    state.contracts[key] = false;
+    expect(autoFulfilmentEnabled(state, key)).toBe(false);
+  });
+
+  it('the two switches are independent', () => {
+    const state = gameIn('dusty_hollow');
+    state.contracts.autoSell = false;
+    expect(autoFulfilmentEnabled(state, 'autoSell')).toBe(false);
+    expect(autoFulfilmentEnabled(state, 'autoClearRubble')).toBe(true);
+    const tutorial = gameIn('tutorial_pit');
+    tutorial.contracts.autoClearRubble = true;
+    expect(autoFulfilmentEnabled(tutorial, 'autoSell')).toBe(false);
+    expect(autoFulfilmentEnabled(tutorial, 'autoClearRubble')).toBe(true);
+  });
+});

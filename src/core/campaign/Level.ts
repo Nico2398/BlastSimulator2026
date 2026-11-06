@@ -86,6 +86,8 @@ export interface LevelDef {
   hiringScript?: readonly ScriptedCandidate[];
   /** Fixed ore-sale offer guaranteed on the contract board; omitted = none (#1600). */
   scriptedOreSale?: ScriptedOreSaleOffer;
+  /** True when the level teaches contracts by hand: automatic ore sales and rubble clearances default off (#2145). */
+  manualContracts?: boolean;
   /** Market pricing this level; omitted = 'legacy' (#1681). */
   market?: MarketId;
   /** Turns the mine-grade progression ladder on; omitted = off (#1921). */
@@ -109,6 +111,7 @@ const LEVELS: readonly LevelDef[] = [
     id: 'tutorial_pit',
     hiringScript: TUTORIAL_HIRING_SCRIPT,       // Same four hires on every run (#1600)
     scriptedOreSale: TUTORIAL_ORE_SALE_OFFER,   // sell-ore never waits on the random board (#1600)
+    manualContracts: true,                      // the scripted ore sale teaches contracts: no automatic selling (#2145)
     startingSite: TUTORIAL_STARTING_SITE, // A free spoil heap from tick 0; no crew or fleet
     rallyPoint: TUTORIAL_RALLY_POINT,                       // Flat plateau, clear of the blast and the building pins
     startingBuildingsNear: TUTORIAL_STARTING_BUILDINGS_NEAR, // The heap on flat ground west of the box cut, clear of the blast
@@ -384,4 +387,12 @@ export function resolveHiringScript(state: GameState): readonly ScriptedCandidat
 export function resolveScriptedOreSale(state: GameState): ScriptedOreSaleOffer | undefined {
   const levelId = state.campaign.activeLevelId;
   return levelId ? getLevel(levelId)?.scriptedOreSale : undefined;
+}
+
+/** Whether an automatic contract behaviour is on: the player's explicit choice, else the level's default (#2145). */
+export function autoFulfilmentEnabled(state: GameState, key: 'autoSell' | 'autoClearRubble'): boolean {
+  const explicit = state.contracts[key];
+  if (explicit !== undefined) return explicit;
+  const levelId = state.campaign.activeLevelId;
+  return !(levelId && getLevel(levelId)?.manualContracts);
 }

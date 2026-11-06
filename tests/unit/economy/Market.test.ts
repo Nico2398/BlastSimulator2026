@@ -171,3 +171,56 @@ describe('Shareholder Summit contract prices (#2117)', () => {
     expect(oreContractBasePrice('dirtite', 'production') * SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER).toBeCloseTo(157.5, 6);
   });
 });
+
+// ── Automatic sale price (#2145) ────────────────────────────────────────────
+
+import { autoSalePricePerKg } from '../../../src/core/economy/Market.js';
+import { saturationFactor } from '../../../src/core/economy/OreSaturation.js';
+import { AUTO_SALE_PRICE_FACTOR, AUTO_SALE_DWELL_TICKS } from '../../../src/core/config/balance.js';
+
+describe('auto sale constants (#2145)', () => {
+  it('pays 0.6 of the market value', () => {
+    expect(AUTO_SALE_PRICE_FACTOR).toBe(0.6);
+  });
+
+  it('waits 20 ticks', () => {
+    expect(AUTO_SALE_DWELL_TICKS).toBe(20);
+  });
+});
+
+describe('autoSalePricePerKg (#2145)', () => {
+  it('is the factor times the legacy ore value on an unsaturated market', () => {
+    for (const ore of getAllOres()) {
+      expect(autoSalePricePerKg(ore.id, 'legacy', 0), ore.id).toBeCloseTo(AUTO_SALE_PRICE_FACTOR * ore.valuePerKg, 9);
+    }
+  });
+
+  it('is the factor times the production ore value on an unsaturated market', () => {
+    for (const id of Object.keys(PRODUCTION_ORE_PRICES)) {
+      expect(autoSalePricePerKg(id, 'production', 0), id).toBeCloseTo(AUTO_SALE_PRICE_FACTOR * oreValuePerKg(id, 'production'), 9);
+    }
+  });
+
+  it('is cut by the ore\'s saturation', () => {
+    for (const s of [0.25, 0.5, 1]) {
+      expect(autoSalePricePerKg('blingite', 'legacy', s)).toBeCloseTo(
+        AUTO_SALE_PRICE_FACTOR * oreValuePerKg('blingite', 'legacy') * saturationFactor(s), 9,
+      );
+    }
+  });
+
+  it('falls as saturation rises', () => {
+    expect(autoSalePricePerKg('blingite', 'production', 0.9)).toBeLessThan(autoSalePricePerKg('blingite', 'production', 0.1));
+  });
+
+  it('pays less than the board\'s base price for the same ore', () => {
+    for (const id of ORE_IDS) {
+      expect(autoSalePricePerKg(id, 'production', 0)).toBeLessThan(oreContractBasePrice(id, 'production'));
+    }
+  });
+
+  it('an unknown ore is worth nothing in legacy and the cheapest ore\'s share in production', () => {
+    expect(autoSalePricePerKg('nonsense', 'legacy', 0)).toBe(0);
+    expect(autoSalePricePerKg('nonsense', 'production', 0)).toBeCloseTo(AUTO_SALE_PRICE_FACTOR * oreValuePerKg('dirtite', 'production'), 9);
+  });
+});

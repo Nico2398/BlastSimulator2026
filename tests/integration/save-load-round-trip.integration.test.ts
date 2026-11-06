@@ -34,6 +34,7 @@ type TickRecord = Record<string, string | number>;
 /** Plays the scripted standard opening until `state.tickCount - start` reaches `untilElapsed`. */
 function playStandardOpening(run: Run, ctx: GameContext, untilElapsed: number): void {
   const state = ctx.state!;
+  state.contracts.autoSell = false; state.contracts.autoClearRubble = false; // stock under test must not be sold off or cleared (#2145)
   const startTick = state.tickCount;
   const over = () => state.levelEnded || state.tickCount - startTick >= untilElapsed;
   const playUntil = (max: number, done: () => boolean) => {

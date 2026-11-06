@@ -24,6 +24,28 @@
       "description": "#553: staffed:true added -- cash:150000 sits on this new_game, not on the campaign start below, because that command fails outright (grumpstone_ridge is tier-2, locked on a fresh campaign, Finding #59), so it never replaces this state and a cash: on it would be discarded with the rest of the command. staffed:true hires and equips its own free crew before any assertion here: employee #1 driller (blasting lvl1, driving.drill_rig lvl1), #2 blaster, #3-5 drivers, vehicle #1 drill_rig, #2 debris_hauler, #3 rock_digger, #4 rock_fragmenter -- free, not deducted from cash, which is why employeeCount is already 5 here instead of 0. All four vehicles come unmanned (driverId: null); vehicle driver 1 1 immediately below crews the free rig with the free driller, since drill_hole is now a queued, vehicle-gated action and nothing drills without a driver aboard. The extra $100,000 over the sandbox default is what the three-vehicle fleet at step 36 needs, same as before -- but see the pattern-1 drill-wait step further down for what that budget can no longer survive once drilling takes hundreds of ticks instead of zero. #1895 merge of #1907: cash raised from $5,000,000 to $5,500,000 -- the last 49-hole charge order now waits out the explosives delivery with the crew on payroll and at $5,000,000 the site was $1,200 overdrawn after the blast, so the rubble-disposal contract could not be accepted. wellBeing/safety/ecology/nuisance and deathCount (4 -> 5 at the last blast) re-measured from deterministic command-mode runs; the level still completes."
     },
     {
+      "command": "contract auto sell off",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract auto sell off"
+        }
+      ],
+      "description": "The scripted contract deliveries need the stored ore; automatic sale (#2145) would sell it first."
+    },
+    {
+      "command": "contract auto rubble off",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract auto rubble off"
+        }
+      ],
+      "description": "The scripted run's contract and event timeline assumes no automatic rubble clearance (#2145)."
+    },
+    {
       "command": "set_policy mode:continuous fatigue:0",
       "interaction": [
         {

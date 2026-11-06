@@ -26,7 +26,8 @@ import { el, fieldStyle, button, card, sectionHeader, emptyState, progressBar, p
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg, insufficientFundsText, wholeKg } from '../../core/economy/formatMoney.js';
-import { resolveContractOres } from '../../core/campaign/Level.js';
+import { AUTO_SALE_PRICE_FACTOR } from '../../core/config/balance.js';
+import { autoFulfilmentEnabled, resolveContractOres } from '../../core/campaign/Level.js';
 import { getProfitShortfall } from '../../core/campaign/LevelObjective.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import { makeBuyerBadge, makeMarketStrip, type MarketStripInput } from './ContractsMarketStrip.js';
@@ -151,6 +152,7 @@ export class ContractsPanel extends PanelBase {
       available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}:${c.negotiationAttempts ?? 0}:${contractAcceptBlocker(c, true, state.cash) === null ? 1 : 0}`),
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
+      auto: [autoFulfilmentEnabled(state, 'autoSell'), autoFulfilmentEnabled(state, 'autoClearRubble')],
       managerLevel: bestAvailableManagerLevel(state.employees.employees),
       market: market && {
         grade: market.grade,
@@ -183,6 +185,7 @@ export class ContractsPanel extends PanelBase {
     const sections: (HTMLElement | null)[] = [
       this.makeMarketSection(state, siteOres),
       this.makeStorageStrip(state),
+      this.makeAutoStrip(state),
       this.makeActiveSummaryStrip(state, activeHeader),
       sectionHeader(t('ui.contracts.available_count', { count: state.contracts.available.length })),
       scrollBoundedSection(
@@ -294,6 +297,31 @@ export class ContractsPanel extends PanelBase {
     linkBtn.style.cssText = 'height:26px;align-self:flex-start;font-size:10px;padding:0 9px';
 
     return card([headRow, progressBar(pct, 'var(--bsx-amber)'), oreEntries.length > 0 ? chipsRow : null, linkBtn]);
+  }
+
+  // ── Automatic fulfilment toggles (#2145) ──
+
+  private makeAutoStrip(state: GameState): HTMLElement {
+    const toggle = (target: 'sell' | 'rubble', key: 'autoSell' | 'autoClearRubble', labelKey: string, hintKey: string): HTMLElement => {
+      const on = autoFulfilmentEnabled(state, key);
+      const btn = button(on ? 'primary' : 'ghost', t(on ? 'ui.contracts.auto_on' : 'ui.contracts.auto_off'), {
+        dataAction: `auto-${target}-toggle`,
+        onClick: () => this.gameConsole?.(`contract auto ${target} ${on ? 'off' : 'on'}`),
+      });
+      btn.style.cssText = 'height:26px;padding:0 10px;font-size:10px;flex-shrink:0';
+      const text = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:2px;min-width:0;flex:1' } });
+      text.append(
+        el('span', { text: t(labelKey), attrs: { style: 'font:600 11px/1.2 var(--bsx-font-ui)' } }),
+        el('span', { text: t(hintKey, { pct: Math.round(AUTO_SALE_PRICE_FACTOR * 100) }), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+      );
+      const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
+      row.append(text, btn);
+      return row;
+    };
+    return card([
+      toggle('sell', 'autoSell', 'ui.contracts.auto_sell', 'ui.contracts.auto_sell_hint'),
+      toggle('rubble', 'autoClearRubble', 'ui.contracts.auto_rubble', 'ui.contracts.auto_rubble_hint'),
+    ]);
   }
 
   // ── Active summary strip ──

@@ -1,16 +1,18 @@
 // BlastSimulator2026 — Delivery of stored ore to active contracts, by hand or automatically.
 
-import { FRAGMENT_SPLIT_EPSILON_KG, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
+import { AUTO_SALE_DWELL_TICKS, FRAGMENT_SPLIT_EPSILON_KG, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
-import { deliverMaterials, isAutoDeliverable, isPaidClearance, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
+import { acceptContract, deliverMaterials, isAutoDeliverable, isPaidClearance, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
 import { addExpense, addIncome, type FinanceState } from './Finance.js';
 import { consumeStoredOre, type LogisticsState } from './Logistics.js';
 import { rubbleStockKg } from './SpoilHeaps.js';
-import type { ContractType } from './Contract.js';
+import type { Contract, ContractType } from './Contract.js';
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { recordOreDelivery } from './MineGrade.js';
-import { recordOreSale } from './OreSaturation.js';
+import { recordOreSale, saturationAt } from './OreSaturation.js';
+import { autoSalePricePerKg } from './Market.js';
+import { oreGradeScaleOf } from './OreGrade.js';
 import { recordBoardOre } from './Board.js';
 import type { Building } from '../entities/Building.js';
 
@@ -36,6 +38,8 @@ interface DeliveryOutcome {
 /** One automatic delivery, tagged with its contract. */
 export interface AutoDelivery extends DeliveryOutcome {
   contractId: number;
+  /** True when the contract was accepted automatically; its cashflow carries its own label (#2145). */
+  auto?: boolean;
 }
 
 /**
@@ -99,7 +103,7 @@ export function autoDeliverContracts(
     const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.fragments, buildings, gradeScale));
     if (stock <= FRAGMENT_SPLIT_EPSILON_KG) continue;
     const result = deliverStoredOre(contracts, logistics, collectedOre, contract.id, stock, tick, buildings, gradeScale);
-    if (result.success && result.data.kg > 0) deliveries.push({ contractId: contract.id, ...result.data });
+    if (result.success && result.data.kg > 0) deliveries.push({ contractId: contract.id, ...result.data, ...(contract.autoAccepted ? { auto: true } : {}) });
   }
   return deliveries;
 }
@@ -108,10 +112,10 @@ export function autoDeliverContracts(
 export function bookDeliveryCashflow(
   account: { cash: number; finances: FinanceState },
   contractId: number,
-  outcome: Pick<DeliveryOutcome, 'payment' | 'bonus' | 'fee'>,
+  outcome: Pick<DeliveryOutcome, 'payment' | 'bonus' | 'fee'> & { auto?: boolean },
   tick: number,
 ): void {
-  const label = `Contract #${contractId} delivery`;
+  const label = outcome.auto ? `Auto rubble clearance #${contractId}` : `Contract #${contractId} delivery`;
   if (outcome.fee) {
     if (outcome.payment <= 0) return;
     account.cash -= outcome.payment;
@@ -144,4 +148,72 @@ export function settleDelivery(
   state.saturation ??= {};
   const sale = recordOreSale(state.saturation, oreId, delivery.kg, tick, state.grade.grade);
   if (sale.crossed) emitter?.emit('progression:ore_glut', { oreId, saturation: sale.after });
+}
+
+/** One automatic sale of unclaimed stored ore (#2145). */
+export interface AutoSale {
+  oreId: string;
+  kg: number;
+  payment: number;
+}
+
+/**
+ * Sell stored ore no active contract claims, once it has stayed unclaimed for AUTO_SALE_DWELL_TICKS (#2145).
+ * Performs the whole sale on `state`: draws the ore down, books `sales` income, records saturation and mine grade.
+ * Sells nothing when `state.contracts.autoSell === false`.
+ */
+export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[] {
+  const contracts = state.contracts;
+  if (contracts.autoSell === false) return [];
+  const since = (contracts.autoSaleSince ??= {});
+  const claimed: Record<string, number> = {};
+  for (const c of contracts.active) {
+    if (c.type === 'rubble_disposal' || c.completed || c.expired) continue;
+    claimed[c.materialId] = (claimed[c.materialId] ?? 0) + remainingKg(c);
+  }
+  const sales: AutoSale[] = [];
+  const gradeScale = oreGradeScaleOf(state.world);
+  for (const [oreId, stock] of Object.entries(state.collectedOre)) {
+    const unclaimed = stock - (claimed[oreId] ?? 0);
+    if (!(unclaimed > FRAGMENT_SPLIT_EPSILON_KG)) {
+      delete since[oreId];
+      continue;
+    }
+    since[oreId] ??= tick;
+    if (tick - since[oreId]! < AUTO_SALE_DWELL_TICKS) continue;
+    const consumed = consumeStoredOre(state.logistics, state.collectedOre, oreId, unclaimed, state.buildings.buildings, gradeScale);
+    if (!consumed.success || !(consumed.consumedKg > 0)) continue;
+    const kg = consumed.consumedKg;
+    // Saturation only exists on a progression site (`state.grade`), as for a contract delivery (settleDelivery).
+    const saturation = state.grade !== undefined ? saturationAt(state.saturation?.[oreId], tick) : 0;
+    const payment = kg * autoSalePricePerKg(oreId, contracts.market ?? 'legacy', saturation);
+    state.cash += payment;
+    addIncome(state.finances, payment, 'sales', `Auto sale: ${oreId}`, tick);
+    recordOreDelivery(state.grade, 'ore_sale', kg);
+    recordBoardOre(state.board, 'ore_sale', kg);
+    if (state.grade !== undefined) recordOreSale((state.saturation ??= {}), oreId, kg, tick, state.grade.grade);
+    delete since[oreId];
+    sales.push({ oreId, kg, payment });
+  }
+  return sales;
+}
+
+/**
+ * Accept every available rubble clearance that pays the player and fits `rubbleStockKg` of barren rock,
+ * stock shared across the accepted offers (#2145). Paid clearances are never taken.
+ * Accepts nothing when `contracts.autoClearRubble === false`. Returns the accepted contracts, flagged `autoAccepted`.
+ */
+export function autoAcceptRubbleClearances(contracts: ContractState, rubbleStockKg: number, tick: number): Contract[] {
+  if (contracts.autoClearRubble === false) return [];
+  let room = rubbleStockKg;
+  const accepted: Contract[] = [];
+  for (const offer of [...contracts.available]) {
+    if (offer.type !== 'rubble_disposal' || isPaidClearance(offer) || offer.quantityKg > room) continue;
+    const contract = acceptContract(contracts, offer.id, tick);
+    if (!contract) continue;
+    contract.autoAccepted = true;
+    room -= contract.quantityKg;
+    accepted.push(contract);
+  }
+  return accepted;
 }

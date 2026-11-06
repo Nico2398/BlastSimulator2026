@@ -80,6 +80,7 @@ function fireReferenceShot(cols: number, chargeKg: number): Shot {
   recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
   expect(run('campaign start level:dusty_hollow seed:1138').success).toBe(true);
   const state = ctx.state!;
+  state.contracts.autoSell = false; state.contracts.autoClearRubble = false; // stock under test must not be sold off or cleared (#2145)
   run('time resume');
 
   // The warehouse the level opens with, raised to tier 2 (research gate skipped; capacity is the subject).

@@ -70,6 +70,7 @@ function openingKitHaul(side: 'west' | 'east') {
   const run = (c: string) => runner.run(c);
   expect(run(`sandbox start biome:desert_badlands difficulty:normal seed:${SEED} ore_grade:1`)).toMatchObject({ success: true });
   const state = ctx.state!;
+  state.contracts.autoSell = false; state.contracts.autoClearRubble = false; // stock under test must not be sold off or cleared (#2145)
   state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
   refresh(state);
 
