@@ -595,20 +595,19 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
     expect(state.drillHoles).toHaveLength(0);
   });
 
-  it('drill_plan remove on a loaded planned hole cancels its charge order and refunds the cost', () => {
+  it('drill_plan remove on a loaded planned hole cancels its charge order, which cost nothing', () => {
     const { run, state } = setupSavedPlan();
     fireBlast(run, state);
     expect(run('blast_plan load').success).toBe(true);
     const cashAfterLoad = state.cash;
     const action = state.pendingActions.find(a => a.type === 'charge_hole')!;
     const holeId = action.payload['holeId'] as string;
-    const cost = action.payload['orderCost'] as number;
 
     expect(run(`drill_plan remove hole:${holeId}`).success).toBe(true);
 
     expect(state.plannedChargesByHole[holeId]).toBeUndefined();
     expect(state.pendingActions.some(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId)).toBe(false);
-    expect(state.cash).toBeCloseTo(cashAfterLoad + cost, 5);
+    expect(state.cash).toBe(cashAfterLoad);
   });
 });
 

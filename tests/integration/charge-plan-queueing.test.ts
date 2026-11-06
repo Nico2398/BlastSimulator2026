@@ -495,7 +495,7 @@ describe('charge order cash cost: paid when the hole is loaded, not when ordered
     run('tick 5');
     expect(state.pendingActions.find(a => a.type === 'charge_hole')!.blockedReason).toBe('explosives_unaffordable');
     expect(state.chargesByHole[holeId]).toBeUndefined();
-    expect(state.cash).toBeGreaterThanOrEqual(0);
+    // Payroll can take the staffed site's cash below zero on its own; what matters is that no explosive was booked.
     expect(explosivesTotal(state)).toBe(0);
   });
 

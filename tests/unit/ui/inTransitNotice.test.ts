@@ -21,7 +21,7 @@ afterEach(() => setLocale('en'));
 describe('explosives_unaffordable notification wording (#2143)', () => {
   it('en: names the order, no arrival text, no raw key, no tick', () => {
     setLocale('en');
-    const msg = buildBlockedOrderMessage(chargeAction(), 280);
+    const msg = buildBlockedOrderMessage(chargeAction());
     expect(msg).toContain(t(ACTION_LABEL_KEY['charge_hole']));
     expect(msg).not.toMatch(/arriv|transit|on their way/i);
     expect(msg).not.toContain('tick');
@@ -30,14 +30,9 @@ describe('explosives_unaffordable notification wording (#2143)', () => {
 
   it('fr: names the order, no arrival text, no raw key', () => {
     setLocale('fr');
-    const msg = buildBlockedOrderMessage(chargeAction(), 280);
+    const msg = buildBlockedOrderMessage(chargeAction());
     expect(msg).toContain(t(ACTION_LABEL_KEY['charge_hole']));
     expect(msg).not.toMatch(/arriv|transit/i);
     expect(msg).not.toContain('notification.');
-  });
-
-  it('is the same with or without a clock reading', () => {
-    setLocale('en');
-    expect(buildBlockedOrderMessage(chargeAction())).toBe(buildBlockedOrderMessage(chargeAction(), 999));
   });
 });

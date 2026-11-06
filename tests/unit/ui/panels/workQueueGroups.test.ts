@@ -168,22 +168,22 @@ describe('debrisGroupSignature', () => {
 
 describe('orderRowsSignature', () => {
   it('is stable for equal input', () => {
-    expect(orderRowsSignature([act(1)], 5)).toBe(orderRowsSignature([act(1)], 5));
+    expect(orderRowsSignature([act(1)])).toBe(orderRowsSignature([act(1)]));
   });
 
   it('differs for empty vs non-empty', () => {
-    expect(orderRowsSignature([], 0)).not.toBe(orderRowsSignature([act(1)], 0));
+    expect(orderRowsSignature([])).not.toBe(orderRowsSignature([act(1)]));
   });
 
   it('changes with status, holder and blocked reason', () => {
-    const base = orderRowsSignature([act(1)], 0);
-    expect(orderRowsSignature([act(1, { status: 'in_progress', holderId: 2 })], 0)).not.toBe(base);
-    expect(orderRowsSignature([act(1, { holderId: 2 })], 0)).not.toBe(base);
-    expect(orderRowsSignature([act(1, { blockedReason: 'no_vehicle_in_fleet' })], 0)).not.toBe(base);
+    const base = orderRowsSignature([act(1)]);
+    expect(orderRowsSignature([act(1, { status: 'in_progress', holderId: 2 })])).not.toBe(base);
+    expect(orderRowsSignature([act(1, { holderId: 2 })])).not.toBe(base);
+    expect(orderRowsSignature([act(1, { blockedReason: 'no_vehicle_in_fleet' })])).not.toBe(base);
   });
 
   it('changes with order and with ids', () => {
-    expect(orderRowsSignature([act(1), act(2)], 0)).not.toBe(orderRowsSignature([act(2), act(1)], 0));
+    expect(orderRowsSignature([act(1), act(2)])).not.toBe(orderRowsSignature([act(2), act(1)]));
   });
 });
 

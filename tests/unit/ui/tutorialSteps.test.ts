@@ -474,9 +474,8 @@ describe('tutorialSteps', () => {
       expect(build.commands).toEqual(['build explosive_warehouse at:7,11']);
     });
 
-    it('build-explosive-warehouse names the delivery wait it avoids', () => {
-      const params = step('build-explosive-warehouse').textParamsFor!(createGame({ seed: 42 }));
-      expect(String(params['duration'])).toMatch(/16/);
+    it('build-explosive-warehouse quotes no delivery time: there is no delivery wait', () => {
+      expect(step('build-explosive-warehouse').textParamsFor).toBeUndefined();
     });
 
     it('stock-explosives is complete only once Boomite stock covers every drilled hole at the default charge', () => {

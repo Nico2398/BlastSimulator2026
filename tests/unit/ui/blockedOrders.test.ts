@@ -90,7 +90,7 @@ describe('buildBlockedOrderMessage', () => {
     const a = action({ type: 'charge_hole', blockedReason: 'explosives_unaffordable' });
     for (const locale of ['en', 'fr'] as const) {
       setLocale(locale);
-      const msg = buildBlockedOrderMessage(a, 100);
+      const msg = buildBlockedOrderMessage(a);
       expect(msg.length).toBeGreaterThan(0);
       expect(msg).not.toMatch(/arriv|transit|on their way|\(in /i);
       expect(msg).not.toContain('notification.');

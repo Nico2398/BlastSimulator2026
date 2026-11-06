@@ -7,7 +7,7 @@ import { getExplosivesInStock } from '../../../src/core/entities/BuildingWarehou
 import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
 import { EXPLOSIVE_BULK_PRICE_FACTOR } from '../../../src/core/config/balance.js';
 import {
-  bulkPricePerKg, drawStockForOrder, buyExplosiveStock, returnOrderStock, explosivePriceFactor, buyStockBlockReason,
+  bulkPricePerKg, drawStockForOrder, buyExplosiveStock, explosivePriceFactor, buyStockBlockReason,
   quoteChargeLoad, canAffordChargeLoad, loadChargeExplosive,
 } from '../../../src/core/mining/ExplosiveStock.js';
 
@@ -194,31 +194,6 @@ describe('buyExplosiveStock', () => {
     const state = makeState();
     buyExplosiveStock(state, 'boomite', 100);
     expect(state.finances.transactions.some(t => t.category === 'explosives')).toBe(true);
-  });
-});
-
-describe('returnOrderStock', () => {
-  it('restocks kg that fit and returns 0 cash', () => {
-    const state = makeState();
-    expect(returnOrderStock(state, 'boomite', 5)).toEqual({ restockedKg: 5, cashRefund: 0 });
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(5);
-  });
-
-  it('returns the bulk-price value in cash for kg that no warehouse can hold', () => {
-    const state = makeState(100_000, 0);
-    const r = returnOrderStock(state, 'boomite', 5);
-    expect(r.restockedKg).toBe(0);
-    expect(r.cashRefund).toBeCloseTo(5 * 8.4, 6);
-  });
-
-  it('restocks the part that fits and returns cash for the remainder', () => {
-    const state = makeState(1_000_000);
-    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
-    buyExplosiveStock(state, 'krackle', cap - 2);
-    const r = returnOrderStock(state, 'boomite', 5);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(2);
-    expect(r.restockedKg).toBe(2);
-    expect(r.cashRefund).toBeCloseTo(3 * 8.4, 6);
   });
 });
 

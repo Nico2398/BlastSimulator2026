@@ -482,7 +482,6 @@ describe('Cancelling a never-loaded charge order changes nothing (#2143)', () =>
     const r = cancelAction(state, action!.id);
     expect(r.success).toBe(true);
     expect(r.refunded ?? 0).toBe(0);
-    expect(r.refundedStockKg ?? 0).toBe(0);
     expect(state.cash).toBe(cash);
     expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(100);
   });

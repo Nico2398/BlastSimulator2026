@@ -280,8 +280,8 @@ describe('Blast execution — outstanding (not yet landed) charge orders are not
     const result = run('blast');
 
     expect(result.success).toBe(false);
-    // #1966: ordered explosives still in delivery read "in transit", not "missing".
-    expect(result.output.toLowerCase()).toContain('in transit');
+    // #2143: an ordered, not yet loaded charge reads "still loading", not "missing".
+    expect(result.output.toLowerCase()).toContain('still loading');
     expect(result.output.toLowerCase()).not.toContain('missing charge');
     expect(Object.keys(state.chargesByHole)).toHaveLength(0);
   });
