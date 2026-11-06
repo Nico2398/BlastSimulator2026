@@ -33,10 +33,11 @@ import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../cor
 import { getExplosivesStockByType } from '../../../core/entities/Building.js';
 import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 import { chargeKgPerMetre } from '../../../core/mining/HoleDiameter.js';
+import { rainWithinTicks } from '../../../core/weather/WeatherCycle.js';
 import { rainExposedHoles, wetHoles } from '../../../core/mining/WetHoles.js';
 import { drainBlockReason } from '../../../core/mining/HoleDrain.js';
 import { TUBING_COST, hasTubing } from '../../../core/mining/Tubing.js';
-import { MIN_STEMMING_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, HOLE_DRAIN_COST_PER_HOLE, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../core/config/balance.js';
+import { MIN_STEMMING_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, HOLE_DRAIN_COST_PER_HOLE, DRILL_HOLE_DEFAULT_DIAMETER_M, TICKS_PER_DAY } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { defaultChargeKg } from '../../../core/economy/PermitDefaults.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
@@ -231,6 +232,7 @@ export class ChargeStep {
     const untubed = holes.filter(h => !tubedSet.has(h.id)).map(h => h.id);
     const wetSet = new Set(wet);
     const exposedSet = new Set(rainExposedHoles(state));
+    const rainSoon = rainWithinTicks(state.weather, TICKS_PER_DAY, state.mineType);
     const drainViews: Record<string, HoleDrainView> = {};
     for (const h of holes) {
       drainViews[h.id] = {
@@ -263,7 +265,7 @@ export class ChargeStep {
       // Water levels (as percent) so the panel repaints while water fades, plus drain affordability.
       water: holes.map(h => Math.round((state.holeWater[h.id]?.level ?? 0) * 100)),
       drainBlocks: holes.map(h => drainViews[h.id]!.block),
-      rainExposed: [...exposedSet],
+      rainExposed: [...exposedSet], rainSoon,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -277,7 +279,7 @@ export class ChargeStep {
     this.updateWeakLine(weakHoleSummary(this.selectedExplosiveId, columns));
     this.holeList.render(holes, state.chargesByHole, state.plannedChargesByHole, new Set(state.chargeAwaitingFunds ?? []), drainViews);
     this.renderDrain(wet, drainViews);
-    this.renderTubingCard(untubed, wet.filter(id => !tubedSet.has(id)).length, tubed.length === holes.length && wet.length === 0, state.tubingState.inventory);
+    this.renderTubingCard(untubed, wet.filter(id => !tubedSet.has(id)).length, tubed.length === holes.length && wet.length === 0, state.tubingState.inventory, rainSoon);
   }
 
   dispose(): void { this.el.remove(); }
@@ -414,23 +416,24 @@ export class ChargeStep {
       return;
     }
     const porousBlocked = wetIds.some(id => views[id]?.block === 'porous_untubed');
-    const reason = wetIds.length === 0
-      ? drainReasonText('dry')
-      : porousBlocked ? drainReasonText('porous_untubed') : null;
+    // Nothing wet is a neutral state, not a problem: the button sits disabled and the reason is only its tooltip.
+    const disabled = wetIds.length === 0 || porousBlocked;
+    const reason = porousBlocked ? drainReasonText('porous_untubed') : null;
     const btn = button('ghost', t('ui.blast_workshop.charge.drain_holes', { count: wetIds.length, cost: `$${formatMoney(wetIds.length * HOLE_DRAIN_COST_PER_HOLE)}` }), {
       dataAction: 'drain-holes',
       onClick: () => this.runAndNotify('drain_hole hole:*'),
     });
-    btn.disabled = reason !== null;
-    const rainExposed = reason === null && wetIds.some(id => views[id]?.rainExposed === true);
+    btn.disabled = disabled;
+    if (wetIds.length === 0) btn.title = drainReasonText('dry');
+    const rainExposed = !disabled && wetIds.some(id => views[id]?.rainExposed === true);
     const rainLine = rainExposed ? reasonLine(drainRainReasonText()) : null;
     if (rainLine) rainLine.dataset['role'] = 'drain-rain-reason';
     this.drainEl.replaceChildren(btn, ...(reason !== null ? [reasonLine(reason)] : []), ...(rainLine ? [rainLine] : []));
   }
 
-  private renderTubingCard(untubedIds: string[], wetUntubed: number, settled: boolean, inventory: number): void {
+  private renderTubingCard(untubedIds: string[], wetUntubed: number, settled: boolean, inventory: number, rainSoon: boolean): void {
     if (untubedIds.length > 0) {
-      this.tubingCardEl.replaceChildren(this.makeTubingNeededCard(untubedIds, wetUntubed, inventory));
+      this.tubingCardEl.replaceChildren(this.makeTubingNeededCard(untubedIds, wetUntubed, inventory, rainSoon));
     } else if (settled) {
       this.tubingCardEl.replaceChildren(this.makeTubingSettledCard(inventory));
     } else {
@@ -454,7 +457,7 @@ export class ChargeStep {
     return wrap;
   }
 
-  private makeTubingNeededCard(untubedIds: string[], wetUntubed: number, inventory: number): HTMLElement {
+  private makeTubingNeededCard(untubedIds: string[], wetUntubed: number, inventory: number, rainSoon: boolean): HTMLElement {
     const wrap = el('div');
     wrap.style.cssText = 'padding:11px;border:1px solid rgba(85,168,255,.28);border-radius:5px;background:rgba(85,168,255,.06);display:flex;flex-direction:column;gap:9px';
 
@@ -463,8 +466,8 @@ export class ChargeStep {
       el('div', { attrs: { style: 'color:var(--bsx-info)' }, children: [iconEl('water', 15)] }),
       el('span', {
         text: wetUntubed > 0
-          ? t('ui.blast_workshop.charge.tubing_needed', { count: wetUntubed })
-          : t('ui.blast_workshop.charge.tubing_ahead', { count: untubedIds.length }),
+          ? t(wetUntubed === 1 ? 'ui.blast_workshop.charge.tubing_needed_one' : 'ui.blast_workshop.charge.tubing_needed', { count: wetUntubed })
+          : t(untubedIds.length === 1 ? 'ui.blast_workshop.charge.tubing_ahead_one' : 'ui.blast_workshop.charge.tubing_ahead', { count: untubedIds.length }),
         attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary);flex:1' },
       }),
     );
@@ -496,8 +499,9 @@ export class ChargeStep {
     actionRow.append(buyBtn, installBtn);
 
     wrap.append(messageRow, actionRow);
-    if (insufficientStock) {
-      wrap.appendChild(reasonLine(t('ui.blast_workshop.charge.tubing_reason', { stock: inventory, need: untubedIds.length })));
+    // A shortage is a warning only while water is a threat: a wet hole, or rain within the day (#2149).
+    if (insufficientStock && (wetUntubed > 0 || rainSoon)) {
+      wrap.appendChild(reasonLine(t(untubedIds.length === 1 ? 'ui.blast_workshop.charge.tubing_reason_one' : 'ui.blast_workshop.charge.tubing_reason', { stock: inventory, need: untubedIds.length })));
     }
     return wrap;
   }
