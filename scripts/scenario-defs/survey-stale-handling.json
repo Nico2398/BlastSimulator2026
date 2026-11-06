@@ -570,12 +570,12 @@
       "role": "setup"
     },
     {
-      "command": "employee cancel 48",
+      "command": "employee cancel 23",
       "description": "The dispatched walk is open-ended general work; cancel it so the surveyor is free for the later core_sample (same pattern as vibration-budget). Rally-point spawns: action id 16 -> 14; #1895: the shift rests queued during the explosives delivery wait move it to 48; the hires and purchases now start beside the rally flag, and that timeline queues two fewer actions before this dispatch.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee cancel 48"
+          "command": "employee cancel 23"
         }
       ],
       "role": "bootstrap"

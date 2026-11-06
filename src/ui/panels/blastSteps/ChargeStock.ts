@@ -2,8 +2,6 @@
 // Stock per offered explosive, buy-into-stock control and the paid-from line.
 // A pure view builder (core numbers in, plain data out) plus a small renderer.
 
-import { formatGameClock } from '../../formatGameClock.js';
-import { formatGameDuration } from '../../formatGameDuration.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { el, stepper, button } from '../../dom.js';
@@ -11,7 +9,7 @@ import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { stockAwareChargesCost } from '../../../core/mining/ChargePlan.js';
 import {
-  buyStockBlockReason, bulkPricePerKg, explosivePriceFactor, orderDeliveryTicks, earliestChargeDeliveryTick, type BuyStockFailure,
+  buyStockBlockReason, bulkPricePerKg, explosivePriceFactor, type BuyStockFailure,
 } from '../../../core/mining/ExplosiveStock.js';
 import { getExplosivesFreeCapacity, getExplosivesStockByType } from '../../../core/entities/Building.js';
 import { STOCK_BUY_STEP_KG } from '../../../core/config/balance.js';
@@ -30,14 +28,6 @@ interface StockView {
   paidFromStockKg: number;
   paidCash: number;
   selectedId: string;
-  /** Kg of the planned pattern neither covered by stock nor yet delivered (#1895). */
-  uncoveredKg: number;
-  /** Delivery wait in ticks for the cash-bought part (#1895). */
-  deliveryTicks: number;
-  /** Tick an in-transit delivery arrives, or null (#1895). */
-  inTransitUntilTick: number | null;
-  /** Current tick while a delivery is in transit (0 otherwise), so the countdown repaints (#1895). */
-  nowTick: number;
 }
 
 /** Stock view for the Charge step; `holeCount` x `amountKg` of the selected explosive is the current pattern. */
@@ -52,8 +42,6 @@ export function buildStockView(
   const buyCost = buyKg * bulkPricePerKg(selectedId, explosivePriceFactor(state));
   const orders = Array.from({ length: holeCount }, () => ({ explosiveId: selectedId, amountKg }));
   const split = stockAwareChargesCost(orders, stock);
-  const uncoveredKg = Math.round(split.totalKg - split.fromStockKg);
-  const inTransitUntilTick = earliestChargeDeliveryTick(state);
   return {
     rows, buyKg, buyCost, selectedId,
     blockReason: buyStockBlockReason(state, selectedId, buyKg),
@@ -61,21 +49,7 @@ export function buildStockView(
     need: Math.ceil(buyCost),
     paidFromStockKg: Math.round(split.fromStockKg),
     paidCash: split.cashCost,
-    uncoveredKg,
-    deliveryTicks: orderDeliveryTicks(uncoveredKg),
-    inTransitUntilTick,
-    // Only while a delivery is in transit: the remaining ticks repaint per tick, otherwise the view stays still.
-    nowTick: inTransitUntilTick === null ? 0 : state.tickCount,
   };
-}
-
-/** Banner text for an in-transit delivery (shown atop the Charge step), or null when nothing is in transit (#1966). */
-export function deliveryTransitText(view: Pick<StockView, 'inTransitUntilTick' | 'nowTick'>): string | null {
-  if (view.inTransitUntilTick === null) return null;
-  return t('ui.blast_workshop.charge.delivery_transit', {
-    when: formatGameClock(view.inTransitUntilTick),
-    duration: formatGameDuration(Math.max(0, view.inTransitUntilTick - view.nowTick)),
-  });
 }
 
 export class ChargeStockBlock {
@@ -141,10 +115,8 @@ export class ChargeStockBlock {
     paid.dataset['info'] = 'paid-from';
     paid.dataset['cash'] = String(Math.round(view.paidCash));
     const notes: HTMLElement[] = [paid];
-    // No hint for a fully stock-covered pattern; a stocked warehouse is what makes that so.
-    if (view.uncoveredKg > 0) {
-      notes.push(this.noteEl('delivery-hint', t('ui.blast_workshop.charge.delivery_hint', { duration: formatGameDuration(view.deliveryTicks) })));
-    }
+    // Estimate only: nothing is paid until a blaster loads each hole (#2143).
+    if (view.paidCash > 0) notes.push(this.noteEl('paid-on-fill', t('ui.blast_workshop.charge.paid_on_fill')));
     this.paidEl.replaceChildren(...notes);
   }
 

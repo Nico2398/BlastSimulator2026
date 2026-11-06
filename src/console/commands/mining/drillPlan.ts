@@ -51,8 +51,8 @@ function clearHoleCharges(state: GameState, holeId: string): void {
  * (`plannedDrillHoles` and `drillHoles`), plus any per-hole charge
  * state keyed by hole id (#553). Cancellation is routed through the shared
  * `cancelAction` (#548) so an in-flight employee/vehicle is released back to
- * idle and any order-time cost is refunded — `drill_hole` carries none, but an
- * outstanding `charge_hole` refunds its `orderCost` (#1341). Charges already
+ * idle and any order-time cost is refunded — `drill_hole` carries none, and a
+ * `charge_hole` pays only when loaded (#2143). Charges already
  * loaded (landed) are wiped without refund: that explosive is consumed.
  * Drilled holes' cells are re-patched in the NavGrid via
  * `nav:occupancy_changed`, emitted after the reset (#1360).

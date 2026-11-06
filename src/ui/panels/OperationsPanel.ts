@@ -30,7 +30,7 @@ import type { ShiftMode } from '../../core/entities/SitePolicy.js';
 import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 import type { GameConsoleFn } from '../gameConsole.js';
-import { isFailureBlock, isInTransitBlock, classifyQueuedBlock, buildBlockedOrderMessage, countBlockedReasons, describeBlockedReasons, rankBlockedKinds, blockedKindLabel } from '../notify/blockedOrders.js';
+import { isFailureBlock, classifyQueuedBlock, buildBlockedOrderMessage, countBlockedReasons, describeBlockedReasons, rankBlockedKinds, blockedKindLabel } from '../notify/blockedOrders.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import {
   DEBRIS_GROUP_PAGE_SIZE, partitionWorkQueue, debrisGroupSignature, orderRowsSignature, debrisPageRows,
@@ -61,8 +61,7 @@ export function countQueuedByBlock(
   const counts = { open: 0, blocked: 0, stranded: 0 };
   for (const a of actions) {
     if (a.status !== 'queued') continue;
-    const kind = classifyQueuedBlock(a);
-    if (kind !== 'inTransit') counts[kind]++;
+    counts[classifyQueuedBlock(a)]++;
   }
   return counts;
 }
@@ -170,8 +169,8 @@ export class OperationsPanel extends PanelBase {
     this.lastState = state;
     this.model = partitionWorkQueue(state.pendingActions);
     this.syncExpandedPages(state);
-    const playerSig = `${orderRowsSignature(this.model.player, state.tickCount)}${this.model.debris.length === 0 ? '|empty' : ''}`;
-    const debrisSig = this.debrisSignature(state);
+    const playerSig = `${orderRowsSignature(this.model.player)}${this.model.debris.length === 0 ? '|empty' : ''}`;
+    const debrisSig = this.debrisSignature();
     const signature = JSON.stringify({
       stored: Math.round(state.logistics.storedMassKg), cap: state.logistics.storageCapacityKg,
       fragCount: state.logistics.fragments.length,
@@ -213,11 +212,11 @@ export class OperationsPanel extends PanelBase {
   }
 
   /** Counts per group, plus the visible (clamped) page rows for expanded groups only. */
-  private debrisSignature(state: GameState): string {
+  private debrisSignature(): string {
     return this.model.debris.map(g => {
       let sig = debrisGroupSignature(g);
       if (this.expanded.has(g.type)) {
-        sig += `|x${this.pages.get(g.type) ?? 0}|${orderRowsSignature(this.pageRows.get(g.type) ?? [], state.tickCount)}`;
+        sig += `|x${this.pages.get(g.type) ?? 0}|${orderRowsSignature(this.pageRows.get(g.type) ?? [])}`;
       }
       return sig;
     }).join('||');
@@ -338,7 +337,6 @@ export class OperationsPanel extends PanelBase {
       part('blocked', group.blocked);
     }
     part('stranded', group.stranded);
-    part('in_transit', group.inTransit);
 
     const summary = el('div');
     summary.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card)';
@@ -394,7 +392,7 @@ export class OperationsPanel extends PanelBase {
   private refreshDebrisNow(): void {
     if (!this.lastState) return;
     this.syncExpandedPages(this.lastState);
-    this.debrisSig = this.debrisSignature(this.lastState);
+    this.debrisSig = this.debrisSignature();
     this.lastSignature = '';
     this.debrisEl.replaceChildren(...this.makeDebrisGroups(this.lastState));
   }
@@ -415,11 +413,9 @@ export class OperationsPanel extends PanelBase {
     const blockedReason = action.status === 'queued' ? (action.blockedReason ?? null) : null;
     const queuedBlocked = blockedReason !== null;
     const statusChip = queuedBlocked
-      ? (isInTransitBlock(action)
-        ? chip(t('ui.operations.work_queue_status_in_transit'), 'neutral')
-        : isFailureBlock(action)
-          ? chip(t('ui.operations.work_queue_status_blocked'), 'warn')
-          : chip(t('ui.operations.work_queue_status_stranded'), 'neutral'))
+      ? (isFailureBlock(action)
+        ? chip(t('ui.operations.work_queue_status_blocked'), 'warn')
+        : chip(t('ui.operations.work_queue_status_stranded'), 'neutral'))
       : chip(t(WORK_QUEUE_STATUS_KEY[action.status]), action.status === 'in_progress' ? 'info' : 'neutral');
 
     const headRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
@@ -446,7 +442,7 @@ export class OperationsPanel extends PanelBase {
     row.append(headRow);
     if (queuedBlocked) {
       row.append(el('span', {
-        text: buildBlockedOrderMessage(action, state.tickCount),
+        text: buildBlockedOrderMessage(action),
         attrs: { 'data-blocked-reason': blockedReason, style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
       }));
     }

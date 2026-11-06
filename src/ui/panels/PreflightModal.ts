@@ -12,9 +12,6 @@
 // rail's modal carve-out (tutorialGuide.ts's MODAL_SELECTOR) and
 // uiActionProbe's `confirm` region keep resolving it without changes there.
 
-import { chargeDeliveryArrivalByHole } from '../../core/mining/ExplosiveStock.js';
-import { formatGameClock } from '../formatGameClock.js';
-import { formatGameDuration } from '../formatGameDuration.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, statGrid } from '../dom.js';
 import { iconEl } from '../icons.js';
@@ -236,13 +233,7 @@ export class PreflightModal {
     const protectedHoles = checkProtectedPositions(state.drillHoles, state.buildings.buildings);
     const buildingsAtRisk = buildingsInBlastReach(state.drillHoles, state.chargesByHole, state.buildings.buildings);
     const loadingHoleIds = new Set(Object.keys(state.plannedChargesByHole));
-    const deliveryArrivals = chargeDeliveryArrivalByHole(state);
-    const validationErrors = validateBlastPlan(plan, loadingHoleIds, deliveryArrivals);
-    const awaitingArrivals = validationErrors
-      .filter(e => e.issue === 'blast.validation.charge_awaiting_delivery')
-      .flatMap(e => (e.arrivalTick === undefined ? [] : [e.arrivalTick]));
-    const awaitingCount = awaitingArrivals.length;
-    const earliestArrival = awaitingCount > 0 ? Math.min(...awaitingArrivals) : null;
+    const validationErrors = validateBlastPlan(plan, loadingHoleIds);
     const loadingCount = validationErrors.filter(e => e.issue === 'blast.validation.charge_loading').length;
 
     // Warning only, never a detonate gate: firing cancels these drill orders (#1346).
@@ -253,7 +244,7 @@ export class PreflightModal {
     const signature = JSON.stringify({
       permit, undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage, brokenVoxels, charged, holeCoverage,
       preview: state.lastBlastPreview, wetCount: wet.length, rainExposedCount: rainExposed.length, occupantCount,
-      walls: wallFaces.map(w => wallWarningText(w)), breakoutText, phase, protectedCount: protectedHoles.length, buildingsAtRisk, loadingCount, awaitingCount, earliestArrival, errorCount: validationErrors.length,
+      walls: wallFaces.map(w => wallWarningText(w)), breakoutText, phase, protectedCount: protectedHoles.length, buildingsAtRisk, loadingCount, errorCount: validationErrors.length,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -285,16 +276,6 @@ export class PreflightModal {
       ...buildingsAtRisk.map(b => ({ ok: false, text: buildingRiskText(b), role: 'preflight-building-risk', buildingType: b.type })),
       ...(loadingCount > 0
         ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_charge_loading', { count: loadingCount }) }]
-        : []),
-      ...(earliestArrival !== null
-        ? [{
-          ok: false,
-          text: t('ui.blast_workshop.preflight.warn_charge_awaiting_delivery', {
-            count: awaitingCount,
-            when: formatGameClock(earliestArrival),
-            duration: formatGameDuration(earliestArrival - state.tickCount),
-          }),
-        }]
         : []),
       ...(undrilledCount > 0
         ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_undrilled', { count: undrilledCount }) }]

@@ -16,9 +16,8 @@ import {
   TOOLBAR_TARGET, isEventDialogOpen,
 } from './tutorialStepHelpers.js';
 import { TUTORIAL_STEPS_CLOSING } from './tutorialStepsClosing.js';
-import { formatGameDuration } from './formatGameDuration.js';
 import { getExplosivesStockByType } from '../core/entities/Building.js';
-import { CHARGE_DEFAULT_AMOUNT_KG, EXPLOSIVE_DELIVERY_TICKS, STOCK_BUY_STEP_KG } from '../core/config/balance.js';
+import { CHARGE_DEFAULT_AMOUNT_KG, STOCK_BUY_STEP_KG } from '../core/config/balance.js';
 
 /** The one scripted event the tutorial fires, so the player meets the dialog. */
 const TUTORIAL_EVENT_ID = 'tutorial_synergy_consultant';
@@ -262,12 +261,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   // ── Step 5b: build-explosive-warehouse ──
-  // Explosives bought with cash when the charge is ordered take
-  // EXPLOSIVE_DELIVERY_TICKS (400) to arrive, with the crew idle the whole time
-  // (#1895); stock already in an explosive warehouse loads at once. Building one
-  // here, before the first charge, is what keeps the first blast from waiting
-  // two weeks of game time. Queued construction: same budget and reason as
-  // build-living-quarters above.
+  // Explosives load at once and are paid as each hole is loaded (#2143); stock bought
+  // in bulk for a warehouse is cheaper than the per-charge price. Building one here,
+  // before the first charge, lets the first blast draw on it. Queued construction:
+  // same budget and reason as build-living-quarters above.
   {
     ...createComparisonStep(
       'build-explosive-warehouse',
@@ -278,7 +275,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       TOOLBAR_TARGET.build,
       { tickBudget: 60, waitsOnWork: true },
     ),
-    textParamsFor: () => ({ duration: formatGameDuration(EXPLOSIVE_DELIVERY_TICKS) }),
   },
 
   // ── Step 5c: stock-explosives ──

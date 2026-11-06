@@ -1140,10 +1140,9 @@
           "employeeCount": 4,
           "buildingCount": 2,
           "vehicleCount": 2,
-          "activeContractCount": 1,
           "surveyCount": 1
         },
-        "note": "#2142: activeContractCount is 1: re-measured after ore concentration on arrival (the warehouse keeps only the ore of each load) shifted hauling and the contract board's draws: the 200 kg sale now part-fills its offer and one contract stays active. Supersedes #1895."
+        "note": "#2143: activeContractCount is no longer pinned. Without the explosives delivery wait the haulers get a shorter run before the sale, so whether the ore_sale offer is filled in full by the 200 kg delivery depends on the clock the run arrived by (command mode: filled and completed; interaction mode: part-delivered, one contract left). The contract outcome is asserted step-locally by the accept and deliver steps above."
       }
     }
   ]

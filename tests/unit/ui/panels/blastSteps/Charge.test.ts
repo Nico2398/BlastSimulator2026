@@ -17,7 +17,6 @@ import { CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, STOCK_BUY_STEP_KG 
 import { dispatchChargeAction } from '../../../../../src/core/mining/ChargeOrder.js';
 import { explosiveHoleLimits } from '../../../../../src/core/mining/ChargePlan.js';
 import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js';
-import { formatGameDuration } from '../../../../../src/ui/formatGameDuration.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -975,8 +974,8 @@ describe('ChargeStep explosive stock (#1685)', () => {
   });
 });
 
-describe('ChargeStep delivery wait (#1966)', () => {
-  function inTransitState() {
+describe('ChargeStep has no delivery wait (#2143)', () => {
+  function orderedState() {
     const state = makeState();
     state.tickCount = 280;
     state.cash = 100_000;
@@ -985,68 +984,27 @@ describe('ChargeStep delivery wait (#1966)', () => {
     dispatchChargeAction(state, { id: hole.id, x: 10, z: 10 }, { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
     return state;
   }
-  const banner = (step: ChargeStep) => step.root.querySelector('[data-info="delivery-transit"]') as HTMLElement | null;
 
-  it('puts the in-transit banner first in the step, visible without scrolling', () => {
+  it('has no in-transit banner with an order outstanding on an empty warehouse', () => {
     const { step } = makeStep();
-    step.update(inTransitState(), 'sunny');
-    const first = step.root.firstElementChild as HTMLElement;
-    expect(first.dataset['info']).toBe('delivery-transit');
-    expect(first.style.display).not.toBe('none');
+    step.update(orderedState(), 'sunny');
+    expect(step.root.querySelector('[data-info="delivery-transit"]')).toBeNull();
   });
 
-  it('shows the arrival as day and hour and the rest as a duration, never a tick', () => {
-    const { step } = makeStep();
-    step.update(inTransitState(), 'sunny');
-    const text = banner(step)!.textContent ?? '';
-    expect(text).toContain('Day 29, 08:00');
-    expect(text).toContain(formatGameDuration(400));
-    expect(text).not.toContain('tick');
-  });
-
-  it('the remaining duration follows the clock', () => {
-    const { step } = makeStep();
-    const state = inTransitState();
-    step.update(state, 'sunny');
-    state.tickCount = 280 + 26;
-    step.update(state, 'sunny');
-    expect(banner(step)!.textContent).toContain(formatGameDuration(400 - 26));
-  });
-
-  it('is hidden when nothing is in transit', () => {
+  it('has no delivery hint when the pattern would be bought with cash', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
-    const el = banner(step);
-    expect(el === null || el.style.display === 'none').toBe(true);
+    expect(step.root.querySelector('[data-info="delivery-hint"]')).toBeNull();
   });
 
-  it('hides again once the delivery arrived', () => {
+  it('shows no arrival or transit wording anywhere in the step', () => {
     const { step } = makeStep();
-    const state = inTransitState();
-    step.update(state, 'sunny');
-    state.tickCount = 700;
-    step.update(state, 'sunny');
-    const el = banner(step);
-    expect(el === null || el.style.display === 'none').toBe(true);
-  });
-
-  it('the transit data-info occurs once only', () => {
-    const { step } = makeStep();
-    step.update(inTransitState(), 'sunny');
-    expect(step.root.querySelectorAll('[data-info="delivery-transit"]')).toHaveLength(1);
-  });
-
-  it('the delivery hint states a duration, not ticks', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
-    step.update(state, 'sunny');
-    const hint = step.root.querySelector('[data-info="delivery-hint"]') as HTMLElement | null;
-    expect(hint).not.toBeNull();
-    expect(hint!.textContent).toContain(formatGameDuration(400));
-    expect(hint!.textContent).not.toContain('tick');
+    step.update(orderedState(), 'sunny');
+    const text = step.root.textContent ?? '';
+    expect(text).not.toMatch(/arrive|arrival|in transit|on the way|on their way/i);
+    expect(text).not.toContain('Day 29, 08:00');
   });
 });
 

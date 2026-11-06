@@ -17,8 +17,8 @@ const RUN_TIMEOUT_MS = 60_000;
  * are the shot's own; the hauling after it is not needed here. The next step runs to 41 s and sets the new warehouse,
  * the first load and the first dump going in one second: that is HAULING's budget, not the collapse's.
  */
-// The shot waits out the explosives delivery (#1895) and answers the events that fire meanwhile: 400 ticks at 8x, the shot lands 88 s in.
-const THROUGH_THE_SHOT_S = 91;
+// With no explosives delivery wait (#2143) the shot lands about 37 s in, as before #1895.
+const THROUGH_THE_SHOT_S = 40;
 
 beforeAll(() => {
   scenarioRun(COLLAPSE, 8, THROUGH_THE_SHOT_S);

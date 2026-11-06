@@ -2,8 +2,8 @@
 //
 // Both sandbox kits start with +150k cash (Digger 480k, Full 520k) and an operating tier-1 explosive
 // warehouse holding 100 kg of krackle, placed with the starting buildings at no charge. The first charge
-// order therefore draws from stock: no cash-bought delivery wait (EXPLOSIVE_DELIVERY_TICKS), so the first
-// blast fires soon after the drill order completes. A campaign level's opening is unchanged.
+// order is paid from that stock as each hole is loaded (#2143): no cash is spent and nothing waits for a
+// delivery, so the first blast fires soon after the drill order completes. A campaign level's opening is unchanged.
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
@@ -19,7 +19,6 @@ import {
   CHARGE_DEFAULT_STEMMING_M,
   DRILL_GRID_DEFAULT_SPACING_M,
   DRILL_HOLE_DEFAULT_DIAMETER_M,
-  EXPLOSIVE_DELIVERY_TICKS,
   SANDBOX_FLAT_PAD_SIZE,
   SANDBOX_STARTER_EXPLOSIVE_ID,
   SANDBOX_STARTER_EXPLOSIVE_KG,
@@ -117,10 +116,6 @@ describe('C2: both kits open with a stocked tier-1 explosive warehouse (#2118)',
 });
 
 describe('C3: a campaign opening is unchanged (#2118)', () => {
-  it('EXPLOSIVE_DELIVERY_TICKS is still 400', () => {
-    expect(EXPLOSIVE_DELIVERY_TICKS).toBe(400);
-  });
-
   it.each(['tutorial_pit', 'dusty_hollow', 'grumpstone_ridge'])('%s opens with its own cash and no explosive stock', (levelId) => {
     const { runner, ctx } = createRunner();
     recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
@@ -188,23 +183,24 @@ describe('C4: Digger kit first shot draws its explosives from stock (#2118)', ()
 
     expect(run(`charge hole:* explosive:${SANDBOX_STARTER_EXPLOSIVE_ID} amount:${amount} stemming:${CHARGE_DEFAULT_STEMMING_M}`)).toMatchObject({ success: true });
 
-    // The whole order is drawn from stock: no delivery pending, none in transit.
+    // Ordering books nothing: no delivery stamp, no cash, no stock drawn yet (#2143).
     const orders = state.pendingActions.filter(a => a.type === 'charge_hole');
     expect(orders).toHaveLength(9);
     for (const a of orders) {
       expect(a.payload['deliveryArrivalTick'], 'no cash-bought delivery').toBeUndefined();
-      expect(a.payload['orderCost'], 'no cash charged').toBe(0);
     }
-    const drawn = orders.reduce((sum, a) => sum + ((a.payload['orderStock'] as { kg: number } | undefined)?.kg ?? 0), 0);
-    expect(drawn).toBeCloseTo(9 * amount, 6);
-    expect(getExplosivesStockByType(state.buildings)['krackle'] ?? 0).toBeCloseTo(100 - 9 * amount, 6);
+    expect(getExplosivesStockByType(state.buildings)['krackle'] ?? 0).toBeCloseTo(100, 6);
 
     for (let n = 0; n < BLAST_WINDOW_TICKS && Object.keys(state.plannedChargesByHole).length > 0; n++) {
       refresh(state);
       playTick(run, state);
-      expect(state.pendingActions.some(a => a.blockedReason === 'explosives_in_transit'), 'no explosives in transit').toBe(false);
+      expect(state.pendingActions.some(a => a.blockedReason === 'explosives_unaffordable'), 'stock covers every hole').toBe(false);
     }
     expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+    // The stock paid for the loads: it is drawn now, and no cash left the till for the explosive.
+    expect(getExplosivesStockByType(state.buildings)['krackle'] ?? 0).toBeCloseTo(100 - 9 * amount, 6);
+    for (const c of Object.values(state.chargesByHole)) expect(c.fromStockKg).toBeCloseTo(amount, 6);
+    expect(state.finances.transactions.filter(t => t.category === 'explosives')).toHaveLength(0);
     clearBlastZone(run, state);
     expect(run('blast detonate')).toMatchObject({ success: true });
     for (let n = 0; n < BLAST_WINDOW_TICKS && state.lastBlastReport === null; n++) { refresh(state); playTick(run, state); }
@@ -212,6 +208,5 @@ describe('C4: Digger kit first shot draws its explosives from stock (#2118)', ()
     expect(state.lastBlastReport, 'blast fired').not.toBeNull();
     const elapsed = state.tickCount - drillDoneTick;
     expect(elapsed).toBeLessThanOrEqual(BLAST_WINDOW_TICKS);
-    expect(elapsed).toBeLessThan(EXPLOSIVE_DELIVERY_TICKS);
   }, 300_000);
 });

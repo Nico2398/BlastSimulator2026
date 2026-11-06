@@ -11,7 +11,6 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import { placeBuilding, getExplosivesStockByType } from '../../src/core/entities/Building.js';
 import { recordedChargesCost } from '../../src/core/mining/ChargePlan.js';
 import { tickUntilFresh } from '../helpers/blastFixtures.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 type Run = (cmd: string) => { success: boolean; output: string };
 
@@ -35,7 +34,7 @@ function drillGrid(run: Run, state: GameState, rows: number, cols: number): void
 function chargeAll(run: Run, state: GameState, explosive: string, kg: number): void {
   const holes = state.drillHoles.length;
   expect(run(`charge hole:* explosive:${explosive} amount:${kg} stemming:2`).success).toBe(true);
-  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 1500);
+  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
   expect(Object.keys(state.chargesByHole)).toHaveLength(holes);
 }
 
@@ -52,7 +51,7 @@ describe('blast report nets stock out of the spent figure (#1685)', () => {
     drillGrid(run, state, 3, 3);
     chargeAll(run, state, 'krackle', 6);
 
-    // recorded at order time, carried onto the loaded charges
+    // drawn and recorded when each hole is loaded (#2143)
     for (const c of Object.values(state.chargesByHole)) expect(c.fromStockKg).toBe(6);
     expect(recordedChargesCost(state.chargesByHole).cashCost).toBe(0);
     expect(getExplosivesStockByType(state.buildings)['krackle']).toBeCloseTo(100 - 54, 6);
@@ -97,7 +96,7 @@ describe('blast report nets stock out of the spent figure (#1685)', () => {
   });
 });
 
-describe('blast_plan load message prices cash net of stock (#1685)', () => {
+describe('blast_plan load books no explosive cost, with or without stock (#1685, #2143)', () => {
   function savedPlanWithStock(): { run: Run; state: GameState } {
     const { run, state } = setup('new_game seed:42 size:32 staffed:true');
     expect(run('buy explosive:boomite kg:200').success).toBe(true);
@@ -111,19 +110,22 @@ describe('blast_plan load message prices cash net of stock (#1685)', () => {
     return { run, state };
   }
 
-  it('shows 0 cost when the stock covers the whole saved plan, not the list price', () => {
-    const { run } = savedPlanWithStock();
+  it('loading with stock in the warehouse spends no cash and leaves the stock where it is', () => {
+    const { run, state } = savedPlanWithStock();
+    const cash = state.cash;
+    const stock = getExplosivesStockByType(state.buildings)['boomite'];
     const r = run('blast_plan load');
     expect(r.success).toBe(true);
-    expect(r.output).toContain('queued (0)');
-    expect(r.output).not.toContain('240'); // 20 kg x $12 list
+    expect(state.cash).toBe(cash);
+    expect(getExplosivesStockByType(state.buildings)['boomite']).toBe(stock);
   });
 
-  it('shows the list price when no stock is left', () => {
+  it('loading with no stock left spends no cash either: the list price is paid when each hole is loaded', () => {
     const { run, state } = savedPlanWithStock();
     for (const b of state.buildings.buildings) b.storedExplosives = {};
+    const cash = state.cash;
     const r = run('blast_plan load');
     expect(r.success).toBe(true);
-    expect(r.output).toContain('240');
+    expect(state.cash).toBe(cash);
   });
 });

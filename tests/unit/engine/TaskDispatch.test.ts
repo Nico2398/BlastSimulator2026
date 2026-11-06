@@ -26,6 +26,7 @@ import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 // ── New module (CH1.4 — does not exist yet; ALL tests fail at import) ─────────
 import { backfillGhostBuildings, dispatchPendingAction, claimPendingAction, completePendingAction, cancelAction, clearActiveTaskFields, interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
+import { dispatchChargeAction } from '../../../src/core/mining/ChargeOrder.js';
 import { seedTaskTimerFields } from '../../../src/core/engine/ActionSelection.js';
 import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
@@ -1664,34 +1665,28 @@ describe('backfillGhostBuildings (#1306)', () => {
   });
 });
 
-// ── cancelAction refunds a queued charge_hole action (#1341) ──
-//   actionOrderCost (TaskCancellation.ts) refunds payload.orderCost in full.
+// ── cancelAction on a queued charge_hole action (#1341, pay-on-fill #2143) ──
+//   A charge order books nothing until its hole is loaded, so cancelling one gives nothing back.
 
-describe('cancelAction — refunds a queued charge_hole action in full (#1341)', () => {
+describe('cancelAction — a never-loaded charge_hole order changes neither cash nor finances (#2143)', () => {
   let state: GameState;
 
   beforeEach(() => {
     state = makeGame();
   });
 
-  it('refunds payload.orderCost, credits state.cash and records a refund income transaction', () => {
-    addQualifiedEmployee(state, 'blasting', SEED);
+  it('cancelling an order placed through dispatchChargeAction moves no cash and records no refund transaction', () => {
     const beforeCash = state.cash;
-    const action = makePendingAction({
-      id: 400, requiredSkill: null,
-      payload: { holeId: 'H1', explosiveId: 'dynatomics', amountKg: 20, stemmingM: 2, durationTicks: 10, orderCost: 4000 },
-    });
-    (action as any).type = 'charge_hole';
-    dispatchPendingAction(state, action);
+    dispatchChargeAction(state, { id: 'H1', x: 5, z: 5 }, { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
+    const order = state.pendingActions.find(a => a.type === 'charge_hole')!;
+    expect(state.cash).toBe(beforeCash);
 
-    const result = cancelAction(state, 400);
+    const result = cancelAction(state, order.id);
 
     expect(result.success).toBe(true);
-    expect(result.refunded).toBe(4000);
-    expect(state.cash).toBe(beforeCash + 4000);
-    const refundTx = state.finances.transactions.find(t => t.category === 'refund');
-    expect(refundTx).toBeDefined();
-    expect(refundTx!.amount).toBe(4000);
+    expect(result.refunded).toBe(0);
+    expect(state.cash).toBe(beforeCash);
+    expect(state.finances.transactions.some(t => t.category === 'refund')).toBe(false);
   });
 
   it('refunds 0 when payload.orderCost is absent (boundary)', () => {

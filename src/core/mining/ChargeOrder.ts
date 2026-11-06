@@ -1,18 +1,15 @@
-// BlastSimulator2026 — Charge ordering: queue, fund-check and auto-charge holes (#1345)
+// BlastSimulator2026 — Charge ordering: queue and auto-charge holes (#1345)
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { DrillHole } from './DrillPlan.js';
 import {
-  createCharge, computeChargeHoleDurationTicks, chargeOrderCost,
+  createCharge, computeChargeHoleDurationTicks,
   type HoleCharge, type ChargeError,
 } from './ChargePlan.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
-import { addExpense } from '../economy/Finance.js';
-import { explosivePriceFactor, drawStockForOrder, drawFromStockPool, readOrderStock, orderDeliveryTicks, type OrderStockDraw } from './ExplosiveStock.js';
-import { consumeExplosives, getExplosivesStockByType } from '../entities/Building.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 
-type AutoChargeOutcome = 'ordered' | 'awaiting_funds' | 'invalid' | 'skipped';
+type AutoChargeOutcome = 'ordered' | 'invalid' | 'skipped';
 
 /** Payload carried by a queued `charge_hole` PendingAction (#554). */
 export interface ChargeHoleActionPayload {
@@ -22,12 +19,6 @@ export interface ChargeHoleActionPayload {
   stemmingM: number;
   /** Base ticks; scaled by the worker's proficiency at claim time. */
   durationTicks: number;
-  /** Cash charged at order time (costPerKg x kg); refunded on cancel (#1341). */
-  orderCost: number;
-  /** Kg of the order drawn from warehouse stock at order time (#1678); returned on cancel. */
-  orderStock?: OrderStockDraw;
-  /** Tick the cash-bought part of the order is delivered (#1895); absent when fully drawn from stock. */
-  deliveryArrivalTick?: number;
 }
 
 /** Outstanding (queued or claimed) `charge_hole` action for a hole. */
@@ -55,9 +46,9 @@ export function cancelOutstandingChargeAction(state: GameState, holeId: string):
 
 /**
  * Queue a `charge_hole` action for `hole`, replacing any outstanding order so a
- * re-charge does not stack (#554). Pays the explosives cost now; the caller has
- * verified funds. Re-charging an already-loaded hole pays in full and does not
- * refund the consumed explosive — intentional default.
+ * re-charge does not stack (#554). Pays nothing: the explosive is drawn and paid when
+ * the hole is loaded (#2143). Re-charging an already-loaded hole pays in full then and
+ * does not refund the consumed explosive — intentional default.
  */
 export function dispatchChargeAction(
   state: GameState,
@@ -68,11 +59,6 @@ export function dispatchChargeAction(
   cancelOutstandingChargeAction(state, hole.id);
 
   const durationTicks = computeChargeHoleDurationTicks(amountKg);
-  // Stock first (the cancel above restocked any replaced order), the rest paid in cash.
-  const { fromStockKg, fromCashKg } = drawStockForOrder(getExplosivesStockByType(state.buildings), explosiveId, amountKg);
-  if (fromStockKg > 0) consumeExplosives(state.buildings, explosiveId, fromStockKg);
-  const orderCost = chargeOrderCost(explosiveId, fromCashKg) * explosivePriceFactor(state);
-  const orderStock = fromStockKg > 0 ? { explosiveId, kg: fromStockKg } : undefined;
   const actionId = state.nextPendingActionId++;
   // Worked from a charging truck by a crew member holding 'blasting' and the
   // truck's licence (#1649). skipQualificationCheck (#554): the order must still
@@ -87,49 +73,12 @@ export function dispatchChargeAction(
     targetZ: hole.z,
     targetY: 0,
     payload: {
-      holeId: hole.id, explosiveId, amountKg, stemmingM, durationTicks, orderCost,
-      ...(orderStock && { orderStock }),
-      ...(fromCashKg > 0 && { deliveryArrivalTick: state.tickCount + orderDeliveryTicks(fromCashKg) }),
+      holeId: hole.id, explosiveId, amountKg, stemmingM, durationTicks,
     } satisfies ChargeHoleActionPayload,
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
 
-  state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM, ...(fromStockKg > 0 && { fromStockKg }) };
-
-  if (orderCost > 0) {
-    state.cash -= orderCost;
-    addExpense(state.finances, orderCost, 'explosives', `Charge ${hole.id}: ${explosiveId} ${amountKg}kg`, state.tickCount);
-  }
-}
-
-/**
- * Cash shortfall for a set of orders, null when affordable. Each order's cost is
- * net of the refund its hole's outstanding order gives back when replaced; equal
- * cash is allowed.
- */
-export function chargeFundsFailureAmount(
-  state: GameState,
-  orders: ReadonlyArray<{ holeId: string; explosiveId: string; amountKg: number }>,
-): { need: number } | null {
-  // Stock is simulated sequentially: an earlier order in the batch depletes what a later one finds,
-  // and a replaced hole's outstanding stock draw is restocked first.
-  const stock = { ...getExplosivesStockByType(state.buildings) };
-  const factor = explosivePriceFactor(state);
-  let need = 0;
-  for (const o of orders) {
-    const outstanding = findOutstandingChargeAction(state, o.holeId);
-    if (outstanding) {
-      need -= (outstanding.payload['orderCost'] as number) ?? 0;
-      const held = readOrderStock(outstanding);
-      if (held) stock[held.explosiveId] = (stock[held.explosiveId] ?? 0) + held.kg;
-    }
-    const { fromCashKg } = drawFromStockPool(stock, o.explosiveId, o.amountKg);
-    need += chargeOrderCost(o.explosiveId, fromCashKg) * factor;
-  }
-  // A replacement costing no more than the refunded order needs no new cash,
-  // even when the balance is negative. Sub-cent residue is float noise.
-  if (need < 0.005 || need <= state.cash) return null;
-  return { need };
+  state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM };
 }
 
 /** True when the hole is charged or has an outstanding charge order. */
@@ -181,25 +130,12 @@ export function removeAwaiting(state: GameState, holeId: string): void {
   state.chargeAwaitingFunds = state.chargeAwaitingFunds.filter(id => id !== holeId);
 }
 
-function addAwaiting(state: GameState, holeId: string): void {
-  const list = state.chargeAwaitingFunds ?? [];
-  if (!list.includes(holeId)) list.push(holeId);
-  state.chargeAwaitingFunds = list;
-}
-
 /** Order the pattern charge for one hole, funds checked per hole. Caller guarantees the hole is uncovered. */
 function orderPatternCharge(state: GameState, hole: DrillHole, pattern: HoleCharge): AutoChargeOutcome | { error: string } {
   const created = createCharge(pattern.explosiveId, pattern.amountKg, pattern.stemmingM, hole.depth, hole.diameter);
   if ('error' in created) {
     removeAwaiting(state, hole.id);
     return { error: created.error };
-  }
-  const short = chargeFundsFailureAmount(state, [{
-    holeId: hole.id, explosiveId: pattern.explosiveId, amountKg: pattern.amountKg,
-  }]);
-  if (short) {
-    addAwaiting(state, hole.id);
-    return 'awaiting_funds';
   }
   removeAwaiting(state, hole.id);
   dispatchChargeAction(state, hole, created.charge);
@@ -214,28 +150,12 @@ export function autoChargeHole(state: GameState, hole: DrillHole): AutoChargeOut
   return typeof outcome === 'string' ? outcome : 'invalid';
 }
 
-/**
- * Retry auto-charges waiting for funds, in id order. Walks only the awaiting
- * list, so a tick with nothing waiting costs nothing.
- */
-export function settleAwaitingFundsCharges(state: GameState): void {
-  const waiting = state.chargeAwaitingFunds;
-  if (waiting == null || waiting.length === 0) return;
-  const pattern = takePatternOrClearIfUnavailable(state);
-  if (pattern == null) { state.chargeAwaitingFunds = []; return; }
-  for (const id of [...waiting].sort()) {
-    const hole = state.drillHoles.find(h => h.id === id);
-    if (!hole || isHoleChargeCovered(state, id)) { removeAwaiting(state, id); continue; }
-    orderPatternCharge(state, hole, pattern);
-  }
-}
-
 /** Charge a set of holes with the pattern charge, skipping covered ones. */
 export function chargePatternHoles(
   state: GameState,
   holes: ReadonlyArray<DrillHole>,
-): { ordered: string[]; awaiting: string[]; invalid: ChargeError[] } {
-  const result = { ordered: [] as string[], awaiting: [] as string[], invalid: [] as ChargeError[] };
+): { ordered: string[]; invalid: ChargeError[] } {
+  const result = { ordered: [] as string[], invalid: [] as ChargeError[] };
   const pattern = takePatternOrClearIfUnavailable(state);
   if (pattern == null) return result;
   const outstanding = outstandingChargeHoleIds(state);
@@ -244,7 +164,6 @@ export function chargePatternHoles(
     const outcome = orderPatternCharge(state, hole, pattern);
     if (typeof outcome !== 'string') result.invalid.push({ holeId: hole.id, message: outcome.error });
     else if (outcome === 'ordered') result.ordered.push(hole.id);
-    else if (outcome === 'awaiting_funds') result.awaiting.push(hole.id);
   }
   return result;
 }

@@ -1117,47 +1117,45 @@ describe('isFailureBlock (#1810)', () => {
   });
 });
 
-describe('NotificationCenter explosives-in-transit toast (#1966)', () => {
+describe('NotificationCenter never announces an explosives delivery (#2143)', () => {
   afterEach(() => { setLocale('en'); });
 
-  function transitState() {
+  function unaffordableState() {
     const state = makeState();
     state.tickCount = 280;
     state.pendingActions.push({
       id: 1, type: 'charge_hole', requiredSkill: 'blasting', requiredVehicleRole: 'charging_truck',
-      targetX: 3, targetZ: 3, targetY: 0, payload: { holeId: 'H1', deliveryArrivalTick: 680 }, targetEmployeeId: null,
-      status: 'queued', holderId: null, queuedAtTick: 280, blockedReason: 'explosives_in_transit',
+      targetX: 3, targetZ: 3, targetY: 0, payload: { holeId: 'H1' }, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 280, blockedReason: 'explosives_unaffordable',
     } as PendingAction);
     return state;
   }
 
-  it('toasts the arrival as day and hour plus a duration, never a tick number', () => {
+  it('en: no entry talks about arrival, transit or a way-on delivery', () => {
     const center = new NotificationCenter();
-    center.update(transitState());
-
-    const entries = center.getLog().filter(e => e.title === t('notification.title.order_blocked'));
-    expect(entries).toHaveLength(1);
-    expect(entries[0]!.body).toContain('Day 29, 08:00');
-    expect(entries[0]!.body).toContain(formatGameDuration(400));
-    expect(entries[0]!.body).not.toContain('tick');
-    expect(entries[0]!.body).not.toContain('680');
+    center.update(unaffordableState());
+    for (const e of center.getLog()) {
+      expect(`${e.title} ${e.body}`).not.toMatch(/arriv|transit|on their way/i);
+      expect(e.body).not.toContain('notification.');
+    }
   });
 
-  it('toasts once per waiting episode', () => {
-    const center = new NotificationCenter();
-    const state = transitState();
-    center.update(state);
-    center.update(state);
-    expect(center.getLog().filter(e => e.title === t('notification.title.order_blocked'))).toHaveLength(1);
-  });
-
-  it('reads in French with the French clock', () => {
+  it('fr: no entry talks about arrival or transit', () => {
     setLocale('fr');
     const center = new NotificationCenter();
-    center.update(transitState());
-    const entry = center.getLog().find(e => e.title === t('notification.title.order_blocked'))!;
-    expect(entry.body).toContain('Jour 29, 08h00');
-    expect(entry.body).not.toContain('tick');
+    center.update(unaffordableState());
+    for (const e of center.getLog()) {
+      expect(`${e.title} ${e.body}`).not.toMatch(/arriv|transit/i);
+      expect(e.body).not.toContain('notification.');
+    }
+  });
+
+  it('a charge order with no blocked reason raises no order-blocked entry', () => {
+    const state = unaffordableState();
+    state.pendingActions[0]!.blockedReason = null;
+    const center = new NotificationCenter();
+    center.update(state);
+    expect(center.getLog().filter(e => e.title === t('notification.title.order_blocked'))).toHaveLength(0);
   });
 });
 

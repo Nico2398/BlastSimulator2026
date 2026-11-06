@@ -2,7 +2,7 @@
 // BlastSimulator2026 — blocked-order wording and classification branches (#1938, #2045)
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { buildBlockedOrderMessage, isFailureBlock, isInTransitBlock, classifyQueuedBlock } from '../../../src/ui/notify/blockedOrders.js';
+import { buildBlockedOrderMessage, isFailureBlock, classifyQueuedBlock } from '../../../src/ui/notify/blockedOrders.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 
@@ -86,13 +86,15 @@ describe('buildBlockedOrderMessage', () => {
     expect(buildBlockedOrderMessage(action({ blockedReason: 'storage_full' }))).toContain('storage is full');
   });
 
-  it('explosives in transit shows ETA with duration only when nowTick is given', () => {
-    const a = action({ type: 'charge_hole', blockedReason: 'explosives_in_transit', payload: { deliveryArrivalTick: 600 } });
-    expect(buildBlockedOrderMessage(a)).toContain('on their way');
-    expect(buildBlockedOrderMessage(a)).not.toContain('(in ');
-    expect(buildBlockedOrderMessage(a, 100)).toContain('(in ');
-    expect(buildBlockedOrderMessage(a, 9999)).toContain('(in ');
-    expect(buildBlockedOrderMessage(action({ blockedReason: 'explosives_in_transit' }))).toContain('on their way');
+  it('unaffordable explosives name the order, never an arrival or a raw key', () => {
+    const a = action({ type: 'charge_hole', blockedReason: 'explosives_unaffordable' });
+    for (const locale of ['en', 'fr'] as const) {
+      setLocale(locale);
+      const msg = buildBlockedOrderMessage(a);
+      expect(msg.length).toBeGreaterThan(0);
+      expect(msg).not.toMatch(/arriv|transit|on their way|\(in /i);
+      expect(msg).not.toContain('notification.');
+    }
   });
 
   it('stranded debris and unknown reason', () => {
@@ -102,21 +104,14 @@ describe('buildBlockedOrderMessage', () => {
 });
 
 describe('block classification', () => {
-  it('isFailureBlock excludes null, debris and in-transit', () => {
+  it('isFailureBlock excludes null and debris', () => {
     expect(isFailureBlock({ blockedReason: null })).toBe(false);
     expect(isFailureBlock({ blockedReason: 'debris_out_of_reach' })).toBe(false);
-    expect(isFailureBlock({ blockedReason: 'explosives_in_transit' })).toBe(false);
     expect(isFailureBlock({ blockedReason: 'storage_full' })).toBe(true);
   });
 
-  it('isInTransitBlock matches only explosives_in_transit', () => {
-    expect(isInTransitBlock({ blockedReason: 'explosives_in_transit' })).toBe(true);
-    expect(isInTransitBlock({ blockedReason: 'storage_full' })).toBe(false);
-  });
-
-  it('classifyQueuedBlock sorts a queued order into open, inTransit, blocked or stranded', () => {
+  it('classifyQueuedBlock sorts a queued order into open, blocked or stranded', () => {
     expect(classifyQueuedBlock({ blockedReason: null })).toBe('open');
-    expect(classifyQueuedBlock({ blockedReason: 'explosives_in_transit' })).toBe('inTransit');
     expect(classifyQueuedBlock({ blockedReason: 'no_vehicle_in_fleet' })).toBe('blocked');
     expect(classifyQueuedBlock({ blockedReason: 'debris_out_of_reach' })).toBe('stranded');
   });

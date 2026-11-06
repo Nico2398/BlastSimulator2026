@@ -18,7 +18,7 @@ import {
   getBestStars,
 } from '../../src/core/campaign/Campaign.js';
 import { getLevel, getAllLevels } from '../../src/core/campaign/Level.js';
-import { DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER } from '../../src/core/config/balance.js';
 import {
   createLevelStats,
   snapshotStats,
@@ -1230,7 +1230,7 @@ describe.each(KIT_LEVELS)('first blast to first sale on %s from the starting kit
       // (bankruptcy at ~tick 490 on the kit's cash). The grant below stands in for a balance decision (a pre-stocked
       // warehouse in the kit, a cheaper opening pattern or a shorter wait); remove it once that lands.
       if (levelId === 'treranium_depths') state.cash += 100_000;
-      tickUntil(run, state, EXPLOSIVE_DELIVERY_TICKS + 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
+      tickUntil(run, state, 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
       run('sequence auto');
       clearBlastZone(run, state);
       expect(run('blast').success).toBe(true);
