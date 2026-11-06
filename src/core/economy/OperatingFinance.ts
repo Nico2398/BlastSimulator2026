@@ -1,5 +1,5 @@
 import type { EmployeeState } from '../entities/Employee.js';
-import { getLivingEmployees } from '../entities/Employee.js';
+import { getLivingEmployees, isEmployeeEarningPay } from '../entities/Employee.js';
 import type { BuildingState } from '../entities/Building.js';
 import { getTotalOperatingCost } from '../entities/Building.js';
 import type { VehicleState } from '../entities/Vehicle.js';
@@ -46,7 +46,9 @@ export function getOperatingCostPerHour(s: {
   const modifiers = s.events?.activeModifiers ?? [];
   const upkeep = factorFor(modifiers, 'upkeep_surcharge', s.tickCount ?? 0);
   let salaries = 0;
-  for (const e of getLivingEmployees(s.employees.employees)) salaries += e.salary * salaryFactor(modifiers, e.role);
+  for (const e of getLivingEmployees(s.employees.employees)) {
+    if (isEmployeeEarningPay(e)) salaries += e.salary * salaryFactor(modifiers, e.role);
+  }
   const payroll = salaries / PAY_CYCLE_TICKS;
   const buildings = getTotalOperatingCost(s.buildings) * upkeep;
   const vehicleMaintenance = getVehicleMaintenanceCostPerTick(s.vehicles) * upkeep;

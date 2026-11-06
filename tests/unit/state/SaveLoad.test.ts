@@ -8,13 +8,25 @@ import { serialize, deserialize, backfillRaises } from '../../../src/core/state/
 import { FilePersistence } from '../../../src/persistence/FilePersistence.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { createBoardState } from '../../../src/core/economy/Board.js';
-import { hireEmployee, BASE_SALARIES, calculateQualificationBonus } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, BASE_SALARIES, calculateQualificationBonus, processPayCycle } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { rampLegsOf } from '../../../src/core/mining/RampPath.js';
 import { updateScores } from '../../../src/core/scores/ScoreManager.js';
 import { SCORE_DECAY_RATE } from '../../../src/core/config/balance.js';
 
 const TEST_SAVE_DIR = path.join(process.cwd(), 'tmp-test-saves');
+
+describe('earned payroll persistence', () => {
+  it('keeps wages accrued before a save', () => {
+    const state = createGame({ seed: 42, startingCash: 100_000 });
+    const emp = hireEmployee(state.employees, 'driller', new Random(42)).employee;
+    emp.activeActionId = 1;
+    processPayCycle(state.employees);
+    const restored = deserialize(serialize(state));
+    expect(restored.employees.accruedPayroll).toBeCloseTo(state.employees.accruedPayroll!);
+    expect(restored.employees.ticksSincePayday).toBe(state.employees.ticksSincePayday);
+  });
+});
 
 afterAll(() => {
   // Cleanup test directory

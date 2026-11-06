@@ -202,10 +202,6 @@ export function runTick(
   let fired = tickEventSystem(state.events, evCtx, rng);
   if (fired) drawPendingLeavers(state.events, state.employees.employees, rng);
 
-  // 2. Payroll — processPayCycle increments ticksSincePayday internally
-  const paySalary = processPayCycle(state.employees, role => salaryFactor(state.events.activeModifiers, role));
-  deductExpense(state, paySalary, 'salaries', 'Payroll');
-
   // 2b. Building and vehicle maintenance — unconditional per-tick upkeep.
   const upkeepFactor = factorFor(state.events.activeModifiers, 'upkeep_surcharge', state.tickCount);
   const buildingUpkeep = getTotalOperatingCost(state.buildings) * upkeepFactor;
@@ -299,6 +295,7 @@ export function runTick(
   // 8c. Training courses — advance and report completions. Without this the
   //     course never ends: the fee is charged and the qualification never
   //     arrives, which made every skill no role is hired with unobtainable.
+  const trainingThisTick = new Set(state.employees.employees.filter(emp => emp.trainingState != null).map(emp => emp.id));
   const { completed: trainingCompletions, cancelled: trainingCancellations } = tickTraining(state, emitter);
   for (const cancellation of trainingCancellations) {
     state.cash += cancellation.refund;
@@ -355,6 +352,10 @@ export function runTick(
   releaseDeadHoldersActions(state, emitter);
   const dispatchResult = tickEmployees(state, emitter);
   fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
+
+  // Accrue after dispatch so newly assigned work and its final work tick are paid.
+  const paySalary = processPayCycle(state.employees, role => salaryFactor(state.events.activeModifiers, role), trainingThisTick);
+  deductExpense(state, paySalary, 'salaries', 'Payroll');
 
   // 8e. Task duration progress + XP/level-up reporting. taskTicksRemaining
   // only counts down once ArrivalGate (8h below) has promoted it from

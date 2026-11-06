@@ -76,11 +76,12 @@ describe('Employee system', () => {
     expect(hiringCost).toBe(HIRING_COSTS['driller']);
   });
 
-  it('salaries are paid each pay cycle', () => {
+  it('accrues salary for work and pays it at the end of the pay cycle', () => {
     const state = createEmployeeState();
     const rng = new Random(42);
     hireEmployee(state, 'driller', rng);
     const salary = state.employees[0]!.salary;
+    state.employees[0]!.activeActionId = 1;
 
     // Not yet a full cycle
     for (let i = 0; i < PAY_CYCLE_TICKS - 1; i++) {
@@ -89,7 +90,43 @@ describe('Employee system', () => {
 
     // Full cycle — pay salaries
     const paid = processPayCycle(state);
-    expect(paid).toBe(salary);
+    expect(paid).toBeCloseTo(salary);
+  });
+
+  it('pays only active ticks and keeps accrued pay if a worker leaves', () => {
+    const state = createEmployeeState();
+    const emp = hireEmployee(state, 'driller', new Random(42)).employee;
+    const salary = emp.salary;
+    const activeTicks = Math.floor(PAY_CYCLE_TICKS / 2);
+    emp.activeActionId = 1;
+    for (let i = 0; i < activeTicks; i++) processPayCycle(state);
+    emp.activeActionId = null;
+    for (let i = activeTicks; i < PAY_CYCLE_TICKS - 1; i++) processPayCycle(state);
+    emp.alive = false;
+    expect(processPayCycle(state)).toBeCloseTo(salary * activeTicks / PAY_CYCLE_TICKS);
+  });
+
+  it('pays nothing for a full idle cycle', () => {
+    const state = createEmployeeState();
+    hireEmployee(state, 'driller', new Random(42));
+    for (let i = 0; i < PAY_CYCLE_TICKS; i++) expect(processPayCycle(state)).toBe(0);
+  });
+
+  it('pays for travel and training but not rest or a stuck journey', () => {
+    const state = createEmployeeState();
+    const emp = hireEmployee(state, 'driller', new Random(42)).employee;
+    emp.itinerary = { legs: [], goal: { kind: 'work', actionId: 1 }, workTicks: 1, estTotalTicks: 1 };
+    processPayCycle(state);
+    emp.isMoveStuck = true;
+    processPayCycle(state);
+    emp.isMoveStuck = false;
+    emp.restTicksRemaining = 1;
+    processPayCycle(state);
+    emp.restTicksRemaining = null;
+    emp.itinerary = null;
+    emp.trainingState = { buildingId: 1, skill: 'blasting', ticksRemaining: 1, fee: 0 };
+    processPayCycle(state);
+    expect(state.accruedPayroll).toBeCloseTo(2 * emp.salary / PAY_CYCLE_TICKS);
   });
 
   it('giving a raise increases salary and morale', () => {

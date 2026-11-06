@@ -29,14 +29,17 @@ describe('getOperatingCostPerHour', () => {
     expect(c).toEqual({ payroll: 0, buildings: 0, vehicleMaintenance: 0, fuel: 0, total: 0 });
   });
 
-  it('payroll is alive salaries spread over the pay cycle', () => {
+  it('payroll includes active workers and excludes idle workers', () => {
     const s = emptySite();
     const rng = new Random(42);
     const a = hireEmployee(s.employees, 'driller', rng).employee;
     const b = hireEmployee(s.employees, 'manager', rng).employee;
+    a.activeActionId = 1;
     const c = getOperatingCostPerHour(s);
-    expect(c.payroll).toBeCloseTo((a.salary + b.salary) / PAY_CYCLE_TICKS, 5);
+    expect(c.payroll).toBeCloseTo(a.salary / PAY_CYCLE_TICKS, 5);
     expect(c.payroll).toBeGreaterThan(0);
+    b.activeActionId = 2;
+    expect(getOperatingCostPerHour(s).payroll).toBeCloseTo((a.salary + b.salary) / PAY_CYCLE_TICKS, 5);
   });
 
   it('excludes dead employees from payroll', () => {
@@ -44,6 +47,7 @@ describe('getOperatingCostPerHour', () => {
     const rng = new Random(42);
     const a = hireEmployee(s.employees, 'driller', rng).employee;
     const b = hireEmployee(s.employees, 'manager', rng).employee;
+    a.activeActionId = 1;
     killEmployee(s.employees, b.id);
     expect(getOperatingCostPerHour(s).payroll).toBeCloseTo(a.salary / PAY_CYCLE_TICKS, 5);
   });
@@ -74,7 +78,7 @@ describe('getOperatingCostPerHour', () => {
   it('total is the sum of the four parts', () => {
     const s = emptySite();
     const rng = new Random(1);
-    hireEmployee(s.employees, 'blaster', rng);
+    hireEmployee(s.employees, 'blaster', rng).employee.activeActionId = 1;
     addBuilding(s, true);
     const v = purchaseVehicle(s.vehicles, 'drill_rig').vehicle;
     reserveVehicle(s.vehicles, v.id, 3);

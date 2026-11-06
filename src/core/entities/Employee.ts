@@ -320,6 +320,8 @@ export interface EmployeeState {
   nextId: number;
   /** Ticks since last pay cycle. */
   ticksSincePayday: number;
+  /** Earned wages not yet paid; absent in older saves. */
+  accruedPayroll?: number;
 }
 
 export function createEmployeeState(): EmployeeState {
@@ -467,17 +469,33 @@ export function applyDismissalMoraleDent(state: EmployeeState, dismissedId: numb
  * Process pay cycle. Returns total salaries paid.
  * Call each tick; only pays when cycle completes. `salaryFactorOf` scales each role's pay (active event modifiers).
  */
-export function processPayCycle(state: EmployeeState, salaryFactorOf: (role: EmployeeRole) => number = () => 1): number {
+/** Whether a worker is actively working, travelling or training, rather than idle. */
+export function isEmployeeEarningPay(emp: Employee): boolean {
+  if (!emp.alive) return false;
+  if (emp.trainingState != null) return true;
+  if (emp.restTicksRemaining != null) return false;
+  if (emp.isMoveStuck) return false;
+  return emp.activeActionId != null || emp.taskTicksRemaining != null || emp.itinerary != null ||
+    emp.destinationX != null || emp.destinationZ != null || emp.pendingTaskDuration != null ||
+    emp.pendingRestDuration != null || emp.pendingTrainingState != null;
+}
+
+export function processPayCycle(
+  state: EmployeeState,
+  salaryFactorOf: (role: EmployeeRole) => number = () => 1,
+  completedTrainingIds: ReadonlySet<number> = new Set(),
+): number {
+  for (const emp of state.employees) {
+    if (emp.alive && (isEmployeeEarningPay(emp) || completedTrainingIds.has(emp.id))) {
+      state.accruedPayroll = (state.accruedPayroll ?? 0) + emp.salary * salaryFactorOf(emp.role) / PAY_CYCLE_TICKS;
+    }
+  }
   state.ticksSincePayday++;
   if (state.ticksSincePayday < PAY_CYCLE_TICKS) return 0;
 
   state.ticksSincePayday = 0;
-  let totalSalaries = 0;
-  for (const emp of state.employees) {
-    if (emp.alive) {
-      totalSalaries += emp.salary * salaryFactorOf(emp.role);
-    }
-  }
+  const totalSalaries = state.accruedPayroll ?? 0;
+  state.accruedPayroll = 0;
   return totalSalaries;
 }
 
