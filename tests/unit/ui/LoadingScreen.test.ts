@@ -3,8 +3,14 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { LoadingScreen, nextPaint, type LoadingSiteInfo } from '../../../src/ui/LoadingScreen.js';
-import { LOADING_QUIPS, QuipBag, LOADING_TIPS, TipBag } from '../../../src/ui/loadingQuips.js';
+import { loadingQuips, loadingTips, QuipBag, TipBag, LOADING_QUIP_COUNT, LOADING_TIP_COUNT } from '../../../src/ui/loadingQuips.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
+
+// Every test below that switches language must leave the shared locale as it
+// found it; this file-level hook restores it even when an assertion throws.
+const ORIGINAL_LOCALE = getLocale();
+beforeEach(() => { setLocale('en'); });
+afterEach(() => { setLocale(ORIGINAL_LOCALE); });
 
 /** Fixture site info for the eyebrow/subtitle/briefing block tests (#493). */
 const FIXTURE_SITE_INFO: LoadingSiteInfo = {
@@ -64,7 +70,7 @@ describe('LoadingScreen', () => {
 
   it('shows a satirical line rather than naming the work being done', () => {
     screen.show();
-    expect(LOADING_QUIPS).toContain(screen.phaseText);
+    expect(loadingQuips()).toContain(screen.phaseText);
   });
 
   it('clamps progress to 0..1 rather than emitting a nonsense bar width', () => {
@@ -271,7 +277,7 @@ describe('LoadingScreen — site info blocks', () => {
     // holds when no site info is supplied.
     expect(screen.visible).toBe(true);
     expect(screen.progress).toBe(0);
-    expect(LOADING_QUIPS).toContain(screen.phaseText);
+    expect(loadingQuips()).toContain(screen.phaseText);
   });
 
   it('runPhases([...]) with no siteInfo also leaves eyebrow/subtitle/briefing empty', async () => {
@@ -403,13 +409,13 @@ describe('LoadingScreen — tip block', () => {
   it('shows a non-empty tip after show() with no siteInfo', () => {
     screen.show();
     expect(screen.tipText.length).toBeGreaterThan(0);
-    expect(LOADING_TIPS).toContain(screen.tipText);
+    expect(loadingTips()).toContain(screen.tipText);
   });
 
   it('shows a non-empty tip after show(siteInfo)', () => {
     screen.show(FIXTURE_SITE_INFO);
     expect(screen.tipText.length).toBeGreaterThan(0);
-    expect(LOADING_TIPS).toContain(screen.tipText);
+    expect(loadingTips()).toContain(screen.tipText);
   });
 
   it('nextTip() draws a different tip than the current one', () => {
@@ -418,7 +424,7 @@ describe('LoadingScreen — tip block', () => {
     const second = screen.nextTip();
     expect(second).not.toBe(first);
     expect(screen.tipText).toBe(second);
-    expect(LOADING_TIPS).toContain(second);
+    expect(loadingTips()).toContain(second);
   });
 
   it('clicking #bs-loading-tip-next changes tipText the same way nextTip() does', () => {
@@ -429,7 +435,7 @@ describe('LoadingScreen — tip block', () => {
     btn.click();
     const after = screen.tipText;
     expect(after).not.toBe(before);
-    expect(LOADING_TIPS).toContain(after);
+    expect(loadingTips()).toContain(after);
   });
 
   it('clicking NEXT mid-phase does not disturb visible, progress, or phaseText', async () => {
@@ -485,27 +491,27 @@ describe('nextPaint', () => {
 
 describe('QuipBag', () => {
   it('offers a decent spread of lines', () => {
-    expect(LOADING_QUIPS.length).toBeGreaterThanOrEqual(30);
-    expect(new Set(LOADING_QUIPS).size).toBe(LOADING_QUIPS.length);
-    for (const q of LOADING_QUIPS) expect(q.trim().length).toBeGreaterThan(0);
+    expect(loadingQuips()).toHaveLength(LOADING_QUIP_COUNT);
+    expect(new Set(loadingQuips()).size).toBe(loadingQuips().length);
+    for (const q of loadingQuips()) expect(q.trim().length).toBeGreaterThan(0);
   });
 
   it('never repeats a line until every one has been used', () => {
     const bag = new QuipBag();
     const drawn = new Set<string>();
-    for (let i = 0; i < LOADING_QUIPS.length; i++) {
+    for (let i = 0; i < loadingQuips().length; i++) {
       const q = bag.next();
       expect(drawn.has(q), `repeated "${q}" before the bag was empty`).toBe(false);
       drawn.add(q);
     }
-    expect(drawn.size).toBe(LOADING_QUIPS.length);
+    expect(drawn.size).toBe(loadingQuips().length);
   });
 
   it('refills once drained rather than running out', () => {
     const bag = new QuipBag();
-    for (let i = 0; i < LOADING_QUIPS.length; i++) bag.next();
+    for (let i = 0; i < loadingQuips().length; i++) bag.next();
     expect(bag.remainingCount).toBe(0);
-    expect(LOADING_QUIPS).toContain(bag.next());
+    expect(loadingQuips()).toContain(bag.next());
   });
 
   it('draws in a different order for a different random source', () => {
@@ -518,7 +524,7 @@ describe('QuipBag', () => {
 
   it('a degenerate random source still yields valid lines', () => {
     const bag = new QuipBag(() => 1);
-    for (let i = 0; i < 5; i++) expect(LOADING_QUIPS).toContain(bag.next());
+    for (let i = 0; i < 5; i++) expect(loadingQuips()).toContain(bag.next());
   });
 });
 
@@ -526,33 +532,33 @@ describe('QuipBag', () => {
 
 describe('TipBag', () => {
   it('offers a decent spread of lines', () => {
-    expect(LOADING_TIPS.length).toBeGreaterThanOrEqual(12);
-    expect(new Set(LOADING_TIPS).size).toBe(LOADING_TIPS.length);
-    for (const tip of LOADING_TIPS) expect(tip.trim().length).toBeGreaterThan(0);
+    expect(loadingTips()).toHaveLength(LOADING_TIP_COUNT);
+    expect(new Set(loadingTips()).size).toBe(loadingTips().length);
+    for (const tip of loadingTips()) expect(tip.trim().length).toBeGreaterThan(0);
   });
 
   it('never repeats a line until every one has been used', () => {
-    expect(LOADING_TIPS.length).toBeGreaterThanOrEqual(12);
+    expect(loadingTips()).toHaveLength(LOADING_TIP_COUNT);
     const bag = new TipBag();
     const drawn = new Set<string>();
-    for (let i = 0; i < LOADING_TIPS.length; i++) {
+    for (let i = 0; i < loadingTips().length; i++) {
       const tip = bag.next();
       expect(drawn.has(tip), `repeated "${tip}" before the bag was empty`).toBe(false);
       drawn.add(tip);
     }
-    expect(drawn.size).toBe(LOADING_TIPS.length);
+    expect(drawn.size).toBe(loadingTips().length);
   });
 
   it('refills once drained rather than running out', () => {
-    expect(LOADING_TIPS.length).toBeGreaterThanOrEqual(12);
+    expect(loadingTips()).toHaveLength(LOADING_TIP_COUNT);
     const bag = new TipBag();
-    for (let i = 0; i < LOADING_TIPS.length; i++) bag.next();
+    for (let i = 0; i < loadingTips().length; i++) bag.next();
     expect(bag.remainingCount).toBe(0);
-    expect(LOADING_TIPS).toContain(bag.next());
+    expect(loadingTips()).toContain(bag.next());
   });
 
   it('draws in a different order for a different random source', () => {
-    expect(LOADING_TIPS.length).toBeGreaterThanOrEqual(12);
+    expect(loadingTips()).toHaveLength(LOADING_TIP_COUNT);
     const seq = (r: () => number) => {
       const bag = new TipBag(r);
       return Array.from({ length: 8 }, () => bag.next()).join('|');
@@ -561,8 +567,142 @@ describe('TipBag', () => {
   });
 
   it('a degenerate random source still yields valid lines', () => {
-    expect(LOADING_TIPS.length).toBeGreaterThanOrEqual(12);
+    expect(loadingTips()).toHaveLength(LOADING_TIP_COUNT);
     const bag = new TipBag(() => 1);
-    for (let i = 0; i < 5; i++) expect(LOADING_TIPS).toContain(bag.next());
+    for (let i = 0; i < 5; i++) expect(loadingTips()).toContain(bag.next());
+  });
+});
+
+// ── Locale-backed captions and tips (#2158) ──
+
+describe('LoadingScreen — captions and tips follow the locale', () => {
+  let container: HTMLElement;
+  let screen: LoadingScreen;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => cb(0), 0) as unknown as number);
+  });
+
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  /** Entries of a pool under a given locale, read through the public API. */
+  const poolsIn = (locale: 'en' | 'fr') => {
+    setLocale(locale);
+    return { quips: [...loadingQuips()], tips: [...loadingTips()] };
+  };
+
+  it('on en the shown caption and tip are English entries, not French ones', () => {
+    const en = poolsIn('en');
+    const fr = poolsIn('fr');
+    setLocale('en');
+    screen = new LoadingScreen(container);
+    for (let i = 0; i < 5; i++) {
+      screen.show();
+      expect(en.quips).toContain(screen.phaseText);
+      expect(fr.quips).not.toContain(screen.phaseText);
+      expect(en.tips).toContain(screen.tipText);
+      expect(fr.tips).not.toContain(screen.tipText);
+    }
+  });
+
+  it('on fr the shown caption and tip are French entries, not English ones', () => {
+    const en = poolsIn('en');
+    const fr = poolsIn('fr');
+    setLocale('fr');
+    screen = new LoadingScreen(container);
+    for (let i = 0; i < 5; i++) {
+      screen.show();
+      expect(fr.quips).toContain(screen.phaseText);
+      expect(en.quips).not.toContain(screen.phaseText);
+      expect(fr.tips).toContain(screen.tipText);
+      expect(en.tips).not.toContain(screen.tipText);
+    }
+  });
+
+  it('a locale switch between loads shows the new language on the next show()', () => {
+    const en = poolsIn('en');
+    const fr = poolsIn('fr');
+    setLocale('en');
+    screen = new LoadingScreen(container);
+    screen.show();
+    expect(en.quips).toContain(screen.phaseText);
+    expect(en.tips).toContain(screen.tipText);
+
+    setLocale('fr');
+    screen.show();
+    expect(fr.quips).toContain(screen.phaseText);
+    expect(fr.tips).toContain(screen.tipText);
+
+    setLocale('en');
+    screen.show();
+    expect(en.quips).toContain(screen.phaseText);
+    expect(en.tips).toContain(screen.tipText);
+  });
+
+  it('a switch after a load that built the screen in another language still takes effect for runPhases captions', async () => {
+    const fr = poolsIn('fr');
+    setLocale('en');
+    screen = new LoadingScreen(container);
+    setLocale('fr');
+    const captions: string[] = [];
+    await screen.runPhases([
+      { run: () => { captions.push(screen.phaseText); } },
+      { run: () => { captions.push(screen.phaseText); } },
+    ]);
+    expect(captions).toHaveLength(2);
+    for (const c of captions) expect(fr.quips).toContain(c);
+  });
+
+  it('nextTip() after a switch draws from the new language', () => {
+    const fr = poolsIn('fr');
+    setLocale('en');
+    screen = new LoadingScreen(container);
+    screen.show();
+    setLocale('fr');
+    screen.show();
+    expect(fr.tips).toContain(screen.nextTip());
+  });
+});
+
+describe('QuipBag / TipBag — pool follows the current locale', () => {
+  it('a bag built on fr draws French entries', () => {
+    setLocale('fr');
+    const frQuips = [...loadingQuips()];
+    const frTips = [...loadingTips()];
+    const quips = new QuipBag();
+    const tips = new TipBag();
+    for (let i = 0; i < 5; i++) {
+      expect(frQuips).toContain(quips.next());
+      expect(frTips).toContain(tips.next());
+    }
+  });
+
+  it('a drained bag refills from the locale current at that moment', () => {
+    setLocale('en');
+    const quips = new QuipBag();
+    const tips = new TipBag();
+    for (let i = 0; i < LOADING_QUIP_COUNT; i++) quips.next();
+    for (let i = 0; i < LOADING_TIP_COUNT; i++) tips.next();
+    expect(quips.remainingCount).toBe(0);
+    expect(tips.remainingCount).toBe(0);
+
+    setLocale('fr');
+    const frQuips = [...loadingQuips()];
+    const frTips = [...loadingTips()];
+    expect(frQuips).toContain(quips.next());
+    expect(frTips).toContain(tips.next());
+    expect(quips.remainingCount).toBe(LOADING_QUIP_COUNT - 1);
+    expect(tips.remainingCount).toBe(LOADING_TIP_COUNT - 1);
+  });
+
+  it('a full French pass never repeats a line', () => {
+    setLocale('fr');
+    const bag = new QuipBag();
+    const seen = new Set<string>();
+    for (let i = 0; i < LOADING_QUIP_COUNT; i++) seen.add(bag.next());
+    expect(seen.size).toBe(LOADING_QUIP_COUNT);
   });
 });

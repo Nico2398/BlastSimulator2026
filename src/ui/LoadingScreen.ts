@@ -101,8 +101,8 @@ export class LoadingScreen {
   private readonly tipLabelEl: HTMLElement;
   private readonly tipTextEl: HTMLElement;
   private readonly tipNextBtn: HTMLButtonElement;
-  private readonly quips = new QuipBag();
-  private readonly tips = new TipBag();
+  private quips = new QuipBag();
+  private tips = new TipBag();
 
   constructor(container: HTMLElement) {
     const layout = buildLoadingScreenLayout();
@@ -173,6 +173,9 @@ export class LoadingScreen {
   get tipNextText(): string { return this.tipNextBtn.textContent ?? ''; }
 
   show(siteInfo?: LoadingSiteInfo): void {
+    // Fresh bags so the pools follow the locale active for this load.
+    this.quips = new QuipBag();
+    this.tips = new TipBag();
     this.titleEl.textContent = t('loading.title');
     this.renderEyebrow(siteInfo ?? null);
     this.renderSubtitle(siteInfo ?? null);
@@ -183,7 +186,7 @@ export class LoadingScreen {
     this.overlay.style.display = 'flex';
   }
 
-  /** `caption` is shown verbatim — the quips are not translated strings. */
+  /** `caption` is shown verbatim — callers pass an already-localised quip. */
   setPhase(caption: string, fraction: number): void {
     const clamped = Math.min(1, Math.max(0, fraction));
     this.label.textContent = caption;
