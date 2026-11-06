@@ -1,6 +1,6 @@
 {
-  "name": "explosive-delivery-transit-visual",
-  "description": "A charge order without warehouse stock is paid upfront and has no delivery wait; the Charge step shows the paid-from line.",
+  "name": "explosives-upfront-no-wait",
+  "description": "An order without warehouse stock charges cash immediately, then finishes loading within 150 ticks without a delivery wait.",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true cash:150000",
@@ -12,7 +12,14 @@
           "type": "command",
           "command": "new_game seed:42 staffed:true cash:150000"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 0,
+          "chargedCount": 0
+        },
+        "note": "No warehouse or prepaid explosives."
+      }
     },
     {
       "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15",
@@ -36,7 +43,12 @@
           "maxTicks": 300,
           "timeoutMs": 120000
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 1
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -47,7 +59,36 @@
           "type": "command",
           "command": "charge hole:* explosive:boomite amount:5 stemming:2"
         }
-      ]
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "chargedCount": 0
+        },
+        "note": "Explosives are paid for at order time; loading remains real work."
+      }
+    },
+    {
+      "command": "wait_until field:chargedCount equals:1 max_ticks:150",
+      "description": "The truck and blaster finish loading well before the former 400-tick delivery delay.",
+      "role": "observe",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 1,
+          "maxTicks": 150,
+          "timeoutMs": 120000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "chargedCount": 1
+        }
+      }
     },
     {
       "command": "state",
@@ -67,23 +108,15 @@
           "selector": "#bs-blast-panel [data-info=\"paid-from\"]"
         },
         {
-          "type": "mousemove",
-          "x": 200,
-          "y": 520
-        },
-        {
-          "type": "wheel",
-          "deltaX": 0,
-          "deltaY": 600
-        },
-        {
-          "type": "wait",
-          "durationMs": 300
-        },
-        {
           "type": "screenshot"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "chargedCount": 1
+        },
+        "note": "Loaded charge and order-time payment summary remain visible; no delivery countdown."
+      }
     }
   ]
 }
