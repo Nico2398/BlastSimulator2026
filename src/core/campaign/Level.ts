@@ -395,6 +395,9 @@ export function resolveScriptedOreSale(state: GameState): ScriptedOreSaleOffer |
 }
 
 /** Whether an automatic contract behaviour is on: the player's explicit choice, else the level's default (#2145). */
-export function autoFulfilmentEnabled(_state: GameState, _key: 'autoSell' | 'autoClearRubble'): boolean {
-  throw new Error('not implemented');
+export function autoFulfilmentEnabled(state: GameState, key: 'autoSell' | 'autoClearRubble'): boolean {
+  const explicit = state.contracts[key];
+  if (explicit !== undefined) return explicit;
+  const levelId = state.campaign.activeLevelId;
+  return !(levelId && getLevel(levelId)?.manualContracts);
 }

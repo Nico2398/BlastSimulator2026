@@ -31,7 +31,7 @@ import { formatDollars, insufficientFundsText } from '../../core/economy/formatM
 import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
-import { resolveContractOres, resolveScriptedOreSale } from '../../core/campaign/Level.js';
+import { autoFulfilmentEnabled, resolveContractOres, resolveScriptedOreSale } from '../../core/campaign/Level.js';
 import { saturationReader, oreSaturationTrend, formatTrendPct } from '../../core/economy/OreSaturation.js';
 import { oreContractBasePrice } from '../../core/economy/Market.js';
 import { buyerTierNameKey } from '../../core/economy/BuyerTiers.js';
@@ -194,6 +194,22 @@ export function contractCommand(
         }));
       }
       return { success: true, output: lines.join('\n') };
+    }
+
+    case 'auto': {
+      const keys = { sell: 'autoSell', rubble: 'autoClearRubble' } as const;
+      const target = args[1];
+      if (target === undefined) {
+        return { success: true, output: [
+          t('economy.contract.auto_line', { name: t('economy.contract.auto_sell_name'), state: t(autoFulfilmentEnabled(state, 'autoSell') ? 'economy.contract.auto_on' : 'economy.contract.auto_off') }),
+          t('economy.contract.auto_line', { name: t('economy.contract.auto_rubble_name'), state: t(autoFulfilmentEnabled(state, 'autoClearRubble') ? 'economy.contract.auto_on' : 'economy.contract.auto_off') }),
+        ].join('\n') };
+      }
+      const key = target === 'sell' || target === 'rubble' ? keys[target] : undefined;
+      const value = args[2] === 'on' ? true : args[2] === 'off' ? false : undefined;
+      if (!key || value === undefined) return { success: false, output: t('economy.contract.usage_auto') };
+      state.contracts[key] = value;
+      return { success: true, output: t('economy.contract.auto_line', { name: t(target === 'sell' ? 'economy.contract.auto_sell_name' : 'economy.contract.auto_rubble_name'), state: t(value ? 'economy.contract.auto_on' : 'economy.contract.auto_off') }) };
     }
 
     case 'accept': {
