@@ -6,9 +6,9 @@
 // held to the same honesty rule: no layoff, scrap, demolish or sell hack.
 
 import type { GameState } from '../../src/core/state/GameState.js';
-import { playTick, playContracts, clearBlastZone, stockWarehouse, type Run } from '../../scripts/shared/player-actions.js';
+import { playTick, playContracts, clearBlastZone, type Run } from '../../scripts/shared/player-actions.js';
 
-export { playTick, playContracts, clearBlastZone, stockWarehouse, type Run };
+export { playTick, playContracts, clearBlastZone, type Run };
 
 const DELIVERY_WAIT_FLOAT = 1_000_000;
 
