@@ -509,7 +509,7 @@ export class GameRenderer {
     }
 
     if (this.characters && this.lastState) {
-      this.characters.update(this.lastState.employees.employees, dt, (x, z) => this.getTerrainSurfaceY(x, z));
+      this.characters.update(this.lastState.employees.employees, dt, (x, z) => this.getTerrainSurfaceY(x, z), this.lastState.timeScale);
     }
 
     this.taskProgress?.update(dt);
