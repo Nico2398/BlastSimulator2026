@@ -8,7 +8,16 @@
 // Drawn without replacement, so a single load never repeats a line, and the
 // bag reshuffles once it runs dry.
 
-export const LOADING_QUIPS: readonly string[] = [
+export const LOADING_QUIP_COUNT = 34;
+export const LOADING_TIP_COUNT = 14;
+
+/** Quips in the current locale, keys `loading.quip.<i>`. */
+export function loadingQuips(): readonly string[] { throw new Error('not implemented'); }
+
+/** Tips in the current locale, keys `loading.tip.<i>`. */
+export function loadingTips(): readonly string[] { throw new Error('not implemented'); }
+
+const LEGACY_QUIPS: readonly string[] = [
   'Bribing the geological survey',
   'Rounding profit margins in our favour',
   'Teaching the interns which end of the drill is which',
@@ -87,7 +96,7 @@ abstract class DrawBag<T> {
  * list, so the bag is drawn down rather than sampled independently each time.
  */
 export class QuipBag extends DrawBag<string> {
-  protected pool(): readonly string[] { return LOADING_QUIPS; }
+  protected pool(): readonly string[] { return LEGACY_QUIPS; }
 }
 
 /**
@@ -96,7 +105,7 @@ export class QuipBag extends DrawBag<string> {
  * Unlike LOADING_QUIPS these are meant to be read and acted on, not just a
  * joke to skim past — real mechanics a player might not have discovered yet.
  */
-export const LOADING_TIPS: readonly string[] = [
+const LEGACY_TIPS: readonly string[] = [
   'A survey narrows the odds before you drill — skipping it is a bet, not a shortcut.',
   'Stemming the top of a hole keeps the blast energy pointed at the rock, not the sky.',
   'A free face lets rock break sideways. Without one, energy has nowhere to go but up.',
@@ -118,5 +127,5 @@ export const LOADING_TIPS: readonly string[] = [
  * as QuipBag, sharing the draw logic via `DrawBag<T>`.
  */
 export class TipBag extends DrawBag<string> {
-  protected pool(): readonly string[] { return LOADING_TIPS; }
+  protected pool(): readonly string[] { return LEGACY_TIPS; }
 }
