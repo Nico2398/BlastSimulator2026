@@ -184,14 +184,14 @@ export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[]
     const consumed = consumeStoredOre(state.logistics, state.collectedOre, oreId, unclaimed, state.buildings.buildings, gradeScale);
     if (!consumed.success || !(consumed.consumedKg > 0)) continue;
     const kg = consumed.consumedKg;
-    state.saturation ??= {};
-    const saturation = saturationAt(state.saturation[oreId], tick);
+    // Saturation only exists on a progression site (`state.grade`), as for a contract delivery (settleDelivery).
+    const saturation = state.grade !== undefined ? saturationAt(state.saturation?.[oreId], tick) : 0;
     const payment = kg * autoSalePricePerKg(oreId, contracts.market ?? 'legacy', saturation);
     state.cash += payment;
     addIncome(state.finances, payment, 'sales', `Auto sale: ${oreId}`, tick);
     recordOreDelivery(state.grade, 'ore_sale', kg);
     recordBoardOre(state.board, 'ore_sale', kg);
-    recordOreSale(state.saturation, oreId, kg, tick, state.grade?.grade ?? 0);
+    if (state.grade !== undefined) recordOreSale((state.saturation ??= {}), oreId, kg, tick, state.grade.grade);
     delete since[oreId];
     sales.push({ oreId, kg, payment });
   }

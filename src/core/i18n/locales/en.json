@@ -4569,7 +4569,7 @@
   "ui.contracts.auto_on": "On",
   "ui.contracts.auto_off": "Off",
   "ui.contracts.auto_sell": "Sell unclaimed ore automatically",
-  "ui.contracts.auto_sell_hint": "Ore no contract claims sells after a short wait at 60% of its base price.",
+  "ui.contracts.auto_sell_hint": "Ore no contract claims sells after a short wait at {pct}% of its base price.",
   "ui.contracts.auto_rubble": "Clear paying rubble automatically",
   "ui.contracts.auto_rubble_hint": "Rubble clearances that pay you are accepted once the barren stock covers them. Paid clearances stay manual.",
   "economy.contract.auto_line": "Auto {name}: {state}",

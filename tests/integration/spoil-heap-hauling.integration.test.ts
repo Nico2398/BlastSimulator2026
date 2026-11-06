@@ -255,7 +255,7 @@ describe('rubble_disposal contracts draw on heap mass (#1530)', () => {
   function site(heapKg: number, warehouseKg: number) {
     const ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
     const state = ctx.state!;
-  state.contracts.autoSell = false; state.contracts.autoClearRubble = false; // stock under test must not be sold off or cleared (#2145)
+    state.contracts.autoSell = false; state.contracts.autoClearRubble = false; // stock under test must not be sold off or cleared (#2145)
     state.contracts.available = [];
     ensureFreightWarehouse(ctx);
     const heap = placeBuilding(state.buildings, 'spoil_heap', 40, 40, 200, 200);
@@ -589,7 +589,7 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
     expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42 ore_grade:1')).toMatchObject({ success: true });
     run('time resume');
     const state = ctx.state!;
-  state.contracts.autoSell = false; state.contracts.autoClearRubble = false; // stock under test must not be sold off or cleared (#2145)
+    state.contracts.autoSell = false; state.contracts.autoClearRubble = false; // stock under test must not be sold off or cleared (#2145)
     const commands: string[] = [];
     const logged: Run = (c) => { commands.push(c); return run(c); };
     const startTick = state.tickCount;

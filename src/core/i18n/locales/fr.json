@@ -4569,7 +4569,7 @@
   "ui.contracts.auto_on": "Activé",
   "ui.contracts.auto_off": "Désactivé",
   "ui.contracts.auto_sell": "Vendre le minerai non réservé automatiquement",
-  "ui.contracts.auto_sell_hint": "Le minerai qu’aucun contrat ne réclame se vend après une courte attente à 60 % de son prix de base.",
+  "ui.contracts.auto_sell_hint": "Le minerai qu’aucun contrat ne réclame se vend après une courte attente à {pct} % de son prix de base.",
   "ui.contracts.auto_rubble": "Déblayer automatiquement les gravats rémunérés",
   "ui.contracts.auto_rubble_hint": "Les déblayages qui vous rapportent sont acceptés dès que le stock stérile les couvre. Les déblayages payants restent manuels.",
   "economy.contract.auto_line": "Auto {name} : {state}",
