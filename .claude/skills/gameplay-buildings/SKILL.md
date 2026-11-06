@@ -30,7 +30,7 @@ All tier names are fictional and humorous. Localized via i18n (`en.json` + `fr.j
 | Living Quarters | "The Cells" | "Staff Dormitory" | "Unnecessarily Luxurious Hotel" | Houses + feeds employees; grade → well-being |
 | Explosive Warehouse | "Boom Closet" | "Blast Vault" | "Fort Kaboom" | Bulk explosive stock, cheaper per kg |
 | Freight Warehouse | "The Pile" | "Stuff Bunker" | "Hoarder's Paradise" | Stores ore debris; primary income source |
-| Spoil Heap | "The Dump" | (single tier) | (single tier) | Takes barren rock hauled off the blast; 50,000 kg capacity (`SPOIL_HEAP_CAPACITY_KG`); no crew needed |
+| Spoil Heap | "The Dump" | (single tier) | (single tier) | Takes barren rock hauled off the blast; 1,500 t capacity (`SPOIL_HEAP_CAPACITY_KG`, one ordinary shot); no crew needed |
 
 ## Tier System
 
@@ -160,14 +160,15 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
 
 **Spoil Heap:**
 - Cost $2000 (`constructionCost`), demolish $500, 2x2, no upkeep, finite capacity
-  `SPOIL_HEAP_CAPACITY_KG` = 50,000 kg (`spoilHeapSites` report the room left, `capacity - storedSpoilKg`,
+  `SPOIL_HEAP_CAPACITY_KG` = 1,500,000 kg (`spoilHeapSites` report the room left, `capacity - storedSpoilKg`,
   and in-transit reservations count against it like a warehouse's). Barren rock never uses freight storage.
-  Target: one heap fills 2,000-3,000 ticks into the opening; `SPOIL_HEAP_CAPACITY_KG` is the one lever to retune.
+  Sized to one shot: a 3x3 desert shot breaks ~1,424-1,434 t (ore 28-34 t, barren ~1,395-1,401 t), so one heap takes a whole shot's barren rock with ~7% slack. The measurement sits beside the constant in `balance.ts`; `SPOIL_HEAP_CAPACITY_KG` is the one lever to retune.
 - **Barren** = a fragment whose summed ore density is at most `SPOIL_BARREN_ORE_FRACTION_THRESHOLD`
   (`isBarrenFragment`, `SpoilHeaps.ts`; an empty density map is barren). Barren fragments haul to the
   nearest heap (`pickSpoilHeap`: squared distance, tie lowest id), ore fragments to warehouses. On
   delivery the fragment leaves `logistics.fragments` and its mass is added to the heap building's
   `storedSpoilKg`; `storedMassKg` and `collectedOre` are untouched. A batch never mixes barren and ore.
+- **Ore is concentrated on arrival (#2142):** when a hauler unloads an ore-bearing fragment at a Freight Warehouse, `concentrateStoredFragment` (`Logistics.ts`, called from `deliverCargoItem`) keeps only the ore's mass (`shrinkStoredFragment`, densities rescaled so ore kg is unchanged) and credits the barren remainder to a heap at once (`creditSpoilHeaps`). With no heap room the remainder stays stored and `releaseBarrenStoredFragments` concentrates it later, when a heap frees room. `collectedOre` is untouched. A warehouse therefore holds ore, not the rock around it.
 - Ecology +2 (`scoreEffects`, +0.2/tick per active heap; inactive gives none). One heap carries ordinary play against
   the settling dust from a blast (a ~2,344 t pile, blast every ~600 ticks); extra heaps shorten and soften
   the dips. Hauling rock off the ground shrinks the settled loss and the next fresh dust pulse.
