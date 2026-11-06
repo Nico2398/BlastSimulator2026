@@ -65,11 +65,40 @@ export const HAIR_COLORS: readonly number[] = [0x2A1A12, 0x4A2F1F, 0x6E4224, 0x9
 
 /** Stable per-employee pick from a palette (ids are small consecutive integers, so mix them first). */
 export function paletteFor(id: number, palette: readonly number[], salt: number): number {
+  return palette[paletteIndex(id, palette.length, salt)]!;
+}
+
+function paletteIndex(id: number, length: number, salt: number): number {
   let h = Math.imul(id + 1, 0x9E3779B1) ^ Math.imul(salt, 0x85EBCA77);
   h ^= h >>> 15;
   h = Math.imul(h, 0x2C1B3C6D);
   h ^= h >>> 12;
-  return palette[(h >>> 0) % palette.length]!;
+  return (h >>> 0) % length;
+}
+
+/** HSL lightness of a 0xRRGGBB colour, 0..1. */
+function lightness(hex: number): number {
+  const r = (hex >> 16) & 0xff;
+  const g = (hex >> 8) & 0xff;
+  const b = hex & 0xff;
+  return (Math.max(r, g, b) + Math.min(r, g, b)) / 510;
+}
+
+/** How far apart in lightness hair (and with it brows, beard, moustache) must be from the skin it sits on. */
+const HAIR_CONTRAST = 0.14;
+
+/**
+ * An employee's hair colour: their stable pick from HAIR_COLORS, stepping on through the
+ * palette until it stands apart from `skin` — otherwise a dark-haired, deep-skinned face
+ * reads as one brown blob under the hat, brows and moustache lost in it.
+ */
+export function hairFor(id: number, skin: number): number {
+  const start = paletteIndex(id, HAIR_COLORS.length, 2);
+  for (let k = 0; k < HAIR_COLORS.length; k++) {
+    const hair = HAIR_COLORS[(start + k) % HAIR_COLORS.length]!;
+    if (Math.abs(lightness(hair) - lightness(skin)) >= HAIR_CONTRAST) return hair;
+  }
+  return HAIR_COLORS.reduce((a, b) => (Math.abs(lightness(b) - lightness(skin)) > Math.abs(lightness(a) - lightness(skin)) ? b : a));
 }
 /** Stand-in box while the worker asset is not loaded: roughly a minion's envelope. */
 const FALLBACK_SIZE = [0.55, 1.2, 0.55] as const;
@@ -330,8 +359,9 @@ export class CharacterMesh {
   private attachModel(group: THREE.Group, employee: Employee): { instance: ModelInstance; animator: WorkerAnimator | null } {
     const instance = this.library.instantiate(workerModelId(employee.role), { size: FALLBACK_SIZE, tint: ROLE_TINT });
     applyStatusTints(instance, employee);
-    instance.tints.get(SKIN_TINT)?.color.setHex(paletteFor(employee.id, SKIN_TONES, 1));
-    instance.tints.get(HAIR_TINT)?.color.setHex(paletteFor(employee.id, HAIR_COLORS, 2));
+    const skin = paletteFor(employee.id, SKIN_TONES, 1);
+    instance.tints.get(SKIN_TINT)?.color.setHex(skin);
+    instance.tints.get(HAIR_TINT)?.color.setHex(hairFor(employee.id, skin));
     group.add(instance.root);
     group.userData[OVERLAY_Y_KEY] = instance.bounds.max.y + OVERLAY_CLEARANCE;
     const rig = instance.isFallback ? null : workerRig(instance.root);

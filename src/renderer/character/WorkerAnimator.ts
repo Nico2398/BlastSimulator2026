@@ -267,7 +267,7 @@ export class WorkerAnimator {
       this.poseHands(m, carry);
       if (m !== 'collapse' && m !== 'work') tiredTilt(rig, this.tired, time, seed);
       const out = m === 'collapse';
-      poseFace(rig, out ? 1 : blink, droop, out ? 0 : alarm, out ? 0.7 : smooth((alarm - 0.3) / 0.4));
+      poseFace(rig, out ? 1 : blink, droop, out ? 0 : alarm, out ? 0.7 : smooth((alarm - 0.3) / 0.4), out ? 0 : this.limp);
       const buf = P.capture(this.bufs[m]);
       total += w;
       if (first) {

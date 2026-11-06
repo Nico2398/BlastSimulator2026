@@ -196,11 +196,12 @@ export function poseGait(rig: WorkerRig, temp: Temperament, g: GaitState): void 
   const hipY = lerp(walkY, runY, run) - LIMP_DIP * onBad - shuffle * 0.03;
   const sway = (temp.waddle * (1 - run * 0.6) + shuffle * 0.012) * Math.min(1, reach * 1.5);
   const hipZ = -sway * Math.cos(TAU * (phi - duty / 2)) + badSign * 0.03 * onBad;
-  const yaw = -lerp(7, 11, run) * DEG * reach * Math.cos(TAU * phi);
+  const yaw = -lerp(10, 12, run) * DEG * reach * Math.cos(TAU * phi);
   const bank = Math.max(-0.22, Math.min(0.22, -g.turn * 0.05 * (0.5 + run)));
   const roll = lerp(temp.roll, 3, run) * DEG * reach * Math.cos(TAU * (phi - duty / 2)) + bank + badSign * 10 * DEG * onBad;
-  const lean = (temp.lean + lerp(4, 20, run) * reach + shuffle * 16) * DEG;
-  torso(rig, hipY, hipZ, 0, roll, yaw, lean, 14 * DEG * run * reach);
+  // Walking he leans into the errand a little; fleeing he pitches forward from the hips.
+  const lean = (temp.lean + lerp(9, 20, run) * reach + shuffle * 16) * DEG;
+  torso(rig, hipY, hipZ, 0, roll, yaw, lean, 24 * DEG * run * reach);
   // Head stays level and steady: undo most of the sway, nod a little on each step.
   P.rot(rig.neck, -roll * 0.4, yaw * 0.4, lean * 0.4);
   P.rot(rig.head, -roll * 0.2, g.turn * 0.12, lean * 0.3 + 0.03 * Math.cos(2 * TAU * (phi - 0.12)) * reach - shuffle * 0.2 - 0.14 * onBad);
@@ -238,7 +239,7 @@ export function poseGait(rig: WorkerRig, temp: Temperament, g: GaitState): void 
   }
 
   // Arms counter-swing the legs, a beat late; elbows bend more as the pace rises.
-  const swingAmp = lerp(temp.armSwing, 50, run) * DEG * reach * (1 - shuffle * 0.6);
+  const swingAmp = lerp(temp.armSwing * 1.3, 50, run) * DEG * reach * (1 - shuffle * 0.6);
   for (const s of SIDES) {
     const off = s === 'L' ? 0.5 : 0;
     const a = Math.cos(TAU * (phi + off - 0.06));
@@ -284,10 +285,10 @@ export function panicBody(rig: WorkerRig, t: number, seed: number): void {
       P.orient(b.hand, _q);
       continue;
     }
-    // Aimed in the world, up and out at an uneven beat, so however far he hunches into
-    // the run the arm still flails above his shoulder and wide of the hat.
+    // Aimed in the world: flung out to the side and trailing back as he runs, at an uneven
+    // beat, so whatever it holds swings wide of his head and hat however far he hunches.
     const w = Math.sin(t * TAU * 3.1 + seed) + 0.4 * Math.sin(t * TAU * 5.3 + seed * 2);
-    _c.set(0.08 + 0.12 * Math.sin(t * 7 + seed), 0.8 + 0.18 * w, sign * (0.55 + 0.12 * Math.sin(t * 5.3 + seed))).normalize();
+    _c.set(-0.35 + 0.12 * Math.sin(t * 7 + seed), 0.45 + 0.15 * w, sign * (0.8 + 0.1 * Math.sin(t * 5.3 + seed))).normalize();
     const hand = P.pos(b.upperArm, _a).addScaledVector(_c, r.armLength * 0.9);
     P.ik2(b.upperArm, b.forearm, b.hand, hand, _d.set(-0.3, -0.2, sign));
     P.rot(b.hand, -sign * 0.5 * w, 0, 0);
@@ -534,19 +535,22 @@ export function basis(restA: THREE.Vector3, restB: THREE.Vector3, wantA: THREE.V
  * (tired), `alarm` throws the eyes wide and the brows up, `gasp` swaps the
  * everyday mouth for the open O.
  */
-export function poseFace(rig: WorkerRig, blink: number, droop: number, alarm: number, gasp: number): void {
+export function poseFace(rig: WorkerRig, blink: number, droop: number, alarm: number, gasp: number, pain = 0): void {
   const P = rig.poser;
   for (const s of SIDES) {
     const b = rig.limbs[s];
     const open = rig.rest[s].lidOpen;
     // Shut is the lid's edge turned down from its resting elevation to well under the eye,
-    // about the eye's own side axis (each eye is yawed out with the face).
-    const shut = Math.max(blink, droop * 0.4) * (open + LID_SHUT);
+    // about the eye's own side axis (each eye is yawed out with the face). Hurting, he
+    // squeezes the eye on the side he favours half shut.
+    const wince = s === rig.freeSide ? pain * 0.5 : pain * 0.15;
+    const shut = Math.max(blink, droop * 0.4, wince) * (open + LID_SHUT);
     const wide = alarm * Math.max(0, 1.25 - open) * (1 - blink);
     P.rotQ(b.lid, _q.setFromAxisAngle(rig.rest[s].lidHinge, -shut + wide));
-    // Alarm lifts the brows and tips their inner ends up — worried, whatever the role's resting scowl.
-    P.shiftRest(b.brow, 0, alarm * 0.016 - droop * 0.006, 0);
-    P.rot(b.brow, rig.rest[s].sign * 0.45 * alarm, 0, 0);
+    // Alarm lifts the brows and tips their inner ends up — worried, whatever the role's resting
+    // scowl; pain knits them, inner ends up and the brows drawn down.
+    P.shiftRest(b.brow, 0, alarm * 0.016 - droop * 0.006 - pain * 0.006, 0);
+    P.rot(b.brow, rig.rest[s].sign * 0.45 * Math.max(alarm, pain * 0.8), 0, 0);
   }
   if (rig.gasp >= 0 && rig.mouth >= 0) {
     P.shiftRest(rig.gasp, GASP_HIDE * gasp, 0, 0);

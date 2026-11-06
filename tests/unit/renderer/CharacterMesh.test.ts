@@ -6,7 +6,7 @@ import type { Employee } from '../../../src/core/entities/Employee.js';
 import type { MovementTrail } from '../../../src/core/entities/MovementTrail.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
 import {
-  GARMENT_COLORS, GARMENT_TINT, HAIR_COLORS, HAIR_TINT, paletteFor, ROLE_COLORS, ROLE_TINT, SKIN_TINT, SKIN_TONES,
+  GARMENT_COLORS, GARMENT_TINT, HAIR_COLORS, HAIR_TINT, hairFor, paletteFor, ROLE_COLORS, ROLE_TINT, SKIN_TINT, SKIN_TONES,
 } from '../../../src/renderer/CharacterMesh.js';
 import { loadedModelLibrary } from '../../helpers/models.js';
 import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
@@ -440,7 +440,7 @@ describe('CharacterMesh — model animation (real assets)', () => {
     expect(inst.tints.get(ROLE_TINT)!.color.getHex()).toBe(ROLE_COLORS.manager);
     expect(inst.tints.get(GARMENT_TINT)!.color.getHex()).toBe(GARMENT_COLORS.manager);
     expect(inst.tints.get(SKIN_TINT)!.color.getHex()).toBe(paletteFor(1, SKIN_TONES, 1));
-    expect(inst.tints.get(HAIR_TINT)!.color.getHex()).toBe(paletteFor(1, HAIR_COLORS, 2));
+    expect(inst.tints.get(HAIR_TINT)!.color.getHex()).toBe(hairFor(1, paletteFor(1, SKIN_TONES, 1)));
     cm.dispose();
   });
 
@@ -453,6 +453,24 @@ describe('CharacterMesh — model animation (real assets)', () => {
       expect(HAIR_COLORS).toContain(paletteFor(id, HAIR_COLORS, 2));
     }
     expect(skins.size).toBeGreaterThan(SKIN_TONES.length - 2);
+  });
+
+  it('never gives a worker hair the same lightness as his skin, so brows and moustache stay readable', () => {
+    const light = (hex: number): number => {
+      const c = [(hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff];
+      return (Math.max(...c) + Math.min(...c)) / 510;
+    };
+    const hairs = new Set<number>();
+    for (let id = 1; id <= 60; id++) {
+      const skin = paletteFor(id, SKIN_TONES, 1);
+      const hair = hairFor(id, skin);
+      hairs.add(hair);
+      expect(HAIR_COLORS).toContain(hair);
+      expect(hairFor(id, skin)).toBe(hair);
+      expect(Math.abs(light(hair) - light(skin)), `employee ${id}`).toBeGreaterThanOrEqual(0.14);
+    }
+    // Still a mixed crew, not everyone pushed to one colour.
+    expect(hairs.size).toBeGreaterThan(3);
   });
 
   /** Forward position of a bone relative to the hips, in the worker's own frame (he faces +X before yaw). */

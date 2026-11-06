@@ -111,7 +111,8 @@ export function carryTool(rig: WorkerRig, role: string, temp: Temperament, t: nu
         handOnHip(rig, 'L', 0.0);
       } else {
         // The shaft runs along the fist's thumb side: thumb down, it hangs along his leg.
-        hangArm(rig, 'R', temp, sw * 16 * DEG + 4 * DEG, 8 * DEG, 20 * DEG);
+        // Elbow bent enough that the jaw swings clear of the ground.
+        hangArm(rig, 'R', temp, sw * 12 * DEG + 4 * DEG, 8 * DEG, WRENCH_CARRY_ELBOW);
         P.orientBasis(rig.limbs.R.hand, rig.rest.R.finger, rig.rest.R.thumb, _f.set(0.8, 0.1, -0.5 * R), _t.set(0.2 - 0.35 * lag, -1, 0.05 * R));
       }
       break;
@@ -377,3 +378,5 @@ const JACK_CARRY_UP = 0.1;
 const JACK_CARRY_OUT = 0.3;
 /** Wrench: from the fist's grip to the centre of its jaw. */
 const WRENCH_REACH = 0.37;
+/** Walking, the driver's elbow bend with the wrench hanging from his fist (rad). */
+const WRENCH_CARRY_ELBOW = 55 * DEG;
