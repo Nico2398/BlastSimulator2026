@@ -12,7 +12,7 @@ const DT = 1 / 60;
 
 let library: ModelLibrary;
 beforeAll(async () => {
-  library = await loadedModelLibrary(['worker_driller', 'worker_blaster', 'worker_surveyor', 'worker_manager']);
+  library = await loadedModelLibrary(['worker_driller', 'worker_blaster', 'worker_driver', 'worker_surveyor', 'worker_manager']);
 });
 
 function worker(role = 'driller'): { root: THREE.Group; rig: WorkerRig } {
@@ -256,6 +256,40 @@ describe('WorkerAnimator', () => {
     const a = new WorkerAnimator(rig, 'driller', 7);
     for (let i = 0; i < 200; i++) a.update(DT, { ...STILL, collapsing: true, fatigue: 0 });
     expect(reach()).toBeGreaterThan(fist * 1.25);
+  });
+
+  it("every role's work loop works the tool hand through a real stroke, and nothing sinks into the ground", () => {
+    for (const role of ['driller', 'blaster', 'driver', 'surveyor', 'manager']) {
+      const { root, rig } = worker(role);
+      const a = new WorkerAnimator(rig, role, 5);
+      const hand = `Hand${rig.toolSide ?? 'R'}`;
+      let lo = new THREE.Vector3(Infinity, Infinity, Infinity);
+      let hi = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+      let lowest = Infinity;
+      for (let i = 0; i < 300; i++) {
+        a.update(DT, { ...STILL, working: true });
+        if (i < 30) continue;
+        const h = world(root, hand);
+        lo = lo.min(h);
+        hi = hi.max(h);
+        root.traverse(o => { if (o instanceof THREE.Bone) lowest = Math.min(lowest, o.getWorldPosition(new THREE.Vector3()).y); });
+      }
+      expect(hi.sub(lo).length(), `${role} stroke`).toBeGreaterThan(0.04);
+      expect(lowest, `${role} lowest bone`).toBeGreaterThan(-0.03);
+    }
+  });
+
+  it('every role keeps its tool up off the ground standing about and walking', () => {
+    for (const role of ['driller', 'blaster', 'driver', 'surveyor', 'manager']) {
+      for (const speed of [0, 2]) {
+        const { root, rig } = worker(role);
+        const a = new WorkerAnimator(rig, role, 5);
+        for (let i = 0; i < 240; i++) {
+          a.update(DT, { ...STILL, speed });
+          if (i > 60 && i % 20 === 0) expect(world(root, 'Tool').y, `${role} at ${speed} m/s`).toBeGreaterThan(0.1);
+        }
+      }
+    }
   });
 
   it('ignores a zero or negative time step', () => {
