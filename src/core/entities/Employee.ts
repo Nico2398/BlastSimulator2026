@@ -120,6 +120,8 @@ export interface Employee {
   name: string;
   role: EmployeeRole;
   salary: number;
+  /** Whether the most recent simulation tick included paid activity; absent before the first tick. */
+  paidLastTick?: boolean;
   /** Accumulated raises ($) on top of base + qualification bonus. Absent on legacy saves until backfilled. */
   raises?: number;
   morale: number; // 0-100
@@ -325,7 +327,7 @@ export interface EmployeeState {
 }
 
 export function createEmployeeState(): EmployeeState {
-  return { employees: [], nextId: 1, ticksSincePayday: 0 };
+  return { employees: [], nextId: 1, ticksSincePayday: 0, accruedPayroll: 0 };
 }
 
 // ── Operations ──
@@ -465,11 +467,7 @@ export function applyDismissalMoraleDent(state: EmployeeState, dismissedId: numb
   }
 }
 
-/**
- * Process pay cycle. Returns total salaries paid.
- * Call each tick; only pays when cycle completes. `salaryFactorOf` scales each role's pay (active event modifiers).
- */
-/** Whether a worker is actively working, travelling or training, rather than idle. */
+/** Activity intent before the first simulated tick; actual ticks supply observed employee IDs. */
 export function isEmployeeEarningPay(emp: Employee): boolean {
   if (!emp.alive) return false;
   if (emp.trainingState != null) return true;
@@ -480,13 +478,22 @@ export function isEmployeeEarningPay(emp: Employee): boolean {
     emp.pendingRestDuration != null || emp.pendingTrainingState != null;
 }
 
+/** Accrue one tick of earned wages and settle the accumulated amount on payday. */
 export function processPayCycle(
   state: EmployeeState,
   salaryFactorOf: (role: EmployeeRole) => number = () => 1,
-  completedTrainingIds: ReadonlySet<number> = new Set(),
+  earnedEmployeeIds?: ReadonlySet<number>,
 ): number {
+  // A legacy save has no historical activity record. Preserve the wages already
+  // owed under its original full-salary rule instead of erasing part of a cycle.
+  if (state.accruedPayroll === undefined) {
+    state.accruedPayroll = state.employees.reduce((sum, emp) => sum + (emp.alive
+      ? emp.salary * salaryFactorOf(emp.role) * state.ticksSincePayday / PAY_CYCLE_TICKS : 0), 0);
+  }
   for (const emp of state.employees) {
-    if (emp.alive && (isEmployeeEarningPay(emp) || completedTrainingIds.has(emp.id))) {
+    const paid = emp.alive && (earnedEmployeeIds?.has(emp.id) ?? isEmployeeEarningPay(emp));
+    emp.paidLastTick = paid;
+    if (paid) {
       state.accruedPayroll = (state.accruedPayroll ?? 0) + emp.salary * salaryFactorOf(emp.role) / PAY_CYCLE_TICKS;
     }
   }

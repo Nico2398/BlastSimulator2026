@@ -52,6 +52,16 @@ describe('getOperatingCostPerHour', () => {
     expect(getOperatingCostPerHour(s).payroll).toBeCloseTo(a.salary / PAY_CYCLE_TICKS, 5);
   });
 
+  it('uses observed activity when a worker holds a blocked action', () => {
+    const s = emptySite();
+    const emp = hireEmployee(s.employees, 'driller', new Random(42)).employee;
+    emp.activeActionId = 1;
+    emp.paidLastTick = false;
+    expect(getOperatingCostPerHour(s).payroll).toBe(0);
+    emp.paidLastTick = true;
+    expect(getOperatingCostPerHour(s).payroll).toBeCloseTo(emp.salary / PAY_CYCLE_TICKS);
+  });
+
   it('counts upkeep of active buildings only', () => {
     const s = emptySite();
     addBuilding(s, true);

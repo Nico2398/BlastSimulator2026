@@ -47,7 +47,7 @@ export function getOperatingCostPerHour(s: {
   const upkeep = factorFor(modifiers, 'upkeep_surcharge', s.tickCount ?? 0);
   let salaries = 0;
   for (const e of getLivingEmployees(s.employees.employees)) {
-    if (isEmployeeEarningPay(e)) salaries += e.salary * salaryFactor(modifiers, e.role);
+    if (e.paidLastTick ?? isEmployeeEarningPay(e)) salaries += e.salary * salaryFactor(modifiers, e.role);
   }
   const payroll = salaries / PAY_CYCLE_TICKS;
   const buildings = getTotalOperatingCost(s.buildings) * upkeep;

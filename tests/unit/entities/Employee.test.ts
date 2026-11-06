@@ -112,6 +112,28 @@ describe('Employee system', () => {
     for (let i = 0; i < PAY_CYCLE_TICKS; i++) expect(processPayCycle(state)).toBe(0);
   });
 
+  it('uses observed activity rather than a claimed but blocked action', () => {
+    const state = createEmployeeState();
+    const emp = hireEmployee(state, 'driller', new Random(42)).employee;
+    emp.activeActionId = 1;
+    processPayCycle(state, () => 1, new Set());
+    expect(state.accruedPayroll).toBe(0);
+    expect(emp.paidLastTick).toBe(false);
+    processPayCycle(state, () => 1, new Set([emp.id]));
+    expect(state.accruedPayroll).toBeCloseTo(emp.salary / PAY_CYCLE_TICKS);
+    expect(emp.paidLastTick).toBe(true);
+  });
+
+  it('preserves the elapsed payroll liability in a legacy save', () => {
+    const state = createEmployeeState();
+    const emp = hireEmployee(state, 'driller', new Random(42)).employee;
+    delete state.accruedPayroll;
+    state.ticksSincePayday = PAY_CYCLE_TICKS - 1;
+    expect(processPayCycle(state, () => 2, new Set())).toBeCloseTo(
+      emp.salary * 2 * (PAY_CYCLE_TICKS - 1) / PAY_CYCLE_TICKS);
+    expect(state.accruedPayroll).toBe(0);
+  });
+
   it('pays for travel and training but not rest or a stuck journey', () => {
     const state = createEmployeeState();
     const emp = hireEmployee(state, 'driller', new Random(42)).employee;

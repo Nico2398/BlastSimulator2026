@@ -25,7 +25,7 @@ import type { FragmentData, BlastReport } from '../../../src/core/mining/BlastEx
 import { runTick, type TickReport } from '../../../src/core/engine/TickPipeline.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { clearEvents } from '../../../src/core/events/EventPool.js';
-import { BANKRUPTCY_GRACE_TICKS, BANKRUPTCY_THRESHOLD, SCORE_VIBRATION_WINDOW_TICKS } from '../../../src/core/config/balance.js';
+import { BANKRUPTCY_GRACE_TICKS, BANKRUPTCY_THRESHOLD, SCORE_VIBRATION_WINDOW_TICKS, PAY_CYCLE_TICKS } from '../../../src/core/config/balance.js';
 import { tickCommand } from '../../../src/console/commands/tick.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 
@@ -55,6 +55,56 @@ function rngFor(state: GameState): Random {
 function runOneTick(state: GameState, emitter: EventEmitter, checkInvariants = false): TickReport {
   return runTick(state, null, rngFor(state), emitter, { checkInvariants });
 }
+
+describe('activity-based wages', () => {
+  beforeEach(() => clearEvents());
+
+  it('does not pay a held action that has no work or movement this tick', () => {
+    const state = createGame({ seed: SEED });
+    const emp = hireEmployee(state.employees, 'driller', new Random(SEED)).employee;
+    emp.activeActionId = 123;
+    runOneTick(state, new EventEmitter());
+    expect(state.employees.accruedPayroll).toBe(0);
+    expect(emp.paidLastTick).toBe(false);
+  });
+
+  it('pays the last work tick even when completion clears the active fields', () => {
+    const state = createGame({ seed: SEED });
+    const emp = hireEmployee(state.employees, 'driller', new Random(SEED)).employee;
+    emp.activeActionId = 123;
+    emp.taskTicksRemaining = 1;
+    emp.pendingActionType = 'general_work';
+    emp.pendingActionPayload = {};
+    const salary = emp.salary;
+    runOneTick(state, new EventEmitter());
+    expect(emp.taskTicksRemaining).toBeNull();
+    expect(emp.paidLastTick).toBe(true);
+    expect(state.employees.accruedPayroll).toBeCloseTo(salary / PAY_CYCLE_TICKS);
+  });
+
+  it('does not pay for work suspended by a stoppage', () => {
+    const state = createGame({ seed: SEED });
+    const emp = hireEmployee(state.employees, 'driller', new Random(SEED)).employee;
+    emp.activeActionId = 123;
+    emp.taskTicksRemaining = 5;
+    state.events.activeModifiers.push({ id: 1, kind: 'work_stoppage', role: null,
+      sourceEventId: 'test', targetId: null, category: null, magnitude: 1, startTick: 0, endTick: 100 });
+    runOneTick(state, new EventEmitter());
+    expect(emp.taskTicksRemaining).toBe(5);
+    expect(emp.paidLastTick).toBe(false);
+    expect(state.employees.accruedPayroll).toBe(0);
+  });
+
+  it('does not pay for a training course cancelled because its school is gone', () => {
+    const state = createGame({ seed: SEED });
+    const emp = hireEmployee(state.employees, 'driller', new Random(SEED)).employee;
+    emp.trainingState = { buildingId: 999, skill: 'blasting', ticksRemaining: 5, fee: 10 };
+    runOneTick(state, new EventEmitter());
+    expect(emp.trainingState).toBeNull();
+    expect(emp.paidLastTick).toBe(false);
+    expect(state.employees.accruedPayroll).toBe(0);
+  });
+});
 
 describe('runTick — step ordering (dev-architecture: no behaviour change from tick.ts)', () => {
   beforeEach(() => {
@@ -125,6 +175,8 @@ describe('runTick — step ordering (dev-architecture: no behaviour change from 
     expect(employee.destinationX).toBeNull();
     expect(employee.destinationZ).toBeNull();
     expect(employee.taskTicksRemaining).not.toBeNull();
+    expect(employee.paidLastTick).toBe(true);
+    expect(state.employees.accruedPayroll).toBeCloseTo(employee.salary / PAY_CYCLE_TICKS);
   });
 
   it('a haul-eligible employee is dispatched the same tick a fragment makes it eligible (haul dispatch runs before the employee-dispatch pass)', () => {
