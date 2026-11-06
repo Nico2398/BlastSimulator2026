@@ -321,6 +321,9 @@ export function curlHand(rig: WorkerRig, s: Side, amount: number): void {
   rig.poser.rotQ(b.tips, _q.setFromAxisAngle(hinge, -open * TIP_OPEN));
 }
 
+/** How far below the horizontal a shut lid's edge goes (rad): its deep back half then covers the eye's top. */
+const LID_SHUT = 1.1;
+
 /** How far the fingers' two segments turn to open a fist out flat (rad). */
 const FINGER_OPEN = 75 * DEG;
 const TIP_OPEN = 60 * DEG;
@@ -536,10 +539,11 @@ export function poseFace(rig: WorkerRig, blink: number, droop: number, alarm: nu
   for (const s of SIDES) {
     const b = rig.limbs[s];
     const open = rig.rest[s].lidOpen;
-    // Shut is the lid's edge turned down from its resting elevation to well under the eye.
-    const shut = Math.max(blink, droop * 0.55) * (open + 0.85);
+    // Shut is the lid's edge turned down from its resting elevation to well under the eye,
+    // about the eye's own side axis (each eye is yawed out with the face).
+    const shut = Math.max(blink, droop * 0.4) * (open + LID_SHUT);
     const wide = alarm * Math.max(0, 1.25 - open) * (1 - blink);
-    P.rot(b.lid, 0, 0, -shut + wide);
+    P.rotQ(b.lid, _q.setFromAxisAngle(rig.rest[s].lidHinge, -shut + wide));
     // Alarm lifts the brows and tips their inner ends up — worried, whatever the role's resting scowl.
     P.shiftRest(b.brow, 0, alarm * 0.016 - droop * 0.006, 0);
     P.rot(b.brow, rig.rest[s].sign * 0.45 * alarm, 0, 0);

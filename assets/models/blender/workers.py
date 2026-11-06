@@ -7,19 +7,26 @@ chunky work boots, and a big expressive head under the role's hard hat
 Bodies differ by role so the crew reads as people, not clones:
 
 * driller  — the muscle. Barrel chest, Popeye forearms, square bearded jaw,
-             denim overalls over a grey tee, headlamp and ear defenders, a
-             chunky rock drill with an auger bit.
+             denim overalls over a grey tee, work gloves, a headlamp on the
+             standard ridged hard hat and ear defenders on arms clipped to it,
+             a cartoon pneumatic jackhammer.
 * blaster  — the lunatic. Wiry and stooped, narrow head, singed hair puffing
-             out under an askew hat, goggles up, scorched ash-khaki coverall,
-             dynamite on a bandolier and on his back, a plunger detonator.
-* driver   — the slab. Door-wide shoulders, no neck, hi-vis vest over a tee,
-             gold-rimmed shades, walrus moustache, a wrench on his shoulder.
-* surveyor — the nerd. Tall, narrow, long neck, egg head, round glasses, buck
-             teeth, striped teal jumper, survey staff on his back, clipboard
-             and pencil.
-* manager  — the fat cat. Short legs and a belly, jowls, charcoal-navy suit,
-             red tie, gold-banded hat, waxed handlebar moustache, a cigar, a
-             coffee mug and a pointing finger.
+             up past the brim of a dented hat worn askew, goggles up, soot on
+             his cheeks and nose, a scorched ash-khaki coverall, dynamite on a
+             bandolier and on his back, a plunger detonator.
+* driver   — the slab. Door-wide shoulders, no neck, an open hi-vis vest with
+             reflective stripes over a tee, a bump cap with a long trucker
+             peak, gold-rimmed shades low on the nose, a chinstrap of stubble,
+             a smirk and a toothpick, an oversize wrench.
+* surveyor — the nerd. Tall, narrow, long neck, egg head under a pith helmet,
+             round glasses, buck teeth, a teal sweater vest over a white
+             shirt, a pocket protector, dark field-olive trousers, survey
+             staff on his back, clipboard and pencil.
+* manager  — the fat cat. Short legs and a belly, jowls, a charcoal-navy suit
+             with a white shirt V and lapels, red tie, one gold button
+             straining over the belly and a gold watch chain, a bowler-shaped
+             hard hat with a tall gold band, waxed handlebar moustache, a
+             cigar, a coffee mug and a pointing finger.
 
 Materials recoloured per instance: `TintRole` (the hat and role accents, in
 the role colour), `TintGarment` (the clothes; red on injury), `TintSkin`
@@ -96,10 +103,10 @@ class Build:
 
 
 BUILDS: dict[str, Build] = {
-    # The muscle: barrel chest, Popeye forearms, square jaw, big mitts.
+    # The muscle: barrel chest, Popeye forearms, square jaw, work gloves (not boxing gloves).
     'driller': Build(chest=(0.218, 0.152), pelvis=(0.168, 0.128), belly=(0.182, 0.142, 0.012), shoulder_y=0.2,
                      arm_r=(0.082, 0.06, 0.086, 0.054), leg_r=(0.085, 0.064, 0.068, 0.059), neck=(0.055, 0.082),
-                     head=(0.198, 0.214, 0.205), jaw=1.24, chin=0.018, hand=1.36, boot=1.1),
+                     head=(0.198, 0.214, 0.205), jaw=1.24, chin=0.018, hand=1.2, boot=1.1),
     # The lunatic: wiry, stooped, long arms, narrow head and a pointed chin.
     'blaster': Build(leg=1.1, torso=1.06, chest=(0.15, 0.106), pelvis=(0.136, 0.106), belly=(0.141, 0.106, 0.0),
                      shoulder_y=0.155, upper_arm=0.222, forearm=0.2, arm_r=(0.05, 0.04, 0.045, 0.035),
@@ -108,7 +115,7 @@ BUILDS: dict[str, Build] = {
     # The slab: shoulders like a door, no neck, a wide flat head.
     'driver': Build(chest=(0.238, 0.162), pelvis=(0.19, 0.15), belly=(0.226, 0.2, 0.04), shoulder_y=0.222,
                     arm_r=(0.084, 0.064, 0.074, 0.054), leg_r=(0.09, 0.07, 0.072, 0.061), neck=(0.03, 0.098),
-                    head=(0.19, 0.226, 0.19), jaw=1.12, hand=1.34, boot=1.08),
+                    head=(0.19, 0.226, 0.19), jaw=1.12, hand=1.2, boot=1.08),
     # The nerd: tall and narrow, a long craning neck under an egg-shaped head.
     'surveyor': Build(leg=1.18, torso=1.05, chest=(0.142, 0.105), pelvis=(0.136, 0.105), belly=(0.14, 0.108, 0.0),
                       shoulder_y=0.155, upper_arm=0.215, forearm=0.195, arm_r=(0.05, 0.04, 0.044, 0.035),
@@ -172,7 +179,7 @@ def _side(v: Vector, side: int) -> Vector:
 def skeleton(b: Build, role: str) -> tuple[Skeleton, Joints]:
     j = joints(b)
     tool_hand = TOOL_HAND.get(role)
-    from worker_face import FACE, eye_center, hat_pivot, lid_open_angle, mouth_center
+    from worker_face import FACE, eye_center, eye_yaw, hat_pivot, lid_open_angle, mouth_center
     hc = j.head_c
     mouth = mouth_center(j, b)
     hat = hat_pivot(j, role)
@@ -186,14 +193,16 @@ def skeleton(b: Build, role: str) -> tuple[Skeleton, Joints]:
         BoneSpec('Mouth', tuple(mouth), tuple(mouth + Vector((0.04, 0, 0))), 'Head'),
         BoneSpec('Gasp', tuple(mouth), tuple(mouth + Vector((0.04, 0, 0))), 'Head'),
     ]
-    # A lid bone points along its lid's resting front edge: the animator reads
-    # that elevation to know how far down to turn the lid to shut the eye.
+    # A lid bone points along its lid's resting front edge, yawed out with its eye: the
+    # animator reads that elevation to know how far down to turn the lid to shut the eye,
+    # and turns it about the side axis square to it.
     lid_dir = Vector((math.cos(lid_open_angle(role)), 0, math.sin(lid_open_angle(role))))
     for s, sfx in ((1, 'L'), (-1, 'R')):
         eye = eye_center(j, s, b.head, role)
         brow = eye + Vector((0.03, 0, FACE[role].brow_h))
+        edge = Matrix.Rotation(eye_yaw(b.head, s), 3, 'Z') @ lid_dir
         specs += [
-            BoneSpec(f'Lid{sfx}', tuple(eye), tuple(eye + lid_dir * 0.06), 'Head'),
+            BoneSpec(f'Lid{sfx}', tuple(eye), tuple(eye + edge * 0.06), 'Head'),
             BoneSpec(f'Brow{sfx}', tuple(brow), tuple(brow + Vector((0.05, 0, 0))), 'Head'),
         ]
         sh = _side(j.shoulder, s)
@@ -288,6 +297,7 @@ def materials(role: str) -> dict[str, bpy.types.Material]:
         'steel': material('Steel', 0x6E7480, roughness=0.5, metallic=0.3),
         'belt': material('Belt', 0x5A3D22, roughness=0.9),
         'stripe': material('Reflective', 0xE8EEF2, roughness=0.4),
+        'soot': material('Soot', 0x26201C, roughness=0.95),
     }
     m.update(OUTFITS[role](role))
     return m
@@ -304,15 +314,16 @@ def _outfit_blaster(_r):
 
 
 def _outfit_driver(_r):
-    # Orange hi-vis vest over a slate tee, jeans.
+    # An open orange hi-vis vest over a slate tee, jeans.
     return {'shirt': material('Shirt', 0x5C6B7E, roughness=0.9), 'legs': material('Jeans', 0x3A4F78, roughness=0.9),
             'cuff': material('Shirt', 0)}
 
 
 def _outfit_surveyor(_r):
-    # Teal field jacket with role-colour cuffs, khaki trousers.
-    return {'shirt': material('TintGarment', 0), 'legs': material('Khaki', 0xB8A47A, roughness=0.9),
-            'cuff': material('TintRole', 0)}
+    # A teal sweater vest over a white collared shirt, dark field-olive trousers (khaki vanished into the sand).
+    white = material('ShirtWhite', 0xF6F4EE, roughness=0.8)
+    return {'shirt': material('TintGarment', 0), 'legs': material('FieldOlive', 0x5A5638, roughness=0.9),
+            'sleeve': white, 'cuff': white, 'collar': white}
 
 
 def _outfit_manager(_r):
@@ -363,25 +374,37 @@ def torso(skel: Skeleton, b: Build, j: Joints, m, role: str) -> None:
         k = min(range(len(tor.centers)), key=lambda i: abs(tor.centers[i].z - height))
         # Two ring rows: a stripe a single row tall breaks up as the spine bends.
         return lambda i, c: tor.face_ring[i] in (k, k + 1) and 0 < tor.face_u[i] < 1
+    col = tor.face_seg
     if role == 'driller':
         # Overall bib in front, waist-high at the back; the tee shows above.
         assign_faces(ob, m['garment'], lambda i, c: rz(i) < hz + 0.14 * t or
                      (c.x > 0 and rz(i) < bib_top and abs(c.y) < cw * 0.55))
     elif role == 'driver':
-        # Hi-vis vest from the belt to the shoulders with two reflective bands, jeans below.
-        assign_faces(ob, m['garment'], lambda i, c: hz + 0.04 <= rz(i) < j.neck_z - 0.04)
+        # Hi-vis vest from the belt to the shoulders, hanging open down the front so a strip of
+        # the tee shows; reflective stripes up the front, over the shoulders and down the back,
+        # and one round the waist (not across the opening). Jeans below.
+        vest = lambda i: hz + 0.04 <= rz(i) and col[i] != VEST_OPEN
+        assign_faces(ob, m['garment'], lambda i, c: vest(i) and rz(i) < j.neck_z - 0.04)
         assign_faces(ob, m['legs'], lambda i, c: rz(i) < hz + 0.04)
-        for h in (0.24, 0.12):
-            assign_faces(ob, m['stripe'], band(hz + h * t))
+        assign_faces(ob, m['stripe'], lambda i, c: vest(i) and col[i] in VEST_STRIPES)
+        k_waist = min(range(len(tor.centers)), key=lambda i: abs(tor.centers[i].z - (hz + 0.1 * t)))
+        assign_faces(ob, m['stripe'], lambda i, c: tor.face_ring[i] == k_waist and 0 < tor.face_u[i] < 1 and
+                     col[i] != VEST_OPEN)
     elif role == 'surveyor':
+        # A sweater vest over the shirt: its collar shows at the neck (the V is a prop).
         assign_faces(ob, m['legs'], lambda i, c: rz(i) < hz + 0.02)
-        for h in (0.25, 0.1):
-            assign_faces(ob, m['stripe'], band(hz + h * t))
+        assign_faces(ob, m['collar'], lambda i, c: rz(i) > j.neck_z - 0.025)
     elif role == 'manager':
         # A white shirt collar shows above the suit.
         assign_faces(ob, m['collar'], lambda i, c: rz(i) > j.neck_z - 0.025)
     skel.attach(ob)
     bind_by(ob, lambda p: _torso_weights(p, j))
+
+
+# The torso loft's columns (22 round it, column k from 360°·k/22 on, 0 at the left side, 5.5 the front):
+# where the driver's vest hangs open, and where its reflective stripes run up and over the shoulders.
+VEST_OPEN = 5
+VEST_STRIPES = (3, 7, 14, 18)
 
 
 def _torso_weights(p: Vector, j: Joints) -> dict[str, float]:
@@ -483,7 +506,7 @@ def arms(skel: Skeleton, b: Build, j: Joints, m, role: str) -> None:
         lf = loft(f'Arm{sfx}', secs, segments=12, rings=rings, cap_start=0.8, cap_end=0.5)
         ob = lf.ob
         assign(ob, m['skin'])
-        sleeve = m['shirt']
+        sleeve = m.get('sleeve', m['shirt'])
         total = b.upper_arm + b.forearm + 0.055
         # Sleeve and glove edges sit on rings, so each boundary is a clean loop.
         k_sleeve = max(1, round(sleeve_end * (rings - 1)))

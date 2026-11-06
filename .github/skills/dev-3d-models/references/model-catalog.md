@@ -18,11 +18,11 @@ colour, and the tool of the trade in hand.
 
 | Role | Caricature | Tool |
 |------|------------|------|
-| driller | The muscle: barrel chest, Popeye forearms, square bearded jaw, denim overalls over a tee, headlamp and red ear defenders | Chunky yellow rock drill with an auger bit |
-| blaster | The lunatic: wiry and stooped, narrow head, pointed chin, singed hair bursting under an askew hat, goggles, scorched ash-khaki coverall, dynamite on a leather bandolier and a bundle strapped to his back | Red plunger detonator box, dangling by its T-handle |
-| driver | The slab: door-wide shoulders, no neck, wide flat head, walrus moustache, gold-rimmed shades, orange hi-vis vest | Steel open-end wrench with an orange grip, carried on the shoulder |
-| surveyor | The nerd: tall and narrow, long neck, egg head, buck teeth, round glasses, striped teal jumper, a red-and-white survey staff slung across his back | Big clipboard and a pencil |
-| manager | The fat cat: short legs, belly out, jowls, waxed handlebar moustache, cigar, charcoal-navy suit, red tie, hard hat with a gold band, a pointing finger on its own bone | Diner coffee mug |
+| driller | The muscle: barrel chest, Popeye forearms, square bearded jaw, denim overalls over a tee, work gloves, the standard ridged hard hat with a big headlamp, red ear defenders on arms clipped to it | Cartoon pneumatic jackhammer, carried by one end of its T-handle; at rest he leans on it |
+| blaster | The lunatic: wiry and stooped, narrow head, pointed chin, wild lashed eyes, singed hair puffing out past the brim of a dented hat worn askew, goggles, soot on his cheeks, ash-khaki coverall, dynamite on a leather bandolier and a bundle strapped to his back | Red plunger detonator box, dangling by its T-handle |
+| driver | The slab: door-wide shoulders, no neck, wide flat head, a bump cap with a long trucker visor and a reflective plate, gold-rimmed shades low on the nose, stubble, a smirk and a toothpick, an open hi-vis vest | Oversize steel wrench with an orange grip, slung on the shoulder |
+| surveyor | The nerd: tall and narrow, long neck, egg head, buck teeth, round glasses, a pith helmet with a target sticker, teal sweater vest over a white shirt with a pocket protector, olive trousers, a red-and-white survey staff slung across his back | Big clipboard and a pencil |
+| manager | The fat cat: short legs, belly out, jowls, heavy smug lids, waxed handlebar moustache, cigar, a bowler with a tall gold band and badge, charcoal-navy suit with lapels and a straining gold button, red tie, a gold watch chain, a pointing finger on its own bone | Diner coffee mug |
 
 Bones: see the skinned-workers row of the runtime contract. Tints: `TintRole`
 (hat and accents), `TintGarment` (clothes; injury), `TintSkin`, `TintHair`.

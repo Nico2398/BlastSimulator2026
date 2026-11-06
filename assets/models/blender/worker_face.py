@@ -7,25 +7,39 @@ care per triangle:
   head and pointed chin, the driver's wide flat pan, the surveyor's egg, the
   manager's jowls. Noses differ too, from button to potato.
 * **Eyes** are big white bulbs seated in sockets carved into the skull, a
-  thin dark iris painted onto the white looking a touch up toward the game
-  camera, and a highlight. Face parts are named `Face*` so the runtime leaves
-  them out of the outline: lined, every eyeball wears a black ring. Each upper lid is a hemisphere of skin on its
-  own bone (`LidL/R`) with a dark lash along its edge: its resting angle sets
-  the personality (wide for the blaster, heavy and smug for the manager) and
-  is written into the lid bone's direction, so the animator knows how far to
-  turn it to shut the eye completely.
+  thin dark iris painted onto the white (it hugs the eyeball) looking a touch
+  up toward the game camera, and a highlight kept under the resting lid's
+  edge. Face parts are named `Face*` so the runtime leaves them out of the
+  outline: lined, every eyeball wears a black ring. Each upper lid is a
+  shell of skin on its own bone (`LidL/R`) with a dark lash along its edge:
+  its resting angle sets the personality (wide for the blaster, heavy and
+  smug for the manager) and is written into the lid bone's direction, so the
+  animator knows how far to turn it to shut the eye completely. Its radii
+  (`lid_radii`) are sized along its own tipped axes so the eye stays inside
+  it, clear of its facets, whatever the angle.
 * **Two mouths**: the role's everyday mouth on bone `Mouth`, and a gaping
   "O" on bone `Gasp`, parked inside the skull until panic or a collapse
-  swaps them.
-* **Decals** — mouths, brows, moustaches — are shaped flat and then
-  *conformed* to the skull by ray-casting onto it, so they hug the face
-  instead of floating on or sinking into it.
+  swaps them. The driver's smirk works a toothpick, merged into his
+  `FaceMouth` on the Mouth bone.
+* **Decals** — mouths, brows, moustaches, the blaster's soot smudges
+  (`FaceSoot`) — are shaped flat and then *conformed* to the skull by
+  ray-casting onto it, so they hug the face instead of floating on or
+  sinking into it.
 * **Hair and beards** are shells of the skull pushed out where a mask says
   hair grows and pulled under the skin everywhere else; the nape edge is
-  scalloped into clumps.
-* **Hard hat** is a lathed crown with its ridge raised out of the same
-  surface, a narrow brim and a peak over the eyes, worn per role — level,
-  askew, perched — on its own bone (`Hat`) so it can be knocked off.
+  scalloped into clumps, and the hair reaches up under the hat (`HAIRLINE`)
+  so no bare scalp shows below the brim. The driller wears a full beard,
+  the driver a thin chinstrap of stubble.
+* **Hard hat** is a lathed crown worn per role — level, askew, perched high
+  and tipped back so the brim clears the eyes from the game camera — on its
+  own bone (`Hat`) so it can be knocked off. Each role's hat has its own
+  silhouette (`Hat.crown`): the driller's standard ridged dome; the
+  blaster's dented one, worn askew; the driver's low bump cap with a long
+  trucker peak; the surveyor's pith helmet, brimmed all round; the
+  manager's bowler with a narrow curled brim and a tall gold band. A badge
+  on the crown's front says whose hat it is from above — the driver's
+  reflective plate, the surveyor's red-and-white target sticker, the
+  manager's gold badge — and a peak's underside is dark.
 
 Coordinates are armature space (Blender Z up, +X the face's front).
 """
@@ -33,14 +47,15 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from functools import lru_cache
 
 import bmesh
 import bpy
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
-from character import Section, Skeleton, assign_faces, bind_rigid, ellipsoid, lathe, loft, prune, smoothstep
-from common import assign, material
+from character import Section, Skeleton, assign_faces, bind_rigid, ellipsoid, lathe, loft, merge, prune, smoothstep
+from common import assign, cylinder, material
 
 
 @dataclass(frozen=True)
@@ -61,29 +76,38 @@ FACE = {
     # A broad, flat boxer's nose; a long hooked beak; a squashed bulb; a button; an upturned snout.
     'driller': Face(0.74, (-4, -4), 0.07, 0.016, 'grin', (0.038, 0.066, 0.04)),
     'blaster': Face(0.97, (26, -14), 0.075, 0.012, 'manic', (0.064, 0.03, 0.03), nose_droop=16, eye=1.15),
-    'driver': Face(0.64, (-10, -10), 0.064, 0.016, 'flat', (0.036, 0.056, 0.032)),
+    'driver': Face(0.7, (-10, -10), 0.072, 0.022, 'smirk', (0.036, 0.056, 0.032)),
     'surveyor': Face(0.8, (-16, -16), 0.074, 0.01, 'nerd', (0.03, 0.026, 0.026), eye=1.25, ear=1.3),
-    'manager': Face(0.52, (22, 22), 0.08, 0.012, 'smirk', (0.056, 0.062, 0.046), nose_droop=-14),
+    'manager': Face(0.58, (22, 22), 0.08, 0.012, 'smirk', (0.056, 0.062, 0.046), nose_droop=-14),
 }
 
 
 @dataclass(frozen=True)
 class Hat:
-    """How each role wears the hard hat."""
+    """How each role wears the hard hat, and which hat it is."""
     line: float      # hat base above the skull centre, metres
     tilt: float      # degrees tipped back
     roll: float      # degrees askew (+ toward the left)
     scale: float
     band: str        # 'dark' or 'gold': the band round the crown
+    crown: str = 'dome'   # the silhouette — see HAT_PEAK and _hat_profile
+    band_top: float = 0.058   # top of the band above the hat's base (before `scale`), metres
 
 
+# Every hat sits high and tipped back, so from the high game camera the brim
+# clears the eyes (the face is what tells the crew apart) — the surveyor's the
+# most, his egg forehead showing.
 HATS = {
-    'driller': Hat(0.112, 5, 0, 1.0, 'dark'),
-    'blaster': Hat(0.128, 9, 13, 0.98, 'dark'),
-    'driver': Hat(0.118, 8, 0, 1.0, 'dark'),
-    'surveyor': Hat(0.15, 15, 0, 0.88, 'dark'),   # perched high and back: the egg forehead shows
-    'manager': Hat(0.142, 12, 0, 0.9, 'gold'),
+    'driller': Hat(0.126, 13, 0, 0.92, 'dark', 'dome'),        # the standard hard hat, ridge and lamp
+    'blaster': Hat(0.142, 17, 13, 0.92, 'dark', 'dented'),     # knocked about and dented, worn askew
+    'driver': Hat(0.13, 16, 0, 1.0, 'dark', 'cap'),           # low bump cap, long trucker peak
+    'surveyor': Hat(0.15, 15, 0, 0.88, 'dark', 'safari'),      # pith helmet: a wide brim all round
+    'manager': Hat(0.146, 16, 0, 0.88, 'gold', 'bowler', 0.088),   # a bowler, gold-banded
 }
+
+HAIRLINE = {'driller': (0.016, 0.04), 'blaster': (0.02, 0.045), 'driver': (0.014, 0.04), 'surveyor': (0.0, 0.035),
+            'manager': (0.01, 0.035)}
+"""How far under the hat's base the hair reaches down, over the forehead and at the sides (metres)."""
 
 EYE_Y = 0.073      # lateral offset of each eye from the midline (for a 0.2 m wide head)
 EYE_Z = 0.028      # height of the eyes above the skull centre
@@ -94,8 +118,14 @@ SOCKET_RIM = 0.3     # the socket's rim, as a fraction of the eye's radius past 
 SKULL_SEGMENTS, SKULL_RINGS = 32, 20
 SKULL_FRONT_BIAS = (0.35, 0.3)   # skull vertices drawn toward the face (ellipsoid front_bias)
 HAT_DOME = 0.184   # crown radius at the brim
+BRIM_BAND = 0.015  # how far under the hat's base the hair is still drawn in under the brim (m)
 HAT_BRIM = 0.02    # how far the brim reaches past the crown at the sides
-HAT_PEAK = 0.05    # and how much further at the front
+HAT_PEAK = {'dome': 0.05, 'dented': 0.035, 'cap': 0.11, 'safari': 0.02, 'bowler': 0.0}
+"""How much further than the brim each crown reaches at the front: a peak, the cap's long visor
+(the safari brim reaches as far again at the back)."""
+HAT_SAFARI_BRIM = 0.05   # the pith helmet's brim, all round past the crown
+HAT_DENTS = ((52, 0.17, 0.05, 0.02), (-140, 0.13, 0.035, 0.013))
+"""The blaster's crown: (azimuth°, height, radius, depth) of each dent knocked into it."""
 GASP_HIDE = 0.04
 """How far inside the skull the gasp mouth waits; the animator moves the Gasp bone forward by this to show it."""
 
@@ -122,6 +152,26 @@ def lid_open_angle(role: str) -> float:
     """Elevation (radians) of the lid's front edge when the eye rests open."""
     cut = 2 * FACE[role].lid - 1
     return math.asin(max(-0.95, min(0.95, cut)))
+
+
+LID_GROW = 1.18                 # the lid shell over the eye: the eye's own ellipsoid, grown evenly
+LID_BACK = 1.16                 # the shell's depth behind the eye's centre, over the eye's height
+
+
+@lru_cache(maxsize=None)
+def lid_radii(role: str, head: tuple[float, float, float]) -> tuple[float, float, float, float]:
+    """The upper lid shell's radii along the eye's own axes: (front, side, up, back).
+
+    In front it is the eye's ellipsoid grown evenly, so it clears the white by the same share
+    everywhere and the open eye shows under it from the high game camera; its edge is cut
+    along a plane tilted up to the resting lid line. The runtime shuts it by turning it about
+    the eye's own side axis (the lid bone carries the yaw), and the deep back half then
+    sweeps over the eye's top.
+    """
+    er = eye_radii(role)
+    # Behind its centre the shell is as deep as the eye is tall: turned down to shut, that
+    # half ends up over the eye's top, and the eye's height is what it then has to cover.
+    return (er[0] * LID_GROW, er[1] * LID_GROW, er[2] * LID_GROW, er[2] * LID_BACK)
 
 
 def hat_pivot(j, role: str) -> Vector:
@@ -225,11 +275,14 @@ def _conform(ob: bpy.types.Object, tree: BVHTree, origin: Vector) -> None:
     ob.data.update()
 
 
-def _shell(name: str, skull: bpy.types.Object, mask, thick: float, sink: float = 0.012, noise=None) -> bpy.types.Object:
+def _shell(name: str, skull: bpy.types.Object, mask, thick: float, sink: float = 0.012, noise=None,
+           clamp=None) -> bpy.types.Object:
     """A copy of the skull pushed out by `thick` where mask(p) is 1 and under the skin where it is 0.
 
     Faces whose every corner is under the skin can never be seen and are
     dropped; the open border that leaves stays buried inside the skull.
+    `clamp(new, skin)` (optional) moves each pushed-out vertex last, given the skull point it
+    grew from — the hat squashing the hair.
     """
     me = skull.data.copy()
     ob = bpy.data.objects.new(name, me)
@@ -245,6 +298,8 @@ def _shell(name: str, skull: bpy.types.Object, mask, thick: float, sink: float =
         ks[v.index] = k
         extra = noise(p) if noise else 0.0
         v.co = p + v.normal * (k * (thick + extra) - (1 - k) * sink)
+        if clamp:
+            v.co = clamp(v.co, p)
     hidden = [f for f in bm.faces if all(ks[v.index] < 0.02 for v in f.verts)]
     bmesh.ops.delete(bm, geom=hidden, context='FACES')
     bm.to_mesh(me)
@@ -267,40 +322,69 @@ def _eyes(skel: Skeleton, b, j, m, role: str) -> None:
         white.data.transform(rot)
         white.location = ec
         assign(white, m['white'])
-        # Iris + pupil: a thin dark disc painted onto the white, a touch up toward the camera.
+        def painted(at: tuple[float, float], lift: float, depth: float):
+            # Laid onto the white: a vertex's local X is its height above the eye's surface,
+            # so the iris and the highlight hug the eyeball instead of standing off it.
+            def onto(p: Vector) -> Vector:
+                y, z = p.y + at[0], p.z + at[1]
+                surf = er[0] * math.sqrt(max(0.0, 1 - (y / er[1]) ** 2 - (z / er[2]) ** 2))
+                return Vector((surf + lift + (p.x / depth + 1) * 0.5 * depth, y, z))
+            return onto
+        # Iris + pupil: a thin dark lens painted onto the white, a touch up toward the camera.
         iris_k = 0.82 if role == 'blaster' else 1.0
-        iris = ellipsoid(f'FaceIris{sfx}', (0.004, 0.023 * iris_k, 0.027 * iris_k), segments=12, rings=7)
-        iris.data.transform(Matrix.Translation((er[0] - 0.0015, -s * 0.002, 0.006)))
+        iris = ellipsoid(f'FaceIris{sfx}', (0.0012, 0.023 * iris_k, 0.027 * iris_k), segments=12, rings=7,
+                         deform=painted((-s * 0.002, 0.006), 0.0006, 0.0012))
         iris.data.transform(rot)
         iris.location = ec
         assign(iris, m['iris'])
-        shine = ellipsoid(f'FaceShine{sfx}', (0.003, 0.0085, 0.0085), segments=8, rings=5)
-        shine.data.transform(Matrix.Translation((er[0] + 0.0025, s * 0.008, 0.018)))
+        # The highlight stays under the resting lid's edge (and a lash's width clear of it),
+        # whatever the role's lid: above it the lid would cover it, or it would poke through.
+        edge = (er[0] + 0.002) * math.tan(open_angle)
+        shine = ellipsoid(f'FaceShine{sfx}', (0.0015, 0.0085, 0.0085), segments=8, rings=5,
+                          deform=painted((s * 0.008, min(0.018, edge - 0.006 - 0.0085)), 0.002, 0.0015))
         shine.data.transform(rot)
         shine.location = ec
         assign(shine, m['white'])
         for ob in (white, iris, shine):
             skel.attach(ob)
             bind_rigid(ob, 'Head')
-        # Upper lid: the top half of a skin shell a little larger than the eye, its edge
-        # turned up to the resting lid line. Turning it down far enough brings the edge
-        # under the eye: shut, with no white left showing.
-        lr = (er[0] * 1.22, er[1] * 1.16, er[2] * 1.14)
-        # Below its edge the shell tucks inside the eye. It crosses the white within
-        # LID_TUCK of the edge, under the lash, so no skin shows through the white.
-        lid = ellipsoid(f'FaceLid{sfx}', lr, segments=16, rings=12,
-                        deform=lambda p, rz=lr[2]: p * (0.72 + 0.28 * smoothstep(-LID_TUCK, 0.0, p.z / rz)))
-        prune(lid, lambda p, rz=lr[2] * 0.8: p.z > -0.45 * rz)   # the tucked-in lower shell never shows
-        # The lid's edge drawn as one flat, even line — no flick at the corner.
+        # Upper lid: the eye's own ellipsoid grown evenly (so it clears the white by the same
+        # share everywhere), yawed out with it, cut along a plane through the eye's centre
+        # tilted up to the resting lid line. Below that edge, in front, it tucks inside the
+        # white within LID_TUCK, under the lash, so no skin shows through the white. Behind,
+        # it is as deep as the eye is tall and stays whole: buried in the skull while the eye
+        # is open, it is what comes over the eye's top as the lid turns down to shut.
+        lf, ly, lz, lb = lid_radii(role, b.head)
+        tilt = Matrix.Rotation(-open_angle, 3, 'Y')      # the edge's frame → the eye's
+        untilt = tilt.transposed()
+
+        def radii(x: float) -> Vector:
+            return Vector((lf if x >= 0 else lb, ly, lz))
+
+        def shell(p: Vector) -> Vector:
+            # p is on a unit sphere whose equator is the edge plane (rings packed there).
+            q = tilt @ p
+            out = Vector((q.x * radii(q.x).x, q.y * ly, q.z * lz))
+            tuck = (1 - smoothstep(-LID_TUCK, 0.0, p.z)) * smoothstep(-0.25, 0.25, p.x)
+            return out * (1 - 0.28 * tuck)
+
+        def edge_frame(v: Vector) -> Vector:
+            r = radii(v.x)
+            return untilt @ Vector((v.x / r.x, v.y / r.y, v.z / r.z)).normalized()
+        lid = ellipsoid(f'FaceLid{sfx}', (1.0, 1.0, 1.0), segments=16, rings=16, deform=shell, front_bias=(0.0, 0.6))
+        # The tucked-in lower shell in front never shows; the back half is kept nearly whole.
+        prune(lid, lambda v: (lambda e: e.z > (-0.36 if e.x > 0 else -0.85))(edge_frame(v)))
+        # The lid's edge drawn as one flat, even line along it — no flick at the corner.
+        normal = tilt @ Vector((0, 0, 1))
         edge = []
         for k in range(9):
             az = math.radians(-62 + 124 * k / 8)
-            edge.append(Section((math.cos(az) * lr[0] * 1.02, math.sin(az) * lr[1] * 1.02, -0.004), 0.0055, 0.0035))
+            q = tilt @ Vector((math.cos(az), math.sin(az), 0.0))
+            at = Vector((q.x * radii(q.x).x, q.y * ly, q.z * lz)) * 1.02 - normal * 0.004
+            edge.append(Section(tuple(at), 0.0055, 0.0035))
         lash_ob = loft(f'FaceLash{sfx}', edge, segments=4, rings=12, cap_start=0.6, cap_end=0.6, cap_rings=1,
-                       front=(0, 0, 1)).ob
-        tip_back = Matrix.Rotation(-open_angle, 4, 'Y')
+                       front=tuple(normal)).ob
         for ob in (lid, lash_ob):
-            ob.data.transform(tip_back)
             ob.data.transform(rot)
             ob.location = ec
         assign(lid, m['skin'])
@@ -349,6 +433,31 @@ def _nose(skel, b, j, m, role, tree) -> None:
         ob.data.transform(Matrix.Rotation(math.radians(f.nose_droop), 4, 'Y'))
     ob.location = hit + Vector((f.nose[0] * 0.45, 0, -0.004))
     assign(ob, m['skin'])
+    if role == 'blaster':
+        # A sooty nose tip.
+        tip = Matrix.Rotation(math.radians(f.nose_droop), 3, 'Y') @ Vector((1, 0, 0))
+        assign_faces(ob, m['soot'], lambda i, c: c.dot(tip) > 0.72 * f.nose[0])
+    skel.attach(ob)
+    bind_rigid(ob, 'Head')
+
+
+def _soot(skel, b, j, m, tree) -> None:
+    """The blaster's blackened cheeks: ragged smudges laid onto the skull, under the eye sockets."""
+    hc = j.head_c
+    smudges = []
+    for s, sfx in ((1, 'L'), (-1, 'R')):
+        def ragged(p: Vector, side=s) -> Vector:
+            ang = math.atan2(p.z, p.y)
+            k = 1 + 0.22 * math.sin(3 * ang + side) + 0.12 * math.sin(5 * ang + 2 * side)
+            return Vector((p.x, p.y * k, p.z * k))
+        ob = ellipsoid(f'FaceSoot{sfx}', (0.003, 0.019, 0.017), segments=12, rings=6, deform=ragged)
+        prune(ob, lambda p: p.x > 1e-5)
+        # Under the socket's rim (it is carved back behind the eye) and clear of the grin's corners.
+        ob.data.transform(Matrix.Translation((0.0012, s * 0.09, hc.z - 0.063)))
+        _conform(ob, tree, hc)
+        assign(ob, m['soot'])
+        smudges.append(ob)
+    ob = merge('FaceSoot', smudges)
     skel.attach(ob)
     bind_rigid(ob, 'Head')
 
@@ -400,9 +509,20 @@ def _mouth(skel, b, j, m, role, tree) -> None:
         _conform(tongue, tree, hc)
         assign(tongue, m['tongue'])
         parts.append(tongue)
-    for ob in parts:
-        skel.attach(ob)
-        bind_rigid(ob, 'Mouth')
+    if role == 'driver':
+        # A toothpick worked into the raised corner of the smirk, sticking out and down.
+        y0 = w * 0.86
+        z0 = mz + smile(Vector((0, y0, 0))).z - 0.004   # the corner's own line, just under its top
+        hit, normal, _, _ = tree.ray_cast(Vector((hc.x + 1, y0, z0)), Vector((-1, 0, 0)))
+        out = (normal.normalized() * 0.55 + Vector((0, 0.75, -0.3))).normalized()
+        pick = cylinder('FaceToothpick', 0.0038, 0.07, loc=tuple(hit + out * 0.023), segments=6, radius2=0.0022)
+        pick.rotation_mode = 'QUATERNION'
+        pick.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(out)
+        assign(pick, material('Toothpick', 0xEAD3A2, roughness=0.8))
+        parts.append(pick)
+    mouth = merge('FaceMouth', parts)
+    skel.attach(mouth)
+    bind_rigid(mouth, 'Mouth')
     # The gasp: a round open mouth, parked GASP_HIDE inside the skull until the animator pulls it out.
     gasp = ellipsoid('FaceGasp', (0.006, 0.026, 0.03), segments=10, rings=6)
     gasp.data.transform(Matrix.Translation((0.006, 0, mz - 0.004)))
@@ -433,6 +553,18 @@ def _ears(skel, b, j, m, role: str) -> None:
         bind_rigid(ear, 'Head')
 
 
+def _face_top(b, j, role: str) -> tuple[float, float]:
+    """(Height above the skull centre of the highest brow or resting lid, and how far out the brows reach.)"""
+    f = FACE[role]
+    wscale = b.head[1] / 0.2
+    inner, outer = 0.024 * wscale, 0.13 * wscale
+    brow = max(EYE_Z + f.brow_h + math.sin(t * math.pi) * 0.01 + (t - 0.4) * math.tan(math.radians(tilt)) * (outer - inner)
+               for tilt in f.brow_tilt for t in (k / 8 for k in range(9))) + f.brow_thick * 1.05
+    _, _, lz, _ = lid_radii(role, b.head)
+    lid = EYE_Z + lz   # the lid shell's crown: the eye's ellipsoid grown evenly, so its top is the up radius
+    return max(brow, lid), outer
+
+
 def _hair(skel, b, j, m, role, skull) -> None:
     a, bw, c = b.head
 
@@ -450,8 +582,56 @@ def _hair(skel, b, j, m, role, skull) -> None:
         band = smoothstep(hem - 0.06, hem + 0.04, p.z / c)
         return max(back * band, burn)
 
+    # Up to the hat: everywhere above a hairline a little under the hat's base, so no bare band of
+    # scalp shows between the hair and the brim however high the hat sits (and a knocked-off hat
+    # leaves a head of hair). The hairline sits lower at the sides than over the forehead.
+    frame = hat_frame(j, role)
+    up = (frame.to_3x3() @ Vector((0, 0, 1))).normalized()
+    base = frame.translation - j.head_c
+    fringe_front, fringe_side = HAIRLINE[role]
+
+    # Never down over the face, though: in front the hairline stays above the brows and the lids.
+    floor, outer = _face_top(b, j, role)
+
+    def under_hat(p: Vector) -> float:
+        depth = fringe_side + (fringe_front - fringe_side) * smoothstep(0.45, 0.85, p.x / a)
+        k = smoothstep(-depth - 0.012, -depth, (p - base).dot(up))
+        face = smoothstep(0.15, 0.35, p.x / a) * (1 - smoothstep(outer, outer + 0.03, abs(p.y)))
+        return k * (1 - face * (1 - smoothstep(floor + 0.008, floor + 0.02, p.z)))
+
+    # The hat squashes the hair: none of it rises out past the crown or over the brim.
+    to_hat = frame.inverted() @ Matrix.Translation(j.head_c)
+    from_hat = to_hat.inverted()
+    dome = HAT_DOME * HATS[role].scale
+    rim = _brim_reach(HATS[role].crown, HATS[role].scale)
+
+    def squash(p: Vector, skin: Vector) -> Vector:
+        q = to_hat @ p
+        r = math.hypot(q.x, q.y)
+        if q.z <= -BRIM_BAND or r < 1e-6:
+            return p
+        if q.z <= 0.0:
+            # Just under the hat's base the hair is drawn in under the brim's underside, so the
+            # two never cross; below that band it is free again.
+            r_cap = dome + 0.6 * rim - 0.004
+            if r <= r_cap:
+                return p
+            s = to_hat @ skin
+            r_new = max(r + (r_cap - r) * smoothstep(-BRIM_BAND, 0.0, q.z), math.hypot(s.x, s.y) + 0.002)
+            q.x, q.y = q.x * r_new / r, q.y * r_new / r
+            return from_hat @ q
+        over = smoothstep(0.004, 0.02, q.z)
+        # Inside the crown, or under the brim; never pressed under the skin (where the head is
+        # wider than the hat's rim, the hair stays a whisker over it rather than leave it bald).
+        s = to_hat @ skin
+        r_max = max(dome + (rim - 0.006) * (1 - over) - 0.004 * over, math.hypot(s.x, s.y) + 0.002)
+        if r <= r_max:
+            return p
+        q.x, q.y = q.x * r_max / r, q.y * r_max / r
+        return from_hat @ q
+
     thick = {'blaster': 0.012, 'driller': 0.012, 'driver': 0.01, 'surveyor': 0.014, 'manager': 0.006}[role]
-    hair = _shell('HeadHair', skull, scalp, thick, noise=wobble)
+    hair = _shell('HeadHair', skull, lambda p: max(scalp(p), under_hat(p)), thick, noise=wobble, clamp=squash)
     assign(hair, m['hair'])
     parts = [hair]
     if role == 'driller':
@@ -465,6 +645,15 @@ def _hair(skel, b, j, m, role, skull) -> None:
                           noise=lambda p: 0.008 * smoothstep(-0.5, -0.95, p.z / c) + 0.003 * math.sin(p.y * 90))
         assign(beard_ob, m['hair'])
         parts.append(beard_ob)
+    elif role == 'driver':
+        def chinstrap(p: Vector) -> float:
+            # A thin strap of stubble along the jaw, ear to ear under the chin, meeting the
+            # sideburns at the sides and passing under the mouth at the front.
+            line = -0.42 - 0.26 * smoothstep(0.3, 0.75, p.x / a)
+            return (1 - smoothstep(line - 0.05, line + 0.03, p.z / c)) * smoothstep(-0.35, -0.1, p.x / a)
+        strap = _shell('HeadBeard', skull, chinstrap, 0.005, noise=lambda p: 0.0015 * math.sin(p.y * 120 + p.z * 70))
+        assign(strap, m['hair'])
+        parts.append(strap)
     for ob in parts:
         skel.attach(ob)
         bind_rigid(ob, 'Head')
@@ -472,9 +661,9 @@ def _hair(skel, b, j, m, role, skull) -> None:
 
 def _moustache(skel, b, j, m, role, tree) -> None:
     hc = j.head_c
-    if role in ('driver', 'driller'):
+    if role == 'driller':
         # Walrus: thick, drooping over the mouth.
-        k = 1.3 if role == 'driver' else 1.1
+        k = 1.1
         pts = [(-0.068 * k, hc.z - 0.092), (-0.034 * k, hc.z - 0.062), (0.0, hc.z - 0.058), (0.034 * k, hc.z - 0.062),
                (0.068 * k, hc.z - 0.092)]
         width = [0.009, 0.022, 0.024, 0.022, 0.009]
@@ -502,43 +691,134 @@ def _moustache(skel, b, j, m, role, tree) -> None:
 
 # -------------------------------------------------------------------- hat
 
-def _hat(skel, b, j, m, role) -> None:
-    """The role's hard hat: an egg-shaped crown with a raised ridge, a narrow brim, a peak over the eyes."""
-    spec = HATS[role]
-    mat = m.get('hat', m['tint'])
-    k = spec.scale
+def _hat_profile(crown: str, k: float) -> list[tuple[float, float]]:
+    """A crown's lathe profile [(radius, z), …]: the underside, the brim, then up the crown to its pole."""
+    dome, brim = HAT_DOME * k, HAT_BRIM * k
+    under = [(0.0, 0.03), (0.15 * k, 0.03), (dome - 0.006, 0.008)]
+    if crown == 'cap':
+        # Hardly a brim at all: the visor is pulled out of this thin rim at the front.
+        rim = [(dome + 0.004, 0.004), (dome + 0.008, 0.009), (dome + 0.006, 0.014), (dome + 0.002, 0.02)]
+    elif crown == 'safari':
+        wb = HAT_SAFARI_BRIM * k
+        rim = [(dome + wb * 0.5, -0.006), (dome + wb, -0.02), (dome + wb + 0.003, -0.013), (dome + wb * 0.95, -0.007),
+               (dome + wb * 0.5, 0.007), (dome + 0.003, 0.022)]
+    elif crown == 'bowler':
+        rim = [(dome + brim * 0.6, 0.0), (dome + brim, 0.008), (dome + brim * 0.9, 0.018), (dome + brim * 0.45, 0.02),
+               (dome + 0.003, 0.026)]
+    else:
+        rim = [(dome + brim * 0.6, 0.0), (dome + brim, 0.006), (dome + brim * 0.95, 0.016), (dome + brim * 0.5, 0.022),
+               (dome + 0.003, 0.03)]
+    # The crown, as (fraction of the dome radius, height before `scale`).
+    if crown == 'cap':
+        top = [(1.0, 0.045), (0.965, 0.08), (0.87, 0.115), (0.7, 0.142), (0.45, 0.158), (0.22, 0.165), (0.0, 0.167)]
+    elif crown == 'bowler':
+        top = [(1.0, 0.06), (0.995, 0.08), (0.985, 0.105), (0.95, 0.142), (0.87, 0.178), (0.72, 0.21), (0.5, 0.232),
+               (0.25, 0.243), (0.0, 0.246)]
+    elif crown == 'dented':
+        # The dome with extra rings, so the dents have faces to land on.
+        top = [(1.0, 0.07), (0.98, 0.095), (0.955, 0.118), (0.912, 0.141), (0.86, 0.163), (0.79, 0.183), (0.7, 0.2),
+               (0.59, 0.214), (0.47, 0.226), (0.22, 0.238), (0.0, 0.241)]
+    else:
+        top = [(1.0, 0.07), (0.955, 0.118), (0.86, 0.163), (0.7, 0.2), (0.47, 0.226), (0.22, 0.238), (0.0, 0.241)]
+    return under + rim + [(dome * r, z * k) for r, z in top]
+
+
+def _brim_reach(crown: str, k: float) -> float:
+    """How far past the crown the profile's own brim reaches, before any peak is pulled out of it."""
+    return {'cap': 0.008, 'safari': HAT_SAFARI_BRIM * k}.get(crown, HAT_BRIM * k)
+
+
+def _hat_shape(crown: str, k: float):
+    """The per-vertex deform that turns a revolved profile into the role's hat (hat-local, Z up, +X front)."""
     dome = HAT_DOME * k
-    brim = HAT_BRIM * k
-    profile = [
-        (0.0, 0.03), (0.15 * k, 0.03), (dome - 0.006, 0.008), (dome + brim * 0.6, 0.0), (dome + brim, 0.006),
-        (dome + brim * 0.95, 0.016), (dome + brim * 0.5, 0.022), (dome + 0.003, 0.03), (dome, 0.07 * k),
-        (dome * 0.955, 0.118 * k), (dome * 0.86, 0.163 * k), (dome * 0.7, 0.2 * k), (dome * 0.47, 0.226 * k),
-        (dome * 0.22, 0.238 * k), (0.0, 0.241 * k),
-    ]
+    rim = _brim_reach(crown, k)
+    peak = HAT_PEAK[crown] * k
+    dip = {'cap': 0.022, 'dome': 0.016, 'dented': 0.016}.get(crown, 0.0)
 
     def shape(p: Vector) -> Vector:
         r = math.hypot(p.x, p.y)
         th = math.atan2(p.y, p.x)
         if r > dome + 0.002 and p.z < 0.027:
-            # The peak: the brim reaches further at the front, dipping toward the eyes.
-            front = max(0.0, math.cos(th)) ** 1.5
-            reach = (r - dome) + HAT_PEAK * k * front * smoothstep(dome, dome + brim, r)
-            nr = dome + reach
+            # The brim: pulled out into a peak at the front (the visor of the cap, and the
+            # safari brim front and back too), dipping toward the eyes.
+            front = abs(math.cos(th)) ** 2 if crown == 'safari' else max(0.0, math.cos(th)) ** (1.0 if crown == 'cap' else 1.5)
+            out = smoothstep(dome, dome + rim, r)
+            nr = r + peak * front * out
             p.x, p.y = p.x * nr / r, p.y * nr / r
-            p.z -= 0.016 * front * smoothstep(dome, dome + brim + HAT_PEAK, nr)
+            p.z -= dip * front * smoothstep(dome, dome + rim + peak, nr)
+            if crown == 'bowler':
+                p.z += 0.014 * math.sin(th) ** 2 * out     # the narrow brim curls up at the sides
         elif p.z > 0.05 * k and r > 1e-4:
-            # The ridge: raised out of the crown along the front-to-back midline.
-            ridge = 0.013 * k * math.exp(-(p.y / (0.022 * k)) ** 2) * smoothstep(0.05 * k, 0.12 * k, p.z)
-            p.x, p.y = p.x * (r + ridge) / r, p.y * (r + ridge) / r
-            p.z += ridge * 0.8 * smoothstep(0.15 * k, 0.24 * k, p.z)
+            nr = r
+            if crown in ('dome', 'dented'):
+                # The ridge: raised out of the crown along the front-to-back midline.
+                ridge = 0.013 * k * math.exp(-(p.y / (0.022 * k)) ** 2) * smoothstep(0.05 * k, 0.12 * k, p.z)
+                nr += ridge
+                p.z += ridge * 0.8 * smoothstep(0.15 * k, 0.24 * k, p.z)
+            if crown == 'dented':
+                for az, zd, rd, depth in HAT_DENTS:
+                    dth = (th - math.radians(az) + math.pi) % (2 * math.pi) - math.pi
+                    d2 = (dth * r) ** 2 + (p.z - zd * k) ** 2
+                    nr -= depth * k * math.exp(-d2 / (rd * k) ** 2)
+            p.x, p.y = p.x * nr / r, p.y * nr / r
         return p
+    return shape
 
-    hat = lathe('HatShell', profile, segments=32, deform=shape)
+
+def _hat_marker(spec: Hat, m, tree: BVHTree) -> bpy.types.Object | None:
+    """The badge on the front of the crown that says whose hat it is, from above (hat-local, on the crown)."""
+    crown, k = spec.crown, spec.scale
+    if crown == 'cap':
+        # A reflective plate: a flat rounded slab, bent round the crown.
+        zc = 0.098 * k
+        ob = loft('HatMarker', [Section((0.003, y, zc), 0.019, 0.003, 4.0) for y in (-0.034, -0.012, 0.012, 0.034)],
+                  segments=8, rings=6, cap_start=0.6, cap_end=0.6, cap_rings=2, front=(1, 0, 0)).ob
+        assign(ob, m['stripe'])
+    elif crown in ('safari', 'bowler'):
+        # A round disc, its pole out of the crown so its latitude rings are concentric.
+        radius = 0.026 if crown == 'safari' else 0.019
+        ob = ellipsoid('HatMarker', (radius, radius, 0.004), segments=16, rings=10)
+        prune(ob, lambda p: p.z > 1e-5)
+        if crown == 'safari':
+            # A red-and-white target sticker: red bull's-eye, white, red, white rim.
+            red = material('StaffRed', 0xD8322B, roughness=0.6)
+            white = material('StaffWhite', 0xF4F1EA, roughness=0.6)
+            assign(ob, white)
+            assign_faces(ob, red, lambda i, c: math.hypot(c.x, c.y) < 0.31 * radius or
+                         0.59 * radius < math.hypot(c.x, c.y) < 0.8 * radius)
+            zc = 0.1 * k
+        else:
+            assign(ob, material('HatBandGold', 0xE0B040, roughness=0.35, metallic=0.5))
+            zc = spec.band_top * k + 0.023
+        ob.data.transform(Matrix.Translation((0.0008, 0, zc)) @ Matrix.Rotation(math.radians(90), 4, 'Y'))
+    else:
+        return None
+    _conform(ob, tree, Vector((0, 0, 0)))
+    return ob
+
+
+def _hat(skel, b, j, m, role) -> None:
+    """The role's hard hat: a lathed crown with its own silhouette per role, a band, a brim, a badge."""
+    spec = HATS[role]
+    crown = spec.crown
+    mat = m.get('hat', m['tint'])
+    k = spec.scale
+    dome = HAT_DOME * k
+    hat = lathe('HatShell', _hat_profile(crown, k), segments=32, deform=_hat_shape(crown, k))
     assign(hat, mat)
-    # A band round the base of the crown (and the driver's orange tape over the ridge).
     band_mat = material('HatBandGold', 0xE0B040, roughness=0.35, metallic=0.5) if spec.band == 'gold' else m['dark']
-    assign_faces(hat, band_mat, lambda i, c: 0.034 < c.z < 0.058 * k and math.hypot(c.x, c.y) < dome + 0.004)
-    hat.data.transform(hat_frame(j, role))
+    if crown != 'cap':
+        assign_faces(hat, band_mat, lambda i, c: 0.034 < c.z < spec.band_top * k and math.hypot(c.x, c.y) < dome + 0.004)
+    if HAT_PEAK[crown] > 0:
+        # The peak's underside in the dark band colour, so from the front the peak reads as a peak.
+        polys = hat.data.polygons
+        assign_faces(hat, m['dark'], lambda i, c: polys[i].normal.z < -0.3 and math.hypot(c.x, c.y) > dome + 0.004 and
+                     c.x > 0.35 * math.hypot(c.x, c.y))
+    marker = _hat_marker(spec, m, _bvh(hat))
+    parts = [hat] + ([marker] if marker else [])
+    for ob in parts:
+        ob.data.transform(hat_frame(j, role))
+    hat = merge('HatShell', parts)
     skel.attach(hat)
     bind_rigid(hat, 'Hat')
 
@@ -551,6 +831,8 @@ def build_head(skel: Skeleton, b, j, m, role: str) -> None:
     _nose(skel, b, j, m, role, tree)
     _mouth(skel, b, j, m, role, tree)
     _moustache(skel, b, j, m, role, tree)
+    if role == 'blaster':
+        _soot(skel, b, j, m, tree)
     _ears(skel, b, j, m, role)
     _hair(skel, b, j, m, role, skull)
     _hat(skel, b, j, m, role)

@@ -117,10 +117,15 @@ export function carryTool(rig: WorkerRig, role: string, temp: Temperament, t: nu
       break;
     }
     case 'driller': {
-      // The drill hangs heavy and plumb from his fist, bit down, swinging a beat behind the
-      // arm; he leans away from its weight, the shoulder dragged down, the free arm out.
-      hangArm(rig, 'R', temp, sw * 8 * DEG + 4 * DEG, 14 * DEG, (10 + 6 * walk) * DEG);
-      P.orientBasis(rig.limbs.R.hand, rig.rest.R.finger, rig.rest.R.thumb, _f.set(-0.25 * lag, -1, 0.04 * R), _t.set(1, 0, 0));
+      if (still) {
+        // Resting on the planted jackhammer, both hands on the T-handle, weight on it.
+        jackhammerOnRock(rig, 0, 0.3, 0);
+        break;
+      }
+      // Carried by one end of the T-handle, hanging plumb with the bit clear of the ground and
+      // swinging a beat behind the arm; he leans away from its weight, the free arm out.
+      const grip = body(rig, 0.1 + 0.03 * sw, JACK_CARRY_UP, R * JACK_CARRY_OUT, _grip);
+      reach(rig, 'R', grip, dir(-0.25 * lag, -1, 0.04 * R, _f), dir(1, 0, 0, _t), dir(-0.6, -0.2, R, _pole));
       leanFrom(rig, 'R', 8);
       break;
     }
@@ -138,6 +143,37 @@ export function carryTool(rig: WorkerRig, role: string, temp: Temperament, t: nu
     default:
       break;
   }
+}
+
+/**
+ * Too spent to carry it, a worker whose tool is too long to hold with his hands on his
+ * knees stands it on the ground beside him instead: the driller's jackhammer, upright
+ * on its bit by his boot.
+ */
+export function setToolDown(rig: WorkerRig, role: string): void {
+  if (role !== 'driller' || rig.tool < 0 || !rig.toolSide) return;
+  const r = rig.rest[rig.toolSide];
+  const P = rig.poser;
+  P.placeAt(rig.tool, _w.set(0.12, JACK_LENGTH, r.sign * 0.36));
+  P.orientBasis(rig.tool, r.finger, r.thumb, _f.set(0, -1, 0), _t.set(1, 0, 0));
+}
+
+/**
+ * The driller's jackhammer standing on its bit `fwd` in front of him, `drop` below the
+ * rock surface (negative while it bites) and `jolt` of hammering on it, both fists on
+ * the ends of its T-handle.
+ */
+function jackhammerOnRock(rig: WorkerRig, drop: number, fwd: number, jolt: number): void {
+  const R = rig.rest.R.sign;
+  // The hammer leans its handle back toward him a little; the T-handle runs across his body.
+  const down = dir(0.12, -1, 0, _f);
+  const across = dir(0, 0, -R, _t);
+  const tip = _w.set(fwd, drop, 0);
+  const grip = _grip.copy(tip).addScaledVector(across, -JACK_T_HALF).addScaledVector(down, -JACK_LENGTH);
+  grip.y += jolt;
+  reach(rig, 'R', grip, down, across, dir(-0.3, 0, R, _pole));
+  const other = _v.copy(grip).addScaledVector(across, 2 * JACK_T_HALF);
+  reach(rig, 'L', other, down, _knee.copy(across).negate(), dir(-0.3, 0, -R, _pole));
 }
 
 /** Lean the trunk away from a heavy load in hand `s` (degrees), that shoulder dragged down, the other arm out. */
@@ -190,17 +226,9 @@ export function poseWork(rig: WorkerRig, role: string, temp: Temperament, t: num
       P.rot(rig.head, 0.05 * jLag, 0, (8 + 4 * jLag) * DEG);
       if (rig.hat >= 0) P.shiftRest(rig.hat, 0, 0.015 * Math.abs(jLag), 0);
       stand(rig, temp, 0.07, 0.12);
-      // The bit, near vertical: the fist's fingers point down it, the drill body forward.
-      const down = dir(0.25, -1, 0, _f);
-      const fwd = dir(1, 0.25, 0, _t);
-      // The grip sits where the bit's tip lands on the rock, and goes down with it as it bites.
-      const grip = _grip.set(0.24 + 0.012 * j, 0, R * 0.05);
-      grip.y = -(DRILL_BIT * down.y + DRILL_BODY * fwd.y) - 0.04 * Math.max(0, sink) + 0.018 * j;
-      reach(rig, 'R', grip, down, fwd, dir(-0.2, 0, R, _pole));
-      // Left hand on top of the motor, pushing down.
-      const top = _v.copy(grip).addScaledVector(fwd, 0.1).addScaledVector(down, -0.13);
-      top.z -= R * 0.02;
-      reach(rig, 'L', top, dir(0.3, -1, 0.15 * R, _w), dir(1, 0.2, 0, _knee), dir(-0.2, 0, L, _pole));
+      // Both fists on the T-handle, the hammer near vertical under them, its bit biting into
+      // the rock in front of his boots and going down with it.
+      jackhammerOnRock(rig, 0.012 * j - JACK_BITE * Math.max(0, sink), 0.25, 0.012 * j);
       break;
     }
     case 'blaster': {
@@ -335,7 +363,17 @@ const PLUNGER_IN = 0.2;
 /** A wheel hub's height off the ground, where the kneeling driver's nut sits. */
 const WHEEL_HUB = 0.36;
 /** Drill: from the fist's grip to the bit's tip, along the fingers and along the thumb (worker_props._drill). */
-const DRILL_BIT = 0.243;
-const DRILL_BODY = 0.095;
+/**
+ * The jackhammer, from the fist on one end of its T-handle (worker_props JACK_*): the bit
+ * tip JACK_LENGTH down the fingers and JACK_T_HALF along the thumb, the other handle end
+ * twice that along the thumb.
+ */
+const JACK_LENGTH = 0.48;
+const JACK_T_HALF = 0.12;
+/** How far the bit bites into the rock at the bottom of a push (m). */
+const JACK_BITE = 0.04;
+/** Carried: the fist's height above the hips joint and its reach out to the side, so the bit clears the ground. */
+const JACK_CARRY_UP = 0.1;
+const JACK_CARRY_OUT = 0.3;
 /** Wrench: from the fist's grip to the centre of its jaw. */
-const WRENCH_REACH = 0.285;
+const WRENCH_REACH = 0.37;

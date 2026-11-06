@@ -49,6 +49,8 @@ interface LimbRest {
   armLength: number;
   /** Elevation (radians) of the lid's front edge when the eye rests open — how far it turns to shut. */
   lidOpen: number;
+  /** The axis a lid turns about to shut: square to its bone, which is yawed out with the eye (rig space). */
+  lidHinge: THREE.Vector3;
   /** Axis the fingers curl about, from their bent rest chain (rig space), or null without finger bones. */
   fingerHinge: THREE.Vector3 | null;
 }
@@ -96,6 +98,13 @@ function fingerHinge(poser: RigPoser, b: LimbBones, q: THREE.Quaternion): THREE.
   return h.lengthSq() > 1e-12 ? h.normalize() : null;
 }
 
+/** Horizontal axis square to a lid bone's resting edge, so turning about it (−) brings the edge down. */
+function lidHinge(poser: RigPoser, lid: number, q: THREE.Quaternion): THREE.Vector3 {
+  const edge = new THREE.Vector3(0, 1, 0).applyQuaternion(poser.restRotation(lid, q)).setY(0);
+  if (edge.lengthSq() < 1e-10) edge.set(1, 0, 0);
+  return edge.normalize().cross(new THREE.Vector3(0, 1, 0)).normalize();
+}
+
 /** Name the crew skeleton's bones; null when the model is not a worker rig. */
 export function workerRig(root: THREE.Object3D): WorkerRig | null {
   const poser = RigPoser.fromModel(root);
@@ -128,6 +137,7 @@ export function workerRig(root: THREE.Object3D): WorkerRig | null {
       armLength: poser.restLength(b.upperArm, b.forearm) + poser.restLength(b.forearm, b.hand),
       // A bone's local +Y runs head to tail; the lid bone's tail marks its edge's resting elevation.
       lidOpen: Math.asin(Math.max(-1, Math.min(1, new THREE.Vector3(0, 1, 0).applyQuaternion(poser.restRotation(b.lid, q)).y))),
+      lidHinge: lidHinge(poser, b.lid, q),
       fingerHinge: fingerHinge(poser, b, q),
     };
   }

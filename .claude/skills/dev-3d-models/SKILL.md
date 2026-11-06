@@ -182,7 +182,7 @@ Budget by **how many copies are drawn**, not by how important the model feels. A
 
 | Family | Copies per level | Triangles (measured) | Notes |
 |--------|------------------|----------------------|-------|
-| Workers | tens | 12.0 k – 14.5 k | skinned: one mesh per material bucket, 6–7 draws with the outline; skin weights shipped as normalized u8 to stay under 400 KB |
+| Workers | tens | 13.6 k – 15.2 k | skinned: one mesh per material bucket, 6–7 draws with the outline; skin weights shipped as normalized u8 to stay under 400 KB |
 | Vehicles t1 / t2 / t3 | tens | 5.8 k – 11.4 k / 9.6 k – 11.1 k / 12.1 k – 17.6 k | tier 3 is the heaviest by design |
 | Buildings t1 / t2 / t3 | tens | 3.0 k – 6.7 k / 3.2 k – 6.3 k / 7.2 k – 13.2 k | 3 merged meshes each |
 | Trees (near) | thousands | 84 – 1 292 | test ceiling 1 600 |

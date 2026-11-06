@@ -7,10 +7,13 @@ workers.py:
 
 * **Surfaces.** `loft()` sweeps a smoothly interpolated chain of elliptical
   (or superelliptical) sections into one closed, round-capped tube — a torso,
-  a limb, a boot. `lathe()` revolves a profile — a hard hat, a mug. Both
-  report every vertex's position *along* the shape, which is what lets
-  materials change on a clean edge loop (sleeve to forearm) and skin weights
-  blend smoothly across a joint.
+  a limb, a boot. `lathe()` revolves a profile — a hard hat, a mug. A loft
+  reports every vertex's position *along* the shape and every face's ring
+  and column, which is what lets materials change on a clean edge loop
+  (sleeve to forearm) or down a clean column (a vest's stripe) and skin
+  weights blend smoothly across a joint. `merge()` joins the parts that ride
+  together into one object: each exported mesh costs a node and an accessor
+  per attribute, hundreds of bytes before its first vertex.
 * **Rig.** `Skeleton` declares bones by head/tail in armature space;
   `bind_*` writes vertex groups — rigid for accessories, blended along a
   chain for the body — and every part gets an Armature modifier.
@@ -132,6 +135,9 @@ class Loft:
     """Centre of every ring, first to last."""
     face_ring: list[int]
     """Per face, the ring its band starts at (caps report their end ring) — colour by ring for clean edge loops."""
+    face_seg: list[int]
+    """Per face, the column (segment) it sits in round the loft; column k spans 360°·k/segments onward
+    from the side axis toward the front — colour by column for clean lengthwise stripes."""
 
     def ring_z(self, face: int) -> float:
         """Height of the ring a face's band starts at: a material boundary by this value runs along an edge loop."""
@@ -210,18 +216,21 @@ def loft(name: str, sections: Sequence[Section], segments: int = 16, rings: int 
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.verts.index_update()
     bm.faces.index_update()
-    ring_of = {}
+    ring_of, seg_of = {}, {}
     for i, rv in enumerate(ring_verts):
-        for v in rv:
+        for k, v in enumerate(rv):
             ring_of[v.index] = i
-    face_u, face_ring = [], []
+            seg_of[v.index] = k
+    face_u, face_ring, face_seg = [], [], []
     for f in bm.faces:
         face_u.append(sum(us[v.index] for v in f.verts) / len(f.verts))
         rings = [ring_of[v.index] for v in f.verts if v.index in ring_of]
         face_ring.append(min(rings) if rings else (0 if face_u[-1] < 0.5 else n - 1))
+        segs = {seg_of[v.index] for v in f.verts if v.index in seg_of}
+        face_seg.append(segments - 1 if {0, segments - 1} <= segs else min(segs, default=0))
     centers = [Vector(sec.c) for sec in secs]
     ob = _to_object(name, bm, col)
-    return Loft(ob, us, face_u, centers, face_ring)
+    return Loft(ob, us, face_u, centers, face_ring, face_seg)
 
 
 def _bridge(bm: bmesh.types.BMesh, a: list, b: list, flip: bool) -> None:
@@ -341,6 +350,39 @@ def bake_transform(ob: bpy.types.Object) -> bpy.types.Object:
     ob.rotation_euler = Euler((0, 0, 0))
     ob.scale = (1, 1, 1)
     return ob
+
+
+def merge(name: str, parts: Sequence[bpy.types.Object]) -> bpy.types.Object:
+    """Join `parts` into one object called `name`: modifiers and transforms applied, materials kept.
+
+    For parts that ride one bone (or one weight function) together — a tool's
+    pieces, a bundle of dynamite, a puff of hair. In the export every mesh costs
+    a node, a mesh and an accessor per attribute and material, hundreds of bytes
+    of JSON before its first vertex; the renderer merges by material anyway, so
+    one object per group is the same picture for a fraction of the file. Call it
+    after the parts are placed (`to_hand`, a hat frame) and before they are
+    attached to the skeleton. Never mix `Face*` parts with outlined ones: the
+    name decides whether the merged object is drawn with the outline.
+    """
+    parts = list(parts)
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    for ob in parts:
+        if ob.modifiers:
+            baked = bpy.data.meshes.new_from_object(ob.evaluated_get(dg))
+            old = ob.data
+            ob.modifiers.clear()
+            ob.data = baked
+            bpy.data.meshes.remove(old)
+        bake_transform(ob)
+    first = parts[0]
+    if len(parts) > 1:
+        with bpy.context.temp_override(active_object=first, object=first, selected_objects=parts,
+                                       selected_editable_objects=parts):
+            bpy.ops.object.join()
+    first.name = name
+    first.data.name = name
+    return first
 
 
 def assign_faces(ob: bpy.types.Object, mat: bpy.types.Material, predicate: Callable[[int, Vector], bool]) -> None:

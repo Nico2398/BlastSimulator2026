@@ -15,7 +15,7 @@ import {
   clutchThigh, curlFinger, curlHand, type GaitState, lerp, panicBody, poseCollapse, poseFace, poseGait, poseIdle, smooth, TEMPERAMENT, type Temperament,
   tiredTilt,
 } from './WorkerMotion.js';
-import { carryTool, poseWork } from './WorkerWork.js';
+import { carryTool, poseWork, setToolDown } from './WorkerWork.js';
 
 /** What the simulation and the mesh's own motion say this frame. */
 export interface WorkerSignals {
@@ -251,6 +251,7 @@ export class WorkerAnimator {
         case 'idle':
           poseIdle(rig, temp, time, seed, this.tired, this.limp);
           if (carry) carryTool(rig, role, temp, time, 0, 0, seed);
+          else setToolDown(rig, role);
           if (this.panic > 0.5) panicBody(rig, time, seed);
           else clutchThigh(rig, this.limp);
           break;
