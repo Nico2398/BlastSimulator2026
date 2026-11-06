@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
-import { EXPLOSIVE_DELIVERY_TICKS, SANDBOX_FLAT_PAD_SIZE } from '../../src/core/config/balance.js';
+import { SANDBOX_FLAT_PAD_SIZE } from '../../src/core/config/balance.js';
 import { fundForDeliveryWait, clearBlastZone, playTick } from '../helpers/playthrough.js';
 
 const BIOME = 'desert_badlands';
@@ -67,7 +67,7 @@ function playOpening(autoSell: boolean | undefined) {
   expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${shotX},${shotZ}`)).toMatchObject({ success: true });
   tickWhile(run, state, () => state.plannedDrillHoles.length === 0, 1500);
   expect(run('charge hole:* explosive:krackle amount:6 stemming:2')).toMatchObject({ success: true });
-  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 1500);
+  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
   clearBlastZone(run, state);
   expect(run('blast detonate')).toMatchObject({ success: true });
   tickWhile(run, state, () => state.lastBlastReport !== null, 600);
