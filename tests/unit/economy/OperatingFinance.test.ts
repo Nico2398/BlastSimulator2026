@@ -6,7 +6,7 @@ import {
   getRunway,
 } from '../../../src/core/economy/OperatingFinance.js';
 import { createFinanceState, addIncome, addExpense } from '../../../src/core/economy/Finance.js';
-import { createEmployeeState, hireEmployee, killEmployee, PAY_CYCLE_TICKS } from '../../../src/core/entities/Employee.js';
+import { processPayCycle, createEmployeeState, hireEmployee, killEmployee } from '../../../src/core/entities/Employee.js';
 import { createBuildingState, getBuildingDef, type Building } from '../../../src/core/entities/Building.js';
 import { createVehicleState, purchaseVehicle, getVehicleDefByTier } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
@@ -29,37 +29,37 @@ describe('getOperatingCostPerHour', () => {
     expect(c).toEqual({ payroll: 0, buildings: 0, vehicleMaintenance: 0, fuel: 0, total: 0 });
   });
 
-  it('payroll includes active workers and excludes idle workers', () => {
+  it('estimates idle wages until the first observed tick, ignoring mere assignments', () => {
     const s = emptySite();
-    const rng = new Random(42);
-    const a = hireEmployee(s.employees, 'driller', rng).employee;
-    const b = hireEmployee(s.employees, 'manager', rng).employee;
+    const a = hireEmployee(s.employees, 'driller', new Random(42)).employee;
+    const b = hireEmployee(s.employees, 'manager', new Random(43)).employee;
     a.activeActionId = 1;
-    const c = getOperatingCostPerHour(s);
-    expect(c.payroll).toBeCloseTo(a.salary / PAY_CYCLE_TICKS, 5);
-    expect(c.payroll).toBeGreaterThan(0);
-    b.activeActionId = 2;
-    expect(getOperatingCostPerHour(s).payroll).toBeCloseTo((a.salary + b.salary) / PAY_CYCLE_TICKS, 5);
-  });
-
-  it('excludes dead employees from payroll', () => {
-    const s = emptySite();
-    const rng = new Random(42);
-    const a = hireEmployee(s.employees, 'driller', rng).employee;
-    const b = hireEmployee(s.employees, 'manager', rng).employee;
-    a.activeActionId = 1;
+    expect(getOperatingCostPerHour(s).payroll).toBeCloseTo((a.salary + b.salary) / 10 * 0.25);
     killEmployee(s.employees, b.id);
-    expect(getOperatingCostPerHour(s).payroll).toBeCloseTo(a.salary / PAY_CYCLE_TICKS, 5);
+    expect(getOperatingCostPerHour(s).payroll).toBeCloseTo(a.salary / 10 * 0.25);
   });
 
-  it('uses observed activity when a worker holds a blocked action', () => {
+  it('averages actual active/idle wages instead of flipping to the last tick rate', () => {
     const s = emptySite();
     const emp = hireEmployee(s.employees, 'driller', new Random(42)).employee;
-    emp.activeActionId = 1;
-    emp.paidLastTick = false;
-    expect(getOperatingCostPerHour(s).payroll).toBe(0);
-    emp.paidLastTick = true;
-    expect(getOperatingCostPerHour(s).payroll).toBeCloseTo(emp.salary / PAY_CYCLE_TICKS);
+    emp.salary = 1000;
+    processPayCycle(s.employees, () => 1, new Set([emp.id]));
+    processPayCycle(s.employees);
+    expect(getOperatingCostPerHour(s).payroll).toBeCloseTo(62.5);
+    const finances = createFinanceState(1000);
+    addIncome(finances, 100, 'sales', 'Ore', 2);
+    const { cost, income } = getOperatingSummary({ ...s, finances, tickCount: 2 });
+    expect(getRunway(1000, cost.total, income).kind).toBe('days');
+  });
+
+  it('does not reprice historical wages after a raise or a departure', () => {
+    const s = emptySite();
+    const emp = hireEmployee(s.employees, 'driller', new Random(42)).employee;
+    const hourly = emp.salary / 10;
+    processPayCycle(s.employees, () => 2, new Set([emp.id]));
+    emp.salary *= 3;
+    killEmployee(s.employees, emp.id);
+    expect(getOperatingCostPerHour(s).payroll).toBeCloseTo(hourly * 2);
   });
 
   it('counts upkeep of active buildings only', () => {

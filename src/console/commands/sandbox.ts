@@ -16,6 +16,7 @@ import {
   sandboxLevelDef,
   type SandboxConfig,
 } from '../../core/campaign/Sandbox.js';
+import { parseIdlePayPercent } from './commandUtils.js';
 import { getAllBiomes, getBiome } from '../../core/world/BiomeCatalog.js';
 import { createGame, createWorldState } from '../../core/state/GameState.js';
 import { generateContracts } from '../../core/economy/Contract.js';
@@ -116,6 +117,9 @@ export function sandboxCommand(
     return { success: false, output: startGrade.error };
   }
 
+  const idlePay = parseIdlePayPercent(named['idle_pay_percent']);
+  if (idlePay.error) return { success: false, output: idlePay.error };
+
   const config = clampSandboxConfig(requested);
   const level = { ...sandboxLevelDef(config), ...(oreGrade.scale !== undefined ? { oreGradeScale: oreGrade.scale } : {}) };
   // Absent: the kit's free site. true: the global staffed roster, no buildings. false: bare.
@@ -123,6 +127,7 @@ export function sandboxCommand(
 
   ctx.state = createGame({
     seed: config.seed,
+    ...(idlePay.percent !== undefined ? { idlePayPercent: idlePay.percent } : {}),
     mineType: config.biome,
     startingCash: level.startingCash,
     eventFreqMultiplier: level.eventFreqMultiplier,

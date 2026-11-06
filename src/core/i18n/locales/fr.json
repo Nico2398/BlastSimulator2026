@@ -2519,7 +2519,7 @@
   "ui.finances.category.maintenance": "Entretien bâtiments",
   "ui.finances.category.vehicle_maintenance": "Entretien véhicules",
   "ui.finances.operating_cost": "Coût d'exploitation / h",
-  "ui.finances.operating_cost_payroll": "Paie des équipes",
+  "ui.finances.operating_cost_payroll": "Paie des équipes (moyenne récente)",
   "ui.finances.operating_cost_buildings": "Bâtiments",
   "ui.finances.operating_cost_vehicles": "Entretien véhicules",
   "ui.finances.operating_cost_fuel": "Carburant",
@@ -2700,7 +2700,7 @@
   "ui.crew.pay_union_discount": "- syndicat {pct} % {amount} $/h",
   "ui.crew.strike_pressure": "Pression de grève {pct} %",
   "ui.crew.strike_pressure_tip": "Refuser les revendications du syndicat augmente la pression de grève ; y céder la réduit.",
-  "ui.crew.pay_total": "{amount} $/h",
+  "ui.crew.pay_total": "En activité : {amount} $/h",
   "ui.crew.give_raise": "Augmenter",
   "ui.crew.raise_amount": "+{amount} $/h",
   "ui.crew.raise_note": "Une augmentation est permanente et remonte le moral immédiatement.",
@@ -4172,7 +4172,7 @@
   "siteExpansion.claim_refused": "Impossible de {what} au bloc ({cx}, {cz}) : {reason}.",
   "employees.hire_usage": "Utilisation : employee hire role:({roles})",
   "employees.hire_success": "{name} embauché ({role}). Coût : {cost} $",
-  "ui.crew.candidate_salary": "{salary} $/h",
+  "ui.crew.candidate_salary": "En activité : {salary} $/h",
   "ui.crew.candidate_union_tradeoff": "Syndicat : salaire {pct} % plus bas, licenciement impossible, mais revendications et grèves",
   "ui.crew.union_tradeoff_detail": "Membre du syndicat : payé {pct} % de moins, licenciement impossible. Les événements syndicaux et les grèves exigent des membres.",
   "ui.crew.candidate_union": "Syndiqué",
@@ -4606,5 +4606,7 @@
   "mining.ramp_flow.set_both": "Rampe n°{id} : circulation à double sens.",
   "mining.ramp_flow.set_down": "Rampe n°{id} : sens unique, les véhicules ne font que la descendre.",
   "mining.ramp_flow.set_up": "Rampe n°{id} : sens unique, les véhicules ne font que la monter.",
-  "mining.ramp_flow.usage": "Usage : ramp_flow id:<id-rampe> flow:{options}"
+  "mining.ramp_flow.usage": "Usage : ramp_flow id:<id-rampe> flow:{options}",
+  "ui.crew.pay_idle": "Inactif / au repos : {amount} $/h ({percent} %). Paiement toutes les {hours} heures.",
+  "console.invalid_idle_pay_percent": "idle_pay_percent doit être un nombre entre 0 et 100."
 }

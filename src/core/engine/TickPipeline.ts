@@ -30,7 +30,7 @@ import { getRock } from '../world/RockCatalog.js';
 import { buildTickEventContext } from './TickEventContext.js';
 import { tickInjuryRecovery } from './InjuryRecovery.js';
 import { releaseInjuredEmployeesQueues, releaseDeadHoldersActions } from './TaskCancellation.js';
-import { processPayCycle, computeAverageMorale, livingNames } from '../entities/Employee.js';
+import { preparePayrollTick, processPayCycle, computeAverageMorale, livingNames } from '../entities/Employee.js';
 import { tickTraining } from '../entities/EmployeeTraining.js';
 import { tickResearch, getTotalOperatingCost, syncBuildingServiceFlags, getStorageCapacity } from '../entities/Building.js';
 import { getVehicleMaintenanceCostPerTick, getVehicleFuelCostPerTick } from '../entities/Vehicle.js';
@@ -202,6 +202,14 @@ export function runTick(
   let fired = tickEventSystem(state.events, evCtx, rng);
   if (fired) drawPendingLeavers(state.events, state.employees.employees, rng);
 
+  // 2. Protect payday funds before purchases/charge retries can spend them.
+  // Activity is known only at tick end: hold accrued wages plus at most one full
+  // work hour, then release the unused part and book only the exact payroll.
+  const payrollTick = preparePayrollTick(state.employees,
+    role => salaryFactor(state.events.activeModifiers, role));
+  state.cash -= payrollTick.reserved;
+  state.finances.cash -= payrollTick.reserved;
+
   // 2b. Building and vehicle maintenance — unconditional per-tick upkeep.
   const upkeepFactor = factorFor(state.events.activeModifiers, 'upkeep_surcharge', state.tickCount);
   const buildingUpkeep = getTotalOperatingCost(state.buildings) * upkeepFactor;
@@ -295,7 +303,7 @@ export function runTick(
   // 8c. Training courses — advance and report completions. Without this the
   //     course never ends: the fee is charged and the qualification never
   //     arrives, which made every skill no role is hired with unobtainable.
-  const paidThisTick = new Set(state.employees.employees
+  const workedThisTick = new Set(state.employees.employees
     .filter(emp => emp.alive && emp.trainingState != null &&
       state.buildings.buildings.some(b => b.id === emp.trainingState!.buildingId))
     .map(emp => emp.id));
@@ -364,7 +372,7 @@ export function runTick(
     if (!emp.alive) continue;
     // Timed work includes fractional progress under slowdown modifiers.
     if (emp.taskTicksRemaining != null && emp.restTicksRemaining == null &&
-      workRate(state.events.activeModifiers, emp.role, state.tickCount) > 0) paidThisTick.add(emp.id);
+      workRate(state.events.activeModifiers, emp.role, state.tickCount) > 0) workedThisTick.add(emp.id);
     const progress = tickTaskProgress(state, emp, emitter, grid ?? undefined);
     if (!progress) continue;
     const completionReport = applyTaskCompletion(state, grid, emp, progress, emitter);
@@ -382,15 +390,8 @@ export function runTick(
   // can tell "moved this tick" from "already here" without re-deriving it
   // from vehicle.state.
   const vehiclePositionsAtTickStart = new Map(state.vehicles.vehicles.map(v => [v.id, { x: v.x, z: v.z }]));
-  const employeePositionsBeforeMove = new Map(state.employees.employees.map(emp => [emp.id, { x: emp.x, z: emp.z }]));
   const movementResult = tickLocomotion(state, emitter);
-  const arrivedThisTick = new Set(movementResult.arrived);
-  for (const emp of state.employees.employees) {
-    const before = employeePositionsBeforeMove.get(emp.id);
-    if (emp.alive && before && (emp.x !== before.x || emp.z !== before.z || arrivedThisTick.has(emp.id))) {
-      paidThisTick.add(emp.id);
-    }
-  }
+  for (const id of movementResult.activeEmployeeIds) workedThisTick.add(id);
   // A training walk-in whose `enter_building` arrival step genuinely failed
   // this tick (#1203 — the school was demolished mid-walk, or was full the
   // instant the employee tried to enter) is refunded and reported the same
@@ -429,8 +430,9 @@ export function runTick(
   // (#1091): ArrivalEffects.ts's own haul_unload/boulder_split effects call
   // completeVehicleGatedAction the instant they succeed, inside this call.
   const arrivalResult = tickArrivalGate(state, grid ?? undefined);
-  const paySalary = processPayCycle(state.employees,
-    role => salaryFactor(state.events.activeModifiers, role), paidThisTick);
+  const paySalary = processPayCycle(state.employees, undefined, workedThisTick, payrollTick);
+  state.cash += payrollTick.reserved;
+  state.finances.cash += payrollTick.reserved;
   deductExpense(state, paySalary, 'salaries', 'Payroll');
 
   // 8i. Anyone still inside a building that was removed this tick (blast

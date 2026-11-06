@@ -591,7 +591,8 @@ describe('TopBar (redesign P1)', () => {
     it('trend is operating net: income minus payroll per hour', () => {
       const state = makeState();
       hireEmployee(state.employees, 'manager', new Random(3));
-      const salaryPerHour = state.employees.employees[0]!.salary / PAY_CYCLE_TICKS;
+      // Without an earnings history, a newly hired idle worker is estimated at 25% pay.
+      const salaryPerHour = state.employees.employees[0]!.salary / PAY_CYCLE_TICKS * 0.25;
       const { container, topBar } = mount(state);
       const trend = `-$${Math.round(salaryPerHour).toLocaleString('en-US')}/h`;
       expect(container.textContent).toContain(trend);
@@ -601,7 +602,7 @@ describe('TopBar (redesign P1)', () => {
     it('tooltip shows the operating cost per hour', () => {
       const state = makeState();
       hireEmployee(state.employees, 'manager', new Random(3));
-      const salaryPerHour = Math.round(state.employees.employees[0]!.salary / PAY_CYCLE_TICKS);
+      const salaryPerHour = Math.round(state.employees.employees[0]!.salary / PAY_CYCLE_TICKS * 0.25);
       const { container, topBar } = mount(state);
       const titles = Array.from(container.querySelectorAll('[title]')).map(e => e.getAttribute('title') ?? '');
       expect(titles).toContain(t('ui.finances.operating_cost_tip', { cost: formatDollars(salaryPerHour) }));

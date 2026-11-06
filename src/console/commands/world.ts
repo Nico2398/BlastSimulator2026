@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Console commands for world creation and inspection
 
 import type { CommandResult } from '../ConsoleRunner.js';
+import { parseIdlePayPercent } from './commandUtils.js';
 import { refreshOrderReachability } from '../../core/engine/OrderReachability.js';
 import { backfillGhostBuildings } from '../../core/engine/TaskDispatch.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
@@ -615,8 +616,12 @@ export function newGameCommand(
     return { success: false, output: flags.error };
   }
 
+  const idlePay = parseIdlePayPercent(named['idle_pay_percent']);
+  if (idlePay.error) return { success: false, output: idlePay.error };
+
   ctx.state = createGame({
     seed, mineType,
+    ...(idlePay.percent !== undefined ? { idlePayPercent: idlePay.percent } : {}),
     ...(startingCash !== undefined ? { startingCash } : {}),
     ...(flags.staffed ? { staffed: true } : {}),
   });

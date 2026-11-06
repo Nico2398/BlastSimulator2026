@@ -1,7 +1,8 @@
 /** Inspector content for employee selections (#1756, #1762). */
+import { salaryFactor } from '../../../core/events/ActiveModifiers.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { computeEmployeeActivity } from '../../../core/entities/EmployeeActivity.js';
-import { managementLevelOf, type Employee } from '../../../core/entities/Employee.js';
+import { getIdlePayPercent, managementLevelOf, type Employee } from '../../../core/entities/Employee.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { el } from '../../dom.js';
 import {
@@ -21,7 +22,7 @@ function sectionBuilders(e: Employee, state: GameState, links: InspectorLinks): 
     ['bs-emp-rest', () => makeRestSection(e, state, link)],
     ['bs-emp-needs', () => makeNeedsSection(e)],
     ['bs-emp-skills', () => makeSkillsSection(e)],
-    ['bs-emp-pay', () => makePaySection(e, amount => links.run(raiseCommand(e, amount)))],
+    ['bs-emp-pay', () => makePaySection(e, amount => links.run(raiseCommand(e, amount)), getIdlePayPercent(state.employees), salaryFactor(state.events.activeModifiers, e.role))],
     ['bs-emp-training', () => makeTrainingSection(e, state, (skill, buildingId) => links.run(trainCommand(e, skill, buildingId)), link)],
     ['bs-emp-manager', () => makeManagerEffect(e)],
     ['bs-emp-dismiss', () => makeDismissSection(e, () => links.confirm(dismissConfirmConfig(e, links.run)))],

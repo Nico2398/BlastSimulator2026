@@ -9,6 +9,16 @@ import { resolveContractPriceMultiplier } from '../../core/campaign/Level.js';
 
 export { resolveContractPriceMultiplier };
 
+/** Optional per-game idle salary percentage shared by new_game and sandbox start. */
+export function parseIdlePayPercent(raw: string | undefined): { percent?: number; error?: string } {
+  if (raw === undefined) return {};
+  const percent = Number(raw);
+  if (raw.trim() === '' || !Number.isFinite(percent) || percent < 0 || percent > 100) {
+    return { error: t('console.invalid_idle_pay_percent') };
+  }
+  return { percent };
+}
+
 /** Re-evaluates on every call so a runtime language switch (Settings) is reflected. */
 export function noEmployeesMessage(): string {
   return t('console.no_employees');

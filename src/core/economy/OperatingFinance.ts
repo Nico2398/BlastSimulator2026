@@ -1,5 +1,5 @@
 import type { EmployeeState } from '../entities/Employee.js';
-import { getLivingEmployees, isEmployeeEarningPay } from '../entities/Employee.js';
+import { getLivingEmployees, getIdlePayPercent } from '../entities/Employee.js';
 import type { BuildingState } from '../entities/Building.js';
 import { getTotalOperatingCost } from '../entities/Building.js';
 import type { VehicleState } from '../entities/Vehicle.js';
@@ -45,11 +45,14 @@ export function getOperatingCostPerHour(s: {
 }): OperatingCostBreakdown {
   const modifiers = s.events?.activeModifiers ?? [];
   const upkeep = factorFor(modifiers, 'upkeep_surcharge', s.tickCount ?? 0);
-  let salaries = 0;
-  for (const e of getLivingEmployees(s.employees.employees)) {
-    if (e.paidLastTick ?? isEmployeeEarningPay(e)) salaries += e.salary * salaryFactor(modifiers, e.role);
-  }
-  const payroll = salaries / PAY_CYCLE_TICKS;
+  // Average earned wages, including unpaid accruals, over the same trailing
+  // window as income. Before any ticks are observed, estimate the idle rate.
+  const history = s.employees.payrollHistory;
+  const payroll = history?.length
+    ? history.reduce((sum, earned) => sum + earned, 0) / history.length
+    : getLivingEmployees(s.employees.employees).reduce((sum, emp) =>
+      sum + emp.salary * salaryFactor(modifiers, emp.role), 0)
+      / PAY_CYCLE_TICKS * getIdlePayPercent(s.employees) / 100;
   const buildings = getTotalOperatingCost(s.buildings) * upkeep;
   const vehicleMaintenance = getVehicleMaintenanceCostPerTick(s.vehicles) * upkeep;
   const fuel = getVehicleFuelCostPerTick(s.vehicles) * upkeep;

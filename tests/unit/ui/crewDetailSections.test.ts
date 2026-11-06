@@ -352,7 +352,7 @@ describe('makePaySection raises line (#1383)', () => {
     const base = num(/^Base \$([\d.]+)\/h$/);
     const skills = num(/^\+ skills \$([\d.]+)\/h$/);
     const raises = num(/^\+ raises \$([\d.]+)\/h$/);
-    const total = num(/^\$([\d.]+)\/h$/);
+    const total = num(/^Active: \$([\d.]+)\/h$/);
     expect(skills).toBeGreaterThan(0);
     expect(raises).toBeGreaterThan(0);
     // each figure is rounded to 0.1, so allow 3 roundings of slack
@@ -667,7 +667,7 @@ describe('makePaySection union discount row (#1890)', () => {
     const skills = num(spans, /^\+ skills \$([\d.]+)\/h$/);
     const raises = num(spans, /^\+ raises \$([\d.]+)\/h$/);
     const discount = num(spans, /^- union \d+% \$([\d.]+)\/h$/);
-    const total = num(spans, /^\$([\d.]+)\/h$/);
+    const total = num(spans, /^Active: \$([\d.]+)\/h$/);
     expect(discount).toBeGreaterThan(0);
     expect(Math.abs(base + skills + raises - discount - total)).toBeLessThanOrEqual(0.2 + 1e-9);
   });
@@ -711,5 +711,18 @@ describe('strike pressure in the crew detail (#1890)', () => {
     const text = detailText(makeEmployee({ unionized: false }), 40);
     expect(text).not.toContain(t('ui.crew.strike_pressure', { pct: 67 }));
     expect(text).not.toMatch(/strike pressure/i);
+  });
+});
+
+describe('active and idle pay display', () => {
+  it('shows the active rate, default idle rate and ten-hour payday', () => {
+    const section = makePaySection(makeEmployee({ salary: 1000 }), () => {});
+    expect(section.textContent).toContain(t('ui.crew.pay_total', { amount: 100 }));
+    expect(section.textContent).toContain(t('ui.crew.pay_idle', { amount: 25, percent: 25, hours: 10 }));
+  });
+  it('uses the saved percentage and salary event multiplier for both rates', () => {
+    const section = makePaySection(makeEmployee({ salary: 1000 }), () => {}, 50, 1.2);
+    expect(section.textContent).toContain(t('ui.crew.pay_total', { amount: 120 }));
+    expect(section.textContent).toContain(t('ui.crew.pay_idle', { amount: 60, percent: 50, hours: 10 }));
   });
 });

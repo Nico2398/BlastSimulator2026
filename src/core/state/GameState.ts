@@ -166,6 +166,8 @@ export interface GameConfig {
   seed: number;
   mineType?: string;
   startingCash?: number;
+  /** Percentage of full hourly wages paid during idle time; defaults to IDLE_PAY_PERCENT. */
+  idlePayPercent?: number;
   eventFreqMultiplier?: number;
   /**
    * Per-tick pull toward the neutral (50) midpoint for all four scores
@@ -651,7 +653,7 @@ export function createGame(config: GameConfig): GameState {
     collectedOre: {},
     buildings: createBuildingState(),
     vehicles: createVehicleState(),
-    employees: createEmployeeState(),
+    employees: createEmployeeState(config.idlePayPercent),
     scores: createScoreState(config.scoreDecayRate),
     damage: createDamageState(),
     zone: createZoneState(),

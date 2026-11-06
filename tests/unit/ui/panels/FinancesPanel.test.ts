@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { FinancesPanel } from '../../../../src/ui/panels/FinancesPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
-import { hireEmployee, PAY_CYCLE_TICKS } from '../../../../src/core/entities/Employee.js';
+import { hireEmployee, processPayCycle, PAY_CYCLE_TICKS } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
 import { TICKS_PER_DAY } from '../../../../src/core/config/balance.js';
 import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
@@ -75,6 +75,7 @@ describe('FinancesPanel', () => {
     state.cash = 2400;
     hireEmployee(state.employees, 'manager', new Random(1));
     const perHour = state.employees.employees[0]!.salary / PAY_CYCLE_TICKS;
+    processPayCycle(state.employees, () => 1, new Set([state.employees.employees[0]!.id]));
     // a huge one-off purchase must not move the runway
     state.finances.transactions.push({ tick: 99, type: 'expense', amount: 35000, category: 'equipment', description: 'rig' });
     panel.show();
@@ -89,6 +90,7 @@ describe('FinancesPanel', () => {
     state.cash = 2400;
     hireEmployee(state.employees, 'manager', new Random(1));
     const perHour = state.employees.employees[0]!.salary / PAY_CYCLE_TICKS;
+    processPayCycle(state.employees, () => 1, new Set([state.employees.employees[0]!.id]));
     const days = (2400 / perHour / TICKS_PER_DAY).toFixed(1);
     setLocale('fr');
     try {
@@ -105,6 +107,7 @@ describe('FinancesPanel', () => {
     const state = makeState();
     hireEmployee(state.employees, 'manager', new Random(1));
     const perHour = Math.round(state.employees.employees[0]!.salary / PAY_CYCLE_TICKS);
+    processPayCycle(state.employees, () => 1, new Set([state.employees.employees[0]!.id]));
     panel.show();
     panel.update(state);
     const text = panel.root.textContent ?? '';

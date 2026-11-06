@@ -1547,8 +1547,14 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
     const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
     let relocatedAtTick: number | null = null;
     for (let i = 0; i < TICK_BOUND; i++) {
-      everAbandoned.push(...tickLocomotion(state).abandoned);
-      if (relocatedAtTick === null && !(blocker.x === 4 && blocker.z === 2)) relocatedAtTick = i;
+      const result = tickLocomotion(state);
+      everAbandoned.push(...result.abandoned);
+      if (relocatedAtTick === null && !(blocker.x === 4 && blocker.z === 2)) {
+        relocatedAtTick = i;
+        expect(result.moved).toContain(blocker.id);
+        expect(result.activeEmployeeIds.has(blocker.id)).toBe(false);
+      }
+      if (result.arrived.includes(mover.id)) expect(result.activeEmployeeIds.has(mover.id)).toBe(true);
     }
 
     expect(relocatedAtTick, 'blocker never moved off (4,2)').not.toBeNull();

@@ -57,15 +57,53 @@ function runOneTick(state: GameState, emitter: EventEmitter, checkInvariants = f
 }
 
 describe('activity-based wages', () => {
+  it('reserves payday wages before retrying a cash-short charge and releases the excess', () => {
+    const state = createGame({ seed: SEED, startingCash: 100 });
+    clearEvents();
+    const emp = hireEmployee(state.employees, 'driller', new Random(SEED)).employee;
+    emp.salary = 100;
+    emp.activeActionId = 999; // blocked: earns 25% of one hour
+    state.employees.ticksSincePayday = 9;
+    state.employees.accruedPayroll = 75;
+    state.drillHoles = [{ id: 'H1', x: 10, z: 10, depth: 8, diameter: 0.089 }];
+    state.patternCharge = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    state.chargeAwaitingFunds = ['H1'];
+
+    runOneTick(state, new EventEmitter());
+
+    expect(state.chargeAwaitingFunds).toEqual(['H1']);
+    expect(state.pendingActions.some(a => a.type === 'charge_hole')).toBe(false);
+    expect(state.cash).toBeCloseTo(22.5); // $75 earned earlier + $2.50 idle this hour
+    expect(state.finances.cash).toBeCloseTo(state.cash);
+    const payroll = state.finances.transactions.filter(t => t.description === 'Payroll');
+    expect(payroll).toHaveLength(1);
+    expect(payroll[0]!.amount).toBeCloseTo(77.5);
+    expect(state.employees.accruedPayroll).toBe(0);
+  });
+
+  it('deducts no wages before tick ten and pays idle time on payday', () => {
+    clearEvents();
+    const state = createGame({ seed: SEED, startingCash: 1000, idlePayPercent: 40 });
+    const emp = hireEmployee(state.employees, 'driller', new Random(SEED)).employee;
+    emp.activeActionId = 999;
+    const salary = emp.salary;
+    for (let i = 0; i < 9; i++) {
+      runOneTick(state, new EventEmitter());
+      expect(state.cash).toBe(1000);
+    }
+    runOneTick(state, new EventEmitter());
+    expect(state.cash).toBeCloseTo(1000 - salary * 0.4);
+  });
+
   beforeEach(() => clearEvents());
 
-  it('does not pay a held action that has no work or movement this tick', () => {
+  it('pays the idle rate for a held action that has no work or movement this tick', () => {
     const state = createGame({ seed: SEED });
     const emp = hireEmployee(state.employees, 'driller', new Random(SEED)).employee;
     emp.activeActionId = 123;
     runOneTick(state, new EventEmitter());
-    expect(state.employees.accruedPayroll).toBe(0);
-    expect(emp.paidLastTick).toBe(false);
+    expect(state.employees.accruedPayroll).toBeCloseTo(emp.salary / PAY_CYCLE_TICKS * 0.25);
+    expect(emp.workedLastTick).toBe(false);
   });
 
   it('pays the last work tick even when completion clears the active fields', () => {
@@ -78,11 +116,11 @@ describe('activity-based wages', () => {
     const salary = emp.salary;
     runOneTick(state, new EventEmitter());
     expect(emp.taskTicksRemaining).toBeNull();
-    expect(emp.paidLastTick).toBe(true);
+    expect(emp.workedLastTick).toBe(true);
     expect(state.employees.accruedPayroll).toBeCloseTo(salary / PAY_CYCLE_TICKS);
   });
 
-  it('does not pay for work suspended by a stoppage', () => {
+  it('pays the idle rate for work suspended by a stoppage', () => {
     const state = createGame({ seed: SEED });
     const emp = hireEmployee(state.employees, 'driller', new Random(SEED)).employee;
     emp.activeActionId = 123;
@@ -91,18 +129,18 @@ describe('activity-based wages', () => {
       sourceEventId: 'test', targetId: null, category: null, magnitude: 1, startTick: 0, endTick: 100 });
     runOneTick(state, new EventEmitter());
     expect(emp.taskTicksRemaining).toBe(5);
-    expect(emp.paidLastTick).toBe(false);
-    expect(state.employees.accruedPayroll).toBe(0);
+    expect(emp.workedLastTick).toBe(false);
+    expect(state.employees.accruedPayroll).toBeCloseTo(emp.salary / PAY_CYCLE_TICKS * 0.25);
   });
 
-  it('does not pay for a training course cancelled because its school is gone', () => {
+  it('pays the idle rate for a training course cancelled because its school is gone', () => {
     const state = createGame({ seed: SEED });
     const emp = hireEmployee(state.employees, 'driller', new Random(SEED)).employee;
     emp.trainingState = { buildingId: 999, skill: 'blasting', ticksRemaining: 5, fee: 10 };
     runOneTick(state, new EventEmitter());
     expect(emp.trainingState).toBeNull();
-    expect(emp.paidLastTick).toBe(false);
-    expect(state.employees.accruedPayroll).toBe(0);
+    expect(emp.workedLastTick).toBe(false);
+    expect(state.employees.accruedPayroll).toBeCloseTo(emp.salary / PAY_CYCLE_TICKS * 0.25);
   });
 });
 
@@ -175,7 +213,7 @@ describe('runTick — step ordering (dev-architecture: no behaviour change from 
     expect(employee.destinationX).toBeNull();
     expect(employee.destinationZ).toBeNull();
     expect(employee.taskTicksRemaining).not.toBeNull();
-    expect(employee.paidLastTick).toBe(true);
+    expect(employee.workedLastTick).toBe(true);
     expect(state.employees.accruedPayroll).toBeCloseTo(employee.salary / PAY_CYCLE_TICKS);
   });
 

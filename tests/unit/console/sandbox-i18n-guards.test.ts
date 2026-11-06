@@ -207,3 +207,18 @@ describe('sandboxCommand — start-success message', () => {
     });
   });
 });
+
+describe('sandbox idle_pay_percent', () => {
+  it('passes the requested idle rate into saved employee state', () => {
+    const ctx = freshCtx();
+    const result = sandboxCommand(ctx, ['start'], { seed: '42', staffed: 'false', idle_pay_percent: '40' });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.employees.idlePayPercent).toBe(40);
+  });
+  it('rejects invalid percentages before replacing the game', () => {
+    const ctx = freshCtx();
+    const result = sandboxCommand(ctx, ['start'], { seed: '42', idle_pay_percent: '101' });
+    expect(result.success).toBe(false);
+    expect(ctx.state).toBeNull();
+  });
+});

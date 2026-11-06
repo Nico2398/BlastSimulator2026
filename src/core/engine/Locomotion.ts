@@ -89,6 +89,8 @@ function writeMoveHistory(emp: Employee, moveHistoryX: number | null, moveHistor
 
 /** Per-tick report, mirrors the old EmployeeMovementResult shape TickPipeline/console already consume. */
 interface LocomotionResult {
+  /** Employees who travelled or completed an arrival step, excluding system relocations. */
+  activeEmployeeIds: Set<number>;
   moved: number[];
   arrived: number[];
   stuck: number[];
@@ -135,7 +137,7 @@ interface LocomotionResult {
  * read-only mirror — MoveTo.ts's syncItineraryMirrors) does not move.
  */
 export function tickLocomotion(state: GameState, emitter?: EventEmitter): LocomotionResult {
-  const result: LocomotionResult = { moved: [], arrived: [], stuck: [], abandoned: [], vehiclesMoved: [], trainingCancelled: [] };
+  const result: LocomotionResult = { activeEmployeeIds: new Set(), moved: [], arrived: [], stuck: [], abandoned: [], vehiclesMoved: [], trainingCancelled: [] };
 
   // #1206: built lazily, the first tick locomotion runs — never rebuilt
   // again after that (see AgentOccupancy.ts's own header comment on the cost
@@ -296,6 +298,7 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
 
     delete emp.blockEpisode;
     const ok = applyArrivalStep(state, emp, leg, itinerary, emitter);
+    if (ok) result.activeEmployeeIds.add(emp.id);
 
     // A board arrival step's post-board handling (evacuation redrive,
     // fragment-work handoff) may itself have installed a brand-new
@@ -529,6 +532,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     // whether the isStuck-abandon branch below also fires (an oscillating
     // tick can be both "moved" and "abandoned" at once; they're independent).
     result.moved.push(emp.id);
+    result.activeEmployeeIds.add(emp.id);
     if (isDrive) {
       result.moved.push(vehicle!.id);
       result.vehiclesMoved.push(vehicle!.id);
@@ -798,6 +802,7 @@ function applyReroutedAdvance(
   if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z, isLegArrived(outcome.x, outcome.z, leg));
   recordWalk(emp, vehicle, fromX, fromZ, outcome.trail);
   result.moved.push(emp.id);
+  if (emp.x !== fromX || emp.z !== fromZ) result.activeEmployeeIds.add(emp.id);
   if (isDrive) {
     result.moved.push(vehicle!.id);
     result.vehiclesMoved.push(vehicle!.id);

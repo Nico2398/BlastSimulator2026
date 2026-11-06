@@ -18,13 +18,17 @@ const TEST_SAVE_DIR = path.join(process.cwd(), 'tmp-test-saves');
 
 describe('earned payroll persistence', () => {
   it('keeps wages accrued before a save', () => {
-    const state = createGame({ seed: 42, startingCash: 100_000 });
+    const state = createGame({ seed: 42, startingCash: 100_000, idlePayPercent: 40 });
     const emp = hireEmployee(state.employees, 'driller', new Random(42)).employee;
     emp.activeActionId = 1;
-    processPayCycle(state.employees);
+    processPayCycle(state.employees, () => 1, new Set([emp.id]));
     const restored = deserialize(serialize(state));
     expect(restored.employees.accruedPayroll).toBeCloseTo(state.employees.accruedPayroll!);
     expect(restored.employees.ticksSincePayday).toBe(state.employees.ticksSincePayday);
+    expect(restored.employees.idlePayPercent).toBe(40);
+    expect(restored.employees.payrollHistory).toEqual(state.employees.payrollHistory);
+    for (let i = 0; i < 8; i++) processPayCycle(restored.employees);
+    expect(processPayCycle(restored.employees)).toBeCloseTo(emp.salary / 10 * (1 + 9 * 0.4));
   });
 });
 

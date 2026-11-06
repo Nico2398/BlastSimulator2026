@@ -12,7 +12,7 @@ import {
   fireEmployee,
   applyDismissalMoraleDent,
   killEmployee,
-  processPayCycle,
+  processPayCycle, preparePayrollTick, getIdlePayPercent,
   getEffectiveness,
   injureEmployee,
   healEmployee,
@@ -38,7 +38,7 @@ import {
   type SkillCategory,
 } from '../../../src/core/entities/Employee.js';
 import {
-  XP_THRESHOLDS,
+  IDLE_PAY_PERCENT, OPERATING_INCOME_WINDOW_TICKS, XP_THRESHOLDS,
   ROLE_STARTING_QUALIFICATIONS,
   ROLE_BLASTER_START_LEVEL,
   QUALIFICATION_SALARY_BONUS,
@@ -76,79 +76,111 @@ describe('Employee system', () => {
     expect(hiringCost).toBe(HIRING_COSTS['driller']);
   });
 
-  it('accrues salary for work and pays it at the end of the pay cycle', () => {
+  it('pays only on each tenth tick, weighting active and idle time', () => {
     const state = createEmployeeState();
-    const rng = new Random(42);
-    hireEmployee(state, 'driller', rng);
-    const salary = state.employees[0]!.salary;
-    state.employees[0]!.activeActionId = 1;
-
-    // Not yet a full cycle
-    for (let i = 0; i < PAY_CYCLE_TICKS - 1; i++) {
-      expect(processPayCycle(state)).toBe(0);
+    const emp = hireEmployee(state, 'driller', new Random(42)).employee;
+    const active = new Set([emp.id]);
+    for (let i = 1; i <= 20; i++) {
+      const paid = processPayCycle(state, () => 1, i <= 15 ? active : new Set());
+      if (i === 10) expect(paid).toBeCloseTo(emp.salary);
+      else if (i === 20) expect(paid).toBeCloseTo(emp.salary * 0.625);
+      else expect(paid).toBe(0);
     }
-
-    // Full cycle — pay salaries
-    const paid = processPayCycle(state);
-    expect(paid).toBeCloseTo(salary);
   });
 
-  it('pays only active ticks and keeps accrued pay if a worker leaves', () => {
+  it.each([0, 25, 100])('supports an idle pay percentage of %s', percent => {
+    const state = createEmployeeState(percent);
+    const emp = hireEmployee(state, 'driller', new Random(42)).employee;
+    for (let i = 1; i < PAY_CYCLE_TICKS; i++) expect(processPayCycle(state)).toBe(0);
+    expect(processPayCycle(state)).toBeCloseTo(emp.salary * percent / 100);
+  });
+
+  it('retains active and idle wages earned by an employee who leaves', () => {
     const state = createEmployeeState();
     const emp = hireEmployee(state, 'driller', new Random(42)).employee;
-    const salary = emp.salary;
-    const activeTicks = Math.floor(PAY_CYCLE_TICKS / 2);
-    emp.activeActionId = 1;
-    for (let i = 0; i < activeTicks; i++) processPayCycle(state);
-    emp.activeActionId = null;
-    for (let i = activeTicks; i < PAY_CYCLE_TICKS - 1; i++) processPayCycle(state);
-    emp.alive = false;
-    expect(processPayCycle(state)).toBeCloseTo(salary * activeTicks / PAY_CYCLE_TICKS);
+    for (let i = 0; i < 4; i++) processPayCycle(state, () => 1, new Set([emp.id]));
+    for (let i = 0; i < 4; i++) processPayCycle(state);
+    emp.unionized = false;
+    expect(fireEmployee(state, emp.id).success).toBe(true);
+    expect(processPayCycle(state)).toBe(0);
+    expect(processPayCycle(state)).toBeCloseTo(emp.salary * 0.5);
   });
 
-  it('pays nothing for a full idle cycle', () => {
-    const state = createEmployeeState();
-    hireEmployee(state, 'driller', new Random(42));
-    for (let i = 0; i < PAY_CYCLE_TICKS; i++) expect(processPayCycle(state)).toBe(0);
-  });
-
-  it('uses observed activity rather than a claimed but blocked action', () => {
+  it('pays the idle rate for an assignment without observed work', () => {
     const state = createEmployeeState();
     const emp = hireEmployee(state, 'driller', new Random(42)).employee;
     emp.activeActionId = 1;
-    processPayCycle(state, () => 1, new Set());
-    expect(state.accruedPayroll).toBe(0);
-    expect(emp.paidLastTick).toBe(false);
+    processPayCycle(state);
+    expect(state.accruedPayroll).toBeCloseTo(emp.salary / PAY_CYCLE_TICKS * 0.25);
+    expect(emp.workedLastTick).toBe(false);
     processPayCycle(state, () => 1, new Set([emp.id]));
-    expect(state.accruedPayroll).toBeCloseTo(emp.salary / PAY_CYCLE_TICKS);
-    expect(emp.paidLastTick).toBe(true);
+    expect(state.accruedPayroll).toBeCloseTo(emp.salary / PAY_CYCLE_TICKS * 1.25);
+    expect(emp.workedLastTick).toBe(true);
   });
 
-  it('preserves the elapsed payroll liability in a legacy save', () => {
+  it('preserves the elapsed full-pay liability in a legacy save', () => {
     const state = createEmployeeState();
     const emp = hireEmployee(state, 'driller', new Random(42)).employee;
     delete state.accruedPayroll;
+    delete state.idlePayPercent;
     state.ticksSincePayday = PAY_CYCLE_TICKS - 1;
-    expect(processPayCycle(state, () => 2, new Set())).toBeCloseTo(
-      emp.salary * 2 * (PAY_CYCLE_TICKS - 1) / PAY_CYCLE_TICKS);
+    expect(processPayCycle(state, () => 2)).toBeCloseTo(
+      emp.salary * 2 * (PAY_CYCLE_TICKS - 1 + 0.25) / PAY_CYCLE_TICKS);
     expect(state.accruedPayroll).toBe(0);
   });
 
-  it('pays for travel and training but not rest or a stuck journey', () => {
+  it('applies salary and event changes only to the hours they cover', () => {
     const state = createEmployeeState();
     const emp = hireEmployee(state, 'driller', new Random(42)).employee;
-    emp.itinerary = { legs: [], goal: { kind: 'work', actionId: 1 }, workTicks: 1, estTotalTicks: 1 };
-    processPayCycle(state);
-    emp.isMoveStuck = true;
-    processPayCycle(state);
-    emp.isMoveStuck = false;
-    emp.restTicksRemaining = 1;
-    processPayCycle(state);
-    emp.restTicksRemaining = null;
-    emp.itinerary = null;
-    emp.trainingState = { buildingId: 1, skill: 'blasting', ticksRemaining: 1, fee: 0 };
-    processPayCycle(state);
-    expect(state.accruedPayroll).toBeCloseTo(2 * emp.salary / PAY_CYCLE_TICKS);
+    emp.salary = 1000;
+    for (let i = 0; i < 5; i++) processPayCycle(state, () => 1, new Set([emp.id]));
+    emp.salary = 2000;
+    for (let i = 0; i < 4; i++) processPayCycle(state, () => 1.5);
+    expect(processPayCycle(state, () => 1.5)).toBeCloseTo(500 + 375);
+  });
+
+  it('uses each role multiplier and the stored qualification/raise/union salary', () => {
+    const state = createEmployeeState();
+    const driller = hireEmployee(state, 'driller', new Random(42)).employee;
+    const manager = hireEmployee(state, 'manager', new Random(43)).employee;
+    driller.unionized = true;
+    assignSkill(state, driller.id, 'geology', 3);
+    giveRaise(state, driller.id, 100);
+    const factor = (role: string) => role === 'driller' ? 1.5 : 2;
+    for (let i = 0; i < 9; i++) processPayCycle(state, factor, new Set([driller.id]));
+    expect(processPayCycle(state, factor, new Set([driller.id]))).toBeCloseTo(
+      calculateSalary(driller) * 1.5 + manager.salary * 2 * 0.25);
+  });
+
+  it('captures rates before the tick and reserves only on payday', () => {
+    const state = createEmployeeState();
+    const emp = hireEmployee(state, 'driller', new Random(42)).employee;
+    emp.salary = 1000;
+    const tick = preparePayrollTick(state);
+    expect(tick.reserved).toBe(0);
+    emp.salary = 2000;
+    processPayCycle(state, undefined, new Set([emp.id]), tick);
+    expect(state.accruedPayroll).toBe(100);
+    state.ticksSincePayday = 9;
+    expect(preparePayrollTick(state).reserved).toBe(300);
+    expect(state.ticksSincePayday).toBe(9);
+  });
+
+  it('keeps a bounded history of wages, including unpaid accruals', () => {
+    const state = createEmployeeState();
+    const emp = hireEmployee(state, 'driller', new Random(42)).employee;
+    processPayCycle(state, () => 1, new Set([emp.id]));
+    for (let i = 0; i < OPERATING_INCOME_WINDOW_TICKS; i++) processPayCycle(state);
+    expect(state.payrollHistory).toHaveLength(OPERATING_INCOME_WINDOW_TICKS);
+    expect(state.payrollHistory!.every(pay => pay === emp.salary / 10 * 0.25)).toBe(true);
+  });
+
+  it('defaults and bounds idle pay for legacy saves and direct configuration', () => {
+    expect(getIdlePayPercent({})).toBe(IDLE_PAY_PERCENT);
+    expect(getIdlePayPercent({ idlePayPercent: NaN })).toBe(IDLE_PAY_PERCENT);
+    expect(createEmployeeState(-1).idlePayPercent).toBe(0);
+    expect(createEmployeeState(101).idlePayPercent).toBe(100);
+    expect(createEmployeeState(12.5).idlePayPercent).toBe(12.5);
   });
 
   it('giving a raise increases salary and morale', () => {

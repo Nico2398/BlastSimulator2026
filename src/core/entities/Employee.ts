@@ -11,7 +11,7 @@ import type { Locomotion } from './EmployeeLocomotion.js';
 import type { ActionType } from '../state/GameState.js';
 import type { VehicleTier } from './Vehicle.js';
 import type { Itinerary } from '../engine/Itinerary.js';
-import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, CANDIDATE_UNION_CHANCE, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS, INJURY_RECOVERY_TICKS, INJURY_MORALE_PENALTY, DISMISSAL_CREW_MORALE_DENT } from '../config/balance.js';
+import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, IDLE_PAY_PERCENT, OPERATING_INCOME_WINDOW_TICKS, CANDIDATE_UNION_CHANCE, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS, INJURY_RECOVERY_TICKS, INJURY_MORALE_PENALTY, DISMISSAL_CREW_MORALE_DENT } from '../config/balance.js';
 
 // ── Roles ──
 
@@ -120,8 +120,8 @@ export interface Employee {
   name: string;
   role: EmployeeRole;
   salary: number;
-  /** Whether the most recent simulation tick included paid activity; absent before the first tick. */
-  paidLastTick?: boolean;
+  /** Whether the most recent simulation tick included work, travel or training; absent before the first tick. */
+  workedLastTick?: boolean;
   /** Accumulated raises ($) on top of base + qualification bonus. Absent on legacy saves until backfilled. */
   raises?: number;
   morale: number; // 0-100
@@ -324,10 +324,21 @@ export interface EmployeeState {
   ticksSincePayday: number;
   /** Earned wages not yet paid; absent in older saves. */
   accruedPayroll?: number;
+  /** Idle hourly pay as a percentage of normal pay; absent in legacy saves. */
+  idlePayPercent?: number;
+  /** Actual wages earned each tick, oldest first, capped at the operating-income window. */
+  payrollHistory?: number[];
 }
 
-export function createEmployeeState(): EmployeeState {
-  return { employees: [], nextId: 1, ticksSincePayday: 0, accruedPayroll: 0 };
+/** Resolve the saved setting, including legacy saves and invalid programmatic overrides. */
+export function getIdlePayPercent(state: Pick<EmployeeState, 'idlePayPercent'>): number {
+  const percent = state.idlePayPercent ?? IDLE_PAY_PERCENT;
+  return Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : IDLE_PAY_PERCENT;
+}
+
+export function createEmployeeState(idlePayPercent: number = IDLE_PAY_PERCENT): EmployeeState {
+  return { employees: [], nextId: 1, ticksSincePayday: 0, accruedPayroll: 0,
+    idlePayPercent: getIdlePayPercent({ idlePayPercent }), payrollHistory: [] };
 }
 
 // ── Operations ──
@@ -467,41 +478,51 @@ export function applyDismissalMoraleDent(state: EmployeeState, dismissedId: numb
   }
 }
 
-/** Activity intent before the first simulated tick; actual ticks supply observed employee IDs. */
-export function isEmployeeEarningPay(emp: Employee): boolean {
-  if (!emp.alive) return false;
-  if (emp.trainingState != null) return true;
-  if (emp.restTicksRemaining != null) return false;
-  if (emp.isMoveStuck) return false;
-  return emp.activeActionId != null || emp.taskTicksRemaining != null || emp.itinerary != null ||
-    emp.destinationX != null || emp.destinationZ != null || emp.pendingTaskDuration != null ||
-    emp.pendingRestDuration != null || emp.pendingTrainingState != null;
+/** Rates are sampled before work/XP changes them; changes apply from the next tick. */
+interface PayrollTick {
+  hourlyRates: ReadonlyMap<number, number>;
+  idleFactor: number;
+  /** Payday upper bound held before cash-dependent work, released at settlement. */
+  reserved: number;
 }
 
-/** Accrue one tick of earned wages and settle the accumulated amount on payday. */
+/** Capture this tick's roster and salary factors, preserving legacy unpaid wages. */
+export function preparePayrollTick(
+  state: EmployeeState,
+  salaryFactorOf: (role: EmployeeRole) => number = () => 1,
+): PayrollTick {
+  const hourlyRates = new Map(state.employees.filter(emp => emp.alive)
+    .map(emp => [emp.id, emp.salary * salaryFactorOf(emp.role) / PAY_CYCLE_TICKS]));
+  const fullTickPay = [...hourlyRates.values()].reduce((sum, pay) => sum + pay, 0);
+  // Old saves have no activity record: retain their elapsed full-salary liability.
+  state.accruedPayroll ??= fullTickPay * state.ticksSincePayday;
+  return { hourlyRates, idleFactor: getIdlePayPercent(state) / 100,
+    reserved: state.ticksSincePayday >= PAY_CYCLE_TICKS - 1 ? state.accruedPayroll + fullTickPay : 0 };
+}
+
+/** Accrue observed active/idle hours; pay the exact earned total every ten ticks. */
 export function processPayCycle(
   state: EmployeeState,
   salaryFactorOf: (role: EmployeeRole) => number = () => 1,
-  earnedEmployeeIds?: ReadonlySet<number>,
+  workedEmployeeIds: ReadonlySet<number> = new Set(),
+  tick: PayrollTick = preparePayrollTick(state, salaryFactorOf),
 ): number {
-  // A legacy save has no historical activity record. Preserve the wages already
-  // owed under its original full-salary rule instead of erasing part of a cycle.
-  if (state.accruedPayroll === undefined) {
-    state.accruedPayroll = state.employees.reduce((sum, emp) => sum + (emp.alive
-      ? emp.salary * salaryFactorOf(emp.role) * state.ticksSincePayday / PAY_CYCLE_TICKS : 0), 0);
+  let earned = 0;
+  for (const [id, rate] of tick.hourlyRates) {
+    earned += rate * (workedEmployeeIds.has(id) ? 1 : tick.idleFactor);
   }
   for (const emp of state.employees) {
-    const paid = emp.alive && (earnedEmployeeIds?.has(emp.id) ?? isEmployeeEarningPay(emp));
-    emp.paidLastTick = paid;
-    if (paid) {
-      state.accruedPayroll = (state.accruedPayroll ?? 0) + emp.salary * salaryFactorOf(emp.role) / PAY_CYCLE_TICKS;
-    }
+    emp.workedLastTick = tick.hourlyRates.has(emp.id) && workedEmployeeIds.has(emp.id);
   }
+  state.accruedPayroll = (state.accruedPayroll ?? 0) + earned;
+  const history = state.payrollHistory ??= [];
+  history.push(earned);
+  if (history.length > OPERATING_INCOME_WINDOW_TICKS) history.shift();
+
   state.ticksSincePayday++;
   if (state.ticksSincePayday < PAY_CYCLE_TICKS) return 0;
-
   state.ticksSincePayday = 0;
-  const totalSalaries = state.accruedPayroll ?? 0;
+  const totalSalaries = state.accruedPayroll;
   state.accruedPayroll = 0;
   return totalSalaries;
 }

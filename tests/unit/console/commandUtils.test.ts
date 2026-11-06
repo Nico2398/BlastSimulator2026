@@ -1,3 +1,4 @@
+import { parseIdlePayPercent } from '../../../src/console/commands/commandUtils.js';
 import { describe, it, expect, afterEach } from 'vitest';
 import { requireGame, noEmployeesMessage, parseStaffedFlag } from '../../../src/console/commands/commandUtils.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
@@ -112,3 +113,15 @@ describe('parseStaffedFlag', () => {
   });
 });
 
+
+describe('idle_pay_percent', () => {
+  it('leaves omitted values at the game default', () => {
+    expect(parseIdlePayPercent(undefined)).toEqual({});
+  });
+  it.each(['0', '25', '12.5', '100'])('accepts %s', raw => {
+    expect(parseIdlePayPercent(raw)).toEqual({ percent: Number(raw) });
+  });
+  it.each(['', '-1', '101', 'NaN', 'Infinity', '25oops'])('rejects %s', raw => {
+    expect(parseIdlePayPercent(raw).error).toBeTruthy();
+  });
+});

@@ -20,7 +20,10 @@ let idle8x: CrowdSim;
 
 beforeAll(() => {
   idle1x = playIdle(IDLE_S, { speed: 1 });
-  idle8x = playIdle(IDLE_S, { speed: 8, noEvents: true });
+  idle8x = playIdle(0, { speed: 8, noEvents: true });
+  // Keep this bankruptcy/silence fixture on full idle wages; default reduced pay extends the mine's life.
+  idle8x.state!.employees.idlePayPercent = 100;
+  idle8x.seconds(IDLE_S);
 }, RUN_TIMEOUT_MS);
 
 describe('an idle mine at 1x', () => {

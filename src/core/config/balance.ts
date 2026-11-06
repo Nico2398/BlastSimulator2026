@@ -25,6 +25,9 @@ export const STAR_ECOLOGY_MIN = 60;
 /** Ticks between employee pay cycles. 1 tick = 1 game-hour; 10 ticks ≈ 10 game-hours. */
 export const PAY_CYCLE_TICKS = 10;
 
+/** Percent of the adjusted hourly salary earned while idle, resting or blocked (0–100). */
+export const IDLE_PAY_PERCENT = 25;
+
 /** Hiring cost by role ($). Reflects real mining labor markets, scaled ~100×. */
 export const HIRING_COSTS = {
   driller: 1000,

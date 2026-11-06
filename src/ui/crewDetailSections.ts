@@ -14,7 +14,7 @@ import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
 import { availableTrainingOffers, planTraining, trainingRefusal, isSchoolFull, heldCourseLevel } from '../core/entities/EmployeeTraining.js';
 import { perHour } from '../core/economy/formatMoney.js';
-import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS, UNION_MEMBER_SALARY_DISCOUNT_PCT } from '../core/config/balance.js';
+import { IDLE_PAY_PERCENT, PAY_CYCLE_TICKS, NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS, UNION_MEMBER_SALARY_DISCOUNT_PCT } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
 import { iconEl } from './icons.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
@@ -306,7 +306,10 @@ export { perHour };
  * and immediately lifts morale — so unlike training there is no affordability
  * gate here; every preset button is always clickable.
  */
-export function makePaySection(e: Employee, onRaise: (amount: number) => void): HTMLElement {
+export function makePaySection(
+  e: Employee, onRaise: (amount: number) => void,
+  idlePayPercent: number = IDLE_PAY_PERCENT, salaryMultiplier: number = 1,
+): HTMLElement {
   const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' } });
   wrap.appendChild(microLabel(t('ui.crew.pay')));
 
@@ -322,8 +325,14 @@ export function makePaySection(e: Employee, onRaise: (amount: number) => void): 
       text: t('ui.crew.pay_union_discount', { pct: UNION_MEMBER_SALARY_DISCOUNT_PCT, amount: perHour(Math.max(0, base + bonus + (e.raises ?? 0) - e.salary)) }),
       attrs: { style: 'margin-left:8px' },
     })] : []),
-    el('span', { text: t('ui.crew.pay_total', { amount: perHour(e.salary) }), attrs: { style: 'margin-left:auto;color:var(--bsx-text-primary);font-weight:600' } }),
+    el('span', { text: t('ui.crew.pay_total', { amount: perHour(e.salary * salaryMultiplier) }), attrs: { style: 'margin-left:auto;color:var(--bsx-text-primary);font-weight:600' } }),
   );
+
+  wrap.appendChild(el('span', {
+    text: t('ui.crew.pay_idle', {
+      amount: perHour(e.salary * salaryMultiplier * idlePayPercent / 100), percent: idlePayPercent, hours: PAY_CYCLE_TICKS,
+    }), attrs: { class: 'bs-pay-idle', style: 'font-size:10px;color:var(--bsx-text-muted)' },
+  }));
 
   const raiseRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:6px' } });
   raiseRow.appendChild(el('span', { text: t('ui.crew.give_raise'), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }));
