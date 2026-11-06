@@ -21,6 +21,9 @@ import type { EmployeeRole } from '../entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
 import type { BuildingType, BuildingTier } from '../entities/Building.js';
 import type { LevelDef } from './Level.js';
+import type { GameState } from '../state/GameState.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
+import type { SurveyResult } from '../mining/SurveyCalc.js';
 
 /** Level id a sandbox site runs under. Deliberately not in the campaign catalog. */
 export const SANDBOX_LEVEL_ID = 'sandbox';
@@ -282,4 +285,17 @@ function sumStock(slots: readonly StartingBuildingSlot[]): { explosiveId: string
     }
   }
   return [...totals].map(([explosiveId, kg]) => ({ explosiveId, kg }));
+}
+
+/**
+ * Record the free seismic survey a sandbox start leaves over its starter deposit (#2148),
+ * as if a previous owner had surveyed it. Costs nothing and needs no surveyor.
+ * Returns the recorded result, or null when the site has no starter deposit.
+ */
+export function recordSandboxStarterSurvey(
+  _state: GameState,
+  _grid: VoxelGrid,
+  _deposit: { x: number; z: number } | null,
+): SurveyResult | null {
+  throw new Error('not implemented');
 }
