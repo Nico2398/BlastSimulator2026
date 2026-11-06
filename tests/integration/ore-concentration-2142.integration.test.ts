@@ -366,6 +366,7 @@ describe(`menu-default sandbox opening keeps hauling ore (${BIOME}, Digger kit, 
     for (let i = 1; i < oreSamples.length; i++) {
       expect(oreSamples[i]!, `sample ${i}`).toBeGreaterThanOrEqual(oreSamples[i - 1]! - 1);
     }
+    expect(oreSamples.at(-1)!).toBeGreaterThan(oreSamples[oreSamples.length >> 1]!);
   });
 
   it('delivered ore ends far above the old ~0.7 t and the tier-1 warehouse holds ore, not rock', () => {
