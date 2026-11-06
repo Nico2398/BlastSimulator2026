@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ChargeStep } from '../../../../../src/ui/panels/blastSteps/Charge.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
@@ -17,6 +17,8 @@ import { CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, STOCK_BUY_STEP_KG 
 import { dispatchChargeAction } from '../../../../../src/core/mining/ChargeOrder.js';
 import { explosiveHoleLimits } from '../../../../../src/core/mining/ChargePlan.js';
 import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js';
+import { setLocale } from '../../../../../src/core/i18n/I18n.js';
+import { pinnedDryCycle, pinnedCycle, rainAfterCycle } from '../../../../helpers/weatherCycles.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -375,7 +377,7 @@ describe('ChargeStep', () => {
   describe('draining (#1350)', () => {
     const drainAll = (step: ChargeStep) => step.root.querySelector('[data-action="drain-holes"]') as HTMLButtonElement;
 
-    it('Drain button is disabled with a visible localized reason when no hole is wet', () => {
+    it('Drain button is a disabled neutral button, with no warning, when no hole is wet (#2149)', () => {
       const { step, gameConsole } = makeStep();
       const state = makeState();
       addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
@@ -384,7 +386,8 @@ describe('ChargeStep', () => {
 
       expect(drainAll(step)).not.toBeNull();
       expect(drainAll(step).disabled).toBe(true);
-      expect(step.root.textContent).toContain(t('ui.blast_workshop.charge.drain_none_reason'));
+      expect(drainAll(step).parentElement!.querySelectorAll('.bsx-reason')).toHaveLength(0);
+      expect(step.root.textContent).not.toContain(t('ui.blast_workshop.charge.drain_none_reason'));
       drainAll(step).click();
       expect(gameConsole).not.toHaveBeenCalled();
     });
@@ -706,14 +709,15 @@ describe('ChargeStep — draining (#1350)', () => {
   const drainRow = (step: ChargeStep, id: string) =>
     step.root.querySelector(`[data-hole="${id}"] [data-action="drain-hole"]`) as HTMLButtonElement;
 
-  it('disables Drain with a visible reason when no hole is wet', () => {
+  it('disables Drain without any warning element when no hole is wet (#2149)', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state);
 
     expect(drainAll(step).disabled).toBe(true);
-    expect(step.root.textContent).toContain(t('ui.blast_workshop.charge.drain_none_reason'));
+    expect(drainAll(step).parentElement!.querySelectorAll('.bsx-reason')).toHaveLength(0);
+    expect(step.root.textContent).not.toContain(t('ui.blast_workshop.charge.drain_none_reason'));
     drainAll(step).click();
     expect(gameConsole).not.toHaveBeenCalled();
   });
@@ -1328,5 +1332,328 @@ describe('ChargeStep — drain reason while it rains (#1957)', () => {
     state.weather.current = 'sunny';
     step.update(state, 'sunny');
     expect(step.root.querySelector(RAIN_LINE)).toBeNull();
+  });
+});
+
+// ── Warnings only when they matter (#2149) ──────────────────────────────────
+
+describe('ChargeStep — drain and tubing warnings only when they matter (#2149)', () => {
+  const drainAll = (step: ChargeStep) => step.root.querySelector('[data-action="drain-holes"]') as HTMLButtonElement;
+  const sectionHeader = (step: ChargeStep): HTMLElement =>
+    Array.from(step.root.querySelectorAll<HTMLElement>('.bsx-section'))
+      .find(h => h.textContent?.includes(t('ui.blast_workshop.charge.tubing_section')))!;
+  /** The element holding the tubing card: the sibling right after the Tubing section header. */
+  const tubingBlock = (step: ChargeStep): HTMLElement => sectionHeader(step).nextElementSibling as HTMLElement;
+  const tubingReasons = (step: ChargeStep) => tubingBlock(step).querySelectorAll('.bsx-reason');
+  const installBtn = (step: ChargeStep) => step.root.querySelector('[data-action="tubing-install"]') as HTMLButtonElement;
+
+  /** Two untubed dry holes and no tubes in stock: a shortage that only matters when water threatens. */
+  function shortStockState(weather = pinnedDryCycle()) {
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
+    state.tubingState.inventory = 0;
+    state.weather = weather;
+    return state;
+  }
+
+  afterEach(() => setLocale('en'));
+
+  describe('drain section', () => {
+    it('C1: shows no warning element beside the drain button when no hole is wet', () => {
+      const { step } = makeStep();
+      const state = shortStockState();
+      step.update(state, 'sunny');
+
+      expect(drainAll(step)).not.toBeNull();
+      expect(drainAll(step).disabled).toBe(true);
+      expect(drainAll(step).parentElement!.querySelectorAll('.bsx-reason')).toHaveLength(0);
+    });
+
+    it('C1: stays free of warnings while rain is due and the holes are still dry', () => {
+      const { step } = makeStep();
+      const state = shortStockState(pinnedCycle('heavy_rain'));
+      step.update(state, 'heavy_rain');
+
+      expect(drainAll(step).disabled).toBe(true);
+      expect(drainAll(step).parentElement!.querySelectorAll('.bsx-reason')).toHaveLength(0);
+    });
+
+    it('C1: the warning is gone again once the water has been drained away', () => {
+      const { step } = makeStep();
+      const state = shortStockState();
+      state.cash = 1000;
+      const holes = state.drillHoles.map(h => h.id);
+      setHoleWater(state, holes, 0.9, 0.35);
+      step.update(state, 'sunny');
+      expect(drainAll(step).parentElement!.querySelectorAll('.bsx-reason').length).toBeGreaterThan(0);
+
+      for (const id of holes) state.holeWater[id]!.level = 0;
+      step.update(state, 'sunny');
+
+      expect(drainAll(step).parentElement!.querySelectorAll('.bsx-reason')).toHaveLength(0);
+    });
+
+    it('C2: a wet untubed hole in porous rock still shows the porous warning', () => {
+      const { step } = makeStep();
+      const state = shortStockState();
+      state.cash = 1000;
+      setHoleWater(state, [state.drillHoles[0]!.id], 0.9, 0.35);
+      step.update(state, 'sunny');
+
+      const reasons = drainAll(step).parentElement!.querySelectorAll('.bsx-reason');
+      expect(drainAll(step).disabled).toBe(true);
+      expect(reasons).toHaveLength(1);
+      expect(reasons[0]!.textContent).toBe(t('ui.blast_workshop.charge.drain_porous_reason'));
+    });
+
+    it('C2: the porous warning also shows in the rain', () => {
+      const { step } = makeStep();
+      const state = shortStockState(pinnedCycle('storm'));
+      state.cash = 1000;
+      setHoleWater(state, state.drillHoles.map(h => h.id), 0.9, 0.35);
+      step.update(state, 'storm');
+
+      expect(drainAll(step).parentElement!.textContent).toContain(t('ui.blast_workshop.charge.drain_porous_reason'));
+    });
+  });
+
+  describe('tubing card', () => {
+    it('C3: no stock-shortage warning for dry holes, dry ground and no rain due; card and controls stay', () => {
+      const { step } = makeStep();
+      const state = shortStockState();
+      step.update(state, 'sunny');
+
+      expect(installBtn(step)).not.toBeNull();
+      expect(step.root.querySelector('[data-action="tubing-buy"]')).not.toBeNull();
+      expect(tubingReasons(step)).toHaveLength(0);
+      expect(tubingBlock(step).textContent).not.toContain(t('ui.blast_workshop.charge.tubing_reason', { stock: 0, need: 2 }));
+    });
+
+    it('C3: no warning when rain is due only after the 24 tick lookahead', () => {
+      const { step } = makeStep();
+      const state = shortStockState(rainAfterCycle(26, 'desert'));
+      expect(state.mineType).toBe('desert');
+      step.update(state, 'sunny');
+
+      expect(installBtn(step)).not.toBeNull();
+      expect(tubingReasons(step)).toHaveLength(0);
+    });
+
+    it.each(['light_rain', 'heavy_rain', 'storm'] as const)('C3: warns while it is raining now (%s), even over dry holes', weather => {
+      const { step } = makeStep();
+      const state = shortStockState(pinnedCycle(weather));
+      step.update(state, weather);
+
+      expect(tubingReasons(step)).toHaveLength(1);
+      expect(installBtn(step).disabled).toBe(true);
+    });
+
+    it('C3: warns when the forecast has rain at tick 24 of the next 24', () => {
+      const { step } = makeStep();
+      const state = shortStockState(rainAfterCycle(24, 'desert'));
+      step.update(state, 'sunny');
+
+      expect(tubingReasons(step)).toHaveLength(1);
+    });
+
+    it('C3: warns when the forecast has rain soon', () => {
+      const { step } = makeStep();
+      const state = shortStockState(rainAfterCycle(3, 'desert'));
+      step.update(state, 'sunny');
+
+      expect(tubingReasons(step)).toHaveLength(1);
+    });
+
+    it('C3/C4: warns for a wet untubed hole under a dry sky with no rain due', () => {
+      const { step } = makeStep();
+      const state = shortStockState();
+      setHoleWater(state, [state.drillHoles[0]!.id], 0.9, 0.03);
+      step.update(state, 'sunny');
+
+      expect(tubingReasons(step)).toHaveLength(1);
+      expect(installBtn(step).disabled).toBe(true);
+    });
+
+    it('C3: a wet hole that is already tubed does not raise the warning', () => {
+      const { step } = makeStep();
+      const state = shortStockState();
+      const [wetHole] = state.drillHoles;
+      setHoleWater(state, [wetHole!.id], 0.9, 0.03);
+      state.tubingState.installedHoles.add(wetHole!.id);
+      step.update(state, 'sunny');
+
+      expect(installBtn(step)).not.toBeNull();
+      expect(tubingReasons(step)).toHaveLength(0);
+    });
+
+    it('C3: no warning when stock covers every untubed hole, rain or not', () => {
+      const { step } = makeStep();
+      const state = shortStockState(pinnedCycle('storm'));
+      state.tubingState.inventory = 2;
+      setHoleWater(state, state.drillHoles.map(h => h.id), 0.9, 0.03);
+      step.update(state, 'storm');
+
+      expect(installBtn(step).disabled).toBe(false);
+      expect(tubingReasons(step)).toHaveLength(0);
+    });
+
+    it('C4: wet untubed holes and short stock show the warning with the stock and need', () => {
+      const { step } = makeStep();
+      const state = shortStockState();
+      state.tubingState.inventory = 1;
+      setHoleWater(state, state.drillHoles.map(h => h.id), 0.9, 0.03);
+      step.update(state, 'sunny');
+
+      const reasons = tubingReasons(step);
+      expect(reasons).toHaveLength(1);
+      expect(reasons[0]!.textContent).toBe(t('ui.blast_workshop.charge.tubing_reason', { stock: 1, need: 2 }));
+    });
+
+    it('the warning appears when rain turns up on the same panel and goes when it clears', () => {
+      const { step } = makeStep();
+      const state = shortStockState();
+      step.update(state, 'sunny');
+      expect(tubingReasons(step)).toHaveLength(0);
+
+      state.weather = pinnedCycle('heavy_rain');
+      step.update(state, 'heavy_rain');
+      expect(tubingReasons(step)).toHaveLength(1);
+
+      state.weather = pinnedDryCycle();
+      step.update(state, 'sunny');
+      expect(tubingReasons(step)).toHaveLength(0);
+    });
+
+    it('the warning appears when the forecast changes to show rain ahead, with the current sky unchanged', () => {
+      const { step } = makeStep();
+      const state = shortStockState();
+      step.update(state, 'sunny');
+      expect(tubingReasons(step)).toHaveLength(0);
+
+      state.weather = rainAfterCycle(8, 'desert');
+      step.update(state, 'sunny');
+
+      expect(tubingReasons(step)).toHaveLength(1);
+    });
+
+    it('the warning appears when a hole turns wet on the same panel', () => {
+      const { step } = makeStep();
+      const state = shortStockState();
+      step.update(state, 'sunny');
+      expect(tubingReasons(step)).toHaveLength(0);
+
+      setHoleWater(state, [state.drillHoles[1]!.id], 0.9, 0.03);
+      step.update(state, 'sunny');
+
+      expect(tubingReasons(step)).toHaveLength(1);
+    });
+  });
+
+  describe('C5: hole counts read singular for 1 (en and fr)', () => {
+    const oneHoleState = (weather = pinnedDryCycle()) => {
+      const state = makeState();
+      addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+      state.tubingState.inventory = 0;
+      state.weather = weather;
+      return state;
+    };
+    const twoHoleState = (weather = pinnedDryCycle()) => {
+      const state = oneHoleState(weather);
+      addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
+      return state;
+    };
+
+    it('en: one wet untubed hole reads "1 hole", not "1 holes"', () => {
+      const { step } = makeStep();
+      const state = oneHoleState();
+      setHoleWater(state, state.drillHoles.map(h => h.id), 0.9, 0.03);
+      step.update(state, 'sunny');
+
+      const text = tubingBlock(step).textContent ?? '';
+      expect(text).toMatch(/\b1 hole\b/);
+      expect(text).not.toMatch(/\b1 holes\b/);
+    });
+
+    it('en: two wet untubed holes read "2 holes"', () => {
+      const { step } = makeStep();
+      const state = twoHoleState();
+      setHoleWater(state, state.drillHoles.map(h => h.id), 0.9, 0.03);
+      step.update(state, 'sunny');
+
+      expect(tubingBlock(step).textContent).toMatch(/\b2 holes\b/);
+    });
+
+    it('en: one untubed dry hole (tubing ahead) reads "1 hole", not "1 holes"', () => {
+      const { step } = makeStep();
+      const state = oneHoleState();
+      step.update(state, 'sunny');
+
+      const text = tubingBlock(step).textContent ?? '';
+      expect(text).toMatch(/\b1 hole\b/);
+      expect(text).not.toMatch(/\b1 holes\b/);
+    });
+
+    it('en: two untubed dry holes (tubing ahead) read "2 holes"', () => {
+      const { step } = makeStep();
+      step.update(twoHoleState(), 'sunny');
+
+      expect(tubingBlock(step).textContent).toMatch(/\b2 holes\b/);
+    });
+
+    it('en: the stock-shortage reason never says "1 holes"', () => {
+      const { step } = makeStep();
+      const state = oneHoleState();
+      setHoleWater(state, state.drillHoles.map(h => h.id), 0.9, 0.03);
+      step.update(state, 'sunny');
+
+      const reasons = tubingReasons(step);
+      expect(reasons).toHaveLength(1);
+      expect(reasons[0]!.textContent).not.toMatch(/\b1 holes\b/);
+    });
+
+    it('fr: one wet untubed hole reads "1 trou", not "1 trous"', () => {
+      setLocale('fr');
+      const { step } = makeStep();
+      const state = oneHoleState();
+      setHoleWater(state, state.drillHoles.map(h => h.id), 0.9, 0.03);
+      step.update(state, 'sunny');
+
+      const text = tubingBlock(step).textContent ?? '';
+      expect(text).toMatch(/\b1 trou\b/);
+      expect(text).not.toMatch(/\b1 trous\b/);
+    });
+
+    it('fr: two wet untubed holes read "2 trous"', () => {
+      setLocale('fr');
+      const { step } = makeStep();
+      const state = twoHoleState();
+      setHoleWater(state, state.drillHoles.map(h => h.id), 0.9, 0.03);
+      step.update(state, 'sunny');
+
+      expect(tubingBlock(step).textContent).toMatch(/\b2 trous\b/);
+    });
+
+    it('fr: one untubed dry hole (tubing ahead) reads "1 trou", not "1 trous"', () => {
+      setLocale('fr');
+      const { step } = makeStep();
+      step.update(oneHoleState(), 'sunny');
+
+      const text = tubingBlock(step).textContent ?? '';
+      expect(text).toMatch(/\b1 trou\b/);
+      expect(text).not.toMatch(/\b1 trous\b/);
+    });
+
+    it('fr: the stock-shortage reason never says "1 trous"', () => {
+      setLocale('fr');
+      const { step } = makeStep();
+      const state = oneHoleState();
+      setHoleWater(state, state.drillHoles.map(h => h.id), 0.9, 0.03);
+      step.update(state, 'sunny');
+
+      const reasons = tubingReasons(step);
+      expect(reasons).toHaveLength(1);
+      expect(reasons[0]!.textContent).not.toMatch(/\b1 trous\b/);
+    });
   });
 });
