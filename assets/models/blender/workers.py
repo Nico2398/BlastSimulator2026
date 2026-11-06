@@ -179,7 +179,7 @@ def _side(v: Vector, side: int) -> Vector:
 def skeleton(b: Build, role: str) -> tuple[Skeleton, Joints]:
     j = joints(b)
     tool_hand = TOOL_HAND.get(role)
-    from worker_face import FACE, eye_center, eye_yaw, hat_pivot, lid_open_angle, mouth_center
+    from worker_face import brow_pivot, eye_center, eye_yaw, hat_pivot, lid_open_angle, mouth_center
     hc = j.head_c
     mouth = mouth_center(j, b)
     hat = hat_pivot(j, role)
@@ -199,7 +199,7 @@ def skeleton(b: Build, role: str) -> tuple[Skeleton, Joints]:
     lid_dir = Vector((math.cos(lid_open_angle(role)), 0, math.sin(lid_open_angle(role))))
     for s, sfx in ((1, 'L'), (-1, 'R')):
         eye = eye_center(j, s, b.head, role)
-        brow = eye + Vector((0.03, 0, FACE[role].brow_h))
+        brow = brow_pivot(b, j, role, s)
         edge = Matrix.Rotation(eye_yaw(b.head, s), 3, 'Z') @ lid_dir
         specs += [
             BoneSpec(f'Lid{sfx}', tuple(eye), tuple(eye + edge * 0.06), 'Head'),

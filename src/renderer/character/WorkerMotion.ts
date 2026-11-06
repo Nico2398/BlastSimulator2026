@@ -322,8 +322,17 @@ export function curlHand(rig: WorkerRig, s: Side, amount: number): void {
   rig.poser.rotQ(b.tips, _q.setFromAxisAngle(hinge, -open * TIP_OPEN));
 }
 
-/** How far below the horizontal a shut lid's edge goes (rad): its deep back half then covers the eye's top. */
-const LID_SHUT = 1.1;
+/**
+ * Lids, in radians of the edge's elevation: shut, it goes this far below the horizontal (mirrors
+ * worker_face.LID_SHUT, which sizes the lid shell to still cover the eye there); wide open in
+ * alarm, no higher than LID_WIDE, so the shell's far edge never comes round under the eye.
+ */
+const LID_SHUT = 1.15;
+const LID_WIDE = 1.15;
+/** Brows in alarm: lifted this far (m), and drawn back this far to follow the forehead; tipped by up to BROW_WORRY (rad). */
+const BROW_LIFT = 0.013;
+const BROW_LIFT_BACK = 0.005;
+const BROW_WORRY = 0.22;
 
 /** How far the fingers' two segments turn to open a fist out flat (rad). */
 const FINGER_OPEN = 62 * DEG;
@@ -545,12 +554,13 @@ export function poseFace(rig: WorkerRig, blink: number, droop: number, alarm: nu
     // squeezes the eye on the side he favours half shut.
     const wince = s === rig.freeSide ? pain * 0.5 : pain * 0.15;
     const shut = Math.max(blink, droop * 0.4, wince) * (open + LID_SHUT);
-    const wide = alarm * Math.max(0, 1.25 - open) * (1 - blink);
+    const wide = alarm * Math.max(0, LID_WIDE - open) * (1 - blink);
     P.rotQ(b.lid, _q.setFromAxisAngle(rig.rest[s].lidHinge, -shut + wide));
-    // Alarm lifts the brows and tips their inner ends up — worried, whatever the role's resting
-    // scowl; pain knits them, inner ends up and the brows drawn down.
-    P.shiftRest(b.brow, 0, alarm * 0.016 - droop * 0.006 - pain * 0.006, 0);
-    P.rot(b.brow, rig.rest[s].sign * 0.45 * Math.max(alarm, pain * 0.8), 0, 0);
+    // Alarm lifts the brows up and back along the forehead; alarm and pain both tip their inner
+    // ends up — worried, whatever the role's resting scowl. A brow turns about its outer end
+    // (where its bone sits), so neither drives it down into the lid or the temple.
+    P.shiftRest(b.brow, -BROW_LIFT_BACK * alarm, BROW_LIFT * alarm, 0);
+    P.rot(b.brow, rig.rest[s].sign * BROW_WORRY * Math.max(alarm, pain * 0.8), 0, 0);
   }
   if (rig.gasp >= 0 && rig.mouth >= 0) {
     P.shiftRest(rig.gasp, GASP_HIDE * gasp, 0, 0);

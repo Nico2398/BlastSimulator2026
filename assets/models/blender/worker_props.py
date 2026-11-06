@@ -559,7 +559,7 @@ def _surveyor_gear(skel: Skeleton, b, j, m) -> None:
     outer: dict[int, Vector] = {}
     for s, sfx in ((1, 'L'), (-1, 'R')):
         ec = eye_center(j, s, b.head, 'surveyor')
-        at = ec + Vector((er[0] + 0.016, 0, 0.002))   # clear of the eye's yawed outer edge and of the lid
+        at = ec + Vector((er[0] + 0.022, 0, 0.002))   # clear of the eye's yawed outer edge, and of the lid's lash as it blinks
         outer[s] = at + Vector((-ring_r * math.sin(turn), s * ring_r * math.cos(turn), 0.0))
         # Thick round rims, no glass: the big magnified eyes show straight through.
         ring = torus(f'FaceGlasses{sfx}', ring_r, 0.005, loc=tuple(at), rot=(0, 90, s * 26), major_segments=24, minor_segments=4)

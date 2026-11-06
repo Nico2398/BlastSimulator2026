@@ -54,7 +54,7 @@ import bpy
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
-from character import Section, Skeleton, assign_faces, bind_rigid, ellipsoid, lathe, loft, merge, prune, smoothstep
+from character import Section, Skeleton, _to_object, assign_faces, bind_rigid, ellipsoid, lathe, loft, merge, prune, smoothstep
 from common import assign, cylinder, material
 
 
@@ -111,14 +111,16 @@ HAIRLINE = {'driller': (0.016, 0.04), 'blaster': (0.02, 0.045), 'driver': (0.014
 
 EYE_Y = 0.073      # lateral offset of each eye from the midline (for a 0.2 m wide head)
 EYE_Z = 0.028      # height of the eyes above the skull centre
-EYE_R = (0.036, 0.045, 0.052)   # eye white radii: depth, width, height
-LID_TUCK = 0.09      # the lid shell is inside the eye this far (fraction of its height) below its edge
-SOCKET_GAP = 0.004   # how far behind the eye white the socket floor sits (m)
+EYE_R = (0.052, 0.045, 0.052)   # eye white radii: depth, width, height (depth = height: see lid_radii)
+EYE_INSET = 0.66   # how far behind the face the eye's centre sits, as a share of its depth radius
+EYE_BACK = 0.3     # the white is kept in front of this share of its depth radius behind its centre
+SOCKET_GAP = 0.006   # how far behind the eye white the socket floor sits (m)
 SOCKET_RIM = 0.3     # the socket's rim, as a fraction of the eye's radius past its outline
 SKULL_SEGMENTS, SKULL_RINGS = 32, 20
 SKULL_FRONT_BIAS = (0.35, 0.3)   # skull vertices drawn toward the face (ellipsoid front_bias)
 HAT_DOME = 0.184   # crown radius at the brim
 BRIM_BAND = 0.015  # how far under the hat's base the hair is still drawn in under the brim (m)
+HAT_HAIR_GAP = 0.007   # what the hair keeps inside the hat's shell, so the two never lie on each other (m)
 HAT_BRIM = 0.02    # how far the brim reaches past the crown at the sides
 HAT_PEAK = {'dome': 0.05, 'dented': 0.035, 'cap': 0.11, 'safari': 0.02, 'bowler': 0.0}
 """How much further than the brim each crown reaches at the front: a peak, the cap's long visor
@@ -140,7 +142,7 @@ def eye_center(j, side: int, head, role: str) -> Vector:
     a, bw, c = head
     y, z = EYE_Y * side * (bw / 0.2), EYE_Z
     x = a * math.sqrt(max(0.0, 1 - (y / bw) ** 2 - (z / c) ** 2))
-    return Vector((hc.x + x - eye_radii(role)[0] * 0.62, y, hc.z + z))
+    return Vector((hc.x + x - eye_radii(role)[0] * EYE_INSET, y, hc.z + z))
 
 
 def eye_yaw(head, side: int) -> float:
@@ -154,24 +156,28 @@ def lid_open_angle(role: str) -> float:
     return math.asin(max(-0.95, min(0.95, cut)))
 
 
-LID_GROW = 1.18                 # the lid shell over the eye: the eye's own ellipsoid, grown evenly
-LID_BACK = 1.16                 # the shell's depth behind the eye's centre, over the eye's height
+LID_GROW = 1.10   # the lid shell's radius over the eye's: it clears the white by this share, everywhere
+LID_SHUT = 1.15
+"""How far below the horizontal a shut lid's edge turns (rad) — mirrors WorkerMotion.LID_SHUT, which
+turns the lids. The shell reaches far enough back over the eye to still cover it there."""
+LID_MARGIN = 0.1  # extra sweep (rad) the shell keeps past what it must cover
+LASH_SPAN = 54    # degrees either side of the lid's middle the lash runs along its edge
+PAINT_IRIS = (0.0008, 0.0006)    # (lift off the white, thickness) of the painted iris, metres
+PAINT_SHINE = (0.0019, 0.0006)   # and of the highlight on it — clear of the iris, under the lash
 
 
 @lru_cache(maxsize=None)
 def lid_radii(role: str, head: tuple[float, float, float]) -> tuple[float, float, float, float]:
     """The upper lid shell's radii along the eye's own axes: (front, side, up, back).
 
-    In front it is the eye's ellipsoid grown evenly, so it clears the white by the same share
-    everywhere and the open eye shows under it from the high game camera; its edge is cut
-    along a plane tilted up to the resting lid line. The runtime shuts it by turning it about
-    the eye's own side axis (the lid bone carries the yaw), and the deep back half then
-    sweeps over the eye's top.
+    The eye is as deep as it is tall, so seen from the side it is a circle about its own
+    side axis — the axis the runtime turns the lid about (the lid bone carries the yaw). The
+    lid is that shape grown by LID_GROW: a surface of revolution about the same axis, so
+    however far it turns it slides over itself and keeps the same gap to the white. Nothing
+    tucks into the eye and nothing swings out of it: open, blinking, drooping or wide.
     """
     er = eye_radii(role)
-    # Behind its centre the shell is as deep as the eye is tall: turned down to shut, that
-    # half ends up over the eye's top, and the eye's height is what it then has to cover.
-    return (er[0] * LID_GROW, er[1] * LID_GROW, er[2] * LID_GROW, er[2] * LID_BACK)
+    return (er[0] * LID_GROW, er[1] * LID_GROW, er[2] * LID_GROW, er[0] * LID_GROW)
 
 
 def hat_pivot(j, role: str) -> Vector:
@@ -250,6 +256,23 @@ def _skull(b, j, m, role: str) -> bpy.types.Object:
     return ob
 
 
+def _bvh_many(obs) -> BVHTree:
+    """One BVH over several meshes, each in its own placement."""
+    bm = bmesh.new()
+    for ob in obs:
+        part = bmesh.new()
+        part.from_mesh(ob.data)
+        part.transform(ob.matrix_basis)
+        me = bpy.data.meshes.new('_bvh_tmp')
+        part.to_mesh(me)
+        part.free()
+        bm.from_mesh(me)
+        bpy.data.meshes.remove(me)
+    tree = BVHTree.FromBMesh(bm)
+    bm.free()
+    return tree
+
+
 def _bvh(ob: bpy.types.Object) -> BVHTree:
     bm = bmesh.new()
     bm.from_mesh(ob.data)
@@ -275,6 +298,9 @@ def _conform(ob: bpy.types.Object, tree: BVHTree, origin: Vector) -> None:
     ob.data.update()
 
 
+SHELL_EDGE = (0.3, 0.7)   # the share of a hair mask over which a shell goes from under the skin to out
+
+
 def _shell(name: str, skull: bpy.types.Object, mask, thick: float, sink: float = 0.012, noise=None,
            clamp=None) -> bpy.types.Object:
     """A copy of the skull pushed out by `thick` where mask(p) is 1 and under the skin where it is 0.
@@ -297,7 +323,11 @@ def _shell(name: str, skull: bpy.types.Object, mask, thick: float, sink: float =
         k = mask(p)
         ks[v.index] = k
         extra = noise(p) if noise else 0.0
-        v.co = p + v.normal * (k * (thick + extra) - (1 - k) * sink)
+        # Out or under, with the change made over the middle of the mask: where the shell
+        # crosses the skin it does so steeply, rather than lying along it over a band — a
+        # surface lying on another within a hair's breadth flickers between the two.
+        out = smoothstep(SHELL_EDGE[0], SHELL_EDGE[1], k)
+        v.co = p + v.normal * (out * (thick + extra) - (1 - out) * sink)
         if clamp:
             v.co = clamp(v.co, p)
     hidden = [f for f in bm.faces if all(ks[v.index] < 0.02 for v in f.verts)]
@@ -310,6 +340,41 @@ def _shell(name: str, skull: bpy.types.Object, mask, thick: float, sink: float =
 
 # ------------------------------------------------------------------- eyes
 
+LID_PSI_STEP = math.radians(9)     # the lid shell's sweep is split this finely
+LID_RINGS = 12                     # and its width into this many rings, pole to pole
+
+
+def _lid_shell(name: str, radius: float, half_width: float, psi0: float, psi1: float) -> bpy.types.Object:
+    """Part of an ellipsoid of revolution about Y — radius `radius` round Y, `half_width` along it —
+    swept from angle `psi0` to `psi1` (from +X toward +Z, about Y), as one open shell facing out.
+
+    The sweep's front edge is a clean column of vertices, so the lash laid along it covers it.
+    """
+    n = max(2, math.ceil((psi1 - psi0) / LID_PSI_STEP))
+    psis = [psi0 + (psi1 - psi0) * i / n for i in range(n + 1)]
+    bm = bmesh.new()
+    rows = []
+    for k in range(1, LID_RINGS):
+        th = -math.pi / 2 + math.pi * k / LID_RINGS
+        r, y = radius * math.cos(th), half_width * math.sin(th)
+        rows.append([bm.verts.new((r * math.cos(p), y, r * math.sin(p))) for p in psis])
+    south = bm.verts.new((0.0, -half_width, 0.0))
+    north = bm.verts.new((0.0, half_width, 0.0))
+    for a, b in zip(rows, rows[1:]):
+        for i in range(n):
+            bm.faces.new((a[i], a[i + 1], b[i + 1], b[i]))
+    for i in range(n):
+        bm.faces.new((south, rows[0][i + 1], rows[0][i]))
+        bm.faces.new((north, rows[-1][i], rows[-1][i + 1]))
+    bm.normal_update()
+    bm.faces.ensure_lookup_table()
+    # Facing out: the middle face's normal points away from the axis.
+    mid = bm.faces[len(bm.faces) // 2]
+    if mid.normal.dot(mid.calc_center_median()) < 0:
+        bmesh.ops.reverse_faces(bm, faces=bm.faces)
+    return _to_object(name, bm, None)
+
+
 def _eyes(skel: Skeleton, b, j, m, role: str) -> None:
     er = eye_radii(role)
     open_angle = lid_open_angle(role)
@@ -318,7 +383,7 @@ def _eyes(skel: Skeleton, b, j, m, role: str) -> None:
         ec = eye_center(j, s, b.head, role)
         rot = Matrix.Rotation(eye_yaw(b.head, s), 4, 'Z')
         white = ellipsoid(f'FaceEye{sfx}', er, segments=16, rings=10)
-        prune(white, lambda p, rx=er[0]: p.x > -0.3 * rx)   # the back half sits inside the skull
+        prune(white, lambda p, rx=er[0]: p.x > -EYE_BACK * rx)   # the back sits inside the skull
         white.data.transform(rot)
         white.location = ec
         assign(white, m['white'])
@@ -332,58 +397,43 @@ def _eyes(skel: Skeleton, b, j, m, role: str) -> None:
             return onto
         # Iris + pupil: a thin dark lens painted onto the white, a touch up toward the camera.
         iris_k = 0.82 if role == 'blaster' else 1.0
-        iris = ellipsoid(f'FaceIris{sfx}', (0.0012, 0.023 * iris_k, 0.027 * iris_k), segments=12, rings=7,
-                         deform=painted((-s * 0.002, 0.006), 0.0006, 0.0012))
+        # Painted layers stack in order, each clear of the last, all under the lash's reach:
+        # iris PAINT_IRIS above the white, the highlight PAINT_SHINE above that.
+        iris = ellipsoid(f'FaceIris{sfx}', (PAINT_IRIS[1], 0.023 * iris_k, 0.027 * iris_k), segments=12, rings=7,
+                         deform=painted((-s * 0.002, 0.006), *PAINT_IRIS))
         iris.data.transform(rot)
         iris.location = ec
         assign(iris, m['iris'])
         # The highlight stays under the resting lid's edge (and a lash's width clear of it),
         # whatever the role's lid: above it the lid would cover it, or it would poke through.
-        edge = (er[0] + 0.002) * math.tan(open_angle)
-        shine = ellipsoid(f'FaceShine{sfx}', (0.0015, 0.0085, 0.0085), segments=8, rings=5,
-                          deform=painted((s * 0.008, min(0.018, edge - 0.006 - 0.0085)), 0.002, 0.0015))
+        edge = er[2] * math.sin(open_angle)
+        shine = ellipsoid(f'FaceShine{sfx}', (PAINT_SHINE[1], 0.0085, 0.0085), segments=8, rings=5,
+                          deform=painted((s * 0.008, min(0.018, edge - 0.006 - 0.0085)), *PAINT_SHINE))
         shine.data.transform(rot)
         shine.location = ec
         assign(shine, m['white'])
         for ob in (white, iris, shine):
             skel.attach(ob)
             bind_rigid(ob, 'Head')
-        # Upper lid: the eye's own ellipsoid grown evenly (so it clears the white by the same
-        # share everywhere), yawed out with it, cut along a plane through the eye's centre
-        # tilted up to the resting lid line. Below that edge, in front, it tucks inside the
-        # white within LID_TUCK, under the lash, so no skin shows through the white. Behind,
-        # it is as deep as the eye is tall and stays whole: buried in the skull while the eye
-        # is open, it is what comes over the eye's top as the lid turns down to shut.
-        lf, ly, lz, lb = lid_radii(role, b.head)
-        tilt = Matrix.Rotation(-open_angle, 3, 'Y')      # the edge's frame → the eye's
-        untilt = tilt.transposed()
-
-        def radii(x: float) -> Vector:
-            return Vector((lf if x >= 0 else lb, ly, lz))
-
-        def shell(p: Vector) -> Vector:
-            # p is on a unit sphere whose equator is the edge plane (rings packed there).
-            q = tilt @ p
-            out = Vector((q.x * radii(q.x).x, q.y * ly, q.z * lz))
-            tuck = (1 - smoothstep(-LID_TUCK, 0.0, p.z)) * smoothstep(-0.25, 0.25, p.x)
-            return out * (1 - 0.28 * tuck)
-
-        def edge_frame(v: Vector) -> Vector:
-            r = radii(v.x)
-            return untilt @ Vector((v.x / r.x, v.y / r.y, v.z / r.z)).normalized()
-        lid = ellipsoid(f'FaceLid{sfx}', (1.0, 1.0, 1.0), segments=16, rings=16, deform=shell, front_bias=(0.0, 0.6))
-        # The tucked-in lower shell in front never shows; the back half is kept nearly whole.
-        prune(lid, lambda v: (lambda e: e.z > (-0.36 if e.x > 0 else -0.85))(edge_frame(v)))
-        # The lid's edge drawn as one flat, even line along it — no flick at the corner.
-        normal = tilt @ Vector((0, 0, 1))
+        # Upper lid: a shell of revolution about the eye's side axis, LID_GROW clear of the
+        # white all round, from its resting edge up over the eye and back far enough that,
+        # turned down to LID_SHUT, it still covers the eye's top; the part behind the eye sits
+        # in the skull. It never reaches round under the eye, however far it is turned up
+        # (WorkerMotion caps that at LID_WIDE).
+        lr, ly, _, _ = lid_radii(role, b.head)
+        back = min(open_angle + LID_SHUT + math.acos(-EYE_BACK) + LID_MARGIN,
+                   2 * math.pi - math.acos(-EYE_BACK) - LID_MARGIN)
+        lid = _lid_shell(f'FaceLid{sfx}', lr, ly, open_angle, back)
+        # The lash runs along the shell's front rim, just proud of it, and hides the open edge.
         edge = []
         for k in range(9):
-            az = math.radians(-62 + 124 * k / 8)
-            q = tilt @ Vector((math.cos(az), math.sin(az), 0.0))
-            at = Vector((q.x * radii(q.x).x, q.y * ly, q.z * lz)) * 1.02 - normal * 0.004
-            edge.append(Section(tuple(at), 0.0055, 0.0035))
+            az = math.radians(-LASH_SPAN + 2 * LASH_SPAN * k / 8)
+            psi = open_angle - 0.002 / lr
+            r = lr * math.cos(az) + 0.0015
+            edge.append(Section((r * math.cos(psi), ly * math.sin(az), r * math.sin(psi)), 0.003, 0.0035))
+        tangent = (-math.sin(open_angle), 0.0, math.cos(open_angle))
         lash_ob = loft(f'FaceLash{sfx}', edge, segments=4, rings=12, cap_start=0.6, cap_end=0.6, cap_rings=1,
-                       front=tuple(normal)).ob
+                       front=tangent).ob
         for ob in (lid, lash_ob):
             ob.data.transform(rot)
             ob.location = ec
@@ -402,22 +452,38 @@ def _decal_loft(name: str, points, width, depth, segments=6, rings=8):
     return loft(name, secs, segments=segments, rings=rings, cap_start=1.0, cap_end=1.0, cap_rings=2, front=(1, 0, 0))
 
 
-def _brows(skel, b, j, m, role, tree) -> None:
+def _brow_points(b, j, role: str, s: int) -> list[tuple[float, float]]:
+    """(y, z) along one brow, inner end first, before it is laid onto the face."""
     f = FACE[role]
     hc = j.head_c
     wscale = b.head[1] / 0.2
+    tilt = math.radians(f.brow_tilt[0 if s == 1 else 1])
+    bz = hc.z + EYE_Z + f.brow_h
+    inner, outer = 0.024 * wscale, 0.13 * wscale
+    pts = []
+    for k in range(5):
+        t = k / 4
+        y = inner + (outer - inner) * t
+        pts.append((s * y, bz + math.sin(t * math.pi) * 0.01 + (t - 0.4) * math.tan(tilt) * (outer - inner)))
+    return pts
+
+
+def brow_pivot(b, j, role: str, s: int) -> Vector:
+    """Where a brow turns: its outer end, so a worried or wincing brow lifts its inner end
+    and never drives the outer one down into the lid or the temple."""
+    y, z = _brow_points(b, j, role, s)[-1]
+    return Vector((eye_center(j, s, b.head, role).x + 0.03, y, z))
+
+
+def _brows(skel, b, j, m, role, tree) -> None:
+    """Brows laid onto the face — onto the lids where they bulge past the skull, so a brow
+    never cuts into a lid (whose surface stays put as it blinks: see lid_radii)."""
+    f = FACE[role]
+    hc = j.head_c
     for s, sfx in ((1, 'L'), (-1, 'R')):
-        tilt = math.radians(f.brow_tilt[0 if s == 1 else 1])
-        bz = hc.z + EYE_Z + f.brow_h
-        inner, outer = 0.024 * wscale, 0.13 * wscale
-        pts = []
-        for k in range(5):
-            t = k / 4
-            y = inner + (outer - inner) * t
-            z = bz + math.sin(t * math.pi) * 0.01 + (t - 0.4) * math.tan(tilt) * (outer - inner)
-            pts.append((s * y, z))
         th = f.brow_thick
-        ob = _decal_loft(f'HeadBrow{sfx}', pts, [th * 0.8, th * 1.05, th, th * 0.9, th * 0.6], 0.011).ob
+        ob = _decal_loft(f'HeadBrow{sfx}', _brow_points(b, j, role, s), [th * 0.8, th * 1.05, th, th * 0.9, th * 0.6],
+                         0.011).ob
         _conform(ob, tree, hc)
         assign(ob, m['hair'])
         skel.attach(ob)
@@ -613,7 +679,7 @@ def _hair(skel, b, j, m, role, skull) -> None:
         if q.z <= 0.0:
             # Just under the hat's base the hair is drawn in under the brim's underside, so the
             # two never cross; below that band it is free again.
-            r_cap = dome + 0.6 * rim - 0.004
+            r_cap = dome + 0.6 * rim - HAT_HAIR_GAP
             if r <= r_cap:
                 return p
             s = to_hat @ skin
@@ -624,7 +690,7 @@ def _hair(skel, b, j, m, role, skull) -> None:
         # Inside the crown, or under the brim; never pressed under the skin (where the head is
         # wider than the hat's rim, the hair stays a whisker over it rather than leave it bald).
         s = to_hat @ skin
-        r_max = max(dome + (rim - 0.006) * (1 - over) - 0.004 * over, math.hypot(s.x, s.y) + 0.002)
+        r_max = max(dome + (rim - 0.006) * (1 - over) - HAT_HAIR_GAP * over, math.hypot(s.x, s.y) + 0.002)
         if r <= r_max:
             return p
         q.x, q.y = q.x * r_max / r, q.y * r_max / r
@@ -827,7 +893,7 @@ def build_head(skel: Skeleton, b, j, m, role: str) -> None:
     skull = _skull(b, j, m, role)
     tree = _bvh(skull)
     _eyes(skel, b, j, m, role)
-    _brows(skel, b, j, m, role, tree)
+    _brows(skel, b, j, m, role, _bvh_many([skull, bpy.data.objects['FaceLidL'], bpy.data.objects['FaceLidR']]))
     _nose(skel, b, j, m, role, tree)
     _mouth(skel, b, j, m, role, tree)
     _moustache(skel, b, j, m, role, tree)

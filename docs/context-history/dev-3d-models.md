@@ -49,3 +49,12 @@ The pipeline claimed byte-identical rebuilds and did not deliver them: under Ble
 unchanged model produced the same vertices and triangles in a different face order, so every rebuild rewrote the
 index buffers of every model, workers and vehicles alike. `finish()` now sorts faces before saving and exporting.
 Only the workers were rebuilt with it; the rest of the set picks it up on its next rebuild.
+
+## Eyes, lids and brows
+
+Players saw the eyes flicker and the eyeball poke through the brow. Measured with a triangle-intersection pass over
+every face part in ten face states: the lid was an ellipsoid cap hinged off-centre, so a blink swept it through the
+white and the brow; the painted iris and highlight sat close enough to the white for their facets to cross it; the
+brow ignored the lids. The fix made the eye round in side profile and the lid a shell of revolution about its own
+hinge axis, so a blink is a symmetry of the shell and keeps its gap; stacked the painted layers with a measured
+lift each; conformed the brow over the lids and pivoted it at its outer end.
