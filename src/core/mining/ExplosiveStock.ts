@@ -2,12 +2,12 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import { factorFor } from '../events/ActiveModifiers.js';
-import { EXPLOSIVE_BULK_PRICE_FACTOR, EXPLOSIVE_DELIVERY_TICKS } from '../config/balance.js';
+import { EXPLOSIVE_BULK_PRICE_FACTOR } from '../config/balance.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
-import { addExpense, addIncome } from '../economy/Finance.js';
+import { addExpense } from '../economy/Finance.js';
 import {
-  getExplosivesCapacity, getExplosivesFreeCapacity, getExplosivesInStock, storeExplosives,
+  getExplosivesCapacity, getExplosivesFreeCapacity, getExplosivesInStock, getExplosivesStockByType, consumeExplosives, storeExplosives,
 } from '../entities/Building.js';
 
 /** Price factor the live event modifiers put on explosives (#1414); 1 when none. */
@@ -82,72 +82,49 @@ export function drawFromStockPool(
   return draw;
 }
 
-/** Kg of a charge order served from warehouse stock at order time (#1678). */
-export interface OrderStockDraw { explosiveId: string; kg: number }
-
-/** The stock draw recorded on a `charge_hole` action's payload, if any. */
-export function readOrderStock(action: Pick<PendingAction, 'payload'>): OrderStockDraw | undefined {
-  return action.payload['orderStock'] as OrderStockDraw | undefined;
+/** Stock/cash split and cash cost of loading `amountKg` into a hole now (#2143); pure. */
+export function quoteChargeLoad(
+  state: Pick<GameState, 'buildings' | 'events' | 'tickCount'>,
+  explosiveId: string,
+  amountKg: number,
+): { fromStockKg: number; fromCashKg: number; cost: number } {
+  const { fromStockKg, fromCashKg } = drawStockForOrder(getExplosivesStockByType(state.buildings), explosiveId, amountKg);
+  const cost = (getExplosive(explosiveId)?.costPerKg ?? 0) * fromCashKg * explosivePriceFactor(state);
+  return { fromStockKg, fromCashKg, cost };
 }
 
-/**
- * Return a cancelled order's stock-drawn kg to warehouses. Kg that no longer fits
- * is refunded in cash at the bulk price instead.
- */
-export function returnOrderStock(
+/** True when the cash part of loading `amountKg` is covered by current cash (#2143). */
+export function canAffordChargeLoad(
+  state: Pick<GameState, 'buildings' | 'events' | 'tickCount' | 'cash'>,
+  explosiveId: string,
+  amountKg: number,
+): boolean {
+  const { cost } = quoteChargeLoad(state, explosiveId, amountKg);
+  return cost < 0.005 || cost <= state.cash;
+}
+
+/** Load time: draw warehouse stock first, pay the rest in cash, book the 'explosives' expense (#2143). */
+export function loadChargeExplosive(
   state: GameState,
   explosiveId: string,
-  kg: number,
-): { restockedKg: number; cashRefund: number } {
-  const restockedKg = storeExplosives(state.buildings, explosiveId, kg);
-  const lost = kg - restockedKg;
-  if (lost <= 0) return { restockedKg, cashRefund: 0 };
-  const cashRefund = lost * bulkPricePerKg(explosiveId, explosivePriceFactor(state));
-  if (cashRefund > 0) {
-    state.cash += cashRefund;
-    addIncome(state.finances, cashRefund, 'refund', `Unstorable ${explosiveId} ${lost}kg`, state.tickCount);
+  amountKg: number,
+): { fromStockKg: number; cost: number } {
+  const { fromStockKg, cost } = quoteChargeLoad(state, explosiveId, amountKg);
+  if (fromStockKg > 0) consumeExplosives(state.buildings, explosiveId, fromStockKg);
+  if (cost > 0) {
+    state.cash -= cost;
+    addExpense(state.finances, cost, 'explosives', `Charge ${explosiveId} ${amountKg}kg`, state.tickCount);
   }
-  return { restockedKg, cashRefund };
+  return { fromStockKg, cost };
 }
 
-/** Delivery wait in ticks for the part of an order bought with cash (#1895); 0 when nothing is bought. */
-export function orderDeliveryTicks(fromCashKg: number): number {
-  return fromCashKg > 0 ? EXPLOSIVE_DELIVERY_TICKS : 0;
-}
-
-/** Delivery arrival tick recorded on a charge action's payload, if any (#1895). */
-export function readOrderDeliveryTick(action: Pick<PendingAction, 'payload'>): number | undefined {
-  const tick = action.payload['deliveryArrivalTick'];
-  return typeof tick === 'number' ? tick : undefined;
-}
-
-/** True while a charge order's cash-bought explosives have not arrived yet (#1895). */
-export function isChargeDeliveryPending(action: Pick<PendingAction, 'type' | 'payload'>, tickCount: number): boolean {
+/** True for a `charge_hole` order whose cash part cash cannot cover at fill time (#2143). */
+export function isChargeUnaffordable(
+  state: Pick<GameState, 'buildings' | 'events' | 'tickCount' | 'cash'>,
+  action: Pick<PendingAction, 'type' | 'payload'>,
+): boolean {
   if (action.type !== 'charge_hole') return false;
-  const arrival = readOrderDeliveryTick(action);
-  return arrival !== undefined && tickCount < arrival;
-}
-
-/** Earliest delivery tick of a still-waiting charge order, or null when none is in transit (#1895). */
-export function earliestChargeDeliveryTick(state: Pick<GameState, 'pendingActions' | 'tickCount'>): number | null {
-  let earliest: number | null = null;
-  for (const a of state.pendingActions) {
-    if (!isChargeDeliveryPending(a, state.tickCount)) continue;
-    const arrival = readOrderDeliveryTick(a) as number;
-    if (earliest === null || arrival < earliest) earliest = arrival;
-  }
-  return earliest;
-}
-
-/** Maps each hole with a still-in-transit charge order to its delivery arrival tick (#1966). */
-export function chargeDeliveryArrivalByHole(state: Pick<GameState, 'pendingActions' | 'tickCount'>): Map<string, number> {
-  const byHole = new Map<string, number>();
-  for (const a of state.pendingActions) {
-    if (!isChargeDeliveryPending(a, state.tickCount)) continue;
-    const holeId = a.payload['holeId'];
-    const arrival = readOrderDeliveryTick(a);
-    if (typeof holeId !== 'string' || arrival === undefined) continue;
-    byHole.set(holeId, arrival);
-  }
-  return byHole;
+  const { explosiveId, amountKg } = action.payload;
+  if (typeof explosiveId !== 'string' || typeof amountKg !== 'number') return false;
+  return !canAffordChargeLoad(state, explosiveId, amountKg);
 }

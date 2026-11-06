@@ -32,7 +32,7 @@ import { drillChargeAndBlast, tickUntilFresh } from '../helpers/blastFixtures.js
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { tickUntil } from './helpers.js';
 import { playContracts, playTick, clearBlastZone, FORBIDDEN_COMMAND, type Run, stockWarehouse } from '../helpers/playthrough.js';
-import { SPOIL_HEAP_CAPACITY_KG, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { SPOIL_HEAP_CAPACITY_KG } from '../../src/core/config/balance.js';
 import { resolveActionCost } from '../../src/core/engine/ActionSelection.js';
 import { octileHeuristic } from '../../src/core/nav/Pathfinding.js';
 
@@ -670,7 +670,7 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
     playUntil(800, () => state.plannedDrillHoles.length === 0);
     expect(stockWarehouse(logged, state, 'krackle', 72).success).toBe(true); // stock-covered: no delivery wait (#1895)
     logged('charge hole:* explosive:krackle amount:8 stemming:2');
-    playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     expect(logged('blast').success).toBe(true);
 
@@ -680,7 +680,7 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
     playUntil(1200, () => state.plannedDrillHoles.length === 0);
     expect(stockWarehouse(logged, state, 'krackle', 72).success).toBe(true); // stock-covered: no delivery wait (#1895)
     logged('charge hole:* explosive:krackle amount:8 stemming:2');
-    playUntil(EXPLOSIVE_DELIVERY_TICKS + 1200, () => Object.keys(state.plannedChargesByHole).length === 0);
+    playUntil(1200, () => Object.keys(state.plannedChargesByHole).length === 0);
     playUntil(SECOND_SHOT_FIRED_AT, () => elapsed() >= SECOND_SHOT_FIRED_AT);
     clearBlastZone(logged, state);
     expect(logged('blast').success).toBe(true);

@@ -452,6 +452,17 @@
       "role": "bootstrap"
     },
     {
+      "command": "event choose 0",
+      "description": "#2143: explosives are paid on fill, so the delivery wait is gone and the event clock lands earlier; defensively resolve any event pending before the hauler-boarding tick (idempotent, no-op when none pending).",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "tick 10",
       "description": "Lets the driver walk to and board the hauler.",
       "interaction": [

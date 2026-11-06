@@ -785,7 +785,7 @@
       "command": "build explosive_warehouse at:7,11",
       "timeout": 90,
       "role": "player",
-      "description": "build-explosive-warehouse, click half: Build panel, the Boom Closet's place button, a click inside the pin's live margin (pin (7,11), picked at its far corner (8,12); the picker snaps to the pin), Confirm. A charge order paid in cash waits EXPLOSIVE_DELIVERY_TICKS (400) for its explosives with the crew idle (#1895); stock in an explosive warehouse loads at once. The order only queues construction; the next step waits for it.",
+      "description": "build-explosive-warehouse, click half: Build panel, the Boom Closet's place button, a click inside the pin's live margin (pin (7,11), picked at its far corner (8,12); the picker snaps to the pin), Confirm. Explosives are paid as each hole is loaded and never wait for a delivery (#2143); stock in an explosive warehouse is drawn at loading. The order only queues construction; the next step waits for it.",
       "interaction": [
         {
           "type": "clickIfPresent",

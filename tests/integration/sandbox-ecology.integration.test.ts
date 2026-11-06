@@ -16,7 +16,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../src/core/economy/Logistics.js';
-import { ECOLOGICAL_SHUTDOWN_TICKS, ECOLOGICAL_WARNING_TICKS, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { ECOLOGICAL_SHUTDOWN_TICKS, ECOLOGICAL_WARNING_TICKS } from '../../src/core/config/balance.js';
 import { playTick, type Run } from '../helpers/playthrough.js';
 import { makeRubbleFragment } from '../helpers/blastFixtures.js';
 
@@ -110,7 +110,7 @@ function fireOrdinaryPattern(site: Site, notBefore: number): number {
   alive('drilling');
   const charged = run('charge hole:* explosive:krackle amount:8 stemming:2');
   expect(charged.success, charged.output).toBe(true);
-  ticks(site, EXPLOSIVE_DELIVERY_TICKS + 1500, () => Object.keys(state.plannedChargesByHole).length === 0);
+  ticks(site, 1500, () => Object.keys(state.plannedChargesByHole).length === 0);
   alive('charging');
   ticks(site, Math.max(0, notBefore - state.tickCount - 40));
   alive('waiting for the next shot');
@@ -149,7 +149,7 @@ describe('sandbox ecology under ordinary play (#1733)', () => {
     const { state } = site;
     const windows: Array<{ pre: number; startSample: number }> = [];
     let notBefore = 0;
-    while (!state.levelEnded && state.tickCount < RUN_TICKS) {
+    while (!state.levelEnded && state.tickCount < RUN_TICKS && notBefore < RUN_TICKS) { // no pattern is begun whose shot would fall past the run (#2143: charging no longer waits on delivery, so shots drift)
       const pre = fireOrdinaryPattern(site, notBefore);
       windows.push({ pre, startSample: site.samples.length });
       notBefore = state.tickCount + BLAST_INTERVAL;

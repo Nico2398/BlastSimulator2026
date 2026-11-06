@@ -412,9 +412,9 @@
         "increased": [
           "orderedChargeCount"
         ],
-        "decreased": [
-          "cash"
-        ]
+        "changedBy": {
+          "cash": 0
+        }
       }
     },
     {

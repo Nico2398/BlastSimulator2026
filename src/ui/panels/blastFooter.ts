@@ -10,15 +10,14 @@ import { el } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
+import { getExplosivesStockByType } from '../../core/entities/Building.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { oreEstimateView, oreValueColor, oreValueText } from './oreEstimateDisplay.js';
 import { OreEstimateMemo } from './oreEstimateMemo.js';
-import { chargeDeliveryArrivalByHole } from '../../core/mining/ExplosiveStock.js';
-import { formatGameClock } from '../formatGameClock.js';
 import { permitPreview, type PermitPreview } from './permitPreview.js';
-import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
+import { recordedChargesCost, stockAwareChargesCost } from '../../core/mining/ChargePlan.js';
 
 export class BlastFooter {
   private readonly el: HTMLElement;
@@ -102,13 +101,15 @@ export class BlastFooter {
 
   update(state: GameState): void {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
-    const errors = validateBlastPlan(
-      plan, new Set(Object.keys(state.plannedChargesByHole)), chargeDeliveryArrivalByHole(state),
-    );
+    const errors = validateBlastPlan(plan, new Set(Object.keys(state.plannedChargesByHole)));
     const hasHoles = plan.holes.length > 0;
     const fireOk = hasHoles && errors.length === 0;
 
-    const planCost = recordedChargesCost(state.chargesByHole).cashCost;
+    // Loaded charges are paid; ordered-not-yet-loaded ones are an estimate, paid as each hole is loaded (#2143).
+    const pending = Object.values(state.plannedChargesByHole);
+    const planCost = recordedChargesCost(state.chargesByHole).cashCost
+      + stockAwareChargesCost(pending, getExplosivesStockByType(state.buildings)).cashCost;
+    const isEstimate = pending.length > 0;
     const estimate = this.estimateMemo.get(state, plan, this.gridProvider());
     const estValue = estimate.value;
     const { coverage, brokenVoxels, charged, holeCoverage, sealedValue } = estimate;
@@ -121,19 +122,17 @@ export class BlastFooter {
     const reason = !hasHoles
       ? t('ui.blast_workshop.footer.fire_reason_no_holes')
       : errors[0]
-        ? errors[0].arrivalTick !== undefined
-          ? t('ui.blast_workshop.footer.fire_reason_awaiting_delivery', {
-            hole: errors[0].holeId, when: formatGameClock(errors[0].arrivalTick),
-          })
-          : t('ui.blast_workshop.footer.fire_reason_invalid', { hole: errors[0].holeId, issue: t(errors[0].issue) })
+        ? t('ui.blast_workshop.footer.fire_reason_invalid', { hole: errors[0].holeId, issue: t(errors[0].issue) })
         : null;
 
     const permit = permitPreview(state.grade, plan, state.tickCount);
-    const signature = JSON.stringify({ planCost, estValue, sealedValue, coverage, brokenVoxels, charged, holeCoverage, margin, fireOk, reason, permit });
+    const signature = JSON.stringify({ planCost, estValue, sealedValue, coverage, brokenVoxels, charged, holeCoverage, margin, fireOk, reason, permit, isEstimate });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
     this.costEl.textContent = `$${formatMoney(planCost)}`;
+    this.costEl.title = isEstimate ? t('ui.blast_workshop.footer.plan_cost_estimate') : '';
+    this.costEl.dataset['estimate'] = String(isEstimate);
     const view = oreEstimateView(estimate);
     this.valueEl.textContent = oreValueText(view, estValue);
     this.valueEl.style.color = oreValueColor(view);

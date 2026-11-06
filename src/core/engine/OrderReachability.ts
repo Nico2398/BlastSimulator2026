@@ -28,7 +28,7 @@ import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup, createStor
 import { holdsRequiredSkill, isEligibleForWork } from '../entities/Employee.js';
 import type { ClimbComponents, ReachableSet } from '../nav/NavGridReachability.js';
 import { cacheFor, componentsOf, type ReachCache } from './ReachCache.js';
-import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
+import { isChargeUnaffordable } from '../mining/ExplosiveStock.js';
 import { dockedFrom, withDockingCells } from '../nav/DockingReach.js';
 import { buildingRingCells, buildingRingTouches } from '../nav/BuildingApproach.js';
 import { haulDestinationOf } from '../economy/SpoilHeaps.js';
@@ -345,7 +345,7 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
   const fits = createStorageFit(state);
   let flipped = false;
   // Every reason reads red, not only an unreachable target: a reachable order
-  // nobody will work (explosives in transit, nowhere to unload) idles the crew too.
+  // nobody will work (an unaffordable charge, nowhere to unload) idles the crew too.
   const stampBlocked = (ghost: GhostPreview | undefined, action: PendingAction): void => {
     if (ghost === undefined) return;
     const blocked = action.blockedReason != null;
@@ -396,7 +396,7 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
     // Buried first: rubble over the hole is the cause a player can act on, even when the pit also reads unreachable.
     action.blockedReason = (isDrillHoleBuried(state, action) ? 'buried_under_rubble' : null)
       ?? reason
-      ?? (isChargeDeliveryPending(action, state.tickCount) ? 'explosives_in_transit' : null)
+      ?? (isChargeUnaffordable(state, action) ? 'explosives_unaffordable' : null)
       ?? haulBlockedReason(state, action, fragmentOf, fits);
     action.blockedLicenceLevel = action.requiredVehicleRole === null ? null
       : reason === 'licence_level_too_low' ? neededTierOf(action.requiredVehicleRole, orderTierFloor(action))

@@ -24,7 +24,6 @@ import { getFinancialReport } from '../../src/core/economy/Finance.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { checkProtectedPositions } from '../../src/core/mining/BlastPlan.js';
 import { buildingFootprintOccupants } from '../../src/core/nav/NavGridSync.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 describe('drill_plan grid — queues drill_hole actions instead of writing holes instantly (#553)', () => {
   afterEach(() => {
@@ -332,7 +331,7 @@ function setupSavedPlan() {
   state.cash = 500_000;
   state.finances.cash = 500_000;
   expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
-  tickUntil(run, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 800);
+  tickUntil(run, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
   expect(Object.keys(state.chargesByHole)).toHaveLength(4);
   expect(run('blast_plan save').success).toBe(true);
   return { run, state };
@@ -383,7 +382,7 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
     expect(Object.keys(state.plannedChargesByHole)).toHaveLength(4);
   });
 
-  it('queues one charge_hole action per saved charge, deducts the summed orderCost and books an explosives expense', () => {
+  it('queues one charge_hole action per saved charge, with no cash taken and no explosives expense booked until the holes are loaded (#2143)', () => {
     const { run, state } = setupSavedPlan();
     fireBlast(run, state);
     const cashBefore = state.cash;
@@ -393,10 +392,8 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
 
     const chargeActions = state.pendingActions.filter(a => a.type === 'charge_hole');
     expect(chargeActions).toHaveLength(4);
-    const sum = chargeActions.reduce((acc, a) => acc + (a.payload['orderCost'] as number), 0);
-    expect(sum).toBeGreaterThan(0);
-    expect(state.cash).toBeCloseTo(cashBefore - sum, 5);
-    expect(explosivesTotal(state) - explosivesBefore).toBeCloseTo(sum, 5);
+    expect(state.cash).toBe(cashBefore);
+    expect(explosivesTotal(state)).toBe(explosivesBefore);
     for (const a of chargeActions) {
       const id = a.payload['holeId'] as string;
       expect(state.plannedDrillHoles.some(h => h.id === id)).toBe(true);
@@ -420,7 +417,7 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
     expect(run('blast_plan load').success).toBe(true);
     const newIds = state.plannedDrillHoles.map(h => h.id);
 
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 1500 && (state.plannedDrillHoles.length > 0 || Object.keys(state.plannedChargesByHole).length > 0); i++) {
+    for (let i = 0; i < 1500 && (state.plannedDrillHoles.length > 0 || Object.keys(state.plannedChargesByHole).length > 0); i++) {
       for (const emp of state.employees.employees) emp.fatigue = 100;
       fundForDeliveryWait(state); // payroll runs through the explosive delivery wait (#1895)
       tickResolvingEvents(run);
@@ -463,20 +460,18 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
     for (const id of Object.keys(state.plannedChargesByHole)) expect(plannedIds).toContain(id);
   });
 
-  it('insufficient cash refuses the whole load: no mutation, console.insufficient_funds', () => {
+  it('low cash does not refuse the load: every charge is queued unpaid (#2143)', () => {
     const { run, state } = setupSavedPlan();
     fireBlast(run, state);
     state.cash = 1;
     state.finances.cash = 1;
-    const actionsBefore = state.pendingActions.length;
 
     const result = run('blast_plan load');
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('Insufficient funds');
-    expect(state.plannedDrillHoles).toHaveLength(0);
-    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
-    expect(state.pendingActions).toHaveLength(actionsBefore);
+    expect(result.success).toBe(true);
+    expect(state.plannedDrillHoles).toHaveLength(4);
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(4);
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(4);
     expect(state.cash).toBe(1);
   });
 
@@ -600,20 +595,19 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
     expect(state.drillHoles).toHaveLength(0);
   });
 
-  it('drill_plan remove on a loaded planned hole cancels its charge order and refunds the cost', () => {
+  it('drill_plan remove on a loaded planned hole cancels its charge order, which cost nothing', () => {
     const { run, state } = setupSavedPlan();
     fireBlast(run, state);
     expect(run('blast_plan load').success).toBe(true);
     const cashAfterLoad = state.cash;
     const action = state.pendingActions.find(a => a.type === 'charge_hole')!;
     const holeId = action.payload['holeId'] as string;
-    const cost = action.payload['orderCost'] as number;
 
     expect(run(`drill_plan remove hole:${holeId}`).success).toBe(true);
 
     expect(state.plannedChargesByHole[holeId]).toBeUndefined();
     expect(state.pendingActions.some(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId)).toBe(false);
-    expect(state.cash).toBeCloseTo(cashAfterLoad + cost, 5);
+    expect(state.cash).toBe(cashAfterLoad);
   });
 });
 

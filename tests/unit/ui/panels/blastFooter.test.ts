@@ -407,8 +407,8 @@ describe('BlastFooter ore estimate: surveyed ground and nothing broken (#1967)',
   });
 });
 
-describe('BlastFooter delivery wait (#1966)', () => {
-  function inTransitState() {
+describe('BlastFooter has no delivery wait (#2143)', () => {
+  function orderedState() {
     const state = makeState();
     state.tickCount = 280;
     state.cash = 100_000;
@@ -418,23 +418,24 @@ describe('BlastFooter delivery wait (#1966)', () => {
     return { state, hole };
   }
 
-  it('names the arrival day and hour for an order waiting for delivery, not "Charge still loading"', () => {
+  it('reads "Charge still loading" for an ordered hole, with no arrival text, and fire stays disabled', () => {
     const { footer } = makeFooter();
-    const { state, hole } = inTransitState();
+    const { state } = orderedState();
     footer.update(state);
 
     const text = footer.root.textContent ?? '';
-    expect(text).toContain(`${hole.id}: explosives arrive Day 29, 08:00`);
-    expect(text).not.toContain('Charge still loading');
+    expect(text).toContain('Charge still loading');
+    expect(text).not.toMatch(/explosives arrive|arrive/i);
+    expect(text).not.toContain('Day 29, 08:00');
     expect(text).not.toContain('tick');
     expect((footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('reads in French with the French clock', () => {
+  it('shows no French arrival clock', () => {
     setLocale('fr');
     const { footer } = makeFooter();
-    footer.update(inTransitState().state);
-    expect(footer.root.textContent).toContain('Jour 29, 08h00');
+    footer.update(orderedState().state);
+    expect(footer.root.textContent).not.toContain('Jour 29, 08h00');
   });
 
   it('still reads "Charge still loading" for a hole that is really loading', () => {

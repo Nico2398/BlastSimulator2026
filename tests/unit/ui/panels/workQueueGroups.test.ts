@@ -71,7 +71,7 @@ describe('partitionWorkQueue', () => {
       act(5, { type: 'haul_debris', status: 'in_progress', holderId: 5 }),
     ]);
     const g = m.debris[0]!;
-    expect(g).toMatchObject({ total: 5, queued: 2, assigned: 1, inProgress: 2, blocked: 0, stranded: 0, inTransit: 0 });
+    expect(g).toMatchObject({ total: 5, queued: 2, assigned: 1, inProgress: 2, blocked: 0, stranded: 0 });
   });
 
   it('counts queued block states consistently with the row classification', () => {
@@ -79,14 +79,12 @@ describe('partitionWorkQueue', () => {
       act(1, { type: 'haul_debris', blockedReason: 'debris_out_of_reach' }),
       act(2, { type: 'haul_debris', blockedReason: 'no_vehicle_in_fleet' }),
       act(3, { type: 'haul_debris', blockedReason: 'no_licensed_driver' }),
-      act(4, { type: 'haul_debris', blockedReason: 'explosives_in_transit' }),
-      act(5, { type: 'haul_debris' }),
+      act(4, { type: 'haul_debris' }),
     ]);
     const g = m.debris[0]!;
-    expect(g.queued).toBe(5);
+    expect(g.queued).toBe(4);
     expect(g.stranded).toBe(1);
     expect(g.blocked).toBe(2);
-    expect(g.inTransit).toBe(1);
     expect(g.open).toBe(1);
   });
 
@@ -115,9 +113,9 @@ describe('DebrisGroup.blockedReasons (#2008)', () => {
     expect(partitionWorkQueue(acts).debris[0]!.blockedReasons).toEqual({ storage_full: 3 });
   });
 
-  it('starts empty and excludes stranded and in-transit reasons', () => {
+  it('starts empty and excludes stranded reasons', () => {
     expect(partitionWorkQueue(debris(2)).debris[0]!.blockedReasons).toEqual({});
-    const acts = debris(2).map((a, i) => ({ ...a, blockedReason: i === 0 ? 'debris_out_of_reach' as const : 'explosives_in_transit' as const }));
+    const acts = debris(2).map(a => ({ ...a, blockedReason: 'debris_out_of_reach' as const }));
     expect(partitionWorkQueue(acts).debris[0]!.blockedReasons).toEqual({});
   });
 
@@ -170,27 +168,22 @@ describe('debrisGroupSignature', () => {
 
 describe('orderRowsSignature', () => {
   it('is stable for equal input', () => {
-    expect(orderRowsSignature([act(1)], 5)).toBe(orderRowsSignature([act(1)], 5));
+    expect(orderRowsSignature([act(1)])).toBe(orderRowsSignature([act(1)]));
   });
 
   it('differs for empty vs non-empty', () => {
-    expect(orderRowsSignature([], 0)).not.toBe(orderRowsSignature([act(1)], 0));
+    expect(orderRowsSignature([])).not.toBe(orderRowsSignature([act(1)]));
   });
 
   it('changes with status, holder and blocked reason', () => {
-    const base = orderRowsSignature([act(1)], 0);
-    expect(orderRowsSignature([act(1, { status: 'in_progress', holderId: 2 })], 0)).not.toBe(base);
-    expect(orderRowsSignature([act(1, { holderId: 2 })], 0)).not.toBe(base);
-    expect(orderRowsSignature([act(1, { blockedReason: 'no_vehicle_in_fleet' })], 0)).not.toBe(base);
+    const base = orderRowsSignature([act(1)]);
+    expect(orderRowsSignature([act(1, { status: 'in_progress', holderId: 2 })])).not.toBe(base);
+    expect(orderRowsSignature([act(1, { holderId: 2 })])).not.toBe(base);
+    expect(orderRowsSignature([act(1, { blockedReason: 'no_vehicle_in_fleet' })])).not.toBe(base);
   });
 
   it('changes with order and with ids', () => {
-    expect(orderRowsSignature([act(1), act(2)], 0)).not.toBe(orderRowsSignature([act(2), act(1)], 0));
-  });
-
-  it('includes the tick when an in-transit order shows a time-dependent message', () => {
-    const o = act(1, { type: 'charge_hole', blockedReason: 'explosives_in_transit' });
-    expect(orderRowsSignature([o], 10)).not.toBe(orderRowsSignature([o], 11));
+    expect(orderRowsSignature([act(1), act(2)])).not.toBe(orderRowsSignature([act(2), act(1)]));
   });
 });
 

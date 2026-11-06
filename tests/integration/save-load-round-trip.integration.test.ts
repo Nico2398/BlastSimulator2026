@@ -18,7 +18,6 @@ import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { buildingFootprintOccupants } from '../../src/core/nav/NavGridSync.js';
 import { rebuildAgentOccupancy, type AgentOccupancy } from '../../src/core/nav/AgentOccupancy.js';
 import { clearBlastZone, playContracts, playTick, type Run, stockWarehouse } from '../helpers/playthrough.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /** Ticks of the standard opening before the save (#1747's opening at the issue's repro point). */
 // 1296 not 1304: ore saturation (#1930) and the continuous ramp anchor (#2043) shift haul timing, so ticks 1300-1304 land mid-step of vehicle 2 where the live occupancy cell lags the rounded position.
@@ -46,7 +45,7 @@ function playStandardOpening(run: Run, ctx: GameContext, untilElapsed: number): 
   playUntil(800, () => state.plannedDrillHoles.length === 0);
   expect(stockWarehouse(run, state, 'krackle', 72).success).toBe(true); // stock-covered: no delivery wait (#1895)
   run('charge hole:* explosive:krackle amount:8 stemming:2.5');
-  playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
+  playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
   clearBlastZone(run, state);
   expect(run('blast detonate').success).toBe(true);
   // The ramp into the crater (x=39..41): digging it lowers columns beside cells whose type depends on them.

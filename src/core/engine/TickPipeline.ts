@@ -70,7 +70,6 @@ import { stateRubbleStockKg } from '../economy/SpoilHeaps.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { resolveContractOres, resolveContractPriceMultiplier, resolveHiringScript, resolveScriptedOreSale } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
-import { settleAwaitingFundsCharges } from '../mining/ChargeOrder.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
 import { releaseOccupantsOfRemovedBuildings, releaseOccupantsOfRemovedVehicles, flushUnannouncedLeaves } from './Mount.js';
@@ -367,8 +366,6 @@ export function runTick(
     const completionReport = applyTaskCompletion(state, grid, emp, progress, emitter);
     taskCompletions.push({ employeeId: emp.id, report: completionReport });
   }
-  // Pattern auto-charges that were short of cash retry once per tick (#1345).
-  settleAwaitingFundsCharges(state);
 
   // 8f. Locomotion (#1089) — the only mover: walks every alive employee's
   // itinerary one tick's worth of movement, and writes a mounted employee's

@@ -25,7 +25,7 @@ import { computeTaskDuration } from '../../src/core/entities/EmployeeTaskDuratio
 import { Random } from '../../src/core/math/Random.js';
 import {
   SURVEY_DURATION_TICKS, XP_THRESHOLDS, ROLE_STARTING_QUALIFICATIONS, SURVEY_BASE_ERROR, SURVEY_SKILL_BONUS_PER_LEVEL,
-  TRAINING_LEVEL_FEE, QUALIFICATION_SALARY_BONUS, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+  TRAINING_LEVEL_FEE, QUALIFICATION_SALARY_BONUS } from '../../src/core/config/balance.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { tickUntil } from './helpers.js';
@@ -950,7 +950,7 @@ describe('debris haul and fragment drivers gain licence XP over the whole script
     playUntil(800, () => state.plannedDrillHoles.length === 0);
     expect(stockWarehouse(run, state, 'krackle', 72).success).toBe(true); // stock-covered: no delivery wait (#1895)
     run('charge hole:* explosive:krackle amount:8 stemming:2');
-    playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(run, state);
     run('blast');
     playUntil(WINDOW_END, () => false);

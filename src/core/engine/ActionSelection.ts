@@ -22,7 +22,7 @@ import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulAct
 import { fragmentHaulUrgency, oreHaulUrgency } from '../economy/OreDemand.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { thinDebrisCandidates } from './DebrisCandidateBins.js';
-import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
+import { isChargeUnaffordable } from '../mining/ExplosiveStock.js';
 import { employeeClimbReach } from './OrderReachability.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 // #1090: planItinerary (PlanItinerary.ts) itself imports computeActionWorkTicks
@@ -444,13 +444,13 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
 
 /**
  * True unless `action` is a charge_hole order whose hole is still only
- * planned (its drill order has not landed yet), or whose explosives are still in transit (#1895),
+ * planned (its drill order has not landed yet), or whose explosives cash cannot pay for at fill time (#2143),
  * or a drill_hole order whose hole is buried under rubble (#1937; a drill already in progress continues).
  */
 export function isHoleOrderClaimable(state: GameState, action: PendingAction): boolean {
   if (action.type === 'drill_hole') return !isDrillHoleBuried(state, action);
   if (action.type !== 'charge_hole') return true;
-  if (isChargeDeliveryPending(action, state.tickCount)) return false;
+  if (isChargeUnaffordable(state, action)) return false;
   const holeId = action.payload['holeId'];
   if (typeof holeId !== 'string') return true;
   return !state.plannedDrillHoles.some(h => h.id === holeId);

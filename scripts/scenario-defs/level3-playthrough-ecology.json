@@ -540,9 +540,9 @@
         "increased": [
           "orderedChargeCount"
         ],
-        "decreased": [
-          "cash"
-        ]
+        "changedBy": {
+          "cash": 0
+        }
       }
     },
     {
@@ -608,7 +608,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 553,
+          "tickCount": 154,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -637,7 +637,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 553,
+          "tickCount": 154,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -666,7 +666,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 553,
+          "tickCount": 154,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -695,7 +695,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 553,
+          "tickCount": 154,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -724,7 +724,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 553,
+          "tickCount": 154,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -753,7 +753,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 553,
+          "tickCount": 154,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -782,7 +782,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 553,
+          "tickCount": 154,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -807,7 +807,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 553,
+          "tickCount": 154,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -832,7 +832,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 553,
+          "tickCount": 154,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -937,7 +937,7 @@
           "deathCount": 11,
           "employeeCount": 12,
           "wellBeing": 99.95,
-          "safety": 51.54021643258459,
+          "safety": 50,
           "ecology": 44.83863403876688,
           "nuisance": 37.096585096917195,
           "levelEnded": false,
@@ -1110,7 +1110,7 @@
           "deathCount": 11,
           "employeeCount": 12,
           "wellBeing": 99.95,
-          "safety": 51.54021643258459,
+          "safety": 50,
           "ecology": 44.83863403876688,
           "nuisance": 37.096585096917195,
           "levelEnded": false,
@@ -1135,7 +1135,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 556,
+          "tickCount": 174,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 11,
@@ -1162,15 +1162,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 556,
+          "tickCount": 174,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 97.40000000000002,
-          "safety": 0,
-          "ecology": 44.08436960195578,
-          "nuisance": 36.76248721321782,
+          "wellBeing": 99.95,
+          "safety": 9.146359655622655,
+          "ecology": 40.782214298843314,
+          "nuisance": 36.482925484585905,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1190,7 +1190,7 @@
       "description": "#945: tickCount corrected 331 -> 333, following the `tick 20` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 556,
+          "tickCount": 174,
           "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1212,13 +1212,13 @@
       "expect": {
         "note": "#1778: pins re-measured for comfort-band morale recovery. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone.",
         "equals": {
-          "tickCount": 556,
+          "tickCount": 174,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 97.40000000000002,
-          "safety": 0,
-          "ecology": 44.08436960195578,
-          "nuisance": 36.76248721321782,
+          "wellBeing": 99.95,
+          "safety": 9.146359655622655,
+          "ecology": 40.782214298843314,
+          "nuisance": 36.482925484585905,
           "levelEnded": false,
           "levelEndReason": null
         }
@@ -1237,13 +1237,13 @@
       "expect": {
         "note": "#1778: pins re-measured for comfort-band morale recovery. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone.",
         "equals": {
-          "tickCount": 556,
+          "tickCount": 174,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 97.40000000000002,
-          "safety": 0,
-          "ecology": 44.08436960195578,
-          "nuisance": 36.76248721321782,
+          "wellBeing": 99.95,
+          "safety": 9.146359655622655,
+          "ecology": 40.782214298843314,
+          "nuisance": 36.482925484585905,
           "levelEnded": false,
           "levelEndReason": null,
           "bankrupt": false

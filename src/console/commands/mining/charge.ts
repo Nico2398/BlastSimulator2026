@@ -6,29 +6,12 @@ import type { MiningContext } from './types.js';
 import { requireGame, resolveHoleId } from './shared.js';
 import { createCharge, batchCharge } from '../../../core/mining/ChargePlan.js';
 import {
-  dispatchChargeAction, chargeFundsFailureAmount, chargePatternHoles, isHoleChargeCovered,
+  dispatchChargeAction, chargePatternHoles, isHoleChargeCovered,
 } from '../../../core/mining/ChargeOrder.js';
 import { MIN_STEMMING_M } from '../../../core/config/balance.js';
-import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { getLevel, isExplosiveAvailable, resolveAvailableExplosives } from '../../../core/campaign/Level.js';
-
-/**
- * Funds check for a set of charge orders, run before any mutation. Null when
- * affordable (#1345: the arithmetic lives in core's ChargeOrder).
- */
-export function chargeFundsFailure(
-  state: GameState,
-  orders: ReadonlyArray<{ holeId: string; explosiveId: string; amountKg: number }>,
-): CommandResult | null {
-  const short = chargeFundsFailureAmount(state, orders);
-  if (!short) return null;
-  return {
-    success: false,
-    output: t('console.insufficient_funds', { need: formatMoney(short.need), have: formatMoney(state.cash) }),
-  };
-}
 
 export function chargeCommand(
   ctx: MiningContext,
@@ -83,8 +66,6 @@ export function chargeCommand(
   const result = createCharge(explosiveId, amount, stemming, hole.depth, hole.diameter);
   if ('error' in result) return { success: false, output: result.error };
 
-  const broke = chargeFundsFailure(ctx.state!, [{ holeId: hole.id, explosiveId, amountKg: amount }]);
-  if (broke) return broke;
   dispatchChargeAction(ctx.state!, hole, result.charge);
   return { success: true, output: `Charge ordered for ${holeId}: ${explosiveId} ${amount}kg, stemming ${stemming}m` };
 }
@@ -146,7 +127,7 @@ function chargePattern(state: GameState, explosiveId: string, amount: number, st
   const lines: string[] = [];
   if (drilled.length > 0) {
     lines.push(t('mining.charge.ordered_summary', {
-      ordered: result.ordered.length, skipped: skippedCount, waiting: result.awaiting.length,
+      ordered: result.ordered.length, skipped: skippedCount,
     }));
   }
   lines.push(t('mining.charge.pattern_set', { explosive: explosiveName(explosiveId), amount, stemming }));

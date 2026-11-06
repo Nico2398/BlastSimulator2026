@@ -21,7 +21,7 @@ import { placeBuilding } from '../../src/core/entities/Building.js';
 import { computeVoxelColumnSurfaceHeight, computeVoxelColumnSurfaceY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { setLocale } from '../../src/core/i18n/I18n.js';
-import { EXPLOSIVE_DELIVERY_TICKS, SECONDARY_BLAST_CRATER_MAX_PASSES } from '../../src/core/config/balance.js';
+import { SECONDARY_BLAST_CRATER_MAX_PASSES } from '../../src/core/config/balance.js';
 import { tickUntilFresh } from '../helpers/blastFixtures.js';
 import { equipDemolition, tickUntilDemolished } from '../helpers/demolition.js';
 
@@ -51,7 +51,7 @@ function prepare(stockKg: number, extra: ExtraWarehouse[] = []): World {
   tickUntilFresh(run, state, () => state.plannedDrillHoles.length === 0, 1500);
   expect(state.drillHoles).toHaveLength(1);
   expect(run('charge hole:* explosive:krackle amount:6 stemming:2').success).toBe(true);
-  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 1500);
+  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
   expect(placeBuilding(state.buildings, 'explosive_warehouse', WX, WZ, 32, 32, 1).success).toBe(true);
   const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
   if (stockKg > 0) wh.storedExplosives = { boomite: stockKg };

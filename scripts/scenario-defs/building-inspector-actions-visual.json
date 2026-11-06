@@ -506,6 +506,17 @@
       }
     },
     {
+      "command": "event choose 0",
+      "description": "#2143: the shorter run to this point (no explosives delivery wait) lets one more random event fire during the preceding tick; answer it if pending so its dialog does not cover the toolbar.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "build research_center at:26,14",
       "description": "Placed from the Build panel's catalog row for research_center; the Build panel is opened with ensurePanel because earlier steps left a different panel up.",
       "interaction": [

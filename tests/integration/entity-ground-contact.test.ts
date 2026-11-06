@@ -33,7 +33,6 @@ import { GhostMesh } from '../../src/renderer/GhostMesh.js';
 import { placeBuilding, getBuildingDef } from '../../src/core/entities/Building.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 // ── Harness: drives the real production sync entry point ───────────────────
@@ -198,7 +197,7 @@ describe('every rendered entity rests on the terrain sampler through the real sy
     expect(runCommand(engine, 'drill_plan grid rows:2 cols:3 spacing:6 depth:8 start:5,5').success).toBe(true);
     driveToCompletion(engine, 300, () => engine.ctx.state!.plannedDrillHoles.length > 0);
     expect(runCommand(engine, 'charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
-    driveToCompletion(engine, EXPLOSIVE_DELIVERY_TICKS + 300, () => Object.keys(engine.ctx.state!.plannedChargesByHole).length > 0);
+    driveToCompletion(engine, 300, () => Object.keys(engine.ctx.state!.plannedChargesByHole).length > 0);
     const blastResult = runCommand(engine, 'blast');
     expect(blastResult.success).toBe(true);
     expect(engine.ctx.state!.lastBlastReport!.clearedVoxels).toBeGreaterThan(0);

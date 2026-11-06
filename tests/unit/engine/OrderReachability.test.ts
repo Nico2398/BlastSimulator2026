@@ -50,7 +50,6 @@ import {
   roleShortfall,
   siteVehicleReach,
 } from '../../../src/core/engine/OrderReachability.js';
-import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { installGradedRamps, bandCentreZ } from '../../helpers/gradedRamps.js';
@@ -443,7 +442,6 @@ describe('classifyQueuedOrders (#1306)', () => {
         state, { id: 'H1', x: IN_A_TARGET.x, z: IN_A_TARGET.z },
         { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
       );
-      state.tickCount += EXPLOSIVE_DELIVERY_TICKS; // explosives have arrived (#1895)
     };
 
     it('requires the charging truck role', () => {
@@ -501,7 +499,7 @@ describe('classifyQueuedOrders (#1306)', () => {
   });
 
   // Any blockedReason reads red, not only an unreachable target: an order a
-  // capable crew can reach but will not work (explosives in transit, nowhere
+  // capable crew can reach but will not work (unaffordable explosives, nowhere
   // to unload) left the crew idle under a blue ghost.
   describe('blocked ghost flag', () => {
     const licence = ROLE_LICENCE_REQUIRED.charging_truck;
@@ -515,15 +513,24 @@ describe('classifyQueuedOrders (#1306)', () => {
       return state.pendingActions.find(a => a.type === 'charge_hole')!;
     };
 
-    it('is set at dispatch on a reachable charge order whose explosives are in transit, and cleared once they arrive', () => {
+    it('is not set on a reachable charge order the cash covers: no delivery wait (#2143)', () => {
       const state = makeState();
       const action = chargeOrder(state);
-      expect(action.blockedReason).toBe('explosives_in_transit');
+      expect(action.blockedReason ?? null).toBeNull();
+      expect(ghostOf(state, action.id).blocked).toBe(false);
+    });
+
+    it('is set on a reachable charge order the cash cannot pay, and cleared once it can (#2143)', () => {
+      const state = makeState();
+      const action = chargeOrder(state);
+      state.cash = 0;
+      classifyQueuedOrders(state);
+      expect(action.blockedReason).toBe('explosives_unaffordable');
       expect(ghostOf(state, action.id).unreachable).toBe(false);
       expect(ghostOf(state, action.id).blocked).toBe(true);
 
       const revision = state.ghostPreviewsRevision;
-      state.tickCount += EXPLOSIVE_DELIVERY_TICKS;
+      state.cash = 100_000;
       classifyQueuedOrders(state);
       expect(action.blockedReason ?? null).toBeNull();
       expect(ghostOf(state, action.id).blocked).toBe(false);
