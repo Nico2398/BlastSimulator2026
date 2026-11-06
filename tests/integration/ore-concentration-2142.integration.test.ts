@@ -26,7 +26,7 @@ import { oreContributionKg } from '../../src/core/mining/BlastOreReport.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import {
-  EXPLOSIVE_DELIVERY_TICKS, FREIGHT_WAREHOUSE_CAPACITY_KG, SANDBOX_FLAT_PAD_SIZE, SPOIL_HEAP_CAPACITY_KG,
+  FREIGHT_WAREHOUSE_CAPACITY_KG, SANDBOX_FLAT_PAD_SIZE, SPOIL_HEAP_CAPACITY_KG,
 } from '../../src/core/config/balance.js';
 import { fundForDeliveryWait, clearBlastZone, playTick } from '../helpers/playthrough.js';
 
@@ -309,7 +309,7 @@ function playOpening(): Played {
   expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${shotX},${shotZ}`)).toMatchObject({ success: true });
   tickWhile(run, state, () => state.plannedDrillHoles.length === 0, 1500);
   expect(run('charge hole:* explosive:krackle amount:6 stemming:2')).toMatchObject({ success: true });
-  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 1500);
+  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
   clearBlastZone(run, state);
   expect(run('blast detonate')).toMatchObject({ success: true });
   tickWhile(run, state, () => state.lastBlastReport !== null, 600);
