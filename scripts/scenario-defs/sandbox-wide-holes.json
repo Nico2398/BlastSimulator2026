@@ -97,11 +97,33 @@
       "command": "charge hole:H1 explosive:boomite amount:16 stemming:2",
       "role": "guard",
       "commandOutcome": "refused",
-      "description": "16 kg with 2 m stemming needs a 8 m column; an 89 mm hole (2 kg/m) in an 8 m hole holds 12 kg at most, so the charge is refused.",
+      "description": "16 kg with 2 m stemming needs a 8 m column; an 89 mm hole (2 kg/m) in an 8 m hole holds 12 kg at most, so the charge is refused. The Charge step is set to the same 16 kg load with a product that allows it (obliviax), which the 8 m hole cannot hold.",
       "interaction": [
         {
           "type": "command",
           "command": "charge hole:H1 explosive:boomite amount:16 stemming:2"
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"obliviax\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 16
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
         }
       ],
       "expect": {
