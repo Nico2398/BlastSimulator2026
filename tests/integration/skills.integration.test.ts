@@ -29,7 +29,7 @@ import {
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { tickUntil } from './helpers.js';
-import { playContracts, playTick, clearBlastZone, type Run, stockWarehouse } from '../helpers/playthrough.js';
+import { playContracts, playTick, clearBlastZone, type Run } from '../helpers/playthrough.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -799,8 +799,6 @@ describe('charge_hole duration scales with blasting proficiency (#1384)', () => 
     expect(state.drillHoles).toHaveLength(1);
     const holeId = state.drillHoles[0]!.id;
 
-    // Stock-covered, so the measured span is the crew's loading time and not the delivery wait (#1895).
-    expect(stockWarehouse(run, state, 'boomite', 5).success).toBe(true);
     expect(run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`).success).toBe(true);
     let ticks = 0;
     while (state.chargesByHole[holeId] === undefined && ticks < 800) {
@@ -948,7 +946,6 @@ describe('debris haul and fragment drivers gain licence XP over the whole script
     expect(run('build living_quarters at:30,48 tier:1').success).toBe(true);
     expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32').success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    expect(stockWarehouse(run, state, 'krackle', 72).success).toBe(true); // stock-covered: no delivery wait (#1895)
     run('charge hole:* explosive:krackle amount:8 stemming:2');
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(run, state);

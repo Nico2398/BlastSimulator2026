@@ -105,7 +105,7 @@ import { haulDestinationOf } from '../../src/core/economy/SpoilHeaps.js';
 import { terrainConfigOf } from '../../src/console/commands/world.js';
 import { resolveStarterDeposit } from '../../src/core/world/StarterDeposit.js';
 import { oreGradeScaleOf } from '../../src/core/economy/OreGrade.js';
-import { BLAST_ZONE_CLEAR_MARGIN, playContracts, playTick, clearBlastZone, explosiveRoomKg, topUpWarehouse, type Run } from './player-actions.js';
+import { BLAST_ZONE_CLEAR_MARGIN, playContracts, playTick, clearBlastZone, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
 import { expandMatrix } from './probe-config.js';
@@ -493,13 +493,10 @@ function orderShot(
 ): Shot | null {
   const span = spanOf(spec);
   const candidates = at ? [at] : freshSites(s.grid, span, spec.depth, earlier, rules, keepOut).slice(0, DEPOSIT_CANDIDATES_TRIED);
-  // The stock buy takes whole kg; round up so the pattern's charge is covered.
-  const totalKg = Math.ceil(spec.rows * spec.cols * spec.kg);
   const diameter = spec.diameterM === undefined ? '' : ` diameter:${spec.diameterM}`;
   for (const c of candidates) {
     const cmd = `drill_plan grid rows:${spec.rows} cols:${spec.cols} spacing:${spec.spacing} depth:${spec.depth} start:${c.x},${c.z}${diameter}`;
     if (!s.run(cmd).success) continue;
-    if (!topUpWarehouse(s.run, s.state, spec.explosive, totalKg, s.config.eventPolicy).success) return null;
     const charge = `charge hole:* explosive:${spec.explosive} amount:${spec.kg} stemming:${spec.stemming}`;
     if (!s.run(charge).success) return null;
     return { at: { x: c.x, z: c.z }, span, startedTick: s.state.tickCount };
@@ -1364,9 +1361,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const wanted = decideLadderShotSide({
     limitSide, grade: gradeOf(s), lastShotFailed: m.lastShotFailed, sealedRubbleCount: craterRubbleCounts(state, m.crater).sealed,
   });
-  const free = explosiveRoomKg(state, shotExplosive(s));
-  let side = shaft ? 1 : wanted;
-  while (side > 0 && side * side * (kgFor(side) + 0.1) > free) side--;
+  const side = shaft ? 1 : wanted;
   const kg = kgFor(Math.max(side, 1));
   const specFor = (n: number): ShotSpec => ({
     rows: n, cols: n, spacing: sized.spacing, depth, explosive: shotExplosive(s), kg: kgFor(n), stemming: sized.stemming, diameterM: sized.diameterM,
