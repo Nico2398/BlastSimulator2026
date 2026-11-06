@@ -617,14 +617,7 @@
         }
       ],
       "role": "setup",
-      "commandOutcome": "either",
-      "expect": {
-        "decreased": [
-          "ecology",
-          "nuisance"
-        ],
-        "note": "#1362: the armed detonation auto-fires inside this tick batch once the zone is clear (tickCommand), so the blast's vibration dip in ecology/nuisance lands here."
-      }
+      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -650,7 +643,11 @@
         "equals": {
           "dangerZoneClear": true
         },
-        "note": "#1042: dangerZoneClear reads true here, not false -- the #947 stranded-driverless-drill_rig case (see the first tick step's own description) is exactly what #1042's evacuation driver-boarding now resolves: an idle employee boards the driverless rig and drives it clear instead of leaving it stranded, so the zone genuinely clears by this point rather than staying blocked forever."
+        "note": "#2143: the armed detonation fires inside this tick batch (the vibration dip in ecology/nuisance lands here). #1042: dangerZoneClear reads true here, not false -- the #947 stranded-driverless-drill_rig case (see the first tick step's own description) is exactly what #1042's evacuation driver-boarding now resolves: an idle employee boards the driverless rig and drives it clear instead of leaving it stranded, so the zone genuinely clears by this point rather than staying blocked forever.",
+        "decreased": [
+          "ecology",
+          "nuisance"
+        ]
       }
     },
     {

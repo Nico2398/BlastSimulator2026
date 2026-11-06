@@ -202,7 +202,7 @@
     },
     {
       "command": "blast_plan load",
-      "description": "Player clicks Load on the saved plan. Holes and charges are ordered, not written: nothing is drilled yet and the explosives are paid.",
+      "description": "Player clicks Load on the saved plan. Holes and charges are ordered, not written: nothing is drilled yet and no explosives are paid (paid on fill, #2143).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -225,9 +225,9 @@
           "holeCount": 0,
           "chargedCount": 0
         },
-        "decreased": [
-          "cash"
-        ]
+        "changedBy": {
+          "cash": 0
+        }
       }
     },
     {
