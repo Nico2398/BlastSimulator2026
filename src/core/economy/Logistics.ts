@@ -579,3 +579,27 @@ export function releaseBarrenStoredFragments(
   state.storedMassKg = Math.max(0, state.storedMassKg - releasedKg);
   return releasedKg;
 }
+
+/**
+ * Concentrate one stored ore-bearing fragment (#2142): keep only the ore's mass in the
+ * warehouse and credit the barren remainder to the first spoil heap with room (net of
+ * `reservedKg`). Returns kg moved to a heap; 0 (nothing changed) when no heap holds the
+ * whole remainder or there is no remainder.
+ */
+export function concentrateStoredFragment(
+  _state: LogisticsState,
+  _tracked: TrackedFragment,
+  _buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
+  _reservedKg: ReadonlyMap<number, number> = new Map(),
+): number {
+  throw new Error('not implemented');
+}
+
+/** concentrateStoredFragment over every stored ore-bearing fragment, oldest first; returns kg moved to heaps (#2142). */
+export function concentrateStoredOre(
+  _state: LogisticsState,
+  _buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
+  _gradeScale = ORE_GRADE_SCALE_DEFAULT,
+): number {
+  throw new Error('not implemented');
+}
