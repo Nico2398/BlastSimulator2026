@@ -212,6 +212,13 @@ def skeleton(b: Build, role: str) -> tuple[Skeleton, Joints]:
             BoneSpec(f'Forearm{sfx}', tuple(_side(j.elbow, s)), tuple(_side(j.wrist, s)), f'UpperArm{sfx}'),
             BoneSpec(f'Hand{sfx}', tuple(_side(j.wrist, s)), tuple(_side(j.hand_tip, s)), f'Forearm{sfx}'),
         ]
+        # The fingers' two segments, along the mitten's curl: knuckle → middle joint → tip.
+        hf = hand_frame(j, s)
+        knuckle, middle, tip = (hf @ Vector(c) for c in finger_joints(b.hand))
+        specs += [
+            BoneSpec(f'Fingers{sfx}', tuple(knuckle), tuple(middle), f'Hand{sfx}'),
+            BoneSpec(f'FingerTips{sfx}', tuple(middle), tuple(tip), f'Fingers{sfx}'),
+        ]
         hy = s * b.hip_w
         ball_x = 0.085 * b.boot
         specs += [
@@ -237,6 +244,15 @@ def skeleton(b: Build, role: str) -> tuple[Skeleton, Joints]:
 
 # Grip centre inside a loose fist, in canonical right-hand space (see hand_frame).
 GRIP = (0.0, 0.045, -0.052)
+FINGER_U = (0.4, 0.7)
+"""Where the mitten loft (six sections, u even in section index) bends: the knuckle at its third
+section, the fingers' middle joint halfway between its fourth and fifth."""
+
+
+def finger_joints(k: float) -> tuple[tuple[float, float, float], ...]:
+    """Knuckle, middle joint and tip of the curled fingers in canonical hand space, for hand scale `k`
+    (the mitten loft's third, fourth-and-a-half and last section centres)."""
+    return ((0.0, 0.012, -0.052 * k), (0.0, 0.046 * k, -0.07 * k), (0.0, 0.07 * k, -0.048 * k))
 # Where the manager's pointing finger leaves the fist (canonical hand space, before the hand scale).
 FINGER_BASE = (0.024, 0.02, -0.05)
 
@@ -563,7 +579,14 @@ def hand(skel: Skeleton, b: Build, j: Joints, m, role: str, s: int, sfx: str) ->
         Section((0.054 * k, 0.034 * k, -0.032 * k), 0.017 * k, 0.017 * k),
         Section((0.04 * k, 0.06 * k, -0.046 * k), 0.016 * k, 0.016 * k),
     ], segments=8, rings=5, cap_start=0.5, cap_end=1.0, cap_rings=3, front=(0, 1, 0))
-    parts = [palm.ob, thumb.ob]
+    # The mitten bends at the knuckles and again halfway down the fingers, so the hand can
+    # open from the fist it is built in; the thumb stays on the hand.
+    to_hand(palm.ob, frame)
+    assign(palm.ob, mat)
+    skel.attach(palm.ob)
+    bind_chain(palm.ob, palm.u, [(0.0, f'Hand{sfx}'), (FINGER_U[0], f'Fingers{sfx}'), (FINGER_U[1], f'FingerTips{sfx}')],
+               blend=0.05)
+    parts = [thumb.ob]
     if role == 'manager' and s == 1:
         # The boss's pointing finger, always out.
         finger = loft('HandFingerL', [

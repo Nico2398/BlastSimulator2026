@@ -325,8 +325,8 @@ export function curlHand(rig: WorkerRig, s: Side, amount: number): void {
 const LID_SHUT = 1.1;
 
 /** How far the fingers' two segments turn to open a fist out flat (rad). */
-const FINGER_OPEN = 75 * DEG;
-const TIP_OPEN = 60 * DEG;
+const FINGER_OPEN = 62 * DEG;
+const TIP_OPEN = 70 * DEG;
 
 /** The manager's pointing finger, curled back into his fist (`amount` 1) or out (0). */
 export function curlFinger(rig: WorkerRig, amount: number): void {

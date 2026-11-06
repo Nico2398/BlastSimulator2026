@@ -240,6 +240,24 @@ describe('WorkerAnimator', () => {
     expect(world(hurt.root, `Hand${s}`).distanceTo(thigh)).toBeLessThan(0.14);
   });
 
+  it("opens a hand that holds nothing: a collapsed worker's fingers uncurl from the fist they are bound in", () => {
+    const { root, rig } = worker('driller');
+    expect(rig.rest.L.fingerHinge, 'finger bones').not.toBeNull();
+    // The fingertip: the far end of the tip segment, along its bone.
+    const reach = (): number => {
+      root.updateMatrixWorld(true);
+      const tip = new THREE.Vector3(0, 0.03, 0).applyMatrix4(root.getObjectByName('FingerTipsL')!.matrixWorld);
+      return tip.distanceTo(world(root, 'HandL'));
+    };
+    const P = rig.poser;
+    P.reset();
+    P.apply(P.capture(P.createBuffer()));
+    const fist = reach();
+    const a = new WorkerAnimator(rig, 'driller', 7);
+    for (let i = 0; i < 200; i++) a.update(DT, { ...STILL, collapsing: true, fatigue: 0 });
+    expect(reach()).toBeGreaterThan(fist * 1.25);
+  });
+
   it('ignores a zero or negative time step', () => {
     const { root, rig } = worker();
     const a = new WorkerAnimator(rig, 'driller', 1);
