@@ -216,6 +216,7 @@ export function applyTaskCompletion(
       const planned = state.plannedChargesByHole[holeId];
       if (planned) {
         delete state.plannedChargesByHole[holeId];
+    // TODO(#2155): re-check affordability here (claim-time gate only), and migrate legacy prepaid orders.
         // Pay on fill (#2143): stock draws and cash book now, not at order time.
         const { fromStockKg } = loadChargeExplosive(state, planned.explosiveId, planned.amountKg);
         const loaded = landLoadedCharge({ ...planned, ...(fromStockKg > 0 && { fromStockKg }) });
