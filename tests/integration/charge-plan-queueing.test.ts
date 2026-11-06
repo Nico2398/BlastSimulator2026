@@ -517,7 +517,7 @@ describe('charge order cash cost: paid when the hole is loaded, not when ordered
     expect(state.pendingActions.some(a => a.type === 'charge_hole')).toBe(false);
   });
 
-  it('cash exactly equal to the cost is accepted and the load takes it to zero', () => {
+  it('cash exactly equal to the cost is accepted at order time (the order books nothing)', () => {
     const { run, state } = setupDrilled(1, 1, 60);
     const holeId = state.drillHoles[0]!.id;
 
