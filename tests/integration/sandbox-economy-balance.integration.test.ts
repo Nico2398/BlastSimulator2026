@@ -32,7 +32,7 @@ import {
   SANDBOX_REFERENCE_CREW_COST_PER_TICK,
   SANDBOX_REFERENCE_SHOT_CYCLE_TICKS,
   TICKS_PER_DAY } from '../../src/core/config/balance.js';
-import { FORBIDDEN_COMMAND, playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from '../helpers/playthrough.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, clearBlastZone, type Run } from '../helpers/playthrough.js';
 
 const DESERT = 'desert_badlands';
 const ABSORB_DAYS = 5;
@@ -415,8 +415,6 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
     // Shot 1: 3x3, drilled, charged and fired by the opening crew.
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${FIRST_SHOT}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    // A player pays for and builds the warehouse (#1963): no free placeBuilding.
-    expect(stockWarehouse(logged, state, 'krackle', 54).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:6 stemming:2');
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
@@ -431,8 +429,6 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
     if (!over()) {
       expect(logged(`drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:${SECOND_SHOT}`).success).toBe(true);
       playUntil(800, () => state.plannedDrillHoles.length === 0);
-      // A player pays for and builds the warehouse (#1963): no free placeBuilding.
-      expect(stockWarehouse(logged, state, 'krackle', 24).success).toBe(true);
       logged('charge hole:* explosive:krackle amount:6 stemming:2');
       playUntil(CHARGE_WAIT_TICKS, () => Object.keys(state.plannedChargesByHole).length === 0);
       expect(Object.keys(state.plannedChargesByHole), `second pattern still uncharged ${CHARGE_WAIT_TICKS} ticks after ordering`).toEqual([]);
@@ -466,9 +462,10 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
    * stockWarehouse (#1963, $20,000 and its build time before the order): 740,314.4. Re-measured once trace ore under the
    * barren threshold, bound for the spoil heap, stopped counting as ore in barren-yields-to-ore (#2089): 735,908.7.
    * Re-measured for the x0.6 production ore prices (#2117): 373,449.0.
+   * Re-measured once the opening stopped building and stocking an explosive warehouse, the load paid from cash (#2152): 504,168.2.
    * Floor is that measurement, rounded down.
    */
-  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 373_449;
+  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 504_168;
 
   interface OpeningTrace {
     endedAtTick: number | null;
@@ -504,8 +501,6 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
     expect(trace.buildOk, 'living quarters placed').toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:5 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    // A player pays for and builds the warehouse (#1963): no free placeBuilding.
-    expect(stockWarehouse(logged, state, 'krackle', 54).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:6 stemming:2');
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
@@ -584,8 +579,6 @@ describe('sandbox economy: a supply contract can be filled (#1789)', () => {
     expect(logged(`build ${BUILD}`).success).toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    // A player pays for and builds the warehouse (#1963): no free placeBuilding.
-    expect(stockWarehouse(logged, state, 'krackle', 72).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:8 stemming:2');
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
@@ -634,8 +627,6 @@ describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => 
     expect(logged(`build ${BUILD}`).success).toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    // A player pays for and builds the warehouse (#1963): no free placeBuilding.
-    expect(stockWarehouse(logged, state, 'krackle', 72).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:8 stemming:2');
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
@@ -707,8 +698,6 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
     expect(logged(`build ${BUILD}`).success).toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    // A player pays for and builds the warehouse (#1963): no free placeBuilding.
-    expect(stockWarehouse(logged, state, 'krackle', 72).success).toBe(true);
     logged('charge hole:* explosive:krackle amount:8 stemming:2');
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);

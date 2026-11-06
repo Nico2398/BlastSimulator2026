@@ -10,7 +10,6 @@ import { stateRubbleStockKg } from '../../src/core/economy/SpoilHeaps.js';
 import { pendingSpoilOverflowKg } from '../../src/core/economy/HaulDispatch.js';
 import { getEventById } from '../../src/core/events/EventPool.js';
 import { isPaidClearance } from '../../src/core/economy/Contract.js';
-import { getExplosivesFreeCapacity, getExplosivesInStock } from '../../src/core/entities/BuildingWarehouse.js';
 
 /** A console command runner, as `createRunner().runner.run` or a recording wrapper of it. */
 export type Run = (cmd: string) => { success: boolean; output: string };
@@ -116,38 +115,4 @@ export function clearBlastZone(run: Run, state: GameState, policy: EventPolicy =
   run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
   const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
   for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state, policy);
-}
-
-/**
- * Stock `kg` of `explosiveId` in an explosive warehouse before ordering a pattern, as a competent player does:
- * a stock-covered order skips the cash-bought delivery wait (#1895), which would idle the crew on payroll.
- * Builds a warehouse on the first free cell when the site has none (the kits carry none) and waits for the
- * crew to raise it, then buys. Returns the buy command's result so a caller can assert it.
- */
-export function stockWarehouse(run: Run, state: GameState, explosiveId: string, kg: number, policy: EventPolicy = 'first'): { success: boolean; output: string } {
-  if (!state.buildings.buildings.some((b) => b.type === 'explosive_warehouse')) {
-    const grid = state.navGrid!;
-    let ordered = false;
-    for (let z = 1; z < grid.height - 6 && !ordered; z += 2) {
-      for (let x = 1; x < grid.width - 6 && !ordered; x += 2) {
-        ordered = run(`build explosive_warehouse at:${x},${z} tier:1`).success;
-      }
-    }
-    for (let i = 0; i < 600 && state.plannedBuildings.length > 0; i++) playTick(run, state, policy);
-  }
-  return run(`buy explosive:${explosiveId} kg:${kg}`);
-}
-
-/** Explosive store room (kg) for an order of `explosiveId`: its free space plus what it already holds of that explosive. */
-export function explosiveRoomKg(state: GameState, explosiveId: string): number {
-  return getExplosivesFreeCapacity(state.buildings) + getExplosivesInStock(state.buildings, explosiveId);
-}
-
-/**
- * Bring the store up to `kg` of `explosiveId`, buying only the shortfall: stock an abandoned pattern left behind charges
- * the next one, and buying the full charge again on top of it fills the store until no order fits (#2091).
- */
-export function topUpWarehouse(run: Run, state: GameState, explosiveId: string, kg: number, policy: EventPolicy = 'first'): { success: boolean; output: string } {
-  const shortKg = Math.max(0, kg - Math.floor(getExplosivesInStock(state.buildings, explosiveId)));
-  return shortKg > 0 ? stockWarehouse(run, state, explosiveId, shortKg, policy) : { success: true, output: `${explosiveId} in stock` };
 }
