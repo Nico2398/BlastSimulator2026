@@ -1140,10 +1140,9 @@
           "employeeCount": 4,
           "buildingCount": 2,
           "vehicleCount": 2,
-          "activeContractCount": 0,
           "surveyCount": 1
         },
-        "note": "#1895: activeContractCount is 0, not 1: the delivery wait gives the haulers a longer run before the sale, so the 200 kg delivery fills the fillable ore_sale offer in full and completes it."
+        "note": "#2143: activeContractCount is no longer pinned. Without the explosives delivery wait the haulers get a shorter run before the sale, so whether the ore_sale offer is filled in full by the 200 kg delivery depends on the clock the run arrived by (command mode: filled and completed; interaction mode: part-delivered, one contract left). The contract outcome is asserted step-locally by the accept and deliver steps above."
       }
     }
   ]
