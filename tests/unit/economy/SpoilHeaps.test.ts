@@ -8,7 +8,7 @@ import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD, SPOIL_HEAP_CAPACITY_KG } from '../
 import {
   creditSpoilHeaps, creditSpoilKg, spoilHeapRoomKg, totalSpoilRoomKg, drawSpoilKg, barrenStoredMassKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg, barrenOverflowKg, stateBarrenOverflowKg,
 } from '../../../src/core/economy/SpoilHeaps.js';
-import { addBlastFragments, createLogisticsState, deliverToSpoilHeap } from '../../../src/core/economy/Logistics.js';
+import { addBlastFragments, createLogisticsState, deliverToSpoilHeap, concentrateStoredFragment, concentrateStoredOre } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import { BUILDING_DEFS } from '../../../src/core/entities/BuildingDefs.js';
@@ -541,5 +541,96 @@ describe('barrenOverflowKg / stateBarrenOverflowKg (#2018)', () => {
     const scaled = { ...state, logistics: { fragments: [frag(10_000, { blingite: 0.015 })], storedMassKg: 10_000 } };
     expect(stateBarrenOverflowKg(scaled)).toBe(10_000);
     expect(stateBarrenOverflowKg({ ...scaled, world: { oreGradeScale: 0.5 } })).toBe(0);
+  });
+});
+
+describe('spoil heap capacity holds one opening shot (#2142)', () => {
+  it('SPOIL_HEAP_CAPACITY_KG is between 1,400 t and 1,600 t', () => {
+    expect(SPOIL_HEAP_CAPACITY_KG).toBeGreaterThanOrEqual(1_400_000);
+    expect(SPOIL_HEAP_CAPACITY_KG).toBeLessThanOrEqual(1_600_000);
+  });
+
+  it('the tier 1 spoil heap definition and its site room follow the constant', () => {
+    expect(BUILDING_DEFS.spoil_heap[1].capacity).toBe(SPOIL_HEAP_CAPACITY_KG);
+    const state = createBuildingState();
+    const r = placeBuilding(state, 'spoil_heap', 10, 12, 64, 64);
+    if (!r.success) throw new Error(`setup: ${r.error}`);
+    expect(spoilHeapSites(state)[0]!.capacityKg).toBe(SPOIL_HEAP_CAPACITY_KG);
+    expect(spoilHeapRoomKg({ type: 'spoil_heap', tier: 1, storedSpoilKg: 0 })).toBe(SPOIL_HEAP_CAPACITY_KG);
+  });
+
+  it('an empty heap takes a 1,000 t load of barren rock in whole, and no more than the constant', () => {
+    const heaps = [{ type: 'spoil_heap' as const, tier: 1 as const, storedSpoilKg: 0 }];
+    expect(creditSpoilHeaps(heaps, 1_000_000)).toBe(true);
+    expect(creditSpoilHeaps(heaps, SPOIL_HEAP_CAPACITY_KG - 1_000_000 + 1)).toBe(false);
+    expect(creditSpoilHeaps(heaps, SPOIL_HEAP_CAPACITY_KG - 1_000_000)).toBe(true);
+    expect(totalSpoilRoomKg(heaps)).toBe(0);
+  });
+});
+
+describe('concentrated rock is spoil like any other (#2142)', () => {
+  const stored = (id: number, mass: number, oreDensities: Record<string, number>): FragmentData => ({
+    id, position: { x: 0, y: 0, z: 0 }, volume: mass / 2500, mass, rockId: 'sandite', oreDensities,
+    initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false, halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: id,
+    origin: { x: 0, y: 0, z: 0 },
+  });
+  function warehouseWith(...frags: FragmentData[]) {
+    const l = createLogisticsState(10_000_000);
+    for (const f of frags) {
+      l.fragments.push({ fragment: f, state: 'stored', vehicleId: null, warehouseId: 1 });
+      l.storedMassKg += f.mass;
+    }
+    return l;
+  }
+
+  it('the remainder lands on the heap as storedSpoilKg and counts in totalSpoilKg and rubble stock', () => {
+    const l = warehouseWith(stored(1, 4_000, { blingite: 0.25 }));
+    const heaps = [pile(0)];
+
+    const moved = concentrateStoredOre(l, heaps);
+
+    expect(moved).toBeCloseTo(3_000, 6);
+    expect(heaps[0]!.storedSpoilKg).toBeCloseTo(3_000, 6);
+    expect(totalSpoilKg(heaps)).toBeCloseTo(3_000, 6);
+    expect(totalSpoilRoomKg(heaps)).toBeCloseTo(SPOIL_HEAP_CAPACITY_KG - 3_000, 6);
+    expect(rubbleStockKg(l.fragments, heaps)).toBeCloseTo(3_000, 6);
+  });
+
+  it('the shrunk ore fragment is still ore (not barren, destined for the warehouse)', () => {
+    const l = warehouseWith(stored(1, 4_000, { blingite: 0.25 }));
+    concentrateStoredOre(l, [pile(0)]);
+    const f = l.fragments[0]!;
+
+    expect(isBarrenFragment(f.fragment.oreDensities)).toBe(false);
+    expect(haulDestinationOf(f.fragment)).toBe('warehouse');
+    expect(barrenStoredMassKg(l.fragments)).toBe(0);
+  });
+
+  it('a barren-heavy warehouse of concentrated ore reports no barren overflow', () => {
+    const l = warehouseWith(stored(1, 4_000, { blingite: 0.25 }));
+    const heap = { ...pile(0), id: 5 };
+    expect(barrenOverflowKg(l.fragments, l.storedMassKg, [heap])).toBe(0);
+    concentrateStoredOre(l, [heap]);
+    expect(barrenOverflowKg(l.fragments, l.storedMassKg, [heap])).toBe(0);
+  });
+
+  it('a heap that is full takes nothing and the fragment is left whole', () => {
+    const l = warehouseWith(stored(1, 4_000, { blingite: 0.25 }));
+    const heaps = [pile(SPOIL_HEAP_CAPACITY_KG)];
+
+    const tracked = l.fragments[0]!;
+    expect(concentrateStoredFragment(l, tracked, heaps)).toBe(0);
+    expect(heaps[0]!.storedSpoilKg).toBe(SPOIL_HEAP_CAPACITY_KG);
+    expect(tracked.fragment.mass).toBe(4_000);
+    expect(l.storedMassKg).toBe(4_000);
+  });
+
+  it('draws for a rubble contract come off the heap that concentration filled', () => {
+    const l = warehouseWith(stored(1, 4_000, { blingite: 0.25 }));
+    const heaps = [pile(0)];
+    concentrateStoredOre(l, heaps);
+
+    expect(drawSpoilKg(heaps, 1_000)).toBe(1_000);
+    expect(heaps[0]!.storedSpoilKg).toBeCloseTo(2_000, 6);
   });
 });
