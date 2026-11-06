@@ -115,6 +115,7 @@ const PHRASE_KIND_BY_REASON: Record<BlockedOrderReason, BlockedPhraseKind | null
   buried_under_rubble: 'buried',
   debris_out_of_reach: null,
   explosives_in_transit: null,
+  explosives_unaffordable: null,
 };
 
 /** Phrase kind of a failure reason; null for non-failure or absent reasons. */

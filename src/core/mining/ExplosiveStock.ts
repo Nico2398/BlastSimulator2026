@@ -151,3 +151,30 @@ export function chargeDeliveryArrivalByHole(state: Pick<GameState, 'pendingActio
   }
   return byHole;
 }
+
+/** Stock/cash split and cash cost of loading `amountKg` into a hole now (#2143); pure. */
+export function quoteChargeLoad(
+  _state: Pick<GameState, 'buildings' | 'events' | 'tickCount'>,
+  _explosiveId: string,
+  _amountKg: number,
+): { fromStockKg: number; fromCashKg: number; cost: number } {
+  throw new Error('not implemented');
+}
+
+/** True when the cash part of loading `amountKg` is covered by current cash (#2143). */
+export function canAffordChargeLoad(
+  _state: Pick<GameState, 'buildings' | 'events' | 'tickCount' | 'cash'>,
+  _explosiveId: string,
+  _amountKg: number,
+): boolean {
+  throw new Error('not implemented');
+}
+
+/** Load time: draw warehouse stock first, pay the rest in cash, book the 'explosives' expense (#2143). */
+export function loadChargeExplosive(
+  _state: GameState,
+  _explosiveId: string,
+  _amountKg: number,
+): { fromStockKg: number; cost: number } {
+  throw new Error('not implemented');
+}
