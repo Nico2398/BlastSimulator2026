@@ -123,9 +123,10 @@ export function readOrderDeliveryTick(action: Pick<PendingAction, 'payload'>): n
 
 /** True while a charge order's cash-bought explosives have not arrived yet (#1895). */
 export function isChargeDeliveryPending(action: Pick<PendingAction, 'type' | 'payload'>, tickCount: number): boolean {
-  if (action.type !== 'charge_hole') return false;
-  const arrival = readOrderDeliveryTick(action);
-  return arrival !== undefined && tickCount < arrival;
+  // Existing saves can contain future delivery ticks from before delivery was removed.
+  void action;
+  void tickCount;
+  return false;
 }
 
 /** Earliest delivery tick of a still-waiting charge order, or null when none is in transit (#1895). */

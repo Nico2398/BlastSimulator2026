@@ -126,14 +126,14 @@ describe('outstandingChargeBlockedReason (#1660)', () => {
 });
 
 describe('explosives_in_transit reason (#1895)', () => {
-  it('marks an otherwise serviceable cash-bought order in transit', () => {
+  it('does not block an otherwise serviceable cash-bought order', () => {
     const state = makeState();
     hireDual(state);
     purchaseVehicle(state.vehicles, 'charging_truck', 10, 10);
     order(state, 1);
     classifyQueuedOrders(state);
-    expect(chargeActions(state)[0]!.blockedReason).toBe('explosives_in_transit');
-    expect(outstandingChargeBlockedReason(state)).toBe('explosives_in_transit');
+    expect(chargeActions(state)[0]!.blockedReason).toBeNull();
+    expect(outstandingChargeBlockedReason(state)).toBeNull();
   });
 
   it('keeps no_vehicle_in_fleet when there is no charging truck', () => {
@@ -144,14 +144,14 @@ describe('explosives_in_transit reason (#1895)', () => {
     expect(chargeActions(state)[0]!.blockedReason).toBe('no_vehicle_in_fleet');
   });
 
-  it('stays in transit one tick before arrival', () => {
+  it('does not block an order before its former arrival', () => {
     const state = makeState();
     hireDual(state);
     purchaseVehicle(state.vehicles, 'charging_truck', 10, 10);
     order(state, 1);
     state.tickCount = EXPLOSIVE_DELIVERY_TICKS - 1;
     classifyQueuedOrders(state);
-    expect(chargeActions(state)[0]!.blockedReason).toBe('explosives_in_transit');
+    expect(chargeActions(state)[0]!.blockedReason).toBeNull();
   });
 
   it('clears at the arrival tick', () => {

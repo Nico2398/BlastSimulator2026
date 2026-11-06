@@ -48,11 +48,11 @@ describe('buildStockView delivery fields (#1895)', () => {
     expect(buildStockView(makeState(), ['boomite'], 'boomite', 10, 1, 5).inTransitUntilTick).toBeNull();
   });
 
-  it('inTransitUntilTick is the earliest arrival of a waiting order', () => {
+  it('has no in-transit order after ordering', () => {
     const state = makeState();
     state.tickCount = 30;
     dispatchChargeAction(state, { id: 'H1', x: 10, z: 10 }, { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
     const view = buildStockView(state, ['boomite'], 'boomite', 10, 1, 5);
-    expect(view.inTransitUntilTick).toBe(30 + EXPLOSIVE_DELIVERY_TICKS);
+    expect(view.inTransitUntilTick).toBeNull();
   });
 });

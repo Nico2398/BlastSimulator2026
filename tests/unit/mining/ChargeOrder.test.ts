@@ -355,18 +355,18 @@ describe('dispatchChargeAction delivery wait (#1895)', () => {
     expect(earliestChargeDeliveryTick(state)).toBeNull();
   });
 
-  it('stamps tickCount + delivery ticks when nothing is stocked', () => {
+  it('does not stamp an arrival when nothing is stocked', () => {
     const state = makeState();
     state.tickCount = 120;
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    expect(arrival(state)).toBe(120 + EXPLOSIVE_DELIVERY_TICKS);
+    expect(arrival(state)).toBeUndefined();
   });
 
-  it('stamps an arrival when stock falls short by 1 kg', () => {
+  it('does not stamp an arrival when stock falls short', () => {
     const state = stockedState(4);
     state.tickCount = 10;
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    expect(arrival(state)).toBe(10 + EXPLOSIVE_DELIVERY_TICKS);
+    expect(arrival(state)).toBeUndefined();
   });
 
   it('stamps no arrival when stock matches the order exactly', () => {
@@ -375,20 +375,20 @@ describe('dispatchChargeAction delivery wait (#1895)', () => {
     expect(arrival(state)).toBeUndefined();
   });
 
-  it('is flat per order, not additive per hole', () => {
+  it('does not delay multiple orders', () => {
     const state = makeState();
     state.tickCount = 50;
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     dispatchChargeAction(state, hole(2), BOOMITE_5KG);
     dispatchChargeAction(state, hole(3), BOOMITE_5KG);
-    for (let i = 0; i < 3; i++) expect(arrival(state, i)).toBe(50 + EXPLOSIVE_DELIVERY_TICKS);
+    for (let i = 0; i < 3; i++) expect(arrival(state, i)).toBeUndefined();
   });
 
   it('still draws stock at order time for the stocked part', () => {
     const state = stockedState(3);
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     expect(state.plannedChargesByHole['H1']!.fromStockKg).toBe(3);
-    expect(arrival(state)).toBeDefined();
+    expect(arrival(state)).toBeUndefined();
   });
 
   it('cancel refunds the order as before', () => {
@@ -401,14 +401,14 @@ describe('dispatchChargeAction delivery wait (#1895)', () => {
     expect(chargeActions(state)).toHaveLength(0);
   });
 
-  it('a re-charge recomputes the arrival from the new tick', () => {
+  it('a re-charge has no delivery delay', () => {
     const state = makeState();
     state.tickCount = 0;
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     state.tickCount = 200;
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     expect(chargeActions(state)).toHaveLength(1);
-    expect(arrival(state)).toBe(200 + EXPLOSIVE_DELIVERY_TICKS);
+    expect(arrival(state)).toBeUndefined();
   });
 });
 
@@ -417,14 +417,14 @@ describe('earliestChargeDeliveryTick (#1895)', () => {
     expect(earliestChargeDeliveryTick(makeState())).toBeNull();
   });
 
-  it('is the smallest arrival among waiting orders', () => {
+  it('has no arrival for new orders', () => {
     const state = makeState();
     state.tickCount = 100;
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     state.tickCount = 300;
     dispatchChargeAction(state, hole(2), BOOMITE_5KG);
     state.tickCount = 150;
-    expect(earliestChargeDeliveryTick(state)).toBe(100 + EXPLOSIVE_DELIVERY_TICKS);
+    expect(earliestChargeDeliveryTick(state)).toBeNull();
   });
 
   it('ignores orders whose arrival has already passed', () => {

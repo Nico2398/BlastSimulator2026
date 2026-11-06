@@ -320,8 +320,8 @@ describe('readOrderDeliveryTick (#1895)', () => {
 describe('isChargeDeliveryPending (#1895)', () => {
   const charge = { type: 'charge_hole', payload: { deliveryArrivalTick: 450 } } as const;
 
-  it('is true before the arrival tick, false from it on', () => {
-    expect(isChargeDeliveryPending(charge, 449)).toBe(true);
+  it('does not delay a legacy order with a future arrival tick', () => {
+    expect(isChargeDeliveryPending(charge, 449)).toBe(false);
     expect(isChargeDeliveryPending(charge, 450)).toBe(false);
   });
 
@@ -336,14 +336,12 @@ describe('chargeDeliveryArrivalByHole (#1966)', () => {
     return { id, type, payload } as unknown as GameState['pendingActions'][number];
   }
 
-  it('maps each hole with an in-transit charge order to its arrival tick', () => {
+  it('ignores legacy arrival ticks on pending orders', () => {
     const map = chargeDeliveryArrivalByHole({
       tickCount: 100,
       pendingActions: [order(1, { holeId: 'H1', deliveryArrivalTick: 500 }), order(2, { holeId: 'H2', deliveryArrivalTick: 520 })],
     });
-    expect(map.get('H1')).toBe(500);
-    expect(map.get('H2')).toBe(520);
-    expect(map.size).toBe(2);
+    expect(map.size).toBe(0);
   });
 
   it('is empty with no pending actions', () => {
@@ -356,7 +354,7 @@ describe('chargeDeliveryArrivalByHole (#1966)', () => {
       pendingActions: [order(1, { holeId: 'H1', deliveryArrivalTick: 500 }), order(2, { holeId: 'H2', deliveryArrivalTick: 501 })],
     });
     expect(map.has('H1')).toBe(false);
-    expect(map.get('H2')).toBe(501);
+    expect(map.has('H2')).toBe(false);
   });
 
   it('ignores an order without an arrival tick (stock-covered) and non-charge actions', () => {

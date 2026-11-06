@@ -3095,7 +3095,7 @@
   "tutorial.step_buyrockdigger": "Buy a Rock Digger from the Fleet panel.",
   "tutorial.step_buychargingtruck": "Buy a Charging Truck from the Fleet panel.",
   "tutorial.step_explosivewarehouse.title": "Build an Explosive Warehouse",
-  "tutorial.step_explosivewarehouse": "Explosives bought when you order the charges take {duration} to arrive, and the crew waits idle the whole time. Build a Boom Closet, the explosive warehouse, so you can keep explosives in stock.",
+  "tutorial.step_explosivewarehouse": "Explosives are available immediately when ordered. Build a Boom Closet to buy discounted explosives in bulk and keep them in stock.",
   "tutorial.step_stockexplosives.title": "Stock Explosives",
   "tutorial.step_stockexplosives": "Buy at least {kg} kg of Boomite into the warehouse: {holes} holes × {perHole} kg. Explosives in stock load at once.",
   "tutorial.step_haul": "Your crew handles hauling on its own now: a qualified driver boards a free Debris Hauler, drives it to the nearest debris, and brings it back to storage. Open the Fleet panel and watch it happen.",

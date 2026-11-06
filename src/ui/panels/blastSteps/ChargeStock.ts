@@ -142,7 +142,7 @@ export class ChargeStockBlock {
     paid.dataset['cash'] = String(Math.round(view.paidCash));
     const notes: HTMLElement[] = [paid];
     // No hint for a fully stock-covered pattern; a stocked warehouse is what makes that so.
-    if (view.uncoveredKg > 0) {
+    if (view.uncoveredKg > 0 && view.deliveryTicks > 0) {
       notes.push(this.noteEl('delivery-hint', t('ui.blast_workshop.charge.delivery_hint', { duration: formatGameDuration(view.deliveryTicks) })));
     }
     this.paidEl.replaceChildren(...notes);

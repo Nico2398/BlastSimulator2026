@@ -845,6 +845,6 @@ describe('sandbox starter explosive stock (#2118)', () => {
     expect(getLevel('dusty_hollow')!.startingCash).toBe(50_000);
     expect(getLevel('grumpstone_ridge')!.startingCash).toBe(210_000);
     expect(getLevel('treranium_depths')!.startingCash).toBe(125_000);
-    expect(EXPLOSIVE_DELIVERY_TICKS).toBe(400);
+    expect(EXPLOSIVE_DELIVERY_TICKS).toBe(0);
   });
 });

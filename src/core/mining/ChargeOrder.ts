@@ -89,7 +89,7 @@ export function dispatchChargeAction(
     payload: {
       holeId: hole.id, explosiveId, amountKg, stemmingM, durationTicks, orderCost,
       ...(orderStock && { orderStock }),
-      ...(fromCashKg > 0 && { deliveryArrivalTick: state.tickCount + orderDeliveryTicks(fromCashKg) }),
+      ...(orderDeliveryTicks(fromCashKg) > 0 && { deliveryArrivalTick: state.tickCount + orderDeliveryTicks(fromCashKg) }),
     } satisfies ChargeHoleActionPayload,
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
