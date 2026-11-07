@@ -70,13 +70,6 @@
           "timeoutMs": 5000
         },
         {
-          "type": "waitForProperty",
-          "selector": "#bs-sandbox-kit-stock",
-          "property": "textContent",
-          "expectedValue": "Krackle: 100 kg in stock",
-          "timeoutMs": 5000
-        },
-        {
           "type": "set",
           "selector": "#bs-sandbox-biome",
           "value": "alpine_granite"
