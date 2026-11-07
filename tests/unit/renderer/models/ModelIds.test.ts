@@ -27,7 +27,7 @@ describe('ModelIds', () => {
     const props = propModelIds();
     // Each tree ships with its decimated far copy.
     expect(props).toHaveLength(TREE_FAMILIES.length * TREE_VARIANTS * 2 + BUSH_VARIANTS + ROCK_VARIANTS + HOUSE_VARIANTS + GRASS_VARIANTS + FLOWER_VARIANTS + 1);
-    expect(ids).toHaveLength(5 + 18 + 29 + 1 + props.length);
+    expect(ids).toHaveLength(5 + 18 + 26 + 1 + props.length);
   });
 
   it('lists the spoil heap at tier 1 only, since it is a single-tier building', () => {
