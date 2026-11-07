@@ -10,7 +10,6 @@ import {
   ALL_WEATHER_STATES,
   type WeatherState,
 } from '../../../core/weather/WeatherCycle.js';
-import { buyExplosiveCommand } from './buyExplosive.js';
 import { buyTubing, installTubing } from '../../../core/mining/Tubing.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -118,12 +117,12 @@ export function drainHoleCommand(
   return { success: true, output: t('mining.drain.success', summary) };
 }
 
-/** `buy` dispatcher: `explosive:<id>` buys warehouse stock, anything else buys tubing. */
+/** `buy` command: buys tubing. Explosives are bought as each hole is loaded (#2153). */
 export function buyCommand(
   ctx: MiningContext,
   _args: string[],
   named: Record<string, string>,
 ): CommandResult {
-  if (named['explosive'] !== undefined) return buyExplosiveCommand(ctx, named);
+  if (named['explosive'] !== undefined) return { success: false, output: t('mining.buy.explosive_at_loading') };
   return tubingCommand(ctx, ['buy'], named);
 }

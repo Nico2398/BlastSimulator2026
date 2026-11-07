@@ -201,8 +201,6 @@ export interface Building {
   active: boolean;
   /** Closed by an out_of_service event modifier (#1568); derived each tick, never the player's `active` choice. */
   outOfService?: boolean;
-  /** Explosives held by an explosive warehouse, kg by explosive id (#1678). */
-  storedExplosives?: Record<string, number>;
   /** Barren rock dumped here (#1530); spoil heaps only. Never counts toward freight storage. */
   storedSpoilKg?: number;
   /**
@@ -673,18 +671,6 @@ export function checkFootprintPlacement(
   return { valid: true };
 }
 
-/** Total kg of explosives held in one building, across all explosive ids (#1678). */
-export function warehouseStockKg(b: Pick<Building, 'storedExplosives'>): number {
-  let total = 0;
-  for (const kg of Object.values(b.storedExplosives ?? {})) total += kg;
-  return total;
-}
-
-/** Unused explosive storage (kg) of one building: its tier's capacity minus its stock (#1685). */
-export function warehouseFreeKg(b: Pick<Building, 'type' | 'tier' | 'storedExplosives'>): number {
-  return Math.max(0, getBuildingDef(b.type, b.tier).capacity - warehouseStockKg(b));
-}
-
 /** Room (kg) left on one building's spoil heap; 0 for a non-heap. */
 export function spoilHeapRoomKg(b: Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>): number {
   if (b.type !== 'spoil_heap') return 0;
@@ -701,10 +687,7 @@ export {
   type QueueBlockCode, type CancelledResearch,
 } from './BuildingResearch.js';
 export { getLivingQuartersWellbeingMultiplier } from './BuildingWellbeing.js';
-export {
-  getExplosivesCapacity, getExplosivesInStock, getExplosivesStockByType, getExplosivesFreeCapacity,
-  storeExplosives, consumeExplosives, hasExplosivesForBlast, freightWarehouseHasRoom,
-} from './BuildingWarehouse.js';
+export { freightWarehouseHasRoom } from './BuildingWarehouse.js';
 export {
   computePlacementCutoff,
   type PlacementCutoff,

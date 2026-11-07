@@ -97,8 +97,6 @@ export interface DestroyedBuildingInfo {
   z: number;
 }
 
-export type { SecondaryBlastEvent } from '../entities/SecondaryBlast.js';
-import { secondaryBlastEventFor, type SecondaryBlastEvent } from '../entities/SecondaryBlast.js';
 
 export interface BlastRegion {
   minX: number;
@@ -123,7 +121,6 @@ export interface BlastResult {
   clearedVoxels: number;
   clearedRegion: BlastRegion;
   destroyedBuildings: DestroyedBuildingInfo[];
-  secondaryBlastEvents: SecondaryBlastEvent[];
   /** Furthest any fragment was thrown horizontally, in metres. */
   maxThrowDistance: number;
   /** How many bodies the thrown rock was flown as (see ProjectileGrouping). */
@@ -172,10 +169,8 @@ export interface BlastReport {
   maxProjectionDistanceM: number;
   /** Value of ore in the rock that broke out and can be reached, per BlastCalc's pricing; sealed ore is `sealedOreValue` (#2003). */
   totalOreValue: number;
-  /** Cash paid for the charges of this blast (list price of the kg not drawn from stock; summed before the plan was cleared). */
+  /** Cash paid for the charges of this blast (list price; summed before the plan was cleared). */
   spent: number;
-  /** List-price dollar value of the charge kg drawn from warehouse stock (#1685). Optional: absent = 0. */
-  spentFromStock?: number;
   destroyedBuildings: DestroyedBuildingInfo[];
   /** Casualties/damage this blast caused (#557). Optional: pre-existing literal fixtures omit it; buildBlastReport defaults to `[]`. */
   accidents?: AccidentRecord[];
@@ -185,8 +180,6 @@ export interface BlastReport {
   wetHoleIds?: string[];
   /** Ids of wet holes whose water-sensitive explosive fizzled. Optional like `wetHoleIds`. */
   fizzledHoleIds?: string[];
-  /** Secondary detonations from destroyed stocked explosive warehouses (#1394). Optional: omitted when none. */
-  secondaryBlasts?: SecondaryBlastReport[];
   /** False when the blast cleared rock but never broke out of its sealed void (#1724). Optional: absent = true (pre-existing fixtures). */
   brokeOut?: boolean;
   /** Ore value left sealed under intact rock (#2003). Optional: absent = 0. */
@@ -195,21 +188,6 @@ export interface BlastReport {
   sealedFragments?: number;
   /** Oversized fragments that are reachable (#2003). Optional: absent = oversizedFragments. */
   reachableOversizedFragments?: number;
-}
-
-/** One secondary detonation as shown in the blast report (#1394). */
-export interface SecondaryBlastReport {
-  buildingId: number;
-  x: number;
-  z: number;
-  explosivesKg: number;
-  radiusM: number;
-  casualties: number;
-  destroyedIds: number[];
-  /** Voxels the detonation's crater cleared (#1896). */
-  craterVoxels: number;
-  /** Fragments the crater left to haul (#1896). */
-  craterFragments: number;
 }
 
 /** True when the blast cleared rock but never broke out of its sealed void (#1724). */
@@ -233,7 +211,7 @@ export function reachableOversized(r: { oversizedFragments: number; reachableOve
 }
 
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
-export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [], chargedCount: 0 }, secondaryBlasts: SecondaryBlastReport[] = [], spentFromStock = 0): BlastReport {
+export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [], chargedCount: 0 }): BlastReport {
   const destroyedIds = new Set<number>(result.destroyedBuildings.map(b => b.buildingId));
   for (const a of accidents) if (a.type === 'building_destroyed') destroyedIds.add(a.entityId);
   const { rating, cap } = applyRatingCaps(result.rating, {
@@ -261,7 +239,6 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     sealedFragments: result.sealedFragmentCount ?? 0,
     reachableOversizedFragments: reachableOversized(result),
     spent,
-    ...(spentFromStock > 0 ? { spentFromStock } : {}),
     brokeOut: result.brokeOut,
     destroyedBuildings: result.destroyedBuildings,
     accidents,
@@ -271,7 +248,6 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     ...(wetHoles.wet.length > 0
       ? { wetHoleIds: wetHoles.wet, fizzledHoleIds: wetHoles.fizzled }
       : {}),
-    ...(secondaryBlasts.length > 0 ? { secondaryBlasts } : {}),
   };
 }
 
@@ -539,7 +515,6 @@ export function* executeBlastSteps(
   // 5b. Check for building destruction: if any cleared voxel's (x, z) falls
   //     within a building's footprint, the building is destroyed.
   const destroyedBuildings: DestroyedBuildingInfo[] = [];
-  const secondaryBlastEvents: SecondaryBlastEvent[] = [];
   if (buildingState && toClear.length > 0) {
     // Build a set of unique (x, z) pairs from cleared voxels for fast lookup.
     const clearedXZSet = new Set<string>();
@@ -568,9 +543,6 @@ export function* executeBlastSteps(
         x: building.x,
         z: building.z,
       });
-      // Secondary blast for explosive_warehouse with stored explosives.
-      const secondary = secondaryBlastEventFor(building);
-      if (secondary) secondaryBlastEvents.push(secondary);
       destroyBuilding(buildingState, building.id);
     }
   }
@@ -624,7 +596,6 @@ export function* executeBlastSteps(
     clearedVoxels,
     clearedRegion,
     destroyedBuildings,
-    secondaryBlastEvents,
     clearedColumns: [...new Set(toClear.map(c => `${c.x},${c.z}`))],
     brokeOut,
     sealedOreValue,

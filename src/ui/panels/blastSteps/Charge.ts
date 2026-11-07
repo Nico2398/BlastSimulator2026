@@ -26,11 +26,10 @@ import { el, stepper, reasonLine, button, scrollBoundedSection } from '../../dom
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature, drainReasonText, drainRainReasonText, type HoleDrainView } from './ChargeHoleList.js';
-import { ChargeStockBlock, buildStockView } from './ChargeStock.js';
 import { chargeFitsHole, maxFittingChargeKg, maxChargeKgForHole, explosiveHoleLimits, weakHoleSummary, type WeakHoleSummary } from '../../../core/mining/ChargePlan.js';
+import { quoteChargeLoad } from '../../../core/mining/ChargeLoad.js';
 import { getRock } from '../../../core/world/RockCatalog.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
-import { getExplosivesStockByType } from '../../../core/entities/Building.js';
 import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 import { chargeKgPerMetre } from '../../../core/mining/HoleDiameter.js';
 import { rainWithinTicks } from '../../../core/weather/WeatherCycle.js';
@@ -50,20 +49,12 @@ const DEFAULT_EXPLOSIVE = 'boomite';
 const STEMMING_STEP_M = 0.1;
 const TUBING_BUY_AMOUNT = 10;
 
-/** Explosive the step preselects: the pattern's, else the best-stocked allowed one, else the default (#2016). */
+/** Explosive the step preselects: the pattern's, else the default (#2016). */
 function preferredExplosiveId(
   patternExplosiveId: string | undefined,
-  stockByType: Readonly<Record<string, number>>,
   allowedIds: readonly string[],
 ): string | undefined {
   if (patternExplosiveId !== undefined && allowedIds.includes(patternExplosiveId)) return patternExplosiveId;
-  let best: string | undefined;
-  let bestKg = 0;
-  for (const id of allowedIds) {
-    const kg = Math.round(stockByType[id] ?? 0);
-    if (kg > bestKg) { best = id; bestKg = kg; }
-  }
-  if (best !== undefined) return best;
   return allowedIds.includes(DEFAULT_EXPLOSIVE) ? DEFAULT_EXPLOSIVE : allowedIds[0];
 }
 
@@ -82,12 +73,11 @@ export class ChargeStep {
   private readonly holeList: ChargeHoleList;
   private readonly tubingCardEl: HTMLElement;
   private readonly drainEl: HTMLElement;
-  private readonly stockBlock: ChargeStockBlock;
 
   private gameConsole?: GameConsoleFn;
   private holeRockSampler?: (hole: DrillHole) => ColumnRock | null;
   private selectedExplosiveId = DEFAULT_EXPLOSIVE;
-  /** Set by a card click; stops stock and pattern from overriding the player's choice. */
+  /** Set by a card click; stops the pattern from overriding the player's choice. */
   private playerPickedExplosive = false;
   private allowedIds: readonly string[] = resolveAvailableExplosives(null);
   private amountKg = CHARGE_DEFAULT_AMOUNT_KG;
@@ -158,10 +148,6 @@ export class ChargeStep {
     this.patternLineEl = el('div');
     this.noticeEl = el('div');
     this.noticeEl.style.display = 'none';
-    this.stockBlock = new ChargeStockBlock(
-      () => { this.lastSignature = ''; },
-      kg => this.runAndNotify(`buy explosive:${this.selectedExplosiveId} kg:${kg}`),
-    );
     this.holeList = new ChargeHoleList(holeId => this.chargeHole(holeId), holeId => this.runAndNotify(`drain_hole hole:${holeId}`));
 
     const tubingHeader = el('div', { className: 'bsx-section' });
@@ -171,7 +157,7 @@ export class ChargeStep {
 
     // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
-      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.stockBlock.root, this.weakLineEl,
+      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.weakLineEl,
       this.holeList.root, this.drainEl, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
@@ -187,7 +173,6 @@ export class ChargeStep {
   refreshLocale(): void {
     this.locale.refresh();
     this.holeList.refreshLocale();
-    this.stockBlock.refreshLocale();
     this.lastSignature = '';
   }
 
@@ -214,11 +199,9 @@ export class ChargeStep {
 
     this.allowedIds = resolveAvailableExplosives(state.campaign.activeLevelId);
     if (this.playerPickedExplosive && !this.allowedIds.includes(this.selectedExplosiveId)) this.playerPickedExplosive = false;
-    // Deliberately re-run on every update until the player clicks: the step instance outlives Continue/load, so the preselection follows live stock.
+    // Deliberately re-run on every update until the player clicks: the step instance outlives Continue/load, so the preselection follows the live pattern.
     if (!this.playerPickedExplosive) {
-      const preferred = preferredExplosiveId(
-        state.patternCharge?.explosiveId, getExplosivesStockByType(state.buildings), this.allowedIds,
-      );
+      const preferred = preferredExplosiveId(state.patternCharge?.explosiveId, this.allowedIds);
       if (preferred !== undefined && preferred !== this.selectedExplosiveId) {
         this.selectedExplosiveId = preferred;
         this.clampAmount();
@@ -240,9 +223,8 @@ export class ChargeStep {
       };
     }
 
-    const stockView = buildStockView(
-      state, this.allowedIds, this.selectedExplosiveId, this.stockBlock.stepKg, holes.length, this.amountKg,
-    );
+    // Explosives are bought as each hole is loaded, at list price and the live event factor (#2153).
+    const chargeCost = holes.length * quoteChargeLoad(state, this.selectedExplosiveId, this.amountKg).cost;
     const columns = holes.map(h => this.holeRockSampler?.(h) ?? null);
     const signature = JSON.stringify({
       rocks: columns.map(c => c?.rockId ?? null),
@@ -257,7 +239,6 @@ export class ChargeStep {
       tightestDepth, narrowest, widest, tightestDiameter,
       planned_holes: state.plannedDrillHoles.length,
       pattern: state.patternCharge ? holeChargeSignature(state.patternCharge) + state.patternCharge.explosiveId : null,
-      stock: stockView,
       wet, tubed, tub: state.tubingState.inventory,
       // Water levels (as percent) so the panel repaints while water fades, plus drain affordability.
       water: holes.map(h => Math.round((state.holeWater[h.id]?.level ?? 0) * 100)),
@@ -268,8 +249,7 @@ export class ChargeStep {
     this.lastSignature = signature;
 
     this.renderProductList(wet.length > 0);
-    this.stockBlock.render(stockView);
-    this.updateChargeLine(holes.length, stockView.paidCash);
+    this.updateChargeLine(holes.length, chargeCost);
     this.updateCapacityLine();
     this.updateFitLine(tightestDepth, tightestDiameter, holes.length + state.plannedDrillHoles.length === 0);
     this.updatePatternLines(state);

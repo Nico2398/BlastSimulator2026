@@ -127,9 +127,6 @@ export const PICKER_CANVAS = 'body.bs-placement-armed #game-canvas';
  * after the rail's next 250ms pass was swallowed by `pointer-events: none`.
  */
 const SURVEY_RUN = '#bs-survey-run';
-/** The Blast Workshop Charge step's buy-into-stock button and its kg stepper (#1685). */
-const STOCK_BUY = '#bs-blast-panel [data-action="stock-buy"]';
-const STOCK_KG_STEPPER = '#bs-blast-panel [data-field="stock-kg"] .bsx-stepper-btn';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
 // Only an ore offer the pit can fill in full: rubble, supply and unfillable
 // offers' Accept stays visible but outside the rails allow set (#1335).
@@ -445,14 +442,6 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       spentWhen: (state) => hasPlannedBuildingOfType(state, 'explosive_warehouse'),
       waitingKey: 'tutorial.waiting.building',
     }),
-  ],
-
-  // The stock block sits on the Charge step the workshop opens on once every
-  // hole is drilled. Buying twice at the default 50 kg, or once after +, both
-  // reach the pattern's need; the step completes on the stock, not the clicks.
-  'stock-explosives': [
-    { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
-    { target: STOCK_BUY, hintKey: 'tutorial.stage.stock_buy', also: [STOCK_KG_STEPPER] },
   ],
 
   // #1596: no amount/stemming steppers -- the panel defaults equal the

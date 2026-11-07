@@ -27,7 +27,7 @@ import { WallWarningMemo } from './wallWarningMemo.js';
 import { wallWarningText } from './wallWarningText.js';
 import { BreakoutWarningMemo } from './breakoutWarningMemo.js';
 import { breakoutWarningFor } from './breakoutWarningText.js';
-import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
+import { plannedChargesCost } from '../../core/mining/ChargePlan.js';
 import { rainExposedHoles, wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
 import { detonationPhase, type DetonationPhase } from '../../core/engine/DetonationSequence.js';
@@ -216,7 +216,7 @@ export class PreflightModal {
     else if (this.awaitingDetonation) { this.hide(); return; }
 
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
-    const planCost = recordedChargesCost(state.chargesByHole).cashCost;
+    const planCost = plannedChargesCost(state.chargesByHole);
     const chargeKg = totalChargeKg(plan.holes, plan.charges);
     const estimate = this.estimateMemo.get(state, plan, this.gridProvider());
     const { value: estValue, coverage, brokenVoxels, charged, holeCoverage } = estimate;

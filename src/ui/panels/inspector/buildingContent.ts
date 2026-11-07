@@ -203,7 +203,7 @@ export const buildingContent: KindContent = {
     const text = statusText(status, builder?.name);
     const upkeep = upkeepText(state, b);
     const capacity = getBuildingPeopleCapacity(b.type, b.tier);
-    const storage = storageContents(b, state, status.kind === 'out_of_service');
+    const storage = storageContents(b, state);
     const peopleSection = residentsSection(b, state, links) ?? schoolSection(b, state, links);
     const research = researchSection(b, state);
     const extras = [storage, peopleSection, research];

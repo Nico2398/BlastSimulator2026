@@ -16,25 +16,9 @@ import {
   TOOLBAR_TARGET, isEventDialogOpen,
 } from './tutorialStepHelpers.js';
 import { TUTORIAL_STEPS_CLOSING } from './tutorialStepsClosing.js';
-import { getExplosivesStockByType } from '../core/entities/Building.js';
-import { CHARGE_DEFAULT_AMOUNT_KG, STOCK_BUY_STEP_KG } from '../core/config/balance.js';
 
 /** The one scripted event the tutorial fires, so the player meets the dialog. */
 const TUTORIAL_EVENT_ID = 'tutorial_synergy_consultant';
-
-/** Explosive the tutorial charges with: its 'charge' command and the Charge step's default. */
-const TUTORIAL_EXPLOSIVE_ID = 'boomite';
-
-/** Holes in the drill-plan step's scripted 3x3 grid. */
-const TUTORIAL_HOLE_COUNT = 9;
-
-/** Stock the scripted purchase buys: the scripted pattern's need, in whole stock-stepper steps (100 kg). */
-const TUTORIAL_STOCK_KG = Math.ceil(TUTORIAL_HOLE_COUNT * CHARGE_DEFAULT_AMOUNT_KG / STOCK_BUY_STEP_KG) * STOCK_BUY_STEP_KG;
-
-/** Kg the drilled holes need at the default charge amount (#1330); 0 before any hole is drilled. */
-function tutorialChargeKg(state: GameState): number {
-  return (state.drillHoles?.length ?? 0) * CHARGE_DEFAULT_AMOUNT_KG;
-}
 
 export interface TutorialStep {
   id: string;
@@ -261,9 +245,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   // ── Step 5b: build-explosive-warehouse ──
-  // Explosives load at once and are paid as each hole is loaded (#2143); stock bought
-  // in bulk for a warehouse is cheaper than the per-charge price. Building one here,
-  // before the first charge, lets the first blast draw on it. Queued construction:
+  // Explosives are bought as each hole is loaded (#2143, #2153), so the warehouse holds
+  // none; the step stays until the building is retired. Queued construction:
   // same budget and reason as build-living-quarters above.
   {
     ...createComparisonStep(
@@ -275,27 +258,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       TOOLBAR_TARGET.build,
       { tickBudget: 60, waitsOnWork: true },
     ),
-  },
-
-  // ── Step 5c: stock-explosives ──
-  // Complete once the warehouse holds enough Boomite for every drilled hole at
-  // the default charge, so the charge order below draws it all from stock.
-  // Buying is instant, so the step only waits on the player's click.
-  {
-    id: 'stock-explosives',
-    titleKey: 'tutorial.step_stockexplosives.title',
-    textKey: 'tutorial.step_stockexplosives',
-    textParamsFor: (state: GameState) => ({
-      kg: tutorialChargeKg(state),
-      holes: state.drillHoles?.length ?? 0,
-      perHole: CHARGE_DEFAULT_AMOUNT_KG,
-    }),
-    commands: [`buy explosive:${TUTORIAL_EXPLOSIVE_ID} kg:${TUTORIAL_STOCK_KG}`],
-    highlightTarget: TOOLBAR_TARGET.blast,
-    isComplete: (state: GameState) => {
-      const needKg = tutorialChargeKg(state);
-      return needKg > 0 && (getExplosivesStockByType(state.buildings)[TUTORIAL_EXPLOSIVE_ID] ?? 0) >= needKg;
-    },
   },
 
   // ── Step 5: charge ──

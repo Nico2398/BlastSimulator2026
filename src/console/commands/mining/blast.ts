@@ -4,19 +4,15 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, releaseAfterAccidents, destroyEntitiesOnColumns, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
-import { executeBlastSteps, emitRegionInStrips, buildBlastReport, didNotBreakOut, reachableOversized, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
+import { executeBlastSteps, emitRegionInStrips, buildBlastReport, didNotBreakOut, reachableOversized, maxVillageVibration } from '../../../core/mining/BlastExecution.js';
 import { resolveMarketId } from '../../../core/campaign/Level.js';
 import { drain, type Steps } from '../../../core/engine/Steps.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
-import { recordedChargesCost } from '../../../core/mining/ChargePlan.js';
+import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { addBlastFragments, reserveFragmentIds } from '../../../core/economy/Logistics.js';
 import type { WarehouseLoss } from '../../../core/economy/FreightWarehouses.js';
 import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
-import { resolveSecondaryBlasts, type SecondaryBlastEvent } from '../../../core/entities/SecondaryBlast.js';
-import { carveSecondaryCraters, type SecondaryCraterReport } from './secondaryCrater.js';
-import { emitFootprintOccupancyChanged, snapshotBuildingFootprints, type BuildingFootprint } from '../buildingHelpers.js';
-import { releaseOccupantsOfRemovedBuildings } from '../../../core/engine/Mount.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
 import { blastPitDepthM, recordBlastChargeShare, recordGradeBlast } from '../../../core/economy/MineGrade.js';
@@ -223,7 +219,6 @@ export function* fireBlastSteps(
   // happened to come down nearby (#557 audit).
   yield;
   const dangerZone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
-  const projectionSecondaryEvents: SecondaryBlastEvent[] = [];
   const impacts = processProjections(
     result.fragments,
     state.buildings,
@@ -232,52 +227,12 @@ export function* fireBlastSteps(
     state.damage,
     state.tickCount,
     dangerZone,
-    projectionSecondaryEvents,
   );
   if (impacts.length > 0) {
     recordStockLosses();
   }
   thisBlastAccidents.push(...impacts);
   yield;
-
-  // Stocked explosive warehouses destroyed by the blast or by flying rock
-  // detonate in turn (#1394). resolveSecondaryBlasts records its accidents on
-  // state.damage itself; they are added to this blast's own list here.
-  const destroyedFootprints = result.secondaryBlastEvents.length + projectionSecondaryEvents.length > 0
-    ? snapshotBuildingFootprints(state.buildings)
-    : new Map<number, BuildingFootprint>();
-  const secondaryOutcomes = resolveSecondaryBlasts(
-    [...result.secondaryBlastEvents, ...projectionSecondaryEvents],
-    state.buildings, state.vehicles, state.employees, state.damage, state.tickCount,
-  );
-  // Each detonation breaks the ground where its warehouse stood (#1896). Warehouses the
-  // craters destroy in turn are appended to secondaryOutcomes; crater kills join this blast's list.
-  const craterByWarehouse = new Map<number, SecondaryCraterReport>();
-  for (const r of yield* carveSecondaryCraters(ctx, secondaryOutcomes, villages, wetHoleIds, thisBlastAccidents)) {
-    craterByWarehouse.set(r.warehouseId, r);
-  }
-  const secondaryReports: SecondaryBlastReport[] = [];
-  for (const outcome of secondaryOutcomes) {
-    const crater = craterByWarehouse.get(outcome.event.buildingId);
-    thisBlastAccidents.push(...outcome.accidents);
-    const destroyed = outcome.accidents.filter(a => a.type === 'building_destroyed');
-    for (const a of destroyed) recordBuildingDestruction(state.scores, a.entityLabel === 'explosive_warehouse');
-    secondaryReports.push({
-      buildingId: outcome.event.buildingId,
-      x: outcome.event.x,
-      z: outcome.event.z,
-      explosivesKg: outcome.event.explosivesKg,
-      radiusM: outcome.radiusM,
-      casualties: outcome.accidents.filter(a => a.type === 'injury' || a.type === 'death').length,
-      destroyedIds: destroyed.map(a => a.entityId),
-      craterVoxels: crater?.craterVoxels ?? 0,
-      craterFragments: crater?.craterFragments ?? 0,
-    });
-  }
-  if (secondaryOutcomes.length > 0) {
-    recordStockLosses();
-    releaseOccupantsOfRemovedBuildings(state, ctx.emitter);
-  }
 
   // One release after both destruction paths (cleared columns above, flying
   // rock in processProjections) so no rider stays mounted on a removed vehicle.
@@ -317,11 +272,11 @@ export function* fireBlastSteps(
 
   // Report figure only: explosives were already paid when each charge order
   // was placed (charge.ts, #1341), so the blast itself never touches cash.
-  const { cashCost: spent, stockValue: spentFromStock } = recordedChargesCost(state.chargesByHole);
+  const spent = plannedChargesCost(state.chargesByHole);
   const wetReport = classifyWetChargedHoles(plan.charges, wetHoleIds);
   const report = buildBlastReport(
     result, state.tickCount, spent, thisBlastAccidents,
-    wetReport, secondaryReports, spentFromStock,
+    wetReport,
   );
   state.lastBlastReport = report;
 
@@ -346,16 +301,6 @@ export function* fireBlastSteps(
   // double-remesh for what carves zero further voxels.
   if (result.clearedVoxels > 0) {
     yield* emitRegionInStrips(ctx.emitter, 'nav:occupancy_changed', regionForColumns(result.clearedRegion, ctx.grid!));
-  }
-
-  // Every footprint a detonation cleared is free ground for navigation, as
-  // `build destroy` reports it.
-  for (const outcome of secondaryOutcomes) {
-    for (const a of outcome.accidents) {
-      if (a.type !== 'building_destroyed') continue;
-      const gone = destroyedFootprints.get(a.entityId);
-      if (gone) emitFootprintOccupancyChanged(ctx, gone.x, gone.z, gone.sizeX, gone.sizeZ);
-    }
   }
 
   // Walls the blast left taller than their rock holds slump into the pit (#1941), progression sites only.
@@ -403,14 +348,12 @@ export function* fireBlastSteps(
         ? [t('mining.blast.sealed_fragments', { count: result.sealedFragmentCount ?? 0, total: result.fragmentCount })]
         : []),
       t('mining.blast.spent_cash', { cash: formatMoney(report.spent) }),
-      ...(spentFromStock > 0 ? [t('mining.blast.spent_from_stock', { value: formatMoney(spentFromStock) })] : []),
       ...(result.destroyedBuildings.length > 0
         ? [`Buildings destroyed: ${result.destroyedBuildings.map(b => `${b.type} #${b.buildingId}`).join(', ')}`]
         : []),
       ...stockLossLines,
       ...slumpLines,
       ...permitLines,
-      ...secondaryReports.map(r => t('mining.blast.secondary_blast', { kg: r.explosivesKg, id: r.buildingId, casualties: r.casualties, voxels: r.craterVoxels })),
     ].join('\n'),
   };
 }

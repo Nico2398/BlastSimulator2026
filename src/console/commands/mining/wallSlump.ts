@@ -8,7 +8,6 @@ import { runWallStability, type SlumpReport } from '../../../core/mining/WallSta
 import type { Steps } from '../../../core/engine/Steps.js';
 import { vec3 } from '../../../core/math/Vec3.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
-import { resolveSecondaryBlasts, type SecondaryBlastEvent } from '../../../core/entities/SecondaryBlast.js';
 import { recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
 import { releaseOccupantsOfRemovedBuildings } from '../../../core/engine/Mount.js';
 import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
@@ -56,17 +55,11 @@ export function* applyWallSlumps(ctx: MiningContext, clearedRegion: BlastRegion)
     state.damage.wallSlumpCount = (state.damage.wallSlumpCount ?? 0) + 1;
 
     const footprintsBefore = snapshotBuildingFootprints(state.buildings);
-    const secondary: SecondaryBlastEvent[] = [];
     const accidents: AccidentRecord[] = processProjections(
       rockfallProjections(report, state.damage.wallSlumpCount),
       state.buildings, state.vehicles, state.employees, state.damage, state.tickCount,
       toeZone(report),
-      secondary,
     );
-    if (secondary.length > 0) {
-      accidents.push(...resolveSecondaryBlasts(secondary, state.buildings, state.vehicles, state.employees, state.damage, state.tickCount)
-        .flatMap(o => o.accidents));
-    }
     if (accidents.length > 0) {
       for (const loss of refreshLogisticsCapacity(state)) ctx.emitter.emit('logistics:warehouse_stock_lost', loss);
       releaseOccupantsOfRemovedBuildings(state, ctx.emitter);

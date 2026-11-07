@@ -6,7 +6,7 @@ import type { HoleCharge } from './ChargePlan.js';
 import { computeInitialEnergy } from './BlastCalc.js';
 import { DRILL_GRID_DEFAULT_SPACING_M, BLAST_REACH_M_PER_SQRT_ENERGY } from '../config/balance.js';
 import { computeDangerZone } from '../entities/Zone.js';
-import { getBuildingDef, isBuildingFootprintCell, warehouseStockKg, type Building, type BuildingType, type FootprintOccupant } from '../entities/Building.js';
+import { getBuildingDef, isBuildingFootprintCell, type Building, type BuildingType, type FootprintOccupant } from '../entities/Building.js';
 
 export interface BlastPlan {
   holes: DrillHole[];
@@ -105,13 +105,12 @@ export function partitionByFootprint<T extends { x: number; z: number }>(
   return { clear: cells.filter((_, i) => !covered.has(String(i))), skipped: covered.size };
 }
 
-/** A building inside a planned blast's reach, with the explosive stock it holds (#2021). */
+/** A building inside a planned blast's reach (#2021). */
 export interface BuildingAtRisk {
   buildingId: number;
   type: BuildingType;
   x: number;
   z: number;
-  stockKg: number;
 }
 
 const SPACING_EPSILON = 1e-6;
@@ -157,7 +156,7 @@ export function holeBlastReachM(charge: HoleCharge | undefined, holeDepth: numbe
 export function buildingsInBlastReach(
   holes: ReadonlyArray<Pick<DrillHole, 'id' | 'x' | 'z' | 'depth'>>,
   charges: Readonly<Record<string, HoleCharge>>,
-  buildings: ReadonlyArray<Pick<Building, 'id' | 'type' | 'tier' | 'x' | 'z' | 'storedExplosives'>>,
+  buildings: ReadonlyArray<Pick<Building, 'id' | 'type' | 'tier' | 'x' | 'z'>>,
   marginM: number = holes.reduce((max, h) => Math.max(max, holeBlastReachM(charges[h.id], h.depth)), 0),
 ): BuildingAtRisk[] {
   if (buildings.length === 0) return [];
@@ -171,10 +170,7 @@ export function buildingsInBlastReach(
       return cx >= reach.x1 && cx <= reach.x2 && cz >= reach.z1 && cz <= reach.z2;
     });
     if (!inReach) continue;
-    result.push({
-      buildingId: b.id, type: b.type, x: b.x, z: b.z,
-      stockKg: b.type === 'explosive_warehouse' ? warehouseStockKg(b) : 0,
-    });
+    result.push({ buildingId: b.id, type: b.type, x: b.x, z: b.z });
   }
   return result.sort((a, c) => a.buildingId - c.buildingId);
 }
