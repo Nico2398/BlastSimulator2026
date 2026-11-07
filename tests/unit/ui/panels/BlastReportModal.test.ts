@@ -853,20 +853,15 @@ describe('BlastReportModal', () => {
       expect(modal.root.textContent).not.toContain('was destroyed');
     });
 
-    it('keeps the secondary-blast card text and also gives a destroyed warehouse its own card (#2029)', () => {
+    it('gives a destroyed warehouse its own card (#2029)', () => {
       const { modal, setPlayback } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport({
         destroyedBuildings: [{ buildingId: 3, type: 'freight_warehouse', x: 5, z: 5 }],
-        secondaryBlasts: [{
-          buildingId: 3, x: 5, z: 5, explosivesKg: 100, radiusM: 4, casualties: 0,
-          destroyedIds: [3], craterVoxels: 12, craterFragments: 5,
-        }],
       });
 
       openReport(modal, state, setPlayback);
 
-      expect(modal.root.textContent).toContain('Secondary blast: 100 kg of stored explosives detonated in warehouse #3');
       expect(modal.root.textContent).toContain('Freight Warehouse #3 was destroyed');
     });
 
@@ -981,27 +976,6 @@ describe('BlastReportModal rating cap note (#1349)', () => {
     for (const cap of ['death', 'casualty_or_destruction', 'wet_holes', 'oversize', 'fizzled_failure', 'fizzled_partial']) {
       expect(modal.root.textContent).not.toContain(t(`ui.blast_workshop.report.rating_cap_${cap}`));
     }
-  });
-
-  it('shows the from-stock stat when explosives came from warehouse stock (#1685)', () => {
-    const { modal, setPlayback } = makeModal();
-    const state = makeState();
-    state.lastBlastReport = makeReport({ spentFromStock: 480 });
-
-    openReport(modal, state, setPlayback);
-
-    const stat = modal.root.querySelector('[data-info="report-spent-from-stock"]');
-    expect(stat?.textContent).toContain('$480');
-  });
-
-  it('omits the from-stock stat when nothing came from stock (#1685)', () => {
-    const { modal, setPlayback } = makeModal();
-    const state = makeState();
-    state.lastBlastReport = makeReport({ spentFromStock: 0 });
-
-    openReport(modal, state, setPlayback);
-
-    expect(modal.root.querySelector('[data-info="report-spent-from-stock"]')).toBeNull();
   });
 });
 

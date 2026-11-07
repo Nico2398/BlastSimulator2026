@@ -19,9 +19,6 @@ import {
   getStorageCapacity,
   getBuildingScoreEffects,
   hasActiveResearchCenter,
-  hasExplosivesForBlast,
-  storeExplosives,
-  consumeExplosives,
   queueResearchTask,
   tickResearch,
   isTierUnlocked,
@@ -419,36 +416,6 @@ describe('Buildings lifecycle', () => {
 
     syncLogisticsCapacity(logistics, stackedCapacity);
     expect(logistics.storageCapacityKg).toBe(stackedCapacity);
-  });
-
-  // ── 11. Explosive warehouse gates blast capability ─────────────────────────
-
-  it('explosive warehouse gates blast capability', () => {
-    const bs = createBuildingState();
-    placeBuilding(bs, 'explosive_warehouse', 0, 0, 64, 64);
-
-    // Without stock, blasts are not possible
-    expect(hasExplosivesForBlast(bs)).toBe(false);
-
-    // Store explosives
-    const stored = storeExplosives(bs, 'anfo', 200);
-    expect(stored).toBe(200);
-    expect(hasExplosivesForBlast(bs)).toBe(true);
-
-    // Consume part — still has stock
-    const consumed1 = consumeExplosives(bs, 'anfo', 80);
-    expect(consumed1).toBe(true);
-    expect(hasExplosivesForBlast(bs)).toBe(true);
-
-    // Consume the remainder
-    const consumed2 = consumeExplosives(bs, 'anfo', 120);
-    expect(consumed2).toBe(true);
-    expect(hasExplosivesForBlast(bs)).toBe(false);
-
-    // Over-consumption attempt returns false
-    const overConsume = consumeExplosives(bs, 'anfo', 50);
-    expect(overConsume).toBe(false);
-    expect(hasExplosivesForBlast(bs)).toBe(false);
   });
 });
 

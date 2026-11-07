@@ -177,7 +177,7 @@ function emptyResult(over: Partial<BlastResult> = {}): BlastResult {
     projectionCount: 0, maxProjectionSpeed: 0, vibrationAtVillages: [], totalRockVolume: 0,
     totalOreValue: 0, rating: 'perfect', crackedVoxels: 0, clearedVoxels: 0,
     clearedRegion: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 }, destroyedBuildings: [],
-    secondaryBlastEvents: [], maxThrowDistance: 0, projectileCount: 0, flights: [], clearedColumns: [], brokeOut: true,
+    maxThrowDistance: 0, projectileCount: 0, flights: [], clearedColumns: [], brokeOut: true,
     ...over,
   };
 }

@@ -56,16 +56,6 @@ describe('placedRowModel — utilization (#1759)', () => {
     expect(placedRowModel(b, stateWith(b)).utilization!.fraction).toBe(0);
   });
 
-  it('explosive warehouse reports stored kg over capacity kg', () => {
-    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
-    const b = mk({ id: 1, type: 'explosive_warehouse', storedExplosives: { boomite: 30, other: 20 } });
-    const u = placedRowModel(b, stateWith(b)).utilization;
-    expect(u).not.toBeNull();
-    expect(u!.fraction).toBeCloseTo(50 / cap);
-    expect(u!.text).toContain('50');
-    expect(u!.text).toContain('kg');
-  });
-
   it('freight warehouse reports its own stored kg, not other warehouses', () => {
     const cap = getBuildingDef('freight_warehouse', 1).capacity;
     const b = mk({ id: 1, type: 'freight_warehouse' });

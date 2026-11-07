@@ -11,11 +11,6 @@ export function writeText(node: HTMLElement, text: string): void {
   if (node.textContent !== text) node.textContent = text;
 }
 
-/** The value node of a `liveRow`; `setLive` finds it by `data-live`. */
-export function liveValue(row: HTMLElement): HTMLElement {
-  return row.lastElementChild as HTMLElement;
-}
-
 /** Set a data attribute on a node and return it, so a row can be tagged inline. */
 export function tagged(node: HTMLElement, attr: string, value = ''): HTMLElement {
   node.setAttribute(attr, value);

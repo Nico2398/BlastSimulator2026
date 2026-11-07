@@ -1,15 +1,12 @@
 // BlastSimulator2026 — Unit tests: a charge_hole completion re-checks affordability at fill time (#2155)
 //
 // The claim-time gate (isHoleOrderClaimable) can pass and cash can still drop before the
-// crew finishes loading. Completion must then leave cash, stock and the planned charge
+// crew finishes loading. Completion must then leave cash and the planned charge
 // alone and put a fresh queued order back for the hole, instead of going into debt.
 
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { getExplosivesInStock } from '../../../src/core/entities/BuildingWarehouse.js';
-import { buyExplosiveStock } from '../../../src/core/mining/ExplosiveStock.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -34,13 +31,6 @@ function makeState(cash = 10_000): GameState {
 function setCash(state: GameState, cash: number): void {
   state.cash = cash;
   state.finances.cash = cash;
-}
-
-function stockedState(kg: number): GameState {
-  const state = makeState(10_000);
-  placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
-  expect(buyExplosiveStock(state, 'boomite', kg).success).toBe(true);
-  return state;
 }
 
 function chargeActionsFor(state: GameState, holeId: string): PendingAction[] {
@@ -71,7 +61,7 @@ function completeOrdered(state: GameState, cashAtCompletion: number) {
 }
 
 describe('applyTaskCompletion — charge_hole when cash no longer covers the load (#2155 C4)', () => {
-  it('leaves cash, finances and stock untouched', () => {
+  it('leaves cash and finances untouched', () => {
     const state = makeState();
     const before = explosivesExpenses(state).length;
     orderAndComplete(state, COST_5KG - 1);
@@ -105,22 +95,12 @@ describe('applyTaskCompletion — charge_hole when cash no longer covers the loa
     expect(fresh.payload).toMatchObject(BOOMITE_5KG);
   });
 
-  it('refuses at zero cash with an empty warehouse', () => {
+  it('refuses at zero cash', () => {
     const state = makeState();
     const { report } = orderAndComplete(state, 0);
     expect(report.chargeLoaded).toBeUndefined();
     expect(state.chargesByHole['H1']).toBeUndefined();
     expect(state.cash).toBe(0);
-  });
-
-  it('leaves warehouse stock untouched when the cash part of a partly stocked load is short', () => {
-    const state = stockedState(3);
-    const { report } = orderAndComplete(state, 23.99); // cash part is 2 kg x $12 = $24
-    expect(report.chargeLoaded).toBeUndefined();
-    expect(state.chargesByHole['H1']).toBeUndefined();
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(3);
-    expect(state.cash).toBe(23.99);
-    expect(chargeActionsFor(state, 'H1')).toHaveLength(1);
   });
 
   it('refuses again on a second completion while cash is still short, never stacking orders', () => {
@@ -154,23 +134,5 @@ describe('applyTaskCompletion — charge_hole when the load is affordable (#2155
     expect(state.plannedChargesByHole['H1']).toBeUndefined();
     expect(state.cash).toBeCloseTo(0, 10);
     expect(chargeActionsFor(state, 'H1')).toHaveLength(0);
-  });
-
-  it('loads at zero cash when stock covers the whole order', () => {
-    const state = stockedState(100);
-    const { report } = orderAndComplete(state, 0);
-    expect(report.chargeLoaded?.holeId).toBe('H1');
-    expect(state.chargesByHole['H1']!.fromStockKg).toBe(5);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(95);
-    expect(state.cash).toBe(0);
-    expect(chargeActionsFor(state, 'H1')).toHaveLength(0);
-  });
-
-  it('draws stock first and pays the remainder when cash covers just that remainder', () => {
-    const state = stockedState(3);
-    orderAndComplete(state, 24);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(0);
-    expect(state.cash).toBeCloseTo(0, 10);
-    expect(state.chargesByHole['H1']!.fromStockKg).toBe(3);
   });
 });

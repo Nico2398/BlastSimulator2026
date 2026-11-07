@@ -446,28 +446,15 @@ describe('PreflightModal — waiting block hooks for the tutorial (#1591)', () =
   });
 });
 
-describe('PreflightModal cost net of stock (#1685)', () => {
-  function stockedPlan(fromStockKg: number): GameState {
+describe('PreflightModal charge cost at list price (#2153)', () => {
+  it('shows the full list-price cost of the pattern', () => {
+    const { modal } = makeModal();
+    modal.show();
     const state = makeState();
     const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    state.chargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2, fromStockKg };
-    return state;
-  }
-
-  it('shows only the cash part of a partly stock-drawn charge', () => {
-    const { modal } = makeModal();
-    modal.show();
-    modal.update(stockedPlan(3), 'sunny');
-    expect(modal.root.textContent).toContain('$24'); // 2 kg x $12
-    expect(modal.root.textContent).not.toContain('$60');
-  });
-
-  it('shows $0 cost when stock covered the whole pattern', () => {
-    const { modal } = makeModal();
-    modal.show();
-    modal.update(stockedPlan(5), 'sunny');
-    expect(modal.root.textContent).toContain('$0');
-    expect(modal.root.textContent).not.toContain('$60');
+    state.chargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    modal.update(state, 'sunny');
+    expect(modal.root.textContent).toContain('$60'); // 5 kg x $12
   });
 });
 
@@ -774,17 +761,9 @@ describe('PreflightModal — buildings in blast reach (#2021)', () => {
     const text = modal.root.textContent ?? '';
     expect(text).toContain('Management Office is inside the blast area and will be destroyed.');
     expect(text).toContain('Freight Warehouse is inside the blast area and will be destroyed.');
-    expect(text).toContain('Explosive Warehouse (228 kg stocked) is inside the blast area');
+    expect(text).toContain('Explosive Warehouse is inside the blast area and will be destroyed.');
     expect(text).not.toContain('Living Quarters is inside the blast area');
     expect(text.match(/is inside the blast area/g)).toHaveLength(3);
-  });
-
-  it('the stocked warehouse row names its kg and the secondary blast', () => {
-    const { modal } = makeModal();
-    modal.show();
-    modal.update(reachState(), 'sunny');
-    expect(modal.root.textContent).toContain('228 kg');
-    expect(modal.root.textContent).toContain('secondary blast');
   });
 
   it('shows no building row when nothing is in reach', () => {
@@ -834,7 +813,7 @@ describe('PreflightModal — buildings in blast reach (#2021)', () => {
     setLocale('fr');
     modal.update(reachState(), 'sunny');
     const text = modal.root.textContent ?? '';
-    expect(text).toContain('228');
+    expect(text).toContain('est dans la zone de tir');
     expect(text).not.toContain('is inside the blast area');
     expect(text).not.toContain('ui.blast_workshop.preflight.warn_building');
   });

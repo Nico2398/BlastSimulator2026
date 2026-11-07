@@ -39,7 +39,7 @@ export function emitFootprintOccupancyChanged(
 }
 
 /** A building's footprint as it stood when the snapshot was taken. */
-export interface BuildingFootprint { x: number; z: number; sizeX: number; sizeZ: number }
+interface BuildingFootprint { x: number; z: number; sizeX: number; sizeZ: number }
 
 /**
  * Footprints of every standing building, by id. Taken before a destruction

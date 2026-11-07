@@ -241,7 +241,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('weather', 'Show/advance/set weather (advance|set <state>)', (args, named) =>
     weatherCommand(ctx, args, named),
   );
-  runner.register('buy', 'Buy items (tubing amount:10 | explosive:<id> kg:500)', (_args, named) =>
+  runner.register('buy', 'Buy items (tubing amount:10)', (_args, named) =>
     buyCommand(ctx, [], named),
   );
   runner.register('drain_hole', 'Drain water from a hole (hole:3 or hole:*)', (args, named) =>

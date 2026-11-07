@@ -6,7 +6,7 @@ import type { ActionSpec, InspectorView } from '../../../../src/ui/panels/inspec
 import { PANEL_CLOSE_ATTR } from '../../../../src/ui/panels/PanelBase.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
-import { placeBuilding, storeExplosives, getBuildingDef } from '../../../../src/core/entities/Building.js';
+import { placeBuilding } from '../../../../src/core/entities/Building.js';
 import { purchaseVehicle, resolveVehicleDriver, ROLE_LICENCE_REQUIRED } from '../../../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
@@ -497,40 +497,23 @@ describe('Inspector — ramp (#1298)', () => {
     expect(bar.open).toBe(false);
   });
 
-  // ── Explosive Warehouse stock and free capacity (#1685) ───────────────────
+  // ── Explosive Warehouse has no stock rows (#2153) ─────────────────────────
 
-  it('shows stock and free capacity for a selected Explosive Warehouse', () => {
+  it('shows no stock figures or stock hook for a selected Explosive Warehouse', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const { building } = placeBuilding(state.buildings, 'explosive_warehouse', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
-    storeExplosives(state.buildings, 'boomite', 100);
-    storeExplosives(state.buildings, 'krackle', 25);
-    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
 
     bar.show(entity('building', building.id), state);
 
-    expect(root.textContent).toContain('125');
-    expect(root.textContent).toContain(String(cap - 125));
-    expect(root.textContent).toContain('kg');
-  });
-
-  it('shows zero stock and the full capacity for an empty Explosive Warehouse', () => {
-    const { bar, root } = makeBar();
-    const state = makeState();
-    const { building } = placeBuilding(state.buildings, 'explosive_warehouse', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
-    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
-
-    bar.show(entity('building', building.id), state);
-
-    expect(root.textContent).toContain(String(cap));
-    expect(root.textContent).toContain('kg');
+    expect(root.querySelector('[data-info="warehouse-stock"]')).toBeNull();
+    expect(root.textContent).not.toContain('kg');
   });
 
   it('shows no stock figures for other buildings', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
-    storeExplosives(state.buildings, 'boomite', 100);
 
     bar.show(entity('building', building.id), state);
 
@@ -680,20 +663,6 @@ describe('Inspector — window frame (#1756)', () => {
 
     expect(root.textContent).toContain('1/4');
     expect(root.textContent).toContain(employee.name);
-  });
-
-  it('update() refreshes explosive warehouse stock', () => {
-    const { bar, root } = makeBar();
-    const state = makeState();
-    const { building } = placeBuilding(state.buildings, 'explosive_warehouse', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
-    bar.show(entity('building', building.id), state);
-    const stock = root.querySelector('[data-info="warehouse-stock"]');
-    expect(stock).not.toBeNull();
-
-    storeExplosives(state.buildings, 'boomite', 60);
-    bar.update(state);
-
-    expect(root.querySelector('[data-info="warehouse-stock"]')!.textContent).toContain('60');
   });
 
   it('update() hides the window when the entity has left the state', () => {

@@ -239,7 +239,6 @@ expose it as `muckPile`, so a browser harness and a headless run read the same n
   and how fast they were going.
 - **Buildings** are destroyed when a cleared voxel falls under their footprint.
 
-- **Secondary crater:** a stocked Explosive Warehouse destroyed by accident fires its own one-hole blast through this pipeline; spec in `gameplay-buildings` (Destruction Effects).
 
 ## Blast Report and Rating
 
@@ -383,9 +382,9 @@ points for an ordinary blast and ~5 for an oversized one.
   the muck pile behind each shot. Its camera looks *into* the site: a blast digs a hole, and from
   eye level the crater's rim hides everything in it. `setOrbit` takes **degrees**.
 
-## Charge cost: cash vs stock
+## Charge cost
 
-A charge order records `fromStockKg` (the part drawn from warehouse stock at order time) on `plannedChargesByHole`, carried into `chargesByHole` on loading. Every cost shown to the player is the cash part at list price (`recordedChargesCost`; forward preview `stockAwareChargesCost`). `BlastReport.spent` = cash, `BlastReport.spentFromStock` = list value of the stock kg. Detail in `gameplay-buildings`.
+Each charge is paid in cash at list price as its hole is loaded (`loadChargeExplosive`, `ChargeLoad.ts`); every cost shown to the player is that list price. `BlastReport.spent` is that cash. Detail in `gameplay-game-design`.
 
 ## EST. ORE VALUE
 

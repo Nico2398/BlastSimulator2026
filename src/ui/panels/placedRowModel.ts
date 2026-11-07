@@ -1,7 +1,7 @@
 import { fractionOf } from '../../core/math/Fraction.js';
 import { t } from '../../core/i18n/I18n.js';
 import { warehouseStoredKg } from '../../core/economy/FreightWarehouses.js';
-import { getBuildingDef, getBuildingPeopleCapacity, warehouseStockKg, type Building } from '../../core/entities/Building.js';
+import { getBuildingDef, getBuildingPeopleCapacity, type Building } from '../../core/entities/Building.js';
 import { computeBuildingStatus } from '../../core/entities/BuildingStatus.js';
 import type { GameState, PlannedBuilding } from '../../core/state/GameState.js';
 
@@ -36,7 +36,6 @@ function utilizationOf(b: Building, state: RowModelState): PlacedRowModel['utili
     return { text: t('ui.build.row.util_beds', { inside, capacity: beds }), fraction: fractionOf(inside, beds) };
   }
   switch (b.type) {
-    case 'explosive_warehouse': return kgUtilization(warehouseStockKg(b), capacity);
     case 'spoil_heap': return kgUtilization(b.storedSpoilKg ?? 0, capacity);
     case 'freight_warehouse': return kgUtilization(warehouseStoredKg(state.logistics, b.id), capacity);
     case 'research_center': {

@@ -8,7 +8,6 @@ import type { GameState } from '../../../../../src/core/state/GameState.js';
 import { getBuildingDef, type Building, type BuildingType } from '../../../../../src/core/entities/Building.js';
 import { addBlastFragments, pickupFragment, deliverToDepot } from '../../../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../../../src/core/mining/BlastExecution.js';
-import { secondaryBlastRadiusM } from '../../../../../src/core/entities/SecondaryBlast.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
 
 const fmt = (kg: number): string => `${Math.round(kg).toLocaleString('en-US')} kg`;
@@ -41,8 +40,8 @@ function load(s: GameState, f: FragmentData, store: boolean): void {
   if (store) expect(deliverToDepot(s.logistics, f.id, s.collectedOre, sites, 17, 23)).toBe(true);
 }
 
-function mount(b: Building, s: GameState, closed = false): { c: InspectorSection; root: HTMLElement } {
-  const c = storageContents(b, s, closed);
+function mount(b: Building, s: GameState): { c: InspectorSection; root: HTMLElement } {
+  const c = storageContents(b, s);
   if (!c) throw new Error('expected a storage section');
   const root = document.createElement('div');
   root.append(c.section);
@@ -58,94 +57,15 @@ describe('storageContents: non-storage buildings', () => {
     'returns null for %s',
     type => {
       const b = makeBuilding(type);
-      expect(storageContents(b, stateWith(b), false)).toBeNull();
+      expect(storageContents(b, stateWith(b))).toBeNull();
     },
   );
 });
 
-describe('storageContents: explosive warehouse', () => {
-  const wh = (stock: Record<string, number>) => makeBuilding('explosive_warehouse', { storedExplosives: stock });
-
-  it('lists one localized row per explosive with its kg', () => {
-    const b = wh({ boomite: 120, krackle: 30 });
-    const { root } = mount(b, stateWith(b));
-    const boomite = live(root, 'stock-row-boomite')!;
-    const krackle = live(root, 'stock-row-krackle')!;
-    expect(boomite.parentElement!.textContent).toContain(t('explosive.boomite.name'));
-    expect(boomite.textContent).toContain('120');
-    expect(krackle.parentElement!.textContent).toContain(t('explosive.krackle.name'));
-    expect(krackle.textContent).toContain('30');
-    expect(liveAll(root, 'stock-row-')).toHaveLength(2);
-  });
-
-  it('shows the used/capacity gauge and free kg', () => {
-    const b = wh({ boomite: 120 });
-    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
-    const { root } = mount(b, stateWith(b));
-    expect(live(root, 'gauge')!.textContent).toContain('120');
-    expect(live(root, 'gauge')!.textContent).toContain(cap.toLocaleString('en-US'));
-    expect(root.textContent).toContain(fmt(cap - 120));
-  });
-
-  it('keeps the warehouse-stock hook with stock and free kg', () => {
-    const b = wh({ boomite: 120 });
-    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
-    const { root } = mount(b, stateWith(b));
-    const hook = root.querySelector<HTMLElement>('[data-info="warehouse-stock"]')!;
-    expect(hook.dataset['stockKg']).toBe('120');
-    expect(hook.dataset['freeKg']).toBe(String(cap - 120));
-  });
-
-  it('shows the detonation radius when stocked', () => {
-    const b = wh({ boomite: 120 });
-    const { root } = mount(b, stateWith(b));
-    const r = secondaryBlastRadiusM(120);
-    const text = live(root, 'radius')!.textContent ?? '';
-    expect(text.includes(String(Math.round(r))) || text.includes(r.toFixed(1))).toBe(true);
-  });
-
-  it('hides the radius and shows no rows when empty', () => {
-    const b = wh({});
-    const { root } = mount(b, stateWith(b));
-    expect(live(root, 'radius')).toBeNull();
-    expect(liveAll(root, 'stock-row-')).toHaveLength(0);
-    expect(root.querySelector('[data-info="warehouse-stock"]')).not.toBeNull();
-  });
-
-  it('hides explosives under half a kilogram', () => {
-    const b = wh({ boomite: 100, krackle: 0.3 });
-    const { root } = mount(b, stateWith(b));
-    expect(live(root, 'stock-row-krackle')).toBeNull();
-    expect(live(root, 'stock-row-boomite')).not.toBeNull();
-  });
-
-  it('says the stock is unavailable when closed', () => {
-    const b = wh({ boomite: 120 });
-    const open = mount(b, stateWith(b), false);
-    const closed = mount(b, stateWith(b), true);
-    expect(closed.root.textContent).not.toBe(open.root.textContent);
-    expect(closed.root.textContent).not.toMatch(/\b(inspector|ui)\.[a-z_.]+/);
-    expect(live(closed.root, 'radius')).toBeNull();
-    expect(live(closed.root, 'note')).not.toBeNull();
-  });
-
-  it('syncs in place: same nodes survive, text updates, new and emptied rows follow', () => {
-    const b = wh({ boomite: 120 });
-    const s = stateWith(b);
-    const { c, root } = mount(b, s);
-    const row = live(root, 'stock-row-boomite')!;
-    const gauge = live(root, 'gauge')!;
-    b.storedExplosives = { boomite: 80, krackle: 40 };
-    c.sync(root);
-    expect(live(root, 'stock-row-boomite')).toBe(row);
-    expect(live(root, 'gauge')).toBe(gauge);
-    expect(row.textContent).toContain('80');
-    expect(live(root, 'stock-row-krackle')!.textContent).toContain('40');
-    expect(root.querySelector<HTMLElement>('[data-info="warehouse-stock"]')!.dataset['stockKg']).toBe('120');
-    b.storedExplosives = { krackle: 40 };
-    c.sync(root);
-    expect(live(root, 'stock-row-boomite')).toBeNull();
-    expect(live(root, 'stock-row-krackle')).not.toBeNull();
+describe('storageContents: explosive warehouse (#2153)', () => {
+  it('has no storage section: explosives are bought at loading, not stocked', () => {
+    const b = makeBuilding('explosive_warehouse');
+    expect(storageContents(b, stateWith(b))).toBeNull();
   });
 });
 

@@ -466,9 +466,11 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
    * Re-measured once the opening stopped building and stocking an explosive warehouse, the load paid from cash (#2152): 504,168.2.
    * Re-measured once the start held a free seismic survey over the starter deposit, so the first blast's ore report compares
    * against an estimate, which settles the run $5,000 lower (#2148): 499,168.2.
+   * Re-measured once the starter warehouse stopped holding 100 kg of Krackle, so the first shot is bought at list price
+   * as it is loaded (#2153; the sandbox starting cash is unchanged): 498,088.2.
    * Floor is that measurement, rounded down.
    */
-  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 499_168;
+  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 498_088;
 
   interface OpeningTrace {
     endedAtTick: number | null;

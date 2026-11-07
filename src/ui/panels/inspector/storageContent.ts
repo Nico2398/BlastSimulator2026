@@ -2,13 +2,12 @@
 import { spoilHeapRoomKg } from '../../../core/economy/SpoilHeaps.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { warehouseReservedKg, warehouseStockByOre } from '../../../core/economy/FreightWarehouses.js';
-import { getBuildingDef, warehouseFreeKg, warehouseStockKg, type Building } from '../../../core/entities/Building.js';
-import { secondaryBlastRadiusM } from '../../../core/entities/SecondaryBlast.js';
+import { getBuildingDef, type Building } from '../../../core/entities/Building.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { getOre } from '../../../core/world/OreCatalog.js';
 import { el } from '../../dom.js';
 import { fractionOf } from '../../../core/math/Fraction.js';
-import { liveLine, liveRow, liveValue, sectionOf, setLive, type InspectorSection } from './inspectorWidgets.js';
+import { liveLine, liveRow, sectionOf, setLive, type InspectorSection } from './inspectorWidgets.js';
 
 /** Rows at or below this mass are noise and stay hidden. */
 const MIN_ROW_KG = 0.5;
@@ -21,8 +20,6 @@ interface Model {
   /** Plain text lines rewritten in place (`data-live` = key). */
   lines: { key: string; text: string }[];
   note: string | null;
-  /** Hook data carried by the gauge value (`data-info="warehouse-stock"`). */
-  stockAttrs: { stockKg: number; freeKg: number } | null;
 }
 
 const kgNumber = (kg: number): string => Math.round(kg).toLocaleString('en-US');
@@ -37,25 +34,6 @@ function gaugeOf(stored: number, capacity: number): NonNullable<Model['gauge']> 
     text: t('inspector.stock_capacity', params),
     fraction: fractionOf(stored, capacity),
     aria: t('inspector.stock_gauge_aria', params),
-  };
-}
-
-function explosiveModel(b: Building, closed: boolean): Model {
-  const stock = Object.entries(b.storedExplosives ?? {}).filter(([, kg]) => kg > MIN_ROW_KG);
-  const stockKg = Math.round(warehouseStockKg(b));
-  const freeKg = Math.round(warehouseFreeKg(b));
-  const total = warehouseStockKg(b);
-  return {
-    rows: closed ? [] : stock.sort(([a], [c]) => (a < c ? -1 : 1))
-      .map(([id, kg]) => ({ key: `stock-row-${id}`, label: t(`explosive.${id}.name`), text: kgText(kg) })),
-    gauge: gaugeOf(total, getBuildingDef(b.type, b.tier).capacity),
-    lines: [
-      { key: 'free', text: t('inspector.free_kg', { kg: kgText(freeKg) }) },
-      ...(!closed && total > MIN_ROW_KG
-        ? [{ key: 'radius', text: t('inspector.detonation_radius', { radius: Math.round(secondaryBlastRadiusM(total)) }) }] : []),
-    ],
-    note: closed ? t('inspector.stock_unavailable') : null,
-    stockAttrs: { stockKg, freeKg },
   };
 }
 
@@ -79,7 +57,6 @@ function freightModel(b: Building, state: GameState): Model {
     gauge: gaugeOf(storedKg, capacity),
     lines: [{ key: 'free', text: t('inspector.free_kg', { kg: kgText(Math.max(0, capacity - storedKg - reservedKg)) }) }],
     note: storedKg > MIN_ROW_KG ? null : t('inspector.stock_empty'),
-    stockAttrs: null,
   };
 }
 
@@ -90,13 +67,11 @@ function spoilModel(b: Building): Model {
     gauge: gaugeOf(stored, getBuildingDef(b.type, b.tier).capacity),
     lines: [{ key: 'free', text: t('inspector.free_kg', { kg: kgText(spoilHeapRoomKg(b)) }) }],
     note: null,
-    stockAttrs: null,
   };
 }
 
-function modelOf(b: Building, state: GameState, closed: boolean): Model | null {
+function modelOf(b: Building, state: GameState): Model | null {
   switch (b.type) {
-    case 'explosive_warehouse': return explosiveModel(b, closed);
     case 'freight_warehouse': return freightModel(b, state);
     case 'spoil_heap': return spoilModel(b);
     default: return null;
@@ -109,17 +84,10 @@ function noteOf(text: string): HTMLElement {
   return note;
 }
 
-function applyStockAttrs(node: HTMLElement, a: { stockKg: number; freeKg: number }): void {
-  node.dataset['info'] = 'warehouse-stock';
-  node.dataset['stockKg'] = String(a.stockKg);
-  node.dataset['freeKg'] = String(a.freeKg);
-}
-
 function buildSection(m: Model): HTMLElement {
   const rows: HTMLElement[] = [];
   if (m.gauge) {
     const row = liveRow(t('inspector.stock'), 'gauge', m.gauge.text);
-    if (m.stockAttrs) applyStockAttrs(liveValue(row), m.stockAttrs);
     const bar = el('div');
     bar.setAttribute('role', 'progressbar');
     bar.setAttribute('aria-label', m.gauge.aria);
@@ -168,8 +136,8 @@ function reconcile(root: HTMLElement, container: HTMLElement, shown: Set<string>
 }
 
 /** Storage section for a building, or null when the building stores nothing. */
-export function storageContents(b: Building, state: GameState, closed: boolean): InspectorSection | null {
-  const m = modelOf(b, state, closed);
+export function storageContents(b: Building, state: GameState): InspectorSection | null {
+  const m = modelOf(b, state);
   if (!m) return null;
   const shown = new Set<string>([...m.rows.map(r => r.key), ...m.lines.map(l => l.key), ...(m.note !== null ? ['note'] : [])]);
   const section = buildSection(m);
@@ -177,11 +145,10 @@ export function storageContents(b: Building, state: GameState, closed: boolean):
     section,
     rowSignature: [...m.rows.map(r => r.key), ...m.lines.map(l => l.key), m.note !== null ? 'note' : ''].join(','),
     sync(root) {
-      const cur = modelOf(b, state, closed);
+      const cur = modelOf(b, state);
       if (!cur) return;
       if (cur.gauge) {
-        const node = setLive(root, 'gauge', cur.gauge.text);
-        if (node && cur.stockAttrs) applyStockAttrs(node, cur.stockAttrs);
+        setLive(root, 'gauge', cur.gauge.text);
         const fill = root.querySelector<HTMLElement>('[data-live="gauge-bar"]');
         if (fill) fill.style.width = `${Math.round(cur.gauge.fraction * 100)}%`;
       }

@@ -10,14 +10,13 @@ import { el } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { getExplosivesStockByType } from '../../core/entities/Building.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { oreEstimateView, oreValueColor, oreValueText } from './oreEstimateDisplay.js';
 import { OreEstimateMemo } from './oreEstimateMemo.js';
 import { permitPreview, type PermitPreview } from './permitPreview.js';
-import { recordedChargesCost, stockAwareChargesCost } from '../../core/mining/ChargePlan.js';
+import { plannedChargesCost } from '../../core/mining/ChargePlan.js';
 
 export class BlastFooter {
   private readonly el: HTMLElement;
@@ -106,10 +105,8 @@ export class BlastFooter {
     const fireOk = hasHoles && errors.length === 0;
 
     // Loaded charges are paid; ordered-not-yet-loaded ones are an estimate, paid as each hole is loaded (#2143).
-    const pending = Object.values(state.plannedChargesByHole);
-    const planCost = recordedChargesCost(state.chargesByHole).cashCost
-      + stockAwareChargesCost(pending, getExplosivesStockByType(state.buildings)).cashCost;
-    const isEstimate = pending.length > 0;
+    const planCost = plannedChargesCost(state.chargesByHole) + plannedChargesCost(state.plannedChargesByHole);
+    const isEstimate = Object.keys(state.plannedChargesByHole).length > 0;
     const estimate = this.estimateMemo.get(state, plan, this.gridProvider());
     const estValue = estimate.value;
     const { coverage, brokenVoxels, charged, holeCoverage, sealedValue } = estimate;

@@ -1,16 +1,15 @@
 // BlastSimulator2026 — Integration: explosives are paid when a hole is loaded, not when it is ordered (#2143)
 //
-// Ordering a charge books no cash, no expense and draws no stock, and waits for no delivery. When the
-// crew finishes loading a hole, warehouse stock is drawn first and the rest is paid in cash at list
-// price, once per hole. A hole whose cash part exceeds cash waits, flagged explosives_unaffordable,
-// until cash covers it. Uses the console layer so the whole order -> claim -> walk -> load pipeline runs
+// Ordering a charge books no cash, no expense and waits for no delivery. When the
+// crew finishes loading a hole, it is paid in cash at list price (x event factor), once per hole.
+// A hole whose cost exceeds cash waits, flagged explosives_unaffordable, until cash covers it.
+// Uses the console layer so the whole order -> claim -> walk -> load pipeline runs
 // as a player's `tick` commands drive it.
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
-import { getExplosivesStockByType, placeBuilding } from '../../src/core/entities/Building.js';
 import { tickResolvingEvents } from './helpers.js';
 
 type Run = (cmd: string) => { success: boolean; output: string };
@@ -18,13 +17,12 @@ type Run = (cmd: string) => { success: boolean; output: string };
 const HOLE_COST = 60;          // boomite $12/kg list price x 5 kg
 const ORDER = 'charge hole:* explosive:boomite amount:5 stemming:2';
 
-function setup(cash = 5_000_000, withWarehouse = false): { run: Run; state: GameState } {
+function setup(cash = 5_000_000): { run: Run; state: GameState } {
   const { runner, ctx } = createRunner();
   const run: Run = cmd => runner.run(cmd) as { success: boolean; output: string };
   expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
   const state = ctx.state!;
   state.events.eventFreqMultiplier = 0;
-  if (withWarehouse) placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 32, 32, 1);
   expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:12,12').success).toBe(true);
   for (let i = 0; i < 4000 && state.plannedDrillHoles.length > 0; i++) tickResolvingEvents(run);
   expect(state.plannedDrillHoles).toHaveLength(0);
@@ -51,12 +49,10 @@ const loadedCount = (state: GameState) => Object.keys(state.chargesByHole).lengt
 const chargeOrders = (state: GameState) => state.pendingActions.filter(a => a.type === 'charge_hole');
 
 describe('ordering a 3x3 pattern books nothing (#2143)', () => {
-  it('orders all nine holes with cash, expense ledger and stock untouched', () => {
-    const { run, state } = setup(5_000_000, true);
-    expect(run('buy explosive:boomite kg:100').success).toBe(true);
+  it('orders all nine holes with cash and expense ledger untouched', () => {
+    const { run, state } = setup();
     const cash = state.cash;
     const expenses = explosivesExpenses(state).length;
-    const stock = getExplosivesStockByType(state.buildings)['boomite'];
 
     expect(run(ORDER).success).toBe(true);
 
@@ -64,7 +60,6 @@ describe('ordering a 3x3 pattern books nothing (#2143)', () => {
     expect(state.cash).toBe(cash);
     expect(state.finances.cash).toBe(cash);
     expect(explosivesExpenses(state)).toHaveLength(expenses);
-    expect(getExplosivesStockByType(state.buildings)['boomite']).toBe(stock);
   });
 
   it('is accepted at zero cash', () => {
@@ -75,24 +70,21 @@ describe('ordering a 3x3 pattern books nothing (#2143)', () => {
     expect(state.cash).toBe(0);
   });
 
-  it('cancelling every order with drill_plan clear leaves cash and stock where they were', () => {
-    const { run, state } = setup(5_000_000, true);
-    expect(run('buy explosive:boomite kg:100').success).toBe(true);
+  it('cancelling every order with drill_plan clear leaves cash where it was', () => {
+    const { run, state } = setup();
     expect(run(ORDER).success).toBe(true);
     const cash = state.cash;
-    const stock = getExplosivesStockByType(state.buildings)['boomite'];
     const expenses = explosivesExpenses(state).length;
 
     expect(run('drill_plan clear').success).toBe(true);
 
     expect(chargeOrders(state)).toHaveLength(0);
     expect(state.cash).toBe(cash);
-    expect(getExplosivesStockByType(state.buildings)['boomite']).toBe(stock);
     expect(explosivesExpenses(state)).toHaveLength(expenses);
   });
 });
 
-describe('an empty warehouse means no delivery wait (#2143)', () => {
+describe('no delivery wait (#2143)', () => {
   it('the first hole is loaded well inside the old 400-tick delivery wait', () => {
     const { run, state } = setup();
     expect(run(ORDER).success).toBe(true);
@@ -173,44 +165,6 @@ describe('cash falls by each hole\'s explosive cost as it is loaded (#2143)', ()
   }, 120_000);
 });
 
-describe('stock is drawn first at load time (#2143)', () => {
-  it('stock covers the first holes for free and only the rest is paid in cash', () => {
-    const { run, state } = setup(5_000_000, true);
-    expect(run('buy explosive:boomite kg:20').success).toBe(true);
-    const baseline = explosivesTotal(state);
-
-    expect(run(ORDER).success).toBe(true);
-    expect(getExplosivesStockByType(state.buildings)['boomite']).toBe(20);
-    expect(explosivesTotal(state)).toBe(baseline);
-
-    for (let i = 0; i < 6000 && loadedCount(state) < 9; i++) tickResolvingEvents(run);
-    expect(loadedCount(state)).toBe(9);
-
-    // 45 kg ordered, 20 kg stocked: 25 kg paid at list price.
-    expect(explosivesTotal(state) - baseline).toBeCloseTo(25 * 12, 6);
-    expect(getExplosivesStockByType(state.buildings)['boomite'] ?? 0).toBe(0);
-    const fromStock = Object.values(state.chargesByHole).reduce((sum, c) => sum + (c.fromStockKg ?? 0), 0);
-    expect(fromStock).toBeCloseTo(20, 6);
-  }, 120_000);
-
-  it('a fully stocked pattern costs no explosive cash at all and is never flagged unaffordable', () => {
-    const { run, state } = setup(5_000_000, true);
-    expect(run('buy explosive:boomite kg:100').success).toBe(true);
-    const baseline = explosivesTotal(state);
-
-    expect(run(ORDER).success).toBe(true);
-    for (let i = 0; i < 6000 && loadedCount(state) < 9; i++) {
-      tickResolvingEvents(run);
-      for (const a of chargeOrders(state)) expect(a.blockedReason as string | null).not.toBe('explosives_unaffordable');
-    }
-
-    expect(loadedCount(state)).toBe(9);
-    expect(explosivesTotal(state)).toBe(baseline);
-    for (const c of Object.values(state.chargesByHole)) expect(c.fromStockKg).toBe(5);
-    expect(getExplosivesStockByType(state.buildings)['boomite']).toBeCloseTo(100 - 45, 6);
-  }, 120_000);
-});
-
 // The staffed crew's payroll drains cash every tick, so the cash-starved cases watch a short window only.
 describe('an order the cash cannot pay waits, flagged, until cash covers it (#2143)', () => {
   const STARVED_TICKS = 20;
@@ -254,12 +208,11 @@ describe('an order the cash cannot pay waits, flagged, until cash covers it (#21
     expect(chargeOrders(state)).toHaveLength(0);
   }, 120_000);
 
-  it('an empty warehouse never loads on credit: no stock appears and no expense is booked', () => {
-    const { run, state } = setup(0, true);
+  it('never loads on credit: no expense is booked while cash is short', () => {
+    const { run, state } = setup(0);
     expect(run(ORDER).success).toBe(true);
     for (let i = 0; i < STARVED_TICKS; i++) tickResolvingEvents(run);
     expect(loadedCount(state)).toBe(0);
     expect(explosivesExpenses(state)).toHaveLength(0);
-    expect(getExplosivesStockByType(state.buildings)['boomite'] ?? 0).toBe(0);
   });
 });

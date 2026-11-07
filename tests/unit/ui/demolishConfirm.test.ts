@@ -41,20 +41,6 @@ describe('buildDemolishConfirm (#1399)', () => {
     expect(cfg.body).not.toContain('ui.build.demolish_confirm_loses_explosives');
   });
 
-  it('explosive warehouse with stock warns with the kg lost', () => {
-    const b = makeBuilding({ type: 'explosive_warehouse', storedExplosives: { anfo: 250 } });
-    const cfg = buildDemolishConfirm(b, vi.fn());
-    expect(cfg.body).toContain(t('ui.build.demolish_confirm_loses_explosives', { kg: 250 }));
-    expect(cfg.body).toContain('250');
-    expect(cfg.body).not.toContain('{kg}');
-  });
-
-  it('explosive warehouse with zero stock has no warning', () => {
-    const b = makeBuilding({ type: 'explosive_warehouse', storedExplosives: { anfo: 0 } });
-    const cfg = buildDemolishConfirm(b, vi.fn());
-    expect(cfg.body).not.toContain(t('ui.build.demolish_confirm_loses_explosives', { kg: 0 }));
-  });
-
   it('explosive warehouse with undefined stock has no warning', () => {
     const b = makeBuilding({ type: 'explosive_warehouse' });
     const cfg = buildDemolishConfirm(b, vi.fn());
@@ -79,10 +65,9 @@ describe('buildDemolishConfirm (#1399)', () => {
     expect(buildDemolishConfirm(b, vi.fn(), { storedOreKg: 0 }).body).not.toContain('loses_ore');
   });
 
-  it('ore and explosives lines can both show, cost line first (#1758)', () => {
-    const b = makeBuilding({ type: 'explosive_warehouse', storedExplosives: { anfo: 250 } });
+  it('the ore line shows after the cost line (#1758)', () => {
+    const b = makeBuilding({ type: 'freight_warehouse' });
     const cfg = buildDemolishConfirm(b, vi.fn(), { storedOreKg: 90 });
-    expect(cfg.body).toContain(t('ui.build.demolish_confirm_loses_explosives', { kg: 250 }));
     expect(cfg.body).toContain(t('ui.build.demolish_confirm_loses_ore', { kg: 90 }));
     expect(cfg.body.indexOf(`$${formatMoney(getDemolishCost(b))}`)).toBeLessThan(cfg.body.indexOf(t('ui.build.demolish_confirm_loses_ore', { kg: 90 })));
   });

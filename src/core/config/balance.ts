@@ -633,12 +633,6 @@ export const MAX_RAMP_LENGTH = 1_000;
  *  realistic volume per kilogram (powder factor ≈ 0.3 kg/m³). */
 export const EXPLOSIVE_ENERGY_SCALE = 10.0;
 
-/** Bulk purchase price relative to the per-order price of an explosive (#1678). */
-export const EXPLOSIVE_BULK_PRICE_FACTOR = 0.7;
-
-/** Kg added or removed per click of the stock purchase stepper (#1685). */
-export const STOCK_BUY_STEP_KG = 50;
-
 /** Kinetic energy (in joules) that one unit of blast energy imparts to a fragment
  *  it throws. Absorption thresholds are a balance scale rather than joules, so
  *  turning leftover energy into a speed needs an explicit conversion — without one
@@ -1589,15 +1583,7 @@ export interface StartingSiteVehicleSlot {
 export interface StartingBuildingSlot {
   readonly type: BuildingType;
   readonly tier: BuildingTier;
-  /** Explosive kg stored in the building as it is placed (#2118); only an explosive warehouse holds any. */
-  readonly stock?: Readonly<Record<string, number>>;
 }
-
-/** Explosive the sandbox kits' starter warehouse holds (#2118): water-resistant, offered by the grade-0 charge step. */
-export const SANDBOX_STARTER_EXPLOSIVE_ID = 'krackle';
-
-/** Kg of it: about two permit-sized shots (#2118). */
-export const SANDBOX_STARTER_EXPLOSIVE_KG = 100;
 
 /**
  * Driller, blaster and truck driver: the crew every starting site opens with.
@@ -1770,7 +1756,7 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
  */
 const SANDBOX_STARTING_BUILDINGS: readonly StartingBuildingSlot[] = [
   ...DIGGER_STARTING_SITE.buildings,
-  { type: 'explosive_warehouse', tier: 1, stock: { [SANDBOX_STARTER_EXPLOSIVE_ID]: SANDBOX_STARTER_EXPLOSIVE_KG } },
+  { type: 'explosive_warehouse', tier: 1 },
 ];
 
 export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxKitId, StartingSiteComposition>> = {
@@ -2379,27 +2365,6 @@ export const RAMP_RESERVATION_MARGIN = 0;
 
 /** Cell radius around a drill hole kept clear of buildings (#1390). */
 export const HOLE_RESERVATION_RADIUS = 0;
-
-/** Secondary blast radius floor in metres (#1394). */
-export const SECONDARY_BLAST_RADIUS_BASE_M = 5;
-
-/** Secondary blast radius growth per sqrt(kg) of stored explosive (#1394). */
-export const SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M = 0.5;
-
-/** Secondary blast radius cap in metres (#1394). */
-export const SECONDARY_BLAST_RADIUS_MAX_M = 40;
-
-/** Fraction of max HP a building or vehicle loses at the epicentre, falling off linearly to 0 at the radius (#1394). */
-export const SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION = 0.6;
-
-/** Fraction of the radius within which people die (#1394). */
-export const SECONDARY_BLAST_DEATH_RADIUS_FRACTION = 0.5;
-
-/** Depth in metres of the single crater hole a secondary blast fires (#1896). */
-export const SECONDARY_BLAST_CRATER_HOLE_DEPTH_M = 3;
-
-/** Cap on blast passes carving one secondary crater (#1896). */
-export const SECONDARY_BLAST_CRATER_MAX_PASSES = 4;
 
 /** Offset added to the game seed to derive the weather cycle's PRNG seed (#1403). */
 export const WEATHER_RNG_SEED_OFFSET = 1000;
