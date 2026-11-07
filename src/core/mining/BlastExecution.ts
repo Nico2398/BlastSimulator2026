@@ -97,7 +97,6 @@ export interface DestroyedBuildingInfo {
   z: number;
 }
 
-
 export interface BlastRegion {
   minX: number;
   maxX: number;
