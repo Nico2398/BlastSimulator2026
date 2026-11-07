@@ -108,6 +108,8 @@ const LIVE_EXPORTS = new Set<string>([
   'src/ui/catalogCardText.ts:BUILDING_CAPACITY_UNIT_KEY',
   // Unit-tested contract of the $/h card format (#1377); production reaches it only through the card-line helpers.
   'src/ui/catalogCardText.ts:formatPerHour',
+  // Event price factor is the unit-tested contract of the charge quote (#2153); production reads it only inside quoteChargeLoad.
+  'src/core/mining/ChargeLoad.ts:explosivePriceFactor',
   // Unit-tested contract of the scores tutorial step (#1334); only createUiActionStep uses these in production.
   'src/ui/tutorialStepHelpers.ts:readScoresInspectCount',
   'src/ui/tutorialStepHelpers.ts:isPanelVisible',

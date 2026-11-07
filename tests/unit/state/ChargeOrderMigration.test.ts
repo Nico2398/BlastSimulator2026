@@ -8,9 +8,6 @@ import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { getExplosivesInStock } from '../../../src/core/entities/BuildingWarehouse.js';
-import { buyExplosiveStock } from '../../../src/core/mining/ExplosiveStock.js';
 import { chargeOrderCost } from '../../../src/core/mining/ChargePlan.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -120,7 +117,7 @@ describe('deserialize — v36 -> v37 refund of prepaid charge orders (#2155 C1)'
     const restored = deserialize(v36Save(json => {
       json['chargesByHole']['H2'] = { ...BOOMITE_5KG, fromStockKg: STOCK_KG };
     }));
-    expect(restored.chargesByHole['H2']!.fromStockKg).toBe(STOCK_KG);
+    expect((restored.chargesByHole['H2'] as Json)['fromStockKg']).toBe(STOCK_KG);
   });
 
   it('refunds only the order cash when the order drew no stock', () => {
@@ -225,7 +222,7 @@ describe('deserialize — refund happens once (#2155 C2)', () => {
 });
 
 describe('a migrated charge order is charged at fill time, once (#2155 C1)', () => {
-  it('pays the full list price on fill when the warehouse holds no stock', () => {
+  it('pays the full list price on fill', () => {
     const restored = deserialize(legacyOrderSave());
     const afterRefund = restored.cash;
     const report = completeCharge(restored);
@@ -233,7 +230,6 @@ describe('a migrated charge order is charged at fill time, once (#2155 C1)', () 
     expect(restored.cash).toBeCloseTo(afterRefund - FULL_PRICE, 8);
     expect(explosivesExpenses(restored)).toHaveLength(1);
     expect(restored.chargesByHole['H1']).toMatchObject(BOOMITE_5KG);
-    expect(restored.chargesByHole['H1']!.fromStockKg ?? 0).toBe(0);
     expect(restored.plannedChargesByHole['H1']).toBeUndefined();
   });
 
@@ -241,20 +237,6 @@ describe('a migrated charge order is charged at fill time, once (#2155 C1)', () 
     const restored = deserialize(legacyOrderSave());
     completeCharge(restored);
     expect(restored.cash).toBeCloseTo(10_000, 8);
-  });
-
-  it('draws warehouse stock first on fill and pays nothing when it covers the order', () => {
-    const state = baseState();
-    placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
-    expect(buyExplosiveStock(state, 'boomite', 100).success).toBe(true);
-    const cashWithStock = state.cash;
-    const restored = deserialize(legacyOrderSave(state));
-    expect(restored.cash).toBeCloseTo(cashWithStock + FULL_PRICE, 8);
-    const afterRefund = restored.cash;
-    completeCharge(restored);
-    expect(getExplosivesInStock(restored.buildings, 'boomite')).toBe(95);
-    expect(restored.cash).toBeCloseTo(afterRefund, 8);
-    expect(restored.chargesByHole['H1']!.fromStockKg).toBe(5);
   });
 
   it('does not charge a second time if the loaded save is completed twice', () => {

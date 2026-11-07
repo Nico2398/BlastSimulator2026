@@ -147,7 +147,7 @@ describe('warehouse inspector shows no stock (#2153)', () => {
     const state = makeState();
     const b = Object.assign(warehouse(), { storedExplosives: { boomite: 120, krackle: 40 } });
     state.buildings.buildings = [b];
-    const section = storageContents(b, state, false);
+    const section = storageContents(b, state);
     if (section === null) return; // a warehouse with nothing to show has no section at all
     const root = document.createElement('div');
     root.append(section.section);
@@ -160,7 +160,7 @@ describe('warehouse inspector shows no stock (#2153)', () => {
     const state = makeState();
     const b = warehouse();
     state.buildings.buildings = [b];
-    const section = storageContents(b, state, false);
+    const section = storageContents(b, state);
     if (section === null) return;
     const root = document.createElement('div');
     root.append(section.section);

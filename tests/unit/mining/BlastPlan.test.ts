@@ -100,8 +100,8 @@ describe('validateBlastPlan loading state (#2143)', () => {
 
 type TestBuilding = Parameters<typeof buildingsInBlastReach>[2][number];
 
-function bld(id: number, type: TestBuilding['type'], x: number, z: number, storedExplosives?: Record<string, number>): TestBuilding {
-  return { id, type, tier: 1, x, z, ...(storedExplosives ? { storedExplosives } : {}) };
+function bld(id: number, type: TestBuilding['type'], x: number, z: number): TestBuilding {
+  return { id, type, tier: 1, x, z };
 }
 
 function gridHoles(x0: number, z0: number, n: number, spacing: number): Array<{ id: string; x: number; z: number; depth: number }> {
@@ -174,20 +174,9 @@ describe('buildingsInBlastReach (#2021)', () => {
     expect(result.some(r => r.type === 'living_quarters')).toBe(false);
   });
 
-  it('carries id, type, position and stockKg', () => {
+  it('carries id, type and position', () => {
     const result = buildingsInBlastReach(holes, strong, [bld(5, 'management_office', 14, 48)]);
-    expect(result).toEqual([{ buildingId: 5, type: 'management_office', x: 14, z: 48, stockKg: 0 }]);
-  });
-
-  it('reports the stocked explosive warehouse stock summed over explosives', () => {
-    const result = buildingsInBlastReach(holes, strong, [bld(2, 'explosive_warehouse', 22, 48, { krackle: 200, boomite: 28 })]);
-    expect(result[0]!.stockKg).toBe(228);
-  });
-
-  it('reports 0 stock for an empty explosive warehouse', () => {
-    const result = buildingsInBlastReach(holes, strong, [bld(2, 'explosive_warehouse', 22, 48)]);
-    expect(result).toHaveLength(1);
-    expect(result[0]!.stockKg).toBe(0);
+    expect(result).toEqual([{ buildingId: 5, type: 'management_office', x: 14, z: 48 }]);
   });
 
   it('orders results by buildingId regardless of input order', () => {
@@ -366,19 +355,17 @@ describe('buildingsInBlastReach follows the charge (#2030)', () => {
     expect(buildingsInBlastReach([], chargeAll(holes, 'dynatomics', 11), [eastOffice(1)])).toEqual([]);
   });
 
-  it('reproduces #2021: warehouse, office and freight warehouse flagged, quarters not, sorted, stock kept', () => {
+  it('reproduces #2021: warehouse, office and freight warehouse flagged, quarters not, sorted', () => {
     const repro = gridHoles(12, 44, 3, 4);
     const charges = chargeAll(repro, 'dynatomics', 11);
     const result = buildingsInBlastReach(repro, charges, [
       bld(4, 'freight_warehouse', 14, 40),
       bld(1, 'living_quarters', 30, 48),
       bld(3, 'management_office', 14, 48),
-      bld(2, 'explosive_warehouse', 22, 48, { krackle: 200, boomite: 28 }),
+      bld(2, 'explosive_warehouse', 22, 48),
     ]);
     expect(result.map(r => r.buildingId)).toEqual([2, 3, 4]);
     expect(result.map(r => r.type)).toEqual(['explosive_warehouse', 'management_office', 'freight_warehouse']);
-    expect(result[0]!.stockKg).toBe(228);
-    expect(result[1]!.stockKg).toBe(0);
   });
 
   it('an explicit marginM still overrides the charge-derived reach', () => {

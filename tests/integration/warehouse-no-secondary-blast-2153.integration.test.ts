@@ -52,13 +52,18 @@ function surfaceSum(grid: VoxelGrid, radius: number): number {
   return sum;
 }
 
+/** Secondary-blast rows on the report: the field no longer exists in the type, so read it untyped. */
+function legacyRows(state: GameState): unknown[] {
+  return (state.lastBlastReport as unknown as { secondaryBlasts?: unknown[] }).secondaryBlasts ?? [];
+}
+
 describe('a destroyed warehouse is only a destroyed building (#2153)', () => {
   const plain = fire(0);
   const legacy = fire(400);
 
   it('records no secondary blast on the report, with or without a legacy field', () => {
-    expect(plain.state.lastBlastReport!.secondaryBlasts ?? []).toHaveLength(0);
-    expect(legacy.state.lastBlastReport!.secondaryBlasts ?? []).toHaveLength(0);
+    expect(legacyRows(plain.state)).toHaveLength(0);
+    expect(legacyRows(legacy.state)).toHaveLength(0);
   });
 
   it('a legacy stock carves no crater: the ground matches the plain run', () => {

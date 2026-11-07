@@ -1,20 +1,16 @@
 // BlastSimulator2026 — Unit tests for blast-aware building interaction.
 //
-// Covers four feature areas:
+// Covers three feature areas:
 //   1. checkProtectedPositions  — validates drill holes against building footprints (BlastPlan)
 //   2. executeBlast destruction — buildings are removed from state when their footprint voxels are cleared
-//   3. executeBlast secondaries — explosive_warehouse detonation chain events emitted on BlastResult
-//   4. recordBuildingDestruction — score penalties applied when buildings are blast-destroyed
+//   3. recordBuildingDestruction — score penalties applied when buildings are blast-destroyed
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
   createBuildingState,
   placeBuilding,
-  buildingCenter,
 } from '../../../src/core/entities/Building.js';
 
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -26,27 +22,12 @@ import {
 } from '../../../src/core/mining/BlastPlan.js';
 import type { ValidationError } from '../../../src/core/mining/BlastPlan.js';
 
-import type { FragmentData, SecondaryBlastEvent } from '../../../src/core/mining/BlastExecution.js';
-import { createDamageState, processProjections } from '../../../src/core/entities/Damage.js';
-import { createVehicleState } from '../../../src/core/entities/Vehicle.js';
-import { createEmployeeState } from '../../../src/core/entities/Employee.js';
-import {
-  blastCommand,
-  chargeCommand,
-  drillPlanCommand,
-} from '../../../src/console/commands/mining.js';
-import { buildCommand } from '../../../src/console/commands/entities.js';
-import { tickCommand } from '../../../src/console/commands/events.js';
-import { makeGameContext } from '../../helpers/gameContext.js';
-import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
-import { buyExplosiveStock } from '../../../src/core/mining/ExplosiveStock.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
 
 import {
   createScoreState,
   recordBuildingDestruction,
 } from '../../../src/core/scores/ScoreManager.js';
-import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -256,102 +237,7 @@ describe('executeBlast — building destruction', () => {
   });
 });
 
-// ── 3. executeBlast — secondary blast events ──────────────────────────────────
-//
-// When an explosive_warehouse with storedExplosives > 0 is destroyed by a blast,
-// executeBlast emits a secondaryBlastEvent in result.secondaryBlastEvents:
-//   { buildingId: number; x: number; z: number; explosivesKg: number }
-//
-// No event is emitted when:
-//   • storedExplosives is 0 or absent
-//   • The destroyed building is not an explosive_warehouse
-
-describe('executeBlast — secondary blast events', () => {
-  beforeEach(() => { holeCounter.nextHoleId = 1; });
-
-  it('emits a secondaryBlastEvent for an explosive_warehouse that has stored explosives', () => {
-    const grid = makeTestGrid();
-    const buildingState = createBuildingState();
-    const placed = placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
-    const buildingId = placed.building!.id;
-    const { cx, cz } = buildingCenter(placed.building!);
-
-    // storedExplosives triggers a secondary blast event when the building is destroyed.
-    (buildingState.buildings[0] as any).storedExplosives = { anfo: 200 };
-
-    const holes: DrillHole[] = [];
-    addHole(holeCounter, holes, 5, 5, 5, 0.15);
-    const plan = makeBlastPlan(holes);
-
-    const result = (executeBlast as any)(plan, grid, [], 1.0, buildingState);
-
-    expect(result).not.toBeNull();
-    const events = (result as any).secondaryBlastEvents;
-    expect(events).toBeDefined();
-    expect(events).toHaveLength(1);
-    expect(events[0].buildingId).toBe(buildingId);
-    expect(events[0].explosivesKg).toBe(200);
-        expect(events[0].x).toBe(cx);
-    expect(events[0].z).toBe(cz);
-  });
-
-  it('emits no secondaryBlastEvent when storedExplosives is 0', () => {
-    const grid = makeTestGrid();
-    const buildingState = createBuildingState();
-    placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
-    (buildingState.buildings[0] as any).storedExplosives = { anfo: 0 };
-
-    const holes: DrillHole[] = [];
-    addHole(holeCounter, holes, 5, 5, 5, 0.15);
-    const plan = makeBlastPlan(holes);
-
-    const result = (executeBlast as any)(plan, grid, [], 1.0, buildingState);
-
-    expect(result).not.toBeNull();
-    const events = (result as any).secondaryBlastEvents;
-    expect(events).toBeDefined();
-    expect(events).toHaveLength(0);
-  });
-
-  it('emits no secondaryBlastEvent when storedExplosives is absent (undefined)', () => {
-    const grid = makeTestGrid();
-    const buildingState = createBuildingState();
-    // No storedExplosives set at all — field will be undefined.
-    placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
-
-    const holes: DrillHole[] = [];
-    addHole(holeCounter, holes, 5, 5, 5, 0.15);
-    const plan = makeBlastPlan(holes);
-
-    const result = (executeBlast as any)(plan, grid, [], 1.0, buildingState);
-
-    expect(result).not.toBeNull();
-    const events = (result as any).secondaryBlastEvents;
-    expect(events).toBeDefined();
-    expect(events).toHaveLength(0);
-  });
-
-  it('emits no secondaryBlastEvent when a non-explosive building is destroyed', () => {
-    const grid = makeTestGrid();
-    const buildingState = createBuildingState();
-    // management_office tier-1 has a 2×2 footprint — same geometry as explosive_warehouse,
-    // but is not an explosive_warehouse and carries no stored explosives.
-    placeBuilding(buildingState, 'management_office', 5, 5, 20, 20);
-
-    const holes: DrillHole[] = [];
-    addHole(holeCounter, holes, 5, 5, 5, 0.15);
-    const plan = makeBlastPlan(holes);
-
-    const result = (executeBlast as any)(plan, grid, [], 1.0, buildingState);
-
-    expect(result).not.toBeNull();
-    const events = (result as any).secondaryBlastEvents;
-    expect(events).toBeDefined();
-    expect(events).toHaveLength(0);
-  });
-});
-
-// ── 4. recordBuildingDestruction — score penalties ────────────────────────────
+// ── 3. recordBuildingDestruction — score penalties ────────────────────────────
 //
 // recordBuildingDestruction(state, isExplosiveWarehouse) applies score penalties
 // immediately to state, clamped to [0, 100]:
@@ -409,258 +295,5 @@ describe('recordBuildingDestruction', () => {
     recordBuildingDestruction(state, true);
 
     expect(state.wellBeing).toBe(0);
-  });
-});
-
-
-// ── 5. processProjections — flying rock destroys a stocked warehouse (#1394) ───
-
-function makeProjection(id: number, x: number, z: number, mass: number, velocity: number): FragmentData {
-  return {
-    id, position: { x, y: 0, z }, volume: mass / 2.5, mass,
-    rockId: 'sandite', oreDensities: {},
-    initialVelocity: { x: velocity, y: 0, z: 0 },
-    isProjection: true,
-    halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
-    shapeSeed: id,
-    origin: { x, y: 0, z },
-  };
-}
-
-describe('processProjections — secondary blast collector (#1394)', () => {
-  function setup(stock: number | undefined) {
-    const buildings = createBuildingState();
-    placeBuilding(buildings, 'explosive_warehouse', 5, 5, 64, 64);
-    const wh = buildings.buildings[0]!;
-    if (stock !== undefined) wh.storedExplosives = { anfo: stock };
-    wh.hp = 1;
-    return { buildings, wh };
-  }
-  // KE = 0.5 * 50 * 40^2 = 40000 J, dead-on hit.
-  const frag = () => makeProjection(1, 6, 6, 50, 40);
-
-  it('pushes an event when flying rock destroys a stocked warehouse', () => {
-    const { buildings, wh } = setup(120);
-    const collector: SecondaryBlastEvent[] = [];
-    processProjections(
-      [frag()], buildings, createVehicleState(), createEmployeeState(),
-      createDamageState(), 3, null, collector,
-    );
-    expect(buildings.buildings.some(b => b.id === wh.id)).toBe(false);
-    expect(collector).toHaveLength(1);
-    expect(collector[0]!.buildingId).toBe(wh.id);
-    expect(collector[0]!.explosivesKg).toBe(120);
-    const { cx, cz } = buildingCenter(wh);
-    expect(collector[0]!.x).toBeCloseTo(cx, 6);
-    expect(collector[0]!.z).toBeCloseTo(cz, 6);
-  });
-
-  it('pushes nothing when the destroyed warehouse holds 0 kg', () => {
-    const { buildings } = setup(0);
-    const collector: SecondaryBlastEvent[] = [];
-    processProjections(
-      [frag()], buildings, createVehicleState(), createEmployeeState(),
-      createDamageState(), 3, null, collector,
-    );
-    expect(buildings.buildings).toHaveLength(0);
-    expect(collector).toEqual([]);
-  });
-
-  it('pushes nothing when stock is undefined', () => {
-    const { buildings } = setup(undefined);
-    const collector: SecondaryBlastEvent[] = [];
-    processProjections(
-      [frag()], buildings, createVehicleState(), createEmployeeState(),
-      createDamageState(), 3, null, collector,
-    );
-    expect(collector).toEqual([]);
-  });
-
-  it('pushes nothing when the stocked warehouse survives the hit', () => {
-    const { buildings, wh } = setup(120);
-    wh.hp = wh.hp + 1_000_000;
-    const collector: SecondaryBlastEvent[] = [];
-    processProjections(
-      [makeProjection(1, 6, 6, 1, 1)], buildings, createVehicleState(), createEmployeeState(),
-      createDamageState(), 3, null, collector,
-    );
-    expect(collector).toEqual([]);
-  });
-
-  it('pushes nothing for a non-warehouse building', () => {
-    const buildings = createBuildingState();
-    placeBuilding(buildings, 'management_office', 5, 5, 64, 64);
-    buildings.buildings[0]!.hp = 1;
-    const collector: SecondaryBlastEvent[] = [];
-    processProjections(
-      [frag()], buildings, createVehicleState(), createEmployeeState(),
-      createDamageState(), 3, null, collector,
-    );
-    expect(buildings.buildings).toHaveLength(0);
-    expect(collector).toEqual([]);
-  });
-
-  it('still returns the building_destroyed accident (existing behaviour)', () => {
-    const { buildings, wh } = setup(120);
-    const accidents = processProjections(
-      [frag()], buildings, createVehicleState(), createEmployeeState(),
-      createDamageState(), 3, null, [],
-    );
-    expect(accidents.some(a => a.type === 'building_destroyed' && a.entityId === wh.id)).toBe(true);
-  });
-});
-
-// ── 6. Console blast with a stocked warehouse in the footprint (#1394) ─────────
-
-function makeBlastContextWithWarehouse(kg: number) {
-  const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32, staffed: true });
-  const state = ctx.state!;
-  drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
-  for (let i = 0; i < 200 && state.plannedDrillHoles.length > 0; i++) {
-    for (const e of state.employees.employees) e.fatigue = 100;
-    tickCommand(ctx, ['1'], {});
-  }
-  chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
-  for (let i = 0; i < 200 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
-    for (const e of state.employees.employees) e.fatigue = 100;
-    fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll
-    tickCommand(ctx, ['1'], {});
-  }
-  const hole = state.drillHoles[0]!;
-  placeBuilding(state.buildings, 'explosive_warehouse', Math.floor(hole.x), Math.floor(hole.z), 32, 32);
-  const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
-  wh.storedExplosives = { anfo: kg };
-  return { ctx, state, wh };
-}
-
-describe('blast command — secondary blast from a stocked warehouse (#1394)', () => {
-  it('reports the secondary blast line and records it on lastBlastReport', () => {
-    const { ctx, state, wh } = makeBlastContextWithWarehouse(150);
-    const result = blastCommand(ctx, [], {});
-
-    expect(result.success).toBe(true);
-    expect(state.lastBlastReport!.destroyedBuildings.some(b => b.buildingId === wh.id)).toBe(true);
-    const sec = state.lastBlastReport!.secondaryBlasts;
-    expect(sec).toBeDefined();
-    expect(sec).toHaveLength(1);
-    expect(sec![0]!.buildingId).toBe(wh.id);
-    expect(sec![0]!.explosivesKg).toBe(150);
-    expect(sec![0]!.radiusM).toBeGreaterThan(0);
-    // Localized line key, params kg / id / casualties.
-    expect(result.output).toContain('Secondary blast: 150 kg of stored explosives detonated');
-  });
-
-  it('adds no secondary blast when the warehouse is empty', () => {
-    const { ctx, state, wh } = makeBlastContextWithWarehouse(0);
-    const result = blastCommand(ctx, [], {});
-
-    expect(state.lastBlastReport!.destroyedBuildings.some(b => b.buildingId === wh.id)).toBe(true);
-    expect(state.lastBlastReport!.secondaryBlasts ?? []).toEqual([]);
-    expect(result.output).not.toContain('Secondary blast');
-  });
-});
-
-describe('blast command — warehouse stocked through purchases (#1678)', () => {
-  function stockedByPurchase(purchases: Array<[string, number]>) {
-    const { ctx, state, wh } = makeBlastContextWithWarehouse(0);
-    delete wh.storedExplosives;
-    state.cash = 1_000_000;
-    for (const [id, kg] of purchases) {
-      expect(buyExplosiveStock(state, id, kg).success).toBe(true);
-    }
-    return { ctx, state, wh };
-  }
-
-  it('detonates when the blast destroys it; explosivesKg is the total stock', () => {
-    const { ctx, state, wh } = stockedByPurchase([['boomite', 100]]);
-    const result = blastCommand(ctx, [], {});
-
-    expect(result.success).toBe(true);
-    expect(state.lastBlastReport!.destroyedBuildings.some(b => b.buildingId === wh.id)).toBe(true);
-    const sec = state.lastBlastReport!.secondaryBlasts;
-    expect(sec).toHaveLength(1);
-    expect(sec![0]!.buildingId).toBe(wh.id);
-    expect(sec![0]!.explosivesKg).toBe(100);
-    expect(result.output).toContain('Secondary blast: 100 kg of stored explosives detonated');
-  });
-
-  it('sums every explosive type held into the secondary blast', () => {
-    const { ctx, state } = stockedByPurchase([['boomite', 100], ['krackle', 50]]);
-    blastCommand(ctx, [], {});
-    expect(state.lastBlastReport!.secondaryBlasts![0]!.explosivesKg).toBe(150);
-  });
-
-  it('adds no secondary blast once the purchased stock was fully drawn by charge orders', () => {
-    const { ctx, state, wh } = stockedByPurchase([['boomite', 5]]);
-    wh.storedExplosives = { boomite: 0 };
-    blastCommand(ctx, [], {});
-    expect(state.lastBlastReport!.secondaryBlasts ?? []).toEqual([]);
-  });
-});
-
-describe('build destroy — stocked explosive warehouse (#1394)', () => {
-  it('warns about the lost explosives and does not detonate', () => {
-    const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32, staffed: true });
-    const state = ctx.state!;
-    placeBuilding(state.buildings, 'explosive_warehouse', 10, 10, 32, 32);
-    const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
-    wh.storedExplosives = { anfo: 80 };
-    state.cash = 1_000_000;
-    const accidentsBefore = state.damage.accidents.length;
-
-    equipDemolition(ctx);
-    state.cash = 1_000_000;
-
-    const result = buildCommand(ctx, ['destroy', String(wh.id)], {});
-
-    // The order itself warns the player what the demolition will cost them (#1392).
-    expect(result.success).toBe(true);
-    expect(result.output).toContain('80 kg of stored explosives');
-    expect(result.output).toContain('no detonation');
-    expect(state.buildings.buildings.some(b => b.id === wh.id)).toBe(true);
-    tickUntilDemolished(ctx);
-    expect(state.buildings.buildings.some(b => b.id === wh.id)).toBe(false);
-    expect(state.damage.accidents.length).toBe(accidentsBefore);
-    expect(state.lastBlastReport?.secondaryBlasts ?? []).toEqual([]);
-  });
-
-  it('adds no lost-explosives line for an empty warehouse', () => {
-    const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32, staffed: true });
-    const state = ctx.state!;
-    placeBuilding(state.buildings, 'explosive_warehouse', 10, 10, 32, 32);
-    const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
-    equipDemolition(ctx);
-    state.cash = 1_000_000;
-    const result = buildCommand(ctx, ['destroy', String(wh.id)], {});
-    expect(result.success).toBe(true);
-    expect(result.output).not.toContain('stored explosives');
-  });
-});
-
-// ── 7. Locale parity for the new keys (#1394) ──────────────────────────────────
-
-describe('secondary blast locale keys (#1394)', () => {
-  const dir = join(import.meta.dirname, '../../../src/core/i18n/locales');
-  const en = JSON.parse(readFileSync(join(dir, 'en.json'), 'utf8')) as Record<string, string>;
-  const fr = JSON.parse(readFileSync(join(dir, 'fr.json'), 'utf8')) as Record<string, string>;
-
-  it('mining.blast.secondary_blast carries kg, id and casualties in both locales', () => {
-    for (const loc of [en, fr]) {
-      const v = loc['mining.blast.secondary_blast'];
-      expect(typeof v).toBe('string');
-      expect(v).toContain('{kg}');
-      expect(v).toContain('{id}');
-      expect(v).toContain('{casualties}');
-    }
-    expect(fr['mining.blast.secondary_blast']).not.toBe(en['mining.blast.secondary_blast']);
-  });
-
-  it('entities.build_destroy_lost_explosives carries kg in both locales', () => {
-    for (const loc of [en, fr]) {
-      const v = loc['entities.build_destroy_lost_explosives'];
-      expect(typeof v).toBe('string');
-      expect(v).toContain('{kg}');
-    }
-    expect(fr['entities.build_destroy_lost_explosives']).not.toBe(en['entities.build_destroy_lost_explosives']);
   });
 });

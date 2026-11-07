@@ -335,7 +335,7 @@ describe('FireStep — within-permit checklist (#1925)', () => {
 // ── #2021: buildings inside the blast area are listed in the checklist ──────
 
 describe('FireStep — buildings in blast reach (#2021)', () => {
-  it('lists a row per building at risk with the stocked warehouse kg and secondary blast', () => {
+  it('lists a row per building at risk', () => {
     const { step } = makeStep();
     const state = makeState();
     addReachPattern(state, holeCounter);
@@ -344,7 +344,7 @@ describe('FireStep — buildings in blast reach (#2021)', () => {
     const text = step.root.textContent ?? '';
     expect(text).toContain('Management Office is inside the blast area and will be destroyed.');
     expect(text).toContain('Freight Warehouse is inside the blast area and will be destroyed.');
-    expect(text).toContain('Explosive Warehouse (228 kg stocked) is inside the blast area: it will be destroyed and its stock will detonate as a secondary blast.');
+    expect(text).toContain('Explosive Warehouse is inside the blast area and will be destroyed.');
     expect(text).not.toContain('Living Quarters is inside the blast area');
   });
 

@@ -11,9 +11,7 @@ import { drainRainReasonText } from '../../../../../src/ui/panels/blastSteps/Cha
 import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
 import { TUBING_COST } from '../../../../../src/core/mining/Tubing.js';
-import { placeBuilding, storeExplosives } from '../../../../../src/core/entities/Building.js';
-import { buyStockBlockReason } from '../../../../../src/core/mining/ExplosiveStock.js';
-import { CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, STOCK_BUY_STEP_KG } from '../../../../../src/core/config/balance.js';
+import { CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M } from '../../../../../src/core/config/balance.js';
 import { dispatchChargeAction } from '../../../../../src/core/mining/ChargeOrder.js';
 import { explosiveHoleLimits } from '../../../../../src/core/mining/ChargePlan.js';
 import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js';
@@ -756,147 +754,10 @@ describe('ChargeStep — draining (#1350)', () => {
   });
 });
 
-// ── Explosive Warehouse stock in the Charge step (#1685) ────────────────────
-// Hooks the implementation must provide:
-//   [data-stock="<explosiveId>"]          one stock row per offered explosive; text shows its kg in stock
-//   [data-field="stock-kg"]               -/value/+ stepper (.bsx-stepper-value), starts at STOCK_BUY_STEP_KG, moves by it
-//   [data-action="stock-buy"]             buy button for the SELECTED explosive; sends `buy explosive:<id> kg:<n>`
-//   [data-info="stock-buy-reason"]        visible reason, present only while the buy button is disabled
-//   [data-info="paid-from"]               line: kg from stock and $ cash for the current pattern
+// ── Charge step prices at list price, no stock (#2153) ──────────────────────
 
-function withWarehouse(state: ReturnType<typeof makeState>, stock: Record<string, number> = {}): void {
-  placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
-  for (const [id, kg] of Object.entries(stock)) storeExplosives(state.buildings, id, kg);
-}
-
-function stockRow(step: ChargeStep, id: string): HTMLElement | null {
-  return step.root.querySelector(`[data-stock="${id}"]`);
-}
-function buyBtn(step: ChargeStep): HTMLButtonElement {
-  return step.root.querySelector('[data-action="stock-buy"]') as HTMLButtonElement;
-}
-function reasonEl(step: ChargeStep): HTMLElement | null {
-  return step.root.querySelector('[data-info="stock-buy-reason"]');
-}
-function paidFrom(step: ChargeStep): string {
-  return step.root.querySelector('[data-info="paid-from"]')?.textContent ?? '';
-}
-function kgStepper(step: ChargeStep): { value: () => string; plus: HTMLButtonElement; minus: HTMLButtonElement } {
-  const f = step.root.querySelector('[data-field="stock-kg"]') as HTMLElement;
-  const btns = f.querySelectorAll('button');
-  return {
-    value: () => f.querySelector('.bsx-stepper-value')!.textContent ?? '',
-    minus: btns[0] as HTMLButtonElement,
-    plus: btns[btns.length - 1] as HTMLButtonElement,
-  };
-}
-
-describe('ChargeStep explosive stock (#1685)', () => {
-  it('shows a stock row for every offered explosive with its kg in stock', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state, { boomite: 120, krackle: 40 });
-    step.update(state, 'sunny');
-
-    expect(stockRow(step, 'boomite')!.textContent).toContain('120');
-    expect(stockRow(step, 'krackle')!.textContent).toContain('40');
-    expect(stockRow(step, 'dynatomics')!.textContent).toContain('0');
-  });
-
-  it('shows 0 kg for every explosive with no warehouse', () => {
-    const { step } = makeStep();
-    step.update(makeState(), 'sunny');
-    expect(stockRow(step, 'boomite')!.textContent).toContain('0');
-  });
-
-  it('repaints the stock row when the stock changes', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state, { boomite: 10 });
-    step.update(state, 'sunny');
-    expect(stockRow(step, 'boomite')!.textContent).toContain('10');
-    storeExplosives(state.buildings, 'boomite', 90);
-    step.update(state, 'sunny');
-    expect(stockRow(step, 'boomite')!.textContent).toContain('100');
-  });
-
-  it('buy control starts at the step amount and the stepper moves by STOCK_BUY_STEP_KG, never below it', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state);
-    step.update(state, 'sunny');
-    const s = kgStepper(step);
-
-    expect(s.value()).toContain(String(STOCK_BUY_STEP_KG));
-    s.plus.click();
-    expect(s.value()).toContain(String(2 * STOCK_BUY_STEP_KG));
-    s.minus.click();
-    s.minus.click();
-    expect(s.value()).toContain(String(STOCK_BUY_STEP_KG));
-  });
-
-  it('buy button sends `buy explosive:<selected> kg:<n>` and is enabled with warehouse, room and cash', () => {
-    const { step, gameConsole } = makeStep();
-    const state = makeState();
-    withWarehouse(state);
-    step.update(state, 'sunny');
-    card(step, 'krackle').click();
-    kgStepper(step).plus.click();
-
-    expect(buyBtn(step).disabled).toBe(false);
-    expect(reasonEl(step)).toBeNull();
-    buyBtn(step).click();
-
-    expect(gameConsole).toHaveBeenCalledWith(`buy explosive:krackle kg:${2 * STOCK_BUY_STEP_KG}`);
-  });
-
-  it('disables buy with a visible reason when there is no warehouse, and a click sends nothing', () => {
-    const { step, gameConsole } = makeStep();
-    const state = makeState();
-    step.update(state, 'sunny');
-
-    expect(buyBtn(step).disabled).toBe(true);
-    expect(reasonEl(step)).not.toBeNull();
-    expect(reasonEl(step)!.textContent!.length).toBeGreaterThan(0);
-    buyBtn(step).click();
-    expect(gameConsole).not.toHaveBeenCalled();
-    expect(buyStockBlockReason(state, 'boomite', STOCK_BUY_STEP_KG)).toBe('no_warehouse');
-  });
-
-  it('disables buy with a visible reason when the purchase would exceed capacity', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state, { boomite: 480 }); // tier 1 holds 500 kg
-    step.update(state, 'sunny');
-    // STOCK_BUY_STEP_KG (50) > 20 kg free
-    expect(buyStockBlockReason(state, 'boomite', STOCK_BUY_STEP_KG)).toBe('over_capacity');
-    expect(buyBtn(step).disabled).toBe(true);
-    expect(reasonEl(step)).not.toBeNull();
-  });
-
-  it('disables buy with a visible reason when cash cannot pay the bulk price', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state);
-    state.cash = 1;
-    step.update(state, 'sunny');
-    expect(buyStockBlockReason(state, 'boomite', STOCK_BUY_STEP_KG)).toBe('insufficient_funds');
-    expect(buyBtn(step).disabled).toBe(true);
-    expect(reasonEl(step)).not.toBeNull();
-  });
-
-  it('re-enables buy and drops the reason once the blocker is gone', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    step.update(state, 'sunny');
-    expect(buyBtn(step).disabled).toBe(true);
-    withWarehouse(state);
-    step.update(state, 'sunny');
-    expect(buyBtn(step).disabled).toBe(false);
-    expect(reasonEl(step)).toBeNull();
-  });
-
-  it('charging with no warehouse still works as before', () => {
+describe('ChargeStep prices the pattern at list price (#2153)', () => {
+  it('charging with no warehouse works', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
@@ -905,61 +766,25 @@ describe('ChargeStep explosive stock (#1685)', () => {
     expect(gameConsole.mock.calls[0]![0]).toContain('charge hole:*');
   });
 
-  it('paid-from line: stock covering the whole pattern shows all kg from stock and $0 cash', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    for (let i = 0; i < 3; i++) addHole(holeCounter, state.drillHoles, 10 + 3 * i, 10, 8, 0.089);
-    withWarehouse(state, { boomite: 100 });
-    step.update(state, 'sunny');
-
-    const line = paidFrom(step);
-    expect(line).toContain(String(3 * CHARGE_DEFAULT_AMOUNT_KG)); // 21 kg
-    expect(line).toContain('$0');
-  });
-
-  it('paid-from line: partly covered prices only the shortfall in cash', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    for (let i = 0; i < 3; i++) addHole(holeCounter, state.drillHoles, 10 + 3 * i, 10, 8, 0.089);
-    withWarehouse(state, { boomite: 5 });
-    step.update(state, 'sunny');
-
-    const line = paidFrom(step);
-    const cash = (3 * CHARGE_DEFAULT_AMOUNT_KG - 5) * getExplosive('boomite')!.costPerKg;
-    expect(line).toContain('5');
-    expect(line).toContain(`$${cash}`);
-  });
-
-  it('paid-from line: no stock shows 0 kg from stock and the full list price in cash', () => {
+  it('shows holes x amount x list price for the pattern', () => {
     const { step } = makeStep();
     const state = makeState();
     for (let i = 0; i < 3; i++) addHole(holeCounter, state.drillHoles, 10 + 3 * i, 10, 8, 0.089);
     step.update(state, 'sunny');
     const full = 3 * CHARGE_DEFAULT_AMOUNT_KG * getExplosive('boomite')!.costPerKg;
-    expect(paidFrom(step)).toContain(`$${full}`);
+    expect(step.root.textContent).toContain(`$${full}`);
   });
 
-  it('paid-from line follows the selected explosive', () => {
+  it('has no stock rows, stock buy control or paid-from line', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
-    withWarehouse(state, { krackle: 100 });
     step.update(state, 'sunny');
-    // Krackle is the stocked explosive, so it is preselected (#2016).
-    expect(paidFrom(step)).toContain('$0');
-    card(step, 'boomite').click();
-    step.update(state, 'sunny');
-    expect(paidFrom(step)).not.toContain('$0');
-  });
-
-  it('Charge All line (button sub-label) shows net cash cost when stock covers the pattern', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
-    withWarehouse(state, { boomite: 100 });
-    step.update(state, 'sunny');
-    const btn = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
-    expect(btn.textContent).toContain('$0');
+    expect(step.root.querySelector('[data-stock]')).toBeNull();
+    expect(step.root.querySelector('[data-field="stock-kg"]')).toBeNull();
+    expect(step.root.querySelector('[data-action="stock-buy"]')).toBeNull();
+    expect(step.root.querySelector('[data-info="stock-buy-reason"]')).toBeNull();
+    expect(step.root.querySelector('[data-info="paid-from"]')).toBeNull();
   });
 });
 
@@ -1044,10 +869,9 @@ describe('ChargeStep — hole diameter (#1934)', () => {
   });
 });
 
-// ── Initial explosive follows pattern charge, then stock (#2016) ─────────────
-// Until the player clicks a card: pattern explosive (if allowed) > allowed explosive
-// with the most kg in stock (ties by allowed order) > boomite. A card click wins for
-// the session; the rule re-applies only if the pick becomes disallowed.
+// ── Initial explosive follows pattern charge, then Boomite (#2016, #2153) ────
+// Until the player clicks a card: pattern explosive (if allowed) > boomite > first allowed.
+// A card click wins for the session; the rule re-applies only if the pick becomes disallowed.
 
 describe('ChargeStep initial explosive (#2016)', () => {
   function chargeAllBtn(step: ChargeStep): HTMLButtonElement {
@@ -1058,82 +882,16 @@ describe('ChargeStep initial explosive (#2016)', () => {
       .filter(c => (c as HTMLElement).dataset['selected'] === 'true')
       .map(c => (c as HTMLElement).dataset['explosive']!);
   }
-  const nameOf = (id: string) => t(getExplosive(id)!.nameKey);
 
-  it('preselects the explosive with stock when nothing is picked and Boomite has none', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
-    withWarehouse(state, { krackle: 300 });
-    step.update(state, 'sunny');
-
-    expect(card(step, 'krackle').dataset['selected']).toBe('true');
-    expect(card(step, 'boomite').dataset['selected']).toBe('false');
-    expect(selectedIds(step)).toEqual(['krackle']);
-    const label = chargeAllBtn(step).textContent!;
-    expect(label).toContain(nameOf('krackle'));
-    expect(label).toContain('$0');
-  });
-
-  it('Charge All sends the preselected stocked explosive', () => {
-    const { step, gameConsole } = makeStep();
-    const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
-    withWarehouse(state, { krackle: 300 });
-    step.update(state, 'sunny');
-    chargeAllBtn(step).click();
-    expect(gameConsole.mock.calls[0]![0]).toContain('explosive:krackle');
-  });
-
-  it('the buy button buys the preselected explosive', () => {
-    const { step, gameConsole } = makeStep();
-    const state = makeState();
-    withWarehouse(state, { krackle: 300 });
-    step.update(state, 'sunny');
-    buyBtn(step).click();
-    expect(gameConsole).toHaveBeenCalledWith(`buy explosive:krackle kg:${STOCK_BUY_STEP_KG}`);
-  });
-
-  it('preselects Boomite with an empty warehouse', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state);
-    step.update(state, 'sunny');
-    expect(selectedIds(step)).toEqual(['boomite']);
-  });
-
-  it('preselects Boomite with no warehouse', () => {
+  it('preselects Boomite when nothing is picked', () => {
     const { step } = makeStep();
     step.update(makeState(), 'sunny');
     expect(selectedIds(step)).toEqual(['boomite']);
+    expect(card(step, 'boomite').dataset['selected']).toBe('true');
+    expect(card(step, 'krackle').dataset['selected']).toBe('false');
   });
 
-  it('picks the explosive with the most kg in stock', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state, { boomite: 20, krackle: 60, dynatomics: 40 });
-    step.update(state, 'sunny');
-    expect(selectedIds(step)).toEqual(['krackle']);
-  });
-
-  it('breaks a stock tie by allowed order', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state, { dynatomics: 100, krackle: 100 });
-    step.update(state, 'sunny');
-    expect(selectedIds(step)).toEqual(['krackle']);
-  });
-
-  it('the pattern charge explosive wins over a larger stock of another', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state, { krackle: 300 });
-    state.patternCharge = { explosiveId: 'boomite', amountKg: 4, stemmingM: 2 };
-    step.update(state, 'sunny');
-    expect(selectedIds(step)).toEqual(['boomite']);
-  });
-
-  it('the pattern charge explosive wins even with no stock of it at all', () => {
+  it('the pattern charge explosive is preselected', () => {
     const { step } = makeStep();
     const state = makeState();
     state.patternCharge = { explosiveId: 'krackle', amountKg: 4, stemmingM: 2 };
@@ -1141,76 +899,47 @@ describe('ChargeStep initial explosive (#2016)', () => {
     expect(selectedIds(step)).toEqual(['krackle']);
   });
 
-  it('a pattern explosive the level does not allow falls through to the most-stocked allowed one', () => {
+  it('Charge All sends the preselected pattern explosive', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    state.patternCharge = { explosiveId: 'krackle', amountKg: 4, stemmingM: 2 };
+    step.update(state, 'sunny');
+    chargeAllBtn(step).click();
+    expect(gameConsole.mock.calls[0]![0]).toContain('explosive:krackle');
+  });
+
+  it('a pattern explosive the level does not allow falls through to Boomite', () => {
     const { step } = makeStep();
     const state = makeState();
     state.campaign.activeLevelId = 'dusty_hollow'; // pop_rock, boomite, krackle
-    withWarehouse(state, { dynatomics: 300, krackle: 80, pop_rock: 10 }); // 500 kg warehouse capacity
     state.patternCharge = { explosiveId: 'dynatomics', amountKg: 4, stemmingM: 2 };
     step.update(state, 'sunny');
+    expect(selectedIds(step)).toEqual(['boomite']);
+  });
+
+  it('keeps the player\'s card pick when the pattern charge then changes', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    step.update(state, 'sunny');
+    card(step, 'krackle').click();
+    state.patternCharge = { explosiveId: 'boomite', amountKg: 4, stemmingM: 2 };
+    step.update(state, 'sunny');
     expect(selectedIds(step)).toEqual(['krackle']);
-  });
-
-  it('stock of a disallowed explosive is ignored; with no allowed stock Boomite is selected', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    state.campaign.activeLevelId = 'dusty_hollow';
-    withWarehouse(state, { dynatomics: 500 });
     step.update(state, 'sunny');
-    expect(selectedIds(step)).toEqual(['boomite']);
-  });
-
-  it('keeps the player\'s card pick when the stock then changes', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state);
-    step.update(state, 'sunny');
-    card(step, 'boomite').click();
-    storeExplosives(state.buildings, 'krackle', 300);
-    step.update(state, 'sunny');
-    expect(selectedIds(step)).toEqual(['boomite']);
-    step.update(state, 'sunny');
-    expect(selectedIds(step)).toEqual(['boomite']);
-  });
-
-  it('a click on the already-preselected card still locks the pick', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state, { boomite: 10 });
-    step.update(state, 'sunny');
-    card(step, 'boomite').click();
-    storeExplosives(state.buildings, 'krackle', 300);
-    step.update(state, 'sunny');
-    expect(selectedIds(step)).toEqual(['boomite']);
+    expect(selectedIds(step)).toEqual(['krackle']);
   });
 
   it('re-applies the rule when the player\'s pick becomes disallowed', () => {
     const { step } = makeStep();
     const state = makeState();
     state.campaign.activeLevelId = null;
-    withWarehouse(state, { krackle: 50 });
     step.update(state, 'sunny');
     card(step, 'dynatomics').click();
     expect(selectedIds(step)).toEqual(['dynatomics']);
     state.campaign.activeLevelId = 'dusty_hollow';
     step.update(state, 'sunny');
-    expect(selectedIds(step)).toEqual(['krackle']);
-  });
-
-  it('an unpicked selection follows the stock between updates', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    withWarehouse(state);
-    step.update(state, 'sunny');
     expect(selectedIds(step)).toEqual(['boomite']);
-
-    storeExplosives(state.buildings, 'krackle', 100);
-    step.update(state, 'sunny');
-    expect(selectedIds(step)).toEqual(['krackle']);
-
-    storeExplosives(state.buildings, 'dynatomics', 200);
-    step.update(state, 'sunny');
-    expect(selectedIds(step)).toEqual(['dynatomics']);
   });
 
   it('clamps the amount to the preselected explosive\'s limits in the narrowest hole', () => {
@@ -1218,7 +947,7 @@ describe('ChargeStep initial explosive (#2016)', () => {
     const state = makeState();
     state.campaign.activeLevelId = 'dusty_hollow';
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
-    withWarehouse(state, { pop_rock: 200 });
+    state.patternCharge = { explosiveId: 'pop_rock', amountKg: 4, stemmingM: 2 };
     step.update(state, 'sunny');
 
     const { maxKg } = explosiveHoleLimits(getExplosive('pop_rock')!, 0.089);
