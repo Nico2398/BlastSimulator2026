@@ -2290,7 +2290,7 @@ describe('ContractsPanel filter bar (#2159)', () => {
       const { panel } = makePanel();
       const state = makeState();
       state.contracts.completedHistory.push(
-        ...Array.from({ length: 6 }, (_, i) => makeContract({ id: 400 + i, materialId: i % 2 ? 'rustite' : 'dirtite', status: 'completed' })),
+        ...Array.from({ length: 6 }, (_, i) => makeContract({ id: 400 + i, materialId: i % 2 ? 'rustite' : 'dirtite', completed: true, deliveredKg: 100 })),
       );
       panel.show();
       panel.update(state);

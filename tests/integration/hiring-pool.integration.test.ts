@@ -40,7 +40,7 @@ function perHour(perCycle: number): number {
 }
 
 describe('SAVE_VERSION', () => {
-  it('is 36', () => expect(SAVE_VERSION).toBe(36));
+  it('is 37', () => expect(SAVE_VERSION).toBe(37));
 });
 
 describe('console — employee hire with candidate', () => {

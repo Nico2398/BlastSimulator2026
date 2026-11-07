@@ -16,7 +16,7 @@ import { MAX_DRILL_GRID_HOLES, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../co
 import { removeHoleTubing } from '../../../core/mining/Tubing.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { coveredByFootprint, partitionByFootprint } from '../../../core/mining/BlastPlan.js';
-import { cancelOutstandingChargeAction, removeAwaiting, planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
+import { cancelOutstandingChargeAction, planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
 import { normaliseHoleDiameter, holeDiameterOptionsMm } from '../../../core/mining/HoleDiameter.js';
 import { claimForAction } from '../siteExpansion.js';
 
@@ -41,7 +41,6 @@ function clearHoleCharges(state: GameState, holeId: string): void {
   delete state.chargesByHole[holeId];
   delete state.plannedChargesByHole[holeId];
   delete state.holeWater[holeId];
-  removeAwaiting(state, holeId);
   removeHoleTubing(state.tubingState, holeId);
 }
 

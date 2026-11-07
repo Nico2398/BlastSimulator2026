@@ -160,7 +160,7 @@ import type { RampWidth, PitMaskShape } from '../config/balance.js';
 // v32 -> v33: Vehicle.payload becomes Vehicle.cargo[] (#1370). See SaveLoad.ts's migrateV32ToV33.
 // v33 -> v34: pendingDetonation (#1362). See SaveLoad.ts's migrateV33ToV34.
 // v34 -> v35: events.activeModifiers + nextModifierId (#1414). See SaveLoad.ts's migrateV34ToV35.
-export const SAVE_VERSION = 36;
+export const SAVE_VERSION = 37;
 
 export interface GameConfig {
   seed: number;
@@ -447,9 +447,6 @@ export interface GameState {
   /** Charge applied automatically to each newly drilled hole; null = none (#1345). */
   patternCharge?: HoleCharge | null;
 
-  /** Hole ids whose auto-charge is waiting for funds (#1345). */
-  chargeAwaitingFunds?: string[];
-
   /** Named saved blast plans. */
   savedPlans: Record<string, SavedBlastPlan>;
 
@@ -643,7 +640,6 @@ export function createGame(config: GameConfig): GameState {
     plannedChargesByHole: {},
     pendingDetonation: null,
     patternCharge: null,
-    chargeAwaitingFunds: [],
     savedPlans: {},
     finances: createFinanceState(config.startingCash ?? STARTING_CASH),
     contracts: createContractState(),

@@ -78,7 +78,6 @@ export class ChargeStep {
   private readonly capacityLineEl: HTMLElement;
   private readonly weakLineEl: HTMLElement;
   private readonly patternLineEl: HTMLElement;
-  private readonly awaitingLineEl: HTMLElement;
   private readonly noticeEl: HTMLElement;
   private readonly holeList: ChargeHoleList;
   private readonly tubingCardEl: HTMLElement;
@@ -157,7 +156,6 @@ export class ChargeStep {
     this.capacityLineEl.dataset['info'] = 'hole-capacity';
     this.weakLineEl = el('div');
     this.patternLineEl = el('div');
-    this.awaitingLineEl = el('div');
     this.noticeEl = el('div');
     this.noticeEl.style.display = 'none';
     this.stockBlock = new ChargeStockBlock(
@@ -173,7 +171,7 @@ export class ChargeStep {
 
     // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
-      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.awaitingLineEl, this.stockBlock.root, this.weakLineEl,
+      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.stockBlock.root, this.weakLineEl,
       this.holeList.root, this.drainEl, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
@@ -259,7 +257,6 @@ export class ChargeStep {
       tightestDepth, narrowest, widest, tightestDiameter,
       planned_holes: state.plannedDrillHoles.length,
       pattern: state.patternCharge ? holeChargeSignature(state.patternCharge) + state.patternCharge.explosiveId : null,
-      awaiting: state.chargeAwaitingFunds ?? [],
       stock: stockView,
       wet, tubed, tub: state.tubingState.inventory,
       // Water levels (as percent) so the panel repaints while water fades, plus drain affordability.
@@ -277,7 +274,7 @@ export class ChargeStep {
     this.updateFitLine(tightestDepth, tightestDiameter, holes.length + state.plannedDrillHoles.length === 0);
     this.updatePatternLines(state);
     this.updateWeakLine(weakHoleSummary(this.selectedExplosiveId, columns));
-    this.holeList.render(holes, state.chargesByHole, state.plannedChargesByHole, new Set(state.chargeAwaitingFunds ?? []), drainViews);
+    this.holeList.render(holes, state.chargesByHole, state.plannedChargesByHole, drainViews);
     this.renderDrain(wet, drainViews);
     this.renderTubingCard(untubed, wet.filter(id => !tubedSet.has(id)).length, tubed.length === holes.length && wet.length === 0, state.tubingState.inventory, rainSoon);
   }
@@ -384,14 +381,6 @@ export class ChargeStep {
       line.dataset['info'] = 'pattern-charge';
       this.patternLineEl.replaceChildren(line);
     }
-    const waiting = state.chargeAwaitingFunds ?? [];
-    if (waiting.length === 0) {
-      this.awaitingLineEl.replaceChildren();
-      return;
-    }
-    const reason = reasonLine(t('ui.blast_workshop.charge.awaiting_funds_reason', { count: waiting.length, holes: waiting.join(', ') }));
-    reason.dataset['warning'] = 'awaiting-funds';
-    this.awaitingLineEl.replaceChildren(reason);
   }
 
   // Advisory only: Charge All stays enabled, the blast just breaks less rock.

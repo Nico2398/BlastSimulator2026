@@ -6,6 +6,7 @@ import { EXPLOSIVE_BULK_PRICE_FACTOR } from '../config/balance.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 import { addExpense } from '../economy/Finance.js';
+import { chargeOrderCost } from './ChargePlan.js';
 import {
   getExplosivesCapacity, getExplosivesFreeCapacity, getExplosivesInStock, getExplosivesStockByType, consumeExplosives, storeExplosives,
 } from '../entities/Building.js';
@@ -89,7 +90,7 @@ export function quoteChargeLoad(
   amountKg: number,
 ): { fromStockKg: number; fromCashKg: number; cost: number } {
   const { fromStockKg, fromCashKg } = drawStockForOrder(getExplosivesStockByType(state.buildings), explosiveId, amountKg);
-  const cost = (getExplosive(explosiveId)?.costPerKg ?? 0) * fromCashKg * explosivePriceFactor(state);
+  const cost = chargeOrderCost(explosiveId, fromCashKg) * explosivePriceFactor(state);
   return { fromStockKg, fromCashKg, cost };
 }
 

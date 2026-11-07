@@ -6,7 +6,7 @@
 // building, resolve a survey, ...) and reports what happened structurally,
 // rather than pushing console-formatted strings.
 
-import { autoChargeHole } from '../mining/ChargeOrder.js';
+import { autoChargeHole, dispatchChargeAction } from '../mining/ChargeOrder.js';
 import type { GameState, PlannedBuilding } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { Employee } from '../entities/Employee.js';
@@ -18,7 +18,7 @@ import { completeVehicleGatedAction } from './VehicleReservation.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../mining/SurveyCalc.js';
 import { landDrilledHole } from '../mining/DrillPlan.js';
 import { landLoadedCharge } from '../mining/ChargePlan.js';
-import { loadChargeExplosive } from '../mining/ExplosiveStock.js';
+import { canAffordChargeLoad, loadChargeExplosive } from '../mining/ExplosiveStock.js';
 import { prefetchBlastZone } from '../mining/BlastExecution.js';
 import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
 import { recordBuiltRamp } from '../mining/RampWidening.js';
@@ -62,6 +62,8 @@ export function applyTaskCompletion(
   progress: TaskProgressResult,
   emitter: EventEmitter,
 ): TaskCompletionReport {
+  // The completed order's own record: the vehicle-continuity block below drops it from the queue.
+  const finished = state.pendingActions.find(a => a.id === progress.actionId);
   const report: TaskCompletionReport = {
     completed: progress.completed,
     levelUps: progress.levelUps,
@@ -214,9 +216,13 @@ export function applyTaskCompletion(
     if (progress.actionType === 'charge_hole' && progress.actionPayload) {
       const holeId = progress.actionPayload['holeId'] as string;
       const planned = state.plannedChargesByHole[holeId];
-      if (planned) {
+      const hole = state.drillHoles.find(h => h.id === holeId);
+      if (planned && !canAffordChargeLoad(state, planned.explosiveId, planned.amountKg)) {
+        // Cash fell short since the claim-time gate (#2155): keep the order, queue it again, load nothing.
+        const at = hole ?? (finished ? { id: holeId, x: finished.targetX, z: finished.targetZ } : undefined);
+        if (at) dispatchChargeAction(state, at, planned);
+      } else if (planned) {
         delete state.plannedChargesByHole[holeId];
-        // TODO(#2155): re-check affordability here (claim-time gate only), and migrate legacy prepaid orders.
         // Pay on fill (#2143): stock draws and cash book now, not at order time.
         const { fromStockKg } = loadChargeExplosive(state, planned.explosiveId, planned.amountKg);
         const loaded = landLoadedCharge({ ...planned, ...(fromStockKg > 0 && { fromStockKg }) });
@@ -224,7 +230,6 @@ export function applyTaskCompletion(
         report.chargeLoaded = { holeId, explosiveId: loaded.explosiveId, amountKg: loaded.amountKg };
         // Generate the rock this hole will blast now, while charging, rather
         // than inside the detonate frame (#1603).
-        const hole = state.drillHoles.find(h => h.id === holeId);
         if (hole && grid) prefetchBlastZone(grid, [hole]);
       }
     }
