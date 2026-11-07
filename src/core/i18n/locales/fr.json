@@ -4188,7 +4188,7 @@
   "ui.crew.union_tradeoff_detail": "Membre du syndicat : payé {pct} % de moins, licenciement impossible. Les événements syndicaux et les grèves exigent des membres.",
   "ui.crew.candidate_union": "Syndiqué",
   "ui.crew.candidate_non_union": "Non syndiqué",
-  "ui.crew.candidate_skill": "Compétence : {skill} ★{level}",
+  "ui.crew.candidate_skill": "{skill} ★{level}",
   "ui.crew.hire_fee": "Frais {fee} $",
   "ui.crew.no_candidates": "Aucun candidat pour le moment. Revenez plus tard.",
   "ui.crew.hiring_filter_role": "Rôle",

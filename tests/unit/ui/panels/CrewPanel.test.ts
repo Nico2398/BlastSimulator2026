@@ -437,6 +437,25 @@ describe('hiringSignature (#1385)', () => {
     expect(hiringSignature(state)).not.toBe(afford);
   });
 
+  it('changes when the filter selection changes (#2160)', () => {
+    const state = makeState([]);
+    const sel = new FilterBarSelection();
+    const before = hiringSignature(state, sel);
+    sel.groups['union'] = 'union';
+    expect(hiringSignature(state, sel)).not.toBe(before);
+  });
+
+  it('panel: clicking a role button narrows the groups and survives the next update (#2160)', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    panel.update(state);
+    (panel.root.querySelector('.bs-filter-bar [data-filter-value="driller"]') as HTMLButtonElement).click();
+    const roles = () => [...panel.root.querySelectorAll<HTMLElement>('[data-hiring-role]')].map(n => n.dataset['hiringRole']);
+    expect(roles()).toEqual(['driller']);
+    panel.update(state);
+    expect(roles()).toEqual(['driller']);
+  });
+
   it('does not change on raw cash changes that keep every role affordability', () => {
     const state = makeState([]);
     state.cash = 1_000_000;
