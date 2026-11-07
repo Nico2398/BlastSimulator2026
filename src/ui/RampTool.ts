@@ -335,7 +335,7 @@ export class RampTool {
         ? t('ui.build.ramp_spiral_preview', { length: spiral.proposal.totalLength, legs: spiral.proposal.legs.length, cost: validation?.cost ?? 0 })
         : def === null ? '' : this.footLine(def),
       fields: [
-        { key: 'depth', label: t('ui.build.ramp_depth'), value: this.depth, format: v => `${v}m`, onDec: () => { this.depth = Math.max(1, this.depth - 1); refresh(); }, onInc: () => { this.depth = Math.min(RAMP_MAX_DEPTH_M, this.depth + 1); refresh(); } },
+        { key: 'depth', label: t('ui.build.ramp_depth'), value: this.depth, format: v => `${Math.round(v * 10) / 10}m`, onDec: () => { this.depth = Math.max(1, this.depth - 1); refresh(); }, onInc: () => { this.depth = Math.min(RAMP_MAX_DEPTH_M, this.depth + 1); refresh(); } },
         { key: 'width', label: t('ui.build.ramp_width'), value: this.width, format: v => `${v}m`, onDec: () => { this.stepRampWidth(-1); refresh(); }, onInc: () => { this.stepRampWidth(1); refresh(); } },
         { key: 'grade', label: t('ui.build.ramp_grade'), value: shownGrade, format: v => `${v}°`, onDec: () => { this.stepGrade(-1, shownGrade, range); refresh(); }, onInc: () => { this.stepGrade(1, shownGrade, range); refresh(); } },
       ],
