@@ -406,6 +406,17 @@
       }
     },
     {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "The first blast's ore report may fire a lucky-strike or barren-blast event against the free starter survey (#2148); resolve it so the ticks below run. No-op when nothing is pending.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "tick 40",
       "role": "setup",
       "description": "40 ticks is longer than an unobstructed rig needs to drill a 2 m hole, yet too short to haul the rubble off: a hole under rubble cannot be claimed (#1937), so the order stays queued (buried_under_rubble) and undrilled while the rubble lies there.",
