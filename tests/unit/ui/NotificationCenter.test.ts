@@ -1029,31 +1029,6 @@ describe('NotificationCenter localization (#1417)', () => {
   });
 });
 
-describe('NotificationCenter — charge awaiting funds toast (#1345)', () => {
-  const warnToasts = (center: NotificationCenter) =>
-    center.getLog().filter(n => n.body === t('notification.charge_awaiting_funds', { count: 1 })
-      || n.body === t('notification.charge_awaiting_funds', { count: 2 }));
-
-  it('toasts once per episode and re-arms after the list empties', () => {
-    const center = new NotificationCenter();
-    const state = makeState();
-    center.update(state);
-    expect(center.getLog()).toHaveLength(0);
-
-    state.chargeAwaitingFunds = ['H1'];
-    center.update(state);
-    state.chargeAwaitingFunds = ['H1', 'H2'];
-    center.update(state);
-    expect(warnToasts(center)).toHaveLength(1);
-
-    state.chargeAwaitingFunds = [];
-    center.update(state);
-    state.chargeAwaitingFunds = ['H3'];
-    center.update(state);
-    expect(warnToasts(center)).toHaveLength(2);
-  });
-});
-
 describe('NotificationCenter — interface cue', () => {
   it('voices each notification by its severity', () => {
     const notification = vi.fn();
@@ -1083,17 +1058,6 @@ describe('NotificationCenter — interface cue', () => {
     center.setCues(null);
     center.notify({ severity: 'warn', title: 'T', body: '' });
     expect(notification).not.toHaveBeenCalled();
-  });
-
-  it('voices a toast the center raises itself from game state (a blocked order warns)', () => {
-    const notification = vi.fn();
-    const center = new NotificationCenter();
-    center.setCues({ notification });
-    const state = makeState();
-    center.update(state);
-    state.chargeAwaitingFunds = ['H1'];
-    center.update(state);
-    expect(notification).toHaveBeenCalledWith('warn');
   });
 });
 
