@@ -273,12 +273,15 @@ export class ContractsPanel extends PanelBase {
   private makeListSection(kind: ListSectionKind, spec: ListSectionSpec): HTMLElement[] {
     const selection = this.selections[kind];
     const materials = [...new Set(spec.rows.map(c => c.materialId))];
+    const showBar = spec.rows.length > Math.max(0, spec.minRowsForBar);
+    // A bar that is not shown cannot clear its selection, so the rows must not stay filtered by it.
+    if (!showBar) selection.clear();
     if (selection.filter !== null && !materials.includes(selection.filter)) selection.filter = null;
     const filtered = filterOffers(spec.rows, selection.filter);
     const visible = sortedBy(filtered, selection.sort, () => spec.defaultOrder(filtered));
 
     const rerender = (): void => { if (this.lastState) this.render(this.lastState); };
-    const bar = spec.rows.length > Math.max(0, spec.minRowsForBar)
+    const bar = showBar
       ? filterBar(selection, {
         choices: materials.map(m => ({ value: m, label: this.materialLabel(m) })),
         sorts: CONTRACT_SORT_KEYS.map(key => ({ key, label: t(`ui.contracts.sort_${key}`) })),

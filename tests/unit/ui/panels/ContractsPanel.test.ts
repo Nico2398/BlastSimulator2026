@@ -2285,6 +2285,24 @@ describe('ContractsPanel filter bar (#2159)', () => {
     });
   });
 
+  describe('vanishing bar (#2159)', () => {
+    it('a Closed filter is dropped when the bar disappears below the threshold', () => {
+      const { panel } = makePanel();
+      const state = makeState();
+      state.contracts.completedHistory.push(
+        ...Array.from({ length: 6 }, (_, i) => makeContract({ id: 400 + i, materialId: i % 2 ? 'rustite' : 'dirtite', status: 'completed' })),
+      );
+      panel.show();
+      panel.update(state);
+      pick(panel, 'closed', 'rustite');
+      state.contracts.completedHistory.pop();
+      panel.update(state);
+      expect(barOf(panel, 'closed')).toBeNull();
+      const text = panel.root.textContent ?? '';
+      for (const id of [400, 401, 402, 403, 404]) expect(text).toContain(`#${id}`);
+    });
+  });
+
   describe('i18n (#2159)', () => {
     it('the no-match line has an English and a French text distinct from its key', () => {
       const key = 'ui.contracts.filter_no_match';
