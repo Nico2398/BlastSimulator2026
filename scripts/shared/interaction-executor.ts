@@ -129,6 +129,11 @@ async function resolveOldestNoticeOnPage(page: Page, timeoutMs: number, option: 
   return true;
 }
 
+/** A major event pending, else the oldest minor notice: what `event choose N` answers. */
+async function resolveEventOrNoticeOnPage(page: Page, timeoutMs: number, option = 0): Promise<boolean> {
+  return (await resolveEventIfPendingOnPage(page, timeoutMs, option)) || resolveOldestNoticeOnPage(page, timeoutMs, option);
+}
+
 /**
  * Checks whether an event is genuinely pending in game state and, if so,
  * resolves its dialog for real (same click path as `case
@@ -155,7 +160,7 @@ export async function resolveEventIfPendingOnPage(page: Page, timeoutMs = 8000, 
     const st = getState === undefined ? null : getState();
     return st ? Boolean(st.pendingEvent) : false;
   });
-  if (!pending) return resolveOldestNoticeOnPage(page, timeoutMs, option);
+  if (!pending) return false;
 
   // An event can be genuinely pending in state while the level has already
   // ended (bankruptcy/revolt/ecological shutdown) — the event system keeps
@@ -450,7 +455,7 @@ async function clickUsableSelector(
     if (Date.now() > deadline) {
       if (!retriedCoveredOnce && reason === 'covered') {
         retriedCoveredOnce = true;
-        const resolved = await resolveEventIfPendingOnPage(page, 8000);
+        const resolved = await resolveEventOrNoticeOnPage(page, 8000);
         if (resolved) {
           deadline += 5000;
           continue;
@@ -624,7 +629,7 @@ export async function executeActionOnPage(
       // resolveEventIfPendingOnPage so clickSelector's covered-by-div retry
       // (#699) can share it without going through the full action dispatch.
       const evTimeout = action.timeoutMs ?? 30000;
-      await resolveEventIfPendingOnPage(page, evTimeout, action.option ?? 0);
+      await resolveEventOrNoticeOnPage(page, evTimeout, action.option ?? 0);
       break;
     }
     case 'clickIfPresent': {
