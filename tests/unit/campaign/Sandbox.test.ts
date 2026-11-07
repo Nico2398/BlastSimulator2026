@@ -18,6 +18,7 @@ import {
   type SandboxConfig,
   type SandboxKitId,
   resolveSandboxKitId,
+  recordSandboxStarterSurvey,
 } from '../../../src/core/campaign/Sandbox.js';
 import { isValidOreGradeScale } from '../../../src/core/economy/OreGrade.js';
 import { getLevel, getAllLevels } from '../../../src/core/campaign/Level.js';
@@ -26,6 +27,13 @@ import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
 import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE, SANDBOX_DIGGER_KIT_DRIVER, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SANDBOX_ORE_GRADE_SCALE, ORE_GRADE_SCALE_DEFAULT, SANDBOX_STARTER_EXPLOSIVE_ID, SANDBOX_STARTER_EXPLOSIVE_KG } from '../../../src/core/config/balance.js';
 import { resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
 import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
+import { createGame } from '../../../src/core/state/GameState.js';
+import { resolveStarterDeposit } from '../../../src/core/world/StarterDeposit.js';
+import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
+import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
+import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
+import { estimateBlastOre } from '../../../src/core/mining/BlastValueEstimate.js';
+import { freshSurveys, isColumnInSurveyDisc } from '../../../src/core/mining/SurveyStaleness.js';
 
 const LEVEL_FIELDS_SHARED_ACROSS_KITS = [
   'unlockThreshold',
@@ -845,5 +853,103 @@ describe('sandbox starter explosive stock (#2118)', () => {
     expect(getLevel('dusty_hollow')!.startingCash).toBe(50_000);
     expect(getLevel('grumpstone_ridge')!.startingCash).toBe(210_000);
     expect(getLevel('treranium_depths')!.startingCash).toBe(125_000);
+  });
+});
+
+
+describe('recordSandboxStarterSurvey (#2148)', () => {
+  const BIOME = 'desert_badlands';
+  const SEED = 12345;
+  const KIT_CASH = SANDBOX_KITS.digger.startingCash;
+
+  function site() {
+    const config = sandboxTerrainConfig(BIOME, SEED);
+    const deposit = resolveStarterDeposit(config);
+    expect(deposit, 'default sandbox site has a starter deposit').not.toBeNull();
+    const grid = generateTerrain(config);
+    const state = createGame({ seed: SEED, startingCash: KIT_CASH });
+    return { grid, state, deposit: deposit! };
+  }
+
+  /** The reference shot centred on the deposit: 3x3 holes, 4 m apart, 5 m deep, Krackle 4 kg, 2.5 m stemming. */
+  function shotOn(deposit: { x: number; z: number }) {
+    const holes = createGridPlan({ nextHoleId: 1 }, { x: deposit.x - 4, z: deposit.z - 4 }, 3, 3, 4, 5, 0.15);
+    const depths: Record<string, number> = {};
+    for (const h of holes) depths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), depths, 'krackle', 4, 2.5);
+    return assembleBlastPlan(holes, charges);
+  }
+
+  it('C1 records one seismic survey centred on the deposit and returns it', () => {
+    const { grid, state, deposit } = site();
+    const result = recordSandboxStarterSurvey(state, grid, deposit);
+    expect(result).not.toBeNull();
+    expect(state.surveyResults).toHaveLength(1);
+    expect(state.surveyResults[0]).toBe(result);
+    expect(result!.method).toBe('seismic');
+    expect(result!.centerX).toBe(deposit.x);
+    expect(result!.centerZ).toBe(deposit.z);
+  });
+
+  it('C1 takes the id from state.nextSurveyId and advances it', () => {
+    const { grid, state, deposit } = site();
+    state.nextSurveyId = 7;
+    const result = recordSandboxStarterSurvey(state, grid, deposit)!;
+    expect(result.id).toBe(7);
+    expect(state.nextSurveyId).toBe(8);
+  });
+
+  it('C1 stamps the current tick as completedTick', () => {
+    const { grid, state, deposit } = site();
+    state.tickCount = 42;
+    expect(recordSandboxStarterSurvey(state, grid, deposit)!.completedTick).toBe(42);
+  });
+
+  it('C1 the survey is fresh, has confidence in (0, 1], and covers the deposit column with estimates', () => {
+    const { grid, state, deposit } = site();
+    const result = recordSandboxStarterSurvey(state, grid, deposit)!;
+    expect(freshSurveys(state.surveyResults)).toHaveLength(1);
+    expect(result.confidence).toBeGreaterThan(0);
+    expect(result.confidence).toBeLessThanOrEqual(1);
+    expect(isColumnInSurveyDisc(result, deposit.x, deposit.z)).toBe(true);
+    expect(Object.keys(result.estimates).length).toBeGreaterThan(0);
+  });
+
+  it('C2 costs nothing: cash is untouched and no employee appears', () => {
+    const { grid, state, deposit } = site();
+    const employeesBefore = state.employees.employees.length;
+    recordSandboxStarterSurvey(state, grid, deposit);
+    expect(state.cash).toBe(KIT_CASH);
+    expect(state.employees.employees).toHaveLength(employeesBefore);
+  });
+
+  it('C2 needs no surveyor: works on a state with no employees at all', () => {
+    const { grid, state, deposit } = site();
+    expect(state.employees.employees.some(e => e.role === 'surveyor')).toBe(false);
+    expect(recordSandboxStarterSurvey(state, grid, deposit)).not.toBeNull();
+  });
+
+  it('C3 a pattern on the deposit has a non-zero ore estimate with the recorded survey, and none without', () => {
+    const { grid, state, deposit } = site();
+    const plan = shotOn(deposit);
+    expect(estimateBlastOre(plan, state.surveyResults, grid).value).toBe(0);
+    recordSandboxStarterSurvey(state, grid, deposit);
+    const estimate = estimateBlastOre(plan, state.surveyResults, grid);
+    expect(estimate.value).toBeGreaterThan(0);
+    expect(estimate.coverage).toBeGreaterThan(0);
+    expect(estimate.holeCoverage).toBe(1);
+  });
+
+  it('C4 a null deposit records no survey and returns null', () => {
+    const { grid, state } = site();
+    expect(recordSandboxStarterSurvey(state, grid, null)).toBeNull();
+    expect(state.surveyResults).toHaveLength(0);
+  });
+
+  it('C4 a null deposit leaves the survey id counter alone', () => {
+    const { grid, state } = site();
+    const before = state.nextSurveyId;
+    recordSandboxStarterSurvey(state, grid, null);
+    expect(state.nextSurveyId).toBe(before);
   });
 });

@@ -307,10 +307,15 @@
       "command": "event choose 0",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 20000
+        },
+        {
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "description": "Clear an event if one is pending (the starter survey makes the first blast fire an ore event); the blast report defers the event dialog, so the player closes the report first.",
       "commandOutcome": "either",
       "role": "player"
     },
@@ -342,15 +347,12 @@
       "command": "state",
       "role": "player",
       "timeout": 60,
-      "description": "Dismiss the blast report.",
+      "description": "Dismiss the blast report (already closed when an ore event had to be answered first).",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 20000
         }
       ]
     },

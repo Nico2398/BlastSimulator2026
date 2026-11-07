@@ -92,6 +92,10 @@ After a blast, `computeBlastOreReport()` calculates actual ore yield from destro
 | Treranium ore found (any amount) | "Legendary Vein" | Contract premium ×3 for 20 ticks |
 | Absurdium > 30% of yield | "Absurdium Jackpot" | Mafia event probability +40% |
 
+## Free starter survey (sandbox)
+
+`sandbox start` records one free seismic `SurveyResult` centred on the starter deposit (`recordSandboxStarterSurvey`, `Sandbox.ts`), as if a previous owner left it: no cash, no surveyor, no payroll, `surveyorId` -1, skill 1. It shows on the overlay and values a pattern in the Blast Workshop footer from tick 0. It means the first blast on it compares against an estimate, so the post-blast ore report can fire Lucky Strike or Barren Blast. Surveying remains the way to see beyond the deposit. Campaign levels get none.
+
 ## Survey Visibility Rules
 
 - Un-surveyed voxels: dominant rock color, no ore overlay
