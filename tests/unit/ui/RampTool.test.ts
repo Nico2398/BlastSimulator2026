@@ -50,6 +50,7 @@ function makeMockKit() {
     setFootprintCheck: vi.fn(),
     arm: (config: PlacementArmConfig) => { armed = true; phase = 'armed'; armConfig = config; },
     cancel: () => { armed = false; phase = 'idle'; waypoints = []; changeHandler?.(); },
+    seedPath: vi.fn((tiles: Tile[]) => { waypoints = [...tiles]; phase = tiles.length ? 'selected' : 'armed'; changeHandler?.(); }),
     /** The player's clicks so far, in order. */
     simulateWaypoints(tiles: Tile[]) { waypoints = tiles; phase = tiles.length ? 'selected' : 'armed'; changeHandler?.(); },
     simulateConfirm() { const sel = selection(); return sel ? confirmHandler?.(sel) : undefined; },
@@ -129,6 +130,25 @@ describe('RampTool: arming', () => {
     const s = setup();
     expect(s.shown().fields.map(f => f.key)).toEqual(expect.arrayContaining(['depth', 'width', 'grade']));
     expect(s.shown().fields[0]!.key).toBe('depth');
+  });
+});
+
+describe('RampTool: armWith a proposed ramp (#2144)', () => {
+  it('arms the path tool pre-filled with the proposal path, depth and width', () => {
+    const s = setup();
+    s.tool.armWith(SWITCHBACK_DEF);
+    expect(s.controller.isArmed).toBe(true);
+    expect(s.controller.waypoints).toEqual([{ x: 15, z: 15 }, { x: 15, z: 27 }, { x: 25, z: 27 }]);
+    expect(s.field('depth').value).toBe(8);
+    expect(s.field('width').value).toBe(3);
+  });
+
+  it('re-arms with the proposal when the tool is already armed, never toggling it off', () => {
+    const s = setup();
+    s.tool.armWith(SWITCHBACK_DEF);
+    s.tool.armWith({ ...SWITCHBACK_DEF, targetDepth: 6 });
+    expect(s.controller.isArmed).toBe(true);
+    expect(s.field('depth').value).toBe(6);
   });
 });
 

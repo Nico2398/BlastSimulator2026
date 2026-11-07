@@ -93,8 +93,9 @@ export class OperationsPanel extends PanelBase {
   private debrisSig = '';
   private model: WorkQueueModel = { player: [], debris: [] };
   private lastState: GameState | null = null;
+  /** The proposed-access-ramp card shown above the debris groups. */
+  readonly accessRamp = new AccessRampOffer('ops');
   /** UI-only expansion state of the debris groups. */
-  private readonly accessRampOffer = new AccessRampOffer('ops');
   private readonly expanded = new Set<DebrisGroup['type']>();
   /** Clamped 0-based page per expanded group; clamped once per update, never by the render builders. */
   private readonly pages = new Map<DebrisGroup['type'], number>();
@@ -159,14 +160,13 @@ export class OperationsPanel extends PanelBase {
     container.appendChild(this.el);
   }
 
-  setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; this.accessRampOffer.setGameConsole(fn); }
+  setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; this.accessRamp.setGameConsole(fn); }
 
   /** The proposed access ramp for stranded rubble (#2144), shown above the logistics rows while there is one. */
-  get accessRamp(): AccessRampOffer { return this.accessRampOffer; }
 
 
   update(state: GameState): void {
-    this.accessRampOffer.refresh(state);
+    this.accessRamp.refresh(state);
     if (!this.policyDirty) {
       this.setActiveShift(state.sitePolicy.shiftMode);
       this.fatigueInput.value = String(state.sitePolicy.fatigueRestThreshold);
@@ -239,7 +239,7 @@ export class OperationsPanel extends PanelBase {
 
   private render(state: GameState): void {
     const sections: HTMLElement[] = [
-      this.accessRampOffer.root,
+      this.accessRamp.root,
       sectionHeader(t('ui.operations.logistics')),
       this.makeLogisticsRows(state),
       sectionHeader(t('ui.operations.work_queue')),

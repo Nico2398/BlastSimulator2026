@@ -365,6 +365,28 @@ describe('TopBar (redesign P1)', () => {
     topBar.dispose();
   });
 
+  it('clicking the out-of-reach debris pip navigates to Operations, which carries the access ramp offer (#2144)', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const topBar = new TopBar(container);
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.pendingActions.push({
+      id: 1, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+      targetX: 1, targetZ: 0, targetY: 0, payload: { fragmentId: 1 }, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0, blockedReason: 'debris_out_of_reach',
+    });
+    topBar.update(state, center);
+    const nav = vi.fn();
+    topBar.setNavigateHandler(nav);
+    const label = t('notification.pip.stranded_debris_label', { count: 1 });
+    const pip = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes(label));
+    expect(pip).toBeDefined();
+    pip!.click();
+    expect(nav).toHaveBeenCalledWith('ops');
+    topBar.dispose();
+  });
+
   it('clicking the balance navigates to the finances panel', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);

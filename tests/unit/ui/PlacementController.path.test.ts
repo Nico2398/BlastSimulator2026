@@ -160,3 +160,36 @@ describe("PlacementController 'path' shape (#1942)", () => {
     expect(controller.waypoints).toEqual([]);
   });
 });
+
+describe("PlacementController 'path' seedPath (#2144)", () => {
+  it('pre-fills the corners as if clicked, selected and ready to confirm', () => {
+    controller.seedPath([{ x: 5, z: 5 }, { x: 5, z: 12 }, { x: 9, z: 12 }]);
+    expect(controller.waypoints).toEqual([{ x: 5, z: 5 }, { x: 5, z: 12 }, { x: 9, z: 12 }]);
+    expect(controller.currentPhase).toBe('selected');
+    expect(controller.canConfirm).toBe(true);
+  });
+
+  it('lets the player keep drawing after the seed', () => {
+    controller.seedPath([{ x: 5, z: 5 }, { x: 5, z: 12 }]);
+    click(9, 12);
+    expect(controller.waypoints.length).toBe(3);
+  });
+
+  it('ignores an empty seed', () => {
+    controller.seedPath([]);
+    expect(controller.waypoints).toEqual([]);
+  });
+
+  it('ignores a seed when not armed', () => {
+    controller.cancel();
+    controller.seedPath([{ x: 5, z: 5 }]);
+    expect(controller.waypoints).toEqual([]);
+  });
+
+  it('ignores a seed for a non-path shape', () => {
+    controller.cancel();
+    controller.arm({ shape: 'rect' });
+    controller.seedPath([{ x: 5, z: 5 }]);
+    expect(controller.waypoints).toEqual([]);
+  });
+});

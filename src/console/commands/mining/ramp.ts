@@ -1,5 +1,6 @@
 // BlastSimulator2026 — Console commands for ramp construction
 
+import { parseCommand } from '../../ConsoleRunner.js';
 import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
@@ -98,12 +99,7 @@ function suggestRampCommand(ctx: MiningContext, order: boolean): CommandResult {
       length: Math.round(proposal.length), cost: formatMoney(proposal.cost), orders: proposal.orderCount, line: proposal.line,
     }) };
   }
-  const named: Record<string, string> = {};
-  for (const token of proposal.line.split(' ').slice(1)) {
-    const at = token.indexOf(':');
-    if (at > 0) named[token.slice(0, at)] = token.slice(at + 1);
-  }
-  return buildRampCommand(ctx, [], named);
+  return buildRampCommand(ctx, [], parseCommand(proposal.line).namedArgs);
 }
 
 /** Validates, claims and queues the ordered `rampDef` (straight or multi-leg); the shared tail of every ramp order form. */

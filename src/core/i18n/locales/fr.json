@@ -3545,7 +3545,7 @@
   "notification.order_blocked_buried": "{order} ne peut pas commencer — le trou est enseveli sous les gravats. Évacuez d'abord les débris.",
   "notification.pip.blocked_orders_label": "{count} BLOQUÉ(S)",
   "notification.pip.stranded_debris_label": "{count} HORS DE PORTÉE",
-  "notification.pip.stranded_debris_tip": "{count} tâche(s) de débris hors d'atteinte - cliquez pour une rampe d'accès toute prête, ou nivelez le terrain, ou laissez-les",
+  "notification.pip.stranded_debris_tip": "{count} tâche(s) de débris hors de portée - cliquez pour une rampe d'accès toute prête, ou nivelez le terrain, ou laissez-les",
   "notification.order_stranded_debris": "{order} : hors de portée - construisez une rampe ou nivelez le terrain pour l'évacuer, ou laissez tel quel",
   "notification.title.cut_off": "Isolé",
   "notification.cut_off_vehicle_name": "{vehicle} n°{id}",
