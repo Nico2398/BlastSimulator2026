@@ -7,6 +7,7 @@ import { HIRING_ROLES, candidatesForRole, type HireCandidate } from '../../core/
 import { ROLE_STARTING_QUALIFICATIONS, UNION_MEMBER_SALARY_DISCOUNT_PCT } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el } from '../dom.js';
+import type { FilterBarSelection } from '../filterBar.js';
 import { perHour } from '../crewDetailSections.js';
 
 /** "Skill ★level" list of what a hire of `role` arrives qualified for. */
@@ -50,7 +51,13 @@ function makeCandidateCard(
   return card;
 }
 
-export function makeHiringSection(state: GameState, onHire: (role: EmployeeRole, candidateId: number) => void): HTMLElement[] {
+/** Filter selection owned by the panel (survives re-renders) and the re-render callback. */
+export interface HiringFilterView {
+  selection: FilterBarSelection;
+  onChange: () => void;
+}
+
+export function makeHiringSection(state: GameState, onHire: (role: EmployeeRole, candidateId: number) => void, _view?: HiringFilterView): HTMLElement[] {
   return HIRING_ROLES.map(role => {
     const count = state.employees.employees.filter(e => e.alive && e.role === role).length;
     const group = el('div', { attrs: { 'data-hiring-role': role, style: 'display:flex;flex-direction:column;gap:6px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card)' } });

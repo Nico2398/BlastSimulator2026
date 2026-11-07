@@ -14,7 +14,16 @@ interface SortChoice {
   label: string;
 }
 
+/** An extra single-choice row beside the main filter row (#2160). */
+export interface FilterBarGroup {
+  id: string;
+  label: string;
+  choices: readonly FilterChoice[];
+}
+
 export interface FilterBarConfig {
+  /** Extra filter rows, each keyed by `id` in `FilterBarSelection.groups`. */
+  groups?: readonly FilterBarGroup[];
   choices: readonly FilterChoice[];
   sorts: readonly SortChoice[];
   onChange: (selection: FilterBarSelection) => void;
@@ -28,6 +37,8 @@ export interface FilterBarConfig {
 export class FilterBarSelection {
   filter: string | null = null;
   sort: string | null = null;
+  /** Selected value per extra group id (absent or null = none). */
+  groups: Record<string, string | null> = {};
 
   clear(): void {
     this.filter = null;
