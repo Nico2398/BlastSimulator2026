@@ -97,12 +97,12 @@
       }
     },
     {
-      "command": "event fire union_coffee_uprising",
+      "command": "event fire union_strike_threat",
       "description": "Fire an event while locale is French — dialog title/description/option labels must render in French, not English. — `event fire` is a test hook with no UI and none intended. Left unmarked.",
       "interaction": [
         {
           "type": "command",
-          "command": "event fire union_coffee_uprising"
+          "command": "event fire union_strike_threat"
         }
       ],
       "role": "bootstrap"

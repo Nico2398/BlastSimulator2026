@@ -111,6 +111,25 @@ async function waitUsableAndClick(page: Page, selector: string, timeoutMs: numbe
 }
 
 /**
+ * With no major event pending, `event choose N` answers the oldest minor notice; do the same by clicking choice `option`
+ * on the first card of the notice dock. False when no notice is live.
+ */
+async function resolveOldestNoticeOnPage(page: Page, timeoutMs: number, option: number): Promise<boolean> {
+  const live = await page.evaluate(() => {
+    const getState = (window as unknown as { __gameState?: () => { noticeCount?: number } | null }).__gameState;
+    return (getState?.()?.noticeCount ?? 0) > 0;
+  });
+  if (!live) return false;
+  try {
+    await waitUsableAndClick(page, `#bs-event-notices .bs-notice:first-child .bs-notice-choice:nth-child(${option + 1})`, timeoutMs);
+  } catch {
+    // The countdown may settle the notice between the state read and the click: nothing left to answer.
+    return false;
+  }
+  return true;
+}
+
+/**
  * Checks whether an event is genuinely pending in game state and, if so,
  * resolves its dialog for real (same click path as `case
  * 'resolveEventIfPending'`) — extracted so `clickSelector`'s covered-by-div
@@ -136,7 +155,7 @@ export async function resolveEventIfPendingOnPage(page: Page, timeoutMs = 8000, 
     const st = getState === undefined ? null : getState();
     return st ? Boolean(st.pendingEvent) : false;
   });
-  if (!pending) return false;
+  if (!pending) return resolveOldestNoticeOnPage(page, timeoutMs, option);
 
   // An event can be genuinely pending in state while the level has already
   // ended (bankruptcy/revolt/ecological shutdown) — the event system keeps
