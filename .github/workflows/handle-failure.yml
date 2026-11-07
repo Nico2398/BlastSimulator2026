@@ -32,8 +32,14 @@ permissions:
   pull-requests: read
 
 jobs:
+  # Every job here acts only on the owner's events, or an installed app's. The
+  # repository is public: a stranger can edit the body of an issue they filed,
+  # and a triage collaborator — were one ever added — could label one.
+  # `.github/scripts/pipeline-trust.cjs` holds the rule and the 2026-11-06 audit.
   chain:
-    if: github.event.label.name == 'blocked' || github.event.label.name == 'paused'
+    if: >-
+      (github.event.sender.login == github.repository_owner || github.event.sender.type == 'Bot') &&
+      (github.event.label.name == 'blocked' || github.event.label.name == 'paused')
     runs-on: ubuntu-latest
     # Shared with every other path into the queue, so no two can assign at once.
     concurrency:
@@ -74,7 +80,10 @@ jobs:
           max_parallel: ${{ vars.AGENTIC_MAX_PARALLEL_RUNS }}
 
   notify:
-    if: always() && (github.event.label.name == 'blocked' || github.event.label.name == 'paused')
+    if: >-
+      always() &&
+      (github.event.sender.login == github.repository_owner || github.event.sender.type == 'Bot') &&
+      (github.event.label.name == 'blocked' || github.event.label.name == 'paused')
     needs: chain
     runs-on: ubuntu-latest
     steps:
@@ -181,8 +190,11 @@ jobs:
   # to go red on its own (Rule 4) without taking the chain down with it.
   reconcile-dependencies:
     if: >-
-      (github.event.action == 'labeled' && (github.event.label.name == 'blocked' || github.event.label.name == 'paused')) ||
-      (github.event.action == 'edited' && github.event.changes.body != null && (contains(github.event.issue.labels.*.name, 'blocked') || contains(github.event.issue.labels.*.name, 'paused')))
+      (github.event.sender.login == github.repository_owner || github.event.sender.type == 'Bot') &&
+      (
+        (github.event.action == 'labeled' && (github.event.label.name == 'blocked' || github.event.label.name == 'paused')) ||
+        (github.event.action == 'edited' && github.event.changes.body != null && (contains(github.event.issue.labels.*.name, 'blocked') || contains(github.event.issue.labels.*.name, 'paused')))
+      )
     runs-on: ubuntu-latest
     steps:
       # The decision rules are read from the workspace, like every other

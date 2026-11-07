@@ -13,6 +13,7 @@ This is the part of the pipeline with no agent in it. It runs unattended, and ev
 - **The token decides whether anything happens next.** `PAT_TOKEN_COPILOT_AUTOMATION` for anything that must raise an event or wake a runner; `GITHUB_TOKEN` only where raising nothing is the point, and say so in the step comment.
 - **Fail closed and fail loud.** A fact you could not read blocks. An absence of evidence is never a pass. A state that must not persist fails the step rather than warning into a log nobody reads, and every terminal outcome leaves the issue released.
 - **Every workflow can fire twice.** Make the second run a no-op by construction — a marker carrying the identity of what was answered, not a timestamp.
+- **A stranger's event wakes nothing.** The repository is public: a job on any event a stranger can raise checks who raised it in its own `if:`, and code acting on a pull request or an issue asks `.github/scripts/pipeline-trust.cjs` first. A branch name, a label or a marker line is never an identity. `tests/unit/config/stranger-events.test.ts` fails on an unclassified job.
 - Comment the incident, not the code: name the PR or issue the mechanism was added for.
 
 Full standards, the allowed-clock table, token matrix, and how a change here is proven: `agentic-workflow-edition` skill. What the mechanisms actually do: `agentic-autonomous-pipeline`.

@@ -32,10 +32,18 @@ jobs:
   # merges, under its own lock, because a merge decided here — one PR at a
   # time, on this PR's head alone — is exactly the merge that lands two
   # separately-green PRs onto an untested `main`.
+  #
+  # Both act only on the owner's work. The repository is public, and anyone can
+  # open a pull request with `READY TO MERGE` in its body or a branch named
+  # `pipeline/feature-1` — `.github/scripts/pipeline-trust.cjs` holds the rule
+  # and the 2026-11-06 audit. The gate re-checks it; this keeps a stranger's
+  # pull request from waking anything at all.
   wake-merge-gate:
     if: >-
       github.event.action != 'closed' &&
       vars.AGENTIC_AUTO_MERGE_ENABLED == 'true' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.user.type == 'Bot') &&
       !github.event.pull_request.draft &&
       (
         contains(github.event.pull_request.body, 'READY TO MERGE') ||
@@ -66,7 +74,9 @@ jobs:
             core.info(`Asked the merge gate to look — #${process.env.PR} ${process.env.ACTION}.`);
 
   chain-next-task:
-    if: github.event.pull_request.merged == true
+    if: >-
+      github.event.pull_request.merged == true &&
+      (github.event.sender.login == github.repository_owner || github.event.sender.type == 'Bot')
     runs-on: ubuntu-latest
     # Shared with every other path into the queue, so no two can assign at once.
     concurrency:

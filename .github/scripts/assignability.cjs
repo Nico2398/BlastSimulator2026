@@ -1,5 +1,7 @@
 'use strict';
 
+const { issueTrust } = require('./pipeline-trust.cjs');
+
 /**
  * Who may be assigned next, and whether the queue may move at all.
  *
@@ -334,6 +336,15 @@ function labelVerdict(issue) {
   }
   if (issue.state !== 'open') {
     return no(`it is ${issue.state}`);
+  }
+  // Who filed it, before anything it says. The issue form applies `agent-task`
+  // and `ready` for whoever files it, and the repository is public: until the
+  // 2026-11-06 audit a stranger's issue reached a session with the PAT on the
+  // strength of its labels alone. `pipeline-trust.cjs` holds the rule and the
+  // incident; `agentic-intake.yml` takes `ready` off on the same verdict.
+  const author = issueTrust(issue);
+  if (!author.trusted) {
+    return no(`it was ${author.reason}`);
   }
   if (labels.has(BLOCKED)) {
     return no('it is labelled `blocked`');

@@ -16,8 +16,15 @@ jobs:
     # Author filtering does not work here: pipeline PRs are pushed with the
     # owner's PAT, so they carry the same author login as hand-written PRs.
     # The head branch prefix is the only reliable distinguisher.
+    #
+    # And only the owner's pull request, from a branch of this repository. The
+    # repository is public: what anyone else opens is never reviewed with the
+    # owner's token — `.github/scripts/pipeline-trust.cjs` holds the rule and
+    # the 2026-11-06 audit that wrote it.
     if: >-
       vars.CLAUDE_REVIEW_ENABLED != 'false' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.author_association == 'OWNER' &&
       !startsWith(github.head_ref, 'pipeline/') &&
       !startsWith(github.head_ref, 'claude/') &&
       !startsWith(github.head_ref, 'opencode/') &&

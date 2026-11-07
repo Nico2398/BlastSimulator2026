@@ -59,7 +59,7 @@ Every one of these is in the tree today. Adding a sixth needs the same kind of a
 | A comment, label, PR or push that must **raise an event** | `PAT_TOKEN_COPILOT_AUTOMATION` | `GITHUB_TOKEN` raises no workflow event. A label applied with it fires no `issues: labeled`, so `handle-failure.yml` never chains; a PR opened with it fires no `pull_request`, so `auto-assign-next.yml` stays dormant |
 | Housekeeping that must **raise nothing** | `GITHUB_TOKEN`, deliberately | `agentic-intake.yml`'s label upkeep and `handle-failure.yml`'s notification comment. Write the "deliberately" into the step comment, or the next editor will "fix" it |
 | Releasing a workflow run parked as `action_required`, or dispatching a workflow | PAT **plus** `actions: write` | Without the scope the step warns and the PR waits on checks that never start |
-| A comment that must **wake a runner** | PAT, always | The runners filter `comment.user.type != 'Bot'`. Under `GITHUB_TOKEN` the author is `github-actions[bot]` and the trigger is written but never read |
+| A comment that must **wake a runner** | PAT, always | The runners act only on a comment the repository owner wrote (`comment.author_association == 'OWNER'`). Under `GITHUB_TOKEN` the author is `github-actions[bot]`, never the owner, and the trigger is written but never read |
 
 `git push` reads no token from the environment: setting `GH_TOKEN` on the step is not enough, and after an agent step the git credential is the agent's own App token, which cannot carry `workflows` scope — a branch that differs from `main` on a workflow file is rejected outright. Push to an explicitly authenticated URL, as `agentic-rescue` does.
 
@@ -90,7 +90,13 @@ Every workflow here can fire twice: webhooks redeliver, sweeps repeat, humans di
 - Branch on **state, not on messages**. `agentic-auto-merge` re-reads the PR and decides from `mergeable_state` plus the runs, never from a refusal string: a string it does not recognise falls through to a warning and a green step while the PR sits unmerged.
 - When reading workflow runs on a head: keep the newest run per `workflow_id` (`cancel-in-progress` leaves superseded runs behind, and a stale `cancelled` reads as red forever), skip the workflow the code itself is running in (or it waits on itself), and treat `skipped`/`neutral` as passes.
 
-## ▶ Rule 6 — Nothing here removes a line but you
+## ▶ Rule 6 — A stranger's event wakes nothing
+
+The repository is public. A workflow on `issue_comment`, `pull_request*`, `issues`, `workflow_run` or any other event a stranger can raise runs here, with this repository's secrets, and the only thing between that stranger and the PAT is the job's own `if:`. So every such job checks who raised the event — `comment.author_association == 'OWNER'`, `sender.login == github.repository_owner` (or an app, `sender.type == 'Bot'`), or for a pull request its author and `head.repo.full_name == github.repository` — and code that acts on a pull request or an issue asks `.github/scripts/pipeline-trust.cjs` first. A branch name, a label or a marker line is never an identity: a fork names its branch `pipeline/feature-1`, the issue form applies `ready` for anyone, and anyone can type `READY TO MERGE`.
+
+Adding a workflow on one of these events, or a job to one, fails `tests/unit/config/stranger-events.test.ts` until it is guarded there or exempt with a written reason. `agentic-autonomous-pipeline`'s github-loop reference lists where each stranger's action stops.
+
+## ▶ Rule 7 — Nothing here removes a line but you
 
 Every rule above only adds. Rule 1 adds a guard, Rule 4 adds a report, Rule 5 adds a marker, "Write the incident into the file" adds a paragraph, and "How a change here is proven" adds a pinned assertion for each of them. Nothing in this layer ever fails because a mechanism outlived the incident that justified it: a workflow no event can reach reports `success`, an output nobody reads costs nothing, an inlined copy whose reason expired still passes the test that pins it. Dead code here is silent by construction — the same property every guard in this layer was written to fight.
 
@@ -141,6 +147,6 @@ The Actions layer has no runtime you can drive locally, so its channel is `logic
 
 Every non-obvious mechanism here carries a comment naming the run that made it necessary. That is not decoration: the guards look redundant. A comment that says *what* the code does can be deleted safely by anyone; a comment that says which PR was lost cannot.
 
-That is a reason to keep the incident, not a licence to keep the file. Rule 6's comment budget bounds this: the record travels with the mechanism and is told once, in the mechanism's own file.
+That is a reason to keep the incident, not a licence to keep the file. Rule 7's comment budget bounds this: the record travels with the mechanism and is told once, in the mechanism's own file.
 
 History: docs/context-history/agentic-workflow-edition.md

@@ -45,3 +45,7 @@ Pinning each copy's own content is not enough: #614 happened because both livene
 ## Write the incident into the file
 
 Every non-obvious mechanism here carries a comment naming the run that made it necessary — #404, #430, #434, #499, #507, #552, #581. Each one was added after a queue stalled for a day.
+
+## Rule 6 — A stranger's event wakes nothing
+
+Added after the 2026-11-06 audit of outside PRs #2150/#2151, which found five places where a stranger's comment, pull request, branch name or issue form reached the PAT — `agentic-autonomous-pipeline`'s history ("references/github-loop.md — Only the owner's events reach the pipeline") tells each one. The former Rule 6 ("Nothing here removes a line but you") became Rule 7. The runners' old `comment.user.type != 'Bot'` filter was replaced, not kept beside the new `author_association == 'OWNER'` clause: a bot is never `OWNER`, so the old clause guarded nothing the new one does not.

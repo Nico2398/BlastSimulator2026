@@ -113,6 +113,10 @@ const normalise = (issue) => ({
   title: issue.title || '',
   isPullRequest: Boolean(issue.pull_request),
   prMergedAt: issue.pull_request?.merged_at ?? null,
+  // Who filed it — `pipeline-trust.cjs`'s `issueTrust` reads these two, and
+  // fails closed when they are absent.
+  user: issue.user ? { login: issue.user.login, type: issue.user.type } : null,
+  author_association: issue.author_association ?? null,
 });
 
 /**
