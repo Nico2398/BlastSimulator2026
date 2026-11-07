@@ -8,15 +8,18 @@ import { noticeTicksLeft } from '../../core/events/EventSystem.js';
 import { t } from '../../core/i18n/I18n.js';
 import { button, chip, el } from '../dom.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import { MINIMAP_EDGE_OFFSET_PX, MINIMAP_WIDTH_PX } from '../tokens.js';
 import { shellLayoutRegistry, type Rect, type Viewport } from './LayoutRegistry.js';
 
 const DOCK_WIDTH_PX = 340;
-const DOCK_BOTTOM_PX = 96;
+const DOCK_BOTTOM_PX = 16;
+/** Left of the minimap, never over it: the dock's right edge clears the minimap's left edge by a gap. */
+const DOCK_RIGHT_PX = MINIMAP_EDGE_OFFSET_PX + MINIMAP_WIDTH_PX + 12;
 /** Room for a few stacked cards; more clip rather than push into other regions. */
 const DOCK_HEIGHT_PX = 320;
 
 function dockBounds(viewport: Viewport): Rect {
-  return { x: Math.max(0, viewport.width - DOCK_WIDTH_PX - 16), y: Math.max(0, viewport.height - DOCK_BOTTOM_PX - DOCK_HEIGHT_PX), width: DOCK_WIDTH_PX, height: DOCK_HEIGHT_PX };
+  return { x: Math.max(0, viewport.width - DOCK_WIDTH_PX - DOCK_RIGHT_PX), y: Math.max(0, viewport.height - DOCK_BOTTOM_PX - DOCK_HEIGHT_PX), width: DOCK_WIDTH_PX, height: DOCK_HEIGHT_PX };
 }
 
 /** What one card shows, derived from state so the DOM can be skipped when nothing changed. */
@@ -53,7 +56,7 @@ export class EventNotices {
   constructor(parent: HTMLElement) {
     this.root = el('div', { className: 'bsx-root', attrs: { id: 'bs-event-notices', role: 'region', 'aria-label': t('ui.notice.aria') } });
     this.root.style.cssText = [
-      'position:fixed', 'right:16px', `bottom:${DOCK_BOTTOM_PX}px`, 'z-index:var(--bsx-z-toast)', `width:${DOCK_WIDTH_PX}px`,
+      'position:fixed', `right:${DOCK_RIGHT_PX}px`, `bottom:${DOCK_BOTTOM_PX}px`, 'z-index:var(--bsx-z-toast)', `width:${DOCK_WIDTH_PX}px`,
       `max-height:${DOCK_HEIGHT_PX}px`, 'overflow:hidden', 'display:flex', 'flex-direction:column', 'gap:8px',
       'justify-content:flex-end', 'pointer-events:none',
     ].join(';');
