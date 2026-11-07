@@ -22,7 +22,7 @@ import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulAct
 import { fragmentHaulUrgency, oreHaulUrgency } from '../economy/OreDemand.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { thinDebrisCandidates } from './DebrisCandidateBins.js';
-import { isChargeUnaffordable } from '../mining/ExplosiveStock.js';
+import { isChargeUnaffordable } from '../mining/ChargeLoad.js';
 import { employeeClimbReach } from './OrderReachability.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 // #1090: planItinerary (PlanItinerary.ts) itself imports computeActionWorkTicks

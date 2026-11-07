@@ -81,16 +81,6 @@ describe('hole inspector', () => {
     expect(charge.textContent).toContain('2');
   });
 
-  it('shows kg from stock only when positive', () => {
-    const s = makeState();
-    const hole = drilled(s);
-    s.chargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 6, stemmingM: 2 };
-    expect(mount(viewOf(s, hole.id)).querySelector('[data-hole-from-stock]')).toBeNull();
-    s.chargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 6, stemmingM: 2, fromStockKg: 4 };
-    const stock = mount(viewOf(s, hole.id)).querySelector('[data-hole-from-stock]')!;
-    expect(stock.textContent).toContain('4');
-  });
-
   it('marks a charge order that is not loaded yet as ordered', () => {
     const s = makeState();
     const hole = drilled(s);

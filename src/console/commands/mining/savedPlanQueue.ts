@@ -5,8 +5,7 @@ import type { SavedBlastPlan } from '../../../core/state/GameState.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { addHole, drillDepthRefusal, drillDiameterRefusal } from '../../../core/mining/DrillPlan.js';
 import { normaliseHoleDiameter, holeDiameterOptionsMm } from '../../../core/mining/HoleDiameter.js';
-import { createCharge, stockAwareChargesCost } from '../../../core/mining/ChargePlan.js';
-import { getExplosivesStockByType } from '../../../core/entities/Building.js';
+import { createCharge, chargeOrderCost } from '../../../core/mining/ChargePlan.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { claimForAction } from '../siteExpansion.js';
 import type { MiningContext } from './types.js';
@@ -62,7 +61,7 @@ export function queueSavedBlastPlan(ctx: MiningContext, saved: SavedBlastPlan, n
     dispatchDrillHoleAction(ctx, hole);
   }
   // Estimate only: the cash is paid as each hole is loaded (#2143).
-  const cost = stockAwareChargesCost(chargeOrders, getExplosivesStockByType(state.buildings)).cashCost;
+  const cost = chargeOrders.reduce((sum, o) => sum + chargeOrderCost(o.explosiveId, o.amountKg), 0);
   for (const o of chargeOrders) {
     const newId = idMap.get(o.oldHoleId)!;
     const hole = state.plannedDrillHoles.find(h => h.id === newId)!;

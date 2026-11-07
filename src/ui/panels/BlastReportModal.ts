@@ -229,9 +229,6 @@ export class BlastReportModal {
       { key: t('ui.blast_workshop.report.stat_volume'), value: `${report.totalRockVolume.toFixed(0)} m³` },
       { key: t('ui.blast_workshop.report.stat_projections'), value: `${report.projectionCount} · ${report.maxProjectionDistanceM.toFixed(0)} m`, ...(report.projectionCount > 0 ? { color: 'var(--bsx-critical-text)' } : {}) },
       { key: t('ui.blast_workshop.report.stat_spent'), value: `$${formatMoney(report.spent)}`, color: 'var(--bsx-critical-text)', info: 'report-spent' },
-      ...((report.spentFromStock ?? 0) > 0
-        ? [{ key: t('ui.blast_workshop.report.stat_from_stock'), value: `$${formatMoney(report.spentFromStock ?? 0)}`, info: 'report-spent-from-stock' }]
-        : []),
       { key: t('ui.blast_workshop.report.stat_ore_value'), value: `$${formatMoney(report.totalOreValue)}`, color: 'var(--bsx-positive)' },
       ...(sealedOre > 0
         ? [{ key: t('ui.blast_workshop.report.stat_sealed_value'), value: `$${formatMoney(sealedOre)}`, color: 'var(--bsx-amber)', info: 'report-sealed' }]
@@ -270,10 +267,6 @@ export class BlastReportModal {
       const bgPrefix = style.critical ? 'rgba(255,91,76,' : 'rgba(255,176,46,';
       const fg = style.critical ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)';
       notes.push(this.makeNoteCard(style.icon, bgPrefix, fg, accidentText(a, state)));
-    }
-    for (const sb of report.secondaryBlasts ?? []) {
-      notes.push(this.makeNoteCard('build', 'rgba(255,91,76,', 'var(--bsx-critical-text)',
-        t('ui.blast_workshop.report.secondary_blast', { kg: sb.explosivesKg, id: sb.buildingId, casualties: sb.casualties, voxels: sb.craterVoxels ?? 0 })));
     }
     if (sealedOre > 0) {
       notes.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',

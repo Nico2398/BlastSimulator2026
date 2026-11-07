@@ -8,14 +8,20 @@
       "timeout": 30,
       "role": "setup",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42 staffed:true cash:150000" }
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true cash:150000"
+        }
       ]
     },
     {
       "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15",
       "role": "bootstrap",
       "interaction": [
-        { "type": "command", "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15" }
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15"
+        }
       ]
     },
     {
@@ -23,19 +29,33 @@
       "timeout": 130,
       "role": "setup",
       "interaction": [
-        { "type": "waitUntil", "field": "holeCount", "equals": 1, "maxTicks": 300, "timeoutMs": 120000 }
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 120000
+        }
       ]
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "description": "Order a charge with no stock: nothing is paid at ordering, the order only queues.",
+      "description": "Order a charge: nothing is paid at ordering, the order only queues.",
       "role": "bootstrap",
       "interaction": [
-        { "type": "command", "command": "charge hole:* explosive:boomite amount:5 stemming:2" }
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
       ],
       "expect": {
-        "changedBy": { "cash": 0 },
-        "equals": { "orderedChargeCount": 1, "chargedCount": 0 }
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "orderedChargeCount": 1,
+          "chargedCount": 0
+        }
       }
     },
     {
@@ -43,13 +63,35 @@
       "description": "The Charge step shows the pattern's explosive cost as an estimate paid as each hole is loaded, and no delivery wait.",
       "role": "observe",
       "interaction": [
-        { "type": "ensurePanel", "panel": "blast" },
-        { "type": "ensureStep", "step": 2 },
-        { "type": "waitForSelector", "selector": "#bs-blast-panel [data-info=\"paid-on-fill\"]" },
-        { "type": "mousemove", "x": 200, "y": 520 },
-        { "type": "wheel", "deltaX": 0, "deltaY": 600 },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "screenshot" }
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-info=\"paid-on-fill\"]"
+        },
+        {
+          "type": "mousemove",
+          "x": 200,
+          "y": 520
+        },
+        {
+          "type": "wheel",
+          "deltaX": 0,
+          "deltaY": 600
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
       ]
     },
     {
@@ -58,11 +100,22 @@
       "timeout": 130,
       "role": "setup",
       "interaction": [
-        { "type": "waitUntil", "field": "chargedCount", "equals": 1, "maxTicks": 300, "timeoutMs": 120000 }
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 120000
+        }
       ],
       "expect": {
-        "decreased": ["cash"],
-        "equals": { "orderedChargeCount": 0, "chargedCount": 1 }
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedChargeCount": 0,
+          "chargedCount": 1
+        }
       }
     }
   ]

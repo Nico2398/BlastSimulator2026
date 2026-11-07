@@ -3,9 +3,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { getExplosivesInStock } from '../../../src/core/entities/BuildingWarehouse.js';
-import { buyExplosiveStock } from '../../../src/core/mining/ExplosiveStock.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -35,13 +32,6 @@ function makeState(cash = 10_000): GameState {
 function setCash(state: GameState, cash: number): void {
   state.cash = cash;
   state.finances.cash = cash;
-}
-
-function stockedState(kg: number, cash = 10_000): GameState {
-  const state = makeState(cash);
-  placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
-  expect(buyExplosiveStock(state, 'boomite', kg).success).toBe(true);
-  return state;
 }
 
 function chargeActions(state: GameState) {
@@ -90,16 +80,6 @@ describe('dispatchChargeAction books nothing at order time (#2143)', () => {
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     expect(chargeActions(state)).toHaveLength(1);
     expect(state.cash).toBe(-500);
-  });
-
-  it('draws no warehouse stock at order time and records no fromStockKg', () => {
-    const state = stockedState(100);
-    const cash = state.cash;
-    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(100);
-    expect(state.cash).toBe(cash);
-    expect(state.plannedChargesByHole['H1']).toEqual(BOOMITE_5KG);
-    expect('fromStockKg' in state.plannedChargesByHole['H1']!).toBe(false);
   });
 
   it('queues the order for a blasting-skilled charging truck crew (#1649)', () => {
@@ -159,13 +139,6 @@ describe('cancelOutstandingChargeAction (#2143)', () => {
     expect(state.cash).toBe(10_000);
     expect(state.finances.cash).toBe(10_000);
     expect(state.finances.transactions).toHaveLength(0);
-  });
-
-  it('changes no warehouse stock', () => {
-    const state = stockedState(40);
-    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    cancelOutstandingChargeAction(state, 'H1');
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(40);
   });
 
   it('leaves other holes\' orders alone', () => {
@@ -310,7 +283,7 @@ describe('outstandingChargeBlockedReason (#1660)', () => {
 });
 
 describe('loading a charge pays for the explosive (#2143)', () => {
-  it('with an empty warehouse cash falls by the list price and one explosives expense is booked', () => {
+  it('cash falls by the list price and one explosives expense is booked', () => {
     const state = makeState();
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     expect(state.cash).toBe(10_000);
@@ -326,40 +299,13 @@ describe('loading a charge pays for the explosive (#2143)', () => {
     expect(expenses[0]!.amount).toBeCloseTo(COST_5KG, 10);
   });
 
-  it('moves the planned charge into chargesByHole with no fromStockKg when no stock was drawn', () => {
+  it('moves the planned charge into chargesByHole', () => {
     const state = makeState();
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     completeCharge(state, 'H1');
 
     expect(state.plannedChargesByHole['H1']).toBeUndefined();
     expect(state.chargesByHole['H1']).toMatchObject(BOOMITE_5KG);
-    expect(state.chargesByHole['H1']!.fromStockKg ?? 0).toBe(0);
-  });
-
-  it('draws stock first, pays only the remainder and records fromStockKg (#2143 C6)', () => {
-    const state = stockedState(3);
-    const cash = state.cash;
-    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    const expensesBefore = explosivesExpenses(state).length;
-    completeCharge(state, 'H1');
-
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(0);
-    expect(state.cash).toBeCloseTo(cash - 2 * 12, 10);
-    expect(explosivesExpenses(state)).toHaveLength(expensesBefore + 1);
-    expect(state.chargesByHole['H1']!.fromStockKg).toBe(3);
-  });
-
-  it('fully stock-covered load costs nothing and records the whole amount as fromStockKg', () => {
-    const state = stockedState(100);
-    const cash = state.cash;
-    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    const expensesBefore = explosivesExpenses(state).length;
-    completeCharge(state, 'H1');
-
-    expect(state.cash).toBe(cash);
-    expect(explosivesExpenses(state)).toHaveLength(expensesBefore);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(95);
-    expect(state.chargesByHole['H1']!.fromStockKg).toBe(5);
   });
 
   it('pays once per hole: two holes cost two loads', () => {
@@ -373,18 +319,6 @@ describe('loading a charge pays for the explosive (#2143)', () => {
     expect(explosivesExpenses(state)).toHaveLength(2);
   });
 
-  it('stock drawn at load time is shared out in completion order, not reserved at order time', () => {
-    const state = stockedState(5);
-    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    dispatchChargeAction(state, hole(2), BOOMITE_5KG);
-    const cash = state.cash;
-    completeCharge(state, 'H2');
-    expect(state.chargesByHole['H2']!.fromStockKg).toBe(5);
-    expect(state.cash).toBe(cash);
-    completeCharge(state, 'H1');
-    expect(state.chargesByHole['H1']!.fromStockKg ?? 0).toBe(0);
-    expect(state.cash).toBeCloseTo(cash - COST_5KG, 10);
-  });
 });
 
 describe('charge order claimability and affordability (#2143)', () => {
@@ -393,7 +327,7 @@ describe('charge order claimability and affordability (#2143)', () => {
     return isHoleOrderClaimable(state, action);
   }
 
-  it('is claimable at once with an empty warehouse and cash to pay (no delivery wait)', () => {
+  it('is claimable at once with cash to pay (no delivery wait)', () => {
     const state = makeState();
     state.tickCount = 0;
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
@@ -418,22 +352,6 @@ describe('charge order claimability and affordability (#2143)', () => {
     expect(claimable(state)).toBe(false);
     setCash(state, 10_000);
     expect(claimable(state)).toBe(true);
-  });
-
-  it('is claimable at zero cash when stock covers the whole order', () => {
-    const state = stockedState(100, 10_000);
-    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    setCash(state, 0);
-    expect(claimable(state)).toBe(true);
-  });
-
-  it('partial stock lowers the cash a claim needs', () => {
-    const state = stockedState(3, 10_000);
-    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    setCash(state, 24);
-    expect(claimable(state)).toBe(true);
-    setCash(state, 23.99);
-    expect(claimable(state)).toBe(false);
   });
 
   it('a hole still waiting to be drilled stays unclaimable even when affordable', () => {

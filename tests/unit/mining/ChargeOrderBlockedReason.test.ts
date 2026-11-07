@@ -10,8 +10,6 @@ import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill, killEmployee } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle, destroyVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { dispatchChargeAction, outstandingChargeBlockedReason } from '../../../src/core/mining/ChargeOrder.js';
-import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { buyExplosiveStock } from '../../../src/core/mining/ExplosiveStock.js';
 import { classifyQueuedOrders } from '../../../src/core/engine/OrderReachability.js';
 
 const LICENCE = ROLE_LICENCE_REQUIRED.charging_truck;
@@ -193,16 +191,6 @@ describe('explosives_unaffordable reason (#2143)', () => {
     classifyQueuedOrders(state);
     expect(chargeActions(state)[0]!.blockedReason).toBeNull();
     expect(outstandingChargeBlockedReason(state)).toBeNull();
-  });
-
-  it('never marks an order that stock covers in full, even at zero cash', () => {
-    const state = serviceable();
-    placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
-    expect(buyExplosiveStock(state, 'boomite', 100).success).toBe(true);
-    order(state, 1);
-    setCash(state, 0);
-    classifyQueuedOrders(state);
-    expect(chargeActions(state)[0]!.blockedReason).toBeNull();
   });
 
   it('follows the current cash as it rises and falls', () => {

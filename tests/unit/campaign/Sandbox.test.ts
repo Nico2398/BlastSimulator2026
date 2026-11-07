@@ -24,7 +24,7 @@ import { isValidOreGradeScale } from '../../../src/core/economy/OreGrade.js';
 import { getLevel, getAllLevels } from '../../../src/core/campaign/Level.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
-import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE, SANDBOX_DIGGER_KIT_DRIVER, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SANDBOX_ORE_GRADE_SCALE, ORE_GRADE_SCALE_DEFAULT, SANDBOX_STARTER_EXPLOSIVE_ID, SANDBOX_STARTER_EXPLOSIVE_KG } from '../../../src/core/config/balance.js';
+import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE, SANDBOX_DIGGER_KIT_DRIVER, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SANDBOX_ORE_GRADE_SCALE, ORE_GRADE_SCALE_DEFAULT } from '../../../src/core/config/balance.js';
 import { resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
 import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -795,37 +795,25 @@ describe('sandbox ore grade scale (#1944)', () => {
   });
 });
 
-describe('sandbox starter explosive stock (#2118)', () => {
-  it('the starter explosive is 100 kg of krackle', () => {
-    expect(SANDBOX_STARTER_EXPLOSIVE_ID).toBe('krackle');
-    expect(SANDBOX_STARTER_EXPLOSIVE_KG).toBe(100);
-  });
-
+describe('sandbox starter warehouse (#2118, #2153)', () => {
   it('starting cash is 480,000 for the digger kit and 520,000 for the full kit, full above digger', () => {
     expect(SANDBOX_KITS.digger.startingCash).toBe(480_000);
     expect(SANDBOX_KITS.full.startingCash).toBe(520_000);
     expect(SANDBOX_KITS.full.startingCash).toBeGreaterThan(SANDBOX_KITS.digger.startingCash);
   });
 
-  it.each(SANDBOX_KIT_ORDER)('%s kit lists one tier-1 explosive warehouse slot carrying the starter stock', (kit) => {
+  it.each(SANDBOX_KIT_ORDER)('%s kit lists one tier-1 explosive warehouse slot', (kit) => {
     const slots = SANDBOX_STARTING_SITES[kit].buildings.filter(b => b.type === 'explosive_warehouse');
     expect(slots).toHaveLength(1);
     expect(slots[0]!.tier).toBe(1);
-    expect(slots[0]!.stock).toEqual({ krackle: 100 });
   });
 
-  it.each(SANDBOX_KIT_ORDER)('%s kit keeps its freight warehouse and spoil heap, without stock', (kit) => {
+  it.each(SANDBOX_KIT_ORDER)('%s kit keeps its freight warehouse and spoil heap', (kit) => {
     const buildings = SANDBOX_STARTING_SITES[kit].buildings;
     const freight = buildings.filter(b => b.type === 'freight_warehouse');
     const heap = buildings.filter(b => b.type === 'spoil_heap');
     expect(freight).toHaveLength(1);
     expect(heap).toHaveLength(1);
-    expect(freight[0]!.stock).toBeUndefined();
-    expect(heap[0]!.stock).toBeUndefined();
-  });
-
-  it.each(SANDBOX_KIT_ORDER)('sandboxKitDetails(%s).stock reports 100 kg of krackle', (kit) => {
-    expect(sandboxKitDetails(kit).stock).toEqual([{ explosiveId: 'krackle', kg: 100 }]);
   });
 
   it('sandboxKitDetails lists the explosive warehouse among the buildings', () => {
@@ -835,15 +823,14 @@ describe('sandbox starter explosive stock (#2118)', () => {
     }
   });
 
-  it('sandboxKitDetails still reports the kit cash alongside the stock', () => {
+  it('sandboxKitDetails still reports the kit cash', () => {
     expect(sandboxKitDetails('digger').startingCash).toBe(480_000);
     expect(sandboxKitDetails('full').startingCash).toBe(520_000);
   });
 
-  it('campaign starting sites carry no explosive stock and no explosive warehouse', () => {
+  it('campaign starting sites carry no explosive warehouse', () => {
     for (const site of [DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE]) {
       for (const slot of site.buildings) {
-        expect(slot.stock).toBeUndefined();
         expect(slot.type).not.toBe('explosive_warehouse');
       }
     }

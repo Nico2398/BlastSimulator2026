@@ -13,7 +13,7 @@ import {
   getQueueBlockCode, type Building,
 } from '../../../src/core/entities/Building.js';
 import { hasActiveResearchCenter, tickResearch } from '../../../src/core/entities/BuildingResearch.js';
-import { getExplosivesCapacity, freightWarehouseSites } from '../../../src/core/entities/BuildingWarehouse.js';
+import { freightWarehouseSites } from '../../../src/core/entities/BuildingWarehouse.js';
 import { enrolInTraining, availableTrainingOffers } from '../../../src/core/entities/EmployeeTraining.js';
 import { addModifier, pruneExpired, type ActiveModifier } from '../../../src/core/events/ActiveModifiers.js';
 import { runSurvey, surveyCostFor } from '../../../src/core/mining/SurveyCalc.js';
@@ -370,12 +370,6 @@ describe('closed buildings are skipped (#1568)', () => {
     bs.buildings.push(building({ id: 2, type: 'freight_warehouse' }));
     expect(getStorageCapacity(bs)).toBe(getBuildingDef('freight_warehouse', 1).capacity);
     expect(freightWarehouseSites(bs).map(s => s.id)).toEqual([2]);
-  });
-
-  it('a closed explosive warehouse adds no capacity', () => {
-    const bs = createBuildingState();
-    bs.buildings.push(building({ type: 'explosive_warehouse', outOfService: true }));
-    expect(getExplosivesCapacity(bs)).toBe(0);
   });
 });
 

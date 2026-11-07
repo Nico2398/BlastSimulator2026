@@ -83,8 +83,6 @@ const LIVE_EXPORTS = new Set<string>([
   'src/ui/scene/ScenePicking.ts:HOVER_TAG_DWELL_MS',
   // Floor-to-grade pass (#1723): the unit-tested contract of the grading rule; production runs it inside identifyFragmentedVoxelsSteps.
   'src/core/mining/VoxelFragmentation.ts:floorToGrade',
-  // Bulk explosive price (#1678): the unit-tested pricing contract; production composes it inside buyExplosiveStock/returnOrderStock.
-  'src/core/mining/ExplosiveStock.ts:bulkPricePerKg',
   // Tutorial rail whitelist (#1595): the per-step whitelist test reads the single always-allowed list and the policy range; production uses them inside their modules.
   'src/ui/tutorialRails.ts:BASE_PERMANENTLY_ALLOWED',
   'src/ui/tutorialStages.ts:TUTORIAL_POLICY_FATIGUE_MAX',
@@ -108,8 +106,8 @@ const LIVE_EXPORTS = new Set<string>([
   'src/ui/catalogCardText.ts:BUILDING_CAPACITY_UNIT_KEY',
   // Unit-tested contract of the $/h card format (#1377); production reaches it only through the card-line helpers.
   'src/ui/catalogCardText.ts:formatPerHour',
-  // Radius formula is the unit-tested contract of resolveSecondaryBlasts (#1394); only the resolver calls it in production.
-  'src/core/entities/SecondaryBlast.ts:secondaryBlastRadiusM',
+  // Event price factor is the unit-tested contract of the charge quote (#2153); production reads it only inside quoteChargeLoad.
+  'src/core/mining/ChargeLoad.ts:explosivePriceFactor',
   // Unit-tested contract of the scores tutorial step (#1334); only createUiActionStep uses these in production.
   'src/ui/tutorialStepHelpers.ts:readScoresInspectCount',
   'src/ui/tutorialStepHelpers.ts:isPanelVisible',

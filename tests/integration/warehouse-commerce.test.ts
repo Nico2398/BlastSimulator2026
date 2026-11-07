@@ -1,17 +1,15 @@
-// Integration test: freight warehouse → contract sell flow + explosive warehouse blast gating.
+// Integration test: freight warehouse -> contract sell flow.
 //
 // This test exercises multiple modules working together:
-//   Building.ts      – getStorageCapacity, hasExplosivesForBlast, storeExplosives, consumeExplosives
-//   Logistics.ts     – createLogisticsState, syncLogisticsCapacity
-//   Contract.ts      – createContractState, acceptContract, deliverMaterials
+//   Building.ts      - getStorageCapacity
+//   Logistics.ts     - createLogisticsState, syncLogisticsCapacity
+//   Contract.ts      - createContractState, acceptContract, deliverMaterials
 //
 // Scenarios covered:
-//   1. No freight warehouse → storage capacity = 0
-//   2. Place freight warehouse → capacity increases; syncLogisticsCapacity updates logistics state
-//   3. Sold material revenue = amountKg × pricePerKg (using deterministic fixture contract)
+//   1. No freight warehouse -> storage capacity = 0
+//   2. Place freight warehouse -> capacity increases; syncLogisticsCapacity updates logistics state
+//   3. Sold material revenue = amountKg x pricePerKg (using deterministic fixture contract)
 //   4. Contract completes once full quantityKg is delivered
-//   5. Explosive warehouse gates blasting: false when empty, true when stocked
-//   6. Explosive stock commerce (#1678): bulk purchase, stock-first charge orders, refunds
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -19,9 +17,6 @@ import {
   placeBuilding,
   getStorageCapacity,
   getBuildingDef,
-  hasExplosivesForBlast,
-  storeExplosives,
-  consumeExplosives,
 } from '../../src/core/entities/Building.js';
 import {
   createLogisticsState,
@@ -33,16 +28,6 @@ import {
   deliverMaterials,
 } from '../../src/core/economy/Contract.js';
 import type { BuildingState } from '../../src/core/entities/Building.js';
-import { createGame, type GameState } from '../../src/core/state/GameState.js';
-import { getExplosivesInStock } from '../../src/core/entities/BuildingWarehouse.js';
-import { buyExplosiveStock, canAffordChargeLoad } from '../../src/core/mining/ExplosiveStock.js';
-import { dispatchChargeAction } from '../../src/core/mining/ChargeOrder.js';
-import { applyTaskCompletion } from '../../src/core/engine/TaskCompletionEffects.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
-import { hireEmployee } from '../../src/core/entities/Employee.js';
-import { Random } from '../../src/core/math/Random.js';
-import { cancelAction } from '../../src/core/engine/TaskCancellation.js';
-import type { DrillHole } from '../../src/core/mining/DrillPlan.js';
 import type { LogisticsState } from '../../src/core/economy/Logistics.js';
 import type { ContractState, Contract } from '../../src/core/economy/Contract.js';
 
@@ -221,299 +206,5 @@ describe('Contract sell flow: stored material → revenue', () => {
     const result = deliverMaterials(contractState, contract.id, 50, 6);
     expect(result.payment).toBe(0);
     expect(result.completed).toBe(false);
-  });
-});
-
-// ─── 3. Explosive warehouse blast gating ────────────────────────────────────
-
-describe('Explosive warehouse blast gating', () => {
-  it('hasExplosivesForBlast is false with no explosive warehouses at all', () => {
-    expect(hasExplosivesForBlast(buildingState)).toBe(false);
-  });
-
-  it('hasExplosivesForBlast is false when a warehouse is placed but never stocked', () => {
-    placeBuilding(buildingState, 'explosive_warehouse', 0, 0, 64, 64, 1);
-    expect(hasExplosivesForBlast(buildingState)).toBe(false);
-  });
-
-  it('hasExplosivesForBlast becomes true after stocking a warehouse', () => {
-    placeBuilding(buildingState, 'explosive_warehouse', 0, 0, 64, 64, 1);
-    storeExplosives(buildingState, 'anfo', 100);
-    expect(hasExplosivesForBlast(buildingState)).toBe(true);
-  });
-
-  it('hasExplosivesForBlast returns false again after all stock is consumed', () => {
-    placeBuilding(buildingState, 'explosive_warehouse', 0, 0, 64, 64, 1);
-    storeExplosives(buildingState, 'anfo', 100);
-    consumeExplosives(buildingState, 'anfo', 100);
-    expect(hasExplosivesForBlast(buildingState)).toBe(false);
-  });
-
-  it('warehouse gates are independent: one empty + one stocked → still true', () => {
-    // Two warehouses; only second gets stock
-    placeBuilding(buildingState, 'explosive_warehouse', 0,  0, 64, 64, 1);
-    placeBuilding(buildingState, 'explosive_warehouse', 10, 0, 64, 64, 1);
-    storeExplosives(buildingState, 'anfo', 1); // minimal — goes into first available slot
-    expect(hasExplosivesForBlast(buildingState)).toBe(true);
-  });
-
-  it('warehouse + freight warehouse combo: each system is independent', () => {
-    // A freight warehouse does NOT gate blasting
-    placeBuilding(buildingState, 'freight_warehouse',   0,  0, 64, 64, 1);
-    placeBuilding(buildingState, 'explosive_warehouse', 10, 0, 64, 64, 1);
-
-    // Explosive warehouse empty → blast gated
-    expect(hasExplosivesForBlast(buildingState)).toBe(false);
-
-    // Stock explosive warehouse → blast allowed
-    storeExplosives(buildingState, 'anfo', 50);
-    expect(hasExplosivesForBlast(buildingState)).toBe(true);
-
-    // Freight warehouse capacity should remain accessible and non-zero
-    expect(getStorageCapacity(buildingState)).toBeGreaterThan(0);
-  });
-});
-
-// ─── 4. Explosive stock commerce (#1678) ─────────────────────────────────────
-
-const BOOMITE_LIST = 12;          // catalog $/kg
-const BOOMITE_BULK = 12 * 0.7;    // bulk $/kg (EXPLOSIVE_BULK_PRICE_FACTOR)
-
-function makeSite(cash: number, withWarehouse = true): GameState {
-  const state = createGame({ seed: 42, startingCash: cash });
-  state.cash = cash;
-  state.finances.cash = cash;
-  if (withWarehouse) placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
-  return state;
-}
-
-function hole(n: number): DrillHole {
-  return { id: `H${n}`, x: 10 + n * 3, z: 10, depth: 8, diameter: 0.15 };
-}
-
-function order(state: GameState, n: number, kg: number, explosiveId = 'boomite') {
-  dispatchChargeAction(state, hole(n), { explosiveId, amountKg: kg, stemmingM: 2 });
-  return state.pendingActions.filter(a => a.type === 'charge_hole' && a.payload['holeId'] === `H${n}`);
-}
-
-describe('Buying explosive into warehouse stock', () => {
-  it('charges the bulk price, cheaper than the list price', () => {
-    const state = makeSite(50_000);
-    const r = buyExplosiveStock(state, 'boomite', 100);
-    expect(r.success).toBe(true);
-    expect(state.cash).toBeCloseTo(50_000 - 100 * BOOMITE_BULK, 6);
-    expect(100 * BOOMITE_BULK).toBeLessThan(100 * BOOMITE_LIST);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(100);
-  });
-
-  it('is refused beyond capacity, leaving cash and stock untouched', () => {
-    const state = makeSite(1_000_000);
-    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
-    const r = buyExplosiveStock(state, 'boomite', cap + 1);
-    expect(r).toMatchObject({ success: false, reason: 'over_capacity', freeKg: cap });
-    expect(state.cash).toBe(1_000_000);
-    expect(getExplosivesInStock(state.buildings)).toBe(0);
-  });
-
-  it('is refused with no warehouse', () => {
-    const state = makeSite(50_000, false);
-    expect(buyExplosiveStock(state, 'boomite', 10)).toMatchObject({ success: false, reason: 'no_warehouse' });
-    expect(state.cash).toBe(50_000);
-  });
-
-  it('is refused with an inoperative warehouse', () => {
-    const state = makeSite(50_000);
-    state.buildings.buildings[0]!.active = false;
-    expect(buyExplosiveStock(state, 'boomite', 10)).toMatchObject({ success: false, reason: 'no_warehouse' });
-    state.buildings.buildings[0]!.active = true;
-    state.buildings.buildings[0]!.outOfService = true;
-    expect(buyExplosiveStock(state, 'boomite', 10)).toMatchObject({ success: false, reason: 'no_warehouse' });
-    expect(state.cash).toBe(50_000);
-  });
-
-  it('is refused on insufficient cash', () => {
-    const state = makeSite(50);
-    expect(buyExplosiveStock(state, 'boomite', 100)).toMatchObject({ success: false, reason: 'insufficient_funds' });
-    expect(state.cash).toBe(50);
-    expect(getExplosivesInStock(state.buildings)).toBe(0);
-  });
-
-  it('is refused for an invalid amount, an unknown explosive and an unavailable one', () => {
-    const state = makeSite(50_000);
-    expect(buyExplosiveStock(state, 'boomite', 0)).toMatchObject({ success: false, reason: 'invalid_amount' });
-    expect(buyExplosiveStock(state, 'boomite', -3)).toMatchObject({ success: false, reason: 'invalid_amount' });
-    expect(buyExplosiveStock(state, 'nope', 10)).toMatchObject({ success: false, reason: 'unknown_explosive' });
-    state.campaign.activeLevelId = 'tutorial_pit';
-    expect(buyExplosiveStock(state, 'krackle', 10)).toMatchObject({ success: false, reason: 'not_available' });
-    expect(state.cash).toBe(50_000);
-    expect(getExplosivesInStock(state.buildings)).toBe(0);
-  });
-});
-
-/** Land the charge_hole task of hole `n`, as the engine does when the crew finishes loading it. */
-function load(state: GameState, n: number) {
-  const { employee } = hireEmployee(state.employees, 'blaster', new Random(42), 0, 0);
-  return applyTaskCompletion(state, null, employee, {
-    completed: true, leveledUp: false, skill: null, levelUps: [], actionType: 'charge_hole', actionPayload: { holeId: `H${n}` },
-  }, new EventEmitter());
-}
-
-describe('Charge orders touch neither stock nor cash until the hole is loaded (#2143)', () => {
-  it('ordering with matching stock spends no cash and draws no stock', () => {
-    const state = makeSite(50_000);
-    buyExplosiveStock(state, 'boomite', 100);
-    const cash = state.cash;
-    order(state, 1, 5);
-    expect(state.cash).toBe(cash);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(100);
-  });
-
-  it('ordering with no warehouse spends no cash either', () => {
-    const state = makeSite(50_000, false);
-    order(state, 1, 5);
-    expect(state.cash).toBe(50_000);
-  });
-
-  it('ordering is accepted at zero cash', () => {
-    const state = makeSite(0, false);
-    expect(order(state, 1, 5)).toHaveLength(1);
-    expect(state.cash).toBe(0);
-  });
-});
-
-describe('Loading a charge draws warehouse stock first and pays the rest in cash (#2143)', () => {
-  it('matching stock covers the load: no cash spent, stock drawn, fromStockKg recorded', () => {
-    const state = makeSite(50_000);
-    buyExplosiveStock(state, 'boomite', 100);
-    order(state, 1, 5);
-    const cash = state.cash;
-    load(state, 1);
-    expect(state.cash).toBe(cash);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(95);
-    expect(state.chargesByHole['H1']!.fromStockKg).toBe(5);
-  });
-
-  it('partial stock is spent first, the remainder is paid in cash at list price', () => {
-    const state = makeSite(50_000);
-    buyExplosiveStock(state, 'boomite', 3);
-    order(state, 1, 5);
-    const cash = state.cash;
-    load(state, 1);
-    expect(state.cash).toBeCloseTo(cash - 2 * BOOMITE_LIST, 6);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(0);
-    expect(state.chargesByHole['H1']!.fromStockKg).toBe(3);
-  });
-
-  it('stock of a different explosive is not drawn', () => {
-    const state = makeSite(50_000);
-    buyExplosiveStock(state, 'krackle', 100);
-    order(state, 1, 5);
-    const cash = state.cash;
-    load(state, 1);
-    expect(state.cash).toBeCloseTo(cash - 5 * BOOMITE_LIST, 6);
-    expect(state.chargesByHole['H1']!.fromStockKg ?? 0).toBe(0);
-    expect(getExplosivesInStock(state.buildings, 'krackle')).toBe(100);
-  });
-
-  it('with no warehouse a load costs exactly the list price', () => {
-    const state = makeSite(50_000, false);
-    order(state, 1, 5);
-    load(state, 1);
-    expect(state.cash).toBe(50_000 - 60);
-  });
-
-  it('draws sequentially across a batch of loads', () => {
-    const state = makeSite(50_000);
-    buyExplosiveStock(state, 'boomite', 8);
-    order(state, 1, 5);
-    order(state, 2, 5);
-    const cash = state.cash;
-    load(state, 1);
-    load(state, 2);
-    expect(state.chargesByHole['H1']!.fromStockKg).toBe(5);
-    expect(state.chargesByHole['H2']!.fromStockKg).toBe(3);
-    expect(state.cash).toBeCloseTo(cash - 2 * BOOMITE_LIST, 6);
-    expect(getExplosivesInStock(state.buildings)).toBe(0);
-  });
-
-  it('re-charging a hole before loading leaves stock and cash untouched, one order outstanding', () => {
-    const state = makeSite(50_000);
-    buyExplosiveStock(state, 'boomite', 100);
-    const cash = state.cash;
-    order(state, 1, 5);
-    const actions = order(state, 1, 5);
-    expect(actions).toHaveLength(1);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(100);
-    expect(state.cash).toBe(cash);
-  });
-});
-
-describe('Affordability of a load follows stock and cash (#2143)', () => {
-  it('stock covering the load makes it affordable at cash 0', () => {
-    const state = makeSite(1_000);
-    buyExplosiveStock(state, 'boomite', 100);
-    state.cash = 0;
-    expect(canAffordChargeLoad(state, 'boomite', 5)).toBe(true);
-  });
-
-  it('only the uncovered kg needs cash', () => {
-    const state = makeSite(1_000);
-    buyExplosiveStock(state, 'boomite', 3);
-    state.cash = 0;
-    expect(canAffordChargeLoad(state, 'boomite', 5)).toBe(false);
-    state.cash = 2 * BOOMITE_LIST;
-    expect(canAffordChargeLoad(state, 'boomite', 5)).toBe(true);
-  });
-
-  it('without a warehouse the whole list price is needed', () => {
-    const state = makeSite(10, false);
-    expect(canAffordChargeLoad(state, 'boomite', 5)).toBe(false);
-    state.cash = 60;
-    expect(canAffordChargeLoad(state, 'boomite', 5)).toBe(true);
-  });
-});
-
-describe('Cancelling a never-loaded charge order changes nothing (#2143)', () => {
-  it('a stock-covered order leaves stock and cash alone', () => {
-    const state = makeSite(50_000);
-    buyExplosiveStock(state, 'boomite', 100);
-    const cash = state.cash;
-    const [action] = order(state, 1, 5);
-    const r = cancelAction(state, action!.id);
-    expect(r.success).toBe(true);
-    expect(r.refunded ?? 0).toBe(0);
-    expect(state.cash).toBe(cash);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(100);
-  });
-
-  it('a mixed order leaves stock and cash alone', () => {
-    const state = makeSite(50_000);
-    buyExplosiveStock(state, 'boomite', 3);
-    const cash = state.cash;
-    const [action] = order(state, 1, 5);
-    const r = cancelAction(state, action!.id);
-    expect(r.refunded ?? 0).toBe(0);
-    expect(state.cash).toBe(cash);
-    expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(3);
-  });
-
-  it('a cash-only order leaves cash and the ledger alone', () => {
-    const state = makeSite(50_000, false);
-    const txBefore = state.finances.transactions.length;
-    const [action] = order(state, 1, 5);
-    cancelAction(state, action!.id);
-    expect(state.cash).toBe(50_000);
-    expect(state.finances.transactions).toHaveLength(txBefore);
-  });
-
-  it('emptying the warehouse after ordering does not turn a cancel into a refund', () => {
-    const state = makeSite(50_000);
-    buyExplosiveStock(state, 'boomite', 100);
-    const [action] = order(state, 1, 5);
-    const cash = state.cash;
-    state.buildings.buildings = [];
-    const r = cancelAction(state, action!.id);
-    expect(r.refunded ?? 0).toBe(0);
-    expect(state.cash).toBe(cash);
   });
 });

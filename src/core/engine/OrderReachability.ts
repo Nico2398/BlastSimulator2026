@@ -28,7 +28,7 @@ import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup, createStor
 import { holdsRequiredSkill, isEligibleForWork } from '../entities/Employee.js';
 import type { ClimbComponents, ReachableSet } from '../nav/NavGridReachability.js';
 import { cacheFor, componentsOf, type ReachCache } from './ReachCache.js';
-import { isChargeUnaffordable } from '../mining/ExplosiveStock.js';
+import { isChargeUnaffordable } from '../mining/ChargeLoad.js';
 import { dockedFrom, withDockingCells } from '../nav/DockingReach.js';
 import { buildingRingCells, buildingRingTouches } from '../nav/BuildingApproach.js';
 import { haulDestinationOf } from '../economy/SpoilHeaps.js';

@@ -41,9 +41,6 @@ function buildChargeSection(holeId: string, state: GameState): HTMLElement {
     if (kind === 'ordered') rows.push(noteLine(t('inspector.hole.charge_ordered')));
     rows.push(valueRow(t('inspector.hole.explosive'), explosiveName(charge.explosiveId)));
     rows.push(valueRow(t('inspector.hole.charge_kg'), kgText(charge.amountKg)));
-    if ((charge.fromStockKg ?? 0) > 0) {
-      rows.push(tagged(valueRow(t('inspector.hole.from_stock'), kgText(charge.fromStockKg ?? 0)), 'data-hole-from-stock'));
-    }
     rows.push(valueRow(t('inspector.hole.stemming'), t('inspector.depth_value', { depth: charge.stemmingM })));
   }
   const section = sectionOf(t('inspector.hole.section.charge'), rows);
