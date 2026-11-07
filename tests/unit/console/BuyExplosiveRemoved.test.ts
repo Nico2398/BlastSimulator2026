@@ -12,7 +12,7 @@ function start(withWarehouse: boolean) {
   const state = ctx.state!;
   state.cash = 100_000;
   state.finances.cash = 100_000;
-  if (withWarehouse) expect(placeBuilding(state.buildings, 'explosive_warehouse', 10, 10, 32, 32).success).toBe(true);
+  if (withWarehouse) expect(placeBuilding(state.buildings, 'freight_warehouse', 10, 10, 32, 32).success).toBe(true);
   return { run, state };
 }
 

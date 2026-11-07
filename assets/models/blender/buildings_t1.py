@@ -10,7 +10,6 @@
 * living_quarters    The Cells: an open-topped cage of cheap galvanized bars on a low steel kick plate,
                      no roof so the mattress and open steel toilet inside are visible from above, a
                      scavenged watchtower with a cold spotlight, cell doors 1 and 3 (2 welded shut).
-* explosive_warehouse Boom Closet: a two-seat outhouse stuffed with dynamite, TNT stencil, lit fuse, danger sign, sandbags.
 * freight_warehouse  The Pile: a junk heap under a tarp on crooked poles, bathtub, bent bike, scale, STUFF sign, rats.
 * spoil_heap         The Dump (single tier): a lumpy mound of barren rock, a leaning THE DUMP board (on the -Y side the game camera sees), a tipped
                      rusty barrel and a half-buried tyre. No doors: it takes no crew.
@@ -42,7 +41,6 @@ DULL = {
     'geology_lab': 0x8C6A48,
     'research_center': 0x8E7A9E,
     'living_quarters': 0xAEB4B8,
-    'explosive_warehouse': 0xA55A4A,
     'freight_warehouse': 0x7A756E,
     'spoil_heap': 0x8A8782,
 }
@@ -1340,58 +1338,6 @@ def build_living_quarters(sx, sz, ex, xx, m):
     pivot('Body', (0, 0, 0), parts)
 
 
-def build_explosive_warehouse(sx, sz, ex, xx, m):
-    """Boom Closet: a two-seat outhouse with crescent vents, packed so full of dynamite that sticks poke out
-    of the roof, a lit fuse curling off the back, TNT stencilled on the side and sandbags round the base."""
-    parts = dirt_lot(sx, sz, m)
-    w, d, h = 1.5, 1.05, 1.5
-    cy = -0.1
-    yf = cy + d / 2
-    z0 = 0.08
-    parts.append(B.block('Walls', w, d, h, z0, m, radius=0.04, loc_xy=(0, cy)))
-    top = z0 + h
-    for face, (px, py, yaw, length) in {'F': (0, yf, 0, w), 'B': (0, cy - d / 2, 180, w),
-                                         'L': (-w / 2, cy, -90, d), 'R': (w / 2, cy, 90, d)}.items():
-        parts += plank_lines(f'Planks{face}', length - 0.08, h - 0.12, (px, py, z0 + h / 2), m, yaw=yaw, gap=0.24,
-                             vertical=True)
-    # A tin lean-to roof, tipped back, with dynamite bursting out of the ridge gap.
-    roof = tin_sheet('Roof', w + 0.34, d + 0.34, (0, cy - 0.05, top + 0.12), m, rot=(-11, 0, 0), mat=m['tin2'])
-    parts += roof
-    for k, (dx, dyy, rx, ry) in enumerate(((-0.3, 0.05, 16, -22), (-0.02, -0.12, -12, 14), (0.28, 0.08, 8, 26),
-                                            (0.12, 0.14, -18, -8))):
-        parts += dynamite(f'Roof.Stick{k}', (dx, cy + dyy, top + 0.34), m, rot=(rx, ry, 0), lit=(k == 2))
-    # The two seats: entry and exit doors side by side, each with a crescent vent.
-    parts += swing_door('Entry', ex, yf, z0, m, m['entry'], width=0.5, height=1.15, leaf_mat=m['plank2'], lamp=False)
-    parts += swing_door('Exit', xx, yf, z0, m, m['exit'], width=0.5, height=1.15, hinge=1, leaf_mat=m['plank2'],
-                        swing=16, lamp=False)
-    for k, dx in enumerate((ex, xx)):
-        outer_c = cylinder(f'Vent{k}.Outer', 0.11, 0.09, loc=(dx, yf + 0.06, z0 + 0.95), axis='Y', segments=14)
-        assign(outer_c, m['char'])
-        inner_c = cylinder(f'Vent{k}.Inner', 0.085, 0.11, loc=(dx + 0.05, yf + 0.06, z0 + 0.97), axis='Y', segments=14)
-        assign(inner_c, m['plank2'])
-        parts += [outer_c, inner_c]
-    # TNT stencilled on the flank, a DANGER board leaning out front.
-    parts += text('TNT', 'TNT', (w / 2 + 0.03, cy, z0 + 0.95), 0.34, m['red'], yaw=90)
-    board = box('Danger.Board', (0.62, 0.05, 0.3), loc=(-w / 2 - 0.3, yf + 0.14, 0.62), rot=(0, 0, 24))
-    bevel(board, 0.02, 2)
-    assign(board, m['stripe_y'])
-    parts.append(board)
-    parts += text('Danger', '!', yawed((-w / 2 - 0.3, yf + 0.11, 0.62), 24, (0, 0, 0)), 0.2, m['stripe_k'], yaw=24)
-    post = cylinder('Danger.Post', 0.03, 0.62, loc=(-w / 2 - 0.3, yf + 0.16, 0.31), segments=6)
-    assign(post, m['plank2'])
-    parts.append(post)
-    # A fuse snaking away from the back corner, and sandbags heaped round the base.
-    for k in range(7):
-        t = k / 6
-        seg = capsule(f'Fuse{k}', 0.022, 0.16, loc=(-w / 2 - 0.1 - t * 0.55, cy - d / 2 - 0.12 - math.sin(t * 3) * 0.14, 0.06),
-                      axis='X', segments=6, rings=4, rot=(0, 0, 20 * math.cos(t * 3)))
-        assign(seg, m['dark'])
-        parts.append(seg)
-    parts += sandbag_wall('Bags', [(-w / 2 - 0.1, cy - d / 2 - 0.05), (w / 2 + 0.1, cy - d / 2 - 0.05)], m, rows=2)
-    parts += sandbag_wall('BagsR', [(w / 2 + 0.16, cy - d / 2 - 0.05), (w / 2 + 0.16, cy + 0.2)], m, rows=1)
-    pivot('Body', (0, 0, 0), parts)
-
-
 def build_freight_warehouse(sx, sz, ex, xx, m):
     """The Pile: no warehouse at all — a heap of junk under a blue tarp slung on crooked poles, with a
     bathtub, a bent bicycle wheel, a rusted scale, spilling crates and a hand-painted STUFF sign."""
@@ -1531,7 +1477,6 @@ BUILDERS = {
     'geology_lab': build_geology_lab,
     'research_center': build_research_center,
     'living_quarters': build_living_quarters,
-    'explosive_warehouse': build_explosive_warehouse,
     'freight_warehouse': build_freight_warehouse,
     'spoil_heap': build_spoil_heap,
 }

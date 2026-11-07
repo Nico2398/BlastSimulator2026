@@ -43,9 +43,9 @@ import { NavGrid, isStepClimbable, type NavCell } from '../../../src/core/nav/Na
 import { findPath, octileHeuristic } from '../../../src/core/nav/Pathfinding.js';
 
 /**
- * The four tutorial pins, in the order the tutorial rail actually orders
+ * The three tutorial pins, in the order the tutorial rail actually orders
  * their construction (tutorialSteps.ts: 'build-living-quarters' first, then
- * 'build-explosive-warehouse', then 'build-driving-center', then
+ * 'build-driving-center', then
  * 'build-storage' for freight_warehouse).
  * checkFootprintPlacement's occupancy check is pairwise against whatever is
  * already on the ground, so exercising the pins in this order matches what a
@@ -54,7 +54,6 @@ import { findPath, octileHeuristic } from '../../../src/core/nav/Pathfinding.js'
  */
 const PINS: ReadonlyArray<{ name: string; type: BuildingType; tier: BuildingTier; region: TileRegion }> = [
   { name: 'livingQuarters', type: 'living_quarters', tier: 1, region: REGION.livingQuarters },
-  { name: 'explosiveWarehouse', type: 'explosive_warehouse', tier: 1, region: REGION.explosiveWarehouse },
   { name: 'drivingCenter', type: 'driving_center', tier: 1, region: REGION.drivingCenter },
   { name: 'warehouse', type: 'freight_warehouse', tier: 1, region: REGION.warehouse },
 ];

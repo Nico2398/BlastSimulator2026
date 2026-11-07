@@ -1,6 +1,6 @@
 {
   "name": "building-warehouse-visual",
-  "description": "Visual check of warehouse buildings: explosive and freight warehouses at multiple tiers",
+  "description": "Visual check of warehouse buildings: a management office and a freight warehouse, with tier 2 locked",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
@@ -20,7 +20,7 @@
       }
     },
     {
-      "command": "build explosive_warehouse at:3,5",
+      "command": "build management_office at:3,5",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -33,7 +33,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
         },
         {
           "type": "waitForSelector",
@@ -55,7 +55,7 @@
       "role": "player",
       "expect": {
         "changedBy": {
-          "cash": -20000
+          "cash": -8000
         },
         "equals": {
           "orderedBuildingCount": 1
@@ -123,11 +123,11 @@
       }
     },
     {
-      "command": "build explosive_warehouse at:20,5 tier:2",
+      "command": "build management_office at:20,5 tier:2",
       "interaction": [
         {
           "type": "set",
-          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-tier-sel",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-tier-sel",
           "value": "2"
         }
       ],
@@ -139,7 +139,7 @@
         "equals": {
           "buildingCount": 2
         },
-        "blocked": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn",
+        "blocked": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn",
         "note": "rejected: tier 2 not researched"
       },
       "role": "guard",
@@ -154,7 +154,7 @@
           "value": "2"
         }
       ],
-      "description": "role: guard (issue #515) — same reasoning as the explosive_warehouse tier:2 attempt above.",
+      "description": "role: guard (issue #515) — same reasoning as the management_office tier:2 attempt above.",
       "expect": {
         "changedBy": {
           "cash": 0

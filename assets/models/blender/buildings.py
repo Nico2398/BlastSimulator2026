@@ -31,7 +31,6 @@ TYPE_COLORS = {
     'geology_lab': 0x996633,
     'research_center': 0x9944CC,
     'living_quarters': 0x4488CC,
-    'explosive_warehouse': 0xFF2222,
     'freight_warehouse': 0x888888,
     'spoil_heap': 0x8C8A86,
     'ceo_statue': 0xEDE8DF,
@@ -570,42 +569,6 @@ def build_living_quarters(sx, sz, tier, ex, xx, m):
     pivot('Body', (0, 0, 0), parts)
 
 
-def build_explosive_warehouse(sx, sz, tier, ex, xx, m):
-    # A vault, not a tower: walls grow a little per tier rather than a storey.
-    parts, top, wsx, wsy = _base(sx, sz, tier, m, floors=1 + 0.4 * (tier - 1), window_rows=False, entry_x=ex, exit_x=xx)
-    parts += barrel_roof(wsx, wsy, top, m, along='X' if wsx >= wsy else 'Y')
-    parts += hazard_band('Hazard', wsx, wsy, 0.9, m)
-    # Vents on the vault roof, blast berm around the back.
-    vent = cylinder('Vent', 0.12, 0.35, loc=(-wsx * 0.25, 0, top + min(wsx, wsy) * 0.28), segments=12)
-    array(vent, 2, (wsx * 0.5, 0, 0))
-    assign(vent, m['steel'])
-    parts.append(vent)
-    bollard = cylinder('Bollard', 0.08, 0.6, loc=(-sx / 2 + 0.3, sz / 2 + 0.45, 0.3), segments=10)
-    array(bollard, max(2, int(sx)), (max(0.8, (sx - 0.6) / max(1, int(sx) - 1)), 0, 0))
-    assign(bollard, m['stripe_y'])
-    parts.append(bollard)
-    for i in range(tier + 1):
-        parts += barrel(f'Drum{i}', (sx / 2 + 0.3, sz / 2 - 0.35 - i * 0.42, 0), m)
-    sign = sign_post('Sign', (-sx / 2 - 0.35, sz / 2 + 0.2, 0), m, m['stripe_y'], h=1.1, plate=(0.6, 0.5))
-    parts += sign
-    bolt = box('Sign.Bolt', (0.12, 0.08, 0.3), loc=(-sx / 2 - 0.35, sz / 2 + 0.17, 1.28))
-    rotate(bolt, y=25)
-    assign(bolt, m['stripe_k'])
-    parts.append(bolt)
-    if tier >= 2:
-        parts += lamp_post('Lamp', (sx / 2 + 0.3, -sz / 2 + 0.2, 0), m, h=1.8)
-    if tier >= 3:
-        for i in range(3):
-            post = cylinder(f'Fence.Post{i}', 0.04, 0.9, loc=(-sx / 2 - 0.9, -sz / 2 + 0.4 + i * 0.9, 0.45), segments=8)
-            assign(post, m['steel'])
-            parts.append(post)
-        rail = box('Fence.Rail', (0.04, 1.9, 0.05), loc=(-sx / 2 - 0.9, -sz / 2 + 1.3, 0.75))
-        array(rail, 2, (0, 0, -0.35))
-        assign(rail, m['steel'])
-        parts.append(rail)
-    pivot('Body', (0, 0, 0), parts)
-
-
 def build_freight_warehouse(sx, sz, tier, ex, xx, m):
     # A hangar: one tall hall that gains headroom per tier, not storeys.
     parts, top, wsx, wsy = _base(sx, sz, tier, m, floors=1.2 + 0.6 * (tier - 1), window_rows=False, entry_x=ex, exit_x=xx)
@@ -696,7 +659,6 @@ TYPE_BUILDERS = {
     'geology_lab': build_geology_lab,
     'research_center': build_research_center,
     'living_quarters': build_living_quarters,
-    'explosive_warehouse': build_explosive_warehouse,
     'freight_warehouse': build_freight_warehouse,
     'spoil_heap': build_spoil_heap,
     # Vanity projects (#1948): single tier, drawn in buildings_vanity.py.

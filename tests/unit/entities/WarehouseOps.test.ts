@@ -1,6 +1,3 @@
-// Explosive warehouse capacities from BuildingDefs.ts:
-//   Tier 1: 500 kg  |  Tier 2: 1500 kg  |  Tier 3: 4000 kg
-
 import { describe, it, expect } from 'vitest';
 import {
   createBuildingState,
@@ -15,22 +12,6 @@ import {
   syncLogisticsCapacity,
 } from '../../../src/core/economy/Logistics.js';
 import type { LogisticsState } from '../../../src/core/economy/Logistics.js';
-
-// ─── BuildingDef sanity checks (already implemented) ─────────────────────────
-
-describe('Explosive warehouse BuildingDef capacity values', () => {
-  it('tier-1 explosive warehouse has 500 kg capacity', () => {
-    expect(getBuildingDef('explosive_warehouse', 1).capacity).toBe(500);
-  });
-
-  it('tier-2 explosive warehouse has 1500 kg capacity', () => {
-    expect(getBuildingDef('explosive_warehouse', 2).capacity).toBe(1500);
-  });
-
-  it('tier-3 explosive warehouse has 4000 kg capacity', () => {
-    expect(getBuildingDef('explosive_warehouse', 3).capacity).toBe(4000);
-  });
-});
 
 // ─── freightWarehouseHasRoom ──────────────────────────────────────────────────
 
@@ -152,7 +133,7 @@ describe('freightWarehouseSites (#1372)', () => {
   it('skips inactive freight warehouses and other building types', () => {
     const bs = createBuildingState();
     const a = placeBuilding(bs, 'freight_warehouse', 10, 10, 100, 100, 1);
-    placeBuilding(bs, 'explosive_warehouse', 40, 40, 100, 100, 1);
+    placeBuilding(bs, 'management_office', 40, 40, 100, 100, 1);
     a.building!.active = false;
     expect(freightWarehouseSites(bs)).toEqual([]);
   });

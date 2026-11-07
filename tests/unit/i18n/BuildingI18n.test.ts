@@ -11,7 +11,7 @@ import type { BuildingType, BuildingTier } from '../../../src/core/entities/Buil
 
 const ALL_BUILDING_TYPES: BuildingType[] = [
   'driving_center', 'blasting_academy', 'management_office', 'geology_lab',
-  'research_center', 'living_quarters', 'explosive_warehouse', 'freight_warehouse',
+  'research_center', 'living_quarters', 'freight_warehouse',
 ];
 
 const ALL_TIERS: BuildingTier[] = [1, 2, 3];

@@ -567,9 +567,8 @@ describe('Well-being model — headroom, overwork, crowding, accidents (#1692)',
 });
 
 describe('Safety model — managed target (#1977)', () => {
-  function site(spec: Array<['explosive_warehouse' | 'management_office', 1 | 2 | 3]>) {
+  function site(spec: Array<['management_office', 1 | 2 | 3]>) {
     const buildings = createBuildingState();
-    buildings.unlockedTiers.explosive_warehouse = 3;
     buildings.unlockedTiers.management_office = 3;
     spec.forEach(([type, tier], i) => {
       placeBuilding(buildings, type, (i % 6) * 10, Math.floor(i / 6) * 10, 64, 64, tier);
@@ -584,20 +583,6 @@ describe('Safety model — managed target (#1977)', () => {
     return state;
   }
 
-  it('a T1 explosive warehouse alone settles near 38, above 0 and below 40', () => {
-    const s = run(site([['explosive_warehouse', 1]]), 2000);
-    expect(Math.abs(s.safety - 38)).toBeLessThan(0.5);
-    expect(s.safety).toBeGreaterThan(0);
-    expect(s.safety).toBeLessThan(40);
-  });
-
-  it('warehouse plus office with safety equipment settles near 67, below 100', () => {
-    const s = run(site([['explosive_warehouse', 1], ['management_office', 1]]), 2000, { hasSafetyEquipment: true });
-    expect(Math.abs(s.safety - 67)).toBeLessThan(0.5);
-    expect(s.safety).toBeGreaterThanOrEqual(40);
-    expect(s.safety).toBeLessThan(100);
-  });
-
   it('a T1 office alone never reaches 100', () => {
     const s = run(site([['management_office', 1]]), 3000);
     expect(s.safety).toBeLessThan(100);
@@ -608,17 +593,6 @@ describe('Safety model — managed target (#1977)', () => {
     const s = run(site([['management_office', 3]]), 3000, { hasSafetyEquipment: true });
     expect(s.safety).toBeLessThanOrEqual(SAFETY_TARGET_MAX + 1e-9);
     expect(s.safety).toBeGreaterThan(80);
-  });
-
-  it('many warehouses floor at SAFETY_TARGET_MIN and never reach 0', () => {
-    const buildings = site(Array.from({ length: 12 }, () => ['explosive_warehouse', 3] as ['explosive_warehouse', 3]));
-    const state = createScoreState();
-    for (let i = 0; i < 3000; i++) {
-      updateScores(state, makeInputs({ buildings }));
-      expect(state.safety).toBeGreaterThan(0);
-    }
-    expect(state.safety).toBeGreaterThanOrEqual(SAFETY_TARGET_MIN - 1e-9);
-    expect(Math.abs(state.safety - SAFETY_TARGET_MIN)).toBeLessThan(0.5);
   });
 
   it('an accident burst drops safety by at least 30 then recovers to within 2 of target in 300 ticks', () => {
@@ -654,30 +628,17 @@ describe('Safety model — managed target (#1977)', () => {
   it('well-being and ecology evolve as before for the same inputs', () => {
     // Expected values recorded from the pre-#1977 ScoreManager (main) for identical inputs.
     const office = createScoreState();
-    const officeAndWarehouse = createScoreState();
     for (let i = 0; i < 50; i++) {
       updateScores(office, makeInputs({ buildings: site([['management_office', 1]]), avgMorale: 70, maxRecentVibration: 5 }));
-      updateScores(
-        officeAndWarehouse,
-        makeInputs({ buildings: site([['explosive_warehouse', 1], ['management_office', 1]]), avgMorale: 70, maxRecentVibration: 5 }),
-      );
     }
     expect(office.wellBeing).toBeCloseTo(67.5, 6);
     expect(office.nuisance).toBeCloseTo(47.5, 6);
     expect(office.ecology).toBeCloseTo(50, 6);
-    expect(officeAndWarehouse.wellBeing).toBeCloseTo(67.5, 6);
-    expect(officeAndWarehouse.nuisance).toBeCloseTo(47.5, 6);
-    expect(officeAndWarehouse.ecology).toBeCloseTo(50, 6);
     // Decay still applies to the other scores: unfed ecology drifts back toward 50.
     const eco = createScoreState();
     eco.ecology = 90;
     updateScores(eco, makeInputs());
     expect(eco.ecology).toBeCloseTo(89.95, 6);
-  });
-
-  it('settles at 62 with a warehouse and an office and no equipment', () => {
-    const state = run(site([['explosive_warehouse', 1], ['management_office', 1]]), 600);
-    expect(state.safety).toBeCloseTo(62, 1);
   });
 
   describe('safetyTarget', () => {

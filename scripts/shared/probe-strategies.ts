@@ -223,7 +223,7 @@ function rankDeposits(grid: VoxelGrid, span = SHOT_SPAN, depth: number = SHOT.de
  * The probe reads it as it reads ore: ground truth standing in for the survey. The opening shoots it when the richest
  * deposit's rock is too hard for the reference charge (`rockBreaks`); shot first elsewhere it sold too little to carry the
  * payroll. Where the richest deposit breaks (desert_badlands, alpine_granite) the opening keeps it: starter-first sold less there, so
- * the starter is the fallback for unbreakable richest rock (tropical_karst, volcanic_flats). The explosive warehouse is raised beside the quarters either way.
+ * the starter is the fallback for unbreakable richest rock (tropical_karst, volcanic_flats).
  */
 export function starterShotOrigin(state: GameState, span: number = SHOT_SPAN): Pattern | null {
   const config = terrainConfigOf(state);
@@ -412,10 +412,9 @@ interface ShotSpec {
 const spanOf = (spec: Pick<ShotSpec, 'cols' | 'spacing'>): number => (spec.cols - 1) * spec.spacing;
 
 /**
- * Order the drill pattern on the best deposit `drill_plan` accepts, stock the explosive warehouse
- * and order the charge. Charging from stock skips the 400-tick cash-bought delivery wait (#1895),
- * which the opening crew cannot afford on payroll; the stock is paid for, not granted. Holes drilled
- * after the charge order are charged automatically. Null when no deposit or no stock is available.
+ * Order the drill pattern on the best deposit `drill_plan` accepts
+ * and order the charge. Holes drilled after the charge order are charged automatically.
+ * Null when no deposit is available.
  */
 /** Footprints (each `span` wide, default SHOT_SPAN) share a tile, with `gap` tiles of berm kept between. */
 function overlapsShot(c: Pattern & { span?: number }, o: Pattern & { span?: number }, gap = 0): boolean {
@@ -646,13 +645,6 @@ function runOpening(s: ProbeSession, sandboxOpening = true): { at: Pattern; ramp
   const starter = !sandboxOpening || (ranked && rockBreaks(s.grid, ranked)) ? null : starterShotOrigin(s.state);
   const site = starter ?? (ranked ? { x: ranked.x, z: ranked.z } : { x: s.grid.sizeX >> 1, z: s.grid.sizeZ >> 1 });
   if (!placeBuilding(s, 'living_quarters', site, site)) fail('living_quarters');
-
-  // Raised beside the quarters, in the crew's reach: the stock helper builds on the first free cell, in the grid corner, which the crew never reached on some alpine sites.
-  // Not the ladder's: its measured windows (and the Shareholder Summit win) were set with the stock helper's warehouse and the richest site.
-  if (sandboxOpening && !s.state.buildings.buildings.some(b => b.type === 'explosive_warehouse')) {
-    if (!placeBuilding(s, 'explosive_warehouse', site, site)) fail('explosive_warehouse');
-    s.waitFor('explosive_warehouse', () => s.state.buildings.buildings.some(b => b.type === 'explosive_warehouse'));
-  }
 
   const shot = orderShot(s, [], undefined, starter ?? undefined);
   if (!shot) return fail('shot');
@@ -1292,8 +1284,7 @@ function craterDepthM(grid: VoxelGrid, crater: Pattern & { span: number }): numb
 /**
  * The shot to fire next for the current grade: limit-sized, at the widest hole the best rig bores.
  * Deepens the crater while a depth target is open, leaving a berm inside the crater rim once the pit
- * stands taller than the stability limit; else takes a fresh site. Cut to what the explosive warehouse
- * has room for and, if no site takes it, shrunk step by step.
+ * stands taller than the stability limit; else takes a fresh site. Shrunk step by step if no site takes it.
  */
 function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const { state } = s;
@@ -1804,8 +1795,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     ladderHaulers(s, m);
     ladderFragmenter(s, m);
     ladderEquipment(s, m);
-    const need = ladderPlan(s, m);
-    if (!Number.isFinite(need.cost)) upgradeBuilding(s, m, 'explosive_warehouse');
+    ladderPlan(s, m);
   }, { supply: true });
 }
 

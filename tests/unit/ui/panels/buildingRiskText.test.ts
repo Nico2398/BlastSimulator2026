@@ -6,7 +6,7 @@ import type { BuildingAtRisk } from '../../../../src/core/mining/BlastPlan.js';
 afterEach(() => setLocale('en'));
 
 const office: BuildingAtRisk = { buildingId: 1, type: 'management_office', x: 14, z: 48 };
-const warehouse: BuildingAtRisk = { buildingId: 2, type: 'explosive_warehouse', x: 22, z: 48 };
+const warehouse: BuildingAtRisk = { buildingId: 2, type: 'living_quarters', x: 22, z: 48 };
 
 describe('buildingRiskText (#2021)', () => {
   it('names a non-stocked building and says it will be destroyed', () => {
@@ -17,9 +17,9 @@ describe('buildingRiskText (#2021)', () => {
     expect(buildingRiskText(office)).toBe(t('ui.blast_workshop.preflight.warn_building', { building: t('building.management_office.name') }));
   });
 
-  it('an explosive warehouse uses the plain wording', () => {
+  it('a living quarters uses the plain wording', () => {
     const text = buildingRiskText(warehouse);
-    expect(text).toBe('Explosive Warehouse is inside the blast area and will be destroyed.');
+    expect(text).toBe('Living Quarters is inside the blast area and will be destroyed.');
     expect(text).not.toContain('secondary');
   });
 

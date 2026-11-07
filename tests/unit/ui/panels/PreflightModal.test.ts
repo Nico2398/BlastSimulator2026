@@ -150,7 +150,7 @@ describe('PreflightModal', () => {
     const { modal } = makeModal();
     modal.show();
     const state = chargedPlan();
-    placeBuilding(state.buildings, 'explosive_warehouse', 9, 9, 32, 32);
+    placeBuilding(state.buildings, 'freight_warehouse', 9, 9, 32, 32);
 
     modal.update(state, 'sunny');
 
@@ -761,7 +761,7 @@ describe('PreflightModal — buildings in blast reach (#2021)', () => {
     const text = modal.root.textContent ?? '';
     expect(text).toContain('Management Office is inside the blast area and will be destroyed.');
     expect(text).toContain('Freight Warehouse is inside the blast area and will be destroyed.');
-    expect(text).toContain('Explosive Warehouse is inside the blast area and will be destroyed.');
+    expect(text).toContain('Blasting Academy is inside the blast area and will be destroyed.');
     expect(text).not.toContain('Living Quarters is inside the blast area');
     expect(text.match(/is inside the blast area/g)).toHaveLength(3);
   });

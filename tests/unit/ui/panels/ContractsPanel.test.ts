@@ -190,11 +190,11 @@ describe('ContractsPanel', () => {
   it('marks data-contract-wins only on a fillable offer whose payout covers the profit target (#1724)', () => {
     const { panel } = makePanel();
     const state = makeState();
-    state.campaign.activeLevelId = 'tutorial_pit'; // target $5,000, no profit yet
+    state.campaign.activeLevelId = 'tutorial_pit'; // target $62,000, no profit yet
     state.collectedOre['dirtite'] = 100;
     state.contracts.available.push(
-      makeContract({ id: 7, materialId: 'dirtite', quantityKg: 100, pricePerKg: 49 }),
-      makeContract({ id: 9, materialId: 'dirtite', quantityKg: 100, pricePerKg: 50 }),
+      makeContract({ id: 7, materialId: 'dirtite', quantityKg: 100, pricePerKg: 619 }),
+      makeContract({ id: 9, materialId: 'dirtite', quantityKg: 100, pricePerKg: 620 }),
     );
     panel.show();
     panel.update(state);

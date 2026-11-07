@@ -101,7 +101,7 @@ describe('ModelLibrary', () => {
 });
 
 describe('ModelLibrary — the exported assets', () => {
-  const ids = ['worker_driller', 'vehicle_drill_rig_t2', 'building_explosive_warehouse_t2'];
+  const ids = ['worker_driller', 'vehicle_drill_rig_t2', 'building_freight_warehouse_t2'];
 
   it('instantiates a rigid vehicle and building as before: plain nodes of plain meshes, no bones, no pick proxy', async () => {
     const lib = await loadedModelLibrary(ids);

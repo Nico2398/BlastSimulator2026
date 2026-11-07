@@ -497,18 +497,7 @@ describe('Inspector — ramp (#1298)', () => {
     expect(bar.open).toBe(false);
   });
 
-  // ── Explosive Warehouse has no stock rows (#2153) ─────────────────────────
-
-  it('shows no stock figures or stock hook for a selected Explosive Warehouse', () => {
-    const { bar, root } = makeBar();
-    const state = makeState();
-    const { building } = placeBuilding(state.buildings, 'explosive_warehouse', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
-
-    bar.show(entity('building', building.id), state);
-
-    expect(root.querySelector('[data-info="warehouse-stock"]')).toBeNull();
-    expect(root.textContent).not.toContain('kg');
-  });
+  // ── No building shows stock rows (#2153) ──────────────────────────────────
 
   it('shows no stock figures for other buildings', () => {
     const { bar, root } = makeBar();

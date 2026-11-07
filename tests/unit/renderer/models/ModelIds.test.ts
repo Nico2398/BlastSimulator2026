@@ -22,12 +22,12 @@ describe('ModelIds', () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.filter(id => id.startsWith('worker_'))).toHaveLength(EMPLOYEE_ROLES.length);
     expect(ids.filter(id => id.startsWith('vehicle_'))).toHaveLength(18);
-    expect(ids.filter(id => /^building_.*_t[123]$/.test(id))).toHaveLength(29);
+    expect(ids.filter(id => /^building_.*_t[123]$/.test(id))).toHaveLength(26);
     expect(ids).toContain(BUILDING_RUIN_MODEL_ID);
     const props = propModelIds();
     // Each tree ships with its decimated far copy.
     expect(props).toHaveLength(TREE_FAMILIES.length * TREE_VARIANTS * 2 + BUSH_VARIANTS + ROCK_VARIANTS + HOUSE_VARIANTS + GRASS_VARIANTS + FLOWER_VARIANTS + 1);
-    expect(ids).toHaveLength(5 + 18 + 29 + 1 + props.length);
+    expect(ids).toHaveLength(5 + 18 + 26 + 1 + props.length);
   });
 
   it('lists the spoil heap at tier 1 only, since it is a single-tier building', () => {

@@ -244,22 +244,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       (state.drillHoles?.length ?? 0) > 0 && (state.plannedDrillHoles ?? []).length === 0,
   },
 
-  // ── Step 5b: build-explosive-warehouse ──
-  // Explosives are bought as each hole is loaded (#2143, #2153), so the warehouse holds
-  // none; the step stays until the building is retired. Queued construction:
-  // same budget and reason as build-living-quarters above.
-  {
-    ...createComparisonStep(
-      'build-explosive-warehouse',
-      'tutorial.step_explosivewarehouse.title',
-      'tutorial.step_explosivewarehouse',
-      (s) => countBuildingsOfType(s, 'explosive_warehouse'),
-      ['build explosive_warehouse at:7,11'],
-      TOOLBAR_TARGET.build,
-      { tickBudget: 60, waitsOnWork: true },
-    ),
-  },
-
   // ── Step 5: charge ──
   // #554: charging is real, queued work now (was instant) -- without
   // waitsOnWork the rail's clock-hold (tutorialGuide.ts's decideClock) has no

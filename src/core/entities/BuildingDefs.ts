@@ -200,34 +200,6 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
     },
   },
 
-  // ── Explosive Warehouse ─────────────────────────────────────────────────────
-  explosive_warehouse: {
-    1: {
-      type: 'explosive_warehouse', tier: 1,
-      nameKey: 'building.explosive_warehouse.t1.name',
-      footprint: rect(2, 2), entryPoint: entry(), exitPoint: exit_(2),
-      constructionCost: 20000, demolishCost: 5000, operatingCostPerTick: 12,
-      capacity: 500, maxHp: 200, structuralResistance: 5000,
-      scoreEffects: { safety: -1 },
-    },
-    2: {
-      type: 'explosive_warehouse', tier: 2,
-      nameKey: 'building.explosive_warehouse.t2.name',
-      footprint: rect(3, 2), entryPoint: entry(), exitPoint: exit_(3),
-      constructionCost: 48000, demolishCost: 11000, operatingCostPerTick: 20,
-      capacity: 1500, maxHp: 300, structuralResistance: 7000,
-      scoreEffects: { safety: -1 },
-    },
-    3: {
-      type: 'explosive_warehouse', tier: 3,
-      nameKey: 'building.explosive_warehouse.t3.name',
-      footprint: rect(4, 3), entryPoint: entry(), exitPoint: exit_(4),
-      constructionCost: 95000, demolishCost: 22000, operatingCostPerTick: 30,
-      capacity: 4000, maxHp: 400, structuralResistance: 10000,
-      scoreEffects: { safety: -2 },
-    },
-  },
-
   // ── Freight Warehouse ───────────────────────────────────────────────────────
   freight_warehouse: {
     1: {

@@ -260,7 +260,7 @@ describe('building-destruction-visual — scenario-runner (#410)', () => {
     expect(blastStep.commandOutput).not.toMatch(/missing charge/i);
   });
 
-  it('the explosive and freight warehouses are destroyed by the blast', () => {
+  it('the management office and freight warehouse are destroyed by the blast', () => {
     // The drill grid (start:15,15 rows:3 cols:3 spacing:5) places holes at
     // (20,20) and (25,25) — exactly the warehouse origins — so the blast is
     // expected to clear their footprint voxels and remove them from
@@ -275,7 +275,7 @@ describe('building-destruction-visual — scenario-runner (#410)', () => {
 
     const remaining = engine.ctx.state!.buildings.buildings;
     const remainingTypes = remaining.map(b => b.type);
-    expect(remainingTypes).not.toContain('explosive_warehouse');
+    expect(remainingTypes).not.toContain('management_office');
     expect(remainingTypes).not.toContain('freight_warehouse');
   });
 });

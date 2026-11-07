@@ -100,10 +100,10 @@ describe('checkProtectedPositions', () => {
   });
 
   it('returns a ValidationError when a hole sits on a building footprint cell', () => {
-    // explosive_warehouse tier-1 footprint: rect(2,2) → covers cells
+    // management_office tier-1 footprint: rect(2,2) → covers cells
     // (2,2), (3,2), (2,3), (3,3) when placed at origin (2, 2).
     const buildingState = createBuildingState();
-    placeBuilding(buildingState, 'explosive_warehouse', 2, 2, 20, 20);
+    placeBuilding(buildingState, 'management_office', 2, 2, 20, 20);
 
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 2, 2, 5, 0.15); // exact match on footprint cell (2, 2)
@@ -119,7 +119,7 @@ describe('checkProtectedPositions', () => {
   it('returns no errors when no hole overlaps any building footprint cell', () => {
     // Building at (2, 2) with 2×2 footprint covers cells (2,2)–(3,3).
     const buildingState = createBuildingState();
-    placeBuilding(buildingState, 'explosive_warehouse', 2, 2, 20, 20);
+    placeBuilding(buildingState, 'management_office', 2, 2, 20, 20);
 
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 8, 8, 5, 0.15); // well clear of the building
@@ -132,7 +132,7 @@ describe('checkProtectedPositions', () => {
   it('only reports errors for the holes that overlap a building footprint', () => {
     // Building at (2, 2) with 2×2 footprint.
     const buildingState = createBuildingState();
-    placeBuilding(buildingState, 'explosive_warehouse', 2, 2, 20, 20);
+    placeBuilding(buildingState, 'management_office', 2, 2, 20, 20);
 
     const holes: DrillHole[] = [];
     const underBuilding = addHole(holeCounter, holes, 2, 2, 5, 0.15); // overlaps footprint cell (2, 2)
@@ -149,7 +149,7 @@ describe('checkProtectedPositions', () => {
     // Building at (2, 2) — footprint cell (2, 2).
     // Hole at (2.3, 2.7): floor(2.3)=2, floor(2.7)=2 → maps to cell (2, 2).
     const buildingState = createBuildingState();
-    placeBuilding(buildingState, 'explosive_warehouse', 2, 2, 20, 20);
+    placeBuilding(buildingState, 'management_office', 2, 2, 20, 20);
 
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 2.3, 2.7, 5, 0.15);
@@ -169,7 +169,7 @@ describe('checkProtectedPositions', () => {
 //   • recorded in result.destroyedBuildings: { buildingId, type, x, z }[]
 //
 // The blast zone from a hole at (5, 5) with BLAST_ZONE_RADIUS=5 spans x=[0..10], z=[0..10].
-// An explosive_warehouse placed at (5, 5) has a 2×2 footprint covering (5,5),(6,5),(5,6),(6,6)
+// An management_office placed at (5, 5) has a 2×2 footprint covering (5,5),(6,5),(5,6),(6,6)
 // — all inside the blast zone.  A building placed at (15, 15) is outside the zone.
 
 describe('executeBlast — building destruction', () => {
@@ -178,7 +178,7 @@ describe('executeBlast — building destruction', () => {
   it('removes a building from buildingState when its footprint voxels are cleared', () => {
     const grid = makeTestGrid();
     const buildingState = createBuildingState();
-    const placed = placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
+    const placed = placeBuilding(buildingState, 'management_office', 5, 5, 20, 20);
     expect(placed.success).toBe(true);
     expect(buildingState.buildings).toHaveLength(1);
 
@@ -197,7 +197,7 @@ describe('executeBlast — building destruction', () => {
     const grid = makeTestGrid();
     const buildingState = createBuildingState();
     // Grid is 20×20; building at (15,15) — blast zone from hole at (5,5) ends at x=10, z=10.
-    const placed = placeBuilding(buildingState, 'explosive_warehouse', 15, 15, 20, 20);
+    const placed = placeBuilding(buildingState, 'management_office', 15, 15, 20, 20);
     expect(placed.success).toBe(true);
 
     const holes: DrillHole[] = [];
@@ -217,7 +217,7 @@ describe('executeBlast — building destruction', () => {
   it('populates result.destroyedBuildings with buildingId, type, x, and z', () => {
     const grid = makeTestGrid();
     const buildingState = createBuildingState();
-    const placed = placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
+    const placed = placeBuilding(buildingState, 'management_office', 5, 5, 20, 20);
     const buildingId = placed.building!.id; // capture before blast removes it
 
     const holes: DrillHole[] = [];
@@ -231,7 +231,7 @@ describe('executeBlast — building destruction', () => {
     expect(destroyed).toBeDefined();
     expect(destroyed).toHaveLength(1);
     expect(destroyed[0].buildingId).toBe(buildingId);
-    expect(destroyed[0].type).toBe('explosive_warehouse');
+    expect(destroyed[0].type).toBe('management_office');
     expect(destroyed[0].x).toBe(5);
     expect(destroyed[0].z).toBe(5);
   });
@@ -239,19 +239,13 @@ describe('executeBlast — building destruction', () => {
 
 // ── 3. recordBuildingDestruction — score penalties ────────────────────────────
 //
-// recordBuildingDestruction(state, isExplosiveWarehouse) applies score penalties
-// immediately to state, clamped to [0, 100]:
-//   Always:              safety  -15,  ecology -8
-//   If isExplosive:      safety  -10 (extra),  wellBeing -5
-//
-// Net result from neutral (50):
-//   non-explosive:  safety=35, ecology=42, wellBeing=50 (unchanged), nuisance=50
-//   explosive:      safety=25, ecology=42, wellBeing=45, nuisance=50
+// recordBuildingDestruction(state) applies a flat penalty immediately to state,
+// clamped to [0, 100]: safety -15, ecology -8.
 
 describe('recordBuildingDestruction', () => {
-  it('deducts safety by 15 and ecology by 8 for a non-explosive building', () => {
+  it('deducts safety by 15 and ecology by 8', () => {
     const state = createScoreState(); // { safety:50, ecology:50, wellBeing:50, nuisance:50 }
-    recordBuildingDestruction(state, false);
+    recordBuildingDestruction(state);
 
     expect(state.safety).toBe(35);    // 50 − 15
     expect(state.ecology).toBe(42);   // 50 − 8
@@ -259,22 +253,11 @@ describe('recordBuildingDestruction', () => {
     expect(state.nuisance).toBe(50);  // unchanged
   });
 
-  it('deducts safety by 25, ecology by 8, and wellBeing by 5 for an explosive_warehouse', () => {
-    const state = createScoreState();
-
-    recordBuildingDestruction(state, true);
-
-    expect(state.safety).toBe(25);    // 50 − (15 + 10)
-    expect(state.ecology).toBe(42);   // 50 − 8
-    expect(state.wellBeing).toBe(45); // 50 − 5
-    expect(state.nuisance).toBe(50);  // unchanged
-  });
-
   it('clamps safety to 0 when the penalty exceeds the current value', () => {
     const state = createScoreState();
     state.safety = 10; // manually lower so the -15 penalty overshoots
 
-    recordBuildingDestruction(state, false); // −15 → −5 → clamp to 0
+    recordBuildingDestruction(state); // −15 → −5 → clamp to 0
 
     expect(state.safety).toBe(0);
   });
@@ -283,17 +266,8 @@ describe('recordBuildingDestruction', () => {
     const state = createScoreState();
     state.ecology = 5; // only 5 points — −8 overshoots
 
-    recordBuildingDestruction(state, false);
+    recordBuildingDestruction(state);
 
     expect(state.ecology).toBe(0);
-  });
-
-  it('clamps wellBeing to 0 when the explosive_warehouse penalty overshoots', () => {
-    const state = createScoreState();
-    state.wellBeing = 3; // only 3 points — −5 overshoots
-
-    recordBuildingDestruction(state, true);
-
-    expect(state.wellBeing).toBe(0);
   });
 });

@@ -12,8 +12,6 @@ research_center     The Ivory Crater: ivory dish with a central tower, spiral ra
                     brain sculpture, telescope dishes on the rim, satellite on a stick.
 living_quarters     Unnecessarily Luxurious Hotel: rooftop infinity pool with slide, diving board, palm and
                     parasol; balconies with striped awnings, gold HOTEL sign, red carpet, valet, fountain.
-explosive_warehouse Fort Kaboom: crenellated castle, four cone-roofed towers, moat and drawbridge, cannons,
-                    warning flags, searchlight, and a giant lit bomb on the keep.
 freight_warehouse   Hoarder's Paradise: warehouse buried under crate towers (some gold), containers, a gantry
                     crane still adding more, MORE sign, conveyor loop, forklift, a leaning stack.
                     strips, twin gantries, warning beacons, jet vent, pad number 01, landing-strip lights.
@@ -840,84 +838,6 @@ def build_living_quarters(sx, sz, ex, xx, m):
     pivot('Body', (0, 0, 0), _all_meshes())
 
 
-def build_explosive_warehouse(sx, sz, ex, xx, m):
-    """Fort Kaboom."""
-    P = []
-    # Moat ring.
-    ox, oy = sx / 2 + 0.75, sz / 2 + 0.65
-    ix, iy = sx / 2 + 0.2, sz / 2 + 0.1
-    for s in (-1, 1):
-        P.append(_bx('Moat', (ox * 2, oy - iy, 0.06), (0, s * (iy + oy) / 2, 0.03), m['water'], r=0))
-        P.append(_bx('Moat', (ox - ix, iy * 2, 0.06), (s * (ix + ox) / 2, 0, 0.03), m['water'], r=0))
-    # Curtain walls, keep, towers.
-    ww, wd, wh = sx - 0.4, sz - 0.6, 2.2
-    P.append(B.block('Walls', ww, wd, wh, 0, m, radius=0.06))
-    P += _merlons('Wall', 0, 0, ww - 0.1, wd - 0.1, wh, m['body'])
-    kw, kd, kh = 2.3, 1.7, 3.5
-    P.append(B.block('Keep', kw, kd, kh, 0, m, radius=0.08))
-    P += _merlons('Keep', 0, 0, kw - 0.1, kd - 0.1, kh, m['body'], size=0.22, gap=0.4)
-    # Hazard band around the keep, a doorway arch on its front.
-    P += B.hazard_band('Hazard', kw, kd, wh + 0.5, m, h=0.2)
-    twr_y = sz / 2 - 0.45
-    twr_h = 3.1
-    for s in (-1, 1):
-        # Square gate towers on the front carry the doors.
-        gx = s * 1.65
-        P.append(B.block('GateTower', 1.15, 1.1, twr_h, 0, m, loc_xy=(gx, twr_y), radius=0.06))
-        P.append(_cy('GateTower.Roof', 0.85, 1.0, (gx, twr_y, twr_h + 0.5), m['roof'], segments=16, radius2=0.04))
-        P += _flag('GateFlag', (gx, twr_y, twr_h + 0.95), 0.7, m, m['stripe_y'], w=0.32, fh=0.2)
-        # Round towers at the back.
-        rx, ry = s * 1.65, -twr_y
-        P.append(_cy('Tower', 0.55, twr_h, (rx, ry, twr_h / 2), m['body'], segments=18, r=0.05))
-        P.append(_cy('Tower.Roof', 0.7, 1.0, (rx, ry, twr_h + 0.5), m['roof'], segments=16, radius2=0.04))
-        P.append(_to('Tower.Band', 0.55, 0.05, (rx, ry, twr_h - 0.4), m['dark'], ms=18, ns=6))
-        P += _flag('TowerFlag', (rx, ry, twr_h + 0.95), 0.7, m, m['stripe_y'], w=0.32, fh=0.2)
-    # Black "!" on each flag is a couple of boxes.
-    for ob in list(bpy.context.scene.objects):
-        if ob.name.startswith(('GateFlag.Cloth', 'TowerFlag.Cloth')):
-            x, y, z = ob.location
-            P.append(_bx('Flag.Mark', (0.05, 0.04, 0.09), (x, y, z + 0.03), m['black'], r=0))
-            P.append(_bx('Flag.Dot', (0.05, 0.04, 0.03), (x, y, z - 0.06), m['black'], r=0))
-    gate_face = twr_y + 0.55
-    P += B.door('Entry', ex, gate_face, 0.06, m, m['entry'], width=0.6, height=1.25)
-    P += B.door('Exit', xx, gate_face, 0.06, m, m['exit'], width=0.6, height=1.25)
-    # Drawbridge over the moat from the entry; portcullis bars on the exit.
-    plank = _bx('Drawbridge', (0.8, 0.78, 0.07), (ex, gate_face + 0.42, 0.12), m['wood'], r=0.01, rot=(-9, 0, 0))
-    P.append(plank)
-    for dx in (-0.3, 0.3):
-        P.append(_rod('Drawbridge.Chain', (ex + dx, gate_face + 0.78, 0.2), (ex + dx, gate_face + 0.02, 2.0), 0.015, m['dark'], segments=5))
-        P.append(_bx('Drawbridge.Band', (0.06, 0.8, 0.02), (ex + dx, gate_face + 0.42, 0.17), m['dark'], r=0, rot=(-9, 0, 0)))
-    for dx in (-0.18, 0, 0.18):
-        P.append(_bx('Portcullis', (0.04, 0.03, 1.2), (xx + dx, gate_face + 0.09, 0.66), m['steel'], r=0))
-    for z in (0.4, 0.8):
-        P.append(_bx('Portcullis.Bar', (0.56, 0.03, 0.04), (xx, gate_face + 0.09, z), m['steel'], r=0))
-    # Cannons on the front wall.
-    for x in (-0.75, 0, 0.75):
-        P.append(_bx('Cannon.Carriage', (0.28, 0.36, 0.14), (x, wd / 2 - 0.35, wh + 0.07), m['wood'], r=0.02))
-        P.append(_cy('Cannon.Barrel', 0.09, 0.62, (x, wd / 2 - 0.2, wh + 0.28), m['dark'], axis='Y', segments=12, radius2=0.075, rot=(20, 0, 0)))
-        for s in (-1, 1):
-            P.append(_cy('Cannon.Wheel', 0.1, 0.04, (x + s * 0.15, wd / 2 - 0.4, wh + 0.1), m['dark'], axis='X', segments=10))
-    # Searchlight on the keep's back corner.
-    P.append(_cy('Search.Base', 0.12, 0.3, (-0.85, -0.55, kh + 0.15), m['steel'], segments=10))
-    P.append(_cy('Search.Head', 0.22, 0.4, (-0.85, -0.55, kh + 0.5), m['dark'], axis='Y', segments=14, rot=(-35, 0, 0)))
-    P.append(_cy('Search.Lens', 0.19, 0.06, (-0.85, -0.37, kh + 0.62), m['glow_warm'], axis='Y', segments=14, rot=(-35, 0, 0)))
-    # The bomb.
-    bz = kh + 0.9
-    P.append(_sp('Bomb', 1.0, (0, 0, bz), m['black'], segments=28, rings=14))
-    P.append(_sp('Bomb.Shine', 0.22, (-0.4, -0.45, bz + 0.55), m['white'], scale=(1.4, 0.8, 0.6), segments=12, rings=6))
-    P.append(_cy('Bomb.Cap', 0.25, 0.3, (0, 0, bz + 1.05), m['steel'], segments=14, r=0.03))
-    fuse = _cap('Bomb.Fuse', 0.045, 0.75, (0.18, 0.12, bz + 1.55), m['wood'], rot=(-25, 25, 0), segments=8, rings=4)
-    P.append(fuse)
-    tip = (0.18 + 0.42 * math.sin(math.radians(25)), 0.12 + 0.42 * math.sin(math.radians(25)), bz + 1.55 + 0.42 * math.cos(math.radians(32)))
-    P.append(_sp('Bomb.Spark', 0.2, tip, m['glow_orange'], segments=12, rings=6))
-    P.append(_star('Bomb.SparkStar', 8, 0.36, 0.17, 0.05, (tip[0], tip[1] - 0.05, tip[2]), m['glow_warm']))
-    P.append(_star('Bomb.SparkStar2', 8, 0.36, 0.17, 0.05, (tip[0] - 0.05, tip[1], tip[2]), m['glow_warm'], axis='X'))
-    # Bollards and drums by the moat.
-    for i in range(3):
-        P += B.barrel(f'Drum{i}', (sx / 2 + 0.45, -0.7 + i * 0.5, 0.06), m)
-    pivot('Body', (0, 0, 0), _all_meshes())
-
-
 def build_freight_warehouse(sx, sz, ex, xx, m):
     """Hoarder's Paradise."""
     parts, top, wsx, wsy = B._base(sx, sz, 3, m, floors=2.0, window_rows=False, entry_x=ex, exit_x=xx)
@@ -1028,7 +948,6 @@ BUILDERS = {
     'geology_lab': build_geology_lab,
     'research_center': build_research_center,
     'living_quarters': build_living_quarters,
-    'explosive_warehouse': build_explosive_warehouse,
     'freight_warehouse': build_freight_warehouse,
 }
 

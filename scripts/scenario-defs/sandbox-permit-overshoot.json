@@ -46,7 +46,7 @@
     {
       "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:400",
       "role": "setup",
-      "description": "The explosive warehouse is built.",
+      "description": "No building order is pending.",
       "interaction": [
         {
           "type": "waitUntil",

@@ -111,15 +111,6 @@ describe('quoteChargeLoad', () => {
     expect(quoteChargeLoad(slim, 'boomite', 5).cost).toBeCloseTo(60, 10);
   });
 
-  it('ignores whatever a legacy warehouse might hold', () => {
-    const state = makeState();
-    const withStock = {
-      ...state,
-      buildings: { buildings: [{ id: 1, type: 'explosive_warehouse', storedExplosives: { boomite: 1000 } }] },
-    } as unknown as GameState;
-    expect(quoteChargeLoad(withStock, 'boomite', 5).cost).toBeCloseTo(60, 10);
-  });
-
   it('a zero-kg load costs 0', () => {
     expect(quoteChargeLoad(makeState(), 'boomite', 0).cost).toBe(0);
   });
@@ -221,16 +212,6 @@ describe('loadChargeExplosive', () => {
     expect(r.cost).toBeCloseTo(90, 10);
     expect(state.cash).toBeCloseTo(10_000 - 90, 10);
     expect(explosivesTx(state)[0]!.amount).toBeCloseTo(90, 10);
-  });
-
-  it('charges cash even when a legacy warehouse holds the explosive', () => {
-    const state = makeState(10_000);
-    const stocked = state as unknown as { buildings: { buildings: unknown[] } };
-    stocked.buildings.buildings.push({ id: 99, type: 'explosive_warehouse', storedExplosives: { boomite: 1000 } });
-    const r = loadChargeExplosive(state, 'boomite', 5);
-    expect(r.cost).toBeCloseTo(60, 10);
-    expect(state.cash).toBeCloseTo(10_000 - 60, 10);
-    expect(explosivesTx(state)).toHaveLength(1);
   });
 
   it('a second load charges again, in full', () => {

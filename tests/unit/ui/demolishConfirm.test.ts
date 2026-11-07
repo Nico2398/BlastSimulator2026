@@ -41,13 +41,6 @@ describe('buildDemolishConfirm (#1399)', () => {
     expect(cfg.body).not.toContain('ui.build.demolish_confirm_loses_explosives');
   });
 
-  it('explosive warehouse with undefined stock has no warning', () => {
-    const b = makeBuilding({ type: 'explosive_warehouse' });
-    const cfg = buildDemolishConfirm(b, vi.fn());
-    expect(cfg.body).not.toContain('ui.build.demolish_confirm_loses_explosives');
-    expect(cfg.body).not.toMatch(/\bkg\b.*lost|lost.*\bkg\b/i);
-  });
-
   it('freight ore in storage adds a line naming the kg lost (#1758)', () => {
     const b = makeBuilding({ type: 'freight_warehouse' });
     const cfg = buildDemolishConfirm(b, vi.fn(), { storedOreKg: 4200 });
@@ -97,7 +90,7 @@ describe('freightOreKg (#1758)', () => {
       { fragment: { id: 2, mass: 50 }, state: 'stored', vehicleId: null, warehouseId: 8 } as never,
     );
     expect(freightOreKg(l, makeBuilding({ type: 'freight_warehouse' }))).toBe(700);
-    expect(freightOreKg(l, makeBuilding({ type: 'explosive_warehouse' }))).toBe(0);
+    expect(freightOreKg(l, makeBuilding({ type: 'management_office' }))).toBe(0);
   });
 });
 

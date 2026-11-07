@@ -1756,7 +1756,6 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
  */
 const SANDBOX_STARTING_BUILDINGS: readonly StartingBuildingSlot[] = [
   ...DIGGER_STARTING_SITE.buildings,
-  { type: 'explosive_warehouse', tier: 1 },
 ];
 
 export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxKitId, StartingSiteComposition>> = {
@@ -1975,10 +1974,6 @@ export const RESEARCH_TASK_DEFS: Record<BuildingType, { 2: ResearchTaskDef; 3: R
   living_quarters: {
     2: { cost: 5000, ticks: 0, conditions: [] },
     3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'living_quarters', tier: 2 }] },
-  },
-  explosive_warehouse: {
-    2: { cost: 5000, ticks: 0, conditions: [] },
-    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'explosive_warehouse', tier: 2 }] },
   },
   freight_warehouse: {
     2: { cost: 5000, ticks: 0, conditions: [] },
@@ -2392,10 +2387,13 @@ export const ENV_CAUSE_NUISANCE_MAX = 45;
  * the full free-play playthrough (tests/integration/tutorial.integration.test.ts,
  * no fire/scrap hacks): 14.0 goes bankrupt, 16.0 is the lowest winning value
  * tried, 300.0 still wins only in free play, 500.0 is already won inside the
- * guided part. 80.0 sits mid-window (geometric) so one upstream change does
- * not make the tutorial unwinnable (or trivially won) again.
+ * guided part (all measured at the pre-#2154 threshold of 5000). #2154 (the Explosive Warehouse step is gone) moved the window: with the
+ * threshold at 62000, 55.0 leaves the guided part's first sale ~$48,000 short of the win
+ * and still gives the scenario a winning offer, while 50.0 loses that offer and 60.0
+ * is nearly won inside the guided part. 55.0 keeps one upstream change from making the
+ * tutorial unwinnable (or trivially won) again.
  */
-export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 80.0;
+export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 55.0;
 
 /** One fixed hire candidate of a scripted hiring pool (#1600). */
 export interface ScriptedCandidate {

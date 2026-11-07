@@ -229,7 +229,7 @@ describe('buildingCardTooltip', () => {
   });
 
   it('storage buildings state capacity in kg', () => {
-    for (const type of ['explosive_warehouse', 'freight_warehouse'] as const) {
+    for (const type of ['freight_warehouse'] as const) {
       expect(buildingCardTooltip(getBuildingDef(type, 1))).toContain('kg');
     }
   });
@@ -303,14 +303,6 @@ describe('buildingScoreEffectLines / buildingCardEffects (#1977)', () => {
     const lines = buildingScoreEffectLines(getBuildingDef('management_office', 1));
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('+2');
-    expect(lines[0]).toContain(t('score.safety'));
-  });
-
-  it('a negative effect renders with a minus sign', () => {
-    const lines = buildingScoreEffectLines(getBuildingDef('explosive_warehouse', 1));
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatch(/[-\u2212]1/);
-    expect(lines[0]).not.toContain('+');
     expect(lines[0]).toContain(t('score.safety'));
   });
 

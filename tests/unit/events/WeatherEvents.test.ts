@@ -34,9 +34,9 @@ describe('Weather events (6.5)', () => {
     registerEvents(WEATHER_EVENTS_2);
   });
 
-  it('at least 50 weather events are registered', () => {
+  it('at least 49 weather events are registered', () => {
     const events = getEventsByCategory('weather');
-    expect(events.length).toBeGreaterThanOrEqual(50);
+    expect(events.length).toBeGreaterThanOrEqual(49);
   });
 
   it('all weather events have 2-4 options', () => {
@@ -56,18 +56,6 @@ describe('Weather events (6.5)', () => {
     expect(ev.canFire(makeCtx({ weatherId: 'sunny' }))).toBe(false);
     expect(ev.canFire(makeCtx({ weatherId: 'heavy_rain' }))).toBe(true);
     expect(ev.canFire(makeCtx({ weatherId: 'storm' }))).toBe(true);
-  });
-
-  it('lightning strike requires storm AND explosive warehouse', () => {
-    const ev = getEventById('weather_lightning_strike')!;
-    expect(ev).toBeDefined();
-
-    expect(ev.canFire(makeCtx({ weatherId: 'sunny' }))).toBe(false);
-    expect(ev.canFire(makeCtx({ weatherId: 'storm' }))).toBe(false); // no building
-    expect(ev.canFire(makeCtx({
-      weatherId: 'storm',
-      hasBuilding: (t) => t === 'explosive_warehouse',
-    }))).toBe(true);
   });
 
   it('heatstroke event resolves with financial and score effects', () => {

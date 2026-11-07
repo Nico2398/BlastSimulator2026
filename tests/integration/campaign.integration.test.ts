@@ -137,7 +137,7 @@ describe('Campaign', () => {
     expect(all[0]!.id).toBe('tutorial_pit');
     expect(all[0]!.difficultyTier).toBe(0);
     expect(all[0]!.startingCash).toBe(500000);
-    expect(all[0]!.unlockThreshold).toBe(5000);
+    expect(all[0]!.unlockThreshold).toBe(62000);
 
     expect(all[1]!.id).toBe('dusty_hollow');
     expect(all[1]!.difficultyTier).toBe(1);
