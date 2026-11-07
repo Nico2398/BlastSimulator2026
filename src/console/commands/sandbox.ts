@@ -133,7 +133,7 @@ export function sandboxCommand(
   });
   ctx.state.world = createWorldState(level.gridX, level.datum, level.gridZ, true);
 
-  regenerateGrid(ctx, {
+  const gridParams = {
     seed: config.seed,
     climateBias: level.climateBias,
     sizeX: level.gridX,
@@ -148,17 +148,12 @@ export function sandboxCommand(
     // Every vehicle climbs the one vehicle limit, so the spawn pad is planned for it (#2044, #2045).
     ...(level.progression ? { vehicleSlopeRatio: vehicleMaxSlopeRatio(true) } : {}),
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
-  });
+  };
+  regenerateGrid(ctx, gridParams);
 
   // A previous owner left a free seismic survey over the starter deposit (#2148).
   if (ctx.grid) {
-    const deposit = resolveStarterDeposit({
-      sizeX: level.gridX, datum: level.datum, sizeZ: level.gridZ, seed: config.seed, climateBias: level.climateBias,
-      mixedRockHardness: level.mixedRockHardness,
-      ...(level.oreDeposits !== undefined ? { oreDeposits: level.oreDeposits } : {}),
-      ...(level.pitMask ? { pitMask: level.pitMask } : {}),
-      ...(level.oreGradeScale !== undefined ? { oreGradeScale: level.oreGradeScale } : {}),
-    });
+    const deposit = resolveStarterDeposit(gridParams);
     recordSandboxStarterSurvey(ctx.state, ctx.grid, deposit);
   }
 
