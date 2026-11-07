@@ -413,9 +413,8 @@ const spanOf = (spec: Pick<ShotSpec, 'cols' | 'spacing'>): number => (spec.cols 
 
 /**
  * Order the drill pattern on the best deposit `drill_plan` accepts
- * and order the charge. Charging from stock skips the 400-tick cash-bought delivery wait (#1895),
- * which the opening crew cannot afford on payroll; the stock is paid for, not granted. Holes drilled
- * after the charge order are charged automatically. Null when no deposit or no stock is available.
+ * and order the charge. Holes drilled after the charge order are charged automatically.
+ * Null when no deposit is available.
  */
 /** Footprints (each `span` wide, default SHOT_SPAN) share a tile, with `gap` tiles of berm kept between. */
 function overlapsShot(c: Pattern & { span?: number }, o: Pattern & { span?: number }, gap = 0): boolean {

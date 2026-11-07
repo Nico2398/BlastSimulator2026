@@ -176,7 +176,7 @@ export function* fireBlastSteps(
   // footprint is already inside clearedRegion, which executeBlast's own
   // `terrain:updated` emit above covers — NavGridSync patches from that
   // event, so no separate NavGrid call is needed here.
-  for (let i = 0; i < result.destroyedBuildings.length; i++) {
+  for (const _building of result.destroyedBuildings) {
     recordBuildingDestruction(state.scores);
   }
 
