@@ -118,26 +118,15 @@ function takePatternOrClearIfUnavailable(state: GameState): HoleCharge | null {
   if (pattern == null) return null;
   if (!isExplosiveAvailable(state.campaign.activeLevelId, pattern.explosiveId)) {
     state.patternCharge = null;
-    state.chargeAwaitingFunds = [];
     return null;
   }
   return pattern;
 }
 
-/** Drop a hole from the awaiting-funds list. No-op when the list is absent. */
-export function removeAwaiting(state: GameState, holeId: string): void {
-  if (state.chargeAwaitingFunds == null) return;
-  state.chargeAwaitingFunds = state.chargeAwaitingFunds.filter(id => id !== holeId);
-}
-
 /** Order the pattern charge for one hole, funds checked per hole. Caller guarantees the hole is uncovered. */
 function orderPatternCharge(state: GameState, hole: DrillHole, pattern: HoleCharge): AutoChargeOutcome | { error: string } {
   const created = createCharge(pattern.explosiveId, pattern.amountKg, pattern.stemmingM, hole.depth, hole.diameter);
-  if ('error' in created) {
-    removeAwaiting(state, hole.id);
-    return { error: created.error };
-  }
-  removeAwaiting(state, hole.id);
+  if ('error' in created) return { error: created.error };
   dispatchChargeAction(state, hole, created.charge);
   return 'ordered';
 }

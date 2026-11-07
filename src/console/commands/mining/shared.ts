@@ -162,7 +162,6 @@ export function resetPlanState(state: GameState): void {
   state.chargesByHole = {};
   state.plannedChargesByHole = {};
   state.patternCharge = null;
-  state.chargeAwaitingFunds = [];
 }
 
 /**

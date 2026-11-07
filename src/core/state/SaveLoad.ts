@@ -15,6 +15,9 @@ import { getStorageCapacity } from '../entities/Building.js';
 import { createHiringPool } from '../entities/HiringPool.js';
 import { createWeatherCycle, isWeatherState } from '../weather/WeatherCycle.js';
 import { WEATHER_HISTORY_MAX } from '../config/balance.js';
+import { chargeOrderCost } from '../mining/ChargePlan.js';
+import { addIncome } from '../economy/Finance.js';
+import type { FinanceState } from '../economy/Finance.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
 import { sanitizeTutorialProgress } from './TutorialProgress.js';
 import { sanitizeGradeState } from '../economy/MineGrade.js';
@@ -600,6 +603,28 @@ function migrateV35ToV36(obj: Record<string, unknown>): Record<string, unknown> 
  * list is dropped. Gated on the save's version (a refund must happen once).
  */
 function migrateV36ToV37(obj: Record<string, unknown>): Record<string, unknown> {
+  const actions = Array.isArray(obj['pendingActions']) ? (obj['pendingActions'] as Record<string, unknown>[]) : [];
+  let refund = 0;
+  for (const action of actions) {
+    const payload = action['payload'] as Record<string, unknown> | undefined;
+    if (action['type'] !== 'charge_hole' || !payload) continue;
+    if (typeof payload['orderCost'] === 'number') refund += payload['orderCost'];
+    const stock = payload['orderStock'] as { explosiveId?: unknown; kg?: unknown } | undefined;
+    if (stock && typeof stock.explosiveId === 'string' && typeof stock.kg === 'number') {
+      refund += chargeOrderCost(stock.explosiveId, stock.kg);
+    }
+    delete payload['orderCost'];
+    delete payload['orderStock'];
+    delete payload['deliveryArrivalTick'];
+  }
+  const finances = obj['finances'] as FinanceState | undefined;
+  if (refund > 0 && finances && typeof obj['cash'] === 'number') {
+    obj['cash'] += refund;
+    addIncome(finances, refund, 'refund', 'Prepaid charge orders refunded (save migration)', (obj['tickCount'] as number) ?? 0);
+  }
+  const planned = obj['plannedChargesByHole'] as Record<string, Record<string, unknown>> | undefined;
+  if (planned) for (const entry of Object.values(planned)) delete entry['fromStockKg'];
+  delete obj['chargeAwaitingFunds'];
   return obj;
 }
 
