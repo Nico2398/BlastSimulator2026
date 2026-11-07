@@ -21,6 +21,7 @@
 // t(), so French actually reads French.
 
 import { PanelBase } from './PanelBase.js';
+import { FilterBarSelection, filterBar } from '../filterBar.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, fieldStyle, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll, flashStatus } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
@@ -78,6 +79,53 @@ export function orderOffers(
   return [...available.filter(fillable), ...available.filter(c => !fillable(c))];
 }
 
+/** Sort keys the Contracts panel offers, in display order. */
+export const CONTRACT_SORT_KEYS = ['price_per_kg', 'total_value', 'deadline'] as const;
+type ContractSortKey = typeof CONTRACT_SORT_KEYS[number];
+/** Active and Closed sections show a filter bar only above this many rows. */
+export const FILTER_BAR_MIN_ROWS = 5;
+
+/** Keep only offers for `materialId` ('' = rubble); null keeps all. Order preserved. */
+export function filterOffers(offers: readonly Contract[], materialId: string | null): Contract[] {
+  return materialId === null ? [...offers] : offers.filter(c => c.materialId === materialId);
+}
+
+const SORT_COMPARATORS: Record<ContractSortKey, (a: Contract, b: Contract) => number> = {
+  price_per_kg: (a, b) => b.pricePerKg - a.pricePerKg,
+  total_value: (a, b) => contractTotal(b) - contractTotal(a),
+  deadline: (a, b) => a.deadlineTicks - b.deadlineTicks,
+};
+
+/** Rows reordered by sort `key`; null or unknown key returns `fallback()`. */
+function sortedBy(rows: readonly Contract[], key: string | null, fallback: () => Contract[]): Contract[] {
+  const compare = key === null ? undefined : SORT_COMPARATORS[key as ContractSortKey];
+  return compare ? [...rows].sort(compare) : fallback();
+}
+
+/** Order offers by `key`; a null key is the default fillable-first order. */
+export function sortOffers(
+  offers: readonly Contract[],
+  key: string | null,
+  collectedOre: Readonly<Record<string, number>>,
+  rubbleStockKg: number,
+): Contract[] {
+  return sortedBy(offers, key, () => orderOffers(offers, collectedOre, rubbleStockKg));
+}
+
+type ListSectionKind = 'available' | 'active' | 'closed';
+
+interface ListSectionSpec {
+  rows: readonly Contract[];
+  /** Height (px) the section shows before it scrolls. */
+  maxPx: number;
+  /** A bar shows only above this many rows (0 = whenever there are rows). */
+  minRowsForBar: number;
+  /** Default order when no sort is picked. */
+  defaultOrder: (rows: readonly Contract[]) => Contract[];
+  makeRow: (c: Contract) => HTMLElement;
+  emptyText: string;
+}
+
 /** One-line roll-up of the player's active contracts. */
 interface ActiveSummary {
   /** Number of active contracts. */
@@ -118,6 +166,10 @@ export class ContractsPanel extends PanelBase {
   private onNavigateCb?: (panel: 'ops') => void;
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
+  private readonly selections: Record<ListSectionKind, FilterBarSelection> = {
+    available: new FilterBarSelection(), active: new FilterBarSelection(), closed: new FilterBarSelection(),
+  };
+  private lastState: GameState | null = null;
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-contract-panel'));
@@ -144,6 +196,7 @@ export class ContractsPanel extends PanelBase {
 
 
   update(state: GameState): void {
+    this.lastState = state;
     const market = this.marketInput(state, resolveContractOres(state));
     const signature = JSON.stringify({
       stored: Math.round(state.logistics.storedMassKg), spoil: Math.round(totalSpoilKg(state.buildings.buildings)), storedTenths: deliverableAmountKg(stateRubbleStockKg(state)), cap: state.logistics.storageCapacityKg,
@@ -152,6 +205,7 @@ export class ContractsPanel extends PanelBase {
       available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}:${c.negotiationAttempts ?? 0}:${contractAcceptBlocker(c, true, state.cash) === null ? 1 : 0}`),
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
+      sel: Object.values(this.selections).map(x => `${x.filter}|${x.sort}`),
       auto: [autoFulfilmentEnabled(state, 'autoSell'), autoFulfilmentEnabled(state, 'autoClearRubble')],
       managerLevel: bestAvailableManagerLevel(state.employees.employees),
       market: market && {
@@ -188,31 +242,67 @@ export class ContractsPanel extends PanelBase {
       this.makeAutoStrip(state),
       this.makeActiveSummaryStrip(state, activeHeader),
       sectionHeader(t('ui.contracts.available_count', { count: state.contracts.available.length })),
-      scrollBoundedSection(
-        state.contracts.available.length > 0
-          ? orderOffers(state.contracts.available, state.collectedOre, stateRubbleStockKg(state)).map(c => this.makeOfferedCard(c, state, managerLevel, siteOres))
-          : [emptyState(t('ui.contracts.none'))],
-        AVAILABLE_SECTION_MAX_PX,
-        { gap: SECTION_GAP_PX, scrollKey: 'available' },
-      ),
+      ...this.makeListSection('available', {
+        rows: state.contracts.available, maxPx: AVAILABLE_SECTION_MAX_PX, minRowsForBar: 0,
+        defaultOrder: rows => orderOffers(rows, state.collectedOre, stateRubbleStockKg(state)),
+        makeRow: c => this.makeOfferedCard(c, state, managerLevel, siteOres),
+        emptyText: t('ui.contracts.none'),
+      }),
       activeHeader,
-      scrollBoundedSection(
-        state.contracts.active.length > 0
-          ? state.contracts.active.map(c => this.makeActiveCard(c, state))
-          : [emptyState(t('ui.contracts.none_active'))],
-        200,
-        { gap: SECTION_GAP_PX, scrollKey: 'active' },
-      ),
+      ...this.makeListSection('active', {
+        rows: state.contracts.active, maxPx: 200, minRowsForBar: FILTER_BAR_MIN_ROWS,
+        defaultOrder: rows => [...rows],
+        makeRow: c => this.makeActiveCard(c, state),
+        emptyText: t('ui.contracts.none_active'),
+      }),
       sectionHeader(t('ui.contracts.closed')),
-      scrollBoundedSection(
-        state.contracts.completedHistory.length > 0
-          ? [...state.contracts.completedHistory].reverse().map(c => this.makeHistoryRow(c))
-          : [emptyState(t('ui.contracts.none_closed'))],
-        200,
-        { gap: SECTION_GAP_PX, scrollKey: 'closed' },
-      ),
+      ...this.makeListSection('closed', {
+        rows: state.contracts.completedHistory, maxPx: 200, minRowsForBar: FILTER_BAR_MIN_ROWS,
+        defaultOrder: rows => [...rows].reverse(),
+        makeRow: c => this.makeHistoryRow(c),
+        emptyText: t('ui.contracts.none_closed'),
+      }),
     ];
     replaceChildrenKeepingScroll(this.bodyEl, sections);
+  }
+
+  /**
+   * Optional filter/sort bar plus the bounded row list for one section. The selection lives on the
+   * panel so it survives re-renders; it only hides and reorders rows, never touches contract state.
+   */
+  private makeListSection(kind: ListSectionKind, spec: ListSectionSpec): HTMLElement[] {
+    const selection = this.selections[kind];
+    const materials = [...new Set(spec.rows.map(c => c.materialId))];
+    const showBar = spec.rows.length > Math.max(0, spec.minRowsForBar);
+    // A bar that is not shown cannot clear its selection, so the rows must not stay filtered by it.
+    if (!showBar) selection.clear();
+    if (selection.filter !== null && !materials.includes(selection.filter)) selection.filter = null;
+    const filtered = filterOffers(spec.rows, selection.filter);
+    const visible = sortedBy(filtered, selection.sort, () => spec.defaultOrder(filtered));
+
+    const rerender = (): void => { if (this.lastState) this.render(this.lastState); };
+    const bar = showBar
+      ? filterBar(selection, {
+        choices: materials.map(m => ({ value: m, label: this.materialLabel(m) })),
+        sorts: CONTRACT_SORT_KEYS.map(key => ({ key, label: t(`ui.contracts.sort_${key}`) })),
+        onChange: rerender,
+        filterLabel: t('ui.filter.filter'), sortLabel: t('ui.filter.sort'),
+        allLabel: t('ui.filter.all'), clearLabel: t('ui.filter.clear'),
+      })
+      : null;
+    if (bar) bar.dataset['filterSection'] = kind;
+
+    let rows: HTMLElement[];
+    if (spec.rows.length === 0) {
+      rows = [emptyState(spec.emptyText)];
+    } else if (visible.length === 0) {
+      const clear = button('ghost', t('ui.filter.clear'), { onClick: () => { selection.clear(); rerender(); } });
+      clear.classList.add('bs-filter-clear');
+      rows = [emptyState(t('ui.contracts.filter_no_match')), clear];
+    } else {
+      rows = visible.map(spec.makeRow);
+    }
+    return [bar, scrollBoundedSection(rows, spec.maxPx, { gap: SECTION_GAP_PX, scrollKey: kind })].filter((n): n is HTMLElement => n !== null);
   }
 
   /** Time-left text and urgency colour tick every hour; patch them in place so scroll and typed input survive. */

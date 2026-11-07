@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   ContractsPanel, deliverableAmountKg, orderOffers, summarizeActive, CONTRACT_OFFER_CARD_PX, AVAILABLE_VISIBLE_CARDS, SECTION_GAP_PX,
+  filterOffers, sortOffers, CONTRACT_SORT_KEYS, FILTER_BAR_MIN_ROWS,
 } from '../../../../src/ui/panels/ContractsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
@@ -16,6 +17,7 @@ import { createGradeState, gradeDef } from '../../../../src/core/economy/MineGra
 import { BUYER_TIERS, buyerTierNameKey } from '../../../../src/core/economy/BuyerTiers.js';
 import { oreSaturationTrend } from '../../../../src/core/economy/OreSaturation.js';
 import { resolveContractOres } from '../../../../src/core/campaign/Level.js';
+import { getOre } from '../../../../src/core/world/OreCatalog.js';
 
 function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -543,6 +545,7 @@ function sectionChildren(bodyEl: HTMLElement, label: string): HTMLElement[] {
   const result: HTMLElement[] = [];
   for (let i = idx + 1; i < children.length; i++) {
     if (children[i]!.classList.contains('bsx-section')) break;
+    if (children[i]!.classList.contains('bs-filter-bar')) continue; // #2159: the bar sits beside the scroll wrapper
     result.push(children[i]!);
   }
   return result;
@@ -1883,6 +1886,434 @@ describe('ContractsPanel — market strip (progression)', () => {
         panel.refreshLocale();
         panel.update(state);
         expect(panel.root.querySelector(STRIP)!.textContent).not.toBe(en);
+      } finally {
+        setLocale('en');
+      }
+    });
+  });
+});
+
+describe('filterOffers (#2159)', () => {
+  const dirt1 = makeContract({ id: 1, materialId: 'dirtite' });
+  const rust = makeContract({ id: 2, materialId: 'rustite' });
+  const rubble = makeContract({ id: 3, type: 'rubble_disposal', materialId: '' });
+  const dirt2 = makeContract({ id: 4, materialId: 'dirtite' });
+  const all = [dirt1, rust, rubble, dirt2];
+
+  it('null keeps every offer in order', () => {
+    expect(filterOffers(all, null).map(c => c.id)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('keeps only the matching material, preserving input order', () => {
+    expect(filterOffers(all, 'dirtite').map(c => c.id)).toEqual([1, 4]);
+    expect(filterOffers(all, 'rustite').map(c => c.id)).toEqual([2]);
+  });
+
+  it("the empty string selects rubble offers", () => {
+    expect(filterOffers(all, '').map(c => c.id)).toEqual([3]);
+  });
+
+  it('returns an empty list when nothing matches, and for empty input', () => {
+    expect(filterOffers(all, 'blingite')).toEqual([]);
+    expect(filterOffers([], 'dirtite')).toEqual([]);
+    expect(filterOffers([], null)).toEqual([]);
+  });
+
+  it('does not mutate its input', () => {
+    const input = [...all];
+    filterOffers(input, 'dirtite');
+    expect(input.map(c => c.id)).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe('sortOffers (#2159)', () => {
+  const a = makeContract({ id: 1, quantityKg: 100, pricePerKg: 2, deadlineTicks: 300 }); // total 200
+  const b = makeContract({ id: 2, quantityKg: 10, pricePerKg: 9, deadlineTicks: 100 });  // total 90
+  const c = makeContract({ id: 3, quantityKg: 500, pricePerKg: 1, deadlineTicks: 200 }); // total 500
+  const offers = [a, b, c];
+
+  it('exposes the three sort keys in display order', () => {
+    expect([...CONTRACT_SORT_KEYS]).toEqual(['price_per_kg', 'total_value', 'deadline']);
+  });
+
+  it('price_per_kg orders highest price first', () => {
+    expect(sortOffers(offers, 'price_per_kg', {}, 0).map(x => x.id)).toEqual([2, 1, 3]);
+  });
+
+  it('total_value orders highest quantity x price first', () => {
+    expect(sortOffers(offers, 'total_value', {}, 0).map(x => x.id)).toEqual([3, 1, 2]);
+  });
+
+  it('deadline orders the smallest deadlineTicks first', () => {
+    expect(sortOffers(offers, 'deadline', {}, 0).map(x => x.id)).toEqual([2, 3, 1]);
+  });
+
+  it('a null key is the default fillable-first order, equal to orderOffers', () => {
+    const ore = { dirtite: 100 }; // fills only `a` (100 kg) and `b` (10 kg), not `c` (500 kg)
+    const expected = orderOffers(offers, ore, 0).map(x => x.id);
+    expect(sortOffers(offers, null, ore, 0).map(x => x.id)).toEqual(expected);
+    expect(expected).toEqual([1, 2, 3]);
+  });
+
+  it('a null key puts a fillable offer ahead of an earlier unfillable one', () => {
+    const unfillable = makeContract({ id: 10, quantityKg: 900 });
+    const fillable = makeContract({ id: 11, quantityKg: 50 });
+    const ore = { dirtite: 60 };
+    expect(sortOffers([unfillable, fillable], null, ore, 0).map(x => x.id)).toEqual([11, 10]);
+  });
+
+  it('an explicit key ignores fillability', () => {
+    const unfillableCheap = makeContract({ id: 10, quantityKg: 900, pricePerKg: 1 });
+    const fillableDear = makeContract({ id: 11, quantityKg: 50, pricePerKg: 5 });
+    const rich = makeContract({ id: 12, quantityKg: 900, pricePerKg: 8 });
+    const out = sortOffers([unfillableCheap, fillableDear, rich], 'price_per_kg', { dirtite: 60 }, 0);
+    expect(out.map(x => x.id)).toEqual([12, 11, 10]);
+  });
+
+  it('returns a new array and leaves the input order alone', () => {
+    const input = [a, b, c];
+    const out = sortOffers(input, 'deadline', {}, 0);
+    expect(out).not.toBe(input);
+    expect(input.map(x => x.id)).toEqual([1, 2, 3]);
+  });
+
+  it('handles empty input for every key', () => {
+    for (const key of [null, ...CONTRACT_SORT_KEYS]) expect(sortOffers([], key, {}, 0)).toEqual([]);
+  });
+});
+
+describe('ContractsPanel filter bar (#2159)', () => {
+  const AVAIL_BAR = '#bs-contract-panel [data-filter-section="available"]';
+
+  function offerPanel(offers: Contract[], setup: (s: GameState) => void = () => {}): { panel: ContractsPanel; state: GameState } {
+    const { panel } = makePanel();
+    const state = makeState();
+    setup(state);
+    state.contracts.available.push(...offers);
+    panel.show();
+    panel.update(state);
+    return { panel, state };
+  }
+
+  /** Offer-card ids in DOM order. With no active contracts, `[data-contract-material]` cards are the offers. */
+  function cardIds(panel: ContractsPanel): number[] {
+    return [...panel.root.querySelectorAll<HTMLElement>('[data-contract-material]')].map(e => Number(e.dataset['contractId']));
+  }
+
+  function barOf(panel: ContractsPanel, section: string): HTMLElement | null {
+    return panel.root.querySelector<HTMLElement>(`[data-filter-section="${section}"]`);
+  }
+
+  function pick(panel: ContractsPanel, section: string, value: string): void {
+    barOf(panel, section)!.querySelector<HTMLButtonElement>(`button[data-filter-value="${value}"]`)!.click();
+  }
+
+  function sortBy(panel: ContractsPanel, section: string, key: string): void {
+    barOf(panel, section)!.querySelector<HTMLButtonElement>(`button[data-sort-key="${key}"]`)!.click();
+  }
+
+  const mixed = (): Contract[] => [
+    makeContract({ id: 1, materialId: 'dirtite', quantityKg: 100, pricePerKg: 2, deadlineTicks: 300 }),
+    makeContract({ id: 2, materialId: 'rustite', quantityKg: 10, pricePerKg: 9, deadlineTicks: 100 }),
+    makeContract({ id: 3, type: 'rubble_disposal', materialId: '', quantityKg: 500, pricePerKg: 1, deadlineTicks: 200 }),
+    makeContract({ id: 4, materialId: 'dirtite', quantityKg: 41, pricePerKg: 5, deadlineTicks: 150 }),
+  ];
+
+  it('renders a bs-filter-bar for the Available section inside the contracts panel', () => {
+    const { panel } = offerPanel(mixed());
+    const bar = panel.root.ownerDocument.querySelector(AVAIL_BAR);
+    expect(bar).not.toBeNull();
+    expect(bar!.classList.contains('bs-filter-bar')).toBe(true);
+  });
+
+  it('offers one choice per distinct material present, rubble included', () => {
+    const { panel } = offerPanel(mixed());
+    const values = [...barOf(panel, 'available')!.querySelectorAll<HTMLElement>('button[data-filter-value]')]
+      .map(b => b.dataset['filterValue']);
+    expect([...values].sort()).toEqual(['', 'dirtite', 'rustite']);
+  });
+
+  it('labels the rubble choice with the rubble material text and ore choices with the ore name', () => {
+    const { panel } = offerPanel(mixed());
+    const bar = barOf(panel, 'available')!;
+    expect(bar.querySelector('button[data-filter-value=""]')!.textContent).toContain(t('ui.contracts.material_rubble'));
+    expect(bar.querySelector('button[data-filter-value="dirtite"]')!.textContent).toContain(t(getOre('dirtite')!.nameKey));
+  });
+
+  it('offers a sort button for each sort key', () => {
+    const { panel } = offerPanel(mixed());
+    const keys = [...barOf(panel, 'available')!.querySelectorAll<HTMLElement>('button[data-sort-key]')].map(b => b.dataset['sortKey']);
+    expect(keys).toEqual([...CONTRACT_SORT_KEYS]);
+  });
+
+  it('shows every offer card before any choice is made', () => {
+    const { panel } = offerPanel(mixed());
+    expect(cardIds(panel).sort()).toEqual([1, 2, 3, 4]);
+  });
+
+  it('picking an ore leaves only its offer cards', () => {
+    const { panel } = offerPanel(mixed());
+    pick(panel, 'available', 'dirtite');
+    expect(cardIds(panel).sort()).toEqual([1, 4]);
+  });
+
+  it('picking rubble leaves only the rubble offer', () => {
+    const { panel } = offerPanel(mixed());
+    pick(panel, 'available', '');
+    expect(cardIds(panel)).toEqual([3]);
+  });
+
+  it('picking the selected material again shows every offer', () => {
+    const { panel } = offerPanel(mixed());
+    pick(panel, 'available', 'dirtite');
+    pick(panel, 'available', 'dirtite');
+    expect(cardIds(panel).sort()).toEqual([1, 2, 3, 4]);
+  });
+
+  it('the all button shows every offer again', () => {
+    const { panel } = offerPanel(mixed());
+    pick(panel, 'available', 'rustite');
+    barOf(panel, 'available')!.querySelector<HTMLButtonElement>('button[data-filter-all]')!.click();
+    expect(cardIds(panel).sort()).toEqual([1, 2, 3, 4]);
+  });
+
+  it('the chosen button is aria-pressed after the re-render', () => {
+    const { panel } = offerPanel(mixed());
+    pick(panel, 'available', 'rustite');
+    const bar = barOf(panel, 'available')!;
+    expect(bar.querySelector('button[data-filter-value="rustite"]')!.getAttribute('aria-pressed')).toBe('true');
+    expect(bar.querySelector('button[data-filter-value="dirtite"]')!.getAttribute('aria-pressed')).not.toBe('true');
+  });
+
+  it('the clear button appears once a filter is chosen and restores every offer', () => {
+    const { panel } = offerPanel(mixed());
+    expect(barOf(panel, 'available')!.querySelector('.bs-filter-clear')).toBeNull();
+    pick(panel, 'available', 'dirtite');
+    const clear = barOf(panel, 'available')!.querySelector<HTMLButtonElement>('.bs-filter-clear');
+    expect(clear).not.toBeNull();
+    clear!.click();
+    expect(cardIds(panel).sort()).toEqual([1, 2, 3, 4]);
+    expect(barOf(panel, 'available')!.querySelector('.bs-filter-clear')).toBeNull();
+  });
+
+  it('the Available header count stays the total number of offers while filtered', () => {
+    const { panel } = offerPanel(mixed());
+    const header = t('ui.contracts.available_count', { count: 4 });
+    expect(panel.root.textContent).toContain(header);
+    pick(panel, 'available', 'rustite');
+    expect(panel.root.textContent).toContain(header);
+  });
+
+  it('filtering never alters the contracts held in state', () => {
+    const { panel, state } = offerPanel(mixed());
+    const before = JSON.stringify(state.contracts);
+    pick(panel, 'available', 'dirtite');
+    sortBy(panel, 'available', 'deadline');
+    panel.update(state);
+    expect(JSON.stringify(state.contracts)).toBe(before);
+  });
+
+  it('price_per_kg sort orders cards highest price first', () => {
+    const { panel } = offerPanel(mixed());
+    sortBy(panel, 'available', 'price_per_kg');
+    expect(cardIds(panel)).toEqual([2, 4, 1, 3]);
+  });
+
+  it('total_value sort orders cards by quantity x price, highest first', () => {
+    const { panel } = offerPanel(mixed());
+    sortBy(panel, 'available', 'total_value');
+    expect(cardIds(panel)).toEqual([3, 4, 1, 2]); // 500, 205, 200, 90
+  });
+
+  it('deadline sort orders cards soonest deadline first', () => {
+    const { panel } = offerPanel(mixed());
+    sortBy(panel, 'available', 'deadline');
+    expect(cardIds(panel)).toEqual([2, 4, 3, 1]);
+  });
+
+  it('selecting the active sort again returns to the default fillable-first order', () => {
+    const offers = [
+      makeContract({ id: 1, materialId: 'dirtite', quantityKg: 900, pricePerKg: 9 }),
+      makeContract({ id: 2, materialId: 'dirtite', quantityKg: 10, pricePerKg: 1 }),
+    ];
+    const { panel } = offerPanel(offers, s => { s.collectedOre['dirtite'] = 50; });
+    expect(cardIds(panel)).toEqual([2, 1]); // fillable first by default
+    sortBy(panel, 'available', 'price_per_kg');
+    expect(cardIds(panel)).toEqual([1, 2]);
+    sortBy(panel, 'available', 'price_per_kg');
+    expect(cardIds(panel)).toEqual([2, 1]);
+  });
+
+  it('the default order stays fillable-first when no sort is chosen', () => {
+    const offers = [
+      makeContract({ id: 1, materialId: 'dirtite', quantityKg: 900 }),
+      makeContract({ id: 2, materialId: 'dirtite', quantityKg: 10 }),
+    ];
+    const { panel } = offerPanel(offers, s => { s.collectedOre['dirtite'] = 50; });
+    expect(cardIds(panel)).toEqual([2, 1]);
+  });
+
+  it('a filter and a sort combine', () => {
+    const { panel } = offerPanel(mixed());
+    pick(panel, 'available', 'dirtite');
+    sortBy(panel, 'available', 'price_per_kg');
+    expect(cardIds(panel)).toEqual([4, 1]);
+  });
+
+  it('the selection persists across the periodic update() while the panel is open', () => {
+    const { panel, state } = offerPanel(mixed());
+    pick(panel, 'available', 'dirtite');
+    sortBy(panel, 'available', 'deadline');
+    state.tickCount += 10;
+    panel.update(state);
+    panel.update(state);
+    expect(cardIds(panel)).toEqual([4, 1]);
+    expect(barOf(panel, 'available')!.querySelector('button[data-filter-value="dirtite"]')!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('the selection persists when the offers change and the chosen material is still present', () => {
+    const { panel, state } = offerPanel(mixed());
+    pick(panel, 'available', 'dirtite');
+    state.contracts.available.push(makeContract({ id: 5, materialId: 'dirtite' }), makeContract({ id: 6, materialId: 'rustite' }));
+    panel.update(state);
+    expect(cardIds(panel).sort()).toEqual([1, 4, 5]);
+  });
+
+  it('a chosen material that left the offers is treated as no filter', () => {
+    const { panel, state } = offerPanel(mixed());
+    pick(panel, 'available', 'rustite');
+    state.contracts.available = state.contracts.available.filter(c => c.materialId !== 'rustite');
+    panel.update(state);
+    expect(cardIds(panel).sort()).toEqual([1, 3, 4]);
+  });
+
+  describe('Active and Closed sections', () => {
+    const activeRows = (n: number): Contract[] =>
+      Array.from({ length: n }, (_, i) => makeContract({
+        id: 20 + i, materialId: i % 2 === 0 ? 'dirtite' : 'rustite', quantityKg: 100, deliveredKg: 0,
+      }));
+    const closedRows = (n: number): Contract[] =>
+      Array.from({ length: n }, (_, i) => makeContract({
+        id: 301 + i, materialId: i % 2 === 0 ? 'dirtite' : 'rustite', completed: true, deliveredKg: 100,
+      }));
+
+    function activePanel(n: number): { panel: ContractsPanel; state: GameState } {
+      const { panel } = makePanel();
+      const state = makeState();
+      state.contracts.active.push(...activeRows(n));
+      panel.show();
+      panel.update(state);
+      return { panel, state };
+    }
+
+    function closedPanel(n: number): { panel: ContractsPanel; state: GameState } {
+      const { panel } = makePanel();
+      const state = makeState();
+      state.contracts.completedHistory.push(...closedRows(n));
+      panel.show();
+      panel.update(state);
+      return { panel, state };
+    }
+
+    it('FILTER_BAR_MIN_ROWS is five', () => {
+      expect(FILTER_BAR_MIN_ROWS).toBe(5);
+    });
+
+    it('shows no Active bar at the threshold', () => {
+      const { panel } = activePanel(FILTER_BAR_MIN_ROWS);
+      expect(barOf(panel, 'active')).toBeNull();
+    });
+
+    it('shows an Active bar above the threshold', () => {
+      const { panel } = activePanel(FILTER_BAR_MIN_ROWS + 1);
+      const bar = barOf(panel, 'active');
+      expect(bar).not.toBeNull();
+      expect(bar!.classList.contains('bs-filter-bar')).toBe(true);
+    });
+
+    it('shows no Closed bar at the threshold, and one above it', () => {
+      expect(barOf(closedPanel(FILTER_BAR_MIN_ROWS).panel, 'closed')).toBeNull();
+      expect(barOf(closedPanel(FILTER_BAR_MIN_ROWS + 1).panel, 'closed')).not.toBeNull();
+    });
+
+    it('an Active bar offers the materials of the active contracts', () => {
+      const { panel } = activePanel(6);
+      const values = [...barOf(panel, 'active')!.querySelectorAll<HTMLElement>('button[data-filter-value]')].map(b => b.dataset['filterValue']);
+      expect([...values].sort()).toEqual(['dirtite', 'rustite']);
+    });
+
+    it('picking a material in the Active bar leaves only matching active cards', () => {
+      const { panel } = activePanel(6);
+      pick(panel, 'active', 'rustite');
+      expect(cardIds(panel).sort()).toEqual([21, 23, 25]);
+    });
+
+    it('the Active filter does not alter state.contracts.active', () => {
+      const { panel, state } = activePanel(6);
+      pick(panel, 'active', 'rustite');
+      panel.update(state);
+      expect(state.contracts.active.map(c => c.id)).toEqual([20, 21, 22, 23, 24, 25]);
+    });
+
+    it('the Active selection persists across update()', () => {
+      const { panel, state } = activePanel(6);
+      pick(panel, 'active', 'dirtite');
+      state.tickCount += 5;
+      panel.update(state);
+      expect(cardIds(panel).sort()).toEqual([20, 22, 24]);
+    });
+
+    it('picking a material in the Closed bar hides the other closed rows and leaves state intact', () => {
+      const { panel, state } = closedPanel(6);
+      pick(panel, 'closed', 'rustite');
+      const text = panel.root.textContent ?? '';
+      expect(text).toContain('#302');
+      expect(text).toContain('#304');
+      expect(text).toContain('#306');
+      expect(text).not.toContain('#301');
+      expect(text).not.toContain('#303');
+      expect(text).not.toContain('#305');
+      expect(state.contracts.completedHistory.length).toBe(6);
+    });
+
+    it('a Closed filter does not hide Available or Active cards', () => {
+      const { panel, state } = closedPanel(6);
+      state.contracts.available.push(makeContract({ id: 1, materialId: 'dirtite' }));
+      panel.update(state);
+      pick(panel, 'closed', 'rustite');
+      expect(cardIds(panel)).toEqual([1]);
+    });
+  });
+
+  describe('vanishing bar (#2159)', () => {
+    it('a Closed filter is dropped when the bar disappears below the threshold', () => {
+      const { panel } = makePanel();
+      const state = makeState();
+      state.contracts.completedHistory.push(
+        ...Array.from({ length: 6 }, (_, i) => makeContract({ id: 400 + i, materialId: i % 2 ? 'rustite' : 'dirtite', completed: true, deliveredKg: 100 })),
+      );
+      panel.show();
+      panel.update(state);
+      pick(panel, 'closed', 'rustite');
+      state.contracts.completedHistory.pop();
+      panel.update(state);
+      expect(barOf(panel, 'closed')).toBeNull();
+      const text = panel.root.textContent ?? '';
+      for (const id of [400, 401, 402, 403, 404]) expect(text).toContain(`#${id}`);
+    });
+  });
+
+  describe('i18n (#2159)', () => {
+    it('the no-match line has an English and a French text distinct from its key', () => {
+      const key = 'ui.contracts.filter_no_match';
+      try {
+        setLocale('en');
+        const en = t(key);
+        setLocale('fr');
+        const fr = t(key);
+        expect(en).not.toBe(key);
+        expect(fr).not.toBe(key);
+        expect(fr).not.toBe(en);
       } finally {
         setLocale('en');
       }

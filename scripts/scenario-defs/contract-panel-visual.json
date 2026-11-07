@@ -42,6 +42,32 @@
       "role": "observe"
     },
     {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-filter-section=\"available\"] [data-filter-value=\"dirtite\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-filter-section=\"available\"] [data-filter-value=\"dirtite\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-filter-section=\"available\"] [data-sort-key=\"price_per_kg\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-filter-section=\"available\"] .bs-filter-clear"
+        }
+      ],
+      "role": "player",
+      "description": "#2159: filter the Available offers to one ore and sort by price per kg through the panel's own filter bar, capture the filtered list, then clear the selection so the accept step below sees the full offer pool. The filter only hides rows, so the console list is unchanged."
+    },
+    {
       "command": "contract accept type:supply material:dirtite",
       "interaction": [
         {
