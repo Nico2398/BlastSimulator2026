@@ -545,6 +545,7 @@ function sectionChildren(bodyEl: HTMLElement, label: string): HTMLElement[] {
   const result: HTMLElement[] = [];
   for (let i = idx + 1; i < children.length; i++) {
     if (children[i]!.classList.contains('bsx-section')) break;
+    if (children[i]!.classList.contains('bs-filter-bar')) continue; // #2159: the bar sits beside the scroll wrapper
     result.push(children[i]!);
   }
   return result;
