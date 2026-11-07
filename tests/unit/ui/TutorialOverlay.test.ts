@@ -1120,7 +1120,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.tickGuide();
       expect(chipShown()).toBe(true);
       expect(chip()!.textContent).toContain('1,234');
-      expect(chip()!.textContent).toContain('5,000');
+      expect(chip()!.textContent).toContain('62,000');
     });
 
     it('goal chip is hidden again on the closing card', () => {

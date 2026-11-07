@@ -1234,14 +1234,14 @@ describe('free-play step card (#1329/#1328) — honest about progress before the
     it('en body names profit, target and remaining, formatted', () => {
       const { body } = render(stateWith(1200), 'en');
       expect(body).toContain('1,200');
-      expect(body).toContain('5,000');
-      expect(body).toContain('3,800');
+      expect(body).toContain('62,000');
+      expect(body).toContain('60,800');
     });
 
     it('fr body carries the same figures', () => {
       const { body } = render(stateWith(1200), 'fr');
       expect(body).toMatch(/1[,\s\u202f\u00a0.]?200/);
-      expect(body).toMatch(/3[,\s\u202f\u00a0.]?800/);
+      expect(body).toMatch(/60[,\s\u202f\u00a0.]?800/);
     });
 
     it('shows a zero remaining without breaking when profit already exceeds target', () => {
