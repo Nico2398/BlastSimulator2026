@@ -652,7 +652,7 @@ describe('ChargeStep — explosive too weak for the rock warning (#1358)', () =>
   });
 });
 
-describe('ChargeStep — pattern line, awaiting funds, refusal notice (#1345)', () => {
+describe('ChargeStep — pattern line, refusal notice (#1345)', () => {
   it('shows the pattern line only while a pattern charge is set', () => {
     const { step } = makeStep();
     const state = makeState();
@@ -670,21 +670,6 @@ describe('ChargeStep — pattern line, awaiting funds, refusal notice (#1345)', 
     state.patternCharge = null;
     step.update(state, 'sunny');
     expect(step.root.querySelector('[data-info="pattern-charge"]')).toBeNull();
-  });
-
-  it('shows the awaiting-funds reason listing the waiting holes, and clears it when empty', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
-    addHole(holeCounter, state.drillHoles, 14, 10, 8, 0.089);
-    state.chargeAwaitingFunds = ['H1', 'H2'];
-    step.update(state, 'sunny');
-    const warning = step.root.querySelector('[data-warning="awaiting-funds"]')!;
-    expect(warning.textContent).toContain(t('ui.blast_workshop.charge.awaiting_funds_reason', { count: 2, holes: 'H1, H2' }));
-
-    state.chargeAwaitingFunds = [];
-    step.update(state, 'sunny');
-    expect(step.root.querySelector('[data-warning="awaiting-funds"]')).toBeNull();
   });
 
   it('shows a refused command output as a notice and hides it after a successful one', () => {

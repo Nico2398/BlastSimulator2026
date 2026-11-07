@@ -15,6 +15,9 @@ import { getStorageCapacity } from '../entities/Building.js';
 import { createHiringPool } from '../entities/HiringPool.js';
 import { createWeatherCycle, isWeatherState } from '../weather/WeatherCycle.js';
 import { WEATHER_HISTORY_MAX } from '../config/balance.js';
+import { chargeOrderCost } from '../mining/ChargePlan.js';
+import { addIncome } from '../economy/Finance.js';
+import type { FinanceState } from '../economy/Finance.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
 import { sanitizeTutorialProgress } from './TutorialProgress.js';
 import { sanitizeGradeState } from '../economy/MineGrade.js';
@@ -595,6 +598,36 @@ function migrateV35ToV36(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/**
+ * v36 -> v37 (#2155): prepaid charge orders are refunded and stripped, the dead awaiting-funds
+ * list is dropped. Gated on the save's version (a refund must happen once).
+ */
+function migrateV36ToV37(obj: Record<string, unknown>): Record<string, unknown> {
+  const actions = Array.isArray(obj['pendingActions']) ? (obj['pendingActions'] as Record<string, unknown>[]) : [];
+  let refund = 0;
+  for (const action of actions) {
+    const payload = action['payload'] as Record<string, unknown> | undefined;
+    if (action['type'] !== 'charge_hole' || !payload) continue;
+    if (typeof payload['orderCost'] === 'number' && Number.isFinite(payload['orderCost']) && payload['orderCost'] > 0) refund += payload['orderCost'];
+    const stock = payload['orderStock'] as { explosiveId?: unknown; kg?: unknown } | undefined;
+    if (stock && typeof stock.explosiveId === 'string' && typeof stock.kg === 'number') {
+      refund += chargeOrderCost(stock.explosiveId, stock.kg);
+    }
+    delete payload['orderCost'];
+    delete payload['orderStock'];
+    delete payload['deliveryArrivalTick'];
+  }
+  const finances = obj['finances'] as FinanceState | undefined;
+  if (refund > 0 && finances && typeof obj['cash'] === 'number') {
+    obj['cash'] += refund;
+    addIncome(finances, refund, 'refund', 'Prepaid charge orders refunded (save migration)', (obj['tickCount'] as number) ?? 0);
+  }
+  const planned = obj['plannedChargesByHole'] as Record<string, Record<string, unknown>> | undefined;
+  if (planned) for (const entry of Object.values(planned)) delete entry['fromStockKg'];
+  delete obj['chargeAwaitingFunds'];
+  return obj;
+}
+
 /** v34 -> v35 (#1414): EventSystemState gains activeModifiers and nextModifierId. Idempotent. */
 function migrateV34ToV35(obj: Record<string, unknown>): Record<string, unknown> {
   const events = obj['events'] as Record<string, unknown> | undefined;
@@ -998,6 +1031,7 @@ export function deserialize(json: string): GameState {
   migrateV33ToV34(obj);
   migrateV34ToV35(obj);
   migrateV35ToV36(obj);
+  if ((obj['version'] as number) < 37) migrateV36ToV37(obj);
   // Every migration above has run: the state is now at the current version.
   obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);

@@ -37,10 +37,8 @@ export function chargeCommand(
     const loadedLines = loadedEntries.map(([id, c]) =>
       `  ${id}: ${c.explosiveId} ${c.amountKg}kg, stemming ${c.stemmingM}m`,
     );
-    const waiting = ctx.state!.chargeAwaitingFunds ?? [];
-    const waitingLine = waiting.length > 0 ? t('mining.charge.awaiting_funds', { count: waiting.length, holes: waiting.join(', ') }) : null;
     const body = `Charges:\n${[...orderedLines, ...loadedLines].join('\n')}`;
-    return { success: true, output: [patternLine, waitingLine, body].filter(Boolean).join('\n') };
+    return { success: true, output: [patternLine, body].filter(Boolean).join('\n') };
   }
 
   const holeSpec = named['hole'] ?? '';
