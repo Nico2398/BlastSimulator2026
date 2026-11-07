@@ -464,9 +464,11 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
    * barren threshold, bound for the spoil heap, stopped counting as ore in barren-yields-to-ore (#2089): 735,908.7.
    * Re-measured for the x0.6 production ore prices (#2117): 373,449.0.
    * Re-measured once the opening stopped building and stocking an explosive warehouse, the load paid from cash (#2152): 504,168.2.
+   * Re-measured once the start held a free seismic survey over the starter deposit, so the first blast's ore report compares
+   * against an estimate, which settles the run $5,000 lower (#2148): 499,168.2.
    * Floor is that measurement, rounded down.
    */
-  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 504_168;
+  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 499_168;
 
   interface OpeningTrace {
     endedAtTick: number | null;

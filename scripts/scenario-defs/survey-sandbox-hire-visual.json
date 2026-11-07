@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "sandbox start seed:42",
-      "description": "Main menu -> Sandbox -> seed 42 -> Start, all by clicking. The sandbox kit has no surveyor (#1671).",
+      "description": "Main menu -> Sandbox -> seed 42 -> Start, all by clicking. The sandbox kit has no surveyor (#1671); the start holds one free seismic survey over the starter deposit (#2148), so the count starts at 1.",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -38,7 +38,7 @@
       "expect": {
         "equals": {
           "seed": 42,
-          "surveyCount": 0
+          "surveyCount": 1
         }
       }
     },
@@ -159,13 +159,13 @@
           "cash"
         ],
         "equals": {
-          "surveyCount": 0
+          "surveyCount": 1
         },
         "note": "surveys are arrival-gated (#437) -- queued and paid for, not yet completed"
       }
     },
     {
-      "command": "wait_until field:surveyCount equals:1 max_ticks:1500",
+      "command": "wait_until field:surveyCount equals:2 max_ticks:1500",
       "description": "#1771: wait for the queued core sample to complete; waits on surveyCount, never a flat delay.",
       "timeout": 150,
       "role": "setup",
@@ -173,14 +173,14 @@
         {
           "type": "waitUntil",
           "field": "surveyCount",
-          "equals": 1,
+          "equals": 2,
           "maxTicks": 1500,
           "timeoutMs": 120000
         }
       ],
       "expect": {
         "equals": {
-          "surveyCount": 1
+          "surveyCount": 2
         }
       }
     }

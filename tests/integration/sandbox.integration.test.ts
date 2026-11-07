@@ -700,12 +700,12 @@ describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start s
     const result = runner.run(`survey ${method} x:${cx} z:${cz}`);
     expect(result.success, result.output).toBe(true);
 
-    for (let i = 0; i < 400 && state.surveyResults.length === 0; i++) tickResolvingEvents(cmd => runner.run(cmd));
-    expect(state.surveyResults.length).toBeGreaterThan(0);
-
-    const survey = state.surveyResults[0]!;
-    expect(survey.method).toBe(method);
-    const densities = Object.values(survey.estimates).flatMap(col => Object.values(col));
+    // The start already holds the free seismic survey over the starter deposit (#2148); wait for the ordered one.
+    const ordered = () => state.surveyResults.find(r => r.method === method);
+    for (let i = 0; i < 400 && !ordered(); i++) tickResolvingEvents(cmd => runner.run(cmd));
+    const survey = ordered();
+    expect(survey, `a ${method} survey result`).toBeDefined();
+    const densities = Object.values(survey!.estimates).flatMap(col => Object.values(col));
     expect(densities.some(d => d > 0), 'the report contains ore').toBe(true);
   }, 60_000);
 });
