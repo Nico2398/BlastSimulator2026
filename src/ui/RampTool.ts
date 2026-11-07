@@ -14,10 +14,10 @@ import {
   proposeRampSpiral, isPitRim, type RampSpiralResult, type SpiralDir, type SpiralSurface,
 } from '../core/mining/RampSpiral.js';
 import {
-  computeRampCost, landRampOnEndFloor, rampDefFromEndpoints, rampCutSlopeRatio, rampDefFromLegs, rampEndGroundsAt, rampGradeBoundsDegrees, validateRampOrder,
+  computeRampCost, landRampOnEndFloor, rampDefFromEndpoints, rampCutSlopeRatio, rampDefFromLegs, rampEndGroundsAt, rampGradeBoundsDegrees, rampWidthOf, validateRampOrder,
   type RampDef,
 } from '../core/mining/Ramp.js';
-import { legsFromWaypoints, rampLegsOf, rampTotalLength, type RampLeg } from '../core/mining/RampPath.js';
+import { legsFromWaypoints, rampLegsOf, rampPathOf, rampTotalLength, rampWaypoints, type RampLeg } from '../core/mining/RampPath.js';
 import { climbForGrade, plannedRampGradeDegrees } from '../core/mining/RampGrade.js';
 import {
   MAX_RAMP_LENGTH, RAMP_DEFAULT_WIDTH, RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_DEPTH_M, RAMP_MAX_DEPTH_M, RAMP_GRADE_STEP_DEGREES, type RampWidth,
@@ -87,6 +87,20 @@ export class RampTool {
     const region = controller.activeRegion;
     if (region?.exact) this.clampDepthToExactRegion(region);
     refresh();
+  }
+
+  /**
+   * Arms the tool pre-filled with `def` (#2144): its corners drawn, its depth, width and any grade set, so "Adjust" on a
+   * proposed access ramp lands in the manual tool exactly where the proposal stands. Re-arms when already armed.
+   */
+  armWith(def: RampDef): void {
+    const { controller } = this.deps.kit;
+    if (controller.isArmed) controller.cancel();
+    this.arm();
+    this.depth = Math.min(RAMP_MAX_DEPTH_M, def.targetDepth);
+    this.width = rampWidthOf(def);
+    this.grade = def.gradeDegrees ?? null;
+    controller.seedPath(rampWaypoints(rampPathOf(def)));
   }
 
   /**
@@ -321,7 +335,7 @@ export class RampTool {
         ? t('ui.build.ramp_spiral_preview', { length: spiral.proposal.totalLength, legs: spiral.proposal.legs.length, cost: validation?.cost ?? 0 })
         : def === null ? '' : this.footLine(def),
       fields: [
-        { key: 'depth', label: t('ui.build.ramp_depth'), value: this.depth, format: v => `${v}m`, onDec: () => { this.depth = Math.max(1, this.depth - 1); refresh(); }, onInc: () => { this.depth = Math.min(RAMP_MAX_DEPTH_M, this.depth + 1); refresh(); } },
+        { key: 'depth', label: t('ui.build.ramp_depth'), value: this.depth, format: v => `${Math.round(v * 10) / 10}m`, onDec: () => { this.depth = Math.max(1, this.depth - 1); refresh(); }, onInc: () => { this.depth = Math.min(RAMP_MAX_DEPTH_M, this.depth + 1); refresh(); } },
         { key: 'width', label: t('ui.build.ramp_width'), value: this.width, format: v => `${v}m`, onDec: () => { this.stepRampWidth(-1); refresh(); }, onInc: () => { this.stepRampWidth(1); refresh(); } },
         { key: 'grade', label: t('ui.build.ramp_grade'), value: shownGrade, format: v => `${v}°`, onDec: () => { this.stepGrade(-1, shownGrade, range); refresh(); }, onInc: () => { this.stepGrade(1, shownGrade, range); refresh(); } },
       ],

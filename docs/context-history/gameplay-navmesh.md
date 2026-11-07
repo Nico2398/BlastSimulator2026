@@ -73,3 +73,7 @@ Records why the rules in the `gameplay-navmesh` skill exist: the issues that int
 ## Search and approach caches
 
 - Failed terrain searches kept per nav grid revision, and the building main region likewise: a 12-hauler ladder run spent 59% of its A* time on repeated failed searches and a quarter of each tick re-labelling the grid for depot approaches (#2089).
+
+## Access ramp offer
+
+- The out-of-reach orders now come with a one-click proposed access ramp in the blast report and the Operations panel, planned by `planCraterAccess`, ordered only on the player's click (#2144).

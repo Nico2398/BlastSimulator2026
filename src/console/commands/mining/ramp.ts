@@ -1,5 +1,6 @@
 // BlastSimulator2026 — Console commands for ramp construction
 
+import { parseCommand } from '../../ConsoleRunner.js';
 import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
@@ -10,6 +11,7 @@ import {
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
 import { proposeRampSpiral, spiralSurfaceFrom, type RampSpiralProposal, type RampSpiralResult, type SpiralDir, type SpiralRequest } from '../../../core/mining/RampSpiral.js';
+import { proposeAccessRamp } from '../../../core/mining/CraterAccessProposal.js';
 import { queueRampOrder } from '../../../core/mining/RampOrder.js';
 import type { RampLeg, RampPathCell } from '../../../core/mining/RampPath.js';
 import { rampPathCells, legsFromWaypoints, firstOccupiedPathTile, rampPathOf, rampTotalLength } from '../../../core/mining/RampPath.js';
@@ -43,6 +45,8 @@ export function buildRampCommand(
     if (isNaN(rampId)) return { success: false, output: t('mining.build_ramp.cancel_usage') };
     return cancelRampCommand(ctx, rampId);
   }
+
+  if (args[0] === 'suggest') return suggestRampCommand(ctx, args[1] === 'order');
 
   const width = parseWidth(named['width']);
   if (!isRampWidth(width)) {
@@ -79,6 +83,23 @@ export function buildRampCommand(
   if (grade !== undefined) rampDef.gradeDegrees = grade;
 
   return orderRampDef(ctx, rampDef);
+}
+
+/**
+ * `build_ramp suggest [order]` (#2144): the access ramp the game proposes for stranded rubble. Plain `suggest` only
+ * prints it; `suggest order` runs the proposal's own `build_ramp path:…` order, so the cost, the digging work and
+ * every refusal are those of a ramp the player drew.
+ */
+function suggestRampCommand(ctx: MiningContext, order: boolean): CommandResult {
+  const proposal = proposeAccessRamp(ctx.state!, ctx.grid!);
+  if (proposal === null) return { success: false, output: t('mining.build_ramp.suggest_none') };
+  if (!proposal.ok) return { success: false, output: `${t(proposal.reasonKey)} ${t('mining.build_ramp.suggest_manual')}` };
+  if (!order) {
+    return { success: true, output: t('mining.build_ramp.suggest_preview', {
+      length: Math.round(proposal.length), cost: formatMoney(proposal.cost), orders: proposal.orderCount, line: proposal.line,
+    }) };
+  }
+  return buildRampCommand(ctx, [], parseCommand(proposal.line).namedArgs);
 }
 
 /** Validates, claims and queues the ordered `rampDef` (straight or multi-leg); the shared tail of every ramp order form. */

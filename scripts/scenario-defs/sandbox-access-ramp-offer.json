@@ -1,0 +1,299 @@
+{
+  "name": "sandbox-access-ramp-offer",
+  "description": "The opening shot's crater strands its own rubble (#2144): the blast report offers an access ramp with its cost, nothing is ordered until the player clicks Dig access ramp, the crew digs the proposed ramp, and the crater's rubble is hauled.",
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:digger seed:12345",
+      "role": "setup",
+      "description": "The menu-default sandbox (desert badlands, Digger kit, seed 12345): the site a new player lands on.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:desert_badlands kit:digger seed:12345"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "seed": 12345,
+          "mineType": "desert_badlands",
+          "builtRampCount": 0,
+          "orderedRampSegmentCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:36,30",
+      "role": "player",
+      "description": "The standard opening 3x3 shot, ordered from the Blast panel: nine holes, 4 m apart, 6 m deep.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 4
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "dragTiles",
+          "x1": 36,
+          "z1": 30,
+          "x2": 44,
+          "z2": 38
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 9,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:1500",
+      "role": "setup",
+      "timeout": 250,
+      "description": "The staffed driller lands all nine holes.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 240000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:6 stemming:2",
+      "role": "player",
+      "description": "Load 6 kg of Krackle per hole, drawn from the kit's starter stock.",
+      "interaction": [
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 6
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "role": "setup",
+      "timeout": 250,
+      "description": "The charges are loaded.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 240000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "role": "player",
+      "timeout": 120,
+      "description": "Fire the shot. The report opens afterwards with the access ramp offer in it: the player is not forced to dig (nothing is ordered here), the report only offers.",
+      "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "orderedRampSegmentCount": 0,
+          "builtRampCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:tickCount equals:270 max_ticks:50",
+      "role": "setup",
+      "timeout": 300,
+      "description": "The classifier stamps the shot's rubble out of reach on the first ticks after the blast, and the offer reads those stamps. The sim does not advance by itself while the harness waits on the report, so the ticks are driven here.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "tickCount",
+          "equals": 270,
+          "maxTicks": 50,
+          "timeoutMs": 120000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "[data-action=\"report-dig-ramp\"]",
+          "timeoutMs": 90000
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    },
+    {
+      "command": "build_ramp suggest order",
+      "role": "player",
+      "timeout": 60,
+      "description": "The player accepts the offer in the blast report: one click on Dig access ramp orders the proposed ramp and pays for it. The report is closed afterwards if the click left it open.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-dig-ramp\"]"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 3000
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:2500",
+      "role": "setup",
+      "timeout": 330,
+      "description": "The crew digs the proposed ramp end to end.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 2500,
+          "timeoutMs": 300000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0,
+          "builtRampCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Defensive: resolve an event that fired during the dig so the ticks below are not refused. No-op when none is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 800",
+      "role": "setup",
+      "timeout": 120,
+      "description": "The rubble on the crater floor is now reachable: the unreachable-order ghosts clear and the haulers carry spoil out to the heap. Ore is sold on the way (auto-sell), so stored ore is no signal.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 800"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "unreachableGhostCount"
+        ],
+        "increased": [
+          "storedSpoilKg"
+        ]
+      }
+    },
+    {
+      "command": "state full",
+      "role": "observe",
+      "description": "One built ramp, rubble hauled.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
+  ]
+}

@@ -53,6 +53,7 @@ import {
 import { isVanityType, isVanityAvailableIn } from '../core/entities/BuildingVanity.js';
 import { placementRefusalReason, hoverRefusal, claimRefusalText, type PlacementKit } from './scene/PlacementKit.js';
 import { RampTool } from './RampTool.js';
+import type { RampDef } from '../core/mining/Ramp.js';
 import type { SpiralSurface } from '../core/mining/RampSpiral.js';
 import { getResearchTaskDef } from '../core/config/balance.js';
 import { researchCostFor } from '../core/events/ActiveModifiers.js';
@@ -207,6 +208,8 @@ export class BuildMenu extends PanelBase {
     }
     return this.rampTool.tool;
   }
+  /** Arms the manual ramp tool pre-filled with `def` — the "Adjust" of a proposed access ramp (#2144). */
+  armRampWith(def: RampDef): void { this.rampToolFor()?.armWith(def); }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
   /** Register the non-mutating claim preview for a footprint rect, used to show a refused ghost before Confirm (#1396). */
   setClaimAreaPreview(

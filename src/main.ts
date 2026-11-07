@@ -84,6 +84,7 @@ import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRe
 import { nextRampWidth } from './core/mining/RampWidening.js';
 import { nextRampFlowSetting, rampFlowSetting } from './core/mining/RampFlow.js';
 import { quoteRampRepair } from './core/mining/RampRepair.js';
+import { proposeAccessRamp } from './core/mining/CraterAccessProposal.js';
 import { spiralSurfaceFrom } from './core/mining/RampSpiral.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 import { hasLevelEnded } from './core/engine/GameOverConditions.js';
@@ -232,6 +233,15 @@ uiManager.setPlacementKit(placementKit);
 // smoothed/rendered height — so the strip and the console never disagree.
 uiManager.setBuildSurfaceSampler((x, z) => ctx.grid ? getSurfaceY(ctx.grid, x, z) : 0);
 uiManager.setSpiralSurfaceProvider(() => ctx.grid ? spiralSurfaceFrom(ctx.grid, ctx.playableArea ?? null) : null);
+// The proposed access ramp is planned over the whole crater: read it once per tick (and per ramp order), not per frame (#2144).
+let accessRampMemo: { key: string; value: ReturnType<typeof proposeAccessRamp> } | null = null;
+uiManager.setAccessRampProvider(() => {
+  const state = ctx.state;
+  if (!state || !ctx.grid) return null;
+  const key = `${state.tickCount}|${state.plannedRamps.length}|${state.cash}|${state.pendingActions.length}`;
+  if (accessRampMemo?.key !== key) accessRampMemo = { key, value: proposeAccessRamp(state, ctx.grid) };
+  return accessRampMemo.value;
+});
 uiManager.setEstimateGridProvider(() => ctx.grid ?? null);
 uiManager.setHoleRockSampler(h => ctx.grid ? dominantRockUnderHole(ctx.grid, h) : null);
 
