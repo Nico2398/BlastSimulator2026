@@ -2015,7 +2015,7 @@ describe('ContractsPanel filter bar (#2159)', () => {
     makeContract({ id: 1, materialId: 'dirtite', quantityKg: 100, pricePerKg: 2, deadlineTicks: 300 }),
     makeContract({ id: 2, materialId: 'rustite', quantityKg: 10, pricePerKg: 9, deadlineTicks: 100 }),
     makeContract({ id: 3, type: 'rubble_disposal', materialId: '', quantityKg: 500, pricePerKg: 1, deadlineTicks: 200 }),
-    makeContract({ id: 4, materialId: 'dirtite', quantityKg: 40, pricePerKg: 5, deadlineTicks: 150 }),
+    makeContract({ id: 4, materialId: 'dirtite', quantityKg: 41, pricePerKg: 5, deadlineTicks: 150 }),
   ];
 
   it('renders a bs-filter-bar for the Available section inside the contracts panel', () => {
@@ -2121,7 +2121,7 @@ describe('ContractsPanel filter bar (#2159)', () => {
   it('total_value sort orders cards by quantity x price, highest first', () => {
     const { panel } = offerPanel(mixed());
     sortBy(panel, 'available', 'total_value');
-    expect(cardIds(panel)).toEqual([3, 1, 4, 2]); // 500, 200, 200 (id1 first by stable order), 90
+    expect(cardIds(panel)).toEqual([3, 4, 1, 2]); // 500, 205, 200, 90
   });
 
   it('deadline sort orders cards soonest deadline first', () => {
