@@ -248,7 +248,7 @@ describe('CrewPanel — scroll-bounded roster section (#958)', () => {
 
     const rosterWrapper = children[0]!;
     const hiringHeader = children[hiringIdx]!;
-    const hiringRows = children.slice(hiringIdx + 1);
+    const hiringRows = children.slice(hiringIdx + 1).filter(c => c.dataset['hiringRole'] !== undefined); // the filter bar (#2160) sits between header and rows
 
     expect(rosterWrapper.contains(hiringHeader)).toBe(false);
     expect(hiringRows.length).toBe(5); // ROLES: driller, blaster, driver, surveyor, manager
