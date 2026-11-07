@@ -62,6 +62,8 @@ export function applyTaskCompletion(
   progress: TaskProgressResult,
   emitter: EventEmitter,
 ): TaskCompletionReport {
+  // The completed order's own record: the vehicle-continuity block below drops it from the queue.
+  const finished = state.pendingActions.find(a => a.id === progress.actionId);
   const report: TaskCompletionReport = {
     completed: progress.completed,
     levelUps: progress.levelUps,
@@ -217,7 +219,8 @@ export function applyTaskCompletion(
       const hole = state.drillHoles.find(h => h.id === holeId);
       if (planned && !canAffordChargeLoad(state, planned.explosiveId, planned.amountKg)) {
         // Cash fell short since the claim-time gate (#2155): keep the order, queue it again, load nothing.
-        if (hole) dispatchChargeAction(state, hole, planned);
+        const at = hole ?? (finished ? { id: holeId, x: finished.targetX, z: finished.targetZ } : undefined);
+        if (at) dispatchChargeAction(state, at, planned);
       } else if (planned) {
         delete state.plannedChargesByHole[holeId];
         // Pay on fill (#2143): stock draws and cash book now, not at order time.

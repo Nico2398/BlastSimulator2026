@@ -652,7 +652,7 @@ describe('ChargeStep — explosive too weak for the rock warning (#1358)', () =>
   });
 });
 
-describe('ChargeStep — pattern line, awaiting funds, refusal notice (#1345)', () => {
+describe('ChargeStep — pattern line, refusal notice (#1345)', () => {
   it('shows the pattern line only while a pattern charge is set', () => {
     const { step } = makeStep();
     const state = makeState();
