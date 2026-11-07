@@ -595,6 +595,14 @@ function migrateV35ToV36(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/**
+ * v36 -> v37 (#2155): prepaid charge orders are refunded and stripped, the dead awaiting-funds
+ * list is dropped. Gated on the save's version (a refund must happen once).
+ */
+function migrateV36ToV37(obj: Record<string, unknown>): Record<string, unknown> {
+  return obj;
+}
+
 /** v34 -> v35 (#1414): EventSystemState gains activeModifiers and nextModifierId. Idempotent. */
 function migrateV34ToV35(obj: Record<string, unknown>): Record<string, unknown> {
   const events = obj['events'] as Record<string, unknown> | undefined;
@@ -996,6 +1004,7 @@ export function deserialize(json: string): GameState {
   migrateV33ToV34(obj);
   migrateV34ToV35(obj);
   migrateV35ToV36(obj);
+  if ((obj['version'] as number) < 37) migrateV36ToV37(obj);
   // Every migration above has run: the state is now at the current version.
   obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);
