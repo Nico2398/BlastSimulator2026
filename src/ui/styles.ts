@@ -11,6 +11,13 @@ const RAIL_RULE_SELECTORS = RAILED_CONTROL_SELECTOR.split(',')
   .join(',\n');
 
 const CSS = `
+/* shared filter/sort bar (src/ui/filterBar.ts) */
+.bs-filter-bar { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.bs-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.bs-filter-label { font: 600 10px/1 var(--bsx-font-ui); color: var(--bsx-text-muted); margin-right: 2px; }
+.bs-filter-btn { font: 600 10px/1 var(--bsx-font-ui); padding: 4px 7px; border: 1px solid var(--bsx-hairline); border-radius: var(--bsx-r-card); background: transparent; cursor: pointer; }
+.bs-filter-clear { align-self: flex-start; }
+
 /* Everything the bsx surfaces style inline or through tokens.ts lives there. This
    sheet keeps only what cannot: click-through layering, selector hooks the
    tutorial and scenarios ride on, the tutorial card, and the tutorial rails. */
