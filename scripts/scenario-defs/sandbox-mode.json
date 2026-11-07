@@ -227,7 +227,7 @@
           "orderedChargeCount"
         ]
       },
-      "description": "#2118: the digger kit's starter warehouse holds 100 kg of Krackle, so the charge draws from that stock with no delivery wait."
+      "description": "The charge is ordered and loads with no delivery wait; the explosive is bought at list price as the hole is loaded."
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",

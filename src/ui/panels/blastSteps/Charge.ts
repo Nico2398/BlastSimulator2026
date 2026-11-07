@@ -69,6 +69,7 @@ export class ChargeStep {
   private readonly capacityLineEl: HTMLElement;
   private readonly weakLineEl: HTMLElement;
   private readonly patternLineEl: HTMLElement;
+  private readonly paidOnFillEl: HTMLElement;
   private readonly noticeEl: HTMLElement;
   private readonly holeList: ChargeHoleList;
   private readonly tubingCardEl: HTMLElement;
@@ -146,6 +147,8 @@ export class ChargeStep {
     this.capacityLineEl.dataset['info'] = 'hole-capacity';
     this.weakLineEl = el('div');
     this.patternLineEl = el('div');
+    this.paidOnFillEl = el('div', { attrs: { style: 'font:500 10px/1.4 var(--bsx-font-ui);color:var(--bsx-amber)' } });
+    this.paidOnFillEl.dataset['info'] = 'paid-on-fill';
     this.noticeEl = el('div');
     this.noticeEl.style.display = 'none';
     this.holeList = new ChargeHoleList(holeId => this.chargeHole(holeId), holeId => this.runAndNotify(`drain_hole hole:${holeId}`));
@@ -157,7 +160,7 @@ export class ChargeStep {
 
     // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
-      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.weakLineEl,
+      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.paidOnFillEl, this.weakLineEl,
       this.holeList.root, this.drainEl, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
@@ -327,6 +330,8 @@ export class ChargeStep {
     this.chargeLineEl.textContent = t('ui.blast_workshop.charge.charge_line', {
       count: holeCount, amount: this.amountKg, name, cost: `$${formatMoney(cashCost)}`,
     });
+    // Estimate only: nothing is paid until a blaster loads each hole (#2143).
+    this.paidOnFillEl.textContent = cashCost > 0 ? t('ui.blast_workshop.charge.paid_on_fill') : '';
   }
 
   // Charge column + stemming overflowing the tightestDepth hole: say why and block
