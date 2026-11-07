@@ -4,10 +4,10 @@
 import type { EventDef } from './EventPool.js';
 import { EVENT_MAJOR_CASH_SHARE } from '../config/balance.js';
 
-export type EventWeight = 'major' | 'minor';
+type EventWeight = 'major' | 'minor';
 
 /** The part of an event outcome the weight rule and the default-answer rule read. */
-export interface OptionOutcome {
+interface OptionOutcome {
   readonly cashDelta?: number;
   readonly effects?: ReadonlyArray<{ readonly type: string }>;
   readonly altConsequence?: OptionOutcome;

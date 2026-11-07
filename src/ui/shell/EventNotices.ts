@@ -20,7 +20,7 @@ function dockBounds(viewport: Viewport): Rect {
 }
 
 /** What one card shows, derived from state so the DOM can be skipped when nothing changed. */
-export interface NoticeCardModel {
+interface NoticeCardModel {
   eventId: string;
   title: string;
   desc: string;
@@ -29,7 +29,7 @@ export interface NoticeCardModel {
 }
 
 /** One card per live notice whose definition still exists. */
-export function noticeCards(state: GameState): NoticeCardModel[] {
+function noticeCards(state: GameState): NoticeCardModel[] {
   const cards: NoticeCardModel[] = [];
   for (const notice of state.events.minorNotices) {
     const def = getEventById(notice.eventId);
