@@ -193,6 +193,18 @@
       }
     },
     {
+      "command": "tick 5",
+      "role": "setup",
+      "timeout": 60,
+      "description": "The classifier stamps the shot's rubble out of reach on the first ticks after the blast; the proposal reads those stamps. In interaction mode the report has been open for ticks already, so this only pads.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ]
+    },
+    {
       "command": "build_ramp suggest order",
       "role": "player",
       "timeout": 60,
@@ -253,7 +265,7 @@
       "command": "tick 800",
       "role": "setup",
       "timeout": 120,
-      "description": "The rubble on the crater floor is now reachable: the debris hauler carries it out and storage grows. No state-dump field holds the out-of-reach count and waitUntil only matches an exact value, so this is a hand-measured pad with an `increased` goal; the out-of-reach count itself falling to near zero is asserted by tests/integration/access-ramp-suggest.integration.test.ts.",
+      "description": "The rubble on the crater floor is now reachable: the unreachable-order ghosts clear and the haulers carry spoil out to the heap. Ore is sold on the way (auto-sell), so stored ore is no signal.",
       "interaction": [
         {
           "type": "command",
@@ -261,15 +273,18 @@
         }
       ],
       "expect": {
+        "decreased": [
+          "unreachableGhostCount"
+        ],
         "increased": [
-          "storedMassKg"
+          "storedSpoilKg"
         ]
       }
     },
     {
       "command": "state full",
       "role": "observe",
-      "description": "One built ramp, ore in storage.",
+      "description": "One built ramp, rubble hauled.",
       "interaction": [
         {
           "type": "command",
