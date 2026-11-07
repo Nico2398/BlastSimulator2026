@@ -15,6 +15,7 @@ import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSect
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
+import { FilterBarSelection } from '../filterBar.js';
 import { makeHiringSection, hiringSignature } from './CrewHiring.js';
 import { moraleColor, makeAvatar, makeRoleMoraleLine, makeStatusTags, makeManagerEffect } from '../crewDetailSections.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -29,6 +30,7 @@ export class CrewPanel extends PanelBase {
   /** Role to scroll into view once the hiring section next renders (revealHiring before first render/show). */
   private pendingHiringRole: EmployeeRole | null = null;
   private lastState: GameState | null = null;
+  private readonly hiringSelection = new FilterBarSelection();
   private onSelectEmployeeCb?: (employeeId: number) => void;
   private readonly locale = new LocaleTextRegistry();
 
@@ -124,7 +126,7 @@ export class CrewPanel extends PanelBase {
         return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}:${e.name}:${quals}`;
       })
       .join('|');
-    return `${rows}#${hiringSignature(state)}`;
+    return `${rows}#${hiringSignature(state, this.hiringSelection)}`;
   }
 
   /** Re-paint values that drift every tick without rebuilding the DOM under an in-flight click. */
@@ -156,7 +158,10 @@ export class CrewPanel extends PanelBase {
     replaceChildrenKeepingScroll(this.bodyEl, [
       scrollBoundedSection(cards, 200, { gap: 8, className: 'bsx-roster-scroll', scrollKey: 'roster' }),
       sectionHeader(t('ui.crew.hiring')),
-      ...makeHiringSection(state, (role, candidateId) => this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`)),
+      ...makeHiringSection(state, (role, candidateId) => this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`), {
+        selection: this.hiringSelection,
+        onChange: () => { if (this.lastState) { this.lastSignature = ''; this.update(this.lastState); } },
+      }),
     ]);
     if (this.pendingHiringRole) {
       this.scrollToHiring(this.pendingHiringRole);

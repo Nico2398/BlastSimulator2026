@@ -43,10 +43,11 @@ export class FilterBarSelection {
   clear(): void {
     this.filter = null;
     this.sort = null;
+    this.groups = {};
   }
 
   isActive(): boolean {
-    return this.filter !== null || this.sort !== null;
+    return this.filter !== null || this.sort !== null || Object.values(this.groups).some(v => v != null);
   }
 }
 
@@ -77,6 +78,22 @@ export function filterBar(selection: FilterBarSelection, cfg: FilterBarConfig): 
     }),
   ] });
 
+  const groupRows = (cfg.groups ?? []).map(group => {
+    const row = el('div', { className: 'bs-filter-row', children: [
+      el('span', { className: 'bs-filter-label', text: group.label }),
+      ...group.choices.map(choice => {
+        const btn = barButton(choice.label, selection.groups[group.id] === choice.value, () => {
+          selection.groups[group.id] = toggle(selection.groups[group.id] ?? null, choice.value);
+          emit();
+        });
+        btn.dataset['filterValue'] = choice.value;
+        return btn;
+      }),
+    ] });
+    row.dataset['filterGroup'] = group.id;
+    return row;
+  });
+
   const sortRow = el('div', { className: 'bs-filter-row', children: [
     el('span', { className: 'bs-filter-label', text: cfg.sortLabel }),
     ...cfg.sorts.map(sort => {
@@ -94,5 +111,5 @@ export function filterBar(selection: FilterBarSelection, cfg: FilterBarConfig): 
     : null;
   if (clear) clear.classList.add('bs-filter-clear');
 
-  return el('div', { className: 'bs-filter-bar', children: [filterRow, sortRow, clear] });
+  return el('div', { className: 'bs-filter-bar', children: [filterRow, ...groupRows, sortRow, clear] });
 }
