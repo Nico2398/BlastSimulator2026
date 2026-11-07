@@ -148,7 +148,8 @@ export function tickCommand(
         lines.push(`  ${t(def.descKey)}`);
         pushEventOptionLines(lines, def);
       }
-      break;
+      // A minor event is a notice: the clock keeps running.
+      if (!firedEvent.minor) break;
     }
 
     // Armed detonation (#1362): fire once the zone is clear, once, and stop the batch.

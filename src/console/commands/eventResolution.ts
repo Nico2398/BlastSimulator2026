@@ -8,11 +8,13 @@ import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
 import { getEventById } from '../../core/events/EventPool.js';
 import { resolveEvent } from '../../core/events/EventResolver.js';
-import { clearLastOutcome } from '../../core/events/EventSystem.js';
+import { clearLastOutcome, noticeTicksLeft } from '../../core/events/EventSystem.js';
+import { applyResolutionToState, resolveNotice } from '../../core/events/EventNotices.js';
+import { isMajorEvent } from '../../core/events/EventWeight.js';
 import { effectChipText } from '../../core/events/EventEffectText.js';
 import { modifierSummary } from '../../core/events/ModifierText.js';
-import { applyCorruptionDelta } from '../../core/economy/Corruption.js';
 import { drawPendingLeavers } from '../../core/events/EventLeavers.js';
+import { EVENT_NOTICE_COUNTDOWN_TICKS } from '../../core/config/balance.js';
 import { requireGame } from './commandUtils.js';
 
 /**
@@ -39,21 +41,30 @@ export function eventCommand(
 
   switch (sub) {
     case 'status': {
-      if (!state.events.pendingEvent) {
+      const notices = state.events.minorNotices;
+      if (!state.events.pendingEvent && notices.length === 0) {
         return { success: true, output: t('eventResolution.none_pending') };
       }
-      const def = getEventById(state.events.pendingEvent.eventId);
-      if (!def) return { success: false, output: t('eventResolution.def_not_found') };
-      const lines = [
-        `Pending event: ${t(def.titleKey)}`,
-        t(def.descKey),
-        '',
-        'Options:',
-      ];
-      for (let i = 0; i < def.options.length; i++) {
-        lines.push(`  [${i}] ${t(def.options[i]!.labelKey)}`);
+      const lines: string[] = [];
+      if (state.events.pendingEvent) {
+        const def = getEventById(state.events.pendingEvent.eventId);
+        if (!def) return { success: false, output: t('eventResolution.def_not_found') };
+        lines.push(`Pending event: ${t(def.titleKey)}`, t(def.descKey), '', 'Options:');
+        for (let i = 0; i < def.options.length; i++) {
+          lines.push(`  [${i}] ${t(def.options[i]!.labelKey)}`);
+        }
+        lines.push('', 'Use "event choose <index>" to decide.');
       }
-      lines.push('', 'Use "event choose <index>" to decide.');
+      for (const notice of notices) {
+        const def = getEventById(notice.eventId);
+        if (!def) continue;
+        if (lines.length > 0) lines.push('');
+        lines.push(t('eventResolution.notice_header', { title: t(def.titleKey), id: def.id, ticks: noticeTicksLeft(notice, state.tickCount) }), t(def.descKey));
+        for (let i = 0; i < def.options.length; i++) {
+          lines.push(`  [${i}] ${t(def.options[i]!.labelKey)}`);
+        }
+        lines.push(t('eventResolution.notice_hint', { id: def.id }));
+      }
       return { success: true, output: lines.join('\n') };
     }
 
@@ -61,15 +72,17 @@ export function eventCommand(
       const idx = parseInt(args[1] ?? '', 10);
       if (isNaN(idx)) return { success: false, output: t('eventResolution.choose_usage') };
       const rng = new Random(state.seed + state.tickCount);
-      const result = resolveEvent(state.events, state.finances, state.scores, idx, state.tickCount, rng, { state, grid: ctx.grid, emitter: ctx.emitter });
+      const world = { state, grid: ctx.grid, emitter: ctx.emitter };
+      // A named event is a notice; a bare index answers the pending major, else the oldest notice (#2146).
+      const noticeId = args[2] ?? (state.events.pendingEvent ? undefined : state.events.minorNotices[0]?.eventId);
+      const answersNotice = noticeId !== undefined;
+      const result = answersNotice
+        ? resolveNotice(state, noticeId, idx, rng, world)
+        // resolveEvent already logged the transaction to state.finances; applyResolutionToState mirrors
+        // it onto the flat state.cash field that FinancesPanel and serializeGameState read.
+        : resolveEvent(state.events, state.finances, state.scores, idx, state.tickCount, rng, world);
       if (!result) return { success: false, output: t('eventResolution.choose_invalid') };
-
-      // resolveEvent already logged the transaction to state.finances via
-      // addIncome/addExpense — mirror it onto the flat state.cash field too,
-      // the same dual-write every other cash-moving command in this file
-      // does, since FinancesPanel.ts and serializeGameState() both read the
-      // flat field, not state.finances.cash.
-      state.cash += result.cashChange;
+      if (!answersNotice) applyResolutionToState(state, result);
 
       const lines = [`Event resolved: ${result.eventId}`, t(result.resultKey), 'Consequences:'];
       for (const e of result.effects) {
@@ -78,11 +91,8 @@ export function eventCommand(
       for (const chip of result.effectChips) {
         lines.push(`  • ${effectChipText(chip)}`);
       }
-      if (result.corruptionChange !== 0) {
-        applyCorruptionDelta(state.corruption, result.corruptionChange);
-      }
-      // Resume the game after resolving the event (tick pauses on event)
-      state.isPaused = false;
+      // Resume the game after resolving a major event (tick pauses on it); a notice never paused it.
+      if (!answersNotice) state.isPaused = false;
       return { success: true, output: lines.join('\n') };
     }
 
@@ -121,14 +131,24 @@ export function eventCommand(
       if (!def) {
         return { success: false, output: t('eventResolution.fire_not_found', { eventId }) };
       }
-      state.events.pendingEvent = { eventId: def.id, firedAtTick: state.tickCount };
+      const minor = !isMajorEvent(def, state.cash);
+      if (minor) {
+        state.events.minorNotices.push({
+          eventId: def.id, firedAtTick: state.tickCount, minor: true,
+          expiresAtTick: state.tickCount + EVENT_NOTICE_COUNTDOWN_TICKS,
+        });
+      } else {
+        state.events.pendingEvent = { eventId: def.id, firedAtTick: state.tickCount };
+      }
       if (!state.events.firedEventIds.includes(def.id)) {
         state.events.firedEventIds.push(def.id);
       }
       state.events.lastEventTick = state.tickCount;
       state.events.actionCountSinceEvent = 0;
-      drawPendingLeavers(state.events, state.employees.employees, new Random(state.seed + state.tickCount));
-      state.isPaused = true;
+      if (!minor) {
+        drawPendingLeavers(state.events, state.employees.employees, new Random(state.seed + state.tickCount));
+        state.isPaused = true;
+      }
       const lines = [
         `EVENT: ${t(def.titleKey)}`,
         `  ${t(def.descKey)}`,

@@ -39,14 +39,22 @@ export function cheapestEventOption(consequences: ReadonlyArray<OptionOutcome>):
 }
 
 /** Whether an outcome (or its fallback) carries a major effect or a cash cost above `cashLimit`. */
-function outcomeIsMajor(_outcome: OptionOutcome | undefined, _cashLimit: number): boolean {
-  throw new Error('not implemented');
+function outcomeIsMajor(outcome: OptionOutcome | undefined, cashLimit: number): boolean {
+  if (!outcome) return false;
+  if ((outcome.effects ?? []).some(e => MAJOR_EFFECT_TYPES.has(e.type))) return true;
+  const cash = outcome.cashDelta ?? 0;
+  if (cash < 0 && -cash > cashLimit) return true;
+  return outcomeIsMajor(outcome.altConsequence, cashLimit);
 }
 
+/** Categories detected from the world (or scripted) rather than drawn from a timer: always a modal. */
+const ALWAYS_MAJOR_CATEGORIES: ReadonlySet<string> = new Set(['traffic', 'mining', 'tutorial']);
+
 /** Major when any option carries a stakes effect or a heavy cash cost; engine-detected categories are always major. */
-export function eventWeight(_def: Pick<EventDef, 'category' | 'consequences'>, _cash: number): EventWeight {
-  void MAJOR_EFFECT_TYPES; void EVENT_MAJOR_CASH_SHARE; void outcomeIsMajor;
-  throw new Error('not implemented');
+export function eventWeight(def: Pick<EventDef, 'category' | 'consequences'>, cash: number): EventWeight {
+  if (ALWAYS_MAJOR_CATEGORIES.has(def.category)) return 'major';
+  const cashLimit = EVENT_MAJOR_CASH_SHARE * Math.max(cash, 0);
+  return def.consequences.some(c => outcomeIsMajor(c, cashLimit)) ? 'major' : 'minor';
 }
 
 export function isMajorEvent(def: Pick<EventDef, 'category' | 'consequences'>, cash: number): boolean {

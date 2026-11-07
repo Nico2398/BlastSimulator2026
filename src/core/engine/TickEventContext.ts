@@ -24,6 +24,7 @@ export function buildTickEventContext(s: GameState): EventContext {
     hasBuilding: (type: string) => s.buildings.buildings.some(b => b.type === type),
     hasDrillPlan: s.drillHoles.length > 0,
     tickCount: s.tickCount,
+    cash: s.cash,
     lawsuitCount: s.events.firedEventIds.filter(id => lawsuitIds.has(id)).length,
     activeContractCount: s.contracts.active.length,
     weatherId: s.weather.current,
