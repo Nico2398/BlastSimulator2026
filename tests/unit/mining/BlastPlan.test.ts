@@ -164,7 +164,7 @@ describe('buildingsInBlastReach (#2021)', () => {
   it('reports the issue layout: office, freight and explosive warehouse, not the quarters', () => {
     const buildings = [
       bld(1, 'living_quarters', 30, 48),
-      bld(2, 'explosive_warehouse', 22, 48, { krackle: 228 }),
+      bld(2, 'explosive_warehouse', 22, 48),
       bld(3, 'management_office', 14, 48),
       bld(4, 'freight_warehouse', 14, 40),
     ];

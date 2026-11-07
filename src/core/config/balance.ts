@@ -2366,27 +2366,6 @@ export const RAMP_RESERVATION_MARGIN = 0;
 /** Cell radius around a drill hole kept clear of buildings (#1390). */
 export const HOLE_RESERVATION_RADIUS = 0;
 
-/** Secondary blast radius floor in metres (#1394). */
-export const SECONDARY_BLAST_RADIUS_BASE_M = 5;
-
-/** Secondary blast radius growth per sqrt(kg) of stored explosive (#1394). */
-export const SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M = 0.5;
-
-/** Secondary blast radius cap in metres (#1394). */
-export const SECONDARY_BLAST_RADIUS_MAX_M = 40;
-
-/** Fraction of max HP a building or vehicle loses at the epicentre, falling off linearly to 0 at the radius (#1394). */
-export const SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION = 0.6;
-
-/** Fraction of the radius within which people die (#1394). */
-export const SECONDARY_BLAST_DEATH_RADIUS_FRACTION = 0.5;
-
-/** Depth in metres of the single crater hole a secondary blast fires (#1896). */
-export const SECONDARY_BLAST_CRATER_HOLE_DEPTH_M = 3;
-
-/** Cap on blast passes carving one secondary crater (#1896). */
-export const SECONDARY_BLAST_CRATER_MAX_PASSES = 4;
-
 /** Offset added to the game seed to derive the weather cycle's PRNG seed (#1403). */
 export const WEATHER_RNG_SEED_OFFSET = 1000;
 

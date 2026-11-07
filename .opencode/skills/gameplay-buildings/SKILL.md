@@ -28,7 +28,7 @@ All tier names are fictional and humorous. Localized via i18n (`en.json` + `fr.j
 | Geology Lab | "Rock Shed" | "Stone Science HQ" | "Institute of Expensive Rocks" | Trains survey techniques |
 | Research Center | "Think Tank Tent" | "Innovation Bunker" | "The Ivory Crater" | Unlocks higher tiers (paid research tasks) |
 | Living Quarters | "The Cells" | "Staff Dormitory" | "Unnecessarily Luxurious Hotel" | Houses + feeds employees; grade → well-being |
-| Explosive Warehouse | "Boom Closet" | "Blast Vault" | "Fort Kaboom" | Bulk explosive stock, cheaper per kg |
+| Explosive Warehouse | "Boom Closet" | "Blast Vault" | "Fort Kaboom" | Holds nothing: explosives are bought as each hole is loaded (retired in a later slice) |
 | Freight Warehouse | "The Pile" | "Stuff Bunker" | "Hoarder's Paradise" | Stores ore debris; primary income source |
 | Spoil Heap | "The Dump" | (single tier) | (single tier) | Takes barren rock hauled off the blast; 1,500 t capacity (`SPOIL_HEAP_CAPACITY_KG`, one ordinary shot); no crew needed |
 
@@ -114,18 +114,10 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
 ## Warehouses
 
 **Explosive Warehouse:**
-- Optional risk/reward store. `buy explosive:<id> kg:<n>` puts explosive into stock at the **bulk price** (catalog `costPerKg` x `EXPLOSIVE_BULK_PRICE_FACTOR` 0.7 x the live `explosive_price` event factor); `buyExplosiveStock` in `ExplosiveStock.ts`.
-- Stock is per explosive id (`Building.storedExplosives`, kg). Capacity (500 / 1,500 / 4,000 kg by tier) is shared across types and summed over operating warehouses; stores fill in placement order. Saves without the field load as empty.
-- Charges draw matching stock first when the hole is loaded, the remainder is paid in cash at the list price; nothing is reserved or paid at order time. No warehouse (or no matching stock) = the whole charge is bought in cash at the list price at loading.
-- No delivery wait: a charge loads as soon as a blaster reaches the hole. When cash cannot cover the cash part at fill time the order is not claimable (`isHoleOrderClaimable`, blocked reason `explosives_unaffordable`) until it can.
-- Cancelling an unloaded charge order costs nothing, refunds nothing and returns no stock; a loaded charge is consumed.
-- UI: the Blast Workshop Charge step lists each offered explosive's stock (`[data-stock]`), buys into stock in `STOCK_BUY_STEP_KG` (50 kg) steps (`[data-action="stock-buy"]`, disabled with a visible reason from the pure `buyStockBlockReason`), and shows how much of the current pattern is paid from stock (`[data-info="paid-from"]`). A selected Explosive Warehouse shows its stock and free kg in the inspector (`[data-info="warehouse-stock"]`).
-- Inspector contents (`storageContent.ts`): a Contents section for every storage building. Explosive Warehouse: a row per explosive held, used/capacity gauge, and the secondary-blast detonation radius while stocked (replaced by "stock unavailable" while closed). Freight Warehouse: gauge, free and in-transit-reserved kg, per-ore rows and a barren row from `warehouseStockByOre` (`FreightWarehouses.ts`, one pass over the stored fragments; `loseOrphanedStock` reuses it). Spoil Heap: spoil kg, used/capacity gauge and free kg. Rows of 0.5 kg or less are hidden.
-- Previews are net of stock at list price (`stockAwareChargesCost`): Charge All label, footer and Preflight cost read the cash part of the recorded orders (`recordedChargesCost`, from each charge's `fromStockKg`, absent = 0 in saves without it). The blast report's `spent` is cash only; `spentFromStock` is the list value of the stock-supplied kg.
-- Capacity scales with tier; an order for more kg than free space is refused entirely (whole-kg purchases only).
-- `plannedChargesCost` and UI cost previews stay at list price.
-- Bulk factor 0.7 applies together with the event price factor; a purchase over free capacity is refused whole, never partly filled; stock is reserved (consumed) at order time, not at loading; unrestockable kg on cancel are refunded as cash at the bulk price.
-- If destroyed by blast projection while containing explosives → **secondary blast event**
+- Holds nothing. Explosive stock is gone from the game: explosives are bought as each hole is loaded, at list price (`costPerKg` x the live `explosive_price` event factor, `ChargeLoad.ts`); there is no `buy explosive:` command, no stock purchase in the Charge step, no stock in starting kits and no stock rows in the inspector.
+- Destroying a warehouse (blast, flying rock or demolition) never detonates: with no stock there is no secondary blast. Demolishing it loses nothing.
+- The building itself stays until a later slice retires it; the sandbox kits still place one and the tutorial still has a build step for it.
+- Inspector contents (`storageContent.ts`): a Contents section for the Freight Warehouse (gauge, free and in-transit-reserved kg, per-ore rows and a barren row from `warehouseStockByOre`, `FreightWarehouses.ts`) and the Spoil Heap (spoil kg, used/capacity gauge and free kg). Rows of 0.5 kg or less are hidden. The Explosive Warehouse has no Contents section.
 
 **Freight Warehouse:**
 - Stores ore debris hauled from blast zone
@@ -220,25 +212,7 @@ Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJE
 - Stored contents lost. A Freight Warehouse's stock is lost with it (`loseOrphanedStock`): other
   warehouses are untouched, `storedMassKg`/`collectedOre` are debited, in-transit reservations are not
   lost (re-picked on delivery). Reported by the `logistics:warehouse_stock_lost` event (toast), the
-  `blast` output, and a warning line on `build destroy`. An Explosive Warehouse destroyed by a blast or flying rock **with stock**
-  detonates (`resolveSecondaryBlasts`, `SecondaryBlast.ts`):
-  - Radius = `SECONDARY_BLAST_RADIUS_BASE_M + SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M * sqrt(kg)`, capped at
-    `SECONDARY_BLAST_RADIUS_MAX_M`, measured from the centre of the warehouse footprint.
-  - Buildings and vehicles within it take `maxHp * SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION` damage,
-    falling off linearly to 0 at the radius. Employees within `SECONDARY_BLAST_DEATH_RADIUS_FRACTION`
-    of the radius die (lawsuit pending, death count up); those further in are injured. Dead or already
-    injured employees are skipped; occupants of a destroyed building or vehicle are injured.
-  - Chain: another stocked warehouse destroyed by a detonation detonates once in turn (visited set).
-  - **Crater:** the detonation also breaks the ground where the warehouse stood, through the blast pipeline
-    (`secondaryCraterPlan` -> `executeBlastSteps`, fired by `carveSecondaryCraters`): one hole at the floored footprint centre,
-    `SECONDARY_BLAST_CRATER_HOLE_DEPTH_M` deep, charged with the whole stock (kg summed over all explosives, type = the one with
-    most stored kg), no stemming. Its rock becomes hauling fragments; buildings and crew on cleared ground are destroyed as in
-    the main blast; stocked warehouses it destroys chain, bounded by `SECONDARY_BLAST_CRATER_MAX_PASSES`.
-    The crater goes through the blast pipeline, not a plain carve, so it leaves fragments to haul and nav/render follow
-    `terrain:updated`; hole depth 3 m (`SECONDARY_BLAST_CRATER_HOLE_DEPTH_M`); heaviest explosive sets the type
-    (`secondaryCraterPlan`); crater fragments do not feed projection damage (the radius model already covers it).
-  - The blast report lists each detonation; the `blast` output carries one line per detonation.
-  - **Demolition does not detonate**: `build destroy` of a stocked warehouse only reports the lost kg.
+  `blast` output, and a warning line on `build destroy`. An Explosive Warehouse holds nothing, so destroying it never detonates.
 - Well-being, Safety, Ecology score penalties applied
 - Research Center destroyed while its enabling research task is in-flight and no other active Research Center remains → the in-flight task is cancelled and its cost refunded in full; a task still pending behind it in the queue is cancelled/refunded in turn once it reaches the head with no Research Center present. If another active Research Center still exists, the in-flight task is unaffected.
 
@@ -248,7 +222,7 @@ Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJE
 |----------|---------------|-----------------|
 | Living Quarters Tier 1 | Housing/feeding | Baseline well-being |
 | Living Quarters Tier 3 | Housing/feeding | High well-being → productivity ×1.10 |
-| Explosive Warehouse | Bulk explosive stock at 0.7x price | Secondary blast if destroyed with stock |
+| Explosive Warehouse | None (holds nothing; explosives are bought at loading) | None |
 | Freight Warehouse | Enables ore sale contracts | Main income; throughput limited by distance |
 | Spoil Heap | Dumps barren rock off the freight pool | Without one, barren hauls are blocked |
 | Research Center | Unlocks building tiers | Occupied during each research task |

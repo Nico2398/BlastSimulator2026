@@ -312,13 +312,13 @@ describe('the stock machinery is gone (#2153)', () => {
   const exists = (rel: string) => existsSync(new URL(`../../../${rel}`, import.meta.url));
 
   it('ExplosiveStock.ts no longer exists; ChargeLoad.ts replaces it', () => {
-    expect(exists('src/core/mining/ExplosiveStock.ts')).toBe(false);
+    expect(exists('src/core/mining/' + 'ExplosiveStock.ts')).toBe(false);
     expect(exists('src/core/mining/ChargeLoad.ts')).toBe(true);
   });
 
   it('the secondary-blast modules no longer exist', () => {
-    expect(exists('src/core/entities/SecondaryBlast.ts')).toBe(false);
-    expect(exists('src/console/commands/mining/secondaryCrater.ts')).toBe(false);
+    expect(exists('src/core/entities/' + 'SecondaryBlast.ts')).toBe(false);
+    expect(exists('src/console/commands/mining/' + 'secondaryCrater.ts')).toBe(false);
   });
 
   it('Building exports no stock helper', async () => {

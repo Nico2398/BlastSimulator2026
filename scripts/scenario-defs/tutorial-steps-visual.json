@@ -854,6 +854,14 @@
       "timeout": 90,
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
           "property": "textContent",

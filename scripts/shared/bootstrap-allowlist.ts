@@ -218,4 +218,7 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   'buy tubing',
   'install_tubing',
   'drain_hole',
+  // explosive-pay-on-fill-visual.json (#2143): the one-hole fixture it observes a pay-on-fill charge on.
+  'drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15',
+  'charge hole:* explosive:boomite amount:5 stemming:2',
 ];
