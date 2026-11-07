@@ -739,6 +739,8 @@ export function deserialize(json: string): GameState {
   ensureField(eventsRaw, 'unionActionCountSinceEvent', v => typeof v === 'number', 0);
   ensureField(eventsRaw, 'unionCooldownMinIntervalTicks', v => typeof v === 'number', null);
   ensureField(eventsRaw, 'unionGrievance', v => typeof v === 'number', 0);
+  ensureField(eventsRaw, 'minorNotices', Array.isArray, []);
+  ensureField(eventsRaw, 'lastNoticeOutcome', v => typeof v === 'object', null);
 
   // #1083: VehicleState gained a `driverBoardingCount` lifetime counter. A
   // pre-#1083 save has none recorded — default to 0, matching

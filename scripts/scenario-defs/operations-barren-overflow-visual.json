@@ -505,9 +505,10 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
+        "increased": [
           "cash"
-        ]
+        ],
+        "note": "#2146: minor events are non-blocking notices now. Over this window income lands (contract #74 delivery and other event/notice effects, no longer halted by minor events) and outweighs the upkeep drain, so cash rises (685164 -> ~692120) instead of falling."
       }
     },
     {

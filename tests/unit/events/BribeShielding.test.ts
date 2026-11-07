@@ -37,7 +37,8 @@ function makeCtx(overrides: Partial<EventContext> = {}): EventContext {
   };
 }
 
-const opts = { weight: () => 1, options: [{ cashDelta: 0 }, { cashDelta: 0 }] };
+// One option costs cash against a context with none, so the fixture events are major and become pending (#2146).
+const opts = { weight: () => 1, options: [{ cashDelta: 0 }, { cashDelta: -1 }] };
 
 function prot(target: ActiveProtection['target'], expiresAtTick: number, dismissalsLeft = 0, shielded = true): ActiveProtection {
   return { target, expiresAtTick, dismissalsLeft, shielded };

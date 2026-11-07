@@ -85,6 +85,8 @@ export interface SerializableGameState {
   trafficJams: { kind: ChokepointKind; rampId: number | null }[];
   /** Whether an event awaits the player's decision (state.events.pendingEvent !== null). */
   pendingEvent: boolean;
+  /** Minor events waiting as non-blocking notices (state.events.minorNotices.length, #2146). */
+  noticeCount: number;
   /** Raw roster size, dead included — deliberate: `killEmployee` never splices `employees` (only `fireEmployee` does), so this stays a total-ever-hired count. `deathCount` tracks how many of them died; the six fields below this one filter to the living roster instead. */
   employeeCount: number;
   /** Qualifications the roster holds — proves a skill was actually obtained, not just clicked at. */
@@ -243,6 +245,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     trafficJamCount: jams.length,
     trafficJams: jams.map(j => ({ kind: j.kind, rampId: j.rampId })),
     pendingEvent: s.events.pendingEvent !== null,
+    noticeCount: s.events.minorNotices.length,
     employeeCount: s.employees.employees.length,
     qualificationCount: livingEmployees
       .reduce((n, e) => n + e.qualifications.length, 0),

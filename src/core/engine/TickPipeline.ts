@@ -22,6 +22,7 @@ import type { Violation } from '../state/WorldInvariants.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import { addExpense, addIncome, deductExpense } from '../economy/Finance.js';
 import { tickEventSystem } from '../events/EventSystem.js';
+import { expireNotices } from '../events/EventNotices.js';
 import { factorFor, holdForcedWeather, outOfServiceIds, salaryFactor, tickModifiers } from '../events/ActiveModifiers.js';
 import { tickWeather } from '../weather/WeatherCycle.js';
 import { tickHoleWater } from '../mining/WetHoles.js';
@@ -78,6 +79,8 @@ import { runBoardReview, type BoardReview } from '../economy/Board.js';
 /** One need/traffic-jam event that fired and auto-paused the tick loop. */
 export interface FiredEventReport {
   eventId: string;
+  /** True for a minor event: it arrived as a notice and does not pause the clock (#2146). */
+  minor?: boolean;
 }
 
 /** What a single employee's just-completed task did to the world, by task type. */
@@ -199,7 +202,8 @@ export function runTick(
   // 1. Event system
   const evCtx = buildTickEventContext(state);
   let fired = tickEventSystem(state.events, evCtx, rng);
-  if (fired) drawPendingLeavers(state.events, state.employees.employees, rng);
+  if (fired && !fired.minor) drawPendingLeavers(state.events, state.employees.employees, rng);
+  expireNotices(state, rng, { state, grid, emitter });
 
   // 2. Payroll — processPayCycle increments ticksSincePayday internally
   const paySalary = processPayCycle(state.employees, role => salaryFactor(state.events.activeModifiers, role));
@@ -459,8 +463,8 @@ export function runTick(
   // 10. Pending event — auto-pause and report to player
   let firedEvent: FiredEventReport | null = null;
   if (fired) {
-    firedEvent = { eventId: fired.eventId };
-    state.isPaused = true;
+    firedEvent = fired.minor ? { eventId: fired.eventId, minor: true } : { eventId: fired.eventId };
+    if (!fired.minor) state.isPaused = true;
   }
   // An unseen grade-approval letter holds the clock until the player dismisses it (#1926).
   if (state.grade?.unseenApproval != null) state.isPaused = true;

@@ -9,7 +9,8 @@ import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext, EventConsequence } from './EventPool.js';
 import { getEventsByCategory, getEventById, hasEnvironmentalCause } from './EventPool.js';
 import { isEventShielded, markShielded, consumeDismissal, pruneProtections, timerStretchFor } from '../economy/BribeProtection.js';
-import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD, MIN_EVENT_TIMER_TICKS, UNION_STRIKE_MIN_MEMBERS, UNION_STRIKE_WEIGHT_BOOST, UNION_EVENT_MIN_INTERVAL_TICKS, UNION_EVENT_MIN_INTERVAL_RANDOM_RANGE } from '../config/balance.js';
+import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD, MIN_EVENT_TIMER_TICKS, UNION_STRIKE_MIN_MEMBERS, UNION_STRIKE_WEIGHT_BOOST, UNION_EVENT_MIN_INTERVAL_TICKS, UNION_EVENT_MIN_INTERVAL_RANDOM_RANGE, EVENT_NOTICE_COUNTDOWN_TICKS } from '../config/balance.js';
+import { isMajorEvent } from './EventWeight.js';
 import { unionEventStretch } from '../entities/UnionMembership.js';
 import { STRIKE_EVENT_TAG, strikeDue } from './UnionGrievance.js';
 
@@ -36,6 +37,10 @@ export interface EventSystemState {
   timers: CategoryTimer[];
   /** Currently pending event requiring player decision. */
   pendingEvent: FiredEvent | null;
+  /** Minor events awaiting an optional answer; they never hold the clock (#2146). */
+  minorNotices: MinorNotice[];
+  /** The most recently resolved notice, or null (#2146). */
+  lastNoticeOutcome: NoticeOutcome | null;
   /** Jam chokepoint key -> tick until which that chokepoint stays silent (#1208). */
   jamSilencedUntil: Record<string, number>;
   /**
@@ -96,6 +101,44 @@ export interface FiredEvent {
   unqualifiedActionIds?: number[];
   /** The employee each employee_leaves option takes, drawn at fire time (#1908). */
   leavers?: LeaverDraw[];
+  /** True on the FiredEvent of a minor event: it became a notice, not a pendingEvent (#2146). */
+  minor?: boolean;
+}
+
+/** A minor event waiting as a non-blocking notice until answered or its countdown ends (#2146). */
+export interface MinorNotice extends FiredEvent {
+  /** Tick at which the notice resolves itself to its default option. */
+  expiresAtTick: number;
+}
+
+/** What the most recently resolved notice did, for the UI to toast (#2146). */
+export interface NoticeOutcome {
+  eventId: string;
+  resultKey: string;
+  /** True when the countdown ended it rather than the player. */
+  auto: boolean;
+  /** Increments per resolved notice, so the UI toasts each once. */
+  seq: number;
+}
+
+/** Ticks left on a notice's countdown, never negative (#2146). */
+export function noticeTicksLeft(notice: MinorNotice, tick: number): number {
+  return Math.max(0, notice.expiresAtTick - tick);
+}
+
+/**
+ * Present a fired event by its stakes (#2146): a major one becomes the pending modal, a minor one a notice that
+ * never holds the clock. Returns the FiredEvent, flagged `minor` for a notice.
+ */
+export function presentEvent(state: EventSystemState, eventId: string, tick: number, cash: number): FiredEvent {
+  const def = getEventById(eventId);
+  if (def && !isMajorEvent(def, cash)) {
+    const notice: MinorNotice = { eventId, firedAtTick: tick, expiresAtTick: tick + EVENT_NOTICE_COUNTDOWN_TICKS, minor: true };
+    state.minorNotices.push(notice);
+    return notice;
+  }
+  state.pendingEvent = { eventId, firedAtTick: tick };
+  return state.pendingEvent;
 }
 
 /** What kind of value an EventEffect carries — decides which chip color/format the UI uses. */
@@ -128,6 +171,8 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
       baseInterval: BASE_TIMER[cat],
     })),
     pendingEvent: null,
+    minorNotices: [],
+    lastNoticeOutcome: null,
     jamSilencedUntil: {},
     raisedUnqualifiedActionIds: [],
     activeModifiers: [],
@@ -199,11 +244,11 @@ export function tickEventSystem(
       const eventId = state.followUpQueue.shift()!;
       state.followUpDelayTicks = FOLLOWUP_DELAY_TICKS;
       if (!state.firedEventIds.includes(eventId)) state.firedEventIds.push(eventId);
-      state.pendingEvent = { eventId, firedAtTick: ctx.tickCount };
+      const presented = presentEvent(state, eventId, ctx.tickCount, ctx.cash ?? 0);
       state.lastEventTick = ctx.tickCount;
       state.actionCountSinceEvent = 0;
       state.cooldownMinIntervalTicks = null;
-      return state.pendingEvent;
+      return presented;
     }
   }
 
@@ -251,7 +296,7 @@ export function tickEventSystem(
           && consumeDismissal(ctx.protections, 'lawsuit', ctx.tickCount)) {
           return null;
         }
-        state.pendingEvent = { eventId: event.id, firedAtTick: ctx.tickCount };
+        const presented = presentEvent(state, event.id, ctx.tickCount, ctx.cash ?? 0);
         if (isUnion) {
           state.lastUnionEventTick = ctx.tickCount;
           state.unionCooldownMinIntervalTicks = null;
@@ -261,7 +306,7 @@ export function tickEventSystem(
           state.actionCountSinceEvent = 0;
           state.cooldownMinIntervalTicks = null;
         }
-        return state.pendingEvent;
+        return presented;
       }
     }
   }

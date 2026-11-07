@@ -911,6 +911,7 @@ window.__gameState = () => {
     // principle those actions already apply to clicks, just not yet to this
     // one console command's own copy.
     pendingEvent: s.events.pendingEvent !== null,
+    noticeCount: s.events.minorNotices.length,
     // ── Game-over detection fields ──
     bankrupt: s.bankruptcy.bankrupt,
     revolted: s.revolt.revolted,

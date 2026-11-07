@@ -494,12 +494,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 60",
-      "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable here, and the haulers keep filling the warehouse (~1.0t to ~13.9t at tick 290 on the aligned trajectory). #1722/#1723: ore and spoil are different orders; which lands first depends on which reachable rock bin the hauler weighs first. Asserting stored ore keeps this step about 'hauling keeps delivering'.",
+      "command": "tick 25",
+      "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable here, and the haulers keep filling the warehouse (~1.0t to ~13.9t at tick 290 on the aligned trajectory). #1722/#1723: ore and spoil are different orders; which lands first depends on which reachable rock bin the hauler weighs first. Asserting stored ore keeps this step about 'hauling keeps delivering'. #2146: minor events are non-blocking notices now, so the clock no longer stops at them; contract deliveries (which sell stored ore) land inside the old tick 60 / tick 40 windows and could drain the warehouse to net zero, so the first window is re-measured to tick 25 (tick 60 -> 25) and the second stays at tick 40 from the shifted start; both still net-increase storedMassKg.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 60"
+          "command": "tick 25"
         }
       ],
       "role": "setup",

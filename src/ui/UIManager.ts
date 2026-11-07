@@ -32,6 +32,8 @@ import { ToolRail } from './shell/ToolRail.js';
 import { Toasts } from './shell/Toasts.js';
 import { ActivityLog } from './shell/ActivityLog.js';
 import { NotificationCenter, type NotifyInput } from './notify/NotificationCenter.js';
+import { EventNotices } from './shell/EventNotices.js';
+import { getEventById } from '../core/events/EventPool.js';
 import type { ClaimRefusalReason } from '../core/world/PlayableArea.js';
 import type { Rect } from '../core/world/WorldGen.js';
 import type { PlacementKit } from './scene/PlacementKit.js';
@@ -67,6 +69,9 @@ export class UIManager {
   private readonly fleetPanel: FleetPanel;
   private readonly crewPanel: CrewPanel;
   private readonly eventModal: EventModal;
+  private readonly eventNotices: EventNotices;
+  /** Last resolved-notice sequence already toasted; null until the first update, so a loaded save does not replay one. */
+  private lastToastedNoticeSeq: number | null = null;
   private readonly permitApprovalModal: PermitApprovalModal;
   private readonly surveyPanel: SurveyPanel;
   private readonly shadyPanel: ShadyPanel;
@@ -161,6 +166,7 @@ export class UIManager {
 
     // Event modal (redesign P8, supersedes EventDialog.ts), appended to container
     this.eventModal = new EventModal(container);
+    this.eventNotices = new EventNotices(container);
     // Mounted after eventModal so the letter renders on top of it.
     this.permitApprovalModal = new PermitApprovalModal(container);
 
@@ -235,6 +241,7 @@ export class UIManager {
     this.fleetPanel.setGameConsole(fn);
     this.crewPanel.setGameConsole(fn);
     this.eventModal.setGameConsole(fn);
+    this.eventNotices.setGameConsole(fn);
     this.permitApprovalModal.setGameConsole(fn);
     this.surveyPanel.setGameConsole(fn);
     this.shadyPanel.setGameConsole(fn);
@@ -512,10 +519,29 @@ export class UIManager {
     this.notify({ severity: 'warn', title: message, body: '' });
   }
 
+  /** Toast the notice that just settled, once: what it was and whether the countdown decided it (#2146). */
+  private toastResolvedNotice(state: GameState): void {
+    const outcome = state.events.lastNoticeOutcome;
+    const seq = outcome?.seq ?? 0;
+    const seen = this.lastToastedNoticeSeq;
+    this.lastToastedNoticeSeq = seq;
+    // A new game resets seq below `seen`; the next notice still toasts.
+    if (seen === null || !outcome || seq <= seen) return;
+    const def = getEventById(outcome.eventId);
+    const title = def ? t(def.titleKey) : outcome.eventId;
+    this.notify({
+      severity: 'info',
+      title: t(outcome.auto ? 'ui.notice.resolved_auto' : 'ui.notice.resolved', { title }),
+      body: t(outcome.resultKey),
+    });
+  }
+
   update(state: GameState, blastPlayback: BlastPlaybackSnapshot = IDLE_BLAST_PLAYBACK): void {
     const weather = state.weather.current;
     this.topBar.update(state, this.notificationCenter);
     this.toasts.update(this.notificationCenter);
+    this.eventNotices.update(state);
+    this.toastResolvedNotice(state);
     this.activityLog.update(this.notificationCenter);
     // setNavGrid before update() — otherwise the overlay draws against the
     // previous tick's navgrid for one frame after any navgrid change (new
@@ -658,6 +684,7 @@ export class UIManager {
     this.fleetPanel.dispose();
     this.crewPanel.dispose();
     this.eventModal.dispose();
+    this.eventNotices.dispose();
     this.permitApprovalModal.dispose();
     this.surveyPanel.dispose();
     this.shadyPanel.dispose();

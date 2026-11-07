@@ -1,0 +1,70 @@
+{
+  "name": "event-minor-notice",
+  "description": "Issue #2146: a minor event (the double rainbow, whose only cost is a sliver of the starting cash) arrives as a non-blocking notice card in #bs-event-notices instead of the blocking #bs-event-dialog. The clock keeps running while the card waits, and clicking one of its .bs-notice-choice buttons answers it so no notice is left. The event is raised with the `event fire` test hook; everything after is ticks and real clicks.",
+  "steps": [
+    {
+      "command": "campaign start level:dusty_hollow staffed:false",
+      "interaction": [{ "type": "command", "command": "campaign start level:dusty_hollow staffed:false" }],
+      "role": "setup"
+    },
+    {
+      "command": "time resume",
+      "interaction": [{ "type": "command", "command": "time resume" }],
+      "role": "setup"
+    },
+    {
+      "command": "event fire weather_double_rainbow",
+      "description": "test hook: `event fire` has no UI control and none is intended. The double rainbow is minor at the starting cash, so it becomes a notice, never the pending event.",
+      "interaction": [{ "type": "command", "command": "event fire weather_double_rainbow" }],
+      "role": "bootstrap",
+      "expect": {
+        "equals": { "noticeCount": 1, "pendingEvent": false }
+      }
+    },
+    {
+      "command": "state",
+      "description": "The notice card is on screen with its option buttons while the blocking event dialog stays hidden (a hidden overlay has no client width).",
+      "interaction": [
+        { "type": "waitForSelector", "selector": "#bs-event-notices .bs-notice-choice" },
+        { "type": "waitForProperty", "selector": "#bs-event-dialog", "property": "clientWidth", "expectedValue": 0, "timeoutMs": 5000 },
+        { "type": "screenshot" }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": { "noticeCount": 1, "pendingEvent": false },
+        "note": "A minor event shows as a notice card and never as the blocking event dialog."
+      }
+    },
+    {
+      "command": "tick 10",
+      "description": "The clock is not held by the notice: ticking is accepted and the tick count advances, and the notice (150 ticks of countdown) is still waiting.",
+      "interaction": [{ "type": "command", "command": "tick 10" }],
+      "role": "setup",
+      "expect": {
+        "increased": ["tickCount"],
+        "equals": { "noticeCount": 1, "pendingEvent": false }
+      }
+    },
+    {
+      "command": "event choose 0 weather_double_rainbow",
+      "description": "The player answers the notice by clicking its first option; the dialog never opens.",
+      "interaction": [
+        { "type": "awaitUsable", "selector": "#bs-event-notices .bs-notice-choice" },
+        { "type": "clickSelector", "selector": "#bs-event-notices .bs-notice-choice" },
+        { "type": "waitForProperty", "selector": "#bs-event-dialog", "property": "clientWidth", "expectedValue": 0, "timeoutMs": 5000 },
+        { "type": "screenshot" }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": { "noticeCount": 0, "pendingEvent": false },
+        "decreased": ["cash"],
+        "note": "Option 0 of the double rainbow is the rainbow break, which costs cash; the notice is gone afterwards."
+      }
+    },
+    {
+      "command": "state",
+      "interaction": [{ "type": "command", "command": "state" }],
+      "role": "observe"
+    }
+  ]
+}

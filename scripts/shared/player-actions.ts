@@ -9,6 +9,7 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import { stateRubbleStockKg } from '../../src/core/economy/SpoilHeaps.js';
 import { pendingSpoilOverflowKg } from '../../src/core/economy/HaulDispatch.js';
 import { getEventById } from '../../src/core/events/EventPool.js';
+import { outcomeCostsCrew, cheapestEventOption } from '../../src/core/events/EventWeight.js';
 import { isPaidClearance } from '../../src/core/economy/Contract.js';
 
 /** A console command runner, as `createRunner().runner.run` or a recording wrapper of it. */
@@ -17,34 +18,7 @@ export type Run = (cmd: string) => { success: boolean; output: string };
 /** How a probe answers a pending event: `first` is option 0, `cheapest` the cheapest option that keeps the crew (#2117, #2126). */
 export type EventPolicy = 'first' | 'cheapest';
 
-/** The part of an event outcome the `cheapest` policy reads. */
-interface OptionOutcome {
-  readonly cashDelta?: number;
-  readonly effects?: ReadonlyArray<{ readonly type: string }>;
-  readonly altConsequence?: OptionOutcome;
-}
-
-/** True when an outcome, or the fallback it may roll into, takes an employee off the crew (`employee_leaves`). */
-export function outcomeCostsCrew(outcome: OptionOutcome | undefined): boolean {
-  if (!outcome) return false;
-  return (outcome.effects ?? []).some(e => e.type === 'employee_leaves') || outcomeCostsCrew(outcome.altConsequence);
-}
-
-/**
- * Index of the option with the highest `cashDelta` (missing = 0; lowest index on ties; 0 when empty) among those that
- * cost no crew, or among all of them when every option does. A free answer that makes an employee quit is not the cheap
- * one: the reinvest probe lost its only licensed fragmenter driver that way and left every later boulder unbroken (#2126).
- */
-export function cheapestEventOption(consequences: ReadonlyArray<OptionOutcome>): number {
-  const keepsCrew = consequences.map(c => !outcomeCostsCrew(c));
-  const eligible = keepsCrew.some(Boolean) ? keepsCrew : consequences.map(() => true);
-  let best = -1;
-  for (let i = 0; i < consequences.length; i++) {
-    if (!eligible[i]) continue;
-    if (best === -1 || (consequences[i]!.cashDelta ?? 0) > (consequences[best]!.cashDelta ?? 0)) best = i;
-  }
-  return Math.max(0, best);
-}
+export { outcomeCostsCrew, cheapestEventOption };
 
 /**
  * Resolve a pending event with its first option (`event choose 0`), or with the one that keeps the most cash when the

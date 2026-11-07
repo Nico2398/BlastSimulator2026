@@ -129,6 +129,8 @@ export interface EventContext {
   applicationPending?: boolean;
   /** Share of the blast charge cap the last blast used, 0..1+ (#1927). */
   lastBlastChargeShare?: number;
+  /** Current cash, read by the event-weight rule (#2146). Absent = 0. */
+  cash?: number;
 }
 
 /** Whether environmental events have a plausible cause yet (#1412). */
