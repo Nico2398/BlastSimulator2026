@@ -161,6 +161,15 @@ export class PlacementController {
     }
     this.notify();
   }
+  /** Pre-fills the path being drawn (#2144): the player sees the corners as if clicked and may add, drag or pop them. */
+  seedPath(corners: readonly Tile[]): void {
+    if (this.shape !== 'path' || this.phase === 'idle' || corners.length === 0) return;
+    this.points = corners.map(c => ({ x: c.x, z: c.z }));
+    this.anchor = this.points[0]!;
+    this.current = this.points[this.points.length - 1]!;
+    this.phase = 'selected';
+    this.notify();
+  }
   /** True through the whole armed lifecycle, including the 220ms confirm flash — camera remap and ScenePicking suppression only release at disarm(). */
   get isArmed(): boolean { return this.phase !== 'idle'; }
   get hoveredTile(): { x: number; z: number } | null { return this.hoverTile; }

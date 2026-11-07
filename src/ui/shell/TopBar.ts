@@ -56,6 +56,8 @@ const ALERT_ROUTE: Partial<Record<AlertPip['kind'], PanelName>> = {
   crew: 'employees',
   fleet: 'vehicles',
   orders: 'ops',
+  // Out-of-reach debris: Operations carries the proposed access ramp (#2144).
+  debris: 'ops',
   // The Fleet panel carries the traffic advisory banner (#1208).
   traffic: 'vehicles',
 };

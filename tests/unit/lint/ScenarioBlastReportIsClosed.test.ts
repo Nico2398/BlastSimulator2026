@@ -13,6 +13,8 @@ import type { InteractionStepAction, ScenarioStepDef } from '../../../scripts/sh
 const FIRE_SELECTOR = '.bs-confirm-overlay .bs-btn-danger';
 const REPORT_CLOSE_SELECTOR = '[data-action="report-close"]';
 const FIRE_ANYWAY_SELECTOR = '[data-action="preflight-fire-anyway"]';
+/** The report's own offer card (#2144): its buttons are part of the report, so clicking them is how the report is used, not play behind it. */
+const REPORT_OFFER_SELECTORS: ReadonlySet<string> = new Set(['[data-action="report-dig-ramp"]', '[data-action="report-adjust-ramp"]']);
 
 /** Actions that act on the scene or HUD, and so are blocked by an open report. */
 const ACTING_TYPES: ReadonlySet<string> = new Set([
@@ -44,8 +46,10 @@ function findOpenReportViolations(file: string, steps: readonly ScenarioStepDef[
         continue;
       }
       if (open && ACTING_TYPES.has(action.type)) {
-        const isFireAnyway = (action.type === 'clickIfPresent' || action.type === 'clickSelector') && selector === FIRE_ANYWAY_SELECTOR;
-        if (!isFireAnyway) violations.push({ file, stepIndex, command: step.command, actionType: action.type });
+        const isClick = action.type === 'clickIfPresent' || action.type === 'clickSelector';
+        const isFireAnyway = isClick && selector === FIRE_ANYWAY_SELECTOR;
+        const isReportOffer = isClick && selector !== undefined && REPORT_OFFER_SELECTORS.has(selector);
+        if (!isFireAnyway && !isReportOffer) violations.push({ file, stepIndex, command: step.command, actionType: action.type });
       }
       if (firesBlast && action.type === 'clickSelector' && selector === FIRE_SELECTOR) open = true;
     }
@@ -122,6 +126,15 @@ describe('findOpenReportViolations (the checker itself)', () => {
   it('allows the preflight fire-anyway click while the report is open', () => {
     const steps = [step('blast', [FIRE, { type: 'clickIfPresent', selector: FIRE_ANYWAY_SELECTOR }, CLOSE])];
     expect(findOpenReportViolations('synthetic', steps)).toEqual([]);
+  });
+
+  it('allows the report\'s own access ramp offer buttons while it is open, then still requires the close (#2144)', () => {
+    const dig: InteractionStepAction = { type: 'clickSelector', selector: '[data-action="report-dig-ramp"]' };
+    expect(findOpenReportViolations('synthetic', [step('blast', [FIRE, dig, CLOSE])])).toEqual([]);
+    const adjust: InteractionStepAction = { type: 'clickSelector', selector: '[data-action="report-adjust-ramp"]' };
+    expect(findOpenReportViolations('synthetic', [step('blast', [FIRE, adjust, CLOSE])])).toEqual([]);
+    const later = [step('blast', [FIRE, dig]), step('tick 5', [{ type: 'click', x: 1, y: 1 }])];
+    expect(findOpenReportViolations('synthetic', later)).toHaveLength(1);
   });
 
   it('accepts a report left open at scenario end', () => {

@@ -1,13 +1,18 @@
 // BlastSimulator2026 — CraterAccess unit tests (#2082)
 // Hand-built height fields stand in for the terrain: level ground with a square pit sunk into it.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import {
   clusterStrandedFloors, planCraterAccess, type AccessSurface, type StrandedFloor,
 } from '../../../src/core/mining/CraterAccess.js';
-import { rampPathCells, rampPathOf, type RampFootprint } from '../../../src/core/mining/RampPath.js';
+import { rampPathCells, rampPathOf, rampLegsOf, rampTotalLength, type RampFootprint } from '../../../src/core/mining/RampPath.js';
+import { validateRampOrder } from '../../../src/core/mining/Ramp.js';
+import { siteVehicleReach, strandedDebrisTargets } from '../../../src/core/engine/OrderReachability.js';
+import { computeVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
+import { openingCraterGame, type OpeningGame } from '../../helpers/openingCrater.js';
 import {
   MAX_RAMP_LENGTH, NAV_MAX_SLOPE_RATIO, RAMP_CRATER_MIN_DROP_M, CRATER_ACCESS_FLOOR_LEVEL_M, CRATER_ACCESS_MIN_DROP_M,
+  CRATER_ACCESS_CLUSTER_GAP_CELLS, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH,
 } from '../../../src/core/config/balance.js';
 
 interface Pit { x0: number; z0: number; w: number; h: number; depth: number }
@@ -348,5 +353,59 @@ describe('planCraterAccess', () => {
     const s: AccessSurface = { ...base, heightAt: (x, z) => (ledge(x, z) ? -10 : base.heightAt(x, z)) };
     const plan = planCraterAccess({ x: 27, z: 26, floorY: -15, orderCount: 5 }, s, MAX_RATIO, 3);
     expect(plan.ok).toBe(true);
+  });
+});
+
+describe('planCraterAccess on the opening crater of the menu-default sandbox (#2144)', () => {
+  let game: OpeningGame;
+  beforeAll(() => { game = openingCraterGame(); }, 300_000);
+
+  /** The terrain the live planner reads: heights from the voxels, the network the fleet reaches, rubble on the floor. */
+  function openingSurface(): AccessSurface {
+    const { state, ctx } = game;
+    const grid = ctx.grid!;
+    const nav = state.navGrid!;
+    const reach = siteVehicleReach(state)!;
+    const rubble = new Set(state.logistics.fragments.filter(f => f.state === 'on_ground')
+      .map(f => `${Math.round(f.fragment.position.x)},${Math.round(f.fragment.position.z)}`));
+    return {
+      heightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
+      contains: (x, z) => grid.containsColumn(x, z) && (nav.cellAt(x, z)?.type ?? 'void') !== 'void',
+      reachableFrom: reach,
+      holdsRubble: (x, z) => rubble.has(`${x},${z}`),
+    };
+  }
+
+  function strandedFloorsOf(surface: AccessSurface): StrandedFloor[] {
+    const cells = strandedDebrisTargets(game.state)
+      .filter(t => !surface.reachableFrom(Math.round(t.x), Math.round(t.z)))
+      .map(t => ({ x: t.x, z: t.z, y: computeVoxelColumnSurfaceHeight(game.ctx.grid!, Math.round(t.x), Math.round(t.z)) }));
+    return clusterStrandedFloors(cells, CRATER_ACCESS_CLUSTER_GAP_CELLS).sort((a, b) => b.orderCount - a.orderCount);
+  }
+
+  it('finds the opening shot as a stranded floor', () => {
+    const floors = strandedFloorsOf(openingSurface());
+    expect(floors.length).toBeGreaterThan(0);
+    expect(floors[0]!.orderCount).toBeGreaterThan(0);
+  });
+
+  it('plans a ramp for the biggest stranded floor that validates and starts on ground the fleet reaches', () => {
+    const surface = openingSurface();
+    const [floor] = strandedFloorsOf(surface);
+    const plan = planCraterAccess(floor!, surface, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH);
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(validateRampOrder(plan.def, game.state.cash)).toMatchObject({ success: true });
+    expect(surface.reachableFrom(plan.def.originX, plan.def.originZ)).toBe(true);
+    expect(plan.cost).toBeGreaterThan(0);
+  });
+
+  it('keeps the planned ramp within the length limit and deep enough to land on the crater floor', () => {
+    const surface = openingSurface();
+    const [floor] = strandedFloorsOf(surface);
+    const plan = planCraterAccess(floor!, surface, VEHICLE_MAX_SLOPE_RATIO, RAMP_DEFAULT_WIDTH);
+    if (!plan.ok) throw new Error(plan.reasonKey);
+    expect(rampTotalLength(rampLegsOf(plan.def))).toBeLessThanOrEqual(MAX_RAMP_LENGTH);
+    expect(plan.def.targetDepth).toBeGreaterThanOrEqual(RAMP_CRATER_MIN_DROP_M);
   });
 });

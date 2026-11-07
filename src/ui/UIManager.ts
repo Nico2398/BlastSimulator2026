@@ -13,6 +13,7 @@ import { BlastReportModal } from './panels/BlastReportModal.js';
 import { ConfirmModal, type ConfirmModalConfig } from './panels/ConfirmModal.js';
 import { ContractsPanel } from './panels/ContractsPanel.js';
 import { FinancesPanel } from './panels/FinancesPanel.js';
+import type { AccessRampProposal } from '../core/mining/CraterAccessProposal.js';
 import { OperationsPanel } from './panels/OperationsPanel.js';
 import { BuildMenu } from './BuildMenu.js';
 import { FleetPanel } from './panels/FleetPanel.js';
@@ -229,6 +230,7 @@ export class UIManager {
     this.preflightModal.setGameConsole(fn);
     this.contractsPanel.setGameConsole(fn);
     this.operationsPanel.setGameConsole(fn);
+    this.blastReportModal.accessRampOffer.setGameConsole(fn);
     this.buildMenu.setGameConsole(fn);
     this.fleetPanel.setGameConsole(fn);
     this.crewPanel.setGameConsole(fn);
@@ -261,6 +263,23 @@ export class UIManager {
   /** Passes the terrain-height sampler down to the Build panel, for the flatness refusal check (#1008). */
   setBuildSurfaceSampler(fn: (x: number, z: number) => number): void {
     this.buildMenu.setSurfaceHeightSampler(fn);
+  }
+
+  /**
+   * The proposed access ramp for stranded rubble (#2144), read by the blast report and the Operations panel. "Adjust"
+   * closes whichever showed it and opens the manual ramp tool pre-filled with the proposal.
+   */
+  setAccessRampProvider(fn: () => AccessRampProposal | null): void {
+    const offers = [this.blastReportModal.accessRampOffer, this.operationsPanel.accessRamp];
+    for (const offer of offers) offer.setProposalProvider(fn);
+    this.blastReportModal.accessRampOffer.setAdjustHandler(proposal => {
+      this.blastReportModal.hide();
+      this.buildMenu.armRampWith(proposal.def);
+    });
+    this.operationsPanel.accessRamp.setAdjustHandler(proposal => {
+      this.hideAllPanels();
+      this.buildMenu.armRampWith(proposal.def);
+    });
   }
 
   /** Passes the spiral-ramp terrain seam down to the Build panel's ramp tool (#1942). */

@@ -21,6 +21,7 @@
 // wired to something that doesn't exist; CLOSE is the only real action here.
 
 import { t } from '../../core/i18n/I18n.js';
+import { AccessRampOffer } from './AccessRampOffer.js';
 import { el, statGrid } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
@@ -56,6 +57,8 @@ export class BlastReportModal {
   private readonly statsEl: HTMLElement;
   private readonly notesEl: HTMLElement;
 
+  /** The ready-made access ramp for rubble the shot left out of reach (#2144), re-read once per update while open. */
+  readonly accessRampOffer = new AccessRampOffer('report');
   private open = false;
   private lastShownReport: BlastReport | null = null;
   private readonly locale = new LocaleTextRegistry();
@@ -103,7 +106,7 @@ export class BlastReportModal {
     this.statsEl = el('div');
     this.notesEl = el('div');
     this.notesEl.style.cssText = 'display:flex;flex-direction:column;gap:10px';
-    body.append(this.statsEl, this.notesEl);
+    body.append(this.statsEl, this.notesEl, this.accessRampOffer.root);
 
     const footer = el('div');
     footer.style.cssText = 'padding:14px 20px;background:var(--bsx-well);border-top:1px solid var(--bsx-hairline);display:flex;gap:9px';
@@ -199,10 +202,12 @@ export class BlastReportModal {
       this.pendingReport = null;
       this.render(toShow, state);
       this.open = true;
+      this.accessRampOffer.refresh(state);
       this.overlay.style.display = '';
       this.overlay.dataset['openedAtPlaybackS'] = playback.elapsedS.toFixed(2);
     }
 
+    if (this.open) this.accessRampOffer.refresh(state);
     this.syncOutstandingMarker();
   }
 
