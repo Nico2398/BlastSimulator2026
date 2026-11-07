@@ -1128,9 +1128,11 @@ describe('bribe protections shield the next event after a resolved one (#1816)',
       runCommand(engine, 'tick 1');
     }
     s.events.timers.find(t => t.category === 'union')!.remaining = 1;
-    for (let i = 0; i < SETTLE_TICKS && !s.events.pendingEvent; i++) runCommand(engine, 'tick 1');
+    // The postponed event may arrive as a notice when it is minor (#2146).
+    const arrived = () => s.events.pendingEvent ?? s.events.minorNotices[0] ?? null;
+    for (let i = 0; i < SETTLE_TICKS && !arrived(); i++) runCommand(engine, 'tick 1');
     expect(s.corruption.protections.some(p => p.target === 'union_leader')).toBe(false);
-    expect(s.events.pendingEvent).not.toBeNull();
-    expect(getEventById(s.events.pendingEvent!.eventId)!.category).toBe('union');
+    expect(arrived()).not.toBeNull();
+    expect(getEventById(arrived()!.eventId)!.category).toBe('union');
   });
 });
