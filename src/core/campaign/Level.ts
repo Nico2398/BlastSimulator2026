@@ -170,7 +170,10 @@ const LEVELS: readonly LevelDef[] = [
     // idled away; the wait is gone (#2143) and the margin is left unchanged.
     startingCash: 500000,
     availableExplosives: ['pop_rock', 'boomite'],
-    unlockThreshold: 5000,
+    // #2154: retuned with TUTORIAL_CONTRACT_PRICE_MULTIPLIER after the warehouse step left
+    // the guided part: its first sale earns ~$48,000 of operating profit, under this
+    // threshold, while free play still reaches it and one winning offer exists.
+    unlockThreshold: 62000,
     eventFreqMultiplier: 0,
     // Tuned (#959, #1328) so the full scripted playthrough plus ordinary play
     // reaches unlockThreshold; rationale beside TUTORIAL_CONTRACT_PRICE_MULTIPLIER.

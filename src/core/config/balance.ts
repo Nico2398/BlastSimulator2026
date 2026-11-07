@@ -2387,12 +2387,13 @@ export const ENV_CAUSE_NUISANCE_MAX = 45;
  * the full free-play playthrough (tests/integration/tutorial.integration.test.ts,
  * no fire/scrap hacks): 14.0 goes bankrupt, 16.0 is the lowest winning value
  * tried, 300.0 still wins only in free play, 500.0 is already won inside the
- * guided part. #2154 retired the Explosive Warehouse tutorial step, which moved the
- * guided part's sale earlier: 50.0 is now already won inside it and 14.0 still wins
- * in free play. 28.0 sits mid-window (geometric) so one upstream change does
- * not make the tutorial unwinnable (or trivially won) again.
+ * guided part. #2154 (the Explosive Warehouse step is gone) moved the window: with the
+ * threshold at 62000, 55.0 leaves the guided part's first sale ~$48,000 short of the win
+ * and still gives the scenario a winning offer, while 50.0 loses that offer and 60.0
+ * is nearly won inside the guided part. 55.0 keeps one upstream change from making the
+ * tutorial unwinnable (or trivially won) again.
  */
-export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 28.0;
+export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 55.0;
 
 /** One fixed hire candidate of a scripted hiring pool (#1600). */
 export interface ScriptedCandidate {
