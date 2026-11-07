@@ -78,6 +78,27 @@ export function orderOffers(
   return [...available.filter(fillable), ...available.filter(c => !fillable(c))];
 }
 
+/** Sort keys the Contracts panel offers, in display order. */
+export const CONTRACT_SORT_KEYS = ['price_per_kg', 'total_value', 'deadline'] as const;
+export type ContractSortKey = typeof CONTRACT_SORT_KEYS[number];
+/** Active and Closed sections show a filter bar only above this many rows. */
+export const FILTER_BAR_MIN_ROWS = 5;
+
+/** Keep only offers for `materialId` ('' = rubble); null keeps all. Order preserved. */
+export function filterOffers(_offers: readonly Contract[], _materialId: string | null): Contract[] {
+  throw new Error('not implemented');
+}
+
+/** Order offers by `key`; a null key is the default fillable-first order. */
+export function sortOffers(
+  _offers: readonly Contract[],
+  _key: string | null,
+  _collectedOre: Readonly<Record<string, number>>,
+  _rubbleStockKg: number,
+): Contract[] {
+  throw new Error('not implemented');
+}
+
 /** One-line roll-up of the player's active contracts. */
 interface ActiveSummary {
   /** Number of active contracts. */
