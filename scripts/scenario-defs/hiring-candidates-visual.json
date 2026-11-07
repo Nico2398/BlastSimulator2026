@@ -62,6 +62,43 @@
       }
     },
     {
+      "command": "state",
+      "timeout": 30,
+      "role": "player",
+      "description": "#2160: click the Drill rig skill filter (a driller's second qualification) and the Salary sort in the hiring filter bar. The list narrows to drillers; other role groups collapse. Then click Clear filter to restore the full pool.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-filter-bar [data-filter-group=\"skill\"] [data-filter-value=\"driving.drill_rig\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-hiring-role=\"driller\"] button[data-candidate-id]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-filter-bar [data-sort-key=\"salary\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-filter-bar .bs-filter-clear"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel button[data-role=\"manager\"][data-candidate-id]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "employeeCount": 0
+        },
+        "note": "Filtering changes the view only; ordering and matching are unit-tested."
+      }
+    },
+    {
       "command": "employee hire role:driller",
       "timeout": 30,
       "role": "player",
