@@ -151,7 +151,7 @@
       "command": "blast",
       "role": "player",
       "timeout": 120,
-      "description": "Fire the shot. The blast report opens with the access ramp offer in it, because the crater floor now lies below every road: the player is not forced to dig (nothing is ordered here), the report only offers.",
+      "description": "Fire the shot. The report opens afterwards with the access ramp offer in it: the player is not forced to dig (nothing is ordered here), the report only offers.",
       "interaction": [
         {
           "type": "ensureStep",
@@ -173,14 +173,6 @@
           "type": "clickIfPresent",
           "selector": "[data-action=\"preflight-fire-anyway\"]",
           "timeoutMs": 3000
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "[data-action=\"report-dig-ramp\"]",
-          "timeoutMs": 90000
-        },
-        {
-          "type": "screenshot"
         }
       ],
       "expect": {
@@ -193,14 +185,25 @@
       }
     },
     {
-      "command": "tick 5",
+      "command": "wait_until field:tickCount equals:270 max_ticks:50",
       "role": "setup",
-      "timeout": 60,
-      "description": "The classifier stamps the shot's rubble out of reach on the first ticks after the blast; the proposal reads those stamps. In interaction mode the report has been open for ticks already, so this only pads.",
+      "timeout": 300,
+      "description": "The classifier stamps the shot's rubble out of reach on the first ticks after the blast, and the offer reads those stamps. The sim does not advance by itself while the harness waits on the report, so the ticks are driven here.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 5"
+          "type": "waitUntil",
+          "field": "tickCount",
+          "equals": 270,
+          "maxTicks": 50,
+          "timeoutMs": 120000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "[data-action=\"report-dig-ramp\"]",
+          "timeoutMs": 90000
+        },
+        {
+          "type": "screenshot"
         }
       ]
     },
