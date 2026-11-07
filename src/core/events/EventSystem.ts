@@ -36,6 +36,10 @@ export interface EventSystemState {
   timers: CategoryTimer[];
   /** Currently pending event requiring player decision. */
   pendingEvent: FiredEvent | null;
+  /** Minor events awaiting an optional answer; they never hold the clock (#2146). */
+  minorNotices: MinorNotice[];
+  /** The most recently resolved notice, or null (#2146). */
+  lastNoticeOutcome: NoticeOutcome | null;
   /** Jam chokepoint key -> tick until which that chokepoint stays silent (#1208). */
   jamSilencedUntil: Record<string, number>;
   /**
@@ -96,6 +100,29 @@ export interface FiredEvent {
   unqualifiedActionIds?: number[];
   /** The employee each employee_leaves option takes, drawn at fire time (#1908). */
   leavers?: LeaverDraw[];
+  /** True on the FiredEvent of a minor event: it became a notice, not a pendingEvent (#2146). */
+  minor?: boolean;
+}
+
+/** A minor event waiting as a non-blocking notice until answered or its countdown ends (#2146). */
+export interface MinorNotice extends FiredEvent {
+  /** Tick at which the notice resolves itself to its default option. */
+  expiresAtTick: number;
+}
+
+/** What the most recently resolved notice did, for the UI to toast (#2146). */
+export interface NoticeOutcome {
+  eventId: string;
+  resultKey: string;
+  /** True when the countdown ended it rather than the player. */
+  auto: boolean;
+  /** Increments per resolved notice, so the UI toasts each once. */
+  seq: number;
+}
+
+/** Ticks left on a notice's countdown, never negative (#2146). */
+export function noticeTicksLeft(_notice: MinorNotice, _tick: number): number {
+  throw new Error('not implemented');
 }
 
 /** What kind of value an EventEffect carries — decides which chip color/format the UI uses. */
@@ -128,6 +155,8 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
       baseInterval: BASE_TIMER[cat],
     })),
     pendingEvent: null,
+    minorNotices: [],
+    lastNoticeOutcome: null,
     jamSilencedUntil: {},
     raisedUnqualifiedActionIds: [],
     activeModifiers: [],

@@ -257,6 +257,10 @@ export const EVENT_BASE_TIMERS = {
 
 /** Minimum ticks that must elapse between consecutive events (2 min at 1× speed). */
 export const MIN_EVENT_INTERVAL_TICKS = 120;
+/** An event is major (blocks the clock) when an option costs more than this share of current cash (#2146). */
+export const EVENT_MAJOR_CASH_SHARE = 0.15;
+/** Ticks a minor event's notice waits for an answer before it resolves to its default option (#2146). */
+export const EVENT_NOTICE_COUNTDOWN_TICKS = 150;
 /** Ticks between a parent event resolving and its queued follow-up firing. */
 export const FOLLOWUP_DELAY_TICKS = 30;
 
