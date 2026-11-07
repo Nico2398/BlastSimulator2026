@@ -90,7 +90,7 @@ function makeOreSaleOffer(materialId: string, quantityKg: number): Contract {
  */
 const SERIALIZED_FIELDS = [
   'boardConfidence',
-  'mineGrade', 'unseenApprovalGrade', 'trafficJamCount', 'trafficJams', 'pendingEvent', 'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather', 'wallSlumpCount',
+  'mineGrade', 'unseenApprovalGrade', 'trafficJamCount', 'trafficJams', 'pendingEvent', 'noticeCount', 'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather', 'wallSlumpCount',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
   'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'redGhostCount', 'researchQueueLength', 'chargedCount', 'wetHoleCount',
   'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'rampLegCount', 'builtRampWidth', 'builtRampFlow', 'vehicleCount', 'vehicleBoardingCount', 'vehicleLoaded', 'employeeCount',
@@ -140,6 +140,29 @@ describe('console-api', () => {
 
       expect(state).not.toBeNull();
       expect(Object.keys(state!).sort()).toEqual([...SERIALIZED_FIELDS].sort());
+    });
+
+    it('noticeCount counts the minor-event notices waiting for an answer (#2146)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const ctx = runner.ctx as MiningContext;
+      const noticeCount = () => (serializeGameState(ctx) as unknown as Record<string, unknown>)['noticeCount'];
+      expect(noticeCount()).toBe(0);
+      ctx.state!.events.minorNotices.push(
+        { eventId: 'a', firedAtTick: 0, expiresAtTick: 150, minor: true },
+        { eventId: 'b', firedAtTick: 0, expiresAtTick: 150, minor: true },
+      );
+      expect(noticeCount()).toBe(2);
+      ctx.state!.events.minorNotices.shift();
+      expect(noticeCount()).toBe(1);
+    });
+
+    it('noticeCount stays separate from pendingEvent (#2146)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const ctx = runner.ctx as MiningContext;
+      ctx.state!.events.pendingEvent = { eventId: 'x', firedAtTick: 0 };
+      const snap = serializeGameState(ctx) as unknown as Record<string, unknown>;
+      expect(snap['pendingEvent']).toBe(true);
+      expect(snap['noticeCount']).toBe(0);
     });
 
     it('unreachableGhostCount counts the red (unreachable) ghost previews (#1306)', () => {

@@ -1785,8 +1785,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 405,
-          "cash": 1812067,
+          "tickCount": 474,
+          "cash": 1730144,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1905,7 +1905,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 406,
+          "tickCount": 475,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -2071,7 +2071,7 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.6097752999405,
+          "wellBeing": 98.61073263701122,
           "safety": 50,
           "ecology": 49.7635685061019,
           "nuisance": 49.40892126525473

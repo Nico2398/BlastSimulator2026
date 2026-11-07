@@ -196,19 +196,19 @@
       "role": "observe"
     },
     {
-      "command": "tick 200",
+      "command": "tick 20",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 200"
+          "command": "tick 20"
         }
       ],
       "role": "setup",
       "expect": {
         "decreased": [
-          "minFatigue"
+          "wellBeing"
         ],
-        "note": "a real event (verified via direct trace) fires only ~5 ticks into this batch and blocks the rest, so cash doesn't move yet within that short a window (no payroll cycle hit) — minFatigue/wellBeing still confirm the continuing drain #1907: wellBeing is asserted in the long-drain steps at the end instead (still capped near 100 at this point)."
+        "note": "#2146: minor events are non-blocking notices now, so ticks no longer halt at them and the old 200-tick batch ran the crew through a mid-batch rest (minFatigue rose) and into the worker revolt that ends the level (tick 376). Batch shortened to 20 ticks, ahead of the rest; the continuing drain shows as wellBeing falling from 45.5 toward 0."
       }
     },
     {
@@ -253,15 +253,15 @@
       "role": "observe"
     },
     {
-      "command": "tick 300",
+      "command": "tick 30",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 300"
+          "command": "tick 30"
         }
       ],
       "role": "setup",
-      "description": "#1996: drain phase. Union events now also need MIN_EVENT_INTERVAL_ACTIONS player commands and their own cooldown, so the tick-242 union event of the old timeline is gone; this batch halts at the tick-216 Trade War instead."
+      "description": "#1996: drain phase. #2146: minor events are non-blocking notices and no longer halt the batch; it is shortened to 30 ticks so the final 100-tick step still ends ahead of the tick-376 worker revolt."
     },
     {
       "command": "event choose 0",
@@ -272,7 +272,7 @@
       ],
       "role": "player",
       "commandOutcome": "either",
-      "description": "Resolve the tick-216 Trade War so the drain can continue."
+      "description": "Resolve a pending major event if any (minor events are notices since #2146 and never block ticks)."
     },
     {
       "command": "tick 100",
@@ -285,10 +285,9 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "cash",
-          "wellBeing"
+          "cash"
         ],
-        "note": "gauges have now drained below thresholds -- wellBeing falls from its ~100 cap to 0 by tick 316 (minFatigue is not asserted: the crew rests mid-batch), confirming the penalty side of the file's claim. #1996: stopped at 100 ticks rather than 300 -- with union events gated on player actions and their cooldown none lands before the worker revolt (wellBeing 0 for 120 ticks, tick 382) ends the level, so the batch must end ahead of it.",
+        "note": "gauges have drained below thresholds -- #2146: wellBeing already hit 0 in the tick-20 step above (falls from its ~100 cap to 0 by ~tick 230) and the decrease is asserted there; here it stays pinned at 0 (minFatigue is not asserted: the crew rests mid-batch), confirming the penalty side of the file's claim. #1996: stopped at 100 ticks rather than 300 -- with union events gated on player actions and their cooldown none lands before the worker revolt (wellBeing 0 for 120 ticks, tick 382) ends the level, so the batch must end ahead of it.",
         "equals": {
           "wellBeing": 0
         }

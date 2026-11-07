@@ -111,6 +111,30 @@ async function waitUsableAndClick(page: Page, selector: string, timeoutMs: numbe
 }
 
 /**
+ * With no major event pending, `event choose N` answers the oldest minor notice; do the same by clicking choice `option`
+ * on the first card of the notice dock. False when no notice is live.
+ */
+async function resolveOldestNoticeOnPage(page: Page, timeoutMs: number, option: number): Promise<boolean> {
+  const live = await page.evaluate(() => {
+    const getState = (window as unknown as { __gameState?: () => { noticeCount?: number } | null }).__gameState;
+    return (getState?.()?.noticeCount ?? 0) > 0;
+  });
+  if (!live) return false;
+  try {
+    await waitUsableAndClick(page, `#bs-event-notices .bs-notice:first-child .bs-notice-choice:nth-child(${option + 1})`, timeoutMs);
+  } catch {
+    // The countdown may settle the notice between the state read and the click: nothing left to answer.
+    return false;
+  }
+  return true;
+}
+
+/** A major event pending, else the oldest minor notice: what `event choose N` answers. */
+async function resolveEventOrNoticeOnPage(page: Page, timeoutMs: number, option = 0): Promise<boolean> {
+  return (await resolveEventIfPendingOnPage(page, timeoutMs, option)) || resolveOldestNoticeOnPage(page, timeoutMs, option);
+}
+
+/**
  * Checks whether an event is genuinely pending in game state and, if so,
  * resolves its dialog for real (same click path as `case
  * 'resolveEventIfPending'`) — extracted so `clickSelector`'s covered-by-div
@@ -431,7 +455,7 @@ async function clickUsableSelector(
     if (Date.now() > deadline) {
       if (!retriedCoveredOnce && reason === 'covered') {
         retriedCoveredOnce = true;
-        const resolved = await resolveEventIfPendingOnPage(page, 8000);
+        const resolved = await resolveEventOrNoticeOnPage(page, 8000);
         if (resolved) {
           deadline += 5000;
           continue;
@@ -605,7 +629,7 @@ export async function executeActionOnPage(
       // resolveEventIfPendingOnPage so clickSelector's covered-by-div retry
       // (#699) can share it without going through the full action dispatch.
       const evTimeout = action.timeoutMs ?? 30000;
-      await resolveEventIfPendingOnPage(page, evTimeout, action.option ?? 0);
+      await resolveEventOrNoticeOnPage(page, evTimeout, action.option ?? 0);
       break;
     }
     case 'clickIfPresent': {

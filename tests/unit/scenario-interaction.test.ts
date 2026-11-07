@@ -760,6 +760,19 @@ describe('resolveEventIfPendingOnPage (issue #699)', () => {
     expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-dismiss', { button: 'left' });
   });
 
+  it('resolveEventIfPending answers the oldest minor notice when no major event is pending', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(false)  // pendingEvent
+      .mockResolvedValueOnce(true)   // noticeCount > 0
+      .mockResolvedValueOnce(null);  // choice usable
+    const page = fakePage({ evaluate, click: vi.fn().mockResolvedValue(undefined) });
+
+    const step: ScenarioStepDef = { command: 'event choose 1', description: 'answer a notice', role: 'player', interaction: [] };
+    await executeActionOnPage(page, { type: 'resolveEventIfPending', option: 1 }, step);
+
+    expect(page.click).toHaveBeenCalledWith('#bs-event-notices .bs-notice:first-child .bs-notice-choice:nth-child(2)', { button: 'left' });
+  });
+
   it('clicks the requested choice when given an option index', async () => {
     const evaluate = vi.fn()
       .mockResolvedValueOnce(true)   // pendingEvent

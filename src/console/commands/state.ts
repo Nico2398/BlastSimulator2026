@@ -69,6 +69,7 @@ function serializeState(ctx: MiningContext): Record<string, unknown> {
     events: {
       timers: s.events.timers,
       pendingEvent: s.events.pendingEvent,
+      minorNotices: s.events.minorNotices,
       followUpQueue: s.events.followUpQueue,
       firedEventIds: s.events.firedEventIds,
     },

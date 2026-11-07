@@ -27,9 +27,14 @@ function playMix(seed: number, clickEvery: number | null): Mix {
   for (let tick = 1; tick <= TICKS; tick++) {
     if (clickEvery !== null && tick % clickEvery === 0) runCommand(engine, 'employee list');
     runCommand(engine, 'tick 1');
-    if (s.events.pendingEvent) {
+    // A minor event is a notice, not a pending modal (#2146): both count as an event that reached the player.
+    const reached = [s.events.pendingEvent, ...s.events.minorNotices].filter(e => e !== null);
+    for (const ev of reached) {
       total++;
-      if (getEventById(s.events.pendingEvent.eventId)?.category === 'union') union++;
+      if (getEventById(ev!.eventId)?.category === 'union') union++;
+    }
+    s.events.minorNotices.length = 0;
+    if (s.events.pendingEvent) {
       runCommand(engine, 'event choose 0');
       if (s.events.lastOutcome) runCommand(engine, 'event dismiss');
     }
