@@ -269,8 +269,8 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('progress display', () => {
-    it('shows step counter "1 / 29" at step 0 and has progress bar fill', () => {
-      // Total comes from TUTORIAL_STEPS (29 today); update the literal when a step is added or removed.
+    it('shows step counter "1 / 28" at step 0 and has progress bar fill', () => {
+      // Total comes from TUTORIAL_STEPS (28 today); update the literal when a step is added or removed.
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
@@ -278,7 +278,7 @@ describe('TutorialOverlay (12.4)', () => {
       const els = Array.from(container.querySelectorAll('*'));
       const ctr = els.find(el => /\d\s*\/\s*\d/.test(el.textContent ?? ''));
       expect(ctr).toBeDefined();
-      expect(ctr?.textContent).toMatch(/1\s*\/\s*29/);
+      expect(ctr?.textContent).toMatch(/1\s*\/\s*28/);
       expect(container.querySelector('.bs-tutorial-progress-fill')).not.toBeNull();
     });
   });

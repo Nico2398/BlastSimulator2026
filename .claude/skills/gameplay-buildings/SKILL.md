@@ -112,7 +112,7 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
 
 ## Warehouses
 
-**Explosive stock is gone from the game:** explosives are bought as each hole is loaded, at list price (`costPerKg` x the live `explosive_price` event factor, `ChargeLoad.ts`); there is no `buy explosive:` command, no stock purchase in the Charge step, no stock in starting kits and no Explosive Warehouse building (retired in #2154).
+**Explosive stock is gone from the game:** explosives are bought as each hole is loaded, at list price (`costPerKg` x the live `explosive_price` event factor, `ChargeLoad.ts`); there is no `buy explosive:` command, no stock purchase in the Charge step, no stock in starting kits and no Explosive Warehouse building.
 - Inspector contents (`storageContent.ts`): a Contents section for the Freight Warehouse (gauge, free and in-transit-reserved kg, per-ore rows and a barren row from `warehouseStockByOre`, `FreightWarehouses.ts`) and the Spoil Heap (spoil kg, used/capacity gauge and free kg). Rows of 0.5 kg or less are hidden.
 
 **Freight Warehouse:**

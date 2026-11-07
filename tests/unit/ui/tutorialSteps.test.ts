@@ -3,7 +3,6 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { createSurveyOverlayToggleStep, isSurveyOverlayToggleOn } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
-import { createGame } from '../../../src/core/state/GameState.js';
 import { victoryProgress, goalChipParams } from '../../../src/ui/tutorialStepsClosing.js';
 import { TUTORIAL_STAGES, REGION } from '../../../src/ui/tutorialStages.js';
 import { createFinanceState, addIncome, addExpense, getFinancialReport } from '../../../src/core/economy/Finance.js';

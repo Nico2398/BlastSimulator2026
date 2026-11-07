@@ -22,7 +22,7 @@ describe('ModelIds', () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.filter(id => id.startsWith('worker_'))).toHaveLength(EMPLOYEE_ROLES.length);
     expect(ids.filter(id => id.startsWith('vehicle_'))).toHaveLength(18);
-    expect(ids.filter(id => /^building_.*_t[123]$/.test(id))).toHaveLength(29);
+    expect(ids.filter(id => /^building_.*_t[123]$/.test(id))).toHaveLength(26);
     expect(ids).toContain(BUILDING_RUIN_MODEL_ID);
     const props = propModelIds();
     // Each tree ships with its decimated far copy.
