@@ -52,7 +52,7 @@ function makeCandidateCard(
 }
 
 /** Filter selection owned by the panel (survives re-renders) and the re-render callback. */
-export interface HiringFilterView {
+interface HiringFilterView {
   selection: FilterBarSelection;
   onChange: () => void;
 }
