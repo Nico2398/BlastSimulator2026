@@ -130,7 +130,7 @@ export function noticeTicksLeft(notice: MinorNotice, tick: number): number {
  * Present a fired event by its stakes (#2146): a major one becomes the pending modal, a minor one a notice that
  * never holds the clock. Returns the FiredEvent, flagged `minor` for a notice.
  */
-function presentEvent(state: EventSystemState, eventId: string, tick: number, cash: number): FiredEvent {
+export function presentEvent(state: EventSystemState, eventId: string, tick: number, cash: number): FiredEvent {
   const def = getEventById(eventId);
   if (def && !isMajorEvent(def, cash)) {
     const notice: MinorNotice = { eventId, firedAtTick: tick, expiresAtTick: tick + EVENT_NOTICE_COUNTDOWN_TICKS, minor: true };

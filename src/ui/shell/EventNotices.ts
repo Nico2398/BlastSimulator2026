@@ -68,10 +68,18 @@ export class EventNotices {
 
   update(state: GameState): void {
     const cards = noticeCards(state);
-    const signature = JSON.stringify(cards);
-    if (signature === this.signature) return;
-    this.signature = signature;
-    this.root.replaceChildren(...cards.map(c => this.renderCard(c)));
+    // The countdown changes every tick: rebuilding on it would swallow a click that straddles the rebuild,
+    // so the cards are rebuilt only when the set of notices changes and the chip text is updated in place.
+    const signature = JSON.stringify(cards.map(({ ticksLeft: _ticks, ...rest }) => rest));
+    if (signature !== this.signature) {
+      this.signature = signature;
+      this.root.replaceChildren(...cards.map(c => this.renderCard(c)));
+    }
+    for (const card of cards) {
+      const chipEl = this.root.querySelector(`[data-event-id="${card.eventId}"] .bs-notice-countdown`);
+      const text = t('ui.notice.countdown', { ticks: card.ticksLeft });
+      if (chipEl && chipEl.textContent !== text) chipEl.textContent = text;
+    }
   }
 
   private renderCard(card: NoticeCardModel): HTMLElement {
@@ -79,9 +87,11 @@ export class EventNotices {
     wrap.style.cssText = 'pointer-events:auto;display:flex;flex-direction:column;gap:6px;padding:10px 12px;'
       + 'background:var(--bsx-surface, #1c1f26);border:1px solid var(--bsx-border, #3a3f4b);border-radius:6px;';
     const head = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
+    const countdown = chip(t('ui.notice.countdown', { ticks: card.ticksLeft }), 'warn');
+    countdown.classList.add('bs-notice-countdown');
     head.append(
       el('strong', { text: card.title, attrs: { style: 'flex:1;font:600 12px/1.3 var(--bsx-font-ui)' } }),
-      chip(t('ui.notice.countdown', { ticks: card.ticksLeft }), 'warn'),
+      countdown,
     );
     wrap.append(head, el('p', { text: card.desc, attrs: { style: 'margin:0;font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }));
     const row = el('div', { attrs: { style: 'display:flex;flex-wrap:wrap;gap:6px' } });

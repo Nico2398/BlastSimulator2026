@@ -4139,7 +4139,6 @@
   "eventResolution.notice_header": "Notice: {title} [{id}] — answers itself in {ticks} ticks",
   "eventResolution.notice_hint": "  → Use \"event choose <index> {id}\" to answer.",
   "ui.notice.countdown": "{ticks}s",
-  "ui.notice.auto": "Left unanswered, it settled itself.",
   "ui.notice.resolved": "Notice settled: {title}",
   "ui.notice.resolved_auto": "Notice settled on its own: {title}",
   "ui.notice.aria": "Minor events awaiting an answer",

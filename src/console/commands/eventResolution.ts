@@ -8,13 +8,11 @@ import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
 import { getEventById } from '../../core/events/EventPool.js';
 import { resolveEvent } from '../../core/events/EventResolver.js';
-import { clearLastOutcome, noticeTicksLeft } from '../../core/events/EventSystem.js';
+import { clearLastOutcome, noticeTicksLeft, presentEvent } from '../../core/events/EventSystem.js';
 import { applyResolutionToState, resolveNotice } from '../../core/events/EventNotices.js';
-import { isMajorEvent } from '../../core/events/EventWeight.js';
 import { effectChipText } from '../../core/events/EventEffectText.js';
 import { modifierSummary } from '../../core/events/ModifierText.js';
 import { drawPendingLeavers } from '../../core/events/EventLeavers.js';
-import { EVENT_NOTICE_COUNTDOWN_TICKS } from '../../core/config/balance.js';
 import { requireGame } from './commandUtils.js';
 
 /**
@@ -131,15 +129,7 @@ export function eventCommand(
       if (!def) {
         return { success: false, output: t('eventResolution.fire_not_found', { eventId }) };
       }
-      const minor = !isMajorEvent(def, state.cash);
-      if (minor) {
-        state.events.minorNotices.push({
-          eventId: def.id, firedAtTick: state.tickCount, minor: true,
-          expiresAtTick: state.tickCount + EVENT_NOTICE_COUNTDOWN_TICKS,
-        });
-      } else {
-        state.events.pendingEvent = { eventId: def.id, firedAtTick: state.tickCount };
-      }
+      const minor = presentEvent(state.events, def.id, state.tickCount, state.cash).minor === true;
       if (!state.events.firedEventIds.includes(def.id)) {
         state.events.firedEventIds.push(def.id);
       }

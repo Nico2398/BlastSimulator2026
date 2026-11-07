@@ -4139,7 +4139,6 @@
   "eventResolution.notice_header": "Avis : {title} [{id}] — se règle seul dans {ticks} ticks",
   "eventResolution.notice_hint": "  → Utilisez « event choose <index> {id} » pour répondre.",
   "ui.notice.countdown": "{ticks} s",
-  "ui.notice.auto": "Laissé sans réponse, il s'est réglé tout seul.",
   "ui.notice.resolved": "Avis réglé : {title}",
   "ui.notice.resolved_auto": "Avis réglé tout seul : {title}",
   "ui.notice.aria": "Événements mineurs en attente de réponse",

@@ -121,7 +121,7 @@ Gating: `CATEGORY_PREREQUISITE` (EventSystem.ts) blocks `union` until an employe
 ### Resolution
 Each event presents 2-4 decision options with different consequences on scores, finances, future event probabilities.
 
-### Event weight: modal or notice (#2146)
+### Event weight: modal or notice
 `eventWeight(def, cash)` (`core/events/EventWeight.ts`) splits events by stakes. **Major** = any option (or its `altConsequence`) carries `employee_leaves`, `ban`, `work_stoppage` or `cancel_contract`, or a cash cost above `EVENT_MAJOR_CASH_SHARE` (15%) of current cash; the engine-detected categories `traffic`, `mining` and `tutorial` are always major. Major events keep the blocking modal (`pendingEvent`, `tick` halts). **Minor** = the rest: pushed to `events.minorNotices` as a `MinorNotice` (non-blocking dock `EventNotices.ts`, `#bs-event-notices`, left of the minimap), the clock keeps running, and an unanswered one resolves after `EVENT_NOTICE_COUNTDOWN_TICKS` (150) to `defaultNoticeOption` = `cheapestEventOption` (best cash among options that keep the crew), with a toast (`lastNoticeOutcome.seq`). `event choose <idx> [eventId]`: no id resolves the pending major, else the oldest notice. Firing rate, definitions and option balance are unchanged; a fixture event whose options all cost ~0 is minor, so tests that need a modal give one option a real cash cost.
 
 ### Event effects
