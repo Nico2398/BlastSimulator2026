@@ -51,6 +51,10 @@ interface FakeIssue {
   blockedBy?: number[];
   /** The relationships call failed for a reason other than the feature being absent. */
   relationshipsUnknown?: boolean;
+  /** Who filed it. Defaults to the repository owner. */
+  user?: { login: string; type: string } | null;
+  /** The filer's association, as GitHub reports it. Defaults to `OWNER`. */
+  author_association?: string | null;
 }
 
 /** The shape `deliverableFor` returns. */
@@ -78,6 +82,8 @@ const issue = (partial: FakeIssue): Required<FakeIssue> => ({
   everInProgress: true,
   blockedBy: [],
   relationshipsUnknown: false,
+  user: { login: 'Nico2398', type: 'User' },
+  author_association: 'OWNER',
   ...partial,
 });
 
@@ -1063,6 +1069,66 @@ describe('which scopes a live run holds', () => {
   it('holds every scope while an exclusive or unscoped run is live', () => {
     expect(free(rules.scopeHolders([{ number: 1230, labels: ['in-progress', 'scope:pipeline'] }]))).toEqual([]);
     expect(free(rules.scopeHolders([{ number: 7, labels: ['in-progress'] }]))).toEqual([]);
+  });
+});
+
+// The 2026-11-06 audit: the issue form applies `agent-task` and `ready` for
+// whoever files it, and the repository is public, so a stranger's issue was one
+// chain away from a session holding the PAT. Who filed it is read before what
+// its labels say — `.github/scripts/pipeline-trust.cjs`.
+describe('only the owner\'s issues reach a session', () => {
+  const READY = ['ready', 'agent-task', 'scope:ui'];
+
+  it.each(['NONE', 'FIRST_TIME_CONTRIBUTOR', 'CONTRIBUTOR', 'COLLABORATOR', 'MEMBER'])(
+    'refuses a ready issue filed by a %s account',
+    (association) => {
+      const verdict = rules.labelVerdict(
+        issue({ number: 2200, labels: READY, user: { login: 'battle-mage', type: 'User' }, author_association: association })
+      );
+      expect(verdict.assignable).toBe(false);
+      expect(verdict.unreadable).toBe(false);
+      expect(verdict.reason).toContain('battle-mage');
+      expect(verdict.reason).toContain('not the repository owner');
+    }
+  );
+
+  it('takes an issue an installed app filed', () => {
+    const verdict = rules.labelVerdict(
+      issue({ number: 2201, labels: READY, user: { login: 'claude[bot]', type: 'Bot' }, author_association: 'NONE' })
+    );
+    expect(verdict.assignable).toBe(true);
+  });
+
+  // Fail closed: an issue whose author was not read is not the owner's.
+  it('refuses an issue whose author is unknown', () => {
+    const verdict = rules.labelVerdict(issue({ number: 2202, labels: READY, user: null, author_association: null }));
+    expect(verdict.assignable).toBe(false);
+    expect(verdict.reason).toContain('not the repository owner');
+  });
+
+  it('skips a stranger\'s ready issue and takes the owner\'s next one', async () => {
+    const api = fakeApi([
+      { number: 2203, labels: READY, user: { login: 'battle-mage', type: 'User' }, author_association: 'NONE' },
+      { number: 2204, labels: READY },
+    ]);
+    const result = await select(api);
+    expect(result.issue?.number).toBe(2204);
+    expect(result.unreadable).toEqual([]);
+  });
+
+  it('carries the author through the REST normaliser', async () => {
+    const client = createIssueApi(
+      {
+        rest: { issues: { get: async () => ({ data: { number: 9, state: 'open', labels: ['ready'], user: { login: 'battle-mage', type: 'User', id: 1 }, author_association: 'NONE' } }) } },
+        paginate: async () => [],
+        graphql: async () => ({}),
+      },
+      { owner: 'o', repo: 'r' }
+    );
+    const read = await client.getIssue(9);
+    expect(read.user).toEqual({ login: 'battle-mage', type: 'User' });
+    expect(read.author_association).toBe('NONE');
+    expect(rules.labelVerdict(read).assignable).toBe(false);
   });
 });
 

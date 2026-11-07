@@ -5,13 +5,17 @@ description: >
   green AND that head already contains its base branch's tip, so the tree that
   lands on `main` is a tree CI has already passed. A green head that is behind
   gets `main` merged into it and goes back through CI; a head that conflicts
-  with `main` is handed back to the agent. Whatever account opened the PR.
+  with `main` is handed back to the agent. Only the repository owner's pull
+  requests, or an installed app's, from a branch of this repository —
+  `.github/scripts/pipeline-trust.cjs` decides; every other pull request is
+  skipped before its marker is read or its runs are approved.
 
   Called only from `agentic-auto-merge.yml`, under its `agentic-merge`
   concurrency group, which is what makes "up to date, then merge" hold: no two
   sweeps can each find a different PR up to date with the same `main` and merge
   both. The repository must be checked out — the machinery list is read from
-  `.github/scripts/ci-handback.cjs`.
+  `.github/scripts/ci-handback.cjs`, the trust rule from
+  `.github/scripts/pipeline-trust.cjs`.
 
 inputs:
   token:
@@ -62,14 +66,35 @@ runs:
             `${process.env.GITHUB_WORKSPACE}/.github/scripts/ci-handback.cjs`
           );
 
-          // The marker decides, never the account. A pipeline PR is opened by
-          // whichever identity the runner's token resolved to that day —
-          // `github-actions[bot]` when the agent step overrides the PAT it was
-          // handed, a real user when it does not — and the loop must not depend
-          // on which. `READY TO MERGE` on a line of its own is the pipeline's
-          // own ship signal, written by the orchestrator and by nothing else,
-          // so it identifies an autonomous run's deliverable without asking who
-          // pressed the button. Trailing whitespace is tolerated because the
+          // Who may have work merged, or runs approved, by this gate: the
+          // repository owner and the apps it installed, from a branch of this
+          // repository. Until the 2026-11-06 audit this gate merged any marked
+          // pull request, fork or not, and approved the fork's parked runs under
+          // the PAT on its way — `pipeline-trust.cjs` holds the incident. Each
+          // author's permission is read once per sweep.
+          const { pullRequestTrust } = require(
+            `${process.env.GITHUB_WORKSPACE}/.github/scripts/pipeline-trust.cjs`
+          );
+          const repository = `${owner}/${repo}`;
+          const permissions = new Map();
+          const readPermission = (login) => {
+            if (!permissions.has(login)) {
+              permissions.set(
+                login,
+                github.rest.repos.getCollaboratorPermissionLevel({ owner, repo, username: login })
+                  .then(({ data }) => data.permission)
+              );
+            }
+            return permissions.get(login);
+          };
+
+          // Among trusted pull requests, the marker decides, never which of the
+          // pipeline's identities opened it — `github-actions[bot]` when the
+          // agent step overrides the PAT it was handed, the owner when it does
+          // not — and the loop must not depend on which. `READY TO MERGE` on a
+          // line of its own is the pipeline's ship signal. Anyone can type it
+          // into their own pull request, which is why trust is decided before
+          // the marker is read. Trailing whitespace is tolerated because the
           // line survives a round trip through the GitHub API and through
           // `gh pr edit`, both of which can add it.
           const carriesMergeMarker = (body) => {
@@ -237,6 +262,19 @@ runs:
 
             if (summary.draft) {
               core.info(`#${n}: draft — a draft is the pipeline's way of saying a channel did not pass.`);
+              continue;
+            }
+            // Before the marker, which anyone can write into their own pull
+            // request's body, and before the unmarked-pipeline-head check, which
+            // a fork can trip by naming its branch `pipeline/feature-1`.
+            const trust = await pullRequestTrust({ pr: summary, repository, readPermission });
+            if (!trust.trusted) {
+              if (trust.unreadable && carriesMergeMarker(summary.body)) {
+                core.warning(`#${n}: marked, but ${trust.reason} — not acting on an unread fact.`);
+                stuck.push(n);
+              } else {
+                core.info(`#${n}: ${trust.reason} — this gate acts only on the owner's work. Skipped.`);
+              }
               continue;
             }
             if (!carriesMergeMarker(summary.body)) {

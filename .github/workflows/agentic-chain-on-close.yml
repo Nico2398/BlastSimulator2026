@@ -88,9 +88,16 @@ jobs:
     # a pull request is carrying the chain already. This clause only keeps
     # unrelated closes out of the shared concurrency group, so erring wide costs
     # a no-op run and erring narrow costs the queue.
+    #
+    # Only the owner's close, or an installed app's: whoever filed an issue can
+    # close it, and the repository is public — `.github/scripts/pipeline-trust.cjs`
+    # holds the rule and the 2026-11-06 audit.
     if: >-
-      contains(github.event.issue.labels.*.name, 'agent-task') ||
-      contains(github.event.issue.labels.*.name, 'in-progress')
+      (github.event.sender.login == github.repository_owner || github.event.sender.type == 'Bot') &&
+      (
+        contains(github.event.issue.labels.*.name, 'agent-task') ||
+        contains(github.event.issue.labels.*.name, 'in-progress')
+      )
     runs-on: ubuntu-latest
     steps:
       # The assignability rules are read from the workspace, not vendored into
