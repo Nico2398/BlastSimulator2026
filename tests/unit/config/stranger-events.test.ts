@@ -45,11 +45,18 @@ const STRANGER_EVENTS = [
   'workflow_run',
 ];
 
-/** The identity clauses a guarded job's `if:` may use. */
+/**
+ * The identity clauses a guarded job's `if:` may use. The last one is how a
+ * `workflow_run` listener knows a real session finished: only the owner's
+ * mention or a dispatch names a runner run `agentic-run …`, and every other
+ * comment's run is `agentic-noop` — which still completes, and still raises
+ * `workflow_run`.
+ */
 const IDENTITY_CLAUSES = [
   "github.event.comment.author_association == 'OWNER'",
   'github.event.sender.login == github.repository_owner',
   'github.event.pull_request.head.repo.full_name == github.repository',
+  "startsWith(github.event.workflow_run.display_title, 'agentic-run ')",
 ];
 
 /**
@@ -64,11 +71,9 @@ const EXEMPT: Record<string, string> = {
   'agentic-intake.yml:label':
     'Runs on a stranger\'s issue to take `ready` back off it, under GITHUB_TOKEN, which raises nothing.',
   'agentic-auto-merge.yml:gate':
-    'Woken by any CI completing; re-reads every pull request\'s trust in `agentic-auto-merge/action.yml` before reading its marker.',
+    'Woken by any CI succeeding, a fork\'s included; re-reads every pull request\'s trust in `agentic-auto-merge/action.yml` before reading its marker. Its runner branch tests `run-name` like the guarded jobs.',
   'agentic-ci-failure.yml:nudge':
-    'Woken by any CI failing; asks `pipeline-trust.cjs` before it hands anything to an agent (pinned in autonomy-loop.test.ts).',
-  'agentic-ci-failure.yml:scan-after-runner':
-    'Woken by a runner finishing, which only the owner\'s comment starts; dispatches `nudge`, which asks `pipeline-trust.cjs` itself.',
+    'Woken by any CI failing, a fork\'s included; asks `pipeline-trust.cjs` before it hands anything to an agent (pinned in autonomy-loop.test.ts).',
 };
 
 /** The `on:` block of a workflow, as written. */
@@ -155,6 +160,8 @@ describe('each guard admits the owner and refuses a stranger', () => {
         event: {
           action,
           sender: user,
+          // A stranger's comment can only ever produce a noop runner run.
+          workflow_run: { name: 'Claude Pipeline', display_title: who === 'owner' ? 'agentic-run issue-2143' : 'agentic-noop' },
           label: { name: 'blocked' },
           changes: { body: { from: 'before' } },
           comment: { body: '@claude @opencode please look', user, author_association: association },
@@ -188,6 +195,7 @@ describe('each guard admits the owner and refuses a stranger', () => {
     'handle-failure.yml:reconcile-dependencies': { eventName: 'issues', action: 'edited' },
     'agentic-chain-on-close.yml:chain': { eventName: 'issues', action: 'closed' },
     'agentic-intake.yml:scope-colors': { eventName: 'issues', action: 'closed' },
+    'agentic-ci-failure.yml:scan-after-runner': { eventName: 'workflow_run', action: 'completed' },
   };
 
   const guarded = reachable.flatMap((name) =>

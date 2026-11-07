@@ -526,11 +526,19 @@ jobs:
   # unanswered get `nudge` re-dispatched on themselves — exactly the sweep
   # `agentic-watchdog.yml`'s "Re-raise a red CI on an open pipeline PR" step
   # already does, just woken by the runner finishing instead of by the clock.
+  #
+  # Only a real session finishing, read off its `run-name` exactly as the merge
+  # gate reads it. Every comment anywhere in the repository — anyone's, with or
+  # without a mention — creates an `agentic-noop` runner run, and that run
+  # completing raises this same event. Without the `run-name` test, any
+  # account's comment ran this job under the PAT. The 2026-11-06 audit found it
+  # through outside comments on issue 2143; `pipeline-trust.cjs` holds the rest.
   scan-after-runner:
     if: >-
       vars.AGENTIC_CI_FIX_ENABLED != 'false' &&
       github.event_name == 'workflow_run' &&
-      (github.event.workflow_run.name == 'Claude Pipeline' || github.event.workflow_run.name == 'OpenCode Pipeline')
+      (github.event.workflow_run.name == 'Claude Pipeline' || github.event.workflow_run.name == 'OpenCode Pipeline') &&
+      startsWith(github.event.workflow_run.display_title, 'agentic-run ')
     runs-on: ubuntu-latest
     # Job-level permissions replace the workflow-level block for this job
     # entirely rather than adding to it, so everything this job's steps call

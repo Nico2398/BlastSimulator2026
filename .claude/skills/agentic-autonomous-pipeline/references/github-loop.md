@@ -254,6 +254,7 @@ The repository is public: anyone can fork it, open a pull request, file an issue
 | A stranger | Stops at |
 |-----------|----------|
 | Comments `@claude` or `@opencode` anywhere | Both runners' job `if:`, `run-name` and concurrency group: `comment.author_association == 'OWNER'`. The run is `agentic-noop`, so no rescue step ever labels the issue |
+| Comments anything at all | GitHub still creates a run of each runner for every comment, since nothing filters `issue_comment` before the job's `if:`: an `agentic-noop` run, skipped, no step, no secret. Its completion raises `workflow_run`, so the merge gate and `scan-after-runner` act only when `run-name` starts `agentic-run ` |
 | Opens a pull request carrying `READY TO MERGE` | `agentic-auto-merge`, before the marker is read: no merge, no update, no handback, and no approval of the fork's parked runs |
 | Names a fork's branch `pipeline/feature-<N>-<runId>` | `agentic-ci-failure.yml`'s `nudge`, before the branch is read: no agent mention is posted on it |
 | Files the "Agent Task" form, which applies `agent-task` and `ready` | `labelVerdict` refuses the issue; `agentic-intake.yml` takes `ready` off |
