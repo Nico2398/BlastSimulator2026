@@ -754,80 +754,16 @@
       "interaction": [
         {
           "type": "awaitTutorialStep",
-          "stepId": "build-explosive-warehouse",
+          "stepId": "charge",
           "timeoutMs": 480000
         }
       ],
       "expect": {
-        "tutorialStep": "build-explosive-warehouse",
+        "tutorialStep": "charge",
         "equals": {
           "holeCount": 9,
           "orderedHoleCount": 0
         }
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "build explosive_warehouse at:7,11",
-      "timeout": 150,
-      "role": "player",
-      "description": "build-explosive-warehouse, click half: Build panel, the Boom Closet's place button, a click inside the pin's live margin (pin (7,11), picked at its far corner (8,12); the picker snaps to the pin), Confirm. A charge order paid in cash waits EXPLOSIVE_DELIVERY_TICKS (400) for its explosives with the crew idle (#1895); stock in an explosive warehouse loads at once. The order only queues construction; the next step waits for it.",
-      "interaction": [
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-inspector [data-panel-close]",
-          "timeoutMs": 0
-        },
-        {
-          "type": "ensurePanel",
-          "panel": "build"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "pickTile",
-          "x": 8,
-          "z": 12
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "orderedBuildingCount"
-        ],
-        "tutorialStep": "build-explosive-warehouse"
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "state",
-      "timeout": 150,
-      "role": "observe",
-      "description": "build-explosive-warehouse complete: an idle crew member walks to (7,11) and builds the tier-1 Boom Closet. buildingCount 3 = the level's free spoil heap, the living quarters and this warehouse. The card moves on to charge.",
-      "interaction": [
-        {
-          "type": "awaitTutorialStep",
-          "stepId": "charge",
-          "timeoutMs": 120000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "buildingCount": 3
-        },
-        "tutorialStep": "charge"
       },
       "interactionOnly": true
     },

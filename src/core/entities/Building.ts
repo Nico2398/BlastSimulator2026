@@ -27,7 +27,6 @@ export type BuildingType =
   | 'geology_lab'
   | 'research_center'
   | 'living_quarters'
-  | 'explosive_warehouse'
   | 'freight_warehouse'
   | 'spoil_heap'
   | 'ceo_statue'

@@ -240,7 +240,7 @@
       }
     },
     {
-      "command": "build explosive_warehouse at:20,5",
+      "command": "build blasting_academy at:20,5",
       "description": "#556: same order-then-build semantics as the orders above.",
       "interaction": [
         {
@@ -250,7 +250,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+          "selector": "#bs-build-panel [data-build-type=\"blasting_academy\"] .bs-build-buy-btn"
         },
         {
           "type": "waitForSelector",
@@ -272,7 +272,7 @@
       "role": "player",
       "expect": {
         "changedBy": {
-          "cash": -20000
+          "cash": -15000
         },
         "equals": {
           "buildingCount": 3,
@@ -282,7 +282,7 @@
     },
     {
       "command": "wait_until field:buildingCount equals:4 max_ticks:300",
-      "description": "Drive the explosive_warehouse site to completion.",
+      "description": "Drive the blasting_academy site to completion.",
       "timeout": 90,
       "interaction": [
         {

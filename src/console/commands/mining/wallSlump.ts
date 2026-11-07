@@ -67,7 +67,7 @@ export function* applyWallSlumps(ctx: MiningContext, clearedRegion: BlastRegion)
     releaseAfterAccidents(state, ctx.emitter, accidents);
     for (const a of accidents) {
       if (a.type !== 'building_destroyed') continue;
-      recordBuildingDestruction(state.scores, a.entityLabel === 'explosive_warehouse');
+      recordBuildingDestruction(state.scores);
       const gone = footprintsBefore.get(a.entityId);
       if (gone) emitFootprintOccupancyChanged(ctx, gone.x, gone.z, gone.sizeX, gone.sizeZ);
     }

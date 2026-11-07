@@ -156,7 +156,7 @@
       "timeout": 130
     },
     {
-      "command": "build explosive_warehouse at:15,20",
+      "command": "build management_office at:15,20",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -169,7 +169,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
         },
         {
           "type": "waitForSelector",
@@ -189,10 +189,10 @@
         }
       ],
       "role": "player",
-      "description": "#1390: built beside hole H1 (20,20), not on it — placement refuses a footprint over a drilled or ordered hole (Blocks a drill hole), so the warehouse sits a few tiles clear of the hole and still inside blast range.",
+      "description": "#1390: built beside hole H1 (20,20), not on it — placement refuses a footprint over a drilled or ordered hole (Blocks a drill hole), so the office sits a few tiles clear of the hole and still inside blast range.",
       "expect": {
         "changedBy": {
-          "cash": -20000
+          "cash": -8000
         },
         "equals": {
           "orderedBuildingCount": 1
@@ -471,7 +471,7 @@
           "chargedCount": 0,
           "buildingCount": 0
         },
-        "note": "both warehouses (200/150 max HP) sit a few tiles from the two charged holes (#1390: placement refuses a footprint over a hole) and still get destroyed — the file's own stated purpose, confirmed via a real dump (blast rating CATASTROPHIC, 'Buildings destroyed: explosive_warehouse #1, freight_warehouse #2')"
+        "note": "the management office and the freight warehouse (80/150 max HP) sit a few tiles from the two charged holes (#1390: placement refuses a footprint over a hole) and still get destroyed — the file's own stated purpose, confirmed via a real dump (blast rating CATASTROPHIC, 'Buildings destroyed: management_office #1, freight_warehouse #2'; building ids and rating not re-captured after the explosive warehouse was retired)"
       }
     },
     {

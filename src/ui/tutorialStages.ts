@@ -179,7 +179,7 @@ function pickerStages(
  * margin onto these corners, so the player aims at a drawn outline and cannot
  * miss.
  *
- * The four tutorial building pins (warehouse, drivingCenter, livingQuarters, explosiveWarehouse)
+ * The four tutorial building pins (warehouse, drivingCenter, livingQuarters)
  * are the tier-1 footprint rects of their building defs, anchored at the
  * origin (x1, z1) the building is placed at (`tutorialSiteFootprintRect`),
  * and are derived, not picked ad hoc: flat for the building's full footprint
@@ -254,11 +254,6 @@ export const REGION = {
   // then driving_center, then freight_warehouse) with each one checked
   // against the prior pins already placed.
   livingQuarters: tutorialSiteFootprintRect('living_quarters', 1, { x1: 8, z1: 15, x2: 8, z2: 15 }),
-  // Same derivation as the pins above. Ordered right after drill-plan, between
-  // living_quarters and driving_center, so it leaves one free column (x=6) to
-  // the freight warehouse at (2,12)-(5,15) and two free rows (z=13-14) to
-  // driving_center (6,15) and living_quarters (8,15).
-  explosiveWarehouse: tutorialSiteFootprintRect('explosive_warehouse', 1, { x1: 7, z1: 11, x2: 7, z2: 11 }),
 } satisfies Record<string, TileRegion>;
 
 /** World edge (tiles) after the seismic survey grows the world from 32 to 48. */
@@ -429,18 +424,6 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     ...pickerStages('tutorial.stage.drill_area', REGION.drill, {
       spentWhen: (state) => state.plannedDrillHoles.length > 0,
       waitingKey: 'tutorial.waiting.drilling',
-    }),
-  ],
-
-  'build-explosive-warehouse': [
-    { target: TOOLBAR_TARGET.build, hintKey: 'tutorial.stage.open_build' },
-    {
-      target: '#bs-build-panel [data-build-type="explosive_warehouse"] .bs-build-buy-btn',
-      hintKey: 'tutorial.stage.build_explosive_warehouse',
-    },
-    ...pickerStages('tutorial.stage.build_site', REGION.explosiveWarehouse, {
-      spentWhen: (state) => hasPlannedBuildingOfType(state, 'explosive_warehouse'),
-      waitingKey: 'tutorial.waiting.building',
     }),
   ],
 

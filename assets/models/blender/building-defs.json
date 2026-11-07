@@ -227,44 +227,6 @@
       ]
     }
   },
-  "explosive_warehouse": {
-    "1": {
-      "sizeX": 2,
-      "sizeZ": 2,
-      "entry": [
-        0,
-        0
-      ],
-      "exit": [
-        1,
-        0
-      ]
-    },
-    "2": {
-      "sizeX": 3,
-      "sizeZ": 2,
-      "entry": [
-        0,
-        0
-      ],
-      "exit": [
-        2,
-        0
-      ]
-    },
-    "3": {
-      "sizeX": 4,
-      "sizeZ": 3,
-      "entry": [
-        0,
-        0
-      ],
-      "exit": [
-        3,
-        0
-      ]
-    }
-  },
   "freight_warehouse": {
     "1": {
       "sizeX": 4,

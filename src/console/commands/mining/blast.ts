@@ -176,8 +176,8 @@ export function* fireBlastSteps(
   // footprint is already inside clearedRegion, which executeBlast's own
   // `terrain:updated` emit above covers — NavGridSync patches from that
   // event, so no separate NavGrid call is needed here.
-  for (const destroyed of result.destroyedBuildings) {
-    recordBuildingDestruction(state.scores, destroyed.type === 'explosive_warehouse');
+  for (let i = 0; i < result.destroyedBuildings.length; i++) {
+    recordBuildingDestruction(state.scores);
   }
 
   // A blast can destroy a Freight Warehouse — keep logistics capacity honest.

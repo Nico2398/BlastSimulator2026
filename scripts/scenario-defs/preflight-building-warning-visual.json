@@ -1,6 +1,6 @@
 {
   "name": "preflight-building-warning-visual",
-  "description": "#2021: a 3x3 pattern drilled around the player's Management Office, Freight Warehouse and Explosive Warehouse lists each building in the Blast step checklist and the Pre-Flight Check (quarters 10 m away is not listed); the warning does not gate firing.",
+  "description": "#2021: a 3x3 pattern drilled around the player's Management Office, Freight Warehouse and Geology Lab lists each building in the Blast step checklist and the Pre-Flight Check (quarters 10 m away is not listed); the warning does not gate firing.",
   "shots": [
     {
       "name": "overview",
@@ -120,9 +120,9 @@
       }
     },
     {
-      "command": "build explosive_warehouse at:22,48",
+      "command": "build geology_lab at:22,48",
       "timeout": 60,
-      "description": "Player builds a explosive_warehouse at 22,48 (issue #2021 layout).",
+      "description": "Player builds a geology_lab at 22,48 (issue #2021 layout).",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -135,7 +135,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+          "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-buy-btn"
         },
         {
           "type": "waitForSelector",
@@ -403,7 +403,7 @@
     {
       "command": "state",
       "timeout": 90,
-      "description": "Blast step checklist (Fire.ts) lists one row per building at risk: office, freight warehouse, explosive warehouse; not the quarters 10 m away. Detonate stays usable.",
+      "description": "Blast step checklist (Fire.ts) lists one row per building at risk: office, freight warehouse, geology lab; not the quarters 10 m away. Detonate stays usable.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -415,7 +415,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"explosive_warehouse\"]"
+          "selector": "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"geology_lab\"]"
         },
         {
           "type": "screenshot"
@@ -428,7 +428,7 @@
         "textEquals": {
           "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"management_office\"]": "Management Office is inside the blast area and will be destroyed.",
           "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"freight_warehouse\"]": "Freight Warehouse is inside the blast area and will be destroyed.",
-          "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"explosive_warehouse\"]": "Explosive Warehouse is inside the blast area and will be destroyed."
+          "#bs-blast-panel [data-role=\"building-risk\"][data-building-type=\"geology_lab\"]": "Geology Lab is inside the blast area and will be destroyed."
         }
       }
     },
@@ -443,7 +443,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay [data-role=\"preflight-building-risk\"][data-building-type=\"explosive_warehouse\"]"
+          "selector": ".bs-confirm-overlay [data-role=\"preflight-building-risk\"][data-building-type=\"geology_lab\"]"
         },
         {
           "type": "screenshot"
@@ -455,7 +455,7 @@
         "textEquals": {
           ".bs-confirm-overlay [data-role=\"preflight-building-risk\"][data-building-type=\"management_office\"]": "Management Office is inside the blast area and will be destroyed.",
           ".bs-confirm-overlay [data-role=\"preflight-building-risk\"][data-building-type=\"freight_warehouse\"]": "Freight Warehouse is inside the blast area and will be destroyed.",
-          ".bs-confirm-overlay [data-role=\"preflight-building-risk\"][data-building-type=\"explosive_warehouse\"]": "Explosive Warehouse is inside the blast area and will be destroyed."
+          ".bs-confirm-overlay [data-role=\"preflight-building-risk\"][data-building-type=\"geology_lab\"]": "Geology Lab is inside the blast area and will be destroyed."
         }
       }
     },

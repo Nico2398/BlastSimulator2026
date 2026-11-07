@@ -1756,7 +1756,6 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
  */
 const SANDBOX_STARTING_BUILDINGS: readonly StartingBuildingSlot[] = [
   ...DIGGER_STARTING_SITE.buildings,
-  { type: 'explosive_warehouse', tier: 1 },
 ];
 
 export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxKitId, StartingSiteComposition>> = {
@@ -1975,10 +1974,6 @@ export const RESEARCH_TASK_DEFS: Record<BuildingType, { 2: ResearchTaskDef; 3: R
   living_quarters: {
     2: { cost: 5000, ticks: 0, conditions: [] },
     3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'living_quarters', tier: 2 }] },
-  },
-  explosive_warehouse: {
-    2: { cost: 5000, ticks: 0, conditions: [] },
-    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'explosive_warehouse', tier: 2 }] },
   },
   freight_warehouse: {
     2: { cost: 5000, ticks: 0, conditions: [] },

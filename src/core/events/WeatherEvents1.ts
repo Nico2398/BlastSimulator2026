@@ -40,18 +40,6 @@ export const WEATHER_EVENTS_1: EventDef[] = [
         effects: [{ type: 'employee_injured' }] },
     ],
   }),
-  // 2 — Lightning strikes near explosives magazine
-  ev('weather_lightning_strike', 'weather', {
-    weight: (s) => 1.5 + 1.5 * (1 - r.sf(s)),
-    canFire: (ctx) => ctx.weatherId === 'storm' && ctx.hasBuilding('explosive_warehouse'),
-    options: [
-      { cashDelta: -30000, scoreDelta: { safety: 15 }, effectTag: 'lightning_rods' },
-      { cashDelta: 0, scoreDelta: { safety: -20 }, probability: 0.4,
-        alt: { cashDelta: -40000, scoreDelta: { safety: -40 }, effectTag: 'magazine_explosion' } },
-      { cashDelta: -10000, scoreDelta: { safety: 8 }, effectTag: 'emergency_relocation',
-        effects: [{ type: 'ban', what: 'blast', hours: EVENT_CURFEW_BAN_HOURS }] },
-    ],
-  }),
   // 3 — 47°C heatstroke, workers fainting
   ev('weather_heatstroke', 'weather', {
     weight: (s) => 1.2 + 1.0 * (1 - r.wb(s)),
