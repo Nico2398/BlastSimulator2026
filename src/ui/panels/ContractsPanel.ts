@@ -81,7 +81,7 @@ export function orderOffers(
 
 /** Sort keys the Contracts panel offers, in display order. */
 export const CONTRACT_SORT_KEYS = ['price_per_kg', 'total_value', 'deadline'] as const;
-export type ContractSortKey = typeof CONTRACT_SORT_KEYS[number];
+type ContractSortKey = typeof CONTRACT_SORT_KEYS[number];
 /** Active and Closed sections show a filter bar only above this many rows. */
 export const FILTER_BAR_MIN_ROWS = 5;
 

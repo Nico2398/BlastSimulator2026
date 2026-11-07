@@ -3,13 +3,13 @@
 
 import { el, paintToggleButton } from './dom.js';
 
-export interface FilterChoice {
+interface FilterChoice {
   /** Value stored in the selection ('' is a valid value, e.g. generic rubble). */
   value: string;
   label: string;
 }
 
-export interface SortChoice {
+interface SortChoice {
   key: string;
   label: string;
 }
