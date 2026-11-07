@@ -608,7 +608,7 @@ function migrateV36ToV37(obj: Record<string, unknown>): Record<string, unknown> 
   for (const action of actions) {
     const payload = action['payload'] as Record<string, unknown> | undefined;
     if (action['type'] !== 'charge_hole' || !payload) continue;
-    if (typeof payload['orderCost'] === 'number') refund += payload['orderCost'];
+    if (typeof payload['orderCost'] === 'number' && Number.isFinite(payload['orderCost']) && payload['orderCost'] > 0) refund += payload['orderCost'];
     const stock = payload['orderStock'] as { explosiveId?: unknown; kg?: unknown } | undefined;
     if (stock && typeof stock.explosiveId === 'string' && typeof stock.kg === 'number') {
       refund += chargeOrderCost(stock.explosiveId, stock.kg);

@@ -110,7 +110,7 @@ export function planReplacementLoss(
 
 /**
  * The pattern charge, or null when none is set. Side effect: a pattern whose
- * explosive the level no longer offers is cleared (with its waiting list)
+ * explosive the level no longer offers is cleared
  * rather than returned.
  */
 function takePatternOrClearIfUnavailable(state: GameState): HoleCharge | null {
