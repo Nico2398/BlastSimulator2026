@@ -119,6 +119,32 @@ jobs:
             // body, which is the over-blocking heuristic this pipeline rejected.
             const issue = context.payload.issue;
             let labels = names(issue.labels);
+            // The form applies `agent-task` and `ready` for whoever files it,
+            // and the repository is public. Only the owner's issues — or an
+            // app's — reach the queue; `pipeline-trust.cjs` holds the rule and
+            // the 2026-11-06 audit that found the gap, and `labelVerdict`
+            // refuses the same issue on the same verdict.
+            const { issueTrust } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/pipeline-trust.cjs`);
+            const author = issueTrust(issue);
+            if (!author.trusted) {
+              if (!labels.includes(rules.READY)) {
+                core.info(`#${n}: ${author.reason} — outside the pipeline, nothing to do.`);
+                return;
+              }
+              await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: rules.READY })
+                .catch(() => {});
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: n,
+                body: [
+                  '<!-- agentic-untrusted-author -->',
+                  '**`ready` taken off: this repository\'s autonomous pipeline only takes issues filed by its owner.**',
+                  '',
+                  'The issue stays open for the owner to read. Nothing in it is assigned to an agent.',
+                ].join('\n'),
+              });
+              core.warning(`#${n}: took \`ready\` off — ${author.reason}.`);
+              return;
+            }
             if (action === 'opened') {
               const section = /^###\s*Scope\s*$([\s\S]*?)(?=^###\s|(?![\s\S]))/m.exec(issue.body || '');
               const picked = section
@@ -178,11 +204,17 @@ jobs:
   scope-colors:
     # `in-progress` arriving or leaving, a scope changing on a live issue, or a
     # live issue closing: the only events that change what a live run holds.
+    # Only the owner's events, or an installed app's: whoever filed an issue
+    # can close it, and the repository is public. The `label` job above is the
+    # one job here that runs on a stranger's event, to take `ready` back off.
     if: >-
-      github.event.action == 'closed' ||
+      (github.event.sender.login == github.repository_owner || github.event.sender.type == 'Bot') &&
       (
-        (github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
-        (github.event.label.name == 'in-progress' || startsWith(github.event.label.name, 'scope:'))
+        github.event.action == 'closed' ||
+        (
+          (github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
+          (github.event.label.name == 'in-progress' || startsWith(github.event.label.name, 'scope:'))
+        )
       )
     runs-on: ubuntu-latest
     # A newer repaint reads fresher state, so it replaces an older one rather

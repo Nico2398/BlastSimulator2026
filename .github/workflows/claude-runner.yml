@@ -27,7 +27,7 @@ run-name: >-
     (
       github.event_name == 'workflow_dispatch' ||
       (
-        github.event.comment.user.type != 'Bot' &&
+        github.event.comment.author_association == 'OWNER' &&
         (
           startsWith(github.event.comment.body, '@claude ') ||
           contains(github.event.comment.body, ' @claude ') ||
@@ -79,7 +79,7 @@ concurrency:
       (
         github.event_name == 'workflow_dispatch' ||
         (
-          github.event.comment.user.type != 'Bot' &&
+          github.event.comment.author_association == 'OWNER' &&
           (
             startsWith(github.event.comment.body, '@claude ') ||
             contains(github.event.comment.body, ' @claude ') ||
@@ -117,10 +117,23 @@ jobs:
     # runners stay enabled: the assignment comment names exactly one agent, so
     # only the configured one answers, and a human can still summon the other
     # by hand.
+    #
+    # Only the repository owner's comment is a trigger. The repository is
+    # public, so any GitHub account can comment, and this test used to read
+    # the author's type alone (`!= 'Bot'`). The 2026-11-06 audit (outside PRs
+    # #2150/#2151) found that a stranger's `@claude` on an open issue ran this
+    # job: the action refused the session for want of write access, but the
+    # `if: always()` rescue below then labelled that issue `blocked` under the
+    # PAT, and `handle-failure.yml` chained a real session onto the next one.
+    # Every comment the pipeline writes to wake a runner is posted with the
+    # owner's PAT, so it reads `OWNER`; a bot is never `OWNER`, which is why
+    # this replaces the old Bot test rather than sitting beside it. The same
+    # clause guards `run-name` and the concurrency group above, so a stranger's
+    # mention never claims an entity's slot either.
     if: >
       github.event_name == 'workflow_dispatch' ||
       (
-        github.event.comment.user.type != 'Bot' &&
+        github.event.comment.author_association == 'OWNER' &&
         (
           startsWith(github.event.comment.body, '@claude ') ||
           contains(github.event.comment.body, ' @claude ') ||

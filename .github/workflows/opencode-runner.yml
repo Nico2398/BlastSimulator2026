@@ -27,7 +27,7 @@ run-name: >-
     (
       github.event_name == 'workflow_dispatch' ||
       (
-        github.event.comment.user.type != 'Bot' &&
+        github.event.comment.author_association == 'OWNER' &&
         (
           startsWith(github.event.comment.body, '@opencode ') ||
           contains(github.event.comment.body, ' @opencode ') ||
@@ -79,7 +79,7 @@ concurrency:
       (
         github.event_name == 'workflow_dispatch' ||
         (
-          github.event.comment.user.type != 'Bot' &&
+          github.event.comment.author_association == 'OWNER' &&
           (
             startsWith(github.event.comment.body, '@opencode ') ||
             contains(github.event.comment.body, ' @opencode ') ||
@@ -112,10 +112,13 @@ permissions:
 
 jobs:
   run:
+    # Only the repository owner's comment is a trigger — claude-runner.yml's
+    # job `if:` holds the incident. The same clause guards `run-name` and the
+    # concurrency group above.
     if: >
       github.event_name == 'workflow_dispatch' ||
       (
-        github.event.comment.user.type != 'Bot' &&
+        github.event.comment.author_association == 'OWNER' &&
         (
           startsWith(github.event.comment.body, '@opencode ') ||
           contains(github.event.comment.body, ' @opencode ') ||

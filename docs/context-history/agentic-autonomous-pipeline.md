@@ -249,3 +249,15 @@ The guard first shipped declared in the orchestrator's own frontmatter, and it n
 ## runtime-parity.md — Claude Code prerequisites
 
 Hooks run on every OS: the shell versions these replaced degraded silently on Windows: they needed Git Bash plus python3, failed open without it, and the stop guard's Python liveness probe, `os.kill(pid, 0)`, is TerminateProcess there — it killed the long run it was checking.
+
+## references/github-loop.md — Only the owner's events reach the pipeline
+
+On 2026-11-06 an account outside the project (`battle-mage`) forked the repository and opened PRs #2150 and #2151 after commenting on issue #2143. The audit that followed found the pipeline reacting to a stranger's event in five places, none of which checked who raised it:
+
+- Any comment carrying `@claude` or `@opencode` ran the runner job. `claude-code-action` refused the session for want of write access, but the `if: always()` rescue step then saw an open, unsettled issue, commented, and labelled it `blocked` under the PAT — and `handle-failure.yml` chained a real session onto the next `ready` issue. Repeated, that spends the owner's quota and trips `AGENTIC_BLOCKED_CHAIN_LIMIT`, parking the queue.
+- The merge gate selected any non-draft pull request carrying `READY TO MERGE`, fork or not, approved its `action_required` runs under the PAT — the switch GitHub keeps between a first-time contributor's fork and the runners — and merged once the channels on its head were green. On a fork those channels run the fork's own workflow files, so the author decided the verdict.
+- The CI fail-safe recognised a pipeline PR by its head branch name alone. A fork can name its branch `pipeline/feature-1-2`; a conflict or a red run on it was answered with an agent mention under the PAT, starting a session on the stranger's head.
+- The "Agent Task" form applies `agent-task` and `ready` for whoever files it, and intake turned its Scope field into scope labels: a stranger's issue was fully `ready`, one chain away from a session holding the PAT.
+- `auto-assign-next.yml`, `claude-code-review.yml`, `handle-failure.yml`'s `edited` path, `agentic-chain-on-close.yml` and intake's `scope-colors` ran on a stranger's pull request, edit or close.
+
+Neither PR was found to exploit any of these; both bodies lacked the marker and their runs stayed parked. Each gap was closed where it was found, on one rule (`.github/scripts/pipeline-trust.cjs`), and `tests/unit/config/stranger-events.test.ts` was added so the next workflow on such an event is classified before it ships.

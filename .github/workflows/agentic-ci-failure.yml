@@ -89,10 +89,10 @@ jobs:
 
       # The PAT, not GITHUB_TOKEN, and for once the mention is the point. A
       # comment created with GITHUB_TOKEN is authored by `github-actions[bot]`,
-      # and both runners filter `comment.user.type != 'Bot'` — so the nudge would
-      # be posted and nothing would read it. This is the second comment in the
-      # whole pipeline allowed to carry an agent mention, after the assignment
-      # comment; see `agentic-autonomous-pipeline`'s github-loop reference.
+      # and both runners act only on a comment the repository owner wrote — so
+      # the nudge would be posted and nothing would read it. This is the second
+      # comment in the whole pipeline allowed to carry an agent mention, after
+      # the assignment comment; see `agentic-autonomous-pipeline`'s github-loop reference.
       - name: Hand the failure back to the agent that owns the PR
         uses: actions/github-script@v7
         env:
@@ -175,6 +175,29 @@ jobs:
                 );
                 return;
               }
+            }
+
+            // A branch name is not an identity: a fork can call its branch
+            // `pipeline/feature-1-2`, and the handback below posts an agent
+            // mention under the owner's PAT, which starts a session on that
+            // head. Only the owner's work, from a branch of this repository —
+            // `pipeline-trust.cjs` holds the rule and the 2026-11-06 audit.
+            const { pullRequestTrust } = require(
+              `${process.env.GITHUB_WORKSPACE}/.github/scripts/pipeline-trust.cjs`
+            );
+            const trust = await pullRequestTrust({
+              pr,
+              repository: `${owner}/${repo}`,
+              readPermission: async (username) =>
+                (await github.rest.repos.getCollaboratorPermissionLevel({ owner, repo, username })).data.permission,
+            });
+            if (trust.unreadable) {
+              core.setFailed(`#${pr.number}: ${trust.reason} — not handing it to an agent on an unread fact.`);
+              return;
+            }
+            if (!trust.trusted) {
+              core.info(`#${pr.number}: ${trust.reason} — the pipeline acts only on the owner's work. Nothing to do.`);
+              return;
             }
 
             const match = PIPELINE_HEAD.exec(pr.head?.ref || '');

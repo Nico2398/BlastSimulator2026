@@ -61,7 +61,7 @@ function tokenize(source: string): Token[] {
       i += 2;
       continue;
     }
-    if ('()[].,!<>'.includes(ch)) {
+    if ('()[].,!<>*'.includes(ch)) {
       tokens.push({ kind: 'op', value: ch });
       i += 1;
       continue;
@@ -112,6 +112,9 @@ function looseEquals(left: Value, right: Value): boolean {
 }
 
 const FUNCTIONS: Record<string, (...args: Value[]) => Value> = {
+  // A job condition's status check. These tests evaluate a condition as if
+  // every job before it ran; `always()` is true there by definition.
+  always: () => true,
   contains: (search, item) =>
     Array.isArray(search)
       ? search.some((entry) => looseEquals(entry, item))
@@ -175,15 +178,24 @@ export function evaluateExpression(source: string, contexts: Record<string, Valu
 
   const postfix = (): Value => {
     let value = primary();
+    // Set by an object filter, `labels.*.name`: every later property reads
+    // through each element, and the result stays an array.
+    let filtered = false;
     for (;;) {
       if (isOp('.')) {
         position += 1;
+        if (isOp('*')) {
+          position += 1;
+          value = Array.isArray(value) ? value : value !== null && typeof value === 'object' ? Object.values(value) : [];
+          filtered = true;
+          continue;
+        }
         const name = peek();
         if (name?.kind !== 'ident') throw new Error('expected a property name');
         position += 1;
-        value = value !== null && typeof value === 'object' && !Array.isArray(value)
-          ? (value[name.value] ?? null)
-          : null;
+        const read = (from: Value): Value =>
+          from !== null && typeof from === 'object' && !Array.isArray(from) ? (from[name.value] ?? null) : null;
+        value = filtered && Array.isArray(value) ? value.map(read) : read(value);
       } else if (isOp('[')) {
         position += 1;
         const key = orExpr();
