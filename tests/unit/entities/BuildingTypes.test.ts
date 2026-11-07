@@ -16,7 +16,7 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 
 const ALL_BUILDING_TYPES: BuildingType[] = [
   'driving_center', 'blasting_academy', 'management_office', 'geology_lab',
-  'research_center', 'living_quarters', 'explosive_warehouse', 'freight_warehouse',
+  'research_center', 'living_quarters', 'freight_warehouse',
 ];
 
 const ALL_TIERS: BuildingTier[] = [1, 2, 3];
@@ -221,13 +221,6 @@ describe('BUILDING_DEFS catalog', () => {
     for (const tier of ALL_TIERS) {
       const def = getBuildingDef('living_quarters', tier);
       expect(def.scoreEffects.wellBeing).toBeGreaterThan(0);
-    }
-  });
-
-  it('explosive_warehouse has negative safety scoreEffects at all tiers', () => {
-    for (const tier of ALL_TIERS) {
-      const def = getBuildingDef('explosive_warehouse', tier);
-      expect(def.scoreEffects.safety).toBeLessThan(0);
     }
   });
 

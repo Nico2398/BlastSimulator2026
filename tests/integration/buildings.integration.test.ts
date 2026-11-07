@@ -110,7 +110,6 @@ const ALL_BUILDING_TYPES: BuildingType[] = [
   'geology_lab',
   'research_center',
   'living_quarters',
-  'explosive_warehouse',
   'freight_warehouse',
 ];
 

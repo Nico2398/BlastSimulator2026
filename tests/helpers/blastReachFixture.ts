@@ -25,10 +25,10 @@ function put(state: GameState, type: Building['type'], x: number, z: number): Bu
   return r.building;
 }
 
-/** Office between holes, freight warehouse, explosive warehouse, far quarters. */
+/** Office between holes, freight warehouse, blasting academy, far quarters. */
 export function addReachBuildings(state: GameState): void {
   put(state, 'management_office', 14, 48);
   put(state, 'freight_warehouse', 14, 40);
-  put(state, 'explosive_warehouse', 22, 48);
+  put(state, 'blasting_academy', 22, 48);
   put(state, 'living_quarters', 30, 48);
 }

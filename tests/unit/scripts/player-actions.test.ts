@@ -148,7 +148,7 @@ describe('playTick with a policy (#2117)', () => {
   });
 });
 
-/** A site with no explosive warehouse yet, an event pending and a warehouse order the next tick raises. */
+/** A site with no buildings yet, an event pending and a building order the next tick raises. */
 function bareSiteWithEvent(eventId: string): GameState {
   const state = {
     buildings: { buildings: [] }, navGrid: { width: 16, height: 16 }, plannedBuildings: [], drillHoles: [{ x: 20, z: 30 }],

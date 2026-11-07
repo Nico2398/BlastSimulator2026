@@ -143,7 +143,7 @@ Legend — where the feature is reachable today:
 | Move / upgrade / demolish | [UI] | upgrade = demolish+construct cost; demolish cost on hover only; no confirms |
 | Tier lock via Research Center | [UI] gating + Queue Research | research task cost/duration/conditions shown only in failure messages |
 | Research queue progress | [console] `research status` | ticksRemaining per task — **no visible progress** [missing] |
-| Building HP / damage / destruction | [console] list; scene removes mesh | blast-destroyed buildings only in blast report; explosive-warehouse secondary blast in core |
+| Building HP / damage / destruction | [console] list; scene removes mesh | blast-destroyed buildings only in blast report |
 | Capacity & effects per building (beds, storage kg, training offered, wellbeing) | data in defs | [missing in UI] |
 | Upkeep per tick (buildings, vehicles) | charged silently | finances categories exist [missing] |
 | Living-quarters overcapacity penalty | simulated | occupancy never shown [missing] |
@@ -368,7 +368,6 @@ Every mention of another entity is a link that selects it. Values follow §2.3: 
 
 | Type | Sections |
 |---|---|
-| Explosive Warehouse | stock per explosive (localized name, kg); used / capacity gauge; free kg; when stocked, the radius a destroying blast would detonate it at; closed → stock unavailable |
 | Freight Warehouse | stored / capacity gauge; kg reserved by loads in transit; stored kg **per ore** (localized ore names) plus barren rock |
 | Spoil Heap | spoil kg (no capacity) |
 | Living Quarters | beds used / total; residents (link, rest time left); the site-wide housing effect on task speed and the overcapacity warning |

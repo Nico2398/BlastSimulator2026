@@ -20,9 +20,9 @@ function makeFlatGrid(size: number, topY = 1): VoxelGrid {
 const hasStoredField = (b: object): boolean => 'storedExplosives' in b;
 
 describe('placeStartingBuildings places no stock (#2153)', () => {
-  it('an explosive warehouse slot places an empty building without a storedExplosives field', () => {
+  it('a freight warehouse slot places an empty building without a storedExplosives field', () => {
     const buildings = createBuildingState();
-    const slot: StartingBuildingSlot = { type: 'explosive_warehouse', tier: 1 };
+    const slot: StartingBuildingSlot = { type: 'freight_warehouse', tier: 1 };
     expect(placeStartingBuildings(buildings, makeFlatGrid(40), [slot], { x: 20, z: 20 })).toBe(1);
     expect(buildings.buildings).toHaveLength(1);
     expect(hasStoredField(buildings.buildings[0]!)).toBe(false);
@@ -30,7 +30,7 @@ describe('placeStartingBuildings places no stock (#2153)', () => {
 
   it('a legacy slot still naming stock gets none', () => {
     const buildings = createBuildingState();
-    const legacy = { type: 'explosive_warehouse', tier: 1, stock: { krackle: 100 } } as unknown as StartingBuildingSlot;
+    const legacy = { type: 'freight_warehouse', tier: 1, stock: { krackle: 100 } } as unknown as StartingBuildingSlot;
     expect(placeStartingBuildings(buildings, makeFlatGrid(40), [legacy], { x: 20, z: 20 })).toBe(1);
     expect(hasStoredField(buildings.buildings[0]!)).toBe(false);
   });
@@ -38,7 +38,7 @@ describe('placeStartingBuildings places no stock (#2153)', () => {
   it('no building among several carries a storedExplosives field', () => {
     const buildings = createBuildingState();
     const slots: StartingBuildingSlot[] = [
-      { type: 'explosive_warehouse', tier: 1 }, { type: 'freight_warehouse', tier: 1 },
+      { type: 'freight_warehouse', tier: 1 }, { type: 'spoil_heap', tier: 1 },
     ];
     placeStartingBuildings(buildings, makeFlatGrid(40), slots, { x: 20, z: 20 });
     for (const b of buildings.buildings) expect(hasStoredField(b), b.type).toBe(false);

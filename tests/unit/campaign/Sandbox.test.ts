@@ -795,17 +795,16 @@ describe('sandbox ore grade scale (#1944)', () => {
   });
 });
 
-describe('sandbox starter warehouse (#2118, #2153)', () => {
+describe('sandbox starter buildings (#2118, #2153, #2154)', () => {
   it('starting cash is 480,000 for the digger kit and 520,000 for the full kit, full above digger', () => {
     expect(SANDBOX_KITS.digger.startingCash).toBe(480_000);
     expect(SANDBOX_KITS.full.startingCash).toBe(520_000);
     expect(SANDBOX_KITS.full.startingCash).toBeGreaterThan(SANDBOX_KITS.digger.startingCash);
   });
 
-  it.each(SANDBOX_KIT_ORDER)('%s kit lists one tier-1 explosive warehouse slot', (kit) => {
-    const slots = SANDBOX_STARTING_SITES[kit].buildings.filter(b => b.type === 'explosive_warehouse');
-    expect(slots).toHaveLength(1);
-    expect(slots[0]!.tier).toBe(1);
+  it.each(SANDBOX_KIT_ORDER)('%s kit lists no explosive warehouse slot (#2154)', (kit) => {
+    const slots = SANDBOX_STARTING_SITES[kit].buildings.filter(b => (b.type as string) === 'explosive_warehouse');
+    expect(slots).toHaveLength(0);
   });
 
   it.each(SANDBOX_KIT_ORDER)('%s kit keeps its freight warehouse and spoil heap', (kit) => {
@@ -816,10 +815,10 @@ describe('sandbox starter warehouse (#2118, #2153)', () => {
     expect(heap).toHaveLength(1);
   });
 
-  it('sandboxKitDetails lists the explosive warehouse among the buildings', () => {
+  it('sandboxKitDetails lists no explosive warehouse among the buildings (#2154)', () => {
     for (const kit of SANDBOX_KIT_ORDER) {
-      const row = sandboxKitDetails(kit).buildings.find(b => b.type === 'explosive_warehouse');
-      expect(row, kit).toEqual({ type: 'explosive_warehouse', tier: 1, count: 1 });
+      const row = sandboxKitDetails(kit).buildings.find(b => (b.type as string) === 'explosive_warehouse');
+      expect(row, kit).toBeUndefined();
     }
   });
 

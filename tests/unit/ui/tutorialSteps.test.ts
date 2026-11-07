@@ -4,7 +4,6 @@ import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSt
 import { createSurveyOverlayToggleStep, isSurveyOverlayToggleOn } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { victoryProgress, goalChipParams } from '../../../src/ui/tutorialStepsClosing.js';
 import { TUTORIAL_STAGES, REGION } from '../../../src/ui/tutorialStages.js';
 import { createFinanceState, addIncome, addExpense, getFinancialReport } from '../../../src/core/economy/Finance.js';
@@ -15,8 +14,8 @@ import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 29 entries (build-explosive-warehouse precedes charge and the charge command pays cash at list price (#2153 removes stock-explosives), #1648 adds buy-charging-truck after buy-rock-digger-assign, #1339 removes train-driller/train-digger, moves hire-driver before box-cut and build-driving-center after blast, adds train-fragmenter, #1335 removes contract-accept, the player accepts the fillable ore offer in sell-ore, #1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1344 removes the detonation-sequence step, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(29);
+  it('has exactly 28 entries (#2154 retires build-explosive-warehouse; the charge command pays cash at list price (#2153 removes stock-explosives), #1648 adds buy-charging-truck after buy-rock-digger-assign, #1339 removes train-driller/train-digger, moves hire-driver before box-cut and build-driving-center after blast, adds train-fragmenter, #1335 removes contract-accept, the player accepts the fillable ore offer in sell-ore, #1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1344 removes the detonation-sequence step, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(28);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -125,7 +124,6 @@ describe('tutorialSteps', () => {
       // no dedicated lesson.
       'drill-plan',
       // The charge command pays cash at list price at loading (#2153).
-      'build-explosive-warehouse',
       'charge',
       // #557: the blast zone must be evacuated before firing. Inserted right
       // before 'blast' so the rail cannot skip past it.
@@ -440,33 +438,6 @@ describe('tutorialSteps', () => {
     } as unknown as GameState, {})).toBe(true);
   });
 
-  // ── explosive warehouse before the first charge ──────────────────────────
-  describe('explosive warehouse before charge', () => {
-    const ids = TUTORIAL_STEPS.map((s) => s.id);
-    const step = (id: string) => TUTORIAL_STEPS.find((s) => s.id === id)!;
-
-    it('sits between drill-plan and charge', () => {
-      const drill = ids.indexOf('drill-plan');
-      expect(ids.slice(drill, drill + 3)).toEqual(['drill-plan', 'build-explosive-warehouse', 'charge']);
-    });
-
-    it('build-explosive-warehouse completes once an explosive warehouse stands, and waits on the build', () => {
-      const build = step('build-explosive-warehouse');
-      const state = createGame({ seed: 42 });
-      const snapshot = build.captureSnapshot!(state);
-      expect(build.isComplete(state, snapshot)).toBe(false);
-      const placed = placeBuilding(state.buildings, 'explosive_warehouse', 4, 4, 64, 64);
-      expect(placed.success).toBe(true);
-      expect(build.isComplete(state, snapshot)).toBe(true);
-      expect(build.waitsOnWork).toBe(true);
-      expect(build.commands).toEqual(['build explosive_warehouse at:7,11']);
-    });
-
-    it('build-explosive-warehouse quotes no delivery time: there is no delivery wait', () => {
-      expect(step('build-explosive-warehouse').textParamsFor).toBeUndefined();
-    });
-  });
-
   // ── #1596: the first blast is the scripted one ───────────────────────────
   describe('first blast is deterministic (#1596)', () => {
     const charge = { explosiveId: 'boomite', amountKg: 4, stemmingM: 2.5 };
@@ -633,7 +604,7 @@ describe('tutorialSteps', () => {
   describe('step haul-debris', () => {
     const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris');
 
-    it('exists, positioned directly after build-storage (index 23) and before finances', () => {
+    it('exists, positioned directly after build-storage (index 22) and before finances', () => {
       const ids = TUTORIAL_STEPS.map(s => s.id);
       const buildIdx = ids.indexOf('build-storage');
       const haulIdx = ids.indexOf('haul-debris');
@@ -641,11 +612,11 @@ describe('tutorialSteps', () => {
       expect(haulIdx).toBeGreaterThan(-1);
       // #1335: contract-accept was removed; no step sits between them.
       expect(haulIdx).toBe(buildIdx + 1);
-      expect(haulIdx).toBe(23);
+      expect(haulIdx).toBe(22);
       // #1328: finances/needs sit between haul-debris and sell-ore now, so
       // the first sale is the last guided step.
       expect(ids[haulIdx + 1]).toBe('finances');
-      expect(ids.indexOf('finances')).toBe(24);
+      expect(ids.indexOf('finances')).toBe(23);
       expect(sellOreIdx).toBe(ids.indexOf('needs') + 1);
     });
 

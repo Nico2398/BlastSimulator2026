@@ -1,7 +1,7 @@
 ---
 name: gameplay-buildings
 description: >
-  Buildings system specification for BlastSimulator2026: 9 building types (8 with 3 tiers, the Spoil Heap with one),
+  Buildings system specification for BlastSimulator2026: 8 building types (7 with 3 tiers, the Spoil Heap with one),
   placement rules, training buildings, living quarters, warehouses, Research Center,
   and destruction effects. Use when implementing or modifying buildings,
   construction, demolition, tier upgrades, or any building-gated action.
@@ -28,7 +28,6 @@ All tier names are fictional and humorous. Localized via i18n (`en.json` + `fr.j
 | Geology Lab | "Rock Shed" | "Stone Science HQ" | "Institute of Expensive Rocks" | Trains survey techniques |
 | Research Center | "Think Tank Tent" | "Innovation Bunker" | "The Ivory Crater" | Unlocks higher tiers (paid research tasks) |
 | Living Quarters | "The Cells" | "Staff Dormitory" | "Unnecessarily Luxurious Hotel" | Houses + feeds employees; grade → well-being |
-| Explosive Warehouse | "Boom Closet" | "Blast Vault" | "Fort Kaboom" | Holds nothing: explosives are bought as each hole is loaded (retired in a later slice) |
 | Freight Warehouse | "The Pile" | "Stuff Bunker" | "Hoarder's Paradise" | Stores ore debris; primary income source |
 | Spoil Heap | "The Dump" | (single tier) | (single tier) | Takes barren rock hauled off the blast; 1,500 t capacity (`SPOIL_HEAP_CAPACITY_KG`, one ordinary shot); no crew needed |
 
@@ -113,11 +112,8 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
 
 ## Warehouses
 
-**Explosive Warehouse:**
-- Holds nothing. Explosive stock is gone from the game: explosives are bought as each hole is loaded, at list price (`costPerKg` x the live `explosive_price` event factor, `ChargeLoad.ts`); there is no `buy explosive:` command, no stock purchase in the Charge step, no stock in starting kits and no stock rows in the inspector.
-- Destroying a warehouse (blast, flying rock or demolition) never detonates: with no stock there is no secondary blast. Demolishing it loses nothing.
-- The building itself stays until a later slice retires it; the sandbox kits still place one and the tutorial still has a build step for it.
-- Inspector contents (`storageContent.ts`): a Contents section for the Freight Warehouse (gauge, free and in-transit-reserved kg, per-ore rows and a barren row from `warehouseStockByOre`, `FreightWarehouses.ts`) and the Spoil Heap (spoil kg, used/capacity gauge and free kg). Rows of 0.5 kg or less are hidden. The Explosive Warehouse has no Contents section.
+**Explosive stock is gone from the game:** explosives are bought as each hole is loaded, at list price (`costPerKg` x the live `explosive_price` event factor, `ChargeLoad.ts`); there is no `buy explosive:` command, no stock purchase in the Charge step, no stock in starting kits and no Explosive Warehouse building (retired in #2154).
+- Inspector contents (`storageContent.ts`): a Contents section for the Freight Warehouse (gauge, free and in-transit-reserved kg, per-ore rows and a barren row from `warehouseStockByOre`, `FreightWarehouses.ts`) and the Spoil Heap (spoil kg, used/capacity gauge and free kg). Rows of 0.5 kg or less are hidden.
 
 **Freight Warehouse:**
 - Stores ore debris hauled from blast zone
@@ -212,7 +208,7 @@ Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJE
 - Stored contents lost. A Freight Warehouse's stock is lost with it (`loseOrphanedStock`): other
   warehouses are untouched, `storedMassKg`/`collectedOre` are debited, in-transit reservations are not
   lost (re-picked on delivery). Reported by the `logistics:warehouse_stock_lost` event (toast), the
-  `blast` output, and a warning line on `build destroy`. An Explosive Warehouse holds nothing, so destroying it never detonates.
+  `blast` output, and a warning line on `build destroy`.
 - Well-being, Safety, Ecology score penalties applied
 - Research Center destroyed while its enabling research task is in-flight and no other active Research Center remains → the in-flight task is cancelled and its cost refunded in full; a task still pending behind it in the queue is cancelled/refunded in turn once it reaches the head with no Research Center present. If another active Research Center still exists, the in-flight task is unaffected.
 
@@ -222,13 +218,12 @@ Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJE
 |----------|---------------|-----------------|
 | Living Quarters Tier 1 | Housing/feeding | Baseline well-being |
 | Living Quarters Tier 3 | Housing/feeding | High well-being → productivity ×1.10 |
-| Explosive Warehouse | None (holds nothing; explosives are bought at loading) | None |
 | Freight Warehouse | Enables ore sale contracts | Main income; throughput limited by distance |
 | Spoil Heap | Dumps barren rock off the freight pool | Without one, barren hauls are blocked |
 | Research Center | Unlocks building tiers | Occupied during each research task |
 | Training Buildings | Grants skill qualifications | Prevents unqualified-task errors |
 
-Safety score settles at a target set by buildings' `scoreEffects.safety` (Management Office raises, Explosive Warehouse lowers); see Scores in `gameplay-game-design`.
+Safety score settles at a target set by buildings' `scoreEffects.safety` (Management Office raises); see Scores in `gameplay-game-design`.
 
 ## Types
 

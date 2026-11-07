@@ -1244,8 +1244,8 @@ describe('BuildMenu — catalog card text and tooltip (#1377)', () => {
 
   it('every catalog row has a .bs-build-desc span with the tier-1 line and a stats tooltip', () => {
     const rows = container.querySelectorAll<HTMLElement>('[data-build-type]');
-    // 9 functional types; the 4 vanity types need a board (#2052) and the mock state has none.
-    expect(rows.length).toBe(9);
+    // 8 functional types; the 4 vanity types need a board (#2052) and the mock state has none.
+    expect(rows.length).toBe(8);
     for (const row of rows) {
       const type = row.dataset['buildType'] as BuildingType;
       const def = getBuildingDef(type, 1);
@@ -1297,16 +1297,6 @@ describe('BuildMenu — safety effect on the card (#1977)', () => {
   });
 
   const rowOf = (type: BuildingType): HTMLElement => container.querySelector<HTMLElement>(`[data-build-type="${type}"]`)!;
-
-  it('the explosive warehouse card shows a negative safety effect in a visible span and in the title', () => {
-    const row = rowOf('explosive_warehouse');
-    const span = row.querySelector('.bs-build-effects');
-    expect(span).not.toBeNull();
-    expect(span!.textContent).toMatch(/[-\u2212]1/);
-    expect(span!.textContent).toContain(t('score.safety'));
-    expect(span!.textContent).toBe(buildingCardEffects(getBuildingDef('explosive_warehouse', 1)));
-    expect(row.title).toContain(span!.textContent!.split('\n')[0]!);
-  });
 
   it('the management office card shows +2 safety', () => {
     const row = rowOf('management_office');

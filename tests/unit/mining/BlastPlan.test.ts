@@ -161,15 +161,15 @@ describe('buildingsInBlastReach (#2021)', () => {
   const strong = chargeAll(holes, 'dynatomics', 11); // reach ~5.4 m
   const none: Record<string, HoleCharge> = {};
 
-  it('reports the issue layout: office, freight and explosive warehouse, not the quarters', () => {
+  it('reports the issue layout: office, freight warehouse and blasting academy, not the quarters', () => {
     const buildings = [
       bld(1, 'living_quarters', 30, 48),
-      bld(2, 'explosive_warehouse', 22, 48),
+      bld(2, 'blasting_academy', 22, 48),
       bld(3, 'management_office', 14, 48),
       bld(4, 'freight_warehouse', 14, 40),
     ];
     const result = buildingsInBlastReach(holes, strong, buildings);
-    expect(result.map(r => r.type)).toEqual(['explosive_warehouse', 'management_office', 'freight_warehouse']);
+    expect(result.map(r => r.type)).toEqual(['blasting_academy', 'management_office', 'freight_warehouse']);
     expect(result.map(r => r.buildingId)).toEqual([2, 3, 4]);
     expect(result.some(r => r.type === 'living_quarters')).toBe(false);
   });
@@ -183,7 +183,7 @@ describe('buildingsInBlastReach (#2021)', () => {
     const result = buildingsInBlastReach(holes, strong, [
       bld(9, 'freight_warehouse', 14, 40),
       bld(3, 'management_office', 14, 48),
-      bld(6, 'explosive_warehouse', 22, 48),
+      bld(6, 'blasting_academy', 22, 48),
     ]);
     expect(result.map(r => r.buildingId)).toEqual([3, 6, 9]);
   });
@@ -362,10 +362,10 @@ describe('buildingsInBlastReach follows the charge (#2030)', () => {
       bld(4, 'freight_warehouse', 14, 40),
       bld(1, 'living_quarters', 30, 48),
       bld(3, 'management_office', 14, 48),
-      bld(2, 'explosive_warehouse', 22, 48),
+      bld(2, 'blasting_academy', 22, 48),
     ]);
     expect(result.map(r => r.buildingId)).toEqual([2, 3, 4]);
-    expect(result.map(r => r.type)).toEqual(['explosive_warehouse', 'management_office', 'freight_warehouse']);
+    expect(result.map(r => r.type)).toEqual(['blasting_academy', 'management_office', 'freight_warehouse']);
   });
 
   it('an explicit marginM still overrides the charge-derived reach', () => {

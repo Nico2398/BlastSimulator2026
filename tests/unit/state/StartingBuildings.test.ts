@@ -375,11 +375,11 @@ describe('placeStartingBuildings — warehouse upgrade room (#1830)', () => {
 });
 
 describe('placeStartingBuildings — starter warehouse (#2118, #2153)', () => {
-  it('places an explosive warehouse slot as an active, empty building', () => {
+  it('places a freight warehouse slot as an active building', () => {
     const buildings = createBuildingState();
-    expect(placeStartingBuildings(buildings, makeFlatGrid(40), [{ type: 'explosive_warehouse', tier: 1 }], { x: 20, z: 20 })).toBe(1);
+    expect(placeStartingBuildings(buildings, makeFlatGrid(40), [{ type: 'freight_warehouse', tier: 1 }], { x: 20, z: 20 })).toBe(1);
     const b = buildings.buildings[0]!;
-    expect(b.type).toBe('explosive_warehouse');
+    expect(b.type).toBe('freight_warehouse');
     expect(b.active).toBe(true);
   });
 

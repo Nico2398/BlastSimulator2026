@@ -347,7 +347,6 @@ describe('getUpgradeCost()', () => {
   const PRICES: ReadonlyArray<readonly [BuildingType, number, number]> = [
     ['freight_warehouse', 28_500, 54_000],
     ['living_quarters', 20_000, 37_500],
-    ['explosive_warehouse', 38_000, 71_000],
     ['research_center', 47_500, 90_000],
     ['blasting_academy', 28_500, 54_000],
     ['driving_center', 24_000, 45_000],
@@ -780,7 +779,7 @@ describe('getBuildingPeopleCapacity (#1202)', () => {
   });
 
   it('buildings that take no people hold none, whatever their capacity field counts', () => {
-    for (const type of ['research_center', 'explosive_warehouse', 'freight_warehouse'] as const) {
+    for (const type of ['research_center', 'freight_warehouse'] as const) {
       for (const tier of [1, 2, 3] as const) {
         expect(getBuildingPeopleCapacity(type, tier)).toBe(0);
       }

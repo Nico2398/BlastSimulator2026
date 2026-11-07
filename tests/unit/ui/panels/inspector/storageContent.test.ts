@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// Inspector storage contents section (#1757): explosive warehouse, freight warehouse, spoil heap.
+// Inspector storage contents section (#1757): freight warehouse, spoil heap.
 import { describe, it, expect } from 'vitest';
 import { storageContents } from '../../../../../src/ui/panels/inspector/storageContent.js';
 import type { InspectorSection } from '../../../../../src/ui/panels/inspector/inspectorWidgets.js';
@@ -60,13 +60,6 @@ describe('storageContents: non-storage buildings', () => {
       expect(storageContents(b, stateWith(b))).toBeNull();
     },
   );
-});
-
-describe('storageContents: explosive warehouse (#2153)', () => {
-  it('has no storage section: explosives are bought at loading, not stocked', () => {
-    const b = makeBuilding('explosive_warehouse');
-    expect(storageContents(b, stateWith(b))).toBeNull();
-  });
 });
 
 describe('storageContents: freight warehouse', () => {
@@ -150,7 +143,7 @@ describe('storageContents: freight warehouse', () => {
     expect(gauge.textContent).toContain('500');
   });
 
-  it('does not render the explosive warehouse hook', () => {
+  it('does not render a stock hook', () => {
     const b = makeBuilding('freight_warehouse');
     const { root } = mount(b, stateWith(b));
     expect(root.querySelector('[data-info="warehouse-stock"]')).toBeNull();

@@ -3,9 +3,9 @@
 // Phantom `BuildingType` names (`office`, `medical_bay`, `canteen`,
 // `storage_depot`, `break_room`, `bunkhouse`) appear in skill doc prose and
 // (until #526) in scenario fixtures, but none of them is, or has ever been, a
-// real `BuildingType` (src/core/entities/Building.ts). The real catalog has 9
+// real `BuildingType` (src/core/entities/Building.ts). The real catalog has 8
 // types: `driving_center`, `blasting_academy`, `management_office`,
-// `geology_lab`, `research_center`, `living_quarters`, `explosive_warehouse`,
+// `geology_lab`, `research_center`, `living_quarters`,
 // `freight_warehouse`, `vehicle_depot` (removed #1393). Runtime code already maps the phantom
 // concepts correctly (`NEED_REST_BUILDING_TYPES`, `BUILDING_REPLENISH_RATES`,
 // `NEED_REST_COSTS` in src/core/config/balance.ts all route hunger/fatigue/

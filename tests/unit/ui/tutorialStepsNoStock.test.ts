@@ -45,12 +45,12 @@ describe('the tutorial teaches no stock (#2153)', () => {
     }
   });
 
-  it('the charge step comes after drill-plan, with at most a warehouse-building step between', () => {
+  it('the charge step follows drill-plan directly', () => {
     const drill = ids.indexOf('drill-plan');
     const charge = ids.indexOf('charge');
     expect(drill).toBeGreaterThanOrEqual(0);
     expect(charge).toBeGreaterThan(drill);
-    for (const between of ids.slice(drill + 1, charge)) expect(between).toBe('build-explosive-warehouse');
+    expect(charge).toBe(drill + 1);
   });
 });
 
@@ -69,9 +69,8 @@ describe('the charge step charges from cash at loading (#2153)', () => {
     expect(step('charge').commands).toEqual(['charge hole:* explosive:boomite amount:7 stemming:2.5']);
   });
 
-  it('completes once every hole is charged, with no warehouse and no stock anywhere', () => {
+  it('completes once every hole is charged, with no stock anywhere', () => {
     const state = chargedState(9, 9);
-    expect(state.buildings.buildings.some((b) => b.type === 'explosive_warehouse')).toBe(false);
     expect(step('charge').isComplete(state, {})).toBe(true);
   });
 

@@ -29,7 +29,7 @@ describe('BuildingMesh', () => {
     const bm = new BuildingMesh(scene);
     const types: Building['type'][] = [
       'driving_center', 'blasting_academy', 'management_office', 'geology_lab',
-      'research_center', 'living_quarters', 'explosive_warehouse', 'freight_warehouse',
+      'research_center', 'living_quarters', 'freight_warehouse',
     ];
     types.forEach((type, i) => bm.addBuilding(makeBuilding(i, type)));
     expect(bm.count).toBe(types.length);
@@ -253,7 +253,7 @@ describe('instantiateBuildingModel (#1306)', () => {
     const library = new ModelLibrary();
     const types: Building['type'][] = [
       'driving_center', 'blasting_academy', 'management_office', 'geology_lab',
-      'research_center', 'living_quarters', 'explosive_warehouse', 'freight_warehouse',
+      'research_center', 'living_quarters', 'freight_warehouse',
     ];
     for (const type of types) {
       for (const tier of [1, 2, 3] as const) {

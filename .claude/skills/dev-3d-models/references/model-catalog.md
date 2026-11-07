@@ -62,7 +62,6 @@ Tier 1 keeps the same node layout at 60–85 % of the tier-2 footprint.
 | geology_lab | Rock Shed: garden shed, rock shelf, magnifying-glass sign | Institute of Expensive Rocks: glass pyramid, glowing diamond, laser grid, price tag |
 | research_center | Think Tank Tent: patched tent, bare-bulb sign, whiteboard, campfire | The Ivory Crater: ivory dish, spiral ramp, lightbulb dome, brain sculpture |
 | living_quarters | The Cells: barred windows, barbed wire, watchtower, ball and chain | Unnecessarily Luxurious Hotel: rooftop infinity pool with slide, gold HOTEL sign, valet |
-| explosive_warehouse | Boom Closet: a two-seat outhouse stuffed with dynamite, lit fuse | Fort Kaboom: crenellated castle, moat, drawbridge, cannons, giant lit bomb |
 | freight_warehouse | The Pile: junk heap under a tarp, bathtub, bent bike, STUFF sign | Hoarder's Paradise: crate towers, gantry crane still adding more, MORE sign |
 
 Single tier: `building_spoil_heap_t1` — The Dump: lumpy barren-rock mound (`TintBody` grey, three

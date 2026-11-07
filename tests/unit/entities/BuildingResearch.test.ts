@@ -304,12 +304,12 @@ describe('queueResearchTask — tier 3: cost + duration + conditions', () => {
   });
 
   it('pushes a task whose ticksRemaining and conditions match RESEARCH_TASK_DEFS exactly', () => {
-    queueResearchTask(state, 'explosive_warehouse', 2);
+    queueResearchTask(state, 'freight_warehouse', 2);
     tickResearch(state);
 
-    queueResearchTask(state, 'explosive_warehouse', 3);
+    queueResearchTask(state, 'freight_warehouse', 3);
     const task = state.researchQueue[0]!;
-    const def = getResearchTaskDef('explosive_warehouse', 3);
+    const def = getResearchTaskDef('freight_warehouse', 3);
     expect(task.ticksRemaining).toBe(def.ticks);
     expect(task.conditions).toEqual(def.conditions);
     expect(task.cost).toBe(def.cost);

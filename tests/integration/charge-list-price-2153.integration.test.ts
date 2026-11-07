@@ -1,14 +1,12 @@
-// BlastSimulator2026 — Integration: every charge is bought at load time at list price, whatever the buildings hold (#2153)
+// BlastSimulator2026 — Integration: every charge is bought at load time at list price (#2153)
 //
 // Explosive stock is gone. Ordering books nothing; as the crew loads each hole it pays costPerKg x kg x the
-// live explosive_price factor from cash and books one 'explosives' expense. A legacy `storedExplosives` field
-// written onto a warehouse by hand must change nothing: no draw, no discount, no `fromStockKg` on the charge.
+// live explosive_price factor from cash and books one 'explosives' expense.
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
-import { placeBuilding } from '../../src/core/entities/Building.js';
 import { tickResolvingEvents } from './helpers.js';
 
 type Run = (cmd: string) => { success: boolean; output: string };
@@ -18,22 +16,14 @@ const HOLE_COST = 60; // boomite $12/kg list price x 5 kg
 const ORDER = 'charge hole:* explosive:boomite amount:5 stemming:2';
 const STARVED_TICKS = 20;
 
-interface SetupOptions { cash?: number; warehouseStockKg?: number }
+interface SetupOptions { cash?: number }
 
-function setup({ cash = 5_000_000, warehouseStockKg }: SetupOptions = {}): { run: Run; state: GameState } {
+function setup({ cash = 5_000_000 }: SetupOptions = {}): { run: Run; state: GameState } {
   const { runner, ctx } = createRunner();
   const run: Run = cmd => runner.run(cmd) as { success: boolean; output: string };
   expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
   const state = ctx.state!;
   state.events.eventFreqMultiplier = 0;
-  if (warehouseStockKg !== undefined) {
-    const placed = placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 32, 32, 1);
-    expect(placed.success).toBe(true);
-    // A leftover from an old save: it must be inert.
-    Object.assign(state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!, {
-      storedExplosives: { boomite: warehouseStockKg },
-    });
-  }
   expect(run(`drill_plan grid rows:1 cols:${HOLES} spacing:4 depth:8 start:12,12`).success).toBe(true);
   for (let i = 0; i < 4000 && state.plannedDrillHoles.length > 0; i++) tickResolvingEvents(run);
   expect(state.plannedDrillHoles).toHaveLength(0);
@@ -108,35 +98,6 @@ describe('ordering books nothing, loading pays list price (#2153)', () => {
     expect(explosivesTotal(state)).toBeCloseTo(total, 6);
     expect(state.lastBlastReport!.spent).toBeCloseTo(HOLES * HOLE_COST, 6);
   }, 120_000);
-});
-
-describe('a warehouse never discounts or supplies a load (#2153)', () => {
-  it('a warehouse standing with a legacy stock still costs full list price per hole', () => {
-    const { run, state } = setup({ warehouseStockKg: 1000 });
-    expect(run(ORDER).success).toBe(true);
-    loadAll(run, state);
-    expect(explosivesExpenses(state)).toHaveLength(HOLES);
-    expect(explosivesTotal(state)).toBeCloseTo(HOLES * HOLE_COST, 6);
-    for (const c of Object.values(state.chargesByHole)) expect('fromStockKg' in c).toBe(false);
-  });
-
-  it('a legacy stock does not make a pattern affordable at zero cash', () => {
-    const { run, state } = setup({ cash: 0, warehouseStockKg: 1000 });
-    expect(run(ORDER).success).toBe(true);
-    for (let i = 0; i < STARVED_TICKS; i++) tickResolvingEvents(run);
-    expect(loadedCount(state)).toBe(0);
-    expect(explosivesExpenses(state)).toHaveLength(0);
-    expect(chargeOrders(state)).toHaveLength(HOLES);
-    expect(chargeOrders(state).every(a => a.blockedReason === 'explosives_unaffordable')).toBe(true);
-  });
-
-  it('a legacy stock is left exactly as it was', () => {
-    const { run, state } = setup({ warehouseStockKg: 1000 });
-    expect(run(ORDER).success).toBe(true);
-    loadAll(run, state);
-    const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse') as unknown as { storedExplosives?: Record<string, number> };
-    expect(wh.storedExplosives).toEqual({ boomite: 1000 });
-  });
 });
 
 describe('an order cash cannot pay waits, flagged (#2153)', () => {

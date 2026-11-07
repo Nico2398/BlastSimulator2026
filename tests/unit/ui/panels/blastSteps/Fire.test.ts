@@ -344,7 +344,7 @@ describe('FireStep — buildings in blast reach (#2021)', () => {
     const text = step.root.textContent ?? '';
     expect(text).toContain('Management Office is inside the blast area and will be destroyed.');
     expect(text).toContain('Freight Warehouse is inside the blast area and will be destroyed.');
-    expect(text).toContain('Explosive Warehouse is inside the blast area and will be destroyed.');
+    expect(text).toContain('Blasting Academy is inside the blast area and will be destroyed.');
     expect(text).not.toContain('Living Quarters is inside the blast area');
   });
 
