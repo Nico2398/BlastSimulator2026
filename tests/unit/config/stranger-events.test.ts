@@ -92,9 +92,10 @@ function jobs(text: string): { name: string; condition: string }[] {
     const lines = block.slice(at).split('\n');
     const first = lines[0]!.replace(/^ {4}if:\s*/, '');
     const folded = first === '>-' || first === '>' || first === '|';
-    const condition = folded
-      ? lines.slice(1).filter((line, j, all) => all.slice(0, j + 1).every((l) => l.startsWith('      ') || l.trim() === '')).join('\n')
-      : first;
+    // A folded `if:` runs until the first line indented less than its body.
+    const following = lines.slice(1);
+    const stop = following.findIndex((line) => line.trim() !== '' && !line.startsWith('      '));
+    const condition = folded ? following.slice(0, stop === -1 ? following.length : stop).join('\n') : first;
     return { name: header[1]!, condition: condition.replace(/^\$\{\{|\}\}$/g, '').trim() };
   });
 }
