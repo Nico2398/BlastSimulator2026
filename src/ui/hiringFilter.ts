@@ -5,7 +5,7 @@ import type { HireCandidate } from '../core/entities/HiringPool.js';
 import type { FilterBarSelection } from './filterBar.js';
 
 export const HIRING_SORT_KEYS = ['salary', 'level'] as const;
-export type HiringSortKey = typeof HIRING_SORT_KEYS[number];
+type HiringSortKey = typeof HIRING_SORT_KEYS[number];
 /** Minimum-level choices offered (level 1 would filter nothing). */
 export const HIRING_LEVEL_CHOICES = [2, 3, 4, 5] as const;
 

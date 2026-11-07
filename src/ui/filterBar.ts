@@ -15,7 +15,7 @@ interface SortChoice {
 }
 
 /** An extra single-choice row beside the main filter row (#2160). */
-export interface FilterBarGroup {
+interface FilterBarGroup {
   id: string;
   label: string;
   choices: readonly FilterChoice[];
