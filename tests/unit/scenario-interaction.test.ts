@@ -767,7 +767,8 @@ describe('resolveEventIfPendingOnPage (issue #699)', () => {
       .mockResolvedValueOnce(null);  // choice usable
     const page = fakePage({ evaluate, click: vi.fn().mockResolvedValue(undefined) });
 
-    await executeActionOnPage(page, { type: 'resolveEventIfPending', option: 1 });
+    const step: ScenarioStepDef = { command: 'event choose 1', description: 'answer a notice', role: 'player', interaction: [] };
+    await executeActionOnPage(page, { type: 'resolveEventIfPending', option: 1 }, step);
 
     expect(page.click).toHaveBeenCalledWith('#bs-event-notices .bs-notice:first-child .bs-notice-choice:nth-child(2)', { button: 'left' });
   });
