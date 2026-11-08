@@ -11,7 +11,7 @@ import { formatMoney } from '../core/economy/formatMoney.js';
 import type { GameState } from '../core/state/GameState.js';
 
 /** Which stored/occupied figure a placed row's utilization shows. */
-export type UtilizationKind = 'beds' | 'kg' | 'research';
+type UtilizationKind = 'beds' | 'kg' | 'research';
 
 const TIERS: readonly BuildingTier[] = [1, 2, 3];
 
@@ -64,7 +64,7 @@ export function upkeepExplain(state: Pick<GameState, 'events' | 'tickCount'>): s
     (m) => m.kind === 'upkeep_surcharge' && (m.endTick === null || m.endTick > state.tickCount),
   );
   if (live.length === 0) return t('ui.explain.building_upkeep_base');
-  const sources = [...new Set(live.map((m) => t(`event.${m.sourceEventId}.title`)))].join(', ');
+  const sources = live.map((m) => t('ui.explain.building_upkeep_source', { event: t(`event.${m.sourceEventId}.title`), factor: round2(m.magnitude) })).join(', ');
   const factor = round2(live.reduce((product, m) => product * m.magnitude, 1));
   return t('ui.explain.building_upkeep_surcharged', { factor, sources });
 }

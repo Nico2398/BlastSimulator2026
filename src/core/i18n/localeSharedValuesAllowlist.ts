@@ -33,6 +33,7 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   // ── Format-only / symbol-only ──
   'hud.speed_x',           // "{speed}×"
   'ui.blast_workshop.drill.diameter', // "Ø"
+  'ui.explain.building_upkeep_source', // "{event} (×{factor})"
   'ui.build.row.title', // "#{id} {name} ({x},{z})"
   'ui.contracts.storage_value', // "{used} / {cap} kg"
   'ui.contracts.delivered_line', // "{delivered} / {total} kg"
