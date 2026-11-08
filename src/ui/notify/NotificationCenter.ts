@@ -26,6 +26,7 @@ import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { isHaulBlockedReason } from '../../core/economy/HaulDispatch.js';
 import { findStrandedCrew, type StrandedCrew } from '../../core/engine/StrandedCrew.js';
 import { vehicleDisplayName } from '../fleetDetailSections.js';
+import type { EntityRef } from '../entityLinks.js';
 import type { UiCues } from '../../audio/ui/UiCues.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
@@ -54,6 +55,8 @@ export interface NotifyInput {
   onCta?: () => void;
   /** True when the event behind this toast already has its own sound, so the toast cue stays quiet. */
   silent?: boolean;
+  /** The entity the notification names; its title becomes a link to it. */
+  ref?: EntityRef;
 }
 
 export interface LogEntry {
@@ -64,6 +67,8 @@ export interface LogEntry {
   readonly body: string;
   /** Game tick the notification landed on, for the log's "when" column. */
   readonly tick: number;
+  /** The entity the entry names, when it names one. */
+  readonly ref?: EntityRef;
 }
 
 export interface Toast extends LogEntry {
@@ -87,6 +92,8 @@ export interface AlertPip {
   readonly label: string;
   readonly tone: 'neutral' | 'warn' | 'critical';
   readonly tip: string;
+  /** The entity the pip is about; a click opens it. */
+  readonly target?: EntityRef;
 }
 
 export class NotificationCenter {
@@ -121,6 +128,7 @@ export class NotificationCenter {
       title: input.title,
       body: input.body,
       tick: this.currentTick,
+      ...(input.ref !== undefined ? { ref: input.ref } : {}),
     };
     this.log.unshift(entry);
     if (this.log.length > MAX_LOG) this.log.length = MAX_LOG;
@@ -181,13 +189,13 @@ export class NotificationCenter {
     if (state.cash < BANKRUPTCY_THRESHOLD) {
       pips.push({ kind: 'bankruptcy', icon: 'crit', label: t('notification.pip.cash_label'), tone: 'critical', tip: t('notification.pip.cash_tip', { threshold: formatMoney(BANKRUPTCY_THRESHOLD) }) });
     }
-    const collapsedCount = state.employees.employees.filter(e => e.alive && e.collapsing).length;
-    if (collapsedCount > 0) {
-      pips.push({ kind: 'crew', icon: 'collapse', label: String(collapsedCount), tone: 'critical', tip: t('notification.pip.crew_collapsed_tip', { count: collapsedCount }) });
+    const collapsed = state.employees.employees.filter(e => e.alive && e.collapsing);
+    if (collapsed.length > 0) {
+      pips.push({ kind: 'crew', icon: 'collapse', label: String(collapsed.length), tone: 'critical', tip: t('notification.pip.crew_collapsed_tip', { count: collapsed.length }), target: { kind: 'employee', id: collapsed[0]!.id } });
     }
-    const stuckCount = state.employees.employees.filter(e => e.alive && e.isMoveStuck).length;
-    if (stuckCount > 0) {
-      pips.push({ kind: 'crew', icon: 'crew', label: String(stuckCount), tone: 'warn', tip: t('notification.pip.crew_stuck_tip', { count: stuckCount }) });
+    const stuck = state.employees.employees.filter(e => e.alive && e.isMoveStuck);
+    if (stuck.length > 0) {
+      pips.push({ kind: 'crew', icon: 'crew', label: String(stuck.length), tone: 'warn', tip: t('notification.pip.crew_stuck_tip', { count: stuck.length }), target: { kind: 'employee', id: stuck[0]!.id } });
     }
     this.updateCutOff(state, pips);
     const jams = findTrafficJams(state.builtRamps, state.employees.employees);
@@ -325,13 +333,13 @@ export class NotificationCenter {
       if (vehicle === undefined) continue;
       const name = t('notification.cut_off_vehicle_name', { vehicle: vehicleDisplayName(vehicle.type, vehicle.tier), id });
       names.push(name);
-      this.warnCutOff(current, `v${id}`, t('notification.cut_off_vehicle', { name }));
+      this.warnCutOff(current, `v${id}`, t('notification.cut_off_vehicle', { name }), { kind: 'vehicle', id });
     }
     for (const id of employeeIds) {
       const employee = state.employees.employees.find(e => e.id === id);
       if (employee === undefined) continue;
       names.push(employee.name);
-      this.warnCutOff(current, `e${id}`, t('notification.cut_off_employee', { name: employee.name }));
+      this.warnCutOff(current, `e${id}`, t('notification.cut_off_employee', { name: employee.name }), { kind: 'employee', id });
     }
     for (const key of this.warnedCutOff) if (!current.has(key)) this.warnedCutOff.delete(key);
     if (names.length === 0) return;
@@ -343,11 +351,11 @@ export class NotificationCenter {
   }
 
   /** Toasts `body` the first time `key` is seen cut off in this episode. */
-  private warnCutOff(current: Set<string>, key: string, body: string): void {
+  private warnCutOff(current: Set<string>, key: string, body: string, ref: EntityRef): void {
     current.add(key);
     if (this.warnedCutOff.has(key)) return;
     this.warnedCutOff.add(key);
-    this.notify({ severity: 'warn', icon: 'warn', title: t('notification.title.cut_off'), body });
+    this.notify({ severity: 'warn', icon: 'warn', title: t('notification.title.cut_off'), body, ref });
   }
 
   /**

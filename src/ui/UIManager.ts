@@ -177,6 +177,9 @@ export class UIManager {
     this.eventModal.setEntityOpener(this.opener);
     this.operationsPanel.setEntityOpener(this.opener);
     this.fleetPanel.setEntityOpener(this.opener);
+    this.topBar.setEntityOpener(this.opener);
+    this.toasts.setEntityOpener(this.opener);
+    this.activityLog.setEntityOpener(this.opener);
     this.eventNotices = new EventNotices(container);
     // Mounted after eventModal so the letter renders on top of it.
     this.permitApprovalModal = new PermitApprovalModal(container);

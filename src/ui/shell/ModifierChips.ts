@@ -4,6 +4,7 @@ import type { ActiveModifier } from '../../core/events/ActiveModifiers.js';
 import { remainingTicks } from '../../core/events/ActiveModifiers.js';
 import { modifierSummary } from '../../core/events/ModifierText.js';
 import { chip, el } from '../dom.js';
+import { modifierExplain } from '../hudExplain.js';
 import { shellLayoutRegistry, type Rect, type Viewport } from './LayoutRegistry.js';
 import { TOPBAR_HEIGHT_PX, SPACING_3_PX } from '../tokens.js';
 
@@ -23,13 +24,16 @@ export function createModifierChips(
   let lastSignature = '';
   return (modifiers, tick) => {
     // A lapsed modifier lingers in the ledger until the next tick prunes it; never show it.
-    const labels = modifiers.filter(m => remainingTicks(m, tick) !== 0).map(m => modifierSummary(m, tick));
+    const live = modifiers.filter(m => remainingTicks(m, tick) !== 0);
+    const labels = live.map(m => modifierSummary(m, tick));
     const signature = labels.join('|');
     if (signature === lastSignature) return;
     lastSignature = signature;
-    container.replaceChildren(...labels.map(label => {
-      const c = chip(label, 'warn');
+    container.replaceChildren(...live.map((m, i) => {
+      const c = chip(labels[i]!, 'warn', modifierExplain(m, tick));
       c.classList.add('bs-modifier-chip');
+      // The strip is click-through; the chips themselves take hover and focus (#2169).
+      c.style.pointerEvents = 'auto';
       return c;
     }));
   };
@@ -42,7 +46,8 @@ export function mountModifierChips(parent: HTMLElement): {
 } {
   const strip = el('div', { className: 'bsx-root', attrs: { id: 'bs-modifier-chips' } });
   strip.style.cssText = [
-    'position:fixed', 'left:50%', 'transform:translateX(-50%)', 'top:calc(var(--bsx-topbar-height) + var(--bsx-sp-3))',
+    // No transform: it would make this strip the containing block of the fixed explanation tooltips (#2169).
+    'position:fixed', `left:calc(50% - ${STRIP_WIDTH_PX / 2}px)`, 'top:calc(var(--bsx-topbar-height) + var(--bsx-sp-3))',
     'z-index:var(--bsx-z-toast)', `width:${STRIP_WIDTH_PX}px`, `height:${STRIP_HEIGHT_PX}px`, 'overflow:hidden',
     'display:flex', 'gap:6px', 'align-items:center', 'justify-content:center', 'pointer-events:none',
   ].join(';');
