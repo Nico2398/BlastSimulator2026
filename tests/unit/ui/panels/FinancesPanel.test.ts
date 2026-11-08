@@ -184,7 +184,7 @@ describe('FinancesPanel', () => {
     expect(text).not.toContain('ui.finances.category.smuggling');
   });
 
-  it('renders the ledger most-recent-first with category and day, not raw description', () => {
+  it('renders the ledger most-recent-first with category, day and description', () => {
     const { panel } = makePanel();
     const state = makeState();
     state.tickCount = 50;
@@ -197,8 +197,8 @@ describe('FinancesPanel', () => {
 
     const rows = Array.from(panel.root.querySelectorAll('div')).map(d => d.textContent);
     expect(rows.some(r => r?.includes('Salaries') && r.includes('Day 3'))).toBe(true);
-    expect(panel.root.textContent).not.toContain('Payroll');
-    expect(panel.root.textContent).not.toContain('Contract #1 delivery');
+    expect(panel.root.textContent).toContain('Payroll');
+    expect(panel.root.textContent).toContain('Contract #1 delivery');
   });
 
   it('shows a bankruptcy warning banner when below threshold', () => {

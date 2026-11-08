@@ -1734,7 +1734,7 @@ describe('ContractsPanel — market strip (progression)', () => {
     const titleAt = (level: number): string => {
       const state = progressionState();
       saturate(state, 'dirtite', level);
-      return rowOf(render(state).panel, 'dirtite').title;
+      return rowOf(render(state).panel, 'dirtite').getAttribute('data-explain') ?? '';
     };
 
     it('has the exact English lines', () => {
@@ -1745,19 +1745,19 @@ describe('ContractsPanel — market strip (progression)', () => {
     });
 
     it('flooded at 0.5 (boundary) and above', () => {
-      expect(titleAt(0.5)).toBe(t('ui.contracts.market_tip_flooded'));
-      expect(titleAt(1)).toBe(t('ui.contracts.market_tip_flooded'));
+      expect(titleAt(0.5)).toContain(t('ui.contracts.market_tip_flooded'));
+      expect(titleAt(1)).toContain(t('ui.contracts.market_tip_flooded'));
     });
 
     it('hungry at 0.1 (boundary) and below, and when unsold', () => {
-      expect(titleAt(0.1)).toBe(t('ui.contracts.market_tip_hungry'));
-      expect(titleAt(0)).toBe(t('ui.contracts.market_tip_hungry'));
+      expect(titleAt(0.1)).toContain(t('ui.contracts.market_tip_hungry'));
+      expect(titleAt(0)).toContain(t('ui.contracts.market_tip_hungry'));
     });
 
     it('steady in between', () => {
-      expect(titleAt(0.3)).toBe(t('ui.contracts.market_tip_steady'));
-      expect(titleAt(0.49)).toBe(t('ui.contracts.market_tip_steady'));
-      expect(titleAt(0.11)).toBe(t('ui.contracts.market_tip_steady'));
+      expect(titleAt(0.3)).toContain(t('ui.contracts.market_tip_steady'));
+      expect(titleAt(0.49)).toContain(t('ui.contracts.market_tip_steady'));
+      expect(titleAt(0.11)).toContain(t('ui.contracts.market_tip_steady'));
     });
   });
 
