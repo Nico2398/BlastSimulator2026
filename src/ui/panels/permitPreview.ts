@@ -75,14 +75,34 @@ export function gridHoleLimitWarning(
   existingHoles = 0,
   tick = 0,
 ): string | null {
-  void existingHoles; void tick;
   if (!grade) return null;
-  const { limits, over } = preFireCheck(grade.grade, {}, addedHoles);
-  return over ? t('permit.preview.grid_warning', { holes: addedHoles, limit: limits.maxHoles }) : null;
+  const total = existingHoles + addedHoles;
+  const over = overPermitConsequence(grade, {}, total, tick);
+  return over ? t('permit.preview.grid_warning', { holes: total, limit: over.limits.maxHoles, consequence: over.consequence }) : null;
 }
 
 /** Warning for a plan charge total (kg) over the permit; null when within it. */
 export function chargeKgLimitWarning(grade: GradeState | undefined, totalKg: number, tick = 0): string | null {
-  void grade; void totalKg; void tick;
-  throw new Error('not implemented');
+  if (!grade) return null;
+  const over = overPermitConsequence(grade, { total: { amountKg: totalKg } }, 0, tick);
+  return over ? t('permit.preview.kg_warning', { kg: Math.round(totalKg * 10) / 10, limit: over.limits.maxChargeKg, consequence: over.consequence }) : null;
+}
+
+/** Limits and consequence text of a plan over the permit; null when within it. */
+function overPermitConsequence(
+  grade: GradeState,
+  charges: Readonly<Record<string, { amountKg: number }>>,
+  holeCount: number,
+  tick: number,
+): { limits: ReturnType<typeof preFireCheck>['limits']; consequence: string } | null {
+  const check = preFireCheck(grade.grade, charges, holeCount);
+  if (!check.over) return null;
+  const strikes = liveStrikes(grade.strikeTicks ?? [], tick).length;
+  const consequence = t('permit.preview.consequence', {
+    chance: Math.round(inspectionChance(check.overshoot) * 100),
+    fine: formatMoney(inspectionFine(check.fee, check.overshoot)),
+    strikes,
+    limit: PERMIT_STRIKES_TO_SUSPEND,
+  });
+  return { limits: check.limits, consequence };
 }
