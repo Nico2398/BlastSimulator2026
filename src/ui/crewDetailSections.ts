@@ -323,7 +323,7 @@ export function makePaySection(e: Employee, onRaise: (amount: number) => void): 
       text: t('ui.crew.pay_union_discount', { pct: UNION_MEMBER_SALARY_DISCOUNT_PCT, amount: perHour(Math.max(0, base + bonus + (e.raises ?? 0) - e.salary)) }),
       attrs: { style: 'margin-left:8px' },
     }), unionExplain())] : []),
-    explainable(el('span', { className: 'bs-pay-total', text: t('ui.crew.pay_total', { amount: perHour(e.salary) }), attrs: { style: 'margin-left:auto;color:var(--bsx-text-primary);font-weight:600' } }), salaryExplain()),
+    explainable(el('span', { className: 'bs-pay-total bsx-explain-end', text: t('ui.crew.pay_total', { amount: perHour(e.salary) }), attrs: { style: 'margin-left:auto;color:var(--bsx-text-primary);font-weight:600' } }), salaryExplain()),
   );
 
   const raiseRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:6px' } });

@@ -297,7 +297,7 @@ ${RAIL_RULE_SELECTORS} {
   left: 0;
   z-index: var(--bsx-z-popover);
   width: max-content;
-  max-width: 220px;
+  max-width: 180px;
   margin-top: 4px;
   padding: 6px 8px;
   border: 1px solid var(--bsx-hairline-strong);
@@ -310,6 +310,12 @@ ${RAIL_RULE_SELECTORS} {
   white-space: normal;
   text-align: left;
   pointer-events: none;
+}
+/* Right-edge anchors (pay total, trailing values) open leftwards so the tooltip stays inside the panel. */
+.bsx-explainable.bsx-explain-end:hover::after,
+.bsx-explainable.bsx-explain-end:focus::after {
+  left: auto;
+  right: 0;
 }
 /* HUD modifier chips (#1414) float over the 3D scene, so the warn tint alone
    washes out on light terrain: opaque panel backing under the tint, 11px text. */
