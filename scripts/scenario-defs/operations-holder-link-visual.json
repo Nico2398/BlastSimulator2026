@@ -1,0 +1,150 @@
+{
+  "name": "operations-holder-link-visual",
+  "description": "Operations Work Queue names who holds each action as a link (#2165). A player orders a building, opens Operations, clicks the holder link and the inspector opens on that employee; then clicks a coordinate link. All by real clicks.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:330000 staffed:true",
+      "timeout": 40,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:330000 staffed:true"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 330000,
+          "buildingCount": 0
+        }
+      },
+      "description": "Staffed site with no Building Destroyer in the fleet."
+    },
+    {
+      "command": "build management_office at:14,5 tier:1",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 14,
+          "z": 5
+        },
+        {
+          "type": "wait",
+          "durationMs": 200
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "description": "Order a management office by clicking the Build panel row and picking the tile."
+    },
+    {
+      "command": "tick 10",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "description": "Let dispatch hand the construction order to a worker so the Work Queue row names a holder."
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "ops"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-operations-panel [data-select-kind=\"employee\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-operations-panel [data-select-kind=\"employee\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"]",
+        "note": "Clicking the holder link opens the employee inspector (#2165)."
+      },
+      "description": "Open Operations, click the holder link; the inspector opens on that employee."
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "ops"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-operations-panel [data-focus-x]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-operations-panel [data-focus-x]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-operations-panel [data-focus-x]"
+      },
+      "description": "Click a coordinate link; the camera centres on it. Flat wait: camera easing has no queryable condition, screenshot is read by eye."
+    }
+  ]
+}

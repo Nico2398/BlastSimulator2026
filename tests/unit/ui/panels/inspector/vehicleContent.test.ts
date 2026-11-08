@@ -10,6 +10,7 @@ import { getVehicleDefByTier } from '../../../../../src/core/entities/Vehicle.js
 import type { Employee } from '../../../../../src/core/entities/Employee.js';
 import type { Building } from '../../../../../src/core/entities/Building.js';
 import type { FragmentData } from '../../../../../src/core/mining/BlastExecution.js';
+import { holeNumericId } from '../../../../../src/core/mining/DrillPlan.js';
 import { oreContributionKg } from '../../../../../src/core/mining/BlastOreReport.js';
 import { computeVehicleUpgradeCost } from '../../../../../src/core/entities/VehicleUpgrade.js';
 import { repairPartsCost } from '../../../../../src/core/entities/VehicleRepair.js';
@@ -498,5 +499,47 @@ describe('vehicle inspector — signature', () => {
     const before = viewOf(s).signature;
     v.hp = 30;
     expect(viewOf(s).signature).toBe(before);
+  });
+});
+
+describe('vehicle inspector — hole target link (#2165)', () => {
+  function rigOnHole(holeId: string): GameState {
+    const rig = makeVehicle({ id: 1, type: 'drill_rig', tier: 1 });
+    const s = makeState(rig, [makeEmployee({ id: 6 })]);
+    const order: PendingAction = {
+      id: 20, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: 'drill_rig',
+      targetX: 10, targetZ: 10, targetY: 0, payload: { holeId }, targetEmployeeId: null,
+      status: 'in_progress', holderId: 6, queuedAtTick: 0,
+    };
+    s.pendingActions.push(order);
+    s.vehicles.reservations.push({ vehicleId: 1, actionId: order.id });
+    return s;
+  }
+
+  it('a job aimed at a hole renders the target as a hole link', () => {
+    const root = mount(viewOf(rigOnHole('H12')));
+    const link = root.querySelector<HTMLElement>('.bs-vehicle-job button[data-select-kind="hole"]');
+    expect(link).not.toBeNull();
+    expect(link!.dataset['selectId']).toBe(String(holeNumericId('H12')));
+  });
+
+  it('keeps the target hole text', () => {
+    const root = mount(viewOf(rigOnHole('H12')));
+    const link = root.querySelector<HTMLElement>('.bs-vehicle-job button[data-select-kind="hole"]')!;
+    expect(link.textContent).toBe(t('inspector.vehicle.target_hole', { id: 'H12' }));
+  });
+
+  it('clicking the hole link calls links.select with hole and the hole numeric id', () => {
+    const { links, select } = makeLinks();
+    const root = mount(viewOf(rigOnHole('H12'), links));
+    root.querySelector<HTMLElement>('.bs-vehicle-job button[data-select-kind="hole"]')!.click();
+    expect(select).toHaveBeenCalledTimes(1);
+    expect(select).toHaveBeenCalledWith('hole', holeNumericId('H12'));
+  });
+
+  it('an idle rig has no hole link', () => {
+    const rig = makeVehicle({ id: 1, type: 'drill_rig', tier: 1 });
+    const root = mount(viewOf(makeState(rig)));
+    expect(root.querySelector('[data-select-kind="hole"]')).toBeNull();
   });
 });

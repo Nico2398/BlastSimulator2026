@@ -2,6 +2,7 @@
 import { t } from '../../../core/i18n/I18n.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { el, sectionHeader } from '../../dom.js';
+import { applyLinkStyle } from '../../entityLinks.js';
 import type { InspectorKind, InspectorLinks } from './InspectorContent.js';
 import type { LinkFactory } from '../../crewDetailSections.js';
 import { ALLOWED_CLASS, HIGHLIGHT_CLASS } from '../../tutorialGuide.js';
@@ -92,7 +93,7 @@ export function entityLink(name: string, kind: InspectorKind, id: number, links:
   const link = el('button', { text: name });
   link.dataset['selectKind'] = kind;
   link.dataset['selectId'] = String(id);
-  link.style.cssText = 'border:0;background:transparent;padding:0;color:var(--bsx-info);cursor:pointer;text-decoration:underline;font:inherit';
+  applyLinkStyle(link);
   link.addEventListener('click', () => links.select(kind, id));
   return link;
 }

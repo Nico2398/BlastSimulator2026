@@ -2,11 +2,11 @@
 import { t } from '../../../core/i18n/I18n.js';
 import { getVehicleDefByTier, getVehicleReservation, resolveVehicleDriver, vehicleFuelCostPerTick, type Vehicle } from '../../../core/entities/Vehicle.js';
 import { computeVehicleJob, type VehicleJobTarget } from '../../../core/entities/VehicleStatus.js';
+import { holeNumericId } from '../../../core/mining/DrillPlan.js';
 import { isVehicleUnderRepair, missingHp, repairPartsCost } from '../../../core/entities/VehicleRepair.js';
 import { vehicleCargoByOre, vehicleCargoWarehouseId } from '../../../core/economy/VehicleCargo.js';
 import { formatDollars, formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { el } from '../../dom.js';
 import { vehicleCapacityText } from '../../catalogCardText.js';
 import {
   buildingDisplayName, makeHpGauge, makeLoadGauge, makeStatusChip, vehicleDisplayName,
@@ -49,7 +49,7 @@ export function buildRepairSection(v: Vehicle, state: GameState): HTMLElement | 
 function targetNode(target: VehicleJobTarget, state: GameState, links: InspectorLinks): HTMLElement {
   switch (target.kind) {
     case 'fragment': return entityLink(t('inspector.vehicle.target_fragment', { id: target.id }), 'fragment', target.id, links);
-    case 'hole': return el('span', { text: t('inspector.vehicle.target_hole', { id: target.id }) });
+    case 'hole': return entityLink(t('inspector.vehicle.target_hole', { id: target.id }), 'hole', holeNumericId(target.id), links);
     case 'building': {
       const b = state.buildings.buildings.find(x => x.id === target.id);
       return entityLink(b ? buildingDisplayName(b.type, b.tier) : `#${target.id}`, 'building', target.id, links);

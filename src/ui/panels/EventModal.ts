@@ -12,6 +12,7 @@
 // 'event-fire-resolve' stage and uiActionProbe's dedicated 'event' region
 // both target these exact selectors.
 
+import { openerLink, type EntityOpener } from '../entityLinks.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, chip, type ChipTone } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
@@ -21,7 +22,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import { getEventById, getOptionEffectHints, type EventCategory, type EventDef, type EventOptionEffectHint } from '../../core/events/EventPool.js';
 import type { EventEffect } from '../../core/events/EventSystem.js';
 import type { GameConsoleFn } from '../gameConsole.js';
-import { leaverLabel, type LeaverLabel } from '../../core/events/EventLeavers.js';
+import { leaverDraw, leaverLabel, type LeaverLabel } from '../../core/events/EventLeavers.js';
 import { getLivingEmployees } from '../../core/entities/Employee.js';
 import { effectChipText, effectChips } from '../../core/events/EventEffectText.js';
 import { createModifierChips } from '../shell/ModifierChips.js';
@@ -92,11 +93,19 @@ function hintName(hint: EventOptionEffectHint): string {
 }
 
 /** Choose-phase hint chip: the exact amount or lasting effect when certain, direction only (with "?") when risky. */
-function hintChip(hint: EventOptionEffectHint, leaver?: LeaverLabel): HTMLElement {
+function hintChip(hint: EventOptionEffectHint, leaver?: LeaverLabel, leaverLink?: (name: string) => HTMLElement): HTMLElement {
   const tone: ChipTone = hint.risky
     ? 'warn'
     : hint.direction === 'positive' ? 'positive' : hint.direction === 'negative' ? 'critical' : 'neutral';
-  if (hint.spec) return chip(effectChipText(effectChips([hint.spec], leaver)[0]!) ?? hint.key, tone);
+  if (hint.spec) {
+    const text = effectChipText(effectChips([hint.spec], leaver)[0]!) ?? hint.key;
+    const name = leaver && leaver !== 'nobody' && hint.spec.type === 'employee_leaves' ? leaver.name : null;
+    const at = name !== null && leaverLink ? text.indexOf(name) : -1;
+    if (name === null || !leaverLink || at < 0) return chip(text, tone);
+    const node = chip('', tone);
+    node.append(text.slice(0, at), leaverLink(name), text.slice(at + name.length));
+    return node;
+  }
   if (hint.amount !== undefined && !hint.risky) return chip(amountLabel(hint.kind, hint.key, hint.amount), tone);
   const sign = hint.direction === 'positive' ? '+' : hint.direction === 'negative' ? '-' : '';
   // An unnamed 'other' key is a lasting effect whose spec is hidden because the outcome is risky.
@@ -132,6 +141,13 @@ export class EventModal {
   /** True while displaying the outcome of a resolved event, distinct from state.events.pendingEvent being null. */
   private showingOutcome = false;
   private readonly locale = new LocaleTextRegistry();
+
+  private opener: EntityOpener | undefined;
+
+  /** Wire the generic entity opener so names and coordinates become links (#2165). */
+  setEntityOpener(opener: EntityOpener | undefined): void {
+    this.opener = opener;
+  }
 
   constructor(container: HTMLElement) {
     this.overlay = el('div', { className: 'bs-confirm-overlay' });
@@ -282,7 +298,9 @@ export class EventModal {
         const hintRow = el('div', { attrs: { style: 'display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;flex:0 1 auto;min-width:0;max-width:60%' } });
         const staff = getLivingEmployees(state.employees.employees);
         const leaver = leaverLabel(state.events.pendingEvent, i, staff);
-        hintRow.append(...hints.map(h => hintChip(h, leaver)));
+        const leaverId = leaverDraw(state.events.pendingEvent, i)?.employeeId ?? null;
+        const leaverLink = leaverId === null ? undefined : (name: string) => openerLink(this.opener, 'employee', leaverId, name);
+        hintRow.append(...hints.map(h => hintChip(h, leaver, leaverLink)));
         btn.appendChild(hintRow);
       }
       const idx = i;

@@ -12,6 +12,7 @@
 // tutorial/scenario defs keep resolving unchanged — same convention
 // ContractsPanel.ts already established for #bs-contract-panel in P5.
 
+import { coordLink, type EntityOpener } from '../entityLinks.js';
 import { PanelBase } from './PanelBase.js';
 import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -65,6 +66,13 @@ export class FleetPanel extends PanelBase {
   private readonly locale = new LocaleTextRegistry();
   private selection: ListSelection = null;
   private readonly filterSelection = new FilterBarSelection();
+
+  private opener: EntityOpener | undefined;
+
+  /** Wire the generic entity opener so names and coordinates become links (#2165). */
+  setEntityOpener(opener: EntityOpener | undefined): void {
+    this.opener = opener;
+  }
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-vehicle-panel'));
@@ -177,7 +185,7 @@ export class FleetPanel extends PanelBase {
       status: makeStatusChip(v, state.vehicles, this.occupantOf(v, state)),
       hp: makeHpGauge(v),
       load: makeLoadGauge(v),
-      driver: makeDriverNameLine(v, state.employees.employees),
+      driver: makeDriverNameLine(v, state.employees.employees, this.opener),
     };
     for (const key of Object.keys(parts) as Array<keyof RowParts>) parts[key]?.classList.add(ROW_PART_CLASS[key]);
     return parts;
@@ -196,12 +204,20 @@ export class FleetPanel extends PanelBase {
     const banner = el('div', { attrs: { style: 'display:flex;gap:8px;padding:9px 11px;border-radius:5px;background:rgba(255,176,46,.08);border:1px solid rgba(255,176,46,.26)' } });
     banner.append(
       el('div', { attrs: { style: 'color:var(--bsx-amber)' }, children: [iconEl('warn', 14)] }),
-      el('span', {
-        text: t('ui.fleet.traffic_advisory', { count: worst.agentIds.length, x: Math.floor(worst.x), z: Math.floor(worst.z) }),
-        attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary);flex:1' },
-      }),
+      this.trafficAdvisory(worst.agentIds.length, Math.floor(worst.x), Math.floor(worst.z)),
     );
     return banner;
+  }
+
+  /** The advisory sentence, its coordinates a link that centres the camera on the jam. */
+  private trafficAdvisory(count: number, x: number, z: number): HTMLElement {
+    const sentence = el('span', { attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary);flex:1' } });
+    const text = t('ui.fleet.traffic_advisory', { count, x, z });
+    const coords = `(${x}, ${z})`;
+    const at = text.indexOf(coords);
+    if (at < 0) { sentence.textContent = text; return sentence; }
+    sentence.append(text.slice(0, at), coordLink(this.opener, x, z, coords), text.slice(at + coords.length));
+    return sentence;
   }
 
   /** Vehicles that pass the fleet bar, in its sort order. */

@@ -1266,6 +1266,12 @@ uiManager.setOpenSavesHandler(() => savesModal.show());
 uiManager.setMapFocusHandler((x, z) => {
   scene.cameraController.focus(x, gameRenderer.surfaceYAt(x, z), z, 60);
 });
+// The one entry point panels use to open an entity: select it in the scene, then centre the camera (#2165).
+uiManager.setOpenEntityHandler((kind, id) => {
+  const entity: EntityPick = { kind, id, point: new THREE.Vector3(), distance: 0 };
+  scenePicking.select(entity);
+  focusEntity(entity);
+});
 uiManager.setSelectVehicleHandler((vehicleId) => {
   scenePicking.select({ kind: 'vehicle', id: vehicleId, point: new THREE.Vector3(), distance: 0 });
 });
@@ -1297,6 +1303,16 @@ function anchorWorldPosition(entity: EntityPick, anchor: SelectionAnchor, state:
   if (!f) return gameRenderer.entityWorldPosition(anchor.type === 'host' ? anchor.kind : entity.kind, anchor.type === 'host' ? anchor.id : entity.id);
   const x = (f.minX + f.maxX + 1) / 2, z = (f.minZ + f.maxZ + 1) / 2;
   return new THREE.Vector3(x, gameRenderer.smoothSurfaceYAt(x, z), z);
+}
+/** Centre the camera on an entity. An employee inside a building or vehicle has no mesh: frame the host the outline is on. */
+function focusEntity(entity: EntityPick): void {
+  const state = ctx.state;
+  const resolved = state && isHostResolvedKind(entity.kind) ? resolveSelection(state, entity.kind, entity.id) : null;
+  const pos = state && resolved?.exists
+    ? anchorWorldPosition(entity, resolved.anchor, state)
+    : gameRenderer.entityWorldPosition(entity.kind, entity.id);
+  const distance = entity.kind === 'vehicle' || entity.kind === 'employee' ? 40 : 20;
+  if (pos) scene.cameraController.focus(pos.x, pos.y, pos.z, distance);
 }
 /**
  * Whether the selected entity no longer exists. Host-resolved kinds answer from their resolution
@@ -1402,14 +1418,7 @@ inspector.setActionHandler((action, entity) => {
       break;
     }
     case 'locate': {
-      // An employee inside a building or vehicle has no mesh: frame the host the outline is on.
-      const state = ctx.state;
-      const resolved = state && isHostResolvedKind(entity.kind) ? resolveSelection(state, entity.kind, entity.id) : null;
-      const pos = state && resolved?.exists
-        ? anchorWorldPosition(entity, resolved.anchor, state)
-        : gameRenderer.entityWorldPosition(entity.kind, entity.id);
-      const distance = entity.kind === 'vehicle' || entity.kind === 'employee' ? 40 : 20;
-      if (pos) scene.cameraController.focus(pos.x, pos.y, pos.z, distance);
+      focusEntity(entity);
       break;
     }
     case 'upgrade':

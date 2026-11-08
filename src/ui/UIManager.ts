@@ -1,6 +1,7 @@
 // BlastSimulator2026 — UI Manager (10.x, redesign P1)
 // Orchestrates all UI panels. Wires game console, handles panel routing, drives per-tick updates.
 
+import type { EntityOpener, OpenableKind } from './entityLinks.js';
 import { IDLE_BLAST_PLAYBACK, type BlastPlaybackSnapshot } from '../core/mining/BlastPlayback.js';
 import { injectStyles } from './styles.js';
 import { injectTokens } from './tokens.js';
@@ -79,6 +80,13 @@ export class UIManager {
   private readonly settingsPanel: SettingsPanel;
   private readonly miniMap: MiniMap;
   private readonly leftColumn: LeftColumn;
+
+  private openEntityHandler?: (kind: OpenableKind, id: number) => void;
+  private mapFocusHandler?: (x: number, z: number) => void;
+  private readonly opener: EntityOpener = {
+    open: (kind, id) => this.openEntity(kind, id),
+    focus: (x, z) => this.focusAt(x, z),
+  };
 
   private activePanel: PanelName | null = null;
   private cues: Pick<UiCues, 'panelShown'> | null = null;
@@ -166,6 +174,9 @@ export class UIManager {
 
     // Event modal (redesign P8, supersedes EventDialog.ts), appended to container
     this.eventModal = new EventModal(container);
+    this.eventModal.setEntityOpener(this.opener);
+    this.operationsPanel.setEntityOpener(this.opener);
+    this.fleetPanel.setEntityOpener(this.opener);
     this.eventNotices = new EventNotices(container);
     // Mounted after eventModal so the letter renders on top of it.
     this.permitApprovalModal = new PermitApprovalModal(container);
@@ -398,12 +409,33 @@ export class UIManager {
 
   /** Wire the minimap's click-to-focus (main.ts owns the camera + surface-height lookup). */
   setMapFocusHandler(cb: (x: number, z: number) => void): void {
+    this.mapFocusHandler = cb;
     this.miniMap.setFocusHandler(cb);
   }
 
   /** Wire the Fleet panel's per-row click-to-select (main.ts owns ScenePicking). */
   setSelectVehicleHandler(cb: (vehicleId: number) => void): void {
     this.fleetPanel.setSelectVehicleHandler(cb);
+  }
+
+  /** Wire the generic open-entity call (main.ts selects in the scene and centres the camera) (#2165). */
+  setOpenEntityHandler(cb: (kind: OpenableKind, id: number) => void): void {
+    this.openEntityHandler = cb;
+  }
+
+  /** Open the inspector on an entity from any panel. */
+  openEntity(kind: OpenableKind, id: number): void {
+    this.openEntityHandler?.(kind, id);
+  }
+
+  /** Centre the camera on a world point from any panel. */
+  focusAt(x: number, z: number): void {
+    this.mapFocusHandler?.(x, z);
+  }
+
+  /** The opener handed to panels that link to entities. */
+  get entityOpener(): EntityOpener {
+    return this.opener;
   }
 
   /** Wire the Build menu's per-row click-to-select (main.ts owns ScenePicking). */

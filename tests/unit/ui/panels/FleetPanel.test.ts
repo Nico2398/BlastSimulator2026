@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { FleetPanel } from '../../../../src/ui/panels/FleetPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
@@ -1083,5 +1083,78 @@ describe('FleetPanel — vehicle filter and sort bar (#2161)', () => {
     expect(en['ui.fleet.filter_no_match']).toBeTruthy();
     expect(fr['ui.fleet.filter_no_match']).toBeTruthy();
     expect(fr['ui.fleet.filter_no_match']).not.toBe(en['ui.fleet.filter_no_match']);
+  });
+});
+
+// ── Traffic banner coordinates as a camera link (#2165) ──
+
+describe('FleetPanel — traffic banner coordinate link (#2165)', () => {
+  function jamState(): GameState {
+    const ids = [1, 2, 3];
+    const vehicles = ids.map(id => makeVehicle({ id, occupantIds: [100 + id] }));
+    const drivers = ids.map(id => makeEmployee({
+      id: 100 + id,
+      x: 8, z: 8,
+      vehicleWaitingTicks: 15,
+      itinerary: {
+        legs: [{ mode: 'drive', vehicleId: id, destX: 8, destZ: 8, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5 }],
+        goal: { kind: 'reposition', x: 8, z: 8 },
+        workTicks: 0,
+        estTotalTicks: 5,
+      },
+    }));
+    return makeState(vehicles, drivers);
+  }
+
+  function withOpener() {
+    const { panel } = makePanel();
+    const open = vi.fn();
+    const focus = vi.fn();
+    panel.setEntityOpener({ open, focus });
+    return { panel, open, focus };
+  }
+
+  it('the banner coordinates are a focus button carrying the jam x and z', () => {
+    const { panel } = withOpener();
+    panel.update(jamState());
+    const link = panel.root.querySelector<HTMLElement>('.bs-fleet-traffic button[data-focus-x][data-focus-z]');
+    expect(link).not.toBeNull();
+    expect(link!.dataset['focusX']).toBe('8');
+    expect(link!.dataset['focusZ']).toBe('8');
+  });
+
+  it('clicking the banner coordinates calls opener.focus with the jam position', () => {
+    const { panel, open, focus } = withOpener();
+    panel.update(jamState());
+    panel.root.querySelector<HTMLElement>('.bs-fleet-traffic button[data-focus-x]')!.click();
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenCalledWith(8, 8);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('the banner text is unchanged by the link', () => {
+    const { panel } = withOpener();
+    panel.update(jamState());
+    const banner = panel.root.querySelector('.bs-fleet-traffic')!;
+    expect(banner.textContent).toContain(t('ui.fleet.traffic_advisory', { count: 3, x: 8, z: 8 }));
+  });
+
+  it('the link survives the in-place banner refresh', () => {
+    const { panel, focus } = withOpener();
+    const calm = jamState();
+    for (const e of calm.employees.employees) e.vehicleWaitingTicks = 0;
+    panel.update(calm);
+    expect(panel.root.querySelector('.bs-fleet-traffic')).toBeNull();
+    panel.update(jamState());
+    panel.root.querySelector<HTMLElement>('.bs-fleet-traffic button[data-focus-x]')!.click();
+    expect(focus).toHaveBeenCalledWith(8, 8);
+  });
+
+  it('without an opener the coordinates stay plain text', () => {
+    const { panel } = makePanel();
+    panel.update(jamState());
+    const banner = panel.root.querySelector('.bs-fleet-traffic')!;
+    expect(banner.textContent).toContain(t('ui.fleet.traffic_advisory', { count: 3, x: 8, z: 8 }));
+    expect(banner.querySelector('button')).toBeNull();
   });
 });
