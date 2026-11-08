@@ -506,7 +506,7 @@ describe('FireStep wet-hole row (#2166)', () => {
     explosives.forEach((id, i) => {
       const hole = addHole(holeCounter, state.drillHoles, 20 + i * 3, 20, 8, 0.15);
       if (id === null) return;
-      const c = createCharge(id, 5, 2, hole.depth);
+      const c = createCharge(id, 3, 2, hole.depth);
       if ('charge' in c) state.chargesByHole[hole.id] = c.charge;
     });
     return state;

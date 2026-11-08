@@ -994,7 +994,7 @@ describe('PreflightModal — wet-hole row and consequences (#2166)', () => {
     explosives.forEach((explosiveId, i) => {
       const hole = addHole(holeCounter, state.drillHoles, 10 + i * 3, 10, 8, 0.15);
       if (explosiveId === null) return;
-      const r = createCharge(explosiveId, 5, 2, hole.depth);
+      const r = createCharge(explosiveId, 3, 2, hole.depth);
       if ('charge' in r) state.chargesByHole[hole.id] = r.charge;
     });
     return state;
