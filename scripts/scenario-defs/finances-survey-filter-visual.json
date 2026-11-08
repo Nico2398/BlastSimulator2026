@@ -1,0 +1,387 @@
+{
+  "name": "finances-survey-filter-visual",
+  "description": "#2162: the Finances ledger and the Survey results list carry the shared filter bar. After hiring a surveyor and completing one seismic survey by real clicks, a player clicks the type filter and amount sort in the ledger, then the method filter in the survey results.",
+  "shots": [
+    {
+      "name": "method-panel",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "seismic-selected",
+      "yaw": 90,
+      "pitch": 30
+    }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "campaign start level:dusty_hollow staffed:false",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow staffed:false"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "worldSizeX"
+        ]
+      }
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:geology level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:geology level:5"
+        }
+      ],
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 5
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "survey mode",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey mode"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "survey seismic x:20 z:20",
+      "description": "Method 1/3: seismic.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "arrival-gated (#437) — queued and paid for, not yet completed"
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "tick 23",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 23"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 8",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 8"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "player",
+      "description": "#2162: open the Finances panel from the balance chip, click the Expense type filter and the Amount sort in its ledger filter bar. The ledger then lists only expense rows (hire and survey costs) and shows the signed total; the filter changes the view only. Clear filter restores the unfiltered ledger, then the panel is closed.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"open-finances\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"open-finances\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-finances-panel .bs-filter-bar"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-finances-panel .bs-filter-bar [data-filter-group=\"type\"] [data-filter-value=\"expense\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-finances-panel [data-ledger-row][data-type=\"expense\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-finances-panel .bs-filter-bar [data-sort-key=\"amount\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-finances-panel [data-ledger-total]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-finances-panel .bs-filter-bar .bs-filter-clear"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-finances-panel [data-ledger-row]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-finances-panel [data-panel-close]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "employeeCount": 1
+        },
+        "note": "Filtering changes the view only; matching, ordering and the total are unit-tested."
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "player",
+      "description": "#2162: open the Survey panel, click the Seismic method filter in the results filter bar so the finished seismic survey card remains listed, then Clear filter restores the full list.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-survey-panel .bs-filter-bar"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel .bs-filter-bar [data-filter-group=\"method\"] [data-filter-value=\"seismic\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-survey-panel [data-survey-id]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel .bs-filter-bar .bs-filter-clear"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-survey-panel [data-survey-id]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "surveyCount": 1
+        },
+        "note": "Filtering changes the view only; matching is unit-tested."
+      }
+    }
+  ]
+}
