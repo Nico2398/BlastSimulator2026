@@ -11,7 +11,7 @@ import { salaryExplain, skillLevelExplain, unionExplain } from '../statExplain.j
 import { filterBar, type FilterBarSelection } from '../filterBar.js';
 import { HIRING_LEVEL_CHOICES, HIRING_SORT_KEYS, criteriaFromSelection, filterCandidates } from '../hiringFilter.js';
 import { perHour } from '../crewDetailSections.js';
-import { makeCandidateSheet } from '../candidateSheet.js';
+import { makeCandidateSheet, hireRefusal } from '../candidateSheet.js';
 
 /** "Skill ★level" list of what a hire of `role` arrives qualified for. */
 function startingQualificationLabel(role: EmployeeRole): string {
@@ -80,11 +80,7 @@ interface HiringFilterView {
   onOpenCandidate?: (candidateId: number | null) => void;
 }
 
-/** Why `c` cannot be hired right now (cash short of the fee), or null when hiring is possible. */
-export function hireRefusal(state: Pick<GameState, 'cash'>, c: Pick<HireCandidate, 'role'>): string | null {
-  const missing = HIRING_COSTS[c.role] - state.cash;
-  return missing > 0 ? t('ui.crew.hire_short_cash', { missing }) : null;
-}
+export { hireRefusal };
 
 export function makeHiringSection(state: GameState, onHire: (role: EmployeeRole, candidateId: number) => void, view?: HiringFilterView): HTMLElement[] {
   const criteria = view ? criteriaFromSelection(view.selection) : null;

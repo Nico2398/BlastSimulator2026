@@ -10,7 +10,12 @@ import { el, explainable, button, reasonLine } from './dom.js';
 import { salaryExplain, unionExplain } from './statExplain.js';
 import { makeSkillsSection, perHour } from './crewDetailSections.js';
 import { UNION_MEMBER_SALARY_DISCOUNT_PCT } from '../core/config/balance.js';
-import { hireRefusal } from './panels/CrewHiring.js';
+
+/** Why `c` cannot be hired right now (cash short of the fee), or null when hiring is possible. */
+export function hireRefusal(state: Pick<GameState, 'cash'>, c: Pick<HireCandidate, 'role'>): string | null {
+  const missing = HIRING_COSTS[c.role] - state.cash;
+  return missing > 0 ? t('ui.crew.hire_short_cash', { missing }) : null;
+}
 
 const MICRO = 'font:400 10px/1.2 var(--bsx-font-ui);color:var(--bsx-text-micro)';
 
