@@ -1,0 +1,63 @@
+{
+  "name": "panel-explain-visual",
+  "description": "Hover-only panel explanations (#2170): a player hovers a contract offer's penalty condition and an event option's effect chip with the real pointer, and the explainable() tooltip is screenshotted open next to what it explains.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32",
+      "timeout": 30,
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 size:32" }
+      ],
+      "expect": {
+        "equals": { "employeeCount": 0 }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "role": "player",
+      "description": "Open the Contracts panel and hover the first offer's 'Fail = -$X' condition; the penalty explanation tooltip appears beside it and is screenshotted.",
+      "interaction": [
+        { "type": "ensurePanel", "panel": "contracts" },
+        { "type": "waitForSelector", "selector": ".bs-contract-penalty[data-explain]" },
+        { "type": "hoverSelector", "selector": ".bs-contract-penalty[data-explain]" },
+        { "type": "screenshot" }
+      ],
+      "expect": {
+        "equals": { "employeeCount": 0 }
+      }
+    },
+    {
+      "command": "event fire union_strike_threat",
+      "description": "test hook: `event fire` has no UI control and none is intended.",
+      "interaction": [{ "type": "command", "command": "event fire union_strike_threat" }],
+      "role": "bootstrap"
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "role": "player",
+      "description": "Hover an effect chip on the event dialog's first option; the chip explanation tooltip appears beside it and is screenshotted.",
+      "interaction": [
+        { "type": "waitForSelector", "selector": "#bs-event-dialog .bs-event-choice .bsx-chip[data-explain]" },
+        { "type": "hoverSelector", "selector": "#bs-event-dialog .bs-event-choice .bsx-chip[data-explain]" },
+        { "type": "screenshot" }
+      ],
+      "expect": {
+        "equals": { "employeeCount": 0 }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "timeout": 30,
+      "role": "player",
+      "description": "Resolve the event with a real click so the run ends clean.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-event-dialog .bs-event-choices .bs-event-choice:nth-child(1)" },
+        { "type": "awaitUsable", "selector": "#bs-event-dialog .bs-event-dismiss" },
+        { "type": "clickSelector", "selector": "#bs-event-dialog .bs-event-dismiss" }
+      ]
+    }
+  ]
+}
