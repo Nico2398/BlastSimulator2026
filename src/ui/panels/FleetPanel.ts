@@ -15,7 +15,7 @@
 import { PanelBase } from './PanelBase.js';
 import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
+import { el, card, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -236,9 +236,9 @@ export class FleetPanel extends PanelBase {
       : visible.length === 0
         ? [el('div', { className: 'bsx-empty', text: t('ui.fleet.filter_no_match') })]
         : visible.map(v => this.makeVehicleCard(v, state));
-    children.push(scrollBoundedSection(vehicles.length === 0 ? vehicleCards : [this.makeFleetBar(), ...vehicleCards], 200, { gap: 9 }));
+    children.push(scrollBoundedSection(vehicles.length === 0 ? vehicleCards : [this.makeFleetBar(), ...vehicleCards], 200, { gap: 9, scrollKey: 'fleet' }));
     children.push(sectionHeader(t('ui.fleet.dealership')), ...this.makeDealershipRows(state));
-    this.bodyEl.replaceChildren(...children);
+    replaceChildrenKeepingScroll(this.bodyEl, children);
   }
 
   // ── Dealership ──
