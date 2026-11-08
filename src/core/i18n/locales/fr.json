@@ -4194,6 +4194,8 @@
   "siteExpansion.claim_refused": "Impossible de {what} au bloc ({cx}, {cz}) : {reason}.",
   "employees.hire_usage": "Utilisation : employee hire role:({roles})",
   "employees.hire_success": "{name} embauché ({role}). Coût : {cost} $",
+  "ui.crew.hire_short_cash": "Il manque {missing} de trésorerie pour embaucher",
+  "ui.crew.candidate_sheet_close": "Fermer",
   "ui.crew.candidate_salary": "{salary} $/h",
   "ui.crew.candidate_union_tradeoff": "Syndicat : salaire {pct} % plus bas, licenciement impossible, mais revendications et grèves",
   "ui.crew.union_tradeoff_detail": "Membre du syndicat : payé {pct} % de moins, licenciement impossible. Les événements syndicaux et les grèves exigent des membres.",

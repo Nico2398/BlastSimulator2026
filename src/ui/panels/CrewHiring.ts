@@ -65,6 +65,14 @@ function makeCandidateCard(
 interface HiringFilterView {
   selection: FilterBarSelection;
   onChange: () => void;
+  /** Candidate whose sheet is open, owned by the panel. */
+  openCandidateId?: number | null;
+  onOpenCandidate?: (candidateId: number | null) => void;
+}
+
+/** Why `c` cannot be hired right now (cash short of the fee), or null when hiring is possible. */
+export function hireRefusal(_state: Pick<GameState, 'cash'>, _c: Pick<HireCandidate, 'role'>): string | null {
+  throw new Error('not implemented');
 }
 
 export function makeHiringSection(state: GameState, onHire: (role: EmployeeRole, candidateId: number) => void, view?: HiringFilterView): HTMLElement[] {

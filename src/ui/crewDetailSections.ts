@@ -251,7 +251,7 @@ export function makeManagerEffect(e: Employee): HTMLElement | null {
 
 // ── SKILLS ──
 
-export function makeSkillsSection(e: Employee): HTMLElement {
+export function makeSkillsSection(e: Pick<Employee, 'qualifications'>): HTMLElement {
   const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' } });
   wrap.appendChild(microLabel(t('ui.crew.skills')));
 

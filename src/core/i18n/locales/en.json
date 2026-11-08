@@ -4194,6 +4194,8 @@
   "siteExpansion.claim_refused": "Cannot {what} at chunk ({cx}, {cz}): {reason}.",
   "employees.hire_usage": "Usage: employee hire role:({roles})",
   "employees.hire_success": "Hired {name} ({role}). Cost: ${cost}",
+  "ui.crew.hire_short_cash": "Need {missing} more cash to hire",
+  "ui.crew.candidate_sheet_close": "Close",
   "ui.crew.candidate_salary": "${salary}/h",
   "ui.crew.candidate_union_tradeoff": "Union: {pct}% lower pay, cannot be dismissed, but brings demands and strikes",
   "ui.crew.union_tradeoff_detail": "Union member: paid {pct}% less, cannot be dismissed. Union events and strikes need members.",
