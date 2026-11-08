@@ -94,7 +94,7 @@ export function filterBar(selection: FilterBarSelection, cfg: FilterBarConfig): 
     return row;
   });
 
-  const sortRow = el('div', { className: 'bs-filter-row', children: [
+  const sortRow = cfg.sorts.length === 0 ? null : el('div', { className: 'bs-filter-row', children: [
     el('span', { className: 'bs-filter-label', text: cfg.sortLabel }),
     ...cfg.sorts.map(sort => {
       const btn = barButton(sort.label, selection.sort === sort.key, () => {

@@ -437,3 +437,332 @@ describe('FinancesPanel — scroll survives a refresh (#1592)', () => {
     expect(ledger().scrollTop).toBe(70);
   });
 });
+
+// ── Ledger filter and sort bar (#2162) ──────────────────────────────────────
+
+describe('FinancesPanel — ledger filter and sort bar (#2162)', () => {
+  /**
+   * Oldest first: 1 income sales 500, 2 expense fuel 200, 3 income contracts 1500,
+   * 4 expense contracts 700, 5 expense salaries 300, 6 income sales 250.
+   * Every amount is unique so a row is identified by its amount.
+   */
+  function fixtureState(): GameState {
+    const state = makeState();
+    state.tickCount = 100;
+    state.finances.transactions.push(
+      { tick: 10, type: 'income', amount: 500, category: 'sales', description: 'a' },
+      { tick: 20, type: 'expense', amount: 200, category: 'fuel', description: 'b' },
+      { tick: 30, type: 'income', amount: 1500, category: 'contracts', description: 'c' },
+      { tick: 40, type: 'expense', amount: 700, category: 'contracts', description: 'd' },
+      { tick: 50, type: 'expense', amount: 300, category: 'salaries', description: 'e' },
+      { tick: 60, type: 'income', amount: 250, category: 'sales', description: 'f' },
+    );
+    return state;
+  }
+
+  function setup(state: GameState = fixtureState()): { panel: FinancesPanel; state: GameState } {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(state);
+    return { panel, state };
+  }
+
+  const bar = (panel: FinancesPanel): HTMLElement => panel.root.querySelector<HTMLElement>('.bs-filter-bar')!;
+  const click = (panel: FinancesPanel, selector: string): void => (bar(panel).querySelector(selector) as HTMLButtonElement).click();
+  const categoryBtn = (category: string): string => `.bs-filter-row:not([data-filter-group]) [data-filter-value="${category}"]`;
+  const typeBtn = (type: string): string => `[data-filter-group="type"] [data-filter-value="${type}"]`;
+  const sortBtn = (key: string): string => `[data-sort-key="${key}"]`;
+  const rows = (panel: FinancesPanel): HTMLElement[] => [...panel.root.querySelectorAll<HTMLElement>('[data-ledger-row]')];
+  /** Signed amounts of the listed rows, in display order. */
+  const shown = (panel: FinancesPanel): string[] =>
+    rows(panel).map(r => /[+-]\$[\d,]+/.exec(r.textContent ?? '')![0]);
+  const totalEl = (panel: FinancesPanel): HTMLElement | null => panel.root.querySelector<HTMLElement>('[data-ledger-total]');
+
+  it('shows the shared filter bar above the ledger rows', () => {
+    const { panel } = setup();
+    expect(panel.root.querySelectorAll('.bs-filter-bar')).toHaveLength(1);
+    const first = rows(panel)[0]!;
+    expect(bar(panel).compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(bar(panel).contains(first)).toBe(false);
+  });
+
+  it('offers exactly the categories present in the transactions, each once', () => {
+    const { panel } = setup();
+    const categories = [...bar(panel).querySelectorAll<HTMLElement>('.bs-filter-row:not([data-filter-group]) [data-filter-value]')]
+      .map(b => b.dataset['filterValue']).sort();
+    expect(categories).toEqual(['contracts', 'fuel', 'salaries', 'sales']);
+    expect(bar(panel).querySelector('[data-filter-all]')).not.toBeNull();
+  });
+
+  it('offers the income and expense types and the amount and date sorts', () => {
+    const { panel } = setup();
+    const types = [...bar(panel).querySelectorAll<HTMLElement>('[data-filter-group="type"] [data-filter-value]')]
+      .map(b => b.dataset['filterValue']).sort();
+    expect(types).toEqual(['expense', 'income']);
+    const sorts = [...bar(panel).querySelectorAll<HTMLElement>('[data-sort-key]')].map(b => b.dataset['sortKey']).sort();
+    expect(sorts).toEqual(['amount', 'date']);
+  });
+
+  it('labels the bar with the localized finance keys, never raw keys', () => {
+    const { panel } = setup();
+    const text = bar(panel).textContent ?? '';
+    for (const key of ['ui.finances.filter_category', 'ui.finances.filter_type', 'ui.finances.filter_type_income', 'ui.finances.filter_type_expense', 'ui.finances.sort_amount', 'ui.finances.sort_date']) {
+      expect(t(key)).not.toBe(key);
+      expect(text).toContain(t(key));
+    }
+    expect(text).not.toContain('ui.finances.');
+  });
+
+  it('tags every row with its category and type', () => {
+    const { panel } = setup();
+    const tags = rows(panel).map(r => `${r.dataset['category']}/${r.dataset['type']}`);
+    expect(tags).toEqual(['sales/income', 'salaries/expense', 'contracts/expense', 'contracts/income', 'fuel/expense', 'sales/income']);
+  });
+
+  it('lists the ledger newest first with nothing selected', () => {
+    const { panel } = setup();
+    expect(shown(panel)).toEqual(['+$250', '-$300', '-$700', '+$1,500', '-$200', '+$500']);
+  });
+
+  it('shows no total while nothing is selected', () => {
+    const { panel } = setup();
+    expect(totalEl(panel)).toBeNull();
+  });
+
+  it('a category filter lists only that category', () => {
+    const { panel } = setup();
+    click(panel, categoryBtn('contracts'));
+    expect(shown(panel)).toEqual(['-$700', '+$1,500']);
+    expect(rows(panel).every(r => r.dataset['category'] === 'contracts')).toBe(true);
+  });
+
+  it('a type filter lists only that type', () => {
+    const { panel } = setup();
+    click(panel, typeBtn('expense'));
+    expect(shown(panel)).toEqual(['-$300', '-$700', '-$200']);
+    click(panel, typeBtn('income'));
+    expect(shown(panel)).toEqual(['+$250', '+$1,500', '+$500']);
+  });
+
+  it('category and type combine to tell apart a category used both ways', () => {
+    const { panel } = setup();
+    click(panel, categoryBtn('contracts'));
+    click(panel, typeBtn('income'));
+    expect(shown(panel)).toEqual(['+$1,500']);
+    click(panel, typeBtn('expense'));
+    expect(shown(panel)).toEqual(['-$700']);
+  });
+
+  it('the amount sort lists the largest amount first', () => {
+    const { panel } = setup();
+    click(panel, sortBtn('amount'));
+    expect(shown(panel)).toEqual(['+$1,500', '-$700', '+$500', '-$300', '+$250', '-$200']);
+  });
+
+  it('the date sort lists the oldest first', () => {
+    const { panel } = setup();
+    click(panel, sortBtn('date'));
+    expect(shown(panel)).toEqual(['+$500', '-$200', '+$1,500', '-$700', '-$300', '+$250']);
+  });
+
+  it('a sort orders only the rows the filter keeps', () => {
+    const { panel } = setup();
+    click(panel, typeBtn('expense'));
+    click(panel, sortBtn('amount'));
+    expect(shown(panel)).toEqual(['-$700', '-$300', '-$200']);
+  });
+
+  it('clicking the pressed choice again removes the filter', () => {
+    const { panel } = setup();
+    click(panel, categoryBtn('fuel'));
+    expect(shown(panel)).toEqual(['-$200']);
+    click(panel, categoryBtn('fuel'));
+    expect(shown(panel)).toHaveLength(6);
+  });
+
+  it('the All button and Clear filter restore the full ledger', () => {
+    const { panel } = setup();
+    click(panel, categoryBtn('sales'));
+    click(panel, '[data-filter-all]');
+    expect(shown(panel)).toHaveLength(6);
+    click(panel, typeBtn('income'));
+    click(panel, sortBtn('amount'));
+    click(panel, '.bs-filter-clear');
+    expect(shown(panel)).toEqual(['+$250', '-$300', '-$700', '+$1,500', '-$200', '+$500']);
+    expect(totalEl(panel)).toBeNull();
+  });
+
+  it('marks the pressed choices', () => {
+    const { panel } = setup();
+    click(panel, categoryBtn('sales'));
+    click(panel, sortBtn('date'));
+    expect(bar(panel).querySelector(categoryBtn('sales'))!.getAttribute('aria-pressed')).toBe('true');
+    expect(bar(panel).querySelector(categoryBtn('fuel'))!.getAttribute('aria-pressed')).not.toBe('true');
+    expect(bar(panel).querySelector(sortBtn('date'))!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('unfiltered it lists the 15 most recent; a filter lifts the cap', () => {
+    const state = makeState();
+    for (let i = 0; i < 20; i++) {
+      state.finances.transactions.push({ tick: i, type: 'expense', amount: 10 + i, category: 'fuel', description: 'f' });
+    }
+    for (let i = 20; i < 40; i++) {
+      state.finances.transactions.push({ tick: i, type: 'income', amount: 10 + i, category: 'sales', description: 's' });
+    }
+    const { panel } = setup(state);
+    expect(rows(panel)).toHaveLength(15);
+    click(panel, categoryBtn('fuel'));
+    expect(rows(panel)).toHaveLength(20);
+    click(panel, '[data-filter-all]');
+    click(panel, typeBtn('income'));
+    expect(rows(panel)).toHaveLength(20);
+  });
+
+  it('a sort alone keeps the 15-row cap', () => {
+    const state = makeState();
+    for (let i = 0; i < 30; i++) {
+      state.finances.transactions.push({ tick: i, type: 'expense', amount: 10 + i, category: 'fuel', description: 'f' });
+    }
+    const { panel } = setup(state);
+    click(panel, sortBtn('date'));
+    expect(rows(panel)).toHaveLength(15);
+  });
+
+  it('a filter finds a transaction older than the unfiltered window', () => {
+    const state = makeState();
+    state.finances.transactions.push({ tick: 1, type: 'income', amount: 8000, category: 'smuggling', description: 'old' });
+    for (let i = 0; i < 20; i++) {
+      state.finances.transactions.push({ tick: 2 + i, type: 'expense', amount: 10 + i, category: 'fuel', description: 'f' });
+    }
+    const { panel } = setup(state);
+    expect(shown(panel)).not.toContain('+$8,000');
+    click(panel, categoryBtn('smuggling'));
+    expect(shown(panel)).toEqual(['+$8,000']);
+  });
+
+  describe('signed total', () => {
+    it('shows the signed net of the listed rows for a category', () => {
+      const { panel } = setup();
+      click(panel, categoryBtn('contracts'));
+      expect(totalEl(panel)!.textContent).toContain('+$800');
+    });
+
+    it('shows a negative net with a minus sign for an expense selection', () => {
+      const { panel } = setup();
+      click(panel, typeBtn('expense'));
+      expect(totalEl(panel)!.textContent).toContain('-$1,200');
+    });
+
+    it('shows a positive net for an income selection', () => {
+      const { panel } = setup();
+      click(panel, typeBtn('income'));
+      expect(totalEl(panel)!.textContent).toContain('+$2,250');
+    });
+
+    it('appears for a sort alone and totals the listed window', () => {
+      const { panel } = setup();
+      click(panel, sortBtn('amount'));
+      expect(totalEl(panel)!.textContent).toContain('+$1,050');
+    });
+
+    it('a sort alone totals only the 15 listed rows, not the older ones', () => {
+      const state = makeState();
+      let listed = 0;
+      for (let i = 0; i < 20; i++) {
+        const type = i % 2 === 0 ? 'income' : 'expense';
+        state.finances.transactions.push({ tick: i, type, amount: 100 + i, category: 'fuel', description: 'f' });
+        if (i >= 5) listed += type === 'income' ? 100 + i : -(100 + i);
+      }
+      const { panel } = setup(state);
+      click(panel, sortBtn('amount'));
+      const expected = `${listed < 0 ? '-' : '+'}$${formatMoney(Math.abs(listed))}`;
+      expect(totalEl(panel)!.textContent).toContain(expected);
+    });
+
+    it('follows a changed selection and disappears when cleared', () => {
+      const { panel } = setup();
+      click(panel, categoryBtn('sales'));
+      expect(totalEl(panel)!.textContent).toContain('+$750');
+      click(panel, categoryBtn('fuel'));
+      expect(totalEl(panel)!.textContent).toContain('-$200');
+      click(panel, '.bs-filter-clear');
+      expect(totalEl(panel)).toBeNull();
+    });
+  });
+
+  describe('no match', () => {
+    function noMatch(): FinancesPanel {
+      const { panel } = setup();
+      click(panel, categoryBtn('sales'));
+      click(panel, typeBtn('expense'));
+      return panel;
+    }
+
+    it('shows the no-match line instead of rows', () => {
+      const panel = noMatch();
+      expect(rows(panel)).toHaveLength(0);
+      const line = t('ui.finances.filter_no_match');
+      expect(line).not.toBe('ui.finances.filter_no_match');
+      expect(panel.root.textContent).toContain(line);
+      expect(panel.root.textContent).not.toContain(t('ui.finances.none_transactions'));
+    });
+
+    it('keeps the bar so the filter can be changed', () => {
+      const panel = noMatch();
+      expect(panel.root.querySelectorAll('.bs-filter-bar')).toHaveLength(1);
+      click(panel, typeBtn('expense'));
+      expect(shown(panel)).toEqual(['+$250', '+$500']);
+      expect(panel.root.textContent).not.toContain(t('ui.finances.filter_no_match'));
+    });
+
+    it('an empty ledger without a filter keeps the no-transactions line', () => {
+      const { panel } = setup(makeState());
+      expect(panel.root.textContent).toContain(t('ui.finances.none_transactions'));
+      expect(panel.root.textContent).not.toContain(t('ui.finances.filter_no_match'));
+    });
+  });
+
+  describe('selection survives re-renders', () => {
+    it('re-renders at once on a click, without waiting for the next update', () => {
+      const { panel } = setup();
+      click(panel, categoryBtn('fuel'));
+      expect(shown(panel)).toEqual(['-$200']);
+    });
+
+    it('keeps the filter when a new transaction arrives and lists it if it matches', () => {
+      const { panel, state } = setup();
+      click(panel, categoryBtn('sales'));
+      state.finances.transactions.push({ tick: 70, type: 'income', amount: 900, category: 'sales', description: 'g' });
+      state.finances.transactions.push({ tick: 71, type: 'expense', amount: 111, category: 'fuel', description: 'h' });
+      panel.update(state);
+      expect(shown(panel)).toEqual(['+$900', '+$250', '+$500']);
+      expect(bar(panel).querySelector(categoryBtn('sales'))!.getAttribute('aria-pressed')).toBe('true');
+      expect(totalEl(panel)!.textContent).toContain('+$1,650');
+    });
+
+    it('keeps the sort and type when the balance changes', () => {
+      const { panel, state } = setup();
+      click(panel, typeBtn('expense'));
+      click(panel, sortBtn('amount'));
+      state.cash += 12345;
+      panel.update(state);
+      expect(shown(panel)).toEqual(['-$700', '-$300', '-$200']);
+    });
+
+    it('keeps the filter across a locale refresh', () => {
+      const { panel, state } = setup();
+      click(panel, categoryBtn('contracts'));
+      panel.refreshLocale();
+      panel.update(state);
+      expect(shown(panel)).toEqual(['-$700', '+$1,500']);
+    });
+
+    it('offers a category that appears later', () => {
+      const { panel, state } = setup();
+      expect(bar(panel).querySelector(categoryBtn('events'))).toBeNull();
+      state.finances.transactions.push({ tick: 80, type: 'income', amount: 77, category: 'events', description: 'x' });
+      panel.update(state);
+      expect(bar(panel).querySelector(categoryBtn('events'))).not.toBeNull();
+    });
+  });
+});

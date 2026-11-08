@@ -31,12 +31,16 @@ import { getOperatingSummary, getRunway } from '../../core/economy/OperatingFina
 import type { GameState } from '../../core/state/GameState.js';
 import { getLevelObjective } from '../../core/campaign/LevelObjective.js';
 import { BANKRUPTCY_GRACE_TICKS } from '../../core/campaign/Bankruptcy.js';
+import { FilterBarSelection, filterBar } from '../filterBar.js';
+import { LEDGER_SORT_KEYS, ledgerCriteriaFromSelection, filterLedger } from '../ledgerFilter.js';
 
 const RECENT_TRANSACTIONS = 15;
 
 export class FinancesPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private lastSignature = '';
+  private lastState: GameState | null = null;
+  private readonly filterSelection = new FilterBarSelection();
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
@@ -58,6 +62,8 @@ export class FinancesPanel extends PanelBase {
 
 
   update(state: GameState): void {
+    this.lastState = state;
+    const sel = this.filterSelection;
     const { cost } = getOperatingSummary(state);
     const signature = JSON.stringify({
       cash: Math.round(state.cash),
@@ -65,6 +71,7 @@ export class FinancesPanel extends PanelBase {
       txCount: state.finances.transactions.length,
       belowThreshold: state.bankruptcy.ticksBelowThreshold,
       bankrupt: state.bankruptcy.bankrupt,
+      sel: [sel.filter, sel.sort, sel.groups],
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -79,15 +86,18 @@ export class FinancesPanel extends PanelBase {
 
   private render(state: GameState): void {
     const report = getFinancialReport(state.finances, state.tickCount, 0);
+    const { rows, total } = this.makeLedger(state);
     const sections: HTMLElement[] = [
       this.makeBalanceCard(state),
       sectionHeader(t('ui.finances.income')),
       ...this.makeCategoryRows(report.incomeByCategory, report.totalIncome, 'var(--bsx-positive)', t('ui.finances.none_income')),
       sectionHeader(t('ui.finances.expenses')),
       ...this.makeCategoryRows(report.expensesByCategory, report.totalExpenses, 'var(--bsx-critical-text)', t('ui.finances.none_expenses')),
+      this.makeLedgerBar(state),
       sectionHeader(t('ui.finances.ledger')),
-      scrollBoundedSection(this.makeLedger(state), 200, { gap: 10, scrollKey: 'ledger' }),
+      scrollBoundedSection(rows, 200, { gap: 10, scrollKey: 'ledger' }),
     ];
+    if (this.filterSelection.isActive()) sections.push(this.makeLedgerTotal(total));
     replaceChildrenKeepingScroll(this.bodyEl, sections);
   }
 
@@ -189,13 +199,41 @@ export class FinancesPanel extends PanelBase {
 
   // ── Ledger ──
 
-  private makeLedger(state: GameState): HTMLElement[] {
-    const recent = state.finances.transactions.slice(-RECENT_TRANSACTIONS).reverse();
-    if (recent.length === 0) return [emptyState(t('ui.finances.none_transactions'))];
-    return recent.map(tx => {
+  private makeLedgerBar(state: GameState): HTMLElement {
+    const present = new Set<string>(state.finances.transactions.map(tx => tx.category));
+    if (this.filterSelection.filter !== null) present.add(this.filterSelection.filter);
+    return filterBar(this.filterSelection, {
+      choices: [...present].sort().map(value => ({ value, label: t(`ui.finances.category.${value}`) })),
+      groups: [{
+        id: 'type', label: t('ui.finances.filter_type'),
+        choices: (['income', 'expense'] as const).map(value => ({ value, label: t(`ui.finances.filter_type_${value}`) })),
+      }],
+      sorts: LEDGER_SORT_KEYS.map(key => ({ key, label: t(`ui.finances.sort_${key}`) })),
+      onChange: () => { if (this.lastState) { this.lastSignature = ''; this.update(this.lastState); } },
+      filterLabel: t('ui.finances.filter_category'), sortLabel: t('ui.filter.sort'),
+      allLabel: t('ui.filter.all'), clearLabel: t('ui.filter.clear'),
+    });
+  }
+
+  private makeLedgerTotal(total: number): HTMLElement {
+    const color = total >= 0 ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';
+    const row = el('div', { attrs: { 'data-ledger-total': '' } });
+    row.style.cssText = 'display:flex;justify-content:space-between;font:600 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-secondary)';
+    row.append(
+      el('span', { text: t('ui.finances.ledger_total') }),
+      el('span', { text: `${total >= 0 ? '+' : '-'}$${formatMoney(Math.abs(total))}`, attrs: { style: `font-family:var(--bsx-font-mono);color:${color}` } }),
+    );
+    return row;
+  }
+
+  private makeLedger(state: GameState): { rows: HTMLElement[]; total: number } {
+    const { rows: recent, total } = filterLedger(state.finances.transactions, ledgerCriteriaFromSelection(this.filterSelection), RECENT_TRANSACTIONS);
+    if (state.finances.transactions.length === 0) return { rows: [emptyState(t('ui.finances.none_transactions'))], total };
+    if (recent.length === 0) return { rows: [emptyState(t('ui.finances.filter_no_match'))], total };
+    const rows = recent.map(tx => {
       const day = Math.floor(tx.tick / 24) + 1;
       const color = tx.type === 'income' ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';
-      const row = el('div');
+      const row = el('div', { attrs: { 'data-ledger-row': '', 'data-category': tx.category, 'data-type': tx.type } });
       row.style.cssText = 'display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:4px;background:var(--bsx-well)';
       const col = el('div');
       col.style.cssText = 'display:flex;flex-direction:column;gap:2px;flex:1;min-width:0';
@@ -209,5 +247,6 @@ export class FinancesPanel extends PanelBase {
       }));
       return row;
     });
+    return { rows, total };
   }
 }

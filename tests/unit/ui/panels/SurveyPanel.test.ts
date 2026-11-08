@@ -780,3 +780,208 @@ describe('SurveyPanel — unaffordable method click (#1771)', () => {
     expect(blocker === null || blocker.style.display === 'none' || blocker.hidden).toBe(true);
   });
 });
+
+// ── Survey results filter bar (#2162) ───────────────────────────────────────
+
+describe('SurveyPanel — results filter bar (#2162)', () => {
+  afterEach(() => {
+    for (const c of liveContainers) c.remove();
+    liveContainers.length = 0;
+  });
+
+  /**
+   * 1 core_sample sparkium, 2 seismic rustite+sparkium, 3 aerial rustite,
+   * 4 core_sample dirtite (sparkium at zero), 5 seismic barren.
+   */
+  function fixture(): SurveyResult[] {
+    return [
+      makeSurveyResult({ id: 1, method: 'core_sample', centerX: 1, centerZ: 1, estimates: { '1,1': { sparkium: 0.5 } } }),
+      makeSurveyResult({ id: 2, method: 'seismic', centerX: 2, centerZ: 2, estimates: { '2,2': { rustite: 0.3, sparkium: 0.4 } } }),
+      makeSurveyResult({ id: 3, method: 'aerial', centerX: 3, centerZ: 3, estimates: { '3,3': { rustite: 0.2 } } }),
+      makeSurveyResult({ id: 4, method: 'core_sample', centerX: 4, centerZ: 4, estimates: { '4,4': { dirtite: 0.1, sparkium: 0 } } }),
+      makeSurveyResult({ id: 5, method: 'seismic', centerX: 5, centerZ: 5, estimates: {} }),
+    ];
+  }
+
+  function setup(results: SurveyResult[] = fixture()): { panel: SurveyPanel; state: GameState } {
+    const { panel } = makePanel();
+    const state = makeState({ surveyResults: results });
+    panel.update(state);
+    return { panel, state };
+  }
+
+  const bar = (panel: SurveyPanel): HTMLElement => panel.root.querySelector<HTMLElement>('.bs-filter-bar')!;
+  const click = (panel: SurveyPanel, selector: string): void => (bar(panel).querySelector(selector) as HTMLButtonElement).click();
+  const oreBtn = (ore: string): string => `.bs-filter-row:not([data-filter-group]) [data-filter-value="${ore}"]`;
+  const methodBtn = (method: string): string => `[data-filter-group="method"] [data-filter-value="${method}"]`;
+  const shown = (panel: SurveyPanel): number[] =>
+    [...panel.root.querySelectorAll<HTMLElement>('[data-survey-id]')].map(c => Number(c.dataset['surveyId']));
+
+  it('shows the shared filter bar with the results', () => {
+    const { panel } = setup();
+    expect(panel.root.querySelectorAll('.bs-filter-bar')).toHaveLength(1);
+  });
+
+  it('offers the ores found with density above zero, each once', () => {
+    const { panel } = setup();
+    const ores = [...bar(panel).querySelectorAll<HTMLElement>('.bs-filter-row:not([data-filter-group]) [data-filter-value]')]
+      .map(b => b.dataset['filterValue']).sort();
+    expect(ores).toEqual(['dirtite', 'rustite', 'sparkium']);
+    expect(bar(panel).querySelector('[data-filter-all]')).not.toBeNull();
+  });
+
+  it('offers the three survey methods', () => {
+    const { panel } = setup();
+    const methods = [...bar(panel).querySelectorAll<HTMLElement>('[data-filter-group="method"] [data-filter-value]')]
+      .map(b => b.dataset['filterValue']).sort();
+    expect(methods).toEqual(['aerial', 'core_sample', 'seismic']);
+  });
+
+  it('labels the bar with the localized survey keys, never raw keys', () => {
+    const { panel } = setup();
+    const text = bar(panel).textContent ?? '';
+    for (const key of ['ui.survey.filter_ore', 'ui.survey.filter_method']) {
+      expect(t(key)).not.toBe(key);
+      expect(text).toContain(t(key));
+    }
+    expect(text).not.toContain('ui.survey.filter_');
+  });
+
+  it('lists the 4 newest results first with nothing selected', () => {
+    const { panel } = setup();
+    expect(shown(panel)).toEqual([5, 4, 3, 2]);
+  });
+
+  it('an ore filter lists the results estimating that ore, newest first', () => {
+    const { panel } = setup();
+    click(panel, oreBtn('sparkium'));
+    expect(shown(panel)).toEqual([2, 1]);
+    click(panel, oreBtn('rustite'));
+    expect(shown(panel)).toEqual([3, 2]);
+  });
+
+  it('a result with the ore at zero density does not match', () => {
+    const { panel } = setup();
+    click(panel, oreBtn('sparkium'));
+    expect(shown(panel)).not.toContain(4);
+  });
+
+  it('a method filter lists only that method', () => {
+    const { panel } = setup();
+    click(panel, methodBtn('seismic'));
+    expect(shown(panel)).toEqual([5, 2]);
+    click(panel, methodBtn('core_sample'));
+    expect(shown(panel)).toEqual([4, 1]);
+  });
+
+  it('ore and method combine (AND)', () => {
+    const { panel } = setup();
+    click(panel, oreBtn('sparkium'));
+    click(panel, methodBtn('seismic'));
+    expect(shown(panel)).toEqual([2]);
+  });
+
+  it('the filter applies before the 4-newest cap', () => {
+    const results = [
+      makeSurveyResult({ id: 1, centerX: 1, centerZ: 1, estimates: { '1,1': { sparkium: 0.5 } } }),
+      ...[2, 3, 4, 5, 6].map(id => makeSurveyResult({ id, centerX: id, centerZ: id, estimates: { [`${id},${id}`]: { rustite: 0.3 } } })),
+    ];
+    const { panel } = setup(results);
+    expect(shown(panel)).toEqual([6, 5, 4, 3]);
+    click(panel, oreBtn('sparkium'));
+    expect(shown(panel)).toEqual([1]);
+  });
+
+  it('a filter matching more than 4 results still lists only the 4 newest', () => {
+    const results = [1, 2, 3, 4, 5, 6].map(id => makeSurveyResult({ id, centerX: id, centerZ: id, estimates: { [`${id},${id}`]: { rustite: 0.3 } } }));
+    const { panel } = setup(results);
+    click(panel, oreBtn('rustite'));
+    expect(shown(panel)).toEqual([6, 5, 4, 3]);
+  });
+
+  it('clicking the pressed choice again removes the filter', () => {
+    const { panel } = setup();
+    click(panel, methodBtn('aerial'));
+    expect(shown(panel)).toEqual([3]);
+    click(panel, methodBtn('aerial'));
+    expect(shown(panel)).toEqual([5, 4, 3, 2]);
+  });
+
+  it('the All button and Clear filter restore the unfiltered list', () => {
+    const { panel } = setup();
+    click(panel, oreBtn('dirtite'));
+    click(panel, '[data-filter-all]');
+    expect(shown(panel)).toEqual([5, 4, 3, 2]);
+    click(panel, methodBtn('seismic'));
+    click(panel, '.bs-filter-clear');
+    expect(shown(panel)).toEqual([5, 4, 3, 2]);
+    expect(bar(panel).querySelector('.bs-filter-clear')).toBeNull();
+  });
+
+  it('marks the pressed choices', () => {
+    const { panel } = setup();
+    click(panel, oreBtn('rustite'));
+    expect(bar(panel).querySelector(oreBtn('rustite'))!.getAttribute('aria-pressed')).toBe('true');
+    expect(bar(panel).querySelector(oreBtn('dirtite'))!.getAttribute('aria-pressed')).not.toBe('true');
+  });
+
+  describe('no match', () => {
+    function noMatch(): SurveyPanel {
+      const { panel } = setup();
+      click(panel, oreBtn('rustite'));
+      click(panel, methodBtn('core_sample'));
+      return panel;
+    }
+
+    it('shows the no-match line instead of cards', () => {
+      const panel = noMatch();
+      expect(shown(panel)).toEqual([]);
+      const line = t('ui.survey.filter_no_match');
+      expect(line).not.toBe('ui.survey.filter_no_match');
+      expect(panel.root.textContent).toContain(line);
+      expect(panel.root.textContent).not.toContain(t('ui.survey.results_none'));
+    });
+
+    it('keeps the bar so the filter can be changed', () => {
+      const panel = noMatch();
+      expect(panel.root.querySelectorAll('.bs-filter-bar')).toHaveLength(1);
+      click(panel, methodBtn('core_sample'));
+      expect(shown(panel)).toEqual([3, 2]);
+      expect(panel.root.textContent).not.toContain(t('ui.survey.filter_no_match'));
+    });
+
+    it('no surveys at all keeps the no-surveys line, not the no-match one', () => {
+      const { panel } = setup([]);
+      expect(panel.root.textContent).toContain(t('ui.survey.results_none'));
+      expect(panel.root.textContent).not.toContain(t('ui.survey.filter_no_match'));
+    });
+  });
+
+  describe('selection survives re-renders', () => {
+    it('re-renders at once on a click, without waiting for the next update', () => {
+      const { panel } = setup();
+      click(panel, methodBtn('aerial'));
+      expect(shown(panel)).toEqual([3]);
+    });
+
+    it('keeps the filter when a new survey completes and lists it if it matches', () => {
+      const { panel, state } = setup();
+      click(panel, oreBtn('sparkium'));
+      state.surveyResults.push(
+        makeSurveyResult({ id: 6, method: 'aerial', centerX: 6, centerZ: 6, estimates: { '6,6': { sparkium: 0.2 } } }),
+        makeSurveyResult({ id: 7, method: 'aerial', centerX: 7, centerZ: 7, estimates: { '7,7': { dirtite: 0.2 } } }),
+      );
+      panel.update(state);
+      expect(shown(panel)).toEqual([6, 2, 1]);
+      expect(bar(panel).querySelector(oreBtn('sparkium'))!.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('offers an ore that is found later', () => {
+      const { panel, state } = setup();
+      expect(bar(panel).querySelector(oreBtn('glimmerite'))).toBeNull();
+      state.surveyResults.push(makeSurveyResult({ id: 6, centerX: 6, centerZ: 6, estimates: { '6,6': { glimmerite: 0.2 } } }));
+      panel.update(state);
+      expect(bar(panel).querySelector(oreBtn('glimmerite'))).not.toBeNull();
+    });
+  });
+});

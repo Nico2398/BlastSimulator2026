@@ -30,6 +30,8 @@ import { resolveMarketId } from '../../core/campaign/Level.js';
 import type { MarketId } from '../../core/economy/Market.js';
 import { summarizeSurveyOres } from '../../core/mining/SurveyOreSummary.js';
 import { buildOreRows } from './surveyOreRows.js';
+import { FilterBarSelection, filterBar } from '../filterBar.js';
+import { surveyCriteriaFromSelection, surveyOreIds, filterSurveys } from '../surveyFilter.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 import type { NotifyInput } from '../notify/NotificationCenter.js';
 
@@ -81,6 +83,7 @@ export class SurveyPanel extends PanelBase {
   private statusIsTransient = false;
   private statusTimer: ReturnType<typeof setTimeout> | null = null;
   private lastState: GameState | null = null;
+  private readonly filterSelection = new FilterBarSelection();
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
@@ -425,6 +428,27 @@ export class SurveyPanel extends PanelBase {
 
   // ── Results ──────────────────────────────────────────────────────────────
 
+  private makeSurveyBar(results: readonly SurveyResult[]): HTMLElement {
+    const ores = new Set(surveyOreIds(results));
+    if (this.filterSelection.filter !== null) ores.add(this.filterSelection.filter);
+    // Richest first, like the ore bars on the cards; ids break ties.
+    const richest = (ore: string): number => Math.max(0, ...results.flatMap(r => Object.values(r.estimates).map(c => c[ore] ?? 0)));
+    return filterBar(this.filterSelection, {
+      choices: [...ores].sort((a, b) => richest(b) - richest(a) || a.localeCompare(b)).map(value => ({ value, label: t(`ore.${value}.name`) })),
+      groups: [{
+        id: 'method', label: t('ui.survey.filter_method'),
+        choices: METHOD_ORDER.map(value => ({ value, label: t(`survey.${value}`) })),
+      }],
+      sorts: [],
+      onChange: () => {
+        this.lastResultCount = -1;
+        if (this.lastState) this.update(this.lastState);
+      },
+      filterLabel: t('ui.survey.filter_ore'), sortLabel: t('ui.filter.sort'),
+      allLabel: t('ui.filter.all'), clearLabel: t('ui.filter.clear'),
+    });
+  }
+
   private renderResults(results: readonly SurveyResult[], currentTick: number, marketId: MarketId): void {
     this.resultsEl.replaceChildren();
 
@@ -433,7 +457,13 @@ export class SurveyPanel extends PanelBase {
       return;
     }
 
-    for (const survey of results.slice(-MAX_RESULTS_SHOWN).reverse()) {
+    this.resultsEl.appendChild(this.makeSurveyBar(results));
+    const shown = filterSurveys(results, surveyCriteriaFromSelection(this.filterSelection));
+    if (shown.length === 0) {
+      this.resultsEl.appendChild(emptyState(t('ui.survey.filter_no_match')));
+      return;
+    }
+    for (const survey of shown.slice(-MAX_RESULTS_SHOWN).reverse()) {
       this.resultsEl.appendChild(this.makeResultCard(survey, currentTick, marketId));
     }
   }
@@ -477,6 +507,8 @@ export class SurveyPanel extends PanelBase {
       attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' },
     }));
 
-    return card(rows);
+    const resultCard = card(rows);
+    resultCard.dataset['surveyId'] = String(survey.id);
+    return resultCard;
   }
 }
