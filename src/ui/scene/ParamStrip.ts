@@ -9,6 +9,9 @@ import { el, button, stepper } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { t } from '../../core/i18n/I18n.js';
 
+/** Joins a short result head to its notes ("4 × 4 holes — 2 skipped"); notes render above the bar. */
+const RESULT_NOTE_SEPARATOR = ' — ';
+
 export interface ParamStripField {
   key: string;
   label: string;
@@ -96,6 +99,7 @@ export class ParamStrip {
       'display:none', 'flex-direction:column', 'align-items:center', 'gap:2px', 'padding:5px 12px', 'border-radius:5px',
       'background:rgba(9,12,16,.9)', 'border:1px solid rgba(255,200,64,.3)',
       'color:var(--bsx-text-primary,#e6e9ee)', 'font:600 11px/1.3 var(--bsx-font-mono)', 'pointer-events:none',
+      'max-width:520px', 'text-align:center',
     ].join(';');
 
     // Above the bar, not below it: the strip is bottom-docked and the tutorial
@@ -166,11 +170,13 @@ export class ParamStrip {
       return wrap;
     });
 
+    // Long result notes (permit warning, skipped cells) wrap in the readout above the bar; the bar keeps the short head.
+    const [resultHead = '', ...resultNotes] = config.result.split(RESULT_NOTE_SEPARATOR);
     const resultBlock = el('div');
     resultBlock.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:7px 14px;border-right:1px solid rgba(255,255,255,.07);justify-content:center';
     resultBlock.append(
       el('span', { text: t('shell.placement.result'), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-text-muted)' } }),
-      el('span', { text: config.result, attrs: { style: `font:600 12px/1 var(--bsx-font-mono);color:${config.resultWarn ? 'var(--bsx-critical-text,#ff8a7e)' : '#ffc840'}` } }),
+      el('span', { text: resultHead, attrs: { style: `font:600 12px/1 var(--bsx-font-mono);color:${config.resultWarn ? 'var(--bsx-critical-text,#ff8a7e)' : '#ffc840'}` } }),
     );
 
     const actions = el('div');
@@ -191,7 +197,7 @@ export class ParamStrip {
 
     this.bar.replaceChildren(titleBlock, ...fieldEls, resultBlock, actions);
 
-    const lines = config.readout ?? [];
+    const lines = [...(config.readout ?? []), ...resultNotes];
     this.readoutEl.replaceChildren(...lines.map(text => el('span', { text })));
     this.readoutEl.style.display = lines.length > 0 ? 'flex' : 'none';
 
