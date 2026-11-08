@@ -20,6 +20,12 @@ export interface PermitPreview {
   strikes: number;
   strikesText: string;
   warningText: string;
+  /** Chance an inspector turns up for this plan; 0 when within the permit. */
+  inspectionChance: number;
+  /** Fine if caught; 0 when within the permit. */
+  fine: number;
+  /** Chance, fine and strikes against the ban threshold; '' when within the permit. */
+  consequenceText: string;
 }
 
 /** Plan shape needed: hole list and per-hole charges (matches `BlastPlan`). */
@@ -50,6 +56,9 @@ export function permitPreview(
     strikes,
     strikesText: permitStrikesText(strikeTicks, tick),
     warningText: check.over ? t('permit.preview.warning') : '',
+    inspectionChance: 0,
+    fine: 0,
+    consequenceText: '',
   };
 }
 
