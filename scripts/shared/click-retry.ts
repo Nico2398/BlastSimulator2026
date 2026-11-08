@@ -230,9 +230,23 @@ export async function clickWithTransientRetry(
   btn: 'left' | 'right' | 'middle',
   actionName = 'clickSelector',
 ): Promise<void> {
+  await withTransientRetry(page, selector, actionName, () => page.click(selector, { button: btn }));
+}
+
+/** `hoverSelector`'s pointer move, retried the same way a click is. */
+export async function hoverWithTransientRetry(page: Page, selector: string): Promise<void> {
+  await withTransientRetry(page, selector, 'hoverSelector', () => page.hover(selector));
+}
+
+async function withTransientRetry(
+  page: Page,
+  selector: string,
+  actionName: string,
+  act: () => Promise<void>,
+): Promise<void> {
   for (let clickAttempt = 1; ; clickAttempt++) {
     try {
-      await page.click(selector, { button: btn });
+      await act();
       return;
     } catch (err) {
       // Puppeteer's own message ("Node is either not clickable or not an

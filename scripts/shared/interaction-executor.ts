@@ -16,7 +16,7 @@ import type { PlayerAction } from './interaction-types.js';
 import { runAction, waitForUiUpdate } from './interaction-driver.js';
 import { TOOLBAR_TARGET } from '../../src/ui/tutorialStepHelpers.js';
 import {
-  CLICK_SELECTOR_ZERO_SIZE_GRACE_MS, clickWithTransientRetry, describeUnclickable, inspectSelector,
+  CLICK_SELECTOR_ZERO_SIZE_GRACE_MS, clickWithTransientRetry, describeUnclickable, hoverWithTransientRetry, inspectSelector,
 } from './click-retry.js';
 import type { ZeroSizeDiagnosisContext } from './click-retry.js';
 
@@ -407,7 +407,21 @@ async function clickUsableSelector(
   button: 'left' | 'right' | 'middle',
   timeoutMs: number,
 ): Promise<void> {
-  const btn = BUTTON_MAP[button] ?? 'left';
+  await awaitUsableSelector(page, selector, timeoutMs, 'clickSelector');
+  await clickWithTransientRetry(page, selector, BUTTON_MAP[button] ?? 'left');
+}
+
+/**
+ * The usability poll `clickSelector` and `hoverSelector` share: returns once
+ * the page's own probe calls `selector` usable, otherwise throws
+ * `<actionName> "<selector>" failed: <reason>`.
+ */
+async function awaitUsableSelector(
+  page: Page,
+  selector: string,
+  timeoutMs: number,
+  actionName: string,
+): Promise<void> {
   // Wait until the page's own probe calls the control usable — an absent
   // selector reports 'absent' (uiActionProbe.ts) rather than null, so this
   // loop alone covers "never appears" the same deadline as "appears but
@@ -491,12 +505,11 @@ async function clickUsableSelector(
         ? { waitedMs: Date.now() - pollStartedAt, graceGranted: zeroSizeGraceGranted }
         : undefined;
       throw new Error(
-        `clickSelector "${selector}" failed: ${describeUnclickable(await inspectSelector(page, selector), !everPresent, zeroSizeContext)}`,
+        `${actionName} "${selector}" failed: ${describeUnclickable(await inspectSelector(page, selector), !everPresent, zeroSizeContext)}`,
       );
     }
     await new Promise((r) => setTimeout(r, 150));
   }
-  await clickWithTransientRetry(page, selector, btn);
 }
 
 export async function executeActionOnPage(
@@ -518,6 +531,10 @@ export async function executeActionOnPage(
       );
       break;
     }
+    case 'hoverSelector':
+      await awaitUsableSelector(page, action.selector, action.timeout ?? CLICK_SELECTOR_DEFAULT_TIMEOUT_MS, 'hoverSelector');
+      await hoverWithTransientRetry(page, action.selector);
+      break;
     case 'setStepper': {
       // The count-encoded form this replaces — N clicks on `:last-child` —
       // assumed the control's default and its persistence across steps; a

@@ -95,6 +95,7 @@ Exactly one entry lands in the step's report/state-dump/screenshot regardless of
 | `zoomOut` | Scroll the wheel out N ticks to bring an off-screen tile into view. |
 | `focusTile` | Re-aim the camera at a world tile before clicking it. |
 | `clickEntity` | Click a live scene entity by kind + id rather than a baked coordinate. |
+| `hoverSelector` | Move the real pointer onto a control once it is usable (same gate and named failure as `clickSelector`) — for hover-only UI such as the `explainable()` tooltip (`[data-explain]` shown via `::after`), then `screenshot`. |
 | `clickIfPresent` | Click a control only if it is on screen and usable; no-op otherwise — for genuinely nondeterministic beats (an `event choose` after a bare `tick`, where a dialog may or may not have fired). Not for a control that is merely hard to reach — use `clickSelector` there so a missing control fails loudly. |
 | `resolveEventIfPending` | Like `clickIfPresent` but decides whether an event is pending from game state, not the DOM — a slow render frame can make a real pending event look absent to a quick DOM probe. Clicks choice `option` (zero-based, default 0) — match it to the step's `event choose N`. |
 | `loadingScreenDebug` | Drive the loading screen's debug preview bridge directly, bypassing a real level entry. |
