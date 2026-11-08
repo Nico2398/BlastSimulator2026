@@ -12,6 +12,7 @@
 
 import { t } from '../../core/i18n/I18n.js';
 import { el, button, card, statGrid } from '../dom.js';
+import { levelEndStatExplain, type LevelEndStatId } from '../levelExplain.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatDollars } from '../../core/economy/formatMoney.js';
@@ -36,6 +37,12 @@ const DEFEAT_ICON: Record<DefeatReason, IconName> = {
   worker_revolt: 'union',
   fired: 'gavel',
 };
+
+/** One stat-grid cell: the label, the value, and what the stat measures on hover. */
+function stat(id: LevelEndStatId, value: string, color?: string): { key: string; value: string; color?: string; explain: string } {
+  const cell = { key: t(`ui.level_end.stat.${id}`), value, explain: levelEndStatExplain(id) };
+  return color ? { ...cell, color } : cell;
+}
 
 export class LevelEndScreen {
   private readonly overlay: HTMLElement;
@@ -306,16 +313,16 @@ export class LevelEndScreen {
 
     const days = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;
     this.statGridEl.replaceChildren(statGrid([
-      { key: t('ui.level_end.stat.profit'), value: formatDollars(stats.totalWealth), color: 'var(--bsx-positive)' },
-      { key: t('ui.level_end.stat.days'), value: `${days}` },
-      { key: t('ui.level_end.stat.blasts'), value: `${stats.blastsPerformed}` },
-      { key: t('ui.level_end.stat.volume'), value: `${Math.round(stats.totalVolumeBlasted).toLocaleString('en-US')} m³` },
-      { key: t('ui.level_end.stat.max_depth'), value: `${Math.round(stats.maxDepthReached)} m` },
-      { key: t('ui.level_end.stat.unique_ores'), value: `${stats.uniqueOresExtracted.size}`, color: 'var(--bsx-amber)' },
+      stat('profit', formatDollars(stats.totalWealth), 'var(--bsx-positive)'),
+      stat('days', `${days}`),
+      stat('blasts', `${stats.blastsPerformed}`),
+      stat('volume', `${Math.round(stats.totalVolumeBlasted).toLocaleString('en-US')} m³`),
+      stat('max_depth', `${Math.round(stats.maxDepthReached)} m`),
+      stat('unique_ores', `${stats.uniqueOresExtracted.size}`, 'var(--bsx-amber)'),
       stats.casualties > 0
-        ? { key: t('ui.level_end.stat.casualties'), value: `${stats.casualties}`, color: 'var(--bsx-critical-text)' }
-        : { key: t('ui.level_end.stat.casualties'), value: `${stats.casualties}` },
-      { key: t('ui.level_end.stat.best_safety'), value: `${Math.round(stats.bestSafety)}` },
+        ? stat('casualties', `${stats.casualties}`, 'var(--bsx-critical-text)')
+        : stat('casualties', `${stats.casualties}`),
+      stat('best_safety', `${Math.round(stats.bestSafety)}`),
     ], 4));
 
     this.starRatingRows.replaceChildren(
@@ -419,7 +426,7 @@ export class LevelEndScreen {
     return `ui.level_end.defeat.${reason}.tip`;
   }
 
-  private defeatStats(reason: DefeatReason, state: GameState): { key: string; value: string; color?: string }[] {
+  private defeatStats(reason: DefeatReason, state: GameState): ReturnType<typeof stat>[] {
     const salariesPaid = state.finances.transactions
       .filter(tx => tx.type === 'expense' && tx.category === 'salaries')
       .reduce((sum, tx) => sum + tx.amount, 0);
@@ -428,42 +435,42 @@ export class LevelEndScreen {
     switch (reason) {
       case 'fired':
         return [
-          { key: t('ui.level_end.stat.quarters_survived'), value: `${Math.max(0, (state.board?.quarter ?? 1) - 1)}` },
-          { key: t('ui.level_end.stat.days'), value: `${days}` },
-          { key: t('ui.level_end.stat.profit'), value: formatDollars(state.levelStats.totalWealth), color: 'var(--bsx-positive)' },
-          { key: t('ui.level_end.stat.final_balance'), value: formatDollars(state.cash) },
+          stat('quarters_survived', `${Math.max(0, (state.board?.quarter ?? 1) - 1)}`),
+          stat('days', `${days}`),
+          stat('profit', formatDollars(state.levelStats.totalWealth), 'var(--bsx-positive)'),
+          stat('final_balance', formatDollars(state.cash)),
         ];
       case 'bankruptcy':
         return [
-          { key: t('ui.level_end.stat.final_balance'), value: formatDollars(state.cash), color: 'var(--bsx-critical-text)' },
-          { key: t('ui.level_end.stat.days'), value: `${days}` },
-          { key: t('ui.level_end.stat.blasts'), value: `${state.levelStats.blastsPerformed}` },
-          { key: t('ui.level_end.stat.salaries_paid'), value: formatDollars(salariesPaid) },
+          stat('final_balance', formatDollars(state.cash), 'var(--bsx-critical-text)'),
+          stat('days', `${days}`),
+          stat('blasts', `${state.levelStats.blastsPerformed}`),
+          stat('salaries_paid', formatDollars(salariesPaid)),
         ];
       case 'arrest':
         return [
-          { key: t('ui.level_end.stat.exposure_at_arrest'), value: `${Math.round(state.mafia.exposureRisk * 100)}%`, color: 'var(--bsx-ore)' },
-          { key: t('ui.level_end.stat.arrangements_made'), value: `${state.corruption.attempts.length}` },
-          { key: t('ui.level_end.stat.profit'), value: formatDollars(state.levelStats.totalWealth), color: 'var(--bsx-positive)' },
-          { key: t('ui.level_end.stat.corruption_level'), value: `${state.corruption.level}` },
+          stat('exposure_at_arrest', `${Math.round(state.mafia.exposureRisk * 100)}%`, 'var(--bsx-ore)'),
+          stat('arrangements_made', `${state.corruption.attempts.length}`),
+          stat('profit', formatDollars(state.levelStats.totalWealth), 'var(--bsx-positive)'),
+          stat('corruption_level', `${state.corruption.level}`),
         ];
       case 'ecological_shutdown': {
         const finesPaid = state.finances.transactions
           .filter(tx => tx.type === 'expense' && tx.category === 'fines')
           .reduce((sum, tx) => sum + tx.amount, 0);
         return [
-          { key: t('ui.level_end.stat.final_ecology'), value: `${Math.round(state.scores.ecology)}`, color: 'var(--bsx-critical-text)' },
-          { key: t('ui.level_end.stat.fines_paid'), value: formatDollars(finesPaid), color: 'var(--bsx-critical-text)' },
-          { key: t('ui.level_end.stat.best_ecology'), value: `${Math.round(state.levelStats.bestEcology)}` },
-          { key: t('ui.level_end.stat.volume'), value: `${Math.round(state.levelStats.totalVolumeBlasted).toLocaleString('en-US')} m³` },
+          stat('final_ecology', `${Math.round(state.scores.ecology)}`, 'var(--bsx-critical-text)'),
+          stat('fines_paid', formatDollars(finesPaid), 'var(--bsx-critical-text)'),
+          stat('best_ecology', `${Math.round(state.levelStats.bestEcology)}`),
+          stat('volume', `${Math.round(state.levelStats.totalVolumeBlasted).toLocaleString('en-US')} m³`),
         ];
       }
       case 'worker_revolt':
         return [
-          { key: t('ui.level_end.stat.final_wellbeing'), value: `${Math.round(state.scores.wellBeing)}`, color: 'var(--bsx-critical-text)' },
-          { key: t('ui.level_end.stat.salaries_paid'), value: formatDollars(salariesPaid) },
-          { key: t('ui.level_end.stat.shift_mode'), value: t(`ui.policy.${state.sitePolicy.shiftMode}`) },
-          { key: t('ui.level_end.stat.days'), value: `${days}` },
+          stat('final_wellbeing', `${Math.round(state.scores.wellBeing)}`, 'var(--bsx-critical-text)'),
+          stat('salaries_paid', formatDollars(salariesPaid)),
+          stat('shift_mode', t(`ui.policy.${state.sitePolicy.shiftMode}`)),
+          stat('days', `${days}`),
         ];
     }
   }
