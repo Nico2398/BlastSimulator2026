@@ -4,6 +4,7 @@
 // file-size guideline, mirroring the old EmployeePanel/employeeDetailSections
 // split this replaces.
 
+import type { VehicleState } from '../core/entities/Vehicle.js';
 import { t } from '../core/i18n/I18n.js';
 import { el, gauge, button, reasonLine, explainable } from './dom.js';
 import { fatigueExplain, licenceExplain, moraleExplain, salaryExplain, skillLevelExplain, ticksLeftExplain, unionExplain } from './statExplain.js';
@@ -65,7 +66,8 @@ export const ACTION_LABEL_KEY: Record<ActionType, string> = {
 };
 
 /** Player-facing label for one EmployeeActivity — the Crew panel's only consumer of the activity's `kind`/`actionType` beyond raw ticks. */
-export function describeActivity(activity: EmployeeActivity): string {
+export function describeActivity(activity: EmployeeActivity, vehicles?: VehicleState): string {
+  void vehicles;
   switch (activity.kind) {
     case 'collapsed': return t('ui.crew.task_collapsed');
     case 'resting': return t('ui.crew.task_resting');

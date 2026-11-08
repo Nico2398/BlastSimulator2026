@@ -1,6 +1,7 @@
 // BlastSimulator2026 — UI Manager (10.x, redesign P1)
 // Orchestrates all UI panels. Wires game console, handles panel routing, drives per-tick updates.
 
+import type { EntityOpener, OpenableKind } from './entityLinks.js';
 import { IDLE_BLAST_PLAYBACK, type BlastPlaybackSnapshot } from '../core/mining/BlastPlayback.js';
 import { injectStyles } from './styles.js';
 import { injectTokens } from './tokens.js';
@@ -404,6 +405,29 @@ export class UIManager {
   /** Wire the Fleet panel's per-row click-to-select (main.ts owns ScenePicking). */
   setSelectVehicleHandler(cb: (vehicleId: number) => void): void {
     this.fleetPanel.setSelectVehicleHandler(cb);
+  }
+
+  /** Wire the generic open-entity call (main.ts selects in the scene and centres the camera) (#2165). */
+  setOpenEntityHandler(cb: (kind: OpenableKind, id: number) => void): void {
+    void cb;
+    throw new Error('not implemented');
+  }
+
+  /** Open the inspector on an entity from any panel. */
+  openEntity(kind: OpenableKind, id: number): void {
+    void kind; void id;
+    throw new Error('not implemented');
+  }
+
+  /** Centre the camera on a world point from any panel. */
+  focusAt(x: number, z: number): void {
+    void x; void z;
+    throw new Error('not implemented');
+  }
+
+  /** The opener handed to panels that link to entities. */
+  get entityOpener(): EntityOpener {
+    throw new Error('not implemented');
   }
 
   /** Wire the Build menu's per-row click-to-select (main.ts owns ScenePicking). */

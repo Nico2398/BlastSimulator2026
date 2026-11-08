@@ -12,6 +12,7 @@
 // 'event-fire-resolve' stage and uiActionProbe's dedicated 'event' region
 // both target these exact selectors.
 
+import type { EntityOpener } from '../entityLinks.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, chip, type ChipTone } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
@@ -132,6 +133,12 @@ export class EventModal {
   /** True while displaying the outcome of a resolved event, distinct from state.events.pendingEvent being null. */
   private showingOutcome = false;
   private readonly locale = new LocaleTextRegistry();
+
+  /** Wire the generic entity opener so names and coordinates become links (#2165). */
+  setEntityOpener(opener: EntityOpener | undefined): void {
+    void opener;
+    throw new Error('not implemented');
+  }
 
   constructor(container: HTMLElement) {
     this.overlay = el('div', { className: 'bs-confirm-overlay' });

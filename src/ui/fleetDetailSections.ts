@@ -2,6 +2,7 @@
 // Status chip, HP/load gauges and the driver name line shown on every Fleet
 // row. The full driver block lives in inspector/vehicleDetailParts.ts.
 
+import type { EntityOpener } from './entityLinks.js';
 import { t } from '../core/i18n/I18n.js';
 import { el, chip, gauge, type ChipTone } from './dom.js';
 import type { Vehicle, VehicleTier, VehicleState } from '../core/entities/Vehicle.js';
@@ -131,7 +132,8 @@ function driverLineContent(v: Vehicle, employees: readonly Employee[]): { text: 
  * Driver name line for a Fleet row: driver, pending driver, muted "Unmanned", or an amber
  * "no licensed driver" hint when nobody on the roster could drive it. No Train button.
  */
-export function makeDriverNameLine(v: Vehicle, employees: readonly Employee[]): HTMLElement {
+export function makeDriverNameLine(v: Vehicle, employees: readonly Employee[], opener?: EntityOpener): HTMLElement {
+  void opener;
   const { text, color: muted } = driverLineContent(v, employees);
   return el('div', { text, className: 'bs-fleet-driver', attrs: { style: `font:500 10px/1.2 var(--bsx-font-ui);color:${muted}` } });
 }

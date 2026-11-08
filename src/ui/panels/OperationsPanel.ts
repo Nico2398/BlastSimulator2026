@@ -13,6 +13,7 @@
 // P5-core, since destroyBuilding/destroyVehicle splice the entity out (a plain
 // live lookup after a *_destroyed accident would find nothing).
 
+import type { EntityOpener } from '../entityLinks.js';
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
 import { AccessRampOffer } from './AccessRampOffer.js';
@@ -101,6 +102,12 @@ export class OperationsPanel extends PanelBase {
   private readonly pages = new Map<DebrisGroup['type'], number>();
   /** Visible rows of each expanded group's current page, resolved once per update. */
   private readonly pageRows = new Map<DebrisGroup['type'], PendingAction[]>();
+
+  /** Wire the generic entity opener so names and coordinates become links (#2165). */
+  setEntityOpener(opener: EntityOpener | undefined): void {
+    void opener;
+    throw new Error('not implemented');
+  }
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-operations-panel'));

@@ -12,6 +12,7 @@
 // tutorial/scenario defs keep resolving unchanged — same convention
 // ContractsPanel.ts already established for #bs-contract-panel in P5.
 
+import type { EntityOpener } from '../entityLinks.js';
 import { PanelBase } from './PanelBase.js';
 import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -65,6 +66,12 @@ export class FleetPanel extends PanelBase {
   private readonly locale = new LocaleTextRegistry();
   private selection: ListSelection = null;
   private readonly filterSelection = new FilterBarSelection();
+
+  /** Wire the generic entity opener so names and coordinates become links (#2165). */
+  setEntityOpener(opener: EntityOpener | undefined): void {
+    void opener;
+    throw new Error('not implemented');
+  }
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-vehicle-panel'));
