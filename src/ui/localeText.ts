@@ -9,11 +9,12 @@
 // result is idempotent under repeated EN→FR→EN switching.
 
 import { t } from '../core/i18n/I18n.js';
+import { explainable } from './dom.js';
 
 export type LocaleParams = Record<string, string | number>;
 
 /** DOM property a binding writes to. */
-type Target = 'text' | 'title';
+type Target = 'text' | 'title' | 'explain';
 
 interface Binding {
   readonly el: HTMLElement;
@@ -26,6 +27,7 @@ interface Binding {
 function apply(b: Binding): void {
   const value = b.prefix + t(b.key, b.params);
   if (b.target === 'title') b.el.title = value;
+  else if (b.target === 'explain') explainable(b.el, value);
   else b.el.textContent = value;
 }
 
@@ -46,6 +48,14 @@ export class LocaleTextRegistry {
   /** Same as bindText, but writes `el.title` (tooltips). */
   bindTitle<T extends HTMLElement>(el: T, key: string, params?: LocaleParams): T {
     const binding: Binding = { el, key, params, target: 'title', prefix: '' };
+    this.bindings.push(binding);
+    apply(binding);
+    return el;
+  }
+
+  /** Same as bindText, but writes the `data-explain` explanation and marks the element explainable. */
+  bindExplain<T extends HTMLElement>(el: T, key: string, params?: LocaleParams): T {
+    const binding: Binding = { el, key, params, target: 'explain', prefix: '' };
     this.bindings.push(binding);
     apply(binding);
     return el;

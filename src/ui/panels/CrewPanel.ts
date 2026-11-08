@@ -202,7 +202,7 @@ export class CrewPanel extends PanelBase {
 
   private makeRosterCard(e: Employee, state: GameState): HTMLElement {
     const row = el('div', { attrs: { 'data-employee-id': String(e.id), 'data-employee-role': e.role } });
-    row.style.cssText = `border-radius:var(--bsx-r-card);overflow:hidden;flex-shrink:0;border:1px solid ${
+    row.style.cssText = `border-radius:var(--bsx-r-card);flex-shrink:0;border:1px solid ${
       e.collapsing ? 'rgba(255,91,76,.4)' : 'var(--bsx-hairline)'
     };background:var(--bsx-card)`;
 

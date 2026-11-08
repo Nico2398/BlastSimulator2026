@@ -85,9 +85,22 @@ export function reasonLine(text: string, critical = false): HTMLElement {
 
 export type ChipTone = 'neutral' | 'positive' | 'critical' | 'warn' | 'info' | 'ore' | 'locked';
 
-/** Status chip (IN ZONE, TUBED, WET, STUCK, UNION, …). */
-export function chip(label: string, tone: ChipTone = 'neutral'): HTMLElement {
-  return el('span', { className: `bsx-chip bsx-chip-${tone}`, text: label });
+/**
+ * The one explanation affordance: marks `node` explainable — `data-explain` holds the
+ * text (CSS shows it on hover and focus), `tabindex=0` makes it reachable by tap and keyboard.
+ * No text leaves the node untouched.
+ */
+export function explainable<T extends HTMLElement>(node: T, text: string | undefined): T {
+  if (!text) return node;
+  node.dataset['explain'] = text;
+  node.tabIndex = 0;
+  node.classList.add('bsx-explainable');
+  return node;
+}
+
+/** Status chip (IN ZONE, TUBED, WET, STUCK, UNION, …); `explain` says what it changes. */
+export function chip(label: string, tone: ChipTone = 'neutral', explain?: string): HTMLElement {
+  return explainable(el('span', { className: `bsx-chip bsx-chip-${tone}`, text: label }), explain);
 }
 
 /** Section header: micro-label + hairline rule, optional trailing note. */
@@ -100,7 +113,7 @@ export function sectionHeader(label: string, note?: string): HTMLElement {
 }
 
 /** Gauge row: label, track+fill, optional threshold tick, numeric readout. */
-export function gauge(label: string, value: number, color: string, opts: { thresholdPct?: number; labelWidth?: number } = {}): HTMLElement {
+export function gauge(label: string, value: number, color: string, opts: { thresholdPct?: number; labelWidth?: number; explain?: string } = {}): HTMLElement {
   const row = el('div', { className: 'bsx-gauge-row' });
   const labelEl = el('span', { className: 'bsx-gauge-label', text: label });
   if (opts.labelWidth) labelEl.style.width = `${opts.labelWidth}px`;
@@ -117,7 +130,7 @@ export function gauge(label: string, value: number, color: string, opts: { thres
   const valueEl = el('span', { className: 'bsx-gauge-value bsx-mono', text: String(Math.round(value)) });
   valueEl.style.color = color;
   row.append(labelEl, track, valueEl);
-  return row;
+  return explainable(row, opts.explain);
 }
 
 /** Progress bar (contract urgency, research progress). */
@@ -168,7 +181,7 @@ export function paintToggleButton(btn: HTMLElement, active: boolean, inactiveBor
 }
 
 /** Stat grid (blast report, pre-flight): N equal columns, each a key/value cell. */
-export function statGrid(items: { key: string; value: string; color?: string; info?: string }[], columns: number): HTMLElement {
+export function statGrid(items: { key: string; value: string; color?: string; info?: string; explain?: string }[], columns: number): HTMLElement {
   const grid = el('div', { className: 'bsx-stat-grid' });
   grid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
   for (const item of items) {
@@ -177,6 +190,7 @@ export function statGrid(items: { key: string; value: string; color?: string; in
     const valueEl = el('span', { className: 'bsx-stat-value', text: item.value });
     if (item.color) valueEl.style.color = item.color;
     if (item.info) valueEl.dataset['info'] = item.info;
+    explainable(valueEl, item.explain);
     cell.appendChild(valueEl);
     grid.appendChild(cell);
   }

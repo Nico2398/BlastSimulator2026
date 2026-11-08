@@ -6,7 +6,8 @@ import { HIRING_COSTS } from '../../core/entities/Employee.js';
 import { HIRING_ROLES, candidatesForRole, type HireCandidate } from '../../core/entities/HiringPool.js';
 import { ROLE_STARTING_QUALIFICATIONS, UNION_MEMBER_SALARY_DISCOUNT_PCT } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el } from '../dom.js';
+import { el, explainable } from '../dom.js';
+import { salaryExplain, skillLevelExplain, unionExplain } from '../statExplain.js';
 import { filterBar, type FilterBarSelection } from '../filterBar.js';
 import { HIRING_LEVEL_CHOICES, HIRING_SORT_KEYS, criteriaFromSelection, filterCandidates } from '../hiringFilter.js';
 import { perHour } from '../crewDetailSections.js';
@@ -23,14 +24,23 @@ function makeCandidateCard(
 ): HTMLElement {
   const card = el('div', { attrs: { 'data-candidate-card': String(c.id), style: 'display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--bsx-hairline);border-radius:5px' } });
   const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
-  const skill = c.qualifications
-    .map(q => t('ui.crew.candidate_skill', { skill: t(`skill.${q.category}`), level: q.proficiencyLevel }))
-    .join(', ');
+  const sep = (text: string): Text => document.createTextNode(text);
+  const skills = c.qualifications.flatMap((q, i) => [
+    ...(i > 0 ? [sep(', ')] : []),
+    explainable(el('span', {
+      text: t('ui.crew.candidate_skill', { skill: t(`skill.${q.category}`), level: q.proficiencyLevel }),
+      attrs: { 'data-candidate-skill': q.category },
+    }), skillLevelExplain(q.proficiencyLevel)),
+  ]);
   info.append(
     el('span', { text: c.name, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
     el('span', {
-      text: `${t('ui.crew.candidate_salary', { salary: perHour(c.salary) })} · ${skill} · ${t(c.unionized ? 'ui.crew.candidate_union' : 'ui.crew.candidate_non_union')}`,
       attrs: { style: 'font:400 10px/1.2 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+      children: [
+        explainable(el('span', { text: t('ui.crew.candidate_salary', { salary: perHour(c.salary) }), attrs: { 'data-candidate-salary': '' } }), salaryExplain()),
+        sep(' · '), ...skills, sep(' · '),
+        explainable(el('span', { text: t(c.unionized ? 'ui.crew.candidate_union' : 'ui.crew.candidate_non_union'), attrs: { 'data-candidate-union': '' } }), unionExplain()),
+      ],
     }),
   );
   if (c.unionized) {

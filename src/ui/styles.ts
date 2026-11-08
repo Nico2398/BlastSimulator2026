@@ -281,6 +281,42 @@ ${RAIL_RULE_SELECTORS} {
 .bs-tutorial-stage {
   font: 600 11px/1.4 var(--bsx-font-ui);
 }
+/* Explanation affordance (#2163): any element marked by explainable() shows its
+   data-explain text on hover and on focus (tap or keyboard). Dotted underline marks it. */
+.bsx-explainable {
+  position: relative;
+  cursor: help;
+  text-decoration: underline dotted var(--bsx-text-micro);
+  text-underline-offset: 2px;
+}
+.bsx-explainable:hover::after,
+.bsx-explainable:focus::after {
+  content: attr(data-explain);
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: var(--bsx-z-popover);
+  width: max-content;
+  max-width: 180px;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--bsx-hairline-strong);
+  border-radius: 5px;
+  background: var(--bsx-panel);
+  color: var(--bsx-text-primary);
+  font: 400 10px/1.35 var(--bsx-font-ui);
+  letter-spacing: normal;
+  text-decoration: none;
+  white-space: normal;
+  text-align: left;
+  pointer-events: none;
+}
+/* Right-edge anchors (pay total, trailing values) open leftwards so the tooltip stays inside the panel. */
+.bsx-explainable.bsx-explain-end:hover::after,
+.bsx-explainable.bsx-explain-end:focus::after {
+  left: auto;
+  right: 0;
+}
 /* HUD modifier chips (#1414) float over the 3D scene, so the warn tint alone
    washes out on light terrain: opaque panel backing under the tint, 11px text. */
 .bsx-chip.bs-modifier-chip {
