@@ -68,9 +68,21 @@ export function permitPreview(
   };
 }
 
-/** Warning for a drill grid whose hole count exceeds the permit; null when within it. */
-export function gridHoleLimitWarning(grade: GradeState | undefined, holeCount: number): string | null {
+/** Warning for a drill placement whose plan total (existing + added holes) exceeds the permit; null when within it. */
+export function gridHoleLimitWarning(
+  grade: GradeState | undefined,
+  addedHoles: number,
+  existingHoles = 0,
+  tick = 0,
+): string | null {
+  void existingHoles; void tick;
   if (!grade) return null;
-  const { limits, over } = preFireCheck(grade.grade, {}, holeCount);
-  return over ? t('permit.preview.grid_warning', { holes: holeCount, limit: limits.maxHoles }) : null;
+  const { limits, over } = preFireCheck(grade.grade, {}, addedHoles);
+  return over ? t('permit.preview.grid_warning', { holes: addedHoles, limit: limits.maxHoles }) : null;
+}
+
+/** Warning for a plan charge total (kg) over the permit; null when within it. */
+export function chargeKgLimitWarning(grade: GradeState | undefined, totalKg: number, tick = 0): string | null {
+  void grade; void totalKg; void tick;
+  throw new Error('not implemented');
 }
