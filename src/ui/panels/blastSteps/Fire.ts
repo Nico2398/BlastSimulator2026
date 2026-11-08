@@ -17,7 +17,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import { el, scrollBoundedSection } from '../../dom.js';
 import { iconEl, type IconName } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
-import { rainExposedHoles, wetHoles } from '../../../core/mining/WetHoles.js';
+import { fizzlingHoles, rainExposedHoles, wetFizzlePercent, wetHoles } from '../../../core/mining/WetHoles.js';
 import { computeDangerZone, isInZone, type ZoneBounds } from '../../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
 import { buildingsInBlastReach, type BuildingAtRisk } from '../../../core/mining/BlastPlan.js';
@@ -44,6 +44,14 @@ interface Occupant {
   sub: string;
   /** What evacuateZone will do with a vehicle (null for a person). Only 'stranded' means it is left behind (#2100). */
   verdict: VehicleEvacuationVerdict | null;
+}
+
+/** Text of the dry-holes checklist row: all dry, wet but water-resistant, or fizzling charges. */
+function dryRowText(holeCount: number, wetCount: number, fizzleCount: number): string {
+  if (fizzleCount > 0) return t('ui.blast_workshop.fire.check_wet', { count: fizzleCount, percent: wetFizzlePercent() });
+  return wetCount > 0
+    ? t('ui.blast_workshop.fire.check_wet_resistant', { count: wetCount })
+    : t('ui.blast_workshop.fire.check_dry', { count: holeCount });
 }
 
 export class FireStep {
@@ -91,6 +99,7 @@ export class FireStep {
   update(state: GameState, _weather?: WeatherState): void {
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
     const wet = wetHoles(state);
+    const fizzled = fizzlingHoles(state);
     const exposed = rainExposedHoles(state);
 
     const verdicts = zone ? evacuationVerdictsForZone(state, zone) : new Map<number, VehicleEvacuationVerdict>();
@@ -101,7 +110,7 @@ export class FireStep {
       this.breakoutMemo.get(state, assembleBlastPlan(state.drillHoles, state.chargesByHole), this.gridProvider()),
       { none: 'ui.blast_workshop.fire.check_breakout_none', partial: 'ui.blast_workshop.fire.check_breakout_partial' },
     );
-    const signature = JSON.stringify({ breakoutText, zone, occupants: occupantKeys, wetCount: wet.length, exposedCount: exposed.length, permit, atRisk });
+    const signature = JSON.stringify({ breakoutText, zone, occupants: occupantKeys, wetCount: wet.length, fizzleCount: fizzled.length, exposedCount: exposed.length, permit, atRisk });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
@@ -110,7 +119,7 @@ export class FireStep {
 
     const occupants = zone ? this.occupants(state, zone, verdicts) : [];
     this.renderZoneList(occupants, zone !== null);
-    this.renderChecklist(state.drillHoles.length, wet.length, exposed.length, occupants, permit, atRisk, breakoutText);
+    this.renderChecklist(state.drillHoles.length, wet.length, fizzled.length, exposed.length, occupants, permit, atRisk, breakoutText);
   }
 
   refreshLocale(): void {
@@ -185,14 +194,14 @@ export class FireStep {
     return row;
   }
 
-  private renderChecklist(holeCount: number, wetCount: number, exposedCount: number, occupants: Occupant[], permit: PermitPreview | null, atRisk: BuildingAtRisk[], breakoutText: string | null): void {
-    const dryOk = wetCount === 0;
+  private renderChecklist(holeCount: number, wetCount: number, fizzleCount: number, exposedCount: number, occupants: Occupant[], permit: PermitPreview | null, atRisk: BuildingAtRisk[], breakoutText: string | null): void {
+    const dryOk = fizzleCount === 0;
     const occupantCount = occupants.length;
     const strandedCount = occupants.filter(o => o.verdict === 'stranded').length;
     const zoneOk = occupantCount === 0;
     this.checklistEl.replaceChildren(
       !dryOk || exposedCount === 0
-        ? this.makeCheckRow(dryOk, dryOk ? t('ui.blast_workshop.fire.check_dry', { count: holeCount }) : t('ui.blast_workshop.fire.check_wet', { count: wetCount }))
+        ? this.makeCheckRow(dryOk, dryRowText(holeCount, wetCount, fizzleCount))
         : this.makeWarnRow(t('ui.blast_workshop.fire.check_rain_risk', { count: exposedCount }), 'rain-risk-check'),
       this.makeCheckRow(zoneOk, zoneOk
         ? t('ui.blast_workshop.fire.check_zone_clear')
@@ -217,7 +226,7 @@ export class FireStep {
   private makePermitRow(permit: PermitPreview): HTMLElement {
     const ok = !permit.over;
     const row = this.makeCheckRow(ok, t(ok ? 'ui.blast_workshop.fire.check_permit_ok' : 'ui.blast_workshop.fire.check_permit_over', {
-      kg: permit.kgText, holes: permit.holesText,
+      kg: permit.kgText, holes: permit.holesText, consequence: permit.consequenceText,
     }));
     row.dataset['role'] = 'permit-check';
     row.dataset['ok'] = String(ok);
