@@ -836,3 +836,39 @@ describe('stat explanations in the employee detail (#2163)', () => {
     });
   });
 });
+
+describe('makeSkillsSection — candidate qualifications (#2164)', () => {
+  // A hiring candidate holds qualifications and nothing else of an Employee.
+  const candidateLike = {
+    qualifications: [
+      { category: 'blasting' as const, proficiencyLevel: 2 as const, xp: 0 },
+      { category: 'driving.drill_rig' as const, proficiencyLevel: 4 as const, xp: 0 },
+    ],
+  };
+
+  it('renders every qualification of a bare qualifications holder', () => {
+    const text = makeSkillsSection(candidateLike).textContent ?? '';
+    expect(text).toContain(t('skill.blasting'));
+    expect(text).toContain(t('skill.driving.drill_rig'));
+    expect(text).toContain('★★☆☆☆');
+    expect(text).toContain('★★★★☆');
+  });
+
+  it('puts the level explanation on each skill level', () => {
+    const explains = [...makeSkillsSection(candidateLike).querySelectorAll<HTMLElement>('[data-explain]')]
+      .map(n => n.getAttribute('data-explain'));
+    expect(explains).toContain(skillLevelExplain(2));
+    expect(explains).toContain(skillLevelExplain(4));
+  });
+
+  it('a holder with no qualifications shows the no-skills text', () => {
+    const section = makeSkillsSection({ qualifications: [] });
+    expect(section.textContent).toContain(t('ui.crew.no_skills'));
+    expect(section.querySelector('[data-explain]')).toBeNull();
+  });
+
+  it('renders the same section for a candidate-like holder as for an employee with those qualifications', () => {
+    const asEmployee = makeEmployee({ qualifications: candidateLike.qualifications });
+    expect(makeSkillsSection(candidateLike).textContent).toBe(makeSkillsSection(asEmployee).textContent);
+  });
+});

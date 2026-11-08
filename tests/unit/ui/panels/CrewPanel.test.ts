@@ -1385,3 +1385,188 @@ describe('CrewPanel — hiring candidate stat explanations (#2163)', () => {
     expect(skills[0]!.getAttribute('data-explain')).toBe(skillLevelExplain(1));
   });
 });
+
+describe('CrewPanel — candidate sheet (#2164)', () => {
+  type Level = 1 | 2 | 3 | 4 | 5;
+  const candidate = (id: number, role: HireCandidate['role'], unionized: boolean): HireCandidate => ({
+    id, role, name: `Sheeted Person${id}`, unionized, salary: 430,
+    qualifications: [
+      { category: 'blasting', proficiencyLevel: 2 as Level, xp: 0 },
+      { category: 'driving.drill_rig', proficiencyLevel: 4 as Level, xp: 0 },
+    ],
+  });
+
+  function setup(pool: HireCandidate[], cash = 100000) {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    const state = makeState([]);
+    state.hiringPool.candidates = pool;
+    state.cash = cash;
+    panel.update(state);
+    return { panel, state, calls };
+  }
+  const card = (panel: CrewPanel, id: number): HTMLElement => panel.root.querySelector<HTMLElement>(`[data-candidate-card="${id}"]`)!;
+  const sheet = (panel: CrewPanel, id?: number): HTMLElement | null =>
+    panel.root.querySelector<HTMLElement>(id === undefined ? '[data-candidate-sheet]' : `[data-candidate-sheet="${id}"]`);
+
+  it('no sheet is open before any card is clicked', () => {
+    const { panel } = setup([candidate(11, 'driller', false)]);
+    expect(sheet(panel)).toBeNull();
+  });
+
+  it('clicking a candidate card opens its sheet inside the Crew panel', () => {
+    const { panel, calls } = setup([candidate(11, 'driller', false)]);
+    card(panel, 11).click();
+    expect(sheet(panel, 11)).not.toBeNull();
+    expect(calls).toEqual([]);
+  });
+
+  it('clicking the candidate name, not just the card edge, opens the sheet', () => {
+    const { panel } = setup([candidate(11, 'driller', false)]);
+    const name = [...card(panel, 11).querySelectorAll<HTMLElement>('span')].find(s => s.textContent === 'Sheeted Person11')!;
+    name.click();
+    expect(sheet(panel, 11)).not.toBeNull();
+  });
+
+  it('the sheet of a candidate with two qualifications lists both with their levels', () => {
+    const { panel } = setup([candidate(11, 'driller', false)]);
+    card(panel, 11).click();
+    const s = sheet(panel, 11)!;
+    expect(s.textContent).toContain(t('skill.blasting'));
+    expect(s.textContent).toContain(t('skill.driving.drill_rig'));
+    const explains = [...s.querySelectorAll<HTMLElement>('[data-explain]')].map(n => n.getAttribute('data-explain'));
+    expect(explains).toContain(skillLevelExplain(2));
+    expect(explains).toContain(skillLevelExplain(4));
+  });
+
+  it('the sheet shows name, role label, salary per hour, union status and the hire fee', () => {
+    const { panel } = setup([candidate(11, 'blaster', false)]);
+    card(panel, 11).click();
+    const text = sheet(panel, 11)!.textContent!;
+    expect(text).toContain('Sheeted Person11');
+    expect(text).toContain(t('role.blaster'));
+    expect(text).toContain(t('ui.crew.candidate_salary', { salary: perHour(430) }));
+    expect(text).toContain(t('ui.crew.candidate_non_union'));
+    expect(text).toContain(t('ui.crew.hire_fee', { fee: HIRING_COSTS.blaster }));
+  });
+
+  it('the sheet explains salary and union status on hover', () => {
+    const { panel } = setup([candidate(11, 'driller', false)]);
+    card(panel, 11).click();
+    const explains = [...sheet(panel, 11)!.querySelectorAll<HTMLElement>('[data-explain]')].map(n => n.getAttribute('data-explain'));
+    expect(explains).toContain(salaryExplain());
+    expect(explains).toContain(unionExplain());
+  });
+
+  it('a union candidate sheet states the union trade-off; a non-union sheet does not', () => {
+    const { panel } = setup([candidate(11, 'driller', true), candidate(12, 'driller', false)]);
+    const line = t('ui.crew.candidate_union_tradeoff', { pct: 15 });
+    card(panel, 11).click();
+    expect(sheet(panel, 11)!.textContent).toContain(t('ui.crew.candidate_union'));
+    expect(sheet(panel, 11)!.textContent).toContain(line);
+    card(panel, 12).click();
+    expect(sheet(panel, 12)!.textContent).not.toContain(line);
+  });
+
+  it('Hire on the sheet hires that candidate and closes the sheet', () => {
+    const { panel, calls } = setup([candidate(11, 'driller', false), candidate(12, 'driller', false)]);
+    card(panel, 12).click();
+    panel.root.querySelector<HTMLButtonElement>('[data-candidate-sheet-hire]')!.click();
+    expect(calls).toEqual(['employee hire role:driller candidate:12']);
+    expect(sheet(panel)).toBeNull();
+  });
+
+  it('the card Hire button still hires directly and does not open the sheet', () => {
+    const { panel, calls } = setup([candidate(11, 'driller', false)]);
+    panel.root.querySelector<HTMLButtonElement>('button[data-candidate-id="11"]')!.click();
+    expect(calls).toEqual(['employee hire role:driller candidate:11']);
+    expect(sheet(panel)).toBeNull();
+  });
+
+  it('the close button closes the sheet without hiring', () => {
+    const { panel, calls } = setup([candidate(11, 'driller', false)]);
+    card(panel, 11).click();
+    panel.root.querySelector<HTMLButtonElement>('[data-candidate-sheet-close]')!.click();
+    expect(sheet(panel)).toBeNull();
+    expect(calls).toEqual([]);
+  });
+
+  it('opening another card swaps the sheet: only the latest candidate is shown', () => {
+    const { panel } = setup([candidate(11, 'driller', false), candidate(12, 'blaster', false)]);
+    card(panel, 11).click();
+    card(panel, 12).click();
+    expect(panel.root.querySelectorAll('[data-candidate-sheet]')).toHaveLength(1);
+    expect(sheet(panel, 12)).not.toBeNull();
+    expect(sheet(panel, 11)).toBeNull();
+  });
+
+  it('the sheet survives a refresh while its candidate is still in the pool', () => {
+    const { panel, state } = setup([candidate(11, 'driller', false)]);
+    card(panel, 11).click();
+    panel.update(state);
+    expect(sheet(panel, 11)).not.toBeNull();
+  });
+
+  it('the sheet disappears when its candidate leaves the pool', () => {
+    const { panel, state } = setup([candidate(11, 'driller', false), candidate(12, 'driller', false)]);
+    card(panel, 11).click();
+    takeCandidate(state.hiringPool, 'driller', 11);
+    panel.update(state);
+    expect(sheet(panel)).toBeNull();
+    expect(card(panel, 12)).not.toBeNull();
+  });
+
+  describe('when cash is short of the fee', () => {
+    const SHORT = 250;
+    const cash = (role: HireCandidate['role']): number => HIRING_COSTS[role] - SHORT;
+
+    it('the sheet Hire button is disabled and a reason line states the missing cash', () => {
+      const { panel, calls } = setup([candidate(11, 'manager', false)], cash('manager'));
+      card(panel, 11).click();
+      const hire = panel.root.querySelector<HTMLButtonElement>('[data-candidate-sheet-hire]')!;
+      expect(hire.disabled).toBe(true);
+      const reason = panel.root.querySelector('[data-candidate-sheet] [data-hire-reason]');
+      expect(reason).not.toBeNull();
+      expect(reason!.textContent).toBe(t('ui.crew.hire_short_cash', { missing: SHORT }));
+      hire.click();
+      expect(calls).toEqual([]);
+      expect(sheet(panel, 11)).not.toBeNull();
+    });
+
+    it('the disabled card Hire button carries the same reason inside the card', () => {
+      const { panel } = setup([candidate(11, 'manager', false)], cash('manager'));
+      expect(card(panel, 11).querySelector<HTMLButtonElement>('button[data-candidate-id="11"]')!.disabled).toBe(true);
+      const reason = card(panel, 11).querySelector('[data-hire-reason]');
+      expect(reason).not.toBeNull();
+      expect(reason!.textContent).toBe(t('ui.crew.hire_short_cash', { missing: SHORT }));
+    });
+
+    it('each card reports the shortfall for its own role fee', () => {
+      const { panel } = setup([candidate(11, 'driller', false), candidate(12, 'manager', false)], 0);
+      expect(card(panel, 11).querySelector('[data-hire-reason]')!.textContent)
+        .toBe(t('ui.crew.hire_short_cash', { missing: HIRING_COSTS.driller }));
+      expect(card(panel, 12).querySelector('[data-hire-reason]')!.textContent)
+        .toBe(t('ui.crew.hire_short_cash', { missing: HIRING_COSTS.manager }));
+    });
+  });
+
+  it('with exactly the fee in cash there is no refusal on the card or the sheet', () => {
+    const { panel } = setup([candidate(11, 'driller', false)], HIRING_COSTS.driller);
+    expect(panel.root.querySelector('[data-hire-reason]')).toBeNull();
+    card(panel, 11).click();
+    expect(panel.root.querySelector('[data-hire-reason]')).toBeNull();
+    expect(panel.root.querySelector<HTMLButtonElement>('[data-candidate-sheet-hire]')!.disabled).toBe(false);
+  });
+
+  it('the new locale keys exist in English and French and differ between them', () => {
+    const en = enLocaleJson as Record<string, string>;
+    const fr = frLocaleJson as Record<string, string>;
+    for (const key of ['ui.crew.hire_short_cash', 'ui.crew.candidate_sheet_close']) {
+      expect(en[key]).toBeTruthy();
+      expect(fr[key]).toBeTruthy();
+      expect(fr[key]).not.toBe(en[key]);
+    }
+    expect(en['ui.crew.hire_short_cash']).toContain('{missing}');
+  });
+});

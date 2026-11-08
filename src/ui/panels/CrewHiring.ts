@@ -6,11 +6,12 @@ import { HIRING_COSTS } from '../../core/entities/Employee.js';
 import { HIRING_ROLES, candidatesForRole, type HireCandidate } from '../../core/entities/HiringPool.js';
 import { ROLE_STARTING_QUALIFICATIONS, UNION_MEMBER_SALARY_DISCOUNT_PCT } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, explainable } from '../dom.js';
+import { el, explainable, reasonLine } from '../dom.js';
 import { salaryExplain, skillLevelExplain, unionExplain } from '../statExplain.js';
 import { filterBar, type FilterBarSelection } from '../filterBar.js';
 import { HIRING_LEVEL_CHOICES, HIRING_SORT_KEYS, criteriaFromSelection, filterCandidates } from '../hiringFilter.js';
 import { perHour } from '../crewDetailSections.js';
+import { makeCandidateSheet, hireRefusal } from '../candidateSheet.js';
 
 /** "Skill ★level" list of what a hire of `role` arrives qualified for. */
 function startingQualificationLabel(role: EmployeeRole): string {
@@ -21,6 +22,7 @@ function makeCandidateCard(
   state: GameState,
   c: HireCandidate,
   onHire: (role: EmployeeRole, candidateId: number) => void,
+  onOpen?: (candidateId: number) => void,
 ): HTMLElement {
   const card = el('div', { attrs: { 'data-candidate-card': String(c.id), style: 'display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--bsx-hairline);border-radius:5px' } });
   const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
@@ -54,10 +56,18 @@ function makeCandidateCard(
     text: t('ui.crew.hire'),
     attrs: { 'data-role': c.role, 'data-candidate-id': String(c.id) },
   });
-  btn.disabled = state.cash < HIRING_COSTS[c.role];
-  btn.addEventListener('click', () => onHire(c.role, c.id));
+  const refusal = hireRefusal(state, c);
+  btn.disabled = refusal !== null;
+  btn.addEventListener('click', ev => { ev.stopPropagation(); onHire(c.role, c.id); });
+  card.style.cursor = 'pointer';
+  card.addEventListener('click', () => onOpen?.(c.id));
   const fee = el('span', { text: t('ui.crew.hire_fee', { fee: HIRING_COSTS[c.role] }), className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
   card.append(info, fee, btn);
+  if (refusal) {
+    const reason = reasonLine(refusal, true);
+    reason.dataset['hireReason'] = '';
+    info.append(reason);
+  }
   return card;
 }
 
@@ -65,7 +75,12 @@ function makeCandidateCard(
 interface HiringFilterView {
   selection: FilterBarSelection;
   onChange: () => void;
+  /** Candidate whose sheet is open, owned by the panel. */
+  openCandidateId?: number | null;
+  onOpenCandidate?: (candidateId: number | null) => void;
 }
+
+export { hireRefusal };
 
 export function makeHiringSection(state: GameState, onHire: (role: EmployeeRole, candidateId: number) => void, view?: HiringFilterView): HTMLElement[] {
   const criteria = view ? criteriaFromSelection(view.selection) : null;
@@ -97,7 +112,9 @@ export function makeHiringSection(state: GameState, onHire: (role: EmployeeRole,
     if (candidates.length === 0) {
       group.append(el('span', { text: t('ui.crew.no_candidates'), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }));
     }
-    for (const c of candidates) group.append(makeCandidateCard(state, c, onHire));
+    const open = candidates.find(c => c.id === view?.openCandidateId);
+    if (open) group.append(makeCandidateSheet(state, open, onHire, () => view?.onOpenCandidate?.(null)));
+    for (const c of candidates) group.append(makeCandidateCard(state, c, onHire, id => view?.onOpenCandidate?.(id)));
     return [group];
   });
   if (filtering && groups.length === 0) {
@@ -130,10 +147,10 @@ function hiringFilterBar(state: GameState, view: HiringFilterView): HTMLElement 
 }
 
 /** Change-detection signature for the hiring section: candidates, affordability buckets, headcounts (never raw cash). */
-export function hiringSignature(state: GameState, selection?: FilterBarSelection): string {
+export function hiringSignature(state: GameState, selection?: FilterBarSelection, openCandidateId?: number | null): string {
   const ids = state.hiringPool.candidates.map(c => c.id).join(',');
   const affordable = HIRING_ROLES.map(r => (state.cash < HIRING_COSTS[r] ? '0' : '1')).join('');
   const headcounts = HIRING_ROLES.map(r => state.employees.employees.filter(e => e.alive && e.role === r).length).join(',');
   const picked = selection ? `${selection.filter}|${selection.sort}|${JSON.stringify(selection.groups)}` : '';
-  return `${ids}~${affordable}~${headcounts}~${picked}`;
+  return `${ids}~${affordable}~${headcounts}~${picked}~${openCandidateId ?? ''}`;
 }
