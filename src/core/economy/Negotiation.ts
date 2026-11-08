@@ -5,7 +5,7 @@ import type { Contract, ContractState, NegotiationChange, NegotiationField } fro
 import { computeEarlyBonus, isPaidClearance } from './Contract.js';
 import { Random } from '../math/Random.js';
 import { hash32, hashCombine } from '../math/Hash.js';
-import { NEGOTIATION_MAX_ATTEMPTS_PER_OFFER, NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL } from '../config/balance.js';
+import { NEGOTIATION_MAX_ATTEMPTS_PER_OFFER, NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL, NEGOTIATION_MAX_IMPROVEMENT as MAX_IMPROVEMENT, NEGOTIATION_MAX_WORSENING as MAX_WORSENING } from '../config/balance.js';
 
 // ── Config ──
 
@@ -16,10 +16,6 @@ const REPUTATION_FACTOR = 0.01;
 /** Success-rate clamp bounds. */
 const MIN_SUCCESS_RATE = 0.05;
 const MAX_SUCCESS_RATE = 0.95;
-/** Maximum improvement factor for successful negotiation (20% better terms). */
-const MAX_IMPROVEMENT = 0.20;
-/** Maximum worsening factor for failed negotiation (15% worse terms). */
-const MAX_WORSENING = 0.15;
 
 // ── Negotiation result ──
 

@@ -107,3 +107,44 @@ describe('makeMarketStrip', () => {
     expect(makeMarketStrip({ ...input, grade: 5 }).querySelector('.bs-market-locked')).toBeNull();
   });
 });
+
+describe('explanations (#2170)', () => {
+  const input: MarketStripInput = {
+    grade: 0,
+    ores: ['dirtite', 'rustite', 'sparkium'],
+    saturation: (ore: string) => (ore === 'dirtite' ? 0.4 : ore === 'sparkium' ? 1 : 0),
+    basePrice: () => 10,
+  };
+  const row = (ore: string) => makeMarketStrip(input).querySelector<HTMLElement>(`.bs-market-row[data-ore="${ore}"]`)!;
+
+  it.each(BUYER_TIERS.map(b => b.id))('the %s buyer badge carries an explanation', (id) => {
+    expect(makeBuyerBadge(id).dataset['explain']).toBeTruthy();
+  });
+
+  it('gives each buyer tier an explanation of its own', () => {
+    const texts = BUYER_TIERS.map(b => makeBuyerBadge(b.id).dataset['explain']);
+    expect(new Set(texts).size).toBe(BUYER_TIERS.length);
+  });
+
+  it('every market row carries an explanation', () => {
+    for (const ore of input.ores) expect(row(ore).dataset['explain']).toBeTruthy();
+  });
+
+  it('a falling row quotes its signed trend', () => {
+    expect(row('dirtite').dataset['explain']).toContain('-20');
+  });
+
+  it('a row carries the joke tip of its saturation', () => {
+    expect(row('dirtite').dataset['explain']).toContain(t(marketTooltipKey(0.4)));
+    expect(row('rustite').dataset['explain']).toContain(t(marketTooltipKey(0)));
+    expect(row('sparkium').dataset['explain']).toContain(t(marketTooltipKey(1)));
+  });
+
+  it('an unsold ore with no trend still explains its row', () => {
+    expect(row('rustite').dataset['explain']!.length).toBeGreaterThan(0);
+  });
+
+  it('rows of different saturation explain differently', () => {
+    expect(row('dirtite').dataset['explain']).not.toBe(row('rustite').dataset['explain']);
+  });
+});

@@ -550,3 +550,140 @@ describe('EventModal — leaver chip link (#2165)', () => {
     container.remove();
   });
 });
+
+describe('EventModal chip explanations (#2170)', () => {
+  afterEach(() => {
+    clearEvents();
+    setupEvents();
+    setLocale('en');
+  });
+
+  const explainOf = (chip: Element): string => (chip as HTMLElement).dataset['explain'] ?? '';
+
+  function outcomeChips(effects: EventEffect[]): { chips: HTMLElement[]; done: () => void } {
+    const { container, modal } = mount();
+    const state = stateWithPendingEvent();
+    modal.setGameConsole(fakeConsole(state, effects));
+    modal.update(state);
+    (container.querySelector('#bs-event-dialog .bs-event-choice') as HTMLButtonElement).click();
+    // Outcome-phase chips: every visible chip outside the (now hidden) choice list.
+    const chips = Array.from(container.querySelectorAll<HTMLElement>('#bs-event-dialog .bsx-chip'))
+      .filter(c => !c.closest('.bs-event-choices') && c.style.display !== 'none');
+    return { chips, done: () => { modal.dispose(); container.remove(); } };
+  }
+
+  it('a safety score chip explains the change and names the score in full', () => {
+    const { chips, done } = outcomeChips([{ kind: 'score', key: 'safety', delta: -5 }]);
+    const chip = chips.find(c => c.textContent === '-5 SAFE')!;
+    expect(chip).toBeDefined();
+    expect(explainOf(chip)).toMatch(/safety/i);
+    expect(explainOf(chip)).toContain('5');
+    done();
+  });
+
+  it('a well-being score chip names the score in full words', () => {
+    const { chips, done } = outcomeChips([{ kind: 'score', key: 'wellBeing', delta: 15 }]);
+    const chip = chips.find(c => c.textContent === '+15 WELL')!;
+    expect(chip).toBeDefined();
+    expect(explainOf(chip)).toMatch(/well-?being/i);
+    done();
+  });
+
+  it('a cash chip explains the cash change', () => {
+    const { chips, done } = outcomeChips([{ kind: 'cash', key: 'cash', delta: -3000 }]);
+    const chip = chips.find(c => c.textContent!.includes('3,000'))!;
+    expect(chip).toBeDefined();
+    expect(explainOf(chip)).toMatch(/cash/i);
+    done();
+  });
+
+  it('every outcome chip of a mixed result carries an explanation, each its own', () => {
+    const { chips, done } = outcomeChips([
+      { kind: 'cash', key: 'cash', delta: -3000 },
+      { kind: 'score', key: 'safety', delta: -5 },
+      { kind: 'score', key: 'ecology', delta: 4 },
+    ]);
+    expect(chips).toHaveLength(3);
+    const texts = chips.map(explainOf);
+    for (const text of texts) expect(text.length).toBeGreaterThan(0);
+    expect(new Set(texts).size).toBe(3);
+    done();
+  });
+
+  it('a lasting effect in the outcome carries an explanation', () => {
+    const { chips, done } = outcomeChips([{ kind: 'other', key: 'exposure', delta: 1 }]);
+    expect(chips).toHaveLength(1);
+    expect(explainOf(chips[0]!).length).toBeGreaterThan(0);
+    done();
+  });
+
+  it('a note-line effect adds no chip and so no explanation', () => {
+    const { chips, done } = outcomeChips([
+      { kind: 'other', key: 'followUp', delta: 0, textKey: 'ui.event.follow_up_developing' },
+    ]);
+    expect(chips).toHaveLength(0);
+    done();
+  });
+
+  it('every hint chip of a choice carries an explanation', () => {
+    const { container, modal } = mount();
+    modal.update(stateWithPendingEvent('union_coffee_uprising'));
+    const choices = container.querySelectorAll('#bs-event-dialog .bs-event-choice');
+    let seen = 0;
+    for (const choice of Array.from(choices)) {
+      for (const chip of Array.from(choice.querySelectorAll('.bsx-chip'))) {
+        seen++;
+        expect(explainOf(chip).length).toBeGreaterThan(0);
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+    modal.dispose();
+    container.remove();
+  });
+
+  it('a hint score chip names the score in full words', () => {
+    const { container, modal } = mount();
+    modal.update(stateWithPendingEvent('union_coffee_uprising'));
+    const chip = Array.from(container.querySelectorAll('#bs-event-dialog .bs-event-choice')[0]!.querySelectorAll('.bsx-chip'))
+      .find(c => c.textContent === '+12 WELL')!;
+    expect(chip).toBeDefined();
+    expect(explainOf(chip)).toMatch(/well-?being/i);
+    modal.dispose();
+    container.remove();
+  });
+
+  it('a hint cash chip explains cash', () => {
+    const { container, modal } = mount();
+    modal.update(stateWithPendingEvent('union_coffee_uprising'));
+    const chip = Array.from(container.querySelectorAll('#bs-event-dialog .bs-event-choice')[0]!.querySelectorAll('.bsx-chip'))
+      .find(c => c.textContent === '-$8,000 Cash')!;
+    expect(chip).toBeDefined();
+    expect(explainOf(chip)).toMatch(/cash/i);
+    modal.dispose();
+    container.remove();
+  });
+
+  it('a certain lasting-effect hint chip explains it is a lasting effect', () => {
+    const { container, modal } = mount();
+    modal.update(stateWithPendingEvent('union_coffee_uprising'));
+    const def = getEventById('union_coffee_uprising')!;
+    const sentence = effectChipText(effectChips([def.consequences[0]!.effects![0]!])[0]!)!;
+    const chip = Array.from(container.querySelectorAll('#bs-event-dialog .bs-event-choice')[0]!.querySelectorAll('.bsx-chip'))
+      .find(c => c.textContent === sentence)!;
+    expect(chip).toBeDefined();
+    expect(explainOf(chip)).toMatch(/lasting/i);
+    modal.dispose();
+    container.remove();
+  });
+
+  it('the explanation follows the locale', () => {
+    setLocale('fr');
+    const { chips, done } = outcomeChips([{ kind: 'score', key: 'safety', delta: -5 }]);
+    const fr = explainOf(chips[0]!);
+    done();
+    setLocale('en');
+    const en = explainOf(outcomeChips([{ kind: 'score', key: 'safety', delta: -5 }]).chips[0]!);
+    expect(fr.length).toBeGreaterThan(0);
+    expect(fr).not.toBe(en);
+  });
+});

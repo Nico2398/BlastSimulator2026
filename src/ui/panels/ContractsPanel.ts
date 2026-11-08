@@ -23,7 +23,7 @@
 import { PanelBase } from './PanelBase.js';
 import { FilterBarSelection, filterBar } from '../filterBar.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, fieldStyle, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll, flashStatus } from '../dom.js';
+import { el, explainable, fieldStyle, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll, flashStatus } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg, insufficientFundsText, wholeKg } from '../../core/economy/formatMoney.js';
@@ -40,6 +40,7 @@ import { negotiationRefusalReason } from '../../core/economy/Negotiation.js';
 import { contractAcceptBlocker, contractTotal, isFillableSaleOffer, isPaidClearance, isWinningSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
 import { stateRubbleStockKg, totalSpoilKg } from '../../core/economy/SpoilHeaps.js';
 import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
+import { earlyBonusExplain, heldExplain, negotiateExplain, offSiteExplain, penaltyExplain } from '../panelExplain.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
@@ -489,7 +490,7 @@ export class ContractsPanel extends PanelBase {
       iconEl(TYPE_ICON[c.type], 14),
       el('span', { text: this.materialLabel(c.materialId), attrs: { style: 'font:600 12px/1 var(--bsx-font-ui)' } }),
       el('span', { text: `#${c.id}`, attrs: { style: 'font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),
-      ...(c.held ? [el('span', { text: t('ui.contracts.held_badge'), attrs: { class: 'bs-contract-held', style: 'font:700 9px/1 var(--bsx-font-ui);letter-spacing:.1em;padding:3px 5px;border-radius:3px;background:rgba(255,255,255,.08);color:var(--bsx-amber)' } })] : []),
+      ...(c.held ? [explainable(el('span', { text: t('ui.contracts.held_badge'), attrs: { class: 'bs-contract-held', style: 'font:700 9px/1 var(--bsx-font-ui);letter-spacing:.1em;padding:3px 5px;border-radius:3px;background:rgba(255,255,255,.08);color:var(--bsx-amber)' } }), heldExplain())] : []),
       el('span', {
         text: t('ui.contracts.time_left', { hours: remainingTicks }),
         className: 'bs-contract-time-left',
@@ -504,7 +505,7 @@ export class ContractsPanel extends PanelBase {
       this.activeMoneyLabel(c),
     );
     if (c.type !== 'rubble_disposal') {
-      progressLine.append(el('span', { text: t('ui.contracts.penalty_line', { amount: formatMoney(c.penaltyAmount) }), attrs: { style: 'margin-left:auto;color:var(--bsx-critical-text)' } }));
+      progressLine.append(explainable(el('span', { text: t('ui.contracts.penalty_line', { amount: formatMoney(c.penaltyAmount) }), attrs: { class: 'bs-contract-penalty', style: 'margin-left:auto;color:var(--bsx-critical-text)' } }), penaltyExplain(c.penaltyAmount)));
     }
 
     const amountValue = maxDeliverable > 0 ? maxDeliverable : 0.1;
@@ -620,12 +621,12 @@ export class ContractsPanel extends PanelBase {
         this.rubbleMoneyLabel(c, { class: isPaidClearance(c) ? 'bs-contract-costs' : 'bs-contract-pays' }),
       );
       if (!isPaidClearance(c)) {
-        termsRow.append(el('span', { text: t('ui.contracts.bonus_line', { amount: formatMoney(c.earlyBonus) }), attrs: { style: 'color:var(--bsx-positive)' } }));
+        termsRow.append(explainable(el('span', { text: t('ui.contracts.bonus_line', { amount: formatMoney(c.earlyBonus) }), attrs: { class: 'bs-contract-bonus', style: 'color:var(--bsx-positive)' } }), earlyBonusExplain(c.earlyBonus)));
       }
     } else {
       termsRow.append(
-        el('span', { text: t('ui.contracts.penalty_line', { amount: formatMoney(c.penaltyAmount) }), attrs: { style: 'color:var(--bsx-critical-text)' } }),
-        el('span', { text: t('ui.contracts.bonus_line', { amount: formatMoney(c.earlyBonus) }), attrs: { style: 'color:var(--bsx-positive)' } }),
+        explainable(el('span', { text: t('ui.contracts.penalty_line', { amount: formatMoney(c.penaltyAmount) }), attrs: { class: 'bs-contract-penalty', style: 'color:var(--bsx-critical-text)' } }), penaltyExplain(c.penaltyAmount)),
+        explainable(el('span', { text: t('ui.contracts.bonus_line', { amount: formatMoney(c.earlyBonus) }), attrs: { class: 'bs-contract-bonus', style: 'color:var(--bsx-positive)' } }), earlyBonusExplain(c.earlyBonus)),
       );
     }
 
@@ -656,6 +657,7 @@ export class ContractsPanel extends PanelBase {
       onClick: () => this.gameConsole?.(`contract negotiate id:${c.id}`),
     });
     negotiateBtn.style.cssText = 'flex:1;height:30px;font-size:10px';
+    explainable(negotiateBtn, negotiateExplain());
 
     const declineBtn = button('danger', '', {
       icon: 'x',
@@ -670,7 +672,7 @@ export class ContractsPanel extends PanelBase {
 
     const offSiteBadge = c.materialId === '' || siteOres.includes(c.materialId)
       ? null
-      : el('span', { text: t('ui.contracts.not_on_site'), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);color:var(--bsx-critical-text)' } });
+      : explainable(el('span', { text: t('ui.contracts.not_on_site'), attrs: { class: 'bs-contract-off-site', style: 'font:600 10px/1 var(--bsx-font-ui);color:var(--bsx-critical-text)' } }), offSiteExplain());
 
     const cardEl = card([headRow, offSiteBadge, statRow, haveRow, termsRow, negBox, btnRow]);
     cardEl.dataset['contractId'] = String(c.id);

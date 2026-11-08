@@ -14,6 +14,7 @@
 
 import { openerLink, type EntityOpener } from '../entityLinks.js';
 import { t } from '../../core/i18n/I18n.js';
+import { eventChipExplain } from '../panelExplain.js';
 import { el, chip, type ChipTone } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
@@ -97,25 +98,26 @@ function hintChip(hint: EventOptionEffectHint, leaver?: LeaverLabel, leaverLink?
   const tone: ChipTone = hint.risky
     ? 'warn'
     : hint.direction === 'positive' ? 'positive' : hint.direction === 'negative' ? 'critical' : 'neutral';
+  const explain = eventChipExplain(hint.kind, hint.key, hint.risky ? undefined : hint.amount);
   if (hint.spec) {
     const text = effectChipText(effectChips([hint.spec], leaver)[0]!) ?? hint.key;
     const name = leaver && leaver !== 'nobody' && hint.spec.type === 'employee_leaves' ? leaver.name : null;
     const at = name !== null && leaverLink ? text.indexOf(name) : -1;
-    if (name === null || !leaverLink || at < 0) return chip(text, tone);
-    const node = chip('', tone);
+    if (name === null || !leaverLink || at < 0) return chip(text, tone, explain);
+    const node = chip('', tone, explain);
     node.append(text.slice(0, at), leaverLink(name), text.slice(at + name.length));
     return node;
   }
-  if (hint.amount !== undefined && !hint.risky) return chip(amountLabel(hint.kind, hint.key, hint.amount), tone);
+  if (hint.amount !== undefined && !hint.risky) return chip(amountLabel(hint.kind, hint.key, hint.amount), tone, explain);
   const sign = hint.direction === 'positive' ? '+' : hint.direction === 'negative' ? '-' : '';
   // An unnamed 'other' key is a lasting effect whose spec is hidden because the outcome is risky.
-  return chip(`${sign}${hintName(hint)}${hint.risky ? '?' : ''}`, tone);
+  return chip(`${sign}${hintName(hint)}${hint.risky ? '?' : ''}`, tone, explain);
 }
 
 /** Outcome-phase effect chip: the real, resolved magnitude. */
 function effectChip(effect: EventEffect): HTMLElement {
   const tone: ChipTone = effect.delta > 0 ? 'positive' : effect.delta < 0 ? 'critical' : 'neutral';
-  return chip(amountLabel(effect.kind, effect.key, effect.delta), tone);
+  return chip(amountLabel(effect.kind, effect.key, effect.delta), tone, eventChipExplain(effect.kind, effect.key, effect.delta));
 }
 
 export class EventModal {
