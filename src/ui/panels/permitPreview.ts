@@ -48,9 +48,7 @@ export function permitPreview(
   const kg = Math.round(check.planKg * 10) / 10;
   const chance = check.over ? inspectionChance(check.overshoot) : 0;
   const fine = check.over ? inspectionFine(check.fee, check.overshoot) : 0;
-  const consequenceText = check.over
-    ? t('permit.preview.consequence', { chance: Math.round(chance * 100), fine: formatMoney(fine), strikes, limit: PERMIT_STRIKES_TO_SUSPEND })
-    : '';
+  const consequenceText = check.over ? consequenceOf(check, strikes) : '';
   return {
     over: check.over,
     kgOver: check.planKg > check.limits.maxChargeKg,
@@ -98,11 +96,15 @@ function overPermitConsequence(
   const check = preFireCheck(grade.grade, charges, holeCount);
   if (!check.over) return null;
   const strikes = liveStrikes(grade.strikeTicks ?? [], tick).length;
-  const consequence = t('permit.preview.consequence', {
+  return { limits: check.limits, consequence: consequenceOf(check, strikes) };
+}
+
+/** Inspection chance, fine and strikes against the ban threshold, for an over-permit check. */
+function consequenceOf(check: ReturnType<typeof preFireCheck>, strikes: number): string {
+  return t('permit.preview.consequence', {
     chance: Math.round(inspectionChance(check.overshoot) * 100),
     fine: formatMoney(inspectionFine(check.fee, check.overshoot)),
     strikes,
     limit: PERMIT_STRIKES_TO_SUSPEND,
   });
-  return { limits: check.limits, consequence };
 }
