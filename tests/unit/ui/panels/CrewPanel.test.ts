@@ -10,7 +10,8 @@ import type { Vehicle } from '../../../../src/core/entities/Vehicle.js';
 import type { Building } from '../../../../src/core/entities/Building.js';
 import frLocaleJson from '../../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
 import { perHour } from '../../../../src/ui/crewDetailSections.js';
-import { hiringSignature } from '../../../../src/ui/panels/CrewHiring.js';
+import { hiringSignature, makeHiringSection } from '../../../../src/ui/panels/CrewHiring.js';
+import { FilterBarSelection } from '../../../../src/ui/filterBar.js';
 import { candidatesForRole, takeCandidate, type HireCandidate } from '../../../../src/core/entities/HiringPool.js';
 import { HIRING_COSTS } from '../../../../src/core/entities/Employee.js';
 
@@ -247,7 +248,7 @@ describe('CrewPanel — scroll-bounded roster section (#958)', () => {
 
     const rosterWrapper = children[0]!;
     const hiringHeader = children[hiringIdx]!;
-    const hiringRows = children.slice(hiringIdx + 1);
+    const hiringRows = children.slice(hiringIdx + 1).filter(c => c.dataset['hiringRole'] !== undefined); // the filter bar (#2160) sits between header and rows
 
     expect(rosterWrapper.contains(hiringHeader)).toBe(false);
     expect(hiringRows.length).toBe(5); // ROLES: driller, blaster, driver, surveyor, manager
@@ -434,6 +435,25 @@ describe('hiringSignature (#1385)', () => {
     const afford = hiringSignature(state);
     state.cash = HIRING_COSTS.driller - 1;
     expect(hiringSignature(state)).not.toBe(afford);
+  });
+
+  it('changes when the filter selection changes (#2160)', () => {
+    const state = makeState([]);
+    const sel = new FilterBarSelection();
+    const before = hiringSignature(state, sel);
+    sel.groups['union'] = 'union';
+    expect(hiringSignature(state, sel)).not.toBe(before);
+  });
+
+  it('panel: clicking a role button narrows the groups and survives the next update (#2160)', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    panel.update(state);
+    (panel.root.querySelector('.bs-filter-bar [data-filter-value="driller"]') as HTMLButtonElement).click();
+    const roles = () => [...panel.root.querySelectorAll<HTMLElement>('[data-hiring-role]')].map(n => n.dataset['hiringRole']);
+    expect(roles()).toEqual(['driller']);
+    panel.update(state);
+    expect(roles()).toEqual(['driller']);
   });
 
   it('does not change on raw cash changes that keep every role affordability', () => {
@@ -719,5 +739,247 @@ describe('CrewPanel — hire card union line names demands and strikes (#1890)',
     expect(fr).toMatch(/revendication/i);
     expect(fr).toMatch(/gr[eè]ve/i);
     expect(fr).toContain('{pct}');
+  });
+});
+
+describe('CrewPanel — hiring filter and sort (#2160)', () => {
+  type Level = 1 | 2 | 3 | 4 | 5;
+  function cand(id: number, role: HireCandidate['role'], quals: [HireCandidate['qualifications'][number]['category'], Level][], salary: number, unionized: boolean): HireCandidate {
+    return {
+      id, role, name: `Zed Person${id}`, unionized, salary,
+      qualifications: quals.map(([category, proficiencyLevel]) => ({ category, proficiencyLevel, xp: 0 })),
+    };
+  }
+
+  // Pool order deliberately differs from salary order inside the driller group (1 before 2).
+  function makePool(): HireCandidate[] {
+    return [
+      cand(1, 'driller', [['blasting', 1], ['driving.drill_rig', 1]], 400, false),
+      cand(2, 'driller', [['blasting', 3], ['driving.drill_rig', 1]], 300, true),
+      cand(3, 'blaster', [['blasting', 2], ['driving.truck', 1]], 900, false),
+      cand(4, 'blaster', [['blasting', 1], ['driving.truck', 3]], 700, true),
+      cand(5, 'driver', [['driving.truck', 1], ['driving.excavator', 1]], 500, false),
+      cand(6, 'surveyor', [['geology', 1]], 600, false),
+      cand(7, 'manager', [['management', 1]], 1000, true),
+    ];
+  }
+
+  function setup(opts: { cash?: number; pool?: HireCandidate[] } = {}) {
+    const state = makeState([]);
+    state.hiringPool.candidates = opts.pool ?? makePool();
+    state.cash = opts.cash ?? 100000;
+    const sel = new FilterBarSelection();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const hires: [string, number][] = [];
+    let changes = 0;
+    const render = (): void => {
+      host.replaceChildren(...makeHiringSection(state, (role, id) => { hires.push([role, id]); }, {
+        selection: sel,
+        onChange: () => { changes++; render(); },
+      }));
+    };
+    render();
+    return { state, sel, host, hires, render, changes: () => changes };
+  }
+
+  const click = (host: HTMLElement, selector: string): void => {
+    const btn = host.querySelector<HTMLButtonElement>(selector);
+    if (!btn) throw new Error(`no control ${selector}`);
+    btn.click();
+  };
+  const roleBtn = (role: string): string => `button[data-filter-value="${role}"]`;
+  const groupBtn = (group: string, value: string): string => `[data-filter-group="${group}"] button[data-filter-value="${value}"]`;
+  const sortBtn = (key: string): string => `button[data-sort-key="${key}"]`;
+  const shownIds = (host: HTMLElement): number[] =>
+    [...host.querySelectorAll<HTMLElement>('[data-candidate-card]')].map(c => Number(c.dataset['candidateCard']));
+  const shownRoles = (host: HTMLElement): string[] =>
+    [...host.querySelectorAll<HTMLElement>('[data-hiring-role]')].map(g => g.dataset['hiringRole']!);
+  const idsInGroup = (host: HTMLElement, role: string): number[] =>
+    [...host.querySelectorAll<HTMLElement>(`[data-hiring-role="${role}"] [data-candidate-card]`)].map(c => Number(c.dataset['candidateCard']));
+
+  it('without a view there is no filter bar and every role group and candidate shows', () => {
+    const state = makeState([]);
+    state.hiringPool.candidates = makePool();
+    const host = document.createElement('div');
+    host.append(...makeHiringSection(state, () => {}));
+    expect(host.querySelector('.bs-filter-bar')).toBeNull();
+    expect(shownRoles(host)).toEqual(['driller', 'blaster', 'driver', 'surveyor', 'manager']);
+    expect(shownIds(host)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('with a view the shared filter bar comes before the role groups', () => {
+    const { host } = setup();
+    const bar = host.querySelector('.bs-filter-bar');
+    expect(bar).not.toBeNull();
+    const firstGroup = host.querySelector('[data-hiring-role]')!;
+    expect(bar!.compareDocumentPosition(firstGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('an untouched view shows every group and candidate, no clear button and no no-match element', () => {
+    const { host } = setup();
+    expect(shownRoles(host)).toEqual(['driller', 'blaster', 'driver', 'surveyor', 'manager']);
+    expect(shownIds(host)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(host.querySelector('.bs-filter-clear')).toBeNull();
+    expect(host.querySelector('[data-hiring-no-match]')).toBeNull();
+  });
+
+  it('the bar offers every role in its main row', () => {
+    const { host } = setup();
+    for (const role of ['driller', 'blaster', 'driver', 'surveyor', 'manager']) {
+      expect(host.querySelector(roleBtn(role))).not.toBeNull();
+    }
+  });
+
+  it('a role button keeps only that role group, and the click calls onChange', () => {
+    const { host, changes } = setup();
+    click(host, roleBtn('blaster'));
+    expect(changes()).toBe(1);
+    expect(shownRoles(host)).toEqual(['blaster']);
+    expect(shownIds(host)).toEqual([3, 4]);
+  });
+
+  it('the skill row offers exactly the categories some pool candidate holds', () => {
+    const { host } = setup();
+    const offered = [...host.querySelectorAll<HTMLElement>('[data-filter-group="skill"] button[data-filter-value]')]
+      .map(b => b.dataset['filterValue']).sort();
+    expect(offered).toEqual(['blasting', 'driving.drill_rig', 'driving.excavator', 'driving.truck', 'geology', 'management']);
+  });
+
+  it('a skill filter matches a candidate whose matching skill is not the first qualification', () => {
+    const { host } = setup();
+    click(host, groupBtn('skill', 'driving.truck'));
+    expect(shownIds(host)).toEqual([3, 4, 5]);
+    expect(shownRoles(host)).toEqual(['blaster', 'driver']);
+  });
+
+  it('min level without a skill matches any qualification at or above it', () => {
+    const { host } = setup();
+    click(host, groupBtn('level', '3'));
+    expect(shownIds(host)).toEqual([2, 4]);
+  });
+
+  it('min level with a skill checks that skill only', () => {
+    const { host } = setup();
+    click(host, groupBtn('skill', 'blasting'));
+    click(host, groupBtn('level', '3'));
+    expect(shownIds(host)).toEqual([2]);
+  });
+
+  it('the union row narrows to union members and to non-members', () => {
+    const { host } = setup();
+    click(host, groupBtn('union', 'union'));
+    expect(shownIds(host)).toEqual([2, 4, 7]);
+    click(host, groupBtn('union', 'non_union'));
+    expect(shownIds(host)).toEqual([1, 3, 5, 6]);
+  });
+
+  it('affordable keeps candidates whose role fee is within cash', () => {
+    const { host } = setup({ cash: HIRING_COSTS.surveyor });
+    click(host, groupBtn('affordable', 'yes'));
+    const expected = makePool().filter(c => HIRING_COSTS[c.role] <= HIRING_COSTS.surveyor).map(c => c.id);
+    expect(shownIds(host)).toEqual(expected);
+    expect(shownIds(host)).toContain(6);
+    expect(shownIds(host)).not.toContain(7);
+  });
+
+  it('affordable drops a role whose fee is one over cash', () => {
+    const { host } = setup({ cash: HIRING_COSTS.surveyor - 1 });
+    click(host, groupBtn('affordable', 'yes'));
+    expect(shownIds(host)).not.toContain(6);
+  });
+
+  it('the salary sort orders ascending inside each role group', () => {
+    const { host } = setup();
+    click(host, sortBtn('salary'));
+    expect(idsInGroup(host, 'driller')).toEqual([2, 1]);
+    expect(idsInGroup(host, 'blaster')).toEqual([4, 3]);
+    expect(shownRoles(host)).toEqual(['driller', 'blaster', 'driver', 'surveyor', 'manager']);
+  });
+
+  it('the level sort orders descending by the highest qualification', () => {
+    const { host } = setup();
+    click(host, sortBtn('level'));
+    expect(idsInGroup(host, 'driller')).toEqual([2, 1]);
+    expect(idsInGroup(host, 'blaster')).toEqual([4, 3]);
+  });
+
+  it('the level sort follows the chosen skill', () => {
+    const { host } = setup();
+    click(host, groupBtn('skill', 'blasting'));
+    click(host, sortBtn('level'));
+    expect(idsInGroup(host, 'blaster')).toEqual([3, 4]);
+  });
+
+  it('with no sort chosen candidates keep pool order', () => {
+    const { host } = setup();
+    expect(idsInGroup(host, 'driller')).toEqual([1, 2]);
+  });
+
+  it('a role group with no remaining candidate is not rendered while a filter is active', () => {
+    const { host } = setup();
+    click(host, groupBtn('union', 'non_union'));
+    expect(host.querySelector('[data-hiring-role="manager"]')).toBeNull();
+    expect(host.querySelector('[data-hiring-role="driller"]')).not.toBeNull();
+    expect(host.querySelector('[data-hiring-no-match]')).toBeNull();
+  });
+
+  it('with an empty pool and no filter the old no-candidates line stays', () => {
+    const { host } = setup({ pool: [] });
+    expect(host.textContent).toContain(t('ui.crew.no_candidates'));
+    expect(host.querySelector('[data-hiring-role]')).not.toBeNull();
+    expect(host.querySelector('[data-hiring-no-match]')).toBeNull();
+  });
+
+  it('when no candidate matches a neutral no-match element replaces the groups', () => {
+    const { host } = setup();
+    click(host, groupBtn('skill', 'management'));
+    click(host, groupBtn('union', 'non_union'));
+    expect(host.querySelector('[data-hiring-no-match]')).not.toBeNull();
+    expect(host.querySelector('[data-hiring-role]')).toBeNull();
+    expect(host.querySelector('[data-candidate-card]')).toBeNull();
+    expect(host.querySelector('.bs-filter-bar')).not.toBeNull();
+  });
+
+  it('filters combine, and clear resets them all', () => {
+    const { host, sel } = setup();
+    click(host, roleBtn('blaster'));
+    click(host, groupBtn('union', 'union'));
+    expect(shownIds(host)).toEqual([4]);
+    click(host, groupBtn('skill', 'driving.truck'));
+    click(host, groupBtn('level', '3'));
+    click(host, sortBtn('salary'));
+    expect(shownIds(host)).toEqual([4]);
+    click(host, '.bs-filter-clear');
+    expect(shownIds(host)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(shownRoles(host)).toHaveLength(5);
+    expect(host.querySelector('.bs-filter-clear')).toBeNull();
+    expect(sel.isActive()).toBe(false);
+  });
+
+  it('clear after a no-match result brings the candidates back', () => {
+    const { host } = setup();
+    click(host, groupBtn('skill', 'management'));
+    click(host, groupBtn('union', 'non_union'));
+    click(host, '.bs-filter-clear');
+    expect(host.querySelector('[data-hiring-no-match]')).toBeNull();
+    expect(shownIds(host)).toHaveLength(7);
+  });
+
+  it('a candidate card lists every qualification, not only the first', () => {
+    const { host } = setup();
+    const card = host.querySelector<HTMLElement>('[data-candidate-card="3"]')!;
+    expect(card.textContent).toContain(t('skill.blasting'));
+    expect(card.textContent).toContain(t('skill.driving.truck'));
+    const other = host.querySelector<HTMLElement>('[data-candidate-card="5"]')!;
+    expect(other.textContent).toContain(t('skill.driving.truck'));
+    expect(other.textContent).toContain(t('skill.driving.excavator'));
+  });
+
+  it('hiring from a filtered card still reports the role and candidate id', () => {
+    const { host, hires } = setup();
+    click(host, groupBtn('union', 'union'));
+    click(host, '[data-candidate-card="4"] button[data-candidate-id]');
+    expect(hires).toEqual([['blaster', 4]]);
   });
 });

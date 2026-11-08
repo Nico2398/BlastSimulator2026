@@ -301,3 +301,161 @@ describe('filterBar selection persistence', () => {
     expect(clearBtn(rebuilt)).toBeNull();
   });
 });
+
+describe('filterBar extra groups (#2160)', () => {
+  const groups = [
+    { id: 'union', label: 'Union', choices: [{ value: 'union', label: 'Union only' }, { value: 'non_union', label: 'Non-union only' }] },
+    { id: 'level', label: 'Min level', choices: [{ value: '2', label: '2+' }, { value: '3', label: '3+' }] },
+  ];
+
+  function row(bar: HTMLElement, id: string): HTMLElement | null {
+    return bar.querySelector<HTMLElement>(`[data-filter-group="${id}"]`);
+  }
+  function groupBtn(bar: HTMLElement, id: string, value: string): HTMLButtonElement {
+    return row(bar, id)!.querySelector<HTMLButtonElement>(`button[data-filter-value="${value}"]`)!;
+  }
+  const groupValue = (sel: FilterBarSelection, id: string): string | null => sel.groups[id] ?? null;
+
+  it('a fresh selection has no group values', () => {
+    expect(new FilterBarSelection().groups).toEqual({});
+  });
+
+  it('renders no group rows when the config has no groups', () => {
+    const bar = filterBar(new FilterBarSelection(), makeCfg());
+    expect(bar.querySelectorAll('[data-filter-group]').length).toBe(0);
+  });
+
+  it('renders one row per group with a button per choice and its label', () => {
+    const bar = filterBar(new FilterBarSelection(), makeCfg({ groups }));
+    expect(row(bar, 'union')).not.toBeNull();
+    expect(row(bar, 'level')).not.toBeNull();
+    expect(row(bar, 'union')!.querySelectorAll('button[data-filter-value]').length).toBe(2);
+    expect(row(bar, 'level')!.querySelectorAll('button[data-filter-value]').length).toBe(2);
+    expect(groupBtn(bar, 'union', 'non_union').textContent).toContain('Non-union only');
+    expect(row(bar, 'level')!.textContent).toContain('Min level');
+  });
+
+  it('keeps the main filter and sort rows working beside the groups', () => {
+    const bar = filterBar(new FilterBarSelection(), makeCfg({ groups }));
+    expect(allBtn(bar)).not.toBeNull();
+    expect(sortBtn(bar, 'price')).not.toBeNull();
+    expect(bar.textContent).toContain('Material');
+  });
+
+  it('clicking a group choice sets that group only and calls onChange with the selection', () => {
+    const sel = new FilterBarSelection();
+    const onChange = vi.fn();
+    const bar = filterBar(sel, makeCfg({ groups, onChange }));
+    groupBtn(bar, 'union', 'union').click();
+    expect(groupValue(sel, 'union')).toBe('union');
+    expect(groupValue(sel, 'level')).toBeNull();
+    expect(sel.filter).toBeNull();
+    expect(sel.sort).toBeNull();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(sel);
+  });
+
+  it('clicking another choice in the same group replaces the value', () => {
+    const sel = new FilterBarSelection();
+    sel.groups['union'] = 'union';
+    const bar = filterBar(sel, makeCfg({ groups }));
+    groupBtn(bar, 'union', 'non_union').click();
+    expect(groupValue(sel, 'union')).toBe('non_union');
+  });
+
+  it('clicking the selected group choice again clears it and still calls onChange', () => {
+    const sel = new FilterBarSelection();
+    sel.groups['level'] = '3';
+    const onChange = vi.fn();
+    const bar = filterBar(sel, makeCfg({ groups, onChange }));
+    groupBtn(bar, 'level', '3').click();
+    expect(groupValue(sel, 'level')).toBeNull();
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('a group click leaves the main filter and sort alone', () => {
+    const sel = new FilterBarSelection();
+    sel.filter = 'dirtite';
+    sel.sort = 'price';
+    const bar = filterBar(sel, makeCfg({ groups }));
+    groupBtn(bar, 'level', '2').click();
+    expect(sel.filter).toBe('dirtite');
+    expect(sel.sort).toBe('price');
+  });
+
+  it('a main-filter click leaves the group values alone', () => {
+    const sel = new FilterBarSelection();
+    sel.groups['union'] = 'union';
+    const bar = filterBar(sel, makeCfg({ groups }));
+    choiceBtn(bar, 'rustite').click();
+    expect(groupValue(sel, 'union')).toBe('union');
+  });
+
+  it('the all button leaves group values alone', () => {
+    const sel = new FilterBarSelection();
+    sel.filter = 'dirtite';
+    sel.groups['union'] = 'union';
+    const bar = filterBar(sel, makeCfg({ groups }));
+    allBtn(bar).click();
+    expect(sel.filter).toBeNull();
+    expect(groupValue(sel, 'union')).toBe('union');
+  });
+
+  it('a bar rebuilt from a selection shows the group choice pressed and the others not', () => {
+    const sel = new FilterBarSelection();
+    const cfg = makeCfg({ groups });
+    groupBtn(filterBar(sel, cfg), 'level', '3').click();
+    const rebuilt = filterBar(sel, cfg);
+    expect(pressed(groupBtn(rebuilt, 'level', '3'))).toBe(true);
+    expect(pressed(groupBtn(rebuilt, 'level', '2'))).toBe(false);
+    expect(pressed(groupBtn(rebuilt, 'union', 'union'))).toBe(false);
+  });
+
+  it('the same value in two groups is pressed only in its own group', () => {
+    const sel = new FilterBarSelection();
+    const twin = [
+      { id: 'a', label: 'A', choices: [{ value: 'x', label: 'X' }] },
+      { id: 'b', label: 'B', choices: [{ value: 'x', label: 'X' }] },
+    ];
+    sel.groups['a'] = 'x';
+    const bar = filterBar(sel, makeCfg({ groups: twin }));
+    expect(pressed(groupBtn(bar, 'a', 'x'))).toBe(true);
+    expect(pressed(groupBtn(bar, 'b', 'x'))).toBe(false);
+  });
+
+  it('a group value alone makes the selection active and shows the clear button', () => {
+    const sel = new FilterBarSelection();
+    expect(clearBtn(filterBar(sel, makeCfg({ groups })))).toBeNull();
+    sel.groups['union'] = 'union';
+    expect(sel.isActive()).toBe(true);
+    expect(clearBtn(filterBar(sel, makeCfg({ groups })))).not.toBeNull();
+  });
+
+  it('a group set back to null does not keep the selection active', () => {
+    const sel = new FilterBarSelection();
+    sel.groups['union'] = null;
+    expect(sel.isActive()).toBe(false);
+  });
+
+  it('clear() resets group values as well as filter and sort', () => {
+    const sel = new FilterBarSelection();
+    sel.filter = 'dirtite';
+    sel.sort = 'price';
+    sel.groups['union'] = 'union';
+    sel.groups['level'] = '3';
+    sel.clear();
+    expect(groupValue(sel, 'union')).toBeNull();
+    expect(groupValue(sel, 'level')).toBeNull();
+    expect(sel.isActive()).toBe(false);
+  });
+
+  it('the clear button resets group values and calls onChange', () => {
+    const sel = new FilterBarSelection();
+    sel.groups['level'] = '2';
+    const onChange = vi.fn();
+    const bar = filterBar(sel, makeCfg({ groups, onChange }));
+    clearBtn(bar)!.click();
+    expect(groupValue(sel, 'level')).toBeNull();
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+});
