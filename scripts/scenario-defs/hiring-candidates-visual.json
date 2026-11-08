@@ -69,7 +69,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-filter-bar [data-filter-group=\"skill\"] [data-filter-value=\"driving.drill_rig\"]"
+          "selector": "#bs-employee-panel .bs-filter-bar:has([data-filter-group=\"affordable\"]) [data-filter-group=\"skill\"] [data-filter-value=\"driving.drill_rig\"]"
         },
         {
           "type": "waitForSelector",
@@ -77,14 +77,14 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-filter-bar [data-sort-key=\"salary\"]"
+          "selector": "#bs-employee-panel .bs-filter-bar:has([data-filter-group=\"affordable\"]) [data-sort-key=\"salary\"]"
         },
         {
           "type": "screenshot"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-filter-bar .bs-filter-clear"
+          "selector": "#bs-employee-panel .bs-filter-bar:has([data-filter-group=\"affordable\"]) .bs-filter-clear"
         },
         {
           "type": "waitForSelector",

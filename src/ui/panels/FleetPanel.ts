@@ -15,7 +15,7 @@
 import { PanelBase } from './PanelBase.js';
 import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
+import { el, card, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -27,6 +27,8 @@ import { countLicenceHolders } from '../../core/entities/VehicleDriverAssignment
 import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
+import { FilterBarSelection, filterBar } from '../filterBar.js';
+import { FLEET_SORT_KEYS, FLEET_STATUS_CHOICES, fleetCriteriaFromSelection, filterVehicles } from '../fleetFilter.js';
 import { syncRowSelection, selectionChanged, type ListSelection } from '../selectionRoute.js';
 import { onRowBodyClick } from '../buildMenuRows.js';
 import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverNameLine } from '../fleetDetailSections.js';
@@ -62,6 +64,7 @@ export class FleetPanel extends PanelBase {
   private lastState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
   private selection: ListSelection = null;
+  private readonly filterSelection = new FilterBarSelection();
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-vehicle-panel'));
@@ -132,7 +135,11 @@ export class FleetPanel extends PanelBase {
    * refreshDynamic patches those in place.
    */
   private computeSignature(state: GameState): string {
-    return state.vehicles.vehicles.map(v => `${v.id}:${v.type}:${v.tier}`).join('|');
+    const rows = state.vehicles.vehicles.map(v => `${v.id}:${v.type}:${v.tier}`).join('|');
+    // Status and HP drift, so a filtered or sorted list signs the ids it shows: rows entering or leaving the view rebuild it.
+    const sel = this.filterSelection;
+    const shown = sel.isActive() ? this.visibleVehicles(state).map(v => v.id).join(',') : '';
+    return `${rows}#${shown}~${sel.filter}|${sel.sort}|${JSON.stringify(sel.groups)}`;
   }
 
   private refreshDynamic(state: GameState): void {
@@ -197,18 +204,41 @@ export class FleetPanel extends PanelBase {
     return banner;
   }
 
+  /** Vehicles that pass the fleet bar, in its sort order. */
+  private visibleVehicles(state: GameState): Vehicle[] {
+    return filterVehicles(state.vehicles.vehicles, fleetCriteriaFromSelection(this.filterSelection), state);
+  }
+
+  /** The fleet bar: role, tier, status, and the two sorts. */
+  private makeFleetBar(): HTMLElement {
+    return filterBar(this.filterSelection, {
+      choices: getAllVehicleRoles().map(role => ({ value: role, label: t(`vehicle_type.${role}`) })),
+      groups: [
+        { id: 'tier', label: t('ui.fleet.filter_tier'), choices: ([1, 2, 3] as const).map(n => ({ value: String(n), label: t('ui.fleet.filter_tier_choice', { tier: n }) })) },
+        { id: 'status', label: t('ui.fleet.filter_status'), choices: FLEET_STATUS_CHOICES.map(value => ({ value, label: t(`ui.fleet.filter_status_${value}`) })) },
+      ],
+      sorts: FLEET_SORT_KEYS.map(key => ({ key, label: t(`ui.fleet.sort_${key}`) })),
+      onChange: () => { if (this.lastState) { this.lastSignature = null; this.update(this.lastState); } },
+      filterLabel: t('ui.fleet.filter_role'), sortLabel: t('ui.filter.sort'),
+      allLabel: t('ui.filter.all'), clearLabel: t('ui.filter.clear'),
+    });
+  }
+
   private render(state: GameState): void {
     const { vehicles } = state.vehicles;
     const children: HTMLElement[] = [];
     const banner = this.makeTrafficBanner(state);
     if (banner) children.push(this.tag(banner, 'bs-fleet-traffic'));
 
+    const visible = this.visibleVehicles(state);
     const vehicleCards = vehicles.length === 0
       ? [el('div', { className: 'bsx-empty', text: t('ui.fleet.none') })]
-      : vehicles.map(v => this.makeVehicleCard(v, state));
-    children.push(scrollBoundedSection(vehicleCards, 200, { gap: 9 }));
+      : visible.length === 0
+        ? [el('div', { className: 'bsx-empty', text: t('ui.fleet.filter_no_match') })]
+        : visible.map(v => this.makeVehicleCard(v, state));
+    children.push(scrollBoundedSection(vehicles.length === 0 ? vehicleCards : [this.makeFleetBar(), ...vehicleCards], 200, { gap: 9, scrollKey: 'fleet' }));
     children.push(sectionHeader(t('ui.fleet.dealership')), ...this.makeDealershipRows(state));
-    this.bodyEl.replaceChildren(...children);
+    replaceChildrenKeepingScroll(this.bodyEl, children);
   }
 
   // ── Dealership ──
