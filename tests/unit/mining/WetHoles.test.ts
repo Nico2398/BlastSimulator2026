@@ -9,9 +9,11 @@ import {
   classifyWetChargedHoles,
   fizzlingHoles,
   rainExposedHoles,
+  wetFizzlePercent,
 } from '../../../src/core/mining/WetHoles.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import { HOLE_WET_THRESHOLD } from '../../../src/core/config/balance.js';
+import { waterEffect } from '../../../src/core/mining/BlastCalc.js';
 import { setHoleWater } from '../../helpers/holeWater.js';
 
 function makeHole(id: string): DrillHole {
@@ -370,5 +372,26 @@ describe('rainExposedHoles (#1957)', () => {
     const state = stateWith([]);
     state.weather.current = 'storm';
     expect(rainExposedHoles(state)).toEqual([]);
+  });
+});
+
+describe('wetFizzlePercent (#2166)', () => {
+  it('is the whole-percent energy share a water-sensitive untubed charge keeps in a wet hole', () => {
+    expect(wetFizzlePercent()).toBe(Math.round(waterEffect(true, true, false) * 100));
+  });
+
+  it('is 10', () => {
+    expect(wetFizzlePercent()).toBe(10);
+  });
+
+  it('is a whole number between 0 and 100', () => {
+    const p = wetFizzlePercent();
+    expect(Number.isInteger(p)).toBe(true);
+    expect(p).toBeGreaterThanOrEqual(0);
+    expect(p).toBeLessThan(100);
+  });
+
+  it('is stable across calls', () => {
+    expect(wetFizzlePercent()).toBe(wetFizzlePercent());
   });
 });

@@ -518,14 +518,14 @@ describe('BlastFooter — permit usage (#1925)', () => {
     expect(footer.root.textContent).not.toContain('/ 40 kg');
   });
 
-  it('never renders an inspection chance or overshoot', () => {
+  it('states the inspection consequence of an over-permit plan, never the raw overshoot (#2166)', () => {
     const { footer } = makeFooter();
     footer.update(permitState(12, 5));
     const text = footer.root.textContent!.toLowerCase();
-    expect(text).not.toContain('chance');
+    expect(text).toContain('chance');
     expect(text).not.toContain('overshoot');
-    expect(text).not.toMatch(/\d\s*%/);
   });
+
 });
 
 describe('BlastFooter sealed ore (#2053)', () => {
