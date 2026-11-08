@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { scrollBoundedSection, panelHeader, replaceChildrenKeepingScroll, explainable, chip, gauge, statGrid } from '../../../src/ui/dom.js';
 import type { ScrollBoundedSectionOptions } from '../../../src/ui/dom.js';
 import { PANEL_CLOSE_ATTR, PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
@@ -331,5 +331,50 @@ describe('statGrid explanation', () => {
     const v = grid.querySelector<HTMLElement>('.bsx-stat-value')!;
     expect(v.dataset['info']).toBe('tip');
     expect(v.hasAttribute('data-explain')).toBe(false);
+  });
+});
+
+describe('explainable placement', () => {
+  function place(rect: Partial<DOMRect>, cls = '', vw = 1000, vh = 700, evt = 'pointerenter'): HTMLElement {
+    const node = document.createElement('span');
+    if (cls !== '') node.classList.add(cls);
+    explainable(node, 'text');
+    vi.spyOn(node, 'getBoundingClientRect').mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0, ...rect } as DOMRect);
+    vi.stubGlobal('innerWidth', vw);
+    vi.stubGlobal('innerHeight', vh);
+    node.dispatchEvent(new Event(evt));
+    vi.unstubAllGlobals();
+    return node;
+  }
+
+  it('opens below with room to spare', () => {
+    const n = place({ top: 100, bottom: 120, left: 50, right: 90 });
+    expect(n.style.getPropertyValue('--bsx-explain-top')).toBe('124px');
+    expect(n.style.getPropertyValue('--bsx-explain-bottom')).toBe('auto');
+    expect(n.style.getPropertyValue('--bsx-explain-left')).toBe('50px');
+  });
+
+  it('flips above near the viewport bottom', () => {
+    const n = place({ top: 650, bottom: 670, left: 50, right: 90 });
+    expect(n.style.getPropertyValue('--bsx-explain-top')).toBe('auto');
+    expect(n.style.getPropertyValue('--bsx-explain-bottom')).toBe('54px');
+  });
+
+  it('right-anchors bsx-explain-end nodes and clamps left to 0', () => {
+    const n = place({ top: 100, bottom: 120, left: 100, right: 150 }, 'bsx-explain-end', 1000, 700, 'focus');
+    expect(n.style.getPropertyValue('--bsx-explain-left')).toBe('0px');
+  });
+
+  it('clamps left inside the viewport width', () => {
+    const n = place({ top: 100, bottom: 120, left: 990, right: 1000 });
+    expect(n.style.getPropertyValue('--bsx-explain-left')).toBe('812px');
+  });
+
+  it('attaches listeners once across repeated calls', () => {
+    const node = document.createElement('span');
+    const spy = vi.spyOn(node, 'addEventListener');
+    explainable(node, 'a');
+    explainable(node, 'b');
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 });

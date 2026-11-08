@@ -7,7 +7,7 @@ import { scenarioFiles, loadScenarioDef, SCENARIO_DIR } from '../../../scripts/s
 // ── Dual-play interaction action types ──
 
 export const KNOWN_INTERACTION_ACTION_TYPES = [
-  'click', 'clickSelector', 'mousedown', 'mouseup', 'mousemove',
+  'click', 'clickSelector', 'hoverSelector', 'mousedown', 'mouseup', 'mousemove',
   'pickTile', 'dragTiles', 'cameraFocus',
   'keypress', 'keydown', 'keyup',
   'scroll', 'wheel',

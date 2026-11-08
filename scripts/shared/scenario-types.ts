@@ -27,6 +27,10 @@ export const WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS = 30000;
 export type InteractionStepAction =
   | { type: 'click'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
   | { type: 'clickSelector'; selector: string; button?: 'left' | 'right' | 'middle'; timeout?: number }
+  // Moves the real pointer onto a control once it is usable (same gate and
+  // failure as `clickSelector`), so hover-only UI such as the `explainable()`
+  // tooltip can be screenshotted by a player step (#2188).
+  | { type: 'hoverSelector'; selector: string; timeout?: number }
   | { type: 'mousedown'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
   | { type: 'mouseup'; x: number; y: number; button?: 'left' | 'right' | 'middle' }
   | { type: 'mousemove'; x: number; y: number }

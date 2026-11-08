@@ -1,0 +1,63 @@
+{
+  "name": "explain-tooltip-visual",
+  "description": "Hover-only stat explanations (#2163, #2188): a player hovers a hiring candidate's skill chip and a crew member's morale value with the real pointer, and the explainable() tooltip is screenshotted open next to the stat it explains.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32",
+      "timeout": 30,
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 size:32" }
+      ],
+      "expect": {
+        "equals": { "cash": 50000, "employeeCount": 0 }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "role": "player",
+      "description": "Open the Crew panel and hover the first hiring candidate's skill chip with the real pointer; the skill-level explanation tooltip appears beside it and is screenshotted.",
+      "interaction": [
+        { "type": "ensurePanel", "panel": "employees" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-candidate-skill]" },
+        { "type": "hoverSelector", "selector": "#bs-employee-panel [data-candidate-skill]" },
+        { "type": "screenshot" }
+      ],
+      "expect": {
+        "equals": { "employeeCount": 0 }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "timeout": 30,
+      "role": "player",
+      "description": "Hire a driller with a real click so the roster has a card carrying a morale value.",
+      "interaction": [
+        { "type": "ensurePanel", "panel": "employees" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" },
+        { "type": "clickSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" }
+      ],
+      "expect": {
+        "increased": ["employeeCount"],
+        "changedBy": { "cash": -1000 },
+        "note": "HIRING_COSTS.driller is 1000 (balance.ts)"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "role": "player",
+      "description": "Hover the hired driller's morale percentage on the roster card; the morale explanation tooltip appears beside it and is screenshotted.",
+      "interaction": [
+        { "type": "ensurePanel", "panel": "employees" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel .bs-crew-morale-value" },
+        { "type": "hoverSelector", "selector": "#bs-employee-panel .bs-crew-morale-value" },
+        { "type": "screenshot" }
+      ],
+      "expect": {
+        "equals": { "employeeCount": 1 }
+      }
+    }
+  ]
+}
