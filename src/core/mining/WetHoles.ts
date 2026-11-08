@@ -74,6 +74,11 @@ export function fizzlingHoles(
   return classifyWetChargedHoles(state.chargesByHole, wetHoleIdsFor(state)).fizzled;
 }
 
+/** Share (whole percent) of its energy a water-sensitive charge delivers in a wet hole. */
+export function wetFizzlePercent(): number {
+  return Math.round(waterEffect(true, true, false) * 100);
+}
+
 /** Charged untubed holes with a water-sensitive charge while rain falls (wet or dry); [] when not raining, sorted. */
 export function rainExposedHoles(
   state: Pick<GameState, 'drillHoles' | 'chargesByHole' | 'tubingState' | 'weather'>,

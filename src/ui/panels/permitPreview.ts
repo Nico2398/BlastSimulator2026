@@ -1,9 +1,10 @@
 // BlastSimulator2026 — Permit preview: view model of a plan against the mine's permit (#1925)
 
 import type { GradeState } from '../../core/economy/MineGrade.js';
-import { preFireCheck, liveStrikes } from '../../core/economy/PermitLimits.js';
+import { preFireCheck, liveStrikes, inspectionChance, inspectionFine } from '../../core/economy/PermitLimits.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { t } from '../../core/i18n/I18n.js';
+import { PERMIT_STRIKES_TO_SUSPEND } from '../../core/config/balance.js';
 import { permitStrikesText } from '../../core/economy/permitLimitText.js';
 
 /** Display-ready comparison of a blast plan with the current permit. */
@@ -20,6 +21,12 @@ export interface PermitPreview {
   strikes: number;
   strikesText: string;
   warningText: string;
+  /** Chance an inspector turns up for this plan; 0 when within the permit. */
+  inspectionChance: number;
+  /** Fine if caught; 0 when within the permit. */
+  fine: number;
+  /** Chance, fine and strikes against the ban threshold; '' when within the permit. */
+  consequenceText: string;
 }
 
 /** Plan shape needed: hole list and per-hole charges (matches `BlastPlan`). */
@@ -39,6 +46,11 @@ export function permitPreview(
   const strikeTicks = grade.strikeTicks ?? [];
   const strikes = liveStrikes(strikeTicks, tick).length;
   const kg = Math.round(check.planKg * 10) / 10;
+  const chance = check.over ? inspectionChance(check.overshoot) : 0;
+  const fine = check.over ? inspectionFine(check.fee, check.overshoot) : 0;
+  const consequenceText = check.over
+    ? t('permit.preview.consequence', { chance: Math.round(chance * 100), fine: formatMoney(fine), strikes, limit: PERMIT_STRIKES_TO_SUSPEND })
+    : '';
   return {
     over: check.over,
     kgOver: check.planKg > check.limits.maxChargeKg,
@@ -49,7 +61,10 @@ export function permitPreview(
     feeText: t('permit.preview.fee', { fee: formatMoney(check.fee) }),
     strikes,
     strikesText: permitStrikesText(strikeTicks, tick),
-    warningText: check.over ? t('permit.preview.warning') : '',
+    warningText: check.over ? t('permit.preview.warning', { consequence: consequenceText }) : '',
+    inspectionChance: chance,
+    fine,
+    consequenceText,
   };
 }
 
