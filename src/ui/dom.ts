@@ -95,7 +95,31 @@ export function explainable<T extends HTMLElement>(node: T, text: string | undef
   node.dataset['explain'] = text;
   node.tabIndex = 0;
   node.classList.add('bsx-explainable');
+  for (const evt of ['pointerenter', 'focus'] as const) node.addEventListener(evt, () => placeExplanation(node));
   return node;
+}
+
+const EXPLAIN_MAX_WIDTH_PX = 180;
+const EXPLAIN_GAP_PX = 4;
+/** Tooltip height budget that decides whether it opens below or above its anchor. */
+const EXPLAIN_HEIGHT_BUDGET_PX = 90;
+
+/**
+ * Anchors the `::after` tooltip in viewport coordinates (it is `position: fixed`), so a
+ * scroll container such as the crew roster cannot clip it. Opens below the node, above when
+ * the space below is short; `bsx-explain-end` anchors its right edge, and the box stays
+ * inside the viewport horizontally.
+ */
+function placeExplanation(node: HTMLElement): void {
+  const r = node.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const openAbove = vh - r.bottom < EXPLAIN_HEIGHT_BUDGET_PX && r.top > EXPLAIN_HEIGHT_BUDGET_PX;
+  const left = node.classList.contains('bsx-explain-end') ? r.right - EXPLAIN_MAX_WIDTH_PX : r.left;
+  const s = node.style;
+  s.setProperty('--bsx-explain-top', openAbove ? 'auto' : `${r.bottom + EXPLAIN_GAP_PX}px`);
+  s.setProperty('--bsx-explain-bottom', openAbove ? `${vh - r.top + EXPLAIN_GAP_PX}px` : 'auto');
+  s.setProperty('--bsx-explain-left', `${Math.max(0, Math.min(left, vw - EXPLAIN_MAX_WIDTH_PX - 8))}px`);
 }
 
 /** Status chip (IN ZONE, TUBED, WET, STUCK, UNION, …); `explain` says what it changes. */

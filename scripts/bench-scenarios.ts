@@ -40,7 +40,7 @@ import { raceStepDeadline } from './shared/step-deadline.js';
 
 const INTERACTION_SETTLE_MS = 300;
 const SETTLE_AFTER = new Set([
-  'click', 'clickSelector', 'pickTile', 'dragTiles', 'mousedown', 'mouseup', 'type',
+  'click', 'clickSelector', 'hoverSelector', 'pickTile', 'dragTiles', 'mousedown', 'mouseup', 'type',
 ]);
 const OUT_DIR = resolve(import.meta.dirname ?? process.cwd(), '..', 'screenshots', 'bench');
 
