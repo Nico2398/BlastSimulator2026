@@ -19,3 +19,7 @@ Issue #553 is the case to remember: its `## Test` section listed 64 scenario def
 ## ▶ Splitting a change that breaks a whole suite
 
 Split the enablers off first: #553 carried three — `campaign start` had no `staffed:` option (#551 gave one to `new_game` and `sandbox` only), every file needed its own sandbox-measured tick pad before its holes landed, and contract ids drifted under the added ticks so each file had to be renumbered by hand. Land a `staffed:` for campaign starts, a `tick_until <field>:<value>` step, and a stable way to name a contract, and most of the 64 files become a two-line edit that fits in one run.
+
+## SKILL.md — A parent scope waits rather than holds
+
+The guidance that a parent scope "holds its place while it waits" was rewritten on 2026-11-07, when the owner retired the parent-scope hold in `assignability.cjs` (see `agentic-autonomous-pipeline`'s history, "A parent scope no longer holds its place"). The advice to prefer the narrowest scope stands, with a different reason: a parent now waits the longest to start, instead of holding younger work back.
