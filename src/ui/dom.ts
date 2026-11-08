@@ -94,8 +94,10 @@ export function explainable<T extends HTMLElement>(node: T, text: string | undef
   if (!text) return node;
   node.dataset['explain'] = text;
   node.tabIndex = 0;
-  node.classList.add('bsx-explainable');
-  for (const evt of ['pointerenter', 'focus'] as const) node.addEventListener(evt, () => placeExplanation(node));
+  if (!node.classList.contains('bsx-explainable')) {
+    node.classList.add('bsx-explainable');
+    for (const evt of ['pointerenter', 'focus'] as const) node.addEventListener(evt, () => placeExplanation(node));
+  }
   return node;
 }
 
