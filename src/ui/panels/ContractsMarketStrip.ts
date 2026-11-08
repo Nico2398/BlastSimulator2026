@@ -4,7 +4,8 @@ import { formatTrendPct, oreSaturationTrend, type SaturationReader } from '../..
 import { gradeDef } from '../../core/economy/MineGrade.js';
 import { MARKET_HUNGRY_SATURATION, ORE_SATURATION_TOAST_LEVEL } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, progressBar } from '../dom.js';
+import { el, card, progressBar, explainable } from '../dom.js';
+import { buyerExplain, marketRowExplain } from '../panelExplain.js';
 import { iconEl, type IconName } from '../icons.js';
 
 export interface MarketStripInput {
@@ -25,7 +26,7 @@ export function makeBuyerBadge(tier: BuyerTierId): HTMLElement {
   const name = t(buyerTierNameKey(tier));
   const aria = t('ui.contracts.buyer_badge_aria', { buyer: name });
   const { color, icon } = TIER_BADGE[tier];
-  return el('span', {
+  return explainable(el('span', {
     className: 'bs-contract-buyer-badge',
     text: name,
     attrs: {
@@ -33,7 +34,7 @@ export function makeBuyerBadge(tier: BuyerTierId): HTMLElement {
       style: `display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:3px;background:rgba(255,255,255,.06);font:600 9px/1 var(--bsx-font-ui);color:${color}`,
     },
     children: [iconEl(icon, 10)],
-  });
+  }), buyerExplain(tier));
 }
 
 export function lockedBuyerTiers(grade: number): readonly BuyerTier[] {
@@ -57,9 +58,9 @@ function makeOreRow(oreId: string, sat: number, basePrice: number): HTMLElement 
   const trendColor = pct < 0 ? 'var(--bsx-critical-text)' : pct > 0 ? 'var(--bsx-positive)' : 'var(--bsx-text-micro)';
   const satBox = el('div', { className: 'bs-market-sat', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '1', 'aria-valuenow': String(sat) }, children: [progressBar(sat * 100, sat >= ORE_SATURATION_TOAST_LEVEL ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)')] });
   satBox.style.cssText = 'flex:1;min-width:40px';
-  return el('div', {
+  return explainable(el('div', {
     className: 'bs-market-row',
-    attrs: { 'data-ore': oreId, title: t(marketTooltipKey(sat)), style: 'display:flex;align-items:center;gap:8px' },
+    attrs: { 'data-ore': oreId, style: 'display:flex;align-items:center;gap:8px' },
     children: [
       el('span', { text: t(`ore.${oreId}.name`), attrs: { style: 'font:500 10px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary);min-width:70px' } }),
       el('span', {
@@ -69,7 +70,7 @@ function makeOreRow(oreId: string, sat: number, basePrice: number): HTMLElement 
       }),
       satBox,
     ],
-  });
+  }), marketRowExplain(pct, sat));
 }
 
 /** Empty ore list yields an empty strip; the caller skips it. */

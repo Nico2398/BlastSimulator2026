@@ -6,7 +6,8 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button, sectionHeader, progressBar, panelRoot, panelHeader, panelBody, flashStatus } from '../dom.js';
+import { permitStrikesExplain } from '../panelExplain.js';
+import { el, explainable, card, button, sectionHeader, progressBar, panelRoot, panelHeader, panelBody, flashStatus } from '../dom.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -110,7 +111,7 @@ export class PermitPanel extends PanelBase {
         }),
       ] }),
       el('span', { text: limitTexts.limits, attrs: { 'data-role': 'permit-limits', style: MICRO_STYLE } }),
-      el('span', { text: limitTexts.strikes, attrs: { 'data-role': 'permit-strikes', style: MICRO_STYLE } }),
+      explainable(el('span', { text: limitTexts.strikes, attrs: { 'data-role': 'permit-strikes', style: MICRO_STYLE } }), permitStrikesExplain()),
     ]);
 
     const nextChildren: (Node | null)[] = [

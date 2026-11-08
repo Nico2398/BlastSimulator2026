@@ -10,6 +10,7 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { t } from '../../../src/core/i18n/I18n.js';
+import { STUCK_THRESHOLD, MOVE_STUCK_ABANDON_TICKS } from '../../../src/core/config/balance.js';
 
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
@@ -330,5 +331,88 @@ describe('fleetDetailSections — makeDriverNameLine, entity opener (#2165)', ()
     const { opener } = mockOpener();
     const line = makeDriverNameLine(makeVehicle({ type: 'drill_rig' }), [], opener);
     expect(line.querySelector('button')).toBeNull();
+  });
+});
+
+// ── Explanations on hover, focus and tap (#2170) ──
+
+describe('fleetDetailSections — explanations (#2170)', () => {
+  it('the HP gauge row explains what low HP does', () => {
+    const row = makeHpGauge(makeVehicle({ hp: 40 }));
+    const text = row.dataset['explain'] ?? '';
+    expect(text.length).toBeGreaterThan(0);
+    expect(text).toMatch(/broken/i);
+    expect(text).toMatch(/repair/i);
+  });
+
+  it('the HP gauge explains even a full-health vehicle', () => {
+    expect(makeHpGauge(makeVehicle({ hp: 100 })).dataset['explain']).toBeTruthy();
+  });
+
+  it('the HP gauge explanation is the same wherever the vehicle stands', () => {
+    expect(makeHpGauge(makeVehicle({ hp: 5 })).dataset['explain']).toBe(makeHpGauge(makeVehicle({ hp: 95 })).dataset['explain']);
+  });
+
+  it('a broken chip explains why', () => {
+    const state = makeState();
+    const chip = makeStatusChip(makeVehicle({ hp: 0 }), state.vehicles);
+    expect(chip.dataset['explain']).toBeTruthy();
+  });
+
+  it('an idle chip explains why', () => {
+    const state = makeState([makeVehicle()], []);
+    expect(makeStatusChip(makeVehicle(), state.vehicles).dataset['explain']).toBeTruthy();
+  });
+
+  it('a stuck chip quotes a stuck figure from balance', () => {
+    const vehicle = makeVehicle({ id: 3, occupantIds: [6] });
+    const occupant = makeEmployee({ id: 6, isMoveStuck: true, moveConsecutiveFailures: 4 });
+    const state = makeState([vehicle], [occupant]);
+    const chip = makeStatusChip(vehicle, state.vehicles, occupant);
+    expect(chip.textContent).toContain('Stuck');
+    const text = chip.dataset['explain'] ?? '';
+    expect(text.includes(String(STUCK_THRESHOLD)) || text.includes(String(MOVE_STUCK_ABANDON_TICKS))).toBe(true);
+  });
+
+  it('a waiting chip gives a waiting reason distinct from the stuck one', () => {
+    const vehicle = makeVehicle({ id: 3, occupantIds: [6] });
+    const waiting = makeEmployee({ id: 6, vehicleWaitingTicks: 5 });
+    const stuck = makeEmployee({ id: 6, isMoveStuck: true, moveConsecutiveFailures: 4 });
+    const state = makeState([vehicle], [waiting]);
+    const waitingChip = makeStatusChip(vehicle, state.vehicles, waiting);
+    const stuckChip = makeStatusChip(vehicle, state.vehicles, stuck);
+    expect(waitingChip.dataset['explain']).toBeTruthy();
+    expect(waitingChip.dataset['explain']).not.toBe(stuckChip.dataset['explain']);
+  });
+
+  it('a hauling chip carries an explanation', () => {
+    const vehicle = makeVehicle({ id: 3, type: 'debris_hauler' });
+    const state = makeState([vehicle], [makeEmployee({ id: 6 })]);
+    vehicle.occupantIds = [6];
+    state.vehicles.reservations.push({ vehicleId: vehicle.id, actionId: 1 });
+    const occupant = state.employees.employees.find(e => e.id === 6);
+    expect(makeStatusChip(vehicle, state.vehicles, occupant).dataset['explain']).toBeTruthy();
+  });
+
+  it('a working and a moving chip each carry an explanation', () => {
+    const vehicle = makeVehicle({ id: 3, occupantIds: [6] });
+    const working = makeEmployee({ id: 6, taskTicksRemaining: 5 });
+    const state = makeState([vehicle], [working]);
+    expect(makeStatusChip(vehicle, state.vehicles, working).dataset['explain']).toBeTruthy();
+    const moving = makeEmployee({ id: 6, itinerary: {} as Employee['itinerary'] });
+    expect(makeStatusChip(vehicle, state.vehicles, moving).dataset['explain']).toBeTruthy();
+  });
+
+  it('every status chip kind explains differently from the others', () => {
+    const state = makeState();
+    const vehicle = makeVehicle({ id: 3, occupantIds: [6] });
+    const explains = [
+      makeStatusChip(makeVehicle({ hp: 0 }), state.vehicles),
+      makeStatusChip(vehicle, state.vehicles, makeEmployee({ id: 6, isMoveStuck: true, moveConsecutiveFailures: 4 })),
+      makeStatusChip(vehicle, state.vehicles, makeEmployee({ id: 6, vehicleWaitingTicks: 5 })),
+      makeStatusChip(vehicle, state.vehicles, makeEmployee({ id: 6, taskTicksRemaining: 5 })),
+      makeStatusChip(makeVehicle(), state.vehicles),
+    ].map(c => c.dataset['explain']);
+    expect(new Set(explains).size).toBe(explains.length);
   });
 });

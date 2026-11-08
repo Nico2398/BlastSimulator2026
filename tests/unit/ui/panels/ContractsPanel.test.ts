@@ -18,6 +18,7 @@ import { BUYER_TIERS, buyerTierNameKey } from '../../../../src/core/economy/Buye
 import { oreSaturationTrend } from '../../../../src/core/economy/OreSaturation.js';
 import { resolveContractOres } from '../../../../src/core/campaign/Level.js';
 import { getOre } from '../../../../src/core/world/OreCatalog.js';
+import { CONTRACT_EARLY_BONUS_DEADLINE_FRACTION, NEGOTIATION_MAX_IMPROVEMENT, NEGOTIATION_MAX_WORSENING } from '../../../../src/core/config/balance.js';
 
 function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -1733,7 +1734,7 @@ describe('ContractsPanel — market strip (progression)', () => {
     const titleAt = (level: number): string => {
       const state = progressionState();
       saturate(state, 'dirtite', level);
-      return rowOf(render(state).panel, 'dirtite').title;
+      return rowOf(render(state).panel, 'dirtite').getAttribute('data-explain') ?? '';
     };
 
     it('has the exact English lines', () => {
@@ -1744,19 +1745,19 @@ describe('ContractsPanel — market strip (progression)', () => {
     });
 
     it('flooded at 0.5 (boundary) and above', () => {
-      expect(titleAt(0.5)).toBe(t('ui.contracts.market_tip_flooded'));
-      expect(titleAt(1)).toBe(t('ui.contracts.market_tip_flooded'));
+      expect(titleAt(0.5)).toContain(t('ui.contracts.market_tip_flooded'));
+      expect(titleAt(1)).toContain(t('ui.contracts.market_tip_flooded'));
     });
 
     it('hungry at 0.1 (boundary) and below, and when unsold', () => {
-      expect(titleAt(0.1)).toBe(t('ui.contracts.market_tip_hungry'));
-      expect(titleAt(0)).toBe(t('ui.contracts.market_tip_hungry'));
+      expect(titleAt(0.1)).toContain(t('ui.contracts.market_tip_hungry'));
+      expect(titleAt(0)).toContain(t('ui.contracts.market_tip_hungry'));
     });
 
     it('steady in between', () => {
-      expect(titleAt(0.3)).toBe(t('ui.contracts.market_tip_steady'));
-      expect(titleAt(0.49)).toBe(t('ui.contracts.market_tip_steady'));
-      expect(titleAt(0.11)).toBe(t('ui.contracts.market_tip_steady'));
+      expect(titleAt(0.3)).toContain(t('ui.contracts.market_tip_steady'));
+      expect(titleAt(0.49)).toContain(t('ui.contracts.market_tip_steady'));
+      expect(titleAt(0.11)).toContain(t('ui.contracts.market_tip_steady'));
     });
   });
 
@@ -2317,6 +2318,155 @@ describe('ContractsPanel filter bar (#2159)', () => {
       } finally {
         setLocale('en');
       }
+    });
+  });
+});
+
+describe('ContractsPanel — explanations (#2170)', () => {
+  const explainOf = (el: Element | null): string => (el as HTMLElement | null)?.dataset['explain'] ?? '';
+  const card = (panel: ContractsPanel, id: number) => panel.root.querySelector<HTMLElement>(`[data-contract-id="${id}"]`)!;
+
+  function render(setup: (state: GameState) => void): ContractsPanel {
+    const { panel } = makePanel();
+    const state = withManager(makeState());
+    setup(state);
+    panel.show();
+    panel.update(state);
+    return panel;
+  }
+
+  describe('held badge (C1)', () => {
+    it('explains that automatic delivery stops until resumed', () => {
+      const panel = render(s => { s.contracts.active.push(makeContract({ id: 5, held: true })); });
+      const badge = card(panel, 5).querySelector('.bs-contract-held');
+      expect(badge).not.toBeNull();
+      expect(explainOf(badge)).toMatch(/deliver/i);
+    });
+
+    it('has no badge, so nothing to explain, on a contract that is not held', () => {
+      const panel = render(s => { s.contracts.active.push(makeContract({ id: 5 })); });
+      expect(card(panel, 5).querySelector('.bs-contract-held')).toBeNull();
+    });
+
+    it('speaks French after a locale change', () => {
+      const panel = render(s => { s.contracts.active.push(makeContract({ id: 5, held: true })); });
+      const en = explainOf(card(panel, 5).querySelector('.bs-contract-held'));
+      setLocale('fr');
+      try {
+        const fr = render(s => { s.contracts.active.push(makeContract({ id: 5, held: true })); });
+        expect(explainOf(card(fr, 5).querySelector('.bs-contract-held'))).not.toBe(en);
+      } finally {
+        setLocale('en');
+      }
+    });
+  });
+
+  describe('offer terms (C2)', () => {
+    it('the penalty span says it is charged when the deadline passes unfulfilled', () => {
+      const panel = render(s => { s.contracts.available.push(makeContract({ id: 7, penaltyAmount: 90 })); });
+      const span = card(panel, 7).querySelector('.bs-contract-penalty');
+      expect(span).not.toBeNull();
+      expect(span!.textContent).toContain('90');
+      expect(explainOf(span)).toMatch(/deadline/i);
+    });
+
+    it('the bonus span states the early-delivery share of the deadline and quotes the bonus', () => {
+      const panel = render(s => { s.contracts.available.push(makeContract({ id: 7, earlyBonus: 4567 })); });
+      const span = card(panel, 7).querySelector('.bs-contract-bonus');
+      expect(span).not.toBeNull();
+      expect(span!.textContent).toContain('4,567');
+      expect(explainOf(span)).toContain(`${Math.round(CONTRACT_EARLY_BONUS_DEADLINE_FRACTION * 100)}%`);
+      expect(explainOf(span)).toContain('4,567');
+    });
+
+    it('the active card penalty span carries the same kind of explanation', () => {
+      const panel = render(s => { s.contracts.active.push(makeContract({ id: 5, penaltyAmount: 90 })); });
+      const span = card(panel, 5).querySelector('.bs-contract-penalty');
+      expect(span).not.toBeNull();
+      expect(explainOf(span)).toMatch(/deadline/i);
+    });
+
+    it('a rubble clearance is never fined, so it carries no penalty span', () => {
+      const panel = render(s => {
+        s.contracts.available.push(makeContract({ id: 8, type: 'rubble_disposal', materialId: '' }));
+        s.contracts.active.push(makeContract({ id: 9, type: 'rubble_disposal', materialId: '' }));
+      });
+      expect(card(panel, 8).querySelector('.bs-contract-penalty')).toBeNull();
+      expect(card(panel, 9).querySelector('.bs-contract-penalty')).toBeNull();
+    });
+
+    it('two offers with different bonuses explain their own amount', () => {
+      const panel = render(s => {
+        s.contracts.available.push(makeContract({ id: 1, earlyBonus: 1111 }), makeContract({ id: 2, earlyBonus: 2222 }));
+      });
+      expect(explainOf(card(panel, 1).querySelector('.bs-contract-bonus'))).toContain('1,111');
+      expect(explainOf(card(panel, 2).querySelector('.bs-contract-bonus'))).toContain('2,222');
+    });
+  });
+
+  describe('negotiate button (C3)', () => {
+    it('states the best and worst case from balance and the single attempt', () => {
+      const panel = render(s => { s.contracts.available.push(makeContract({ id: 3 })); });
+      const btn = card(panel, 3).querySelector<HTMLButtonElement>('[data-action="negotiate"]')!;
+      const text = explainOf(btn);
+      expect(text).toContain(`${Math.round(NEGOTIATION_MAX_IMPROVEMENT * 100)}%`);
+      expect(text).toContain(`${Math.round(NEGOTIATION_MAX_WORSENING * 100)}%`);
+      expect(text).toMatch(/one attempt|once|single/i);
+    });
+
+    it('keeps the disabled reason in the title, and still explains', () => {
+      const panel = render(s => { s.contracts.available.push(makeContract({ id: 3, negotiationAttempts: 1 })); });
+      const btn = card(panel, 3).querySelector<HTMLButtonElement>('[data-action="negotiate"]')!;
+      expect(btn.disabled).toBe(true);
+      expect(btn.title).toBe(t('ui.contracts.negotiate_used'));
+      expect(btn.dataset['explain']).toBeTruthy();
+      expect(btn.dataset['explain']).not.toBe(btn.title);
+    });
+
+    it('keeps the no-manager reason in the title', () => {
+      const { panel } = makePanel();
+      const state = makeState();
+      state.contracts.available.push(makeContract({ id: 3 }));
+      panel.show();
+      panel.update(state);
+      const btn = card(panel, 3).querySelector<HTMLButtonElement>('[data-action="negotiate"]')!;
+      expect(btn.title).toBe(t('ui.contracts.negotiate_no_manager'));
+      expect(btn.dataset['explain']).toBeTruthy();
+    });
+  });
+
+  describe('off-site badge (C4)', () => {
+    it('explains the ore is not on this site and what follows', () => {
+      const panel = render(s => { s.contracts.available.push(makeContract({ id: 22, materialId: 'sparkium' })); });
+      const badge = card(panel, 22).querySelector('.bs-contract-off-site');
+      expect(badge).not.toBeNull();
+      expect(badge!.textContent).toContain(t('ui.contracts.not_on_site'));
+      expect(explainOf(badge).length).toBeGreaterThan(0);
+      expect(explainOf(badge)).not.toBe(badge!.textContent);
+    });
+
+    it('an on-site ore and a rubble clearance have no badge', () => {
+      const panel = render(s => {
+        s.contracts.available.push(
+          makeContract({ id: 21, materialId: 'dirtite' }),
+          makeContract({ id: 23, type: 'rubble_disposal', materialId: '' }),
+        );
+      });
+      expect(card(panel, 21).querySelector('.bs-contract-off-site')).toBeNull();
+      expect(card(panel, 23).querySelector('.bs-contract-off-site')).toBeNull();
+    });
+  });
+
+  describe('buyer badge (C5)', () => {
+    it.each(BUYER_TIERS.map(b => b.id))('the %s badge on an offer card carries an explanation', (id) => {
+      const state = withManager(makeState());
+      state.grade = createGradeState();
+      state.contracts.available.push(makeContract({ id: 3, buyerTier: id }));
+      const { panel } = makePanel();
+      panel.show();
+      panel.update(state);
+      const badge = card(panel, 3).querySelector('.bs-contract-buyer-badge');
+      expect(explainOf(badge).length).toBeGreaterThan(0);
     });
   });
 });
