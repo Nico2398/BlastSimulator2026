@@ -32,6 +32,8 @@ export class CrewPanel extends PanelBase {
   /** Role to scroll into view once the hiring section next renders (revealHiring before first render/show). */
   private pendingHiringRole: EmployeeRole | null = null;
   private lastState: GameState | null = null;
+  /** Candidate whose sheet is open; survives re-renders. */
+  private openCandidateId: number | null = null;
   private readonly hiringSelection = new FilterBarSelection();
   private readonly rosterSelection = new FilterBarSelection();
   private onSelectEmployeeCb?: (employeeId: number) => void;
@@ -132,7 +134,7 @@ export class CrewPanel extends PanelBase {
     // Status drifts, so a filtered or sorted roster signs the ids it shows: rows entering or leaving the view rebuild it.
     const shown = this.rosterSelection.isActive() ? this.visibleEmployees(state).map(e => e.id).join(',') : '';
     const picked = `${this.rosterSelection.filter}|${this.rosterSelection.sort}|${JSON.stringify(this.rosterSelection.groups)}`;
-    return `${rows}#${shown}~${picked}#${hiringSignature(state, this.hiringSelection)}`;
+    return `${rows}#${shown}~${picked}#${hiringSignature(state, this.hiringSelection, this.openCandidateId)}`;
   }
 
   /** Re-paint values that drift every tick without rebuilding the DOM under an in-flight click. */
@@ -189,8 +191,13 @@ export class CrewPanel extends PanelBase {
     replaceChildrenKeepingScroll(this.bodyEl, [
       scrollBoundedSection(living.length === 0 ? cards : [this.makeRosterBar(state), ...cards], 200, { gap: 8, className: 'bsx-roster-scroll', scrollKey: 'roster' }),
       sectionHeader(t('ui.crew.hiring')),
-      ...makeHiringSection(state, (role, candidateId) => this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`), {
+      ...makeHiringSection(state, (role, candidateId) => {
+        if (this.openCandidateId === candidateId) this.openCandidateId = null;
+        this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`);
+      }, {
         selection: this.hiringSelection,
+        openCandidateId: this.openCandidateId,
+        onOpenCandidate: id => { this.openCandidateId = id; if (this.lastState) { this.lastSignature = ''; this.update(this.lastState); } },
         onChange: () => { if (this.lastState) { this.lastSignature = ''; this.update(this.lastState); } },
       }),
     ]);
