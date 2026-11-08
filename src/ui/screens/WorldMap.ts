@@ -5,7 +5,8 @@
 // screen instead of a second view sharing MainMenu's overlay.
 
 import { t } from '../../core/i18n/I18n.js';
-import { el } from '../dom.js';
+import { el, explainable } from '../dom.js';
+import { difficultyExplain, starExplain } from '../levelExplain.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { CampaignState } from '../../core/campaign/Campaign.js';
@@ -190,17 +191,17 @@ export class WorldMap {
         + 'font:700 8px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-secondary)' },
     });
     this.locale.bindText(categoryChip, style.categoryKey);
-    const diffChip = el('div', {
+    const diffChip = explainable(el('div', {
       attrs: { style: 'position:absolute;right:14px;top:12px;display:flex;gap:4px;padding:4px 7px;border-radius:3px;'
         + 'background:rgba(8,10,14,.7);color:var(--bsx-amber)' },
       children: Array.from({ length: lvl.difficultyTier }, () => iconEl('pick', 12)),
-    });
+    }), difficultyExplain(lvl.difficultyTier, lvl.unlockThreshold));
     const starRow = el('div', {
       attrs: { style: 'position:absolute;left:14px;bottom:12px;display:flex;gap:4px' },
       children: Array.from({ length: 3 }, (_, i) => {
         const star = iconEl('star', 16);
         star.style.color = i < stars ? 'var(--bsx-amber)' : 'rgba(255,255,255,.14)';
-        return star;
+        return explainable(star, starExplain(i < stars, lvl.unlockThreshold));
       }),
     });
     biomeHeader.append(categoryChip, diffChip, starRow);
