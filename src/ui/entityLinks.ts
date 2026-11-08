@@ -16,14 +16,34 @@ export interface EntityOpener {
 /** Look of every in-text link, the inspector's included. */
 export const LINK_STYLE = 'border:0;background:transparent;padding:0;color:var(--bsx-info);cursor:pointer;text-decoration:underline;font:inherit';
 
+function linkButton(label: string): HTMLElement {
+  const link = el('button', { text: label });
+  link.style.cssText = LINK_STYLE;
+  return link;
+}
+
 /** A link that opens `kind` `id`; plain text when no opener is wired. */
 export function openerLink(opener: EntityOpener | undefined, kind: OpenableKind, id: number, label: string): HTMLElement {
-  void opener; void kind; void id; void label; void el;
-  throw new Error('not implemented');
+  if (!opener) return el('span', { text: label });
+  const link = linkButton(label);
+  link.dataset['selectKind'] = kind;
+  link.dataset['selectId'] = String(id);
+  link.addEventListener('click', event => {
+    event.stopPropagation();
+    opener.open(kind, id);
+  });
+  return link;
 }
 
 /** A link that centres the camera on (x, z); plain text when no opener is wired. */
 export function coordLink(opener: EntityOpener | undefined, x: number, z: number, label: string): HTMLElement {
-  void opener; void x; void z; void label;
-  throw new Error('not implemented');
+  if (!opener) return el('span', { text: label });
+  const link = linkButton(label);
+  link.dataset['focusX'] = String(x);
+  link.dataset['focusZ'] = String(z);
+  link.addEventListener('click', event => {
+    event.stopPropagation();
+    opener.focus(x, z);
+  });
+  return link;
 }

@@ -48,7 +48,7 @@ export const employeeContent: KindContent = {
       title: e.name,
       sub: `#${e.id} · ${kindLabel('employee')} · ${role}`,
       icon: 'person',
-      status: describeActivity(computeEmployeeActivity(e, state.vehicles)),
+      status: describeActivity(computeEmployeeActivity(e, state.vehicles), state.vehicles),
       signature: `${e.id}:${optional}`,
       get sections() { return [build()]; },
       actions: [

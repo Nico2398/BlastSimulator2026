@@ -13,7 +13,7 @@
 // P5-core, since destroyBuilding/destroyVehicle splice the entity out (a plain
 // live lookup after a *_destroyed accident would find nothing).
 
-import type { EntityOpener } from '../entityLinks.js';
+import { coordLink, openerLink, type EntityOpener, type OpenableKind } from '../entityLinks.js';
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
 import { AccessRampOffer } from './AccessRampOffer.js';
@@ -27,7 +27,7 @@ import { getFragmentCounts } from '../../core/economy/Logistics.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import { oreValuePerKg } from '../../core/economy/Market.js';
 import { resolveMarketId } from '../../core/campaign/Level.js';
-import { ACCIDENT_STYLE, accidentText } from '../accidentLookup.js';
+import { ACCIDENT_STYLE, accidentText, buildingLabelText } from '../accidentLookup.js';
 import type { ShiftMode } from '../../core/entities/SitePolicy.js';
 import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
@@ -103,10 +103,11 @@ export class OperationsPanel extends PanelBase {
   /** Visible rows of each expanded group's current page, resolved once per update. */
   private readonly pageRows = new Map<DebrisGroup['type'], PendingAction[]>();
 
+  private opener: EntityOpener | undefined;
+
   /** Wire the generic entity opener so names and coordinates become links (#2165). */
   setEntityOpener(opener: EntityOpener | undefined): void {
-    void opener;
-    throw new Error('not implemented');
+    this.opener = opener;
   }
 
   constructor(container: HTMLElement) {
@@ -415,11 +416,12 @@ export class OperationsPanel extends PanelBase {
     const holder = action.holderId !== null
       ? state.employees.employees.find(e => e.id === action.holderId)
       : undefined;
-    const holderText = action.holderId === null
-      ? t('ui.operations.work_queue_holder_unclaimed')
-      : holder
-        ? holder.name
-        : t('ui.operations.work_queue_holder_unknown');
+    const holderNode = holder
+      ? openerLink(this.opener, 'employee', holder.id, holder.name)
+      : el('span', { text: action.holderId === null ? t('ui.operations.work_queue_holder_unclaimed') : t('ui.operations.work_queue_holder_unknown') });
+    holderNode.style.fontSize = '11px';
+    holderNode.style.fontWeight = '500';
+    if (holderNode.tagName !== 'BUTTON') holderNode.style.color = 'var(--bsx-text-secondary)';
 
     const row = el('div');
     row.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card)';
@@ -432,19 +434,20 @@ export class OperationsPanel extends PanelBase {
         : chip(t('ui.operations.work_queue_status_stranded'), 'neutral'))
       : chip(t(WORK_QUEUE_STATUS_KEY[action.status]), action.status === 'in_progress' ? 'info' : 'neutral');
 
+    const coordNode = coordLink(this.opener, action.targetX, action.targetZ, t('ui.crew.location_coords', { x: action.targetX, z: action.targetZ }));
+    coordNode.classList.add('bsx-mono');
+    coordNode.style.fontSize = '10px';
+    if (coordNode.tagName !== 'BUTTON') coordNode.style.color = 'var(--bsx-text-micro)';
+
     const headRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
     headRow.append(
       el('span', { text: t(ACTION_LABEL_KEY[action.type]), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-      el('span', {
-        text: t('ui.crew.location_coords', { x: action.targetX, z: action.targetZ }),
-        className: 'bsx-mono',
-        attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' },
-      }),
+      coordNode,
       statusChip,
     );
 
     const footRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
-    footRow.append(el('span', { text: holderText, attrs: { style: 'font:500 11px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }));
+    footRow.append(holderNode);
     if (cancellable) {
       const cancelBtn = button('danger', t('ui.operations.work_queue_cancel'));
       cancelBtn.style.cssText = `margin-left:auto;${SMALL_BTN_STYLE}`;
@@ -527,9 +530,50 @@ export class OperationsPanel extends PanelBase {
     const wrap = el('div');
     wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px';
     for (const e of injured) {
-      wrap.appendChild(chip(t('ui.operations.injured_chip', { name: e.name }), 'critical'));
+      wrap.appendChild(this.injuredChip(e));
     }
     return [wrap];
+  }
+
+  /** The injured chip, its employee name a link to the inspector. */
+  private injuredChip(e: { id: number; name: string }): HTMLElement {
+    const marker = '\u0000';
+    const [before = '', after = ''] = t('ui.operations.injured_chip', { name: marker }).split(marker);
+    const node = chip('', 'critical');
+    node.append(before, openerLink(this.opener, 'employee', e.id, e.name), after);
+    return node;
+  }
+
+  /** What an incident row can open: the worker, or the building/vehicle while it still stands. */
+  private incidentTarget(a: AccidentRecord, state: GameState): { kind: OpenableKind; label: string } | null {
+    switch (a.type) {
+      case 'injury':
+      case 'death': {
+        const emp = state.employees.employees.find(e => e.id === a.entityId);
+        return emp ? { kind: 'employee', label: emp.name } : null;
+      }
+      case 'building_damage':
+      case 'building_destroyed':
+      case 'seismic_damage':
+      case 'seismic_destroyed':
+        return state.buildings.buildings.some(b => b.id === a.entityId) ? { kind: 'building', label: buildingLabelText(a) } : null;
+      case 'vehicle_damage':
+      case 'vehicle_destroyed':
+        return a.entityLabel && state.vehicles.vehicles.some(v => v.id === a.entityId)
+          ? { kind: 'vehicle', label: t(`vehicle_type.${a.entityLabel}`) }
+          : null;
+    }
+  }
+
+  /** The incident sentence with its subject turned into a link when it can be opened. */
+  private incidentSentence(a: AccidentRecord, state: GameState): HTMLElement {
+    const text = accidentText(a, state);
+    const sentence = el('span', { attrs: { style: 'font:500 11px/1.3 var(--bsx-font-ui)' } });
+    const target = this.incidentTarget(a, state);
+    const at = target ? text.indexOf(target.label) : -1;
+    if (!target || at < 0) { sentence.textContent = text; return sentence; }
+    sentence.append(text.slice(0, at), openerLink(this.opener, target.kind, a.entityId, target.label), text.slice(at + target.label.length));
+    return sentence;
   }
 
   private makeIncidentRows(state: GameState): HTMLElement[] {
@@ -550,7 +594,7 @@ export class OperationsPanel extends PanelBase {
       el('div', {
         attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1' },
         children: [
-          el('span', { text: accidentText(a, state), attrs: { style: 'font:500 11px/1.3 var(--bsx-font-ui)' } }),
+          this.incidentSentence(a, state),
           el('span', { text: t('ui.operations.day_label', { day }), attrs: { style: 'font:400 11px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),
         ],
       }),

@@ -20,6 +20,7 @@ import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLI
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
 import { iconEl } from './icons.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
+import { vehicleDisplayName } from './fleetDetailSections.js';
 import { describeRamp } from './describeRamp.js';
 import { strikePressure } from '../core/events/UnionGrievance.js';
 import { resolveEmployeeLocation, resolveTaskTarget, trainingSchool, type EntityRef } from './crewFacts.js';
@@ -65,14 +66,19 @@ export const ACTION_LABEL_KEY: Record<ActionType, string> = {
   general_work: 'ui.crew.action_general_work',
 };
 
+/** A vehicle's display name, or `#id` when it is not in `vehicles` (or none was given). */
+function vehicleLabel(vehicleId: number | null,vehicles?: VehicleState): string {
+  const v = vehicles?.vehicles.find(x => x.id === vehicleId);
+  return v ? vehicleDisplayName(v.type, v.tier) : `#${vehicleId}`;
+}
+
 /** Player-facing label for one EmployeeActivity — the Crew panel's only consumer of the activity's `kind`/`actionType` beyond raw ticks. */
 export function describeActivity(activity: EmployeeActivity, vehicles?: VehicleState): string {
-  void vehicles;
   switch (activity.kind) {
     case 'collapsed': return t('ui.crew.task_collapsed');
     case 'resting': return t('ui.crew.task_resting');
-    case 'driving': return t('ui.crew.task_driving', { vehicle: `#${activity.vehicleId}` });
-    case 'driving_to_task': return t('ui.crew.task_driving_to_task', { vehicle: `#${activity.vehicleId}` });
+    case 'driving': return t('ui.crew.task_driving', { vehicle: vehicleLabel(activity.vehicleId, vehicles) });
+    case 'driving_to_task': return t('ui.crew.task_driving_to_task', { vehicle: vehicleLabel(activity.vehicleId, vehicles) });
     case 'working': return t(activity.actionType ? ACTION_LABEL_KEY[activity.actionType] : 'ui.crew.action_general_work');
     case 'walking': return activity.actionType
       ? t('ui.crew.task_walking_to', { task: t(ACTION_LABEL_KEY[activity.actionType]) })
@@ -202,7 +208,7 @@ export function makeCurrentTaskSection(e: Employee, state: GameState, link?: Lin
 
   const headRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
   headRow.append(
-    el('span', { text: describeActivity(activity), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+    el('span', { text: describeActivity(activity, state.vehicles), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
   );
   if (activity.ticksRemaining !== null) {
     headRow.appendChild(explainable(el('span', {
