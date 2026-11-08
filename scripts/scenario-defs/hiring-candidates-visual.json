@@ -1,6 +1,6 @@
 {
   "name": "hiring-candidates-visual",
-  "description": "#1385: the Crew panel's HIRING section offers named candidates per role (3 each) showing name, $/h salary, skill and union status; a real click on one candidate's Hire button hires exactly that candidate. Interaction mode proves a player reaches the candidate cards and the Hire buttons by clicking (data-role + data-candidate-id). Counts of 3 per role and the exact name/salary/union/qualification match between card and hire are pinned by tests/unit/ui/panels/CrewPanel.test.ts and tests/integration/hiring-pool.integration.test.ts; the state dump carries no per-employee salary, so this scenario proves reachability and the cash/headcount effect. Inspect the screenshots for card text.",
+  "description": "#1385: the Crew panel's HIRING section offers named candidates per role (3 each) showing name, $/h salary, skill and union status; a real click on one candidate's Hire button hires exactly that candidate. Interaction mode proves a player reaches the candidate cards and the Hire buttons by clicking (data-role + data-candidate-id). Counts of 3 per role and the exact name/salary/union/qualification match between card and hire are pinned by tests/unit/ui/panels/CrewPanel.test.ts and tests/integration/hiring-pool.integration.test.ts; the state dump carries no per-employee salary, so this scenario proves reachability and the cash/headcount effect. Inspect the screenshots for card text. #2164: clicking a candidate card (not its Hire button) opens the candidate sheet; its Hire button hires that candidate and closes the sheet.",
   "steps": [
     {
       "command": "new_game seed:42 size:32",
@@ -147,6 +147,60 @@
           "employeeCount": 1
         },
         "usable": "#bs-employee-panel button[data-role=\"blaster\"][data-candidate-id]"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "role": "player",
+      "description": "#2164: click the first blaster candidate's name (the card, not its Hire button). The candidate sheet opens inside the Crew panel with its own Hire button; nothing is hired yet.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-hiring-role=\"blaster\"] [data-candidate-card] > div > span:first-child"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-candidate-sheet] [data-candidate-sheet-hire]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "employeeCount": 1
+        },
+        "usable": "#bs-employee-panel [data-candidate-sheet] [data-candidate-sheet-hire]",
+        "note": "Opening the sheet hires nobody; sheet content is unit-tested."
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "timeout": 30,
+      "role": "player",
+      "description": "#2164: click Hire on the candidate sheet. Hires the sheet's candidate (the first blaster, as the command-mode equivalent does) and the sheet closes.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-candidate-sheet] [data-candidate-sheet-hire]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"blaster\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "employeeCount": 1
+        },
+        "decreased": [
+          "cash"
+        ],
+        "note": "Exactly one hire for one click on the sheet's Hire button."
       }
     }
   ]
