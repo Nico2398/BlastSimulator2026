@@ -76,7 +76,7 @@ export function fizzlingHoles(
 
 /** Share (whole percent) of its energy a water-sensitive charge delivers in a wet hole. */
 export function wetFizzlePercent(): number {
-  throw new Error('not implemented');
+  return Math.round(waterEffect(true, true, false) * 100);
 }
 
 /** Charged untubed holes with a water-sensitive charge while rain falls (wet or dry); [] when not raining, sorted. */

@@ -28,7 +28,7 @@ import { wallWarningText } from './wallWarningText.js';
 import { BreakoutWarningMemo } from './breakoutWarningMemo.js';
 import { breakoutWarningFor } from './breakoutWarningText.js';
 import { plannedChargesCost } from '../../core/mining/ChargePlan.js';
-import { rainExposedHoles, wetHoles } from '../../core/mining/WetHoles.js';
+import { fizzlingHoles, rainExposedHoles, wetFizzlePercent, wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
 import { detonationPhase, type DetonationPhase } from '../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
@@ -43,11 +43,12 @@ import type { GameConsoleFn } from '../gameConsole.js';
 interface Warning { ok: boolean; text: string; role?: string; buildingType?: string }
 
 /** The dry-charges row: wet beats rain risk beats all-clear. */
-function dryWarning(wetCount: number, rainExposedCount: number): Warning {
-  if (wetCount > 0) return { ok: false, text: t('ui.blast_workshop.preflight.warn_wet', { count: wetCount }) };
+function dryWarning(wetCount: number, fizzleCount: number, rainExposedCount: number): Warning {
+  if (fizzleCount > 0) return { ok: false, text: t('ui.blast_workshop.preflight.warn_wet', { count: fizzleCount, percent: wetFizzlePercent() }) };
   if (rainExposedCount > 0) {
     return { ok: false, text: t('ui.blast_workshop.preflight.warn_rain_risk', { count: rainExposedCount }), role: 'preflight-rain-risk' };
   }
+  if (wetCount > 0) return { ok: true, text: t('ui.blast_workshop.preflight.ok_wet_resistant', { count: wetCount }) };
   return { ok: true, text: t('ui.blast_workshop.preflight.ok_dry') };
 }
 
@@ -227,6 +228,7 @@ export class PreflightModal {
       partial: 'ui.blast_workshop.preflight.warn_breakout_partial',
     });
     const wet = wetHoles(state);
+    const fizzled = fizzlingHoles(state);
     const rainExposed = rainExposedHoles(state);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
     const occupantCount = zone ? countZoneOccupants(zone, state.vehicles, state.employees) : 0;
@@ -243,7 +245,7 @@ export class PreflightModal {
 
     const signature = JSON.stringify({
       permit, undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage, brokenVoxels, charged, holeCoverage,
-      preview: state.lastBlastPreview, wetCount: wet.length, rainExposedCount: rainExposed.length, occupantCount,
+      preview: state.lastBlastPreview, wetCount: wet.length, fizzleCount: fizzled.length, rainExposedCount: rainExposed.length, occupantCount,
       walls: wallFaces.map(w => wallWarningText(w)), breakoutText, phase, protectedCount: protectedHoles.length, buildingsAtRisk, loadingCount, errorCount: validationErrors.length,
     });
     if (signature === this.lastSignature) return;
@@ -283,7 +285,7 @@ export class PreflightModal {
       ...wallFaces.map(w => ({ ok: false, text: wallWarningText(w, 'ui.blast_workshop.preflight.warn_wall_slump'), role: 'preflight-wall-warning' })),
       ...(breakoutText ? [{ ok: false, text: breakoutText, role: 'preflight-breakout-warning' }] : []),
       ...predictedRatingWarning(state.lastBlastPreview),
-      dryWarning(wet.length, rainExposed.length),
+      dryWarning(wet.length, fizzled.length, rainExposed.length),
       occupantCount > 0
         ? { ok: false, text: t('ui.blast_workshop.preflight.warn_zone', { count: occupantCount }) }
         : { ok: true, text: t('ui.blast_workshop.preflight.ok_zone') },
