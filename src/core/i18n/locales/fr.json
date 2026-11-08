@@ -4720,7 +4720,7 @@
   "ui.explain.event_lasting": "Effet durable : un modificateur qui reste actif un certain temps au lieu d'un changement ponctuel.",
   "ui.explain.vehicle_hp": "État du véhicule. À 0 il est en panne et ne travaille plus avant réparation ; la réparation coûte {cost} pièces par PV rendu.",
   "ui.explain.vehicle_status_broken": "En panne : les PV ont atteint 0. Une réparation est nécessaire avant de reprendre le travail.",
-  "ui.explain.vehicle_status_stuck": "Bloqué : immobilisé depuis {stuck} ticks ou plus. Le conducteur perd du moral ; après {abandon} ticks le véhicule abandonne sa route et en replanifie une.",
+  "ui.explain.vehicle_status_stuck": "Bloqué : immobilisé depuis {stuck} ticks ou plus. Le chauffeur perd du moral ; après {abandon} ticks le véhicule abandonne sa route et en replanifie une.",
   "ui.explain.vehicle_status_waiting": "En attente : retenu par la circulation ou un point de chargement occupé ; repart quand la voie est libre (bloqué après {stuck} ticks).",
   "ui.explain.vehicle_status_hauling": "Transport : achemine du minerai vers sa destination.",
   "ui.explain.vehicle_status_working": "Au travail : occupé à sa tâche.",
