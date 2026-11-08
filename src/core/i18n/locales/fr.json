@@ -4700,7 +4700,7 @@
   "ui.explain.penalty": "Échec = -{amount} $ : prélevé si l'échéance passe avant l'exécution du contrat.",
   "ui.explain.early_bonus": "Bonus anticipé +{amount} $ : versé si le contrat est rempli avant {pct} % de son échéance.",
   "ui.explain.negotiate": "Demander de meilleures conditions : l'offre peut s'améliorer jusqu'à {gain} %, mais l'acheteur peut aussi la dégrader jusqu'à {risk} %. Un seul essai par contrat.",
-  "ui.explain.off_site": "Introuvable sur ce site : aucun gisement prospecté ici ne contient ce minerai, vous ne pourriez pas le livrer. Prospectez ailleurs ou ignorez l'offre.",
+  "ui.explain.off_site": "Introuvable sur ce site : aucune roche ici ne contient ce minerai. Vous pouvez accepter, mais vous ne livrerez qu'une fois le minerai trouvé, et la pénalité d'échéance s'applique sinon.",
   "ui.explain.buyer_local": "Acheteur local : paie {min}-{max} % du prix de base, pour de petites quantités.",
   "ui.explain.buyer_regional": "Acheteur régional : paie {min}-{max} % du prix de base, pour des quantités moyennes.",
   "ui.explain.buyer_national": "Acheteur national : paie {min}-{max} % du prix de base, pour de grandes quantités.",

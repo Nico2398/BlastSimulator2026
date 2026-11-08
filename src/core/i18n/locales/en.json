@@ -4700,7 +4700,7 @@
   "ui.explain.penalty": "Fail = -${amount}: charged if the deadline passes before the contract is fulfilled.",
   "ui.explain.early_bonus": "Early bonus +${amount}: paid when the contract is fulfilled before {pct}% of its deadline has elapsed.",
   "ui.explain.negotiate": "Ask the buyer for better terms: the offer can improve by up to {gain}%, but the buyer may also worsen it by up to {risk}%. You can try only once per contract.",
-  "ui.explain.off_site": "Not found on this site: no deposit surveyed here holds this ore, so you could not deliver it. Survey elsewhere or skip the offer.",
+  "ui.explain.off_site": "Not found on this site: no rock here holds this ore. You can still accept, but you can deliver only once you source it, and the deadline penalty applies if you cannot.",
   "ui.explain.buyer_local": "Local buyer: pays {min}-{max}% of the base price, for small quantities.",
   "ui.explain.buyer_regional": "Regional buyer: pays {min}-{max}% of the base price, for medium quantities.",
   "ui.explain.buyer_national": "National buyer: pays {min}-{max}% of the base price, for large quantities.",

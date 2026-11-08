@@ -185,6 +185,12 @@ export class FinancesPanel extends PanelBase {
   private makeCategoryRows(state: GameState, type: Transaction['type'], categories: CategoryTotal[], sectionTotal: number, color: string, emptyText: string): HTMLElement[] {
     if (categories.length === 0) return [emptyState(emptyText)];
     const sorted = [...categories].sort((a, b) => b.total - a.total);
+    const byCategory = new Map<string, Transaction[]>();
+    for (const tx of state.finances.transactions) {
+      if (tx.type !== type) continue;
+      const list = byCategory.get(tx.category);
+      if (list) list.push(tx); else byCategory.set(tx.category, [tx]);
+    }
     return sorted.map(cat => {
       const pct = sectionTotal > 0 ? Math.round((cat.total / sectionTotal) * 100) : 0;
       const row = el('div', { attrs: { 'data-category-row': '', 'data-category': cat.category, 'data-type': type } });
@@ -194,8 +200,7 @@ export class FinancesPanel extends PanelBase {
         el('div', { attrs: { style: 'flex:1' }, children: [progressBar(pct, color)] }),
         el('span', { text: `$${formatMoney(cat.total)}`, attrs: { style: `font:500 11px/1 var(--bsx-font-mono);color:${color};width:66px;text-align:right;flex:0 0 66px` } }),
       );
-      const entries = state.finances.transactions.filter(tx => tx.type === type && tx.category === cat.category);
-      return explainable(row, financeCategoryExplain(entries, pct));
+      return explainable(row, financeCategoryExplain(byCategory.get(cat.category) ?? [], pct));
     });
   }
 
