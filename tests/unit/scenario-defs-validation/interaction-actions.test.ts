@@ -95,6 +95,11 @@ const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
     expect(a.selector.length).toBeGreaterThan(0);
     expect(typeof a.text).toBe('string');
   }),
+  defineActionCheck('hoverSelector', 'hoverSelector actions have a non-empty selector (#2188)', (a) => {
+    expect(typeof a.selector).toBe('string');
+    expect(a.selector.length).toBeGreaterThan(0);
+    if (a.timeout !== undefined) expect(typeof a.timeout).toBe('number');
+  }),
   defineActionCheck('wait', 'wait actions have durationMs', (a) => {
     expect(typeof a.durationMs).toBe('number');
     expect(a.durationMs).toBeGreaterThan(0);
