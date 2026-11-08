@@ -4685,5 +4685,13 @@
   "mining.ramp_flow.set_both": "Rampe n°{id} : circulation à double sens.",
   "mining.ramp_flow.set_down": "Rampe n°{id} : sens unique, les véhicules ne font que la descendre.",
   "mining.ramp_flow.set_up": "Rampe n°{id} : sens unique, les véhicules ne font que la monter.",
-  "mining.ramp_flow.usage": "Usage : ramp_flow id:<id-rampe> flow:{options}"
+  "mining.ramp_flow.usage": "Usage : ramp_flow id:<id-rampe> flow:{options}",
+  "ui.explain.skill_level": "Niveau {level} : les tâches prennent ×{mult} du temps de base. {next} XP pour atteindre le niveau suivant.",
+  "ui.explain.skill_level_max": "Niveau {level} (maximum) : les tâches prennent ×{mult} du temps de base.",
+  "ui.explain.morale": "Sous {low}, les besoins baissent plus vite et l'employé traîne ; au-dessus de {high}, ils baissent plus lentement et le rendement monte.",
+  "ui.explain.fatigue": "Le travail la fait baisser ; à 0 l'employé s'effondre. Sous {low} (le repère), la productivité chute et la politique de repos l'envoie se reposer.",
+  "ui.explain.licence": "Le permis de niveau {tier} permet de conduire les véhicules de niveau {tier} et moins.",
+  "ui.explain.salary": "Versé à chaque cycle de paie ({cycle} h). Les compétences et les augmentations le font monter.",
+  "ui.explain.union": "Syndiqué : salaire {pct}% plus bas, licenciement impossible, et participation aux grèves quand les griefs montent.",
+  "ui.explain.ticks_left": "Heures de jeu restantes avant la fin de cette tâche ou de ce repos."
 }

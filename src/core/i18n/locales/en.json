@@ -4685,5 +4685,13 @@
   "mining.ramp_flow.set_both": "Ramp #{id}: two-way traffic.",
   "mining.ramp_flow.set_down": "Ramp #{id}: one way, vehicles only drive down it.",
   "mining.ramp_flow.set_up": "Ramp #{id}: one way, vehicles only drive up it.",
-  "mining.ramp_flow.usage": "Usage: ramp_flow id:<ramp-id> flow:{options}"
+  "mining.ramp_flow.usage": "Usage: ramp_flow id:<ramp-id> flow:{options}",
+  "ui.explain.skill_level": "Level {level}: tasks take ×{mult} of the base time. {next} XP reaches the next level.",
+  "ui.explain.skill_level_max": "Level {level} (maximum): tasks take ×{mult} of the base time.",
+  "ui.explain.morale": "Below {low}, needs drain faster and the worker slacks; above {high}, needs drain slower and output improves.",
+  "ui.explain.fatigue": "Working drains it; at 0 the worker collapses. Below {low} (the tick), productivity drops and the worker is sent to rest by the rest policy.",
+  "ui.explain.licence": "Licence tier {tier} lets this worker drive vehicles of tier {tier} and below.",
+  "ui.explain.salary": "Charged every pay cycle ({cycle}h). Skills and raises increase it.",
+  "ui.explain.union": "Union member: salary {pct}% lower, cannot be dismissed, and takes part in strikes when grievances rise.",
+  "ui.explain.ticks_left": "Game hours remaining before this task or rest finishes."
 }

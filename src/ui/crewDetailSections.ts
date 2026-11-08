@@ -5,7 +5,8 @@
 // split this replaces.
 
 import { t } from '../core/i18n/I18n.js';
-import { el, gauge, button, reasonLine } from './dom.js';
+import { el, gauge, button, reasonLine, explainable } from './dom.js';
+import { fatigueExplain, licenceExplain, moraleExplain, salaryExplain, skillLevelExplain, ticksLeftExplain, unionExplain } from './statExplain.js';
 import type { Employee, EmployeeRole, SkillCategory } from '../core/entities/Employee.js';
 import { BASE_SALARIES, calculateQualificationBonus, managementLevelOf, injuryHoursRemaining, employeeQueueDepth, isLicenceSkill } from '../core/entities/Employee.js';
 import { managerNegotiationBonusPct } from '../core/economy/Negotiation.js';
@@ -183,7 +184,7 @@ export function makeNeedsSection(e: Employee): HTMLElement {
     [t('ui.crew.need_fatigue'), e.fatigue, NEED_THRESHOLDS.fatigue],
   ];
   for (const [label, value, thresholds] of rows) {
-    const row = gauge(label, value, bandColor(value, thresholds.critical, thresholds.low), { thresholdPct: thresholds.low, labelWidth: 52 });
+    const row = gauge(label, value, bandColor(value, thresholds.critical, thresholds.low), { thresholdPct: thresholds.low, labelWidth: 52, explain: fatigueExplain() });
     row.dataset['need'] = label;
     wrap.appendChild(row);
   }
@@ -202,11 +203,11 @@ export function makeCurrentTaskSection(e: Employee, state: GameState, link?: Lin
     el('span', { text: describeActivity(activity), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
   );
   if (activity.ticksRemaining !== null) {
-    headRow.appendChild(el('span', {
+    headRow.appendChild(explainable(el('span', {
       text: t('ui.crew.ticks_left', { n: activity.ticksRemaining }),
       className: 'bsx-mono',
       attrs: { style: 'margin-left:auto;font-size:10px;color:var(--bsx-text-micro)' },
-    }));
+    }), ticksLeftExplain()));
   }
 
   const children: HTMLElement[] = [headRow];
@@ -264,7 +265,7 @@ export function makeSkillsSection(e: Employee): HTMLElement {
     const stars = '★'.repeat(q.proficiencyLevel) + '☆'.repeat(5 - q.proficiencyLevel);
     headRow.append(
       el('span', { text: t(`skill.${q.category}`), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-      el('span', { text: stars, attrs: { style: 'font:400 11px/1 var(--bsx-font-mono);color:var(--bsx-amber);letter-spacing:.1em' } }),
+      explainable(el('span', { text: stars, attrs: { style: 'font:400 11px/1 var(--bsx-font-mono);color:var(--bsx-amber);letter-spacing:.1em' } }), skillLevelExplain(q.proficiencyLevel)),
     );
 
     const atMax = q.proficiencyLevel >= 5;
@@ -290,7 +291,7 @@ export function makeSkillsSection(e: Employee): HTMLElement {
         attrs: { style: 'font-size:10px;color:var(--bsx-positive)' },
       }));
     } else {
-      rows.push(el('span', { text: t('ui.crew.licence_tier', { tier: q.licenceLevel ?? 1 }), className: 'bsx-mono bs-licence-tier', attrs: { style: 'font-size:10px;color:var(--bsx-text-secondary)' } }));
+      rows.push(explainable(el('span', { text: t('ui.crew.licence_tier', { tier: q.licenceLevel ?? 1 }), className: 'bsx-mono bs-licence-tier', attrs: { style: 'font-size:10px;color:var(--bsx-text-secondary)' } }), licenceExplain(q.licenceLevel ?? 1)));
     }
     wrap.appendChild(well(rows));
   }
@@ -317,12 +318,12 @@ export function makePaySection(e: Employee, onRaise: (amount: number) => void): 
     el('span', { text: t('ui.crew.pay_base', { amount: perHour(base) }) }),
     el('span', { text: t('ui.crew.pay_bonus', { amount: perHour(bonus) }), attrs: { style: 'margin-left:8px' } }),
     el('span', { text: t('ui.crew.pay_raises', { amount: perHour(e.raises ?? 0) }), attrs: { style: 'margin-left:8px' } }),
-    ...(e.unionized ? [el('span', {
+    ...(e.unionized ? [explainable(el('span', {
       className: 'bs-pay-union-discount',
       text: t('ui.crew.pay_union_discount', { pct: UNION_MEMBER_SALARY_DISCOUNT_PCT, amount: perHour(Math.max(0, base + bonus + (e.raises ?? 0) - e.salary)) }),
       attrs: { style: 'margin-left:8px' },
-    })] : []),
-    el('span', { text: t('ui.crew.pay_total', { amount: perHour(e.salary) }), attrs: { style: 'margin-left:auto;color:var(--bsx-text-primary);font-weight:600' } }),
+    }), unionExplain())] : []),
+    explainable(el('span', { className: 'bs-pay-total', text: t('ui.crew.pay_total', { amount: perHour(e.salary) }), attrs: { style: 'margin-left:auto;color:var(--bsx-text-primary);font-weight:600' } }), salaryExplain()),
   );
 
   const raiseRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:6px' } });
@@ -474,7 +475,7 @@ function makeMiniBar(pct: number, color: string, fillClass?: string): HTMLElemen
 function makeMoraleMeter(e: Employee): HTMLElement[] {
   const color = moraleColor(e.morale);
   const track = makeMiniBar(e.morale, color, 'bs-crew-morale-fill');
-  const value = el('span', { className: 'bs-crew-morale-value bsx-mono', text: `${Math.round(e.morale)}%`, attrs: { style: `font-size:11px;color:${color}` } });
+  const value = explainable(el('span', { className: 'bs-crew-morale-value bsx-mono', text: `${Math.round(e.morale)}%`, attrs: { style: `font-size:11px;color:${color}` } }), moraleExplain());
   return [track, value];
 }
 
@@ -521,7 +522,7 @@ export function makeRestSection(e: Employee, state: GameState, link?: LinkFactor
     const loc = resolveEmployeeLocation(e, state);
     line = loc.kind === 'inside'
       ? linkedSentence('ui.crew.rest_at', 'building', buildingLabel(loc.building, state), loc.building, link, { n: e.restTicksRemaining })
-      : el('span', { text: `${t('ui.crew.task_resting')} · ${t('ui.crew.ticks_left', { n: e.restTicksRemaining })}` });
+      : explainable(el('span', { text: `${t('ui.crew.task_resting')} · ${t('ui.crew.ticks_left', { n: e.restTicksRemaining })}` }), ticksLeftExplain());
   } else {
     line = el('span', { text: t('ui.crew.rest_walking') });
   }

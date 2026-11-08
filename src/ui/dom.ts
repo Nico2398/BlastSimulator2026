@@ -91,15 +91,16 @@ export type ChipTone = 'neutral' | 'positive' | 'critical' | 'warn' | 'info' | '
  * No text leaves the node untouched.
  */
 export function explainable<T extends HTMLElement>(node: T, text: string | undefined): T {
-  void text;
-  throw new Error('not implemented');
+  if (!text) return node;
+  node.dataset['explain'] = text;
+  node.tabIndex = 0;
+  node.classList.add('bsx-explainable');
   return node;
 }
 
 /** Status chip (IN ZONE, TUBED, WET, STUCK, UNION, …); `explain` says what it changes. */
 export function chip(label: string, tone: ChipTone = 'neutral', explain?: string): HTMLElement {
-  void explain;
-  return el('span', { className: `bsx-chip bsx-chip-${tone}`, text: label });
+  return explainable(el('span', { className: `bsx-chip bsx-chip-${tone}`, text: label }), explain);
 }
 
 /** Section header: micro-label + hairline rule, optional trailing note. */
@@ -129,7 +130,7 @@ export function gauge(label: string, value: number, color: string, opts: { thres
   const valueEl = el('span', { className: 'bsx-gauge-value bsx-mono', text: String(Math.round(value)) });
   valueEl.style.color = color;
   row.append(labelEl, track, valueEl);
-  return row;
+  return explainable(row, opts.explain);
 }
 
 /** Progress bar (contract urgency, research progress). */
@@ -189,6 +190,7 @@ export function statGrid(items: { key: string; value: string; color?: string; in
     const valueEl = el('span', { className: 'bsx-stat-value', text: item.value });
     if (item.color) valueEl.style.color = item.color;
     if (item.info) valueEl.dataset['info'] = item.info;
+    explainable(valueEl, item.explain);
     cell.appendChild(valueEl);
     grid.appendChild(cell);
   }
