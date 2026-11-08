@@ -1,0 +1,112 @@
+{
+  "name": "world-map-explain-visual",
+  "description": "World map explanations (#2172): from the Portfolio the player hovers a level's star and its difficulty chip with the real pointer; each explanation tooltip is screenshotted open.",
+  "steps": [
+    {
+      "command": "sandbox start seed:42",
+      "description": "Setup: a live sandbox game.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start seed:42"
+        }
+      ],
+      "role": "setup",
+      "timeout": 60
+    },
+    {
+      "command": "state",
+      "description": "Player opens Settings and clicks Return to Main Menu, then confirms; the main menu returns. `state` is the inert paired command.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-main-menu #bs-menu-new-campaign"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-main-menu #bs-menu-new-campaign"
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "description": "Player clicks New Campaign; the Portfolio opens. `state` is the inert paired command.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-main-menu #bs-menu-new-campaign"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "role": "player",
+      "description": "Hover Dusty Hollow's star; the criteria tooltip opens.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-world-map [data-level=\"dusty_hollow\"] .bsx-explainable svg"
+        },
+        {
+          "type": "hoverSelector",
+          "selector": "#bs-world-map [data-level=\"dusty_hollow\"] .bsx-explainable svg"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "role": "player",
+      "description": "Hover the difficulty chip; its tooltip opens.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-world-map [data-level=\"dusty_hollow\"] div.bsx-explainable"
+        },
+        {
+          "type": "hoverSelector",
+          "selector": "#bs-world-map [data-level=\"dusty_hollow\"] div.bsx-explainable"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "commandOutcome": "either"
+    }
+  ]
+}
