@@ -1,16 +1,21 @@
 {
   "name": "hud-explain-links-visual",
-  "description": "HUD explanations and entity links (#2169): a union-style lawsuit settlement raises a live work-stoppage chip under the top bar, a player hovers it with the real pointer and the explainable() tooltip shows its effect and end time as the game clock; then the player opens the activity log from the top bar and clicks the employee named by a crew entry, if one has been raised by then, which opens the inspector on that employee. All by real clicks.",
+  "description": "HUD explanations and entity links (#2169): a union-style lawsuit settlement raises a live work-stoppage chip under the top bar, a player hovers it with the real pointer and the explainable() tooltip shows its effect and end time as the game clock; then the player opens the activity log from the top bar and clicks the employee named by a crew entry which opens the inspector on that employee. All by real clicks.",
   "steps": [
     {
       "command": "new_game seed:42 cash:330000 staffed:true",
       "timeout": 40,
       "role": "setup",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42 cash:330000 staffed:true" }
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:330000 staffed:true"
+        }
       ],
       "expect": {
-        "equals": { "cash": 330000 }
+        "equals": {
+          "cash": 330000
+        }
       },
       "description": "Staffed site with plenty of cash for the settlement."
     },
@@ -19,7 +24,10 @@
       "timeout": 30,
       "role": "bootstrap",
       "interaction": [
-        { "type": "command", "command": "event fire lawsuit_superpowers" }
+        {
+          "type": "command",
+          "command": "event fire lawsuit_superpowers"
+        }
       ],
       "description": "Test hook: `event fire` has no UI control and none is intended. Raises the lawsuit whose second option ends in a 12 hour work stoppage."
     },
@@ -28,11 +36,20 @@
       "timeout": 40,
       "role": "player",
       "interaction": [
-        { "type": "resolveEventIfPending", "option": 1 },
-        { "type": "clickIfPresent", "selector": "#bs-event-dialog .bs-event-dismiss", "timeoutMs": 3000 }
+        {
+          "type": "resolveEventIfPending",
+          "option": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 3000
+        }
       ],
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "Option 1 of lawsuit_superpowers costs money and starts a work stoppage modifier."
       },
       "description": "Answer the lawsuit by clicking its second option; the work stoppage becomes a chip in the strip under the top bar."
@@ -42,9 +59,17 @@
       "timeout": 30,
       "role": "player",
       "interaction": [
-        { "type": "awaitUsable", "selector": ".bs-modifier-chip" },
-        { "type": "hoverSelector", "selector": ".bs-modifier-chip" },
-        { "type": "screenshot" }
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-modifier-chip"
+        },
+        {
+          "type": "hoverSelector",
+          "selector": ".bs-modifier-chip"
+        },
+        {
+          "type": "screenshot"
+        }
       ],
       "expect": {
         "usable": ".bs-modifier-chip",
@@ -53,32 +78,107 @@
       "description": "Hover the work-stoppage chip with the real pointer; the explanation tooltip opens beside it and is screenshotted."
     },
     {
-      "command": "tick 150",
-      "timeout": 60,
+      "command": "build driving_center at:3,5",
+      "timeout": 40,
       "role": "setup",
       "interaction": [
-        { "type": "command", "command": "tick 150" }
+        {
+          "type": "command",
+          "command": "build driving_center at:3,5"
+        }
       ],
-      "commandOutcome": "either",
-      "description": "Let the crew work so the log may collect an entry naming an employee. A tick command stops early when a random event lands, hence either."
+      "description": "Setup: a driving school, so a course can finish and the crew raises a trained entry that names an employee."
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:600",
+      "timeout": 95,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 600,
+          "timeoutMs": 90000
+        }
+      ],
+      "description": "Let the crew finish the school."
+    },
+    {
+      "command": "employee train 1 skill:driving.excavator",
+      "timeout": 40,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee train 1 skill:driving.excavator"
+        }
+      ],
+      "description": "Setup: enrol employee 1."
+    },
+    {
+      "command": "wait_until field:trainingCount equals:1 max_ticks:600",
+      "timeout": 95,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 1,
+          "maxTicks": 600,
+          "timeoutMs": 90000
+        }
+      ],
+      "description": "The employee walks to the school and starts the course."
+    },
+    {
+      "command": "wait_until field:trainingCount equals:0 max_ticks:600",
+      "timeout": 95,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 90000
+        }
+      ],
+      "description": "The course completes; employee:trained lands in the activity log with an employee reference."
     },
     {
       "command": "state",
       "timeout": 40,
       "role": "player",
       "interaction": [
-        { "type": "resolveEventIfPending", "option": 0 },
-        { "type": "clickSelector", "selector": "#bs-hud-top bs-icon[name=\"bell\"]" },
-        { "type": "awaitUsable", "selector": "#bs-activity-log" },
-        { "type": "screenshot" },
-        { "type": "clickIfPresent", "selector": "#bs-activity-log button[data-select-kind=\"employee\"]", "timeoutMs": 1000 },
-        { "type": "screenshot" }
+        {
+          "type": "resolveEventIfPending",
+          "option": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top bs-icon[name=\"bell\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-activity-log"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-activity-log button[data-select-kind=\"employee\"]"
+        },
+        {
+          "type": "screenshot"
+        }
       ],
       "expect": {
         "usable": "#bs-activity-log",
-        "note": "Closest viable: no console command raises a crew notification on demand, so the employee link click is conditional on such an entry existing. The row shows the game clock either way."
+        "note": "The trained entry names employee 1, so the employee link is present; the row shows the game clock."
       },
-      "description": "Open the activity log from the top bar bell, screenshot the rows with their game-clock times, and click the employee link of a crew entry when one exists; the inspector opens on that employee."
+      "description": "Open the activity log from the top bar bell, screenshot the rows with their game-clock times, and click the employee link of the trained entry; the inspector opens on that employee."
     }
   ]
 }
