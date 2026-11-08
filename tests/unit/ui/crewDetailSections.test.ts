@@ -36,6 +36,11 @@ import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'js
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
 import { t } from '../../../src/core/i18n/I18n.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import {
+  skillLevelExplain, moraleExplain, fatigueExplain, licenceExplain,
+  salaryExplain, unionExplain, ticksLeftExplain,
+} from '../../../src/ui/statExplain.js';
+import { makeNeedsSection, perHour } from '../../../src/ui/crewDetailSections.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -711,5 +716,116 @@ describe('strike pressure in the crew detail (#1890)', () => {
     const text = detailText(makeEmployee({ unionized: false }), 40);
     expect(text).not.toContain(t('ui.crew.strike_pressure', { pct: 67 }));
     expect(text).not.toMatch(/strike pressure/i);
+  });
+});
+
+describe('stat explanations in the employee detail (#2163)', () => {
+  const explainOf = (node: Element | null | undefined): string | null => node?.getAttribute('data-explain') ?? null;
+  const spanWithText = (root: HTMLElement, text: string): HTMLElement | null =>
+    Array.from(root.querySelectorAll<HTMLElement>('span')).find(s => s.textContent === text) ?? null;
+
+  describe('skills', () => {
+    const skilled = () => makeEmployee({
+      qualifications: [
+        { category: 'blasting', proficiencyLevel: 2, xp: 0 },
+        { category: 'geology', proficiencyLevel: 4, xp: 0 },
+      ],
+    });
+
+    it('each skill stars element carries the explanation for that skill level', () => {
+      const sec = makeSkillsSection(skilled());
+      const two = spanWithText(sec, '★★☆☆☆');
+      const four = spanWithText(sec, '★★★★☆');
+      expect(explainOf(two)).toBe(skillLevelExplain(2));
+      expect(explainOf(four)).toBe(skillLevelExplain(4));
+      expect(two!.getAttribute('tabindex')).toBe('0');
+    });
+
+    it('a maxed skill carries the level-5 explanation', () => {
+      const e = makeEmployee({ qualifications: [{ category: 'blasting', proficiencyLevel: 5, xp: 1000 }] });
+      expect(explainOf(spanWithText(makeSkillsSection(e), '★★★★★'))).toBe(skillLevelExplain(5));
+    });
+
+    it('a licence row carries the skill-level explanation on its stars and the tier explanation on its tier label', () => {
+      const e = makeEmployee({ qualifications: [{ category: 'driving.truck', proficiencyLevel: 3, xp: 0, licenceLevel: 2 }] });
+      const sec = makeSkillsSection(e);
+      expect(explainOf(spanWithText(sec, '★★★☆☆'))).toBe(skillLevelExplain(3));
+      const tier = sec.querySelector('.bs-licence-tier');
+      expect(tier).not.toBeNull();
+      expect(explainOf(tier)).toBe(licenceExplain(2));
+      expect(tier!.getAttribute('tabindex')).toBe('0');
+    });
+
+    it('an absent licenceLevel explains tier 1', () => {
+      const e = makeEmployee({ qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }] });
+      expect(explainOf(makeSkillsSection(e).querySelector('.bs-licence-tier'))).toBe(licenceExplain(1));
+    });
+
+    it('an employee with no skills has nothing explainable', () => {
+      expect(makeSkillsSection(makeEmployee()).querySelector('[data-explain]')).toBeNull();
+    });
+  });
+
+  describe('morale', () => {
+    it('the identity morale value carries the morale explanation', () => {
+      const sec = makeIdentitySection(makeEmployee({ morale: 42 }), makeState());
+      const value = sec.querySelector('.bs-crew-morale-value');
+      expect(value).not.toBeNull();
+      expect(explainOf(value)).toBe(moraleExplain());
+      expect(value!.getAttribute('tabindex')).toBe('0');
+    });
+  });
+
+  describe('fatigue', () => {
+    it('the fatigue gauge row carries the fatigue explanation', () => {
+      const row = makeNeedsSection(makeEmployee({ fatigue: 55 })).querySelector('[data-need]');
+      expect(row).not.toBeNull();
+      expect(explainOf(row)).toBe(fatigueExplain());
+      expect(row!.getAttribute('tabindex')).toBe('0');
+    });
+  });
+
+  describe('ticks left', () => {
+    it('the current-task ticks-left span carries the ticks explanation', () => {
+      const e = makeEmployee({ activeActionId: 5, taskTicksRemaining: 10, activeTaskTotalTicks: 20, pendingActionType: 'repair_vehicle' as never });
+      const sec = makeCurrentTaskSection(e, makeState());
+      const span = spanWithText(sec, t('ui.crew.ticks_left', { n: 10 }));
+      expect(span).not.toBeNull();
+      expect(explainOf(span)).toBe(ticksLeftExplain());
+      expect(span!.getAttribute('tabindex')).toBe('0');
+    });
+
+    it('an idle employee has no ticks-left span to explain', () => {
+      const sec = makeCurrentTaskSection(makeEmployee(), makeState());
+      expect(sec.querySelector('[data-explain]')).toBeNull();
+    });
+  });
+
+  describe('pay', () => {
+    const member = (unionized: boolean): Employee => {
+      const e = makeEmployee({ role: 'driller', unionized, qualifications: [{ category: 'blasting', proficiencyLevel: 2, xp: 0 }] });
+      e.salary = calculateSalary(e);
+      return e;
+    };
+
+    it('the pay total carries the salary explanation', () => {
+      const e = member(false);
+      const sec = makePaySection(e, () => {});
+      const total = spanWithText(sec, t('ui.crew.pay_total', { amount: perHour(e.salary) }));
+      expect(total).not.toBeNull();
+      expect(explainOf(total)).toBe(salaryExplain());
+      expect(total!.getAttribute('tabindex')).toBe('0');
+    });
+
+    it('the union discount line carries the union explanation', () => {
+      const line = makePaySection(member(true), () => {}).querySelector('.bs-pay-union-discount');
+      expect(line).not.toBeNull();
+      expect(explainOf(line)).toBe(unionExplain());
+      expect(line!.getAttribute('tabindex')).toBe('0');
+    });
+
+    it('a non-member has no union discount line', () => {
+      expect(makePaySection(member(false), () => {}).querySelector('.bs-pay-union-discount')).toBeNull();
+    });
   });
 });

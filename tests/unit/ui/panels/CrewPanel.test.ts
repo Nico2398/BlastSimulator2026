@@ -15,6 +15,7 @@ import { hiringSignature, makeHiringSection } from '../../../../src/ui/panels/Cr
 import { FilterBarSelection } from '../../../../src/ui/filterBar.js';
 import { candidatesForRole, takeCandidate, type HireCandidate } from '../../../../src/core/entities/HiringPool.js';
 import { HIRING_COSTS } from '../../../../src/core/entities/Employee.js';
+import { skillLevelExplain, salaryExplain, unionExplain } from '../../../../src/ui/statExplain.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -1301,5 +1302,86 @@ describe('CrewPanel — roster filter and sort bar (#2161)', () => {
     expect(en['ui.crew.filter_no_match']).toBeTruthy();
     expect(fr['ui.crew.filter_no_match']).toBeTruthy();
     expect(fr['ui.crew.filter_no_match']).not.toBe(en['ui.crew.filter_no_match']);
+  });
+});
+
+describe('CrewPanel — hiring candidate stat explanations (#2163)', () => {
+  type Level = 1 | 2 | 3 | 4 | 5;
+  const candidate = (id: number, unionized: boolean): HireCandidate => ({
+    id, role: 'driller', name: `Zed Person${id}`, unionized, salary: 430,
+    qualifications: [
+      { category: 'blasting', proficiencyLevel: 2 as Level, xp: 0 },
+      { category: 'driving.drill_rig', proficiencyLevel: 4 as Level, xp: 0 },
+    ],
+  });
+
+  function cardFor(unionized: boolean): { card: HTMLElement; c: HireCandidate } {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    const c = candidate(901, unionized);
+    state.hiringPool.candidates = [c];
+    panel.update(state);
+    const card = panel.root.querySelector<HTMLElement>('[data-candidate-card="901"]');
+    expect(card).not.toBeNull();
+    return { card: card!, c };
+  }
+
+  it('each skill is its own element carrying the explanation for its level', () => {
+    const { card } = cardFor(false);
+    const skills = [...card.querySelectorAll<HTMLElement>('[data-candidate-skill]')];
+    expect(skills).toHaveLength(2);
+    expect(skills[0]!.getAttribute('data-explain')).toBe(skillLevelExplain(2));
+    expect(skills[1]!.getAttribute('data-explain')).toBe(skillLevelExplain(4));
+    expect(skills[0]!.getAttribute('tabindex')).toBe('0');
+    expect(skills[0]!.textContent).toContain(t('skill.blasting'));
+    expect(skills[1]!.textContent).toContain(t('skill.driving.drill_rig'));
+  });
+
+  it('the salary is its own element carrying the salary explanation', () => {
+    const { card, c } = cardFor(false);
+    const salary = card.querySelector<HTMLElement>('[data-candidate-salary]');
+    expect(salary).not.toBeNull();
+    expect(salary!.getAttribute('data-explain')).toBe(salaryExplain());
+    expect(salary!.getAttribute('tabindex')).toBe('0');
+    expect(salary!.textContent).toContain(perHour(c.salary));
+  });
+
+  it('a union candidate label carries the union explanation', () => {
+    const { card } = cardFor(true);
+    const label = card.querySelector<HTMLElement>('[data-candidate-union]');
+    expect(label).not.toBeNull();
+    expect(label!.getAttribute('data-explain')).toBe(unionExplain());
+    expect(label!.getAttribute('tabindex')).toBe('0');
+    expect(label!.textContent).toContain(t('ui.crew.candidate_union'));
+  });
+
+  it('a non-union candidate label also carries the union explanation', () => {
+    const { card } = cardFor(false);
+    const label = card.querySelector<HTMLElement>('[data-candidate-union]');
+    expect(label).not.toBeNull();
+    expect(label!.getAttribute('data-explain')).toBe(unionExplain());
+    expect(label!.textContent).toContain(t('ui.crew.candidate_non_union'));
+  });
+
+  it('the card text still reads salary · skills · union label', () => {
+    const { card, c } = cardFor(true);
+    const skills = c.qualifications
+      .map(q => t('ui.crew.candidate_skill', { skill: t(`skill.${q.category}`), level: q.proficiencyLevel }))
+      .join(', ');
+    const expected = `${t('ui.crew.candidate_salary', { salary: perHour(c.salary) })} · ${skills} · ${t('ui.crew.candidate_union')}`;
+    expect(card.textContent).toContain(expected);
+  });
+
+  it('a candidate with a single skill has exactly one skill element', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    const c = candidate(902, false);
+    c.qualifications = [{ category: 'blasting', proficiencyLevel: 1 as Level, xp: 0 }];
+    state.hiringPool.candidates = [c];
+    panel.update(state);
+    const card = panel.root.querySelector<HTMLElement>('[data-candidate-card="902"]')!;
+    const skills = card.querySelectorAll<HTMLElement>('[data-candidate-skill]');
+    expect(skills).toHaveLength(1);
+    expect(skills[0]!.getAttribute('data-explain')).toBe(skillLevelExplain(1));
   });
 });

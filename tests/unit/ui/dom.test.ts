@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { scrollBoundedSection, panelHeader, replaceChildrenKeepingScroll } from '../../../src/ui/dom.js';
+import { scrollBoundedSection, panelHeader, replaceChildrenKeepingScroll, explainable, chip, gauge, statGrid } from '../../../src/ui/dom.js';
 import type { ScrollBoundedSectionOptions } from '../../../src/ui/dom.js';
 import { PANEL_CLOSE_ATTR, PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 
@@ -206,5 +206,130 @@ describe('replaceChildrenKeepingScroll (#1592)', () => {
     host.append(numberInput('40', '40'));
     replaceChildrenKeepingScroll(host, [numberInput('55', '55')]);
     expect(host.querySelector<HTMLInputElement>('[data-preserve-key="amount"]')!.value).toBe('55');
+  });
+});
+
+describe('explainable', () => {
+  it('sets data-explain, a focusable tabindex and the visible-mark class, and returns the same node', () => {
+    const node = document.createElement('span');
+    const out = explainable(node, 'What this does');
+
+    expect(out).toBe(node);
+    expect(node.getAttribute('data-explain')).toBe('What this does');
+    expect(node.getAttribute('tabindex')).toBe('0');
+    expect(node.classList.contains('bsx-explainable')).toBe(true);
+  });
+
+  it('keeps the node classes it already had', () => {
+    const node = document.createElement('div');
+    node.className = 'existing';
+    explainable(node, 'text');
+    expect(node.classList.contains('existing')).toBe(true);
+    expect(node.classList.contains('bsx-explainable')).toBe(true);
+  });
+
+  it('leaves the node untouched for undefined text', () => {
+    const node = document.createElement('span');
+    const out = explainable(node, undefined);
+
+    expect(out).toBe(node);
+    expect(node.hasAttribute('data-explain')).toBe(false);
+    expect(node.hasAttribute('tabindex')).toBe(false);
+    expect(node.classList.contains('bsx-explainable')).toBe(false);
+  });
+
+  it('leaves the node untouched for empty text', () => {
+    const node = document.createElement('span');
+    explainable(node, '');
+
+    expect(node.hasAttribute('data-explain')).toBe(false);
+    expect(node.hasAttribute('tabindex')).toBe(false);
+    expect(node.classList.contains('bsx-explainable')).toBe(false);
+  });
+
+  it('a later call with new text replaces the explanation', () => {
+    const node = document.createElement('span');
+    explainable(node, 'first');
+    explainable(node, 'second');
+    expect(node.getAttribute('data-explain')).toBe('second');
+  });
+});
+
+describe('chip explanation', () => {
+  it('a chip given an explanation is explainable and keeps its label and tone', () => {
+    const c = chip('UNION', 'warn', 'Members cost less');
+    expect(c.textContent).toBe('UNION');
+    expect(c.classList.contains('bsx-chip-warn')).toBe(true);
+    expect(c.getAttribute('data-explain')).toBe('Members cost less');
+    expect(c.getAttribute('tabindex')).toBe('0');
+    expect(c.classList.contains('bsx-explainable')).toBe(true);
+  });
+
+  it('a chip without an explanation is unchanged: no data-explain, no tabindex', () => {
+    const c = chip('WET');
+    expect(c.hasAttribute('data-explain')).toBe(false);
+    expect(c.hasAttribute('tabindex')).toBe(false);
+    expect(c.classList.contains('bsx-explainable')).toBe(false);
+    expect(c.className).toBe('bsx-chip bsx-chip-neutral');
+  });
+
+  it('an empty explanation counts as none', () => {
+    const c = chip('WET', 'info', '');
+    expect(c.hasAttribute('data-explain')).toBe(false);
+    expect(c.hasAttribute('tabindex')).toBe(false);
+  });
+});
+
+describe('gauge explanation', () => {
+  it('the whole gauge row is explainable when explain is given', () => {
+    const row = gauge('Fatigue', 55, 'red', { explain: 'Tired crews work slower' });
+    expect(row.classList.contains('bsx-gauge-row')).toBe(true);
+    expect(row.getAttribute('data-explain')).toBe('Tired crews work slower');
+    expect(row.getAttribute('tabindex')).toBe('0');
+    expect(row.classList.contains('bsx-explainable')).toBe(true);
+  });
+
+  it('a gauge without explain is unchanged', () => {
+    const row = gauge('Fatigue', 55, 'red', { thresholdPct: 40 });
+    expect(row.hasAttribute('data-explain')).toBe(false);
+    expect(row.hasAttribute('tabindex')).toBe(false);
+    expect(row.textContent).toContain('Fatigue');
+    expect(row.textContent).toContain('55');
+  });
+
+  it('explain does not disturb the threshold tick', () => {
+    const row = gauge('Fatigue', 55, 'red', { thresholdPct: 40, explain: 'x' });
+    expect(row.querySelector('.bsx-gauge-tick')).not.toBeNull();
+  });
+});
+
+describe('statGrid explanation', () => {
+  it('an item with explain makes its value cell explainable', () => {
+    const grid = statGrid([{ key: 'Salary', value: '$5/h', explain: 'Paid every cycle' }, { key: 'Other', value: '1' }], 2);
+    const values = grid.querySelectorAll<HTMLElement>('.bsx-stat-value');
+    expect(values[0]!.getAttribute('data-explain')).toBe('Paid every cycle');
+    expect(values[0]!.getAttribute('tabindex')).toBe('0');
+    expect(values[0]!.classList.contains('bsx-explainable')).toBe(true);
+  });
+
+  it('an item without explain has no data-explain and no tabindex', () => {
+    const grid = statGrid([{ key: 'Salary', value: '$5/h', explain: 'Paid every cycle' }, { key: 'Other', value: '1' }], 2);
+    const plain = grid.querySelectorAll<HTMLElement>('.bsx-stat-value')[1]!;
+    expect(plain.hasAttribute('data-explain')).toBe(false);
+    expect(plain.hasAttribute('tabindex')).toBe(false);
+  });
+
+  it('the existing info hook still works beside explain', () => {
+    const grid = statGrid([{ key: 'K', value: 'V', info: 'tip', explain: 'why' }], 1);
+    const v = grid.querySelector<HTMLElement>('.bsx-stat-value')!;
+    expect(v.dataset['info']).toBe('tip');
+    expect(v.getAttribute('data-explain')).toBe('why');
+  });
+
+  it('info alone leaves the cell not explainable', () => {
+    const grid = statGrid([{ key: 'K', value: 'V', info: 'tip' }], 1);
+    const v = grid.querySelector<HTMLElement>('.bsx-stat-value')!;
+    expect(v.dataset['info']).toBe('tip');
+    expect(v.hasAttribute('data-explain')).toBe(false);
   });
 });
