@@ -46,6 +46,14 @@ interface Occupant {
   verdict: VehicleEvacuationVerdict | null;
 }
 
+/** Text of the dry-holes checklist row: all dry, wet but water-resistant, or fizzling charges. */
+function dryRowText(holeCount: number, wetCount: number, fizzleCount: number): string {
+  if (fizzleCount > 0) return t('ui.blast_workshop.fire.check_wet', { count: fizzleCount, percent: wetFizzlePercent() });
+  return wetCount > 0
+    ? t('ui.blast_workshop.fire.check_wet_resistant', { count: wetCount })
+    : t('ui.blast_workshop.fire.check_dry', { count: holeCount });
+}
+
 export class FireStep {
   private readonly el: HTMLElement;
   private readonly zoneHeaderLabelEl: HTMLElement;
@@ -193,7 +201,7 @@ export class FireStep {
     const zoneOk = occupantCount === 0;
     this.checklistEl.replaceChildren(
       !dryOk || exposedCount === 0
-        ? this.makeCheckRow(dryOk, dryOk ? (wetCount > 0 ? t('ui.blast_workshop.fire.check_wet_resistant', { count: wetCount }) : t('ui.blast_workshop.fire.check_dry', { count: holeCount })) : t('ui.blast_workshop.fire.check_wet', { count: fizzleCount, percent: wetFizzlePercent() }))
+        ? this.makeCheckRow(dryOk, dryRowText(holeCount, wetCount, fizzleCount))
         : this.makeWarnRow(t('ui.blast_workshop.fire.check_rain_risk', { count: exposedCount }), 'rain-risk-check'),
       this.makeCheckRow(zoneOk, zoneOk
         ? t('ui.blast_workshop.fire.check_zone_clear')
