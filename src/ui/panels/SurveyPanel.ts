@@ -431,8 +431,10 @@ export class SurveyPanel extends PanelBase {
   private makeSurveyBar(results: readonly SurveyResult[]): HTMLElement {
     const ores = new Set(surveyOreIds(results));
     if (this.filterSelection.filter !== null) ores.add(this.filterSelection.filter);
+    // Richest first, like the ore bars on the cards; ids break ties.
+    const richest = (ore: string): number => Math.max(0, ...results.flatMap(r => Object.values(r.estimates).map(c => c[ore] ?? 0)));
     return filterBar(this.filterSelection, {
-      choices: [...ores].sort().map(value => ({ value, label: t(`ore.${value}.name`) })),
+      choices: [...ores].sort((a, b) => richest(b) - richest(a) || a.localeCompare(b)).map(value => ({ value, label: t(`ore.${value}.name`) })),
       groups: [{
         id: 'method', label: t('ui.survey.filter_method'),
         choices: METHOD_ORDER.map(value => ({ value, label: t(`survey.${value}`) })),
