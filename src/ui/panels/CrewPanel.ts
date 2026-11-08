@@ -192,8 +192,10 @@ export class CrewPanel extends PanelBase {
       scrollBoundedSection(living.length === 0 ? cards : [this.makeRosterBar(state), ...cards], 200, { gap: 8, className: 'bsx-roster-scroll', scrollKey: 'roster' }),
       sectionHeader(t('ui.crew.hiring')),
       ...makeHiringSection(state, (role, candidateId) => {
-        if (this.openCandidateId === candidateId) this.openCandidateId = null;
+        const wasOpen = this.openCandidateId === candidateId;
+        if (wasOpen) this.openCandidateId = null;
         this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`);
+        if (wasOpen && this.lastState) { this.lastSignature = ''; this.update(this.lastState); }
       }, {
         selection: this.hiringSelection,
         openCandidateId: this.openCandidateId,

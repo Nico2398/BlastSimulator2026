@@ -8,7 +8,8 @@ import type { HireCandidate } from '../core/entities/HiringPool.js';
 import { t } from '../core/i18n/I18n.js';
 import { el, explainable, button, reasonLine } from './dom.js';
 import { salaryExplain, unionExplain } from './statExplain.js';
-import { makeSkillsSection, makeUnionTradeoffLine, perHour } from './crewDetailSections.js';
+import { makeSkillsSection, perHour } from './crewDetailSections.js';
+import { UNION_MEMBER_SALARY_DISCOUNT_PCT } from '../core/config/balance.js';
 import { hireRefusal } from './panels/CrewHiring.js';
 
 const MICRO = 'font:400 10px/1.2 var(--bsx-font-ui);color:var(--bsx-text-micro)';
@@ -38,7 +39,9 @@ export function makeCandidateSheet(
     explainable(el('span', { text: t('ui.crew.candidate_salary', { salary: perHour(c.salary) }), className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600' } }), salaryExplain()),
     union,
   ] });
-  const tradeoff = makeUnionTradeoffLine(c);
+  const tradeoff = c.unionized
+    ? el('div', { text: t('ui.crew.candidate_union_tradeoff', { pct: UNION_MEMBER_SALARY_DISCOUNT_PCT }), attrs: { style: MICRO } })
+    : null;
 
   const refusal = hireRefusal(state, c);
   const hire = button('primary', t('ui.crew.hire'));
