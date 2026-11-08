@@ -14,7 +14,8 @@
       ],
       "expect": {
         "equals": {
-          "cash": 330000
+          "cash": 330000,
+          "holeCount": 0
         }
       },
       "description": "Staffed site with plenty of cash for the settlement."
