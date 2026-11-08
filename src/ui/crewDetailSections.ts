@@ -67,7 +67,7 @@ export const ACTION_LABEL_KEY: Record<ActionType, string> = {
 };
 
 /** A vehicle's display name, or `#id` when it is not in `vehicles` (or none was given). */
-function vehicleLabel(vehicleId: number | null,vehicles?: VehicleState): string {
+function vehicleLabel(vehicleId: number | null, vehicles?: VehicleState): string {
   const v = vehicles?.vehicles.find(x => x.id === vehicleId);
   return v ? vehicleDisplayName(v.type, v.tier) : `#${vehicleId}`;
 }
