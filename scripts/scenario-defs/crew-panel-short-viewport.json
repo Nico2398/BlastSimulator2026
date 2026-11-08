@@ -149,6 +149,18 @@
         {
           "type": "wheel",
           "deltaX": 0,
+          "deltaY": -3000
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-employee-panel .bsx-panel-body",
+          "property": "scrollTop",
+          "expectedValue": 0,
+          "timeoutMs": 5000
+        },
+        {
+          "type": "wheel",
+          "deltaX": 0,
           "deltaY": 50
         },
         {
