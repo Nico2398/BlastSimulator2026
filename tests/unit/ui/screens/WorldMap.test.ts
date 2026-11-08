@@ -3,6 +3,10 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { WorldMap } from '../../../../src/ui/screens/WorldMap.js';
 import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
 import type { CampaignState } from '../../../../src/core/campaign/Campaign.js';
+import { getCampaignLevels } from '../../../../src/core/campaign/Campaign.js';
+import { formatDollars } from '../../../../src/core/economy/formatMoney.js';
+import { STAR_ECOLOGY_MIN } from '../../../../src/core/config/balance.js';
+import { starExplain, difficultyExplain } from '../../../../src/ui/levelExplain.js';
 
 function mount(): { container: HTMLDivElement; map: WorldMap } {
   const container = document.createElement('div');
@@ -461,6 +465,136 @@ describe('WorldMap — back to site (#1314)', () => {
     map.refreshLocale();
     expect(t('ui.portfolio.back_to_site')).not.toBe(en);
     expect(btnOf(container)!.textContent).toContain(t('ui.portfolio.back_to_site'));
+    map.dispose();
+  });
+});
+
+describe('WorldMap — star and difficulty explanations (#2172)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    setLocale('en');
+  });
+
+  const explainOf = (node: Element): HTMLElement => {
+    const host = node.closest<HTMLElement>('.bsx-explainable');
+    expect(host, 'node is not inside an explainable element').not.toBeNull();
+    return host!;
+  };
+  const stars = (c: HTMLElement, id: string): Element[] =>
+    Array.from(c.querySelectorAll(`#bs-world-map [data-level="${id}"] bs-icon[name="star"]`));
+  const picks = (c: HTMLElement, id: string): Element[] =>
+    Array.from(c.querySelectorAll(`#bs-world-map [data-level="${id}"] bs-icon[name="pick"]`));
+  const card = (c: HTMLElement, id: string) => c.querySelector(`#bs-world-map [data-level="${id}"]`)!;
+  const withStars = (n: 1 | 2 | 3) => makeCampaign({
+    dusty_hollow: { levelId: 'dusty_hollow', unlocked: true, completed: true, cumulativeProfit: 80000, bestSessionProfit: 80000, bestStars: n },
+  });
+
+  it('every star icon of every card carries a non-empty data-explain and the explainable class', () => {
+    const { container, map } = mount();
+    map.show(makeCampaign());
+    for (const lvl of getCampaignLevels()) {
+      const icons = stars(container, lvl.id);
+      expect(icons.length).toBe(3);
+      for (const icon of icons) {
+        const host = explainOf(icon);
+        expect(host.dataset['explain']?.trim().length ?? 0, `${lvl.id} star`).toBeGreaterThan(0);
+      }
+    }
+    map.dispose();
+  });
+
+  it('each star lists the level target and the ecology minimum', () => {
+    const { container, map } = mount();
+    map.show(makeCampaign());
+    for (const lvl of getCampaignLevels()) {
+      for (const icon of stars(container, lvl.id)) {
+        const text = explainOf(icon).dataset['explain']!;
+        expect(text).toContain(formatDollars(lvl.unlockThreshold));
+        expect(text).toContain(String(STAR_ECOLOGY_MIN));
+      }
+    }
+    map.dispose();
+  });
+
+  it('a star explanation is the shared starExplain text for its earned state and the level target', () => {
+    const { container, map } = mount();
+    map.show(withStars(1));
+    const icons = stars(container, 'dusty_hollow');
+    const target = getCampaignLevels().find(l => l.id === 'dusty_hollow')!.unlockThreshold;
+    expect(explainOf(icons[0]!).dataset['explain']).toBe(starExplain(true, target));
+    expect(explainOf(icons[1]!).dataset['explain']).toBe(starExplain(false, target));
+    expect(explainOf(icons[2]!).dataset['explain']).toBe(starExplain(false, target));
+    map.dispose();
+  });
+
+  it('on one card an earned star and an unearned star differ in text', () => {
+    const { container, map } = mount();
+    map.show(withStars(2));
+    const [a, b, c] = stars(container, 'dusty_hollow').map(s => explainOf(s).dataset['explain']);
+    expect(a).toBe(b);
+    expect(a).not.toBe(c);
+    map.dispose();
+  });
+
+  it('a level with no stars earned carries one text on all three stars', () => {
+    const { container, map } = mount();
+    map.show(makeCampaign());
+    const texts = new Set(stars(container, 'grumpstone_ridge').map(s => explainOf(s).dataset['explain']));
+    expect(texts.size).toBe(1);
+    map.dispose();
+  });
+
+  it('locked cards explain their stars too', () => {
+    const { container, map } = mount();
+    map.show(makeCampaign());
+    for (const icon of stars(container, 'shareholder_summit')) {
+      expect(explainOf(icon).dataset['explain']!.trim().length).toBeGreaterThan(0);
+    }
+    map.dispose();
+  });
+
+  it('the difficulty chip of every card explains its tier and target', () => {
+    const { container, map } = mount();
+    map.show(makeCampaign());
+    for (const lvl of getCampaignLevels()) {
+      const icons = picks(container, lvl.id);
+      expect(icons.length).toBe(lvl.difficultyTier);
+      const host = explainOf(icons[0]!);
+      expect(host.dataset['explain']).toBe(difficultyExplain(lvl.difficultyTier, lvl.unlockThreshold));
+      expect(host.dataset['explain']!.trim().length).toBeGreaterThan(0);
+    }
+    map.dispose();
+  });
+
+  it('difficulty chips of different levels explain differently', () => {
+    const { container, map } = mount();
+    map.show(makeCampaign());
+    const texts = new Set(getCampaignLevels().map(l => explainOf(picks(container, l.id)[0]!).dataset['explain']));
+    expect(texts.size).toBe(getCampaignLevels().length);
+    map.dispose();
+  });
+
+  it('the explanations follow a locale refresh', () => {
+    const { container, map } = mount();
+    map.show(withStars(1));
+    const en = explainOf(stars(container, 'dusty_hollow')[0]!).dataset['explain'];
+    const enChip = explainOf(picks(container, 'dusty_hollow')[0]!).dataset['explain'];
+    setLocale('fr');
+    map.refreshLocale();
+    const fr = explainOf(stars(container, 'dusty_hollow')[0]!).dataset['explain'];
+    const frChip = explainOf(picks(container, 'dusty_hollow')[0]!).dataset['explain'];
+    expect(fr!.trim().length).toBeGreaterThan(0);
+    expect(fr).not.toBe(en);
+    expect(frChip).not.toBe(enChip);
+    map.dispose();
+  });
+
+  it('adding explanations leaves the earned-star colouring and card contents intact', () => {
+    const { container, map } = mount();
+    map.show(withStars(2));
+    const earned = stars(container, 'dusty_hollow').filter(s => (s as HTMLElement).style.color === 'var(--bsx-amber)');
+    expect(earned.length).toBe(2);
+    expect(card(container, 'dusty_hollow').textContent).toContain(formatDollars(80000));
     map.dispose();
   });
 });
