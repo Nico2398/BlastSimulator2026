@@ -16,9 +16,17 @@ export interface EntityOpener {
 /** Look of every in-text link, the inspector's included. */
 export const LINK_STYLE = 'border:0;background:transparent;padding:0;color:var(--bsx-info);cursor:pointer;text-decoration:underline;font:inherit';
 
+/** Apply LINK_STYLE declaration by declaration: jsdom's whole-string cssText parser drops the lot when one shorthand trips it. */
+export function applyLinkStyle(node: HTMLElement): void {
+  for (const decl of LINK_STYLE.split(';')) {
+    const [prop, value] = decl.split(':');
+    if (prop && value) node.style.setProperty(prop.trim(), value.trim());
+  }
+}
+
 function linkButton(label: string): HTMLElement {
   const link = el('button', { text: label });
-  link.style.cssText = LINK_STYLE;
+  applyLinkStyle(link);
   return link;
 }
 
