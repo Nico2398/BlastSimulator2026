@@ -2346,6 +2346,15 @@ export const NEGOTIATION_MAX_ATTEMPTS_PER_OFFER = 1;
 /** Early-delivery bonus as a fraction of quantity x price (#1366). */
 export const NEGOTIATION_EARLY_BONUS_RATE = 0.15;
 
+/** Delivery finishing before this fraction of the deadline earns the early bonus. */
+export const CONTRACT_EARLY_BONUS_DEADLINE_FRACTION = 0.5;
+
+/** Best case of a successful negotiation: terms improve by up to this fraction. */
+export const NEGOTIATION_MAX_IMPROVEMENT = 0.20;
+
+/** Worst case of a failed negotiation: terms worsen by up to this fraction. */
+export const NEGOTIATION_MAX_WORSENING = 0.15;
+
 /** Missed-deadline penalty as a fraction of quantity x unmultiplied base price. */
 export const CONTRACT_PENALTY_RATE = 0.3;
 

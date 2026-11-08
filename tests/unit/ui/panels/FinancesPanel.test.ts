@@ -184,7 +184,7 @@ describe('FinancesPanel', () => {
     expect(text).not.toContain('ui.finances.category.smuggling');
   });
 
-  it('renders the ledger most-recent-first with category and day, not raw description', () => {
+  it('renders the ledger most-recent-first with category, day and description', () => {
     const { panel } = makePanel();
     const state = makeState();
     state.tickCount = 50;
@@ -197,8 +197,8 @@ describe('FinancesPanel', () => {
 
     const rows = Array.from(panel.root.querySelectorAll('div')).map(d => d.textContent);
     expect(rows.some(r => r?.includes('Salaries') && r.includes('Day 3'))).toBe(true);
-    expect(panel.root.textContent).not.toContain('Payroll');
-    expect(panel.root.textContent).not.toContain('Contract #1 delivery');
+    expect(panel.root.textContent).toContain('Payroll');
+    expect(panel.root.textContent).toContain('Contract #1 delivery');
   });
 
   it('shows a bankruptcy warning banner when below threshold', () => {
@@ -763,6 +763,111 @@ describe('FinancesPanel — ledger filter and sort bar (#2162)', () => {
       state.finances.transactions.push({ tick: 80, type: 'income', amount: 77, category: 'events', description: 'x' });
       panel.update(state);
       expect(bar(panel).querySelector(categoryBtn('events'))).not.toBeNull();
+    });
+  });
+});
+
+// ── Explanations and ledger descriptions (#2170) ────────────────────────────
+
+describe('FinancesPanel — explanations and descriptions (#2170)', () => {
+  function setup(txs: GameState['finances']['transactions']): FinancesPanel {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.finances.transactions.push(...txs);
+    panel.show();
+    panel.update(state);
+    return panel;
+  }
+
+  const categoryRow = (panel: FinancesPanel, category: string, type: string): HTMLElement | null =>
+    panel.root.querySelector<HTMLElement>(`[data-category-row][data-category="${category}"][data-type="${type}"]`);
+
+  it('every category bar row carries its category and type and an explanation', () => {
+    const panel = setup([
+      { tick: 1, type: 'income', amount: 500, category: 'sales', description: 'Ore to Acme' },
+      { tick: 2, type: 'expense', amount: 200, category: 'fuel', description: 'Diesel run' },
+    ]);
+    const rows = [...panel.root.querySelectorAll<HTMLElement>('[data-category-row]')];
+    expect(rows.map(r => `${r.dataset['category']}/${r.dataset['type']}`).sort()).toEqual(['fuel/expense', 'sales/income']);
+    for (const r of rows) expect(r.dataset['explain']).toBeTruthy();
+  });
+
+  it('the explanation gives transaction count, share and the entry descriptions', () => {
+    const panel = setup([
+      { tick: 1, type: 'income', amount: 600, category: 'sales', description: 'Ore to Acme' },
+      { tick: 2, type: 'income', amount: 150, category: 'sales', description: 'Scrap lot' },
+      { tick: 3, type: 'income', amount: 250, category: 'contracts', description: 'Contract payout' },
+    ]);
+    const sales = categoryRow(panel, 'sales', 'income')!.dataset['explain']!;
+    expect(sales).toContain('2');
+    expect(sales).toContain('75');
+    expect(sales).toContain('Ore to Acme');
+    const contracts = categoryRow(panel, 'contracts', 'income')!.dataset['explain']!;
+    expect(contracts).toContain('25');
+    expect(contracts).toContain('Contract payout');
+    expect(contracts).not.toContain('Ore to Acme');
+  });
+
+  it('lists only the largest entries of a busy category', () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      tick: i + 1, type: 'income' as const, amount: 1000 - i * 10, category: 'sales' as const, description: `Sale number ${i}`,
+    }));
+    const panel = setup(many);
+    const text = categoryRow(panel, 'sales', 'income')!.dataset['explain']!;
+    expect(text).toContain('Sale number 0');
+    expect(text).not.toContain('Sale number 11');
+  });
+
+  it('keeps income and expense rows of one category apart', () => {
+    const panel = setup([
+      { tick: 1, type: 'income', amount: 1500, category: 'contracts', description: 'Paid out' },
+      { tick: 2, type: 'expense', amount: 700, category: 'contracts', description: 'Penalty charged' },
+    ]);
+    expect(categoryRow(panel, 'contracts', 'income')!.dataset['explain']).toContain('Paid out');
+    expect(categoryRow(panel, 'contracts', 'income')!.dataset['explain']).not.toContain('Penalty charged');
+    expect(categoryRow(panel, 'contracts', 'expense')!.dataset['explain']).toContain('Penalty charged');
+  });
+
+  it('a category whose entries have no description still explains itself', () => {
+    const panel = setup([{ tick: 1, type: 'expense', amount: 90, category: 'fuel', description: '' }]);
+    expect(categoryRow(panel, 'fuel', 'expense')!.dataset['explain']).toBeTruthy();
+  });
+
+  it('shows no category rows, hence no explanations, with no transactions', () => {
+    expect(setup([]).root.querySelectorAll('[data-category-row]')).toHaveLength(0);
+  });
+
+  describe('ledger descriptions', () => {
+    const descriptions = (panel: FinancesPanel): string[] =>
+      [...panel.root.querySelectorAll<HTMLElement>('[data-ledger-row]')]
+        .map(r => r.querySelector('[data-role="ledger-description"]')?.textContent ?? '');
+
+    it('shows the transaction description in its own element', () => {
+      const panel = setup([{ tick: 1, type: 'income', amount: 500, category: 'sales', description: 'Ore to Acme' }]);
+      expect(descriptions(panel)).toEqual(['Ore to Acme']);
+    });
+
+    it('shows each row its own description', () => {
+      const panel = setup([
+        { tick: 1, type: 'income', amount: 500, category: 'sales', description: 'First' },
+        { tick: 2, type: 'expense', amount: 200, category: 'fuel', description: 'Second' },
+      ]);
+      expect(descriptions(panel).sort()).toEqual(['First', 'Second']);
+    });
+
+    it('omits the element when the description is empty', () => {
+      const panel = setup([{ tick: 1, type: 'income', amount: 500, category: 'sales', description: '' }]);
+      const row = panel.root.querySelector('[data-ledger-row]')!;
+      expect(row).not.toBeNull();
+      expect(row.querySelector('[data-role="ledger-description"]')).toBeNull();
+    });
+
+    it('keeps the category and day beside the description', () => {
+      const panel = setup([{ tick: 30, type: 'income', amount: 500, category: 'sales', description: 'Ore to Acme' }]);
+      const text = panel.root.querySelector('[data-ledger-row]')!.textContent!;
+      expect(text).toContain(t('ui.finances.category.sales'));
+      expect(text).toContain(t('ui.finances.ledger_day', { day: 2 }));
+      expect(text).toContain('+$500');
     });
   });
 });

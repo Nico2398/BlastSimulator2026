@@ -11,6 +11,7 @@ import {
   CONTRACTS_PER_REFRESH,
   MAX_AVAILABLE_CONTRACTS,
   NEGOTIATION_EARLY_BONUS_RATE,
+  CONTRACT_EARLY_BONUS_DEADLINE_FRACTION,
   CONTRACT_PENALTY_RATE,
   SUPPLY_COMMON_ORE_COUNT,
   LEGACY_OFFER_DEADLINE_TICKS,
@@ -367,7 +368,7 @@ export function deliverMaterials(
 
     // Check for early bonus
     const elapsed = currentTick - contract.acceptedAtTick;
-    const isEarly = elapsed < contract.deadlineTicks * 0.5;
+    const isEarly = elapsed < contract.deadlineTicks * CONTRACT_EARLY_BONUS_DEADLINE_FRACTION;
     const bonus = isEarly ? contract.earlyBonus : 0;
 
     // Move to history
