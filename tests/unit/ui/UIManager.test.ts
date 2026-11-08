@@ -1270,3 +1270,118 @@ describe('UIManager — Build menu building-select and list selection (#1759)', 
     expect(placedRow(2)!.classList.contains('bs-row-selected')).toBe(true);
   });
 });
+
+// ── Generic entity opener (#2165) ───────────────────────────────────────────
+describe('UIManager — entity opener (#2165)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    uiManager = new UIManager(container);
+  });
+
+  afterEach(() => {
+    uiManager.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('openEntity routes kind and id unchanged to the handler set with setOpenEntityHandler', () => {
+    const cb = vi.fn();
+    uiManager.setOpenEntityHandler(cb);
+    uiManager.openEntity('building', 7);
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb).toHaveBeenCalledWith('building', 7);
+  });
+
+  it.each(['employee', 'vehicle', 'building', 'hole'] as const)('openEntity forwards kind %s', kind => {
+    const cb = vi.fn();
+    uiManager.setOpenEntityHandler(cb);
+    uiManager.openEntity(kind, 3);
+    expect(cb).toHaveBeenCalledWith(kind, 3);
+  });
+
+  it('openEntity with no handler set is a no-op and does not throw', () => {
+    expect(() => uiManager.openEntity('employee', 1)).not.toThrow();
+  });
+
+  it('a later setOpenEntityHandler replaces the earlier one', () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    uiManager.setOpenEntityHandler(first);
+    uiManager.setOpenEntityHandler(second);
+    uiManager.openEntity('vehicle', 2);
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledWith('vehicle', 2);
+  });
+
+  it('entityOpener.open calls openEntity and so the handler', () => {
+    const cb = vi.fn();
+    uiManager.setOpenEntityHandler(cb);
+    uiManager.entityOpener.open('employee', 5);
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb).toHaveBeenCalledWith('employee', 5);
+  });
+
+  it('entityOpener.open calls the UIManager openEntity method', () => {
+    const spy = vi.spyOn(uiManager, 'openEntity');
+    uiManager.entityOpener.open('hole', 9);
+    expect(spy).toHaveBeenCalledWith('hole', 9);
+  });
+
+  it('focusAt calls the handler set with setMapFocusHandler', () => {
+    const cb = vi.fn();
+    uiManager.setMapFocusHandler(cb);
+    uiManager.focusAt(11, 22);
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb).toHaveBeenCalledWith(11, 22);
+  });
+
+  it('entityOpener.focus reaches the map-focus handler with x and z', () => {
+    const cb = vi.fn();
+    uiManager.setMapFocusHandler(cb);
+    uiManager.entityOpener.focus(4, 8);
+    expect(cb).toHaveBeenCalledWith(4, 8);
+  });
+
+  it('entityOpener.focus does not open an entity', () => {
+    const open = vi.fn();
+    uiManager.setOpenEntityHandler(open);
+    uiManager.setMapFocusHandler(vi.fn());
+    uiManager.entityOpener.focus(4, 8);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('wires the opener into the Operations panel: a work-queue holder link opens that employee', () => {
+    const cb = vi.fn();
+    uiManager.setOpenEntityHandler(cb);
+    uiManager.showPanel('ops');
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    state.employees.employees = [{
+      id: 2, name: 'Walt Diggins', role: 'driller', salary: 1000, morale: 60, unionized: false, injured: false,
+      alive: true, x: 3, z: 3, qualifications: [], trainingState: null, activeActionId: null, fatigue: 100,
+      collapsing: false, interruptedActionPayload: null, ticksWorked: 0, restTicksRemaining: null,
+      restNeedKey: null, taskTicksRemaining: null, activeTaskSkill: null, destinationX: null,
+      destinationZ: null, moveConsecutiveFailures: 0, isMoveStuck: false, pendingRestDuration: null,
+      pendingRestNeedKey: null, pendingTaskDuration: null, pendingActionType: null,
+      pendingActionPayload: null, pendingDriverVehicleId: null, taskQueue: [],
+      locomotion: { kind: 'on_foot' }, itinerary: null, vehicleWaitingTicks: 0,
+    }];
+    state.employees.nextId = 3;
+    state.pendingActions = [{
+      id: 40, type: 'general_work', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 3, targetZ: 7, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'assigned', holderId: 2, queuedAtTick: 0,
+    }];
+    state.ghostPreviews.push({ id: 40, type: 'general_work', targetX: 3, targetZ: 7, targetY: 0, claimed: true });
+    uiManager.update(state);
+
+    const link = container.querySelector<HTMLElement>('#bs-operations-panel [data-select-kind="employee"][data-select-id="2"]');
+    expect(link).not.toBeNull();
+    link!.click();
+    expect(cb).toHaveBeenCalledWith('employee', 2);
+  });
+});

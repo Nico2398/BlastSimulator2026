@@ -452,3 +452,101 @@ describe('EventModal hint chip amounts (#1893)', () => {
     expect(amountLabel('score', 'safety', -3)).toBe('-3 SAFE');
   });
 });
+
+// ── Leaver chip as an employee link (#2165) ──
+
+describe('EventModal — leaver chip link (#2165)', () => {
+  afterEach(() => {
+    setLocale('en');
+  });
+
+  function leaverFixture(named: boolean) {
+    const { container, modal } = mount();
+    const state = createGame({ seed: 42, mineType: 'desert' });
+    clearEvents();
+    setupEvents();
+    let doomedId: number | null = null;
+    if (named) {
+      hireEmployee(state.employees, 'manager', new Random(1), 5, 5, 0);
+      doomedId = state.employees.employees[state.employees.employees.length - 1]!.id;
+    }
+    const doomed = state.employees.employees.find(e => e.id === doomedId);
+    state.events.pendingEvent = { eventId: 'mafia_informant', firedAtTick: 3, leavers: [{ optionIndex: 1, employeeId: doomedId }] };
+    const open = vi.fn();
+    const focus = vi.fn();
+    modal.setEntityOpener({ open, focus });
+    const gameConsole = fakeConsole(state, []);
+    modal.setGameConsole(gameConsole);
+    modal.update(state);
+    return { container, modal, state, doomed, open, focus, gameConsole };
+  }
+
+  const choiceAt = (container: HTMLElement, i: number) => container.querySelectorAll('#bs-event-dialog .bs-event-choice')[i]!;
+
+  it('the named leaver is an employee link carrying their id and name', () => {
+    const { container, modal, doomed } = leaverFixture(true);
+    const link = choiceAt(container, 1).querySelector<HTMLElement>(`[data-select-kind="employee"][data-select-id="${doomed!.id}"]`);
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe(doomed!.name);
+    modal.dispose();
+    container.remove();
+  });
+
+  it('clicking the leaver link calls opener.open with the employee', () => {
+    const { container, modal, doomed, open } = leaverFixture(true);
+    choiceAt(container, 1).querySelector<HTMLElement>('[data-select-kind="employee"]')!.click();
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith('employee', doomed!.id);
+    modal.dispose();
+    container.remove();
+  });
+
+  it('clicking the leaver link does not choose the option', () => {
+    const { container, modal, gameConsole } = leaverFixture(true);
+    choiceAt(container, 1).querySelector<HTMLElement>('[data-select-kind="employee"]')!.click();
+    expect(gameConsole).not.toHaveBeenCalled();
+    modal.dispose();
+    container.remove();
+  });
+
+  it('the chip sentence reads the same with the link in it', () => {
+    const { container, modal, doomed } = leaverFixture(true);
+    const text = choiceAt(container, 1).textContent ?? '';
+    expect(text).toContain(doomed!.name);
+    expect(text).toContain('quits the crew');
+    modal.dispose();
+    container.remove();
+  });
+
+  it('the other options carry no employee link', () => {
+    const { container, modal } = leaverFixture(true);
+    expect(choiceAt(container, 0).querySelector('[data-select-kind]')).toBeNull();
+    modal.dispose();
+    container.remove();
+  });
+
+  it('"nobody" stays plain text', () => {
+    const { container, modal } = leaverFixture(false);
+    const choice = choiceAt(container, 1);
+    expect(choice.textContent).toContain('Nobody is left to quit.');
+    expect(choice.querySelector('[data-select-kind]')).toBeNull();
+    modal.dispose();
+    container.remove();
+  });
+
+  it('without an opener the named leaver is plain text', () => {
+    const { container, modal } = mount();
+    const state = createGame({ seed: 42, mineType: 'desert' });
+    clearEvents();
+    setupEvents();
+    hireEmployee(state.employees, 'manager', new Random(1), 5, 5, 0);
+    const doomed = state.employees.employees[state.employees.employees.length - 1]!;
+    state.events.pendingEvent = { eventId: 'mafia_informant', firedAtTick: 3, leavers: [{ optionIndex: 1, employeeId: doomed.id }] };
+    modal.update(state);
+    const choice = choiceAt(container, 1);
+    expect(choice.textContent).toContain(doomed.name);
+    expect(choice.querySelector('[data-select-kind]')).toBeNull();
+    modal.dispose();
+    container.remove();
+  });
+});

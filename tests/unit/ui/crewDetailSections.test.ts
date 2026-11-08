@@ -36,6 +36,7 @@ import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'js
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
 import { t } from '../../../src/core/i18n/I18n.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import { vehicleDisplayName } from '../../../src/ui/fleetDetailSections.js';
 import {
   skillLevelExplain, moraleExplain, fatigueExplain, licenceExplain,
   salaryExplain, unionExplain, ticksLeftExplain,
@@ -870,5 +871,58 @@ describe('makeSkillsSection — candidate qualifications (#2164)', () => {
   it('renders the same section for a candidate-like holder as for an employee with those qualifications', () => {
     const asEmployee = makeEmployee({ qualifications: candidateLike.qualifications });
     expect(makeSkillsSection(candidateLike).textContent).toBe(makeSkillsSection(asEmployee).textContent);
+  });
+});
+
+describe('describeActivity — vehicle names (#2165)', () => {
+  const hauler = (id: number, tier: 1 | 2 | 3 = 1): Vehicle => ({
+    id, type: 'debris_hauler', tier, x: 5, z: 5, hp: 100, cargo: [], occupantIds: [],
+  });
+
+  it('driving names the vehicle by its display name when the fleet has it', () => {
+    const fleet = makeState([hauler(7, 2)]).vehicles;
+    const name = vehicleDisplayName('debris_hauler', 2);
+    const text = describeActivity(activity({ kind: 'driving', vehicleId: 7 }), fleet);
+    expect(text).toBe(t('ui.crew.task_driving', { vehicle: name }));
+    expect(text).toContain(name);
+    expect(text).not.toContain('#7');
+  });
+
+  it('driving to a task names the vehicle by its display name when the fleet has it', () => {
+    const fleet = makeState([hauler(7, 3)]).vehicles;
+    const name = vehicleDisplayName('debris_hauler', 3);
+    const text = describeActivity(activity({ kind: 'driving_to_task', vehicleId: 7 }), fleet);
+    expect(text).toBe(t('ui.crew.task_driving_to_task', { vehicle: name }));
+    expect(text).not.toContain('#7');
+  });
+
+  it('picks the vehicle by id among several, with its own type and tier', () => {
+    const rig: Vehicle = { id: 8, type: 'drill_rig', tier: 1, x: 0, z: 0, hp: 100, cargo: [], occupantIds: [] };
+    const fleet = makeState([hauler(7), rig]).vehicles;
+    expect(describeActivity(activity({ kind: 'driving', vehicleId: 8 }), fleet))
+      .toBe(t('ui.crew.task_driving', { vehicle: vehicleDisplayName('drill_rig', 1) }));
+  });
+
+  it('falls back to "#<id>" when the fleet does not hold the vehicle', () => {
+    const fleet = makeState([hauler(1)]).vehicles;
+    expect(describeActivity(activity({ kind: 'driving', vehicleId: 7 }), fleet)).toBe('Driving #7');
+    expect(describeActivity(activity({ kind: 'driving_to_task', vehicleId: 7 }), fleet)).toBe('Driving to task (#7)');
+  });
+
+  it('falls back to "#<id>" with an empty fleet', () => {
+    const fleet = makeState([]).vehicles;
+    expect(describeActivity(activity({ kind: 'driving', vehicleId: 7 }), fleet)).toBe('Driving #7');
+  });
+
+  it('keeps "#<id>" when no fleet is passed', () => {
+    expect(describeActivity(activity({ kind: 'driving', vehicleId: 7 }))).toBe('Driving #7');
+    expect(describeActivity(activity({ kind: 'driving_to_task', vehicleId: 7 }))).toBe('Driving to task (#7)');
+  });
+
+  it('other activities ignore the fleet', () => {
+    const fleet = makeState([hauler(7)]).vehicles;
+    expect(describeActivity(activity({ kind: 'resting' }), fleet)).toBe('Resting');
+    expect(describeActivity(activity({ kind: 'idle' }), fleet)).toBe('Idle');
+    expect(describeActivity(activity({ kind: 'working', actionType: 'drill_hole' }), fleet)).toBe('Drilling');
   });
 });

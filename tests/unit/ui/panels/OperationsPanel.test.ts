@@ -1262,3 +1262,303 @@ describe('OperationsPanel — barren rock filling storage (#2018)', () => {
     expect(text).not.toContain('rubble contract');
   });
 });
+
+// ── Entity links (#2165) ─────────────────────────────────────────────────────
+//
+// Names and coordinates in the Work Queue and Incidents sections become links
+// that open the inspector / centre the camera through the EntityOpener.
+
+function makeOpenerMock() {
+  const open = vi.fn();
+  const focus = vi.fn();
+  return { opener: { open, focus }, open, focus };
+}
+
+function makePanelWithOpener() {
+  const made = makePanel();
+  const mock = makeOpenerMock();
+  made.panel.setEntityOpener(mock.opener);
+  return { ...made, ...mock };
+}
+
+function queueAction(state: GameState, overrides: Partial<PendingAction> = {}): PendingAction {
+  const action = makePendingActionFixture({ id: 50, status: 'assigned', ...overrides });
+  state.pendingActions.push(action);
+  state.ghostPreviews.push({ id: action.id, type: 'general_work', targetX: action.targetX, targetZ: action.targetZ, targetY: 0, claimed: action.holderId !== null });
+  return action;
+}
+
+describe('OperationsPanel — entity links: work queue (#2165)', () => {
+  it('a known holder name is an employee link whose text is the employee name', () => {
+    const { panel } = makePanelWithOpener();
+    const state = makeState();
+    const emp = addEmployee(state, { name: 'Oz Trill' });
+    queueAction(state, { holderId: emp.id });
+    panel.show();
+    panel.update(state);
+
+    const link = panel.root.querySelector<HTMLElement>(`button[data-select-kind="employee"][data-select-id="${emp.id}"]`);
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe('Oz Trill');
+  });
+
+  it('clicking the holder link calls opener.open with employee and the holder id', () => {
+    const { panel, open, focus } = makePanelWithOpener();
+    const state = makeState();
+    const emp = addEmployee(state, { name: 'Oz Trill' });
+    queueAction(state, { holderId: emp.id });
+    panel.show();
+    panel.update(state);
+
+    panel.root.querySelector<HTMLElement>(`button[data-select-kind="employee"][data-select-id="${emp.id}"]`)!.click();
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith('employee', emp.id);
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it('an in-progress order links its holder too', () => {
+    const { panel, open } = makePanelWithOpener();
+    const state = makeState();
+    const emp = addEmployee(state, { name: 'Pip Walker' });
+    queueAction(state, { status: 'in_progress', holderId: emp.id });
+    panel.show();
+    panel.update(state);
+    panel.root.querySelector<HTMLElement>('button[data-select-kind="employee"]')!.click();
+    expect(open).toHaveBeenCalledWith('employee', emp.id);
+  });
+
+  it('an unclaimed order keeps plain "Unclaimed" text with no employee link', () => {
+    const { panel } = makePanelWithOpener();
+    const state = makeState();
+    queueAction(state, { status: 'queued', holderId: null });
+    panel.show();
+    panel.update(state);
+    expect(panel.root.textContent).toContain(t('ui.operations.work_queue_holder_unclaimed'));
+    expect(panel.root.querySelector('button[data-select-kind="employee"]')).toBeNull();
+  });
+
+  it('a holder id nobody on the roster has keeps plain "Unknown" text with no employee link', () => {
+    const { panel } = makePanelWithOpener();
+    const state = makeState();
+    queueAction(state, { holderId: 999 });
+    panel.show();
+    panel.update(state);
+    expect(panel.root.textContent).toContain(t('ui.operations.work_queue_holder_unknown'));
+    expect(panel.root.querySelector('button[data-select-kind="employee"]')).toBeNull();
+  });
+
+  it('without an opener the holder name stays plain text', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    const emp = addEmployee(state, { name: 'Oz Trill' });
+    queueAction(state, { holderId: emp.id });
+    panel.show();
+    panel.update(state);
+    expect(panel.root.textContent).toContain('Oz Trill');
+    expect(panel.root.querySelector('button[data-select-kind]')).toBeNull();
+  });
+
+  it('the target coordinates are a focus button carrying x and z, with the coordinate text', () => {
+    const { panel } = makePanelWithOpener();
+    const state = makeState();
+    queueAction(state, { targetX: 3, targetZ: 7 });
+    panel.show();
+    panel.update(state);
+
+    const link = panel.root.querySelector<HTMLElement>('button[data-focus-x][data-focus-z]');
+    expect(link).not.toBeNull();
+    expect(link!.dataset['focusX']).toBe('3');
+    expect(link!.dataset['focusZ']).toBe('7');
+    expect(link!.textContent).toBe(t('ui.crew.location_coords', { x: 3, z: 7 }));
+  });
+
+  it('clicking the coordinates calls opener.focus with x and z and never open', () => {
+    const { panel, open, focus } = makePanelWithOpener();
+    const state = makeState();
+    queueAction(state, { targetX: 3, targetZ: 7 });
+    panel.show();
+    panel.update(state);
+
+    panel.root.querySelector<HTMLElement>('button[data-focus-x][data-focus-z]')!.click();
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenCalledWith(3, 7);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('without an opener the coordinates stay plain text', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    queueAction(state, { targetX: 3, targetZ: 7 });
+    panel.show();
+    panel.update(state);
+    expect(panel.root.textContent).toContain(t('ui.crew.location_coords', { x: 3, z: 7 }));
+    expect(panel.root.querySelector('button[data-focus-x]')).toBeNull();
+  });
+
+  it('clicking a link does not cancel the order', () => {
+    const { panel, gameConsole } = makePanelWithOpener();
+    const state = makeState();
+    const emp = addEmployee(state, { name: 'Oz Trill' });
+    queueAction(state, { holderId: emp.id });
+    panel.show();
+    panel.update(state);
+    panel.root.querySelector<HTMLElement>('button[data-select-kind="employee"]')!.click();
+    panel.root.querySelector<HTMLElement>('button[data-focus-x]')!.click();
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+});
+
+describe('OperationsPanel — entity links: incidents (#2165)', () => {
+  const liveBuilding = (id: number) => ({ id, type: 'management_office' as const, tier: 1 as const, x: 5, z: 5, hp: 100, active: true, occupantIds: [] });
+  const liveVehicle = (id: number) => ({ id, type: 'debris_hauler' as const, tier: 1 as const, x: 5, z: 5, hp: 100, cargo: [], occupantIds: [] });
+
+  it('an injured chip names the employee as a link and keeps its text', () => {
+    const { panel } = makePanelWithOpener();
+    const state = makeState();
+    const emp = addEmployee(state, { name: 'Dorian Kask', injured: true, alive: true });
+    panel.show();
+    panel.update(state);
+
+    const link = panel.root.querySelector<HTMLElement>(`button[data-select-kind="employee"][data-select-id="${emp.id}"]`);
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe('Dorian Kask');
+    expect(panel.root.textContent).toContain('Dorian Kask injured');
+  });
+
+  it('clicking the injured-chip link calls opener.open with the employee', () => {
+    const { panel, open } = makePanelWithOpener();
+    const state = makeState();
+    const emp = addEmployee(state, { name: 'Dorian Kask', injured: true, alive: true });
+    panel.show();
+    panel.update(state);
+    panel.root.querySelector<HTMLElement>('button[data-select-kind="employee"]')!.click();
+    expect(open).toHaveBeenCalledWith('employee', emp.id);
+  });
+
+  it('each injured employee gets their own link; a dead one gets none', () => {
+    const { panel } = makePanelWithOpener();
+    const state = makeState();
+    const a = addEmployee(state, { name: 'Dorian Kask', injured: true, alive: true });
+    const b = addEmployee(state, { name: 'Oz Trill', injured: true, alive: true });
+    addEmployee(state, { name: 'Chuck Deadman', injured: true, alive: false });
+    panel.show();
+    panel.update(state);
+    const ids = [...panel.root.querySelectorAll<HTMLElement>('button[data-select-kind="employee"]')].map(l => l.dataset['selectId']);
+    expect(ids.sort()).toEqual([String(a.id), String(b.id)].sort());
+  });
+
+  it('without an opener the injured chip is plain text', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    addEmployee(state, { name: 'Dorian Kask', injured: true, alive: true });
+    panel.show();
+    panel.update(state);
+    expect(panel.root.textContent).toContain('Dorian Kask injured');
+    expect(panel.root.querySelector('button[data-select-kind]')).toBeNull();
+  });
+
+  it('an injury incident links the employee and keeps the sentence', () => {
+    const { panel, open } = makePanelWithOpener();
+    const state = makeState();
+    const emp = addEmployee(state, { name: 'Oz Trill' });
+    state.damage.accidents.push(makeAccident({ type: 'injury', entityId: emp.id, tick: 24 }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.textContent).toContain('Oz Trill was injured');
+    const link = panel.root.querySelector<HTMLElement>(`button[data-select-kind="employee"][data-select-id="${emp.id}"]`);
+    expect(link).not.toBeNull();
+    link!.click();
+    expect(open).toHaveBeenCalledWith('employee', emp.id);
+  });
+
+  it('a death incident links the employee, who stays on the roster with alive:false', () => {
+    const { panel, open } = makePanelWithOpener();
+    const state = makeState();
+    const emp = addEmployee(state, { name: 'Chuck Deadman', alive: false });
+    state.damage.accidents.push(makeAccident({ type: 'death', entityId: emp.id }));
+    panel.show();
+    panel.update(state);
+
+    const link = panel.root.querySelector<HTMLElement>(`button[data-select-kind="employee"][data-select-id="${emp.id}"]`);
+    expect(link).not.toBeNull();
+    link!.click();
+    expect(open).toHaveBeenCalledWith('employee', emp.id);
+  });
+
+  it('an injury incident for an employee no longer on the roster stays plain text', () => {
+    const { panel } = makePanelWithOpener();
+    const state = makeState();
+    state.damage.accidents.push(makeAccident({ type: 'injury', entityId: 4242 }));
+    panel.show();
+    panel.update(state);
+    expect(panel.root.textContent).toContain(t('ui.operations.incident_injury', { name: t('ui.operations.incident_unknown_worker') }));
+    expect(panel.root.querySelector('button[data-select-kind]')).toBeNull();
+  });
+
+  it('a damaged building that still exists is linked as a building', () => {
+    const { panel, open } = makePanelWithOpener();
+    const state = makeState();
+    state.buildings.buildings.push(liveBuilding(31));
+    state.damage.accidents.push(makeAccident({ type: 'building_damage', entityId: 31, entityLabel: 'management_office' }));
+    panel.show();
+    panel.update(state);
+
+    const link = panel.root.querySelector<HTMLElement>('button[data-select-kind="building"][data-select-id="31"]');
+    expect(link).not.toBeNull();
+    link!.click();
+    expect(open).toHaveBeenCalledWith('building', 31);
+  });
+
+  it('a destroyed building stays plain text', () => {
+    const { panel } = makePanelWithOpener();
+    const state = makeState();
+    state.damage.accidents.push(makeAccident({ type: 'building_destroyed', entityId: 99, entityLabel: 'living_quarters' }));
+    panel.show();
+    panel.update(state);
+    expect(panel.root.textContent).toContain('Living Quarters was destroyed');
+    expect(panel.root.querySelector('button[data-select-kind="building"]')).toBeNull();
+  });
+
+  it('a damaged building that no longer exists stays plain text', () => {
+    const { panel } = makePanelWithOpener();
+    const state = makeState();
+    state.damage.accidents.push(makeAccident({ type: 'building_damage', entityId: 77, entityLabel: 'management_office' }));
+    panel.show();
+    panel.update(state);
+    expect(panel.root.querySelector('button[data-select-kind="building"]')).toBeNull();
+  });
+
+  it('a damaged vehicle that still exists is linked as a vehicle', () => {
+    const { panel, open } = makePanelWithOpener();
+    const state = makeState();
+    state.vehicles.vehicles.push(liveVehicle(21));
+    state.damage.accidents.push(makeAccident({ type: 'vehicle_damage', entityId: 21, entityLabel: 'debris_hauler' }));
+    panel.show();
+    panel.update(state);
+
+    const link = panel.root.querySelector<HTMLElement>('button[data-select-kind="vehicle"][data-select-id="21"]');
+    expect(link).not.toBeNull();
+    link!.click();
+    expect(open).toHaveBeenCalledWith('vehicle', 21);
+  });
+
+  it('a destroyed vehicle stays plain text', () => {
+    const { panel } = makePanelWithOpener();
+    const state = makeState();
+    state.damage.accidents.push(makeAccident({ type: 'vehicle_destroyed', entityId: 21, entityLabel: 'debris_hauler' }));
+    panel.show();
+    panel.update(state);
+    expect(panel.root.querySelector('button[data-select-kind="vehicle"]')).toBeNull();
+  });
+
+  it('without an opener the incident rows are plain text even for a live building', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.buildings.buildings.push(liveBuilding(31));
+    state.damage.accidents.push(makeAccident({ type: 'building_damage', entityId: 31, entityLabel: 'management_office' }));
+    panel.show();
+    panel.update(state);
+    expect(panel.root.querySelector('button[data-select-kind]')).toBeNull();
+  });
+});

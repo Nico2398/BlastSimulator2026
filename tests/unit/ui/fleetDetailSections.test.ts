@@ -3,7 +3,7 @@
 // builders. FleetPanel.test.ts exercises these indirectly through the whole
 // panel and only ever hits one leg of each of makeHpGauge's/makeLoadGauge's/
 // makeDriverRow's ternaries — this file targets the legs it misses.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { makeHpGauge, makeLoadGauge, makeStatusChip, makeDriverNameLine } from '../../../src/ui/fleetDetailSections.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
@@ -262,5 +262,73 @@ describe('fleetDetailSections — makeDriverNameLine, nobody licensed at the tie
 
   it('the row still carries no Train button', () => {
     expect(makeDriverNameLine(rig(), [levelOneDriller()]).querySelector('button')).toBeNull();
+  });
+});
+
+// ── makeDriverNameLine with an opener (#2165): the driver name becomes a link ──
+
+describe('fleetDetailSections — makeDriverNameLine, entity opener (#2165)', () => {
+  const mockOpener = () => {
+    const open = vi.fn();
+    const focus = vi.fn();
+    return { opener: { open, focus }, open, focus };
+  };
+
+  it('the seated driver name is an employee link carrying the driver id', () => {
+    const { opener } = mockOpener();
+    const line = makeDriverNameLine(makeVehicle({ occupantIds: [6] }), [makeEmployee({ id: 6, name: 'Dorian Kask' })], opener);
+    const link = line.querySelector<HTMLElement>('button[data-select-kind="employee"][data-select-id="6"]');
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe('Dorian Kask');
+  });
+
+  it('clicking the driver link calls opener.open with employee and the driver id', () => {
+    const { opener, open, focus } = mockOpener();
+    const line = makeDriverNameLine(makeVehicle({ occupantIds: [6] }), [makeEmployee({ id: 6, name: 'Dorian Kask' })], opener);
+    line.querySelector<HTMLElement>('button[data-select-kind="employee"]')!.click();
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith('employee', 6);
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it('keeps the bs-fleet-driver hook and the same text as without an opener', () => {
+    const { opener } = mockOpener();
+    const v = makeVehicle({ occupantIds: [6] });
+    const roster = [makeEmployee({ id: 6, name: 'Dorian Kask' })];
+    const withOpener = makeDriverNameLine(v, roster, opener);
+    const without = makeDriverNameLine(v, roster);
+    expect(withOpener.classList.contains('bs-fleet-driver')).toBe(true);
+    expect(withOpener.textContent).toBe(without.textContent);
+  });
+
+  it('without an opener the driver name is plain text, no button', () => {
+    const line = makeDriverNameLine(makeVehicle({ occupantIds: [6] }), [makeEmployee({ id: 6, name: 'Dorian Kask' })]);
+    expect(line.textContent).toBe('Dorian Kask');
+    expect(line.querySelector('button')).toBeNull();
+    expect(line.classList.contains('bs-fleet-driver')).toBe(true);
+  });
+
+  it('a pending "walking to board" driver stays text, not a link', () => {
+    const { opener } = mockOpener();
+    const line = makeDriverNameLine(
+      makeVehicle({ id: 2 }),
+      [makeEmployee({ id: 8, name: 'Pip Walker', pendingDriverVehicleId: 2 })],
+      opener,
+    );
+    expect(line.textContent).toBe(t('ui.fleet.walking_to_board', { name: 'Pip Walker' }));
+    expect(line.querySelector('button')).toBeNull();
+  });
+
+  it('Unmanned stays text', () => {
+    const { opener } = mockOpener();
+    const line = makeDriverNameLine(makeVehicle(), [makeEmployee({ id: 6, qualifications: [TRUCK_LICENCE] })], opener);
+    expect(line.textContent).toContain(t('ui.fleet.unmanned'));
+    expect(line.querySelector('button')).toBeNull();
+  });
+
+  it('the no-licensed-driver hint stays text', () => {
+    const { opener } = mockOpener();
+    const line = makeDriverNameLine(makeVehicle({ type: 'drill_rig' }), [], opener);
+    expect(line.querySelector('button')).toBeNull();
   });
 });
