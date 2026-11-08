@@ -213,7 +213,7 @@ describe('DrillStep permit hole-limit warning is unchanged by the depth default 
     const arg = stripArg(h);
     expect(arg.confirmEnabled).toBe(true);
     expect(JSON.stringify(arg).toLowerCase()).toContain(gridHoleLimitWarning(createGradeState(), 16)!.toLowerCase());
-    expect(JSON.stringify(arg)).toContain('(9)');
+    expect(JSON.stringify(arg)).toContain('/ 9');
   });
 
   it('a 3x3 grid on a grade-0 site shows no permit warning', () => {

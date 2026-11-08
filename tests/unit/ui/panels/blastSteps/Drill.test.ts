@@ -699,7 +699,7 @@ describe('DrillStep — permit hole-limit warning (#1925)', () => {
     expect(arg.confirmEnabled).toBe(true);
     expect(textOf(arg)).toContain(gridHoleLimitWarning(createGradeState(), 16)!.toLowerCase());
     // Literal check so the assertion does not merely echo the helper under test.
-    expect(textOf(arg)).toContain('(9)');
+    expect(textOf(arg)).toContain('/ 9');
   });
 
   it('a 3x3 grid at the limit shows no warning', () => {
