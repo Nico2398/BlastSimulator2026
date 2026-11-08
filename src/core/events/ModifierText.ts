@@ -12,7 +12,7 @@ export function signedTicks(n: number): string {
 }
 
 /** The number or name a modifier's label shows, by kind. */
-function labelValue(m: ActiveModifier): string {
+export function modifierValueText(m: ActiveModifier): string {
   switch (m.kind) {
     case 'morale_drift': return `${m.magnitude > 0 ? '+' : ''}${m.magnitude}`;
     case 'recurring_charge': return formatMoney(m.magnitude);
@@ -26,7 +26,7 @@ function labelValue(m: ActiveModifier): string {
 
 /** "Work stoppage · Driller" style label for a modifier. */
 function modifierLabel(m: ActiveModifier): string {
-  const label = t(`ui.modifier.${m.kind}`, { value: labelValue(m) });
+  const label = t(`ui.modifier.${m.kind}`, { value: modifierValueText(m) });
   return m.role === null ? label : `${label} (${t(`role.${m.role}`)})`;
 }
 

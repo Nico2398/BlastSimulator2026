@@ -7,6 +7,12 @@ import { el } from './dom.js';
 /** What a panel link can open in the inspector. */
 export type OpenableKind = 'employee' | 'vehicle' | 'building' | 'hole';
 
+/** A reference to one openable entity, carried by a notification or an alert pip. */
+export interface EntityRef {
+  kind: OpenableKind;
+  id: number;
+}
+
 /** The one entry point panels call: open the inspector on an entity, or centre the camera on a point. */
 export interface EntityOpener {
   open(kind: OpenableKind, id: number): void;
