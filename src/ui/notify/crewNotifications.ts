@@ -61,6 +61,7 @@ export function wireCrewNotifications(
       severity: CREW_SEVERITY[kind],
       title: t('notification.title.crew'),
       body: t(`notification.crew.${kind}`, { name: nameOf(employeeId), ...params }),
+      ref: { kind: 'employee', id: employeeId },
       ...(VOICED_KINDS.has(kind) ? { silent: true } : {}),
     });
   };

@@ -4,6 +4,7 @@ import type { ActiveModifier } from '../../core/events/ActiveModifiers.js';
 import { remainingTicks } from '../../core/events/ActiveModifiers.js';
 import { modifierSummary } from '../../core/events/ModifierText.js';
 import { chip, el } from '../dom.js';
+import { modifierExplain } from '../hudExplain.js';
 import { shellLayoutRegistry, type Rect, type Viewport } from './LayoutRegistry.js';
 import { TOPBAR_HEIGHT_PX, SPACING_3_PX } from '../tokens.js';
 
@@ -23,13 +24,16 @@ export function createModifierChips(
   let lastSignature = '';
   return (modifiers, tick) => {
     // A lapsed modifier lingers in the ledger until the next tick prunes it; never show it.
-    const labels = modifiers.filter(m => remainingTicks(m, tick) !== 0).map(m => modifierSummary(m, tick));
+    const live = modifiers.filter(m => remainingTicks(m, tick) !== 0);
+    const labels = live.map(m => modifierSummary(m, tick));
     const signature = labels.join('|');
     if (signature === lastSignature) return;
     lastSignature = signature;
-    container.replaceChildren(...labels.map(label => {
-      const c = chip(label, 'warn');
+    container.replaceChildren(...live.map((m, i) => {
+      const c = chip(labels[i]!, 'warn', modifierExplain(m, tick));
       c.classList.add('bs-modifier-chip');
+      // The strip is click-through; the chips themselves take hover and focus (#2169).
+      c.style.pointerEvents = 'auto';
       return c;
     }));
   };

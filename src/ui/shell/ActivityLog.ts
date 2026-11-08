@@ -2,7 +2,8 @@
 // Right-side drawer, z500, holding every notification ever raised — nothing
 // is lost once a toast's 6.5s expire.
 
-import type { EntityOpener } from '../entityLinks.js';
+import { openerLink, type EntityOpener } from '../entityLinks.js';
+import { formatGameClock } from '../formatGameClock.js';
 import { iconEl } from '../icons.js';
 import { el } from '../dom.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -25,6 +26,7 @@ export class ActivityLog {
   private readonly body: HTMLElement;
   private _visible = false;
   private lastSignature = '';
+  private opener: EntityOpener | undefined;
 
   constructor(container: HTMLElement) {
     this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-activity-log' } });
@@ -57,7 +59,7 @@ export class ActivityLog {
   }
 
   /** Wires the opener that entity links call (#2169). */
-  setEntityOpener(_opener: EntityOpener): void { /* not implemented */ }
+  setEntityOpener(opener: EntityOpener): void { this.opener = opener; this.lastSignature = ''; }
 
   show(): void { this._visible = true; this.el.style.display = 'flex'; this.lastSignature = ''; }
   hide(): void { this._visible = false; this.el.style.display = 'none'; }
@@ -83,9 +85,12 @@ export class ActivityLog {
       iconWrap.appendChild(iconEl(entry.icon, 14));
       const body = el('div');
       body.style.cssText = 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0';
-      body.appendChild(el('div', { text: entry.title, attrs: { style: 'font:600 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }));
+      const title = el('div', { attrs: { style: 'font:600 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-primary)' } });
+      if (entry.ref && this.opener) title.appendChild(openerLink(this.opener, entry.ref.kind, entry.ref.id, entry.title));
+      else title.textContent = entry.title;
+      body.appendChild(title);
       body.appendChild(el('div', { text: entry.body, attrs: { style: 'font:400 10px/1.45 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }));
-      const when = el('span', { className: 'bsx-mono', text: `t${entry.tick}` });
+      const when = el('span', { className: 'bsx-mono', text: formatGameClock(entry.tick) });
       when.style.cssText = 'font-size:11px;color:var(--bsx-text-micro);white-space:nowrap';
       row.append(iconWrap, body, when);
       this.body.appendChild(row);

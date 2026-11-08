@@ -2,7 +2,7 @@
 // Stacked, severity-colored, click-through-to-source, auto-dismissing.
 // Replaces UIManager.showNotification's single fixed toast.
 
-import type { EntityOpener } from '../entityLinks.js';
+import { openerLink, type EntityOpener } from '../entityLinks.js';
 import { iconEl } from '../icons.js';
 import { el } from '../dom.js';
 import type { NotificationCenter, Toast } from '../notify/NotificationCenter.js';
@@ -44,6 +44,7 @@ function toastsBounds(viewport: Viewport): Rect {
 export class Toasts {
   private readonly el: HTMLElement;
   private lastSignature = '';
+  private opener: EntityOpener | undefined;
 
   constructor(container: HTMLElement) {
     this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-toasts' } });
@@ -58,7 +59,7 @@ export class Toasts {
   }
 
   /** Wires the opener that entity links call (#2169). */
-  setEntityOpener(_opener: EntityOpener): void { /* not implemented */ }
+  setEntityOpener(opener: EntityOpener): void { this.opener = opener; }
 
   update(center: NotificationCenter): void {
     const toasts = center.getToasts();
@@ -101,7 +102,10 @@ export class Toasts {
 
     const body = el('div');
     body.style.cssText = 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0';
-    body.appendChild(el('div', { text: toast.title, attrs: { style: 'font:600 12px/1.25 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }));
+    const title = el('div', { attrs: { style: 'font:600 12px/1.25 var(--bsx-font-ui);color:var(--bsx-text-primary)' } });
+    if (toast.ref && this.opener) title.appendChild(openerLink(this.opener, toast.ref.kind, toast.ref.id, toast.title));
+    else title.textContent = toast.title;
+    body.appendChild(title);
     body.appendChild(el('div', { text: toast.body, attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }));
     if (toast.cta && toast.onCta) {
       const cta = el('button', { text: toast.cta });

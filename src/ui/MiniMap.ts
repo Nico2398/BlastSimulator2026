@@ -5,7 +5,8 @@
 import { t } from '../core/i18n/I18n.js';
 import { LocaleTextRegistry } from './localeText.js';
 import { iconEl } from './icons.js';
-import { paintToggleButton } from './dom.js';
+import { explainable, paintToggleButton } from './dom.js';
+import { minimapLayerExplain } from './hudExplain.js';
 import {
   MAP_SIZE,
   MINIMAP_LAYERS,
@@ -18,6 +19,7 @@ import {
   projectZ,
   StaticLayerInputs,
   type MapProjection,
+  type MiniMapLayerId,
 } from './miniMapLayers.js';
 import type { GameState } from '../core/state/GameState.js';
 import { isInsideBuilding } from '../core/entities/EmployeeLocomotion.js';
@@ -60,6 +62,7 @@ export class MiniMap {
   private readonly staticCtx: CanvasRenderingContext2D | null;
   private readonly staticInputs = new StaticLayerInputs();
   private readonly locale = new LocaleTextRegistry();
+  private readonly legendEntries: Array<[HTMLElement, MiniMapLayerId]> = [];
   private onFocus?: (x: number, z: number) => void;
 
   constructor(container: HTMLElement) {
@@ -130,6 +133,8 @@ export class MiniMap {
       txt.style.cssText = 'color:var(--bsx-text-secondary);font-size:10px';
       this.locale.bindText(txt, layer.labelKey);
       entry.append(swatch, txt);
+      explainable(entry, minimapLayerExplain(layer.id));
+      this.legendEntries.push([entry, layer.id]);
       legend.append(entry);
     }
 
@@ -171,6 +176,7 @@ export class MiniMap {
   /** Re-render locale-dependent text (title, legend) after a language change. */
   refreshLocale(): void {
     this.locale.refresh();
+    for (const [entry, id] of this.legendEntries) explainable(entry, minimapLayerExplain(id));
     // The canvas placeholder is painted by update(), which runs every tick.
   }
 
