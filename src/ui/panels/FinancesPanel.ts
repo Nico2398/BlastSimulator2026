@@ -18,14 +18,15 @@
 // real, a closed set of 14 values, and fully localizable, so that carries
 // the row instead.
 
+import { financeCategoryExplain } from '../panelExplain.js';
 import { PanelBase } from './PanelBase.js';
 import { t, getLocale } from '../../core/i18n/I18n.js';
 import { formatGameDuration } from '../formatGameDuration.js';
-import { el, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
+import { el, explainable, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatDollars } from '../../core/economy/formatMoney.js';
-import { getFinancialReport, type CategoryTotal } from '../../core/economy/Finance.js';
+import { getFinancialReport, type CategoryTotal, type Transaction } from '../../core/economy/Finance.js';
 import type { OperatingCostBreakdown } from '../../core/economy/OperatingFinance.js';
 import { getOperatingSummary, getRunway } from '../../core/economy/OperatingFinance.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -90,9 +91,9 @@ export class FinancesPanel extends PanelBase {
     const sections: HTMLElement[] = [
       this.makeBalanceCard(state),
       sectionHeader(t('ui.finances.income')),
-      ...this.makeCategoryRows(report.incomeByCategory, report.totalIncome, 'var(--bsx-positive)', t('ui.finances.none_income')),
+      ...this.makeCategoryRows(state, 'income', report.incomeByCategory, report.totalIncome, 'var(--bsx-positive)', t('ui.finances.none_income')),
       sectionHeader(t('ui.finances.expenses')),
-      ...this.makeCategoryRows(report.expensesByCategory, report.totalExpenses, 'var(--bsx-critical-text)', t('ui.finances.none_expenses')),
+      ...this.makeCategoryRows(state, 'expense', report.expensesByCategory, report.totalExpenses, 'var(--bsx-critical-text)', t('ui.finances.none_expenses')),
       this.makeLedgerBar(state),
       sectionHeader(t('ui.finances.ledger')),
       scrollBoundedSection(rows, 200, { gap: 10, scrollKey: 'ledger' }),
@@ -181,19 +182,20 @@ export class FinancesPanel extends PanelBase {
 
   // ── Category bars ──
 
-  private makeCategoryRows(categories: CategoryTotal[], sectionTotal: number, color: string, emptyText: string): HTMLElement[] {
+  private makeCategoryRows(state: GameState, type: Transaction['type'], categories: CategoryTotal[], sectionTotal: number, color: string, emptyText: string): HTMLElement[] {
     if (categories.length === 0) return [emptyState(emptyText)];
     const sorted = [...categories].sort((a, b) => b.total - a.total);
     return sorted.map(cat => {
       const pct = sectionTotal > 0 ? Math.round((cat.total / sectionTotal) * 100) : 0;
-      const row = el('div');
+      const row = el('div', { attrs: { 'data-category-row': '', 'data-category': cat.category, 'data-type': type } });
       row.style.cssText = 'display:flex;align-items:center;gap:8px';
       row.append(
         el('span', { text: t(`ui.finances.category.${cat.category}`), attrs: { style: 'font:400 11px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary);width:88px;flex:0 0 88px' } }),
         el('div', { attrs: { style: 'flex:1' }, children: [progressBar(pct, color)] }),
         el('span', { text: `$${formatMoney(cat.total)}`, attrs: { style: `font:500 11px/1 var(--bsx-font-mono);color:${color};width:66px;text-align:right;flex:0 0 66px` } }),
       );
-      return row;
+      const entries = state.finances.transactions.filter(tx => tx.type === type && tx.category === cat.category);
+      return explainable(row, financeCategoryExplain(entries, pct));
     });
   }
 
@@ -241,6 +243,9 @@ export class FinancesPanel extends PanelBase {
         el('span', { text: t(`ui.finances.category.${tx.category}`), attrs: { style: 'font:500 11px/1.2 var(--bsx-font-ui)' } }),
         el('span', { text: t('ui.finances.ledger_day', { day }), attrs: { style: 'font:600 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),
       );
+      if (tx.description) {
+        col.append(el('span', { text: tx.description, attrs: { 'data-role': 'ledger-description', style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }));
+      }
       row.append(col, el('span', {
         text: `${tx.type === 'income' ? '+' : '-'}$${formatMoney(tx.amount)}`,
         attrs: { style: `font:600 11px/1 var(--bsx-font-mono);color:${color}` },

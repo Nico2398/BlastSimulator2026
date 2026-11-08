@@ -4,6 +4,7 @@
 
 import { openerLink, type EntityOpener } from './entityLinks.js';
 import { t } from '../core/i18n/I18n.js';
+import { vehicleHpExplain, vehicleStatusExplain } from './panelExplain.js';
 import { el, chip, gauge, type ChipTone } from './dom.js';
 import type { Vehicle, VehicleTier, VehicleState } from '../core/entities/Vehicle.js';
 import { ROLE_LICENCE_REQUIRED, getVehicleDefByTier, vehicleCargoMassKg, vehicleDriverId } from '../core/entities/Vehicle.js';
@@ -63,14 +64,14 @@ export function describeStatus(status: VehicleStatus): string {
  */
 export function makeStatusChip(v: Vehicle, vehicleState: VehicleState, occupant?: Employee): HTMLElement {
   const status = computeVehicleStatus(v, vehicleState, occupant);
-  return chip(describeStatus(status), STATUS_TONE[status.kind]);
+  return chip(describeStatus(status), STATUS_TONE[status.kind], vehicleStatusExplain(status.kind));
 }
 
 export function makeHpGauge(v: Vehicle): HTMLElement {
   const maxHp = getVehicleDefByTier(v.type, v.tier).maxHp;
   const pct = maxHp > 0 ? Math.round((v.hp / maxHp) * 100) : 0;
   const color = pct > 50 ? 'var(--bsx-positive)' : pct > 20 ? 'var(--bsx-amber)' : 'var(--bsx-critical)';
-  const row = gauge(t('ui.fleet.hp'), pct, color, { labelWidth: 30 });
+  const row = gauge(t('ui.fleet.hp'), pct, color, { labelWidth: 30, explain: vehicleHpExplain() });
   const value = row.querySelector('.bsx-gauge-value');
   if (value) value.textContent = `${pct}%`;
   return row;
