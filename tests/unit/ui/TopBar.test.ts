@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TopBar, formatBalance } from '../../../src/ui/shell/TopBar.js';
 import { NotificationCenter } from '../../../src/ui/notify/NotificationCenter.js';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { createWeatherCycle, setWeather, type WeatherCycleState } from '../../../src/core/weather/WeatherCycle.js';
+import { ALL_WEATHER_STATES, createWeatherCycle, setWeather, type WeatherCycleState } from '../../../src/core/weather/WeatherCycle.js';
 import { hireEmployee, PAY_CYCLE_TICKS } from '../../../src/core/entities/Employee.js';
 import { addIncome, addExpense } from '../../../src/core/economy/Finance.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -11,6 +11,8 @@ import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { formatDollars } from '../../../src/core/economy/formatMoney.js';
 import * as TopBarModule from '../../../src/ui/shell/TopBar.js';
 import { createBoardState } from '../../../src/core/economy/Board.js';
+import { BOARD_CONFIDENCE_MET_GAIN, BOARD_CONFIDENCE_MISS_PENALTY } from '../../../src/core/config/balance.js';
+import type { EntityOpener } from '../../../src/ui/entityLinks.js';
 import { createGradeState, gradeDef } from '../../../src/core/economy/MineGrade.js';
 import en from '../../../src/core/i18n/locales/en.json';
 import fr from '../../../src/core/i18n/locales/fr.json';
@@ -994,5 +996,133 @@ describe('TopBar board chip (#1946)', () => {
   it('has the shell.topbar.board key in both locales', () => {
     expect(Object.keys(en)).toContain('shell.topbar.board');
     expect(Object.keys(fr)).toContain('shell.topbar.board');
+  });
+});
+
+describe('TopBar HUD explanations (#2169)', () => {
+  afterEach(() => { setLocale('en'); document.body.innerHTML = ''; });
+
+  function mountBar() {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    return { container, topBar: new TopBar(container), center: new NotificationCenter() };
+  }
+
+  it('the weather button explains the weather name and its effect', () => {
+    const { container, topBar, center } = mountBar();
+    topBar.update({ ...makeState(), weather: makeWeatherCycle('heavy_rain') }, center);
+    const explain = container.querySelector<HTMLElement>('.bs-weather')!.dataset['explain'] ?? '';
+    expect(explain).toContain(t('hud.weather.heavy_rain'));
+    expect(explain).toContain(t('ui.weather.effect.heavy_rain'));
+    topBar.dispose();
+  });
+
+  it('the weather explanation follows the weather for every state', () => {
+    const { container, topBar, center } = mountBar();
+    for (const w of ALL_WEATHER_STATES) {
+      topBar.update({ ...makeState(), weather: makeWeatherCycle(w) }, center);
+      const explain = container.querySelector<HTMLElement>('.bs-weather')!.dataset['explain'] ?? '';
+      expect(explain, w).toContain(t(`hud.weather.${w}`));
+      expect(explain, w).toContain(t(`ui.weather.effect.${w}`));
+    }
+    topBar.dispose();
+  });
+
+  it('the weather button is focusable and marked explainable', () => {
+    const { container, topBar, center } = mountBar();
+    topBar.update({ ...makeState(), weather: makeWeatherCycle('sunny') }, center);
+    const btn = container.querySelector<HTMLElement>('.bs-weather')!;
+    expect(btn.classList.contains('bsx-explainable')).toBe(true);
+    expect(btn.tabIndex).toBe(0);
+    topBar.dispose();
+  });
+
+  it('the board chip explains confidence and the quarterly review with the balance numbers', () => {
+    const { container, topBar, center } = mountBar();
+    const s = makeState();
+    s.board = createBoardState({ quarterTicks: 720, oreTargetT: 20, profitTarget: 5000 }, 0);
+    s.board.quarter = 2;
+    s.board.confidence = 75;
+    topBar.update(s, center);
+    const chip = container.querySelector<HTMLElement>('[data-action="open-board"]')!;
+    const explain = chip.dataset['explain'] ?? '';
+    expect(explain.trim().length).toBeGreaterThan(10);
+    expect(explain).toContain(String(BOARD_CONFIDENCE_MET_GAIN));
+    expect(explain).toContain(String(BOARD_CONFIDENCE_MISS_PENALTY));
+    expect(chip.classList.contains('bsx-explainable')).toBe(true);
+    expect(chip.tabIndex).toBe(0);
+    topBar.dispose();
+  });
+});
+
+describe('TopBar crew pips open the employee (#2169)', () => {
+  afterEach(() => { setLocale('en'); document.body.innerHTML = ''; });
+
+  function setup(configure: (s: ReturnType<typeof makeState>) => void) {
+    setLocale('en');
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const topBar = new TopBar(container);
+    const state = makeState();
+    configure(state);
+    const open = vi.fn();
+    const opener: EntityOpener = { open, focus: vi.fn() };
+    const nav = vi.fn();
+    topBar.setNavigateHandler(nav);
+    return { container, topBar, state, open, opener, nav };
+  }
+  const hire = (s: ReturnType<typeof makeState>) => hireEmployee(s.employees, 'driller', new Random(7), 0, 0).employee;
+  const pipWith = (container: HTMLElement, title: string) =>
+    Array.from(container.querySelectorAll('button')).find(b => b.title === title);
+
+  it('a collapsed-crew pip opens the collapsing employee when an opener is wired', () => {
+    let id = -1;
+    const { container, topBar, state, open, opener, nav } = setup(s => { const e = hire(s); e.collapsing = true; id = e.id; });
+    topBar.setEntityOpener(opener);
+    topBar.update(state, new NotificationCenter());
+    const pip = pipWith(container, t('notification.pip.crew_collapsed_tip', { count: 1 }));
+    expect(pip).toBeDefined();
+    pip!.click();
+    expect(open).toHaveBeenCalledWith('employee', id);
+    expect(nav).not.toHaveBeenCalled();
+    topBar.dispose();
+  });
+
+  it('a stuck-crew pip opens the stuck employee when an opener is wired', () => {
+    let id = -1;
+    const { container, topBar, state, open, opener, nav } = setup(s => { const e = hire(s); e.isMoveStuck = true; id = e.id; });
+    topBar.setEntityOpener(opener);
+    topBar.update(state, new NotificationCenter());
+    const pip = pipWith(container, t('notification.pip.crew_stuck_tip', { count: 1 }));
+    expect(pip).toBeDefined();
+    pip!.click();
+    expect(open).toHaveBeenCalledWith('employee', id);
+    expect(nav).not.toHaveBeenCalled();
+    topBar.dispose();
+  });
+
+  it('without an opener a crew pip still navigates to the employees panel', () => {
+    const { container, topBar, state, nav } = setup(s => { hire(s).collapsing = true; });
+    topBar.update(state, new NotificationCenter());
+    pipWith(container, t('notification.pip.crew_collapsed_tip', { count: 1 }))!.click();
+    expect(nav).toHaveBeenCalledWith('employees');
+    topBar.dispose();
+  });
+
+  it('a pip without a target keeps navigating even when an opener is wired', () => {
+    const { container, topBar, state, open, opener, nav } = setup(s => {
+      s.contracts.active.push({
+        id: 1, type: 'ore_sale', materialId: 'grumpite', description: 'test',
+        quantityKg: 100, deliveredKg: 0, pricePerKg: 1, deadlineTicks: 5,
+        acceptedAtTick: 50, penaltyAmount: 10, earlyBonus: 0, completed: false, expired: false,
+      });
+      s.tickCount = 52;
+    });
+    topBar.setEntityOpener(opener);
+    topBar.update(state, new NotificationCenter());
+    Array.from(container.querySelectorAll('button')).find(b => b.title.includes('expires'))!.click();
+    expect(nav).toHaveBeenCalledWith('contracts');
+    expect(open).not.toHaveBeenCalled();
+    topBar.dispose();
   });
 });

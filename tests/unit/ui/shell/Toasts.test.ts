@@ -13,11 +13,12 @@
 // number) rather than by reading getBoundingClientRect.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Toasts } from '../../../../src/ui/shell/Toasts.js';
 import { TopBar } from '../../../../src/ui/shell/TopBar.js';
 import { TOKENS_CSS } from '../../../../src/ui/tokens.js';
 import { NotificationCenter } from '../../../../src/ui/notify/NotificationCenter.js';
+import type { EntityOpener } from '../../../../src/ui/entityLinks.js';
 
 const TOASTS_SRC = readFileSync(resolve(__dirname, '../../../../src/ui/shell/Toasts.ts'), 'utf-8');
 const TOPBAR_SRC = readFileSync(resolve(__dirname, '../../../../src/ui/shell/TopBar.ts'), 'utf-8');
@@ -206,3 +207,76 @@ describe('Toasts — behavior (no prior coverage in the repo before #955)', () =
     expect(toastsRoot(container)).toBeNull();
   });
 });
+
+describe('Toasts — entity links (#2169)', () => {
+  const LINK = 'button[data-select-kind][data-select-id]';
+  const makeOpener = () => {
+    const open = vi.fn();
+    const opener: EntityOpener = { open, focus: vi.fn() };
+    return { open, opener };
+  };
+
+  it('a toast with a ref renders its title as an entity link that opens the entity', () => {
+    const { container, toasts } = mount();
+    const { open, opener } = makeOpener();
+    toasts.setEntityOpener(opener);
+    const center = new NotificationCenter();
+    center.notify({ severity: 'critical', title: 'Crew down', body: 'Someone fainted.', ref: { kind: 'employee', id: 12 } });
+    toasts.update(center);
+    const link = toastsRoot(container).querySelector<HTMLElement>(LINK)!;
+    expect(link).not.toBeNull();
+    expect(link.textContent).toBe('Crew down');
+    expect(link.dataset['selectKind']).toBe('employee');
+    expect(link.dataset['selectId']).toBe('12');
+    link.click();
+    expect(open).toHaveBeenCalledWith('employee', 12);
+    toasts.dispose();
+  });
+
+  it('a vehicle ref opens a vehicle', () => {
+    const { container, toasts } = mount();
+    const { open, opener } = makeOpener();
+    toasts.setEntityOpener(opener);
+    const center = new NotificationCenter();
+    center.notify({ severity: 'warn', title: 'Cut off', body: 'Truck.', ref: { kind: 'vehicle', id: 3 } });
+    toasts.update(center);
+    toastsRoot(container).querySelector<HTMLElement>(LINK)!.click();
+    expect(open).toHaveBeenCalledWith('vehicle', 3);
+    toasts.dispose();
+  });
+
+  it('a toast without a ref has a plain-text title', () => {
+    const { container, toasts } = mount();
+    toasts.setEntityOpener(makeOpener().opener);
+    const center = new NotificationCenter();
+    center.notify({ severity: 'info', title: 'Plain title', body: 'b' });
+    toasts.update(center);
+    expect(toastsRoot(container).querySelector(LINK)).toBeNull();
+    expect(toastsRoot(container).textContent).toContain('Plain title');
+    toasts.dispose();
+  });
+
+  it('a toast with a ref but no opener wired keeps a plain-text title', () => {
+    const { container, toasts } = mount();
+    const center = new NotificationCenter();
+    center.notify({ severity: 'info', title: 'Unlinked', body: 'b', ref: { kind: 'employee', id: 1 } });
+    toasts.update(center);
+    expect(toastsRoot(container).querySelector(LINK)).toBeNull();
+    expect(toastsRoot(container).textContent).toContain('Unlinked');
+    toasts.dispose();
+  });
+
+  it('clicking the link does not dismiss the toast it belongs to', () => {
+    const { container, toasts } = mount();
+    toasts.setEntityOpener(makeOpener().opener);
+    const center = new NotificationCenter();
+    center.notify({ severity: 'info', title: 'Linked', body: 'b', ref: { kind: 'employee', id: 5 } });
+    toasts.update(center);
+    toastsRoot(container).querySelector<HTMLElement>(LINK)!.click();
+    toasts.update(center);
+    expect(center.getToasts()).toHaveLength(1);
+    expect(toastsRoot(container).children.length).toBe(1);
+    toasts.dispose();
+  });
+});
+
