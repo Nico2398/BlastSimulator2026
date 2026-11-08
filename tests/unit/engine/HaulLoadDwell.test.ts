@@ -229,7 +229,8 @@ describe('locomotion serves the load dwell before the load applies (#2199)', () 
     const arrivedAt = free.loadedAt.get(1)!;
     for (let t = arrivedAt; t < arrivedAt + HAUL_LOAD_TICKS; t++) {
       expect(paid.cargo[t]).toEqual([]);
-      expect(paid.at[t]).toEqual(free.at[arrivedAt]);
+      // The free run drives on the tick it loads, so only the fragment's own cell is a fixed point.
+      expect(paid.at[t]).toEqual({ x: 5, z: 5 });
     }
     expect(paid.cargo[arrivedAt + HAUL_LOAD_TICKS]).toEqual([1]);
   });
@@ -237,9 +238,8 @@ describe('locomotion serves the load dwell before the load applies (#2199)', () 
   it('the vehicle does not move on, and does not unload, until the load has landed', () => {
     const paid = runTrip(planHaul(cluster(1)));
     const loadedTick = paid.loadedAt.get(1)!;
-    const stillAtLoad = paid.at[loadedTick - 1]!;
-    // Position when the load lands is the position it waited in.
-    expect(paid.at[loadedTick]).toEqual(stillAtLoad);
+    // It waited on the fragment's cell until the tick the load landed (the landing tick drives on).
+    expect(paid.at[loadedTick - 1]).toEqual({ x: 5, z: 5 });
     for (let t = 0; t < loadedTick; t++) expect(paid.cargo[t]).toEqual([]);
   });
 
