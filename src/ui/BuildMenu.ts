@@ -674,6 +674,7 @@ export class BuildMenu extends PanelBase {
     // Tier selector
     const tierSel = el('select', { className: 'bs-build-tier-sel' });
     tierSel.style.cssText = 'flex:0 0 auto;font:600 10px/1 var(--bsx-font-mono);width:44px;padding:4px 2px;border-radius:4px;border:1px solid var(--bsx-hairline-strong);background:var(--bsx-well);color:var(--bsx-text-secondary)';
+    tierSel.setAttribute('aria-label', t('ui.build.select_tier'));
     explainable(tierSel, tierCompareExplain(type));
     // A single-tier type has nothing to choose (#1530).
     if (isSingleTierType(type)) tierSel.style.display = 'none';
