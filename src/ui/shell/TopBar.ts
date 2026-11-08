@@ -4,6 +4,7 @@
 // floating Saves and Return-to-Map buttons main.ts used to create ad-hoc
 // (spec §5 defect: they collided with the event chip).
 
+import type { EntityOpener } from '../entityLinks.js';
 import { iconEl } from '../icons.js';
 import { el, sectionHeader, progressBar } from '../dom.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -312,6 +313,9 @@ export class TopBar {
     shellLayoutRegistry.register({ id: 'topbar', layer: 'hud', bounds: topBarBounds });
     this.modifierChips = mountModifierChips(container);
   }
+
+  /** Wires the opener that entity links call (#2169). */
+  setEntityOpener(_opener: EntityOpener): void { /* not implemented */ }
 
   setSpeedChangeHandler(cb: (speed: number) => void): void { this.onSpeedChange = cb; }
   setTogglePauseHandler(cb: () => void): void { this.onTogglePause = cb; }

@@ -26,6 +26,7 @@ import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { isHaulBlockedReason } from '../../core/economy/HaulDispatch.js';
 import { findStrandedCrew, type StrandedCrew } from '../../core/engine/StrandedCrew.js';
 import { vehicleDisplayName } from '../fleetDetailSections.js';
+import type { EntityRef } from '../entityLinks.js';
 import type { UiCues } from '../../audio/ui/UiCues.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
@@ -54,6 +55,8 @@ export interface NotifyInput {
   onCta?: () => void;
   /** True when the event behind this toast already has its own sound, so the toast cue stays quiet. */
   silent?: boolean;
+  /** The entity the notification names; its title becomes a link to it. */
+  ref?: EntityRef;
 }
 
 export interface LogEntry {
@@ -64,6 +67,8 @@ export interface LogEntry {
   readonly body: string;
   /** Game tick the notification landed on, for the log's "when" column. */
   readonly tick: number;
+  /** The entity the entry names, when it names one. */
+  readonly ref?: EntityRef;
 }
 
 export interface Toast extends LogEntry {
@@ -87,6 +92,8 @@ export interface AlertPip {
   readonly label: string;
   readonly tone: 'neutral' | 'warn' | 'critical';
   readonly tip: string;
+  /** The entity the pip is about; a click opens it. */
+  readonly target?: EntityRef;
 }
 
 export class NotificationCenter {

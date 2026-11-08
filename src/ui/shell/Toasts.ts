@@ -2,6 +2,7 @@
 // Stacked, severity-colored, click-through-to-source, auto-dismissing.
 // Replaces UIManager.showNotification's single fixed toast.
 
+import type { EntityOpener } from '../entityLinks.js';
 import { iconEl } from '../icons.js';
 import { el } from '../dom.js';
 import type { NotificationCenter, Toast } from '../notify/NotificationCenter.js';
@@ -55,6 +56,9 @@ export class Toasts {
 
     shellLayoutRegistry.register({ id: 'toasts', layer: 'hud', bounds: toastsBounds });
   }
+
+  /** Wires the opener that entity links call (#2169). */
+  setEntityOpener(_opener: EntityOpener): void { /* not implemented */ }
 
   update(center: NotificationCenter): void {
     const toasts = center.getToasts();

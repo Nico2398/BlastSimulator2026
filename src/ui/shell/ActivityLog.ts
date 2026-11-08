@@ -2,6 +2,7 @@
 // Right-side drawer, z500, holding every notification ever raised — nothing
 // is lost once a toast's 6.5s expire.
 
+import type { EntityOpener } from '../entityLinks.js';
 import { iconEl } from '../icons.js';
 import { el } from '../dom.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -54,6 +55,9 @@ export class ActivityLog {
 
     shellLayoutRegistry.register({ id: 'activity-log', layer: 'overlay', bounds: activityLogBounds });
   }
+
+  /** Wires the opener that entity links call (#2169). */
+  setEntityOpener(_opener: EntityOpener): void { /* not implemented */ }
 
   show(): void { this._visible = true; this.el.style.display = 'flex'; this.lastSignature = ''; }
   hide(): void { this._visible = false; this.el.style.display = 'none'; }
