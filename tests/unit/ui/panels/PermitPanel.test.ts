@@ -9,6 +9,7 @@ import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
 import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
 import { permitLimitsFor } from '../../../../src/core/economy/PermitLimits.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
+import { PERMIT_STRIKES_TO_SUSPEND, PERMIT_STRIKE_WINDOW_TICKS, PERMIT_SUSPENSION_TICKS } from '../../../../src/core/config/balance.js';
 
 const PENDING_LINE = 'Your file is on the pile. The pile is on a desk. The desk is on holiday.';
 
@@ -228,5 +229,44 @@ describe('PermitPanel (#1924)', () => {
     expect(panel.root.textContent).toContain(t('permit.no_ladder'));
     expect(applyBtn()).toBeNull();
     expect(q('[data-role="permit-stamp"]')).toBeNull();
+  });
+});
+
+describe('PermitPanel — strikes explanation (#2170)', () => {
+  const explain = (): string => q('[data-role="permit-strikes"]')?.dataset['explain'] ?? '';
+  const quotes = (text: string, n: number): boolean =>
+    text.includes(String(n)) || text.includes(n.toLocaleString('en-US')) || text.includes(formatGameDuration(n));
+
+  it('explains the strikes line with the balance numbers', () => {
+    panel.update(progression());
+    const text = explain();
+    expect(text).toContain(String(PERMIT_STRIKES_TO_SUSPEND));
+    expect(quotes(text, PERMIT_STRIKE_WINDOW_TICKS)).toBe(true);
+    expect(quotes(text, PERMIT_SUSPENSION_TICKS)).toBe(true);
+    expect(text).toMatch(/blast/i);
+  });
+
+  it('still explains once strikes have accrued', () => {
+    const s = progression();
+    s.tickCount = 100;
+    s.grade!.strikeTicks = [90, 95];
+    panel.update(s);
+    expect(explain()).toContain(String(PERMIT_STRIKES_TO_SUSPEND));
+    expect(q('[data-role="permit-strikes"]')!.textContent).toBe(t('permit.status.strikes', { count: 2 }));
+  });
+
+  it('keeps the visible strikes text apart from the explanation', () => {
+    panel.update(progression());
+    expect(explain()).not.toBe(q('[data-role="permit-strikes"]')!.textContent);
+  });
+
+  it('speaks French after a locale change', () => {
+    panel.update(progression());
+    const en = explain();
+    setLocale('fr');
+    panel.refreshLocale();
+    panel.update(progression());
+    expect(explain().length).toBeGreaterThan(0);
+    expect(explain()).not.toBe(en);
   });
 });
