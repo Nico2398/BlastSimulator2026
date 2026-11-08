@@ -51,6 +51,12 @@ export class LocaleTextRegistry {
     return el;
   }
 
+  /** Same as bindText, but writes the `data-explain` explanation and marks the element explainable. */
+  bindExplain<T extends HTMLElement>(el: T, key: string, params?: LocaleParams): T {
+    void el; void key; void params;
+    throw new Error('not implemented');
+  }
+
   /** Re-apply every binding against the locale active right now. */
   refresh(): void {
     for (const b of this.bindings) apply(b);
