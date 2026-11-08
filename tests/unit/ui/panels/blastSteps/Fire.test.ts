@@ -3,12 +3,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { FireStep } from '../../../../../src/ui/panels/blastSteps/Fire.js';
 import { wetAllHoles } from '../../../../helpers/holeWater.js';
 import { readFileSync } from 'node:fs';
-import { t } from '../../../../../src/core/i18n/I18n.js';
+import { t, setLocale } from '../../../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
 import { addReachBuildings, addReachPattern } from '../../../../helpers/blastReachFixture.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
+import { permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
 import { purchaseVehicle } from '../../../../../src/core/entities/Vehicle.js';
 import { NavGrid } from '../../../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../../../src/core/world/VoxelGrid.js';
@@ -168,11 +169,13 @@ describe('FireStep', () => {
     const { step } = makeStep();
     const state = makeState();
     const hole = addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
+    const charge = createCharge('boomite', 5, 2, hole.depth);
+    if ('charge' in charge) state.chargesByHole[hole.id] = charge.charge;
     state.holeWater[hole.id] = { level: 0.8, porosity: 0.03 };
 
     wetAllHoles(state);
     step.update(state, 'heavy_rain');
-    expect(step.root.textContent).toContain('holes are full of water');
+    expect(step.root.textContent).toContain(t('ui.blast_workshop.fire.check_wet', { count: 1, percent: 10 }));
 
     state.holeWater = {};
     step.update(state, 'sunny');
@@ -323,12 +326,39 @@ describe('FireStep — within-permit checklist (#1925)', () => {
     expect(row(step)).toBeNull();
   });
 
-  it('never renders an inspection chance or overshoot', () => {
+  it('the over-limit row states the consequence (#2166)', () => {
+    const { step } = makeStep();
+    const state = permitState(9, 5);
+    step.update(state, 'sunny');
+    const p = permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount)!;
+    expect(p.consequenceText.length).toBeGreaterThan(0);
+    expect(row(step)!.textContent).toBe(t('ui.blast_workshop.fire.check_permit_over', { kg: p.kgText, holes: p.holesText, consequence: p.consequenceText }));
+    expect(row(step)!.textContent).toContain(p.consequenceText);
+  });
+
+  it('within the limit the row carries no consequence (#2166)', () => {
+    const { step } = makeStep();
+    const state = permitState(9, 4);
+    step.update(state, 'sunny');
+    expect(row(step)!.dataset['ok']).toBe('true');
+    expect(row(step)!.textContent).toBe(t('ui.blast_workshop.fire.check_permit_ok', {
+      kg: permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount)!.kgText,
+      holes: permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount)!.holesText,
+    }));
+  });
+
+  it('never renders the raw overshoot', () => {
     const { step } = makeStep();
     step.update(permitState(12, 5), 'sunny');
-    const text = step.root.textContent!.toLowerCase();
-    expect(text).not.toContain('chance');
-    expect(text).not.toContain('overshoot');
+    expect(step.root.textContent!.toLowerCase()).not.toContain('overshoot');
+  });
+
+  it('en and fr define the over-permit row with kg, holes and the consequence', () => {
+    for (const l of ['en', 'fr']) {
+      const loc = JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8')) as Record<string, string>;
+      const text = loc['ui.blast_workshop.fire.check_permit_over']!;
+      for (const param of ['{kg}', '{holes}', '{consequence}']) expect(text).toContain(param);
+    }
   });
 });
 
@@ -406,7 +436,7 @@ describe('FireStep rain warning (#1957)', () => {
     wetAllHoles(state);
     step.update(state, 'light_rain');
 
-    expect(step.root.textContent).toContain(t('ui.blast_workshop.fire.check_wet', { count: 2 }));
+    expect(step.root.textContent).toContain(t('ui.blast_workshop.fire.check_wet', { count: 2, percent: 10 }));
     expect(step.root.querySelector(RAIN_ROW)).toBeNull();
   });
 
@@ -458,5 +488,153 @@ describe('FireStep rain warning (#1957)', () => {
     expect(read('en')[key]).toBeTruthy();
     expect(read('fr')[key]).toBeTruthy();
     expect(read('en')[key]).not.toBe(read('fr')[key]);
+  });
+});
+
+// ── #2166: the wet row counts only holes that fizzle; zone rows state the consequence ──
+
+describe('FireStep wet-hole row (#2166)', () => {
+  const CHECK_WET = 'ui.blast_workshop.fire.check_wet';
+  const CHECK_OK = 'ui.blast_workshop.fire.check_wet_resistant';
+  const CHECK_DRY = 'ui.blast_workshop.fire.check_dry';
+
+  beforeEach(() => { setLocale('en'); });
+
+  /** One hole per entry, charged with that explosive (null = left uncharged). */
+  function withCharges(explosives: (string | null)[]): GameState {
+    const state = makeState();
+    explosives.forEach((id, i) => {
+      const hole = addHole(holeCounter, state.drillHoles, 20 + i * 3, 20, 8, 0.15);
+      if (id === null) return;
+      const c = createCharge(id, 5, 2, hole.depth);
+      if ('charge' in c) state.chargesByHole[hole.id] = c.charge;
+    });
+    return state;
+  }
+
+  /** Icon on the checklist row whose text is exactly `text` ('check' = ticked, 'warn' = unticked); null when absent. */
+  function rowIcon(step: FireStep, text: string): string | null {
+    const span = [...step.root.querySelectorAll('span')].find(s => s.textContent === text);
+    return span?.parentElement?.querySelector('bs-icon')?.getAttribute('name') ?? null;
+  }
+
+  function render(state: GameState): FireStep {
+    const { step } = makeStep();
+    step.update(state, 'sunny');
+    return step;
+  }
+
+  it('wet holes with a water-sensitive charge warn with count and percent, unticked', () => {
+    const s = withCharges(['boomite', 'boomite']);
+    wetAllHoles(s);
+    const step = render(s);
+    const text = t(CHECK_WET, { count: 2, percent: 10 });
+    expect(rowIcon(step, text)).toBe('warn');
+    expect(step.root.textContent).not.toContain(t(CHECK_DRY, { count: 2 }));
+  });
+
+  it('every water-sensitive explosive in the catalog warns', () => {
+    for (const id of ['pop_rock', 'boomite', 'big_bada_boom', 'obliviax']) {
+      const s = withCharges([id]);
+      wetAllHoles(s);
+      expect(rowIcon(render(s), t(CHECK_WET, { count: 1, percent: 10 })), id).toBe('warn');
+    }
+  });
+
+  it('counts only the wet holes holding a water-sensitive charge', () => {
+    const s = withCharges(['boomite', 'krackle', 'boomite', null]);
+    wetAllHoles(s);
+    const step = render(s);
+    expect(rowIcon(step, t(CHECK_WET, { count: 2, percent: 10 }))).toBe('warn');
+    expect(step.root.textContent).not.toContain(t(CHECK_WET, { count: 4, percent: 10 }));
+  });
+
+  it('the warning text states the energy share and the two fixes', () => {
+    const text = t(CHECK_WET, { count: 2, percent: 10 });
+    expect(text).toMatch(/10\s?%/);
+    expect(text).toMatch(/drain/i);
+    expect(text).toMatch(/water-resistant/i);
+  });
+
+  it('wet holes holding only water-resistant charges tick the row with the wet count', () => {
+    const s = withCharges(['krackle', 'dynatomics']);
+    wetAllHoles(s);
+    const step = render(s);
+    expect(rowIcon(step, t(CHECK_OK, { count: 2 }))).toBe('check');
+    expect(step.root.textContent).not.toContain(t(CHECK_WET, { count: 0, percent: 10 }));
+    expect(step.root.textContent).not.toContain(t(CHECK_DRY, { count: 2 }));
+  });
+
+  it('every water-resistant explosive in the catalog ticks the row', () => {
+    for (const id of ['krackle', 'shatternite', 'rumblox', 'dynatomics']) {
+      const s = withCharges([id]);
+      wetAllHoles(s);
+      expect(rowIcon(render(s), t(CHECK_OK, { count: 1 })), id).toBe('check');
+    }
+  });
+
+  it('wet uncharged holes tick the row; the count is every wet hole', () => {
+    const s = withCharges([null, null, 'krackle']);
+    wetAllHoles(s);
+    expect(rowIcon(render(s), t(CHECK_OK, { count: 3 }))).toBe('check');
+  });
+
+  it('an unknown explosive does not fizzle', () => {
+    const s = withCharges(['boomite']);
+    const id = s.drillHoles[0]!.id;
+    s.chargesByHole[id] = { ...s.chargesByHole[id]!, explosiveId: 'no_such_explosive' };
+    wetAllHoles(s);
+    const step = render(s);
+    expect(step.root.textContent).not.toContain(t(CHECK_WET, { count: 1, percent: 10 }));
+    expect(rowIcon(step, t(CHECK_OK, { count: 1 }))).toBe('check');
+  });
+
+  it('no wet holes and no rain: the unchanged all-dry row', () => {
+    const step = render(withCharges(['boomite', 'krackle']));
+    expect(rowIcon(step, t(CHECK_DRY, { count: 2 }))).toBe('check');
+  });
+
+  it('rain risk on dry sensitive holes is unchanged', () => {
+    const s = withCharges(['boomite', 'boomite']);
+    s.weather.current = 'light_rain';
+    const { step } = makeStep();
+    step.update(s, 'light_rain');
+    expect(step.root.querySelector('[data-role="rain-risk-check"]')!.textContent).toContain(t('ui.blast_workshop.fire.check_rain_risk', { count: 2 }));
+  });
+
+  it('the row follows the water: draining the holes returns the dry row', () => {
+    const { step } = makeStep();
+    const s = withCharges(['boomite']);
+    wetAllHoles(s);
+    step.update(s, 'sunny');
+    expect(rowIcon(step, t(CHECK_WET, { count: 1, percent: 10 }))).toBe('warn');
+    s.holeWater = {};
+    step.update(s, 'sunny');
+    expect(rowIcon(step, t(CHECK_DRY, { count: 1 }))).toBe('check');
+  });
+
+  it('en and fr define the wet rows with their parameters, in different text', () => {
+    const read = (l: string): Record<string, string> => JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8'));
+    const en = read('en');
+    const fr = read('fr');
+    for (const loc of [en, fr]) {
+      expect(loc[CHECK_WET]).toContain('{count}');
+      expect(loc[CHECK_WET]).toContain('{percent}');
+      expect(loc[CHECK_OK]).toContain('{count}');
+    }
+    expect(en[CHECK_WET]).not.toBe(fr[CHECK_WET]);
+    expect(en[CHECK_OK]).not.toBe(fr[CHECK_OK]);
+  });
+
+  it('the occupied-zone rows state the consequence', () => {
+    expect(t('ui.blast_workshop.fire.check_zone_occupied', { count: 2 })).toContain('injured');
+    expect(t('ui.blast_workshop.fire.check_zone_occupied_stranded', { count: 2, strandedCount: 1 })).toContain('injured');
+  });
+
+  it('an occupied zone still renders its row with the count', () => {
+    const s = withCharges(['boomite']);
+    addEmployee(s, 22, 22);
+    const step = render(s);
+    expect(rowIcon(step, t('ui.blast_workshop.fire.check_zone_occupied', { count: 1 }))).toBe('warn');
   });
 });

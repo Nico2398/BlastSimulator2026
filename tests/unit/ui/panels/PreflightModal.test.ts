@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PreflightModal } from '../../../../src/ui/panels/PreflightModal.js';
-import { wetAllHoles } from '../../../helpers/holeWater.js';
+import { setHoleWater, wetAllHoles } from '../../../helpers/holeWater.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
@@ -14,6 +14,8 @@ import { dispatchChargeAction } from '../../../../src/core/mining/ChargeOrder.js
 import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
 import { addReachBuildings, addReachPattern } from '../../../helpers/blastReachFixture.js';
 import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
+import { permitPreview } from '../../../../src/ui/panels/permitPreview.js';
+import { buildWallGrid, standardShot } from '../../../helpers/wallWarningFixture.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -116,7 +118,7 @@ describe('PreflightModal', () => {
 
     wetAllHoles(state);
     modal.update(state, 'sunny');
-    expect(modal.root.textContent).toContain('1 holes are full of water');
+    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.warn_wet', { count: 1, percent: 10 }));
 
     state.holeWater = {};
     modal.update(state, 'sunny');
@@ -143,7 +145,7 @@ describe('PreflightModal', () => {
 
     modal.update(state, 'sunny');
 
-    expect(modal.root.textContent).toContain('1 workers or vehicles are still inside the danger zone');
+    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.warn_zone', { count: 1 }));
   });
 
   it('shows a protected-position warning when a hole sits on a building footprint', () => {
@@ -154,7 +156,7 @@ describe('PreflightModal', () => {
 
     modal.update(state, 'sunny');
 
-    expect(modal.root.textContent).toContain('sit directly on a building');
+    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.warn_protected', { count: 1, hole: state.drillHoles[0]!.id }));
   });
 
   it('refreshLocale() does not throw', () => {
@@ -732,13 +734,32 @@ describe('PreflightModal — permit lines (#1925)', () => {
     expect(q(modal, 'preflight-permit-warning')).toBeNull();
   });
 
-  it('never renders an inspection chance or overshoot', () => {
+  it('the over-limit row states the consequence: chance, fine and strikes (#2166)', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const state = permitState(9, 5);
+    modal.update(state, 'sunny');
+    const p = permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount)!;
+    expect(p.consequenceText.length).toBeGreaterThan(0);
+    expect(q(modal, 'preflight-permit-warning')!.textContent).toBe(p.warningText);
+    expect(q(modal, 'preflight-permit-warning')!.textContent).toContain(p.consequenceText);
+  });
+
+  it('within the limit there is no consequence text anywhere (#2166)', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const state = permitState(9, 4);
+    modal.update(state, 'sunny');
+    const p = permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount)!;
+    expect(p.consequenceText).toBe('');
+    expect(q(modal, 'preflight-permit-warning')).toBeNull();
+  });
+
+  it('never renders the raw overshoot', () => {
     const { modal } = makeModal();
     modal.show();
     modal.update(permitState(12, 5), 'sunny');
-    const text = modal.root.textContent!.toLowerCase();
-    expect(text).not.toContain('chance');
-    expect(text).not.toContain('overshoot');
+    expect(modal.root.textContent!.toLowerCase()).not.toContain('overshoot');
   });
 });
 
@@ -909,7 +930,7 @@ describe('PreflightModal — held shot and rain risk (#1957)', () => {
     wetAllHoles(state);
     modal.update(state, 'light_rain');
 
-    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.warn_wet', { count: 1 }));
+    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.warn_wet', { count: 1, percent: 10 }));
     expect(modal.root.querySelector(RAIN_ROW)).toBeNull();
   });
 
@@ -946,5 +967,223 @@ describe('PreflightModal — held shot and rain risk (#1957)', () => {
       expect(read('fr')[key], `fr ${key}`).toBeTruthy();
       expect(read('en')[key], key).not.toBe(read('fr')[key]);
     }
+  });
+});
+
+// ── #2166: warnings state the consequence and the fix ───────────────────────
+
+describe('PreflightModal — wet-hole row and consequences (#2166)', () => {
+  const WARN_WET = 'ui.blast_workshop.preflight.warn_wet';
+  const OK_WET = 'ui.blast_workshop.preflight.ok_wet_resistant';
+  const OK_DRY = 'ui.blast_workshop.preflight.ok_dry';
+  const readLocale = (l: string): Record<string, string> =>
+    JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8'));
+
+  beforeEach(() => { setLocale('en'); });
+  afterEach(() => { setLocale('en'); });
+
+  /** Which icon ('check' = ticked, 'warn' = unticked) sits on the row whose text is exactly `text`; null when no such row. */
+  function rowIcon(modal: PreflightModal, text: string): string | null {
+    const span = [...modal.root.querySelectorAll('span')].find(s => s.textContent === text);
+    return span?.parentElement?.querySelector('bs-icon')?.getAttribute('name') ?? null;
+  }
+
+  /** `explosives.length` holes, each charged with the matching explosive id (null = left uncharged). */
+  function withCharges(explosives: (string | null)[]): GameState {
+    const state = makeState();
+    explosives.forEach((explosiveId, i) => {
+      const hole = addHole(holeCounter, state.drillHoles, 10 + i * 3, 10, 8, 0.15);
+      if (explosiveId === null) return;
+      const r = createCharge(explosiveId, 5, 2, hole.depth);
+      if ('charge' in r) state.chargesByHole[hole.id] = r.charge;
+    });
+    return state;
+  }
+
+  function render(state: GameState): PreflightModal {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(state, 'sunny');
+    return modal;
+  }
+
+  it('wet holes with a water-sensitive charge warn with count and percent, unticked', () => {
+    const modal = render((() => { const s = withCharges(['boomite', 'boomite']); wetAllHoles(s); return s; })());
+    const text = t(WARN_WET, { count: 2, percent: 10 });
+    expect(modal.root.textContent).toContain(text);
+    expect(rowIcon(modal, text)).toBe('warn');
+    expect(modal.root.textContent).not.toContain(t(OK_DRY));
+  });
+
+  it('every water-sensitive explosive in the catalog triggers the warning', () => {
+    for (const id of ['pop_rock', 'boomite', 'big_bada_boom', 'obliviax']) {
+      const s = withCharges([id]);
+      wetAllHoles(s);
+      const modal = render(s);
+      expect(modal.root.textContent, id).toContain(t(WARN_WET, { count: 1, percent: 10 }));
+    }
+  });
+
+  it('counts only the wet holes holding a water-sensitive charge', () => {
+    const s = withCharges(['boomite', 'krackle', 'boomite', null]);
+    wetAllHoles(s);
+    const modal = render(s);
+    expect(modal.root.textContent).toContain(t(WARN_WET, { count: 2, percent: 10 }));
+    expect(modal.root.textContent).not.toContain(t(WARN_WET, { count: 4, percent: 10 }));
+    expect(modal.root.textContent).not.toContain(t(WARN_WET, { count: 3, percent: 10 }));
+  });
+
+  it('a dry water-sensitive hole is not counted', () => {
+    const s = withCharges(['boomite', 'boomite', 'boomite']);
+    setHoleWater(s, [s.drillHoles[0]!.id]);
+    const modal = render(s);
+    expect(modal.root.textContent).toContain(t(WARN_WET, { count: 1, percent: 10 }));
+  });
+
+  it('the warning text states the energy share and that draining or a water-resistant explosive fixes it', () => {
+    const text = t(WARN_WET, { count: 2, percent: 10 });
+    expect(text).toMatch(/10\s?%/);
+    expect(text).toMatch(/drain/i);
+    expect(text).toMatch(/water-resistant/i);
+    expect(text).toContain('2');
+  });
+
+  it('wet holes holding only water-resistant charges are not a warning: a ticked row with the wet count', () => {
+    const s = withCharges(['krackle', 'shatternite']);
+    wetAllHoles(s);
+    const modal = render(s);
+    const text = t(OK_WET, { count: 2 });
+    expect(modal.root.textContent).toContain(text);
+    expect(rowIcon(modal, text)).toBe('check');
+    expect(modal.root.textContent).not.toContain(t(WARN_WET, { count: 2, percent: 10 }));
+    expect(modal.root.textContent).not.toContain(t(WARN_WET, { count: 0, percent: 10 }));
+    expect(modal.root.textContent).not.toContain(t(OK_DRY));
+  });
+
+  it('every water-resistant explosive in the catalog leaves the row ticked', () => {
+    for (const id of ['krackle', 'shatternite', 'rumblox', 'dynatomics']) {
+      const s = withCharges([id]);
+      wetAllHoles(s);
+      const modal = render(s);
+      expect(rowIcon(modal, t(OK_WET, { count: 1 })), id).toBe('check');
+    }
+  });
+
+  it('wet uncharged holes are not a warning either; the ok row counts all wet holes', () => {
+    const s = withCharges(['krackle', null, null]);
+    wetAllHoles(s);
+    const modal = render(s);
+    expect(rowIcon(modal, t(OK_WET, { count: 3 }))).toBe('check');
+  });
+
+  it('an unknown explosive does not fizzle', () => {
+    const s = withCharges(['boomite']);
+    const hole = s.drillHoles[0]!;
+    s.chargesByHole[hole.id] = { ...s.chargesByHole[hole.id]!, explosiveId: 'no_such_explosive' };
+    wetAllHoles(s);
+    const modal = render(s);
+    expect(modal.root.textContent).not.toContain(t(WARN_WET, { count: 1, percent: 10 }));
+    expect(rowIcon(modal, t(OK_WET, { count: 1 }))).toBe('check');
+  });
+
+  it('no wet holes and no rain: the unchanged all-dry row', () => {
+    const modal = render(withCharges(['boomite', 'krackle']));
+    expect(rowIcon(modal, t(OK_DRY))).toBe('check');
+    expect(modal.root.textContent).not.toContain(t(OK_WET, { count: 0 }));
+  });
+
+  it('rain risk on dry sensitive holes is unchanged', () => {
+    const s = withCharges(['boomite', 'boomite']);
+    s.weather.current = 'light_rain';
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(s, 'light_rain');
+    expect(modal.root.querySelector('[data-role="preflight-rain-risk"]')!.textContent).toContain(t('ui.blast_workshop.preflight.warn_rain_risk', { count: 2 }));
+  });
+
+  it('a water-sensitive warning never gates the shot: detonate stays enabled and fires', () => {
+    const { modal, gameConsole } = makeModal();
+    modal.show();
+    const s = withCharges(['boomite']);
+    wetAllHoles(s);
+    modal.update(s, 'sunny');
+    const detonate = modal.root.querySelector('[data-action="preflight-detonate"]') as HTMLButtonElement;
+    expect(detonate.disabled).toBe(false);
+    detonate.click();
+    expect(gameConsole).toHaveBeenCalledWith('blast detonate');
+  });
+
+  it('the warning goes away once the holes are drained', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const s = withCharges(['boomite']);
+    wetAllHoles(s);
+    modal.update(s, 'sunny');
+    expect(modal.root.textContent).toContain(t(WARN_WET, { count: 1, percent: 10 }));
+    s.holeWater = {};
+    modal.update(s, 'sunny');
+    expect(modal.root.textContent).not.toContain(t(WARN_WET, { count: 1, percent: 10 }));
+    expect(rowIcon(modal, t(OK_DRY))).toBe('check');
+  });
+
+  it('en and fr define the wet rows with their parameters, in different text', () => {
+    const en = readLocale('en');
+    const fr = readLocale('fr');
+    for (const loc of [en, fr]) {
+      expect(loc[WARN_WET]).toContain('{count}');
+      expect(loc[WARN_WET]).toContain('{percent}');
+      expect(loc[OK_WET]).toContain('{count}');
+    }
+    expect(en[WARN_WET]).not.toBe(fr[WARN_WET]);
+    expect(en[OK_WET]).not.toBe(fr[OK_WET]);
+  });
+
+  it('the zone row states the consequence for anyone left inside', () => {
+    expect(t('ui.blast_workshop.preflight.warn_zone', { count: 2 })).toContain('injured');
+  });
+
+  it('the zone row still shows with its count when someone stands in the zone', () => {
+    const s = chargedPlan();
+    s.employees.employees.push({
+      id: 1, name: 'Oz Trill', role: 'driller', salary: 500, morale: 60,
+      unionized: false, injured: false, alive: true, x: 11, z: 11,
+      qualifications: [], trainingState: null, activeActionId: null,
+      fatigue: 0, collapsing: false, interruptedActionPayload: null,
+      ticksWorked: 0, restTicksRemaining: null, restNeedKey: null, taskTicksRemaining: null,
+      activeTaskSkill: null, destinationX: null, destinationZ: null,
+      moveConsecutiveFailures: 0, isMoveStuck: false,
+      pendingRestDuration: null, pendingRestNeedKey: null, pendingTaskDuration: null,
+      pendingActionType: null, pendingActionPayload: null, pendingDriverVehicleId: null,
+      taskQueue: [], locomotion: { kind: 'on_foot' },
+      itinerary: null, vehicleWaitingTicks: 0,
+    });
+    const modal = render(s);
+    const text = t('ui.blast_workshop.preflight.warn_zone', { count: 1 });
+    expect(rowIcon(modal, text)).toBe('warn');
+    expect(text).toContain('injured');
+  });
+
+  it('the footprint row states what happens to the buildings', () => {
+    const s = chargedPlan();
+    placeBuilding(s.buildings, 'freight_warehouse', 9, 9, 32, 32);
+    const modal = render(s);
+    const text = t('ui.blast_workshop.preflight.warn_protected', { count: 1, hole: s.drillHoles[0]!.id });
+    expect(modal.root.textContent).toContain(text);
+    expect(text).toContain('destroyed');
+  });
+
+  it('the wall-slump row states the collapse', () => {
+    const { state } = standardShot();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const modal = new PreflightModal(container);
+    modal.setGameConsole(vi.fn().mockReturnValue({ success: true, output: '' }));
+    modal.setGridProvider(() => buildWallGrid({ plateauTop: 25 }));
+    modal.show();
+    modal.update(state, 'sunny');
+    const row = modal.root.querySelector('[data-role="preflight-wall-warning"]');
+    expect(row).not.toBeNull();
+    expect(row!.textContent).toMatch(/collapse/i);
+    expect(row!.textContent).toContain('Cruite');
   });
 });
