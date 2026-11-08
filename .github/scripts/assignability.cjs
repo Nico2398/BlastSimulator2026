@@ -88,8 +88,8 @@ const DEFAULT_MAX_PARALLEL_RUNS = 1;
  * queue was back to one. Each is split into the areas below it
  * (`SCOPE_PARENTS`). The parent scope itself still exists, for a change to the
  * shared base of its areas, and it clashes with every one of them. A change
- * across several areas lists them rather than taking the parent: a parent is a
- * wide claim and holds its place while it waits.
+ * across several areas lists them rather than taking the parent: a parent
+ * clashes with every area under it, so it starts only once they are all free.
  *
  * `src/core/mining` was one scope with `src/core/nav`, as `nav`. On 20 Oct
  * 2026 six of the eleven `ready` issues carried it — blast bugs, a ramp flood
@@ -771,38 +771,6 @@ function scopesOverlap(a, b) {
   return a === b || SCOPE_PARENTS[a] === b || SCOPE_PARENTS[b] === a;
 }
 
-/**
- * Whether a claim is wide enough to hold its place while it waits: it runs
- * alone, or it declares a scope other scopes sit inside (`ui`, `engine`).
- * Such a claim needs many areas free at once, which a busy queue never
- * leaves on its own — see "Its place in line" in `selectNextAssignable`.
- */
-function isWideClaim(claim) {
-  if (claim.exclusive) return true;
-  const parents = new Set(Object.values(SCOPE_PARENTS));
-  return claim.scopes.some((scope) => parents.has(scope));
-}
-
-/**
- * The part of a wide claim it holds while it waits: everything when it runs
- * alone, otherwise only its parent scopes (which cover every area under them).
- * Its ordinary scopes are left free, for the reason an ordinary claim holds
- * nothing: they free up within a few passes. On 5 Oct 2026 #1403 (`console`,
- * `hud`, `engine`) held `console` and `hud` with its `engine`, and nine issues
- * that touched only those waited behind a run they had nothing to do with.
- */
-function heldPart(claim) {
-  if (claim.exclusive) return claim;
-  const parents = new Set(Object.values(SCOPE_PARENTS));
-  return { exclusive: false, scopes: claim.scopes.filter((scope) => parents.has(scope)), why: null };
-}
-
-/** A claim as the assignment log names it. */
-function describeClaim(claim) {
-  if (claim.exclusive) return 'everything';
-  return claim.scopes.map((scope) => `\`${SCOPE_PREFIX}${scope}\``).join(', ');
-}
-
 /** Whether two claims may not be held at the same time. */
 function claimsConflict(a, b) {
   if (a.exclusive || b.exclusive) return true;
@@ -960,35 +928,30 @@ const WAITING_AHEAD = 'waiting ahead of it';
  * scopes — the Definition of Ready refuses one that does not — and
  * `scope:global` or `scope:pipeline` claims the whole repository.
  *
- * **Its place in line — wide claims only.** Live runs are what keep two runs
- * off the same code; nothing below changes that. On top of it, an older issue
- * with a *wide* claim (`isWideClaim`: it runs alone, or it declares a parent
- * scope such as `ui` or `engine`) that could run but for a clash with a
- * *running* claim — a live run, or an issue assigned earlier in this pass —
- * *holds* the wide part of its claim (`heldPart`: everything when it runs
- * alone, otherwise its parent scopes) for the rest of the pass, so nothing
- * younger that overlaps that part starts first. A wide claim needs many areas free at once, and with every
- * slot refilled on each merge that moment never comes on its own: a
- * `scope:pipeline` issue would wait until the backlog emptied. Holding drains
- * the overlapping queue until it can run. No clock is involved: the hold lasts
- * exactly as long as the clash does. Only an issue that is otherwise assignable
- * holds a place — one waiting on a dependency does not, or a paused issue would
- * hold the very scope its own blocker needs.
+ * **Its place in line — a claim that runs alone, and nothing else.** Live runs
+ * are what keep two runs off the same code; nothing below changes that. On top
+ * of it, an older issue that runs alone (`scope:global`, `scope:pipeline`, no
+ * scope at all) and could run but for a clash with a *running* claim — a live
+ * run, or an issue assigned earlier in this pass — *holds* everything for the
+ * rest of the pass, so nothing younger starts first. Such a claim needs the
+ * whole repository free, and with every slot refilled on each merge that moment
+ * never comes on its own: a `scope:pipeline` issue would wait until the backlog
+ * emptied. Holding drains the queue until it can run. No clock is involved: the
+ * hold lasts exactly as long as the clash does. Only an issue that is otherwise
+ * assignable holds a place — one waiting on a dependency does not, or a paused
+ * issue would hold the very scope its own blocker needs. One that waits only on
+ * another waiting issue's hold waits, but holds nothing itself.
  *
- * An ordinary claim — one or a few areas, no parent — waits without holding.
- * Its scopes free up often enough that it starts within a few passes, and its
- * hold was what kept unrelated work idle: on 5 Oct 2026 #1380 (`engine`,
- * `world`) waited on live #1379 and held `world`, so #1466, which touched only
- * `world` and clashed with nothing live, could not start.
- *
- * A hold is also one level deep. A wide issue that waits only on another
- * *waiting* issue's hold waits, but holds nothing itself. Transitive holds chained
- * through overlapping multi-scope issues: on 4 Oct 2026 live #1320 (ui,
- * economy) made #1341 (console, engine, economy) wait, whose hold made #1343
- * (nav, engine, world) wait, whose hold covered the last free scopes — one
- * session ran with four slots configured. Starvation stays bounded: once the
- * issue it waited behind starts, the clash is with a running claim and the
- * younger issue holds its place from then on.
+ * Every other claim waits without holding, a parent scope (`ui`, `engine`)
+ * included. A parent's hold kept younger work in its areas idle while the run
+ * it waited on was somewhere else: on 7 Nov 2026 #2163 (`ui`, `panels`) waited
+ * on live #2160 (`panels`) and held `ui`, so #2166, which touched only
+ * `workshop` and clashed with nothing live, could not start. The owner retired
+ * the parent hold. The cost is the one it was written to avoid: a parent-scope
+ * issue now starts only when every area under it is free at the same moment,
+ * and a busy queue can keep it waiting. Narrow claims never held, for the same
+ * reason: on 5 Oct 2026 #1380 (`engine`, `world`) waited on live #1379 and held
+ * `world`, so #1466, which touched only `world`, could not start.
  *
  * `completedIssue` is the issue whose own run fired this chain. It is exempt
  * from the in-progress count below — its labels are still the finishing run's —
@@ -1096,23 +1059,22 @@ async function selectNextAssignable(api, options = {}) {
         );
         continue;
       }
-      if (!isWideClaim(claim)) {
+      if (!claim.exclusive) {
         log(
           `#${issue.number}: waits — ${clashReason(claim, running)}. ` +
-            'Its claim is narrow, so it holds no place: younger work that clashes with nothing live may start.'
+            'It holds no place while it waits: younger work that clashes with nothing live may start.'
         );
         continue;
       }
-      const held = heldPart(claim);
       log(
         `#${issue.number}: waits — ${clashReason(claim, running)}. ` +
-          `It holds its place on ${describeClaim(held)}: nothing younger that overlaps it there starts first.`
+          'It runs alone, so it holds its place on everything: nothing younger starts first.'
       );
       // A hold on everything leaves nothing younger to start, but the walk goes
       // on so the log names each issue it keeps waiting. It used to stop here:
       // on 22 Oct 2026 #2066 (`scope:pipeline`) held everything behind live
       // #2045, and #2068 never appeared in the log at all.
-      holders.push({ number: issue.number, holds: WAITING_AHEAD, claim: held });
+      holders.push({ number: issue.number, holds: WAITING_AHEAD, claim });
       continue;
     }
 
@@ -1249,8 +1211,6 @@ module.exports = {
   blockedByFor,
   blockedChainLimit,
   claimsConflict,
-  heldPart,
-  isWideClaim,
   consecutiveHaltedRuns,
   dependencyVerdict,
   graphVerdict,
