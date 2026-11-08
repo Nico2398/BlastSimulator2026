@@ -76,11 +76,11 @@
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-world-map [data-level=\"dusty_hollow\"] .bsx-explainable svg"
+          "selector": "#bs-world-map [data-level=\"dusty_hollow\"] .bsx-explainable:not(div)"
         },
         {
           "type": "hoverSelector",
-          "selector": "#bs-world-map [data-level=\"dusty_hollow\"] .bsx-explainable svg"
+          "selector": "#bs-world-map [data-level=\"dusty_hollow\"] .bsx-explainable:not(div)"
         },
         {
           "type": "screenshot"
