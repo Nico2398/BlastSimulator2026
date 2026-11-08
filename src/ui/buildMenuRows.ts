@@ -3,7 +3,8 @@
 // rebuilt only on a signature change, HP / utilization / progress are written into the nodes).
 
 import { t } from '../core/i18n/I18n.js';
-import { el } from './dom.js';
+import { el, explainable } from './dom.js';
+import { buildingHpExplain, placedRowTitle } from './buildingExplain.js';
 import { iconEl } from './icons.js';
 import { makeLocateButton } from './locateButton.js';
 import { findLive, markLive, writeText } from './panels/inspector/inspectorWidgets.js';
@@ -44,9 +45,10 @@ export function placedInfoBlock(b: Building, model: PlacedRowModel, onLocate: ()
     className: 'bs-build-row-hp',
     children: [hpBar(), markLive(el('span', { className: 'bsx-mono bs-build-row-hp-text' }), 'hp')],
   });
+  explainable(hp, buildingHpExplain());
   const info = el('div', { className: 'bs-build-row-info', children: [head, hp] });
   info.style.cssText = 'flex:1 1 100%;min-width:0;overflow-wrap:break-word';
-  info.title = `${b.type} T${b.tier} at (${b.x},${b.z})`;
+  info.title = placedRowTitle(b);
   syncPlacedRow(info, model);
   return info;
 }
@@ -68,12 +70,16 @@ export function syncPlacedRow(row: HTMLElement, model: PlacedRowModel): void {
   const hp = findLive(row, 'hp');
   if (hp) writeText(hp, model.hpText);
   syncOptional(row, 'util', model.utilization?.text ?? null, () => markLive(el('div', { className: 'bsx-mono bs-build-row-util' }), 'util'));
+  const util = findLive(row, 'util');
+  if (util && model.utilization) explainable(util, model.utilization.explain);
   // The badge node always exists on a placed row so a status change later writes in place.
   let badge = findLive(row, 'badge');
   if (!badge) { badge = makeBadge(); row.append(badge); }
   writeText(badge, model.badge === null ? '' : t(`ui.build.row.badge.${model.badge}`));
   badge.hidden = model.badge === null;
   badge.dataset['badge'] = model.badge ?? '';
+  if (model.badgeExplain === null) delete badge.dataset['explain'];
+  else explainable(badge, model.badgeExplain);
 }
 
 function progressText(progress: number | null): string {
