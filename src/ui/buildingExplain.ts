@@ -8,6 +8,7 @@ import { t } from '../core/i18n/I18n.js';
 import { getBuildingDef, isSingleTierType, type Building, type BuildingTier, type BuildingType } from '../core/entities/Building.js';
 import type { BuildingStatus } from '../core/entities/BuildingStatus.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
+import { factorFor } from '../core/events/ActiveModifiers.js';
 import type { GameState } from '../core/state/GameState.js';
 
 /** Which stored/occupied figure a placed row's utilization shows. */
@@ -65,6 +66,6 @@ export function upkeepExplain(state: Pick<GameState, 'events' | 'tickCount'>): s
   );
   if (live.length === 0) return t('ui.explain.building_upkeep_base');
   const sources = live.map((m) => t('ui.explain.building_upkeep_source', { event: t(`event.${m.sourceEventId}.title`), factor: round2(m.magnitude) })).join(', ');
-  const factor = round2(live.reduce((product, m) => product * m.magnitude, 1));
+  const factor = round2(factorFor(state.events.activeModifiers, 'upkeep_surcharge', state.tickCount));
   return t('ui.explain.building_upkeep_surcharged', { factor, sources });
 }
