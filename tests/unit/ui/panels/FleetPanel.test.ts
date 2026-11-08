@@ -13,6 +13,8 @@ import { addBlastFragments } from '../../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../../src/core/mining/BlastExecution.js';
 import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
 import { SELECTED_ROW_CLASS } from '../../../../src/ui/selectionRoute.js';
+import enLocaleJson from '../../../../src/core/i18n/locales/en.json' assert { type: 'json' };
+import frLocaleJson from '../../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
 
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
@@ -786,5 +788,300 @@ describe('FleetPanel dealership grade gate (#1928)', () => {
     panel.update(state);
     expect(panel.root.querySelectorAll('.bs-fleet-tier-lock').length).toBe(0);
     expect(tierBtn(panel, 'debris_hauler', 3).disabled).toBe(false);
+  });
+});
+
+// ── Fleet filter and sort bar (#2161) ───────────────────────────────────────
+
+describe('FleetPanel — vehicle filter and sort bar (#2161)', () => {
+  const maxHp = (role: VehicleRole, tier: VehicleTier): number => getVehicleDefByTier(role, tier).maxHp;
+
+  /**
+   * 1 hauler t1 working, 2 drill_rig t2 waiting, 3 hauler t3 stuck, 4 drill_rig t1 broken, 5 rock_digger t2 idle.
+   * hp fractions: 1 → 0.9, 2 → 0.6, 3 → 0.5, 4 → 0, 5 → 0.75.
+   */
+  function fleet(): { vehicles: Vehicle[]; crew: Employee[] } {
+    return {
+      vehicles: [
+        makeVehicle({ id: 1, type: 'debris_hauler', tier: 1, hp: maxHp('debris_hauler', 1) * 0.9, occupantIds: [11] }),
+        makeVehicle({ id: 2, type: 'drill_rig', tier: 2, hp: maxHp('drill_rig', 2) * 0.6, occupantIds: [12] }),
+        makeVehicle({ id: 3, type: 'debris_hauler', tier: 3, hp: maxHp('debris_hauler', 3) * 0.5, occupantIds: [13] }),
+        makeVehicle({ id: 4, type: 'drill_rig', tier: 1, hp: 0 }),
+        makeVehicle({ id: 5, type: 'rock_digger', tier: 2, hp: maxHp('rock_digger', 2) * 0.75, occupantIds: [14] }),
+      ],
+      crew: [
+        makeEmployee({ id: 11, taskTicksRemaining: 5 }),
+        makeEmployee({ id: 12, vehicleWaitingTicks: 3 }),
+        makeEmployee({ id: 13, isMoveStuck: true, moveConsecutiveFailures: 2 }),
+        makeEmployee({ id: 14 }),
+      ],
+    };
+  }
+
+  function setup(f = fleet()) {
+    const { panel } = makePanel();
+    const state = makeState(f.vehicles, f.crew);
+    panel.update(state);
+    return { panel, state };
+  }
+
+  const bar = (panel: FleetPanel): HTMLElement => panel.root.querySelector<HTMLElement>('.bs-filter-bar')!;
+  const click = (panel: FleetPanel, selector: string): void => (bar(panel).querySelector(selector) as HTMLButtonElement).click();
+  const roleBtn = (role: string): string => `.bs-filter-row:not([data-filter-group]) [data-filter-value="${role}"]`;
+  const groupBtn = (group: string, value: string): string => `[data-filter-group="${group}"] [data-filter-value="${value}"]`;
+  const sortBtn = (key: string): string => `[data-sort-key="${key}"]`;
+  const shown = (panel: FleetPanel): number[] =>
+    [...panel.root.querySelectorAll<HTMLElement>('[data-vehicle-id]')].map(r => Number(r.dataset['vehicleId']));
+  const groupValues = (panel: FleetPanel, group: string): string[] =>
+    [...bar(panel).querySelectorAll<HTMLElement>(`[data-filter-group="${group}"] [data-filter-value]`)].map(b => b.dataset['filterValue']!);
+
+  it('shows the shared filter bar above the vehicle rows', () => {
+    const { panel } = setup();
+    expect(panel.root.querySelectorAll('.bs-filter-bar')).toHaveLength(1);
+    const first = panel.root.querySelector('[data-vehicle-id]')!;
+    expect(bar(panel).compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('offers every vehicle role in the main filter row', () => {
+    const { panel } = setup();
+    const roles = [...bar(panel).querySelectorAll<HTMLElement>('.bs-filter-row:not([data-filter-group]) [data-filter-value]')]
+      .map(b => b.dataset['filterValue']).sort();
+    expect(roles).toEqual(['building_destroyer', 'charging_truck', 'debris_hauler', 'drill_rig', 'rock_digger', 'rock_fragmenter']);
+    expect(bar(panel).querySelector('[data-filter-all]')).not.toBeNull();
+  });
+
+  it('offers the three tiers and the four status choices', () => {
+    const { panel } = setup();
+    expect(groupValues(panel, 'tier').sort()).toEqual(['1', '2', '3']);
+    expect(groupValues(panel, 'status').sort()).toEqual(['damaged', 'stuck', 'waiting', 'working']);
+  });
+
+  it('offers the hp and tier sorts', () => {
+    const { panel } = setup();
+    const keys = [...bar(panel).querySelectorAll<HTMLElement>('[data-sort-key]')].map(b => b.dataset['sortKey']).sort();
+    expect(keys).toEqual(['hp', 'tier']);
+  });
+
+  it('shows the whole fleet in stored order before any choice', () => {
+    const { panel } = setup();
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('a role button hides the other roles, and All brings them back', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('drill_rig'));
+    expect(shown(panel)).toEqual([2, 4]);
+    click(panel, '[data-filter-all]');
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('a tier button keeps only that tier', () => {
+    const { panel } = setup();
+    click(panel, groupBtn('tier', '2'));
+    expect(shown(panel)).toEqual([2, 5]);
+    click(panel, groupBtn('tier', '3'));
+    expect(shown(panel)).toEqual([3]);
+  });
+
+  it('the status buttons map to what each driver is doing', () => {
+    const { panel } = setup();
+    click(panel, groupBtn('status', 'working'));
+    expect(shown(panel)).toEqual([1]);
+    click(panel, groupBtn('status', 'waiting'));
+    expect(shown(panel)).toEqual([2]);
+    click(panel, groupBtn('status', 'stuck'));
+    expect(shown(panel)).toEqual([3]);
+    click(panel, groupBtn('status', 'damaged'));
+    expect(shown(panel)).toEqual([4]);
+  });
+
+  it('an idle vehicle shows under no status choice', () => {
+    const { panel } = setup();
+    for (const status of ['working', 'waiting', 'stuck', 'damaged']) {
+      click(panel, groupBtn('status', status));
+      expect(shown(panel)).not.toContain(5);
+    }
+  });
+
+  it('role, tier and status combine with AND', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('debris_hauler'));
+    expect(shown(panel)).toEqual([1, 3]);
+    click(panel, groupBtn('tier', '3'));
+    expect(shown(panel)).toEqual([3]);
+    click(panel, groupBtn('status', 'working'));
+    expect(shown(panel)).toEqual([]);
+  });
+
+  it('clicking the pressed choice again removes the filter', () => {
+    const { panel } = setup();
+    click(panel, groupBtn('tier', '1'));
+    click(panel, groupBtn('tier', '1'));
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('the hp sort lists the lowest hp fraction of the tier maximum first', () => {
+    const { panel } = setup();
+    click(panel, sortBtn('hp'));
+    expect(shown(panel)).toEqual([4, 3, 2, 5, 1]);
+  });
+
+  it('the tier sort lists the highest tier first, ties by id', () => {
+    const { panel } = setup();
+    click(panel, sortBtn('tier'));
+    expect(shown(panel)).toEqual([3, 2, 5, 1, 4]);
+  });
+
+  it('clicking the pressed sort again restores the stored order', () => {
+    const { panel } = setup();
+    click(panel, sortBtn('tier'));
+    click(panel, sortBtn('tier'));
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('a sort orders only the rows the filter keeps', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('drill_rig'));
+    click(panel, sortBtn('hp'));
+    expect(shown(panel)).toEqual([4, 2]);
+  });
+
+  it('Clear filter resets every choice', () => {
+    const { panel } = setup();
+    expect(bar(panel).querySelector('.bs-filter-clear')).toBeNull();
+    click(panel, roleBtn('drill_rig'));
+    click(panel, groupBtn('tier', '2'));
+    click(panel, sortBtn('hp'));
+    click(panel, '.bs-filter-clear');
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+    expect(bar(panel).querySelector('.bs-filter-clear')).toBeNull();
+  });
+
+  it('the pressed buttons show the current choice', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('rock_digger'));
+    click(panel, sortBtn('hp'));
+    expect(bar(panel).querySelector(roleBtn('rock_digger'))!.getAttribute('aria-pressed')).toBe('true');
+    expect(bar(panel).querySelector(sortBtn('hp'))!.getAttribute('aria-pressed')).toBe('true');
+    expect(bar(panel).querySelector(roleBtn('drill_rig'))!.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('the filter leaves the dealership alone', () => {
+    const { panel } = setup();
+    const buttons = () => panel.root.querySelectorAll('.bs-fleet-tier-btn').length;
+    const before = buttons();
+    expect(before).toBeGreaterThan(0);
+    click(panel, roleBtn('drill_rig'));
+    expect(buttons()).toBe(before);
+  });
+
+  it('a filtered row still selects its vehicle through the handler', () => {
+    const { panel } = setup();
+    const picked: number[] = [];
+    panel.setSelectVehicleHandler(id => picked.push(id));
+    click(panel, groupBtn('status', 'damaged'));
+    (panel.root.querySelector('[data-vehicle-id="4"]') as HTMLElement).click();
+    expect(picked).toEqual([4]);
+  });
+
+  it('a sorted row still selects its vehicle through the handler', () => {
+    const { panel } = setup();
+    const picked: number[] = [];
+    panel.setSelectVehicleHandler(id => picked.push(id));
+    click(panel, sortBtn('tier'));
+    (panel.root.querySelector('[data-vehicle-id]') as HTMLElement).click();
+    expect(picked).toEqual([3]);
+  });
+
+  it('the scene selection highlight follows its row through filtering', () => {
+    const { panel } = setup();
+    panel.setSelectedVehicle({ kind: 'vehicle', id: 1 });
+    click(panel, roleBtn('drill_rig'));
+    expect(panel.root.querySelector('[data-vehicle-id="1"]')).toBeNull();
+    click(panel, '[data-filter-all]');
+    expect(panel.root.querySelector('[data-vehicle-id="1"]')!.classList.contains(SELECTED_ROW_CLASS)).toBe(true);
+  });
+
+  it('the filter survives the next update, also when the fleet changes', () => {
+    const { panel, state } = setup();
+    click(panel, roleBtn('drill_rig'));
+    panel.update(state);
+    expect(shown(panel)).toEqual([2, 4]);
+    state.vehicles.vehicles.push(makeVehicle({ id: 6, type: 'drill_rig', tier: 3 }), makeVehicle({ id: 7, type: 'rock_digger' }));
+    panel.update(state);
+    expect(shown(panel)).toEqual([2, 4, 6]);
+    expect(bar(panel).querySelector(roleBtn('drill_rig'))!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('a vehicle whose driver starts working joins the working list on the next update', () => {
+    const { panel, state } = setup();
+    click(panel, groupBtn('status', 'working'));
+    expect(shown(panel)).toEqual([1]);
+    state.employees.employees.find(e => e.id === 14)!.taskTicksRemaining = 4;
+    panel.update(state);
+    expect(shown(panel)).toEqual([1, 5]);
+  });
+
+  it('a vehicle that gets unstuck leaves the stuck list on the next update', () => {
+    const { panel, state } = setup();
+    click(panel, groupBtn('status', 'stuck'));
+    expect(shown(panel)).toEqual([3]);
+    state.employees.employees.find(e => e.id === 13)!.isMoveStuck = false;
+    panel.update(state);
+    expect(shown(panel)).toEqual([]);
+  });
+
+  it('a vehicle that breaks down joins the damaged list on the next update', () => {
+    const { panel, state } = setup();
+    click(panel, groupBtn('status', 'damaged'));
+    state.vehicles.vehicles.find(v => v.id === 1)!.hp = 0;
+    panel.update(state);
+    expect(shown(panel)).toEqual([1, 4]);
+  });
+
+  it('the hp sort order follows damage on the next update', () => {
+    const { panel, state } = setup();
+    click(panel, sortBtn('hp'));
+    expect(shown(panel)).toEqual([4, 3, 2, 5, 1]);
+    state.vehicles.vehicles.find(v => v.id === 1)!.hp = 1;
+    panel.update(state);
+    expect(shown(panel)).toEqual([4, 1, 3, 2, 5]);
+  });
+
+  it('a filter nobody matches shows the no-match line instead of rows', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('charging_truck'));
+    expect(shown(panel)).toEqual([]);
+    const empties = [...panel.root.querySelectorAll('.bsx-empty')];
+    expect(empties).toHaveLength(1);
+    expect(empties[0]!.textContent).toBe(t('ui.fleet.filter_no_match'));
+    expect(empties[0]!.textContent).not.toBe('ui.fleet.filter_no_match');
+  });
+
+  it('the no-match line goes away when the filter is cleared', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('charging_truck'));
+    click(panel, '.bs-filter-clear');
+    expect(panel.root.querySelector('.bsx-empty')).toBeNull();
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('an empty fleet without a filter keeps the no-vehicles line', () => {
+    const { panel } = setup({ vehicles: [], crew: [] });
+    expect(panel.root.querySelector('.bsx-empty')!.textContent).toBe(t('ui.fleet.none'));
+  });
+
+  it('a filter on a fleet that has vehicles never shows the no-vehicles line', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('charging_truck'));
+    expect(panel.root.textContent).not.toContain(t('ui.fleet.none'));
+  });
+
+  it('has the no-match line in English and French, worded differently', () => {
+    const en = enLocaleJson as Record<string, string>;
+    const fr = frLocaleJson as Record<string, string>;
+    expect(en['ui.fleet.filter_no_match']).toBeTruthy();
+    expect(fr['ui.fleet.filter_no_match']).toBeTruthy();
+    expect(fr['ui.fleet.filter_no_match']).not.toBe(en['ui.fleet.filter_no_match']);
   });
 });

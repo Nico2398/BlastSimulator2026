@@ -192,6 +192,100 @@
         }
       ],
       "role": "observe"
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "role": "player",
+      "description": "#2161: in the Crew roster's filter bar click the Driller role filter and the Name sort, then click the remaining driller row. The filter only hides rows and the row click still selects the employee, so the row carries the selection highlight. Clear filter then restores the full roster.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-filter-bar:has([data-filter-group=\"status\"]) [data-filter-value=\"driller\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-id][data-employee-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-filter-bar:has([data-filter-group=\"status\"]) [data-sort-key=\"name\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"driller\"] .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"driller\"].bs-row-selected"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-filter-bar:has([data-filter-group=\"status\"]) .bs-filter-clear"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"driver\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "employeeCount": 2
+        },
+        "note": "Filtering changes the view only; matching and ordering are unit-tested."
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "role": "player",
+      "description": "#2161: in the Fleet list's filter bar click the Debris Hauler role filter and the HP sort, then click the hauler row. The row click still selects the vehicle, so the row carries the selection highlight. Clear filter then restores the full list.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-filter-bar [data-filter-value=\"debris_hauler\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id][data-vtype=\"debris_hauler\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-filter-bar [data-sort-key=\"hp\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id][data-vtype=\"debris_hauler\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id][data-vtype=\"debris_hauler\"].bs-row-selected"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-filter-bar .bs-filter-clear"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "vehicleCount": 1
+        },
+        "note": "Filtering changes the view only; matching and ordering are unit-tested."
+      }
     }
   ]
 }

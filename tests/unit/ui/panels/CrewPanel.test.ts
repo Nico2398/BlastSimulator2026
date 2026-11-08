@@ -5,10 +5,11 @@ import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { managerNegotiationBonusPct } from '../../../../src/core/economy/Negotiation.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
-import type { Employee } from '../../../../src/core/entities/Employee.js';
+import type { Employee, SkillCategory } from '../../../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../../../src/core/entities/Vehicle.js';
 import type { Building } from '../../../../src/core/entities/Building.js';
 import frLocaleJson from '../../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import enLocaleJson from '../../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import { perHour } from '../../../../src/ui/crewDetailSections.js';
 import { hiringSignature, makeHiringSection } from '../../../../src/ui/panels/CrewHiring.js';
 import { FilterBarSelection } from '../../../../src/ui/filterBar.js';
@@ -449,7 +450,9 @@ describe('hiringSignature (#1385)', () => {
     const { panel } = makePanel();
     const state = makeState([]);
     panel.update(state);
-    (panel.root.querySelector('.bs-filter-bar [data-filter-value="driller"]') as HTMLButtonElement).click();
+    // The roster has its own bar (#2161); the hiring bar is the one without the status group.
+    const hiringBar = [...panel.root.querySelectorAll('.bs-filter-bar')].find(b => !b.querySelector('[data-filter-group="status"]'))!;
+    (hiringBar.querySelector('[data-filter-value="driller"]') as HTMLButtonElement).click();
     const roles = () => [...panel.root.querySelectorAll<HTMLElement>('[data-hiring-role]')].map(n => n.dataset['hiringRole']);
     expect(roles()).toEqual(['driller']);
     panel.update(state);
@@ -981,5 +984,322 @@ describe('CrewPanel — hiring filter and sort (#2160)', () => {
     click(host, groupBtn('union', 'union'));
     click(host, '[data-candidate-card="4"] button[data-candidate-id]');
     expect(hires).toEqual([['blaster', 4]]);
+  });
+});
+
+// ── Roster filter and sort bar (#2161) ──────────────────────────────────────
+
+describe('CrewPanel — roster filter and sort bar (#2161)', () => {
+  const qual = (category: SkillCategory) => ({ category, proficiencyLevel: 1 as const, xp: 0 });
+
+  /** Five employees, one per activity, with distinct names, morale, fatigue and salary. */
+  function roster(): Employee[] {
+    return [
+      makeEmployee({ id: 1, name: 'Walt', role: 'driller', morale: 70, fatigue: 40, salary: 900, taskTicksRemaining: 5, qualifications: [qual('blasting'), qual('driving.drill_rig')] }),
+      makeEmployee({ id: 2, name: 'amy', role: 'blaster', morale: 20, fatigue: 90, salary: 1500, restTicksRemaining: 4, qualifications: [qual('blasting')] }),
+      makeEmployee({ id: 3, name: 'Bo', role: 'driver', morale: 50, fatigue: 10, salary: 700, qualifications: [qual('driving.truck')] }),
+      makeEmployee({ id: 4, name: 'Cy', role: 'surveyor', morale: 90, fatigue: 60, salary: 1200, destinationX: 8, destinationZ: 8, isMoveStuck: true, qualifications: [qual('geology')] }),
+      makeEmployee({ id: 5, name: 'Di', role: 'driller', morale: 35, fatigue: 75, salary: 1100, injured: true, qualifications: [qual('driving.drill_rig')] }),
+    ];
+  }
+
+  function setup(employees: Employee[] = roster()) {
+    const { panel } = makePanel();
+    const state = makeState(employees);
+    panel.update(state);
+    return { panel, state };
+  }
+
+  /** The roster's own bar: the one carrying the status group (the hiring bar has none). */
+  const bar = (panel: CrewPanel): HTMLElement =>
+    [...panel.root.querySelectorAll<HTMLElement>('.bs-filter-bar')].find(b => b.querySelector('[data-filter-group="status"]'))!;
+  const click = (panel: CrewPanel, selector: string): void => (bar(panel).querySelector(selector) as HTMLButtonElement).click();
+  const roleBtn = (role: string): string => `.bs-filter-row:not([data-filter-group]) [data-filter-value="${role}"]`;
+  const groupBtn = (group: string, value: string): string => `[data-filter-group="${group}"] [data-filter-value="${value}"]`;
+  const sortBtn = (key: string): string => `[data-sort-key="${key}"]`;
+  const shown = (panel: CrewPanel): number[] =>
+    [...panel.root.querySelectorAll<HTMLElement>('[data-employee-id]')].map(r => Number(r.dataset['employeeId']));
+  const groupValues = (panel: CrewPanel, group: string): string[] =>
+    [...bar(panel).querySelectorAll<HTMLElement>(`[data-filter-group="${group}"] [data-filter-value]`)].map(b => b.dataset['filterValue']!);
+
+  it('shows the shared filter bar above the roster rows', () => {
+    const { panel } = setup();
+    const first = panel.root.querySelector('[data-employee-id]')!;
+    expect(bar(panel)).toBeTruthy();
+    expect(bar(panel).compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('offers every role in the main filter row', () => {
+    const { panel } = setup();
+    const roles = [...bar(panel).querySelectorAll<HTMLElement>('.bs-filter-row:not([data-filter-group]) [data-filter-value]')]
+      .map(b => b.dataset['filterValue']).sort();
+    expect(roles).toEqual(['blaster', 'driller', 'driver', 'manager', 'surveyor']);
+    expect(bar(panel).querySelector('[data-filter-all]')).not.toBeNull();
+  });
+
+  it('offers the five status choices', () => {
+    const { panel } = setup();
+    expect(groupValues(panel, 'status').sort()).toEqual(['idle', 'injured', 'resting', 'stuck', 'working']);
+  });
+
+  it('offers the four sort keys', () => {
+    const { panel } = setup();
+    const keys = [...bar(panel).querySelectorAll<HTMLElement>('[data-sort-key]')].map(b => b.dataset['sortKey']).sort();
+    expect(keys).toEqual(['fatigue', 'morale', 'name', 'salary']);
+  });
+
+  it('offers only the skill categories a living employee holds', () => {
+    const { panel } = setup([
+      ...roster(),
+      makeEmployee({ id: 6, name: 'Ghost', alive: false, qualifications: [qual('repair'), qual('management')] }),
+    ]);
+    expect(groupValues(panel, 'skill').sort()).toEqual(['blasting', 'driving.drill_rig', 'driving.truck', 'geology']);
+  });
+
+  it('offers no skill choice on a roster without qualifications', () => {
+    const { panel } = setup([makeEmployee({ id: 1 })]);
+    expect(groupValues(panel, 'skill')).toEqual([]);
+  });
+
+  it('shows the whole roster in stored order before any choice', () => {
+    const { panel } = setup();
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('a role button hides the other roles, and All brings them back', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('driller'));
+    expect(shown(panel)).toEqual([1, 5]);
+    click(panel, '[data-filter-all]');
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('the status buttons map to the activity of each employee', () => {
+    const { panel } = setup();
+    click(panel, groupBtn('status', 'working'));
+    expect(shown(panel)).toEqual([1]);
+    click(panel, groupBtn('status', 'resting'));
+    expect(shown(panel)).toEqual([2]);
+    click(panel, groupBtn('status', 'idle'));
+    expect(shown(panel)).toEqual([3, 5]);
+    click(panel, groupBtn('status', 'stuck'));
+    expect(shown(panel)).toEqual([4]);
+    click(panel, groupBtn('status', 'injured'));
+    expect(shown(panel)).toEqual([5]);
+  });
+
+  it('a collapsed employee shows under stuck', () => {
+    const { panel } = setup([makeEmployee({ id: 1, collapsing: true }), makeEmployee({ id: 2 })]);
+    click(panel, groupBtn('status', 'stuck'));
+    expect(shown(panel)).toEqual([1]);
+  });
+
+  it('a skill button keeps employees holding that category, whichever qualification', () => {
+    const { panel } = setup();
+    click(panel, groupBtn('skill', 'driving.drill_rig'));
+    expect(shown(panel)).toEqual([1, 5]);
+    click(panel, groupBtn('skill', 'blasting'));
+    expect(shown(panel)).toEqual([1, 2]);
+  });
+
+  it('role, status and skill combine with AND', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('driller'));
+    click(panel, groupBtn('skill', 'driving.drill_rig'));
+    expect(shown(panel)).toEqual([1, 5]);
+    click(panel, groupBtn('status', 'working'));
+    expect(shown(panel)).toEqual([1]);
+  });
+
+  it('clicking the pressed choice again removes the filter', () => {
+    const { panel } = setup();
+    click(panel, groupBtn('status', 'working'));
+    click(panel, groupBtn('status', 'working'));
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('the name sort lists A to Z ignoring case', () => {
+    const { panel } = setup();
+    click(panel, sortBtn('name'));
+    expect(shown(panel)).toEqual([2, 3, 4, 5, 1]);
+  });
+
+  it('the morale sort lists the lowest morale first', () => {
+    const { panel } = setup();
+    click(panel, sortBtn('morale'));
+    expect(shown(panel)).toEqual([2, 5, 3, 1, 4]);
+  });
+
+  it('the fatigue sort lists the most tired (lowest gauge) first', () => {
+    const { panel } = setup();
+    click(panel, sortBtn('fatigue'));
+    expect(shown(panel)).toEqual([3, 1, 4, 5, 2]);
+  });
+
+  it('the salary sort lists the highest salary first', () => {
+    const { panel } = setup();
+    click(panel, sortBtn('salary'));
+    expect(shown(panel)).toEqual([2, 4, 5, 1, 3]);
+  });
+
+  it('clicking the pressed sort again restores the stored order', () => {
+    const { panel } = setup();
+    click(panel, sortBtn('salary'));
+    click(panel, sortBtn('salary'));
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('a sort orders only the rows the filter keeps', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('driller'));
+    click(panel, sortBtn('morale'));
+    expect(shown(panel)).toEqual([5, 1]);
+  });
+
+  it('Clear filter resets every choice', () => {
+    const { panel } = setup();
+    expect(bar(panel).querySelector('.bs-filter-clear')).toBeNull();
+    click(panel, roleBtn('driller'));
+    click(panel, groupBtn('status', 'injured'));
+    click(panel, sortBtn('name'));
+    click(panel, '.bs-filter-clear');
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+    expect(bar(panel).querySelector('.bs-filter-clear')).toBeNull();
+  });
+
+  it('the pressed buttons show the current choice', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('blaster'));
+    click(panel, sortBtn('name'));
+    expect(bar(panel).querySelector(roleBtn('blaster'))!.getAttribute('aria-pressed')).toBe('true');
+    expect(bar(panel).querySelector(sortBtn('name'))!.getAttribute('aria-pressed')).toBe('true');
+    expect(bar(panel).querySelector(roleBtn('driller'))!.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('the roster filter leaves the hiring section alone', () => {
+    const { panel } = setup();
+    const groups = () => panel.root.querySelectorAll('[data-hiring-role]').length;
+    const before = groups();
+    click(panel, roleBtn('driller'));
+    expect(groups()).toBe(before);
+  });
+
+  it('a filtered row still selects its employee through the handler', () => {
+    const { panel } = setup();
+    const picked: number[] = [];
+    panel.setSelectEmployeeHandler(id => picked.push(id));
+    click(panel, groupBtn('status', 'injured'));
+    (panel.root.querySelector('[data-employee-id="5"] .bs-detail-toggle') as HTMLButtonElement).click();
+    expect(picked).toEqual([5]);
+  });
+
+  it('a sorted row still selects its employee through the handler', () => {
+    const { panel } = setup();
+    const picked: number[] = [];
+    panel.setSelectEmployeeHandler(id => picked.push(id));
+    click(panel, sortBtn('salary'));
+    const first = panel.root.querySelector('[data-employee-id] .bs-detail-toggle') as HTMLButtonElement;
+    first.click();
+    expect(picked).toEqual([2]);
+  });
+
+  it('the scene selection highlight follows its row through filtering', () => {
+    const { panel } = setup();
+    panel.setSelectedEmployee({ kind: 'employee', id: 1 });
+    click(panel, roleBtn('blaster'));
+    expect(panel.root.querySelector('[data-employee-id="1"]')).toBeNull();
+    click(panel, '[data-filter-all]');
+    expect(panel.root.querySelector('[data-employee-id="1"]')!.classList.contains('bs-row-selected')).toBe(true);
+  });
+
+  it('the filter survives the next update, also when the roster changes', () => {
+    const { panel, state } = setup();
+    click(panel, roleBtn('driller'));
+    panel.update(state);
+    expect(shown(panel)).toEqual([1, 5]);
+    state.employees.employees.push(makeEmployee({ id: 6, name: 'New driller', role: 'driller' }), makeEmployee({ id: 7, name: 'New blaster', role: 'blaster' }));
+    panel.update(state);
+    expect(shown(panel)).toEqual([1, 5, 6]);
+    expect(bar(panel).querySelector(roleBtn('driller'))!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('the sort survives the next update, also when the roster changes', () => {
+    const { panel, state } = setup();
+    click(panel, sortBtn('salary'));
+    state.employees.employees.push(makeEmployee({ id: 6, name: 'Rich', salary: 5000 }));
+    panel.update(state);
+    expect(shown(panel)).toEqual([6, 2, 4, 5, 1, 3]);
+  });
+
+  it('an employee who starts a task appears under working on the next update', () => {
+    const { panel, state } = setup();
+    click(panel, groupBtn('status', 'working'));
+    expect(shown(panel)).toEqual([1]);
+    state.employees.employees.find(e => e.id === 3)!.taskTicksRemaining = 6;
+    panel.update(state);
+    expect(shown(panel)).toEqual([1, 3]);
+  });
+
+  it('an employee who finishes working leaves the working list on the next update', () => {
+    const { panel, state } = setup();
+    click(panel, groupBtn('status', 'working'));
+    state.employees.employees.find(e => e.id === 1)!.taskTicksRemaining = null;
+    panel.update(state);
+    expect(shown(panel)).toEqual([]);
+  });
+
+  it('an employee who falls injured joins the injured list on the next update', () => {
+    const { panel, state } = setup();
+    click(panel, groupBtn('status', 'injured'));
+    state.employees.employees.find(e => e.id === 2)!.injured = true;
+    panel.update(state);
+    expect(shown(panel)).toEqual([2, 5]);
+  });
+
+  it('the sort order follows morale drift on the next update', () => {
+    const { panel, state } = setup();
+    click(panel, sortBtn('morale'));
+    expect(shown(panel)).toEqual([2, 5, 3, 1, 4]);
+    state.employees.employees.find(e => e.id === 4)!.morale = 5;
+    panel.update(state);
+    expect(shown(panel)).toEqual([4, 2, 5, 3, 1]);
+  });
+
+  it('a filter nobody matches shows the no-match line instead of rows', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('manager'));
+    expect(shown(panel)).toEqual([]);
+    const empties = [...panel.root.querySelectorAll('.bsx-empty')];
+    expect(empties).toHaveLength(1);
+    expect(empties[0]!.textContent).toBe(t('ui.crew.filter_no_match'));
+    expect(empties[0]!.textContent).not.toBe('ui.crew.filter_no_match');
+  });
+
+  it('the no-match line goes away when the filter is cleared', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('manager'));
+    click(panel, '.bs-filter-clear');
+    expect(panel.root.querySelector('.bsx-empty')).toBeNull();
+    expect(shown(panel)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('an empty roster without a filter keeps the no-crew line', () => {
+    const { panel } = setup([]);
+    const empty = panel.root.querySelector('.bsx-empty')!;
+    expect(empty.textContent).toBe(t('ui.crew.none'));
+  });
+
+  it('a filter on a roster that has crew never shows the no-crew line', () => {
+    const { panel } = setup();
+    click(panel, roleBtn('manager'));
+    expect(panel.root.textContent).not.toContain(t('ui.crew.none'));
+  });
+
+  it('has the no-match line in English and French, worded differently', () => {
+    const en = enLocaleJson as Record<string, string>;
+    const fr = frLocaleJson as Record<string, string>;
+    expect(en['ui.crew.filter_no_match']).toBeTruthy();
+    expect(fr['ui.crew.filter_no_match']).toBeTruthy();
+    expect(fr['ui.crew.filter_no_match']).not.toBe(en['ui.crew.filter_no_match']);
   });
 });
