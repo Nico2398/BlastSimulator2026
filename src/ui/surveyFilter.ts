@@ -1,6 +1,6 @@
 // BlastSimulator2026 — survey results filter criteria (#2162).
 
-import type { SurveyMethod, SurveyResult } from '../core/mining/SurveyCalc.js';
+import { SURVEY_METHODS, type SurveyMethod, type SurveyResult } from '../core/mining/SurveyCalc.js';
 import type { FilterBarSelection } from './filterBar.js';
 
 export interface SurveyCriteria {
@@ -8,14 +8,12 @@ export interface SurveyCriteria {
   method: SurveyMethod | null;
 }
 
-const METHODS: readonly string[] = ['core_sample', 'seismic', 'aerial'];
-
 /** Read the bar selection: filter = ore, group `method`. */
 export function surveyCriteriaFromSelection(selection: FilterBarSelection): SurveyCriteria {
   const method = selection.groups['method'] ?? '';
   return {
     ore: selection.filter,
-    method: METHODS.includes(method) ? method as SurveyMethod : null,
+    method: (SURVEY_METHODS as readonly string[]).includes(method) ? method as SurveyMethod : null,
   };
 }
 

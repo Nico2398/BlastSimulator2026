@@ -139,6 +139,14 @@ describe('filterBar structure', () => {
     expect(bar.querySelectorAll('button[data-sort-key]').length).toBe(2);
   });
 
+  it('omits the sort row when there are no sorts (#2162)', () => {
+    const bar = filterBar(new FilterBarSelection(), makeCfg({ sorts: [] }));
+    expect(bar.querySelectorAll('button[data-sort-key]').length).toBe(0);
+    const labels = [...bar.querySelectorAll('.bs-filter-label')].map(l => l.textContent);
+    expect(labels).toEqual(['Material']);
+    expect(bar.querySelectorAll('button[data-filter-value]').length).toBe(3);
+  });
+
   it('marks no choice or sort as pressed on a fresh selection', () => {
     const bar = filterBar(new FilterBarSelection(), makeCfg());
     for (const b of bar.querySelectorAll('button[data-filter-value], button[data-sort-key]')) {
