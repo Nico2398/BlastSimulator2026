@@ -15,7 +15,9 @@ import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSect
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
-import { FilterBarSelection } from '../filterBar.js';
+import { FilterBarSelection, filterBar } from '../filterBar.js';
+import { HIRING_ROLES } from '../../core/entities/HiringPool.js';
+import { CREW_SORT_KEYS, CREW_STATUS_CHOICES, crewCriteriaFromSelection, filterEmployees } from '../crewFilter.js';
 import { makeHiringSection, hiringSignature } from './CrewHiring.js';
 import { moraleColor, makeAvatar, makeRoleMoraleLine, makeStatusTags, makeManagerEffect } from '../crewDetailSections.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -31,6 +33,7 @@ export class CrewPanel extends PanelBase {
   private pendingHiringRole: EmployeeRole | null = null;
   private lastState: GameState | null = null;
   private readonly hiringSelection = new FilterBarSelection();
+  private readonly rosterSelection = new FilterBarSelection();
   private onSelectEmployeeCb?: (employeeId: number) => void;
   private readonly locale = new LocaleTextRegistry();
 
@@ -126,7 +129,10 @@ export class CrewPanel extends PanelBase {
         return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}:${e.name}:${quals}`;
       })
       .join('|');
-    return `${rows}#${hiringSignature(state, this.hiringSelection)}`;
+    // Status drifts, so a filtered or sorted roster signs the ids it shows: rows entering or leaving the view rebuild it.
+    const shown = this.rosterSelection.isActive() ? this.visibleEmployees(state).map(e => e.id).join(',') : '';
+    const picked = `${this.rosterSelection.filter}|${this.rosterSelection.sort}|${JSON.stringify(this.rosterSelection.groups)}`;
+    return `${rows}#${shown}~${picked}#${hiringSignature(state, this.hiringSelection)}`;
   }
 
   /** Re-paint values that drift every tick without rebuilding the DOM under an in-flight click. */
@@ -147,15 +153,41 @@ export class CrewPanel extends PanelBase {
     }
   }
 
+  /** Living employees that pass the roster bar, in its sort order. */
+  private visibleEmployees(state: GameState): Employee[] {
+    const living = state.employees.employees.filter(e => e.alive);
+    return filterEmployees(living, crewCriteriaFromSelection(this.rosterSelection), state);
+  }
+
+  /** The roster bar: role, status, skill (categories living employees hold), and the four sorts. */
+  private makeRosterBar(state: GameState): HTMLElement {
+    const skills = [...new Set(state.employees.employees.filter(e => e.alive).flatMap(e => e.qualifications.map(q => q.category)))];
+    return filterBar(this.rosterSelection, {
+      choices: HIRING_ROLES.map(role => ({ value: role, label: t(`role.${role}`) })),
+      groups: [
+        { id: 'status', label: t('ui.crew.filter_status'), choices: CREW_STATUS_CHOICES.map(value => ({ value, label: t(`ui.crew.filter_status_${value}`) })) },
+        { id: 'skill', label: t('ui.crew.filter_skill'), choices: skills.map(value => ({ value, label: t(`skill.${value}`) })) },
+      ],
+      sorts: CREW_SORT_KEYS.map(key => ({ key, label: t(`ui.crew.sort_${key}`) })),
+      onChange: () => { if (this.lastState) { this.lastSignature = ''; this.update(this.lastState); } },
+      filterLabel: t('ui.crew.filter_role'), sortLabel: t('ui.filter.sort'),
+      allLabel: t('ui.filter.all'), clearLabel: t('ui.filter.clear'),
+    });
+  }
+
   private render(state: GameState): void {
-    const employees = state.employees.employees.filter(e => e.alive);
-    const cards = employees.length === 0
+    const living = state.employees.employees.filter(e => e.alive);
+    const employees = this.visibleEmployees(state);
+    const cards = living.length === 0
       ? [el('div', { className: 'bsx-empty', text: t('ui.crew.none') })]
-      : employees.map(e => this.makeRosterCard(e, state));
+      : employees.length === 0
+        ? [el('div', { className: 'bsx-empty', text: t('ui.crew.filter_no_match') })]
+        : employees.map(e => this.makeRosterCard(e, state));
     // className hook: this inner div, not bodyEl, is now the roster's real
     // scrolling container (overflow-y:auto lives here per scrollBoundedSection),
     // so scenario coverage needs a stable selector for it (#964 CI fix).
     replaceChildrenKeepingScroll(this.bodyEl, [
+      ...(living.length === 0 ? [] : [this.makeRosterBar(state)]),
       scrollBoundedSection(cards, 200, { gap: 8, className: 'bsx-roster-scroll', scrollKey: 'roster' }),
       sectionHeader(t('ui.crew.hiring')),
       ...makeHiringSection(state, (role, candidateId) => this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`), {
