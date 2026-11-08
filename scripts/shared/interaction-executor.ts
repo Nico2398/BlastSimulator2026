@@ -518,6 +518,8 @@ export async function executeActionOnPage(
       );
       break;
     }
+    case 'hoverSelector':
+      throw new Error('not implemented');
     case 'setStepper': {
       // The count-encoded form this replaces — N clicks on `:last-child` —
       // assumed the control's default and its persistence across steps; a
