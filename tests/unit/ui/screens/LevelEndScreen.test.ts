@@ -12,6 +12,7 @@ import { calculateStarRating } from '../../../../src/core/campaign/SuccessTracke
 import { getLevel } from '../../../../src/core/campaign/Level.js';
 import en from '../../../../src/core/i18n/locales/en.json';
 import fr from '../../../../src/core/i18n/locales/fr.json';
+import { levelEndStatExplain, type LevelEndStatId } from '../../../../src/ui/levelExplain.js';
 import { TICKS_PER_DAY, REVOLT_TICKS, BOARD_CONFIDENCE_MISS_PENALTY, BOARD_CONFIDENCE_MET_GAIN } from '../../../../src/core/config/balance.js';
 
 function mount(): { container: HTMLDivElement; screen: LevelEndScreen } {
@@ -999,5 +1000,107 @@ describe('LevelEndScreen fired by the board (#1946)', () => {
     expect((en as Record<string, string>)['ui.level_end.defeat.fired.body']).toBe(
       "You're fired. Your golden parachute: one (1) hard hat.",
     );
+  });
+});
+
+describe('LevelEndScreen stat explanations (#2172)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    setLocale('en');
+  });
+
+  type Reason = 'completed' | 'bankruptcy' | 'arrest' | 'ecological_shutdown' | 'worker_revolt' | 'fired';
+
+  const EXPECTED: Record<Reason, LevelEndStatId[]> = {
+    completed: ['profit', 'days', 'blasts', 'volume', 'max_depth', 'unique_ores', 'casualties', 'best_safety'],
+    fired: ['quarters_survived', 'days', 'profit', 'final_balance'],
+    bankruptcy: ['final_balance', 'days', 'blasts', 'salaries_paid'],
+    arrest: ['exposure_at_arrest', 'arrangements_made', 'profit', 'corruption_level'],
+    ecological_shutdown: ['final_ecology', 'fines_paid', 'best_ecology', 'volume'],
+    worker_revolt: ['final_wellbeing', 'salaries_paid', 'shift_mode', 'days'],
+  };
+
+  function stateFor(reason: Reason): GameState {
+    if (reason === 'completed') return stateAtLevelEnd(THREE_STAR);
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    s.campaign.activeLevelId = 'dusty_hollow';
+    s.levelEnded = true;
+    s.levelEndReason = reason;
+    return s;
+  }
+
+  const cells = (container: HTMLElement): HTMLElement[] =>
+    Array.from(container.querySelectorAll<HTMLElement>('#bs-level-end-screen .bsx-stat-cell'))
+      .filter(cell => (cell.closest('[style*="display: none"]') === null));
+
+  /** Explanation on the value cell of the stat whose key label is `id`'s locale text. */
+  function explainOfStat(container: HTMLElement, id: LevelEndStatId): HTMLElement {
+    const label = t(`ui.level_end.stat.${id}`);
+    const cell = cells(container).find(c => c.querySelector('.bsx-stat-key')?.textContent === label);
+    expect(cell, `no stat cell labelled ${label}`).toBeDefined();
+    return cell!.querySelector<HTMLElement>('.bsx-stat-value')!;
+  }
+
+  for (const reason of Object.keys(EXPECTED) as Reason[]) {
+    describe(reason, () => {
+      it('every stat value cell carries a non-empty explanation and the explainable class', () => {
+        const { container, screen } = mount();
+        screen.update(stateFor(reason));
+        const visible = cells(container);
+        expect(visible.length).toBe(EXPECTED[reason].length);
+        for (const cell of visible) {
+          const value = cell.querySelector<HTMLElement>('.bsx-stat-value')!;
+          expect(value.classList.contains('bsx-explainable'), cell.textContent ?? '').toBe(true);
+          expect(value.dataset['explain']?.trim().length ?? 0, cell.textContent ?? '').toBeGreaterThan(0);
+        }
+        screen.dispose();
+      });
+
+      it('each cell explains the stat it shows, via levelEndStatExplain', () => {
+        const { container, screen } = mount();
+        screen.update(stateFor(reason));
+        for (const id of EXPECTED[reason]) {
+          expect(explainOfStat(container, id).dataset['explain'], id).toBe(levelEndStatExplain(id));
+        }
+        screen.dispose();
+      });
+
+      it('the explanation is translated after switching to fr', () => {
+        setLocale('fr');
+        const { container, screen } = mount();
+        screen.update(stateFor(reason));
+        for (const id of EXPECTED[reason]) {
+          const text = explainOfStat(container, id).dataset['explain']!;
+          expect(text.trim().length, id).toBeGreaterThan(0);
+          setLocale('en');
+          const en = levelEndStatExplain(id);
+          setLocale('fr');
+          expect(text, id).not.toBe(en);
+        }
+        screen.dispose();
+      });
+    });
+  }
+
+  it('victory star-rating rows are unchanged: no explanation on the rows', () => {
+    const { container, screen } = mount();
+    screen.update(stateFor('completed'));
+    for (const key of ['profit', 'safety', 'ecology']) {
+      const label = Array.from(container.querySelectorAll<HTMLElement>('#bs-level-end-screen span'))
+        .find(s => s.textContent === t(`ui.level_end.star_rating.${key}_label`));
+      expect(label, key).toBeDefined();
+      const row = label!.parentElement!;
+      expect(row.hasAttribute('data-explain')).toBe(false);
+      expect(row.querySelector('[data-explain]')).toBeNull();
+    }
+    screen.dispose();
+  });
+
+  it('victory still renders its star-rating note text', () => {
+    const { container, screen } = mount();
+    screen.update(stateFor('completed'));
+    expect(container.querySelector('#bs-level-end-screen')!.textContent)
+      .toContain(t('ui.level_end.star_rating.safety_pass', { count: '0' }));
+    screen.dispose();
   });
 });
