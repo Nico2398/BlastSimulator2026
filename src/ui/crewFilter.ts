@@ -8,7 +8,7 @@ import type { FilterBarSelection } from './filterBar.js';
 export const CREW_SORT_KEYS = ['name', 'morale', 'fatigue', 'salary'] as const;
 type CrewSortKey = typeof CREW_SORT_KEYS[number];
 export const CREW_STATUS_CHOICES = ['working', 'resting', 'idle', 'stuck', 'injured'] as const;
-export type CrewStatusChoice = typeof CREW_STATUS_CHOICES[number];
+type CrewStatusChoice = typeof CREW_STATUS_CHOICES[number];
 
 export interface CrewCriteria {
   role: EmployeeRole | null;

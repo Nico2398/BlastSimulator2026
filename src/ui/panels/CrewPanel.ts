@@ -187,8 +187,7 @@ export class CrewPanel extends PanelBase {
     // scrolling container (overflow-y:auto lives here per scrollBoundedSection),
     // so scenario coverage needs a stable selector for it (#964 CI fix).
     replaceChildrenKeepingScroll(this.bodyEl, [
-      ...(living.length === 0 ? [] : [this.makeRosterBar(state)]),
-      scrollBoundedSection(cards, 200, { gap: 8, className: 'bsx-roster-scroll', scrollKey: 'roster' }),
+      scrollBoundedSection(living.length === 0 ? cards : [this.makeRosterBar(state), ...cards], 200, { gap: 8, className: 'bsx-roster-scroll', scrollKey: 'roster' }),
       sectionHeader(t('ui.crew.hiring')),
       ...makeHiringSection(state, (role, candidateId) => this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`), {
         selection: this.hiringSelection,

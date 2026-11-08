@@ -8,7 +8,7 @@ import type { FilterBarSelection } from './filterBar.js';
 export const FLEET_SORT_KEYS = ['hp', 'tier'] as const;
 type FleetSortKey = typeof FLEET_SORT_KEYS[number];
 export const FLEET_STATUS_CHOICES = ['working', 'waiting', 'stuck', 'damaged'] as const;
-export type FleetStatusChoice = typeof FLEET_STATUS_CHOICES[number];
+type FleetStatusChoice = typeof FLEET_STATUS_CHOICES[number];
 
 export interface FleetCriteria {
   role: VehicleRole | null;

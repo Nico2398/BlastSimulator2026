@@ -236,8 +236,7 @@ export class FleetPanel extends PanelBase {
       : visible.length === 0
         ? [el('div', { className: 'bsx-empty', text: t('ui.fleet.filter_no_match') })]
         : visible.map(v => this.makeVehicleCard(v, state));
-    if (vehicles.length > 0) children.push(this.makeFleetBar());
-    children.push(scrollBoundedSection(vehicleCards, 200, { gap: 9 }));
+    children.push(scrollBoundedSection(vehicles.length === 0 ? vehicleCards : [this.makeFleetBar(), ...vehicleCards], 200, { gap: 9 }));
     children.push(sectionHeader(t('ui.fleet.dealership')), ...this.makeDealershipRows(state));
     this.bodyEl.replaceChildren(...children);
   }
