@@ -601,6 +601,13 @@ describe('makeStatusTags / makeIdentitySection (#1762)', () => {
       .toBeGreaterThan(plain.textContent!.length + plain.querySelectorAll('*').length);
   });
 
+  it('union status tag carries the shared explanation, not a native title (#2163)', () => {
+    const tag = makeStatusTags(makeEmployee({ unionized: true }), makeState()).querySelector<HTMLElement>('[data-explain]');
+    expect(tag).not.toBeNull();
+    expect(tag!.getAttribute('data-explain')).toContain(unionExplain());
+    expect(tag!.hasAttribute('title')).toBe(false);
+  });
+
   it('identity shows name initials, role and morale', () => {
     const sec = makeIdentitySection(makeEmployee({ morale: 42, hiredAtTick: 48 }), makeState());
     const text = sec.textContent ?? '';
