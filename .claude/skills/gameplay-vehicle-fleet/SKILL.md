@@ -269,7 +269,7 @@ their cumulative mass stays within the tier capacity and `storageRoomKg`. The pr
 so a fragment heavier than the tier capacity rides alone (the load gauge clamps at 100%); an extra
 that overflows is skipped and a later, smaller one may still fit. On arrival an extra consumes its
 own haul action; one that is gone, claimed or no longer fits is a soft no-op and the trip carries
-less. Every `load` leg carries `dwellTicks = HAUL_LOAD_TICKS` (#2199): the hauler stands on the
+less. Every `load` leg carries `dwellTicks = HAUL_LOAD_TICKS`: the hauler stands on the
 fragment for that many ticks, whatever its size or mass, before the load applies (`Locomotion` holds the
 arrived leg; the planner adds it to `estTicks`; `vehicleEtaTicks` counts it), so a shot of many small
 fragments hauls slower. Boulder-split and `unload` legs have no dwell. The `unload` leg delivers every cargo item (one `vehicle:haul_delivered` each) and completes
