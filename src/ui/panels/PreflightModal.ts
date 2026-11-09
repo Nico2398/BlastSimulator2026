@@ -333,7 +333,11 @@ export class PreflightModal {
     const fragments = preview.fragments;
     line.appendChild(fragments
       ? explainable(
-        el('span', { text: t(k('predicted_fragments'), { oversized: fragments.oversizedFragments, dust: fragments.dustVolumeM3.toFixed(1) }) }),
+        el('span', { text: t(k('predicted_fragments'), {
+          oversized: fragments.oversizedFragments,
+          fines: (fragments.finesVolumeM3 + fragments.dustVolumeM3).toFixed(1),
+          loss: formatMoney(fragments.dustLossValue),
+        }) }),
         t(k('predicted_fragments_explain')),
       )
       : locked('predicted_locked_fragments'));

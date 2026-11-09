@@ -231,14 +231,15 @@ export class PreviewStep {
       ));
       return;
     }
+    const rows = PREDICTED_ROWS.map(row => this.makePredictedRow(row, preview));
     if (preview.tier < SOFTWARE_TIER_FRAGMENTS) {
-      // No software: nothing tier-gated to show, only the way to the free heatmap.
+      // No software: every stat row is locked; a line points to the free heatmap.
       const pointer = emptyState(t(`${P}heatmap_pointer`));
       pointer.dataset['role'] = 'heatmap-pointer';
-      this.predictedListEl.replaceChildren(pointer);
+      this.predictedListEl.replaceChildren(pointer, ...rows);
       return;
     }
-    this.predictedListEl.replaceChildren(...PREDICTED_ROWS.map(row => this.makePredictedRow(row, preview)));
+    this.predictedListEl.replaceChildren(...rows);
   }
 
   private makePredictedRow(row: PredictedRow, preview: BlastPreviewSummary): HTMLElement {

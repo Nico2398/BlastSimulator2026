@@ -3928,7 +3928,7 @@
   "ui.blast_workshop.preflight.stat_value": "Valeur est.",
   "ui.blast_workshop.preflight.predicted_at_tier": "Prévisions au palier {tier}",
   "ui.blast_workshop.preflight.predicted_at_tier_explain": "Ce que votre logiciel de tir prévoit pour ce tir. Chaque palier ajoute des chiffres : T1 fragments, T2 prévision de projection, T3 vibration.",
-  "ui.blast_workshop.preflight.predicted_fragments": "{oversized} hors gabarit, {dust} m3 de poussière",
+  "ui.blast_workshop.preflight.predicted_fragments": "{oversized} hors gabarit, {fines} m3 de fines et poussière, {loss} $ perdus en poussière",
   "ui.blast_workshop.preflight.predicted_voxels_explain": "Voxels touchés par le tir. Gratuit à tous les paliers grâce à la carte d'énergie.",
   "ui.blast_workshop.preflight.predicted_fragments_explain": "Les hors gabarit demandent un débitage secondaire ; la poussière est perdue pour la vente. Une maille plus serrée ou moins de charge réduit les deux.",
   "ui.blast_workshop.preflight.predicted_forecast_explain": "Résultat de l'essai à blanc : la note que le tir obtiendrait, la part de roche projetée et la projection max.",

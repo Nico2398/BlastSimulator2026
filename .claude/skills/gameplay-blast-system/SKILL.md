@@ -369,7 +369,7 @@ Firing with ordered-but-undrilled holes (`plannedDrillHoles`) warns in the prefl
 | 1 | "BlastView Basic" | Fragment size distribution: average size, oversized count, band volumes (good, fines, dust), value lost to dust |
 | 2 | "FragPredict" | Projection risk zones tinted on the terrain (`ProjectionZoneOverlay`), plus the dry-run figures: predicted rating, thrown share, furthest throw |
 | 3 | "ProjectoScan" | Vibration at the level's villages |
-| 4 | "VibroMap Pro" | Charge optimizer (#2204; no content yet) |
+| 4 | "VibroMap Pro" | Charge optimizer (no content yet) |
 
 Energy is free at every tier through the workshop heatmap. Tier prices stay `SOFTWARE_TIER_COSTS` (500 / 2000 / 5000 / 12000) and a saved game keeps its tier number, so it gets that tier's new content. Tier numbers come from `SOFTWARE_TIER_FRAGMENTS`, `SOFTWARE_TIER_PROJECTIONS`, `SOFTWARE_TIER_VIBRATIONS` and `SOFTWARE_TIER_OPTIMIZER` in `balance.ts`. One dry run (`dryRunBlast`) serves T1 and T2 in `blast_preview`; `fragmentDistributionFrom` reads the T1 figures off it. The Preview step at tier 0 shows no gated stat and points to the heatmap; a locked row reads "Requires blasting software T{n}: <what it shows>", and every row is `explainable`. `lastBlastPreview.shape` (`BLAST_PREVIEW_SHAPE`) marks the content line-up; a save carrying another shape loads the preview as null. The console `preview energy` is ungated; `preview fragments|projections|vibrations` follow the tiers above.
 

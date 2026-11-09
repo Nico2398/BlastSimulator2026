@@ -3928,7 +3928,7 @@
   "ui.blast_workshop.preflight.stat_value": "Est. Value",
   "ui.blast_workshop.preflight.predicted_at_tier": "Predicted at Tier {tier}",
   "ui.blast_workshop.preflight.predicted_at_tier_explain": "What your blasting software forecasts for this shot. Each tier adds figures: T1 fragments, T2 projection forecast, T3 vibration.",
-  "ui.blast_workshop.preflight.predicted_fragments": "{oversized} oversized, {dust} m3 dust",
+  "ui.blast_workshop.preflight.predicted_fragments": "{oversized} oversized, {fines} m3 fines and dust, ${loss} lost to dust",
   "ui.blast_workshop.preflight.predicted_voxels_explain": "Voxels the shot affects. Free at every tier through the energy heatmap.",
   "ui.blast_workshop.preflight.predicted_fragments_explain": "Oversized pieces need secondary breaking; dust is lost to the sale. A tighter pattern or less charge cuts both.",
   "ui.blast_workshop.preflight.predicted_forecast_explain": "Dry-run result: the rating the blast would earn, the share of rock thrown clear and the furthest throw.",

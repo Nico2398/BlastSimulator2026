@@ -80,7 +80,7 @@ export interface FragmentPreview {
 }
 
 /** What tier 1 shows: how finely the rock breaks, read off the dry-run blast. */
-export interface FragmentDistribution {
+interface FragmentDistribution {
   /** Volume (m3) by fragmentation band. */
   bandVolumes: Record<FragmentationBand, number>;
   fragmentCount: number;

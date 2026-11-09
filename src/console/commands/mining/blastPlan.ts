@@ -190,7 +190,8 @@ export function blastPreviewCommand(
   const lines: string[] = [t('mining.blast.preview_header')];
 
   lines.push('');
-  lines.push('--- Energy Map (free: see the heatmap) ---');
+  lines.push('--- Energy Map ---');
+  lines.push('  (free: the heatmap shows it on the terrain)');
   lines.push(`  Affected voxels: ${energyPreview.energyMap.size}`);
   lines.push(`  Min energy: ${energyPreview.minEnergy.toFixed(1)}`);
   lines.push(`  Max energy: ${energyPreview.maxEnergy.toFixed(1)}`);
