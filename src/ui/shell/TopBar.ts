@@ -4,8 +4,10 @@
 // floating Saves and Return-to-Map buttons main.ts used to create ad-hoc
 // (spec §5 defect: they collided with the event chip).
 
+import type { EntityOpener } from '../entityLinks.js';
 import { iconEl } from '../icons.js';
-import { el, sectionHeader, progressBar } from '../dom.js';
+import { el, explainable, sectionHeader, progressBar } from '../dom.js';
+import { boardExplain, weatherExplain } from '../hudExplain.js';
 import { t } from '../../core/i18n/I18n.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -109,6 +111,7 @@ export class TopBar {
   private readonly clockValue: HTMLElement;
   private readonly weatherIcon: HTMLElement;
   private readonly weatherBtn: HTMLButtonElement;
+  private opener: EntityOpener | undefined;
   private readonly weatherPopoverEl: HTMLElement;
   private weatherWrapEl!: HTMLElement;
   private readonly speedButtons: HTMLButtonElement[] = [];
@@ -199,7 +202,7 @@ export class TopBar {
     this.boardWrap = el('div');
     this.boardWrap.dataset['action'] = 'open-board';
     this.boardWrap.style.cssText = 'display:none;flex:0 1 auto;min-width:0;align-items:center;gap:8px;padding:0 12px;border-right:1px solid var(--bsx-hairline)';
-    this.locale.bindTitle(this.boardWrap, 'shell.topbar.board_tip');
+    explainable(this.boardWrap, boardExplain());
     this.boardText = el('span', { className: 'bsx-mono' });
     this.boardText.style.cssText = 'font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px';
     this.boardWrap.append(iconEl('gavel', 14), this.boardText);
@@ -313,6 +316,9 @@ export class TopBar {
     this.modifierChips = mountModifierChips(container);
   }
 
+  /** Wires the opener that entity links call (#2169). */
+  setEntityOpener(opener: EntityOpener): void { this.opener = opener; }
+
   setSpeedChangeHandler(cb: (speed: number) => void): void { this.onSpeedChange = cb; }
   setTogglePauseHandler(cb: () => void): void { this.onTogglePause = cb; }
   setNavigateHandler(cb: (panel: PanelName) => void): void { this.onNavigate = cb; }
@@ -347,7 +353,7 @@ export class TopBar {
     // Weather
     this.lastWeather = weather;
     this.weatherIcon.setAttribute('name', WEATHER_ICON[weather] ?? 'sun');
-    this.weatherBtn.title = t(`hud.weather.${weather}`);
+    explainable(this.weatherBtn, weatherExplain(weather));
     if (this.weatherPopoverOpen) this.renderWeatherPopover();
 
     // Speed / pause
@@ -380,7 +386,9 @@ export class TopBar {
       btn.appendChild(iconEl(pip.icon, 12));
       btn.appendChild(el('span', { text: pip.label }));
       const route = ALERT_ROUTE[pip.kind];
-      if (route) btn.addEventListener('click', () => this.onNavigate?.(route));
+      const target = pip.target;
+      if (target && this.opener) btn.addEventListener('click', () => this.opener?.open(target.kind, target.id));
+      else if (route) btn.addEventListener('click', () => this.onNavigate?.(route));
       this.alertPipsEl.appendChild(btn);
     }
 
@@ -622,7 +630,8 @@ export class TopBar {
 
   refreshLocale(): void {
     this.locale.refresh();
-    this.weatherBtn.title = t(`hud.weather.${this.lastWeather}`);
+    explainable(this.weatherBtn, weatherExplain(this.lastWeather));
+    explainable(this.boardWrap, boardExplain());
     this.lastScoreSig = '';
     this.lastObjectiveSig = '';
     this.lastGradeSig = null;

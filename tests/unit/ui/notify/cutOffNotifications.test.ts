@@ -80,3 +80,32 @@ describe('cut-off alert (#2095)', () => {
     expect(cutOffPip(center.update(state))).toBeDefined();
   });
 });
+
+describe('cut-off notifications name their entity (#2169)', () => {
+  it('the cut-off employee toast carries an employee ref', () => {
+    const { state, employee, center } = setup();
+    stranded.employeeIds = [employee.id];
+    center.update(state);
+    expect(center.getLog()).toHaveLength(1);
+    expect(center.getLog()[0]!.ref).toEqual({ kind: 'employee', id: employee.id });
+    expect(center.getToasts()[0]!.ref).toEqual({ kind: 'employee', id: employee.id });
+  });
+
+  it('the cut-off vehicle toast carries a vehicle ref', () => {
+    const { state, vehicle, center } = setup();
+    stranded.vehicleIds = [vehicle.id];
+    center.update(state);
+    expect(center.getLog()).toHaveLength(1);
+    expect(center.getLog()[0]!.ref).toEqual({ kind: 'vehicle', id: vehicle.id });
+  });
+
+  it('each of two cut-off entities gets its own ref', () => {
+    const { state, employee, vehicle, center } = setup();
+    stranded.vehicleIds = [vehicle.id];
+    stranded.employeeIds = [employee.id];
+    center.update(state);
+    const refs = center.getLog().map(e => e.ref).sort((a, b) => a!.kind.localeCompare(b!.kind));
+    expect(refs).toEqual([{ kind: 'employee', id: employee.id }, { kind: 'vehicle', id: vehicle.id }]);
+  });
+});
+

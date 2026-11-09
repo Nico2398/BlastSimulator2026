@@ -16,9 +16,12 @@ const COLOR_HOLE = '#4040d0';
 const COLOR_CREW = '#6ad0f0';
 const COLOR_VEHICLE = '#c0c040';
 
+/** Id of a drawn mini-map layer. */
+export type MiniMapLayerId = 'rock' | 'ore' | 'building' | 'vehicle' | 'crew' | 'hole';
+
 /** One drawn mini-map layer: the single source for legend entries and draw fills. */
 interface MiniMapLayer {
-  id: 'rock' | 'ore' | 'building' | 'vehicle' | 'crew' | 'hole';
+  id: MiniMapLayerId;
   color: string;
   /** i18n key of the legend label. */
   labelKey: string;
