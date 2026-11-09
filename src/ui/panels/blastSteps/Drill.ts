@@ -13,7 +13,7 @@ import { LocaleTextRegistry } from '../../localeText.js';
 import { SavedPlansList, savedPlansSignature } from './SavedPlansList.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { gridCellPositions, fleetDrillReachM, fleetDrillDiameterM } from '../../../core/mining/DrillPlan.js';
+import { gridCellPositions, fleetDrillReachM, fleetDrillDiameterM, holeNumericId } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
 import { buriedHolesOf } from '../../../core/mining/BuriedHoles.js';
@@ -26,6 +26,7 @@ import type { ConfirmModalConfig } from '../ConfirmModal.js';
 import { planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
 import { gridHoleLimitWarning, permitPreview } from '../permitPreview.js';
 import { defaultGridDepthM } from '../../../core/economy/PermitDefaults.js';
+import { holeStatusExplain, drillFieldExplain } from '../../blastWorkshopExplain.js';
 import { buildReplacePatternConfirm } from '../../replacePatternConfirm.js';
 import {
   DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, MAX_DRILL_GRID_HOLES, DRILL_GRID_DEFAULT_DEPTH_M,
@@ -65,6 +66,7 @@ export class DrillStep {
 
   private confirmingClear = false;
   private lastSignature = '';
+  private opener: EntityOpener | undefined;
   private lastHoleCount = 0;
   private readonly locale = new LocaleTextRegistry();
 
@@ -104,17 +106,18 @@ export class DrillStep {
     this.clearRowEl.style.cssText = 'display:none;flex-direction:column;gap:6px;padding:8px 10px;border:1px solid rgba(255,91,76,.32);border-radius:4px;background:rgba(255,91,76,.08)';
 
     // Stat strip
-    const stripCell = (labelKey: string, borderRight: boolean): { wrap: HTMLElement; value: HTMLElement } => {
+    const stripCell = (labelKey: string, borderRight: boolean, explainKey?: string): { wrap: HTMLElement; value: HTMLElement } => {
       const wrap = el('div');
       wrap.style.cssText = `flex:1;padding:9px 10px;display:flex;flex-direction:column;gap:4px${borderRight ? ';border-right:1px solid var(--bsx-hairline)' : ''}`;
       const label = this.locale.bindText(el('span', { attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-text-micro)' } }), labelKey);
       const value = el('span', { className: 'bsx-mono', attrs: { style: 'font:600 12px/1 var(--bsx-font-mono);color:var(--bsx-text-primary)' } });
+      if (explainKey) this.locale.bindExplain(label, explainKey);
       wrap.append(label, value);
       return { wrap, value };
     };
     const pattern = stripCell('ui.blast_workshop.drill.pattern', true);
-    const spacing = stripCell('ui.blast_workshop.drill.spacing', true);
-    const depth = stripCell('ui.blast_workshop.drill.depth', false);
+    const spacing = stripCell('ui.blast_workshop.drill.spacing', true, 'ui.explain.drill_field_spacing');
+    const depth = stripCell('ui.blast_workshop.drill.depth', false, 'ui.explain.drill_field_depth');
     this.patternValueEl = pattern.value;
     this.spacingValueEl = spacing.value;
     this.depthValueEl = depth.value;
@@ -150,8 +153,9 @@ export class DrillStep {
   get root(): HTMLElement { return this.el; }
 
   /** Wire the generic entity opener so rows and names become links (#2168). */
-  setEntityOpener(_opener: EntityOpener | undefined): void {
-    throw new Error('not implemented');
+  setEntityOpener(opener: EntityOpener | undefined): void {
+    this.opener = opener;
+    this.lastSignature = ''; // rebuild the rows so they pick up (or drop) the click-through
   }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
@@ -257,7 +261,7 @@ export class DrillStep {
 
   private makeHoleRow(hole: DrillHole, state: GameState, wet: Set<string>): HTMLElement {
     const status = this.holeStatus(hole, state, wet);
-    return this.buildHoleRow(hole, chip(status.label, status.tone), '');
+    return this.buildHoleRow(hole, chip(status.label, status.tone, holeStatusExplain(status.kind)), '');
   }
 
   /**
@@ -269,8 +273,8 @@ export class DrillStep {
    */
   private makeOrderedHoleRow(hole: PlannedHole, isBuried: boolean): HTMLElement {
     const status = isBuried
-      ? chip(t('ui.blast_workshop.drill.status_buried'), 'warn')
-      : chip(t('ui.blast_workshop.drill.status_ordered'), 'neutral');
+      ? chip(t('ui.blast_workshop.drill.status_buried'), 'warn', holeStatusExplain('buried'))
+      : chip(t('ui.blast_workshop.drill.status_ordered'), 'neutral', holeStatusExplain('ordered'));
     return this.buildHoleRow(hole, status, ';opacity:.7');
   }
 
@@ -287,17 +291,27 @@ export class DrillStep {
     deleteBtn.style.cssText = 'width:20px;height:20px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--bsx-text-micro);cursor:pointer;padding:0';
     deleteBtn.dataset['action'] = 'remove-hole';
     deleteBtn.appendChild(iconEl('x', 10));
-    deleteBtn.addEventListener('click', () => this.gameConsole?.(`drill_plan remove hole:${hole.id}`));
+    deleteBtn.addEventListener('click', ev => {
+      ev.stopPropagation(); // removing a hole must not also open its inspector
+      this.gameConsole?.(`drill_plan remove hole:${hole.id}`);
+    });
+    const opener = this.opener;
+    if (opener) {
+      row.style.cursor = 'pointer';
+      row.dataset['selectKind'] = 'hole';
+      row.dataset['selectId'] = String(holeNumericId(hole.id));
+      row.addEventListener('click', () => opener.open('hole', holeNumericId(hole.id)));
+    }
 
     row.append(tag, at, depth, statusChip, deleteBtn);
     return row;
   }
 
-  private holeStatus(hole: DrillHole, state: GameState, wet: Set<string>): { label: string; tone: ChipTone } {
+  private holeStatus(hole: DrillHole, state: GameState, wet: Set<string>): { label: string; tone: ChipTone; kind: 'wet' | 'tubed' | 'dry' } {
     // Water already inside wins over tubing: tubing keeps new water out but does not drain (#1350).
-    if (wet.has(hole.id)) return { label: t('ui.blast_workshop.drill.status_wet'), tone: 'info' };
-    if (hasTubing(state.tubingState, hole.id)) return { label: t('ui.blast_workshop.drill.status_tubed'), tone: 'positive' };
-    return { label: t('ui.blast_workshop.drill.status_dry'), tone: 'neutral' };
+    if (wet.has(hole.id)) return { label: t('ui.blast_workshop.drill.status_wet'), tone: 'info', kind: 'wet' };
+    if (hasTubing(state.tubingState, hole.id)) return { label: t('ui.blast_workshop.drill.status_tubed'), tone: 'positive', kind: 'tubed' };
+    return { label: t('ui.blast_workshop.drill.status_dry'), tone: 'neutral', kind: 'dry' };
   }
 
   /** UIManager wires this to its shared ConfirmModal's show(). */
@@ -358,7 +372,7 @@ export class DrillStep {
       refresh();
     };
     return {
-      key: 'diameter', label: t('ui.blast_workshop.drill.diameter'),
+      key: 'diameter', label: t('ui.blast_workshop.drill.diameter'), explain: drillFieldExplain('diameter'),
       value: Math.round(this.gridDiameter * 1000), format: (v: number) => `${v} mm`,
       onDec: go(idx - 1), onInc: go(idx + 1),
     };
@@ -374,7 +388,7 @@ export class DrillStep {
       this[prop] = bound(limit, this[prop] + delta); this.lastSignature = ''; refresh();
     };
     return {
-      key, label, value: this[prop], format: (v: number) => `${v} m`,
+      key, label, explain: drillFieldExplain(key), value: this[prop], format: (v: number) => `${v} m`,
       onDec: step(-1, Math.max, min), onInc: step(1, Math.min, max),
     };
   }

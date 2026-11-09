@@ -123,8 +123,9 @@ export class BlastWorkshop extends PanelBase {
   }
 
   /** Wire the generic entity opener to the steps that link to entities (#2168). */
-  setEntityOpener(_opener: EntityOpener | undefined): void {
-    throw new Error('not implemented');
+  setEntityOpener(opener: EntityOpener | undefined): void {
+    this.drillStep.setEntityOpener(opener);
+    this.fireStep.setEntityOpener(opener);
   }
 
   setGameConsole(fn: GameConsoleFn): void {

@@ -22,7 +22,8 @@
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import type { ColumnRock } from '../../../core/mining/ExplosiveRockFit.js';
 import { t } from '../../../core/i18n/I18n.js';
-import { el, stepper, reasonLine, button, scrollBoundedSection } from '../../dom.js';
+import { stemmingExplain } from '../../blastWorkshopExplain.js';
+import { el, stepper, reasonLine, button, scrollBoundedSection, explainable } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature, drainReasonText, drainRainReasonText, type HoleDrainView } from './ChargeHoleList.js';
@@ -92,6 +93,7 @@ export class ChargeStep {
   /** Diameters (m) of the narrowest and widest drilled holes: the max follows the first, the min the second (#1934). */
   private narrowestM = DRILL_HOLE_DEFAULT_DIAMETER_M;
   private widestM = DRILL_HOLE_DEFAULT_DIAMETER_M;
+  private readonly stemmingLabelEl: HTMLElement;
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
@@ -127,8 +129,12 @@ export class ChargeStep {
       amountStepperEl,
     ] });
     amountField.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:4px';
-    const stemmingField = el('div', { attrs: { 'data-field': 'stemming' }, children: [
+    this.stemmingLabelEl = explainable(
       this.locale.bindText(el('span', { attrs: { style: fieldLabelStyle } }), 'ui.blast_workshop.charge.stemming'),
+      stemmingExplain(),
+    );
+    const stemmingField = el('div', { attrs: { 'data-field': 'stemming' }, children: [
+      this.stemmingLabelEl,
       stemmingStepperEl,
     ] });
     stemmingField.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:4px';
@@ -183,6 +189,7 @@ export class ChargeStep {
 
   refreshLocale(): void {
     this.locale.refresh();
+    explainable(this.stemmingLabelEl, stemmingExplain());
     this.holeList.refreshLocale();
     this.lastSignature = '';
   }

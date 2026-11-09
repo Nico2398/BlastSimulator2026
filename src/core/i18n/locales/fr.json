@@ -4792,5 +4792,19 @@
   "ui.hud_explain.minimap.building": "Bâtiments : bureaux, dépôts et ateliers.",
   "ui.hud_explain.minimap.vehicle": "Véhicules : foreuses, camions et chargeuses en mouvement.",
   "ui.hud_explain.minimap.crew": "Équipe : vos employés sur le terrain.",
-  "ui.hud_explain.minimap.hole": "Trous : trous de tir forés, chargés ou vides."
+  "ui.hud_explain.minimap.hole": "Trous : trous de tir forés, chargés ou vides.",
+  "ui.explain.hole_status_wet": "Humide : de l'eau stagne dans ce trou. Les explosifs sensibles à l'eau ne délivrent que {percent}% de leur énergie ; un tubage empêche l'eau neuve d'entrer mais ne vide pas celle déjà présente.",
+  "ui.explain.hole_status_tubed": "Tubé : un tubage empêche l'eau neuve d'entrer dans ce trou. Il ne vide pas l'eau déjà présente.",
+  "ui.explain.hole_status_dry": "Sec : pas d'eau dans ce trou, tout explosif y agit à pleine puissance.",
+  "ui.explain.hole_status_ordered": "Commandé : ce trou attend un foreur et n'est pas encore percé. Impossible de le charger avant.",
+  "ui.explain.hole_status_buried": "Enfoui : la roche au-dessus de ce trou n'a jamais été dégagée, la foreuse ne l'atteint pas. Dégagez d'abord la surface.",
+  "ui.explain.drill_field_spacing": "Distance entre trous voisins. Un espacement serré fragmente plus fin mais demande plus de trous, de forage et d'explosif ; un espacement large laisse de la roche intacte entre les trous.",
+  "ui.explain.drill_field_depth": "Profondeur de chaque trou. Plus profond, il abat plus de roche et laisse place à un bourrage plus long, mais le forage coûte plus de temps.",
+  "ui.explain.drill_field_diameter": "Largeur du trou. Un trou plus large contient plus d'explosif par mètre et abat plus de roche, mais se fore plus lentement et coûte plus cher.",
+  "ui.explain.stemming": "Remplissage inerte posé au-dessus de la charge. Le confinement total exige un bourrage de {fullPct}% de la profondeur du trou ; sans bourrage, le tir ne délivre que {minPct}% de son énergie vers le bas et projette le reste vers le haut.",
+  "ui.explain.report_stat_cleared": "Roche entièrement détachée par le tir et prête à être évacuée.",
+  "ui.explain.report_stat_cracked": "Roche fracturée mais non dégagée. Elle demande un autre tir ou du travail en plus.",
+  "ui.explain.report_stat_fragments": "Nombre de morceaux produits par le tir. Beaucoup de petits morceaux se creusent et se transportent facilement ; les trop gros sont à refragmenter.",
+  "ui.explain.report_stat_volume": "Volume total de roche déplacé par le tir, en mètres cubes.",
+  "ui.explain.report_stat_projections": "Fragments projetés à plus de {speed} m/s. Ce sont des projections : elles abîment les bâtiments et blessent les gens. Moins de bourrage et plus d'explosif en projettent davantage."
 }

@@ -16,6 +16,7 @@
 import { t } from '../../../core/i18n/I18n.js';
 import type { EntityOpener } from '../../entityLinks.js';
 import { el, scrollBoundedSection } from '../../dom.js';
+import { openerLink } from '../../entityLinks.js';
 import { iconEl, type IconName } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { fizzlingHoles, rainExposedHoles, wetFizzlePercent, wetHoles } from '../../../core/mining/WetHoles.js';
@@ -42,6 +43,8 @@ const OCCUPANT_TAG_KEYS: Record<VehicleEvacuationVerdict, string> = {
 interface Occupant {
   icon: IconName;
   name: string;
+  /** What the name links to; null → plain text. */
+  ref: { kind: 'employee' | 'vehicle'; id: number };
   sub: string;
   /** What evacuateZone will do with a vehicle (null for a person). Only 'stranded' means it is left behind (#2100). */
   verdict: VehicleEvacuationVerdict | null;
@@ -64,6 +67,7 @@ export class FireStep {
   private gridProvider: () => VoxelGrid | null = () => null;
   private readonly breakoutMemo = new BreakoutWarningMemo();
   private lastSignature = '';
+  private opener: EntityOpener | undefined;
   private readonly locale = new LocaleTextRegistry();
 
   /** Supplies the voxel grid the breakout warning predicts against (#2003). */
@@ -98,8 +102,9 @@ export class FireStep {
   get root(): HTMLElement { return this.el; }
 
   /** Wire the generic entity opener so rows and names become links (#2168). */
-  setEntityOpener(_opener: EntityOpener | undefined): void {
-    throw new Error('not implemented');
+  setEntityOpener(opener: EntityOpener | undefined): void {
+    this.opener = opener;
+    this.lastSignature = ''; // re-render so the names become (or stop being) links
   }
 
   update(state: GameState, _weather?: WeatherState): void {
@@ -142,13 +147,14 @@ export class FireStep {
       result.push({
         icon: e.collapsing ? 'collapse' : 'crew',
         name: e.name,
+        ref: { kind: 'employee', id: e.id },
         sub: t(`role.${e.role}`),
         verdict: null,
       });
     }
     for (const v of state.vehicles.vehicles) {
       if (!isInZone(v.x, v.z, zone)) continue;
-      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), sub: `#${v.id}`, verdict: verdicts.get(v.id) ?? 'driver_aboard' });
+      result.push({ icon: 'vehicle', name: t(`vehicle_type.${v.type}`), ref: { kind: 'vehicle', id: v.id }, sub: `#${v.id}`, verdict: verdicts.get(v.id) ?? 'driver_aboard' });
     }
     return result;
   }
@@ -189,7 +195,7 @@ export class FireStep {
     row.append(
       el('div', { attrs: { style: 'color:var(--bsx-critical-text)' }, children: [iconEl(o.icon, 14)] }),
       el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:2px' }, children: [
-        el('span', { text: o.name, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+        el('span', { attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' }, children: [openerLink(this.opener, o.ref.kind, o.ref.id, o.name)] }),
         el('span', { text: o.sub, attrs: { style: 'font:400 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),
       ] }),
       el('span', {

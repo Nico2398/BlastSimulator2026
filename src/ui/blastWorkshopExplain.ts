@@ -4,26 +4,33 @@
 // to the shot, translated through t(); every number is read from balance.ts or the core
 // function that applies it. Callers attach the text with explainable() / chip().
 
+import { t } from '../core/i18n/I18n.js';
+import { PROJECTION_SPEED_THRESHOLD, STEMMING_FULL_DEPTH_FRACTION, STEMMING_MIN_EFFICIENCY } from '../core/config/balance.js';
+import { wetFizzlePercent } from '../core/mining/WetHoles.js';
+
 export type HoleStatusKind = 'wet' | 'tubed' | 'dry' | 'ordered' | 'buried';
 export type DrillFieldKind = 'spacing' | 'depth' | 'diameter';
 export type ReportStatKind = 'cleared' | 'cracked' | 'fragments' | 'volume' | 'projections';
 
 /** What a hole's status chip means for the charge in it. */
-export function holeStatusExplain(_kind: HoleStatusKind): string {
-  throw new Error('not implemented');
+export function holeStatusExplain(kind: HoleStatusKind): string {
+  return t(`ui.explain.hole_status_${kind}`, { percent: wetFizzlePercent() });
 }
 
 /** What changing a drill setting does to the pattern. */
-export function drillFieldExplain(_field: DrillFieldKind): string {
-  throw new Error('not implemented');
+export function drillFieldExplain(field: DrillFieldKind): string {
+  return t(`ui.explain.drill_field_${field}`);
 }
 
 /** What the stemming column does to the shot. */
 export function stemmingExplain(): string {
-  throw new Error('not implemented');
+  return t('ui.explain.stemming', {
+    fullPct: Math.round(STEMMING_FULL_DEPTH_FRACTION * 100),
+    minPct: Math.round(STEMMING_MIN_EFFICIENCY * 100),
+  });
 }
 
 /** What a blast-report stat counts and what it says about the shot. */
-export function reportStatExplain(_stat: ReportStatKind): string {
-  throw new Error('not implemented');
+export function reportStatExplain(stat: ReportStatKind): string {
+  return t(`ui.explain.report_stat_${stat}`, { speed: PROJECTION_SPEED_THRESHOLD });
 }
