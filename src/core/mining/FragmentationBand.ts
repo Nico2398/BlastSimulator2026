@@ -45,3 +45,8 @@ export const FRAGMENTATION_BAND_COLORS: Record<FragmentationBand, number> = {
 export function heatmapBandColor(intensity: number): number {
   return FRAGMENTATION_BAND_COLORS[classifyFragmentationBand(intensity)];
 }
+
+/** Share of the broken rock (good + fines + dust, by volume) that was crushed into fines or dust; 0 when nothing broke (#2202). */
+export function finesShare(_bandVolumes: Record<FragmentationBand, number>): number {
+  throw new Error('not implemented');
+}
