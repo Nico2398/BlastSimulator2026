@@ -2,13 +2,11 @@
 // Analysis Suite (buy software tiers) + Predicted rows (Run Analysis against
 // the current plan) — the tier-gated preview data Software.ts already computes.
 //
-// Deviation from the design mock: there, a "SHOW ENERGY OVERLAY IN SCENE"
-// button toggles the scene overlay. Real overlay behavior doesn't work that
-// way — GameRenderer.showBlastPlanOverlay already renders every tier-owned
-// layer (energy heatmap, frag-size dots, projection arcs, vibration waves)
-// automatically whenever a plan exists, with no manual on/off switch. The
-// button is replaced with a callout stating that fact instead of wiring up
-// a toggle capability nothing else in the renderer supports.
+// Deviation from the design mock: the tier-owned scene layers (frag-size dots,
+// projection arcs, vibration waves) have no manual on/off switch —
+// GameRenderer.showBlastPlanOverlay renders them whenever a plan exists — so
+// a callout states that fact. The energy heatmap is different: it has its own
+// toggle at the top of the workshop (EnergyHeatmapView, #2200), at every tier.
 //
 // Predictions come from the real blast_preview console command, not a local
 // computation — Software.ts's preview functions need VoxelGrid access, which
