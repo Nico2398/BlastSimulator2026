@@ -16,6 +16,8 @@ import {
   SHARD_DUMP_FORMAT,
   ShardCoverageInjector,
   buildShardDump,
+  checkShardPartition,
+  comparableTransform,
   listShardDumps,
   parseShardDump,
   readShardDump,
@@ -254,6 +256,19 @@ describe('ShardCoverageInjector hands the provider every test file, in canonical
     expect(vitenode.fetchCaches.web.size).toBe(0);
   });
 
+  it('accepts two shards whose transforms differ only in the source map\'s `file`', async () => {
+    const { provider, vitenode, write } = sinks();
+    const injector = new ShardCoverageInjector(provider, vitenode, write);
+    const inline = (file: string): string => `const a = 1;\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${Buffer.from(JSON.stringify({ version: 3, mappings: 'AAAA', file })).toString('base64')}`;
+    const first = dump(1, 2);
+    const second = dump(2, 2);
+    const path = `${SHARD_ROOT}/src/a.ts`;
+    if (first.modes.ssr?.transforms[path]) first.modes.ssr.transforms[path].code = inline('/src/a.ts');
+    if (second.modes.ssr?.transforms[path]) second.modes.ssr.transforms[path].code = inline(path);
+    expect((await injector.add(first)).success).toBe(true);
+    expect((await injector.add(second)).success).toBe(true);
+  });
+
   it('refuses two shards that transformed one module differently', async () => {
     const { provider, vitenode, write } = sinks();
     const injector = new ShardCoverageInjector(provider, vitenode, write);
@@ -264,6 +279,54 @@ describe('ShardCoverageInjector hands the provider every test file, in canonical
     const added = await injector.add(other);
     expect(added.success).toBe(false);
     if (!added.success) expect(added.error).toContain('transformed differently');
+  });
+});
+
+describe('comparableTransform: what two shards must agree on in a transform', () => {
+  const withMap = (code: string, map: Record<string, unknown>): string =>
+    `${code}\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${Buffer.from(JSON.stringify(map)).toString('base64')}`;
+  const map = { version: 3, mappings: 'AAAA', sources: ['x.ts'], sourcesContent: ['const x = 1;'] };
+
+  it("ignores the module id vite-node wrote into the source map's `file`", () => {
+    expect(comparableTransform(withMap('const x = 1;', { ...map, file: '/src/x.ts' })))
+      .toBe(comparableTransform(withMap('const x = 1;', { ...map, file: '/home/runner/work/repo/src/x.ts' })));
+  });
+
+  it('still tells apart a different executed code or a different mapping', () => {
+    const a = comparableTransform(withMap('const x = 1;', { ...map, file: '/src/x.ts' }));
+    expect(comparableTransform(withMap('const x = 2;', { ...map, file: '/src/x.ts' }))).not.toBe(a);
+    expect(comparableTransform(withMap('const x = 1;', { ...map, mappings: 'AACA', file: '/src/x.ts' }))).not.toBe(a);
+  });
+
+  it('leaves code without an inline map, and an absent code, as they are', () => {
+    expect(comparableTransform('const y = 1;')).toBe('const y = 1;');
+    expect(comparableTransform(undefined)).toBeUndefined();
+  });
+});
+
+describe('checkShardPartition holds the shards to one split of the suite', () => {
+  const split = (...shards: string[][]): Map<number, Set<string>> => new Map(shards.map((tests, i) => [i + 1, new Set(tests)]));
+
+  it('accepts every expected test file in exactly one shard', () => {
+    expect(checkShardPartition(split(['tests/a.test.ts'], ['tests/b.test.ts', 'tests/c.test.ts']), ['tests/a.test.ts', 'tests/b.test.ts', 'tests/c.test.ts']).success).toBe(true);
+  });
+
+  it('refuses a test file two shards both ran, one no shard ran, and one the measurement does not run', () => {
+    const checked = checkShardPartition(split(['tests/a.test.ts', 'tests/b.test.ts'], ['tests/b.test.ts', 'tests/stray.test.ts']), ['tests/a.test.ts', 'tests/b.test.ts', 'tests/c.test.ts']);
+    expect(checked.success).toBe(false);
+    if (!checked.success) {
+      expect(checked.error).toContain('tests/b.test.ts ran in shard 1 and shard 2');
+      expect(checked.error).toContain('tests/c.test.ts is in no shard\'s coverage');
+      expect(checked.error).toContain('tests/stray.test.ts is not a test file the measurement runs');
+    }
+  });
+
+  it('reads the test files the injector was handed, per shard', async () => {
+    const { provider, vitenode, write } = sinks();
+    const injector = new ShardCoverageInjector(provider, vitenode, write);
+    await injector.add(shardWith(1, ['tests/c.test.ts', null]));
+    await injector.add(shardWith(2, ['tests/b.test.ts']));
+    expect([...injector.testsByShard()].map(([index, tests]) => [index, [...tests]])).toEqual([[1, ['tests/c.test.ts']], [2, ['tests/b.test.ts']]]);
   });
 });
 

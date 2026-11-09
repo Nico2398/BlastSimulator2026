@@ -20,17 +20,18 @@
  *
  * Exit code: 0 when every threshold holds, 1 when one does not (vitest prints
  * which file and metric), 2 when the shard set itself is unusable — a missing,
- * extra, corrupt or mislabelled dump fails the gate rather than judging part of
- * the suite.
+ * extra, corrupt or mislabelled dump, or dumps that do not split the measured
+ * test files exactly once between them, fail the gate rather than judging part
+ * of the suite.
  *
  * @module coverage-merge
  */
 
 import { writeFile } from 'fs/promises';
-import { resolve } from 'path';
+import { relative, resolve, sep } from 'path';
 import { V8CoverageProvider } from '@vitest/coverage-v8/dist/provider.js';
 import { createVitest } from 'vitest/node';
-import { listShardDumps, rebaseShardDump, readShardDump, ShardCoverageInjector } from './lib/coverage-shards.js';
+import { checkShardPartition, listShardDumps, rebaseShardDump, readShardDump, ShardCoverageInjector } from './lib/coverage-shards.js';
 
 const ROOT = resolve(import.meta.dirname, '..');
 
@@ -112,6 +113,10 @@ async function main(): Promise<number> {
       const added = await injector.add(rebased.data);
       if (!added.success) return unusable(added.error);
     }
+    // Every measured test file in exactly one shard's dump, or nothing is judged.
+    const expected = (await ctx.globTestFiles()).map(([, file]) => relative(ROOT, file).split(sep).join('/'));
+    const partition = checkShardPartition(injector.testsByShard(), expected);
+    if (!partition.success) return unusable(partition.error);
     const testFiles = injector.finish();
 
     const before = process.exitCode;

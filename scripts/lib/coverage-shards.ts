@@ -132,6 +132,55 @@ interface RawProcessCoverage {
   result: ScriptCov[];
 }
 
+const INLINE_SOURCE_MAP = /\n\/\/# sourceMappingURL=data:application\/json;(?:charset=utf-8;)?base64,([A-Za-z0-9+/=]+)\s*$/;
+
+/**
+ * A transform as two shards must agree on it: the executed code exactly, and
+ * its inline source map minus `file`. vite-node writes the module id it was
+ * first requested by into `file` — `/src/ui/x.ts` from one import, the absolute
+ * path from another — so which test file a shard ran first changes it. Nothing
+ * reads `file` to place an offset; the code and every mapping still must match.
+ */
+export function comparableTransform(code: string | undefined): string | undefined {
+  if (code === undefined) return undefined;
+  const inline = INLINE_SOURCE_MAP.exec(code);
+  if (!inline) return code;
+  try {
+    const { file: _sharedIdOnly, ...map } = JSON.parse(Buffer.from(inline[1]!, 'base64').toString('utf8')) as Record<string, unknown>;
+    return `${code.slice(0, inline.index)}\n${JSON.stringify(map)}`;
+  } catch {
+    return code;
+  }
+}
+
+/**
+ * Whether the shards' dumps split exactly the `expected` test files: each in
+ * one shard, none missing, none the measured run would not hold. Shards that
+ * read different splits — two checkouts, two weight tables — would otherwise
+ * merge into a measurement of some files twice and others never, and a file
+ * whose coverage went missing would read 0% rather than refuse.
+ */
+export function checkShardPartition(
+  testsByShard: ReadonlyMap<number, ReadonlySet<string>>,
+  expected: readonly string[],
+): Result<void> {
+  const shardOf = new Map<string, number>();
+  const problems: string[] = [];
+  for (const [index, tests] of [...testsByShard].sort(([a], [b]) => a - b)) {
+    for (const test of tests) {
+      const earlier = shardOf.get(test);
+      if (earlier !== undefined) problems.push(`${test} ran in shard ${earlier} and shard ${index}`);
+      else shardOf.set(test, index);
+    }
+  }
+  const wanted = new Set(expected);
+  for (const test of [...wanted].sort()) if (!shardOf.has(test)) problems.push(`${test} is in no shard's coverage`);
+  for (const test of [...shardOf.keys()].sort()) if (!wanted.has(test)) problems.push(`${test} is not a test file the measurement runs`);
+  if (problems.length === 0) return { success: true, data: undefined };
+  const shown = problems.slice(0, 10).join('\n');
+  return { success: false, error: `the shards do not split one suite:\n${shown}${problems.length > 10 ? `\n… and ${problems.length - 10} more` : ''}` };
+}
+
 /**
  * Reads the raw V8 files of one shard into a dump: each test file's coverage cut
  * down to the scripts the measurement instruments (`coverage.include`/`exclude`,
@@ -385,6 +434,7 @@ function byTestFile(a: QueuedCoverage, b: QueuedCoverage): number {
 export class ShardCoverageInjector {
   private readonly queued: Record<TransformMode, QueuedCoverage[]> = { ssr: [], web: [] };
   private readonly code: Record<TransformMode, Map<string, string | undefined>> = { ssr: new Map(), web: new Map() };
+  private readonly tests = new Map<number, Set<string>>();
   private written = 0;
 
   constructor(
@@ -399,15 +449,19 @@ export class ShardCoverageInjector {
       if (!coverage) continue;
       for (const [path, source] of Object.entries(coverage.transforms)) {
         const known = this.code[mode];
-        if (known.has(path) && known.get(path) !== source.code) {
+        const comparable = comparableTransform(source.code);
+        if (known.has(path) && known.get(path) !== comparable) {
           return { success: false, error: `${path} (${mode}) was transformed differently by two shards; their offsets cannot be merged` };
         }
-        known.set(path, source.code);
+        known.set(path, comparable);
         const entry: FetchCacheEntry = { timestamp: 0, result: { code: source.code, map: source.map } };
         this.vitenode.fetchCaches[mode].set(path, entry);
         this.vitenode.fetchCache.set(path, entry);
       }
       for (const testCoverage of coverage.processes) {
+        const ran = this.tests.get(dump.shard.index) ?? new Set<string>();
+        for (const test of testCoverage.test?.split(' ') ?? []) ran.add(test);
+        this.tests.set(dump.shard.index, ran);
         const file = join(this.provider.coverageFilesDirectory, `${mode}-${String(this.written).padStart(6, '0')}.json`);
         await this.writeFile(file, JSON.stringify({ result: testCoverage.result }));
         this.queued[mode].push({ test: testCoverage.test, at: this.written, file });
@@ -415,6 +469,11 @@ export class ShardCoverageInjector {
       }
     }
     return { success: true, data: undefined };
+  }
+
+  /** The test files each shard's dump covers, by shard index. */
+  testsByShard(): ReadonlyMap<number, ReadonlySet<string>> {
+    return this.tests;
   }
 
   /** Registers every written file with the provider, in canonical order; returns how many. */
