@@ -3,7 +3,12 @@ import {
   identifyFragmentedVoxels,
   isFragmented,
   floorToGrade,
+  type FragmentationResult,
+  type VoxelCoord,
 } from '../../../src/core/mining/VoxelFragmentation.js';
+import { generateFragments } from '../../../src/core/mining/FragmentGeneration.js';
+import { Random } from '../../../src/core/math/Random.js';
+import { classifyFragmentationBand, bandMassRetention } from '../../../src/core/mining/FragmentationBand.js';
 import {
   createEnergyField,
   seedEnergy,
@@ -16,7 +21,7 @@ import {
   setVoxelColumnSurfaceHeight,
 } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
-import { CRACKED_VOXEL_WEAKENING, BLAST_GRADE_MAX_CUT_M, BLAST_GRADE_FLOOR_OFFSET_M } from '../../../src/core/config/balance.js';
+import { CRACKED_VOXEL_WEAKENING, BLAST_GRADE_MAX_CUT_M, BLAST_GRADE_FLOOR_OFFSET_M, DUST_LOSS_SHARE } from '../../../src/core/config/balance.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -949,5 +954,137 @@ describe('VoxelFragmentation — floorToGrade', () => {
         for (let y = 8; y < 16; y++) expect(isFragmented(result, field, x, y, z), `x=${x} y=${y} z=${z}`).toBe(true);
       }
     }
+  });
+});
+
+// ── Dust loses mass and ore (#2198) ───────────────────────────────────────────
+
+const ORE_GRADE = 0.4;
+const GOOD_INTENSITY = 1.5;
+const FINES_INTENSITY = 3;
+const DUST_INTENSITY = 6;
+
+/**
+ * Carve a block (x/y/z in [3, 11) of a 14-wide grid of ore-bearing cruite), every voxel broken,
+ * with the intensity `intensityOf` gives each. Intensity is written straight into the field.
+ */
+function carveBlock(intensityOf: (x: number, y: number, z: number) => number, seed = 5) {
+  const size = 14;
+  const grid = new VoxelGrid(size, size);
+  for (let z = 0; z < size; z++) {
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        grid.setVoxel(x, y, z, { ...rockVoxel('cruite'), oreDensities: { rustite: ORE_GRADE } });
+      }
+    }
+  }
+  const field = createEnergyField(grid, wholeGrid(grid, size));
+  const fragmented: VoxelCoord[] = [];
+  const mask = new Uint8Array(field.effective.length);
+  for (let z = 3; z < 11; z++) {
+    for (let y = 3; y < 11; y++) {
+      for (let x = 3; x < 11; x++) {
+        const i = indexOf(field, x, y, z);
+        const threshold = field.threshold[i]!;
+        field.effective[i] = threshold;
+        field.overflowOut[i] = threshold * (intensityOf(x, y, z) - 1);
+        mask[i] = 1;
+        fragmented.push({ x, y, z });
+      }
+    }
+  }
+  const fragmentation: FragmentationResult = {
+    fragmented, mask, cracked: [], detachedCount: 0, liftedCount: 0, gradedCount: 0,
+  };
+  const { fragments } = generateFragments(fragmentation, field, grid, new Random(seed));
+  return { fragments, voxelCount: fragmented.length, density: getRock('cruite')!.density };
+}
+
+describe('VoxelFragmentation — dust loses mass and ore', () => {
+  it('a dust-band voxel keeps all but the configured share of its mass', () => {
+    const { fragments, density } = carveBlock(() => DUST_INTENSITY);
+
+    expect(fragments.length).toBeGreaterThan(0);
+    for (const f of fragments) {
+      expect(f.massKg).toBeCloseTo(f.volumeM3 * density * (1 - DUST_LOSS_SHARE), 4);
+    }
+  });
+
+  it('a dust-band voxel keeps all but the configured share of its ore', () => {
+    const { fragments } = carveBlock(() => DUST_INTENSITY);
+
+    for (const f of fragments) {
+      expect(f.oreDensities['rustite']).toBeCloseTo(ORE_GRADE * (1 - DUST_LOSS_SHARE), 6);
+    }
+  });
+
+  it('a good-band voxel loses nothing', () => {
+    const { fragments, density } = carveBlock(() => GOOD_INTENSITY);
+
+    expect(fragments.length).toBeGreaterThan(0);
+    for (const f of fragments) {
+      expect(f.massKg).toBeCloseTo(f.volumeM3 * density, 4);
+      expect(f.oreDensities['rustite']).toBeCloseTo(ORE_GRADE, 6);
+    }
+  });
+
+  it('a fines-band voxel loses nothing either', () => {
+    const { fragments, density } = carveBlock(() => FINES_INTENSITY);
+
+    for (const f of fragments) {
+      expect(f.massKg).toBeCloseTo(f.volumeM3 * density, 4);
+      expect(f.oreDensities['rustite']).toBeCloseTo(ORE_GRADE, 6);
+    }
+  });
+
+  it('volume is unchanged by dust loss', () => {
+    const { fragments, voxelCount } = carveBlock(() => DUST_INTENSITY);
+
+    expect(fragments.reduce((s, f) => s + f.volumeM3, 0)).toBeCloseTo(voxelCount, 6);
+  });
+
+  it('a mixed block loses the share of its dust half only', () => {
+    // Dust on the low-x half, good rock on the rest.
+    const intensityOf = (x: number): number => (x < 7 ? DUST_INTENSITY : GOOD_INTENSITY);
+    const { fragments, voxelCount, density } = carveBlock(intensityOf);
+
+    const dustVolume = (voxelCount / 8) * 4;
+    const totalMass = fragments.reduce((s, f) => s + f.massKg, 0);
+    expect(totalMass).toBeCloseTo(density * (voxelCount - dustVolume * DUST_LOSS_SHARE), 3);
+
+    const totalOre = fragments.reduce((s, f) => s + (f.oreDensities['rustite'] ?? 0) * f.volumeM3, 0);
+    expect(totalOre).toBeCloseTo(ORE_GRADE * (voxelCount - dustVolume * DUST_LOSS_SHARE), 3);
+  });
+
+  it('a fragment straddling both halves carries the retention weighted by its sources', () => {
+    const intensityOf = (x: number): number => (x < 7 ? DUST_INTENSITY : GOOD_INTENSITY);
+    const { fragments, density } = carveBlock(intensityOf, 12);
+
+    for (const f of fragments) {
+      const retained = f.sources.reduce(
+        (s, src) => s + src.weight * bandMassRetention(classifyFragmentationBand(intensityOf(src.x))),
+        0,
+      );
+      expect(f.massKg).toBeCloseTo(retained * density, 4);
+    }
+    // At least one piece really did bridge the two halves, or the weighting went untested.
+    expect(fragments.some(f => f.sources.some(s => s.x < 7) && f.sources.some(s => s.x >= 7))).toBe(true);
+  });
+
+  it('a fragment only partly dust loses less than an all-dust one', () => {
+    const intensityOf = (x: number): number => (x < 7 ? DUST_INTENSITY : GOOD_INTENSITY);
+    const { fragments, density } = carveBlock(intensityOf, 12);
+
+    for (const f of fragments) {
+      const ratio = f.massKg / (f.volumeM3 * density);
+      expect(ratio).toBeGreaterThanOrEqual(1 - DUST_LOSS_SHARE - 1e-9);
+      expect(ratio).toBeLessThanOrEqual(1 + 1e-9);
+    }
+  });
+
+  it('is deterministic for a given seed', () => {
+    const a = carveBlock(() => DUST_INTENSITY, 33).fragments.map(f => f.massKg);
+    const b = carveBlock(() => DUST_INTENSITY, 33).fragments.map(f => f.massKg);
+    expect(b).toEqual(a);
   });
 });

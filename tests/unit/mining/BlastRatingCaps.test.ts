@@ -178,6 +178,7 @@ function emptyResult(over: Partial<BlastResult> = {}): BlastResult {
     totalOreValue: 0, rating: 'perfect', crackedVoxels: 0, clearedVoxels: 0,
     clearedRegion: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 }, destroyedBuildings: [],
     maxThrowDistance: 0, projectileCount: 0, flights: [], clearedColumns: [], brokeOut: true,
+    bandVolumes: { intact: 0, cracked: 0, good: 0, fines: 0, dust: 0 }, dustLoss: { massKg: 0, oreValue: 0 },
     ...over,
   };
 }

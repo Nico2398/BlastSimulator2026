@@ -129,6 +129,26 @@ voxel count, exactly.
 A fragment carries the volume-weighted rock and ore of the voxels it was carved from
 (`FragmentComposition.ts`), plus the bounding box the renderer scales it to.
 
+### Fragmentation bands
+
+`classifyFragmentationBand(intensity)` (`FragmentationBand.ts`) is the only place that names the
+ranges; the blast, previews, heatmap and report all read it. A bound belongs to the band above it.
+
+| Intensity | Band | Colour | Consequence |
+|---|---|---|---|
+| < `CRACKED_VOXEL_ENERGY_RATIO` (0.5) | intact | blue | none |
+| 0.5 – `FRAGMENTATION_MULTIPLIER` (1) | cracked | pale blue | weakened, not broken |
+| 1 – `FRAGMENTATION_BAND_FINES_MIN` (2) | good | green | haulable fragments |
+| 2 – `FRAGMENTATION_BAND_DUST_MIN` (4) | fines | orange | smaller, more numerous fragments (more loads to haul) |
+| ≥ 4 | dust | red | finest fragments; loses `DUST_LOSS_SHARE` of its mass and ore |
+
+Fragment size follows from the seed curve above, which already shrinks fragments monotonically
+across the bands. The explosive's tier never gates a band; the rock's threshold does. Overcharge does
+not throw rock by itself: projections stay governed by stemming and the free face, so a heavily
+stemmed overcharge crushes the rock near the charge (fines, dust) and leaves the rock near the collar
+coarse or unbroken. `BlastResult.bandVolumes` holds the m³ per band and `BlastResult.dustLoss` the
+mass (kg) and ore value lost to dust; fragments are already net of that loss, their volume is not.
+
 ## Step 4 — Throw, Flight and the Muck Pile
 
 **Three things decide whether rock is thrown rather than merely broken:**

@@ -2,6 +2,7 @@
 // Orchestrates: validate → energy → fragmentation → terrain subtraction → results
 // Pure function operating on GameState + VoxelGrid, no side effects.
 
+import { type FragmentationBand, FRAGMENTATION_BANDS, classifyFragmentationBand, bandMassRetention } from './FragmentationBand.js';
 import { oreValuePerKg, type MarketId } from '../economy/Market.js';
 import { isFragmentSealed } from '../economy/SealedFragments.js';
 import type { Vec3 } from '../math/Vec3.js';
@@ -24,6 +25,7 @@ import {
   buildHoleSeeds,
   clampBoxToGrid,
   createEnergyFieldSteps,
+  intensityAt,
   seedEnergySteps,
   type BlastBox,
   type EnergyField,
@@ -112,7 +114,7 @@ export interface BlastResult {
   maxProjectionSpeed: number;
   vibrationAtVillages: VillageVibration[];
   totalRockVolume: number;
-  /** Value of ore in the rock that broke out and can be reached; ore left sealed is `sealedOreValue` (#2003). */
+  /** Value of ore in the rock that broke out and can be reached; ore left sealed is `sealedOreValue` (#2003). Gross of dust loss: the ore dust took is `dustLoss.oreValue` (#2198). */
   totalOreValue: number;
   rating: BlastRating;
   crackedVoxels: number;
@@ -136,6 +138,10 @@ export interface BlastResult {
   sealedFragmentCount?: number;
   /** Oversized fragments that are reachable, not sealed (#2003). */
   reachableOversizedFragments?: number;
+  /** Volume (m3) of rock the blast energised, by fragmentation band (#2198). `intact` is always 0: rock below the cracked bound is not tallied. */
+  bandVolumes: Record<FragmentationBand, number>;
+  /** Mass and ore value lost to dust-band voxels (#2198). */
+  dustLoss: { massKg: number; oreValue: number };
 }
 
 /**
@@ -362,6 +368,8 @@ export function* executeBlastSteps(
   let totalOreValue = 0;
   let oversizedFragments = 0;
   const crackedVoxels = fragmentation?.cracked.length ?? 0;
+  const bandVolumes: Record<FragmentationBand, number> = Object.fromEntries(FRAGMENTATION_BANDS.map((b) => [b, 0])) as Record<FragmentationBand, number>;
+  const dustLoss = { massKg: 0, oreValue: 0 };
   let clearedVoxels = 0;
 
   // Track which voxels to clear (defer clearing so the whole pass sees the
@@ -381,7 +389,8 @@ export function* executeBlastSteps(
       if ((g & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
       const gen = generated[g]!;
       const throwFraction = throwFractionAt(gen.origin, plan);
-      const velocity = computeFragmentVelocity(gen.origin, gen.sources, gen.massKg, field, throwFraction);
+      // Thrown at its pre-loss mass: the dust goes after the throw, so retuning the loss never re-aims the rock.
+      const velocity = computeFragmentVelocity(gen.origin, gen.sources, gen.massKg + gen.lostMassKg, field, throwFraction);
 
       fragments.push({
         id: nextId++,
@@ -400,6 +409,12 @@ export function* executeBlastSteps(
       });
 
       if (gen.volumeM3 > OVERSIZED_FRAGMENT_THRESHOLD) oversizedFragments++;
+      dustLoss.massKg += gen.lostMassKg;
+    }
+
+    // Voxels that cracked without breaking still took energy: tally them by band.
+    for (const { x, y, z } of fragmentation.cracked) {
+      bandVolumes[classifyFragmentationBand(intensityAt(field, x, y, z))] += VoxelGrid.CELL_SIZE ** 3;
     }
 
     // Ore value and rock volume come from the ground that was removed, not from
@@ -408,7 +423,14 @@ export function* executeBlastSteps(
       if ((v & (BLAST_SLICE_CELLS - 1)) === 0) yield;
       const { x, y, z } = fragmentation.fragmented[v]!;
       const ores = grid.oresAt(x, y, z);
-      if (ores) totalOreValue += calculateOreValue(ores, VoxelGrid.CELL_SIZE, marketId);
+      const band = classifyFragmentationBand(intensityAt(field, x, y, z));
+      bandVolumes[band] += VoxelGrid.CELL_SIZE ** 3;
+      if (ores) {
+        const oreValue = calculateOreValue(ores, VoxelGrid.CELL_SIZE, marketId);
+        totalOreValue += oreValue;
+        // Dust takes its share of the ore with it (#2198); the fragments already carry the net grade.
+        dustLoss.oreValue += oreValue * (1 - bandMassRetention(band));
+      }
       totalRockVolume += VoxelGrid.CELL_SIZE ** 3;
       toClear.push({ x, y, z });
       clearedVoxels++;
@@ -602,6 +624,8 @@ export function* executeBlastSteps(
     maxThrowDistance,
     projectileCount,
     flights,
+    bandVolumes,
+    dustLoss,
   };
 }
 
