@@ -173,11 +173,11 @@
       }
     },
     {
-      "command": "preview energy",
+      "command": "preview fragments",
       "interaction": [
         {
           "type": "command",
-          "command": "preview energy"
+          "command": "preview fragments"
         }
       ],
       "role": "observe",
@@ -203,11 +203,11 @@
       }
     },
     {
-      "command": "preview energy",
+      "command": "preview fragments",
       "interaction": [
         {
           "type": "command",
-          "command": "preview energy"
+          "command": "preview fragments"
         }
       ],
       "role": "observe"
@@ -232,11 +232,11 @@
       }
     },
     {
-      "command": "preview fragments",
+      "command": "preview projections",
       "interaction": [
         {
           "type": "command",
-          "command": "preview fragments"
+          "command": "preview projections"
         }
       ],
       "role": "observe"
@@ -261,11 +261,11 @@
       }
     },
     {
-      "command": "preview projections",
+      "command": "preview vibrations",
       "interaction": [
         {
           "type": "command",
-          "command": "preview projections"
+          "command": "preview vibrations"
         }
       ],
       "role": "observe"
