@@ -54,18 +54,17 @@ per-voxel objects or string keys, which a blast revisits far too often to afford
   `confinementFactor(distToAir)`. **Rock near a free face breaks for a fraction of the energy**
   (`UNCONFINED_THRESHOLD_FACTOR`, ramping to full over `CONFINEMENT_FULL_DEPTH`) — this is why bench
   blasting works at all.
-- **Explosive tier shortfall.** An explosive never refuses rock; rock harder than its
-  `minRockTier` just costs more. Per column, the nearest *charged* hole (horizontal distance) names
-  the explosive; each rock voxel's threshold is multiplied by
-  `TIER_SHORTFALL_THRESHOLD_FACTOR ** max(0, rockTier - minRockTier)` (`ExplosiveRockFit.ts`),
-  rock tier = `hardnessTier` of the voxel's dominant rock (air: 0). The factor is applied inside
-  `createEnergyField` through an optional per-column lookup, so `EnergyPropagation` stays unaware of
-  explosives; `buildBlastEnergyField` builds that lookup, which covers both `executeBlast` and the
-  previews (`buildPlanEnergyField`). No charged holes: no lookup, no gating.
-- **Charge step warning.** For the selected explosive, the Charge step samples the dominant rock
-  along each drilled hole (`dominantRockAlongColumn`, modal rock, higher tier wins ties) and,
-  via `weakHoleSummary`, shows `data-warning="weak-explosive"` naming the hardest offending rock and
-  "N of M holes". Advisory: Charge All stays enabled.
+- **The explosive never gates breaking (#2197).** A voxel's threshold depends only on its rock
+  (absorption, `fractureModifier`, confinement); the explosive's only part is the energy it
+  delivers (`energyPerKg` x kg, stemming, water). There is no explosive tier and no per-column
+  gating lookup: `createEnergyField(grid, box)` takes none. The catalog defines an explosive by energy
+  per kg, cost per kg, min/max kg per hole, water sensitivity and vibration modifier. A weak
+  explosive on hard rock breaks only the voxels next to the charge, in proportion to its energy;
+  Shareholder Summit's hard rock (obstiite/titanite) therefore still needs the strong explosives
+  for a real crater, through energy and kg alone. Measured on titanite at max kg per hole: pop_rock
+  breaks nothing, boomite and krackle only the charge cells (72 voxels), dynatomics a crater.
+- **No Charge step weak-explosive warning.** The old tier-based "too weak for rock" line is gone;
+  the pre-fire "breaks nothing" warning (below) is the fit signal.
 - **Spread** goes to the 18 face-and-edge neighbours, weighted by 1/distance and biased toward
   neighbours nearer a free face (`FREE_FACE_BIAS`, via `freeFaceWeight`). Air above always pulls; a side
   or lower face pulls only within `FREE_FACE_LATERAL_RANGE_M` (4 m) of the rock, so an excavation beside
@@ -179,7 +178,7 @@ a blast that cleared rock but never broke out is reported (`mining.blast.no_brea
 executor's read-only energy pass and fragmentation (`liftUnderminedBurden`, per-hole diameter via
 `chargeKgPerMetre`) on a charged plan and reports broken voxels, sealed voxels (intact rock still above
 in the column), `sealedShare`, `tooDeepHoleIds` and the charged hole count, plus the `fragmented` set and `sealedKeys` (`isVoxelSealed`, the voxel-level twin of `isFragmentSealed`); it agrees with
-`executeBlast`'s `brokeOut`. `breakoutWarningKind`: `none` when every broken voxel stays sealed,
+`executeBlast`'s `brokeOut`. `breakoutWarningKind`: `nothing` when the shot breaks no rock at all (not enough energy for the rock under the holes; checked first, so a dud no longer stays silent), `none` when every broken voxel stays sealed,
 `partial` when the sealed share reaches `BLAST_SEALED_SHARE_PARTIAL`. Both the Blast step
 (`breakout-check`) and the Pre-Flight modal (`preflight-breakout-warning`) show it at every software
 tier (a plan-against-ground check, not an analysis number); it never blocks firing, and advises
