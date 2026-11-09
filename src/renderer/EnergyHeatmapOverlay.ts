@@ -28,7 +28,9 @@ export class EnergyHeatmapOverlay {
 
   /** Replace the tinted columns and show the layer when there are any. */
   show(columns: ReadonlyArray<ColumnBandSummary>): void {
-    this.layer.replace(columns.map(columnPatch));
+    // Emitted far-to-near (x, then z, descending): a deterministic vertex order, whatever order the caller built the columns in.
+    const ordered = [...columns].sort((a, b) => b.x - a.x || b.z - a.z);
+    this.layer.replace(ordered.map(columnPatch));
     this.layer.setVisible(columns.length > 0);
   }
 
