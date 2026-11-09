@@ -24,13 +24,13 @@ const SURFACE_Y = 24;
 const LO = 6;
 const HI = 34;
 
-function makeGrid(oreDensities: Record<string, number> = { blingite: 0.9 }): VoxelGrid {
+function makeGrid(oreDensities: Record<string, number> = { blingite: 0.9 }, rockId = 'molite'): VoxelGrid {
   const grid = new VoxelGrid(40, 40);
   for (let z = LO; z <= HI; z++) {
     for (let y = 0; y <= SURFACE_Y; y++) {
       for (let x = LO; x <= HI; x++) {
         grid.setVoxel(x, y, z, {
-          composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] },
+          composition: { rocks: [{ rockId, coefficient: 1.0 }] },
           density: 1.0,
           oreDensities: { ...oreDensities },
           fractureModifier: 1.0,
@@ -668,11 +668,12 @@ describe('estimateBlastOre — charged, brokenVoxels and holeCoverage (#1967)', 
   });
 
   it('a charge too weak for the rock is charged with nothing broken', () => {
+    const hard = makeGrid({ blingite: 0.9 }, 'titanite');
     const weak = chargedPlan([HOLE], 0.5, 'pop_rock');
-    const field = buildPlanEnergyField(weak, grid, new Set());
+    const field = buildPlanEnergyField(weak, hard, new Set());
     expect(field).not.toBeNull();
-    expect(identifyFragmentedVoxels(field!, grid, false).fragmented).toHaveLength(0);
-    const r = estimateBlastOre(weak, [makeSurvey()], grid);
+    expect(identifyFragmentedVoxels(field!, hard, false).fragmented).toHaveLength(0);
+    const r = estimateBlastOre(weak, [makeSurvey()], hard);
     expect(r.charged).toBe(true);
     expect(r.brokenVoxels).toBe(0);
     expect(r.coverage).toBe(0);
@@ -680,7 +681,7 @@ describe('estimateBlastOre — charged, brokenVoxels and holeCoverage (#1967)', 
   });
 
   it('an unsurveyed weak charge is still charged with nothing broken', () => {
-    const r = estimateBlastOre(chargedPlan([HOLE], 0.5, 'pop_rock'), [], grid);
+    const r = estimateBlastOre(chargedPlan([HOLE], 0.5, 'pop_rock'), [], makeGrid({ blingite: 0.9 }, 'titanite'));
     expect(r.charged).toBe(true);
     expect(r.brokenVoxels).toBe(0);
     expect(r.holeCoverage).toBe(0);

@@ -688,7 +688,7 @@ describe('executeBlast — sealed vs broken-out ore (#2003)', () => {
   function breakoutBlast() {
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
-    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.089);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 6, 0.089);
     const depths: Record<string, number> = {};
     for (const h of holes) depths[h.id] = h.depth;
     const { charges } = batchCharge(holes.map(h => h.id), depths, 'boomite', 8, 2);
