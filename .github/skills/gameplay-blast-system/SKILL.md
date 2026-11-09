@@ -54,7 +54,7 @@ per-voxel objects or string keys, which a blast revisits far too often to afford
   `confinementFactor(distToAir)`. **Rock near a free face breaks for a fraction of the energy**
   (`UNCONFINED_THRESHOLD_FACTOR`, ramping to full over `CONFINEMENT_FULL_DEPTH`) — this is why bench
   blasting works at all.
-- **The explosive never gates breaking (#2197).** A voxel's threshold depends only on its rock
+- **The explosive never gates breaking.** A voxel's threshold depends only on its rock
   (absorption, `fractureModifier`, confinement); the explosive's only part is the energy it
   delivers (`energyPerKg` x kg, stemming, water). There is no explosive tier and no per-column
   gating lookup: `createEnergyField(grid, box)` takes none. The catalog defines an explosive by energy
