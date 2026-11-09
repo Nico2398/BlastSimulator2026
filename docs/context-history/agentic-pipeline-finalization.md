@@ -27,3 +27,7 @@ A label added after `create` raises no `pull_request` event of its own, which is
 ### await-ci
 
 `ci:await` listens to every workflow run on the PR head, not `ci.yml` alone: PR #773's blocking check was the closing-keyword guard, with CI green.
+
+### sync-main — a clean merge owes no `verify`
+
+A clean merge with `main` changes the tree, so `verify`'s per-tree cache never answered it, and each run paid a full suite again before opening its pull request — inside the 49 hours the timed-out runs of #2142, #2143, #2148, #2154 and #2199 belonged to. CI tests the merged head anyway, and the merge gate tests it again once `main` moves.

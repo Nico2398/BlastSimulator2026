@@ -16,7 +16,7 @@ The Verification Gate in the entry point decides *which* channels a change owes.
 
 ## ▶ PROCEDURE — the finish line
 
-1. **Run every channel the change touches.** The Verification Gate names them; run the ones the change earns, not the cheapest one. `npm run pipeline -- verify` reads the branch's diff, runs exactly the non-visual channels it owes, skips any already green on this committed tree, and prints one line per channel with an excerpt of a failure — the logs stay in `.agentic/verify/logs/`. It outlives one Bash call on a code change: start it through `npm run long`.
+1. **Run every channel the change touches.** The Verification Gate names them; run the ones the change earns, not the cheapest one. `npm run pipeline -- verify` reads the branch's diff, runs exactly the non-visual channels it owes, skips any already green on this committed tree, and prints one line per channel with an excerpt of a failure — the logs stay in `.agentic/verify/logs/`. Its `logic` channel runs the test files the diff reaches — the changed tests, the tests that import a changed module, the mirrored test — and says how many it chose; the whole suite is CI's (table below). Start it through `npm run long` when it owes `scenario` or falls back to the whole suite.
 2. **Hand the browser-heavy channels to CI** — see the ownership table below. A channel CI owns is covered, never pending.
 3. **Commit and push** to the branch this work belongs on.
 4. **Open the pull request** if none is open, laid out per `.github/pull_request_template.md` — or `.github/PULL_REQUEST_TEMPLATE/pipeline.md` in a pipeline run (`agentic-pipeline-finalization`) — and apply the labels the change earns.
@@ -30,7 +30,9 @@ Steps 5 and 6 are where a finished-looking change stops being finished. Everythi
 
 | Run | Where |
 |-----|-------|
-| `static`, `logic`, `scenario` (command mode) | Either. CI runs all three on every push and pull request. |
+| `static`, `scenario` (command mode) | Either. CI runs both on every push and pull request. |
+| `logic`, the test files the diff reaches | Your session — `npm run pipeline -- verify`. |
+| `logic`, the whole suite, and the coverage gate | CI jobs `Unit & integration tests` (sharded, under coverage) and `Coverage thresholds`, on every push and pull request. A local whole-suite run — `verify --full`, `npm run test` — repeats them and is never owed. |
 | `screenshot`, one named scenario in interaction mode | Your session — this is the `visual` channel's working loop. |
 | `build` (production bundle) | CI job `Production build`, on every push and pull request. |
 | All scenarios in interaction mode | CI job `Scenarios (interaction mode)`, sharded, on every push and pull request. |

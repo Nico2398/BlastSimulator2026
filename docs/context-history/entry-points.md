@@ -27,3 +27,9 @@ The before-ending checklist's rule about how GitHub's own merge-time parser read
 ## ▶ Follow-up Gate — work you found that is not your task (all three entry points)
 
 **One issue per run.** The measured cost of a pipeline that files as fast as it merges was pointed to in `agentic-pipeline-finalization`.
+
+## ▶ Verification Gate — `logic` is split between the session and CI
+
+Issues #2142, #2143, #2148, #2154 and #2199 each ran their agent step for the whole 270-minute budget (Nov 2026). The `agentic-metrics` branch's 58 recorded runs (159 wall-hours) put the model's own API time at about 6 hours — 4 % — and the waiting at: 49 hours inside `npm run pipeline -- verify`, 23.5 hours inside `npm run ci:await`. `verify` ran the whole vitest suite (734 s for 1005 files on a 4-core sandbox, longer on the runner) five to seven times per run, and its per-tree cache almost never answered because every fix changes the tree. CI then ran the same suite twice more on every head — once in the test shards, once more, unsharded, under coverage (45 minutes, the longest job of every CI run). The local runs were the duplicate, so `logic` became a focused pre-flight in the session and the whole suite CI's alone.
+
+An import-graph measurement drove the selection: a third of `src/` reaches ~98 % of the suite transitively, so "every related test" saves nothing for a core change, while the tests that import a changed module directly cost 32 s of test time at the 90th percentile.

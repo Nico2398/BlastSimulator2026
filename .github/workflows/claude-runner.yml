@@ -340,13 +340,14 @@ jobs:
             process exits. Any result you arrange to collect "later" is never collected: a
             backgrounded sub-agent, a backgrounded shell command, a task notification. Every
             delegation is synchronous — parallel means several delegations in ONE message, all
-            awaited in that same turn. For a command too long for one Bash call (`npm run test`
-            included — it now runs ~500s on this runner, and a foreground call without an
-            explicit matching timeout gets silently backgrounded before you'd ever hit the 600s
-            cap; also `npm run scenarios`, `npm run ci:await`), start it with `npm run long --
-            start <label> -- <cmd>` and then call `npm run long -- wait <label>` repeatedly in
-            this same turn; exit code 75 means still going, not failed. Never end your turn while
-            one is outstanding.
+            awaited in that same turn. For a command that can outrun one Bash call (`npm run
+            ci:await`; a `npm run pipeline -- verify` that owes `scenario`; a foreground call
+            without an explicit matching timeout gets silently backgrounded before you'd ever hit
+            the 600s cap), start it with `npm run long -- start <label> -- <cmd>` and then call
+            `npm run long -- wait <label>` repeatedly in this same turn; exit code 75 means still
+            going, not failed. Never end your turn while one is outstanding. The whole test suite
+            is CI's: `verify` runs the test files your diff reaches, so never run `npm run test`
+            in full here — CI runs it on your pull request and `ci:await` reads it.
 
             ${{ steps.context.outputs.prompt }}
           # No permission prompts. The runner is a throwaway VM with no access

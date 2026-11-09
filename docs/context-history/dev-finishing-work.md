@@ -18,3 +18,7 @@ Two pull requests paid for this rule:
 ## ▶ Driving a red CI green
 
 PR #888's own new scenario asserted a scroll position immediately after dispatching a wheel event — `page.mouse.wheel()` resolving does not mean Chrome has committed the scroll, since it can land on the compositor thread after the CDP call returns. It passed every local run and failed CI reproducibly.
+
+## Which channels you run, which CI runs — `logic`
+
+The split row came from the same measurement as the entry points' `logic` paragraph (`docs/context-history/entry-points.md`): local whole-suite runs were 49 of 159 recorded pipeline wall-hours, and CI already ran the suite twice per head.

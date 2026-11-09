@@ -40,7 +40,7 @@ The runtimes disagree on what delegation defaults to, so the same sentence produ
 
 ## ▶ The loop budget
 
-Every pipeline bounds its loops by count — fix iterations after a red `verify`, visual iterations, re-reviews, CI-fix rounds — and each count was set alone. On a two-core runner one iteration of any of them costs 15 to 30 minutes of fixed verification before any thinking happens: a full `npm run test`, a full `npm run scenarios`, a CI round. Added together the counts hold more than the job does.
+Every pipeline bounds its loops by count — fix iterations after a red `verify`, visual iterations, re-reviews, CI-fix rounds — and each count was set alone. Every iteration pays fixed verification before any thinking happens — a `verify`, a CI round. Added together the counts hold more than the job does.
 
 So a run carries **one clock across all of its loops**, the loop deadline. The runner sets it — `AGENTIC_LOOP_BUDGET_MINUTES` after the job started, default 180 — and exports it to the session as `AGENTIC_LOOP_DEADLINE_EPOCH`; the lead is told how much of it is left before every delegation. A session nobody timed — a CLI, a human at a terminal — has no deadline, and its budget is open.
 

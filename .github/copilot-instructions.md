@@ -34,7 +34,7 @@ Path-scoped instructions in `.github/instructions/` carry the hard invariants fo
 
 ```bash
 npm run verify:env      # which verification channels are live
-npm run pipeline -- verify  # only the channels this branch's diff owes; cached per tree, one line per channel
+npm run pipeline -- verify  # the channels this diff owes; logic = the tests the diff reaches (--full: whole suite); cached per tree
 npm run validate        # TypeScript → coverage (thresholds) → full suite → build
 npm run test            # Vitest unit + integration
 npm run scenarios       # all scenarios, command mode, no browser
@@ -76,6 +76,8 @@ Four independent channels prove a change works. Each catches what the others mis
 **Running a visual channel is not the same as owning it.** The Capability Gate below still applies: capture the screenshots, then hand the inspection to @visual-tester, who reports what is actually on screen. A rendering change is unverified until an image has been looked at — a green test suite proves the logic, not the picture. Procedures live in the `dev-visual-testing` skill.
 
 **When a channel is genuinely unavailable** (no browser, dev server unreachable, screenshots never written), say so explicitly and mark the work unverified for that channel. Never substitute a state JSON dump for an image nobody inspected, and never report PASS for a channel you did not run.
+
+**`logic` is split between the session and CI.** `npm run pipeline -- verify` runs the test files the diff reaches — its changed tests, the tests that import a changed module, the mirrored test. CI runs the whole suite on every push, sharded and under the coverage gate. Report both: the focused run, and the CI result once read. A local whole-suite run repeats CI and is never owed.
 
 **▶ Passing the channels is not finishing.** Landing the work — pushing, opening the pull request, labelling it, and reading what CI says about the pushed head rather than assuming it — is its own procedure with its own failure modes. Load `dev-finishing-work` before claiming any coding task complete, and whenever a push, a pull request, or a CI result is involved.
 
