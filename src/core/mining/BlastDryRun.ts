@@ -5,6 +5,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { BlastPlan } from './BlastPlan.js';
 import { executeBlast, ratingFactsFrom, type BlastRating, type VillagePosition } from './BlastExecution.js';
 import { applyRatingCaps } from './BlastRatingCaps.js';
+import type { FragmentationBand } from './FragmentationBand.js';
 import { forkVoxelGrid } from '../world/VoxelGridFork.js';
 
 export interface BlastForecast {
@@ -14,6 +15,12 @@ export interface BlastForecast {
   thrownShare: number;
   furthestThrowM: number;
   clearedVoxels: number;
+  /** Volume (m3) the blast would energise, by fragmentation band. */
+  bandVolumes: Record<FragmentationBand, number>;
+  oversizedFragments: number;
+  dustLossMassKg: number;
+  /** Ore value the dust band would take. */
+  dustLossValue: number;
 }
 
 /** Runs the blast on a fork of `grid`; null when the plan is invalid or has no holes. Never mutates `grid`. */
@@ -44,6 +51,10 @@ export function dryRunBlast(
     thrownShare: result.fragmentCount > 0 ? result.projectionCount / result.fragmentCount : 0,
     furthestThrowM: result.maxThrowDistance,
     clearedVoxels: result.clearedVoxels,
+    bandVolumes: result.bandVolumes,
+    oversizedFragments: result.oversizedFragments,
+    dustLossMassKg: result.dustLoss.massKg,
+    dustLossValue: result.dustLoss.oreValue,
   };
 }
 

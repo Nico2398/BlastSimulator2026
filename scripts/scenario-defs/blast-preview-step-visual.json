@@ -1,6 +1,6 @@
 {
   "name": "blast-preview-step-visual",
-  "description": "Redesign P4/#25: the Blast Workshop's Preview step — Analysis Suite tier list (buy real SOFTWARE_TIER_COSTS tiers) and Predicted rows (Run Analysis against the real blast_preview command, tier-gated).",
+  "description": "Blast Workshop Preview step as a player plays it: buy T1 (fragment distribution) then T2 (projection risk zones and dry-run figures) with real clicks, Run Analysis after each, and Predicted rows gated by tier.",
   "shots": [
     {
       "name": "overview",
@@ -200,7 +200,53 @@
     {
       "command": "blast_preview",
       "timeout": 30,
-      "description": "Run Analysis populates the Predicted rows with real energy data (T1 owned); fragmentation/projection/vibration rows stay locked behind their tier",
+      "description": "Run Analysis at T1 fills the fragment rows (oversized, good/fines/dust volume, value lost to dust); the T2 and T3 rows stay locked, each naming its tier",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"run-analysis\"]"
+      }
+    },
+    {
+      "command": "buy_software",
+      "timeout": 30,
+      "description": "Buying T2 (real $2000 cost) opens the projection risk zones on the terrain and the dry-run figures",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "blast_preview",
+      "timeout": 30,
+      "description": "Run Analysis at T2 fills predicted rating, thrown share and furthest throw; only the T3 vibration row stays locked",
       "interaction": [
         {
           "type": "clickSelector",

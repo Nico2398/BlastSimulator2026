@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { DrillHole } from '../core/mining/DrillPlan.js';
 import { holeNumericId } from '../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../core/mining/ChargePlan.js';
+import { SOFTWARE_TIER_FRAGMENTS, SOFTWARE_TIER_PROJECTIONS, SOFTWARE_TIER_VIBRATIONS } from '../core/config/balance.js';
 import { tagPickable } from './Pickable.js';
 import { disposeGroup } from './MeshUtils.js';
 import { GroundTintLayer, FallbackSurfaceSampler, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
@@ -132,16 +133,15 @@ export class BlastPlanOverlay {
       this.addHoleMarker(hd);
     }
 
-    if (options.softwareTier >= 1) {
-      this.addEnergyHeatmap(options);
-    }
-    if (options.softwareTier >= 2) {
+    // Energy is free at every tier (#2200); the software tiers add fragment sizes (T1), projection arcs (T2) and vibration waves (T3).
+    this.addEnergyHeatmap(options);
+    if (options.softwareTier >= SOFTWARE_TIER_FRAGMENTS) {
       this.addFragSizeOverlay(options);
     }
-    if (options.softwareTier >= 3) {
+    if (options.softwareTier >= SOFTWARE_TIER_PROJECTIONS) {
       this.addProjectionArcs(options);
     }
-    if (options.softwareTier >= 4) {
+    if (options.softwareTier >= SOFTWARE_TIER_VIBRATIONS) {
       this.addVibrationWaves(options.origin);
     }
   }

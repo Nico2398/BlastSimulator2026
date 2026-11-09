@@ -8,6 +8,8 @@ import { SOFTWARE_TIER_COSTS } from '../../../../../src/core/mining/Software.js'
 import { t } from '../../../../../src/core/i18n/I18n.js';
 import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js';
 import type { GameState } from '../../../../../src/core/state/GameState.js';
+import { makePreviewSummary, PREVIEW_FIGURES } from '../../../../helpers/blastPreviewFixture.js';
+import { formatMoney } from '../../../../../src/core/economy/formatMoney.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -129,24 +131,15 @@ describe('PreviewStep', () => {
   it('renders real predicted values once state.lastBlastPreview is populated, respecting the tier lock', () => {
     const { step } = makeStep();
     const state = chargedPlan();
-    state.softwareTier = 2;
-    state.lastBlastPreview = {
-      tier: 2,
-      energy: { affectedVoxels: 42, minEnergy: 1.5, maxEnergy: 9.25 },
-      fragments: { fractured: 7, cracked: 3, unaffected: 1, avgFragmentSizeCm: 55.4 },
-      projections: null,
-      vibrations: null,
-    };
+    state.softwareTier = 1;
+    state.lastBlastPreview = makePreviewSummary(1);
     step.update(state);
 
-    expect(step.root.textContent).toContain('42');
-    expect(step.root.textContent).toContain('1.5–9.3');
-    expect(step.root.textContent).toContain('7');
     expect(step.root.textContent).toContain('55 cm');
-    // Tier-3/4 rows are locked — real projection/vibration data must not leak through as text,
-    // the row should read the "Requires T3"/"Requires T4" placeholder instead.
-    expect(step.root.textContent).toContain('Requires T3');
-    expect(step.root.textContent).toContain('Requires T4');
+    expect(step.root.textContent).toContain(String(PREVIEW_FIGURES.oversized));
+    // T2/T3 rows are locked — real forecast/vibration data must not leak through as text.
+    expect(step.root.textContent).toContain('Requires blasting software T2');
+    expect(step.root.textContent).toContain('Requires blasting software T3');
   });
 
   it('dispose() removes the step from the DOM', () => {
@@ -186,53 +179,222 @@ describe('PreviewStep — bore line (#1934)', () => {
   });
 });
 
-describe('PreviewStep — blast outcome rows (#1968)', () => {
-  function withForecast(tier: number): GameState {
-    const state = chargedPlan();
-    state.softwareTier = tier;
-    state.lastBlastPreview = {
-      tier,
-      energy: { affectedVoxels: 42, minEnergy: 1.5, maxEnergy: 9.25 },
-      fragments: { fractured: 77, cracked: 3, unaffected: 1, avgFragmentSizeCm: 55.4 },
-      projections: tier >= 3
-        ? {
-          projectionZoneVoxels: 5, collapseFragments: 2,
-          predictedRating: 'bad', thrownFragments: 25, totalFragments: 100, thrownShare: 0.25, furthestThrowM: 14,
-        }
-        : null,
-      vibrations: null,
-    };
-    return state;
-  }
+function textOf(step: PreviewStep): string { return step.root.textContent!; }
 
-  it('shows predicted rating, thrown share and furthest throw at T3', () => {
+function withPreview(tier: number, ownedTier = tier): GameState {
+  const state = chargedPlan();
+  state.softwareTier = ownedTier;
+  state.lastBlastPreview = makePreviewSummary(tier);
+  return state;
+}
+
+/** Smallest element whose text matches `label` (no child element matches too). */
+function labelEl(step: PreviewStep, label: RegExp): HTMLElement | null {
+  const matches = [...step.root.querySelectorAll<HTMLElement>('*')]
+    .filter(e => label.test(e.textContent ?? ''))
+    .filter(e => ![...e.children].some(c => label.test(c.textContent ?? '')));
+  return matches[0] ?? null;
+}
+
+/** The data-explain text on the stat row carrying `label`: on the label, an ancestor, or the row's own cells. */
+function explainOf(step: PreviewStep, label: RegExp): string | undefined {
+  const lab = labelEl(step, label);
+  if (!lab) return undefined;
+  const own = lab.closest<HTMLElement>('[data-explain]');
+  if (own) return own.dataset['explain'];
+  return lab.parentElement?.querySelector<HTMLElement>('[data-explain]')?.dataset['explain'];
+}
+
+const COUNT = (text: string, re: RegExp): number => (text.match(re) ?? []).length;
+
+describe('PreviewStep — tier line-up (#2201)', () => {
+  it.each<[number, RegExp]>([
+    [1, /fragment distribution/i],
+    [2, /projection risk/i],
+    [3, /vibration model/i],
+    [4, /charge optimizer/i],
+  ])('tier row %i is named for what it unlocks', (n, name) => {
     const { step } = makeStep();
-    step.update(withForecast(3));
-    const text = step.root.textContent!;
-    expect(text).toContain(t('ui.blast_workshop.preview.row_predicted_rating'));
-    expect(text).toContain(t('blast.rating.bad'));
-    expect(text).toContain(t('ui.blast_workshop.preview.row_thrown_share'));
-    expect(text).toContain('25%');
-    expect(text).toContain(t('ui.blast_workshop.preview.row_furthest_throw'));
-    expect(text).toMatch(/14(\.0)? m/);
+    step.update(makeState());
+    expect(tierRow(step, n).textContent).toMatch(name);
   });
 
-  it('keeps the three rows locked below T3 and leaks no forecast value', () => {
+  it('no tier row is still called the energy heatmap: energy is free', () => {
     const { step } = makeStep();
-    step.update(withForecast(2));
-    const text = step.root.textContent!;
-    expect(text).toContain(t('ui.blast_workshop.preview.row_predicted_rating'));
-    expect(text.split('Requires T3').length - 1).toBe(3);
+    step.update(makeState());
+    for (let n = 1; n <= 4; n++) expect(tierRow(step, n).textContent).not.toMatch(/heatmap/i);
+  });
+
+  it('keeps one buy button per next tier, T1 first, at the unchanged price', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    state.softwareTier = 3;
+    step.update(state);
+    const buy = tierRow(step, 4).querySelector('[data-action="buy-tier"]') as HTMLButtonElement;
+    expect(buy).not.toBeNull();
+    expect(buy.textContent).toContain(`$${formatMoney(SOFTWARE_TIER_COSTS[4]!)}`);
+    expect(tierRow(step, 3).querySelector('bs-icon[name="check"]')).not.toBeNull();
+  });
+});
+
+describe('PreviewStep — stat rows by tier (#2201)', () => {
+  it('shows no energy rows at any tier', () => {
+    for (const tier of [0, 1, 2, 3]) {
+      const { step } = makeStep();
+      step.update(withPreview(tier));
+      expect(textOf(step), `tier ${tier}`).not.toMatch(/affected voxels/i);
+      expect(textOf(step), `tier ${tier}`).not.toMatch(/energy range/i);
+      expect(textOf(step), `tier ${tier}`).not.toContain(String(PREVIEW_FIGURES.affectedVoxels));
+      expect(textOf(step), `tier ${tier}`).not.toContain('1.5–9.3');
+    }
+  });
+
+  it('at tier 0 shows no tier-gated stat value', () => {
+    const { step } = makeStep();
+    step.update(withPreview(0));
+    const text = textOf(step);
+    expect(text).not.toContain('55 cm');
+    expect(text).not.toContain(String(PREVIEW_FIGURES.oversized));
     expect(text).not.toContain('25%');
     expect(text).not.toContain(t('blast.rating.bad'));
     expect(text).not.toMatch(/14 m/);
+    expect(text).not.toContain('3.21');
   });
 
-  it('relabels the fragments row as voxels cleared', () => {
+  it('at tier 0 every stat row is locked, each naming the software tier that opens it', () => {
     const { step } = makeStep();
-    step.update(withForecast(3));
-    expect(t('ui.blast_workshop.preview.row_fragments')).not.toBe('Fragments');
-    expect(t('ui.blast_workshop.preview.row_fragments').toLowerCase()).toContain('voxel');
-    expect(step.root.textContent).toContain(t('ui.blast_workshop.preview.row_fragments'));
+    step.update(withPreview(0));
+    const text = textOf(step);
+    expect(COUNT(text, /Requires blasting software T1/g)).toBeGreaterThanOrEqual(4);
+    expect(COUNT(text, /Requires blasting software T2/g)).toBe(3);
+    expect(COUNT(text, /Requires blasting software T3/g)).toBe(1);
+    expect(text).not.toMatch(/Requires T\d/);
+  });
+
+  it('at tier 0 points to the free heatmap with an extra line', () => {
+    const free = makeStep();
+    free.step.update(withPreview(0));
+    const owned = makeStep();
+    owned.step.update(withPreview(1));
+    expect(COUNT(textOf(free.step), /heatmap/gi)).toBeGreaterThan(COUNT(textOf(owned.step), /heatmap/gi));
+  });
+
+  it('a locked row reads "Requires blasting software T{n}: <what it shows>"', () => {
+    const { step } = makeStep();
+    step.update(withPreview(0));
+    const text = textOf(step);
+    for (const n of [1, 2, 3]) {
+      expect(text, `T${n}`).toMatch(new RegExp(`Requires blasting software T${n}: \\S`));
+    }
+  });
+
+  it('locked rows still render their labels', () => {
+    const { step } = makeStep();
+    step.update(withPreview(0));
+    expect(labelEl(step, /predicted rating/i)).not.toBeNull();
+    expect(labelEl(step, /thrown share/i)).not.toBeNull();
+    expect(labelEl(step, /furthest throw/i)).not.toBeNull();
+    expect(labelEl(step, /peak vibration/i)).not.toBeNull();
+    expect(labelEl(step, /oversized/i)).not.toBeNull();
+  });
+
+  it('at tier 1 shows the fragment distribution and keeps T2 and T3 locked', () => {
+    const { step } = makeStep();
+    step.update(withPreview(1));
+    const text = textOf(step);
+    expect(text).toContain('55 cm');
+    expect(text).toContain(String(PREVIEW_FIGURES.oversized));
+    expect(text).toContain(String(PREVIEW_FIGURES.goodVolumeM3));
+    expect(text).toContain(String(PREVIEW_FIGURES.finesVolumeM3));
+    expect(text).toContain(String(PREVIEW_FIGURES.dustVolumeM3));
+    expect(text).toContain(formatMoney(PREVIEW_FIGURES.dustLossValue));
+    expect(text).not.toMatch(/Requires blasting software T1/);
+    expect(COUNT(text, /Requires blasting software T2/g)).toBe(3);
+    expect(COUNT(text, /Requires blasting software T3/g)).toBe(1);
+    expect(text).not.toContain('25%');
+    expect(text).not.toContain(t('blast.rating.bad'));
+  });
+
+  it('at tier 2 shows predicted rating, thrown share and furthest throw', () => {
+    const { step } = makeStep();
+    step.update(withPreview(2));
+    const text = textOf(step);
+    expect(text).toContain(t('blast.rating.bad'));
+    expect(text).toContain('25%');
+    expect(text).toMatch(/14(\.0)? m/);
+    expect(text).not.toMatch(/Requires blasting software T2/);
+    expect(COUNT(text, /Requires blasting software T3/g)).toBe(1);
+    expect(text).not.toContain('3.21');
+  });
+
+  it('at tier 3 shows the peak vibration and nothing is locked', () => {
+    const { step } = makeStep();
+    step.update(withPreview(3));
+    const text = textOf(step);
+    expect(text).toContain('3.21');
+    expect(text).not.toMatch(/Requires blasting software/);
+  });
+
+  it('tier 4 has no stat row: no row ever asks for T4', () => {
+    for (const tier of [0, 3, 4]) {
+      const { step } = makeStep();
+      step.update(withPreview(Math.min(tier, 3), tier));
+      expect(textOf(step), `tier ${tier}`).not.toMatch(/Requires blasting software T4/);
+    }
+  });
+
+  it('a tier-4 owner sees the same unlocked stats as tier 3', () => {
+    const { step } = makeStep();
+    step.update(withPreview(4));
+    const text = textOf(step);
+    expect(text).toContain('3.21');
+    expect(text).toContain('25%');
+    expect(text).not.toMatch(/Requires blasting software/);
+  });
+
+  it('a preview from a lower tier than the one owned now does not leak a higher tier', () => {
+    const { step } = makeStep();
+    step.update(withPreview(1, 3));
+    expect(textOf(step)).not.toContain('3.21');
+  });
+});
+
+describe('PreviewStep — stat rows explain themselves (#2201)', () => {
+  const LABELS: Array<[string, RegExp]> = [
+    ['average fragment size', /(avg|average) fragment size/i],
+    ['oversized count', /oversized/i],
+    ['predicted rating', /predicted rating/i],
+    ['thrown share', /thrown share/i],
+    ['furthest throw', /furthest throw/i],
+    ['peak vibration', /peak vibration/i],
+  ];
+
+  it.each(LABELS)('the %s row carries a data-explain text', (_name, label) => {
+    const { step } = makeStep();
+    step.update(withPreview(3));
+    const explain = explainOf(step, label);
+    expect(explain).toBeDefined();
+    expect(explain!.length).toBeGreaterThan(20);
+  });
+
+  it('the explanations differ from row to row', () => {
+    const { step } = makeStep();
+    step.update(withPreview(3));
+    const texts = LABELS.map(([, re]) => explainOf(step, re));
+    expect(new Set(texts).size).toBe(LABELS.length);
+  });
+
+  it('the dust-loss and volume rows are explained too', () => {
+    const { step } = makeStep();
+    step.update(withPreview(3));
+    expect(explainOf(step, /dust/i)).toBeDefined();
+  });
+
+  it('every explanation is real text, never a raw locale key', () => {
+    const { step } = makeStep();
+    step.update(withPreview(3));
+    const explains = [...step.root.querySelectorAll<HTMLElement>('[data-explain]')].map(e => e.dataset['explain']!);
+    expect(explains.length).toBeGreaterThanOrEqual(LABELS.length);
+    for (const e of explains) expect(e).not.toMatch(/^ui\./);
   });
 });

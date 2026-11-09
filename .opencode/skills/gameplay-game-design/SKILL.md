@@ -39,7 +39,7 @@ description: >
 **Detonation:** All charges fire together; no per-hole order or delay. Vibration uses the total charge of every hole
 
 ### Blast Preview / Software Upgrades
-Tier 0 (none) → Tier 1 (energy heatmap) → Tier 2 (fragment prediction) → Tier 3 (projection risk) → Tier 4 (vibration model)
+Tier 0 (none, energy is free via the heatmap) → Tier 1 (fragments, fines, dust) → Tier 2 (projection zones, dry-run figures) → Tier 3 (village vibration) → Tier 4 (charge optimizer)
 
 ### Blast Execution
 See blast-system skill for detailed physics algorithm.

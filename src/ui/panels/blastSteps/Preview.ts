@@ -14,13 +14,14 @@
 // directly, same constraint the Charge step's rock-tier gating ran into).
 // So "Run Analysis" is an explicit action, and the rows below it read
 // state.lastBlastPreview — a snapshot from the last run, not a live value.
-// Mock row "Oversized (> 1.2m)" is dropped for the same never-real-data
-// reason: previewFragments() has no per-fragment size distribution, only an
-// aggregate average, so it becomes "Avg Fragment Size" (avgFragmentSizeCm,
-// already unit-converted by the command) instead.
+// Tier line-up (#2201): T1 fragment distribution, T2 projection risk plus the
+// dry-run figures, T3 village vibration, T4 the charge optimizer (#2204).
+// Energy is free through the heatmap, so no row carries it; at tier 0 the list
+// is a pointer to the heatmap. Every row explains itself (`explainable`).
 
 import { t } from '../../../core/i18n/I18n.js';
-import { el, emptyState, reasonLine, button } from '../../dom.js';
+import { el, emptyState, reasonLine, button, explainable } from '../../dom.js';
+import { SOFTWARE_TIER_FRAGMENTS, SOFTWARE_TIER_PROJECTIONS, SOFTWARE_TIER_VIBRATIONS } from '../../../core/config/balance.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { SOFTWARE_TIER_COSTS, MAX_SOFTWARE_TIER, type BlastPreviewSummary } from '../../../core/mining/Software.js';
@@ -43,19 +44,26 @@ const TIER_NAME_KEYS = [
 
 interface PredictedRow {
   labelKey: string;
+  explainKey: string;
   requiredTier: number;
   value: (p: BlastPreviewSummary) => string;
 }
 
+const P = 'ui.blast_workshop.preview.';
+
+/** Every row is tier-gated: energy is free through the heatmap and has no row (#2201). */
 const PREDICTED_ROWS: PredictedRow[] = [
-  { labelKey: 'ui.blast_workshop.preview.row_affected_voxels', requiredTier: 1, value: p => `${p.energy!.affectedVoxels}` },
-  { labelKey: 'ui.blast_workshop.preview.row_energy_range', requiredTier: 1, value: p => `${p.energy!.minEnergy.toFixed(1)}–${p.energy!.maxEnergy.toFixed(1)}` },
-  { labelKey: 'ui.blast_workshop.preview.row_fragments', requiredTier: 2, value: p => `${p.fragments!.fractured}` },
-  { labelKey: 'ui.blast_workshop.preview.row_avg_size', requiredTier: 2, value: p => `${p.fragments!.avgFragmentSizeCm.toFixed(0)} cm` },
-  { labelKey: 'ui.blast_workshop.preview.row_predicted_rating', requiredTier: 3, value: p => t(`blast.rating.${p.projections!.predictedRating}`) },
-  { labelKey: 'ui.blast_workshop.preview.row_thrown_share', requiredTier: 3, value: p => `${Math.round(p.projections!.thrownShare * 100)}%` },
-  { labelKey: 'ui.blast_workshop.preview.row_furthest_throw', requiredTier: 3, value: p => `${Math.round(p.projections!.furthestThrowM)} m` },
-  { labelKey: 'ui.blast_workshop.preview.row_vibration', requiredTier: 4, value: p => `${p.vibrations!.maxVibration.toFixed(2)} mm/s` },
+  { labelKey: `${P}row_fragments`, explainKey: `${P}explain_fragments`, requiredTier: SOFTWARE_TIER_FRAGMENTS, value: p => `${p.fragments!.fractured}` },
+  { labelKey: `${P}row_avg_size`, explainKey: `${P}explain_avg_size`, requiredTier: SOFTWARE_TIER_FRAGMENTS, value: p => `${p.fragments!.avgFragmentSizeCm.toFixed(0)} cm` },
+  { labelKey: `${P}row_oversized`, explainKey: `${P}explain_oversized`, requiredTier: SOFTWARE_TIER_FRAGMENTS, value: p => `${p.fragments!.oversizedFragments} / ${p.fragments!.fragmentCount}` },
+  { labelKey: `${P}row_good_volume`, explainKey: `${P}explain_good_volume`, requiredTier: SOFTWARE_TIER_FRAGMENTS, value: p => `${p.fragments!.goodVolumeM3.toFixed(1)} m³` },
+  { labelKey: `${P}row_fines_volume`, explainKey: `${P}explain_fines_volume`, requiredTier: SOFTWARE_TIER_FRAGMENTS, value: p => `${p.fragments!.finesVolumeM3.toFixed(1)} m³` },
+  { labelKey: `${P}row_dust_volume`, explainKey: `${P}explain_dust_volume`, requiredTier: SOFTWARE_TIER_FRAGMENTS, value: p => `${p.fragments!.dustVolumeM3.toFixed(1)} m³` },
+  { labelKey: `${P}row_dust_loss`, explainKey: `${P}explain_dust_loss`, requiredTier: SOFTWARE_TIER_FRAGMENTS, value: p => `$${formatMoney(p.fragments!.dustLossValue)}` },
+  { labelKey: `${P}row_predicted_rating`, explainKey: `${P}explain_predicted_rating`, requiredTier: SOFTWARE_TIER_PROJECTIONS, value: p => t(`blast.rating.${p.projections!.predictedRating}`) },
+  { labelKey: `${P}row_thrown_share`, explainKey: `${P}explain_thrown_share`, requiredTier: SOFTWARE_TIER_PROJECTIONS, value: p => `${Math.round(p.projections!.thrownShare * 100)}%` },
+  { labelKey: `${P}row_furthest_throw`, explainKey: `${P}explain_furthest_throw`, requiredTier: SOFTWARE_TIER_PROJECTIONS, value: p => `${Math.round(p.projections!.furthestThrowM)} m` },
+  { labelKey: `${P}row_vibration`, explainKey: `${P}explain_vibration`, requiredTier: SOFTWARE_TIER_VIBRATIONS, value: p => `${p.vibrations!.maxVibration.toFixed(2)} mm/s` },
 ];
 
 export class PreviewStep {
@@ -223,7 +231,15 @@ export class PreviewStep {
       ));
       return;
     }
-    this.predictedListEl.replaceChildren(...PREDICTED_ROWS.map(row => this.makePredictedRow(row, preview)));
+    const rows = PREDICTED_ROWS.map(row => this.makePredictedRow(row, preview));
+    if (preview.tier < SOFTWARE_TIER_FRAGMENTS) {
+      // No software: every stat row is locked; a line points to the free heatmap.
+      const pointer = emptyState(t(`${P}heatmap_pointer`));
+      pointer.dataset['role'] = 'heatmap-pointer';
+      this.predictedListEl.replaceChildren(pointer, ...rows);
+      return;
+    }
+    this.predictedListEl.replaceChildren(...rows);
   }
 
   private makePredictedRow(row: PredictedRow, preview: BlastPreviewSummary): HTMLElement {
@@ -234,10 +250,14 @@ export class PreviewStep {
     if (locked) wrap.appendChild(iconEl('lock', 11, 0.5));
     wrap.appendChild(el('span', { text: t(row.labelKey), attrs: { style: 'font:500 11px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }));
 
-    const valueText = locked ? t('ui.blast_workshop.preview.locked', { tier: row.requiredTier }) : row.value(preview);
-    const valueColor = locked ? 'var(--bsx-text-micro)' : 'var(--bsx-text-primary)';
-    wrap.appendChild(el('span', { text: valueText, attrs: { style: `margin-left:auto;font:600 12px/1 var(--bsx-font-mono);color:${valueColor}` } }));
+    const valueText = locked
+      ? t(`${P}locked`, { tier: row.requiredTier, shows: t(`${P}shows_${row.requiredTier}`) })
+      : row.value(preview);
+    const valueStyle = locked
+      ? 'margin-left:auto;text-align:right;font:500 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)'
+      : 'margin-left:auto;font:600 12px/1 var(--bsx-font-mono);color:var(--bsx-text-primary)';
+    wrap.appendChild(el('span', { text: valueText, attrs: { style: valueStyle } }));
 
-    return wrap;
+    return explainable(wrap, t(row.explainKey));
   }
 }

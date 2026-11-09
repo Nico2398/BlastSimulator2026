@@ -151,7 +151,7 @@ mass (kg) and ore value lost to dust; fragments are already net of that loss, th
 
 ### Energy heatmap (Blast Workshop)
 
-The workshop's heatmap toggle (`toggle-energy-heatmap`, every software tier including none) shows the plan's own energy field (`previewPlanBands` in `SoftwarePreview.ts`, built on `buildPlanEnergyField`) coloured by `classifyFragmentationBand`; colours are `FRAGMENTATION_BAND_COLORS` (`FragmentationBand.ts`), shared by overlay, section and legend. `planHeatmap` (`EnergyHeatmap.ts`) caches one result per grid/holes/charges/wet-holes/`editRevision`, so redraws and hovers cost nothing. Measured recompute: 100 holes 106 ms, 256 holes 183 ms, 576 holes (139k voxels) 257 ms; cached read under 1 ms. Two views: a top-down terrain overlay (`EnergyHeatmapOverlay`, a `GroundTintLayer`, opacity `HEATMAP_OVERLAY_OPACITY`) with one colour per column, and a vertical section (`EnergyHeatmapView`) through the row of voxels sharing the selected hole's z. A column shows the finest band covering at least `HEATMAP_COLUMN_BAND_MIN_SHARE` (0.15) of its filled voxels, so a lone fines voxel does not paint a whole column. Hover (panel cells and the scene `HoverTag`) names exact intensity and band. The console `preview energy` stays tier-gated.
+The workshop's heatmap toggle (`toggle-energy-heatmap`, every software tier including none) shows the plan's own energy field (`previewPlanBands` in `SoftwarePreview.ts`, built on `buildPlanEnergyField`) coloured by `classifyFragmentationBand`; colours are `FRAGMENTATION_BAND_COLORS` (`FragmentationBand.ts`), shared by overlay, section and legend. `planHeatmap` (`EnergyHeatmap.ts`) caches one result per grid/holes/charges/wet-holes/`editRevision`, so redraws and hovers cost nothing. Measured recompute: 100 holes 106 ms, 256 holes 183 ms, 576 holes (139k voxels) 257 ms; cached read under 1 ms. Two views: a top-down terrain overlay (`EnergyHeatmapOverlay`, a `GroundTintLayer`, opacity `HEATMAP_OVERLAY_OPACITY`) with one colour per column, and a vertical section (`EnergyHeatmapView`) through the row of voxels sharing the selected hole's z. A column shows the finest band covering at least `HEATMAP_COLUMN_BAND_MIN_SHARE` (0.15) of its filled voxels, so a lone fines voxel does not paint a whole column. Hover (panel cells and the scene `HoverTag`) names exact intensity and band. The console `preview energy` is ungated, like the heatmap.
 
 ## Step 4 — Throw, Flight and the Muck Pile
 
@@ -366,10 +366,12 @@ Firing with ordered-but-undrilled holes (`plannedDrillHoles`) warns in the prefl
 | Tier | Name | Shows |
 |------|------|-------|
 | 0 | None | Blind blasting |
-| 1 | "BlastView Basic" | Energy heatmap |
-| 2 | "FragPredict" | Expected fragment size |
-| 3 | "ProjectoScan" | Projection risk zones |
-| 4 | "VibroMap Pro" | Vibration at the level's villages |
+| 1 | "BlastView Basic" | Fragment size distribution: average size, oversized count, band volumes (good, fines, dust), value lost to dust |
+| 2 | "FragPredict" | Projection risk zones tinted on the terrain (`ProjectionZoneOverlay`), plus the dry-run figures: predicted rating, thrown share, furthest throw |
+| 3 | "ProjectoScan" | Vibration at the level's villages |
+| 4 | "VibroMap Pro" | Charge optimizer (no content yet) |
+
+Energy is free at every tier through the workshop heatmap. Tier prices stay `SOFTWARE_TIER_COSTS` (500 / 2000 / 5000 / 12000) and a saved game keeps its tier number, so it gets that tier's new content. Tier numbers come from `SOFTWARE_TIER_FRAGMENTS`, `SOFTWARE_TIER_PROJECTIONS`, `SOFTWARE_TIER_VIBRATIONS` and `SOFTWARE_TIER_OPTIMIZER` in `balance.ts`. One dry run (`dryRunBlast`) serves T1 and T2 in `blast_preview`; `fragmentDistributionFrom` reads the T1 figures off it. The Preview step at tier 0 shows no gated stat and points to the heatmap; a locked row reads "Requires blasting software T{n}: <what it shows>", and every row is `explainable`. `lastBlastPreview.shape` (`BLAST_PREVIEW_SHAPE`) marks the content line-up; a save carrying another shape loads the preview as null. The console `preview energy` is ungated; `preview fragments|projections|vibrations` follow the tiers above.
 
 Previews run the **same** propagation the blast does (`buildPlanEnergyField`) and the same seeding
 and velocity maths. A preview that models the rock differently from the game is worse than no
