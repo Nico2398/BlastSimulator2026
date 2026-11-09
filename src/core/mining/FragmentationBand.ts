@@ -42,6 +42,6 @@ export const FRAGMENTATION_BAND_COLORS: Record<FragmentationBand, number> = {
 };
 
 /** Colour token of the band a voxel of this intensity falls in. */
-export function heatmapBandColor(_intensity: number): number {
-  throw new Error('not implemented');
+export function heatmapBandColor(intensity: number): number {
+  return FRAGMENTATION_BAND_COLORS[classifyFragmentationBand(intensity)];
 }

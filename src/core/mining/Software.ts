@@ -142,18 +142,16 @@ export function purchaseSoftware(
 // ── Preview functions ──
 
 /**
- * Preview energy field. Requires software tier >= 1.
+ * Preview energy field. Available at every tier: the energy heatmap shows it with no software (#2200).
  * Previews take the same `wetHoleIds` set executeBlast receives (wetHoleIdsFor), so a
  * water-sensitive charge in a wet hole is predicted as weakened as the blast will be.
  */
 export function previewEnergy(
   plan: BlastPlan,
   grid: VoxelGrid,
-  softwareTier: number,
+  _softwareTier: number,
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): EnergyPreview | null {
-  if (softwareTier < 1) return null;
-
   const field = buildPlanEnergyField(plan, grid, wetHoleIds);
   if (!field) return { energyMap: new Map(), maxEnergy: 0, minEnergy: 0 };
 

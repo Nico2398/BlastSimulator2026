@@ -3,6 +3,7 @@
 // syncSurveyOverlay() — the console-driven "reflect current MiningContext onto
 // the already-built scene" step shared by syncFromContext() and finishLevelLoad().
 
+import { planHeatmap, type ColumnBandSummary } from '../core/mining/EnergyHeatmap.js';
 import { isProgressionSite, type GameState } from '../core/state/GameState.js';
 import { firstEmptyLayerAboveGround, type VoxelGrid } from '../core/world/VoxelGrid.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
@@ -330,5 +331,19 @@ export function syncWallOverlay(terrain: TerrainMesh | null, faces: ReadonlyArra
   if (!terrain) return;
   const overlay = terrain.getWallOverlay();
   if (visibilityPreference && faces.length > 0) overlay.show(faces);
+  else overlay.hide();
+}
+
+/** Column summaries of the armed plan's energy heatmap (#2200); empty without a grid or a charged hole. */
+export function buildHeatmapColumns(state: GameState, grid: VoxelGrid | null): ColumnBandSummary[] {
+  if (!grid || grid.sizeX <= 0 || grid.sizeZ <= 0) return [];
+  return planHeatmap(assembleBlastPlan(state.drillHoles, state.chargesByHole), grid, wetHoleIdsFor(state)).columns;
+}
+
+/** Show the heatmap overlay with `columns` when the player has it on; hide it otherwise. */
+export function syncEnergyHeatmap(terrain: TerrainMesh | null, columns: ReadonlyArray<ColumnBandSummary>, visibilityPreference: boolean): void {
+  if (!terrain) return;
+  const overlay = terrain.getEnergyHeatmapOverlay();
+  if (visibilityPreference && columns.length > 0) overlay.show(columns);
   else overlay.hide();
 }
