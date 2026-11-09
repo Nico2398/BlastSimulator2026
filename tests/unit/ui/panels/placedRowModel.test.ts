@@ -3,6 +3,9 @@ import { placedRowModel, siteRowModel } from '../../../../src/ui/panels/placedRo
 import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState, PlannedBuilding } from '../../../../src/core/state/GameState.js';
 import { getBuildingDef, type Building, type BuildingType, type BuildingTier } from '../../../../src/core/entities/Building.js';
+import { utilizationExplain, badgeExplain } from '../../../../src/ui/buildingExplain.js';
+import { t } from '../../../../src/core/i18n/I18n.js';
+import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
 import { SPOIL_HEAP_CAPACITY_KG } from '../../../../src/core/config/balance.js';
 
 function mk(overrides: Partial<Building> & Pick<Building, 'id' | 'type'>): Building {
@@ -154,5 +157,85 @@ describe('siteRowModel (#1759)', () => {
       status: 'in_progress', holderId: 5, queuedAtTick: 0,
     } as never);
     expect(siteRowModel(pb, s).progress).toBeCloseTo(0.6);
+  });
+});
+
+describe('placedRowModel — explanations (#2171)', () => {
+  const closure = (s: GameState, endTick: number | null): void => {
+    s.events.activeModifiers.push({
+      id: 801, kind: 'out_of_service', sourceEventId: 'lawsuit_back_taxes', role: null, targetId: 1,
+      targetKind: 'building', category: null, magnitude: 1, startTick: 0, endTick,
+    });
+  };
+  const demolition = (s: GameState): void => {
+    s.pendingActions.push({
+      id: 50, type: 'demolish_building', requiredSkill: null, requiredVehicleRole: 'building_destroyer',
+      targetX: 5, targetZ: 5, targetY: 0, payload: { buildingId: 1 }, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
+    });
+  };
+
+  it('badgeExplain is null when the row has no badge', () => {
+    const b = mk({ id: 1, type: 'management_office' });
+    expect(placedRowModel(b, stateWith(b)).badgeExplain).toBeNull();
+  });
+
+  it('an out_of_service badge names the closing event', () => {
+    const b = mk({ id: 1, type: 'management_office' });
+    const s = stateWith(b);
+    s.tickCount = 10;
+    closure(s, 70);
+    const m = placedRowModel(b, s);
+    expect(m.badge).toBe('out_of_service');
+    expect(m.badgeExplain).toContain(t('event.lawsuit_back_taxes.title'));
+  });
+
+  it('an out_of_service badge quotes the time left', () => {
+    const b = mk({ id: 1, type: 'management_office' });
+    const s = stateWith(b);
+    s.tickCount = 10;
+    closure(s, 70);
+    const text = placedRowModel(b, s).badgeExplain!;
+    expect(text.includes('60') || text.includes(formatGameDuration(60))).toBe(true);
+  });
+
+  it('a demolition_ordered badge explains the status as a sentence', () => {
+    const b = mk({ id: 1, type: 'management_office' });
+    const s = stateWith(b);
+    demolition(s);
+    const m = placedRowModel(b, s);
+    expect(m.badge).toBe('demolition_ordered');
+    expect(m.badgeExplain).toBe(badgeExplain('demolition_ordered', { closureEventId: null, closureTicksRemaining: null }));
+    expect(m.badgeExplain!.length).toBeGreaterThan(10);
+  });
+
+  it('an upgrading badge explains the status as a sentence', () => {
+    const b = mk({ id: 1, type: 'management_office' });
+    const s = stateWith(b);
+    s.plannedBuildings.push({ id: 90, buildingId: 1, type: 'management_office', tier: 2, x: 5, z: 5, actionId: 60, cost: 1, upgrade: true });
+    const m = placedRowModel(b, s);
+    expect(m.badge).toBe('upgrading');
+    expect(m.badgeExplain).toBe(badgeExplain('upgrading', { closureEventId: null, closureTicksRemaining: null }));
+    expect(m.badgeExplain).not.toBe(badgeExplain('demolition_ordered', { closureEventId: null, closureTicksRemaining: null }));
+  });
+
+  it.each<[BuildingType, 'beds' | 'kg' | 'research']>([
+    ['living_quarters', 'beds'],
+    ['management_office', 'beds'],
+    ['spoil_heap', 'kg'],
+    ['freight_warehouse', 'kg'],
+    ['research_center', 'research'],
+  ])('%s utilization carries the %s explanation', (type, kind) => {
+    const b = mk({ id: 1, type });
+    const u = placedRowModel(b, stateWith(b)).utilization!;
+    expect(u.explain.length).toBeGreaterThan(0);
+    expect(u.explain).toBe(utilizationExplain(b, kind));
+  });
+
+  it('a busy research queue keeps an explanation', () => {
+    const b = mk({ id: 1, type: 'research_center' });
+    const s = stateWith(b);
+    s.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 2 } as never);
+    expect(placedRowModel(b, s).utilization!.explain).toBe(utilizationExplain(b, 'research'));
   });
 });

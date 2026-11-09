@@ -2,6 +2,7 @@ import { fractionOf } from '../../core/math/Fraction.js';
 import { t } from '../../core/i18n/I18n.js';
 import { warehouseStoredKg } from '../../core/economy/FreightWarehouses.js';
 import { getBuildingDef, getBuildingPeopleCapacity, type Building } from '../../core/entities/Building.js';
+import { badgeExplain, utilizationExplain } from '../buildingExplain.js';
 import { computeBuildingStatus } from '../../core/entities/BuildingStatus.js';
 import type { GameState, PlannedBuilding } from '../../core/state/GameState.js';
 
@@ -13,18 +14,20 @@ type RowModelState = Pick<
 export interface PlacedRowModel {
   hpFraction: number;
   hpText: string;
-  utilization: { text: string; fraction: number | null } | null;
+  utilization: { text: string; fraction: number | null; explain: string } | null;
   badge: 'out_of_service' | 'demolition_ordered' | 'upgrading' | null;
+  badgeExplain: string | null;
 }
 
 export interface SiteRowModel {
   progress: number | null;
 }
 
-function kgUtilization(storedKg: number, capacity: number): NonNullable<PlacedRowModel['utilization']> {
+function kgUtilization(b: Building, storedKg: number, capacity: number): NonNullable<PlacedRowModel['utilization']> {
   return {
     text: t('ui.build.row.util_kg', { stored: Math.round(storedKg), capacity: Math.round(capacity) }),
     fraction: fractionOf(storedKg, capacity),
+    explain: utilizationExplain(b, 'kg'),
   };
 }
 
@@ -33,14 +36,14 @@ function utilizationOf(b: Building, state: RowModelState): PlacedRowModel['utili
   const beds = getBuildingPeopleCapacity(b.type, b.tier);
   if (beds > 0) {
     const inside = b.occupantIds.length;
-    return { text: t('ui.build.row.util_beds', { inside, capacity: beds }), fraction: fractionOf(inside, beds) };
+    return { text: t('ui.build.row.util_beds', { inside, capacity: beds }), fraction: fractionOf(inside, beds), explain: utilizationExplain(b, 'beds') };
   }
   switch (b.type) {
-    case 'spoil_heap': return kgUtilization(b.storedSpoilKg ?? 0, capacity);
-    case 'freight_warehouse': return kgUtilization(warehouseStoredKg(state.logistics, b.id), capacity);
+    case 'spoil_heap': return kgUtilization(b, b.storedSpoilKg ?? 0, capacity);
+    case 'freight_warehouse': return kgUtilization(b, warehouseStoredKg(state.logistics, b.id), capacity);
     case 'research_center': {
       const busy = state.buildings.researchQueue.length > 0;
-      return { text: t(busy ? 'ui.build.row.util_research_busy' : 'ui.build.row.util_research_idle'), fraction: null };
+      return { text: t(busy ? 'ui.build.row.util_research_busy' : 'ui.build.row.util_research_idle'), fraction: null, explain: utilizationExplain(b, 'research') };
     }
     default: return null;
   }
@@ -48,13 +51,15 @@ function utilizationOf(b: Building, state: RowModelState): PlacedRowModel['utili
 
 export function placedRowModel(b: Building, state: RowModelState): PlacedRowModel {
   const maxHp = getBuildingDef(b.type, b.tier).maxHp;
-  const kind = computeBuildingStatus(state, b.id)?.kind;
+  const status = computeBuildingStatus(state, b.id);
+  const kind = status?.kind;
   const badge = kind === 'out_of_service' || kind === 'demolition_ordered' || kind === 'upgrading' ? kind : null;
   return {
     hpFraction: fractionOf(b.hp, maxHp),
     hpText: t('ui.build.row.hp', { hp: Math.round(b.hp), max: maxHp }),
     utilization: utilizationOf(b, state),
     badge,
+    badgeExplain: badge !== null && status ? badgeExplain(badge, status) : null,
   };
 }
 
