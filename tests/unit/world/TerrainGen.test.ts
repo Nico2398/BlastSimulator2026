@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  generateTerrain, surfaceDensityAt, buildTerrainContext, createChunkSource,
+  generateTerrain, surfaceDensityAt, buildTerrainContext, createChunkSource, clearTerrainContextMemo,
   requireValidGenDimension, requireValidGenDatum, requireValidPitMask, requireValidOreGradeScale, MAX_TERRAIN_GEN_DIMENSION,
   climateBiasLandingOn, resolveGeneratedBiome,
   TERRAIN_GENERATOR_VERSION,
@@ -22,6 +22,7 @@ function makeConfig(seed: number, biomeId = 'desert_badlands'): TerrainConfig {
 describe('TerrainGen — determinism', () => {
   it('same seed produces identical terrain', () => {
     const a = generateTerrain(makeConfig(42));
+    clearTerrainContextMemo(); // an independent build, not the memoised context
     const b = generateTerrain(makeConfig(42));
     for (const [x, y, z] of [[5, 5, 5], [10, 3, 15], [20, 10, 20]] as const) {
       const va = a.getVoxel(x, y, z)!;
@@ -626,7 +627,9 @@ describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
     });
 
     it('is deterministic, and buildTerrainContext hands the sampler the switch', () => {
-      expect(oreSignature(generateTerrain({ ...cfg, oreDeposits: true }))).toBe(oreSignature(generateTerrain({ ...cfg, oreDeposits: true })));
+      const first = oreSignature(generateTerrain({ ...cfg, oreDeposits: true }));
+      clearTerrainContextMemo(); // an independent build, not the memoised context
+      expect(oreSignature(generateTerrain({ ...cfg, oreDeposits: true }))).toBe(first);
       const on = buildTerrainContext({ ...cfg, oreDeposits: true });
       const off = buildTerrainContext(cfg);
       const comp = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
@@ -662,6 +665,7 @@ describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
 
   it('outside ore is deterministic across fresh generations', () => {
     const a = generateTerrain(big());
+    clearTerrainContextMemo(); // a fresh generation builds its own context
     const b = generateTerrain(big());
     claimOutside(a);
     claimOutside(b);
@@ -829,5 +833,142 @@ describe('requireValidOreGradeScale (#1932)', () => {
 
   it.each([[0], [-0.1], [1.0001], [2], [NaN], [Infinity], [-Infinity]])('rejects %s with the corrupt-save error', (v) => {
     expect(() => requireValidOreGradeScale(v, 'world.oreGradeScale')).toThrow(/corrupt save: world\.oreGradeScale is not a valid ore grade scale/);
+  });
+});
+
+// ── buildTerrainContext memo ───────────────────────────────────────────────
+// One `sandbox start` built the same context three to five times, ~0.1 s each;
+// the memo shares one build per config. These pin that the sharing is keyed on
+// every field by content, bounded, and cannot leak a caller's later edit.
+
+import { TERRAIN_CONTEXT_MEMO_ENTRIES } from '../../../src/core/world/TerrainGen.js';
+
+describe('buildTerrainContext memo', () => {
+  const sandbox = (seed: number): TerrainConfig => sandboxTerrainConfig('desert_badlands', seed);
+
+  it('returns the same context for the same config, and for an equal copy with fresh arrays and objects', () => {
+    const config = sandbox(901);
+    const first = buildTerrainContext(config);
+    expect(buildTerrainContext(config)).toBe(first);
+    const copy: TerrainConfig = {
+      ...config,
+      climateBias: [config.climateBias[0], config.climateBias[1]],
+      // Same pit mask content, keys in a different order: keyed by content, not identity or order.
+      pitMask: Object.fromEntries(Object.entries(config.pitMask!).reverse()) as PitMaskShape,
+    };
+    expect(buildTerrainContext(copy)).toBe(first);
+  });
+
+  it('ignores fields a caller object carries beyond TerrainConfig', () => {
+    const config = sandbox(902);
+    const first = buildTerrainContext(config);
+    const widened = { ...config, startingCrew: true, fleetMustStayMobile: true };
+    expect(buildTerrainContext(widened)).toBe(first);
+  });
+
+  it.each<[string, (c: TerrainConfig) => TerrainConfig]>([
+    ['sizeX', c => ({ ...c, sizeX: c.sizeX + 1 })],
+    ['sizeZ', c => ({ ...c, sizeZ: c.sizeZ + 1 })],
+    ['datum', c => ({ ...c, datum: c.datum + 1 })],
+    ['seed', c => ({ ...c, seed: c.seed + 1 })],
+    ['climateBias[0]', c => ({ ...c, climateBias: [c.climateBias[0] + 0.01, c.climateBias[1]] })],
+    ['climateBias[1]', c => ({ ...c, climateBias: [c.climateBias[0], c.climateBias[1] + 0.01] })],
+    ['mixedRockHardness', c => ({ ...c, mixedRockHardness: !c.mixedRockHardness })],
+    ['oreDeposits', c => ({ ...c, oreDeposits: false })],
+    ['pitMask', c => ({ ...c, pitMask: { ...c.pitMask!, margin: c.pitMask!.margin + 1 } })],
+    ['pitMask absent', c => { const { pitMask: _omit, ...rest } = c; return rest; }],
+    ['oreGradeScale', c => ({ ...c, oreGradeScale: 0.5 })],
+  ])('a config differing only in %s gets its own context', (_field, change) => {
+    const config = sandbox(903);
+    const first = buildTerrainContext(config);
+    const other = buildTerrainContext(change(config));
+    expect(other).not.toBe(first);
+    expect(buildTerrainContext(config)).toBe(first);
+  });
+
+  it('keeps at most TERRAIN_CONTEXT_MEMO_ENTRIES contexts, evicting the least recently used', () => {
+    expect(TERRAIN_CONTEXT_MEMO_ENTRIES).toBeGreaterThanOrEqual(2);
+    const kept = sandbox(904);
+    const evicted = sandbox(905);
+    const keptCtx = buildTerrainContext(kept);
+    const evictedCtx = buildTerrainContext(evicted);
+    // Fill the rest of the memo, touching `kept` before every insert so it stays the most recently used.
+    for (let i = 0; i < TERRAIN_CONTEXT_MEMO_ENTRIES - 1; i++) {
+      expect(buildTerrainContext(kept)).toBe(keptCtx);
+      buildTerrainContext(sandbox(910 + i));
+    }
+    expect(buildTerrainContext(kept)).toBe(keptCtx);
+    const rebuilt = buildTerrainContext(evicted);
+    expect(rebuilt).not.toBe(evictedCtx);
+    // A rebuild is the same terrain: the memo changes what is shared, never what is generated.
+    expect(rebuilt.starterDeposit).toEqual(evictedCtx.starterDeposit);
+    expect(rebuilt.biome).toBe(evictedCtx.biome);
+    for (const [x, z] of [[0, 0], [17, 40], [63, 63], [-20, 90]] as const) {
+      expect(sampleSurfaceHeightY(rebuilt.worldGen, x, z)).toBe(sampleSurfaceHeightY(evictedCtx.worldGen, x, z));
+    }
+  });
+
+  it('a caller editing its config after the build changes neither the shared context nor what that config key returns', () => {
+    const climateBias: [number, number] = [...sandbox(906).climateBias];
+    const pitMask: PitMaskShape = { ...sandbox(906).pitMask! };
+    const config: TerrainConfig = { ...sandbox(906), climateBias, pitMask };
+    const ctx = buildTerrainContext(config);
+    const before = [sampleSurfaceHeightY(ctx.worldGen, 5, 5), sampleSurfaceHeightY(ctx.worldGen, 40, 12)];
+    const margin = pitMask.margin;
+    climateBias[0] += 5;
+    pitMask.margin += 7;
+    expect(ctx.worldGen.pitMask.margin).toBe(margin);
+    expect([sampleSurfaceHeightY(ctx.worldGen, 5, 5), sampleSurfaceHeightY(ctx.worldGen, 40, 12)]).toEqual(before);
+    expect(buildTerrainContext(config)).not.toBe(ctx);
+    expect(buildTerrainContext({ ...sandbox(906) })).toBe(ctx);
+  });
+
+  it('hands out a frozen context, so a consumer write fails loudly instead of corrupting a shared build', () => {
+    const ctx = buildTerrainContext(sandbox(907));
+    expect(Object.isFrozen(ctx)).toBe(true);
+    expect(Object.isFrozen(ctx.worldGen)).toBe(true);
+    expect(Object.isFrozen(ctx.worldGen.playableRect)).toBe(true);
+    expect(Object.isFrozen(ctx.worldGen.pitMask)).toBe(true);
+    expect(ctx.starterDeposit).not.toBeNull();
+    expect(Object.isFrozen(ctx.starterDeposit)).toBe(true);
+    expect(() => { (ctx.worldGen.playableRect as { maxX: number }).maxX = 1; }).toThrow(TypeError);
+  });
+
+  it('two grids generated from one config share the context and still generate identical voxels', () => {
+    const config = sandbox(908);
+    const a = generateTerrain(config);
+    const b = generateTerrain({ ...config });
+    for (const [x, z] of [[3, 3], [32, 32], [50, 20]] as const) {
+      for (let y = 0; y < 40; y += 4) {
+        expect(b.densityAt(x, y, z)).toBe(a.densityAt(x, y, z));
+        expect(JSON.stringify(b.oresAt(x, y, z))).toBe(JSON.stringify(a.oresAt(x, y, z)));
+      }
+    }
+  });
+
+  it('clearTerrainContextMemo forces an independent build, which generates the same terrain, starter pocket included', () => {
+    const config = sandbox(909);
+    const first = buildTerrainContext(config);
+    const a = generateTerrain(config);
+    clearTerrainContextMemo();
+    const second = buildTerrainContext(config);
+    expect(second).not.toBe(first);
+    expect(second.starterDeposit).toEqual(first.starterDeposit);
+    const b = generateTerrain(config);
+    const d = first.starterDeposit!;
+    for (const [x, z] of [[d.x, d.z], [d.x + 2, d.z - 1], [3, 3], [50, 20]] as const) {
+      for (let y = 0; y < 40; y += 2) {
+        expect(b.densityAt(x, y, z)).toBe(a.densityAt(x, y, z));
+        expect(JSON.stringify(b.compositionAt(x, y, z))).toBe(JSON.stringify(a.compositionAt(x, y, z)));
+        expect(JSON.stringify(b.oresAt(x, y, z))).toBe(JSON.stringify(a.oresAt(x, y, z)));
+      }
+    }
+  });
+
+  it('clearTerrainContextMemo on an empty memo is harmless', () => {
+    clearTerrainContextMemo();
+    clearTerrainContextMemo();
+    const config = sandbox(901);
+    expect(buildTerrainContext(config)).toBe(buildTerrainContext(config));
   });
 });
