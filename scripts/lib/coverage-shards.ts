@@ -139,7 +139,9 @@ const INLINE_SOURCE_MAP = /\n\/\/# sourceMappingURL=data:application\/json;(?:ch
  * its inline source map minus `file`. vite-node writes the module id it was
  * first requested by into `file` — `/src/ui/x.ts` from one import, the absolute
  * path from another — so which test file a shard ran first changes it. Nothing
- * reads `file` to place an offset; the code and every mapping still must match.
+ * reads `file` to place an offset; the code and every mapping still must match,
+ * and the later shard's ranges are moved onto the first's code
+ * (`onFirstShardsCode`) so the two merge as one script.
  */
 export function comparableTransform(code: string | undefined): string | undefined {
   if (code === undefined) return undefined;
@@ -151,6 +153,28 @@ export function comparableTransform(code: string | undefined): string | undefine
   } catch {
     return code;
   }
+}
+
+/**
+ * `script` moved onto the code the first shard executed for its module, when
+ * the two differ only in the source map's `file` (`comparableTransform`). That
+ * comment closes the script, so only the ranges that end where the script ends
+ * — the module function and vite-node's wrapper — see the length change. Left
+ * unshifted, they would not key-match the first shard's (V8 merges functions by
+ * their range), and every top-level block under them would be counted twice.
+ */
+export function onFirstShardsCode(script: ScriptCov, lengthDelta: ReadonlyMap<string, number>): ScriptCov {
+  if (!script.url.startsWith('file://')) return script;
+  const delta = lengthDelta.get(fileURLToPath(script.url));
+  if (delta === undefined || delta === 0) return script;
+  const end = Math.max(...script.functions.flatMap((fn) => fn.ranges.map((range) => range.endOffset)));
+  return {
+    ...script,
+    functions: script.functions.map((fn) => ({
+      ...fn,
+      ranges: fn.ranges.map((range) => (range.endOffset === end ? { ...range, endOffset: end + delta } : range)),
+    })),
+  };
 }
 
 /**
@@ -433,7 +457,8 @@ function byTestFile(a: QueuedCoverage, b: QueuedCoverage): number {
  */
 export class ShardCoverageInjector {
   private readonly queued: Record<TransformMode, QueuedCoverage[]> = { ssr: [], web: [] };
-  private readonly code: Record<TransformMode, Map<string, string | undefined>> = { ssr: new Map(), web: new Map() };
+  /** Per module, the code the first shard to dump it executed, and its comparable form. */
+  private readonly code: Record<TransformMode, Map<string, { raw: string | undefined; comparable: string | undefined }>> = { ssr: new Map(), web: new Map() };
   private readonly tests = new Map<number, Set<string>>();
   private written = 0;
 
@@ -447,13 +472,21 @@ export class ShardCoverageInjector {
     for (const mode of TRANSFORM_MODES) {
       const coverage = dump.modes[mode];
       if (!coverage) continue;
+      // Modules this shard executed with a source map `file` other than the
+      // first shard's: by how many characters its script is longer.
+      const lengthDelta = new Map<string, number>();
       for (const [path, source] of Object.entries(coverage.transforms)) {
         const known = this.code[mode];
         const comparable = comparableTransform(source.code);
-        if (known.has(path) && known.get(path) !== comparable) {
-          return { success: false, error: `${path} (${mode}) was transformed differently by two shards; their offsets cannot be merged` };
+        const first = known.get(path);
+        if (first !== undefined) {
+          if (first.comparable !== comparable) {
+            return { success: false, error: `${path} (${mode}) was transformed differently by two shards; their offsets cannot be merged` };
+          }
+          if (first.raw !== source.code) lengthDelta.set(path, (first.raw?.length ?? 0) - (source.code?.length ?? 0));
+          continue;
         }
-        known.set(path, comparable);
+        known.set(path, { raw: source.code, comparable });
         const entry: FetchCacheEntry = { timestamp: 0, result: { code: source.code, map: source.map } };
         this.vitenode.fetchCaches[mode].set(path, entry);
         this.vitenode.fetchCache.set(path, entry);
@@ -463,7 +496,8 @@ export class ShardCoverageInjector {
         for (const test of testCoverage.test?.split(' ') ?? []) ran.add(test);
         this.tests.set(dump.shard.index, ran);
         const file = join(this.provider.coverageFilesDirectory, `${mode}-${String(this.written).padStart(6, '0')}.json`);
-        await this.writeFile(file, JSON.stringify({ result: testCoverage.result }));
+        const result = lengthDelta.size === 0 ? testCoverage.result : testCoverage.result.map((script) => onFirstShardsCode(script, lengthDelta));
+        await this.writeFile(file, JSON.stringify({ result }));
         this.queued[mode].push({ test: testCoverage.test, at: this.written, file });
         this.written++;
       }

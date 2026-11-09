@@ -3078,6 +3078,25 @@ describe('a run cannot end waiting on work that reports after the turn', () => {
   });
 });
 
+// The whole suite moved to CI when `verify` became a focused pre-flight (the
+// timeouts of #2142, #2143, #2148, #2154 and #2199 were mostly local full-suite
+// runs). The runner prompt says so; the conflict handback pasted into the same
+// prompt kept asking for `npm run test` until a review caught the contradiction.
+describe('no prompt the pipeline writes sends a session to the whole suite', () => {
+  it('the runner prompt leaves the whole suite to CI', () => {
+    const first = workflow('claude-runner.yml');
+    const prompt = first.slice(first.indexOf('- name: Run Claude Code'), first.indexOf('- name: Verify the agent binary'));
+    expect(prompt).toContain('The whole test suite');
+    expect(prompt).toContain('never run `npm run test`');
+  });
+
+  it("the CI-fix handback verifies through `verify`, not `npm run test`", () => {
+    const handback = workflow('agentic-ci-failure.yml');
+    expect(handback).toContain('`npm run pipeline -- verify` through `npm run long`');
+    expect(handback).not.toContain('`npm run test`');
+  });
+});
+
 // The hourly `agentic-watchdog.yml` cron is the only thing that re-raises a
 // red CI once the live session that would have read `[await-ci]` itself has
 // exited — and GitHub delivers `schedule` unreliably, with gaps of 3-5 hours

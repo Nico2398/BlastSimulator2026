@@ -4,7 +4,7 @@
 // committed table, with a new scenario falling back to its static estimate.
 // These pin the table's parsing and fallback, the `Timing:` line the batch
 // prints and the refresh reads back, and — on the committed table itself —
-// that it covers the definitions on disk and actually balances the shards.
+// that it parses and actually balances the shards.
 
 import { describe, it, expect, vi } from 'vitest';
 import { readdirSync } from 'node:fs';
@@ -54,14 +54,20 @@ describe('run-all-scenarios-costs.ts', () => {
   });
 
   describe('timing lines', () => {
-    it('reads back what the batch prints, with or without a CI timestamp prefix', () => {
+    it('reads back what the batch prints, behind a raw-log timestamp or a `gh run view --log` prefix', () => {
       const log = [
         timingLine('level1-lose-ecology', 337.44),
         `2026-11-09T07:31:18.1234567Z ${timingLine('tutorial-real-clock', 161.4)}`,
+        `Scenarios (interaction mode) — shard 7/10\tRun scenario shard 7/10\t2026-11-09T07:31:19.0000000Z ${timingLine('vehicle-traffic', 37.1)}`,
         '  Progress: 2/26 (2 passed, 0 failed) [498.8s]',
         '  Timing: not a line 3s',
       ].join('\n');
-      expect([...parseTimingLines(log)]).toEqual([['level1-lose-ecology', 337.4], ['tutorial-real-clock', 161.4]]);
+      expect([...parseTimingLines(log)]).toEqual([['level1-lose-ecology', 337.4], ['tutorial-real-clock', 161.4], ['vehicle-traffic', 37.1]]);
+    });
+
+    it('skips a scenario that failed: the time it took to fail is not its cost', () => {
+      expect(timingLine('mafia-tax-audit-click', 15.04, true)).toBe('  Timing: mafia-tax-audit-click 15.0s FAILED');
+      expect([...parseTimingLines(timingLine('mafia-tax-audit-click', 15, true))]).toEqual([]);
     });
   });
 
@@ -74,13 +80,19 @@ describe('run-all-scenarios-costs.ts', () => {
   });
 
   describe('the committed table', () => {
+    // Named literally, so `verify`'s selection runs this file when a refresh rewrites the table.
+    const TABLE_FILE = 'scripts/run-all-scenarios-interaction-seconds.json';
     const table = loadScenarioSeconds(INTERACTION_SECONDS_PATH, () => { throw new Error('the committed table must parse'); });
     const names = readdirSync(DEFS).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
 
-    it('names only scenario definitions that exist', () => {
-      expect([...table.keys()].filter((name) => !names.includes(name))).toEqual([]);
+    it(`is ${TABLE_FILE}`, () => {
+      expect(INTERACTION_SECONDS_PATH).toBe(resolve(import.meta.dirname, '../../..', TABLE_FILE));
     });
 
+    // An entry for a definition since deleted or renamed is never asked for, and
+    // the next --refresh drops it: the table is checked for what it balances,
+    // not held to the definitions on disk, so a pull request that deletes a
+    // scenario does not owe a table edit.
     it('splits ten shards within 5% of the ideal on its own seconds', () => {
       const costOf = (name: string): number => table.get(name) ?? 0;
       const loads = Array.from({ length: 10 }, (_, i) =>

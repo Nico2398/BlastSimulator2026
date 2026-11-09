@@ -16,7 +16,8 @@
  *                      mid-run in production twice (issue #842's rescue, PR
  *                      #872) at ~500 s, despite being "under the cap". It is
  *                      CI's now; `npm run pipeline -- verify` runs it only when
- *                      a diff changes how every test runs
+ *                      a diff changes how every test runs, its focused set
+ *                      would reach 60% of the suite, or the selection fails
  *   npm run scenarios about a minute since it fans out across worker
  *                      processes (~120 s serial, ~559 s on a 2-core runner
  *                      before that)

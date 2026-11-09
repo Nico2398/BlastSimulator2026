@@ -15,6 +15,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import vitestConfig from '../../../vitest.config.js';
+import { branchChanges } from '../../../scripts/lib/pipeline/git.js';
 import {
   buildImportGraph,
   changedExports,
@@ -473,6 +474,12 @@ describe('console verbs', () => {
     expect(verbsCalling(registry, new Set())).toEqual([]);
   });
 
+  it('counts a call of the handler, not its name in a description or a key', () => {
+    const described = "runner.register('terrain_info', 'Show terrain grid info', () => terrainInfo(ctx));\nrunner.register('stats', 'Stats', () => ({ info: 1 }));";
+    expect(verbsCalling(described, new Set(['info']))).toEqual([]);
+    expect(verbsCalling(described, new Set(['terrainInfo']))).toEqual(['terrain_info']);
+  });
+
   it('lists the names a module declares as exports', () => {
     const text = ['export function rampCommand() {}', 'export const LIMIT = 3;', 'function privateOne() {}', 'export async function later() {}'].join('\n');
     expect([...declaredExports(text)].sort()).toEqual(['LIMIT', 'later', 'rampCommand']);
@@ -505,6 +512,21 @@ describe('console verbs', () => {
     expect(describeSelection(narrowed)).toContain('1 runs a changed command');
     const unattributed = select(files, [command], { [command]: undefined });
     expect(unattributed.files).toEqual(sorted(UNIT('drivesRamp.test.ts'), UNIT('drivesTick.test.ts')));
+  });
+
+  it('runs the tests that issue the verb through a helper they import', () => {
+    const command = p('src', 'console', 'commands', 'demo.ts');
+    const helper = p('tests', 'helpers', 'rampFixture.ts');
+    const files: Record<string, string> = {
+      [COMMAND_REGISTRY]: `${importing(COMMAND_REGISTRY, command, 'rampCommand')}${registry}`,
+      [command]: 'export function rampCommand() {}\n',
+      [helper]: "export function digRamp(run) { run('ramp spiral from:1,1'); }\n",
+      [UNIT('viaHelper.test.ts')]: importing(UNIT('viaHelper.test.ts'), helper, 'digRamp'),
+      [UNIT('a.test.ts')]: '\n',
+      [UNIT('b.test.ts')]: '\n',
+      [UNIT('c.test.ts')]: '\n',
+    };
+    expect(select(files, [command], { [command]: ['rampCommand'] }).files).toEqual([UNIT('viaHelper.test.ts')]);
   });
 });
 
@@ -576,5 +598,32 @@ describe('planLogic on a real repository', () => {
     const selection = planLogic(repo, fork, [SRC('Hub.ts'), 'linked-dir']);
     expect(selection.files).toEqual(sorted(LINT, UNIT('Hub0.test.ts'), UNIT('Hub1.test.ts')));
     expect(selection.notes).toEqual([expect.stringContaining('narrowed to 2 by the changed identifiers A')]);
+  });
+
+  it('still runs a test that imports a module by the path a rename left behind', () => {
+    write(SRC('Old.ts'), 'export const x = 1;\n');
+    write(UNIT('UsesOld.test.ts'), importing(UNIT('UsesOld.test.ts'), SRC('Old.ts')));
+    sh('add', '-A');
+    sh('commit', '-q', '-m', 'old module');
+    const fork = sh('rev-parse', 'HEAD');
+    sh('mv', SRC('Old.ts'), SRC('Renamed.ts'));
+    sh('commit', '-q', '-m', 'rename');
+    const changed = branchChanges(repo, fork);
+    expect(changed).toEqual(sorted(SRC('Old.ts'), SRC('Renamed.ts')));
+    expect(planLogic(repo, fork, changed).files).toContain(UNIT('UsesOld.test.ts'));
+  });
+
+  it('selects a scripts-only package.json edit as data, and runs the full suite for a dependency change', () => {
+    write('package.json', JSON.stringify({ name: 'x', scripts: { test: 'vitest run', lint: 'a' }, devDependencies: { vitest: '1' } }));
+    write(UNIT('Scripts.test.ts'), "readFileSync('package.json');\n");
+    sh('add', '-A');
+    sh('commit', '-q', '-m', 'package');
+    const fork = sh('rev-parse', 'HEAD');
+    write('package.json', JSON.stringify({ name: 'x', scripts: { test: 'vitest run', lint: 'b' }, devDependencies: { vitest: '1' } }));
+    const scriptsOnly = planLogic(repo, fork, ['package.json']);
+    expect(scriptsOnly.full).toBe(false);
+    expect(scriptsOnly.files).toContain(UNIT('Scripts.test.ts'));
+    write('package.json', JSON.stringify({ name: 'x', scripts: { test: 'vitest run', lint: 'b' }, devDependencies: { vitest: '2' } }));
+    expect(planLogic(repo, fork, ['package.json']).full).toBe(true);
   });
 });

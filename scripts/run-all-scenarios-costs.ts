@@ -18,11 +18,13 @@
  * balance: nothing here decides which scenarios run.
  *
  * Refreshing the table: every interaction-mode batch prints a `Timing:` line
- * per scenario (`timingLine`). Save the logs of a CI run's interaction shards
- * and run
+ * per scenario (`timingLine`), marked FAILED for a scenario that failed. Save
+ * the logs of a CI run's interaction shards (`gh run view <run id> --log >
+ * ci.log`, or each job's raw log) and run
  *   npx tsx scripts/run-all-scenarios-costs.ts --refresh <log>...
- * which rewrites the table from them — measured entries replaced, scenarios
- * the logs did not cover kept, entries for deleted definitions dropped.
+ * which rewrites the table from them — measured entries of passed scenarios
+ * replaced, scenarios the logs did not cover or that failed kept, entries for
+ * deleted definitions dropped.
  *
  * @module run-all-scenarios-costs
  */
@@ -73,19 +75,25 @@ export function interactionCostSeconds(name: string, staticCost: number, measure
   return measured.get(name) ?? staticCost * SECONDS_PER_COST_UNIT;
 }
 
-/** The line an interaction batch prints after each scenario; `parseTimingLines` reads it back. */
-export function timingLine(name: string, seconds: number): string {
-  return `  Timing: ${name} ${seconds.toFixed(1)}s`;
+/**
+ * The line an interaction batch prints after each scenario; `parseTimingLines`
+ * reads it back. A failed scenario's line says so: the time it took to fail is
+ * not what it costs, and a refresh skips it.
+ */
+export function timingLine(name: string, seconds: number, failed = false): string {
+  return `  Timing: ${name} ${seconds.toFixed(1)}s${failed ? ' FAILED' : ''}`;
 }
 
-const TIMING = /^(?:\S+Z )?\s*Timing: (\S+) (\d+(?:\.\d+)?)s\s*$/;
+// Anywhere on the line: a raw job log prefixes a timestamp, `gh run view --log`
+// a job name, a step name and a timestamp.
+const TIMING = /(?:^|\s)Timing: (\S+) (\d+(?:\.\d+)?)s( FAILED)?\s*$/;
 
-/** Every `Timing:` line in a log — a CI job log's timestamp prefix allowed — by scenario name; the last wins. */
+/** Every passed scenario's `Timing:` line in a log, by scenario name; the last wins. */
 export function parseTimingLines(log: string): Map<string, number> {
   const timings = new Map<string, number>();
   for (const line of log.split('\n')) {
     const match = TIMING.exec(line.trimEnd());
-    if (match) timings.set(match[1]!, Number(match[2]));
+    if (match && match[3] === undefined) timings.set(match[1]!, Number(match[2]));
   }
   return timings;
 }

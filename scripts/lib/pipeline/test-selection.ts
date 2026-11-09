@@ -36,7 +36,8 @@
  *   (`changedExports`), plus the direct test importers of the modules that
  *   import the hub and use one of those identifiers. When the diff cannot be
  *   attributed to a named declaration (only import lines, a side-effect
- *   statement, a default export), every direct importer runs.
+ *   statement, a default export, or a changed name such a statement reads),
+ *   every direct importer runs.
  * - **Directory owners** (`DIRECTORY_OWNERS`). A scenario definition owes the
  *   scenario validation suites, a locale the i18n suites, and a workflow,
  *   composite action or decision module under `.github/` the whole
@@ -47,7 +48,9 @@
  *   (`run('ramp spiral …')`), which no import edge shows. A changed module
  *   under `src/console/` owes the tests that issue a verb whose handler
  *   `COMMAND_REGISTRY` registers with one of the module's changed exports —
- *   every export it declares when the diff names none (`verbsCalling`).
+ *   every export it declares when the diff names none (`verbsCalling`) — and
+ *   the direct importers of a test helper or `scripts/shared/` module that
+ *   issues one of those verbs.
  * - **Nearest tests.** A changed module no test reaches by any rule above takes
  *   the test files at the first importer depth that has any, up to
  *   `NEAREST_MAX_DEPTH`.
@@ -62,8 +65,9 @@
  * chain (a hub change whose behaviour flows through an intermediate module
  * that never names the changed identifier), files read from disk under a
  * computed name that is neither a path, a file name, a quoted stem nor a
- * directory literal, and a verb string assembled at run time. All three are
- * what CI's full run on the pull request head catches.
+ * directory literal, a verb string assembled at run time, and a verb a test
+ * issues through a helper two or more imports away. All of them are what CI's
+ * full run on the pull request head catches.
  *
  * The pure half (`importRefs` … `selectTests`) works on maps a test can build
  * by hand; `planLogic` is the thin layer that reads the repository.
@@ -358,9 +362,11 @@ export const COMMAND_REGISTRY = 'src/console/createRunner.ts';
 export function verbsCalling(registry: string, exported: ReadonlySet<string>): string[] {
   const pattern = identifierPattern(exported);
   if (pattern === undefined) return [];
+  // A call, not a mention: `info` in a description string calls nothing.
+  const call = new RegExp(`${pattern.source}\\s*\\(`);
   const starts = [...registry.matchAll(/\.register\(\s*['"`]([\w-]+)['"`]/g)];
   return starts
-    .filter((start, i) => pattern.test(registry.slice(start.index!, starts[i + 1]?.index ?? registry.length)))
+    .filter((start, i) => call.test(registry.slice(start.index!, starts[i + 1]?.index ?? registry.length)))
     .map((start) => start[1]!)
     .sort();
 }
@@ -405,6 +411,8 @@ export function selectTests(input: SelectionInput): TestSelection {
   };
   const testImporters = (path: string): string[] => [...(graph.importers.get(path) ?? [])].filter((f) => testSet.has(f)).sort();
   const mentioning = (pattern: RegExp): string[] => testFiles.filter((file) => pattern.test(texts.get(file) ?? ''));
+  /** Modules tests drive the console through: test helpers and the shared scenario and probe code. */
+  const commandHelpers = [...texts.keys()].filter((file) => !testSet.has(file) && (file.startsWith('tests/') || file.startsWith('scripts/shared/'))).sort();
 
   /** Direct test importers of `path`, narrowed to the changed identifiers when `path` is a hub. */
   const narrowedImporters = (path: string): string[] => {
@@ -460,7 +468,14 @@ export function selectTests(input: SelectionInput): TestSelection {
       const handlers = input.changedIdentifiers(path) ?? declaredExports(texts.get(path) ?? '');
       const verbs = verbsCalling(texts.get(COMMAND_REGISTRY) ?? '', handlers);
       const pattern = verbPattern(verbs);
-      if (pattern !== undefined) reached += add(mentioning(pattern), 'verb');
+      if (pattern !== undefined) {
+        reached += add(mentioning(pattern), 'verb');
+        // Tests that issue the verb through a helper — a fixture, a probe
+        // strategy — reach it one import away.
+        for (const helper of commandHelpers.filter((file) => pattern.test(texts.get(file) ?? ''))) {
+          reached += add(testImporters(helper), 'verb');
+        }
+      }
     }
     // A hub narrowed to nothing has tests; it is the diff that reaches none of them.
     if (reached === 0 && testImporters(path).length === 0 && (CODE_EXTENSION.test(path) || graph.importers.has(path))) {
@@ -580,8 +595,10 @@ function topLevelStatements(text: string): { statements: TopLevelStatement[]; al
  * alter: the top-level declarations the lines fall in (a comment or blank line
  * belongs to the declaration after it), then every declaration whose text uses
  * one of those, to a fixpoint — a constant feeds the exported function that
- * reads it. `undefined` when a line falls in a statement no name stands for
- * (a side effect, `export *`, a default export) or the lines touch only imports.
+ * reads it. A changed import line marks its bindings' users too. `undefined`
+ * when a line falls in a statement no name stands for (a side effect,
+ * `export *`, a default export), when the lines touch only imports, or when a
+ * marked name is read by such a statement (a registration call).
  */
 export function changedExports(text: string, lines: readonly number[]): Set<string> | undefined {
   if (lines.length === 0) return new Set();

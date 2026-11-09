@@ -220,7 +220,7 @@ export async function runBatchInteraction(
 
       logBatchProgress(results, i, names.length, startTime);
       // What `run-all-scenarios-costs.ts --refresh` reads to rebalance the shards.
-      console.log(timingLine(name!, (Date.now() - scenarioStart) / 1000));
+      console.log(timingLine(name!, (Date.now() - scenarioStart) / 1000, results.at(-1)?.failed ?? true));
     }
   } finally {
     await browser.close();

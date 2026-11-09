@@ -25,7 +25,7 @@ The layers surface as four independent channels. Each catches what the others mi
 | Channel | Command | Proves | Misses |
 |---------|---------|--------|--------|
 | `static` | `npm run typecheck` | Types line up across `src/` and `scripts/` | Anything about runtime behaviour |
-| `logic` | `npm run test` | Unit + integration behaviour matches expectations | Whether the game renders |
+| `logic` | `npm run pipeline -- verify` (the tests the diff reaches); CI runs `npm run test`, the whole suite | Unit + integration behaviour matches expectations | Whether the game renders |
 | `scenario` | `npm run scenarios` | Full command sequences produce the expected game state — a command the console refuses now fails the step unless the step declares `commandOutcome: 'refused'`/`'either'` | Whether the UI is reachable |
 | `visual` | `npm run scenarios:interaction`, `npm run screenshot` | The game renders, the UI responds to real clicks, and a player can reach the goal by clicking alone | Numeric correctness — that is `logic` |
 
@@ -41,7 +41,7 @@ Two channels disagreeing means neither result stands. Investigate until they agr
 
 ```bash
 npm run verify:env        # which channels are live
-npm run validate          # TypeScript → coverage → integration → scenario defs → build
+npm run validate          # TypeScript → coverage (thresholds) → whole suite → build
 npm run typecheck         # TypeScript across src/ and scripts/
 npm run test              # Unit + integration tests
 npm run test:integration  # Integration tests only

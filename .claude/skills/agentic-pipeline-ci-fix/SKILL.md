@@ -61,7 +61,7 @@ The merge gate merges a pull request only on a head that contains `main`'s tip, 
 
 1. `git fetch origin main && git merge origin/main`. Nothing to merge, or it merges cleanly → someone resolved it first: skip to step 8.
 2. Resolve the conflicted files so both sides' intent survives: this branch's change applied on top of what landed on `main`, never one side dropped. Lockfiles and generated files are regenerated with their tooling, never hand-merged. A mirrored context file is resolved once and the result copied to all three runtime directories.
-3. Commit the merge, then continue at step 6 — `verify` reads the merged diff, so it runs the channels both sides' changes owe.
+3. Commit the merge, then continue at step 6 — `verify` diffs the branch against the `main` it now contains, so it checks this branch's side of the merge; CI on the pushed head checks both sides, and `[await-ci]` reads it.
 
 A conflict that can only be resolved by choosing between two behaviours is a decision, not a merge: comment what the two sides want, convert the PR to a draft, label the issue `blocked`, stop with `ESCALATED: conflict with main needs a decision`.
 
@@ -86,3 +86,5 @@ A CI failure on a pipeline PR is one of three things, and the log says which:
 3. **The failure predates the change** and reproduces on `main`. Then it is still this run's finding: say so in a PR comment naming the check, and fix it here if it is small. Never report the PR ready while the channel is red — the Verification Gate's rule about a channel already red when you arrived applies unchanged.
 
 Flakiness is a claim, not a diagnosis. A step that fails on load contention or a timeout has a cause; name it before calling it flaky, and if it genuinely is, the fix is the scenario's own robustness, not a re-run.
+
+History: docs/context-history/agentic-pipeline-ci-fix.md

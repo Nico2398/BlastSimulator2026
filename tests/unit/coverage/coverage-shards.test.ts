@@ -18,6 +18,7 @@ import {
   buildShardDump,
   checkShardPartition,
   comparableTransform,
+  onFirstShardsCode,
   listShardDumps,
   parseShardDump,
   readShardDump,
@@ -256,17 +257,30 @@ describe('ShardCoverageInjector hands the provider every test file, in canonical
     expect(vitenode.fetchCaches.web.size).toBe(0);
   });
 
-  it('accepts two shards whose transforms differ only in the source map\'s `file`', async () => {
-    const { provider, vitenode, write } = sinks();
+  it('merges two shards whose transforms differ only in the source map\'s `file`, on the first shard\'s code', async () => {
+    const { provider, vitenode, written, write } = sinks();
     const injector = new ShardCoverageInjector(provider, vitenode, write);
     const inline = (file: string): string => `const a = 1;\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${Buffer.from(JSON.stringify({ version: 3, mappings: 'AAAA', file })).toString('base64')}`;
-    const first = dump(1, 2);
-    const second = dump(2, 2);
     const path = `${SHARD_ROOT}/src/a.ts`;
-    if (first.modes.ssr?.transforms[path]) first.modes.ssr.transforms[path].code = inline('/src/a.ts');
-    if (second.modes.ssr?.transforms[path]) second.modes.ssr.transforms[path].code = inline(path);
-    expect((await injector.add(first)).success).toBe(true);
-    expect((await injector.add(second)).success).toBe(true);
+    const firstCode = inline('/src/a.ts');
+    const secondCode = inline(path);
+    // The module function and the wrapper end where each shard's script ends.
+    const withEnd = (index: number, code: string): ShardDump => {
+      const d = dump(index, 2);
+      const end = 200 + code.length;
+      d.modes.ssr!.transforms[path]!.code = code;
+      d.modes.ssr!.processes[0]!.result = [{ ...script(path), functions: [{ functionName: '', isBlockCoverage: true, ranges: [{ startOffset: 0, endOffset: end, count: 1 }, { startOffset: 5, endOffset: 9, count: 0 }] }] }];
+      return d;
+    };
+    expect((await injector.add(withEnd(1, firstCode))).success).toBe(true);
+    expect((await injector.add(withEnd(2, secondCode))).success).toBe(true);
+    injector.finish();
+    const ranges = [...written.values()].map((text) => (JSON.parse(text) as { result: ScriptCov[] }).result[0]!.functions[0]!.ranges);
+    expect(ranges).toEqual([
+      [{ startOffset: 0, endOffset: 200 + firstCode.length, count: 1 }, { startOffset: 5, endOffset: 9, count: 0 }],
+      [{ startOffset: 0, endOffset: 200 + firstCode.length, count: 1 }, { startOffset: 5, endOffset: 9, count: 0 }],
+    ]);
+    expect(vitenode.fetchCaches.ssr.get(path)?.result.code).toBe(firstCode);
   });
 
   it('refuses two shards that transformed one module differently', async () => {
@@ -301,6 +315,28 @@ describe('comparableTransform: what two shards must agree on in a transform', ()
   it('leaves code without an inline map, and an absent code, as they are', () => {
     expect(comparableTransform('const y = 1;')).toBe('const y = 1;');
     expect(comparableTransform(undefined)).toBeUndefined();
+  });
+});
+
+describe('onFirstShardsCode', () => {
+  const path = `${SHARD_ROOT}/src/a.ts`;
+  const scriptEnding = (end: number): ScriptCov => ({
+    ...script(path),
+    functions: [
+      { functionName: '', isBlockCoverage: true, ranges: [{ startOffset: 0, endOffset: end, count: 1 }, { startOffset: 3, endOffset: 8, count: 0 }] },
+      { functionName: 'wrapper', isBlockCoverage: true, ranges: [{ startOffset: 2, endOffset: end, count: 1 }] },
+    ],
+  });
+
+  it('moves every range ending where the script ends by the length difference, and nothing else', () => {
+    const moved = onFirstShardsCode(scriptEnding(100), new Map([[path, -7]]));
+    expect(moved.functions.map((fn) => fn.ranges.map((r) => [r.startOffset, r.endOffset]))).toEqual([[[0, 93], [3, 8]], [[2, 93]]]);
+  });
+
+  it('leaves a script of another module, or one with no difference, as it is', () => {
+    const original = scriptEnding(100);
+    expect(onFirstShardsCode(original, new Map([[`${SHARD_ROOT}/src/b.ts`, 5]]))).toBe(original);
+    expect(onFirstShardsCode(original, new Map([[path, 0]]))).toBe(original);
   });
 });
 

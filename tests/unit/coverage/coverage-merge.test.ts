@@ -144,6 +144,22 @@ describe('scripts/coverage-merge.ts over real shard dumps', () => {
     expect(merged.status).toBe(2);
     expect(merged.stderr).toContain('coverage-shard-2-of-2.json: not JSON');
   });
+
+  it('fails closed with exit code 2 when the shards do not split the suite between them', () => {
+    // Shard 1's dump twice, the second relabelled 2/2: its files ran twice and
+    // shard 2's never — what two shards reading different splits would upload.
+    const misSplit = join(work, 'mis-split');
+    mkdirSync(misSplit);
+    collect(join(work, 'r-1-2'), 1, 2, misSplit);
+    const dump = JSON.parse(readFileSync(join(work, 'r-1-2', shardDumpFileName({ index: 1, count: 2 })), 'utf8')) as { shard: { index: number } };
+    dump.shard.index = 2;
+    writeFileSync(join(misSplit, shardDumpFileName({ index: 2, count: 2 })), JSON.stringify(dump));
+    const merged = merge(misSplit, 2, 0, join(work, 'merged-mis-split'));
+    expect(merged.status).toBe(2);
+    expect(merged.stderr).toContain('the shards do not split one suite');
+    expect(merged.stderr).toMatch(/ran in shard 1 and shard 2/);
+    expect(merged.stderr).toMatch(/is in no shard's coverage/);
+  });
 });
 
 describe('parseMergeArgs', () => {

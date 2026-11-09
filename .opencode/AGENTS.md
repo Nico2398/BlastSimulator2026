@@ -60,7 +60,7 @@ Four independent channels prove a change works. Each catches what the others mis
 | Channel | Command | Proves | Required when |
 |---------|---------|--------|---------------|
 | `static` | `npm run typecheck` | Types line up across `src/` and `scripts/` | Every code change |
-| `logic` | `npm run test` | Unit + integration behaviour matches expectations | Every code change |
+| `logic` | `npm run pipeline -- verify` (the tests the diff reaches); CI runs `npm run test`, the whole suite | Unit + integration behaviour matches expectations | Every code change |
 | `scenario` | `npm run scenarios` | Full command sequences produce the expected game state | Gameplay, console, economy, campaign changes |
 | `visual` | `npm run screenshot`, `npm run scenario -- --mode interaction --screenshots` | The game renders correctly, the UI responds to real clicks, and a player can actually reach the goal by clicking — no console command stands in for a player action | Any change to `src/renderer/`, `src/ui/`, or anything a player sees; any change to a player-facing flow: tutorial, panels, hiring, skills, contracts, building, vehicles |
 
