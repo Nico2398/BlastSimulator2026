@@ -43,6 +43,7 @@ import type { LandscapeMesh } from './terrain/LandscapeMesh.js';
 import type { LandscapeChunkStreamer } from './terrain/LandscapeChunkStreamer.js';
 import type { WorldBorderWall } from './WorldBorderWall.js';
 import type { BlastPlanOverlay } from './BlastPlanOverlay.js';
+import type { ColumnBandSummary } from '../core/mining/EnergyHeatmap.js';
 import type { GhostMesh } from './GhostMesh.js';
 import type { RampArrowLayer } from './RampArrow.js';
 import type { RallyFlagMesh } from './RallyFlagMesh.js';
@@ -562,6 +563,21 @@ export class GameRenderer {
   setWallOverlayVisible(visible: boolean): void {
     this.wallOverlayPreference = visible;
     this.refreshWallOverlay();
+  }
+
+  /** Player-facing visibility preference for the top-down energy heatmap (#2200). */
+  get energyHeatmapVisible(): boolean {
+    throw new Error('not implemented');
+  }
+
+  /** Set the heatmap preference and re-sync it against the last known state (#2200). */
+  setEnergyHeatmapVisible(_visible: boolean): void {
+    throw new Error('not implemented');
+  }
+
+  /** The heatmap summary of the column at tile (x, z), or null when the overlay is off or the column is outside the blast box (#2200). */
+  energyHeatmapColumnAt(_x: number, _z: number): ColumnBandSummary | null {
+    throw new Error('not implemented');
   }
 
   private refreshWallOverlay(): void {

@@ -143,6 +143,20 @@ export class BlastWorkshop extends PanelBase {
 
   setFireRequestedHandler(cb: () => void): void { this.footer.setFireRequestedHandler(cb); }
 
+  /** Register the callback fired when the player toggles the energy heatmap (#2200). */
+  setEnergyHeatmapToggleHandler(_cb: (visible: boolean) => void): void {
+    throw new Error('not implemented');
+  }
+
+  /** Reflect the heatmap preference without firing the handler (#2200). */
+  setEnergyHeatmapVisible(_visible: boolean): void {
+    throw new Error('not implemented');
+  }
+
+  get energyHeatmapVisible(): boolean {
+    throw new Error('not implemented');
+  }
+
   override show(): void {
     super.show();
     this.autoAdvance = true;

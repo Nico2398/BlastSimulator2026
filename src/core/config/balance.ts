@@ -3490,3 +3490,9 @@ export const CRATER_ACCESS_FLOOR_LEVEL_M = 0.5;
  * (`CRATER_ACCESS_FLOOR_LEVEL_M`).
  */
 export const CRATER_ACCESS_MIN_DROP_M = 1;
+
+/** A heatmap column shows the finest fragmentation band covering at least this share of its filled voxels (#2200). */
+export const HEATMAP_COLUMN_BAND_MIN_SHARE = 0.15;
+
+/** Opacity of the top-down energy heatmap tint on the terrain (#2200). */
+export const HEATMAP_OVERLAY_OPACITY = 0.55;

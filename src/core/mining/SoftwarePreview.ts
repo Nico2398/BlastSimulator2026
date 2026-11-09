@@ -9,6 +9,7 @@ import { getDominantRockId, firstEmptyLayerAboveGround, clampToGridColumn } from
 import { getRock, type RockType } from '../world/RockCatalog.js';
 import { SEEDS_BASE, SEEDS_PER_INTENSITY, MAX_SEEDS_PER_VOXEL, FRAGMENTATION_MULTIPLIER } from '../config/balance.js';
 import { type EnergyField, effectiveAt, thresholdAt, intensityAt } from './EnergyPropagation.js';
+import type { FragmentationBand } from './FragmentationBand.js';
 
 export const PREVIEW_RADIUS = 5;
 
@@ -143,4 +144,27 @@ export function getBlastBBox(plan: BlastPlan, ctx: HoleContext): BlastBBox {
     minZ: Math.floor(minZ - PREVIEW_RADIUS),
     maxZ: Math.ceil(maxZ + PREVIEW_RADIUS),
   };
+}
+
+/** One filled voxel of the plan's blast box with the intensity the blast would give it and its band (#2200). */
+export interface PlanBandCell {
+  x: number;
+  y: number;
+  z: number;
+  intensity: number;
+  band: FragmentationBand;
+}
+
+/** Every filled voxel of the plan's blast box, keyed `x,y,z`. Empty when nothing is charged. */
+export interface PlanBandMap {
+  bbox: BlastBBox;
+  cells: ReadonlyMap<string, PlanBandCell>;
+}
+
+/**
+ * The fragmentation bands the plan would produce, read from the blast's own energy field.
+ * Needs no software tier (#2200).
+ */
+export function previewPlanBands(_plan: BlastPlan, _grid: VoxelGrid, _wetHoleIds: ReadonlySet<string> = new Set()): PlanBandMap {
+  throw new Error('not implemented');
 }

@@ -31,3 +31,17 @@ export function classifyFragmentationBand(intensity: number): FragmentationBand 
 export function bandMassRetention(band: FragmentationBand): number {
   return band === 'dust' ? 1 - DUST_LOSS_SHARE : 1;
 }
+
+/** One colour token per band, shared by the heatmap overlay, its section view and legend (#2200). */
+export const FRAGMENTATION_BAND_COLORS: Record<FragmentationBand, number> = {
+  intact: 0x2f6fd6,
+  cracked: 0x9cc7f2,
+  good: 0x3fbf5f,
+  fines: 0xf59a2b,
+  dust: 0xd8372b,
+};
+
+/** Colour token of the band a voxel of this intensity falls in. */
+export function heatmapBandColor(_intensity: number): number {
+  throw new Error('not implemented');
+}
