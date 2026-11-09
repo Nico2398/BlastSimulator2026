@@ -3827,7 +3827,6 @@
   "ui.blast_workshop.charge.tubing_install": "Install on {count}",
   "ui.blast_workshop.charge.too_much_for_hole": "Shallowest hole is {depth} m. At this stemming at most {max} kg fits.",
   "ui.blast_workshop.charge.hole_capacity": "{diameter} mm holes: {kgPerMetre} kg of explosive per metre.",
-  "ui.blast_workshop.charge.too_weak_for_rock": "{explosive} is too weak for {rock} under {count} of {total} holes",
   "ui.blast_workshop.charge.tubing_reason": "Only {stock} tubes in stock, {need} holes need one",
   "ui.blast_workshop.charge.tubing_reason_one": "Only {stock} tubes in stock, 1 hole needs one",
   "ui.blast_workshop.charge.drain_holes": "Drain wet holes ({count} · {cost})",

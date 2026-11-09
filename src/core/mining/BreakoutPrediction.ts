@@ -101,6 +101,7 @@ export type BreakoutWarningKind = 'nothing' | 'none' | 'partial';
  * BLAST_SEALED_SHARE_PARTIAL; null when no warning is due.
  */
 export function breakoutWarningKind(prediction: BreakoutPrediction): BreakoutWarningKind | null {
-  if (prediction.brokenVoxels > 0 && prediction.sealedVoxels >= prediction.brokenVoxels) return 'none';
+  if (prediction.brokenVoxels === 0) return 'nothing';
+  if (prediction.sealedVoxels >= prediction.brokenVoxels) return 'none';
   return prediction.sealedShare >= BLAST_SEALED_SHARE_PARTIAL ? 'partial' : null;
 }

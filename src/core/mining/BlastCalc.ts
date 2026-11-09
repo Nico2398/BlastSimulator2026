@@ -61,15 +61,13 @@ export function waterEffect(isFlooded: boolean, waterSensitive: boolean, hasTubi
 
 export function effectiveHoleEnergy(
   charge: HoleCharge, holeDepth: number, isFlooded: boolean, hasTubing: boolean,
-): { downward: number; upward: number; vibrationMod: number } {
+): { downward: number; vibrationMod: number } {
   const explosive = getExplosive(charge.explosiveId);
-  if (!explosive) return { downward: 0, upward: 0, vibrationMod: 1 };
+  if (!explosive) return { downward: 0, vibrationMod: 1 };
   const rawE = explosive.energyPerKg * charge.amountKg;
-  const sf = stemmingFactor(charge.stemmingM, holeDepth);
   const wf = waterEffect(isFlooded, explosive.waterSensitive, hasTubing);
   return {
     downward: rawE * stemmingEfficiency(charge.stemmingM, holeDepth) * wf,
-    upward: rawE * (1 - sf) * 0.7 * wf * explosive.projectionRiskMod,
     vibrationMod: explosive.vibrationMod,
   };
 }
