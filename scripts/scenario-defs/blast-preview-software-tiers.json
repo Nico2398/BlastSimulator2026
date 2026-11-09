@@ -98,7 +98,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite amount:5 stemming:1",
       "interaction": [
         {
           "type": "clickSelector",
@@ -112,7 +112,7 @@
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 2
+          "value": 1
         },
         {
           "type": "clickSelector",
@@ -217,6 +217,14 @@
     {
       "command": "preview projections",
       "interaction": [
+        {
+          "type": "focusTile",
+          "x": 17,
+          "z": 17,
+          "distance": 22,
+          "yaw": 0,
+          "pitch": 70
+        },
         {
           "type": "command",
           "command": "preview projections"
