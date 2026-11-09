@@ -18,19 +18,27 @@
 //     the mid 90s to 84-88% (#1949).
 //
 // All of them still run, unexcluded, in the ordinary `npm run test` suite that
-// CI's test job and the `logic` channel use. This config only shapes the coverage
-// measurement.
+// the `logic` channel uses. In CI they run uninstrumented beside each coverage
+// shard (vitest.coverage-excluded.config.ts reads the list below, so the two
+// halves cannot drift apart). This config only shapes the coverage measurement.
 
 import { defineConfig, mergeConfig, configDefaults } from 'vitest/config';
 import base from './vitest.config.js';
 
+/**
+ * Test files the coverage measurement leaves out, each for the reason above.
+ * Spelled as test-file patterns, not directories: vitest.coverage-excluded.config.ts
+ * runs them as its include, where `tests/unit/lint/**` would also pick up the
+ * fixtures and the JSON baseline beside the tests and run them as test files.
+ */
+export const COVERAGE_EXCLUDED_TESTS: readonly string[] = [
+  'tests/unit/benchmarks/**/*.test.ts',
+  'tests/unit/lint/**/*.test.ts',
+  'tests/integration/full-level/shareholder-summit-competent.integration.test.ts',
+];
+
 export default mergeConfig(base, defineConfig({
   test: {
-    exclude: [
-      ...configDefaults.exclude,
-      'tests/unit/benchmarks/**',
-      'tests/unit/lint/**',
-      'tests/integration/full-level/shareholder-summit-competent.integration.test.ts',
-    ],
+    exclude: [...configDefaults.exclude, ...COVERAGE_EXCLUDED_TESTS],
   },
 }));
