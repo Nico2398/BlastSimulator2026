@@ -78,6 +78,31 @@ describe('wireCrewNotifications', () => {
     }
   });
 
+  it('every crew notification carries a ref to its employee (#2169)', () => {
+    const events: Array<[string, Record<string, unknown>]> = [
+      ['employee:collapsed', { needKey: 'fatigue' }],
+      ['employee:need_warning', { needKey: 'fatigue' }],
+      ['agent:stuck', {}],
+      ['agent:action_abandoned', { actionId: 5 }],
+      ['employee:training_cancelled', { skill: 'driving', buildingId: 1, refund: 10 }],
+      ['employee:levelup', { category: 'driving', oldLevel: 1, newLevel: 2 }],
+      ['employee:trained', { skill: 'driving', level: 1, isNew: true }],
+      ['employee:trained', { skill: 'driving', level: 2, isNew: false }],
+    ];
+    for (const [event, payload] of events) {
+      notes.length = 0;
+      emitter.fire(event, { employeeId: empId, ...payload });
+      expect(notes, event).toHaveLength(1);
+      expect(notes[0]!.ref, event).toEqual({ kind: 'employee', id: empId });
+    }
+  });
+
+  it('the ref follows the employee the event is about', () => {
+    const other = hireEmployee(state.employees, 'blaster', new Random(43), 1, 1).employee;
+    emitter.fire('agent:stuck', { employeeId: other.id });
+    expect(notes[0]!.ref).toEqual({ kind: 'employee', id: other.id });
+  });
+
   it('collapse raises a critical toast naming the employee', () => {
     emitter.fire('employee:collapsed', { employeeId: empId, needKey: 'fatigue' });
     expect(notes).toHaveLength(1);

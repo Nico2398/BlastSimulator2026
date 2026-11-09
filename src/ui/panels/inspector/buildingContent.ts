@@ -9,13 +9,14 @@ import { factorFor } from '../../../core/events/ActiveModifiers.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { buildingActionRules, REASON_CASH, type BuildingActionRules, type InspectorWaitKey } from '../../buildingActionRules.js';
-import { el } from '../../dom.js';
+import { el, explainable } from '../../dom.js';
+import { buildingHpExplain, upkeepExplain } from '../../buildingExplain.js';
 import type { ActionSpec, InspectorLinks, InspectorView, KindContent } from './InspectorContent.js';
 import { storageContents } from './storageContent.js';
 import { residentsSection, schoolSection } from './occupantsContent.js';
 import { researchSection } from './researchContent.js';
 import { fractionOf } from '../../../core/math/Fraction.js';
-import { entityLink, kindLabel, liveRow, sectionOf, setLive } from './inspectorWidgets.js';
+import { entityLink, findLive, kindLabel, liveRow, sectionOf, setLive } from './inspectorWidgets.js';
 
 /** One plain sentence stating what a building is for (#2138). */
 export function buildingRoleText(type: BuildingType): string {
@@ -60,6 +61,19 @@ function upkeepText(state: GameState, b: Building): string {
   const perHour = getBuildingDef(b.type, b.tier).operatingCostPerTick * factor;
   const money = t('inspector.upkeep_value', { cost: formatMoney(Math.round(perHour * 100) / 100) });
   return factor === 1 ? money : t('inspector.upkeep_surcharged', { value: money, factor: Math.round(factor * 100) / 100 });
+}
+
+/** Attach `text` to the live node `key` under `root`. */
+function explainLive(root: HTMLElement, key: string, text: string): void {
+  const node = findLive(root, key);
+  if (node) explainable(node, text);
+}
+
+/** Upkeep row; hovering the value names the event raising it, if any. */
+function upkeepRow(text: string, state: GameState): HTMLElement {
+  const row = liveRow(t('inspector.upkeep'), 'upkeep', text);
+  explainLive(row, 'upkeep', upkeepExplain(state));
+  return row;
 }
 
 function reasonText(key: string | null, cost: number, cash: number, params?: Record<string, string | number>): string | undefined {
@@ -137,6 +151,7 @@ function siteActions(): ActionSpec[] {
 /** HP row with a fill bar; `sync` rewrites both in place. */
 function hpRow(text: string, fraction: number): HTMLElement {
   const row = liveRow(t('inspector.hp'), 'hp', text);
+  explainLive(row, 'hp', buildingHpExplain());
   const bar = el('div');
   bar.style.cssText = 'height:4px;border-radius:2px;background:var(--bsx-well)';
   const fill = el('div');
@@ -222,7 +237,7 @@ export const buildingContent: KindContent = {
           liveRow(t('inspector.status'), 'status', text),
           ...(builder ? [builderRow(builder, links)] : []),
           hpRow(hp, hpFraction),
-          liveRow(t('inspector.upkeep'), 'upkeep', upkeep),
+          upkeepRow(upkeep, state),
         ];
         for (const { id, amount } of effects) {
           rows.push(liveRow(t(`score.${id}`), `score-${id}`, `${amount > 0 ? '+' : ''}${amount}`));
@@ -241,6 +256,7 @@ export const buildingContent: KindContent = {
         const fill = root.querySelector<HTMLElement>('[data-live="hp-bar"]');
         if (fill) fill.style.width = `${Math.round(hpFraction * 100)}%`;
         setLive(root, 'upkeep', upkeep);
+        explainLive(root, 'upkeep', upkeepExplain(state));
         setLive(root, 'occupancy', t('building.occupancy', { inside: b.occupantIds.length, capacity }));
         storage?.sync(root);
         peopleSection?.sync(root);

@@ -1,0 +1,79 @@
+{
+  "name": "building-explain-visual",
+  "description": "Build-menu and placed-row explanations (#2171): a player hovers the tier select of a catalog card and the utilization and HP of a placed Living Quarters row with the real pointer, and each explainable() tooltip is screenshotted open next to the figure it explains.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:500000 staffed:true",
+      "description": "Staffed opening with a generous cushion.",
+      "timeout": 40,
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 cash:500000 staffed:true" }
+      ],
+      "expect": { "equals": { "cash": 500000, "buildingCount": 0 } }
+    },
+    {
+      "command": "state",
+      "description": "Open Build and hover the Living Quarters tier select; the tier comparison tooltip appears and is screenshotted.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        { "type": "ensurePanel", "panel": "build" },
+        { "type": "waitForSelector", "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-tier-sel" },
+        { "type": "hoverSelector", "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-tier-sel" },
+        { "type": "screenshot" }
+      ],
+      "expect": { "equals": { "buildingCount": 0 } }
+    },
+    {
+      "command": "build living_quarters at:2,8 tier:1",
+      "description": "Order Living Quarters through the Build panel.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        { "type": "ensurePanel", "panel": "build" },
+        { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 2, "z": 8 },
+        { "type": "awaitUsable", "selector": "#bs-tile-select-confirm" },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
+      ],
+      "expect": { "decreased": ["cash"], "changedBy": { "orderedBuildingCount": 1 } }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:1500",
+      "description": "Wait for the crew to finish the site so it has a placed row.",
+      "timeout": 130,
+      "role": "setup",
+      "interaction": [
+        { "type": "waitUntil", "field": "buildingCount", "equals": 1, "maxTicks": 1500, "timeoutMs": 120000 }
+      ],
+      "expect": { "equals": { "buildingCount": 1, "orderedBuildingCount": 0 } }
+    },
+    {
+      "command": "state",
+      "description": "Hover the placed row's utilization figure; the tooltip says what inside/capacity counts and is screenshotted.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        { "type": "ensurePanel", "panel": "build" },
+        { "type": "awaitUsable", "selector": "#bs-build-panel .bs-build-placed-row .bs-build-row-util" },
+        { "type": "hoverSelector", "selector": "#bs-build-panel .bs-build-placed-row .bs-build-row-util" },
+        { "type": "screenshot" }
+      ],
+      "expect": { "equals": { "buildingCount": 1 } }
+    },
+    {
+      "command": "state",
+      "description": "Hover the placed row's HP bar; the tooltip says what low HP does and is screenshotted.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        { "type": "ensurePanel", "panel": "build" },
+        { "type": "hoverSelector", "selector": "#bs-build-panel .bs-build-placed-row .bs-build-row-hp" },
+        { "type": "screenshot" }
+      ],
+      "expect": { "equals": { "buildingCount": 1 } }
+    }
+  ]
+}

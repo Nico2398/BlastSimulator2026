@@ -1378,3 +1378,62 @@ describe('NotificationCenter grouped crew/fleet blocked orders (#2099)', () => {
   });
 });
 
+
+describe('NotificationCenter entity refs and crew pip targets (#2169)', () => {
+  function hire(state: ReturnType<typeof makeState>, seed: number) {
+    return hireEmployee(state.employees, 'driller', new Random(seed), 0, 0).employee;
+  }
+
+  it('notify() stores the ref on the log entry and on the toast', () => {
+    const center = new NotificationCenter();
+    center.notify({ severity: 'warn', title: 'Crew', body: 'b', ref: { kind: 'employee', id: 7 } });
+    expect(center.getLog()[0]!.ref).toEqual({ kind: 'employee', id: 7 });
+    expect(center.getToasts()[0]!.ref).toEqual({ kind: 'employee', id: 7 });
+  });
+
+  it('notify() without a ref leaves the entry without one', () => {
+    const center = new NotificationCenter();
+    center.notify({ severity: 'info', title: 'Plain', body: 'b' });
+    expect(center.getLog()[0]!.ref).toBeUndefined();
+    expect(center.getToasts()[0]!.ref).toBeUndefined();
+  });
+
+  it('the collapsed-crew pip targets the first collapsing alive employee', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    const dead = hire(state, 1);
+    const first = hire(state, 2);
+    const second = hire(state, 3);
+    hire(state, 4); // healthy
+    dead.collapsing = true; dead.alive = false;
+    first.collapsing = true;
+    second.collapsing = true;
+    const pip = center.update(state).find(p => p.kind === 'crew' && p.tone === 'critical');
+    expect(pip).toBeDefined();
+    expect(pip!.target).toEqual({ kind: 'employee', id: first.id });
+  });
+
+  it('the stuck-crew pip targets the first alive stuck employee', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    const dead = hire(state, 1);
+    const first = hire(state, 2);
+    const second = hire(state, 3);
+    dead.isMoveStuck = true; dead.alive = false;
+    first.isMoveStuck = true;
+    second.isMoveStuck = true;
+    const pip = center.update(state).find(p => p.kind === 'crew' && p.tone === 'warn');
+    expect(pip).toBeDefined();
+    expect(pip!.target).toEqual({ kind: 'employee', id: first.id });
+  });
+
+  it('pips that name no single entity carry no target', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    state.events.pendingEvent = { eventId: 'test_event', firedAtTick: 1 };
+    state.cash = -1000;
+    const pips = center.update(state);
+    expect(pips.length).toBeGreaterThan(1);
+    for (const pip of pips) expect(pip.target).toBeUndefined();
+  });
+});

@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { MiniMap } from '../../../src/ui/MiniMap.js';
 import { MINIMAP_LAYERS, layerColor } from '../../../src/ui/miniMapLayers.js';
+import { minimapLayerExplain } from '../../../src/ui/hudExplain.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
@@ -193,3 +194,56 @@ describe('MiniMap legend (#1424)', () => {
     minimap.dispose();
   });
 });
+
+describe('MiniMap legend explanations (#2169)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+    setLocale('en');
+  });
+
+  it('every legend entry is explainable with non-empty text', () => {
+    stubContexts([]);
+    const minimap = new MiniMap(document.body);
+    const entries = legendEntries();
+    expect(entries).toHaveLength(EXPECTED_IDS.length);
+    for (const entry of entries) {
+      expect((entry.dataset['explain'] ?? '').trim().length, entry.dataset['layer']).toBeGreaterThan(5);
+      expect(entry.tabIndex).toBe(0);
+      expect(entry.classList.contains('bsx-explainable')).toBe(true);
+    }
+    minimap.dispose();
+  });
+
+  it('each layer carries a different explanation', () => {
+    stubContexts([]);
+    const minimap = new MiniMap(document.body);
+    const texts = legendEntries().map((e) => e.dataset['explain']);
+    expect(new Set(texts).size).toBe(EXPECTED_IDS.length);
+    minimap.dispose();
+  });
+
+  it('each entry carries the explanation of its own layer', () => {
+    stubContexts([]);
+    const minimap = new MiniMap(document.body);
+    for (const entry of legendEntries()) {
+      expect(entry.dataset['explain']).toBe(minimapLayerExplain(entry.dataset['layer'] as never));
+    }
+    minimap.dispose();
+  });
+
+  it('re-translates the explanations on a locale refresh', () => {
+    stubContexts([]);
+    const minimap = new MiniMap(document.body);
+    const before = new Map(legendEntries().map((e) => [e.dataset['layer']!, e.dataset['explain']]));
+    setLocale('fr');
+    minimap.refreshLocale();
+    for (const entry of legendEntries()) {
+      const id = entry.dataset['layer']!;
+      expect(entry.dataset['explain'], id).not.toBe(before.get(id));
+      expect(entry.dataset['explain'], id).toBe(minimapLayerExplain(id as never));
+    }
+    minimap.dispose();
+  });
+});
+
