@@ -88,7 +88,6 @@ import { proposeAccessRamp } from './core/mining/CraterAccessProposal.js';
 import { spiralSurfaceFrom } from './core/mining/RampSpiral.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 import { hasLevelEnded } from './core/engine/GameOverConditions.js';
-import { dominantRockUnderHole } from './core/mining/ExplosiveRockFit.js';
 import { outstandingChargeBlockedReason } from './core/mining/ChargeOrder.js';
 import { wetHoles } from './core/mining/WetHoles.js';
 import { getSurfaceY } from './core/entities/BuildingPlacement.js';
@@ -243,7 +242,6 @@ uiManager.setAccessRampProvider(() => {
   return accessRampMemo.value;
 });
 uiManager.setEstimateGridProvider(() => ctx.grid ?? null);
-uiManager.setHoleRockSampler(h => ctx.grid ? dominantRockUnderHole(ctx.grid, h) : null);
 
 // Survey confidence overlay's player-facing visibility toggle (#496): the
 // panel's own click handler drives the renderer; the renderer's current

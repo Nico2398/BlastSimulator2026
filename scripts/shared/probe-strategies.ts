@@ -387,7 +387,7 @@ interface Shot {
 /** Explosive of every shot: the run's own (hard rock needs more than SHOT's krackle), else SHOT's. */
 const shotExplosive = (s: ProbeSession): string => s.config.explosive ?? (hardRockLevel(s) ? HARD_ROCK_EXPLOSIVE : SHOT.explosive);
 
-/** Explosive a campaign level of this difficulty tier or above is shot with: krackle breaks nothing in its hard rock at the grade-0 charge cap. */
+/** Explosive a campaign level of this difficulty tier or above is shot with: krackle breaks only the cells beside its charge in its hard rock at the grade-0 charge cap. */
 const HARD_ROCK_MIN_DIFFICULTY_TIER = 4;
 const HARD_ROCK_EXPLOSIVE = 'dynatomics';
 

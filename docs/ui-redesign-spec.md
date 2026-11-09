@@ -121,7 +121,7 @@ Legend — where the feature is reachable today:
 | Drill plan: single hole add | [console] `drill_plan add` | [missing in UI] |
 | Hole list w/ charge + delay | [UI] | depth/diameter per hole not shown in list |
 | Clear plan | [UI] | |
-| Charge per hole / all | [UI] | explosive catalog data (cost/kg, max charge, water sensitivity, min rock tier, 8 types) not shown; total blast cost never computed for player |
+| Charge per hole / all | [UI] | explosive catalog data (cost/kg, max charge, water sensitivity, 8 types) not shown; total blast cost never computed for player |
 | Detonation sequence auto V-pattern | [UI] | `delay_step` param hidden (default 25ms) |
 | Per-hole delay set / sequence show | [console] | [missing in UI] |
 | Tubing (waterproof holes): buy stock, install per hole | [console] only | **entire feature invisible** [missing]; interacts with weather + water-sensitive explosives |
@@ -246,7 +246,7 @@ Left→right (single coherent bar, no floating strays):
 ### 6.4 Blast workshop (panel; the core-loop centerpiece)
 Restructure as a stepped workflow the player can read state from: **1 Drill → 2 Charge → 3 Sequence → 4 Preview → 5 Fire**, with per-step completion states (9 holes / 9 charged / 9 sequenced pattern already in state).
 - **Drill:** grid tool (drag in scene, see 6.9; spacing/depth/diameter controls with sane defaults), add-single-hole tool, clear; hole list with depth + coordinates.
-- **Charge:** explosive picker as rich rows — localized name, $/kg, energy, max charge kg, water-sensitive flag (⚠ when current weather is wet and hole untubed), min rock tier vs current site rock; amount + stemming with validation hints; **total cost of the loaded plan** (Σ amount×costPerKg) always visible; charge-all and per-hole edit.
+- **Charge:** explosive picker as rich rows — localized name, $/kg, energy, max charge kg, water-sensitive flag (⚠ when current weather is wet and hole untubed); amount + stemming with validation hints; **total cost of the loaded plan** (Σ amount×costPerKg) always visible; charge-all and per-hole edit.
 - **Tubing (new):** stock count, buy N, install on hole(s) — surfaces the existing `tubing buy/install` commands; hole rows show tubed/wet state.
 - **Sequence:** auto V-pattern with exposed delay-step; per-hole delay editing (list or click-hole-in-scene); visual order preview (numbers in scene overlay already exist).
 - **Preview:** software tier gate made explicit — show current tier, what each tier unlocks (T1 energy heatmap, T2 fragmentation, T3 projection risk, T4 vibration), **Buy tier N ($cost)** button (`buy_software`); preview numbers displayed in-panel (affected voxels, expected fragments/oversized, projection zone size, max vibration) alongside the 3D overlay toggle.
@@ -431,7 +431,7 @@ Everything below exists in `GameState` today and can be displayed without new si
 - **Money/time:** `cash`, `tickCount` (1h ticks), `timeScale`, `isPaused`, `finances.transactions[{tick,type,amount,category,description}]`.
 - **Scores:** `scores.wellBeing/safety/ecology/nuisance` (0–100 floats).
 - **Mining:** `drillHoles[{id,x,z,depth,diameter}]`, `chargesByHole{holeId→{explosiveId,amountKg,stemmingM}}`, `sequenceDelays{holeId→ms}`, `savedPlans`, `surveyResults[{method,centerX,centerZ,confidence,estimates,completedTick}]`, `lastOreReport{oreYields,totalYieldKg,estimatedYieldKg,yieldRatio}`, `ctx.softwareTier` (0–4), `ctx.tubingState{inventory,installedHoles}`.
-- **Catalogs:** `ExplosiveCatalog` (8: id, energyPerKg, costPerKg, waterSensitive, maxChargeKg, minRockTier), `OreCatalog`, `RockCatalog`, `getMinePreset` (biomes), `SURVEY_COSTS`, `SURVEY_BASE_ERROR`.
+- **Catalogs:** `ExplosiveCatalog` (8: id, energyPerKg, costPerKg, waterSensitive, maxChargeKg), `OreCatalog`, `RockCatalog`, `getMinePreset` (biomes), `SURVEY_COSTS`, `SURVEY_BASE_ERROR`.
 - **Economy:** `contracts.available/active/completedHistory` (`Contract{type,materialId,description,quantityKg,deliveredKg,pricePerKg,deadlineTicks,acceptedAtTick,penaltyAmount,earlyBonus}`), `logistics{fragments,storedMassKg,storageCapacityKg}`, `collectedOre{oreId→kg}`.
 - **Entities:** `buildings.buildings[{id,type,tier,x,z,hp,active}]` + defs (cost, demolishCost, maxHp, operating cost, capacity, footprint) + `unlockedTiers` + `researchQueue[{targetType,targetTier,ticksRemaining,cost}]`; `vehicles.vehicles[{id,type,tier,x,z,hp,task,driverId,payloadKg,waitingTicks,isMoveStuck,haulingPhase,haulingFragmentId}]` + defs per tier; `employees.employees[{id,name,role,salary,morale,unionized,injured,alive,collapsing,x,z,qualifications[{category,proficiencyLevel,xp}],trainingState{skill,ticksRemaining},activeActionId,hunger,fatigue,breakNeed,restTicksRemaining,taskTicksRemaining}]`; `pendingActions[{id,type,requiredSkill,requiredVehicleRole,targetX/Y/Z,targetEmployeeId}]`; `ghostPreviews`.
 - **Events/dark path:** `events{pendingEvent,timers,firedEventIds,followUpQueue}` + `getEventById(id)→{titleKey,descKey,options[{labelKey}]}`; `corruption{level,attempts,mafiaUnlocked}` + `getSuccessRate`; `mafia{exposureRisk,smugglingActive,smugglingIncome,pendingFrames}`.

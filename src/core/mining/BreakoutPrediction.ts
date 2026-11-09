@@ -93,11 +93,15 @@ export function predictBreakout(
   };
 }
 
+/** 'nothing': the shot breaks no rock at all; 'none': all broken rock stays sealed; 'partial': part of it does (#2197). */
+export type BreakoutWarningKind = 'nothing' | 'none' | 'partial';
+
 /**
- * 'none' when nothing breaks out of the too-deep holes; 'partial' when the sealed share reaches
+ * 'nothing' when the shot breaks no rock; 'none' when nothing breaks out of the too-deep holes; 'partial' when the sealed share reaches
  * BLAST_SEALED_SHARE_PARTIAL; null when no warning is due.
  */
-export function breakoutWarningKind(prediction: BreakoutPrediction): 'none' | 'partial' | null {
-  if (prediction.brokenVoxels > 0 && prediction.sealedVoxels >= prediction.brokenVoxels) return 'none';
+export function breakoutWarningKind(prediction: BreakoutPrediction): BreakoutWarningKind | null {
+  if (prediction.brokenVoxels === 0) return 'nothing';
+  if (prediction.sealedVoxels >= prediction.brokenVoxels) return 'none';
   return prediction.sealedShare >= BLAST_SEALED_SHARE_PARTIAL ? 'partial' : null;
 }

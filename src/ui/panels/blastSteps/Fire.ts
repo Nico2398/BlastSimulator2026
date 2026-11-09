@@ -119,7 +119,7 @@ export class FireStep {
     const atRisk = buildingsInBlastReach(state.drillHoles, state.chargesByHole, state.buildings.buildings);
     const breakoutText = state.drillHoles.length === 0 ? null : breakoutWarningFor(
       this.breakoutMemo.get(state, assembleBlastPlan(state.drillHoles, state.chargesByHole), this.gridProvider()),
-      { none: 'ui.blast_workshop.fire.check_breakout_none', partial: 'ui.blast_workshop.fire.check_breakout_partial' },
+      { nothing: 'ui.blast_workshop.fire.check_breakout_nothing', none: 'ui.blast_workshop.fire.check_breakout_none', partial: 'ui.blast_workshop.fire.check_breakout_partial' },
     );
     const signature = JSON.stringify({ breakoutText, zone, occupants: occupantKeys, wetCount: wet.length, fizzleCount: fizzled.length, exposedCount: exposed.length, permit, atRisk });
     if (signature === this.lastSignature) return;

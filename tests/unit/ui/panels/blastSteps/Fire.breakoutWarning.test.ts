@@ -3,7 +3,8 @@
 import { describe, it, expect } from 'vitest';
 import { FireStep } from '../../../../../src/ui/panels/blastSteps/Fire.js';
 import { sandboxPadGrid, breakoutShotState } from '../../../../helpers/breakoutWarningFixture.js';
-import { setLocale } from '../../../../../src/core/i18n/I18n.js';
+import { nothingBreaksGrid, nothingBreaksState } from '../../../../helpers/breaksNothingFixture.js';
+import { setLocale, t } from '../../../../../src/core/i18n/I18n.js';
 import type { VoxelGrid } from '../../../../../src/core/world/VoxelGrid.js';
 import type { GameState } from '../../../../../src/core/state/GameState.js';
 
@@ -58,5 +59,41 @@ describe('FireStep breakout warning', () => {
     const state = breakoutShotState(12, 'krackle', 10);
     state.drillHoles.length = 0;
     expect(render(sandboxPadGrid(), state).root.querySelector(ROW)).toBeNull();
+  });
+});
+
+describe('FireStep breaks-nothing warning (#2197)', () => {
+  const KEY = 'ui.blast_workshop.fire.check_breakout_nothing';
+
+  it('shows the breaks-nothing row, in the nothing wording rather than the too-deep one', () => {
+    const row = render(nothingBreaksGrid(), nothingBreaksState()).root.querySelector(ROW);
+    expect(row).not.toBeNull();
+    expect(row!.textContent).toBe(t(KEY));
+    expect(row!.textContent).not.toBe(t('ui.blast_workshop.fire.check_breakout_none', { count: 9, total: 9 }));
+  });
+
+  it.each([0, 1, 2, 3, 4])('shows at software tier %i', (tier) => {
+    const state = nothingBreaksState();
+    state.softwareTier = tier;
+    expect(render(nothingBreaksGrid(), state).root.querySelector(ROW)).not.toBeNull();
+  });
+
+  it('renders in French too', () => {
+    const step = render(nothingBreaksGrid(), nothingBreaksState());
+    setLocale('fr');
+    step.update(nothingBreaksState(), 'sunny');
+    const text = step.root.querySelector(ROW)!.textContent!;
+    setLocale('en');
+    expect(text).toMatch(/Rien ne casse/);
+  });
+
+  it('shows no row without a grid', () => {
+    expect(render(null, nothingBreaksState()).root.querySelector(ROW)).toBeNull();
+  });
+
+  it('shows no row without holes', () => {
+    const state = nothingBreaksState();
+    state.drillHoles.length = 0;
+    expect(render(nothingBreaksGrid(), state).root.querySelector(ROW)).toBeNull();
   });
 });

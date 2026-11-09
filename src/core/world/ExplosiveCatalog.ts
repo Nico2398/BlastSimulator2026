@@ -18,10 +18,6 @@ export interface ExplosiveType {
   readonly minChargeKg: number;
   /** Maximum charge per hole in kg. */
   readonly maxChargeKg: number;
-  /** Highest rock hardness tier this explosive handles without penalty; harder rock still breaks, at a raised threshold (#1358). */
-  readonly minRockTier: number;
-  /** Multiplier on projection risk (1.0 = normal). Higher = more dangerous. */
-  readonly projectionRiskMod: number;
   /** Multiplier on ground vibration (1.0 = normal). Higher = more vibration. */
   readonly vibrationMod: number;
 }
@@ -36,8 +32,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     waterSensitive: true,
     minChargeKg: 0.5,
     maxChargeKg: 3,
-    minRockTier: 1,
-    projectionRiskMod: 0.5,   // Low risk — gentle
     vibrationMod: 0.4,
   },
   {
@@ -49,8 +43,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     waterSensitive: true,
     minChargeKg: 1,
     maxChargeKg: 8,
-    minRockTier: 1,
-    projectionRiskMod: 0.8,
     vibrationMod: 0.7,
   },
   {
@@ -62,8 +54,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     waterSensitive: false,    // Water-resistant emulsion
     minChargeKg: 1,
     maxChargeKg: 10,
-    minRockTier: 2,
-    projectionRiskMod: 0.7,
     vibrationMod: 0.8,
   },
   {
@@ -75,8 +65,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     waterSensitive: true,
     minChargeKg: 1,
     maxChargeKg: 12,
-    minRockTier: 2,
-    projectionRiskMod: 1.1,   // Bigger boom = more projection risk
     vibrationMod: 1.2,
   },
   {
@@ -88,8 +76,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     waterSensitive: false,
     minChargeKg: 1,
     maxChargeKg: 15,
-    minRockTier: 3,
-    projectionRiskMod: 1.0,
     vibrationMod: 1.0,
   },
   {
@@ -101,8 +87,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     waterSensitive: false,
     minChargeKg: 2,
     maxChargeKg: 20,
-    minRockTier: 3,
-    projectionRiskMod: 1.3,
     vibrationMod: 1.6,        // Defining trait: high vibration
   },
   {
@@ -114,8 +98,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     waterSensitive: true,
     minChargeKg: 2,
     maxChargeKg: 20,
-    minRockTier: 4,
-    projectionRiskMod: 1.5,   // High projection risk
     vibrationMod: 1.2,
   },
   {
@@ -127,8 +109,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     waterSensitive: false,
     minChargeKg: 3,
     maxChargeKg: 25,
-    minRockTier: 4,
-    projectionRiskMod: 1.8,   // Extremely dangerous
     vibrationMod: 2.0,        // Village-shaking
   },
 ] as const;

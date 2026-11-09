@@ -18,19 +18,37 @@ describe('ExplosiveCatalog', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('explosives sorted by tier have increasing energy per kg', () => {
-    const sorted = [...getAllExplosives()].sort(
-      (a, b) => a.minRockTier - b.minRockTier || a.energyPerKg - b.energyPerKg,
-    );
-    for (let i = 1; i < sorted.length; i++) {
-      expect(sorted[i]!.energyPerKg).toBeGreaterThanOrEqual(sorted[i - 1]!.energyPerKg);
+  it('carries exactly the fields id, nameKey, descKey, energyPerKg, costPerKg, waterSensitive, minChargeKg, maxChargeKg, vibrationMod (#2197)', () => {
+    const expected = [
+      'costPerKg', 'descKey', 'energyPerKg', 'id', 'maxChargeKg', 'minChargeKg', 'nameKey', 'vibrationMod', 'waterSensitive',
+    ];
+    for (const e of getAllExplosives()) {
+      expect(Object.keys(e).sort(), e.id).toEqual(expected);
     }
   });
 
-  it('dynatomics is a top-tier explosive', () => {
+  it('no explosive declares a rock tier or a projection-risk multiplier (#2197)', () => {
+    for (const e of getAllExplosives()) {
+      expect(e).not.toHaveProperty('minRockTier');
+      expect(e).not.toHaveProperty('projectionRiskMod');
+    }
+  });
+
+  it('every explosive keeps a positive vibration multiplier', () => {
+    for (const e of getAllExplosives()) expect(e.vibrationMod).toBeGreaterThan(0);
+  });
+
+  it('a pricier explosive carries more energy per kg', () => {
+    const byCost = [...getAllExplosives()].sort((a, b) => a.costPerKg - b.costPerKg);
+    for (let i = 1; i < byCost.length; i++) {
+      expect(byCost[i]!.energyPerKg).toBeGreaterThanOrEqual(byCost[i - 1]!.energyPerKg);
+    }
+  });
+
+  it('dynatomics is the most energetic explosive', () => {
     const dyn = getExplosive('dynatomics');
     expect(dyn).toBeDefined();
-    expect(dyn!.minRockTier).toBeGreaterThanOrEqual(4);
+    for (const e of getAllExplosives()) expect(dyn!.energyPerKg).toBeGreaterThanOrEqual(e.energyPerKg);
   });
 
   it('at least 6 explosives defined', () => {

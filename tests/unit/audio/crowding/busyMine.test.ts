@@ -121,8 +121,9 @@ describe.each(SCENARIOS)('%s at 1x', (name) => {
     }
   });
 
-  it('plays one blast as one timeline: five main layers, at most 22 sounds in all', () => {
-    // Measured 7 to 17 blast and debris sounds within 15 s of a shot (the cap on simultaneous debris is 10 + 8).
+  it('plays one blast as one timeline: five main layers, at most 26 sounds in all', () => {
+    // Measured 10 to 26 blast and debris sounds within 15 s of a shot (the cap on simultaneous debris is 10 + 8). The 26 is
+    // vibration-budget's rumblox overcharge since #2197: the tier gate is gone, so it breaks more rock and sheds more debris.
     const plays = sim().recorder.plays;
     const shots = plays.filter(p => p.id === 'blast_snap');
     expect(shots.length).toBeGreaterThan(0);
@@ -131,7 +132,7 @@ describe.each(SCENARIOS)('%s at 1x', (name) => {
     }
     for (const shot of shots) {
       const timeline = plays.filter(p => p.accepted && isBlastSound(p.id) && p.id !== 'blast_beep' && p.startS >= shot.startS - 0.01 && p.startS < shot.startS + 15);
-      expect(timeline.length).toBeLessThanOrEqual(22);
+      expect(timeline.length).toBeLessThanOrEqual(26);
     }
   });
 });
