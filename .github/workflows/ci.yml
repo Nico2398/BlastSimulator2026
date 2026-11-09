@@ -69,20 +69,31 @@ jobs:
       - name: Check i18n parity (en.json / fr.json)
         run: npm run check:i18n
 
-  # The unit + integration suite, split across runners with vitest's own
-  # `--shard`: each runner takes every Nth test file, so the three together
-  # run exactly `npm run test` once. One runner took 4–8 minutes for the
-  # whole suite; the split brings the job to the length of its slowest
-  # shard. No browser is installed here: nothing under tests/unit or
+  # The unit + integration suite, run once, with the coverage measurement in
+  # it. It used to run twice: three uninstrumented shards here (8 / 11.5 /
+  # 15 min, vitest's hash split) and the whole suite again under coverage in
+  # one unsharded `coverage` job (45 min, the longest job of every run, so
+  # every pipeline run waited on it; #2142, #2143, #2148, #2154 and #2199 hit
+  # the agent step's timeout mostly waiting on programs). Now each shard runs
+  # its share of the coverage-measured files with coverage on and thresholds
+  # off (vitest.coverage-shard.config.ts), then its share of the files the
+  # measurement excludes, uninstrumented (vitest.coverage-excluded.config.ts);
+  # over the five shards that is every file of `npm run test` exactly once.
+  # The `coverage` job below judges the thresholds over all five dumps.
+  # The split is balanced by measured duration (tests/shard-weights.json),
+  # heaviest file first. The shard count lives in the matrix, and the
+  # `coverage` job's `--shards` must equal it:
+  # tests/unit/config/ci-test-shards.test.ts pins the two together.
+  # No browser is installed here: nothing under tests/unit or
   # tests/integration launches one (tests/scenarios/, which does, is
   # `npm run test:playthrough`, outside vitest.config.ts's include).
   test:
-    name: Unit & integration tests (shard ${{ matrix.shard }}/3)
+    name: Unit & integration tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -103,8 +114,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests with verbose and JUnit reporters
-        run: npx vitest run --shard=${{ matrix.shard }}/3 --reporter=verbose --reporter=junit --outputFile=test-results/junit-${{ matrix.shard }}.xml
+      - name: Run the coverage-measured tests with coverage on
+        run: npx vitest run --config vitest.coverage-shard.config.ts --shard=${{ matrix.shard }}/${{ strategy.job-total }} --reporter=verbose --reporter=junit --outputFile=test-results/junit-${{ matrix.shard }}.xml
+
+      # Runs after a red step above too, so one CI round reports every failing
+      # test of the shard rather than hiding this half behind the first.
+      - name: Run the coverage-excluded tests uninstrumented
+        if: ${{ !cancelled() }}
+        run: npx vitest run --config vitest.coverage-excluded.config.ts --shard=${{ matrix.shard }}/${{ strategy.job-total }} --passWithNoTests --reporter=verbose --reporter=junit --outputFile=test-results/junit-${{ matrix.shard }}-uninstrumented.xml
 
       - name: Upload test results artifact
         if: always()
@@ -112,6 +129,17 @@ jobs:
         with:
           name: test-results-${{ matrix.shard }}
           path: test-results/
+
+      # The shard's raw V8 coverage, for the `coverage` job. A shard whose run
+      # died before writing it fails here, by name, as well as there.
+      - name: Upload coverage shard artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-shard-${{ matrix.shard }}
+          path: coverage/shards/
+          if-no-files-found: error
+          retention-days: 1
 
   qualimetry:
     name: Syntactic duplication check (jscpd)
@@ -152,8 +180,21 @@ jobs:
       - name: Run the diff duplication gate
         run: npm run qualimetry:diff
 
+  # Enforces the per-file thresholds in vitest.config.ts over the coverage the
+  # `test` shards measured. scripts/coverage-merge.ts hands every shard's raw
+  # V8 coverage to vitest's own v8 provider, configured as
+  # `npm run test:coverage` configures it, which merges, converts and checks
+  # the thresholds itself — the verdict is vitest's, not a re-implementation.
+  # `!cancelled()` rather than the default: a shard with a failing test still
+  # uploads its coverage (`reportOnFailure`), and judging the thresholds in the
+  # same round saves a CI-fix agent a second round to discover them — though a
+  # threshold missed beside a failing test may be that test's own doing. A
+  # shard that uploaded nothing fails the merge closed (exit 2) instead of
+  # passing on four fifths of the suite.
   coverage:
     name: Coverage thresholds
+    needs: test
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -175,15 +216,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Enforces the per-file thresholds in vitest.config.ts, which nothing
-      # ran until now — the `test` job runs the suite without --coverage.
-      # vitest.coverage.config.ts holds the two directories this measurement
-      # excludes and why; they still run, unexcluded, in that `test` job.
-      # Not sharded: the thresholds are per file over the whole suite's
-      # coverage, and this vitest (1.6) cannot merge partial coverage
-      # reports, so one runner has to see every test.
-      - name: Run tests with coverage thresholds
-        run: npm run test:coverage
+      - name: Download every shard's coverage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-shard-*
+          path: coverage/shards
+          merge-multiple: true
+
+      - name: Merge the shards' coverage and check the thresholds
+        run: npx tsx scripts/coverage-merge.ts --dir coverage/shards --shards 5
 
   # Runs the production build check on every push and pull request. It costs
   # ~20 s, and a bundle that breaks on `main` after a merge is a red main
