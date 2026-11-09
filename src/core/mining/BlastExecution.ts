@@ -2,6 +2,7 @@
 // Orchestrates: validate → energy → fragmentation → terrain subtraction → results
 // Pure function operating on GameState + VoxelGrid, no side effects.
 
+import type { FragmentationBand } from './FragmentationBand.js';
 import { oreValuePerKg, type MarketId } from '../economy/Market.js';
 import { isFragmentSealed } from '../economy/SealedFragments.js';
 import type { Vec3 } from '../math/Vec3.js';
@@ -136,6 +137,10 @@ export interface BlastResult {
   sealedFragmentCount?: number;
   /** Oversized fragments that are reachable, not sealed (#2003). */
   reachableOversizedFragments?: number;
+  /** Volume (m3) of rock the blast energised, by fragmentation band (#2198). */
+  bandVolumes: Record<FragmentationBand, number>;
+  /** Mass and ore value lost to dust-band voxels (#2198). */
+  dustLoss: { massKg: number; oreValue: number };
 }
 
 /**
@@ -602,6 +607,8 @@ export function* executeBlastSteps(
     maxThrowDistance,
     projectileCount,
     flights,
+    bandVolumes: { intact: 0, cracked: 0, good: 0, fines: 0, dust: 0 }, // skeleton
+    dustLoss: { massKg: 0, oreValue: 0 }, // skeleton
   };
 }
 

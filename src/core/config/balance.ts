@@ -875,6 +875,15 @@ export const FRAGMENTATION_MULTIPLIER = 1.0;
  *  survives the blast but is left weakened. */
 export const CRACKED_VOXEL_ENERGY_RATIO = 0.5;
 
+/** Intensity at which rock turns from good fragmentation to fines (orange), and from fines to dust (red).
+ *  The 1 / 2 / 4 bounds come from the original blast spec. Intact < CRACKED_VOXEL_ENERGY_RATIO <= cracked
+ *  < FRAGMENTATION_MULTIPLIER <= good < FINES_MIN <= fines < DUST_MIN <= dust. */
+export const FRAGMENTATION_BAND_FINES_MIN = 2;
+export const FRAGMENTATION_BAND_DUST_MIN = 4;
+
+/** Share of a dust-band voxel's mass and ore lost to the cloud. */
+export const DUST_LOSS_SHARE = 0.03;
+
 /** Multiplier applied to a cracked voxel's fracture modifier, so rock that took a
  *  near-miss gives way more easily to the next blast. */
 export const CRACKED_VOXEL_WEAKENING = 0.7;
