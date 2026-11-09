@@ -134,7 +134,12 @@ npm run scenarios:interaction
 
 # Filter by name
 npm run scenarios -- blast-basic tutorial-playthrough
+
+# Command mode, in this process only (no worker fan-out)
+npm run scenarios -- --jobs 1
 ```
+
+Command mode fans the batch out across worker processes, one per core up to six (`--jobs N` overrides), costliest scenario first; each scenario's output still prints whole, in name order, and a worker that dies fails the scenario it was running. Interaction mode and `--shard` run in one process.
 
 Interaction actions (clickSelector, waitForSelector, type, etc.) defined in scenario step `interaction` arrays. Type definitions in `scripts/shared/scenario-types.ts`. Steps without `interaction` use command execution. A step's `expect` (same file) is what proves game state actually moved during the step, not merely that nothing threw — role/expect mechanics: `dev-testing-strategy`.
 

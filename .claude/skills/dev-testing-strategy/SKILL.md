@@ -31,6 +31,8 @@ The layers surface as four independent channels. Each catches what the others mi
 
 The first three all drive the simulation through `src/console/`, whose commands are a superset of what the UI exposes. That is why they can be green on an unplayable game, and why a `role: 'player'` scenario step forbids console commands for anything a player would have to do (`checkStepActionAllowed`, `scripts/shared/interaction-executor.ts`). Procedures: `dev-visual-testing` skill; step roles: `dev-scenario-authoring` skill.
 
+`logic` runs in two places: in a session, `npm run pipeline -- verify` runs the test files the diff reaches; CI runs the whole suite on every push. `dev-finishing-work` holds which runs where.
+
 Two channels disagreeing means neither result stands. Investigate until they agree.
 
 `npm run verify:env` reports each channel as READY or BLOCKED with the remedy. Run it when a channel's usability is in doubt rather than assuming a failure is a code defect.
@@ -69,7 +71,7 @@ None is a substitute for a channel, and all four run in CI on every push and pul
 |------|---------|----------------|---------------------|
 | Repo-wide duplication | `npm run qualimetry` | Duplicated **lines** across `src/` + `scripts/` stay under `.jscpd.json`'s `threshold` | job `Syntactic duplication check (jscpd)` |
 | Diff duplication | `npm run qualimetry:diff` | At most 10% of the lines a branch adds may sit inside a clone | same job, second step |
-| Coverage | `npm run test:coverage` | Per-file thresholds in `vitest.config.ts` | job `Coverage thresholds` |
+| Coverage | `npm run test:coverage` | Per-file thresholds in `vitest.config.ts` | measured in the `test` job's shards, judged by job `Coverage thresholds` (below) |
 | i18n parity | `npm run check:i18n` | Every non-allowlisted key differs between `en.json` and `fr.json`, and both key sets match | a step in the `TypeScript type check` job |
 | Dead code | `npm run check:dead-code` | No file under `src/`/`scripts/` goes unimported; no new unused export | `tests/unit/lint/NoDeadCode.test.ts`, so the `test` job |
 
@@ -89,8 +91,12 @@ nature.
 `tests/unit/benchmarks/` (asserts wall-clock times that v8 instrumentation inflates past their
 budgets) and `tests/unit/lint/` (static rules about scenario JSON and repo hygiene, not `src/`
 behaviour — nothing there adds to the measurement). An undeclared command refusal is failed by
-`npm run scenarios` through `checkCommandOutcome` in `runSteps`, not by a lint-directory replay. Both directories still run, unexcluded, in `npm run test` — the `logic`
-channel and CI's `test` job — so nothing goes unrun; only the coverage measurement is narrowed.
+`npm run scenarios` through `checkCommandOutcome` in `runSteps`, not by a lint-directory replay. It
+also excludes the shareholder-summit-competent playthrough, whose hottest branch counters overflow
+under instrumentation. The list is `COVERAGE_EXCLUDED_TESTS`. Every excluded file still runs:
+unexcluded in `npm run test`, and in CI each `test` shard runs its share of them uninstrumented
+(`vitest.coverage-excluded.config.ts`) after its measured share — so nothing goes unrun; only the
+coverage measurement is narrowed.
 
 ### What the coverage gate actually holds
 
@@ -117,6 +123,18 @@ host-API wrappers (`SceneManager`, `PostPipeline`, the IndexedDB and in-memory b
 only exercise against a mock of the browser API rather than against our own behaviour — the
 `scenario` and `visual` channels are what prove those. Nothing else under `src/` is exempt, `src/audio/`
 included: it runs against fake contexts and a recording player and meets the floor file by file.
+
+**How CI measures it.** The suite runs once, in the `test` job's shards: each shard measures its share
+of the files under coverage with the thresholds off (`vitest.coverage-shard.config.ts`) and uploads
+its raw V8 coverage. The `Coverage thresholds` job hands every shard's dump to vitest's own v8
+provider (`scripts/coverage-merge.ts`), which folds them in a fixed order, converts, adds every
+measured file no test loaded at 0% and checks the thresholds itself. Exit 0: every threshold holds;
+1: one does not, named by vitest; 2: the shard set is unusable — missing, extra, corrupt or from
+another split — and nothing was judged. Shards are balanced on per-file durations in
+`tests/shard-weights.json` (refresh: `npx tsx scripts/shard-weights.ts <CI JUnit or vitest JSON
+reports>`); a stale table costs balance only. To reproduce CI's verdict locally rather than
+`npm run test:coverage`'s, whose fold order follows completion order:
+`npx vitest run --config vitest.coverage-shard.config.ts --shard=1/1 && npx tsx scripts/coverage-merge.ts --dir coverage/shards --shards 1`.
 
 **Coverage measures execution, not verification.** A test that calls a function and asserts nothing
 scores 100%. These floors catch code the suite never reaches; they say nothing about whether the
@@ -258,11 +276,11 @@ CI has 3 tiers of scenario testing:
 
 | Tier | What | When | Time |
 |------|------|------|------|
-| **1 — Command** | Every scenario definition in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~2 min |
+| **1 — Command** | Every scenario definition in command mode (pure Node.js, no browser), fanned out across worker processes | Every push, PR, schedule, manual | about a minute |
 | **2 — Interaction** | Every scenario definition in interaction mode (Puppeteer, real browser), sharded | Every push and pull request, schedule (weekly), workflow_dispatch | a few minutes wall clock† |
 | **3 — Full** | Tiers 1 + 2, alongside every other job — nothing waits on the unit suite | Every push and pull request | the slowest job† |
 
-† No GPU means ~6 s/frame in software rasterisation, so a scenario page boots with drawing suspended (`?scenarioMode=1`, main.ts). Shards are cost-balanced (`selectShard`, `scripts/run-all-scenarios-cli.ts`), so the count in `SCENARIO_INTERACTION_SHARDS` is the lever: more shards, shorter wall clock, until the ~1 min of per-shard setup dominates. Figures go stale as the suite grows. Why both jobs run on every PR: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
+† No GPU means ~6 s/frame in software rasterisation, so a scenario page boots with drawing suspended (`?scenarioMode=1`, main.ts). Shards are balanced on each scenario's measured seconds (`scripts/run-all-scenarios-interaction-seconds.json`; a scenario the table lacks costs its static estimate, `estimateScenarioCost`), so the count in `SCENARIO_INTERACTION_SHARDS` is the lever: more shards, shorter wall clock, until the ~1 min of per-shard setup dominates. Each shard's log prints a `Timing:` line per scenario; `npx tsx scripts/run-all-scenarios-costs.ts --refresh <shard logs>` rewrites the table from a CI run. Figures go stale as the suite grows. Why both jobs run on every PR: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
 
 **Every scenario job runs on every pull request.** The in-session `visual` channel covers the one scenario that exercises a change — that is the working loop — and CI covers the rest. Why: `agentic-pipeline-pr-management`.
 

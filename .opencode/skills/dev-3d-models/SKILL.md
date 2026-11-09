@@ -213,7 +213,7 @@ Where the triangles go:
 | visual | `npm run screenshot -- --name <n> --commands "…" --focus-entity "…"` | The model reads in place, at the game camera's distance, beside its neighbours |
 | static | `npm run typecheck` | Only when TypeScript changed alongside the asset |
 
-`npm run test` runs ~500 s — detach it through `npm run long -- start models npm run test` and wait it out in the same turn. Capture rules, focus flags and the model-viewer URL parameters: `dev-visual-testing`.
+Run the model test files by name as above; the whole `npm run test` suite is CI's, and `npm run pipeline -- verify` runs the test files a model change reaches. Capture rules, focus flags and the model-viewer URL parameters: `dev-visual-testing`.
 
 A model change is unverified until an image has been inspected, and **one inspection is not the loop** — **The visual loop** above is, and it reports the round it took. A green `ModelAssets` run proves the contract, not the picture.
 

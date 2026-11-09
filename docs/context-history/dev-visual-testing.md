@@ -13,3 +13,7 @@ A real failure this diagnostic order was built to catch: `hireEmployee` created 
 ## Supporting Checks
 
 `npm run a11y` came from #1419.
+
+## Batch runner — command-mode fan-out (Nov 2026)
+
+`npm run scenarios` ran 246 definitions serially in one process: 117–123 s with three of four cores idle, 5.5 minutes in CI's command-mode job, on every `verify` that owed the `scenario` channel. A shared longest-first queue across worker processes keeps every worker busy; a static split by step count was simulated at 34.7 s for the slowest of four workers against 29.4 s for the queue.

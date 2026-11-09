@@ -58,3 +58,7 @@ white and the brow; the painted iris and highlight sat close enough to the white
 brow ignored the lids. The fix made the eye round in side profile and the lid a shell of revolution about its own
 hinge axis, so a blink is a symmetry of the shell and keeps its gap; stacked the painted layers with a measured
 lift each; conformed the brow over the lids and pivoted it at its outer end.
+
+## Verify a model change — the whole suite (Nov 2026)
+
+The page told a session to detach the whole `npm run test` suite (~500 s then). The model contract is proven by the model test files run by name; the whole suite is CI's.
