@@ -75,6 +75,7 @@ export class EnergyHeatmapView {
     selectRow.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11px';
     selectRow.appendChild(this.locale.bindText(el('span'), 'ui.blast_workshop.heatmap.section_hole'));
     this.holeSelect = el('select', { attrs: { 'data-role': 'heatmap-section-hole' } });
+    this.holeSelect.style.cssText = 'background:var(--bsx-panel);color:var(--bsx-text-primary);border:1px solid var(--bsx-border);border-radius:4px;padding:2px 4px;font:inherit';
     this.holeSelect.addEventListener('change', () => this.render(true));
     selectRow.appendChild(this.holeSelect);
 
