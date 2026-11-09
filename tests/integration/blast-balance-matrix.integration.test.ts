@@ -15,6 +15,10 @@ import { summariseMuckPile } from '../../src/core/mining/MuckPileSummary.js';
 import { buildPlanEnergyField } from '../../src/core/mining/BlastExecution.js';
 import { identifyFragmentedVoxels } from '../../src/core/mining/VoxelFragmentation.js';
 import { getAllExplosives } from '../../src/core/world/ExplosiveCatalog.js';
+import { classifyFragmentationBand } from '../../src/core/mining/FragmentationBand.js';
+import { intensityAt } from '../../src/core/mining/EnergyPropagation.js';
+import { getRock } from '../../src/core/world/RockCatalog.js';
+import { DUST_LOSS_SHARE, FRAGMENTATION_BAND_FINES_MIN } from '../../src/core/config/balance.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -27,10 +31,12 @@ interface Shot {
   depth?: number;
   rows?: number;
   cols?: number;
+  /** Ore density carried by every voxel of the block (default none). */
+  ore?: Record<string, number>;
 }
 
 /** A block of one rock, 21×11×21, surface at y=10. */
-function bench(rock: string): VoxelGrid {
+function bench(rock: string, ore: Record<string, number> = {}): VoxelGrid {
   const grid = new VoxelGrid(40, 40);
   for (let z = 5; z <= 25; z++) {
     for (let y = 0; y <= 10; y++) {
@@ -38,7 +44,7 @@ function bench(rock: string): VoxelGrid {
         grid.setVoxel(x, y, z, {
           composition: { rocks: [{ rockId: rock, coefficient: 1.0 }] },
           density: 1.0,
-          oreDensities: {},
+          oreDensities: { ...ore },
           fractureModifier: 1.0,
         });
       }
@@ -55,11 +61,11 @@ function fire(shot: Shot): BlastResult {
 function fireOnto(shot: Shot): { result: BlastResult; grid: VoxelGrid } {
   const {
     rock = 'molite', explosive = 'boomite', kg = 8, stemming = 2,
-    spacing = 4, depth = 8, rows = 2, cols = 3,
+    spacing = 4, depth = 8, rows = 2, cols = 3, ore = {},
   } = shot;
 
   holeCounter.nextHoleId = 1;
-  const grid = bench(rock);
+  const grid = bench(rock, ore);
   const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, rows, cols, spacing, depth, 0.089);
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
@@ -290,5 +296,215 @@ describe('Blast balance — the pipeline stays coherent', () => {
     expect(b.fragmentCount).toBe(a.fragmentCount);
     expect(b.maxThrowDistance).toBeCloseTo(a.maxThrowDistance, 9);
     expect(b.fragments.map(f => f.position)).toEqual(a.fragments.map(f => f.position));
+  });
+});
+
+// ── Fragmentation bands (#2198) ───────────────────────────────────────────────
+
+/** Total volume of the three bands a broken voxel can fall in. */
+const brokenBandVolume = (r: BlastResult): number =>
+  r.bandVolumes!.good + r.bandVolumes!.fines + r.bandVolumes!.dust;
+
+describe('Blast balance — the report says how finely the rock broke', () => {
+  const BANDS = ['intact', 'cracked', 'good', 'fines', 'dust'] as const;
+
+  it('carries a volume for every band and a dust loss', () => {
+    const r = fire({ rock: 'molite', explosive: 'krackle', kg: 3, depth: 10 });
+
+    expect(r.bandVolumes).toBeDefined();
+    expect(r.dustLoss).toBeDefined();
+    for (const band of BANDS) {
+      expect(r.bandVolumes![band], band).toBeGreaterThanOrEqual(0);
+      expect(Number.isFinite(r.bandVolumes![band]), band).toBe(true);
+    }
+    expect(r.dustLoss!.massKg).toBeGreaterThanOrEqual(0);
+    expect(r.dustLoss!.oreValue).toBeGreaterThanOrEqual(0);
+  });
+
+  it('good, fines and dust together are exactly the rock that broke', () => {
+    for (const shot of [{ kg: 3 }, { kg: 6 }, { kg: 8 }]) {
+      const r = fire({ rock: 'molite', explosive: 'krackle', depth: 10, ...shot });
+      expect(r.totalRockVolume).toBeGreaterThan(0);
+      expect(brokenBandVolume(r), JSON.stringify(shot)).toBeCloseTo(r.totalRockVolume, 4);
+    }
+  });
+
+  it('rock that cracked but held shows up as cracked, not as broken', () => {
+    const r = fire({ rock: 'molite', explosive: 'krackle', kg: 3, depth: 10 });
+
+    expect(r.crackedVoxels).toBeGreaterThan(0);
+    expect(r.bandVolumes!.cracked).toBeGreaterThan(0);
+  });
+
+  it('a shot that breaks nothing reports no broken-band volume and no dust loss', () => {
+    const r = fire({ rock: 'titanite', explosive: 'pop_rock', kg: 0.5, depth: 6, ore: { rustite: 0.3 } });
+
+    expect(r.clearedVoxels).toBe(0);
+    expect(brokenBandVolume(r)).toBe(0);
+    expect(r.dustLoss!.massKg).toBe(0);
+    expect(r.dustLoss!.oreValue).toBe(0);
+  });
+
+  it('a heavier charge shifts the rock toward finer bands', () => {
+    const light = fire({ rock: 'cruite', explosive: 'krackle', kg: 2, depth: 10 });
+    const heavy = fire({ rock: 'cruite', explosive: 'dynatomics', kg: 16, depth: 10 });
+    const finerShare = (r: BlastResult): number => (r.bandVolumes!.fines + r.bandVolumes!.dust) / brokenBandVolume(r);
+
+    expect(finerShare(heavy)).toBeGreaterThan(finerShare(light));
+  });
+});
+
+describe('Blast balance — a correct, a doubled and a heavy charge on one pattern', () => {
+  // One 2x3 pattern, 4 m apart, 10 m deep, 2 m of stemming. Only the charge changes.
+  const ORE = { rustite: 0.3 };
+  const pattern = { rock: 'molite', depth: 10, stemming: 2, ore: ORE } as const;
+  const correct = (): BlastResult => fire({ ...pattern, explosive: 'krackle', kg: 3 });
+  const doubled = (): BlastResult => fire({ ...pattern, explosive: 'krackle', kg: 6 });
+  const heavy = (): BlastResult => fire({ ...pattern, explosive: 'dynatomics', kg: 16 });
+
+  const share = (r: BlastResult, band: 'good' | 'fines' | 'dust'): number => r.bandVolumes![band] / brokenBandVolume(r);
+
+  it('the correct charge gives mostly good-band rock', () => {
+    const r = correct();
+    expect(share(r, 'good')).toBeGreaterThan(share(r, 'fines'));
+    expect(share(r, 'good')).toBeGreaterThan(share(r, 'dust'));
+    expect(share(r, 'good')).toBeGreaterThanOrEqual(0.5);
+  });
+
+  it('doubling the charge finer-breaks the rock: fewer good, more fines', () => {
+    const a = correct();
+    const b = doubled();
+    expect(brokenBandVolume(b)).toBeGreaterThan(brokenBandVolume(a));
+    expect(b.bandVolumes!.fines).toBeGreaterThan(a.bandVolumes!.fines);
+    expect(b.bandVolumes!.dust).toBeGreaterThanOrEqual(a.bandVolumes!.dust);
+  });
+
+  it('the heavy overcharge gives mostly dust, more than any other band', () => {
+    const r = heavy();
+    expect(share(r, 'dust')).toBeGreaterThan(share(r, 'good'));
+    expect(share(r, 'dust')).toBeGreaterThan(share(r, 'fines'));
+  });
+
+  it('the heavy overcharge is dustier and less good-band than the correct charge', () => {
+    const a = correct();
+    const c = heavy();
+    expect(share(c, 'dust')).toBeGreaterThan(share(a, 'dust'));
+    expect(share(c, 'good')).toBeLessThan(share(a, 'good'));
+  });
+
+  it('the heavy overcharge reports a dust loss in mass and in ore value', () => {
+    const r = heavy();
+    expect(r.dustLoss!.massKg).toBeGreaterThan(0);
+    expect(r.dustLoss!.oreValue).toBeGreaterThan(0);
+  });
+
+  it('dust loss grows with the charge', () => {
+    const lossOf = (r: BlastResult): number => r.dustLoss!.massKg;
+    expect(lossOf(heavy())).toBeGreaterThan(lossOf(doubled()));
+    expect(lossOf(doubled())).toBeGreaterThanOrEqual(lossOf(correct()));
+  });
+
+  it('the mass lost is the configured share of the dust-band rock', () => {
+    const r = heavy();
+    const density = getRock('molite')!.density;
+    expect(r.dustLoss!.massKg).toBeCloseTo(r.bandVolumes!.dust * density * DUST_LOSS_SHARE, 1);
+  });
+
+  it('the ore lost is a small part of the ore the blast delivers', () => {
+    const r = heavy();
+    const delivered = r.totalOreValue + (r.sealedOreValue ?? 0);
+    expect(r.dustLoss!.oreValue).toBeGreaterThan(0);
+    expect(r.dustLoss!.oreValue).toBeLessThan(delivered);
+  });
+
+  it('a block with no ore loses no ore value to dust, only mass', () => {
+    const r = fire({ rock: 'molite', explosive: 'dynatomics', kg: 16, depth: 10, stemming: 2 });
+    expect(r.dustLoss!.massKg).toBeGreaterThan(0);
+    expect(r.dustLoss!.oreValue).toBe(0);
+  });
+
+  it('is reproducible', () => {
+    const a = heavy();
+    const b = heavy();
+    expect(b.bandVolumes).toEqual(a.bandVolumes);
+    expect(b.dustLoss).toEqual(a.dustLoss);
+  });
+});
+
+describe('Blast balance — a heavily stemmed overcharge stratifies the rock', () => {
+  const SURFACE_TOP = 11; // bench voxels fill y 0..10
+  const STEMMING = 6;
+  const DEPTH = 10;
+
+  /** Hole bottom y = SURFACE_TOP - DEPTH; charge 8 kg of krackle fills 4 m above it. */
+  const CHARGE_TOP = SURFACE_TOP - DEPTH + 4;
+
+  function singleHolePlan(kg: number, stemming: number, depth: number) {
+    holeCounter.nextHoleId = 1;
+    const holes = createGridPlan(holeCounter, { x: 15, z: 15 }, 1, 1, 4, depth, 0.089);
+    const depths: Record<string, number> = {};
+    for (const h of holes) depths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), depths, 'krackle', kg, stemming);
+    return assembleBlastPlan(holes, charges);
+  }
+
+  /** Fragmentation-band volumes by height, for the broken rock of a single-hole shot. */
+  function bandsByLayer(kg: number) {
+    const plan = singleHolePlan(kg, STEMMING, DEPTH);
+    const grid = bench('cruite');
+    const field = buildPlanEnergyField(plan, grid)!;
+    expect(field, 'plan was rejected').not.toBeNull();
+    const fragmentation = identifyFragmentedVoxels(field, grid);
+    const finesOrDust: number[] = [];
+    const broken: number[] = [];
+    for (let y = 0; y < SURFACE_TOP; y++) { finesOrDust[y] = 0; broken[y] = 0; }
+    for (const v of fragmentation.fragmented) {
+      broken[v.y]!++;
+      if (intensityAt(field, v.x, v.y, v.z) >= FRAGMENTATION_BAND_FINES_MIN) finesOrDust[v.y]!++;
+    }
+    return { finesOrDust, broken, field };
+  }
+
+  const sum = (values: number[], from: number, to: number): number => {
+    let total = 0;
+    for (let y = from; y < to; y++) total += values[y]!;
+    return total;
+  };
+
+  it('puts fines and dust near the charge', () => {
+    const { finesOrDust } = bandsByLayer(8);
+    expect(sum(finesOrDust, 0, CHARGE_TOP + 1)).toBeGreaterThan(0);
+  });
+
+  it('puts more fines and dust at the charge than in the stemming above it', () => {
+    const { finesOrDust } = bandsByLayer(8);
+    expect(sum(finesOrDust, 0, CHARGE_TOP + 1)).toBeGreaterThan(sum(finesOrDust, CHARGE_TOP + 1, SURFACE_TOP));
+  });
+
+  it('leaves the collar coarse or unbroken: no fines or dust in the top metres', () => {
+    const { field } = bandsByLayer(8);
+    const { box } = field;
+    for (let y = SURFACE_TOP - 3; y < SURFACE_TOP; y++) {
+      for (let z = box.minZ; z < box.maxZ; z++) {
+        for (let x = box.minX; x < box.maxX; x++) {
+          const band = classifyFragmentationBand(intensityAt(field, x, y, z));
+          expect(['intact', 'cracked', 'good'], `${x},${y},${z} is ${band}`).toContain(band);
+        }
+      }
+    }
+  });
+
+  it('throws no more rock than a correctly charged hole', () => {
+    const stemmed = fire({ rock: 'cruite', explosive: 'krackle', kg: 8, stemming: STEMMING, depth: DEPTH, rows: 1, cols: 1 });
+    const correct = fire({ rock: 'cruite', explosive: 'krackle', kg: 4, stemming: 2, depth: 8, rows: 1, cols: 1 });
+
+    expect(stemmed.clearedVoxels).toBeGreaterThan(0);
+    expect(stemmed.projectionCount).toBeLessThanOrEqual(correct.projectionCount);
+    expect(stemmed.maxThrowDistance).toBeLessThanOrEqual(correct.maxThrowDistance);
+  });
+
+  it('reports the finer rock of the overcharge in the band volumes', () => {
+    const stemmed = fire({ rock: 'cruite', explosive: 'krackle', kg: 8, stemming: STEMMING, depth: DEPTH, rows: 1, cols: 1 });
+    expect(stemmed.bandVolumes!.fines + stemmed.bandVolumes!.dust).toBeGreaterThan(0);
   });
 });
