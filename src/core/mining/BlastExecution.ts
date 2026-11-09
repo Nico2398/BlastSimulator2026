@@ -2,7 +2,7 @@
 // Orchestrates: validate → energy → fragmentation → terrain subtraction → results
 // Pure function operating on GameState + VoxelGrid, no side effects.
 
-import { type FragmentationBand, classifyFragmentationBand, bandMassRetention } from './FragmentationBand.js';
+import { type FragmentationBand, FRAGMENTATION_BANDS, classifyFragmentationBand, bandMassRetention } from './FragmentationBand.js';
 import { oreValuePerKg, type MarketId } from '../economy/Market.js';
 import { isFragmentSealed } from '../economy/SealedFragments.js';
 import type { Vec3 } from '../math/Vec3.js';
@@ -114,7 +114,7 @@ export interface BlastResult {
   maxProjectionSpeed: number;
   vibrationAtVillages: VillageVibration[];
   totalRockVolume: number;
-  /** Value of ore in the rock that broke out and can be reached; ore left sealed is `sealedOreValue` (#2003). */
+  /** Value of ore in the rock that broke out and can be reached; ore left sealed is `sealedOreValue` (#2003). Gross of dust loss: the ore dust took is `dustLoss.oreValue` (#2198). */
   totalOreValue: number;
   rating: BlastRating;
   crackedVoxels: number;
@@ -138,7 +138,7 @@ export interface BlastResult {
   sealedFragmentCount?: number;
   /** Oversized fragments that are reachable, not sealed (#2003). */
   reachableOversizedFragments?: number;
-  /** Volume (m3) of rock the blast energised, by fragmentation band (#2198). */
+  /** Volume (m3) of rock the blast energised, by fragmentation band (#2198). `intact` is always 0: rock below the cracked bound is not tallied. */
   bandVolumes: Record<FragmentationBand, number>;
   /** Mass and ore value lost to dust-band voxels (#2198). */
   dustLoss: { massKg: number; oreValue: number };
@@ -368,7 +368,7 @@ export function* executeBlastSteps(
   let totalOreValue = 0;
   let oversizedFragments = 0;
   const crackedVoxels = fragmentation?.cracked.length ?? 0;
-  const bandVolumes: Record<FragmentationBand, number> = { intact: 0, cracked: 0, good: 0, fines: 0, dust: 0 };
+  const bandVolumes: Record<FragmentationBand, number> = Object.fromEntries(FRAGMENTATION_BANDS.map((b) => [b, 0])) as Record<FragmentationBand, number>;
   const dustLoss = { massKg: 0, oreValue: 0 };
   let clearedVoxels = 0;
 
