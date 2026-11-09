@@ -18,6 +18,22 @@ export interface ParsedArgs {
   port: number;
   shard?: ShardSpec;
   reportDrift: boolean;
+  /**
+   * `--jobs N`: how many worker processes a command-mode batch fans out
+   * across (`run-all-scenarios-fanout.ts`). Absent means the machine's
+   * default; `--jobs 1` runs every scenario in this process, as before.
+   */
+  jobs?: number;
+  /**
+   * Internal: this process is a fan-out worker, serving scenarios its parent
+   * sends over IPC (`run-all-scenarios-worker.ts`) — never typed by a person.
+   */
+  worker?: true;
+}
+
+export function parseJobsArg(raw: string): number {
+  if (!/^[1-9]\d*$/.test(raw)) throw new Error(`--jobs must be a positive integer, got "${raw}"`);
+  return parseInt(raw, 10);
 }
 
 export function parseShardArg(raw: string): ShardSpec {
@@ -37,10 +53,17 @@ export function parseArgs(): ParsedArgs {
   let port = DEV_SERVER_PORT;
   let shard: ShardSpec | undefined;
   let reportDrift = false;
+  let jobs: number | undefined;
+  let worker = false;
   const scenarios: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--mode' && args[i + 1]) {
+    if (args[i] === '--jobs' && args[i + 1]) {
+      jobs = parseJobsArg(args[i + 1]!);
+      i++;
+    } else if (args[i] === '--worker') {
+      worker = true;
+    } else if (args[i] === '--mode' && args[i + 1]) {
       mode = args[i + 1]!;
       i++;
     } else if (args[i] === '--port' && args[i + 1]) {
@@ -56,7 +79,15 @@ export function parseArgs(): ParsedArgs {
     }
   }
 
-  return { mode, scenarios, port, ...(shard ? { shard } : {}), reportDrift };
+  return {
+    mode,
+    scenarios,
+    port,
+    ...(shard ? { shard } : {}),
+    reportDrift,
+    ...(jobs !== undefined ? { jobs } : {}),
+    ...(worker ? { worker: true as const } : {}),
+  };
 }
 
 /** What one interaction action costs on average, the unit `estimateScenarioCost` counts in. */

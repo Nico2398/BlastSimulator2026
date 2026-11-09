@@ -15,7 +15,7 @@
 // DO NOT implement anything here — only add implementation to scripts/.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { parseArgs, parseShardArg, selectShard, estimateScenarioCost } from '../../../scripts/run-all-scenarios-cli.js';
+import { parseArgs, parseShardArg, parseJobsArg, selectShard, estimateScenarioCost } from '../../../scripts/run-all-scenarios-cli.js';
 import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 
 const ORIGINAL_ARGV = process.argv;
@@ -55,6 +55,20 @@ describe('run-all-scenarios-cli.ts', () => {
     });
   });
 
+  describe('parseJobsArg', () => {
+    it('parses a positive integer', () => {
+      expect(parseJobsArg('4')).toBe(4);
+    });
+
+    it('accepts 1, the in-process path', () => {
+      expect(parseJobsArg('1')).toBe(1);
+    });
+
+    it.each(['0', '-2', '2.5', 'many', ''])('throws naming the raw value for "%s"', (raw) => {
+      expect(() => parseJobsArg(raw)).toThrow(`--jobs must be a positive integer, got "${raw}"`);
+    });
+  });
+
   describe('parseArgs', () => {
     it('defaults to command mode, default port, no shard, no drift report, no scenario filter', () => {
       process.argv = ['node', 'run-all-scenarios.js'];
@@ -89,6 +103,28 @@ describe('run-all-scenarios-cli.ts', () => {
     it('parses --report-drift as a boolean flag with no following value', () => {
       process.argv = ['node', 'run-all-scenarios.js', '--report-drift'];
       expect(parseArgs().reportDrift).toBe(true);
+    });
+
+    it('parses --jobs into a worker count', () => {
+      process.argv = ['node', 'run-all-scenarios.js', '--jobs', '3'];
+      expect(parseArgs().jobs).toBe(3);
+    });
+
+    it('omits jobs entirely when --jobs is absent, so the machine default applies', () => {
+      process.argv = ['node', 'run-all-scenarios.js'];
+      expect('jobs' in parseArgs()).toBe(false);
+    });
+
+    it('throws on a --jobs value that is not a positive integer', () => {
+      process.argv = ['node', 'run-all-scenarios.js', '--jobs', '0'];
+      expect(() => parseArgs()).toThrow(/--jobs must be a positive integer.*"0"/);
+    });
+
+    it('parses the internal --worker flag, and omits it when absent', () => {
+      process.argv = ['node', 'run-all-scenarios.js', '--worker', '--report-drift'];
+      expect(parseArgs()).toMatchObject({ worker: true, reportDrift: true, scenarios: [] });
+      process.argv = ['node', 'run-all-scenarios.js'];
+      expect('worker' in parseArgs()).toBe(false);
     });
 
     it('collects bare positional args as scenario name filters', () => {

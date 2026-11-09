@@ -22,6 +22,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 import type { ScenarioResult } from '../../../scripts/shared/command-runner.js';
+import type { RunnerWithContext } from '../../../src/console/createRunner.js';
 
 const { createGameEngineMock, runScenarioMock, loadScenarioDefMock } = vi.hoisted(() => ({
   createGameEngineMock: vi.fn(() => ({ fakeEngine: true })),
@@ -103,6 +104,33 @@ describe('run-all-scenarios-command-batch.ts', () => {
     expect(results).toHaveLength(2);
     expect(results[0]).toEqual({ name: 'ok', totalSteps: 1, failed: false });
     expect(results[1]).toMatchObject({ name: 'broken', totalSteps: 0, failed: true, error: 'bad scenario JSON' });
+  });
+
+  // runCommandScenario is the one-scenario body a fan-out worker runs
+  // (run-all-scenarios-worker.ts), so a worker judges a scenario exactly as
+  // the in-process batch does.
+  it('runCommandScenario runs one scenario against the given engine with its drift flag', async () => {
+    const { runCommandScenario } = await import('../../../scripts/run-all-scenarios-command-batch.js');
+    const engine = { fakeEngine: true };
+    const steps = [{ command: 'state', role: 'observe' }] as ScenarioStepDef[];
+    loadScenarioDefMock.mockReturnValue({ name: 'x', description: '', steps });
+    runScenarioMock.mockReturnValue({ name: 'x', totalSteps: 1, failed: false } satisfies ScenarioResult);
+
+    const result = runCommandScenario(engine as unknown as RunnerWithContext, 'x', true);
+
+    expect(result).toEqual({ name: 'x', totalSteps: 1, failed: false });
+    expect(runScenarioMock).toHaveBeenCalledWith(engine, 'x', steps, expect.any(String), true);
+    expect(createGameEngineMock).not.toHaveBeenCalled();
+  });
+
+  it('runCommandScenario turns a definition that fails to load into a failed result', async () => {
+    const { runCommandScenario } = await import('../../../scripts/run-all-scenarios-command-batch.js');
+    loadScenarioDefMock.mockImplementation(() => { throw new Error('Unexpected token } in JSON'); });
+
+    const result = runCommandScenario({} as unknown as RunnerWithContext, 'broken', false);
+
+    expect(result).toEqual({ name: 'broken', totalSteps: 0, failed: true, error: 'Unexpected token } in JSON' });
+    expect(runScenarioMock).not.toHaveBeenCalled();
   });
 
   it('returns an empty array for an empty scenario list without creating an engine call failure', async () => {
