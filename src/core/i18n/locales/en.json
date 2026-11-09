@@ -4792,5 +4792,19 @@
   "ui.hud_explain.minimap.building": "Buildings: your offices, depots and workshops.",
   "ui.hud_explain.minimap.vehicle": "Vehicles: drill rigs, trucks and loaders on the move.",
   "ui.hud_explain.minimap.crew": "Crew: your employees on the ground.",
-  "ui.hud_explain.minimap.hole": "Holes: drilled blast holes, loaded or empty."
+  "ui.hud_explain.minimap.hole": "Holes: drilled blast holes, loaded or empty.",
+  "ui.explain.hole_status_wet": "Wet: water stands in this hole. Water-sensitive explosives deliver only {percent}% of their energy here; a tube keeps new water out but does not drain what is already inside.",
+  "ui.explain.hole_status_tubed": "Tubed: a liner keeps new water out of this hole. It does not drain water already inside.",
+  "ui.explain.hole_status_dry": "Dry: no water in this hole, so any explosive fires at full strength.",
+  "ui.explain.hole_status_ordered": "Ordered: this hole is queued for a drill rig and not drilled yet. It cannot be charged until it exists.",
+  "ui.explain.hole_status_buried": "Buried: rock above this hole was never cleared, so a rig cannot reach it. Clear the surface first.",
+  "ui.explain.drill_field_spacing": "Distance between neighbouring holes. Tighter spacing shatters rock finer but needs more holes, drilling and explosive; wider spacing leaves uncracked rock between holes.",
+  "ui.explain.drill_field_depth": "How deep each hole goes. Deeper holes break more rock per hole and leave room for a longer stemming column, but cost more drilling time.",
+  "ui.explain.drill_field_diameter": "Bore width. A wider hole holds more explosive per metre and breaks more rock, but drills slower and costs more.",
+  "ui.explain.stemming": "Inert fill packed above the charge. Full confinement needs stemming of {fullPct}% of the hole depth; with none, the shot delivers only {minPct}% of its energy downward and throws the rest upward as projections.",
+  "ui.explain.report_stat_cleared": "Rock the blast fully broke loose and that is ready to haul.",
+  "ui.explain.report_stat_cracked": "Rock the blast fractured but did not clear. It needs another shot or extra work.",
+  "ui.explain.report_stat_fragments": "Number of broken pieces the blast produced. Many small pieces dig and haul easily; oversized ones need breaking again.",
+  "ui.explain.report_stat_volume": "Total rock volume the blast moved, in cubic metres.",
+  "ui.explain.report_stat_projections": "Fragments thrown faster than {speed} m/s. They are flyrock: they damage buildings and hurt people. Less stemming and more explosive throw more."
 }

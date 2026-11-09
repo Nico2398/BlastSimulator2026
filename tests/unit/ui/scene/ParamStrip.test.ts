@@ -270,4 +270,44 @@ describe('ParamStrip readout and actions (#1942)', () => {
     strip.show(makeConfig());
     expect(bar().querySelector('[data-action="ramp-spiral"]')).toBeNull();
   });
+
+  // #2168: a field label explains what stepping the field does to the pattern.
+  describe('field explanations (#2168)', () => {
+    it('a field with an explain text carries it on its label', () => {
+      strip.show(makeConfig({ fields: [field('spacing', 4, { label: 'Spacing', explain: 'Wider spacing, bigger burden.' })] }));
+      const holder = bar().querySelector<HTMLElement>('[data-field="spacing"] [data-explain]');
+      expect(holder).not.toBeNull();
+      expect(holder!.textContent).toBe('Spacing');
+      expect(holder!.dataset['explain']).toBe('Wider spacing, bigger burden.');
+    });
+
+    it('only the fields that have an explain text become explainable', () => {
+      strip.show(makeConfig({ fields: [
+        field('spacing', 4, { explain: 'About spacing' }),
+        field('depth', 6),
+      ] }));
+      expect(bar().querySelector('[data-field="spacing"] [data-explain]')).not.toBeNull();
+      expect(bar().querySelector('[data-field="depth"] [data-explain]')).toBeNull();
+    });
+
+    it('a field without any explain text stays as before: no data-explain anywhere in the bar', () => {
+      strip.show(makeConfig({ fields: [field('spacing', 4), field('depth', 6)] }));
+      expect(bar().querySelector('[data-explain]')).toBeNull();
+    });
+
+    it('each field keeps its own text', () => {
+      strip.show(makeConfig({ fields: [
+        field('spacing', 4, { explain: 'text A' }),
+        field('depth', 6, { explain: 'text B' }),
+      ] }));
+      expect(bar().querySelector<HTMLElement>('[data-field="spacing"] [data-explain]')!.dataset['explain']).toBe('text A');
+      expect(bar().querySelector<HTMLElement>('[data-field="depth"] [data-explain]')!.dataset['explain']).toBe('text B');
+    });
+
+    it('a changed explain text re-renders even when the values did not move', () => {
+      strip.show(makeConfig({ fields: [field('spacing', 4, { explain: 'old words' })] }));
+      strip.show(makeConfig({ fields: [field('spacing', 4, { explain: 'new words' })] }));
+      expect(bar().querySelector<HTMLElement>('[data-field="spacing"] [data-explain]')!.dataset['explain']).toBe('new words');
+    });
+  });
 });

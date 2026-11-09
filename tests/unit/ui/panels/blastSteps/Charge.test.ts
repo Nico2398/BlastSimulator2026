@@ -18,6 +18,7 @@ import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js
 import { setLocale } from '../../../../../src/core/i18n/I18n.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
 import { chargeKgLimitWarning, permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
+import { stemmingExplain } from '../../../../../src/ui/blastWorkshopExplain.js';
 import { pinnedDryCycle, pinnedCycle, rainAfterCycle } from '../../../../helpers/weatherCycles.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -1513,5 +1514,40 @@ describe('ChargeStep — projected plan kg against the permit (#2167)', () => {
     chargeAllBtn(step).click();
     expect(gameConsole).toHaveBeenCalledWith(expect.stringContaining('charge hole:* '));
     expect(gameConsole.mock.calls[0]![0]).toContain('amount:5kg');
+  });
+});
+
+describe('ChargeStep — stemming field explains itself (#2168)', () => {
+  afterEach(() => setLocale('en'));
+
+  it('the stemming label carries the stemming explanation', () => {
+    const { step } = makeStep();
+    step.update(makeState(), 'sunny');
+    const field = step.root.querySelector('[data-field="stemming"]') as HTMLElement;
+    const holder = field.querySelector<HTMLElement>('[data-explain]');
+    expect(holder).not.toBeNull();
+    expect(holder!.textContent).toBe(t('ui.blast_workshop.charge.stemming'));
+    expect(holder!.dataset['explain']).toBe(stemmingExplain());
+    expect(holder!.dataset['explain']!.length).toBeGreaterThan(0);
+  });
+
+  it('the amount field is not given the stemming explanation', () => {
+    const { step } = makeStep();
+    step.update(makeState(), 'sunny');
+    const amount = step.root.querySelector('[data-field="amount"]') as HTMLElement;
+    expect(amount).not.toBeNull();
+    const explains = [...amount.querySelectorAll<HTMLElement>('[data-explain]')].map(e => e.dataset['explain']);
+    expect(explains).not.toContain(stemmingExplain());
+  });
+
+  it('the explanation follows a language switch after refreshLocale', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    step.update(state, 'sunny');
+    setLocale('fr');
+    step.refreshLocale();
+    step.update(state, 'sunny');
+    const holder = step.root.querySelector<HTMLElement>('[data-field="stemming"] [data-explain]')!;
+    expect(holder.dataset['explain']).toBe(stemmingExplain());
   });
 });

@@ -5,7 +5,7 @@
 // text — this only renders whatever config it's handed, same signature-gated
 // rebuild convention as the rest of src/ui/.
 
-import { el, button, stepper } from '../dom.js';
+import { el, button, stepper, explainable } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { t } from '../../core/i18n/I18n.js';
 
@@ -15,6 +15,8 @@ const RESULT_NOTE_SEPARATOR = ' — ';
 export interface ParamStripField {
   key: string;
   label: string;
+  /** What changing this field does; shown on hover of the label. */
+  explain?: string;
   value: number;
   format?: (v: number) => string;
   onDec: () => void;
@@ -117,7 +119,7 @@ export class ParamStrip {
     this.root.style.display = 'flex';
     const sig = JSON.stringify({
       icon: config.icon, title: config.title, subtitle: config.subtitle,
-      fields: config.fields.map(f => [f.key, f.value]),
+      fields: config.fields.map(f => [f.key, f.value, f.explain]),
       result: config.result, warn: config.resultWarn, confirm: config.confirmEnabled,
       reason: config.confirmDisabledReason, instr: config.instruction,
       readout: config.readout, actions: config.actions?.map(a => [a.key, a.label, a.disabled]),
@@ -164,7 +166,7 @@ export class ParamStrip {
       const wrap = el('div', { attrs: { 'data-field': f.key } });
       wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:7px 12px;border-right:1px solid rgba(255,255,255,.07);justify-content:center';
       wrap.append(
-        el('span', { text: f.label, attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-text-muted)' } }),
+        explainable(el('span', { text: f.label, attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-text-muted)' } }), f.explain),
         stepper(f.format ? f.format(f.value) : String(f.value), f.onDec, f.onInc),
       );
       return wrap;

@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { BlastReportModal } from '../../../../src/ui/panels/BlastReportModal.js';
 import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../../../src/core/config/balance.js';
 import type { BlastPlaybackSnapshot } from '../../../../src/core/mining/BlastPlayback.js';
-import { t } from '../../../../src/core/i18n/I18n.js';
+import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
+import { reportStatExplain, type ReportStatKind } from '../../../../src/ui/blastWorkshopExplain.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
 
@@ -1035,4 +1036,65 @@ describe('BlastReportModal sealed rock (#2003)', () => {
       expect(modal.root.textContent).toContain(text);
     });
   }
+});
+
+// ── Stat values explain themselves (#2168) ───────────────────────────────────
+
+describe('BlastReportModal — stat explanations (#2168)', () => {
+  const STATS: readonly [ReportStatKind, string][] = [
+    ['cleared', 'ui.blast_workshop.report.stat_cleared'],
+    ['cracked', 'ui.blast_workshop.report.stat_cracked'],
+    ['fragments', 'ui.blast_workshop.report.stat_fragments'],
+    ['volume', 'ui.blast_workshop.report.stat_volume'],
+    ['projections', 'ui.blast_workshop.report.stat_projections'],
+  ];
+
+  function openModal(overrides: Partial<BlastReport> = {}): BlastReportModal {
+    const { modal, setPlayback } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport(overrides);
+    openReport(modal, state, setPlayback);
+    return modal;
+  }
+
+  /** The value element of the stat cell whose key reads `key`. */
+  function valueOf(modal: BlastReportModal, key: string): HTMLElement | undefined {
+    const cell = [...modal.root.querySelectorAll<HTMLElement>('.bsx-stat-cell')]
+      .find(c => c.querySelector('.bsx-stat-key')?.textContent === key);
+    return cell?.querySelector<HTMLElement>('.bsx-stat-value') ?? undefined;
+  }
+
+  for (const [stat, key] of STATS) {
+    it(`the ${stat} value carries its explanation`, () => {
+      const value = valueOf(openModal(), t(key));
+      expect(value).toBeDefined();
+      expect(value!.dataset['explain']).toBe(reportStatExplain(stat));
+      expect(value!.dataset['explain']!.trim().length).toBeGreaterThan(0);
+    });
+  }
+
+  it('an explanation is still attached when the stat is zero', () => {
+    const modal = openModal({ clearedVoxels: 0, crackedVoxels: 0, fragmentCount: 0, totalRockVolume: 0, projectionCount: 0 });
+    for (const [stat, key] of STATS) expect(valueOf(modal, t(key))!.dataset['explain'], stat).toBe(reportStatExplain(stat));
+  });
+
+  it('an explanation is still attached when projections are flagged (value recoloured)', () => {
+    const modal = openModal({ projectionCount: 3, maxProjectionDistanceM: 42 });
+    expect(valueOf(modal, t('ui.blast_workshop.report.stat_projections'))!.dataset['explain']).toBe(reportStatExplain('projections'));
+  });
+
+  it('the five stat explanations read differently from each other', () => {
+    expect(new Set(STATS.map(([stat]) => reportStatExplain(stat))).size).toBe(5);
+  });
+
+  it('the explanations are in French under the French locale', () => {
+    const en = STATS.map(([stat]) => reportStatExplain(stat));
+    try {
+      setLocale('fr');
+      const fr = STATS.map(([stat]) => reportStatExplain(stat));
+      fr.forEach((text, i) => expect(text, STATS[i]![0]).not.toBe(en[i]));
+    } finally {
+      setLocale('en');
+    }
+  });
 });

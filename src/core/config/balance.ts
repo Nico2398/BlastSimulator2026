@@ -495,6 +495,12 @@ export const OVERSIZED_FRAGMENT_THRESHOLD = 0.5;
  *  Real blasting: fly-rock can travel 500m+ at high speed. Scaled for gameplay. */
 export const PROJECTION_SPEED_THRESHOLD = 15;
 
+/** Stemming column, as a fraction of the hole depth, from which stemming confines the charge fully (`stemmingFactor`). */
+export const STEMMING_FULL_DEPTH_FRACTION = 0.3;
+
+/** Share of a charge's energy that still goes downward with no stemming at all (`stemmingEfficiency`). */
+export const STEMMING_MIN_EFFICIENCY = 0.5;
+
 /** Epsilon for blast energy attenuation formula (prevents division by zero). */
 export const BLAST_ENERGY_EPSILON = 4.0;
 

@@ -24,6 +24,7 @@ import { t } from '../../core/i18n/I18n.js';
 import { AccessRampOffer } from './AccessRampOffer.js';
 import { el, statGrid } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
+import { reportStatExplain } from '../blastWorkshopExplain.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { ACCIDENT_STYLE, accidentText, buildingLabelText } from '../accidentLookup.js';
@@ -222,12 +223,12 @@ export class BlastReportModal {
     this.ratingEl.style.color = RATING_COLOR[report.rating];
 
     this.statsEl.replaceChildren(statGrid([
-      { key: t('ui.blast_workshop.report.stat_cleared'), value: `${report.clearedVoxels}` },
-      { key: t('ui.blast_workshop.report.stat_cracked'), value: `${report.crackedVoxels}` },
-      { key: t('ui.blast_workshop.report.stat_fragments'), value: `${report.fragmentCount}` },
+      { key: t('ui.blast_workshop.report.stat_cleared'), explain: reportStatExplain('cleared'), value: `${report.clearedVoxels}` },
+      { key: t('ui.blast_workshop.report.stat_cracked'), explain: reportStatExplain('cracked'), value: `${report.crackedVoxels}` },
+      { key: t('ui.blast_workshop.report.stat_fragments'), explain: reportStatExplain('fragments'), value: `${report.fragmentCount}` },
       { key: t('ui.blast_workshop.report.stat_oversized'), value: `${reachableCount}`, ...(reachableCount > 0 ? { color: 'var(--bsx-amber)' } : {}) },
-      { key: t('ui.blast_workshop.report.stat_volume'), value: `${report.totalRockVolume.toFixed(0)} m³` },
-      { key: t('ui.blast_workshop.report.stat_projections'), value: `${report.projectionCount} · ${report.maxProjectionDistanceM.toFixed(0)} m`, ...(report.projectionCount > 0 ? { color: 'var(--bsx-critical-text)' } : {}) },
+      { key: t('ui.blast_workshop.report.stat_volume'), explain: reportStatExplain('volume'), value: `${report.totalRockVolume.toFixed(0)} m³` },
+      { key: t('ui.blast_workshop.report.stat_projections'), explain: reportStatExplain('projections'), value: `${report.projectionCount} · ${report.maxProjectionDistanceM.toFixed(0)} m`, ...(report.projectionCount > 0 ? { color: 'var(--bsx-critical-text)' } : {}) },
       { key: t('ui.blast_workshop.report.stat_spent'), value: `$${formatMoney(report.spent)}`, color: 'var(--bsx-critical-text)', info: 'report-spent' },
       { key: t('ui.blast_workshop.report.stat_ore_value'), value: `$${formatMoney(report.totalOreValue)}`, color: 'var(--bsx-positive)' },
       ...(sealedOre > 0

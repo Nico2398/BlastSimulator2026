@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FireStep } from '../../../../../src/ui/panels/blastSteps/Fire.js';
 import { wetAllHoles } from '../../../../helpers/holeWater.js';
 import { readFileSync } from 'node:fs';
+import type { EntityOpener } from '../../../../../src/ui/entityLinks.js';
 import { t, setLocale } from '../../../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
@@ -636,5 +637,100 @@ describe('FireStep wet-hole row (#2166)', () => {
     addEmployee(s, 22, 22);
     const step = render(s);
     expect(rowIcon(step, t('ui.blast_workshop.fire.check_zone_occupied', { count: 1 }))).toBe('warn');
+  });
+});
+
+// ── Occupants link to their entity (#2168) ───────────────────────────────────
+
+function makeOpener(): EntityOpener & { open: ReturnType<typeof vi.fn>; focus: ReturnType<typeof vi.fn> } {
+  return { open: vi.fn(), focus: vi.fn() };
+}
+
+describe('FireStep — danger-zone occupants link to their entity (#2168)', () => {
+  it('an employee occupant is a link that opens the employee', () => {
+    const { step } = makeStep();
+    const opener = makeOpener();
+    step.setEntityOpener(opener);
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
+    const emp = addEmployee(state, 22, 22);
+    step.update(state, 'sunny');
+
+    const link = step.root.querySelector<HTMLButtonElement>(`button[data-select-kind="employee"][data-select-id="${emp.id}"]`);
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toContain('Walt Diggins');
+    link!.click();
+    expect(opener.open).toHaveBeenCalledTimes(1);
+    expect(opener.open).toHaveBeenCalledWith('employee', emp.id);
+  });
+
+  it('a vehicle occupant links as a vehicle with its id', () => {
+    const { step } = makeStep();
+    const opener = makeOpener();
+    step.setEntityOpener(opener);
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 21, 21);
+    vehicle.occupantIds = [1];
+    withNavGrid(state);
+    step.update(state, 'sunny');
+
+    const link = step.root.querySelector<HTMLButtonElement>(`button[data-select-kind="vehicle"][data-select-id="${vehicle.id}"]`);
+    expect(link).not.toBeNull();
+    link!.click();
+    expect(opener.open).toHaveBeenCalledWith('vehicle', vehicle.id);
+  });
+
+  it('every occupant of a mixed zone gets its own link', () => {
+    const { step } = makeStep();
+    step.setEntityOpener(makeOpener());
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
+    const emp = addEmployee(state, 22, 22);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 23, 23);
+    vehicle.occupantIds = [];
+    withNavGrid(state);
+    step.update(state, 'sunny');
+
+    const links = [...step.root.querySelectorAll<HTMLElement>('button[data-select-kind]')];
+    expect(links.map(l => `${l.dataset['selectKind']}:${l.dataset['selectId']}`).sort())
+      .toEqual([`employee:${emp.id}`, `vehicle:${vehicle.id}`].sort());
+  });
+
+  it('without an opener the names are plain text: no button, name still shown', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
+    addEmployee(state, 22, 22);
+    step.update(state, 'sunny');
+
+    expect(step.root.querySelector('button[data-select-kind]')).toBeNull();
+    expect(step.root.textContent).toContain('Walt Diggins');
+  });
+
+  it('an opener wired after the list was rendered links on the next render', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
+    addEmployee(state, 22, 22);
+    step.update(state, 'sunny');
+    expect(step.root.querySelector('button[data-select-kind]')).toBeNull();
+
+    step.setEntityOpener(makeOpener());
+    addEmployee(state, 23, 23); // the occupant list changes, so the zone list rebuilds
+    step.update(state, 'sunny');
+
+    expect(step.root.querySelectorAll('button[data-select-kind="employee"]').length).toBe(2);
+  });
+
+  it('a dead employee is neither listed nor linked', () => {
+    const { step } = makeStep();
+    step.setEntityOpener(makeOpener());
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
+    addEmployee(state, 22, 22).alive = false;
+    step.update(state, 'sunny');
+
+    expect(step.root.querySelector('button[data-select-kind]')).toBeNull();
   });
 });

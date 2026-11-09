@@ -3,10 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DrillStep } from '../../../../../src/ui/panels/blastSteps/Drill.js';
 import { wetAllHoles } from '../../../../helpers/holeWater.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
-import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
+import { addHole, holeNumericId } from '../../../../../src/core/mining/DrillPlan.js';
 import { installTubing, buyTubing } from '../../../../../src/core/mining/Tubing.js';
 import { DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../../../src/core/config/balance.js';
-import { t } from '../../../../../src/core/i18n/I18n.js';
+import { t, setLocale } from '../../../../../src/core/i18n/I18n.js';
+import { addBlastFragments } from '../../../../../src/core/economy/Logistics.js';
+import { holeStatusExplain, drillFieldExplain } from '../../../../../src/ui/blastWorkshopExplain.js';
+import type { EntityOpener } from '../../../../../src/ui/entityLinks.js';
+import type { FragmentData } from '../../../../../src/core/mining/BlastExecution.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
 import { gridHoleLimitWarning, permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
 import type { ConfirmModalConfig } from '../../../../../src/ui/panels/ConfirmModal.js';
@@ -971,5 +975,287 @@ describe('DrillStep — permit used / limit readout (#2167)', () => {
     expect((step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).disabled).toBe(false);
     expect((step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).disabled).toBe(false);
     expect((step.root.querySelector('[data-action="clear-holes"]') as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+// ── Explanations and entity links (#2168) ────────────────────────────────────
+
+function makeOpener(): EntityOpener & { open: ReturnType<typeof vi.fn>; focus: ReturnType<typeof vi.fn> } {
+  return { open: vi.fn(), focus: vi.fn() };
+}
+
+/** The status chip of the row whose label reads `label`. */
+function chipWithLabel(root: HTMLElement, label: string): HTMLElement | undefined {
+  return [...root.querySelectorAll<HTMLElement>('.bsx-chip')].find(c => c.textContent === label);
+}
+
+/** The row of a hole: the parent of its remove button. */
+function rowOf(root: HTMLElement, index = 0): HTMLElement {
+  return root.querySelectorAll('[data-action="remove-hole"]')[index]!.parentElement as HTMLElement;
+}
+
+function rubbleAt(id: number, x: number, z: number): FragmentData {
+  return {
+    id, position: { x, y: 0, z }, volume: 0.3, mass: 1000, rockId: 'cruite', oreDensities: {},
+    initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+    halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: id, origin: { x, y: 0, z },
+  };
+}
+
+describe('DrillStep — status chips explain themselves (#2168)', () => {
+  it('a WET chip carries the wet explanation', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    wetAllHoles(state);
+    step.update(state, 'sunny');
+    const c = chipWithLabel(step.root, t('ui.blast_workshop.drill.status_wet'))!;
+    expect(c).toBeDefined();
+    expect(c.dataset['explain']).toBe(holeStatusExplain('wet'));
+    expect(c.dataset['explain']!.length).toBeGreaterThan(0);
+  });
+
+  it('a TUBED chip carries the tubed explanation', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    const hole = addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    buyTubing(state.tubingState, 1, state.cash);
+    installTubing(state.tubingState, hole.id, [hole.id]);
+    step.update(state, 'sunny');
+    const c = chipWithLabel(step.root, t('ui.blast_workshop.drill.status_tubed'))!;
+    expect(c.dataset['explain']).toBe(holeStatusExplain('tubed'));
+  });
+
+  it('a DRY chip carries the dry explanation', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    step.update(state, 'sunny');
+    const c = chipWithLabel(step.root, t('ui.blast_workshop.drill.status_dry'))!;
+    expect(c.dataset['explain']).toBe(holeStatusExplain('dry'));
+  });
+
+  it('an ORDERED chip carries the ordered explanation', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.plannedDrillHoles, 10, 20, 8, 0.15);
+    step.update(state, 'sunny');
+    const c = chipWithLabel(step.root, t('ui.blast_workshop.drill.status_ordered'))!;
+    expect(c.dataset['explain']).toBe(holeStatusExplain('ordered'));
+  });
+
+  it('a Buried chip carries the buried explanation', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    state.grade = createGradeState();
+    addHole(holeCounter, state.plannedDrillHoles, 20, 20, 8, 0.15);
+    addBlastFragments(state.logistics, [rubbleAt(1, 20, 20)]);
+    step.update(state, 'sunny');
+    const c = chipWithLabel(step.root, t('ui.blast_workshop.drill.status_buried'))!;
+    expect(c).toBeDefined();
+    expect(c.dataset['explain']).toBe(holeStatusExplain('buried'));
+  });
+
+  it('the five chips read differently from each other', () => {
+    const texts = (['wet', 'tubed', 'dry', 'ordered', 'buried'] as const).map(holeStatusExplain);
+    expect(new Set(texts).size).toBe(5);
+  });
+
+  it('the explanation follows a language switch after refreshLocale', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    step.update(state, 'sunny');
+    try {
+      setLocale('fr');
+      step.refreshLocale();
+      step.update(state, 'sunny');
+      const c = chipWithLabel(step.root, t('ui.blast_workshop.drill.status_dry'))!;
+      expect(c.dataset['explain']).toBe(holeStatusExplain('dry'));
+    } finally {
+      setLocale('en');
+    }
+  });
+});
+
+describe('DrillStep — drill setting explanations (#2168)', () => {
+  type ExplainField = { key: string; label: string; explain?: string };
+  const fieldsOf = (strip: { show: ReturnType<typeof vi.fn> }) =>
+    (strip.show.mock.calls.at(-1)![0] as { fields: ExplainField[] }).fields;
+
+  it('the grid tool strip gives Spacing, Depth and Diameter each an explanation', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(makeState(), 'sunny');
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 16, z2: 16 });
+
+    const fields = fieldsOf(strip);
+    for (const key of ['spacing', 'depth', 'diameter'] as const) {
+      const f = fields.find(x => x.key === key)!;
+      expect(f, key).toBeDefined();
+      expect(f.explain, key).toBe(drillFieldExplain(key));
+      expect(f.explain!.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('the add-hole strip explains Depth and Diameter', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(makeState(), 'sunny');
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 12, z1: 12, x2: 12, z2: 12 });
+
+    const fields = fieldsOf(strip);
+    expect(fields.find(x => x.key === 'depth')!.explain).toBe(drillFieldExplain('depth'));
+    expect(fields.find(x => x.key === 'diameter')!.explain).toBe(drillFieldExplain('diameter'));
+  });
+
+  it('the three setting explanations differ from each other', () => {
+    const texts = (['spacing', 'depth', 'diameter'] as const).map(drillFieldExplain);
+    expect(new Set(texts).size).toBe(3);
+  });
+
+  for (const [field, labelKey] of [['spacing', 'ui.blast_workshop.drill.spacing'], ['depth', 'ui.blast_workshop.drill.depth']] as const) {
+    it(`the stat strip's ${field} label carries the ${field} explanation`, () => {
+      const { step } = makeStep();
+      step.update(makeState(), 'sunny');
+      const label = [...step.root.querySelectorAll<HTMLElement>('span')].find(s => s.textContent === t(labelKey))!;
+      expect(label).toBeDefined();
+      const holder = label.closest<HTMLElement>('[data-explain]');
+      expect(holder).not.toBeNull();
+      expect(holder!.dataset['explain']).toBe(drillFieldExplain(field));
+    });
+  }
+});
+
+describe('DrillStep — hole rows open the inspector (#2168)', () => {
+  it('clicking a drilled hole row opens that hole through the opener', () => {
+    const { step } = makeStep();
+    const opener = makeOpener();
+    step.setEntityOpener(opener);
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 13, 20, 8, 0.15);
+    step.update(state, 'sunny');
+
+    rowOf(step.root, 1).click();
+
+    expect(opener.open).toHaveBeenCalledTimes(1);
+    expect(opener.open).toHaveBeenCalledWith('hole', holeNumericId(state.drillHoles[1]!.id));
+  });
+
+  it('an ordered (not yet drilled) row opens too', () => {
+    const { step } = makeStep();
+    const opener = makeOpener();
+    step.setEntityOpener(opener);
+    const state = makeState();
+    const hole = addHole(holeCounter, state.plannedDrillHoles, 10, 20, 8, 0.15);
+    step.update(state, 'sunny');
+
+    rowOf(step.root).click();
+
+    expect(opener.open).toHaveBeenCalledWith('hole', holeNumericId(hole.id));
+  });
+
+  it('a buried ordered row opens too', () => {
+    const { step } = makeStep();
+    const opener = makeOpener();
+    step.setEntityOpener(opener);
+    const state = makeState();
+    state.grade = createGradeState();
+    const hole = addHole(holeCounter, state.plannedDrillHoles, 20, 20, 8, 0.15);
+    addBlastFragments(state.logistics, [rubbleAt(1, 20, 20)]);
+    step.update(state, 'sunny');
+    expect(chipWithLabel(step.root, t('ui.blast_workshop.drill.status_buried'))).toBeDefined();
+
+    rowOf(step.root).click();
+
+    expect(opener.open).toHaveBeenCalledWith('hole', holeNumericId(hole.id));
+  });
+
+  it('clicking the row text (id label) also opens the hole', () => {
+    const { step } = makeStep();
+    const opener = makeOpener();
+    step.setEntityOpener(opener);
+    const state = makeState();
+    const hole = addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    step.update(state, 'sunny');
+
+    const idLabel = [...rowOf(step.root).querySelectorAll('span')].find(s => s.textContent === hole.id)!;
+    idLabel.click();
+
+    expect(opener.open).toHaveBeenCalledWith('hole', holeNumericId(hole.id));
+  });
+
+  it('the remove button still removes and does not open the hole', () => {
+    const { step, gameConsole } = makeStep();
+    const opener = makeOpener();
+    step.setEntityOpener(opener);
+    const state = makeState();
+    const hole = addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    step.update(state, 'sunny');
+
+    (step.root.querySelector('[data-action="remove-hole"]') as HTMLButtonElement).click();
+
+    expect(gameConsole).toHaveBeenCalledWith(`drill_plan remove hole:${hole.id}`);
+    expect(opener.open).not.toHaveBeenCalled();
+  });
+
+  it('the remove button of an ordered row does not open the hole either', () => {
+    const { step, gameConsole } = makeStep();
+    const opener = makeOpener();
+    step.setEntityOpener(opener);
+    const state = makeState();
+    const hole = addHole(holeCounter, state.plannedDrillHoles, 10, 20, 8, 0.15);
+    step.update(state, 'sunny');
+
+    (step.root.querySelector('[data-action="remove-hole"]') as HTMLButtonElement).click();
+
+    expect(gameConsole).toHaveBeenCalledWith(`drill_plan remove hole:${hole.id}`);
+    expect(opener.open).not.toHaveBeenCalled();
+  });
+
+  it('without an opener a row click does nothing and nothing throws', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    step.update(state, 'sunny');
+
+    expect(() => rowOf(step.root).click()).not.toThrow();
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  it('an opener wired after the rows were rendered takes effect on the next render', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    const hole = addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    step.update(state, 'sunny');
+
+    const opener = makeOpener();
+    step.setEntityOpener(opener);
+    addHole(holeCounter, state.drillHoles, 13, 20, 8, 0.15); // changes the signature: rows rebuild
+    step.update(state, 'sunny');
+    rowOf(step.root, 0).click();
+
+    expect(opener.open).toHaveBeenCalledWith('hole', holeNumericId(hole.id));
+  });
+
+  it('unwiring the opener (undefined) makes rows inert again', () => {
+    const { step } = makeStep();
+    const opener = makeOpener();
+    step.setEntityOpener(opener);
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    step.update(state, 'sunny');
+
+    step.setEntityOpener(undefined);
+    addHole(holeCounter, state.drillHoles, 13, 20, 8, 0.15);
+    step.update(state, 'sunny');
+    rowOf(step.root, 0).click();
+
+    expect(opener.open).not.toHaveBeenCalled();
   });
 });
