@@ -267,3 +267,7 @@ The same day, the owner noticed that each of the outside account's two comments 
 ## references/github-loop.md — A parent scope no longer holds its place
 
 On 2026-11-07, with `AGENTIC_MAX_PARALLEL_RUNS` at 6, #2163 (`scope:ui`, `scope:panels`) waited on live #2160 (`scope:panels`). Being older and declaring the parent `ui`, it held `ui` for the pass, so #2166 (`scope:workshop`), which clashed with nothing live, waited behind it, and one session ran with six slots configured. The owner retired the parent-scope hold: only a claim that runs alone (`scope:global`, `scope:pipeline`, no scope) still holds its place, because without it such an issue would wait until the backlog emptied. The accepted cost is that a parent-scope issue now starts only when all of its areas are free together.
+
+## Definition of Done — the epic exception
+
+Added on 2026-11-09 with the epic system: the owner's rule is that an epic carries `epic` alone, open or closed, so the merge chain closes an epic its fix pull request names without applying `done`.
