@@ -180,6 +180,31 @@ describe('path rules', () => {
     // A code module's directory is too generic a word to count.
     expect(mentionPattern(p('scripts', 'shared', 'chrome.ts')).test("join(ROOT, 'shared')")).toBe(false);
   });
+
+  it('finds a data file by the stem its loader takes, and by its name in prose', () => {
+    const defs = mentionPattern(p('scripts', 'scenario-defs', 'blast-basic.json'));
+    expect(defs.test("const COLLAPSE = 'blast-basic';")).toBe(true);
+    expect(defs.test('runScenarioSteps("blast-basic")')).toBe(true);
+    expect(defs.test('// Runs blast-basic.json and its twin through the runner')).toBe(true);
+    expect(defs.test('(see blast-basic.json)')).toBe(true);
+    expect(defs.test("loadScenarioDef('blast-basic-2', SCENARIO_DIR)")).toBe(false);
+    expect(defs.test('a blast-basic shot')).toBe(false);
+    // A locale's stem is a language code every i18n-aware test quotes.
+    const locale = mentionPattern(p('src', 'core', 'i18n', 'locales', 'en.json'));
+    expect(locale.test("setLocale('en')")).toBe(false);
+    expect(locale.test('// every key of en.json')).toBe(true);
+  });
+
+  it('finds a code file by a directory of it a test lists, written whole', () => {
+    const kit = mentionPattern(p('src', 'ui', 'scene', 'Kit.ts'));
+    expect(kit.test(`const UI_DIR = resolve(import.meta.dirname, '../../../${p('src', 'ui')}');`)).toBe(true);
+    expect(kit.test(`readdirSync('${p('src', 'ui', 'scene')}/')`)).toBe(true);
+    // A bare first segment is an ordinary word (an HTML attribute here).
+    expect(kit.test("expect(el.attributes.has('src')).toBe(false)")).toBe(false);
+    expect(mentionPattern(p('.github', 'scripts', 'gate.cjs')).test(`readdirSync(join(ROOT, '${p('.github', 'scripts')}'))`)).toBe(true);
+    // A code file named in prose is no mention: that would bypass a hub's narrowing.
+    expect(mentionPattern(SRC('Hub.ts')).test('// constants from Hub.ts')).toBe(false);
+  });
 });
 
 describe('selectTests', () => {
@@ -314,10 +339,48 @@ describe('selectTests', () => {
       expect(selection.files).toEqual(sorted(LINT, p('tests', 'unit', 'i18n', 'keyParity.test.ts'), p('tests', 'unit', 'ui', 'TopBar.test.ts')));
     });
 
+    it('runs the tests that load a scenario definition by its stem, directly or through a helper', () => {
+      const helper = p('tests', 'helpers', 'crowd.ts');
+      const replay = p('tests', 'unit', 'demo', 'replay.test.ts');
+      const dense = p('tests', 'unit', 'audio', 'dense.test.ts');
+      const runner = p('tests', 'integration', 'charge.integration.test.ts');
+      const twin = p('tests', 'unit', 'demo', 'twin.test.ts');
+      const selection = select({
+        ...files,
+        [helper]: "export const scenarioRun = (name: string) => loadScenarioDef(name, SCENARIO_DIR);\n",
+        [replay]: "const NAME = 'blast-basic';\nconst def = loadScenarioDef(NAME, SCENARIO_DIR);\n",
+        [dense]: `${importing(dense, helper, 'scenarioRun')}const COLLAPSE = 'blast-basic';\nscenarioRun(COLLAPSE);\n`,
+        [runner]: '// Runs blast-basic.json through the scenario runner.\n',
+        [twin]: "loadScenarioDef('blast-basic-2', SCENARIO_DIR);\n",
+      }, [def]);
+      for (const test of [replay, dense, runner]) expect(selection.reasons.get(test), test).toBe('mention');
+      expect(selection.files).not.toContain(twin);
+    });
+
+    it('runs the whole config suite for the Actions layer, whose rules sweep files they never name', () => {
+      const config = [p('tests', 'unit', 'config', 'ci.test.ts'), p('tests', 'unit', 'config', 'hooks.test.ts')];
+      for (const changed of [p('.github', 'workflows', 'ci.yml'), p('.github', 'actions', 'gate', 'action.yml'), p('.github', 'scripts', 'gate.cjs')]) {
+        expect(select(files, [changed]).files, changed).toEqual(sorted(LINT, ...config));
+      }
+      expect(select(files, [p('.github', 'scripts', 'gate.cjs')]).reasons.get(config[1]!)).toBe('owner');
+    });
+
     it('runs the tests that read a workflow or spawn a hook by name', () => {
-      expect(select(files, [p('.github', 'workflows', 'ci.yml')]).files).toEqual(sorted(LINT, p('tests', 'unit', 'config', 'ci.test.ts')));
+      expect(select(files, [p('.github', 'workflows', 'ci.yml')]).reasons.get(p('tests', 'unit', 'config', 'ci.test.ts'))).toBe('mention');
       expect(select(files, [p('.claude', 'hooks', 'guard.mjs')]).files).toEqual(sorted(LINT, p('tests', 'unit', 'config', 'hooks.test.ts')));
     });
+  });
+
+  it('runs a test that lists a directory holding a changed module', () => {
+    const stages = p('tests', 'unit', 'ui', 'stages.test.ts');
+    const files = {
+      ...base,
+      [p('src', 'ui', 'scene', 'Kit.ts')]: "export const kit = 'data-tutorial-target';\n",
+      [stages]: `const UI_DIR = resolve(import.meta.dirname, '../../../${p('src', 'ui')}');\n`,
+    };
+    const selection = select(files, [p('src', 'ui', 'scene', 'Kit.ts')]);
+    expect(selection.files).toEqual(sorted(LINT, stages));
+    expect(selection.reasons.get(stages)).toBe('mention');
   });
 
   it('runs the full suite for a change to how tests run', () => {

@@ -20,8 +20,9 @@
  * - **Direct importers.** For every other changed file: the test files that
  *   import it at runtime (`import type` is the typecheck's business, not a
  *   runtime edge), the test files that name it (`mentionPattern`: a test that
- *   `require`s a hook, spawns a script or reads a workflow has no import edge),
- *   and the mirrored test files (`src/core/nav/Pathfinding.ts` →
+ *   `require`s a hook, spawns a script, reads a workflow or lists a source
+ *   directory has no import edge), and the mirrored test files
+ *   (`src/core/nav/Pathfinding.ts` →
  *   `tests/unit/nav/Pathfinding.test.ts` and its `Pathfinding.*` /
  *   `Pathfinding-*` siblings). Test helpers are files like any other: a changed
  *   `tests/helpers/` module selects the tests that import it.
@@ -35,10 +36,12 @@
  *   import the hub and use one of those identifiers. When the diff cannot be
  *   attributed to a named declaration (only import lines, a side-effect
  *   statement, a default export), every direct importer runs.
- * - **Data files.** A scenario definition owes the scenario validation suites
- *   and a locale the i18n suites (`DATA_OWNERS`); any data file also owes the
- *   tests that name its directory as a path segment, which is how a test that
- *   lists a directory finds it.
+ * - **Directory owners** (`DIRECTORY_OWNERS`). A scenario definition owes the
+ *   scenario validation suites, a locale the i18n suites, and a workflow,
+ *   composite action or decision module under `.github/` the whole
+ *   `tests/unit/config/` — the Actions layer's only proof before CI. Beyond
+ *   these, a data file owes the tests that name its directory as a path
+ *   segment or quote its stem (`mentionPattern`).
  * - **Nearest tests.** A changed module no test reaches by any rule above takes
  *   the test files at the first importer depth that has any, up to
  *   `NEAREST_MAX_DEPTH`.
@@ -51,9 +54,10 @@
  *
  * What it cannot see: a test reaching a module only through a longer import
  * chain (a hub change whose behaviour flows through an intermediate module
- * that never names the changed identifier), and files read from disk under a
- * computed name that is neither a path, a file name nor a directory literal.
- * Both are what CI's full run on the pull request head catches.
+ * that never names the changed identifier), files read from disk under a
+ * computed name that is neither a path, a file name, a quoted stem nor a
+ * directory literal, and a console command a test drives by its verb string.
+ * All three are what CI's full run on the pull request head catches.
  *
  * The pure half (`importRefs` … `selectTests`) works on maps a test can build
  * by hand; `planLogic` is the thin layer that reads the repository.
@@ -87,26 +91,49 @@ const NEAREST_MAX_DEPTH = 4;
 /** Suites that read the repository as text. No import edge leads to them, so they always run. */
 const REPO_LINT_DIR = 'tests/unit/lint/';
 
-/** Explicit owners of data directories, beyond the tests that name a data file or its directory. */
-const DATA_OWNERS: ReadonlyArray<{ data: string; tests: readonly string[] }> = [
+/** Tests that own every file under a directory, whether or not they name the file. */
+interface DirectoryOwner {
+  /** Repository directory, with its trailing slash. */
+  dir: string;
+  /** Test files, or test directories with their trailing slash. */
+  tests: readonly string[];
+  /** The files' stems are words tests quote for their own sake, so a quoted stem is no sign a test reads the file. */
+  commonStems?: true;
+}
+
+/**
+ * The Actions layer has no local runtime, so `tests/unit/config/` is its proof
+ * before CI (`agentic-workflow-edition`), and its rules sweep every workflow,
+ * action and decision module without naming each — `autonomy-loop.test.ts`
+ * applies the no-clock rule to whatever `readdirSync('.github/scripts')`
+ * returns. All 25 files: 9 s wall, 13 s summed, on a contended 4-core box.
+ */
+const ACTIONS_LAYER_PROOF = ['tests/unit/config/'];
+
+/** Explicit owners of directories, beyond the tests that name a file in them or the directory itself. */
+const DIRECTORY_OWNERS: readonly DirectoryOwner[] = [
   // Every definition is validated by these suites (they list the directory), and
   // the survey scenario suites replay specific definitions.
-  { data: 'scripts/scenario-defs/', tests: ['tests/unit/scenario-defs-validation/', 'tests/unit/scenario/'] },
-  // Key parity, glossary and value-parity suites read both locales whole.
-  { data: 'src/core/i18n/locales/', tests: ['tests/unit/i18n/'] },
+  { dir: 'scripts/scenario-defs/', tests: ['tests/unit/scenario-defs-validation/', 'tests/unit/scenario/'] },
+  // Key parity, glossary and value-parity suites read both locales whole. A
+  // locale's stem is a language code: 148 test files quote 'en' or 'fr' to pick
+  // a language, and counting them would take the en.json + fr.json change most
+  // feature branches carry from 125 selected files to 210.
+  { dir: 'src/core/i18n/locales/', tests: ['tests/unit/i18n/'], commonStems: true },
+  ...['.github/workflows/', '.github/actions/', '.github/scripts/'].map((dir) => ({ dir, tests: ACTIONS_LAYER_PROOF })),
 ];
 
 const CODE_EXTENSION = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
 
 /** Why a test file is in the focused set. The first rule that picks a file names it. */
-type SelectionReason = 'changed' | 'importer' | 'mirrored' | 'mention' | 'data' | 'nearest' | 'lint';
+type SelectionReason = 'changed' | 'importer' | 'mirrored' | 'mention' | 'owner' | 'nearest' | 'lint';
 
 const REASON_LABELS: Record<SelectionReason, [string, string]> = {
   changed: ['changed test', 'changed tests'],
   importer: ['direct importer', 'direct importers'],
   mirrored: ['mirrored', 'mirrored'],
   mention: ['names a changed file', 'name a changed file'],
-  data: ['data-file owner', 'data-file owners'],
+  owner: ['directory owner', 'directory owners'],
   nearest: ['nearest importer', 'nearest importers'],
   lint: ['repo lint', 'repo lint'],
 };
@@ -267,20 +294,42 @@ function identifierPattern(names: Iterable<string>): RegExp | undefined {
   return list.length === 0 ? undefined : new RegExp(`(?<![\\w$])(?:${list.join('|')})(?![\\w$])`);
 }
 
+/** `dir` as a path ending a literal (`'…/scenario-defs'`, `'src/ui/'`) or opening a template (`` `locales/${l}.json` ``). */
+const directoryLiteral = (dir: string): string => `(?:^|[/'"\`])${escapeRegExp(dir)}(?:\\/?['"\`]|\\/\\$\\{)`;
+
 /**
  * How a test names a file it reads or runs instead of importing it — a hook it
- * spawns, a workflow it parses, a definition it loads: by the file name ending
- * a path or a string (`'require-foreground-bash.mjs'`, `.github/scripts/assignability.cjs`).
- * A data file is also named by its directory, as a path segment ending a
- * literal (`'…/scenario-defs'`, `join(ROOT, 'scenario-defs')`) or opening a
- * template (`` `locales/${l}.json` ``) — how a test that lists a directory
- * finds it. Code directories (`scripts`, `shared`) are too generic to count.
+ * spawns, a workflow it parses, a definition it loads, a directory it lists.
+ *
+ * - **Code file:** its name ending a path or a string
+ *   (`'require-foreground-bash.mjs'`, `.github/scripts/assignability.cjs`), or
+ *   one of its directories two segments deep or more, written whole as a
+ *   literal: `tutorialStages.test.ts` reads every file under `'../../../src/ui'`
+ *   and `autonomy-loop.test.ts` every module `readdirSync` finds in
+ *   `'.github/scripts'`. A bare segment (`'scripts'`, `'shared'`, `'src'` — an
+ *   HTML attribute in the audio tests) is too generic to count.
+ * - **Data file:** its name after a path, quote, space or parenthesis (a comment
+ *   saying `Runs blast-overcharge.json`), its stem as a whole quoted literal —
+ *   the project's loaders take the stem (`loadScenarioDef(name, dir)`,
+ *   `scenarioRun(name)`, `` `${id}.glb` ``), so `denseBlast.test.ts` names
+ *   `ore-haul-dispatch.json` only as `'ore-haul-dispatch'` — unless its
+ *   directory's stems are common words (`DirectoryOwner.commonStems`); or its
+ *   directory as a path segment (`join(ROOT, 'scenario-defs')`).
  */
 export function mentionPattern(path: string): RegExp {
   const parts = path.split('/');
-  const byName = `(?:^|[/'"\`])${escapeRegExp(parts.at(-1)!)}(?![\\w.-])`;
-  if (CODE_EXTENSION.test(path) || parts.length < 2) return new RegExp(byName);
-  return new RegExp(`${byName}|(?:^|[/'"\`])${escapeRegExp(parts.at(-2)!)}(?:\\/?['"\`]|\\/\\$\\{)`);
+  const name = parts.at(-1)!;
+  if (CODE_EXTENSION.test(path)) {
+    const directories = Array.from({ length: Math.max(0, parts.length - 2) }, (_, i) => parts.slice(0, i + 2).join('/'));
+    return new RegExp([`(?:^|[/'"\`])${escapeRegExp(name)}(?![\\w.-])`, ...directories.map(directoryLiteral)].join('|'));
+  }
+  const alternatives = [`(?:^|[\\s(/'"\`])${escapeRegExp(name)}(?![\\w.-])`];
+  const dot = name.lastIndexOf('.');
+  if (dot > 0 && !DIRECTORY_OWNERS.some((owner) => owner.commonStems === true && path.startsWith(owner.dir))) {
+    alternatives.push(`['"\`]${escapeRegExp(name.slice(0, dot))}['"\`]`);
+  }
+  if (parts.length >= 2) alternatives.push(directoryLiteral(parts.at(-2)!));
+  return new RegExp(alternatives.join('|'));
 }
 
 // ── Selection ────────────────────────────────────────────────────────────────
@@ -354,8 +403,8 @@ export function selectTests(input: SelectionInput): TestSelection {
     let reached = add(narrowedImporters(path), 'importer');
     reached += add(mirroredTests(path, testFiles), 'mirrored');
     reached += add(mentioning(mentionPattern(path)), 'mention');
-    for (const owner of DATA_OWNERS.filter((o) => path.startsWith(o.data))) {
-      reached += add(testFiles.filter((f) => owner.tests.some((dir) => f.startsWith(dir))), 'data');
+    for (const owner of DIRECTORY_OWNERS.filter((o) => path.startsWith(o.dir))) {
+      reached += add(testFiles.filter((f) => owner.tests.some((test) => f.startsWith(test))), 'owner');
     }
     // A hub narrowed to nothing has tests; it is the diff that reaches none of them.
     if (reached === 0 && testImporters(path).length === 0 && (CODE_EXTENSION.test(path) || graph.importers.has(path))) {
