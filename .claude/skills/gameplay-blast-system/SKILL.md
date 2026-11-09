@@ -149,6 +149,10 @@ stemmed overcharge crushes the rock near the charge (fines, dust) and leaves the
 coarse or unbroken. `BlastResult.bandVolumes` holds the m³ per band and `BlastResult.dustLoss` the
 mass (kg) and ore value lost to dust; fragments are already net of that loss, their volume is not.
 
+### Energy heatmap (Blast Workshop)
+
+The workshop's heatmap toggle (`toggle-energy-heatmap`, every software tier including none) shows the plan's own energy field (`previewPlanBands` in `SoftwarePreview.ts`, built on `buildPlanEnergyField`) coloured by `classifyFragmentationBand`; colours are `FRAGMENTATION_BAND_COLORS` (`FragmentationBand.ts`), shared by overlay, section and legend. `planHeatmap` (`EnergyHeatmap.ts`) caches one result per grid/holes/charges/wet-holes/`editRevision`, so redraws and hovers cost nothing. Measured recompute: 100 holes 106 ms, 256 holes 183 ms, 576 holes (139k voxels) 257 ms; cached read under 1 ms. Two views: a top-down terrain overlay (`EnergyHeatmapOverlay`, a `GroundTintLayer`, opacity `HEATMAP_OVERLAY_OPACITY`) with one colour per column, and a vertical section (`EnergyHeatmapView`) through the row of voxels sharing the selected hole's z. A column shows the finest band covering at least `HEATMAP_COLUMN_BAND_MIN_SHARE` (0.15) of its filled voxels, so a lone fines voxel does not paint a whole column. Hover (panel cells and the scene `HoverTag`) names exact intensity and band. The console `preview energy` stays tier-gated.
+
 ## Step 4 — Throw, Flight and the Muck Pile
 
 **Three things decide whether rock is thrown rather than merely broken:**
