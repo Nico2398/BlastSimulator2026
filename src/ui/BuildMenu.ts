@@ -27,7 +27,8 @@
 
 import { PanelBase } from './panels/PanelBase.js';
 import { t } from '../core/i18n/I18n.js';
-import { el, button, emptyState, panelRoot, panelHeader, panelBody, flashStatus } from './dom.js';
+import { tierCompareExplain } from './buildingExplain.js';
+import { el, explainable, button, emptyState, panelRoot, panelHeader, panelBody, flashStatus } from './dom.js';
 import { iconEl } from './icons.js';
 import { LocaleTextRegistry } from './localeText.js';
 import type { ClaimRefusalReason } from '../core/world/PlayableArea.js';
@@ -673,9 +674,15 @@ export class BuildMenu extends PanelBase {
     // Tier selector
     const tierSel = el('select', { className: 'bs-build-tier-sel' });
     tierSel.style.cssText = 'flex:0 0 auto;font:600 10px/1 var(--bsx-font-mono);width:44px;padding:4px 2px;border-radius:4px;border:1px solid var(--bsx-hairline-strong);background:var(--bsx-well);color:var(--bsx-text-secondary)';
-    tierSel.title = t('ui.build.select_tier');
+    tierSel.setAttribute('aria-label', t('ui.build.select_tier'));
+    const tierText = tierCompareExplain(type);
+    explainable(tierSel, tierText);
+    // A native <select> cannot draw the ::after tooltip, so a wrapper carries it too.
+    const tierWrap = explainable(el('span', { className: 'bs-build-tier-wrap', children: [tierSel] }), tierText);
+    tierWrap.tabIndex = -1;
+    tierWrap.style.flex = '0 0 auto';
     // A single-tier type has nothing to choose (#1530).
-    if (isSingleTierType(type)) tierSel.style.display = 'none';
+    if (isSingleTierType(type)) { tierSel.style.display = 'none'; tierWrap.style.display = 'none'; }
     for (const tier of [1, 2, 3] as BuildingTier[]) {
       tierSel.appendChild(el('option', { text: `T${tier}`, attrs: { value: String(tier) } }));
     }
@@ -714,7 +721,7 @@ export class BuildMenu extends PanelBase {
     researchBtn.classList.add('bs-build-research-btn');
     researchBtn.style.cssText = 'flex:0 1 auto;min-width:0;height:auto;padding:6px 8px;font-size:9px;white-space:normal;line-height:1.2;display:none';
 
-    row.append(iconChip, info, tierSel, placeBtn, researchBtn);
+    row.append(iconChip, info, tierWrap, placeBtn, researchBtn);
     return row;
   }
 

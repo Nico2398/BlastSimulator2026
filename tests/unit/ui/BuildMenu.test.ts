@@ -24,7 +24,8 @@ import { REGION } from '../../../src/ui/tutorialStages.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
-import { t } from '../../../src/core/i18n/I18n.js';
+import { t, setLocale } from '../../../src/core/i18n/I18n.js';
+import { tierCompareExplain, placedRowTitle } from '../../../src/ui/buildingExplain.js';
 import { buildingCardLine, buildingCardTooltip, buildingCardEffects, buildingScoreEffectLines } from '../../../src/ui/catalogCardText.js';
 import type { ClaimRefusalReason } from '../../../src/core/world/PlayableArea.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
@@ -2073,5 +2074,112 @@ describe('BuildMenu — Vanity section (#1947)', () => {
     expect(sectionOrNull()).not.toBeNull();
     menu.update(stateAt(5));
     expect(sectionOrNull()).toBeNull();
+  });
+});
+
+describe('BuildMenu — tiers and placed rows explain themselves (#2171)', () => {
+  let container: HTMLDivElement;
+  let menu: BuildMenu;
+
+  beforeEach(() => {
+    ({ container, menu } = setupMenu());
+  });
+
+  afterEach(() => {
+    setLocale('en');
+    menu.dispose();
+    container.remove();
+  });
+
+  const catalogRow = (type: BuildingType): HTMLElement => container.querySelector<HTMLElement>(`[data-build-type="${type}"]`)!;
+  const stateWith = (buildings: Building[]): GameState => {
+    const s = makeMockState();
+    s.buildings.buildings = buildings;
+    return s;
+  };
+
+  it('the tier select is explainable with the tier comparison of its type', () => {
+    menu.update(makeMockState());
+    const sel = catalogRow('management_office').querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
+    expect(sel.dataset['explain']).toBe(tierCompareExplain('management_office'));
+    expect(sel.dataset['explain']!.length).toBeGreaterThan(0);
+  });
+
+  it('every multi-tier type carries a comparison of its own', () => {
+    menu.update(makeMockState());
+    const texts = (['management_office', 'living_quarters', 'freight_warehouse', 'driving_center'] as BuildingType[])
+      .map((type) => catalogRow(type).querySelector<HTMLSelectElement>('.bs-build-tier-sel')!.dataset['explain']);
+    for (const text of texts) expect(text).toBeTruthy();
+    expect(new Set(texts).size).toBe(texts.length);
+  });
+
+  it('the old bare "Select tier" title is gone', () => {
+    menu.update(makeMockState());
+    const sel = catalogRow('management_office').querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
+    expect(sel.title).not.toBe('Select tier');
+    expect(sel.title).not.toBe(t('ui.build.select_tier'));
+  });
+
+  it('a placed row title reads #id tier name (x,z) in English', () => {
+    menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 2, x: 5, z: 7 })]));
+    const info = findPlacedRow(container, 4).querySelector<HTMLElement>('.bs-build-row-info')!;
+    expect(info.title).toBe('#4 Bureaucracy Box (5,7)');
+    expect(info.title).toBe(placedRowTitle({ id: 4, type: 'management_office', tier: 2, x: 5, z: 7 }));
+  });
+
+  it('no raw "type T tier at" English remains in a placed row title', () => {
+    menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 2 })]));
+    const info = findPlacedRow(container, 4).querySelector<HTMLElement>('.bs-build-row-info')!;
+    expect(info.title).not.toContain('management_office');
+    expect(info.title).not.toMatch(/\bT\d at\b/);
+  });
+
+  it('a placed row title is translated to French', () => {
+    setLocale('fr');
+    menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 2, x: 5, z: 7 })]));
+    const info = findPlacedRow(container, 4).querySelector<HTMLElement>('.bs-build-row-info')!;
+    expect(info.title).toBe(`#4 ${t('building.management_office.t2.name')} (5,7)`);
+    expect(info.title).not.toContain('Bureaucracy Box');
+  });
+
+  it('the status badge of a closed building is explainable and names the closing event', () => {
+    const s = stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]);
+    s.events.activeModifiers.push({
+      id: 801, kind: 'out_of_service', sourceEventId: 'lawsuit_back_taxes', role: null, targetId: 4,
+      targetKind: 'building', category: null, magnitude: 1, startTick: 0, endTick: null,
+    });
+    menu.update(s);
+    const badge = findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="badge"]')!;
+    expect(badge.dataset['explain']).toContain(t('event.lawsuit_back_taxes.title'));
+  });
+
+  it('the badge explanation clears in place when the status ends', () => {
+    const s = stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]);
+    s.pendingActions.push({
+      id: 50, type: 'demolish_building', requiredSkill: null, requiredVehicleRole: 'building_destroyer',
+      targetX: 5, targetZ: 5, targetY: 0, payload: { buildingId: 4 }, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
+    });
+    menu.update(s);
+    const badge = findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="badge"]')!;
+    expect(badge.dataset['explain']).toBeTruthy();
+    s.pendingActions = [];
+    menu.update(s);
+    expect(badge.dataset['explain'] ?? '').toBe('');
+  });
+
+  it('an operating building badge carries no explanation', () => {
+    menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]));
+    const badge = findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="badge"]')!;
+    expect(badge.dataset['explain'] ?? '').toBe('');
+  });
+
+  it.each<[BuildingType, RegExp]>([
+    ['living_quarters', /bed|people|occupan/i],
+    ['spoil_heap', /kg/i],
+  ])('the %s utilization figure is explainable', (type, pattern) => {
+    menu.update(stateWith([makeBuilding({ id: 4, type, tier: 1 })]));
+    const util = findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="util"]')!;
+    expect(util.dataset['explain']).toMatch(pattern);
   });
 });

@@ -721,3 +721,92 @@ describe('building inspector — builder phase (#1897)', () => {
     });
   });
 });
+
+describe('building inspector — HP and upkeep explain themselves (#2171)', () => {
+  afterEach(() => setLocale('en'));
+
+  const rootOf = (view: InspectorView): HTMLElement => {
+    const root = document.createElement('div');
+    root.append(...view.sections);
+    return root;
+  };
+
+  /** The explanation attached to the row holding the live node `key`: on it, an ancestor, or inside its row. */
+  const explainOf = (view: InspectorView, key: string): string | undefined => {
+    const live = rootOf(view).querySelector<HTMLElement>(`[data-live="${key}"]`)!;
+    const own = live.closest<HTMLElement>('[data-explain]');
+    if (own) return own.dataset['explain'];
+    return live.parentElement?.querySelector<HTMLElement>('[data-explain]')?.dataset['explain'];
+  };
+
+  const surcharge = (s: GameState, id: number, eventId: string, magnitude: number, endTick: number | null = null): void => {
+    s.events.activeModifiers.push({
+      id, kind: 'upkeep_surcharge', sourceEventId: eventId, role: null, targetId: null,
+      category: null, magnitude, startTick: 0, endTick,
+    });
+  };
+
+  it('the HP row says low HP damages and 0 HP destroys the building', () => {
+    const text = explainOf(viewOf(stateWith(makeBuilding())), 'hp');
+    expect(text).toBeTruthy();
+    expect(text).toMatch(/destroy/i);
+    expect(text).toMatch(/damage/i);
+  });
+
+  it('the HP explanation is translated to French', () => {
+    const en = explainOf(viewOf(stateWith(makeBuilding())), 'hp');
+    setLocale('fr');
+    const fr = explainOf(viewOf(stateWith(makeBuilding())), 'hp');
+    expect(fr).toBeTruthy();
+    expect(fr).not.toBe(en);
+    expect(fr).not.toMatch(/^[a-z_]+(\.[a-z0-9_]+)+$/);
+  });
+
+  it('the HP row and the upkeep row carry separate explanations', () => {
+    const view = viewOf(stateWith(makeBuilding()));
+    expect(explainOf(view, 'hp')).toBeTruthy();
+    expect(explainOf(view, 'upkeep')).toBeTruthy();
+    expect(explainOf(view, 'hp')).not.toBe(explainOf(view, 'upkeep'));
+  });
+
+  it('without a surcharge the upkeep explanation says it is the base cost per hour', () => {
+    const text = explainOf(viewOf(stateWith(makeBuilding())), 'upkeep');
+    expect(text).toMatch(/base/i);
+    expect(text).toMatch(/hour/i);
+  });
+
+  it('a live surcharge names its source event and the factor', () => {
+    const s = stateWith(makeBuilding());
+    surcharge(s, 803, 'lawsuit_back_taxes', 1.5);
+    const text = explainOf(viewOf(s), 'upkeep')!;
+    expect(text).toContain(t('event.lawsuit_back_taxes.title'));
+    expect(text.includes('1.5') || text.includes('150')).toBe(true);
+  });
+
+  it('several surcharges name every source event', () => {
+    const s = stateWith(makeBuilding());
+    surcharge(s, 803, 'lawsuit_back_taxes', 1.5);
+    surcharge(s, 804, 'lawsuit_bad_coffee', 1.2);
+    const text = explainOf(viewOf(s), 'upkeep')!;
+    expect(text).toContain(t('event.lawsuit_back_taxes.title'));
+    expect(text).toContain(t('event.lawsuit_bad_coffee.title'));
+  });
+
+  it('a lapsed surcharge is not named', () => {
+    const s = stateWith(makeBuilding());
+    surcharge(s, 803, 'lawsuit_back_taxes', 1.5, 50);
+    const text = explainOf(viewOf(s), 'upkeep')!;
+    expect(text).not.toContain(t('event.lawsuit_back_taxes.title'));
+    expect(text).toMatch(/base/i);
+  });
+
+  it('the surcharge explanation is translated and names the event in French', () => {
+    const s = stateWith(makeBuilding());
+    surcharge(s, 803, 'lawsuit_back_taxes', 1.5);
+    const en = explainOf(viewOf(s), 'upkeep');
+    setLocale('fr');
+    const fr = explainOf(viewOf(s), 'upkeep')!;
+    expect(fr).not.toBe(en);
+    expect(fr).toContain(t('event.lawsuit_back_taxes.title'));
+  });
+});
