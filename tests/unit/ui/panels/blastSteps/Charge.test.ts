@@ -16,6 +16,8 @@ import { dispatchChargeAction } from '../../../../../src/core/mining/ChargeOrder
 import { explosiveHoleLimits } from '../../../../../src/core/mining/ChargePlan.js';
 import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js';
 import { setLocale } from '../../../../../src/core/i18n/I18n.js';
+import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
+import { chargeKgLimitWarning, permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
 import { pinnedDryCycle, pinnedCycle, rainAfterCycle } from '../../../../helpers/weatherCycles.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -1369,5 +1371,147 @@ describe('ChargeStep — drain and tubing warnings only when they matter (#2149)
       expect(reasons).toHaveLength(1);
       expect(reasons[0]!.textContent).not.toMatch(/\b1 trous\b/);
     });
+  });
+});
+
+// ── Projected plan kg against the permit (#2167) ────────────────────────────
+
+describe('ChargeStep — projected plan kg against the permit (#2167)', () => {
+  const DIAMETER_M = 0.089;
+  const kgEl = (step: ChargeStep) => step.root.querySelector('[data-role="permit-kg"]') as HTMLElement | null;
+  const warnEl = (step: ChargeStep) => step.root.querySelector('[data-role="permit-kg-warning"]') as HTMLElement | null;
+  const amountText = (step: ChargeStep) =>
+    (step.root.querySelector('[data-field="amount"] .bsx-stepper-value') as HTMLElement).textContent ?? '';
+  const chargeAllBtn = (step: ChargeStep) => step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
+
+  /** Click the amount stepper until it shows `kg`, then let the panel refresh from the state. */
+  function setAmount(step: ChargeStep, state: ReturnType<typeof makeState>, kg: number): void {
+    const buttons = Array.from(step.root.querySelectorAll('[data-field="amount"] button')) as HTMLButtonElement[];
+    const minus = buttons[0]!;
+    const plus = buttons[buttons.length - 1]!;
+    for (let i = 0; i < 60 && amountText(step) !== `${kg} kg`; i++) {
+      (parseInt(amountText(step), 10) < kg ? plus : minus).click();
+    }
+    expect(amountText(step)).toBe(`${kg} kg`);
+    step.update(state, 'sunny');
+  }
+
+  /** Grade-0 state (40 kg allowed) holding `drilled` deep drilled holes and `planned` ordered ones. */
+  function stateWith(drilled: number, planned = 0, progression = true) {
+    const state = makeState();
+    if (progression) state.grade = createGradeState();
+    for (let i = 0; i < drilled; i++) addHole(holeCounter, state.drillHoles, 10 + (i % 5) * 4, 10 + Math.floor(i / 5) * 4, 12, DIAMETER_M);
+    for (let i = 0; i < planned; i++) addHole(holeCounter, state.plannedDrillHoles, 60 + (i % 5) * 4, 60 + Math.floor(i / 5) * 4, 12, DIAMETER_M);
+    return state;
+  }
+
+  it('shows used / limit kg as holes x amount when within the permit', () => {
+    const { step } = makeStep();
+    const state = stateWith(8);
+    step.update(state, 'sunny');
+    setAmount(step, state, 4);
+    expect(kgEl(step)!.textContent).toBe(permitPreview(state.grade, { holes: new Array(8).fill({}), charges: { all: { amountKg: 32 } } }, 0)!.kgText);
+    expect(kgEl(step)!.textContent).toContain('32 / 40');
+  });
+
+  it('follows the amount stepper', () => {
+    const { step } = makeStep();
+    const state = stateWith(8);
+    step.update(state, 'sunny');
+    setAmount(step, state, 3);
+    expect(kgEl(step)!.textContent).toContain('24 / 40');
+    setAmount(step, state, 4);
+    expect(kgEl(step)!.textContent).toContain('32 / 40');
+  });
+
+  it('within the limit: no warning', () => {
+    const { step } = makeStep();
+    const state = stateWith(8);
+    step.update(state, 'sunny');
+    setAmount(step, state, 4);
+    expect(warnEl(step)?.textContent ?? '').toBe('');
+  });
+
+  it('exactly at the kg limit: no warning', () => {
+    const { step } = makeStep();
+    const state = stateWith(8);
+    step.update(state, 'sunny');
+    setAmount(step, state, 5);
+    expect(kgEl(step)!.textContent).toContain('40 / 40');
+    expect(warnEl(step)?.textContent ?? '').toBe('');
+  });
+
+  it('over the kg limit: shows the projected total and the warning with its consequence', () => {
+    const { step } = makeStep();
+    const state = stateWith(9);
+    step.update(state, 'sunny');
+    setAmount(step, state, 5);
+    expect(kgEl(step)!.textContent).toContain('45 / 40');
+    const warning = chargeKgLimitWarning(state.grade, 45, state.tickCount)!;
+    expect(warning).toBeTruthy();
+    expect(warnEl(step)).not.toBeNull();
+    expect(warnEl(step)!.textContent).toContain(warning);
+    const consequence = permitPreview(state.grade, { holes: [], charges: { all: { amountKg: 45 } } }, state.tickCount)!.consequenceText;
+    expect(consequence.length).toBeGreaterThan(0);
+    expect(warnEl(step)!.textContent).toContain(consequence);
+  });
+
+  it('the warning clears when the amount drops back within the limit', () => {
+    const { step } = makeStep();
+    const state = stateWith(9);
+    step.update(state, 'sunny');
+    setAmount(step, state, 5);
+    expect(warnEl(step)!.textContent).not.toBe('');
+    setAmount(step, state, 4);
+    expect(kgEl(step)!.textContent).toContain('36 / 40');
+    expect(warnEl(step)?.textContent ?? '').toBe('');
+  });
+
+  it('counts the strikes live at the current tick in the consequence', () => {
+    const { step } = makeStep();
+    const state = stateWith(9);
+    state.grade!.strikeTicks = [900, 1500];
+    state.tickCount = 2000;
+    step.update(state, 'sunny');
+    setAmount(step, state, 5);
+    expect(warnEl(step)!.textContent).toContain(chargeKgLimitWarning(state.grade, 45, 2000)!);
+    expect(warnEl(step)!.textContent).not.toContain(chargeKgLimitWarning(createGradeState(), 45, 2000)!);
+  });
+
+  it('projects what Charge All produces: drilled holes only, not ordered ones', () => {
+    const { step } = makeStep();
+    const state = stateWith(4, 6);
+    step.update(state, 'sunny');
+    setAmount(step, state, 5);
+    expect(kgEl(step)!.textContent).toContain('20 / 40');
+    expect(warnEl(step)?.textContent ?? '').toBe('');
+  });
+
+  it('with no holes it shows nothing to warn about', () => {
+    const { step } = makeStep();
+    const state = stateWith(0);
+    step.update(state, 'sunny');
+    expect(warnEl(step)?.textContent ?? '').toBe('');
+  });
+
+  it('no grade: no warning even for a huge plan, and no used / limit readout', () => {
+    const { step } = makeStep();
+    const state = stateWith(15, 0, false);
+    step.update(state, 'sunny');
+    setAmount(step, state, 8);
+    expect(warnEl(step)?.textContent ?? '').toBe('');
+    expect(kgEl(step)?.textContent ?? '').toBe('');
+  });
+
+  it('over the permit, Charge All stays enabled and still dispatches the charge', () => {
+    const { step, gameConsole } = makeStep();
+    const state = stateWith(9);
+    step.update(state, 'sunny');
+    setAmount(step, state, 5);
+    expect(warnEl(step)!.textContent).not.toBe('');
+    expect(chargeAllBtn(step).disabled).toBe(false);
+    chargeAllBtn(step).click();
+    expect(gameConsole).toHaveBeenCalledWith(expect.stringContaining('charge hole:* '));
+    expect(gameConsole.mock.calls[0]![0]).toContain('amount:5kg');
   });
 });

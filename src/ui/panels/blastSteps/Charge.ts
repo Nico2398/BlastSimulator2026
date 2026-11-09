@@ -41,6 +41,7 @@ import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { defaultChargeKg } from '../../../core/economy/PermitDefaults.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
+import { permitPreview, chargeKgLimitWarning } from '../permitPreview.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 
 
@@ -71,6 +72,9 @@ export class ChargeStep {
   private readonly patternLineEl: HTMLElement;
   private readonly paidOnFillEl: HTMLElement;
   private readonly noticeEl: HTMLElement;
+  /** Projected plan kg against the permit, and the over-permit warning (#2167). */
+  private readonly permitKgEl: HTMLElement;
+  private readonly permitKgWarningEl: HTMLElement;
   private readonly holeList: ChargeHoleList;
   private readonly tubingCardEl: HTMLElement;
   private readonly drainEl: HTMLElement;
@@ -149,6 +153,10 @@ export class ChargeStep {
     this.patternLineEl = el('div');
     this.paidOnFillEl = el('div', { attrs: { style: 'font:500 10px/1.4 var(--bsx-font-ui);color:var(--bsx-amber)' } });
     this.paidOnFillEl.dataset['info'] = 'paid-on-fill';
+    this.permitKgEl = el('div', { attrs: { style: 'font:500 11px/1.4 var(--bsx-font-mono);color:var(--bsx-text-muted)' } });
+    this.permitKgEl.dataset['role'] = 'permit-kg';
+    this.permitKgWarningEl = el('div', { attrs: { style: 'font:500 11px/1.4 var(--bsx-font-ui);color:var(--bsx-amber)' } });
+    this.permitKgWarningEl.dataset['role'] = 'permit-kg-warning';
     this.noticeEl = el('div');
     this.noticeEl.style.display = 'none';
     this.holeList = new ChargeHoleList(holeId => this.chargeHole(holeId), holeId => this.runAndNotify(`drain_hole hole:${holeId}`));
@@ -160,7 +168,7 @@ export class ChargeStep {
 
     // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
-      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.paidOnFillEl, this.weakLineEl,
+      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.paidOnFillEl, this.permitKgEl, this.permitKgWarningEl, this.weakLineEl,
       this.holeList.root, this.drainEl, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
@@ -233,6 +241,7 @@ export class ChargeStep {
       rocks: columns.map(c => c?.rockId ?? null),
       level: state.campaign.activeLevelId,
       selected: this.selectedExplosiveId, amt: this.amountKg, stem: this.stemmingM,
+      permitGrade: state.grade?.grade ?? null,
       // Hole ids *and* their charges, not just a count: a per-hole charge
       // changes neither the hole list nor anything else in the signature, so a
       // count-only signature would leave the row it was fired from stale.
@@ -253,6 +262,7 @@ export class ChargeStep {
 
     this.renderProductList(wet.length > 0);
     this.updateChargeLine(holes.length, chargeCost);
+    this.updatePermitKg(state, holes.length * this.amountKg);
     this.updateCapacityLine();
     this.updateFitLine(tightestDepth, tightestDiameter, holes.length + state.plannedDrillHoles.length === 0);
     this.updatePatternLines(state);
@@ -322,6 +332,13 @@ export class ChargeStep {
       diameter: Math.round(this.narrowestM * 1000),
       kgPerMetre: +chargeKgPerMetre(this.narrowestM).toFixed(2),
     });
+  }
+
+  /** Warns, never blocks: Charge All stays enabled when the projected plan is over the permit (#2167). */
+  private updatePermitKg(state: GameState, projectedKg: number): void {
+    const preview = permitPreview(state.grade, { holes: [], charges: { total: { amountKg: projectedKg } } }, state.tickCount);
+    this.permitKgEl.textContent = preview ? preview.kgText : '';
+    this.permitKgWarningEl.textContent = chargeKgLimitWarning(state.grade, projectedKg, state.tickCount) ?? '';
   }
 
   private updateChargeLine(holeCount: number, cashCost: number): void {

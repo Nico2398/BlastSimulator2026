@@ -1,7 +1,7 @@
 // BlastSimulator2026 — permitPreview view model (#1925): plan vs the mine's permit.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { permitPreview, gridHoleLimitWarning } from '../../../../src/ui/panels/permitPreview.js';
+import { permitPreview, gridHoleLimitWarning, chargeKgLimitWarning } from '../../../../src/ui/panels/permitPreview.js';
 import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
 import { permitLimitsFor, preFireCheck, inspectionChance, inspectionFine, liveStrikes } from '../../../../src/core/economy/PermitLimits.js';
 import { PERMIT_STRIKE_WINDOW_TICKS, PERMIT_STRIKES_TO_SUSPEND } from '../../../../src/core/config/balance.js';
@@ -207,9 +207,20 @@ describe('permitPreview consequence (#2166)', () => {
   });
 });
 
-describe('gridHoleLimitWarning', () => {
+/** The consequence text the Contract attaches to a plan of `holes` holes and `kg` kg in total. */
+function consequenceFor(holes: number, kg: number, strikeTicks: number[] = [], tick = 0): string {
+  const g = createGradeState();
+  g.strikeTicks = strikeTicks;
+  const ids = Array.from({ length: holes }, (_, i) => ({ id: i + 1 }));
+  return permitPreview(g, { holes: ids, charges: kg > 0 ? { total: { amountKg: kg } } : {} }, tick)!.consequenceText;
+}
+
+describe('gridHoleLimitWarning (#2167: plan total)', () => {
+  beforeEach(() => { setLocale('en'); });
+
   it('null for an undefined grade', () => {
     expect(gridHoleLimitWarning(undefined, 500)).toBeNull();
+    expect(gridHoleLimitWarning(undefined, 500, 500)).toBeNull();
   });
 
   it('null at the limit', () => {
@@ -220,13 +231,119 @@ describe('gridHoleLimitWarning', () => {
     expect(gridHoleLimitWarning(createGradeState(), 1)).toBeNull();
   });
 
-  it('text above the limit', () => {
-    const w = gridHoleLimitWarning(createGradeState(), 10);
-    expect(typeof w).toBe('string');
-    expect(w!.length).toBeGreaterThan(0);
+  it('null when added + existing sit exactly at the limit', () => {
+    expect(gridHoleLimitWarning(createGradeState(), 4, 5)).toBeNull();
   });
 
-  it('never mentions an inspection chance', () => {
-    expect(gridHoleLimitWarning(createGradeState(), 50)!.toLowerCase()).not.toContain('chance');
+  it('a grid that fits alone but overflows with existing holes warns', () => {
+    expect(gridHoleLimitWarning(createGradeState(), 9)).toBeNull();
+    expect(gridHoleLimitWarning(createGradeState(), 9, 3)).not.toBeNull();
+  });
+
+  it('one existing hole too many over the limit warns even for a single added hole', () => {
+    expect(gridHoleLimitWarning(createGradeState(), 1, 9)).not.toBeNull();
+    expect(gridHoleLimitWarning(createGradeState(), 1, 8)).toBeNull();
+  });
+
+  it('states the plan total and the limit', () => {
+    const w = gridHoleLimitWarning(createGradeState(), 9, 3)!;
+    expect(w).toContain('12');
+    expect(w).toContain(String(permitLimitsFor(0).maxHoles));
+  });
+
+  it('the total is existing + added, not the added count alone', () => {
+    const w = gridHoleLimitWarning(createGradeState(), 10, 5)!;
+    expect(w).toContain('15');
+  });
+
+  it('carries the consequence text of the plan total', () => {
+    const w = gridHoleLimitWarning(createGradeState(), 9, 3)!;
+    expect(w).toContain(consequenceFor(12, 0));
+    expect(consequenceFor(12, 0).length).toBeGreaterThan(0);
+  });
+
+  it('a bigger plan total carries a bigger consequence than a smaller one', () => {
+    const small = gridHoleLimitWarning(createGradeState(), 10)!;
+    const big = gridHoleLimitWarning(createGradeState(), 20)!;
+    expect(small).toContain(consequenceFor(10, 0));
+    expect(big).toContain(consequenceFor(20, 0));
+    expect(small).not.toContain(consequenceFor(20, 0));
+  });
+
+  it('counts only live strikes at the given tick in the consequence', () => {
+    const g = createGradeState();
+    g.strikeTicks = [900, 1500];
+    const w = gridHoleLimitWarning(g, 10, 0, 2000)!;
+    expect(w).toContain(consequenceFor(10, 0, [900, 1500], 2000));
+    expect(w).not.toContain(consequenceFor(10, 0, [], 2000));
+  });
+
+  it('tick defaults to 0', () => {
+    const g = createGradeState();
+    g.strikeTicks = [10];
+    expect(gridHoleLimitWarning(g, 10)).toContain(consequenceFor(10, 0, [10], 0));
+  });
+
+  it('en and fr both define the warning text', () => {
+    const read = (l: string): Record<string, string> => JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8'));
+    setLocale('fr');
+    try {
+      const w = gridHoleLimitWarning(createGradeState(), 9, 3)!;
+      expect(w).toContain('12');
+      expect(w).toContain(consequenceFor(12, 0));
+      expect(w).not.toMatch(/^permit\./);
+    } finally { setLocale('en'); }
+    expect(Object.keys(read('en')).filter(k => k.startsWith('permit.preview.')).sort())
+      .toEqual(Object.keys(read('fr')).filter(k => k.startsWith('permit.preview.')).sort());
+  });
+});
+
+describe('chargeKgLimitWarning (#2167)', () => {
+  beforeEach(() => { setLocale('en'); });
+
+  it('null for an undefined grade', () => {
+    expect(chargeKgLimitWarning(undefined, 5000)).toBeNull();
+  });
+
+  it('null below the kg limit', () => {
+    expect(chargeKgLimitWarning(createGradeState(), 10)).toBeNull();
+  });
+
+  it('null at exactly the kg limit', () => {
+    expect(chargeKgLimitWarning(createGradeState(), permitLimitsFor(0).maxChargeKg)).toBeNull();
+  });
+
+  it('null for a zero plan', () => {
+    expect(chargeKgLimitWarning(createGradeState(), 0)).toBeNull();
+  });
+
+  it('warns just above the kg limit with the consequence text', () => {
+    const kg = permitLimitsFor(0).maxChargeKg + 5;
+    const w = chargeKgLimitWarning(createGradeState(), kg)!;
+    expect(typeof w).toBe('string');
+    expect(w).toContain(consequenceFor(0, kg));
+    expect(consequenceFor(0, kg).length).toBeGreaterThan(0);
+  });
+
+  it('a bigger overshoot carries its own, bigger consequence', () => {
+    const w = chargeKgLimitWarning(createGradeState(), 120)!;
+    expect(w).toContain(consequenceFor(0, 120));
+    expect(w).not.toContain(consequenceFor(0, 45));
+  });
+
+  it('counts only live strikes at the given tick', () => {
+    const g = createGradeState();
+    g.strikeTicks = [900, 1500];
+    const w = chargeKgLimitWarning(g, 60, 2000)!;
+    expect(w).toContain(consequenceFor(0, 60, [900, 1500], 2000));
+    expect(w).not.toContain(consequenceFor(0, 60, [], 2000));
+  });
+
+  it('en and fr both render it', () => {
+    setLocale('fr');
+    try {
+      const w = chargeKgLimitWarning(createGradeState(), 60)!;
+      expect(w).toContain(consequenceFor(0, 60));
+    } finally { setLocale('en'); }
   });
 });

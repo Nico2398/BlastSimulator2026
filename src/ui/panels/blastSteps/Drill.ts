@@ -23,7 +23,7 @@ import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 import type { ConfirmModalConfig } from '../ConfirmModal.js';
 import { planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
-import { gridHoleLimitWarning } from '../permitPreview.js';
+import { gridHoleLimitWarning, permitPreview } from '../permitPreview.js';
 import { defaultGridDepthM } from '../../../core/economy/PermitDefaults.js';
 import { buildReplacePatternConfirm } from '../../replacePatternConfirm.js';
 import {
@@ -42,6 +42,8 @@ export class DrillStep {
   private readonly spacingValueEl: HTMLElement;
   private readonly depthValueEl: HTMLElement;
   private readonly holesNoteEl: HTMLElement;
+  /** "used / limit holes" against the permit, always visible (#2167). */
+  private readonly permitHolesEl: HTMLElement;
   private readonly holeListEl: HTMLElement;
   private readonly clearRowEl: HTMLElement;
   private readonly clearBtn: HTMLButtonElement;
@@ -121,7 +123,9 @@ export class DrillStep {
     this.holesNoteEl = el('span', { className: 'bsx-section-note' });
     const holesHeader = el('div', { className: 'bsx-section' });
     const holesLabelEl = this.locale.bindText(el('span', { className: 'bsx-section-label' }), 'ui.blast_workshop.drill.holes_section');
-    holesHeader.append(holesLabelEl, el('span', { className: 'bsx-section-rule' }), this.holesNoteEl);
+    this.permitHolesEl = el('span', { className: 'bsx-section-note' });
+    this.permitHolesEl.dataset['role'] = 'permit-holes';
+    holesHeader.append(holesLabelEl, el('span', { className: 'bsx-section-rule' }), this.permitHolesEl, this.holesNoteEl);
 
     // Bounded + independently scrollable, same reasoning as Charge's product
     // list: a full tutorial-sized plan (16 holes) would otherwise push saved
@@ -167,6 +171,7 @@ export class DrillStep {
       spacing: this.gridSpacing, depth: this.gridDepth, diameter: this.gridDiameter,
       confirmingClear: this.confirmingClear,
       savedPlans: savedPlansSignature(state.savedPlans),
+      permitGrade: state.grade?.grade ?? null,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -179,6 +184,7 @@ export class DrillStep {
       ? t('ui.blast_workshop.drill.planned_buried', { count: totalCount, buried: buried.size })
       : t('ui.blast_workshop.drill.planned', { count: totalCount });
     this.clearBtn.disabled = totalCount === 0;
+    this.renderPermitHoles(state, totalCount);
 
     this.renderClearRow(totalCount);
     this.savedPlans.render(state.savedPlans);
@@ -191,6 +197,12 @@ export class DrillStep {
       ...ordered.map(h => this.makeOrderedHoleRow(h, buried.has(h.id))),
       ...holes.map(h => this.makeHoleRow(h, state, wet)),
     );
+  }
+
+  private renderPermitHoles(state: GameState, totalCount: number): void {
+    const preview = permitPreview(state.grade, { holes: new Array(totalCount), charges: {} }, state.tickCount);
+    this.permitHolesEl.textContent = preview ? preview.holesText : '';
+    this.permitHolesEl.dataset['over'] = String(preview?.holesOver ?? false);
   }
 
   refreshLocale(): void {
@@ -410,7 +422,7 @@ export class DrillStep {
       const rows = sel ? Math.max(1, Math.round((sel.z2 - sel.z1) / this.gridSpacing) + 1) : 0;
       const coveredCount = sel ? this.coveredGridCount(sel, rows, cols) : 0;
       const allCovered = sel !== null && rows * cols > 0 && coveredCount >= rows * cols;
-      const permitWarning = sel ? gridHoleLimitWarning(this.lastState?.grade, cols * rows) : null;
+      const permitWarning = sel ? gridHoleLimitWarning(this.lastState?.grade, cols * rows - coveredCount, this.lastHoleCount, this.lastState?.tickCount) : null;
       const refusal = hoverRefusal(controller, allCovered ? t('mining.drill_plan.grid_all_blocked') : null);
       strip.show({
         icon: 'grid',
@@ -453,6 +465,7 @@ export class DrillStep {
       const covered = sel ? this.coveredCount([{ id: 'add', x: sel.x1, z: sel.z1 }]) > 0 : false;
       const footprintReason = covered && sel ? t('mining.drill_plan.refused_footprint', { x: Math.floor(sel.x1), z: Math.floor(sel.z1) }) : null;
       const refusal = hoverRefusal(controller, footprintReason);
+      const permitWarning = sel && !covered ? gridHoleLimitWarning(this.lastState?.grade, 1, this.lastHoleCount, this.lastState?.tickCount) : null;
       overlay.update(sel ? { shape: 'point', x: sel.x1, z: sel.z1, refused: refusal.refused } : null);
 
       strip.show({
@@ -463,7 +476,7 @@ export class DrillStep {
           this.stepField('depth', t('ui.blast_workshop.drill.depth'), 'gridDepth', DRILL_HOLE_MIN_DEPTH_M, this.reachM(), refresh),
           this.diameterField(refresh),
         ],
-        result: sel ? '1' : '—',
+        result: sel ? `1${permitWarning ? ` — ${permitWarning}` : ''}` : '—',
         confirmEnabled: controller.canConfirm && !covered,
         confirmDisabledReason: refusal.reason,
         instruction: `${t('ui.blast_workshop.drill.add_hole_hint')}\n${t('ui.blast_workshop.drill.depth_reach', { reach: this.reachM() })}`,
