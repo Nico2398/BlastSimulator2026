@@ -42,9 +42,31 @@ describe('Software — purchase', () => {
 });
 
 describe('Software — preview tiers', () => {
-  it('previewEnergy with tier 0 returns null', () => {
+  it('previewEnergy with tier 0 returns the energy preview too (#2200: the heatmap needs no software tier)', () => {
     const { grid, plan } = makeTestPlan();
-    expect(previewEnergy(plan, grid, 0)).toBeNull();
+    const result = previewEnergy(plan, grid, 0);
+    expect(result).not.toBeNull();
+    expect(result!.energyMap.size).toBeGreaterThan(0);
+    expect(result!.maxEnergy).toBeGreaterThan(0);
+  });
+
+  it('previewEnergy at tier 0 matches tier 1 exactly', () => {
+    const { grid, plan } = makeTestPlan();
+    expect(previewEnergy(plan, grid, 0)).toEqual(previewEnergy(plan, grid, 1));
+  });
+
+  it('previewEnergy at tier 0 with nothing charged returns an empty preview, not null', () => {
+    const { grid, plan } = makeTestPlan();
+    const result = previewEnergy({ holes: plan.holes, charges: {} }, grid, 0);
+    expect(result).not.toBeNull();
+    expect(result!.energyMap.size).toBe(0);
+    expect(result!.maxEnergy).toBe(0);
+  });
+
+  it('the fragment, projection and vibration previews stay gated behind their tiers at tier 0', () => {
+    const { grid, plan } = makeTestPlan();
+    expect(previewFragments(plan, grid, 0)).toBeNull();
+    expect(previewProjections(plan, grid, 0)).toBeNull();
   });
 
   it('previewEnergy with tier >= 1 returns energy field data', () => {

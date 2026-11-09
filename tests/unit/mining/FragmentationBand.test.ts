@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   classifyFragmentationBand,
   bandMassRetention,
+  heatmapBandColor,
+  FRAGMENTATION_BAND_COLORS,
   FRAGMENTATION_BANDS,
   type FragmentationBand,
 } from '../../../src/core/mining/FragmentationBand.js';
@@ -129,5 +131,67 @@ describe('FragmentationBand — bandMassRetention', () => {
   it('retention at a classified intensity follows the band the intensity falls in', () => {
     expect(bandMassRetention(classifyFragmentationBand(FRAGMENTATION_BAND_DUST_MIN))).toBeLessThan(1);
     expect(bandMassRetention(classifyFragmentationBand(FRAGMENTATION_BAND_DUST_MIN - EPS))).toBe(1);
+  });
+});
+
+// ── Heatmap colour tokens (#2200) ────────────────────────────────────────────
+
+describe('FragmentationBand — FRAGMENTATION_BAND_COLORS', () => {
+  it('has one colour token per band', () => {
+    expect(Object.keys(FRAGMENTATION_BAND_COLORS).sort()).toEqual([...FRAGMENTATION_BANDS].sort());
+    for (const band of FRAGMENTATION_BANDS) {
+      expect(Number.isInteger(FRAGMENTATION_BAND_COLORS[band]), band).toBe(true);
+      expect(FRAGMENTATION_BAND_COLORS[band], band).toBeGreaterThanOrEqual(0);
+      expect(FRAGMENTATION_BAND_COLORS[band], band).toBeLessThanOrEqual(0xffffff);
+    }
+  });
+
+  it('gives every band a colour of its own', () => {
+    const colours = FRAGMENTATION_BANDS.map(b => FRAGMENTATION_BAND_COLORS[b]);
+    expect(new Set(colours).size).toBe(FRAGMENTATION_BANDS.length);
+  });
+
+  const channels = (c: number) => ({ r: (c >> 16) & 0xff, g: (c >> 8) & 0xff, b: c & 0xff });
+
+  it('intact is blue, cracked a paler blue, good green, fines orange, dust red', () => {
+    const intact = channels(FRAGMENTATION_BAND_COLORS.intact);
+    const cracked = channels(FRAGMENTATION_BAND_COLORS.cracked);
+    const good = channels(FRAGMENTATION_BAND_COLORS.good);
+    const fines = channels(FRAGMENTATION_BAND_COLORS.fines);
+    const dust = channels(FRAGMENTATION_BAND_COLORS.dust);
+
+    expect(intact.b).toBeGreaterThan(intact.r);
+    expect(intact.b).toBeGreaterThan(intact.g);
+    expect(cracked.b).toBeGreaterThan(cracked.r);
+    expect(cracked.r + cracked.g + cracked.b).toBeGreaterThan(intact.r + intact.g + intact.b);
+    expect(good.g).toBeGreaterThan(good.r);
+    expect(good.g).toBeGreaterThan(good.b);
+    expect(fines.r).toBeGreaterThan(fines.g);
+    expect(fines.g).toBeGreaterThan(fines.b);
+    expect(dust.r).toBeGreaterThan(dust.g * 2);
+    expect(dust.r).toBeGreaterThan(dust.b * 2);
+  });
+});
+
+describe('FragmentationBand — heatmapBandColor', () => {
+  it('returns the token of the band the classifier picks, across the whole range', () => {
+    for (const intensity of [0, 0.2, CRACKED_VOXEL_ENERGY_RATIO, 0.9, FRAGMENTATION_MULTIPLIER, 1.5, FRAGMENTATION_BAND_FINES_MIN, 3, FRAGMENTATION_BAND_DUST_MIN, 55]) {
+      expect(heatmapBandColor(intensity), String(intensity)).toBe(FRAGMENTATION_BAND_COLORS[classifyFragmentationBand(intensity)]);
+    }
+  });
+
+  it('switches colour exactly at each band bound', () => {
+    expect(heatmapBandColor(CRACKED_VOXEL_ENERGY_RATIO - EPS)).toBe(FRAGMENTATION_BAND_COLORS.intact);
+    expect(heatmapBandColor(CRACKED_VOXEL_ENERGY_RATIO)).toBe(FRAGMENTATION_BAND_COLORS.cracked);
+    expect(heatmapBandColor(FRAGMENTATION_MULTIPLIER - EPS)).toBe(FRAGMENTATION_BAND_COLORS.cracked);
+    expect(heatmapBandColor(FRAGMENTATION_MULTIPLIER)).toBe(FRAGMENTATION_BAND_COLORS.good);
+    expect(heatmapBandColor(FRAGMENTATION_BAND_FINES_MIN - EPS)).toBe(FRAGMENTATION_BAND_COLORS.good);
+    expect(heatmapBandColor(FRAGMENTATION_BAND_FINES_MIN)).toBe(FRAGMENTATION_BAND_COLORS.fines);
+    expect(heatmapBandColor(FRAGMENTATION_BAND_DUST_MIN - EPS)).toBe(FRAGMENTATION_BAND_COLORS.fines);
+    expect(heatmapBandColor(FRAGMENTATION_BAND_DUST_MIN)).toBe(FRAGMENTATION_BAND_COLORS.dust);
+  });
+
+  it('zero intensity is the intact colour', () => {
+    expect(heatmapBandColor(0)).toBe(FRAGMENTATION_BAND_COLORS.intact);
   });
 });

@@ -5,9 +5,12 @@ import {
   predictFragmentation,
   getBlastBBox,
   forEachBBoxVoxel,
+  previewPlanBands,
   PREVIEW_RADIUS,
 } from '../../../src/core/mining/SoftwarePreview.js';
 import { buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js';
+import { intensityAt } from '../../../src/core/mining/EnergyPropagation.js';
+import { classifyFragmentationBand } from '../../../src/core/mining/FragmentationBand.js';
 import { VoxelGrid, firstEmptyLayerAboveGround } from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
@@ -173,5 +176,135 @@ describe('SoftwarePreview — getBlastBBox', () => {
 
     const ctx = computeHoleContext(plan, grid);
     expect(ctx.holeSurfaceYs[holes[0]!.id]).toBe(1);
+  });
+});
+
+
+// ── previewPlanBands (#2200) ─────────────────────────────────────────────────
+
+const ROCK = { composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+
+/** One hole at (12,12), depth 8 in a solid block y=0..8, charged as given. */
+function singleHolePlan(amountKg: number, stemmingM: number, explosiveId = 'boomite') {
+  const grid = new VoxelGrid(30, 30);
+  for (let z = 5; z <= 20; z++)
+    for (let y = 0; y <= 8; y++)
+      for (let x = 5; x <= 20; x++) grid.setVoxel(x, y, z, ROCK);
+  const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 1, 1, 3, 8, 0.15);
+  const depths: Record<string, number> = {};
+  for (const h of holes) depths[h.id] = h.depth;
+  const { charges } = batchCharge(holes.map(h => h.id), depths, explosiveId, amountKg, stemmingM);
+  return { grid, plan: assembleBlastPlan(holes, charges), hole: holes[0]! };
+}
+
+describe('SoftwarePreview — previewPlanBands', () => {
+  it('reports each cell with the intensity of the blast\'s own energy field and its classified band', () => {
+    const { grid, plan } = makeTestPlan();
+    const field = buildPlanEnergyField(plan, grid)!;
+    const map = previewPlanBands(plan, grid);
+
+    expect(map.cells.size).toBeGreaterThan(0);
+    for (const [key, cell] of map.cells) {
+      expect(key).toBe(`${cell.x},${cell.y},${cell.z}`);
+      expect(cell.intensity).toBe(intensityAt(field, cell.x, cell.y, cell.z));
+      expect(cell.band).toBe(classifyFragmentationBand(cell.intensity));
+    }
+  });
+
+  it('covers every filled voxel of the plan\'s blast box and nothing else', () => {
+    const { grid, plan } = makeTestPlan();
+    const map = previewPlanBands(plan, grid);
+    const bbox = getBlastBBox(plan, computeHoleContext(plan, grid));
+    expect(map.bbox).toEqual(bbox);
+
+    const filled = new Set<string>();
+    forEachBBoxVoxel(grid, bbox, (x, y, z) => { filled.add(`${x},${y},${z}`); });
+    expect(filled.size).toBeGreaterThan(0);
+    expect(new Set(map.cells.keys())).toEqual(filled);
+  });
+
+  it('leaves air out: no cell above the surface', () => {
+    const { grid, plan } = makeTestPlan();
+    const map = previewPlanBands(plan, grid);
+    for (const cell of map.cells.values()) {
+      expect(grid.getVoxel(cell.x, cell.y, cell.z)!.density).toBeGreaterThan(0);
+      expect(cell.y).toBeLessThanOrEqual(8);
+    }
+  });
+
+  it('needs no software tier: the same call serves a fresh game', () => {
+    const { grid, plan } = makeTestPlan();
+    expect(() => previewPlanBands(plan, grid)).not.toThrow();
+    expect(previewPlanBands(plan, grid).cells.size).toBeGreaterThan(0);
+  });
+
+  it('is empty for a plan with no holes', () => {
+    const { grid } = makeTestPlan();
+    const map = previewPlanBands(assembleBlastPlan([], {}), grid);
+    expect(map.cells.size).toBe(0);
+  });
+
+  it('is empty for holes with no charge', () => {
+    const { grid, plan } = makeTestPlan();
+    const map = previewPlanBands(assembleBlastPlan(plan.holes, {}), grid);
+    expect(map.cells.size).toBe(0);
+  });
+
+  it('every intensity is non-negative and every band is one of the five', () => {
+    const { grid, plan } = makeTestPlan();
+    for (const cell of previewPlanBands(plan, grid).cells.values()) {
+      expect(cell.intensity).toBeGreaterThanOrEqual(0);
+      expect(['intact', 'cracked', 'good', 'fines', 'dust']).toContain(cell.band);
+    }
+  });
+
+  it('recomputes when the charge amount changes', () => {
+    const light = singleHolePlan(3, 4);
+    const heavy = singleHolePlan(8, 4);
+    const peak = (m: ReturnType<typeof previewPlanBands>) => Math.max(...[...m.cells.values()].map(c => c.intensity));
+    expect(peak(previewPlanBands(heavy.plan, heavy.grid))).toBeGreaterThan(peak(previewPlanBands(light.plan, light.grid)));
+  });
+
+  it('recomputes when stemming changes', () => {
+    const tight = singleHolePlan(5, 4);
+    const loose = singleHolePlan(5, 1);
+    const a = previewPlanBands(tight.plan, tight.grid);
+    const b = previewPlanBands(loose.plan, loose.grid);
+    const intensities = (m: ReturnType<typeof previewPlanBands>) => [...m.cells.values()].map(c => c.intensity).join(',');
+    expect(intensities(a)).not.toBe(intensities(b));
+  });
+
+  it('recomputes when the hole is wet and the explosive is water-sensitive', () => {
+    const { grid, plan, hole } = singleHolePlan(8, 1, 'big_bada_boom');
+    const dry = previewPlanBands(plan, grid);
+    const wet = previewPlanBands(plan, grid, new Set([hole.id]));
+    const total = (m: ReturnType<typeof previewPlanBands>) => [...m.cells.values()].reduce((a, c) => a + c.intensity, 0);
+    expect(total(wet)).toBeLessThan(total(dry));
+  });
+
+  it('a water-resistant explosive reads the same wet or dry', () => {
+    const { grid, plan, hole } = singleHolePlan(5, 2, 'krackle');
+    const dry = previewPlanBands(plan, grid);
+    const wet = previewPlanBands(plan, grid, new Set([hole.id]));
+    expect([...wet.cells.values()]).toEqual([...dry.cells.values()]);
+  });
+
+  it('an omitted wet set equals an explicit empty one', () => {
+    const { grid, plan } = makeTestPlan();
+    expect([...previewPlanBands(plan, grid).cells.values()])
+      .toEqual([...previewPlanBands(plan, grid, new Set()).cells.values()]);
+  });
+
+  it('#2200 C8: an overcharged hole under heavy stemming is fines or dust at the bottom of its column and intact or cracked near the collar', () => {
+    const { grid, plan, hole } = singleHolePlan(8, 4);
+    const map = previewPlanBands(plan, grid);
+    const column = [...map.cells.values()].filter(c => c.x === hole.x && c.z === hole.z).sort((a, b) => a.y - b.y);
+    expect(column.length).toBeGreaterThan(3);
+
+    const bottom = column.find(c => c.y === 1)!;
+    const collar = column[column.length - 1]!;
+    expect(['fines', 'dust']).toContain(bottom.band);
+    expect(['intact', 'cracked']).toContain(collar.band);
+    expect(bottom.intensity).toBeGreaterThan(collar.intensity);
   });
 });
