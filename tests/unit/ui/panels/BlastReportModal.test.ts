@@ -2,7 +2,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { BlastReportModal } from '../../../../src/ui/panels/BlastReportModal.js';
-import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../../../src/core/config/balance.js';
+import {
+  BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S,
+  BLAST_REPORT_MAX_HOLE_REASONS, OVERCHARGE_NOTE_MIN_FINES_SHARE,
+} from '../../../../src/core/config/balance.js';
 import type { BlastPlaybackSnapshot } from '../../../../src/core/mining/BlastPlayback.js';
 import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
 import { reportStatExplain, type ReportStatKind } from '../../../../src/ui/blastWorkshopExplain.js';
@@ -11,6 +14,8 @@ import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
 
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { BlastReport } from '../../../../src/core/mining/BlastExecution.js';
+import type { HoleFailure } from '../../../../src/core/mining/HoleFailures.js';
+import { finesShare } from '../../../../src/core/mining/FragmentationBand.js';
 import type { AccidentRecord } from '../../../../src/core/entities/Damage.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 
@@ -1096,5 +1101,269 @@ describe('BlastReportModal — stat explanations (#2168)', () => {
     } finally {
       setLocale('en');
     }
+  });
+});
+
+// ── Bands, dust loss, failed holes, overcharge (#2202) ─────────────────────
+
+describe('BlastReportModal — bands, failed holes and overcharge (#2202)', () => {
+  const K = 'ui.blast_workshop.report.';
+  const BAND_KEYS = ['stat_band_cracked', 'stat_band_good', 'stat_band_fines', 'stat_band_dust'] as const;
+  const ALL_KEYS = [
+    ...BAND_KEYS, 'stat_dust_lost', 'dud_title', 'dud_hint', 'hole_reason_below_threshold',
+    'hole_reason_fizzled', 'hole_reason_buried', 'hole_reasons_more', 'sealed_holes_title', 'overcharge_hint',
+  ] as const;
+
+  type Bands = NonNullable<BlastReport['bandVolumes']>;
+  /** Distinct three-digit volumes so each is easy to find in the text. */
+  const BANDS: Bands = { intact: 0, cracked: 311, good: 422, fines: 233, dust: 144 };
+
+  function textOf(overrides: Partial<BlastReport>): string {
+    const { modal, setPlayback } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport(overrides);
+    openReport(modal, state, setPlayback);
+    return modal.root.textContent ?? '';
+  }
+
+  /**
+   * Every place `text` reads like the `key` template: fixed params are matched
+   * literally, numeric params are read back as numbers. Independent of how the
+   * modal formats a number (1 decimal, unit suffix) and of the wording.
+   */
+  function readNumbers(text: string, key: string, fixed: Record<string, string>, numeric: string[]): Array<Record<string, number>> {
+    const params: Record<string, string> = { ...fixed };
+    for (const n of numeric) params[n] = `\u0001${n}\u0001`;
+    const parts = t(key, params).split(/\u0001(\w+)\u0001/);
+    const names = parts.filter((_, i) => i % 2 === 1);
+    const statics = parts.filter((_, i) => i % 2 === 0).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    let source = statics[0]!;
+    names.forEach((_, i) => { source += '(-?[\\d.,]+)' + statics[i + 1]!; });
+    return [...text.matchAll(new RegExp(source, 'g'))].map(m => {
+      const out: Record<string, number> = {};
+      names.forEach((name, i) => { out[name] = Number(m[i + 1]!.replace(/,(?=\d{3}\b)/g, '')); });
+      return out;
+    });
+  }
+
+  const below = (id: string, pct: number): HoleFailure => ({ holeId: id, kind: 'below_threshold', moreEnergyPct: pct });
+  const buried = (id: string, m: number): HoleFailure => ({ holeId: id, kind: 'buried', rockAboveM: m });
+  const NOTHING: Partial<BlastReport> = { clearedVoxels: 0, crackedVoxels: 0, fragmentCount: 0, totalRockVolume: 0, totalOreValue: 0 };
+
+  it('has every new key in en and fr with distinct, non-empty text', () => {
+    const dir = 'src/core/i18n/locales';
+    const en = JSON.parse(readFileSync(`${dir}/en.json`, 'utf8')) as Record<string, string>;
+    const fr = JSON.parse(readFileSync(`${dir}/fr.json`, 'utf8')) as Record<string, string>;
+    for (const k of ALL_KEYS) {
+      expect(en[K + k], `en ${k}`).toBeTruthy();
+      expect(fr[K + k], `fr ${k}`).toBeTruthy();
+      expect(fr[K + k], `fr differs ${k}`).not.toBe(en[K + k]);
+    }
+  });
+
+  it('the parameterised keys keep their placeholders', () => {
+    const en = JSON.parse(readFileSync('src/core/i18n/locales/en.json', 'utf8')) as Record<string, string>;
+    expect(en[K + 'hole_reason_below_threshold']).toContain('{hole}');
+    expect(en[K + 'hole_reason_below_threshold']).toContain('{pct}');
+    expect(en[K + 'hole_reason_fizzled']).toContain('{hole}');
+    expect(en[K + 'hole_reason_buried']).toContain('{hole}');
+    expect(en[K + 'hole_reason_buried']).toContain('{metres}');
+    expect(en[K + 'hole_reasons_more']).toContain('{count}');
+    expect(en[K + 'overcharge_hint']).toContain('{volume}');
+    expect(en[K + 'overcharge_hint']).toContain('{pct}');
+  });
+
+  // ── C8: volume per band and dust loss ──
+
+  describe('rock volume per band and dust loss (C8)', () => {
+    it('labels the four broken bands and shows each one\'s volume in m3', () => {
+      const text = textOf({ bandVolumes: BANDS, dustLossKg: 876, dustLossOreValue: 55 });
+      const expected: Array<[typeof BAND_KEYS[number], number]> = [
+        ['stat_band_cracked', 311], ['stat_band_good', 422], ['stat_band_fines', 233], ['stat_band_dust', 144],
+      ];
+      for (const [key, volume] of expected) {
+        const label = t(K + key);
+        expect(label, key).not.toBe(K + key);
+        const at = text.indexOf(label);
+        expect(at, `${key} label`).toBeGreaterThanOrEqual(0);
+        expect(text.slice(at, at + label.length + 40), `${key} value`).toContain(String(volume));
+        expect(text.slice(at, at + label.length + 40), `${key} unit`).toContain('m³');
+      }
+    });
+
+    it('shows the dust loss in kg beside its label', () => {
+      const text = textOf({ bandVolumes: BANDS, dustLossKg: 876, dustLossOreValue: 55 });
+      const label = t(K + 'stat_dust_lost');
+      expect(label).not.toBe(K + 'stat_dust_lost');
+      const at = text.indexOf(label);
+      expect(at).toBeGreaterThanOrEqual(0);
+      const near = text.slice(at, at + label.length + 40);
+      expect(near).toContain('876');
+      expect(near).toContain('kg');
+    });
+
+    it('shows a zero dust loss as zero when the bands are there', () => {
+      const text = textOf({ bandVolumes: { ...BANDS, dust: 0 }, dustLossKg: 0, dustLossOreValue: 0 });
+      const at = text.indexOf(t(K + 'stat_dust_lost'));
+      expect(at).toBeGreaterThanOrEqual(0);
+      expect(text.slice(at, at + 60)).toContain('0');
+    });
+
+    it('shows no band or dust content on a report that predates the fields', () => {
+      const text = textOf({});
+      for (const key of [...BAND_KEYS, 'stat_dust_lost'] as const) expect(text).not.toContain(t(K + key));
+    });
+
+    it('shows no band content when only the failure list is present', () => {
+      const text = textOf({ holeFailures: [] });
+      for (const key of BAND_KEYS) expect(text).not.toContain(t(K + key));
+    });
+
+    it('the band labels read differently from each other', () => {
+      expect(new Set(BAND_KEYS.map(k => t(K + k))).size).toBe(4);
+    });
+  });
+
+  // ── C9: nothing broke ──
+
+  describe('nothing broke card (C9)', () => {
+    it('shows the title and hint, and one line per failed hole with its reason', () => {
+      const text = textOf({
+        ...NOTHING,
+        holeFailures: [below('H1', 40), { holeId: 'H2', kind: 'fizzled' }, buried('H3', 7)],
+      });
+      expect(t(K + 'dud_title')).not.toBe(K + 'dud_title');
+      expect(text).toContain(t(K + 'dud_title'));
+      expect(text).toContain(t(K + 'dud_hint'));
+
+      const shortfall = readNumbers(text, K + 'hole_reason_below_threshold', { hole: 'H1' }, ['pct']);
+      expect(shortfall).toHaveLength(1);
+      expect(shortfall[0]!['pct']).toBeCloseTo(40, 5);
+
+      expect(text).toContain(t(K + 'hole_reason_fizzled', { hole: 'H2' }));
+
+      const above = readNumbers(text, K + 'hole_reason_buried', { hole: 'H3' }, ['metres']);
+      expect(above).toHaveLength(1);
+      expect(above[0]!['metres']).toBeCloseTo(7, 5);
+    });
+
+    it('does not show the card when the shot cleared rock', () => {
+      const text = textOf({ holeFailures: [below('H1', 40)] });
+      expect(text).not.toContain(t(K + 'dud_title'));
+      expect(text).not.toContain(t(K + 'dud_hint'));
+    });
+
+    it('does not show the card for a report that predates the failure list and cleared rock', () => {
+      expect(textOf({})).not.toContain(t(K + 'dud_title'));
+    });
+
+    it('lists every failed hole when there are exactly as many as the cap', () => {
+      const failed = Array.from({ length: BLAST_REPORT_MAX_HOLE_REASONS }, (_, i) => below(`H${i + 1}`, 10 + i));
+      const text = textOf({ ...NOTHING, holeFailures: failed });
+      for (const f of failed) {
+        expect(readNumbers(text, K + 'hole_reason_below_threshold', { hole: f.holeId }, ['pct']), f.holeId).toHaveLength(1);
+      }
+      expect(readNumbers(text, K + 'hole_reasons_more', {}, ['count'])).toEqual([]);
+    });
+
+    it('past the cap lists only the first holes and folds the rest into a +N more line', () => {
+      const total = BLAST_REPORT_MAX_HOLE_REASONS + 3;
+      const failed = Array.from({ length: total }, (_, i) => below(`H${i + 1}`, 10 + i));
+      const text = textOf({ ...NOTHING, holeFailures: failed });
+      failed.forEach((f, i) => {
+        const lines = readNumbers(text, K + 'hole_reason_below_threshold', { hole: f.holeId }, ['pct']);
+        expect(lines, f.holeId).toHaveLength(i < BLAST_REPORT_MAX_HOLE_REASONS ? 1 : 0);
+      });
+      const more = readNumbers(text, K + 'hole_reasons_more', {}, ['count']);
+      expect(more).toHaveLength(1);
+      expect(more[0]!['count']).toBe(3);
+    });
+
+    it('one hole past the cap still folds into a +1 more line', () => {
+      const failed = Array.from({ length: BLAST_REPORT_MAX_HOLE_REASONS + 1 }, (_, i) => below(`H${i + 1}`, 20));
+      const more = readNumbers(textOf({ ...NOTHING, holeFailures: failed }), K + 'hole_reasons_more', {}, ['count']);
+      expect(more).toHaveLength(1);
+      expect(more[0]!['count']).toBe(1);
+    });
+  });
+
+  // ── C10: cleared rock but holes failed ──
+
+  describe('sealed holes (C10)', () => {
+    it('lists the failed holes\' reasons under the sealed title when rock was cleared', () => {
+      const text = textOf({ holeFailures: [buried('H3', 7), below('H4', 55)] });
+      expect(t(K + 'sealed_holes_title')).not.toBe(K + 'sealed_holes_title');
+      expect(text).toContain(t(K + 'sealed_holes_title'));
+      expect(text).not.toContain(t(K + 'dud_title'));
+      expect(readNumbers(text, K + 'hole_reason_buried', { hole: 'H3' }, ['metres'])[0]!['metres']).toBeCloseTo(7, 5);
+      expect(readNumbers(text, K + 'hole_reason_below_threshold', { hole: 'H4' }, ['pct'])[0]!['pct']).toBeCloseTo(55, 5);
+    });
+
+    it('caps its reasons at the same limit and folds the rest', () => {
+      const failed = Array.from({ length: BLAST_REPORT_MAX_HOLE_REASONS + 2 }, (_, i) => buried(`H${i + 1}`, 5 + i));
+      const text = textOf({ holeFailures: failed });
+      const shown = failed.filter(f => readNumbers(text, K + 'hole_reason_buried', { hole: f.holeId }, ['metres']).length === 1);
+      expect(shown).toHaveLength(BLAST_REPORT_MAX_HOLE_REASONS);
+      expect(readNumbers(text, K + 'hole_reasons_more', {}, ['count'])[0]!['count']).toBe(2);
+    });
+
+    it('shows neither title when rock was cleared and every hole opened', () => {
+      const text = textOf({ holeFailures: [] });
+      expect(text).not.toContain(t(K + 'sealed_holes_title'));
+      expect(text).not.toContain(t(K + 'dud_title'));
+    });
+
+    it('shows no sealed-holes title on a report that predates the failure list', () => {
+      expect(textOf({})).not.toContain(t(K + 'sealed_holes_title'));
+    });
+  });
+
+  // ── C11: overcharge ──
+
+  describe('overcharge card (C11)', () => {
+    it('shows the m3 crushed into fines or dust and the share when fines are a large part of the broken rock', () => {
+      const bandVolumes: Bands = { intact: 0, cracked: 5, good: 60, fines: 30, dust: 10 };
+      expect(finesShare(bandVolumes)).toBeGreaterThanOrEqual(OVERCHARGE_NOTE_MIN_FINES_SHARE);
+      const found = readNumbers(textOf({ bandVolumes }), K + 'overcharge_hint', {}, ['volume', 'pct']);
+      expect(found).toHaveLength(1);
+      expect(found[0]!['volume']).toBeCloseTo(40, 5);
+      expect(found[0]!['pct']).toBeCloseTo(40, 5);
+    });
+
+    it('shows it exactly at the threshold share', () => {
+      const bandVolumes: Bands = { intact: 0, cracked: 0, good: 300, fines: 70, dust: 30 };
+      expect(finesShare(bandVolumes)).toBe(OVERCHARGE_NOTE_MIN_FINES_SHARE);
+      const found = readNumbers(textOf({ bandVolumes }), K + 'overcharge_hint', {}, ['volume', 'pct']);
+      expect(found).toHaveLength(1);
+      expect(found[0]!['volume']).toBeCloseTo(100, 5);
+      expect(found[0]!['pct']).toBeCloseTo(25, 5);
+    });
+
+    it('counts dust-only crushing too', () => {
+      const found = readNumbers(textOf({ bandVolumes: { intact: 0, cracked: 0, good: 20, fines: 0, dust: 80 } }), K + 'overcharge_hint', {}, ['volume', 'pct']);
+      expect(found).toHaveLength(1);
+      expect(found[0]!['volume']).toBeCloseTo(80, 5);
+      expect(found[0]!['pct']).toBeCloseTo(80, 5);
+    });
+
+    it('stays away just below the threshold share', () => {
+      const bandVolumes: Bands = { intact: 0, cracked: 0, good: 301, fines: 69, dust: 30 };
+      expect(finesShare(bandVolumes)).toBeLessThan(OVERCHARGE_NOTE_MIN_FINES_SHARE);
+      expect(readNumbers(textOf({ bandVolumes }), K + 'overcharge_hint', {}, ['volume', 'pct'])).toEqual([]);
+    });
+
+    it('stays away for a clean shot of good rock', () => {
+      const bandVolumes: Bands = { intact: 0, cracked: 12, good: 500, fines: 0, dust: 0 };
+      expect(readNumbers(textOf({ bandVolumes }), K + 'overcharge_hint', {}, ['volume', 'pct'])).toEqual([]);
+    });
+
+    it('stays away when nothing broke, however the cracked volume looks', () => {
+      const bandVolumes: Bands = { intact: 0, cracked: 40, good: 0, fines: 0, dust: 0 };
+      expect(readNumbers(textOf({ ...NOTHING, bandVolumes, holeFailures: [] }), K + 'overcharge_hint', {}, ['volume', 'pct'])).toEqual([]);
+    });
+
+    it('stays away on a report that predates the band fields', () => {
+      expect(readNumbers(textOf({}), K + 'overcharge_hint', {}, ['volume', 'pct'])).toEqual([]);
+    });
   });
 });

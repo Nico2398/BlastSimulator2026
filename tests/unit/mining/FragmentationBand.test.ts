@@ -3,6 +3,7 @@ import {
   classifyFragmentationBand,
   bandMassRetention,
   heatmapBandColor,
+  finesShare,
   FRAGMENTATION_BAND_COLORS,
   FRAGMENTATION_BANDS,
   type FragmentationBand,
@@ -13,6 +14,8 @@ import {
   FRAGMENTATION_BAND_FINES_MIN,
   FRAGMENTATION_BAND_DUST_MIN,
   DUST_LOSS_SHARE,
+  BLAST_REPORT_MAX_HOLE_REASONS,
+  OVERCHARGE_NOTE_MIN_FINES_SHARE,
 } from '../../../src/core/config/balance.js';
 
 /** A hair below a bound, small enough to stay in the lower band at any plausible bound. */
@@ -193,5 +196,71 @@ describe('FragmentationBand — heatmapBandColor', () => {
 
   it('zero intensity is the intact colour', () => {
     expect(heatmapBandColor(0)).toBe(FRAGMENTATION_BAND_COLORS.intact);
+  });
+});
+
+// ── finesShare (#2202) ───────────────────────────────────────────────────────
+
+describe('FragmentationBand — finesShare (#2202)', () => {
+  const volumes = (v: Partial<Record<FragmentationBand, number>>): Record<FragmentationBand, number> =>
+    ({ intact: 0, cracked: 0, good: 0, fines: 0, dust: 0, ...v });
+
+  it('is the fines plus dust volume over the good plus fines plus dust volume', () => {
+    expect(finesShare(volumes({ good: 60, fines: 30, dust: 10 }))).toBeCloseTo(0.4, 10);
+  });
+
+  it('is 0 when nothing broke', () => {
+    expect(finesShare(volumes({}))).toBe(0);
+  });
+
+  it('is 0 when the only rock is intact or cracked, never NaN', () => {
+    const share = finesShare(volumes({ intact: 900, cracked: 120 }));
+    expect(Number.isNaN(share)).toBe(false);
+    expect(share).toBe(0);
+  });
+
+  it('is 0 when all the broken rock is good', () => {
+    expect(finesShare(volumes({ good: 80 }))).toBe(0);
+  });
+
+  it('is 1 when all the broken rock is fines', () => {
+    expect(finesShare(volumes({ fines: 12 }))).toBe(1);
+  });
+
+  it('is 1 when all the broken rock is dust', () => {
+    expect(finesShare(volumes({ dust: 7 }))).toBe(1);
+  });
+
+  it('counts fines and dust alike', () => {
+    expect(finesShare(volumes({ good: 50, fines: 50 }))).toBeCloseTo(0.5, 10);
+    expect(finesShare(volumes({ good: 50, dust: 50 }))).toBeCloseTo(0.5, 10);
+  });
+
+  it('ignores intact and cracked volume: they are not broken rock', () => {
+    const base = finesShare(volumes({ good: 60, fines: 30, dust: 10 }));
+    expect(finesShare(volumes({ intact: 5000, cracked: 1000, good: 60, fines: 30, dust: 10 }))).toBeCloseTo(base, 10);
+  });
+
+  it('stays within 0 and 1', () => {
+    for (const v of [volumes({ good: 1 }), volumes({ fines: 1, dust: 1 }), volumes({ good: 3, fines: 5, dust: 9 })]) {
+      const share = finesShare(v);
+      expect(share).toBeGreaterThanOrEqual(0);
+      expect(share).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('a share built to sit exactly on the overcharge bound equals it', () => {
+    // 100 of 400 m3 crushed.
+    expect(finesShare(volumes({ good: 300, fines: 70, dust: 30 }))).toBe(OVERCHARGE_NOTE_MIN_FINES_SHARE);
+  });
+});
+
+describe('FragmentationBand — blast report balance constants (#2202)', () => {
+  it('lists reasons for at most 6 holes', () => {
+    expect(BLAST_REPORT_MAX_HOLE_REASONS).toBe(6);
+  });
+
+  it('calls a shot overcharged from a quarter of its broken rock crushed fine', () => {
+    expect(OVERCHARGE_NOTE_MIN_FINES_SHARE).toBe(0.25);
   });
 });
