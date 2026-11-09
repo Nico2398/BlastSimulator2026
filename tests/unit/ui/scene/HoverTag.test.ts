@@ -326,4 +326,34 @@ describe('HoverTag', () => {
     tag.dispose();
     expect(container.contains(root)).toBe(false);
   });
+  describe('energy heatmap line (#2200)', () => {
+    const column = {
+      x: 12, z: 8, band: 'fines' as const, worstBand: 'dust' as const, goodShare: 0.2, maxIntensity: 3.39,
+      counts: { intact: 0, cracked: 0, good: 2, fines: 6, dust: 1 },
+    };
+    const hover = (): PickResult => ({ entity: null, terrain: { point: new THREE.Vector3(), tileX: 12, tileZ: 8, distance: 1 } });
+
+    it('heatmap-only: shows the tile and the band with its exact intensity', () => {
+      const { tag, root } = makeTag();
+      tag.update(hover(), makeState(), false, column);
+      expect(root.style.display).toBe('');
+      const line = root.querySelector('[data-role="hover-heatmap"]');
+      expect(line?.textContent).toContain('3.39');
+    });
+
+    it('survey and heatmap: both lines in one tag', () => {
+      const state = makeState();
+      addSurvey(state);
+      const { tag, root } = makeTag();
+      tag.update(hover(), state, true, column);
+      expect(root.querySelector('[data-role="hover-heatmap"]')).not.toBeNull();
+      expect(root.textContent).toContain('grumpite');
+    });
+
+    it('no heatmap and no overlay: hidden as before', () => {
+      const { tag, root } = makeTag();
+      tag.update(hover(), makeState(), false, null);
+      expect(root.style.display).toBe('none');
+    });
+  });
 });
