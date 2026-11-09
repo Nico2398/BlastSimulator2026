@@ -277,6 +277,59 @@ describe('vehicleEtaTicks', () => {
   });
 });
 
+describe('vehicleEtaTicks — load dwell (#2199)', () => {
+  const DWELL = 5; // fixture value: the arithmetic under test does not depend on the tuned constant
+
+  function loadLeg(dwellTicks: number | undefined, dwellLeft?: number): Itinerary['legs'][number] {
+    return {
+      mode: 'drive', vehicleId: 1, destX: 40, destZ: 40, arrival: 'exact',
+      onArrive: { kind: 'effect', effectId: 'haul_load' }, estTicks: (dwellTicks ?? 0) + 3,
+      ...(dwellTicks !== undefined ? { dwellTicks } : {}),
+      ...(dwellLeft !== undefined ? { dwellLeft } : {}),
+    };
+  }
+  const itineraryOf = (...legs: Itinerary['legs']): Itinerary => ({
+    legs, goal: { kind: 'work', actionId: 10 }, workTicks: 0, estTotalTicks: legs.reduce((s, l) => s + l.estTicks, 0),
+  });
+
+  it('a vehicle standing on a leg destination still owes the leg dwell', () => {
+    const v = makeVehicle({ x: 40, z: 40 });
+    expect(vehicleEtaTicks(v, itineraryOf(loadLeg(DWELL)))).toBe(DWELL);
+  });
+
+  it('counts the dwell left once the dwell is running, not the planned dwell', () => {
+    const v = makeVehicle({ x: 40, z: 40 });
+    expect(vehicleEtaTicks(v, itineraryOf(loadLeg(DWELL, 2)))).toBe(2);
+  });
+
+  it('a dwell fully served adds nothing', () => {
+    const v = makeVehicle({ x: 40, z: 40 });
+    expect(vehicleEtaTicks(v, itineraryOf(loadLeg(DWELL, 0)))).toBe(0);
+  });
+
+  it('adds the current leg dwell to the drive still to go', () => {
+    const speed = getVehicleDefByTier('debris_hauler', 1).speed;
+    const v = makeVehicle({ x: 0, z: 0 });
+    const withDwell = vehicleEtaTicks(v, itineraryOf(loadLeg(DWELL)));
+    const without = vehicleEtaTicks(v, itineraryOf(loadLeg(undefined)));
+    expect(withDwell - without).toBe(DWELL);
+    expect(without).toBeGreaterThanOrEqual(Math.floor(40 / speed));
+  });
+
+  it('keeps counting the dwell of the legs that follow, once', () => {
+    const v = makeVehicle({ x: 40, z: 40 });
+    const next = { ...loadLeg(DWELL), destX: 60 }; // estTicks already includes its dwell
+    const eta = vehicleEtaTicks(v, itineraryOf(loadLeg(DWELL), next));
+    expect(eta).toBeGreaterThanOrEqual(DWELL + next.estTicks);
+    expect(eta).toBeLessThan(DWELL + next.estTicks + 1);
+  });
+
+  it('a leg with no dwell behaves as before', () => {
+    const v = makeVehicle({ x: 40, z: 40 });
+    expect(vehicleEtaTicks(v, itineraryOf(loadLeg(undefined)))).toBe(0);
+  });
+});
+
 describe('computeVehicleJob', () => {
   function haulState(vehicle: Vehicle, action: PendingAction) {
     const vs = createVehicleState();

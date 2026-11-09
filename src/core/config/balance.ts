@@ -2548,6 +2548,17 @@ export const HAUL_BATCH_RADIUS_CELLS = 8;
 /** Most fragments one haul trip carries (#1370). */
 export const HAUL_BATCH_MAX_ITEMS = 6;
 
+/**
+ * Ticks a hauler stands at a fragment loading it, whatever its size or mass (#2199).
+ * Every fragment of a trip pays it, so a shot of many small fragments hauls slower.
+ *
+ * Measured (#2199), desert full-kit opening, seed 42, one 3x3 krackle shot, 1500 ticks after the blast: the hauler made
+ * 95 loads with no dwell and 88 with 1 tick (15.8 -> 17.0 ticks per load, +7.9%, inside the ~10% band for a good-band
+ * shot). Fines pay it per piece: the haul-batch integration test hauls the same ore mass in 4x the fragments and takes
+ * HAUL_LOAD_TICKS more per extra fragment.
+ */
+export const HAUL_LOAD_TICKS = 1;
+
 /** Fewest stranded cells that make a placement report a cutoff (#1391). */
 export const PLACEMENT_CUTOFF_MIN_CELLS = 1;
 

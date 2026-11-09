@@ -27,6 +27,8 @@ import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { tickTaskProgress } from '../../../src/core/engine/TaskProgress.js';
 import { computeXpPerTick } from '../../../src/core/entities/EmployeeXpRules.js';
 import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
+import { HAUL_LOAD_TICKS } from '../../../src/core/config/balance.js';
 import {
   applyHaulLoad,
   applyHaulUnload,
@@ -550,5 +552,105 @@ describe('driver XP across applyHaulLoad / applyHaulUnload (#1833)', () => {
 
     expect(vehicle.cargo).toEqual([{ fragmentId: 999, massKg: 500 }]);
     expect(xp() - before).toBe(TICKS_BETWEEN * computeXpPerTick(1));
+  });
+});
+
+// ── Load is not applied on arrival: it waits out the dwell (#2199) ───────────
+
+describe('haul_load fires HAUL_LOAD_TICKS ticks after arrival, not on arrival (#2199)', () => {
+  const DEST = { x: 9, z: 5 };
+
+  /** A hauler driving from (5,5) to DEST, whose one leg loads fragment 1 on arrival. */
+  function setupLoadTrip(dwellTicks: number | undefined) {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(20);
+    const { vehicle, driverId } = makeDrivenHauler(state, 5, 5);
+    const driver = state.employees.employees.find(e => e.id === driverId)!;
+    addBlastFragments(state.logistics, [makeFragment(1, DEST.x, DEST.z, 0.3, 850)], state.navGrid);
+    const action = reserveFragmentAction(state, vehicle, driverId, 'haul_debris', 1, DEST);
+    driver.activeActionId = action.id;
+    driver.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: DEST.x, destZ: DEST.z, arrival: 'exact',
+        onArrive: { kind: 'effect', effectId: 'haul_load' }, estTicks: 4 + (dwellTicks ?? 0),
+        ...(dwellTicks !== undefined ? { dwellTicks } : {}),
+      }],
+      goal: { kind: 'work', actionId: action.id }, workTicks: 0, estTotalTicks: 4 + (dwellTicks ?? 0),
+    };
+    const emitter = new EventEmitter();
+    const loadedEvents: number[] = [];
+    emitter.on('vehicle:haul_loaded', (p: { fragmentId: number }) => loadedEvents.push(p.fragmentId));
+    return { state, vehicle, driver, emitter, loadedEvents };
+  }
+
+  /** Index of the tick on which the vehicle's cargo first held the fragment (-1 when it never did). */
+  function loadTick(t: ReturnType<typeof setupLoadTrip>, maxTicks = 60): number {
+    for (let i = 0; i < maxTicks; i++) {
+      tickLocomotion(t.state, t.emitter);
+      if (t.vehicle.cargo.length > 0) return i;
+    }
+    return -1;
+  }
+
+  it('lands the load HAUL_LOAD_TICKS ticks later than the same leg with no dwell', () => {
+    const free = loadTick(setupLoadTrip(undefined));
+    const paid = loadTick(setupLoadTrip(HAUL_LOAD_TICKS));
+    expect(free).toBeGreaterThanOrEqual(0);
+    expect(paid).toBe(free + HAUL_LOAD_TICKS);
+  });
+
+  it('does not load on the tick the vehicle arrives', () => {
+    const free = loadTick(setupLoadTrip(undefined));
+    const trip = setupLoadTrip(HAUL_LOAD_TICKS);
+    for (let i = 0; i <= free; i++) tickLocomotion(trip.state, trip.emitter);
+
+    expect(trip.vehicle.x).toBe(DEST.x);
+    expect(trip.vehicle.z).toBe(DEST.z);
+    expect(trip.vehicle.cargo).toEqual([]);
+    expect(trip.loadedEvents).toEqual([]);
+    expect(trip.state.logistics.fragments[0]!.state).toBe('on_ground');
+  });
+
+  it('emits vehicle:haul_loaded once, on the tick the cargo lands', () => {
+    const trip = setupLoadTrip(HAUL_LOAD_TICKS);
+    const at = loadTick(trip);
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(trip.loadedEvents).toEqual([1]);
+    expect(trip.state.logistics.fragments[0]!.state).toBe('in_transit');
+    for (let i = 0; i < 10; i++) tickLocomotion(trip.state, trip.emitter);
+    expect(trip.loadedEvents).toEqual([1]);
+  });
+
+  it('keeps the driver on the action and the vehicle on the spot through the dwell', () => {
+    const free = loadTick(setupLoadTrip(undefined));
+    const trip = setupLoadTrip(HAUL_LOAD_TICKS);
+    for (let i = 0; i < free + HAUL_LOAD_TICKS; i++) {
+      tickLocomotion(trip.state, trip.emitter);
+      if (i >= free) {
+        expect({ x: trip.vehicle.x, z: trip.vehicle.z }).toEqual(DEST);
+        expect(trip.driver.activeActionId).not.toBeNull();
+        expect(trip.driver.itinerary).not.toBeNull();
+      }
+    }
+  });
+
+  it('a leg without dwellTicks still loads on arrival', () => {
+    const trip = setupLoadTrip(undefined);
+    const at = loadTick(trip);
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(trip.vehicle.cargo).toEqual([{ fragmentId: 1, massKg: 850 }]);
+  });
+
+  it('a failed load after the dwell interrupts the action as before', () => {
+    const free = loadTick(setupLoadTrip(undefined));
+    const trip = setupLoadTrip(HAUL_LOAD_TICKS);
+    for (let i = 0; i <= free; i++) tickLocomotion(trip.state, trip.emitter);
+    trip.state.logistics.fragments = []; // the fragment is gone while the hauler stands loading it
+
+    for (let i = 0; i < HAUL_LOAD_TICKS + 3; i++) tickLocomotion(trip.state, trip.emitter);
+
+    expect(trip.vehicle.cargo).toEqual([]);
+    expect(trip.loadedEvents).toEqual([]);
+    expect(trip.driver.activeActionId).toBeNull();
   });
 });

@@ -108,6 +108,14 @@ export interface Leg {
    * contested claim on its cell. Optional, same reasoning as `neverSpread`.
    */
   returnTrip?: boolean;
+  /**
+   * Ticks the mover stays on this leg's destination, after arriving and before
+   * its arrival step fires (#2199): the fixed time of loading one fragment.
+   * Counted in `estTicks`. Optional — absent means the step fires on arrival.
+   */
+  dwellTicks?: number;
+  /** Runtime countdown of `dwellTicks`, set by the locomotion tick on arrival; absent until then. */
+  dwellLeft?: number;
 }
 
 /** What the itinerary is ultimately for. */

@@ -232,6 +232,20 @@ function clearItineraryOnFailure(state: GameState, emp: Employee): void {
 }
 
 /**
+ * True while `leg`'s dwell has ticks left on its destination (#2199). The first call on
+ * an arrived leg starts the countdown; the call that finds it spent returns false so the
+ * arrival step fires.
+ */
+function holdForDwell(leg: Leg): boolean {
+  const dwell = leg.dwellTicks ?? 0;
+  if (dwell <= 0) return false;
+  const left = leg.dwellLeft ?? dwell;
+  if (left <= 0) return false;
+  leg.dwellLeft = left - 1;
+  return true;
+}
+
+/**
  * Walk `emp`'s current itinerary one tick's worth: advances the current leg,
  * and — the instant it arrives — applies its arrival step and continues
  * straight into the next leg (a zero-length leg, e.g. an already-mounted
@@ -295,6 +309,9 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
     }
 
     delete emp.blockEpisode;
+    // #2199: a leg with a dwell (loading a fragment) holds the mover on its destination
+    // for dwellTicks before the arrival step fires.
+    if (holdForDwell(leg)) break;
     const ok = applyArrivalStep(state, emp, leg, itinerary, emitter);
 
     // A board arrival step's post-board handling (evacuation redrive,

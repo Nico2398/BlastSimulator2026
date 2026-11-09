@@ -10,7 +10,7 @@ import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback, type RampFlowField } from '../nav/Pathfinding.js';
 import { rampFlowField } from '../mining/RampFlow.js';
-import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_BATCH_MAX_ITEMS } from '../config/balance.js';
+import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_BATCH_MAX_ITEMS, HAUL_LOAD_TICKS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole, minVehicleTierFor } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
@@ -403,6 +403,12 @@ function resolveEffectiveDistance(
   return dist ?? octileHeuristic(fromX, fromZ, toX, toZ);
 }
 
+/** Gives a haul_load leg its fixed loading time (#2199): held on the spot, and counted in its estimate. */
+function withLoadDwell(leg: Leg): void {
+  leg.dwellTicks = HAUL_LOAD_TICKS;
+  leg.estTicks += HAUL_LOAD_TICKS;
+}
+
 /**
  * A drive leg from (`fromX`, `fromZ`) to (`toX`, `toZ`), timed at
  * `def.speed`, ending in `onArrive` — the shape four sites in this file
@@ -568,6 +574,7 @@ function planFragmentTaskItinerary(
   const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
   const toFragmentLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, approach.x, approach.z, { kind: 'effect', effectId: action.type === 'haul_debris' ? 'haul_load' : 'boulder_split' }, def, 'exact', false);
   if (toFragmentLeg === null) return null;
+  if (action.type === 'haul_debris') withLoadDwell(toFragmentLeg);
   legs.push(toFragmentLeg);
 
   if (action.type === 'fragment_debris') {
@@ -604,6 +611,7 @@ function planFragmentTaskItinerary(
     const extraApproach = fragmentApproachCell(extraTracked.fragment, state, vehicle.id);
     const extraLeg = buildDriveLeg(state, fidelity, vehicle, lastX, lastZ, extraApproach.x, extraApproach.z, { kind: 'effect', effectId: 'haul_load', targetId: extra.fragmentId }, def, 'exact', false);
     if (extraLeg === null) continue; // unreachable extra: the trip just carries less
+    withLoadDwell(extraLeg);
     legs.push(extraLeg);
     lastX = extraApproach.x;
     lastZ = extraApproach.z;
