@@ -97,7 +97,7 @@ export function predictBreakout(
 export type BreakoutWarningKind = 'nothing' | 'none' | 'partial';
 
 /**
- * 'none' when nothing breaks out of the too-deep holes; 'partial' when the sealed share reaches
+ * 'nothing' when the shot breaks no rock; 'none' when nothing breaks out of the too-deep holes; 'partial' when the sealed share reaches
  * BLAST_SEALED_SHARE_PARTIAL; null when no warning is due.
  */
 export function breakoutWarningKind(prediction: BreakoutPrediction): BreakoutWarningKind | null {

@@ -1,5 +1,4 @@
-// BlastSimulator2026 — Explosive vs rock tier fit
-// Dominant rock of a hole's column.
+// BlastSimulator2026 — Dominant rock of a hole's column
 
 import { type VoxelGrid, firstEmptyLayerAboveGround } from '../world/VoxelGrid.js';
 import { getRock } from '../world/RockCatalog.js';

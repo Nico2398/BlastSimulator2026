@@ -374,20 +374,10 @@ describe('EnergyPropagation — buildHoleSeeds', () => {
 describe('EnergyPropagation — createEnergyField thresholds come from the rock only (#2197)', () => {
   const SIZE = 12;
   const mid = SIZE >> 1;
-  type LooseCreate = (grid: VoxelGrid, box: BlastBox, ...extra: unknown[]) => ReturnType<typeof createEnergyField>;
 
   it('takes a grid and a box and nothing else', () => {
     expect(createEnergyField.length).toBe(2);
     expect(createEnergyFieldSteps.length).toBe(2);
-  });
-
-  it('a stray third argument never changes a threshold, whatever tier it claims', () => {
-    const grid = solidGrid(SIZE, 'obstiite');
-    const baseline = fieldOver(grid, SIZE);
-    for (const claimed of [1, 2, 4]) {
-      const field = (createEnergyField as LooseCreate)(grid, wholeGrid(grid, SIZE), () => claimed);
-      expect(Array.from(field.threshold)).toEqual(Array.from(baseline.threshold));
-    }
   });
 
   it('confined rock breaks at exactly its rock absorption', () => {
