@@ -315,7 +315,7 @@ describe('BlastFooter ore estimate: surveyed ground and nothing broken (#1967)',
   type Holes = 'drilled' | 'weak' | 'charged';
   function setup(holes: Holes, survey: 'none' | 'full' | 'barren') {
     const { footer } = makeFooter();
-    const grid = makeOreGrid();
+    const grid = makeOreGrid(holes === 'weak' ? 'titanite' : 'molite');
     footer.setGridProvider(() => grid);
     const state = makeState();
     if (holes === 'drilled') addDrilledPattern(state, holeCounter);

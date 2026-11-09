@@ -88,7 +88,6 @@
     "src/core/mining/BlastCalc.ts:parseKey",
     "src/core/mining/BlastResolve.ts:ResolveResult",
     "src/core/mining/EnergyPropagation.ts:computeDistanceToAir",
-    "src/core/mining/EnergyPropagation.ts:confinementFactor",
     "src/core/mining/FragmentGeneration.ts:FragmentGenerationResult",
     "src/core/mining/FragmentGeneration.ts:GeneratedFragment",
     "src/core/mining/FragmentVelocity.ts:energyGradientDirection",

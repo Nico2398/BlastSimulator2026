@@ -1,9 +1,7 @@
-// BlastSimulator2026 — Explosive vs rock tier fit
-// How far an explosive's tier falls short of the rock it must break.
+// BlastSimulator2026 — Dominant rock of a hole's column
 
 import { type VoxelGrid, firstEmptyLayerAboveGround } from '../world/VoxelGrid.js';
 import { getRock } from '../world/RockCatalog.js';
-import { TIER_SHORTFALL_THRESHOLD_FACTOR } from '../config/balance.js';
 
 /** Dominant rock of a column together with its hardness tier. */
 export interface ColumnRock {
@@ -11,24 +9,9 @@ export interface ColumnRock {
   tier: number;
 }
 
-/** Tiers by which the rock outclasses the explosive (0 when the explosive suffices). */
-export function tierShortfall(explosiveTier: number, rockTier: number): number {
-  return Math.max(0, rockTier - explosiveTier);
-}
-
-/** Breaking-threshold multiplier for a shortfall. */
-export function tierThresholdFactor(shortfall: number): number {
-  return TIER_SHORTFALL_THRESHOLD_FACTOR ** shortfall;
-}
-
 /** Hardness tier of a rock id (0 for air or an unknown id). */
 function rockTierOf(rockId: string): number {
   return rockId === '' ? 0 : (getRock(rockId)?.hardnessTier ?? 0);
-}
-
-/** Hardness tier of the dominant rock in a voxel (0 for air). */
-export function dominantRockTierAt(grid: VoxelGrid, x: number, y: number, z: number): number {
-  return rockTierOf(grid.dominantRockAt(x, y, z));
 }
 
 /** Modal dominant rock along a column (higher tier wins ties); null when all air. */

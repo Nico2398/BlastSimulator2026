@@ -224,6 +224,7 @@ export class PreflightModal {
 
     const wallFaces = this.wallMemo.get(state, plan, this.gridProvider());
     const breakoutText = breakoutWarningFor(this.breakoutMemo.get(state, plan, this.gridProvider()), {
+      nothing: 'ui.blast_workshop.preflight.warn_breakout_nothing',
       none: 'ui.blast_workshop.preflight.warn_breakout_none',
       partial: 'ui.blast_workshop.preflight.warn_breakout_partial',
     });

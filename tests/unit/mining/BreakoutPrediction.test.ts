@@ -12,6 +12,7 @@ import { predictBreakout, breakoutWarningKind, isVoxelSealed, type BreakoutPredi
 import { forkVoxelGrid } from '../../../src/core/world/VoxelGridFork.js';
 import { BLAST_SEALED_SHARE_PARTIAL } from '../../../src/core/config/balance.js';
 import type { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { blockShot, nothingBreaksGrid, rockBlockGrid } from '../../helpers/breaksNothingFixture.js';
 
 const ORIGIN = { x: 24, z: 32 };
 const D89 = 0.089;
@@ -145,6 +146,48 @@ describe('breakoutWarningKind', () => {
     expect(p.sealedShare).toBeGreaterThanOrEqual(BLAST_SEALED_SHARE_PARTIAL);
     expect(p.sealedShare).toBeLessThan(1);
     expect(breakoutWarningKind(p)).toBe('partial');
+  });
+});
+
+describe("breakoutWarningKind 'nothing' (#2197)", () => {
+  const empty: BreakoutPrediction = { brokenVoxels: 0, sealedVoxels: 0, sealedShare: 0, tooDeepHoleIds: [], chargedHoleCount: 9, fragmented: [], sealedKeys: new Set<string>() };
+
+  it("is 'nothing' when a charged shot breaks no rock at all", () => {
+    expect(breakoutWarningKind(empty)).toBe('nothing');
+  });
+
+  it("is 'nothing' for a single charged hole that breaks nothing", () => {
+    expect(breakoutWarningKind({ ...empty, chargedHoleCount: 1 })).toBe('nothing');
+  });
+
+  it("is 'nothing' whatever the sealed share reads, since no voxel broke", () => {
+    expect(breakoutWarningKind({ ...empty, sealedShare: 1 })).toBe('nothing');
+  });
+
+  it("a real shot too weak for its rock predicts zero broken voxels and warns 'nothing'", () => {
+    const { plan } = blockShot('pop_rock', 0.5);
+    const p = predictBreakout(plan, nothingBreaksGrid())!;
+    expect(p).not.toBeNull();
+    expect(p.chargedHoleCount).toBe(9);
+    expect(p.brokenVoxels).toBe(0);
+    expect(breakoutWarningKind(p)).toBe('nothing');
+  });
+
+  it('the same pattern with a strong charge in soft rock does not warn nothing', () => {
+    const { plan } = blockShot('boomite', 8);
+    const p = predictBreakout(plan, rockBlockGrid('cruite'))!;
+    expect(p.brokenVoxels).toBeGreaterThan(0);
+    expect(breakoutWarningKind(p)).not.toBe('nothing');
+  });
+
+  it("'none' and 'partial' keep their meaning once some rock breaks", () => {
+    expect(breakoutWarningKind({ ...empty, brokenVoxels: 10, sealedVoxels: 10, sealedShare: 1 })).toBe('none');
+    expect(breakoutWarningKind({ ...empty, brokenVoxels: 100, sealedVoxels: 30, sealedShare: BLAST_SEALED_SHARE_PARTIAL + 0.05 })).toBe('partial');
+  });
+
+  it('still returns null (no prediction) when no hole is charged', () => {
+    const holes = createGridPlan({ nextHoleId: 1 }, ORIGIN, 3, 3, 4, 8, D89);
+    expect(predictBreakout(assembleBlastPlan(holes, {}), nothingBreaksGrid())).toBeNull();
   });
 });
 

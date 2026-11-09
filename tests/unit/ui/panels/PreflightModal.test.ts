@@ -568,7 +568,7 @@ describe('PreflightModal ore estimate: surveyed ground and nothing broken (#1967
   function open(holes: 'drilled' | 'weak' | 'charged', survey: 'none' | 'full' | 'barren'): PreflightModal {
     setLocale('en');
     const { modal } = makeModal();
-    const grid = makeOreGrid();
+    const grid = makeOreGrid(holes === 'weak' ? 'titanite' : 'molite');
     modal.setGridProvider(() => grid);
     const state = makeState();
     if (holes === 'drilled') addDrilledPattern(state, holeCounter);

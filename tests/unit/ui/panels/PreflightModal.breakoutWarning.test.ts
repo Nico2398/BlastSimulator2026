@@ -3,7 +3,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PreflightModal } from '../../../../src/ui/panels/PreflightModal.js';
 import { sandboxPadGrid, breakoutShotState } from '../../../helpers/breakoutWarningFixture.js';
-import { setLocale } from '../../../../src/core/i18n/I18n.js';
+import { nothingBreaksGrid, nothingBreaksState } from '../../../helpers/breaksNothingFixture.js';
+import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
 import type { VoxelGrid } from '../../../../src/core/world/VoxelGrid.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 
@@ -71,5 +72,30 @@ describe('PreflightModal breakout warning', () => {
     expect(detonate(warned.modal).disabled).toBe(false);
     detonate(warned.modal).click();
     expect(warned.gameConsole).toHaveBeenCalledWith('blast detonate');
+  });
+});
+
+describe('PreflightModal breaks-nothing warning (#2197)', () => {
+  it('warns that nothing breaks, in the nothing wording rather than the too-deep one', () => {
+    const row = open(nothingBreaksGrid(), nothingBreaksState()).modal.root.querySelector(ROW);
+    expect(row).not.toBeNull();
+    expect(row!.textContent).toBe(t('ui.blast_workshop.preflight.warn_breakout_nothing'));
+  });
+
+  it.each([0, 1, 2, 3, 4])('shows at software tier %i', (tier) => {
+    const state = nothingBreaksState();
+    state.softwareTier = tier;
+    expect(open(nothingBreaksGrid(), state).modal.root.querySelector(ROW)).not.toBeNull();
+  });
+
+  it('adds no row without a grid', () => {
+    expect(open(null, nothingBreaksState()).modal.root.querySelector(ROW)).toBeNull();
+  });
+
+  it('is a warning, not a gate: detonate stays enabled and still fires', () => {
+    const { modal, gameConsole } = open(nothingBreaksGrid(), nothingBreaksState());
+    expect(detonate(modal).disabled).toBe(false);
+    detonate(modal).click();
+    expect(gameConsole).toHaveBeenCalledWith('blast detonate');
   });
 });

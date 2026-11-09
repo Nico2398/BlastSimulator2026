@@ -2473,12 +2473,6 @@ export const DEMOLITION_TIER_MULTIPLIER = { 1: 1, 2: 1.5, 3: 2 } as const;
 /** Demolition speed factor per building_destroyer vehicle tier — bigger machines work faster (#1392). */
 export const DEMOLITION_VEHICLE_TIER_SPEED = { 1: 1, 2: 1.5, 3: 2.25 } as const;
 
-/**
- * Factor applied to a rock's breaking threshold per explosive tier it falls short of
- * (rock tier above the explosive's minRockTier): threshold x FACTOR ** shortfall (#1358).
- */
-export const TIER_SHORTFALL_THRESHOLD_FACTOR = 4;
-
 /** Recovery progress an injured employee must accumulate before returning to work (#1382). */
 export const INJURY_RECOVERY_TICKS = 48;
 

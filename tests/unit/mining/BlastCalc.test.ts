@@ -548,3 +548,31 @@ describe('BlastCalc — isFragmentOversized', () => {
     expect(isFragmentOversized(0.7)).toBe(isOversized(0.7));
   });
 });
+// -- effectiveHoleEnergy: no upward component (#2197) --
+
+describe('BlastCalc — effectiveHoleEnergy shape (#2197)', () => {
+  const charge = (explosiveId: string): HoleCharge => ({ explosiveId, amountKg: 4, stemmingM: 2.4 });
+
+  it('returns exactly downward and vibrationMod', () => {
+    const e = effectiveHoleEnergy(charge('boomite'), 8, false, false);
+    expect(Object.keys(e).sort()).toEqual(['downward', 'vibrationMod']);
+    expect(e).not.toHaveProperty('upward');
+  });
+
+  it('an unknown explosive yields no energy and a neutral vibration, still without upward', () => {
+    const e = effectiveHoleEnergy(charge('no_such_explosive'), 8, false, false);
+    expect(e).toEqual({ downward: 0, vibrationMod: 1 });
+  });
+
+  it('reports the explosive vibration multiplier', () => {
+    expect(effectiveHoleEnergy(charge('dynatomics'), 8, false, false).vibrationMod)
+      .toBeGreaterThan(effectiveHoleEnergy(charge('pop_rock'), 8, false, false).vibrationMod);
+  });
+
+  it('a flooded water-sensitive hole delivers a fraction of the dry downward energy', () => {
+    const dry = effectiveHoleEnergy(charge('boomite'), 8, false, false).downward;
+    const wet = effectiveHoleEnergy(charge('boomite'), 8, true, false).downward;
+    expect(wet).toBeGreaterThan(0);
+    expect(wet).toBeLessThan(dry);
+  });
+});

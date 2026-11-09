@@ -6,8 +6,6 @@ import { IDLE_BLAST_PLAYBACK, type BlastPlaybackSnapshot } from '../core/mining/
 import { injectStyles } from './styles.js';
 import { injectTokens } from './tokens.js';
 import { registerIcons } from './icons.js';
-import type { DrillHole } from '../core/mining/DrillPlan.js';
-import type { ColumnRock } from '../core/mining/ExplosiveRockFit.js';
 import { BlastWorkshop } from './panels/BlastWorkshop.js';
 import { PreflightModal } from './panels/PreflightModal.js';
 import { BlastReportModal } from './panels/BlastReportModal.js';
@@ -313,11 +311,6 @@ export class UIManager {
   setEstimateGridProvider(fn: () => VoxelGrid | null): void {
     this.blastUI.setGridProvider(fn);
     this.preflightModal.setGridProvider(fn);
-  }
-
-  /** Passes the dominant-rock-under-a-hole sampler down to the Blast Workshop's Charge step (#1358). */
-  setHoleRockSampler(fn: (hole: DrillHole) => ColumnRock | null): void {
-    this.blastUI.setHoleRockSampler(fn);
   }
 
   /** Passes the non-mutating claim preview down to the Build panel (#1396). */

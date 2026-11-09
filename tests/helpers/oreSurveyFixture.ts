@@ -9,13 +9,13 @@ import type { SurveyResult } from '../../src/core/mining/SurveyCalc.js';
 
 export const SURFACE_Y = 24;
 
-export function makeOreGrid(): VoxelGrid {
+export function makeOreGrid(rockId = 'molite'): VoxelGrid {
   const grid = new VoxelGrid(40, 40);
   for (let z = 6; z <= 34; z++) {
     for (let y = 0; y <= SURFACE_Y; y++) {
       for (let x = 6; x <= 34; x++) {
         grid.setVoxel(x, y, z, {
-          composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] },
+          composition: { rocks: [{ rockId, coefficient: 1.0 }] },
           density: 1.0,
           oreDensities: { blingite: 0.9 },
           fractureModifier: 1.0,
@@ -67,7 +67,7 @@ export function addDrilledPattern(state: GameState, counter: { nextHoleId: numbe
   for (const x of [12, 28]) addHole(counter, state.drillHoles, x, 20, 8, 0.089);
 }
 
-/** The same two holes charged with the weakest load (pop_rock, minimum kg) too small to fragment molite: a field exists, nothing breaks (#1967). */
+/** The same two holes charged with the weakest load (pop_rock, minimum kg) too small to fragment titanite (build the grid with `makeOreGrid('titanite')`): a field exists, nothing breaks (#1967). */
 export function addWeakChargedPattern(state: GameState, counter: { nextHoleId: number }): void {
   for (const x of [12, 28]) {
     const hole = addHole(counter, state.drillHoles, x, 20, 8, 0.089);

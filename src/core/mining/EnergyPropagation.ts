@@ -17,7 +17,6 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { drain, type Steps } from '../engine/Steps.js';
 import { getRock } from '../world/RockCatalog.js';
 import { chargeKgPerMetre } from './HoleDiameter.js';
-import { tierShortfall, tierThresholdFactor, dominantRockTierAt } from './ExplosiveRockFit.js';
 import {
   MAX_PROPAGATION_ITERATIONS,
   BLAST_GRADE_FLOOR_OFFSET_M,
@@ -305,16 +304,14 @@ export function confinementFactor(distToAir: number): number {
 export function createEnergyField(
   grid: VoxelGrid,
   box: BlastBox,
-  explosiveTierAt?: (x: number, z: number) => number,
 ): EnergyField {
-  return drain(createEnergyFieldSteps(grid, box, explosiveTierAt));
+  return drain(createEnergyFieldSteps(grid, box));
 }
 
 /** `createEnergyField`, yielding between slabs of the box (#1603). */
 export function* createEnergyFieldSteps(
   grid: VoxelGrid,
   box: BlastBox,
-  explosiveTierAt?: (x: number, z: number) => number,
 ): Steps<EnergyField> {
   const nx = box.maxX - box.minX;
   const ny = box.maxY - box.minY;
@@ -341,10 +338,7 @@ export function* createEnergyFieldSteps(
     for (let y = box.minY; y < box.maxY; y++) {
       for (let x = box.minX; x < box.maxX; x++) {
         const i = indexOf(field, x, y, z);
-        let threshold = grid.densityAt(x, y, z) > 0 ? computeVoxelThreshold(grid, x, y, z) : 0;
-        if (threshold > 0 && explosiveTierAt) {
-          threshold *= tierThresholdFactor(tierShortfall(explosiveTierAt(x, z), dominantRockTierAt(grid, x, y, z)));
-        }
+        const threshold = grid.densityAt(x, y, z) > 0 ? computeVoxelThreshold(grid, x, y, z) : 0;
         if (threshold <= 0) {
           field.air[i] = 1;
           continue;
