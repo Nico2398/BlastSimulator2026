@@ -8,7 +8,7 @@ import { installTubing, buyTubing } from '../../../../../src/core/mining/Tubing.
 import { DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../../../src/core/config/balance.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
-import { gridHoleLimitWarning } from '../../../../../src/ui/panels/permitPreview.js';
+import { gridHoleLimitWarning, permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
 import type { ConfirmModalConfig } from '../../../../../src/ui/panels/ConfirmModal.js';
 import type { PlacementKit } from '../../../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../../../src/ui/scene/PlacementController.js';
@@ -699,7 +699,7 @@ describe('DrillStep — permit hole-limit warning (#1925)', () => {
     expect(arg.confirmEnabled).toBe(true);
     expect(textOf(arg)).toContain(gridHoleLimitWarning(createGradeState(), 16)!.toLowerCase());
     // Literal check so the assertion does not merely echo the helper under test.
-    expect(textOf(arg)).toContain('(9)');
+    expect(textOf(arg)).toContain('/ 9');
   });
 
   it('a 3x3 grid at the limit shows no warning', () => {
@@ -769,5 +769,207 @@ describe('DrillStep — diameter stepper follows fleet rigs (#1934)', () => {
     expect(diameterFieldOf(strip).value).toBe(89);
     controller.simulateConfirm();
     expect(gameConsole.mock.calls[0]![0] as string).toContain('diameter:0.089');
+  });
+});
+
+// ── Plan-total permit warnings and the used / limit readout (#2167) ─────────
+
+describe('DrillStep — permit warning counts the whole plan (#2167)', () => {
+  /** Grade-0 state (9 holes allowed) already holding `drilled` drilled and `planned` ordered holes, far from the test grids. */
+  function stateWithHoles(drilled: number, planned: number, progression = true) {
+    const state = makeState();
+    if (progression) state.grade = createGradeState();
+    for (let i = 0; i < drilled; i++) addHole(holeCounter, state.drillHoles, 100 + i * 4, 100, 8, 0.15);
+    for (let i = 0; i < planned; i++) addHole(holeCounter, state.plannedDrillHoles, 100 + i * 4, 140, 8, 0.15);
+    return state;
+  }
+
+  function armed(tool: 'grid-tool' | 'add-hole-tool', state: ReturnType<typeof makeState>, sel: { x1: number; z1: number; x2: number; z2: number }) {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(state, 'sunny');
+    (step.root.querySelector(`[data-action="${tool}"]`) as HTMLButtonElement).click();
+    controller.simulateSelect(sel);
+    return { arg: lastStripArg(strip), step, controller, strip };
+  }
+
+  // Default spacing 4 m: x 10..14 / z 10..14 is 2 x 2 = 4 holes; 10..18 is 3 x 3 = 9.
+  const GRID_2X2 = { x1: 10, z1: 10, x2: 14, z2: 14 };
+  const GRID_3X3 = { x1: 10, z1: 10, x2: 18, z2: 18 };
+
+  it('a grid that fits alone but overflows with the existing holes warns with the plan total', () => {
+    const { arg } = armed('grid-tool', stateWithHoles(3, 3), GRID_2X2);
+    const warning = gridHoleLimitWarning(createGradeState(), 4, 6)!;
+    expect(warning).toBeTruthy();
+    expect(arg.result).toContain(warning);
+    expect(arg.result).toContain('10');
+    expect(arg.confirmEnabled).toBe(true);
+  });
+
+  it('drilled and ordered holes both count toward the existing total', () => {
+    // 4 new holes: 5 drilled alone -> 9, within; 5 drilled + 1 ordered -> 10, over.
+    expect(JSON.stringify(armed('grid-tool', stateWithHoles(5, 0), GRID_2X2).arg).toLowerCase()).not.toContain('permit');
+    const overByOrdered = armed('grid-tool', stateWithHoles(5, 1), GRID_2X2).arg.result;
+    expect(overByOrdered).toContain(gridHoleLimitWarning(createGradeState(), 4, 6)!);
+    const overByDrilled = armed('grid-tool', stateWithHoles(6, 0), GRID_2X2).arg.result;
+    expect(overByDrilled).toContain(gridHoleLimitWarning(createGradeState(), 4, 6)!);
+  });
+
+  it('a grid whose total lands exactly on the limit shows no warning', () => {
+    const { arg } = armed('grid-tool', stateWithHoles(3, 2), GRID_2X2);
+    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
+    expect(gridHoleLimitWarning(createGradeState(), 4, 5)).toBeNull();
+    expect(arg.confirmEnabled).toBe(true);
+  });
+
+  it('a grid at the limit with no existing holes shows no warning', () => {
+    const { arg } = armed('grid-tool', stateWithHoles(0, 0), GRID_3X3);
+    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
+  });
+
+  it('the warning carries the consequence text for the plan total', () => {
+    const { arg } = armed('grid-tool', stateWithHoles(6, 0), GRID_3X3);
+    const consequence = permitPreview(createGradeState(), { holes: new Array(15).fill({}), charges: {} }, 0)!.consequenceText;
+    expect(consequence.length).toBeGreaterThan(0);
+    expect(arg.result).toContain(consequence);
+  });
+
+  it('footprint-covered cells are not new holes: a 10-cell grid with one cell under a building fits the limit', () => {
+    // 5 x 2 = 10 cells at (10,10)..(26,14); the building covers (10,10), so 9 holes are new.
+    const state = makeStateWithFootprint();
+    state.grade = createGradeState();
+    const covered = armed('grid-tool', state, { x1: 10, z1: 10, x2: 26, z2: 14 });
+    expect(covered.arg.result).toContain('skipped');
+    expect(covered.arg.result).not.toContain(gridHoleLimitWarning(createGradeState(), 10)!);
+    expect(JSON.stringify(covered.arg).toLowerCase()).not.toContain('permit');
+
+    // Control: the same 10 cells away from the building are all new and overflow.
+    const clear = makeStateWithFootprint();
+    clear.grade = createGradeState();
+    const free = armed('grid-tool', clear, { x1: 200, z1: 200, x2: 216, z2: 204 });
+    expect(free.arg.result).toContain(gridHoleLimitWarning(createGradeState(), 10)!);
+  });
+
+  it('no grade: never warns, however many holes exist or are added', () => {
+    const { arg } = armed('grid-tool', stateWithHoles(30, 30, false), { x1: 10, z1: 10, x2: 40, z2: 40 });
+    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
+    expect(arg.confirmEnabled).toBe(true);
+  });
+
+  it('add hole: the tenth hole warns with the same text, confirm stays enabled', () => {
+    const { arg } = armed('add-hole-tool', stateWithHoles(5, 4), { x1: 10, z1: 10, x2: 10, z2: 10 });
+    const warning = gridHoleLimitWarning(createGradeState(), 1, 9)!;
+    expect(warning).toBeTruthy();
+    expect(JSON.stringify(arg)).toContain(warning);
+    expect(arg.confirmEnabled).toBe(true);
+  });
+
+  it('add hole: the ninth hole stays within the limit and shows no warning', () => {
+    const { arg } = armed('add-hole-tool', stateWithHoles(5, 3), { x1: 10, z1: 10, x2: 10, z2: 10 });
+    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
+    expect(arg.confirmEnabled).toBe(true);
+  });
+
+  it('add hole: with no existing holes there is no warning', () => {
+    const { arg } = armed('add-hole-tool', stateWithHoles(0, 0), { x1: 10, z1: 10, x2: 10, z2: 10 });
+    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
+  });
+
+  it('add hole: no grade never warns', () => {
+    const { arg } = armed('add-hole-tool', stateWithHoles(20, 20, false), { x1: 10, z1: 10, x2: 10, z2: 10 });
+    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
+  });
+
+  it('confirming an over-permit grid still dispatches the drill_plan command', () => {
+    const { step, gameConsole } = makeStep();
+    const { kit, controller } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(stateWithHoles(6, 0), 'sunny');
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect(GRID_3X3);
+    controller.simulateConfirm();
+    expect(gameConsole.mock.calls.some(c => String(c[0]).startsWith('drill_plan grid'))).toBe(true);
+  });
+});
+
+describe('DrillStep — permit used / limit readout (#2167)', () => {
+  const readout = (step: DrillStep) => step.root.querySelector('[data-role="permit-holes"]') as HTMLElement | null;
+
+  function withHoles(drilled: number, planned: number, progression = true) {
+    const state = makeState();
+    if (progression) state.grade = createGradeState();
+    for (let i = 0; i < drilled; i++) addHole(holeCounter, state.drillHoles, 10 + i * 3, 10, 8, 0.15);
+    for (let i = 0; i < planned; i++) addHole(holeCounter, state.plannedDrillHoles, 10 + i * 3, 30, 8, 0.15);
+    return state;
+  }
+
+  it('shows "0 / 9" with no holes at all when the mine has a grade', () => {
+    const { step } = makeStep();
+    step.update(withHoles(0, 0), 'sunny');
+    expect(readout(step)).not.toBeNull();
+    expect(readout(step)!.textContent).toContain('0 / 9');
+    expect(readout(step)!.textContent).toBe(permitPreview(createGradeState(), { holes: [], charges: {} }, 0)!.holesText);
+  });
+
+  it('counts drilled and planned holes together as used', () => {
+    const { step } = makeStep();
+    step.update(withHoles(3, 2), 'sunny');
+    expect(readout(step)!.textContent).toContain('5 / 9');
+  });
+
+  it('follows the plan as holes are added', () => {
+    const { step } = makeStep();
+    step.update(withHoles(2, 0), 'sunny');
+    expect(readout(step)!.textContent).toContain('2 / 9');
+    step.update(withHoles(2, 4), 'sunny');
+    expect(readout(step)!.textContent).toContain('6 / 9');
+  });
+
+  it('at the limit it is not marked over', () => {
+    const { step } = makeStep();
+    step.update(withHoles(5, 4), 'sunny');
+    expect(readout(step)!.textContent).toContain('9 / 9');
+    expect(readout(step)!.dataset['over']).not.toBe('true');
+  });
+
+  it('over the limit it is marked data-over="true"', () => {
+    const { step } = makeStep();
+    step.update(withHoles(6, 4), 'sunny');
+    expect(readout(step)!.textContent).toContain('10 / 9');
+    expect(readout(step)!.dataset['over']).toBe('true');
+  });
+
+  it('the over mark clears when the plan drops back to the limit', () => {
+    const { step } = makeStep();
+    step.update(withHoles(6, 4), 'sunny');
+    step.update(withHoles(4, 2), 'sunny');
+    expect(readout(step)!.textContent).toContain('6 / 9');
+    expect(readout(step)!.dataset['over']).not.toBe('true');
+  });
+
+  it('absent or empty when the mine has no grade, even with holes', () => {
+    const { step } = makeStep();
+    step.update(withHoles(0, 0, false), 'sunny');
+    expect(readout(step)?.textContent ?? '').toBe('');
+    step.update(withHoles(4, 4, false), 'sunny');
+    expect(readout(step)?.textContent ?? '').toBe('');
+    expect(readout(step)?.dataset['over']).not.toBe('true');
+  });
+
+  it('empties again when the grade disappears', () => {
+    const { step } = makeStep();
+    step.update(withHoles(2, 0), 'sunny');
+    expect(readout(step)!.textContent).toContain('2 / 9');
+    step.update(withHoles(2, 0, false), 'sunny');
+    expect(readout(step)?.textContent ?? '').toBe('');
+  });
+
+  it('being over the permit disables nothing in the step', () => {
+    const { step } = makeStep();
+    step.update(withHoles(8, 8), 'sunny');
+    expect((step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).disabled).toBe(false);
+    expect((step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).disabled).toBe(false);
+    expect((step.root.querySelector('[data-action="clear-holes"]') as HTMLButtonElement).disabled).toBe(false);
   });
 });

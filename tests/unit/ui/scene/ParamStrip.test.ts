@@ -208,6 +208,23 @@ describe('ParamStrip readout and actions (#1942)', () => {
     expect(bar().compareDocumentPosition(line) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 
+  it('splits a result on " — ": head stays in the bar, notes go above it (#2167)', () => {
+    strip.show(makeConfig({ result: 'HEAD-X — NOTE-B — NOTE-C' }));
+    const leaf = (txt: string) => [...container.querySelectorAll('*')].find(e => e.children.length === 0 && e.textContent === txt)!;
+    expect(bar().contains(leaf('HEAD-X'))).toBe(true);
+    for (const note of ['NOTE-B', 'NOTE-C']) {
+      const line = leaf(note);
+      expect(line).toBeDefined();
+      expect(bar().contains(line)).toBe(false);
+    }
+  });
+
+  it('does not split a result on a bare dash (#2167)', () => {
+    strip.show(makeConfig({ result: 'A—B' }));
+    const leaf = [...container.querySelectorAll('*')].find(e => e.children.length === 0 && e.textContent === 'A—B')!;
+    expect(bar().contains(leaf)).toBe(true);
+  });
+
   it('renders no readout for an empty or absent list', () => {
     strip.show(makeConfig({ readout: [] }));
     const emptyHtml = container.innerHTML;
