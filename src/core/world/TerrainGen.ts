@@ -152,9 +152,10 @@ export function resolveGeneratedBiome(
 
 /**
  * Every `TerrainConfig` field, in key order. `satisfies` makes this exhaustive:
- * a field added to `TerrainConfig` fails the typecheck here until the memo key
- * below covers it, so a new generation lever can never be silently left out of
- * the key and hand one config's terrain to another.
+ * a field added to `TerrainConfig` fails the typecheck here until it is listed,
+ * and both the memo key and the private copy the context is built from
+ * (`ownedConfig`) read this list — so a new generation lever can never be left
+ * out of either and hand one config's terrain to another.
  */
 const TERRAIN_CONFIG_FIELDS = {
   sizeX: true, datum: true, sizeZ: true, seed: true, climateBias: true,
@@ -209,7 +210,9 @@ function terrainConfigKey(config: TerrainConfig): string {
  * (audited: TerrainGen, PlayableArea, VoxelGridCodec, world.ts's
  * ensureLandscape, LandscapeMap and Structures only read it). It is frozen so
  * a future write fails loudly instead of corrupting a context other grids
- * share; the samplers inside are immutable after construction. The palette,
+ * share — the context, its world-gen context, playable rect, starter deposit
+ * and pit mask (a config's own, or the frozen `DEFAULT_PIT_MASK`); the biome
+ * is a catalog entry and the samplers are immutable after construction. The palette,
  * which genuinely must be per grid, is not part of it (see LandscapeMap.ts).
  */
 export function buildTerrainContext(config: TerrainConfig): TerrainContext {
@@ -239,17 +242,22 @@ export function clearTerrainContextMemo(): void {
   terrainContextMemo.clear();
 }
 
-/** The config's `TerrainConfig` fields only, with its array and object values copied and frozen. */
+/**
+ * The config's `TerrainConfig` fields only, with its array and object values
+ * copied and frozen. Read off `TERRAIN_CONFIG_FIELDS`, the list the memo key
+ * reads, so a field cannot be keyed and then left out of the build: the key
+ * and what the context is built from are one list.
+ */
 function ownedConfig(config: TerrainConfig): TerrainConfig {
-  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, oreDeposits, pitMask, oreGradeScale } = config;
-  return {
-    sizeX, datum, sizeZ, seed,
-    climateBias: Object.freeze([climateBias[0], climateBias[1]] as const),
-    ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
-    ...(oreDeposits !== undefined ? { oreDeposits } : {}),
-    ...(pitMask !== undefined ? { pitMask: Object.freeze({ ...pitMask }) } : {}),
-    ...(oreGradeScale !== undefined ? { oreGradeScale } : {}),
-  };
+  const owned: Record<string, unknown> = {};
+  for (const field of Object.keys(TERRAIN_CONFIG_FIELDS) as Array<keyof TerrainConfig>) {
+    const value: unknown = config[field];
+    if (value === undefined) continue;
+    owned[field] = Array.isArray(value) ? Object.freeze([...value])
+      : typeof value === 'object' && value !== null ? Object.freeze({ ...value })
+      : value;
+  }
+  return owned as unknown as TerrainConfig;
 }
 
 /** The unmemoised build behind `buildTerrainContext`; the result is frozen because the memo shares it. */

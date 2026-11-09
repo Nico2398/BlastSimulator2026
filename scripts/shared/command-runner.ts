@@ -3,6 +3,7 @@
 // Used by both scenario-test.ts (single scenario) and run-all-scenarios.ts (batch).
 
 import { resetCampaignProfile } from '../../src/persistence/CampaignProfile.js';
+import { clearQuickSaveSlots } from '../../src/console/commands/saveload.js';
 import { mkdirSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { createRunner, serializeGameState } from '../../src/console-api.js';
@@ -310,6 +311,8 @@ export function runScenario(
   // The campaign profile outlives any one game (#1312), and a batch shares one
   // engine: without this reset an earlier scenario's unlocks leak into the next.
   resetCampaignProfile(engine.ctx.campaignProfile);
+  // Quick-save slots outlive a game the same way.
+  clearQuickSaveSlots();
 
   try {
     const results = runSteps(engine, steps, outDir, reportDrift);

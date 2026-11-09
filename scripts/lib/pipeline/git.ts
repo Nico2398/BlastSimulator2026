@@ -79,7 +79,8 @@ export function cleanTreeHash(cwd: string): string | undefined {
 
 /** Paths changed between `from` and `to` (a commit, or the working tree when omitted). */
 export function changedPaths(cwd: string, from: string, to?: string): string[] {
-  const args = ['diff', '--name-only', from];
+  // Both sides of a rename: a test that still imports the old path is owed too.
+  const args = ['diff', '--name-only', '--no-renames', from];
   if (to !== undefined) args.push(to);
   const out = git(cwd, ...args);
   return out === '' ? [] : out.split('\n');

@@ -2904,7 +2904,7 @@ export interface PitMaskShape {
 }
 
 /** Mask used by campaign levels and standalone worlds. */
-export const DEFAULT_PIT_MASK: PitMaskShape = { margin: 24, reliefKeep: 0.3 };
+export const DEFAULT_PIT_MASK: PitMaskShape = Object.freeze({ margin: 24, reliefKeep: 0.3 });
 
 /** Outline wobble wavelengths (m) and unit-ish propagation directions (#1734); two incommensurate waves. */
 export const OUTLINE_WOBBLE_WAVELENGTH_A = 27;

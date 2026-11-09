@@ -19,6 +19,7 @@ import {
   deathOutcome,
   notRunOutcome,
   describeInFlight,
+  describeFinished,
   runFanOutCommand,
   type ScenarioOutcome,
 } from '../../../scripts/run-all-scenarios-fanout.js';
@@ -361,6 +362,19 @@ describe('run-all-scenarios-fanout.ts', () => {
 
     it('says so when nothing is running', () => {
       expect(describeInFlight(new Map(), 0)).toBe('No scenario was running.\n');
+    });
+  });
+
+  describe('describeFinished', () => {
+    const outcome = (failed: boolean): ScenarioOutcome => ({ result: { failed } as ScenarioResult, output: [] });
+
+    it('keeps the verdicts already in, failures by name', () => {
+      const outcomes = new Map([['b-scenario', outcome(true)], ['a-scenario', outcome(false)], ['c-scenario', outcome(true)]]);
+      expect(describeFinished(outcomes)).toBe('Finished before the interrupt: 3 (1 passed; failed: b-scenario, c-scenario).\n');
+    });
+
+    it('says nothing when no scenario had finished', () => {
+      expect(describeFinished(new Map())).toBe('');
     });
   });
 

@@ -205,6 +205,18 @@ export function describeInFlight(running: ReadonlyMap<string, { name: string; si
   return `Scenarios still running:\n${lines.join('\n')}\n`;
 }
 
+/**
+ * The verdicts already in when a run is interrupted. The ordered printer holds
+ * a finished scenario back until every name before it has printed, so without
+ * this an interrupt would drop a FAILED verdict the run already had.
+ */
+export function describeFinished(outcomes: ReadonlyMap<string, ScenarioOutcome>): string {
+  if (outcomes.size === 0) return '';
+  const failed = [...outcomes].filter(([, outcome]) => outcome.result.failed).map(([name]) => name).sort();
+  const passed = outcomes.size - failed.length;
+  return `Finished before the interrupt: ${outcomes.size} (${passed} passed${failed.length > 0 ? `; failed: ${failed.join(', ')}` : ''}).\n`;
+}
+
 /** Runs `names` across `jobs` workers and returns every result plus the workers' own failures. */
 export async function runFanOutCommand(options: FanOutOptions): Promise<{ results: ScenarioResult[]; workerErrors: string[] }> {
   const { names, jobs, reportDrift, costOf, entry, startTime } = options;
@@ -231,7 +243,7 @@ export async function runFanOutCommand(options: FanOutOptions): Promise<{ result
   // workers down with the batch — a worker stuck in a synchronous scenario
   // never notices its parent is gone and would run on as an orphan.
   const onInterrupt = (signal: NodeJS.Signals) => {
-    emit({ stream: 'stderr', text: `\nInterrupted by ${signal}. ${describeInFlight(running, Date.now())}` });
+    emit({ stream: 'stderr', text: `\nInterrupted by ${signal}. ${describeInFlight(running, Date.now())}${describeFinished(outcomes)}` });
     for (const worker of workers) worker.kill();
     process.exit(signal === 'SIGINT' ? 130 : 143);
   };

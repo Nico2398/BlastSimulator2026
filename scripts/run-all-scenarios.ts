@@ -54,6 +54,9 @@ async function main(): Promise<void> {
   const { mode, scenarios: filterScenarios, port, shard, reportDrift, jobs, worker } = parseArgs();
 
   if (worker) {
+    // Without an IPC channel nothing would ever ask for a scenario, and the
+    // process would exit 0 having run none: a silent green channel.
+    if (!process.send) throw new Error('--worker is internal: it runs only as a fan-out child of `npm run scenarios`');
     // A fan-out worker: one engine for every scenario its parent sends, as the
     // in-process batch shares one; it exits when the parent says stop.
     const engine = createGameEngine();
@@ -71,7 +74,9 @@ async function main(): Promise<void> {
     .map(f => f.replace(/\.json$/, ''))
     .sort();
 
-  const selected = filterScenarios.length > 0 ? filterScenarios : scenarioFiles;
+  // Each name once: the fan-out keys results by name, so a repeated name would
+  // let one copy's verdict overwrite the other's.
+  const selected = filterScenarios.length > 0 ? [...new Set(filterScenarios)] : scenarioFiles;
   // A definition that fails to load costs 1 here and is still run — the
   // batch loop reports it as a failed scenario, which is where a bad file
   // should surface, not as a crash before any shard starts.

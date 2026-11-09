@@ -15,7 +15,8 @@
  *
  * - **Full-suite triggers.** A change to how tests run at all (`package.json`,
  *   the lockfile, a Vitest config, a tsconfig, a Vitest setup file) owes the
- *   whole suite.
+ *   whole suite — except a `package.json` edit confined to scripts other than
+ *   `test`, which is selected like any data file.
  * - **Changed tests** run.
  * - **Direct importers.** For every other changed file: the test files that
  *   import it at runtime (`import type` is the typecheck's business, not a
@@ -42,6 +43,11 @@
  *   `tests/unit/config/` — the Actions layer's only proof before CI. Beyond
  *   these, a data file owes the tests that name its directory as a path
  *   segment or quote its stem (`mentionPattern`).
+ * - **Console verbs.** A test drives a console command by its verb string
+ *   (`run('ramp spiral …')`), which no import edge shows. A changed module
+ *   under `src/console/` owes the tests that issue a verb whose handler
+ *   `COMMAND_REGISTRY` registers with one of the module's changed exports —
+ *   every export it declares when the diff names none (`verbsCalling`).
  * - **Nearest tests.** A changed module no test reaches by any rule above takes
  *   the test files at the first importer depth that has any, up to
  *   `NEAREST_MAX_DEPTH`.
@@ -56,8 +62,8 @@
  * chain (a hub change whose behaviour flows through an intermediate module
  * that never names the changed identifier), files read from disk under a
  * computed name that is neither a path, a file name, a quoted stem nor a
- * directory literal, and a console command a test drives by its verb string.
- * All three are what CI's full run on the pull request head catches.
+ * directory literal, and a verb string assembled at run time. All three are
+ * what CI's full run on the pull request head catches.
  *
  * The pure half (`importRefs` … `selectTests`) works on maps a test can build
  * by hand; `planLogic` is the thin layer that reads the repository.
@@ -126,7 +132,7 @@ const DIRECTORY_OWNERS: readonly DirectoryOwner[] = [
 const CODE_EXTENSION = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
 
 /** Why a test file is in the focused set. The first rule that picks a file names it. */
-type SelectionReason = 'changed' | 'importer' | 'mirrored' | 'mention' | 'owner' | 'nearest' | 'lint';
+type SelectionReason = 'changed' | 'importer' | 'mirrored' | 'mention' | 'owner' | 'verb' | 'nearest' | 'lint';
 
 const REASON_LABELS: Record<SelectionReason, [string, string]> = {
   changed: ['changed test', 'changed tests'],
@@ -134,6 +140,7 @@ const REASON_LABELS: Record<SelectionReason, [string, string]> = {
   mirrored: ['mirrored', 'mirrored'],
   mention: ['names a changed file', 'name a changed file'],
   owner: ['directory owner', 'directory owners'],
+  verb: ['runs a changed command', 'run a changed command'],
   nearest: ['nearest importer', 'nearest importers'],
   lint: ['repo lint', 'repo lint'],
 };
@@ -160,12 +167,18 @@ interface SelectionInput {
   texts: ReadonlyMap<string, string>;
   graph: ImportGraph;
   /**
-   * The exported identifiers a hub's diff touched, or `undefined` when the
-   * diff cannot be attributed to named declarations. Asked for hubs only.
+   * The exported identifiers a file's diff touched, or `undefined` when the
+   * diff cannot be attributed to named declarations. Asked for hubs and for
+   * console command modules only.
    */
   changedIdentifiers: (path: string) => ReadonlySet<string> | undefined;
   /** Vitest setup files the config names: a change to one changes how every test runs. */
   setupFiles?: readonly string[] | undefined;
+  /**
+   * Trigger paths whose change cannot alter how a test runs — a `package.json`
+   * edit confined to scripts other than `test` — selected as data instead.
+   */
+  inertTriggers?: readonly string[] | undefined;
 }
 
 export interface TestSelection {
@@ -332,6 +345,40 @@ export function mentionPattern(path: string): RegExp {
   return new RegExp(alternatives.join('|'));
 }
 
+// ── Console verbs ────────────────────────────────────────────────────────────
+
+/** Where every console verb is registered with the handler that runs it. */
+export const COMMAND_REGISTRY = 'src/console/createRunner.ts';
+
+/**
+ * The console verbs whose registered handler calls one of `exported`:
+ * `runner.register('ramp', …, (args, named) => rampCommand(ctx, args, named))`
+ * gives `ramp` for `rampCommand`. A handler runs from its `register(` to the next.
+ */
+export function verbsCalling(registry: string, exported: ReadonlySet<string>): string[] {
+  const pattern = identifierPattern(exported);
+  if (pattern === undefined) return [];
+  const starts = [...registry.matchAll(/\.register\(\s*['"`]([\w-]+)['"`]/g)];
+  return starts
+    .filter((start, i) => pattern.test(registry.slice(start.index!, starts[i + 1]?.index ?? registry.length)))
+    .map((start) => start[1]!)
+    .sort();
+}
+
+/** Top-level `export`ed names a module declares by name — the handlers a registry can call. */
+export function declaredExports(text: string): Set<string> {
+  return new Set([...text.matchAll(/^export\s+(?:async\s+)?(?:function\*?|const|let|class)\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]!));
+}
+
+/**
+ * A console verb in command position: opening a quoted command string or
+ * following a `;` inside one — `run('ramp spiral …')`, `'new_game seed:1; ramp …'`.
+ * `build_ramp` does not match `ramp`.
+ */
+export function verbPattern(verbs: readonly string[]): RegExp | undefined {
+  return verbs.length === 0 ? undefined : new RegExp(`(?:['"\`]|;\\s*)(?:${verbs.map(escapeRegExp).join('|')})(?=[\\s'"\`])`);
+}
+
 // ── Selection ────────────────────────────────────────────────────────────────
 
 /** The focused test set for a change, or the verdict that it owes the full suite. */
@@ -340,7 +387,8 @@ export function selectTests(input: SelectionInput): TestSelection {
   const total = testFiles.length;
   const full = (fullReason: string, notes: string[] = []): TestSelection => ({ full: true, fullReason, files: [], reasons: new Map(), total, notes });
 
-  const trigger = [...changed].sort().find((path) => isFullSuiteTrigger(path, input.setupFiles));
+  const inert = new Set(input.inertTriggers ?? []);
+  const trigger = [...changed].sort().find((path) => !inert.has(path) && isFullSuiteTrigger(path, input.setupFiles));
   if (trigger !== undefined) return full(`${trigger} changes how every test runs`);
 
   const testSet = new Set(testFiles);
@@ -405,6 +453,14 @@ export function selectTests(input: SelectionInput): TestSelection {
     reached += add(mentioning(mentionPattern(path)), 'mention');
     for (const owner of DIRECTORY_OWNERS.filter((o) => path.startsWith(o.dir))) {
       reached += add(testFiles.filter((f) => owner.tests.some((test) => f.startsWith(test))), 'owner');
+    }
+    // A console command is reached through its verb string, which no import edge shows.
+    if (path.startsWith('src/console/') && path !== COMMAND_REGISTRY) {
+      // Only the handlers the diff changed, when it can say; every handler the module declares otherwise.
+      const handlers = input.changedIdentifiers(path) ?? declaredExports(texts.get(path) ?? '');
+      const verbs = verbsCalling(texts.get(COMMAND_REGISTRY) ?? '', handlers);
+      const pattern = verbPattern(verbs);
+      if (pattern !== undefined) reached += add(mentioning(pattern), 'verb');
     }
     // A hub narrowed to nothing has tests; it is the diff that reaches none of them.
     if (reached === 0 && testImporters(path).length === 0 && (CODE_EXTENSION.test(path) || graph.importers.has(path))) {
@@ -486,7 +542,17 @@ function topLevelStatements(text: string): { statements: TopLevelStatement[]; al
     const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) ?? [] : [];
     const exported = modifiers.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
     const isDefault = modifiers.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword);
-    if (ts.isImportDeclaration(statement) || ts.isImportEqualsDeclaration(statement)) return { ...base, kind: 'import', names: [], exported: false };
+    if (ts.isImportEqualsDeclaration(statement)) return { ...base, kind: 'import', names: [statement.name.text], exported: false };
+    if (ts.isImportDeclaration(statement)) {
+      // The local bindings, so a diff that re-sources one marks the declarations that use it.
+      const clause = statement.importClause;
+      const bindings = clause?.namedBindings;
+      const names = [
+        ...(clause?.name ? [clause.name.text] : []),
+        ...(bindings === undefined ? [] : ts.isNamespaceImport(bindings) ? [bindings.name.text] : bindings.elements.map((e) => e.name.text)),
+      ];
+      return { ...base, kind: 'import', names, exported: false };
+    }
     if (ts.isVariableStatement(statement)) {
       return { ...base, kind: 'named', names: statement.declarationList.declarations.flatMap((d) => bindingNames(d.name)), exported };
     }
@@ -530,12 +596,17 @@ export function changedExports(text: string, lines: readonly number[]): Set<stri
   if (named.length === 0) return hit.size > 0 ? undefined : new Set();
 
   const marked = new Set(named);
-  const names = new Set(named.flatMap((s) => s.names));
+  // A changed import line re-sources its bindings: their users change with it.
+  const names = new Set([...named, ...[...hit].filter((s) => s.kind === 'import')].flatMap((s) => s.names));
   for (let grew = true; grew;) {
     grew = false;
     const pattern = identifierPattern(names);
+    if (pattern === undefined) break;
+    // A marked name used by a statement no name stands for — a registration
+    // call, a default export — reaches importers this cannot name: run them all.
+    if (statements.some((s) => s.kind === 'opaque' && pattern.test(s.text))) return undefined;
     for (const statement of statements) {
-      if (marked.has(statement) || statement.kind !== 'named' || pattern === undefined || !pattern.test(statement.text)) continue;
+      if (marked.has(statement) || statement.kind !== 'named' || !pattern.test(statement.text)) continue;
       marked.add(statement);
       for (const name of statement.names) names.add(name);
       grew = true;
@@ -552,6 +623,23 @@ export function changedExports(text: string, lines: readonly number[]): Set<stri
 }
 
 // ── Repository IO ────────────────────────────────────────────────────────────
+
+/**
+ * True when `package.json` changed only in scripts Vitest does not read: every
+ * other key — dependencies, `type`, `imports`, overrides — and `scripts.test`
+ * are equal on both sides. Unparseable on either side counts as a real change.
+ */
+export function packageJsonChangeIsInert(before: string, after: string): boolean {
+  try {
+    const strip = (text: string): unknown => {
+      const pkg = JSON.parse(text) as { scripts?: Record<string, string> } & Record<string, unknown>;
+      return { ...pkg, scripts: { test: pkg.scripts?.test } };
+    };
+    return JSON.stringify(strip(before)) === JSON.stringify(strip(after));
+  } catch {
+    return false;
+  }
+}
 
 /** The exported identifiers `path`'s diff against `forkPoint` touched, on both sides of the diff. */
 function diffIdentifiers(root: string, forkPoint: string, path: string): Set<string> | undefined {
@@ -585,5 +673,9 @@ export function planLogic(root: string, forkPoint: string, changed: readonly str
     graph: buildImportGraph(texts, (path) => known.has(path) || texts.has(path)),
     changedIdentifiers: (path) => diffIdentifiers(root, forkPoint, path),
     setupFiles: existsSync(configPath) ? vitestSetupFiles(readFileSync(configPath, 'utf8')) : [],
+    inertTriggers: changed.includes('package.json') && gitSucceeds(root, 'cat-file', '-e', `${forkPoint}:package.json`) &&
+      existsSync(join(root, 'package.json')) &&
+      packageJsonChangeIsInert(git(root, 'show', `${forkPoint}:package.json`), readFileSync(join(root, 'package.json'), 'utf8'))
+      ? ['package.json'] : [],
   });
 }

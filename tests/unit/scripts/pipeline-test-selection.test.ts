@@ -27,11 +27,16 @@ import {
   isRunnableTest,
   mentionPattern,
   mirroredTests,
+  packageJsonChangeIsInert,
   planLogic,
   resolveImport,
   selectionLog,
   selectTests,
+  verbPattern,
+  verbsCalling,
   vitestSetupFiles,
+  COMMAND_REGISTRY,
+  declaredExports,
   type TestSelection,
 } from '../../../scripts/lib/pipeline/test-selection.js';
 
@@ -440,6 +445,97 @@ describe('changedExports', () => {
 
   it('names nothing for no changed line', () => {
     expect(changedExports(source, [])).toEqual(new Set());
+  });
+
+  it('marks the users of a binding a changed import line re-sources, beside the declaration it changed', () => {
+    expect([...changedExports(source, [1, 10])!].sort()).toEqual(['UNRELATED', 'reveal']);
+  });
+
+  it('cannot tell once a changed name feeds a statement no name stands for', () => {
+    const registered = ['export const REACH = 4;', 'const doubled = REACH * 2;', 'registerSomething(doubled);', 'export const OTHER = 1;'].join('\n');
+    expect(changedExports(registered, [1])).toBeUndefined();
+    expect([...changedExports(registered, [4])!]).toEqual(['OTHER']);
+  });
+});
+
+describe('console verbs', () => {
+  const registry = [
+    "runner.register('ramp', 'Spiral ramp', (args, named) =>",
+    '  rampCommand(ctx, args, named));',
+    "runner.register('build_ramp', 'Build ramp', (args, named) => buildRampCommand(ctx, args, named));",
+    "runner.register(`tick`, 'Advance', (args) => tickCommand(ctx, args));",
+  ].join('\n');
+
+  it('reads the verbs whose registered handler calls one of the given exports', () => {
+    expect(verbsCalling(registry, new Set(['rampCommand']))).toEqual(['ramp']);
+    expect(verbsCalling(registry, new Set(['rampCommand', 'tickCommand']))).toEqual(['ramp', 'tick']);
+    expect(verbsCalling(registry, new Set(['helper']))).toEqual([]);
+    expect(verbsCalling(registry, new Set())).toEqual([]);
+  });
+
+  it('lists the names a module declares as exports', () => {
+    const text = ['export function rampCommand() {}', 'export const LIMIT = 3;', 'function privateOne() {}', 'export async function later() {}'].join('\n');
+    expect([...declaredExports(text)].sort()).toEqual(['LIMIT', 'later', 'rampCommand']);
+  });
+
+  it('finds a verb opening a command string or following a semicolon in one, never inside another verb', () => {
+    const pattern = verbPattern(['ramp'])!;
+    expect(pattern.test("runner.run('ramp spiral from:1,1')")).toBe(true);
+    expect(pattern.test('run(`ramp spiral`)')).toBe(true);
+    expect(pattern.test("'new_game seed:1; ramp spiral'")).toBe(true);
+    expect(pattern.test("runner.run('build_ramp origin:1,1')")).toBe(false);
+    expect(pattern.test('const ramp = 3;')).toBe(false);
+    expect(verbPattern([])).toBeUndefined();
+  });
+
+  it('runs the tests that issue a verb whose handler the diff changed', () => {
+    const command = p('src', 'console', 'commands', 'demo.ts');
+    const files: Record<string, string> = {
+      [COMMAND_REGISTRY]: `${importing(COMMAND_REGISTRY, command, 'rampCommand, tickCommand')}${registry}`,
+      [command]: 'export function rampCommand() {}\nexport function tickCommand() {}\n',
+      [UNIT('drivesRamp.test.ts')]: "runner.run('ramp spiral from:1,1');\n",
+      [UNIT('drivesTick.test.ts')]: "runner.run('tick 10');\n",
+      [UNIT('buildsRamp.test.ts')]: "runner.run('build_ramp origin:1,1');\n",
+      // Unrelated tests, so two selected files stay under the full-suite share.
+      [UNIT('a.test.ts')]: '\n',
+      [UNIT('b.test.ts')]: '\n',
+    };
+    const narrowed = select(files, [command], { [command]: ['rampCommand'] });
+    expect(narrowed.files).toEqual([UNIT('drivesRamp.test.ts')]);
+    expect(describeSelection(narrowed)).toContain('1 runs a changed command');
+    const unattributed = select(files, [command], { [command]: undefined });
+    expect(unattributed.files).toEqual(sorted(UNIT('drivesRamp.test.ts'), UNIT('drivesTick.test.ts')));
+  });
+});
+
+describe('package.json', () => {
+  const pkg = (scripts: Record<string, string>, extra: Record<string, unknown> = {}): string =>
+    JSON.stringify({ name: 'x', type: 'module', scripts, devDependencies: { vitest: '^1.6.1' }, ...extra }, null, 2);
+
+  it('is inert when only scripts other than `test` changed', () => {
+    expect(packageJsonChangeIsInert(pkg({ test: 'vitest run', lint: 'a' }), pkg({ test: 'vitest run', lint: 'b', added: 'c' }))).toBe(true);
+  });
+
+  it('is a real change when `test`, a dependency or any other key changed, or a side does not parse', () => {
+    expect(packageJsonChangeIsInert(pkg({ test: 'vitest run' }), pkg({ test: 'vitest run --pool=forks' }))).toBe(false);
+    expect(packageJsonChangeIsInert(pkg({}), pkg({}, { devDependencies: { vitest: '^2.0.0' } }))).toBe(false);
+    expect(packageJsonChangeIsInert(pkg({}), pkg({}, { type: 'commonjs' }))).toBe(false);
+    expect(packageJsonChangeIsInert(pkg({}), '{ not json')).toBe(false);
+  });
+
+  it('selects an inert package.json like a data file instead of running the full suite', () => {
+    const files = {
+      [UNIT('scripts.test.ts')]: "readFileSync('package.json');\n",
+      [UNIT('other.test.ts')]: '\n',
+    };
+    const selection = selectTests({
+      ...world(files),
+      changed: ['package.json'],
+      changedIdentifiers: () => undefined,
+      inertTriggers: ['package.json'],
+    });
+    expect(selection.full).toBe(false);
+    expect(selection.files).toEqual([UNIT('scripts.test.ts')]);
   });
 });
 

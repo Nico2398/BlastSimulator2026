@@ -4,7 +4,7 @@
 // the serialized GameState — see saveload.ts's header comment).
 
 import { describe, it, expect } from 'vitest';
-import { saveCommand, loadCommand } from '../../../src/console/commands/saveload.js';
+import { saveCommand, loadCommand, clearQuickSaveSlots } from '../../../src/console/commands/saveload.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 
 import { computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
@@ -46,6 +46,18 @@ describe('saveCommand', () => {
     const result = saveCommand(ctx, ['bravo'], {});
     expect(result.success).toBe(true);
     expect(result.output).toContain('bravo');
+  });
+});
+
+describe('clearQuickSaveSlots', () => {
+  it('empties every slot, so a later load finds nothing an earlier game saved', () => {
+    const ctx = makeCtx();
+    expect(saveCommand(ctx, ['kept'], {}).success).toBe(true);
+    expect(loadCommand(ctx, ['kept'], {}).success).toBe(true);
+    clearQuickSaveSlots();
+    const result = loadCommand(ctx, ['kept'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No save found');
   });
 });
 
