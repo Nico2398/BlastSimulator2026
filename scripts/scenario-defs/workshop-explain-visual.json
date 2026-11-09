@@ -20,14 +20,14 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:15,15",
+      "command": "drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6",
       "timeout": 30,
-      "role": "setup",
-      "description": "Orders four holes so the Drill step lists rows with an ORDERED chip.",
+      "role": "bootstrap",
+      "description": "Orders four holes so the Drill step lists rows with an ORDERED chip. Test hook: the bootstrap allowlist carries this exact grid command.",
       "interaction": [
         {
           "type": "command",
-          "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:15,15"
+          "command": "drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6"
         }
       ]
     },
