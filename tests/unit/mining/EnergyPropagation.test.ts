@@ -3,7 +3,9 @@ import {
   buildHoleSeeds,
   clampBoxToGrid,
   computeVoxelThreshold,
+  confinementFactor,
   createEnergyField,
+  createEnergyFieldSteps,
   effectiveAt,
   isAirAt,
   overflowAt,
@@ -14,7 +16,7 @@ import {
 } from '../../../src/core/mining/EnergyPropagation.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
-import { MAX_PROPAGATION_ITERATIONS, TIER_SHORTFALL_THRESHOLD_FACTOR } from '../../../src/core/config/balance.js';
+import { MAX_PROPAGATION_ITERATIONS } from '../../../src/core/config/balance.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -367,60 +369,65 @@ describe('EnergyPropagation — buildHoleSeeds', () => {
   });
 });
 
-// ── Explosive tier gating (#1358) ────────────────────────────────────────────
+// ── The breaking threshold depends on the rock alone (#2197) ─────────────────
 
-describe('EnergyPropagation — createEnergyField explosive tier resolver (#1358)', () => {
+describe('EnergyPropagation — createEnergyField thresholds come from the rock only (#2197)', () => {
   const SIZE = 12;
   const mid = SIZE >> 1;
+  type LooseCreate = (grid: VoxelGrid, box: BlastBox, ...extra: unknown[]) => ReturnType<typeof createEnergyField>;
 
-  it('omitting the resolver leaves thresholds identical to a resolver that always meets the rock tier', () => {
-    const grid = solidGrid(SIZE, 'obstiite'); // tier 4
-    const baseline = fieldOver(grid, SIZE);
-    const adequate = createEnergyField(grid, wholeGrid(grid, SIZE), () => 4);
-    expect(Array.from(adequate.threshold)).toEqual(Array.from(baseline.threshold));
+  it('takes a grid and a box and nothing else', () => {
+    expect(createEnergyField.length).toBe(2);
+    expect(createEnergyFieldSteps.length).toBe(2);
   });
 
-  it('an explosive 3 tiers short multiplies the threshold by TIER_SHORTFALL_THRESHOLD_FACTOR ** 3', () => {
-    const grid = solidGrid(SIZE, 'obstiite'); // tier 4
-    const baseline = fieldOver(grid, SIZE);
-    const weak = createEnergyField(grid, wholeGrid(grid, SIZE), () => 1);
-    const base = thresholdAt(baseline, mid, mid, mid);
-    expect(base).toBeGreaterThan(0);
-    expect(thresholdAt(weak, mid, mid, mid) / base).toBeCloseTo(TIER_SHORTFALL_THRESHOLD_FACTOR ** 3, 4);
-  });
-
-  it('an explosive one tier short scales by the factor once', () => {
+  it('a stray third argument never changes a threshold, whatever tier it claims', () => {
     const grid = solidGrid(SIZE, 'obstiite');
     const baseline = fieldOver(grid, SIZE);
-    const weak = createEnergyField(grid, wholeGrid(grid, SIZE), () => 3);
-    expect(thresholdAt(weak, mid, mid, mid) / thresholdAt(baseline, mid, mid, mid))
-      .toBeCloseTo(TIER_SHORTFALL_THRESHOLD_FACTOR, 4);
+    for (const claimed of [1, 2, 4]) {
+      const field = (createEnergyField as LooseCreate)(grid, wholeGrid(grid, SIZE), () => claimed);
+      expect(Array.from(field.threshold)).toEqual(Array.from(baseline.threshold));
+    }
   });
 
-  it('a higher-tier explosive than the rock changes nothing', () => {
-    const grid = solidGrid(SIZE, 'cruite'); // tier 1
-    const baseline = fieldOver(grid, SIZE);
-    const strong = createEnergyField(grid, wholeGrid(grid, SIZE), () => 5);
-    expect(Array.from(strong.threshold)).toEqual(Array.from(baseline.threshold));
+  it('confined rock breaks at exactly its rock absorption', () => {
+    const field = fieldOver(solidGrid(SIZE, 'obstiite'), SIZE);
+    expect(thresholdAt(field, mid, mid, mid)).toBeCloseTo(getRock('obstiite')!.energyAbsorption, 3);
   });
 
-  it('the resolver is per column: only columns it reports weak are scaled', () => {
+  it('harder rock costs more to break than softer rock', () => {
+    const soft = thresholdAt(fieldOver(solidGrid(SIZE, 'cruite'), SIZE), mid, mid, mid);
+    const hard = thresholdAt(fieldOver(solidGrid(SIZE, 'titanite'), SIZE), mid, mid, mid);
+    expect(hard).toBeGreaterThan(soft);
+    expect(hard / soft).toBeCloseTo(TITANITE / CRUITE, 3);
+  });
+
+  it('rock cracked by an earlier blast gives way sooner', () => {
     const grid = solidGrid(SIZE, 'obstiite');
-    const baseline = fieldOver(grid, SIZE);
-    const mixed = createEnergyField(grid, wholeGrid(grid, SIZE), x => (x < mid ? 1 : 4));
-    expect(thresholdAt(mixed, mid + 1, mid, mid)).toBeCloseTo(thresholdAt(baseline, mid + 1, mid, mid), 4);
-    expect(thresholdAt(mixed, mid - 2, mid, mid) / thresholdAt(baseline, mid - 2, mid, mid))
-      .toBeCloseTo(TIER_SHORTFALL_THRESHOLD_FACTOR ** 3, 4);
+    grid.setVoxel(mid, mid, mid, { ...rockVoxel('obstiite'), fractureModifier: 0.5 });
+    const field = fieldOver(grid, SIZE);
+    expect(thresholdAt(field, mid, mid, mid)).toBeCloseTo(getRock('obstiite')!.energyAbsorption * 0.5, 3);
   });
 
-  it('air voxels stay air under a weak resolver', () => {
+  it('rock next to a free face breaks for the confinement fraction of its absorption', () => {
     const grid = new VoxelGrid(SIZE, SIZE);
     for (let z = 0; z < SIZE; z++) for (let y = 0; y < 4; y++) for (let x = 0; x < SIZE; x++) {
       grid.setVoxel(x, y, z, rockVoxel('obstiite'));
     }
-    const weak = createEnergyField(grid, wholeGrid(grid, SIZE), () => 1);
-    expect(isAirAt(weak, mid, 8, mid)).toBe(true);
-    expect(thresholdAt(weak, mid, 8, mid)).toBe(0);
+    const field = fieldOver(grid, SIZE);
+    const absorption = getRock('obstiite')!.energyAbsorption;
+    expect(thresholdAt(field, mid, 3, mid)).toBeCloseTo(absorption * confinementFactor(1), 3);
+    expect(thresholdAt(field, mid, 3, mid)).toBeLessThan(thresholdAt(field, mid, 0, mid));
+  });
+
+  it('air voxels stay air', () => {
+    const grid = new VoxelGrid(SIZE, SIZE);
+    for (let z = 0; z < SIZE; z++) for (let y = 0; y < 4; y++) for (let x = 0; x < SIZE; x++) {
+      grid.setVoxel(x, y, z, rockVoxel('obstiite'));
+    }
+    const field = fieldOver(grid, SIZE);
+    expect(isAirAt(field, mid, 8, mid)).toBe(true);
+    expect(thresholdAt(field, mid, 8, mid)).toBe(0);
   });
 });
 

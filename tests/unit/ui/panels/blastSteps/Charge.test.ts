@@ -4,8 +4,6 @@ import { ChargeStep } from '../../../../../src/ui/panels/blastSteps/Charge.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { getExplosive, getAllExplosives } from '../../../../../src/core/world/ExplosiveCatalog.js';
-import type { DrillHole } from '../../../../../src/core/mining/DrillPlan.js';
-import type { ColumnRock } from '../../../../../src/core/mining/ExplosiveRockFit.js';
 import { wetAllHoles, setHoleWater } from '../../../../helpers/holeWater.js';
 import { drainRainReasonText } from '../../../../../src/ui/panels/blastSteps/ChargeHoleList.js';
 import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
@@ -575,78 +573,44 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
   });
 });
 
-describe('ChargeStep — explosive too weak for the rock warning (#1358)', () => {
+describe('ChargeStep — no weak-explosive warning (#2197)', () => {
   const WARNING = '[data-warning="weak-explosive"]';
-  const warningEl = (step: ChargeStep) => step.root.querySelector(WARNING) as HTMLElement | null;
   const chargeAll = (step: ChargeStep) => step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
-  const HARD = { rockId: 'obstiite', tier: 4 };
-  const SOFT = { rockId: 'cruite', tier: 1 };
 
-  function stepWithHoles(sample: (hole: DrillHole) => ColumnRock | null) {
+  function stepWithHoles() {
     const made = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
-    made.step.setHoleRockSampler(sample);
     return { ...made, state };
   }
 
-  it('shows the too-weak warning with count, total and explosive when the selected explosive is below the rock tier', () => {
-    const { step, state } = stepWithHoles(() => HARD);
+  it.each(['pop_rock', 'boomite', 'obliviax', 'dynatomics'])('shows no weak-explosive warning after picking %s', (id) => {
+    const { step, state } = stepWithHoles();
+    step.update(state, 'sunny');
+    card(step, id).click();
+    step.update(state, 'sunny');
+
+    expect(step.root.querySelector(WARNING)).toBeNull();
+  });
+
+  it('shows no warning before any explosive is picked', () => {
+    const { step, state } = stepWithHoles();
+    step.update(state, 'sunny');
+    expect(step.root.querySelector(WARNING)).toBeNull();
+  });
+
+  it('no longer offers a rock sampler to feed the warning', () => {
+    const { step } = stepWithHoles();
+    expect((step as unknown as Record<string, unknown>)['setHoleRockSampler']).toBeUndefined();
+  });
+
+  it('keeps Charge All enabled and dispatching with the weakest explosive selected', () => {
+    const { step, state, gameConsole } = stepWithHoles();
     step.update(state, 'sunny');
     card(step, 'pop_rock').click();
     step.update(state, 'sunny');
 
-    const el = warningEl(step);
-    expect(el).not.toBeNull();
-    expect(el!.textContent).toMatch(/too weak for .* under 2 of 2 holes/);
-  });
-
-  it('counts only the holes whose rock outclasses the explosive', () => {
-    const { step, state } = stepWithHoles(hole => (hole.id === 'H1' ? HARD : SOFT));
-    step.update(state, 'sunny');
-    card(step, 'pop_rock').click();
-    step.update(state, 'sunny');
-
-    expect(warningEl(step)!.textContent).toMatch(/under 1 of 2 holes/);
-  });
-
-  it('shows no warning when the selected explosive meets the rock tier', () => {
-    const { step, state } = stepWithHoles(() => HARD);
-    step.update(state, 'sunny');
-    card(step, 'obliviax').click(); // minRockTier 4
-    step.update(state, 'sunny');
-
-    expect(warningEl(step)).toBeNull();
-  });
-
-  it('shows no warning when the sampler reports no rock for any hole', () => {
-    const { step, state } = stepWithHoles(() => null);
-    step.update(state, 'sunny');
-    card(step, 'pop_rock').click();
-    step.update(state, 'sunny');
-
-    expect(warningEl(step)).toBeNull();
-  });
-
-  it('shows no warning when no sampler was provided', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
-    step.update(state, 'sunny');
-    card(step, 'pop_rock').click();
-    step.update(state, 'sunny');
-
-    expect(warningEl(step)).toBeNull();
-  });
-
-  it('keeps Charge All enabled and dispatching while the warning shows', () => {
-    const { step, state, gameConsole } = stepWithHoles(() => HARD);
-    step.update(state, 'sunny');
-    card(step, 'pop_rock').click();
-    step.update(state, 'sunny');
-
-    expect(warningEl(step)).not.toBeNull();
     expect(chargeAll(step).disabled).toBe(false);
     chargeAll(step).click();
     expect(gameConsole).toHaveBeenCalled();

@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import {
-  tierShortfall, tierThresholdFactor, dominantRockTierAt, dominantRockAlongColumn, dominantRockUnderHole,
-} from '../../../src/core/mining/ExplosiveRockFit.js';
+import * as fit from '../../../src/core/mining/ExplosiveRockFit.js';
+import { dominantRockAlongColumn, dominantRockUnderHole } from '../../../src/core/mining/ExplosiveRockFit.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
-import { TIER_SHORTFALL_THRESHOLD_FACTOR } from '../../../src/core/config/balance.js';
+import * as balance from '../../../src/core/config/balance.js';
 
 function voxel(rocks: { rockId: string; coefficient: number }[]): VoxelData {
   return { composition: { rocks }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
@@ -15,55 +14,19 @@ function fillColumn(grid: VoxelGrid, x: number, z: number, fromY: number, toY: n
   for (let y = fromY; y <= toY; y++) grid.setVoxel(x, y, z, pure(rockId));
 }
 
-describe('tierShortfall', () => {
-  it('is the number of tiers the rock outclasses the explosive', () => {
-    expect(tierShortfall(1, 4)).toBe(3);
-    expect(tierShortfall(3, 4)).toBe(1);
+describe('module surface (#2197)', () => {
+  it('no longer exports the tier-shortfall helpers', () => {
+    expect(Object.keys(fit)).not.toContain('tierShortfall');
+    expect(Object.keys(fit)).not.toContain('tierThresholdFactor');
   });
-  it('is 0 when the explosive tier equals the rock tier', () => {
-    expect(tierShortfall(2, 2)).toBe(0);
-  });
-  it('is 0, never negative, when the explosive outclasses the rock', () => {
-    expect(tierShortfall(4, 1)).toBe(0);
-    expect(tierShortfall(5, 1)).toBe(0);
-  });
-  it('is 0 against air (tier 0)', () => {
-    expect(tierShortfall(1, 0)).toBe(0);
-  });
-});
 
-describe('tierThresholdFactor', () => {
-  it('is 1 for no shortfall', () => {
-    expect(tierThresholdFactor(0)).toBe(1);
+  it('keeps the column-rock samplers', () => {
+    expect(typeof fit.dominantRockAlongColumn).toBe('function');
+    expect(typeof fit.dominantRockUnderHole).toBe('function');
   });
-  it('is TIER_SHORTFALL_THRESHOLD_FACTOR ** shortfall', () => {
-    for (const s of [1, 2, 3, 4]) {
-      expect(tierThresholdFactor(s)).toBeCloseTo(TIER_SHORTFALL_THRESHOLD_FACTOR ** s, 6);
-    }
-  });
-  it('is strictly increasing in the shortfall', () => {
-    for (let s = 0; s < 4; s++) {
-      expect(tierThresholdFactor(s + 1)).toBeGreaterThan(tierThresholdFactor(s));
-    }
-  });
-});
 
-describe('dominantRockTierAt', () => {
-  it('returns the hardness tier of a pure rock voxel', () => {
-    const grid = new VoxelGrid(8, 8);
-    grid.setVoxel(2, 2, 2, pure('obstiite'));
-    grid.setVoxel(3, 2, 2, pure('cruite'));
-    expect(dominantRockTierAt(grid, 2, 2, 2)).toBe(4);
-    expect(dominantRockTierAt(grid, 3, 2, 2)).toBe(1);
-  });
-  it('uses the rock with the largest coefficient in a mixed voxel', () => {
-    const grid = new VoxelGrid(8, 8);
-    grid.setVoxel(1, 1, 1, voxel([{ rockId: 'cruite', coefficient: 0.3 }, { rockId: 'titanite', coefficient: 0.7 }]));
-    expect(dominantRockTierAt(grid, 1, 1, 1)).toBe(5);
-  });
-  it('returns 0 for air', () => {
-    const grid = new VoxelGrid(8, 8);
-    expect(dominantRockTierAt(grid, 4, 4, 4)).toBe(0);
+  it('balance no longer carries TIER_SHORTFALL_THRESHOLD_FACTOR', () => {
+    expect(Object.keys(balance)).not.toContain('TIER_SHORTFALL_THRESHOLD_FACTOR');
   });
 });
 

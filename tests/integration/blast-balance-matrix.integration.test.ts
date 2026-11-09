@@ -12,6 +12,9 @@ import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast, type BlastResult } from '../../src/core/mining/BlastExecution.js';
 import { summariseMuckPile } from '../../src/core/mining/MuckPileSummary.js';
+import { buildPlanEnergyField } from '../../src/core/mining/BlastExecution.js';
+import { identifyFragmentedVoxels } from '../../src/core/mining/VoxelFragmentation.js';
+import { getAllExplosives } from '../../src/core/world/ExplosiveCatalog.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -82,6 +85,11 @@ describe('Blast balance — more explosive does more', () => {
     expect(fire({ kg: 8 }).fragmentCount).toBeGreaterThan(fire({ kg: 2 }).fragmentCount);
   });
 
+  it('a stronger explosive at the same weight breaks more on hard rock too', () => {
+    expect(fire({ rock: 'obstiite', explosive: 'dynatomics', kg: 4, depth: 6 }).clearedVoxels)
+      .toBeGreaterThan(fire({ rock: 'obstiite', explosive: 'boomite', kg: 4, depth: 6 }).clearedVoxels);
+  });
+
   it('a stronger explosive at the same weight breaks more', () => {
     // 4 kg is inside the valid loading range of both.
     expect(fire({ explosive: 'dynatomics', kg: 4 }).clearedVoxels)
@@ -91,7 +99,6 @@ describe('Blast balance — more explosive does more', () => {
 
 describe('Blast balance — stemming decides whether rock is thrown', () => {
   it('a minimally stemmed hole throws rock further than a stemmed one', () => {
-    // cruite is tier 1, matching boomite: no tier-shortfall penalty (#1358).
     expect(fire({ rock: 'cruite', stemming: 0.5 }).maxThrowDistance)
       .toBeGreaterThan(fire({ rock: 'cruite', stemming: 3 }).maxThrowDistance);
   });
@@ -131,6 +138,85 @@ describe('Blast balance — the rock fights back', () => {
   });
 });
 
+describe('Blast balance — the explosive never changes the rock (#2197)', () => {
+  /** The breaking-threshold array of the energy field a shot builds over a block of `rock`. */
+  function thresholdsOf(shot: Shot): number[] {
+    const { rock = 'obstiite', explosive = 'boomite', kg = 3, stemming = 2, depth = 6 } = shot;
+    holeCounter.nextHoleId = 1;
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, depth, 0.089);
+    const depths: Record<string, number> = {};
+    for (const h of holes) depths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), depths, explosive, kg, stemming);
+    const field = buildPlanEnergyField(assembleBlastPlan(holes, charges), bench(rock));
+    expect(field, 'plan was rejected').not.toBeNull();
+    return Array.from(field!.threshold);
+  }
+
+  it('every catalog explosive builds the same breaking thresholds over the same rock', () => {
+    const reference = thresholdsOf({ explosive: 'dynatomics' });
+    expect(reference.some(v => v > 0)).toBe(true);
+    for (const e of getAllExplosives()) {
+      expect(thresholdsOf({ explosive: e.id, kg: e.minChargeKg }), e.id).toEqual(reference);
+    }
+  });
+
+  it('two explosives delivering equal energy break the same rock identically', () => {
+    // 340 x 4 = 400 x 3.4 = 1360: boomite and krackle sat a tier apart before #2197, and molite
+    // (tier 2) used to cost boomite four times the energy it cost krackle.
+    const boomite = fire({ rock: 'molite', explosive: 'boomite', kg: 4, depth: 6 });
+    const krackle = fire({ rock: 'molite', explosive: 'krackle', kg: 3.4, depth: 6 });
+    expect(boomite.clearedVoxels).toBeGreaterThan(0);
+    expect(krackle.clearedVoxels).toBe(boomite.clearedVoxels);
+  });
+
+  it('equal energy also breaks tougher rock identically, whatever the former tiers', () => {
+    // clunkite (tier 3): boomite fell two tiers short before #2197 and broke none of it.
+    const boomite = fire({ rock: 'clunkite', explosive: 'boomite', kg: 4, depth: 6 });
+    const krackle = fire({ rock: 'clunkite', explosive: 'krackle', kg: 3.4, depth: 6 });
+    expect(krackle.clearedVoxels).toBeGreaterThan(0);
+    expect(boomite.clearedVoxels).toBe(krackle.clearedVoxels);
+  });
+
+  it('a weak explosive at its maximum charge still breaks some hard rock', () => {
+    const popRock = fire({ rock: 'obstiite', explosive: 'pop_rock', kg: 3, depth: 6 });
+    expect(popRock.clearedVoxels).toBeGreaterThan(0);
+  });
+
+  it('what a weak explosive breaks grows with its energy, not all-or-nothing', () => {
+    const half = fire({ rock: 'obstiite', explosive: 'pop_rock', kg: 1.5, depth: 6 }).clearedVoxels;
+    const full = fire({ rock: 'obstiite', explosive: 'pop_rock', kg: 3, depth: 6 }).clearedVoxels;
+    const strong = fire({ rock: 'obstiite', explosive: 'dynatomics', kg: 3, depth: 6 }).clearedVoxels;
+    expect(full).toBeGreaterThan(half);
+    expect(strong).toBeGreaterThan(full);
+  });
+
+  it('breaks more rock as the explosive gets stronger at one weight, on hard rock', () => {
+    const cleared = ['pop_rock', 'boomite', 'krackle', 'dynatomics']
+      .map(explosive => fire({ rock: 'obstiite', explosive, kg: 3, depth: 6 }).clearedVoxels);
+    for (let i = 1; i < cleared.length; i++) expect(cleared[i]!).toBeGreaterThanOrEqual(cleared[i - 1]!);
+    expect(cleared[cleared.length - 1]!).toBeGreaterThan(cleared[0]!);
+  });
+
+  it('the real blast clears exactly the voxels the preview field predicts, weak explosive on hard rock', () => {
+    const shot = { rock: 'obstiite', explosive: 'pop_rock', kg: 3, depth: 6 };
+    const { result } = fireOnto(shot);
+    holeCounter.nextHoleId = 1;
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 6, 0.089);
+    const depths: Record<string, number> = {};
+    for (const h of holes) depths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), depths, 'pop_rock', 3, 2);
+    const grid = bench('obstiite');
+    const preview = buildPlanEnergyField(assembleBlastPlan(holes, charges), grid)!;
+    expect(result.clearedVoxels).toBeGreaterThan(0);
+    expect(identifyFragmentedVoxels(preview, grid).fragmented.length).toBe(result.clearedVoxels);
+  });
+
+  it('a minimum charge of the weakest explosive in the hardest rock breaks nothing, without failing the blast', () => {
+    const r = fire({ rock: 'titanite', explosive: 'pop_rock', kg: 0.5, depth: 6 });
+    expect(r.clearedVoxels).toBe(0);
+  });
+});
+
 describe('Blast balance — pattern geometry', () => {
   // Spacing is the lever that actually controls fragment size. Charge weight
   // mostly decides how much rock comes out: a bigger charge reaches further, so
@@ -143,7 +229,6 @@ describe('Blast balance — pattern geometry', () => {
 
   it('holes spaced tighter leave fewer oversized boulders', () => {
     const share = (r: BlastResult): number => r.oversizedFragments / Math.max(1, r.fragmentCount);
-    // cruite is tier 1, matching boomite: no tier-shortfall penalty (#1358).
     expect(share(fire({ rock: 'cruite', spacing: 2 }))).toBeLessThan(share(fire({ rock: 'cruite', spacing: 6 })));
   });
 
