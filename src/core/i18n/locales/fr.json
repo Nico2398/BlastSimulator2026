@@ -3887,7 +3887,7 @@
   "ui.blast_workshop.preview.explain_avg_size": "Taille moyenne des morceaux abattus. Les gros morceaux bloquent le concasseur ; les petits se chargent vite.",
   "ui.blast_workshop.preview.explain_oversized": "Morceaux trop gros pour le concasseur. Chacun demande un débitage secondaire : une maille plus serrée ou plus de charge en réduit le nombre.",
   "ui.blast_workshop.preview.explain_good_volume": "Roche abattue à la taille que le concasseur aime. C’est le volume à maximiser.",
-  "ui.blast_workshop.preview.explain_fines_volume": "Roche broyée plus fin que nécessaire. Encore vendable, mais signe d'un excès d'énergie.",
+  "ui.blast_workshop.preview.explain_fines_volume": "Roche broyée plus fin que nécessaire. Encore vendable, mais elle coûte du temps de transport et signale trop d'énergie.",
   "ui.blast_workshop.preview.explain_dust_volume": "Roche réduite en poussière. Elle est perdue pour la vente : moins de charge en réduit la quantité.",
   "ui.blast_workshop.preview.explain_dust_loss": "Valeur de minerai que la poussière retire à ce tir. Réduisez-la avec moins de charge par tonne.",
   "ui.blast_workshop.preview.explain_predicted_rating": "La note que le vrai tir obtiendrait, d’après un essai à blanc sur une copie du terrain. Une mauvaise note attire amendes et villageois furieux.",

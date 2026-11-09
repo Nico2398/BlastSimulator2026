@@ -152,7 +152,7 @@ export class GameRenderer {
   private wallOverlayPreference = false;
   private energyHeatmapPreference = false;
   private energyHeatmapShown: ColumnBandSummary[] | null = null;
-  private projectionZoneKey: { grid: VoxelGrid; holes: unknown; charges: unknown; revision: number; tier: number } | null = null;
+  private projectionZoneKey: { grid: VoxelGrid; plan: string; revision: number; tier: number } | null = null;
   private energyHeatmapIndex = new Map<string, ColumnBandSummary>();
   /** Faces the overlay shows, rebuilt only when the terrain or the game bound to it changes. */
   private wallOverlayCache: { state: GameState; gridId: number; revision: number; faces: WallFace[]; planKey: string } | null = null;
@@ -612,9 +612,10 @@ export class GameRenderer {
       syncProjectionZones(this.terrain, []);
       return;
     }
-    const key = { grid, holes: state.drillHoles, charges: state.chargesByHole, revision: this.terrainMeshRevision, tier: state.softwareTier };
+    // The game edits holes and charges in place, so key on their content, not their identity.
+    const key = { grid, plan: JSON.stringify([state.drillHoles, state.chargesByHole]), revision: this.terrainMeshRevision, tier: state.softwareTier };
     const shown = this.projectionZoneKey;
-    if (shown && shown.grid === key.grid && shown.holes === key.holes && shown.charges === key.charges
+    if (shown && shown.grid === key.grid && shown.plan === key.plan
       && shown.revision === key.revision && shown.tier === key.tier) return;
     this.projectionZoneKey = key;
     syncProjectionZones(this.terrain, buildProjectionZoneColumns(state, grid));

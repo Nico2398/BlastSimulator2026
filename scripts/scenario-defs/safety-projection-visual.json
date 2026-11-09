@@ -422,7 +422,7 @@
     },
     {
       "command": "buy_software tier:1",
-      "description": "preview projections requires software tier 3+ (default tier is 0) — unlock sequentially so the projection preview actually computes instead of printing a lock message",
+      "description": "preview projections requires software tier 2+ (default tier is 0) — unlock sequentially so the projection preview actually computes instead of printing a lock message",
       "interaction": [
         {
           "type": "clickSelector",
