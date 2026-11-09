@@ -12,7 +12,7 @@ import type { BlastPlan } from './BlastPlan.js';
 import type { EnergyField } from './EnergyPropagation.js';
 import type { FragmentationResult } from './VoxelFragmentation.js';
 
-export type HoleFailureKind = 'below_threshold' | 'fizzled' | 'buried';
+type HoleFailureKind = 'below_threshold' | 'fizzled' | 'buried';
 
 export interface HoleFailure {
   holeId: string;
@@ -23,7 +23,7 @@ export interface HoleFailure {
   rockAboveM?: number;
 }
 
-export interface HoleFailureInput {
+interface HoleFailureInput {
   plan: BlastPlan;
   field: EnergyField;
   fragmentation: FragmentationResult;

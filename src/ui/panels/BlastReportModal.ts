@@ -307,8 +307,8 @@ export class BlastReportModal {
       { key: t('ui.blast_workshop.report.stat_band_good'), value: m3(bands.good) },
       { key: t('ui.blast_workshop.report.stat_band_fines'), value: m3(bands.fines) },
       { key: t('ui.blast_workshop.report.stat_band_dust'), value: m3(bands.dust) },
-      ...((report.dustLossKg ?? 0) > 0
-        ? [{ key: t('ui.blast_workshop.report.stat_dust_lost'), value: `${(report.dustLossKg ?? 0).toFixed(0)} kg`, color: 'var(--bsx-amber)' }]
+      ...(report.dustLossKg !== undefined
+        ? [{ key: t('ui.blast_workshop.report.stat_dust_lost'), value: `${report.dustLossKg.toFixed(0)} kg`, color: 'var(--bsx-amber)' }]
         : []),
     ];
   }
