@@ -58,7 +58,7 @@ export function sectionAtZ(map: PlanBandMap, z: number): PlanBandCell[] {
   return out;
 }
 
-export interface PlanHeatmap { bands: PlanBandMap; columns: ColumnBandSummary[] }
+interface PlanHeatmap { bands: PlanBandMap; columns: ColumnBandSummary[] }
 
 let cache: { grid: VoxelGrid; key: string; value: PlanHeatmap } | null = null;
 

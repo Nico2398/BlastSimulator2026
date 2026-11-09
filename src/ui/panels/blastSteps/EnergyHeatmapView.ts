@@ -18,7 +18,7 @@ const cssColor = (hex: number): string => `#${hex.toString(16).padStart(6, '0')}
 const bandName = (band: FragmentationBand): string => t(`blast.band.${band}`);
 
 /** Text naming a cell's band and exact intensity, shared by the cell tooltip and the readout. */
-export function heatmapCellText(band: FragmentationBand, intensity: number): string {
+function heatmapCellText(band: FragmentationBand, intensity: number): string {
   return t('ui.blast_workshop.heatmap.cell', { band: bandName(band), intensity: intensity.toFixed(2) });
 }
 
