@@ -231,6 +231,34 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue_number: ${{ inputs.issue_number }}
 
+      # claude-code-action installs its own Bun through `oven-sh/setup-bun`,
+      # which downloads from github.com release assets and gives up after three
+      # tries in ~25 s. Issue #2197 lost two runs in a row that way on
+      # 2026-11-09 (runs 42568803492, 42572272170): every attempt answered
+      # `504`, no `claude` binary was installed, and the issue went `blocked`
+      # without the agent reading a word. This step installs the same Bun build
+      # from the npm registry instead, with backoff, and hands its path to both
+      # attempts through `path_to_bun_executable`, which skips setup-bun. If npm
+      # fails too, `path` stays empty and the action installs Bun itself, as
+      # before — this step can only add a route, never remove one.
+      # The version must match the one the pinned action hardcodes
+      # (`bun-version` in its action.yml at the pinned SHA).
+      - name: Install the agent action's Bun from npm
+        id: bun
+        continue-on-error: true
+        run: |
+          DIR="${RUNNER_TEMP}/agent-bun"
+          BIN="${DIR}/node_modules/@oven/bun-linux-x64/bin/bun"
+          for attempt in 1 2 3 4 5; do
+            if npm install --no-save --no-audit --no-fund --prefix "${DIR}" @oven/bun-linux-x64@1.3.14 \
+              && "${BIN}" --version; then
+              echo "path=${BIN}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep $(( 2 ** attempt ))
+          done
+          echo "::warning::Bun could not be installed from npm; claude-code-action will download it itself."
+
       # OpenCode starts in the orchestrator through `default_agent` in
       # .opencode/opencode.json. Claude Code has no equivalent setting, so the
       # /agentic-run command carries that mandate instead.
@@ -273,6 +301,8 @@ jobs:
         uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Empty unless the npm install above succeeded — see that step.
+          path_to_bun_executable: ${{ steps.bun.outputs.path }}
           # The PAT, not GITHUB_TOKEN. The action exports its own `github_token`
           # into the session environment, overriding the step-level `GH_TOKEN`
           # above — so whatever is passed here is the identity `gh pr create`
@@ -455,6 +485,8 @@ jobs:
         uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Empty unless the npm install above succeeded — see that step.
+          path_to_bun_executable: ${{ steps.bun.outputs.path }}
           # Same PAT as the first attempt, for the same reason: the retry is the
           # attempt that opens the PR whenever the first one did not.
           github_token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}

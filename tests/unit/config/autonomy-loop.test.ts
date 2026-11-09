@@ -2546,6 +2546,38 @@ describe('the agent binary cannot change underneath a run', () => {
   });
 });
 
+// #2197 lost two runs in a row (42568803492, 42572272170) to `oven-sh/setup-bun`
+// inside claude-code-action: github.com release downloads answered 504 three
+// times, no agent binary was installed, and the issue went `blocked` unread.
+describe('the agent action does not depend on github.com release downloads for Bun', () => {
+  const runner = workflow('claude-runner.yml');
+  const step = runner.slice(
+    runner.indexOf("- name: Install the agent action's Bun from npm"),
+    runner.indexOf('- name: Run Claude Code')
+  );
+
+  it('installs Bun from npm before the first attempt, without failing the job', () => {
+    expect(step).toContain('id: bun');
+    expect(step).toContain('continue-on-error: true');
+    expect(step).toContain('@oven/bun-linux-x64@');
+    expect(step).toContain('echo "path=${BIN}" >> "$GITHUB_OUTPUT"');
+  });
+
+  // The action's own setup-bun hardcodes a version; a different Bun under the
+  // pinned action is an unproven combination.
+  it('installs the same Bun version the pinned action hardcodes', () => {
+    const version = step.match(/@oven\/bun-linux-x64@(\d+\.\d+\.\d+)/)?.[1];
+    expect(version).toBe('1.3.14');
+  });
+
+  it('hands the path to both attempts', () => {
+    const passes = runner.match(/path_to_bun_executable: \$\{\{ steps\.bun\.outputs\.path \}\}/g) ?? [];
+    const calls = runner.match(/uses: anthropics\/claude-code-action@/g) ?? [];
+    expect(calls.length).toBeGreaterThan(0);
+    expect(passes.length).toBe(calls.length);
+  });
+});
+
 // The pin stops one known-bad build returning; this stops the next one being
 // reported as an agent that had nothing to say.
 describe('an agent that never started is not an agent that produced nothing', () => {
