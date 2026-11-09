@@ -118,13 +118,14 @@ export interface TerrainConfig {
   oreGradeScale?: number;
 }
 
+/** Shared between every grid built from one config (`buildTerrainContext` memoises it): read-only, frozen. */
 export interface TerrainContext {
-  worldGen: WorldGenContext;
-  biome: BiomeDef;
-  strata: StrataSampler;
-  oreVeins: OreVeinSampler;
+  readonly worldGen: WorldGenContext;
+  readonly biome: BiomeDef;
+  readonly strata: StrataSampler;
+  readonly oreVeins: OreVeinSampler;
   /** The sandbox starter deposit (#2116); null when ore deposits are off. */
-  starterDeposit: StarterDeposit | null;
+  readonly starterDeposit: StarterDeposit | null;
 }
 
 /** Dominant climate-weighted biome at the playable centre — what terrain generation lands on. */
@@ -150,16 +151,109 @@ export function resolveGeneratedBiome(
 }
 
 /**
+ * Every `TerrainConfig` field, in key order. `satisfies` makes this exhaustive:
+ * a field added to `TerrainConfig` fails the typecheck here until the memo key
+ * below covers it, so a new generation lever can never be silently left out of
+ * the key and hand one config's terrain to another.
+ */
+const TERRAIN_CONFIG_FIELDS = {
+  sizeX: true, datum: true, sizeZ: true, seed: true, climateBias: true,
+  mixedRockHardness: true, oreDeposits: true, pitMask: true, oreGradeScale: true,
+} as const satisfies Record<keyof TerrainConfig, true>;
+
+/**
+ * How many distinct configs `buildTerrainContext` keeps built. One game holds
+ * one terrain config; a few entries cover a save/reload or a test alternating
+ * between two sites while bounding the memory (a context is a few hundred KB of
+ * noise tables at most).
+ */
+export const TERRAIN_CONTEXT_MEMO_ENTRIES = 4;
+
+/** Built contexts by config key, oldest first (re-inserted on a hit, so eviction is least-recently-used). */
+const terrainContextMemo = new Map<string, TerrainContext>();
+
+/** A config value as a stable key part: content, not identity; object keys sorted; undefined distinct from any value. */
+function keyPart(value: unknown): string {
+  if (value === undefined) return '~';
+  if (typeof value === 'number') return Object.is(value, -0) ? '-0' : String(value);
+  if (typeof value !== 'object' || value === null) return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(keyPart).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${entries.map(([k, v]) => `${k}:${keyPart(v)}`).join(',')}}`;
+}
+
+/** The memo key of a config: every `TerrainConfig` field by content; any extra field a caller's object carries is ignored. */
+function terrainConfigKey(config: TerrainConfig): string {
+  return (Object.keys(TERRAIN_CONFIG_FIELDS) as Array<keyof TerrainConfig>).map(f => keyPart(config[f])).join('|');
+}
+
+/**
  * Builds everything generateTerrain needs from one config: the world height
- * sampler, the grid's single dominant biome, and its strata/ore samplers.
- * Exported (not just internal to generateTerrain) so a caller building the
- * landscape map alongside the playable grid (#458 T2.1) can reconstruct an
- * equivalent context from the same config — determinism guarantees it
- * produces byte-identical sampling to what generateTerrain used internally,
- * without the two needing to share object references (unlike the palette,
- * which genuinely must be the same instance — see LandscapeMap.ts).
+ * sampler, the grid's single dominant biome, its strata/ore samplers and the
+ * sandbox starter deposit. Exported (not just internal to generateTerrain) so
+ * a caller building the landscape map alongside the playable grid (#458 T2.1),
+ * the starter-deposit lookups and a save decode can reach the same context
+ * from the same config.
+ *
+ * Memoised on the config's content, a few entries deep: one `sandbox start`
+ * built the same context three times (generateTerrain, the starting-building
+ * keep-clear square, the #2148 starter survey; five on the #2044 retry path),
+ * ~0.1 s each, and the starter pick inside it was the largest single cost of
+ * the slowest test files — the waits behind the agent-step timeouts of #2142,
+ * #2143, #2148, #2154 and #2199.
+ *
+ * Core stays side-effect free: the memo is unobservable, like the WeakMap
+ * caches elsewhere in core. The context is a pure function of the config's
+ * fields (all keyed, by value); it is built from a private copy of the config,
+ * so no caller-owned array or object is aliased; and no consumer writes to it
+ * (audited: TerrainGen, PlayableArea, VoxelGridCodec, world.ts's
+ * ensureLandscape, LandscapeMap and Structures only read it). It is frozen so
+ * a future write fails loudly instead of corrupting a context other grids
+ * share; the samplers inside are immutable after construction. The palette,
+ * which genuinely must be per grid, is not part of it (see LandscapeMap.ts).
  */
 export function buildTerrainContext(config: TerrainConfig): TerrainContext {
+  const key = terrainConfigKey(config);
+  const hit = terrainContextMemo.get(key);
+  if (hit) {
+    terrainContextMemo.delete(key);
+    terrainContextMemo.set(key, hit);
+    return hit;
+  }
+  const built = computeTerrainContext(ownedConfig(config));
+  terrainContextMemo.set(key, built);
+  if (terrainContextMemo.size > TERRAIN_CONTEXT_MEMO_ENTRIES) {
+    terrainContextMemo.delete(terrainContextMemo.keys().next().value!);
+  }
+  return built;
+}
+
+/**
+ * Drops every memoised context, so the next `buildTerrainContext` builds from
+ * scratch. The game never needs it (a context is a pure function of its
+ * config); a test proving that two independent builds of one config generate
+ * identical terrain calls it between them, so the memo cannot hand the second
+ * build the first one's samplers.
+ */
+export function clearTerrainContextMemo(): void {
+  terrainContextMemo.clear();
+}
+
+/** The config's `TerrainConfig` fields only, with its array and object values copied and frozen. */
+function ownedConfig(config: TerrainConfig): TerrainConfig {
+  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, oreDeposits, pitMask, oreGradeScale } = config;
+  return {
+    sizeX, datum, sizeZ, seed,
+    climateBias: Object.freeze([climateBias[0], climateBias[1]] as const),
+    ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+    ...(oreDeposits !== undefined ? { oreDeposits } : {}),
+    ...(pitMask !== undefined ? { pitMask: Object.freeze({ ...pitMask }) } : {}),
+    ...(oreGradeScale !== undefined ? { oreGradeScale } : {}),
+  };
+}
+
+/** The unmemoised build behind `buildTerrainContext`; the result is frozen because the memo shares it. */
+function computeTerrainContext(config: TerrainConfig): TerrainContext {
   const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, oreDeposits, pitMask, oreGradeScale } = config;
 
   const worldGen = createWorldGenContext(seed, sizeX, datum, sizeZ, (fields) => (x, z) => {
@@ -175,7 +269,15 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
   const strata = new StrataSampler(seed, profile);
   const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true, ...(oreGradeScale !== undefined ? { gradeScale: oreGradeScale } : {}) });
 
-  return { worldGen, biome, strata, oreVeins, starterDeposit: pickStarterDeposit(config, worldGen) };
+  const starterDeposit = pickStarterDeposit(config, worldGen);
+  Object.freeze(worldGen.playableRect);
+  return Object.freeze({
+    worldGen: Object.freeze(worldGen),
+    biome,
+    strata,
+    oreVeins,
+    starterDeposit: starterDeposit ? Object.freeze(starterDeposit) : null,
+  });
 }
 
 export { surfaceDensityAt };

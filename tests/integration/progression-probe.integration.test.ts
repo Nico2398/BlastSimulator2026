@@ -51,10 +51,13 @@ function expectFiniteOrAllowedNull(r: RunResult, horizon: number): void {
 
 describe('progression probe integration', () => {
   const opts = parseArgs(['--quick', '--horizon', '1200', '--strategy', 'opening']);
+  /** The first case's matrix, kept as one of the determinism case's two runs (a run is ~2 s; the cases only read it). */
+  let firstMatrix: RunResult[] | undefined;
 
   it('runs the quick matrix to one finite result', () => {
     const seen: RunResult[] = [];
     const results = runMatrix(opts, r => seen.push(r));
+    firstMatrix = results;
     expect(results).toHaveLength(1);
     expect(seen).toHaveLength(1);
     const r = results[0]!;
@@ -70,7 +73,8 @@ describe('progression probe integration', () => {
   }, 60000);
 
   it('is deterministic: two runs serialize identically', () => {
-    const a = toJson(runMatrix(opts), opts);
+    // Two independent runs: the first case's (when it ran) and a fresh one.
+    const a = toJson(firstMatrix ?? runMatrix(opts), opts);
     const b = toJson(runMatrix(opts), opts);
     expect(a).toBe(b);
   }, 60000);
@@ -125,9 +129,12 @@ describe('ladder strategy (#1945)', () => {
 
 describe('probe --start-delay (#2118)', () => {
   const base: ProbeRunConfig = { seed: 42, biome: 'desert_badlands', kit: 'digger', strategy: 'opening', horizon: 1200 };
+  /** The undelayed run, played once for the two cases that only read it (a run is ~2 s). */
+  let plainRun: RunResult | undefined;
+  const plainBase = (): RunResult => (plainRun ??= runProbe(base));
 
   it('a delay of 0 leaves the run identical to no delay at all', () => {
-    const plain = runProbe(base);
+    const plain = plainBase();
     const zero = runProbe({ ...base, startDelay: 0 });
     expect(zero.metrics).toEqual(plain.metrics);
     expect(zero.endTick).toBe(plain.endTick);
@@ -135,7 +142,7 @@ describe('probe --start-delay (#2118)', () => {
   }, 120000);
 
   it('with no delay the opening fires its first blast inside the horizon', () => {
-    expect(runProbe(base).metrics.blastsFired).toBeGreaterThanOrEqual(1);
+    expect(plainBase().metrics.blastsFired).toBeGreaterThanOrEqual(1);
   }, 60000);
 
   it('a delay nearly as long as the horizon keeps the first order, and so every blast, out of the run', () => {

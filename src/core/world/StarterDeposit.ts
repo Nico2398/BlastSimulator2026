@@ -44,14 +44,30 @@ function cellJitter(seed: number, x: number, z: number): number {
   return (subSeed(seed, `starter:${x}:${z}`) % 10_000) / 10_000;
 }
 
-/** Surface voxel Y of a cell, memoised: neighbouring footprints share most of their cells. */
-function surfaceYMemo(worldGen: WorldGenContext): (x: number, z: number) => number {
-  const memo = new Map<number, number>();
+/**
+ * Continuous surface height of a cell, sampled once per cell for the whole pick. The crew flood
+ * fills (one per crew start) test each cell from up to eight neighbours, and the footprint scan
+ * revisits the same cells under neighbouring candidates: unmemoised, one pick on a 64x64 site
+ * sampled the noise stack about 250,000 times, and the pick was 45% of a `sandbox start` (CPU
+ * profile, ~0.7 s a start) — the cost the slowest suites paid per case while the pipeline runs of
+ * #2142/#2143/#2148/#2154/#2199 sat waiting on them into their timeout. Grid cells live in a flat
+ * array; a cell outside the grid (a footprint on a small grid) goes to a map. The values are the
+ * sampler's own, so the pick is unchanged.
+ */
+function surfaceHeightMemo(worldGen: WorldGenContext, sizeX: number, sizeZ: number): (x: number, z: number) => number {
+  const inGrid = new Float64Array(sizeX * sizeZ).fill(Number.NaN);
+  const outside = new Map<number, number>();
   return (x, z) => {
+    if (x >= 0 && z >= 0 && x < sizeX && z < sizeZ) {
+      const i = x * sizeZ + z;
+      let h = inGrid[i]!;
+      if (Number.isNaN(h)) { h = sampleSurfaceHeightY(worldGen, x, z); inGrid[i] = h; }
+      return h;
+    }
     const key = x * 65_536 + z;
-    let y = memo.get(key);
-    if (y === undefined) { y = Math.floor(sampleSurfaceHeightY(worldGen, x, z)); memo.set(key, y); }
-    return y;
+    let h = outside.get(key);
+    if (h === undefined) { h = sampleSurfaceHeightY(worldGen, x, z); outside.set(key, h); }
+    return h;
   };
 }
 
@@ -70,10 +86,9 @@ function footprintSpread(surfaceY: (x: number, z: number) => number, cx: number,
 
 /**
  * Cells a vehicle climbing at its slope limit reaches from the crew corner over the grid, flood-filled on the
- * continuous surface height; keyed like `surfaceYMemo`. Mirrors the nav grid's climb gate without building one.
+ * continuous surface height `height`; keyed x * 65,536 + z. Mirrors the nav grid's climb gate without building one.
  */
-function reachableFromCrew(worldGen: WorldGenContext, sizeX: number, sizeZ: number, startX: number, startZ: number): Set<number> {
-  const height = (x: number, z: number) => sampleSurfaceHeightY(worldGen, x, z);
+function reachableFromCrew(height: (x: number, z: number) => number, sizeX: number, sizeZ: number, startX: number, startZ: number): Set<number> {
   const seen = new Set<number>();
   const stack: Array<[number, number]> = [[startX, startZ]];
   seen.add(startX * 65_536 + startZ);
@@ -121,8 +136,9 @@ export function pickStarterDeposit(config: TerrainConfig, worldGen: WorldGenCont
   if (config.oreDeposits !== true) return null;
   const cx = Math.floor(config.sizeX / 2), cz = Math.floor(config.sizeZ / 2);
   const reach = STARTER_DEPOSIT_POCKET_RADIUS_M + 1;
-  const surfaceY = surfaceYMemo(worldGen);
-  const climbable = STARTER_DEPOSIT_CREW_STARTS.map(([sx, sz]) => reachableFromCrew(worldGen, config.sizeX, config.sizeZ, sx, sz));
+  const height = surfaceHeightMemo(worldGen, config.sizeX, config.sizeZ);
+  const surfaceY = (x: number, z: number) => Math.floor(height(x, z));
+  const climbable = STARTER_DEPOSIT_CREW_STARTS.map(([sx, sz]) => reachableFromCrew(height, config.sizeX, config.sizeZ, sx, sz));
   let best: { x: number; z: number; score: number } | null = null;
   const span = STARTER_DEPOSIT_MAX_DISTANCE_M;
   for (let dx = -span; dx <= span; dx++) {

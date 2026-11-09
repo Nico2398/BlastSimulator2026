@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { resolveStarterDeposit, isInStartingEdgeMargin, type StarterDeposit } from '../../../src/core/world/StarterDeposit.js';
-import { buildTerrainContext, generateTerrain, surfaceDensityAt, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
+import { buildTerrainContext, clearTerrainContextMemo, generateTerrain, surfaceDensityAt, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
 import { sampleSurfaceHeightY } from '../../../src/core/world/WorldGen.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
@@ -27,8 +27,21 @@ const SELLABLE = ['dirtite', 'rustite'];
 
 const cases = BIOMES.flatMap(biome => SEEDS.map(seed => [biome, seed] as const));
 
+/**
+ * Each site's deposit, picked once for the whole file: seven case tables below read the same 42
+ * sites' deposits in turn, which cycles past the terrain memo's few entries, and re-picking each
+ * was most of this file's time (49.6 s before the starter pick and this table were cheapened). A
+ * pick is a pure function of the config; the cases that prove that build independently.
+ */
+const deposits = new Map<string, StarterDeposit | null>();
+
 function deposit(config: TerrainConfig): StarterDeposit {
-  const d = buildTerrainContext(config).starterDeposit;
+  const key = JSON.stringify(config);
+  let d = deposits.get(key);
+  if (d === undefined) {
+    d = buildTerrainContext(config).starterDeposit;
+    deposits.set(key, d);
+  }
   expect(d, 'sandbox site has a starter deposit').not.toBeNull();
   return d!;
 }
@@ -68,7 +81,22 @@ describe('resolveStarterDeposit (#2116)', () => {
 
   it('is a pure function of the config', () => {
     const config = sandboxTerrainConfig('alpine_granite', 5);
-    expect(resolveStarterDeposit(config)).toEqual(resolveStarterDeposit({ ...config }));
+    const first = resolveStarterDeposit(config);
+    clearTerrainContextMemo(); // an independent pick, not the memoised context
+    expect(resolveStarterDeposit({ ...config })).toEqual(first);
+  });
+
+  it('picks on a grid smaller than its search ring, where candidate footprints reach past the grid edge', () => {
+    // A 32 m site puts most of the 10..25 m ring outside the grid: the pick samples those cells
+    // too (its height memo holds them apart from the grid's), and stays a pure function of the config.
+    const config: TerrainConfig = { ...sandboxTerrainConfig('desert_badlands', 42), sizeX: 32, sizeZ: 32 };
+    const d = resolveStarterDeposit(config);
+    expect(d).not.toBeNull();
+    const dist = Math.hypot(d!.x - 16, d!.z - 16);
+    expect(dist).toBeGreaterThanOrEqual(STARTER_DEPOSIT_MIN_DISTANCE_M);
+    expect(dist).toBeLessThanOrEqual(STARTER_DEPOSIT_MAX_DISTANCE_M);
+    clearTerrainContextMemo();
+    expect(resolveStarterDeposit({ ...config })).toEqual(d);
   });
 
   it('differs between seeds on the same biome (placement is seeded, not a constant)', () => {
@@ -163,9 +191,10 @@ describe('generated starter deposit voxels (#2116)', () => {
   it.each([['desert_badlands', 42], ['alpine_granite', 3], ['tropical_karst', 12345]] as const)('C2 %s seed %i: two grids from the same config hold identical rock and ore in the pocket', (biome, seed) => {
     const config = sandboxTerrainConfig(biome, seed);
     const a = deposit(config);
-    const b = deposit({ ...config });
-    expect(a).toEqual(b);
     const gridA = generateTerrain(config);
+    clearTerrainContextMemo(); // the second grid builds its own context
+    const b = buildTerrainContext({ ...config }).starterDeposit;
+    expect(a).toEqual(b);
     const gridB = generateTerrain({ ...config });
     const r = STARTER_DEPOSIT_POCKET_RADIUS_M + 1;
     for (let x = a.x - r; x <= a.x + r; x++) for (let z = a.z - r; z <= a.z + r; z++) {

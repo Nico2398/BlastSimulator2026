@@ -10,7 +10,7 @@ import type { GameContext } from '../../src/console/commands/world.js';
 import { saveCommand, loadCommand } from '../../src/console/commands/saveload.js';
 import { claimForAction } from '../../src/console/commands/siteExpansion.js';
 import { sandboxLevelDef, SANDBOX_DEFAULTS } from '../../src/core/campaign/Sandbox.js';
-import type { TerrainConfig } from '../../src/core/world/TerrainGen.js';
+import { clearTerrainContextMemo, type TerrainConfig } from '../../src/core/world/TerrainGen.js';
 import { MAX_TERRAIN_GEN_DIMENSION, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { estimateSurveyResult } from '../../src/core/mining/SurveyCalc.js';
 import { surveyColumnKey } from '../../src/core/mining/SurveyColumn.js';
@@ -39,6 +39,21 @@ function expandEast(ctx: GameContext): void {
   expect(claim.expanded).toBe(true);
 }
 
+/** Same keys, each value `Object.is`-identical: strictly narrower than `toEqual`, so a pass here is a `toEqual` pass. */
+function sameOres(a: Record<string, number> | undefined, b: Record<string, number> | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every(k => Object.hasOwn(b, k) && Object.is(a[k], b[k]));
+}
+
+/**
+ * Every voxel of two chunks over MAX_TERRAIN_GEN_DIMENSION (4096) rows is 2.1 million voxels; calling
+ * `expect` (with a message built up front) twice per voxel was most of this file's time. Each value is
+ * checked by a test at least as strict as its matcher, and only a voxel that fails it goes through the
+ * original `expect`: every voxel is still compared and the same matcher still decides a mismatch.
+ */
 function assertChunkOresMatch(a: VoxelGrid, b: VoxelGrid, cx: number, cz: number): number {
   const rect = b.chunkRect(cx, cz);
   expect(rect, `chunk (${cx}, ${cz}) not owned by the reference grid`).not.toBeNull();
@@ -47,9 +62,12 @@ function assertChunkOresMatch(a: VoxelGrid, b: VoxelGrid, cx: number, cz: number
   for (let x = rect!.minX; x < rect!.maxX; x++) {
     for (let z = rect!.minZ; z < rect!.maxZ; z++) {
       for (let y = 0; y < MAX_TERRAIN_GEN_DIMENSION; y++) {
-        expect(a.densityAt(x, y, z), `density (${x},${y},${z})`).toBe(b.densityAt(x, y, z));
+        const aDensity = a.densityAt(x, y, z);
+        const bDensity = b.densityAt(x, y, z);
+        if (!Object.is(aDensity, bDensity)) expect(aDensity, `density (${x},${y},${z})`).toBe(bDensity);
+        const aOres = a.oresAt(x, y, z);
         const bOres = b.oresAt(x, y, z);
-        expect(a.oresAt(x, y, z), `ores (${x},${y},${z})`).toEqual(bOres);
+        if (!sameOres(aOres, bOres)) expect(aOres, `ores (${x},${y},${z})`).toEqual(bOres);
         if (bOres && Object.keys(bOres).length > 0) oreVoxels++;
       }
     }
@@ -83,10 +101,13 @@ describe('sandbox ore deposits (#1682)', () => {
     expandEast(live);
     expect(saveCommand(live, [], { slot: 'sandbox-deposits' }).success).toBe(true);
     live.grid = null;
+    // A reload in a fresh session, and a reference built apart from both: neither may reuse a memoised terrain context.
+    clearTerrainContextMemo();
     expect(loadCommand(live, [], { slot: 'sandbox-deposits' }).success).toBe(true);
     expect(live.grid).not.toBeNull();
     expect(live.state!.world!.oreDeposits, 'oreDeposits survives the save').toBe(true);
 
+    clearTerrainContextMemo();
     const reference = startSandbox();
     expandEast(reference);
 
