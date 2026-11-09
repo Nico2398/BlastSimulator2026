@@ -257,6 +257,13 @@ uiManager.setSurveyOverlayVisible(gameRenderer.surveyOverlayVisible);
 uiManager.setWallOverlayToggleHandler(visible => gameRenderer.setWallOverlayVisible(visible));
 uiManager.setWallOverlayVisible(gameRenderer.wallOverlayVisible);
 
+// Blast workshop energy heatmap (#2200): the workshop's toggle drives the renderer's terrain overlay.
+uiManager.setEnergyHeatmapToggleHandler(visible => {
+  gameRenderer.setEnergyHeatmapVisible(visible);
+  if (!visible) hoverTag.hide();
+});
+uiManager.setEnergyHeatmapVisible(gameRenderer.energyHeatmapVisible);
+
 // --- Persistence ---
 // IndexedDB construction never throws; failures surface when it opens, so probe it
 // and fall back to a session-only in-memory backend (#1325).
@@ -1284,7 +1291,9 @@ uiManager.setSelectEmployeeHandler((employeeId) => {
 
 // --- Scene picking wiring (redesign P2) ---
 scenePicking.setRestChangeHandler((rest) => {
-  if (ctx.state) hoverTag.update(rest, ctx.state, gameRenderer.surveyOverlayVisible);
+  const tile = rest?.terrain;
+  const heatmap = tile ? gameRenderer.energyHeatmapColumnAt(tile.tileX, tile.tileZ) : null;
+  if (ctx.state) hoverTag.update(rest, ctx.state, gameRenderer.surveyOverlayVisible, heatmap);
 });
 /** Anchor the selection outline was last drawn on; a change (employee steps out, fragment loaded, site finished, ramp widened) re-draws it. */
 let shownAnchorKey: string | null = null;

@@ -82,7 +82,8 @@ export function previewCommand(
   const sub = args[0];
 
   if (sub === 'energy') {
-    const result = previewEnergy(plan, ctx.grid!, tier, wetHoleIds);
+    // The console's energy report stays tier-gated; the workshop heatmap (#2200) reads the field at every tier.
+    const result = tier >= 1 ? previewEnergy(plan, ctx.grid!, tier, wetHoleIds) : null;
     if (!result) return { success: false, output: `Requires software tier 1+ (current: ${tier})` };
     return { success: true, output: `Energy preview: ${result.energyMap.size} voxels, max=${result.maxEnergy.toFixed(1)}, min=${result.minEnergy.toFixed(1)}` };
   }
@@ -128,7 +129,7 @@ export function blastPreviewCommand(
 
   const tier = ctx.state!.softwareTier;
   const wetHoleIds = wetHoleIdSet(ctx);
-  const energyPreview = previewEnergy(plan, ctx.grid!, tier, wetHoleIds);
+  const energyPreview = tier >= 1 ? previewEnergy(plan, ctx.grid!, tier, wetHoleIds) : null;
   const fragmentPreview = previewFragments(plan, ctx.grid!, tier, wetHoleIds);
   const projectionPreview = previewProjections(plan, ctx.grid!, tier, wetHoleIds);
   const villages = levelVillagePositions(ctx);

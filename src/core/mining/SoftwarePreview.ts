@@ -3,12 +3,14 @@
 // detail). Extracted so the tier-gated preview functions in Software.ts each
 // call one shared computation instead of repeating it.
 
-import type { BlastPlan } from './BlastPlan.js';
+import { type BlastPlan, hasChargedHole } from './BlastPlan.js';
 import type { VoxelGrid, VoxelData } from '../world/VoxelGrid.js';
 import { getDominantRockId, firstEmptyLayerAboveGround, clampToGridColumn } from '../world/VoxelGrid.js';
 import { getRock, type RockType } from '../world/RockCatalog.js';
 import { SEEDS_BASE, SEEDS_PER_INTENSITY, MAX_SEEDS_PER_VOXEL, FRAGMENTATION_MULTIPLIER } from '../config/balance.js';
 import { type EnergyField, effectiveAt, thresholdAt, intensityAt } from './EnergyPropagation.js';
+import { type FragmentationBand, classifyFragmentationBand } from './FragmentationBand.js';
+import { buildPlanEnergyField } from './BlastExecution.js';
 
 export const PREVIEW_RADIUS = 5;
 
@@ -143,4 +145,36 @@ export function getBlastBBox(plan: BlastPlan, ctx: HoleContext): BlastBBox {
     minZ: Math.floor(minZ - PREVIEW_RADIUS),
     maxZ: Math.ceil(maxZ + PREVIEW_RADIUS),
   };
+}
+
+/** One filled voxel of the plan's blast box with the intensity the blast would give it and its band (#2200). */
+export interface PlanBandCell {
+  x: number;
+  y: number;
+  z: number;
+  intensity: number;
+  band: FragmentationBand;
+}
+
+/** Every filled voxel of the plan's blast box, keyed `x,y,z`. Empty when nothing is charged. */
+export interface PlanBandMap {
+  bbox: BlastBBox;
+  cells: ReadonlyMap<string, PlanBandCell>;
+}
+
+/**
+ * The fragmentation bands the plan would produce, read from the blast's own energy field.
+ * Needs no software tier (#2200).
+ */
+export function previewPlanBands(plan: BlastPlan, grid: VoxelGrid, wetHoleIds: ReadonlySet<string> = new Set()): PlanBandMap {
+  const cells = new Map<string, PlanBandCell>();
+  const ctx = computeHoleContext(plan, grid);
+  const bbox = getBlastBBox(plan, ctx);
+  const field = hasChargedHole(plan) ? buildPlanEnergyField(plan, grid, wetHoleIds) : null;
+  if (!field) return { bbox, cells };
+  forEachBBoxVoxel(grid, bbox, (x, y, z) => {
+    const intensity = intensityAt(field, x, y, z);
+    cells.set(`${x},${y},${z}`, { x, y, z, intensity, band: classifyFragmentationBand(intensity) });
+  });
+  return { bbox, cells };
 }

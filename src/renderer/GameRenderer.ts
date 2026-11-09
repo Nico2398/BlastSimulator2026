@@ -43,6 +43,7 @@ import type { LandscapeMesh } from './terrain/LandscapeMesh.js';
 import type { LandscapeChunkStreamer } from './terrain/LandscapeChunkStreamer.js';
 import type { WorldBorderWall } from './WorldBorderWall.js';
 import type { BlastPlanOverlay } from './BlastPlanOverlay.js';
+import type { ColumnBandSummary } from '../core/mining/EnergyHeatmap.js';
 import type { GhostMesh } from './GhostMesh.js';
 import type { RampArrowLayer } from './RampArrow.js';
 import type { RallyFlagMesh } from './RallyFlagMesh.js';
@@ -52,7 +53,7 @@ import type { EmployeePictograms } from './EmployeePictograms.js';
 import type { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import type { SurveyConfidenceOverlayOptions } from './SurveyConfidenceOverlay.js';
 
-import { syncGameRendererEntities, syncSurveyOverlay, buildSurveyOverlayOptions, buildWallOverlayFaces, syncWallOverlay } from './GameRendererSync.js';
+import { syncGameRendererEntities, syncSurveyOverlay, buildSurveyOverlayOptions, buildWallOverlayFaces, syncWallOverlay, buildHeatmapColumns, syncEnergyHeatmap } from './GameRendererSync.js';
 import {
   rebuildTerrain, remeshTerrainRegion, stepTerrainRemesh, finishTerrainRemesh, siteBoundsChanged, playableCut,
   landscapeEdgeHeightSampler, rebuildBorderWall, getTerrainSurfaceY, getSmoothTerrainSurfaceY,
@@ -148,6 +149,9 @@ export class GameRenderer {
 
   /** Player-facing visibility preference for the wall stability overlay (#1943); off until toggled. */
   private wallOverlayPreference = false;
+  private energyHeatmapPreference = false;
+  private energyHeatmapShown: ColumnBandSummary[] | null = null;
+  private energyHeatmapIndex = new Map<string, ColumnBandSummary>();
   /** Faces the overlay shows, rebuilt only when the terrain or the game bound to it changes. */
   private wallOverlayCache: { state: GameState; gridId: number; revision: number; faces: WallFace[]; planKey: string } | null = null;
 
@@ -355,6 +359,7 @@ export class GameRenderer {
       syncSurveyOverlay: options => this.syncSurveyOverlay(options),
     });
     this.refreshWallOverlay();
+    this.refreshEnergyHeatmap();
     this.lastGhostRevision = result.lastGhostRevision;
     this.lastSyncedTerrainRevision = result.lastSyncedTerrainRevision;
     // syncGameRendererEntities() only returns lastWeather when a skybox received it.
@@ -562,6 +567,38 @@ export class GameRenderer {
   setWallOverlayVisible(visible: boolean): void {
     this.wallOverlayPreference = visible;
     this.refreshWallOverlay();
+  }
+
+  /** Player-facing visibility preference for the top-down energy heatmap (#2200). */
+  get energyHeatmapVisible(): boolean {
+    return this.energyHeatmapPreference;
+  }
+
+  /** Set the heatmap preference and re-sync it against the last known state (#2200). */
+  setEnergyHeatmapVisible(visible: boolean): void {
+    this.energyHeatmapPreference = visible;
+    this.refreshEnergyHeatmap();
+  }
+
+  /** The heatmap summary of the column at tile (x, z), or null when the overlay is off or the column is outside the blast box (#2200). */
+  energyHeatmapColumnAt(x: number, z: number): ColumnBandSummary | null {
+    if (!this.energyHeatmapPreference) return null;
+    return this.energyHeatmapIndex.get(`${x},${z}`) ?? null;
+  }
+
+  private refreshEnergyHeatmap(): void {
+    const state = this.lastState, grid = this.lastGrid;
+    if (!this.energyHeatmapPreference || !state || !grid) {
+      this.energyHeatmapIndex.clear();
+      this.energyHeatmapShown = null;
+      syncEnergyHeatmap(this.terrain, [], false);
+      return;
+    }
+    const columns = buildHeatmapColumns(state, grid);
+    if (columns === this.energyHeatmapShown) return; // planHeatmap returns the same array until its inputs change
+    this.energyHeatmapShown = columns;
+    this.energyHeatmapIndex = new Map(columns.map(c => [`${c.x},${c.z}`, c]));
+    syncEnergyHeatmap(this.terrain, columns, true);
   }
 
   private refreshWallOverlay(): void {
