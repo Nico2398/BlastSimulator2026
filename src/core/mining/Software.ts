@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Blast preview software tiers
 // Player purchases software upgrades to unlock prediction capabilities.
-// Tier 0: no preview. Tier 1: energy. Tier 2: fragments. Tier 3: projections. Tier 4: vibrations.
+// Energy is free (the workshop heatmap, #2200). Tier 1: fragment distribution. Tier 2: projections.
+// Tier 3: vibrations. Tier 4: charge optimizer (#2204, no preview content yet).
 
 import { formatMoney } from '../economy/formatMoney.js';
 import type { BlastPlan } from './BlastPlan.js';
@@ -8,6 +9,7 @@ import { type VoxelGrid, clampToGridColumn } from '../world/VoxelGrid.js';
 import type { VillagePosition, BlastRating } from './BlastExecution.js';
 import type { MarketId } from '../economy/Market.js';
 import { dryRunBlast, type BlastForecast } from './BlastDryRun.js';
+import type { FragmentationBand } from './FragmentationBand.js';
 import { vec3, length } from '../math/Vec3.js';
 import {
   VOXEL_SIZE_CM,
@@ -74,6 +76,20 @@ export interface FragmentPreview {
   avgFragmentSize: number;
 }
 
+/** What tier 1 shows: how finely the rock breaks, read off the dry-run blast. */
+export interface FragmentDistribution {
+  /** Volume (m3) by fragmentation band. */
+  bandVolumes: Record<FragmentationBand, number>;
+  fragmentCount: number;
+  oversizedFragments: number;
+  goodVolumeM3: number;
+  finesVolumeM3: number;
+  dustVolumeM3: number;
+  dustLossMassKg: number;
+  /** Ore value the dust band takes. */
+  dustLossValue: number;
+}
+
 export interface ProjectionPreview {
   /** Number of voxels where energy ratio exceeds 4.0 (projection zone). */
   projectionZoneCount: number;
@@ -96,9 +112,13 @@ export interface VibrationPreview {
  * a size on its own.
  */
 export interface BlastPreviewSummary {
+  /** `BLAST_PREVIEW_SHAPE` when written; an older save's preview is dropped on load. */
+  shape: number;
   tier: number;
-  energy: { affectedVoxels: number; minEnergy: number; maxEnergy: number } | null;
-  fragments: { fractured: number; cracked: number; unaffected: number; avgFragmentSizeCm: number } | null;
+  /** Free at every tier. */
+  energy: { affectedVoxels: number; minEnergy: number; maxEnergy: number };
+  /** Tier 1+. */
+  fragments: ({ fractured: number; cracked: number; unaffected: number; avgFragmentSizeCm: number } & FragmentDistribution) | null;
   projections: {
     projectionZoneVoxels: number;
     collapseFragments: number;
@@ -217,6 +237,24 @@ export function previewFragments(
     unaffectedCount: unaffected,
     avgFragmentSize: fractured > 0 ? totalFragSize / fractured : 1,
   };
+}
+
+/** The tier-1 content of a dry-run forecast. */
+export function fragmentDistributionFrom(_forecast: BlastForecast): FragmentDistribution {
+  throw new Error('not implemented');
+}
+
+/** Dry-run the blast and read its fragment distribution. Requires software tier >= 1; null below it or without holes. */
+export function previewFragmentDistribution(
+  _plan: BlastPlan,
+  _grid: VoxelGrid,
+  _softwareTier: number,
+  _villages: readonly VillagePosition[],
+  _groundFactor: number,
+  _wetHoleIds: ReadonlySet<string>,
+  _marketId?: MarketId,
+): FragmentDistribution | null {
+  throw new Error('not implemented');
 }
 
 /** Dry-run the whole blast on a forked grid. Requires software tier >= 3; null below it. */

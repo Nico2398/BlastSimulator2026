@@ -3496,3 +3496,15 @@ export const HEATMAP_COLUMN_BAND_MIN_SHARE = 0.15;
 
 /** Opacity of the top-down energy heatmap tint on the terrain (#2200). */
 export const HEATMAP_OVERLAY_OPACITY = 0.55;
+
+// ── Blasting software tiers (#2201) ──
+
+/** Software tier that unlocks each preview. Energy needs none: the workshop heatmap is free (#2200). */
+export const SOFTWARE_TIER_FRAGMENTS = 1;
+export const SOFTWARE_TIER_PROJECTIONS = 2;
+export const SOFTWARE_TIER_VIBRATIONS = 3;
+/** The charge optimizer (#2204) has no preview content yet. */
+export const SOFTWARE_TIER_OPTIMIZER = 4;
+
+/** Version of the persisted `lastBlastPreview` shape; a save carrying another one loads it as null. */
+export const BLAST_PREVIEW_SHAPE = 2;
