@@ -265,14 +265,14 @@
       ]
     },
     {
-      "command": "tick 800",
+      "command": "tick 100",
       "role": "setup",
       "timeout": 120,
-      "description": "The rubble on the crater floor is now reachable: the unreachable-order ghosts clear and the haulers carry spoil out to the heap. Ore is sold on the way (auto-sell), so stored ore is no signal.",
+      "description": "The rubble on the crater floor is now reachable: the unreachable-order ghosts clear and the haulers carry spoil out to the heap. Ore is sold on the way (auto-sell), so stored ore is no signal. The window is 100 ticks: spoil stored on the heap starts draining after that, and since each load costs the hauler HAUL_LOAD_TICKS the drain wins over 300 ticks or more (tick 300 ends at 6630 kg from 7370, tick 800 at 4071; measured for #2199).",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 800"
+          "command": "tick 100"
         }
       ],
       "expect": {
