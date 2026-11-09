@@ -25,6 +25,7 @@ import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import { computeVoxelColumnSurfaceY, MAX_TERRAIN_GEN_DIMENSION, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { clearTerrainContextMemo } from '../../src/core/world/TerrainGen.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -92,7 +93,28 @@ function runBlastAndExpansion(ctx: GameContext): void {
   expect(claim.expanded).toBe(true);
 }
 
-/** Walks every voxel of chunk (cx, cz) and compares `a` against `b` — density, dominant rock, ores, fracture. */
+/** Same keys, each value `Object.is`-identical: strictly narrower than `toEqual`, so a pass here is a `toEqual` pass. */
+function sameOres(a: Record<string, number> | undefined, b: Record<string, number> | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every(k => Object.hasOwn(b, k) && Object.is(a[k], b[k]));
+}
+
+/** `toBeCloseTo(expected, 10)`'s own pass test for finite values; anything else goes to the matcher. */
+const FRACTURE_CLOSE = 10 ** -10 / 2;
+
+/**
+ * Walks every voxel of chunk (cx, cz) and compares `a` against `b` — density, dominant rock, ores, fracture.
+ *
+ * Three chunks of 16 x 16 columns x MAX_TERRAIN_GEN_DIMENSION (4096) rows is 3.1 million voxels, and
+ * the walk used to call `expect` four times per voxel with a message built up front (two
+ * `JSON.stringify` calls each): ~37 s of this file's 38 s, for a test that passes. Each value is now
+ * checked by a test at least as strict as its matcher, and only a voxel that fails it goes through
+ * the original `expect` and message — so every voxel is still compared, the same matcher still
+ * decides a mismatch, and a failure reads exactly as before.
+ */
 function assertChunkMatchesVoxelForVoxel(a: VoxelGrid, b: VoxelGrid, cx: number, cz: number): void {
   const rect = b.chunkRect(cx, cz);
   expect(rect, `chunk (${cx}, ${cz}) is not owned by the reference grid`).not.toBeNull();
@@ -103,19 +125,27 @@ function assertChunkMatchesVoxelForVoxel(a: VoxelGrid, b: VoxelGrid, cx: number,
       for (let y = 0; y < MAX_TERRAIN_GEN_DIMENSION; y++) {
         const aDensity = a.densityAt(x, y, z);
         const bDensity = b.densityAt(x, y, z);
-        expect(aDensity, `density mismatch at (${x},${y},${z}): reloaded=${aDensity} reference=${bDensity}`).toBe(bDensity);
+        if (!Object.is(aDensity, bDensity)) {
+          expect(aDensity, `density mismatch at (${x},${y},${z}): reloaded=${aDensity} reference=${bDensity}`).toBe(bDensity);
+        }
 
         const aRock = a.dominantRockAt(x, y, z);
         const bRock = b.dominantRockAt(x, y, z);
-        expect(aRock, `dominant rock mismatch at (${x},${y},${z}): reloaded=${aRock} reference=${bRock}`).toBe(bRock);
+        if (!Object.is(aRock, bRock)) {
+          expect(aRock, `dominant rock mismatch at (${x},${y},${z}): reloaded=${aRock} reference=${bRock}`).toBe(bRock);
+        }
 
         const aOres = a.oresAt(x, y, z);
         const bOres = b.oresAt(x, y, z);
-        expect(aOres, `ore mismatch at (${x},${y},${z}): reloaded=${JSON.stringify(aOres)} reference=${JSON.stringify(bOres)}`).toEqual(bOres);
+        if (!sameOres(aOres, bOres)) {
+          expect(aOres, `ore mismatch at (${x},${y},${z}): reloaded=${JSON.stringify(aOres)} reference=${JSON.stringify(bOres)}`).toEqual(bOres);
+        }
 
         const aFracture = a.fractureAt(x, y, z);
         const bFracture = b.fractureAt(x, y, z);
-        expect(aFracture, `fracture mismatch at (${x},${y},${z}): reloaded=${aFracture} reference=${bFracture}`).toBeCloseTo(bFracture, 10);
+        if (!(Math.abs(bFracture - aFracture) < FRACTURE_CLOSE)) {
+          expect(aFracture, `fracture mismatch at (${x},${y},${z}): reloaded=${aFracture} reference=${bFracture}`).toBeCloseTo(bFracture, 10);
+        }
       }
     }
   }
@@ -134,11 +164,14 @@ describe('terrain save/reload against treranium_depths (#1181)', () => {
       expect(saveResult.success).toBe(true);
 
       live.grid = null;
+      // A reload in a fresh session: it may not reuse the memoised terrain context the live game built.
+      clearTerrainContextMemo();
       const loadResult = loadCommand(live, [], { slot: 'treranium-reload' });
       expect(loadResult.success).toBe(true);
       expect(live.grid).not.toBeNull();
 
       // ── Context 2: identical sequence, never saved ────────────────────────
+      clearTerrainContextMemo(); // built apart from the reload, as before the memo existed
       const reference = startTreraniumDepths();
       runBlastAndExpansion(reference);
 

@@ -7,7 +7,7 @@
 // ore (STARTER_DEPOSIT_YIELD_KG_*, #2126), and finding it still takes a survey -
 // nothing in the game state marks it.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { buildTerrainContext, type TerrainConfig } from '../../src/core/world/TerrainGen.js';
@@ -78,11 +78,20 @@ function oreKg(result: BlastResult, oreId: string): number {
   return kg;
 }
 
-describe('sandbox starter deposit: placement relative to the opening site', () => {
-  it.each(kitCases)('C3 %s kit, %s seed %i: centre is 10..25 m from the site centre and 5..35 m from the nearest starting building', (kit, biome, seed) => {
+// C3 and C4 only read the started site, so each (kit, biome, seed) is started once and both read
+// that start: 108 `sandbox start`s instead of 216, the largest share of this file's 194 s (the
+// slowest file of the suite, measured while the pipeline runs of #2142/#2143/#2148/#2154/#2199
+// timed out waiting on the suite). The start is dropped once both cases ran, so one is held at a
+// time. C7 fires a blast into its grid and keeps a fresh start per case.
+describe.each(kitCases)('sandbox starter deposit: the opening site, %s kit, %s seed %i (C3 and C4 read one start)', (kit, biome, seed) => {
+  let started: GameContext | null = null;
+  const site = (): GameContext => (started ??= startSandbox(biome, seed, kit));
+  afterAll(() => { started = null; });
+
+  it(`C3 ${kit} kit, ${biome} seed ${seed}: centre is 10..25 m from the site centre and 5..35 m from the nearest starting building`, () => {
     const config = sandboxTerrainConfig(biome, seed);
     const d = depositOf(config);
-    const ctx = startSandbox(biome, seed, kit);
+    const ctx = site();
     const toCentre = Math.hypot(d.x - config.sizeX / 2, d.z - config.sizeZ / 2);
     expect(toCentre).toBeGreaterThanOrEqual(STARTER_DEPOSIT_MIN_DISTANCE_M);
     expect(toCentre).toBeLessThanOrEqual(STARTER_DEPOSIT_MAX_DISTANCE_M);
@@ -92,12 +101,10 @@ describe('sandbox starter deposit: placement relative to the opening site', () =
     expect(nearest, `nearest building ${nearest.toFixed(1)} m`).toBeGreaterThanOrEqual(5);
     expect(nearest, `nearest building ${nearest.toFixed(1)} m`).toBeLessThanOrEqual(35);
   }, TIMEOUT);
-});
 
-describe('sandbox starter deposit: reachable at the vehicle slope limit without a ramp', () => {
-  it.each(kitCases)('C4 %s kit, %s seed %i: flat footprint, climb-connected to the rally point', (kit, biome, seed) => {
+  it(`C4 ${kit} kit, ${biome} seed ${seed}: flat footprint, climb-connected to the rally point (reachable at the vehicle slope limit without a ramp)`, () => {
     const d = depositOf(sandboxTerrainConfig(biome, seed));
-    const ctx = startSandbox(biome, seed, kit);
+    const ctx = site();
     const grid = ctx.grid!;
     let lo = Infinity, hi = -Infinity;
     for (let x = d.x - HALF; x <= d.x + HALF; x++) for (let z = d.z - HALF; z <= d.z + HALF; z++) {
