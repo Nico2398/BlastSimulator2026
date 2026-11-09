@@ -9,7 +9,7 @@ import type { HoleCharge } from './ChargePlan.js';
 import type { VoxelData } from '../world/VoxelGrid.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { getRock } from '../world/RockCatalog.js';
-import { PROJECTION_SPEED_THRESHOLD } from '../config/balance.js';
+import { PROJECTION_SPEED_THRESHOLD, STEMMING_FULL_DEPTH_FRACTION, STEMMING_MIN_EFFICIENCY } from '../config/balance.js';
 
 // --------------------------------------------------------
 // § 1: Voxel Threshold
@@ -47,11 +47,11 @@ export function computeInitialEnergy(charge: HoleCharge, holeDepth: number, isFl
 
 export function stemmingFactor(stemmingHeight: number, holeDepth: number): number {
   if (holeDepth <= 0) return 0;
-  return Math.max(0, Math.min(1, stemmingHeight / (holeDepth * 0.3)));
+  return Math.max(0, Math.min(1, stemmingHeight / (holeDepth * STEMMING_FULL_DEPTH_FRACTION)));
 }
 
 export function stemmingEfficiency(stemmingHeight: number, holeDepth: number): number {
-  return 0.5 + 0.5 * stemmingFactor(stemmingHeight, holeDepth);
+  return STEMMING_MIN_EFFICIENCY + (1 - STEMMING_MIN_EFFICIENCY) * stemmingFactor(stemmingHeight, holeDepth);
 }
 
 export function waterEffect(isFlooded: boolean, waterSensitive: boolean, hasTubing: boolean): number {
@@ -68,7 +68,7 @@ export function effectiveHoleEnergy(
   const sf = stemmingFactor(charge.stemmingM, holeDepth);
   const wf = waterEffect(isFlooded, explosive.waterSensitive, hasTubing);
   return {
-    downward: rawE * (0.5 + 0.5 * sf) * wf,
+    downward: rawE * (STEMMING_MIN_EFFICIENCY + (1 - STEMMING_MIN_EFFICIENCY) * sf) * wf,
     upward: rawE * (1 - sf) * 0.7 * wf * explosive.projectionRiskMod,
     vibrationMod: explosive.vibrationMod,
   };

@@ -6,6 +6,7 @@
 // built here, so this is where it is banked and brought back.
 
 import { t } from '../../../core/i18n/I18n.js';
+import type { EntityOpener } from '../../entityLinks.js';
 import { el, chip, emptyState, scrollBoundedSection, type ChipTone } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
@@ -147,6 +148,11 @@ export class DrillStep {
   }
 
   get root(): HTMLElement { return this.el; }
+
+  /** Wire the generic entity opener so rows and names become links (#2168). */
+  setEntityOpener(_opener: EntityOpener | undefined): void {
+    throw new Error('not implemented');
+  }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }

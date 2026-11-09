@@ -14,6 +14,7 @@
 // everyone is out.
 
 import { t } from '../../../core/i18n/I18n.js';
+import type { EntityOpener } from '../../entityLinks.js';
 import { el, scrollBoundedSection } from '../../dom.js';
 import { iconEl, type IconName } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
@@ -95,6 +96,11 @@ export class FireStep {
   }
 
   get root(): HTMLElement { return this.el; }
+
+  /** Wire the generic entity opener so rows and names become links (#2168). */
+  setEntityOpener(_opener: EntityOpener | undefined): void {
+    throw new Error('not implemented');
+  }
 
   update(state: GameState, _weather?: WeatherState): void {
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);

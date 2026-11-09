@@ -15,6 +15,8 @@ const RESULT_NOTE_SEPARATOR = ' — ';
 export interface ParamStripField {
   key: string;
   label: string;
+  /** What changing this field does; shown on hover of the label. */
+  explain?: string;
   value: number;
   format?: (v: number) => string;
   onDec: () => void;

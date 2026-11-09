@@ -8,6 +8,7 @@
 // `blast`.
 
 import { PanelBase } from './PanelBase.js';
+import type { EntityOpener } from '../entityLinks.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, panelRoot, panelHeader } from '../dom.js';
 import { LocaleTextRegistry } from '../localeText.js';
@@ -119,6 +120,11 @@ export class BlastWorkshop extends PanelBase {
     this.footer.setGridProvider(fn);
     this.previewStep.setGridProvider(fn);
     this.fireStep.setGridProvider(fn);
+  }
+
+  /** Wire the generic entity opener to the steps that link to entities (#2168). */
+  setEntityOpener(_opener: EntityOpener | undefined): void {
+    throw new Error('not implemented');
   }
 
   setGameConsole(fn: GameConsoleFn): void {
