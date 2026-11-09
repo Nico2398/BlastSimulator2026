@@ -13,7 +13,8 @@ import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { vehicleDriverId, vehicleCargoMassKg } from '../../src/core/entities/Vehicle.js';
 import type { EventEmitter } from '../../src/core/state/EventEmitter.js';
-import { tickUntil } from './helpers.js';
+import { tickUntil, tickResolvingEvents } from './helpers.js';
+import { HAUL_LOAD_TICKS } from '../../src/core/config/balance.js';
 
 function makeFragment(id: number, x: number, z: number, mass = 900): FragmentData {
   return {
@@ -128,6 +129,77 @@ describe('batched hauling (#1370)', () => {
 
     expect(state.logistics.fragments.find(t => t.fragment.id === 9201)!.state).toBe('stored');
     expect(state.logistics.fragments.find(t => t.fragment.id === 9203)!.state).toBe('stored');
+    expect(vehicle.cargo).toEqual([]);
+  });
+});
+
+// ── Loading takes time, per fragment (#2199) ────────────────────────────────
+
+describe('hauling time grows with the fragment count (#2199)', () => {
+  const TOTAL_MASS_KG = 2000;
+
+  /**
+   * Ticks from the haul command until every fragment is stored, for `count` fragments sharing
+   * TOTAL_MASS_KG. With `withoutDwell` the planned dwell is cleared off the driver's itinerary
+   * first: the same trip, driven by the same movement, with loading free.
+   */
+  function tripTicks(count: number, withoutDwell: boolean): number {
+    const { run, state, vehicleId } = setup();
+    const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
+    upgradeFreightWarehousesToTier3(state);
+    const frags = Array.from({ length: count }, (_, i) => makeFragment(9500 + i, 5 + i, 6, TOTAL_MASS_KG / count));
+    addBlastFragments(state.logistics, frags, state.navGrid);
+    syncHaulDispatch(state);
+    expect(run(`vehicle haul ${vehicleId} fragment:${frags[0]!.id}`)).toMatchObject({ success: true });
+
+    const driver = state.employees.employees.find(e => e.id === vehicleDriverId(vehicle))!;
+    expect(driver.itinerary).not.toBeNull();
+    if (withoutDwell) for (const leg of driver.itinerary!.legs) delete leg.dwellTicks;
+
+    let ticks = 0;
+    while (ticks < 1500 && !frags.every(f => state.logistics.fragments.find(t => t.fragment.id === f.id)?.state === 'stored')) {
+      tickResolvingEvents(run);
+      ticks++;
+    }
+    expect(frags.every(f => state.logistics.fragments.find(t => t.fragment.id === f.id)?.state === 'stored')).toBe(true);
+    return ticks;
+  }
+
+  it('a lone fragment pays the load time once', () => {
+    const extra = tripTicks(1, false) - tripTicks(1, true);
+    expect(extra).toBeGreaterThanOrEqual(HAUL_LOAD_TICKS - 1);
+    expect(extra).toBeLessThanOrEqual(HAUL_LOAD_TICKS + 1);
+    expect(extra).toBeGreaterThan(0);
+  });
+
+  it('the same ore mass split in four fragments takes HAUL_LOAD_TICKS more per extra fragment', () => {
+    const wholeLoad = tripTicks(1, false) - tripTicks(1, true);
+    const splitLoad = tripTicks(4, false) - tripTicks(4, true);
+    const perExtra = (splitLoad - wholeLoad) / 3;
+    expect(perExtra).toBeGreaterThanOrEqual(HAUL_LOAD_TICKS - 1);
+    expect(perExtra).toBeLessThanOrEqual(HAUL_LOAD_TICKS + 1);
+    expect(splitLoad).toBeGreaterThan(wholeLoad);
+  });
+
+  it('four fragments pay four load times in total', () => {
+    const extra = tripTicks(4, false) - tripTicks(4, true);
+    expect(extra).toBeGreaterThanOrEqual(4 * HAUL_LOAD_TICKS - 1);
+    expect(extra).toBeLessThanOrEqual(4 * HAUL_LOAD_TICKS + 1);
+  });
+
+  it('the split trip still delivers the whole ore mass', () => {
+    const { run, state, vehicleId } = setup();
+    const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
+    upgradeFreightWarehousesToTier3(state);
+    const frags = Array.from({ length: 4 }, (_, i) => makeFragment(9600 + i, 5 + i, 6, TOTAL_MASS_KG / 4));
+    addBlastFragments(state.logistics, frags, state.navGrid);
+    syncHaulDispatch(state);
+    const storedBefore = state.logistics.storedMassKg;
+    expect(run(`vehicle haul ${vehicleId} fragment:${frags[0]!.id}`)).toMatchObject({ success: true });
+
+    tickUntil(run, () => frags.every(f => state.logistics.fragments.find(t => t.fragment.id === f.id)?.state === 'stored'), 1500);
+
+    expect(state.logistics.storedMassKg).toBe(storedBefore + TOTAL_MASS_KG);
     expect(vehicle.cargo).toEqual([]);
   });
 });

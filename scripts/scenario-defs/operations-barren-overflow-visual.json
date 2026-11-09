@@ -495,12 +495,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 60",
+      "command": "tick 80",
       "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable here, and the haulers keep filling the warehouse (~1.0t to ~13.9t at tick 290 on the aligned trajectory). #1722/#1723: ore and spoil are different orders; which lands first depends on which reachable rock bin the hauler weighs first. Asserting stored ore keeps this step about 'hauling keeps delivering'.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 60"
+          "command": "tick 80"
         }
       ],
       "role": "setup",
@@ -508,7 +508,7 @@
         "increased": [
           "cash"
         ],
-        "note": "#2146: minor events are non-blocking notices now. Over this window income lands (contract #74 delivery and other event/notice effects, no longer halted by minor events) and outweighs the upkeep drain, so cash rises (685164 -> ~692120) instead of falling."
+        "note": "#2146: minor events are non-blocking notices now. Over this window income lands (contract #74 delivery and other event/notice effects, no longer halted by minor events) and outweighs the upkeep drain, so cash rises (685164 -> ~692120) instead of falling. The window is 80 ticks, re-derived for #2199 (a hauler stands HAUL_LOAD_TICKS at each fragment): cash read 677713 after 60, 684372 after 100 and 682520 after 120, all below the start, while 80 ends above it."
       }
     },
     {

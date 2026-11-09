@@ -157,5 +157,7 @@ export function vehicleEtaTicks(v: Pick<Vehicle, 'x' | 'z' | 'type' | 'tier'>, i
   if (!first) return 0;
   const { speed } = getVehicleDefByTier(v.type, v.tier);
   const toFirst = speed > 0 ? Math.ceil(octileHeuristic(v.x, v.z, first.destX, first.destZ) / speed) : 0;
-  return toFirst + rest.reduce((sum, leg) => sum + leg.estTicks, 0);
+  // The first leg's estimate is replaced by the live distance; its load dwell (#2199) is added back.
+  const firstDwell = first.dwellLeft ?? first.dwellTicks ?? 0;
+  return toFirst + firstDwell + rest.reduce((sum, leg) => sum + leg.estTicks, 0);
 }

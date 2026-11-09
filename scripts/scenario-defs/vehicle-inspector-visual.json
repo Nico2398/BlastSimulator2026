@@ -359,7 +359,7 @@
     },
     {
       "command": "wait_until field:vehicleLoaded equals:false max_ticks:600",
-      "description": "Let the hauler deliver and unload at the warehouse, away from the idle fragmenter it was passing at pickup. clickEntity aims at a vehicle's screen position, so a hauler parked on top of vehicle 4 would swallow the click. Condition-based: no pinned tick count.",
+      "description": "Let the hauler deliver and unload at the warehouse, away from the idle digger. clickEntity aims at a vehicle's screen position, so a hauler parked on top of vehicle 3 would swallow the click. Condition-based: no pinned tick count.",
       "timeout": 125,
       "interaction": [
         {
@@ -378,8 +378,8 @@
       }
     },
     {
-      "command": "vehicle upgrade 4",
-      "description": "Back on a vehicle: click the staffed rock fragmenter (vehicle 4) and upgrade it through the inspector Upgrade button. Same rules and cost as the Fleet card. The blast destroys the drill rig (1) and charging truck (5), so 3 vehicles remain. The open employee inspector is closed first: it covers the viewport centre, where clickEntity aims.",
+      "command": "vehicle upgrade 3",
+      "description": "Back on a vehicle: click the idle rock digger (vehicle 3, parked clear of the rubble pile that can hide the fragmenter) and upgrade it through the inspector Upgrade button. Same rules and cost as the Fleet card. The blast destroys the drill rig (1) and charging truck (5), so 3 vehicles remain. The open employee inspector is closed first: it covers the viewport centre, where clickEntity aims.",
       "timeout": 60,
       "interaction": [
         {
@@ -390,15 +390,15 @@
         {
           "type": "clickEntity",
           "kind": "vehicle",
-          "id": 4
+          "id": 3
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"] [data-action=\"upgrade_vehicle\"]"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"upgrade_vehicle\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"] [data-action=\"upgrade_vehicle\"]"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"upgrade_vehicle\"]"
         },
         {
           "type": "screenshot"
@@ -415,17 +415,17 @@
       }
     },
     {
-      "command": "vehicle scrap 4",
+      "command": "vehicle scrap 3",
       "description": "Scrap the same vehicle from the inspector: Scrap opens the confirm modal naming the residual value; confirming removes the vehicle and credits cash.",
       "timeout": 60,
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"] [data-action=\"scrap_vehicle\"]"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"scrap_vehicle\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"] [data-action=\"scrap_vehicle\"]"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"scrap_vehicle\"]"
         },
         {
           "type": "waitForSelector",
