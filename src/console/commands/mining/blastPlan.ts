@@ -7,7 +7,7 @@ import { requireGame, requireGameWithSub, assembleCurrentBlastPlan, assembleVali
 import {
   previewEnergy,
   previewFragments,
-  previewBlastOutcome,
+  fragmentDistributionFrom,
   previewProjections,
   previewVibrations,
   purchaseSoftware,
@@ -15,7 +15,16 @@ import {
 import { averageVibrationMod, DEFAULT_GROUND_FACTOR } from '../../../core/mining/BlastExecution.js';
 import { resolveMarketId } from '../../../core/campaign/Level.js';
 import type { BlastPlan } from '../../../core/mining/BlastPlan.js';
-import { VOXEL_SIZE_CM, VILLAGE_VIBRATION_FLOOR_MM_S } from '../../../core/config/balance.js';
+import {
+  VOXEL_SIZE_CM,
+  VILLAGE_VIBRATION_FLOOR_MM_S,
+  SOFTWARE_TIER_FRAGMENTS,
+  SOFTWARE_TIER_PROJECTIONS,
+  SOFTWARE_TIER_VIBRATIONS,
+  BLAST_PREVIEW_SHAPE,
+} from '../../../core/config/balance.js';
+import { dryRunBlast } from '../../../core/mining/BlastDryRun.js';
+import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { queueSavedBlastPlan } from './savedPlanQueue.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 
@@ -82,34 +91,45 @@ export function previewCommand(
   const sub = args[0];
 
   if (sub === 'energy') {
-    // The console's energy report stays tier-gated; the workshop heatmap (#2200) reads the field at every tier.
-    const result = tier >= 1 ? previewEnergy(plan, ctx.grid!, tier, wetHoleIds) : null;
-    if (!result) return { success: false, output: `Requires software tier 1+ (current: ${tier})` };
+    // Free at every tier: the workshop heatmap (#2200) shows the same field.
+    const result = previewEnergy(plan, ctx.grid!, tier, wetHoleIds);
+    if (!result) return { success: false, output: t('mining.preview.usage') };
     return { success: true, output: `Energy preview: ${result.energyMap.size} voxels, max=${result.maxEnergy.toFixed(1)}, min=${result.minEnergy.toFixed(1)}` };
   }
   if (sub === 'fragments') {
     const result = previewFragments(plan, ctx.grid!, tier, wetHoleIds);
-    if (!result) return { success: false, output: `Requires software tier 2+ (current: ${tier})` };
+    if (!result) return { success: false, output: lockText(SOFTWARE_TIER_FRAGMENTS, tier) };
     return { success: true, output: `Fragment preview: ${result.fracturedCount} fractured, ${result.crackedCount} cracked, ${result.unaffectedCount} unaffected, avg size ${result.avgFragmentSize.toFixed(2)}` };
   }
   if (sub === 'projections') {
     const result = previewProjections(plan, ctx.grid!, tier, wetHoleIds);
-    if (!result) return { success: false, output: `Requires software tier 3+ (current: ${tier})` };
+    if (!result) return { success: false, output: lockText(SOFTWARE_TIER_PROJECTIONS, tier) };
     return { success: true, output: `Projection preview: ${result.projectionZoneCount} voxels in projection zone` };
   }
   if (sub === 'vibrations') {
     const result = previewVibrations(plan, levelVillagePositions(ctx), tier, vibrationFactor(ctx, plan));
-    if (!result) return { success: false, output: `Requires software tier 4+ (current: ${tier})` };
+    if (!result) return { success: false, output: lockText(SOFTWARE_TIER_VIBRATIONS, tier) };
     return { success: true, output: `Vibration preview: max=${result.maxVibration.toFixed(4)}` };
   }
 
   return { success: false, output: t('mining.preview.usage') };
 }
 
+/** What each tier shows, for the lock line of a section the player has not bought. */
+const TIER_SHOWS: Record<number, string> = {
+  [SOFTWARE_TIER_FRAGMENTS]: 'fragment size distribution, oversized count, fines and dust volume, value lost to dust',
+  [SOFTWARE_TIER_PROJECTIONS]: 'projection risk zones on the terrain and the dry-run rating, thrown share and furthest throw',
+  [SOFTWARE_TIER_VIBRATIONS]: 'village vibration',
+};
+
+function lockText(requiredTier: number, current: number): string {
+  return `Requires software tier ${requiredTier}+ (current: ${current}): ${TIER_SHOWS[requiredTier]}`;
+}
+
 /**
  * Show a comprehensive blast preview covering energy, fragmentation,
- * projections, and vibrations — each unlocked by the corresponding
- * software tier.  Sections with insufficient tier display a lock message.
+ * projections, and vibrations. Energy is free; the other sections are
+ * unlocked by the software tier. Sections with insufficient tier display a lock message.
  */
 export function blastPreviewCommand(
   ctx: MiningContext,
@@ -129,25 +149,26 @@ export function blastPreviewCommand(
 
   const tier = ctx.state!.softwareTier;
   const wetHoleIds = wetHoleIdSet(ctx);
-  const energyPreview = tier >= 1 ? previewEnergy(plan, ctx.grid!, tier, wetHoleIds) : null;
+  const energyPreview = previewEnergy(plan, ctx.grid!, tier, wetHoleIds) ?? { energyMap: new Map(), maxEnergy: 0, minEnergy: 0 };
   const fragmentPreview = previewFragments(plan, ctx.grid!, tier, wetHoleIds);
   const projectionPreview = previewProjections(plan, ctx.grid!, tier, wetHoleIds);
   const villages = levelVillagePositions(ctx);
   const vibrationPreview = previewVibrations(plan, villages, tier, vibrationFactor(ctx, plan));
-  // T3+: dry-run the blast itself on a forked grid, so the forecast is what the blast will do.
-  const forecast = previewBlastOutcome(
-    plan, ctx.grid!, tier, villages, DEFAULT_GROUND_FACTOR, wetHoleIds, resolveMarketId(ctx.state!),
-  );
+  // T1+: dry-run the blast itself on a forked grid, so the forecast is what the blast will do. One run serves T1 and T2.
+  const forecast = tier >= SOFTWARE_TIER_FRAGMENTS
+    ? dryRunBlast(plan, ctx.grid!, villages, DEFAULT_GROUND_FACTOR, wetHoleIds, resolveMarketId(ctx.state!))
+    : null;
+  const distribution = fragmentPreview && forecast ? fragmentDistributionFrom(forecast) : null;
 
   ctx.state!.lastBlastPreview = {
+    shape: BLAST_PREVIEW_SHAPE,
     tier,
-    energy: energyPreview
-      ? { affectedVoxels: energyPreview.energyMap.size, minEnergy: energyPreview.minEnergy, maxEnergy: energyPreview.maxEnergy }
-      : null,
-    fragments: fragmentPreview
+    energy: { affectedVoxels: energyPreview.energyMap.size, minEnergy: energyPreview.minEnergy, maxEnergy: energyPreview.maxEnergy },
+    fragments: fragmentPreview && distribution
       ? {
         fractured: fragmentPreview.fracturedCount, cracked: fragmentPreview.crackedCount, unaffected: fragmentPreview.unaffectedCount,
         avgFragmentSizeCm: fragmentPreview.avgFragmentSize * VOXEL_SIZE_CM,
+        ...distribution,
       }
       : null,
     projections: projectionPreview && forecast
@@ -169,24 +190,25 @@ export function blastPreviewCommand(
   const lines: string[] = [t('mining.blast.preview_header')];
 
   lines.push('');
-  if (energyPreview) {
-    lines.push('--- Energy Map ---');
-    lines.push(`  Affected voxels: ${energyPreview.energyMap.size}`);
-    lines.push(`  Min energy: ${energyPreview.minEnergy.toFixed(1)}`);
-    lines.push(`  Max energy: ${energyPreview.maxEnergy.toFixed(1)}`);
-  } else {
-    lines.push('--- Energy Map --- [Requires software tier 1]');
-  }
+  lines.push('--- Energy Map (free: see the heatmap) ---');
+  lines.push(`  Affected voxels: ${energyPreview.energyMap.size}`);
+  lines.push(`  Min energy: ${energyPreview.minEnergy.toFixed(1)}`);
+  lines.push(`  Max energy: ${energyPreview.maxEnergy.toFixed(1)}`);
 
   lines.push('');
-  if (fragmentPreview) {
+  if (fragmentPreview && distribution) {
     lines.push('--- Fragmentation ---');
     lines.push(`  Fractured: ${fragmentPreview.fracturedCount}`);
     lines.push(`  Cracked: ${fragmentPreview.crackedCount}`);
     lines.push(`  Unaffected: ${fragmentPreview.unaffectedCount}`);
     lines.push(`  Average fragment size: ${(fragmentPreview.avgFragmentSize * VOXEL_SIZE_CM).toFixed(0)} cm`);
+    lines.push(`  Oversized fragments: ${distribution.oversizedFragments} of ${distribution.fragmentCount}`);
+    lines.push(`  Good volume: ${distribution.goodVolumeM3.toFixed(1)} m3`);
+    lines.push(`  Fines volume: ${distribution.finesVolumeM3.toFixed(1)} m3`);
+    lines.push(`  Dust volume: ${distribution.dustVolumeM3.toFixed(1)} m3`);
+    lines.push(`  Value lost to dust: $${formatMoney(distribution.dustLossValue)}`);
   } else {
-    lines.push('--- Fragmentation --- [Requires software tier 2]');
+    lines.push(`--- Fragmentation --- [${lockText(SOFTWARE_TIER_FRAGMENTS, tier)}]`);
   }
 
   lines.push('');
@@ -203,7 +225,7 @@ export function blastPreviewCommand(
     lines.push(`  Thrown share: ${Math.round(forecast.thrownShare * 100)}% (${forecast.projectionCount} of ${forecast.fragmentCount} fragments)`);
     lines.push(`  Furthest throw: ${forecast.furthestThrowM.toFixed(0)} m`);
   } else {
-    lines.push('--- Projections --- [Requires software tier 3]');
+    lines.push(`--- Projections --- [${lockText(SOFTWARE_TIER_PROJECTIONS, tier)}]`);
   }
 
   lines.push('');
@@ -213,7 +235,7 @@ export function blastPreviewCommand(
     const felt = vibrationPreview.villages.filter(v => v.vibration >= VILLAGE_VIBRATION_FLOOR_MM_S).length;
     lines.push(`  Affected villages: ${vibrationPreview.villages.length} measured, ${felt} above ${VILLAGE_VIBRATION_FLOOR_MM_S} mm/s`);
   } else {
-    lines.push('--- Vibrations --- [Requires software tier 4]');
+    lines.push(`--- Vibrations --- [${lockText(SOFTWARE_TIER_VIBRATIONS, tier)}]`);
   }
 
   return { success: true, output: lines.join('\n') };

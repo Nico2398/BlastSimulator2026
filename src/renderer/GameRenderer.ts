@@ -18,6 +18,7 @@ import { onGroundFragmentData, type LogisticsState } from '../core/economy/Logis
 import type { GameState } from '../core/state/GameState.js';
 import type { WallFace } from '../core/mining/WallStability.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
+import { SOFTWARE_TIER_PROJECTIONS } from '../core/config/balance.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
 import type { SceneManager } from './SceneManager.js';
 import type { TerrainMesh, DirtyRegion } from './TerrainMesh.js';
@@ -53,7 +54,7 @@ import type { EmployeePictograms } from './EmployeePictograms.js';
 import type { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import type { SurveyConfidenceOverlayOptions } from './SurveyConfidenceOverlay.js';
 
-import { syncGameRendererEntities, syncSurveyOverlay, buildSurveyOverlayOptions, buildWallOverlayFaces, syncWallOverlay, buildHeatmapColumns, syncEnergyHeatmap } from './GameRendererSync.js';
+import { syncGameRendererEntities, syncSurveyOverlay, buildSurveyOverlayOptions, buildWallOverlayFaces, syncWallOverlay, buildHeatmapColumns, syncEnergyHeatmap, buildProjectionZoneColumns, syncProjectionZones } from './GameRendererSync.js';
 import {
   rebuildTerrain, remeshTerrainRegion, stepTerrainRemesh, finishTerrainRemesh, siteBoundsChanged, playableCut,
   landscapeEdgeHeightSampler, rebuildBorderWall, getTerrainSurfaceY, getSmoothTerrainSurfaceY,
@@ -151,6 +152,7 @@ export class GameRenderer {
   private wallOverlayPreference = false;
   private energyHeatmapPreference = false;
   private energyHeatmapShown: ColumnBandSummary[] | null = null;
+  private projectionZoneKey: { grid: VoxelGrid; holes: unknown; charges: unknown; revision: number; tier: number } | null = null;
   private energyHeatmapIndex = new Map<string, ColumnBandSummary>();
   /** Faces the overlay shows, rebuilt only when the terrain or the game bound to it changes. */
   private wallOverlayCache: { state: GameState; gridId: number; revision: number; faces: WallFace[]; planKey: string } | null = null;
@@ -360,6 +362,7 @@ export class GameRenderer {
     });
     this.refreshWallOverlay();
     this.refreshEnergyHeatmap();
+    this.refreshProjectionZones();
     this.lastGhostRevision = result.lastGhostRevision;
     this.lastSyncedTerrainRevision = result.lastSyncedTerrainRevision;
     // syncGameRendererEntities() only returns lastWeather when a skybox received it.
@@ -599,6 +602,22 @@ export class GameRenderer {
     this.energyHeatmapShown = columns;
     this.energyHeatmapIndex = new Map(columns.map(c => [`${c.x},${c.z}`, c]));
     syncEnergyHeatmap(this.terrain, columns, true);
+  }
+
+  /** Tint the columns the armed plan would throw rock from (software T2, #2201); recomputed when the plan, the grid or the tier changes. */
+  private refreshProjectionZones(): void {
+    const state = this.lastState, grid = this.lastGrid;
+    if (!state || !grid || state.softwareTier < SOFTWARE_TIER_PROJECTIONS || state.drillHoles.length === 0) {
+      this.projectionZoneKey = null;
+      syncProjectionZones(this.terrain, []);
+      return;
+    }
+    const key = { grid, holes: state.drillHoles, charges: state.chargesByHole, revision: this.terrainMeshRevision, tier: state.softwareTier };
+    const shown = this.projectionZoneKey;
+    if (shown && shown.grid === key.grid && shown.holes === key.holes && shown.charges === key.charges
+      && shown.revision === key.revision && shown.tier === key.tier) return;
+    this.projectionZoneKey = key;
+    syncProjectionZones(this.terrain, buildProjectionZoneColumns(state, grid));
   }
 
   private refreshWallOverlay(): void {

@@ -3508,3 +3508,9 @@ export const SOFTWARE_TIER_OPTIMIZER = 4;
 
 /** Version of the persisted `lastBlastPreview` shape; a save carrying another one loads it as null. */
 export const BLAST_PREVIEW_SHAPE = 2;
+
+/** Tint of the projection risk zones on the terrain (#2201). */
+export const PROJECTION_ZONE_COLOR = 0xff4020;
+
+/** Opacity of the projection risk zone tint (#2201). */
+export const PROJECTION_ZONE_OPACITY = 0.5;

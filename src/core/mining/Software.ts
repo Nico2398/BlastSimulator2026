@@ -16,6 +16,9 @@ import {
   FRAGMENTATION_MULTIPLIER,
   CRACKED_VOXEL_ENERGY_RATIO,
   PROJECTION_SPEED_THRESHOLD,
+  SOFTWARE_TIER_FRAGMENTS,
+  SOFTWARE_TIER_PROJECTIONS,
+  SOFTWARE_TIER_VIBRATIONS,
 } from '../config/balance.js';
 import {
   calculateVibrations,
@@ -194,7 +197,7 @@ export function previewEnergy(
 }
 
 /**
- * Preview fragmentation quality. Requires software tier >= 2.
+ * Preview fragmentation quality. Requires software tier >= 1.
  * `fracturedCount` is the blast's cleared-voxel count (the same pass executeBlast runs), not the
  * energy-test count; `avgFragmentSize` still averages the energy-test fractured voxels.
  */
@@ -204,7 +207,7 @@ export function previewFragments(
   softwareTier: number,
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): FragmentPreview | null {
-  if (softwareTier < 2) return null;
+  if (softwareTier < SOFTWARE_TIER_FRAGMENTS) return null;
 
   const field = buildPlanEnergyField(plan, grid, wetHoleIds);
   if (!field) return { fracturedCount: 0, crackedCount: 0, unaffectedCount: 0, avgFragmentSize: 1 };
@@ -240,24 +243,35 @@ export function previewFragments(
 }
 
 /** The tier-1 content of a dry-run forecast. */
-export function fragmentDistributionFrom(_forecast: BlastForecast): FragmentDistribution {
-  throw new Error('not implemented');
+export function fragmentDistributionFrom(forecast: BlastForecast): FragmentDistribution {
+  return {
+    bandVolumes: forecast.bandVolumes,
+    fragmentCount: forecast.fragmentCount,
+    oversizedFragments: forecast.oversizedFragments,
+    goodVolumeM3: forecast.bandVolumes.good,
+    finesVolumeM3: forecast.bandVolumes.fines,
+    dustVolumeM3: forecast.bandVolumes.dust,
+    dustLossMassKg: forecast.dustLossMassKg,
+    dustLossValue: forecast.dustLossValue,
+  };
 }
 
 /** Dry-run the blast and read its fragment distribution. Requires software tier >= 1; null below it or without holes. */
 export function previewFragmentDistribution(
-  _plan: BlastPlan,
-  _grid: VoxelGrid,
-  _softwareTier: number,
-  _villages: readonly VillagePosition[],
-  _groundFactor: number,
-  _wetHoleIds: ReadonlySet<string>,
-  _marketId?: MarketId,
+  plan: BlastPlan,
+  grid: VoxelGrid,
+  softwareTier: number,
+  villages: readonly VillagePosition[],
+  groundFactor: number,
+  wetHoleIds: ReadonlySet<string>,
+  marketId?: MarketId,
 ): FragmentDistribution | null {
-  throw new Error('not implemented');
+  if (softwareTier < SOFTWARE_TIER_FRAGMENTS) return null;
+  const forecast = dryRunBlast(plan, grid, villages, groundFactor, wetHoleIds, marketId);
+  return forecast ? fragmentDistributionFrom(forecast) : null;
 }
 
-/** Dry-run the whole blast on a forked grid. Requires software tier >= 3; null below it. */
+/** Dry-run the whole blast on a forked grid. Requires software tier >= 2; null below it. */
 export function previewBlastOutcome(
   plan: BlastPlan,
   grid: VoxelGrid,
@@ -267,18 +281,18 @@ export function previewBlastOutcome(
   wetHoleIds: ReadonlySet<string>,
   marketId?: MarketId,
 ): BlastForecast | null {
-  if (softwareTier < 3) return null;
+  if (softwareTier < SOFTWARE_TIER_PROJECTIONS) return null;
   return dryRunBlast(plan, grid, villages, groundFactor, wetHoleIds, marketId);
 }
 
-/** Preview projection zones. Requires software tier >= 3. */
+/** Preview projection zones. Requires software tier >= 2. */
 export function previewProjections(
   plan: BlastPlan,
   grid: VoxelGrid,
   softwareTier: number,
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): ProjectionPreview | null {
-  if (softwareTier < 3) return null;
+  if (softwareTier < SOFTWARE_TIER_PROJECTIONS) return null;
 
   const field = buildPlanEnergyField(plan, grid, wetHoleIds);
   if (!field) return { projectionZoneCount: 0, projectionZonePositions: [] };
@@ -308,10 +322,10 @@ export function previewProjections(
 }
 
 export interface HolePreviewDetail {
-  /** Predicted average fragment size at this hole's position (cm). Tier >= 2. */
+  /** Predicted average fragment size at this hole's position (cm). Tier >= 1. */
   fragSizeCm?: number;
   /** Predicted projection speed (m/s), only set when the hole's rock is predicted
-   *  to be thrown clear (energy ratio >= projection threshold). Tier >= 3. */
+   *  to be thrown clear (energy ratio >= projection threshold). Tier >= 2. */
   projectionSpeedMs?: number;
 }
 
@@ -319,8 +333,8 @@ export interface HolePreviewDetail {
  * Preview per-hole fragmentation and projection detail, for the blast-plan
  * overlay (BlastPlanOverlay.ts) to render fragment-size dots and projection
  * arcs per hole. Tier-gated the same as previewFragments/previewProjections —
- * an entry's `fragSizeCm` is only present at tier >= 2, `projectionSpeedMs`
- * only at tier >= 3.
+ * an entry's `fragSizeCm` is only present at tier >= 1, `projectionSpeedMs`
+ * only at tier >= 2.
  */
 export function previewHoleDetails(
   plan: BlastPlan,
@@ -329,7 +343,7 @@ export function previewHoleDetails(
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): Record<string, HolePreviewDetail> {
   const result: Record<string, HolePreviewDetail> = {};
-  if (softwareTier < 2) return result;
+  if (softwareTier < SOFTWARE_TIER_FRAGMENTS) return result;
 
   const field = buildPlanEnergyField(plan, grid, wetHoleIds);
   if (!field) return result;
@@ -353,7 +367,7 @@ export function previewHoleDetails(
       fragSizeCm: Math.cbrt(predicted.sizeM3) * VOXEL_SIZE_CM,
     };
 
-    if (softwareTier >= 3) {
+    if (softwareTier >= SOFTWARE_TIER_PROJECTIONS) {
       const velocity = computeFragmentVelocity(
         vec3(gx, gy, gz),
         [{ x: gx, y: gy, z: gz, weight: 1 }],
@@ -372,7 +386,7 @@ export function previewHoleDetails(
 }
 
 /**
- * Preview vibrations at villages. Requires software tier >= 4.
+ * Preview vibrations at villages. Requires software tier >= 3.
  * `groundFactor` must be the one executeBlast uses (base factor x averageVibrationMod) for the preview to equal the blast.
  */
 export function previewVibrations(
@@ -381,7 +395,7 @@ export function previewVibrations(
   softwareTier: number,
   groundFactor: number = 1.0,
 ): VibrationPreview | null {
-  if (softwareTier < 4) return null;
+  if (softwareTier < SOFTWARE_TIER_VIBRATIONS) return null;
 
   const blastChargeKg = totalChargeKg(plan.holes, plan.charges);
   let cx = 0, cz = 0;

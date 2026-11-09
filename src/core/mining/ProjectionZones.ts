@@ -2,7 +2,9 @@
 
 /** Unique ground columns holding projected voxels, sorted by x then z. */
 export function projectionZoneColumns(
-  _positions: ReadonlyArray<{ x: number; y: number; z: number }>,
+  positions: ReadonlyArray<{ x: number; y: number; z: number }>,
 ): Array<{ x: number; z: number }> {
-  throw new Error('not implemented');
+  const seen = new Map<string, { x: number; z: number }>();
+  for (const { x, z } of positions) seen.set(`${x},${z}`, { x, z });
+  return [...seen.values()].sort((a, b) => a.x - b.x || a.z - b.z);
 }

@@ -24,6 +24,7 @@ import { TerrainMaterial } from './terrain/TerrainMaterial.js';
 import { SurveyConfidenceOverlay } from './SurveyConfidenceOverlay.js';
 import { WallStabilityOverlay } from './WallStabilityOverlay.js';
 import { EnergyHeatmapOverlay } from './EnergyHeatmapOverlay.js';
+import { ProjectionZoneOverlay } from './ProjectionZoneOverlay.js';
 
 // The density field moved to terrain/TerrainField.ts (#1603); its public samplers stay importable from here.
 export { densityGradientNormal, virtualEdgeDensity, type EdgeHeightSampler } from './terrain/TerrainField.js';
@@ -133,6 +134,7 @@ export class TerrainMesh {
   private surveyOverlay: SurveyConfidenceOverlay | null = null;
   private wallOverlay: WallStabilityOverlay | null = null;
   private energyHeatmapOverlay: EnergyHeatmapOverlay | null = null;
+  private projectionZoneOverlay: ProjectionZoneOverlay | null = null;
 
   /** Packed signed chunk coordinate -> its Mesh, or null for a built-but-empty chunk (no triangles). */
   private readonly chunks = new Map<number, THREE.Mesh | null>();
@@ -349,6 +351,8 @@ export class TerrainMesh {
     this.wallOverlay = null;
     this.energyHeatmapOverlay?.dispose();
     this.energyHeatmapOverlay = null;
+    this.projectionZoneOverlay?.dispose();
+    this.projectionZoneOverlay = null;
   }
 
   /**
@@ -387,6 +391,14 @@ export class TerrainMesh {
       this.energyHeatmapOverlay = new EnergyHeatmapOverlay(this.scene, (x, z) => getSmoothTerrainSurfaceY(this.grid, x, z));
     }
     return this.energyHeatmapOverlay;
+  }
+
+  /** Get or lazily create the projection risk zone overlay (#2201); conforms to the smoothed surface. */
+  getProjectionZoneOverlay(): ProjectionZoneOverlay {
+    if (!this.projectionZoneOverlay) {
+      this.projectionZoneOverlay = new ProjectionZoneOverlay(this.scene, (x, z) => getSmoothTerrainSurfaceY(this.grid, x, z));
+    }
+    return this.projectionZoneOverlay;
   }
 
   /** The Mesh for one chunk, or null if it's empty/unbuilt — diagnostics and dirty-set tests. */

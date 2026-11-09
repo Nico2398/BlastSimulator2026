@@ -6,7 +6,7 @@ import { cancelLegacyUpgradeOrders } from './LegacyUpgradeOrders.js';
 import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
 import { createTaxAuditState } from '../events/TaxAudit.js';
-import { SCORE_DECAY_RATE, QUALIFICATION_SALARY_BONUS, SMUGGLING_MIGRATED_VOLUME } from '../config/balance.js';
+import { SCORE_DECAY_RATE, QUALIFICATION_SALARY_BONUS, SMUGGLING_MIGRATED_VOLUME, BLAST_PREVIEW_SHAPE } from '../config/balance.js';
 import { releaseBarrenStoredFragments, syncLogisticsCapacity } from '../economy/Logistics.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { BASE_SALARIES, calculateQualificationBonus } from '../entities/Employee.js';
@@ -1066,6 +1066,10 @@ export function deserialize(json: string): GameState {
   const saturation = obj['grade'] ? sanitizeOreSaturation(obj['saturation']) : undefined;
   if (saturation) obj['saturation'] = saturation;
   else delete obj['saturation'];
+
+  // #2201: a preview written under the old tier line-up carries other content for the same tier number; drop it.
+  const preview = obj['lastBlastPreview'] as { shape?: unknown } | null | undefined;
+  if (preview && preview.shape !== BLAST_PREVIEW_SHAPE) obj['lastBlastPreview'] = null;
 
   const restored = obj as unknown as GameState;
   // Capacity is derived from the warehouses, never trusted from the save (#1369).
