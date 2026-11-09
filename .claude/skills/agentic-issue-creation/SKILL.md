@@ -1,6 +1,6 @@
 ---
 name: agentic-issue-creation
-description: Create or edit GitHub issues for agentic pipeline consumption — context, files, test files, dependencies (setting or reading a blocked_by relationship), labels, and verification criteria. Use when filing an issue for autonomous coding agents, when recording technical debt, a codebase gap, an inconsistency or a defect found while working on something else, when cutting a task that turns out to be bigger than one run and filing the remainder, or when editing an already-filed issue's dependencies, labels, or lifecycle state.
+description: Create or edit GitHub issues for agentic pipeline consumption — context, files, test files, dependencies (setting or reading a blocked_by relationship), labels, verification criteria, and epics grouping a batch of sub-issues. Use when filing an issue for autonomous coding agents, when filing a batch of issues for one feature or feature group, when recording technical debt, a codebase gap, an inconsistency or a defect found while working on something else, when cutting a task that turns out to be bigger than one run and filing the remainder, or when editing an already-filed issue's dependencies, labels, or lifecycle state.
 ---
 
 # Skill: agentic-issue-creation
@@ -13,7 +13,7 @@ Four situations put an agent here, and they differ only in what the issue record
 
 | Situation | What the issue carries |
 |-----------|------------------------|
-| **Planned work** — decomposing a feature, or a human filing a task | The task itself, in one of the two shapes below |
+| **Planned work** — decomposing a feature, or a human filing a task | The task itself, in one of the two shapes below — and, for a batch that delivers one behaviour together, an epic over it (Epics below) |
 | **A finding** — technical debt, a codebase gap, an inconsistency, a defect noticed while working on something else | The finding, plus where it was found and why it was not fixed on the spot |
 | **A blocker you routed around** — something in your task's way that you bypassed with a `TODO(#N)` | The finding, plus the bypass to remove and the file it is in |
 | **A scope cut** — the assigned task turns out to be bigger than one run can carry | The remainder deliberately left out, and what was landed instead |
@@ -40,7 +40,7 @@ Both enter the same queue once `ready` lands on the issue — a two-line issue t
 3. Fill every section that shape carries, using the headings below verbatim
 4. Verify the Rules are satisfied
 5. Run through the Checklist
-6. Create the issue with `gh issue create`, setting labels per the Labels section below — always `agent-task` and the issue's `scope:*` labels, and `ready` only when the Definition of Ready holds. A human who specified labels, or said the issue should wait, overrides that table; a human who asked for `ready` still gets the scope labels it needs
+6. Create the issue with `gh issue create`, setting labels per the Labels section below — always `agent-task` and the issue's `scope:*` labels, and `ready` only when the Definition of Ready holds; an epic carries `epic` alone, filed in the order Epics below gives. A human who specified labels, or said the issue should wait, overrides that table; a human who asked for `ready` still gets the scope labels it needs
 
    ```bash
    gh issue create --label agent-task --label ready --label scope:nav --label scope:engine \
@@ -75,7 +75,7 @@ Searching costs one command. Filing a duplicate costs a run.
 
 `ready` says *this work should be done, and the issue is good enough to start from.* An issue carries it only when every line below holds. The first two are checked by machine, the rest by whoever adds the label:
 
-1. **`agent-task`** — it is a task for the pipeline.
+1. **`agent-task`, and no `epic`** — it is a task for the pipeline, not the parent of a batch (Epics below).
 2. **One or more `scope:*` labels, every one from the taxonomy below** — the areas its change will stay inside. The assigner runs issues side by side only when their scopes are disjoint, so an issue that declares none cannot be placed at all.
 3. **The outcome is stated** — Context says why, Task says what is different once it is done. A two-line intent issue can meet this.
 4. **Verification is observable** — how a reader tells it is finished, not which commands to run.
@@ -83,11 +83,11 @@ Searching costs one command. Filing a duplicate costs a run.
 6. **No open question** — an issue carrying `## Open question` waits on a human and is not ready.
 7. **Confidence is high** — the Labels table below.
 
-**The checkable half is enforced where the label is spent.** `readinessVerdict` in `.github/scripts/assignability.cjs` decides lines 1 and 2. `agentic-intake.yml` takes `ready` off an issue that fails them — on open, and whenever `ready`, a scope or `agent-task` arrives or leaves — and comments what is missing; `agentic-assign` refuses the same issue on the same verdict. So `ready` never sits on an issue the queue will not take. The "Agent Task" form meets line 2 through its required Scope field, which intake turns into labels.
+**The checkable half is enforced where the label is spent.** `readinessVerdict` in `.github/scripts/assignability.cjs` decides lines 1 and 2. `agentic-intake.yml` takes `ready` off an issue that fails them — on open, whenever `ready` or `epic` arrives, and whenever a scope or `agent-task` arrives or leaves — and comments what is missing; `agentic-assign` refuses the same issue on the same verdict. So `ready` never sits on an issue the queue will not take. The "Agent Task" form meets line 2 through its required Scope field, which intake turns into labels.
 
 ## ▶ Labels — `ready` is a confidence statement
 
-`agentic-assign` selects on `ready`, and only among issues meeting the Definition of Ready. Putting it on a hunch spends a whole run discovering the hunch was wrong. Every issue an agent files carries `agent-task` and its `scope:*` labels whatever its confidence, so that `ready` is the only thing a human has to add when they agree.
+`agentic-assign` selects on `ready`, and only among issues meeting the Definition of Ready. Putting it on a hunch spends a whole run discovering the hunch was wrong. Every task issue an agent files carries `agent-task` and its `scope:*` labels whatever its confidence, so that `ready` is the only thing a human has to add when they agree. An epic is not a task and carries `epic` alone.
 
 | Confidence | Labels | What follows |
 |-----------|--------|--------------|
@@ -100,7 +100,7 @@ Searching costs one command. Filing a duplicate costs a run.
 
 An issue held for confirmation carries an `## Open question` section naming exactly what a human must answer and what changes with each answer. Without it the issue is a hunch nobody can act on, and it waits until someone re-derives the question you already knew.
 
-**Every issue you file leaves with exactly one hold-or-go marker: `ready`, an `## Open question` section, or `decision-review`.** Leaving `ready` off is a decision, and the body has to carry its reason — a held issue states its question, a decision states its default. An issue with none of the three is a filing error. Nothing in the pipeline tells a human to look at it — `agentic-intake.yml` checks only issues that already carry `ready` — so it sits out of the queue with nobody deciding it, while the run that filed it reports the follow-up handled. Before `gh issue create`, read your own body: no `## Open question` and not a decision means `--label ready` is on the command.
+**Every task issue you file leaves with exactly one hold-or-go marker: `ready`, an `## Open question` section, or `decision-review`** — an epic carries none of the three, since the queue never takes it. Leaving `ready` off is a decision, and the body has to carry its reason — a held issue states its question, a decision states its default. An issue with none of the three is a filing error. Nothing in the pipeline tells a human to look at it — `agentic-intake.yml` checks only issues that already carry `ready` — so it sits out of the queue with nobody deciding it, while the run that filed it reports the follow-up handled. Before `gh issue create`, read your own body: no `## Open question` and not a decision means `--label ready` is on the command.
 
 ### Scope labels — where the diff will stay
 
@@ -239,11 +239,61 @@ Cut instead:
 
 1. **Pick the slice that reaches a green pull request on its own.** Not the slice already written — the slice that is coherent. A half-migrated call site is worse than an unmigrated one.
 2. **Land it, verified through every channel it owes.** A reduced scope changes nothing about the Verification Gate.
-3. **File the remainder**, one issue per slice, each able to reach green alone. The three splitting strategies above apply unchanged, and splitting the enablers off first is still the best of them.
+3. **File the remainder**, one issue per slice, each able to reach green alone. The three splitting strategies above apply unchanged, and splitting the enablers off first is still the best of them. When the original issue is a sub-issue of an epic, every remainder issue is attached to that same epic.
 4. **Say what was cut**, in the pull request body and on the original issue, naming the new issue numbers. A remainder nobody can find is a remainder nobody does.
 5. **Set `Blocked by` only where a real ordering exists.** Slices touching different files are independent, and marking them blocked on each other serialises work that could run side by side.
 
 The original issue closes on its own merged pull request with its reduced scope stated. It stays open to track nothing — that is what the new issues are for, and an issue held open past its own merge defers every assignment behind it.
+
+## ▶ Epics — a batch that delivers one behaviour
+
+Every time planned work is filed, decide its shape yourself; never ask:
+
+| File | When |
+|------|------|
+| **Standalone issues** | Each issue's own Verification proves its value alone — one issue, or several independent ones |
+| **An epic with sub-issues** | Two or more issues deliver one behaviour — a feature, a feature group, a split from Sizing — observable only once all of them have landed |
+
+An epic is a GitHub issue carrying the `epic` label **and no other label**, open or closed. It is never a task: `readinessVerdict` refuses it, so the queue never assigns it, and its sub-issues are what the queue takes. Each sub-issue is an ordinary issue under every other rule on this page — shape, labels, scopes, Definition of Ready, sizing. Once every sub-issue has closed, the epic is checked end to end and closed by `agentic-epic-review`.
+
+**The epic's body:**
+
+```markdown
+## Goal
+[The behaviour the batch delivers, and why it is wanted.]
+
+## Epic verification
+- [Observable end-to-end outcome, true only once every sub-issue has landed]
+
+## Out of scope
+- [What this epic deliberately leaves out]
+```
+
+The sub-issues are listed by GitHub's parent/child relationship, never as a checklist in the epic's body. Each sub-issue's `## Context` names its epic as `Part of epic #<E>` — a mention, which the queue never reads as a dependency.
+
+**Filing order:**
+
+1. Run the duplicate check against open epics too. An open epic promising the same behaviour gains sub-issues rather than a twin.
+2. Create the epic with `--label epic` and nothing else.
+3. Create every sub-issue, without `ready`.
+4. Attach each sub-issue to the epic by its **database id**, as for a dependency, then read the list back:
+   ```bash
+   REPO=Nico2398/BlastSimulator2026
+   SUB_ID=$(gh api "repos/$REPO/issues/<sub-number>" --jq .id)
+   gh api --method POST "repos/$REPO/issues/<E>/sub_issues" -F "sub_issue_id=$SUB_ID"
+   gh api "repos/$REPO/issues/<E>/sub_issues" --jq '.[].number'
+   ```
+   Without `gh`, the same endpoints through `curl` with `$GITHUB_TOKEN`, or the GitHub MCP's `sub_issue_write` (method `add`) and `issue_read` (method `get_sub_issues`).
+5. Set the `blocked_by` relationships between sub-issues (Setting a dependency below). Order between sub-issues is always a dependency; the parent/child relationship orders nothing.
+6. Add `ready` last, to every sub-issue meeting the Definition of Ready.
+
+**Rules:**
+
+- **Epics are flat.** A sub-issue is a task, never an epic. A second batch is a second epic, and a sub-issue of it may be `Blocked by` the first epic itself, which holds it until that epic is reviewed and closed.
+- **A sub-issue never depends on its own epic**, which closes only after it.
+- **One parent per issue**, and at most 100 sub-issues per epic — GitHub's limits.
+- **Work the epic's behaviour needs is a sub-issue of that epic**, wherever it is found: a scope-cut remainder of a sub-issue, or a gap `agentic-epic-review` finds. A finding, a bypass or a decision filed while working a sub-issue stays standalone.
+- **A sub-issue's pull request closes that sub-issue only.** The epic is closed by its review, or by the review's own fix pull request.
 
 ## Setting a dependency
 
@@ -320,6 +370,8 @@ recorded can be picked up in that window.
 
 ## Checklist
 
+- [ ] A batch delivering one behaviour is filed under an epic; independent work is filed standalone
+- [ ] An epic carries `epic` and no other label; every sub-issue is attached to it and read back before any `ready`
 - [ ] Title starts with feature context ("Add tutorial level - ...")
 - [ ] Context section explains the larger feature and this task's place in it
 - [ ] Task section states what changes

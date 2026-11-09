@@ -28,6 +28,14 @@ const BLOCKED = 'blocked';
 const DONE = 'done';
 
 /**
+ * The parent of a batch of sub-issues, never a task itself. An epic carries this
+ * label and nothing else, open or closed (`agentic-issue-creation`): its
+ * sub-issues are what the queue takes, so `readinessVerdict` refuses it and the
+ * merge chain closes it without settling a lifecycle it never had.
+ */
+const EPIC = 'epic';
+
+/**
  * A run stopped here on a dependency it filed, not on a question for a human.
  *
  * `blocked` and `paused` are both terminal — the session is over either way —
@@ -291,7 +299,7 @@ const yes = () => ({ assignable: true, reason: 'no blocking condition found', un
  * queue may hand it to an agent. `agentic-issue-creation` holds the whole
  * definition — outcome, verification, declared dependencies, no open question —
  * and most of it is judgment. This is the part that is not: the issue is a
- * pipeline task (`agent-task`), and it declares the areas its diff will stay
+ * pipeline task (`agent-task`), not an epic, and it declares the areas its diff will stay
  * inside, every one from `SCOPES`. Without a scope the assigner cannot tell what
  * the issue may run beside, and a typo would silently widen what runs at once.
  *
@@ -306,6 +314,9 @@ const yes = () => ({ assignable: true, reason: 'no blocking condition found', un
 function readinessVerdict(issue) {
   const labels = issue.labels || [];
   const missing = [];
+  if (labels.includes(EPIC)) {
+    missing.push(`it is labelled \`${EPIC}\`, a parent whose sub-issues are the tasks — an epic is never queued itself`);
+  }
   if (!labels.includes(AGENT_TASK)) {
     missing.push(`it carries no \`${AGENT_TASK}\` label`);
   }
@@ -1196,6 +1207,7 @@ module.exports = {
   AGENT_TASK,
   BLOCKED,
   DONE,
+  EPIC,
   IN_PROGRESS,
   PAUSED,
   READY,
