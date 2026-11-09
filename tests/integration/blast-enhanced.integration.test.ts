@@ -375,7 +375,7 @@ describe('Blast enhanced — village vibration (#1343)', () => {
     recordProfit(ctx.campaignProfile.campaign, 'dusty_hollow', 80000);
     expect(run('campaign start level:grumpstone_ridge cash:500000').success).toBe(true);
     const state = ctx.state!;
-    state.softwareTier = opts.tier ?? 4;
+    state.softwareTier = opts.tier ?? 3;
     if (opts.noVillages) vi.spyOn(ctx.playableArea!, 'villages').mockReturnValue([]);
 
     expect(run('employee hire role:driller').success).toBe(true);
@@ -412,7 +412,7 @@ describe('Blast enhanced — village vibration (#1343)', () => {
     expect(ctx.playableArea!.villages().length).toBeGreaterThan(0);
   });
 
-  it('tier 4 preview measures a positive vibration at the villages', () => {
+  it('tier 3 preview measures a positive vibration at the villages', () => {
     const ctx = chargedRidge();
     const max = previewMax(ctx);
     expect(max).not.toBeNull();
@@ -420,8 +420,8 @@ describe('Blast enhanced — village vibration (#1343)', () => {
     expect(ctx.state!.lastBlastPreview!.vibrations!.affectedVillages).toBe(ctx.playableArea!.villages().length);
   });
 
-  it('a preview below tier 4 reports no vibration data', () => {
-    const ctx = chargedRidge({ tier: 3 });
+  it('a preview below tier 3 reports no vibration data', () => {
+    const ctx = chargedRidge({ tier: 2 });
     expect(previewMax(ctx)).toBeNull();
   });
 
@@ -430,7 +430,7 @@ describe('Blast enhanced — village vibration (#1343)', () => {
     expect(fire(ctx)).toBeGreaterThan(0);
   });
 
-  it('the blast measures vibration even below tier 4 (the tier gates only the preview)', () => {
+  it('the blast measures vibration even below tier 3 (the tier gates only the preview)', () => {
     const ctx = chargedRidge({ tier: 1 });
     expect(fire(ctx)).toBeGreaterThan(0);
   });
