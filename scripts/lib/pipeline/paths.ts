@@ -87,7 +87,11 @@ export type Channel = 'static' | 'logic' | 'scenario' | 'context' | 'i18n' | 'du
  *
  * `context` is `validate:context` plus the suites that read context files
  * (`tests/unit/config`, `tests/unit/lint`): a context-only change owes those,
- * not the whole 270-second suite.
+ * not the test suite.
+ *
+ * `logic` here is the full suite. `verify` runs it only on `--full` or when
+ * the focused selection (`test-selection.ts`) escalates; otherwise it runs
+ * Vitest on the selected files.
  */
 export const CHANNEL_COMMANDS: Record<Channel, string[][]> = {
   context: [
@@ -106,15 +110,17 @@ export const CHANNEL_ORDER: Channel[] = ['context', 'i18n', 'static', 'duplicati
 /**
  * The channels `verify` runs for these changed paths. `visual` is never in it:
  * screenshots are read by the visual-tester, and interaction mode is CI's.
- * `logic` subsumes `context`'s test half, so a change owing both runs the
- * suite once.
+ * A full `logic` run subsumes `context`'s test half; a focused one does not
+ * (`contextSubsumedBy` in verify.ts). A workflow or composite action owes
+ * `logic`: the Actions layer has no local runtime, and the suites that read
+ * its YAML are its only proof before CI.
  */
 export function channelsFor(paths: string[]): Channel[] {
   const owed = new Set<Channel>();
   for (const path of paths) {
     const context = isContextPath(path);
     if (isTypeScript(path) || isBuildConfig(path)) owed.add('static');
-    if (isCode(path) || isBuildConfig(path) || (path.endsWith('.json') && !context)) owed.add('logic');
+    if (isCode(path) || isBuildConfig(path) || (path.endsWith('.json') && !context) || isPipelineCodePath(path)) owed.add('logic');
     if (isCode(path) && (path.startsWith('src/') || path.startsWith('scripts/'))) owed.add('duplication');
     if (owesScenarios(path)) owed.add('scenario');
     if (context) owed.add('context');

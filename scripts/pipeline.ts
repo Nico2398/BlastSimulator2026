@@ -13,13 +13,15 @@
  *   npm run pipeline -- tdd red    --label <label> [--no-commit] [--detail]  (the test-writer runs this with --detail)
  *   npm run pipeline -- tdd join   --label <label>
  *   npm run pipeline -- tdd status --label <label>
- *   npm run pipeline -- verify [--base origin/main] [--only static,logic] [--no-cache]
+ *   npm run pipeline -- verify [--base origin/main] [--only static,logic] [--no-cache] [--full]
  *   npm run pipeline -- review-brief [--base origin/main] [--label <label>]...
  *   npm run pipeline -- step <name> --label <label> [--heavy] [--note "<what is open>"]   (`step done` closes the last)
  *   npm run pipeline -- open-pr --label <label> --title <title> --body-file <file> [--draft | --paused]
  *
- * `verify` outlives one Bash call on a full change: run it through
- * `npm run long -- start verify -- npm run pipeline -- verify`.
+ * `verify`'s `logic` channel runs the test files the diff can break, not the
+ * whole suite — the full suite is CI's, on every pull request head. `--full`
+ * runs the whole suite locally. Either can outlive one Bash call on a code
+ * change: run it through `npm run long -- start verify -- npm run pipeline -- verify`.
  *
  * @module pipeline
  */
@@ -35,7 +37,7 @@ import { verify } from './lib/pipeline/verify.js';
 
 const USAGE = `Usage:
   npm run pipeline -- tdd start|split|red|join|status --label <label> [--base <ref>] [--feature <branch>] [--no-commit]
-  npm run pipeline -- verify [--base <ref>] [--only <channel,...>] [--no-cache]
+  npm run pipeline -- verify [--base <ref>] [--only <channel,...>] [--no-cache] [--full]
   npm run pipeline -- review-brief [--base <ref>] [--label <label>]...
   npm run pipeline -- step <name>|done --label <label> [--heavy] [--note <text>]
   npm run pipeline -- open-pr --label <label> --title <title> --body-file <file> [--draft | --paused]`;
@@ -49,7 +51,7 @@ export function parseArgs(argv: string[]): { positional: string[]; values: Map<s
     const arg = argv[i]!;
     if (!arg.startsWith('--')) {
       positional.push(arg);
-    } else if (['--no-commit', '--no-cache', '--heavy', '--detail', '--draft', '--paused'].includes(arg)) {
+    } else if (['--no-commit', '--no-cache', '--full', '--heavy', '--detail', '--draft', '--paused'].includes(arg)) {
       flags.add(arg.slice(2));
     } else {
       const value = argv[++i];
@@ -105,6 +107,7 @@ function run(argv: string[]): number {
       base: one(values, 'base'),
       only: channels(one(values, 'only')),
       noCache: flags.has('no-cache'),
+      full: flags.has('full'),
       progress: (line) => console.log(`… ${line}`),
     });
     print(result.lines);
