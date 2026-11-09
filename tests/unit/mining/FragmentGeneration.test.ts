@@ -181,7 +181,7 @@ describe('FragmentGeneration — fragment properties', () => {
     const { fragments } = blastAndCarve(grid, CRUITE * 80, 11, 6, { x: 5, y: 5, z: 5 });
 
     for (const f of fragments) {
-      expect(f.massKg).toBeCloseTo(f.volumeM3 * density, 4);
+      expect(f.massKg + f.lostMassKg).toBeCloseTo(f.volumeM3 * density, 4);
     }
   });
 

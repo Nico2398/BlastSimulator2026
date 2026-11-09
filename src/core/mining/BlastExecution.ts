@@ -389,7 +389,8 @@ export function* executeBlastSteps(
       if ((g & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
       const gen = generated[g]!;
       const throwFraction = throwFractionAt(gen.origin, plan);
-      const velocity = computeFragmentVelocity(gen.origin, gen.sources, gen.massKg, field, throwFraction);
+      // Thrown at its pre-loss mass: the dust goes after the throw, so retuning the loss never re-aims the rock.
+      const velocity = computeFragmentVelocity(gen.origin, gen.sources, gen.massKg + gen.lostMassKg, field, throwFraction);
 
       fragments.push({
         id: nextId++,
