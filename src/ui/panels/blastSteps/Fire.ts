@@ -43,7 +43,7 @@ const OCCUPANT_TAG_KEYS: Record<VehicleEvacuationVerdict, string> = {
 interface Occupant {
   icon: IconName;
   name: string;
-  /** What the name links to; null → plain text. */
+  /** Entity the name links to when an opener is wired. */
   ref: { kind: 'employee' | 'vehicle'; id: number };
   sub: string;
   /** What evacuateZone will do with a vehicle (null for a person). Only 'stranded' means it is left behind (#2100). */

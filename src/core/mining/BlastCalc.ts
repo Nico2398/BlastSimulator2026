@@ -68,7 +68,7 @@ export function effectiveHoleEnergy(
   const sf = stemmingFactor(charge.stemmingM, holeDepth);
   const wf = waterEffect(isFlooded, explosive.waterSensitive, hasTubing);
   return {
-    downward: rawE * (STEMMING_MIN_EFFICIENCY + (1 - STEMMING_MIN_EFFICIENCY) * sf) * wf,
+    downward: rawE * stemmingEfficiency(charge.stemmingM, holeDepth) * wf,
     upward: rawE * (1 - sf) * 0.7 * wf * explosive.projectionRiskMod,
     vibrationMod: explosive.vibrationMod,
   };
