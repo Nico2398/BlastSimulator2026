@@ -39,7 +39,7 @@ permissions:
 jobs:
   label:
     # Only the label events that can change whether `ready` is honest: `ready`
-    # itself arriving, a scope or `agent-task` arriving or leaving. Everything
+    # itself arriving, `epic` arriving, a scope or `agent-task` arriving or leaving. Everything
     # else — `ready` leaving and `in-progress` arriving at assignment, `blocked`,
     # `paused` — is the pipeline's own bookkeeping and none of this workflow's
     # business.
@@ -51,6 +51,7 @@ jobs:
         (
           github.event.label.name == 'ready' ||
           github.event.label.name == 'agent-task' ||
+          github.event.label.name == 'epic' ||
           startsWith(github.event.label.name, 'scope:')
         )
       ) ||
@@ -94,6 +95,7 @@ jobs:
               { name: rules.BLOCKED, color: 'd93f0b', description: 'Needs a human answer or intervention' },
               { name: rules.PAUSED, color: 'fbca04', description: 'A run stopped here on a dependency; the queue returns to it when that dependency lands' },
               { name: rules.DONE, color: 'a18bc6', description: 'Meets the Definition of Done (agentic-autonomous-pipeline)' },
+              { name: rules.EPIC, color: '5319e7', description: 'Parent of a batch of sub-issues; never queued, carries no other label (agentic-issue-creation)' },
             ];
             const existing = new Map(
               (await github.paginate(github.rest.issues.listLabelsForRepo, { owner, repo, per_page: 100 }))

@@ -23,3 +23,7 @@ Split the enablers off first: #553 carried three — `campaign start` had no `st
 ## SKILL.md — A parent scope waits rather than holds
 
 The guidance that a parent scope "holds its place while it waits" was rewritten on 2026-11-07, when the owner retired the parent-scope hold in `assignability.cjs` (see `agentic-autonomous-pipeline`'s history, "A parent scope no longer holds its place"). The advice to prefer the narrowest scope stands, with a different reason: a parent now waits the longest to start, instead of holding younger work back.
+
+## ▶ Epics — a batch that delivers one behaviour
+
+Added on 2026-11-09 at the owner's request. Issues were filed one by one or as loose batches, and nothing recorded that a batch existed to deliver one behaviour, nor checked that behaviour once the batch had landed. An epic is GitHub's own parent/child relationship plus a purple `epic` label, chosen because the queue already ignores both: `assignability.cjs` reads `blocked_by` and the body's `Blocked by` section, never parent/child, and the chain workflows key on `agent-task` and `in-progress`, which an epic never carries. The filing agent decides standalone-or-epic itself, without asking — the owner's explicit choice. The one code guard added was `readinessVerdict` refusing `epic`: this skill used to say every issue an agent files carries `agent-task` and its scopes, and an epic labelled that way would have handed one run the whole batch.
