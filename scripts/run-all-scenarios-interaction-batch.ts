@@ -32,6 +32,7 @@ import { checkGoal, gameState, setTutorialRealClock } from './shared/interaction
 import { stateIfInteractionOnlyStepMoot } from './shared/interaction-level-skip.js';
 import { scopeGoalToInteraction, goalAssertsAnything } from './shared/interaction-goal-scope.js';
 import { buildScenarioLoadFailure, logBatchProgress } from './run-all-scenarios-result.js';
+import { timingLine } from './run-all-scenarios-costs.js';
 
 export async function runBatchInteraction(
   names: string[],
@@ -49,6 +50,7 @@ export async function runBatchInteraction(
   try {
     for (let i = 0; i < names.length; i++) {
       const name = names[i];
+      const scenarioStart = Date.now();
       const outDir = resolve(SCREENSHOT_DIR, `scenario-${name}-interaction`);
       mkdirSync(outDir, { recursive: true });
 
@@ -217,6 +219,8 @@ export async function runBatchInteraction(
       }
 
       logBatchProgress(results, i, names.length, startTime);
+      // What `run-all-scenarios-costs.ts --refresh` reads to rebalance the shards.
+      console.log(timingLine(name!, (Date.now() - scenarioStart) / 1000));
     }
   } finally {
     await browser.close();

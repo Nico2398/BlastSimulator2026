@@ -109,13 +109,15 @@ const WAIT_SECOND_COST = 3;
  * the game rather than on the DOM cost beyond their count — a blast step's
  * report waits out the collapse playback, a `waitUntil` runs hundreds of
  * ticks, a fixed `wait` sleeps for its duration. Command mode: the number
- * of steps. Neither needs measured durations that go stale as the suite
- * changes. The weights were chosen against CI run 34855681700's measured
+ * of steps. The weights were chosen against CI run 34855681700's measured
  * per-scenario durations (13.1 s mean, 110 s max): balancing on the action
  * count alone put 311 s on one shard of ten against an ideal 185 s, these
  * weights 227 s, and no static proxy does much better across 10–14 shards —
  * the remaining gap is a handful of scenarios whose cost is not in their
- * definition at all.
+ * definition at all. By CI run 42579175214 that gap had grown to 708 s on the
+ * slowest shard against 254 s on the fastest, so interaction shards now
+ * balance on measured seconds and use this estimate only for a scenario the
+ * measured table does not hold yet (run-all-scenarios-costs.ts).
  */
 export function estimateScenarioCost(def: Pick<ScenarioDef, 'steps'>, mode: string): number {
   if (mode !== 'interaction') return def.steps.length;

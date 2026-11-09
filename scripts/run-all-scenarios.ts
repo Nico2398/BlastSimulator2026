@@ -47,6 +47,7 @@ import { runBatchCommand, runCommandScenario } from './run-all-scenarios-command
 import { runBatchInteraction } from './run-all-scenarios-interaction-batch.js';
 import { resolveJobCount, runFanOutCommand } from './run-all-scenarios-fanout.js';
 import { serveScenarioWorkerProcess } from './run-all-scenarios-worker.js';
+import { interactionCostSeconds, loadScenarioSeconds } from './run-all-scenarios-costs.js';
 
 export { buildScenarioLoadFailure } from './run-all-scenarios-result.js';
 
@@ -77,15 +78,20 @@ async function main(): Promise<void> {
   // Each name once: the fan-out keys results by name, so a repeated name would
   // let one copy's verdict overwrite the other's.
   const selected = filterScenarios.length > 0 ? [...new Set(filterScenarios)] : scenarioFiles;
-  // A definition that fails to load costs 1 here and is still run — the
-  // batch loop reports it as a failed scenario, which is where a bad file
-  // should surface, not as a crash before any shard starts.
+  // A definition that fails to load costs 1 static unit here and is still run —
+  // the batch loop reports it as a failed scenario, which is where a bad file
+  // should surface, not as a crash before any shard starts. Interaction shards
+  // balance on measured seconds (run-all-scenarios-costs.ts): the static
+  // estimate alone left the slowest of ten shards at 2.8× the fastest.
+  const measured = mode === 'interaction' ? loadScenarioSeconds() : undefined;
   const costOf = (name: string): number => {
+    let staticCost = 1;
     try {
-      return estimateScenarioCost(loadScenarioDef(name, SCENARIO_DIR), mode);
+      staticCost = estimateScenarioCost(loadScenarioDef(name, SCENARIO_DIR), mode);
     } catch {
-      return 1;
+      // Still run, and still costed: the batch reports the bad file as a failed scenario.
     }
+    return measured ? interactionCostSeconds(name, staticCost, measured) : staticCost;
   };
   const names = shard ? selectShard(selected, shard, costOf) : selected;
   const jobCount = fansOut ? resolveJobCount(jobs, availableParallelism(), names.length) : 1;
