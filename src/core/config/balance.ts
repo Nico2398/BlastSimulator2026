@@ -3508,8 +3508,12 @@ export const HEATMAP_OVERLAY_OPACITY = 0.55;
 export const SOFTWARE_TIER_FRAGMENTS = 1;
 export const SOFTWARE_TIER_PROJECTIONS = 2;
 export const SOFTWARE_TIER_VIBRATIONS = 3;
-/** The charge optimizer (#2204) has no preview content yet. */
+/** The charge optimizer (#2204). */
 export const SOFTWARE_TIER_OPTIMIZER = 4;
+/** Charge amounts the optimizer tries per explosive, from the smallest to the heaviest that fits a hole. */
+export const OPTIMIZER_SWEEP_STEPS = 8;
+/** A hole takes the cheapest charge whose good-band share is within this of its best. */
+export const OPTIMIZER_GOOD_TOLERANCE = 0.02;
 
 /** Version of the persisted `lastBlastPreview` shape; a save carrying another one loads it as null. */
 export const BLAST_PREVIEW_SHAPE = 2;

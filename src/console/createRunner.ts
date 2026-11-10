@@ -17,6 +17,7 @@ import {
   type MiningContext,
   drillPlanCommand,
   chargeCommand,
+  optimizeChargesCommand,
   blastCommand,
   blastPlanCommand,
   previewCommand,
@@ -204,6 +205,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('charge', 'Set charges (hole:* explosive:X amount:Ykg stemming:Zm)', (args, named) =>
     chargeCommand(ctx, args, named),
+  );
+  runner.register('optimize_charges', 'Tier-4 charge optimizer proposal (stemming:Zm apply:true)', (args, named) =>
+    optimizeChargesCommand(ctx, args, named),
   );
   runner.register('blast', 'Execute the current blast plan', (args, named) =>
     blastCommand(ctx, args, named),

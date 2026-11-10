@@ -134,3 +134,12 @@ function chargePattern(state: GameState, explosiveId: string, amount: number, st
   }
   return { success: true, output: lines.join('\n') };
 }
+
+/** `optimize_charges [stemming:<m>m] [apply:true]` — the tier-4 charge proposal for the drilled pattern (#2204). */
+export function optimizeChargesCommand(
+  _ctx: MiningContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  throw new Error('not implemented');
+}

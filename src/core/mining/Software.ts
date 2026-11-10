@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Blast preview software tiers
 // Player purchases software upgrades to unlock prediction capabilities.
 // Energy is free (the workshop heatmap, #2200). Tier 1: fragment distribution. Tier 2: projections.
-// Tier 3: vibrations. Tier 4: charge optimizer (#2204, no preview content yet).
+// Tier 3: vibrations. Tier 4: charge optimizer (#2204).
 
 import { formatMoney } from '../economy/formatMoney.js';
 import type { BlastPlan } from './BlastPlan.js';
@@ -19,7 +19,10 @@ import {
   SOFTWARE_TIER_FRAGMENTS,
   SOFTWARE_TIER_PROJECTIONS,
   SOFTWARE_TIER_VIBRATIONS,
+  SOFTWARE_TIER_OPTIMIZER,
 } from '../config/balance.js';
+import { optimizeCharges, type ChargeProposal, type OptimizeChargesOptions } from './ChargeOptimizer.js';
+import type { DrillHole } from './DrillPlan.js';
 import {
   calculateVibrations,
   totalChargeKg,
@@ -423,3 +426,14 @@ export function previewVibrations(
   };
 }
 
+
+/** The charge optimizer's proposal for the pattern. Requires software tier >= 4; null below it (#2204). */
+export function previewChargeOptimization(
+  _holes: readonly DrillHole[],
+  _grid: VoxelGrid,
+  _softwareTier: number,
+  _options: OptimizeChargesOptions,
+): ChargeProposal | null {
+  void optimizeCharges; void SOFTWARE_TIER_OPTIMIZER;
+  throw new Error('not implemented');
+}
