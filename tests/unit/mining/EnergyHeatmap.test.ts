@@ -20,7 +20,8 @@ import {
   FRAGMENTATION_BAND_DUST_MIN,
 } from '../../../src/core/config/balance.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
-import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
+import { batchCharge, holePowderFactors } from '../../../src/core/mining/ChargePlan.js';
+import { holeBandMixes, recommendedPowderFactors } from '../../../src/core/mining/SoftwarePreview.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
 
@@ -224,7 +225,8 @@ describe('EnergyHeatmap — planHeatmap', () => {
   it('its columns are the summaries of those bands', () => {
     const { grid, plan } = makeTestPlan();
     const { bands, columns } = planHeatmap(plan, grid);
-    expect(columns).toEqual(summarizeColumns(bands));
+    // The hole readout (#2203) rides on top of the summary; everything else is the summary itself.
+    expect(columns.map(({ hole: _hole, ...rest }) => rest)).toEqual(summarizeColumns(bands));
     expect(columns.length).toBeGreaterThan(0);
   });
 
@@ -320,5 +322,106 @@ describe('EnergyHeatmap — planHeatmap', () => {
     const first = planHeatmap(a.plan, a.grid);
     const second = planHeatmap(a.plan, b.grid);
     expect(second.bands).not.toBe(first.bands);
+  });
+});
+
+
+// ── hole readout on the columns (#2203 C5) ───────────────────────────────────
+
+describe('EnergyHeatmap — hole readout on columns (#2203 C5)', () => {
+  /** Four holes 3 m apart, depth 6, each charged with 5 kg of boomite under 2 m of stemming. */
+  function fourHoles() {
+    const { grid } = makeTestPlan();
+    const holes = createGridPlan(holeCounter, { x: 10, z: 10 }, 2, 2, 3, 6, 0.15);
+    const charges: Record<string, { explosiveId: string; amountKg: number; stemmingM: number }> = {};
+    for (const h of holes) charges[h.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    return { grid, holes, charges, plan: assembleBlastPlan(holes, charges) };
+  }
+  const columnAt = (cols: ReturnType<typeof planHeatmap>['columns'], x: number, z: number) => cols.find(c => c.x === x && c.z === z);
+
+  it('a column at a charged hole carries that hole\'s readout', () => {
+    const { grid, holes, plan } = fourHoles();
+    const { columns } = planHeatmap(plan, grid);
+    for (const h of holes) {
+      const col = columnAt(columns, h.x, h.z)!;
+      expect(col.hole, h.id).toBeDefined();
+      expect(col.hole!.holeId).toBe(h.id);
+    }
+  });
+
+  it('a column beside the hole, inside its cell, belongs to it', () => {
+    const { grid, holes, plan } = fourHoles();
+    const { columns } = planHeatmap(plan, grid);
+    expect(columnAt(columns, 11, 10)!.hole!.holeId).toBe(holes[0]!.id);
+    expect(columnAt(columns, 12, 10)!.hole!.holeId).toBe(holes[1]!.id);
+    expect(columnAt(columns, 10, 11)!.hole!.holeId).toBe(holes[0]!.id);
+  });
+
+  it('a column far from every hole carries none', () => {
+    const { grid, plan } = fourHoles();
+    const { columns } = planHeatmap(plan, grid);
+    const far = columnAt(columns, 18, 18);
+    expect(far).toBeDefined();
+    expect(far!.hole).toBeUndefined();
+    expect(columnAt(columns, 6, 6)?.hole).toBeUndefined();
+  });
+
+  it('reads the powder factor of the hole', () => {
+    const { grid, holes, charges, plan } = fourHoles();
+    const col = columnAt(planHeatmap(plan, grid).columns, holes[0]!.x, holes[0]!.z)!;
+    expect(col.hole!.powderFactor).toBeCloseTo(5 / (3 * 3 * 6), 10);
+    expect(col.hole!.powderFactor).toBeCloseTo(holePowderFactors(holes, charges)[holes[0]!.id]!, 12);
+  });
+
+  it('reads the band shares of the hole from the same bands the heatmap draws', () => {
+    const { grid, holes, plan } = fourHoles();
+    const { bands, columns } = planHeatmap(plan, grid);
+    const expected = holeBandMixes(bands, holes);
+    for (const h of holes) {
+      const shares = columnAt(columns, h.x, h.z)!.hole!.shares;
+      expect(shares).toEqual(expected[h.id]);
+      expect(FRAGMENTATION_BANDS.reduce((a, b) => a + shares[b], 0)).toBeCloseTo(1, 10);
+    }
+  });
+
+  it('the recommended range is computed on demand and matches the preview of the hole\'s own explosive and stemming', () => {
+    const { grid, holes, plan } = fourHoles();
+    const readout = columnAt(planHeatmap(plan, grid).columns, holes[0]!.x, holes[0]!.z)!.hole!;
+    expect(typeof readout.recommended).toBe('function');
+    expect(readout.recommended()).toEqual(recommendedPowderFactors(holes, grid, 'boomite', 2)[holes[0]!.id]);
+    expect(readout.recommended()).toEqual(readout.recommended());
+  });
+
+  it('an uncharged hole leaves its columns without a readout', () => {
+    const { grid, holes, charges } = fourHoles();
+    const partial = { ...charges };
+    delete partial[holes[3]!.id];
+    const { columns } = planHeatmap(assembleBlastPlan(holes, partial), grid);
+    expect(columnAt(columns, holes[3]!.x, holes[3]!.z)?.hole).toBeUndefined();
+    expect(columnAt(columns, holes[0]!.x, holes[0]!.z)!.hole!.holeId).toBe(holes[0]!.id);
+  });
+
+  it('a lone charged hole is read at the default grid spacing', () => {
+    const { grid } = makeTestPlan();
+    const [hole] = createGridPlan(holeCounter, { x: 12, z: 12 }, 1, 1, 3, 8, 0.089);
+    const plan = assembleBlastPlan([hole!], { [hole!.id]: { explosiveId: 'boomite', amountKg: 8, stemmingM: 2 } });
+    const col = columnAt(planHeatmap(plan, grid).columns, 12, 12)!;
+    expect(col.hole!.powderFactor).toBeCloseTo(8 / (4 * 4 * 8), 10);
+  });
+
+  it('an empty plan has no columns and so no readouts', () => {
+    const { grid } = makeTestPlan();
+    const { columns } = planHeatmap(assembleBlastPlan([], {}), grid);
+    expect(columns.every(c => c.hole === undefined)).toBe(true);
+  });
+
+  it('keeps the column band summary the readout rides on', () => {
+    const { grid, holes, plan } = fourHoles();
+    const { bands, columns } = planHeatmap(plan, grid);
+    const col = columnAt(columns, holes[0]!.x, holes[0]!.z)!;
+    const plain = summarizeColumns(bands).find(c => c.x === col.x && c.z === col.z)!;
+    expect(col.band).toBe(plain.band);
+    expect(col.counts).toEqual(plain.counts);
+    expect(col.maxIntensity).toBe(plain.maxIntensity);
   });
 });
