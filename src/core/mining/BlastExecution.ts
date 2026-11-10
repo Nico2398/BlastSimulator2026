@@ -2,6 +2,7 @@
 // Orchestrates: validate → energy → fragmentation → terrain subtraction → results
 // Pure function operating on GameState + VoxelGrid, no side effects.
 
+import { analyseHoleFailures, type HoleFailure } from './HoleFailures.js';
 import { type FragmentationBand, FRAGMENTATION_BANDS, classifyFragmentationBand, bandMassRetention } from './FragmentationBand.js';
 import { oreValuePerKg, type MarketId } from '../economy/Market.js';
 import { isFragmentSealed } from '../economy/SealedFragments.js';
@@ -142,6 +143,8 @@ export interface BlastResult {
   bandVolumes: Record<FragmentationBand, number>;
   /** Mass and ore value lost to dust-band voxels (#2198). */
   dustLoss: { massKg: number; oreValue: number };
+  /** One entry per charged hole that broke no rock or left its column sealed (#2202). Always set by `executeBlast`; optional for fixtures. */
+  holeFailures?: HoleFailure[];
 }
 
 /**
@@ -192,6 +195,13 @@ export interface BlastReport {
   sealedFragments?: number;
   /** Oversized fragments that are reachable (#2003). Optional: absent = oversizedFragments. */
   reachableOversizedFragments?: number;
+  /** Volume (m3) per fragmentation band (#2202). Optional: absent on reports that predate it. */
+  bandVolumes?: Record<FragmentationBand, number>;
+  /** Mass (kg) and ore value lost to dust (#2202). Optional like `bandVolumes`. */
+  dustLossKg?: number;
+  dustLossOreValue?: number;
+  /** Per-hole reasons the shot did not open its rock (#2202). Optional like `bandVolumes`. */
+  holeFailures?: HoleFailure[];
 }
 
 /** True when the blast cleared rock but never broke out of its sealed void (#1724). */
@@ -249,6 +259,10 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     ...(result.vibrationAtVillages.length > 0
       ? { maxVibration: maxVillageVibration(result.vibrationAtVillages) }
       : {}),
+    bandVolumes: result.bandVolumes,
+    dustLossKg: result.dustLoss.massKg,
+    dustLossOreValue: result.dustLoss.oreValue,
+    ...(result.holeFailures ? { holeFailures: result.holeFailures } : {}),
     ...(wetHoles.wet.length > 0
       ? { wetHoleIds: wetHoles.wet, fizzledHoleIds: wetHoles.fizzled }
       : {}),
@@ -361,6 +375,9 @@ export function* executeBlastSteps(
   // 3. Propagate the charge energy through the rock, then read off what broke.
   const field = yield* buildBlastEnergyFieldSteps(plan, grid, bbox, holeSurfaceYs, wetHoleIds);
   const fragmentation = field ? yield* identifyFragmentedVoxelsSteps(field, grid) : null;
+  const holeFailures = field && fragmentation
+    ? analyseHoleFailures({ plan, field, fragmentation, holeSurfaceYs, wetHoleIds })
+    : undefined;
 
   const fragments: FragmentData[] = [];
   let nextId = firstFragmentId;
@@ -626,6 +643,7 @@ export function* executeBlastSteps(
     flights,
     bandVolumes,
     dustLoss,
+    ...(holeFailures ? { holeFailures } : {}),
   };
 }
 

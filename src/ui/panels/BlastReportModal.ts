@@ -30,7 +30,8 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { ACCIDENT_STYLE, accidentText, buildingLabelText } from '../accidentLookup.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { reachableOversized, type BlastReport, type BlastRating } from '../../core/mining/BlastExecution.js';
-import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../core/config/balance.js';
+import { BLAST_REPORT_MAX_HOLE_REASONS, BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S, OVERCHARGE_NOTE_MIN_FINES_SHARE } from '../../core/config/balance.js';
+import { finesShare } from '../../core/mining/FragmentationBand.js';
 import { IDLE_BLAST_PLAYBACK, isBlastReportDue, type BlastPlaybackSnapshot } from '../../core/mining/BlastPlayback.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 
@@ -234,6 +235,7 @@ export class BlastReportModal {
       ...(sealedOre > 0
         ? [{ key: t('ui.blast_workshop.report.stat_sealed_value'), value: `$${formatMoney(sealedOre)}`, color: 'var(--bsx-amber)', info: 'report-sealed' }]
         : []),
+      ...this.bandStats(report),
     ], 4));
 
     const notes: HTMLElement[] = [];
@@ -283,7 +285,61 @@ export class BlastReportModal {
       notes.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',
         t(key, { wet: report.wetHoleIds.length, fizzled })));
     }
+    notes.push(...this.holeFailureCards(report));
+    const bands = report.bandVolumes;
+    if (bands && finesShare(bands) >= OVERCHARGE_NOTE_MIN_FINES_SHARE) {
+      notes.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',
+        t('ui.blast_workshop.report.overcharge_hint', {
+          volume: (bands.fines + bands.dust).toFixed(0),
+          pct: Math.round(finesShare(bands) * 100),
+        })));
+    }
     this.notesEl.replaceChildren(...notes);
+  }
+
+  /** Band breakdown stats (m³ per band, dust loss); empty on reports that predate them (#2202). */
+  private bandStats(report: BlastReport): { key: string; value: string; color?: string }[] {
+    const bands = report.bandVolumes;
+    if (!bands) return [];
+    const m3 = (v: number): string => `${v.toFixed(0)} m³`;
+    return [
+      { key: t('ui.blast_workshop.report.stat_band_cracked'), value: m3(bands.cracked) },
+      { key: t('ui.blast_workshop.report.stat_band_good'), value: m3(bands.good) },
+      { key: t('ui.blast_workshop.report.stat_band_fines'), value: m3(bands.fines) },
+      { key: t('ui.blast_workshop.report.stat_band_dust'), value: m3(bands.dust) },
+      ...(report.dustLossKg !== undefined
+        ? [{ key: t('ui.blast_workshop.report.stat_dust_lost'), value: `${report.dustLossKg.toFixed(0)} kg`, color: 'var(--bsx-amber)' }]
+        : []),
+    ];
+  }
+
+  /** Dud explanation and per-hole reasons, capped at `BLAST_REPORT_MAX_HOLE_REASONS` lines (#2202). */
+  private holeFailureCards(report: BlastReport): HTMLElement[] {
+    const failures = report.holeFailures ?? [];
+    const dud = report.clearedVoxels === 0;
+    if (!dud && failures.length === 0) return [];
+    const cards: HTMLElement[] = [];
+    if (dud) {
+      cards.push(this.makeNoteCard('rock', 'rgba(255,91,76,', 'var(--bsx-critical-text)', t('ui.blast_workshop.report.dud_title')));
+      cards.push(this.makeNoteCard('rock', 'rgba(255,91,76,', 'var(--bsx-critical-text)', t('ui.blast_workshop.report.dud_hint')));
+    } else {
+      cards.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)', t('ui.blast_workshop.report.sealed_holes_title')));
+    }
+    for (const f of failures.slice(0, BLAST_REPORT_MAX_HOLE_REASONS)) {
+      const text = f.kind === 'below_threshold'
+        ? (f.moreEnergyPct !== undefined
+          ? t('ui.blast_workshop.report.hole_reason_below_threshold', { hole: f.holeId, pct: f.moreEnergyPct })
+          : t('ui.blast_workshop.report.hole_reason_no_energy', { hole: f.holeId }))
+        : f.kind === 'fizzled'
+          ? t('ui.blast_workshop.report.hole_reason_fizzled', { hole: f.holeId })
+          : t('ui.blast_workshop.report.hole_reason_buried', { hole: f.holeId, metres: (f.rockAboveM ?? 0).toFixed(0) });
+      cards.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)', text));
+    }
+    if (failures.length > BLAST_REPORT_MAX_HOLE_REASONS) {
+      cards.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',
+        t('ui.blast_workshop.report.hole_reasons_more', { count: failures.length - BLAST_REPORT_MAX_HOLE_REASONS })));
+    }
+    return cards;
   }
 
   private makeOreCard(oreReport: NonNullable<GameState['lastOreReport']>): HTMLElement {

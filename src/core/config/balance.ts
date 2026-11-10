@@ -3514,3 +3514,8 @@ export const PROJECTION_ZONE_COLOR = 0xff4020;
 
 /** Opacity of the projection risk zone tint (#2201). */
 export const PROJECTION_ZONE_OPACITY = 0.5;
+
+/** Most holes the blast report lists a failure reason for before it folds the rest into "+N more" (#2202). */
+export const BLAST_REPORT_MAX_HOLE_REASONS = 6;
+/** Share of the broken rock crushed into fines or dust from which the report calls the shot overcharged (#2202). */
+export const OVERCHARGE_NOTE_MIN_FINES_SHARE = 0.25;
