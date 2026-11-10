@@ -1967,8 +1967,10 @@ describe('ChargeStep — charge optimizer (#2204)', () => {
 
       const second = openProposal();
       (second.step.root.querySelector(APPLY_ALL) as HTMLButtonElement).click();
-      const all = second.gameConsole.mock.calls.map(c => parseCharge(c[0] as string)).find(c => c.hole === target.id)!;
-      expect(single).toEqual(all);
+      // Each openProposal numbers its holes afresh from the shared counter: compare the same hole by position.
+      const twin = second.holes[2]!;
+      const all = second.gameConsole.mock.calls.map(c => parseCharge(c[0] as string)).find(c => c.hole === twin.id)!;
+      expect({ ...single, hole: twin.id }).toEqual(all);
     });
 
     it('proposes no water-sensitive explosive for a wet hole', () => {
