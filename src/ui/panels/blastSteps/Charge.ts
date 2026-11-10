@@ -39,9 +39,12 @@ import { MIN_STEMMING_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, HO
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { defaultChargeKg } from '../../../core/economy/PermitDefaults.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
+import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { permitPreview, chargeKgLimitWarning } from '../permitPreview.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
+import { bandMixEl } from '../../bandMix.js';
+import { ChargeReadouts } from './chargeReadouts.js';
 
 
 const DEFAULT_EXPLOSIVE = 'boomite';
@@ -78,6 +81,8 @@ export class ChargeStep {
   private readonly drainEl: HTMLElement;
 
   private gameConsole?: GameConsoleFn;
+  private gridProvider: () => VoxelGrid | null = () => null;
+  private readonly readouts = new ChargeReadouts();
   private selectedExplosiveId = DEFAULT_EXPLOSIVE;
   /** Set by a card click; stops the pattern from overriding the player's choice. */
   private playerPickedExplosive = false;
@@ -179,6 +184,12 @@ export class ChargeStep {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
+  /** Grid the cards and hole rows read their predicted band mix from (#2203). */
+  setGridProvider(fn: () => VoxelGrid | null): void {
+    this.gridProvider = fn;
+    this.lastSignature = '';
+  }
+
   refreshLocale(): void {
     this.locale.refresh();
     explainable(this.stemmingLabelEl, stemmingExplain());
@@ -235,7 +246,10 @@ export class ChargeStep {
 
     // Explosives are bought as each hole is loaded, at list price and the live event factor (#2153).
     const chargeCost = holes.length * quoteChargeLoad(state, this.selectedExplosiveId, this.amountKg).cost;
+    this.readouts.begin(holes, wet, this.gridProvider());
     const signature = JSON.stringify({
+      grid: this.readouts.revision,
+      holeGeometry: holes.map(h => [h.x, h.z, h.depth, h.diameter]),
       level: state.campaign.activeLevelId,
       selected: this.selectedExplosiveId, amt: this.amountKg, stem: this.stemmingM,
       permitGrade: state.grade?.grade ?? null,
@@ -263,7 +277,10 @@ export class ChargeStep {
     this.updateCapacityLine();
     this.updateFitLine(tightestDepth, tightestDiameter, holes.length + state.plannedDrillHoles.length === 0);
     this.updatePatternLines(state);
-    this.holeList.render(holes, state.chargesByHole, state.plannedChargesByHole, drainViews);
+    this.holeList.render(
+      holes, state.chargesByHole, state.plannedChargesByHole, drainViews,
+      this.readouts.rows(state.chargesByHole, this.selectedExplosiveId, this.stemmingM),
+    );
     this.renderDrain(wet, drainViews);
     this.renderTubingCard(untubed, wet.filter(id => !tubedSet.has(id)).length, tubed.length === holes.length && wet.length === 0, state.tubingState.inventory, rainSoon);
   }
@@ -302,16 +319,24 @@ export class ChargeStep {
     const statsRow = el('div');
     statsRow.style.cssText = 'display:flex;gap:10px;font:400 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)';
     statsRow.append(
-      el('span', { text: `${explosive.energyPerKg} MJ/kg` }),
-      el('span', { text: `${Math.round(explosiveHoleLimits(explosive, this.narrowestM).maxKg * 10) / 10} kg max` }),
+      el('span', { text: t('ui.blast_workshop.charge.energy_label', { value: explosive.energyPerKg }) }),
+      el('span', {
+        text: t('ui.blast_workshop.charge.kg_range', {
+          min: Math.round(explosiveHoleLimits(explosive, this.narrowestM).minKg * 10) / 10,
+          max: Math.round(explosiveHoleLimits(explosive, this.narrowestM).maxKg * 10) / 10,
+        }),
+      }),
+      el('span', { text: t('ui.blast_workshop.charge.vibration', { value: explosive.vibrationMod }) }),
     );
-    if (explosive.waterSensitive && anyWet) {
-      const badge = el('span', { attrs: { style: 'display:flex;align-items:center;gap:3px;color:var(--bsx-info)' } });
+    if (explosive.waterSensitive) {
+      const badge = el('span', { attrs: { 'data-role': 'water-badge', style: `display:flex;align-items:center;gap:3px;color:${anyWet ? 'var(--bsx-info)' : 'var(--bsx-text-secondary)'}` } });
       badge.append(iconEl('water', 9), el('span', { text: t('ui.blast_workshop.charge.water_sensitive') }));
       statsRow.appendChild(badge);
     }
 
     card.append(nameRow, statsRow);
+    const mix = this.readouts.cardMix(explosive.id, this.amountKg, this.stemmingM);
+    if (mix) card.appendChild(bandMixEl(mix, 'explosive-band-mix'));
     card.addEventListener('click', () => {
       this.selectedExplosiveId = explosive.id;
       this.playerPickedExplosive = true;

@@ -5,10 +5,26 @@
 import type { BlastPlan } from './BlastPlan.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { type FragmentationBand, FRAGMENTATION_BANDS, classifyFragmentationBand } from './FragmentationBand.js';
-import { type PlanBandCell, type PlanBandMap, previewPlanBands } from './SoftwarePreview.js';
+import {
+  type PlanBandCell, type PlanBandMap, type BandShares, type PowderFactorRange,
+  previewPlanBands, holeBandMixes, recommendedPowderFactors, ownerHoleOf,
+} from './SoftwarePreview.js';
+import { holePowderFactors, holeSpacingM } from './ChargePlan.js';
 import { HEATMAP_COLUMN_BAND_MIN_SHARE } from '../config/balance.js';
 
+/** What the heatmap hover says about the hole whose rock cell a column sits in (#2203). */
+export interface HoleReadout {
+  holeId: string;
+  /** kg of explosive per m3 of the hole's rock. */
+  powderFactor: number;
+  shares: BandShares;
+  /** Recommended range for this rock with the hole's own explosive and stemming; computed on first call. */
+  recommended(): PowderFactorRange | null;
+}
+
 export interface ColumnBandSummary {
+  /** Set on columns inside a charged hole's cell. */
+  hole?: HoleReadout;
   x: number;
   z: number;
   /** Displayed band: the finest band covering at least HEATMAP_COLUMN_BAND_MIN_SHARE of the column. */
@@ -58,6 +74,45 @@ export function sectionAtZ(map: PlanBandMap, z: number): PlanBandCell[] {
   return out;
 }
 
+/** Sets `hole` on every column inside a charged hole's cell: nearest hole by column, within half its spacing (#2203). */
+function annotateHoles(
+  columns: ColumnBandSummary[],
+  plan: BlastPlan,
+  grid: VoxelGrid,
+  bands: PlanBandMap,
+  wetHoleIds: ReadonlySet<string>,
+): ColumnBandSummary[] {
+  const charged = plan.holes.filter(h => plan.charges[h.id] !== undefined);
+  if (charged.length === 0) return columns;
+  const mixes = holeBandMixes(bands, plan.holes);
+  const factors = holePowderFactors(plan.holes, plan.charges);
+  // One sweep per (explosive, stemming) pair, shared by every hole charged that way.
+  const sweeps = new Map<string, Record<string, PowderFactorRange | null>>();
+  const recommendedFor = (holeId: string): PowderFactorRange | null => {
+    const charge = plan.charges[holeId]!;
+    const key = `${charge.explosiveId}|${charge.stemmingM}`;
+    let sweep = sweeps.get(key);
+    if (!sweep) sweeps.set(key, sweep = recommendedPowderFactors(plan.holes, grid, charge.explosiveId, charge.stemmingM, wetHoleIds));
+    return sweep[holeId] ?? null;
+  };
+  // Every hole competes for a column, charged or not: a column an uncharged hole owns shows no readout.
+  const cells = plan.holes.map(h => ({ h, cx: Math.floor(h.x), cz: Math.floor(h.z), half: holeSpacingM(h, plan.holes) / 2 }));
+  return columns.map(col => {
+    const owner = ownerHoleOf(col.x, col.z, cells);
+    const shares = owner && plan.charges[owner.h.id] !== undefined ? mixes[owner.h.id] : undefined;
+    if (!owner || !shares) return col;
+    const holeId = owner.h.id;
+    let memo: { value: PowderFactorRange | null } | null = null;
+    const hole: HoleReadout = {
+      holeId,
+      powderFactor: factors[holeId] ?? 0,
+      shares,
+      recommended: () => (memo ??= { value: recommendedFor(holeId) }).value,
+    };
+    return { ...col, hole };
+  });
+}
+
 interface PlanHeatmap { bands: PlanBandMap; columns: ColumnBandSummary[] }
 
 let cache: { grid: VoxelGrid; key: string; value: PlanHeatmap } | null = null;
@@ -71,7 +126,7 @@ export function planHeatmap(
   const key = JSON.stringify([plan.holes, plan.charges, [...wetHoleIds].sort(), grid.editRevision]);
   if (cache && cache.grid === grid && cache.key === key) return cache.value;
   const bands = previewPlanBands(plan, grid, wetHoleIds);
-  const value = { bands, columns: summarizeColumns(bands) };
+  const value = { bands, columns: annotateHoles(summarizeColumns(bands), plan, grid, bands, wetHoleIds) };
   cache = { grid, key, value };
   return value;
 }

@@ -119,6 +119,7 @@ export class BlastWorkshop extends PanelBase {
   /** Passes the voxel-grid provider down to the sticky footer's estimate (#1703). */
   setGridProvider(fn: () => VoxelGrid | null): void {
     this.footer.setGridProvider(fn);
+    this.chargeStep.setGridProvider(fn);
     this.previewStep.setGridProvider(fn);
     this.fireStep.setGridProvider(fn);
     this.heatmapView.setGridProvider(fn);

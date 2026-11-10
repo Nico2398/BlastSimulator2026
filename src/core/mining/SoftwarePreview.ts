@@ -4,12 +4,18 @@
 // call one shared computation instead of repeating it.
 
 import { type BlastPlan, hasChargedHole } from './BlastPlan.js';
+import type { DrillHole } from './DrillPlan.js';
 import type { VoxelGrid, VoxelData } from '../world/VoxelGrid.js';
 import { getDominantRockId, firstEmptyLayerAboveGround, clampToGridColumn } from '../world/VoxelGrid.js';
 import { getRock, type RockType } from '../world/RockCatalog.js';
-import { SEEDS_BASE, SEEDS_PER_INTENSITY, MAX_SEEDS_PER_VOXEL, FRAGMENTATION_MULTIPLIER } from '../config/balance.js';
+import {
+  SEEDS_BASE, SEEDS_PER_INTENSITY, MAX_SEEDS_PER_VOXEL, FRAGMENTATION_MULTIPLIER,
+  RECOMMENDED_GOOD_SHARE_MIN, RECOMMENDED_SWEEP_STEPS,
+} from '../config/balance.js';
+import { getExplosive } from '../world/ExplosiveCatalog.js';
+import { type HoleCharge, holeSpacingM, holePowderFactors, maxFittingChargeKg } from './ChargePlan.js';
 import { type EnergyField, effectiveAt, thresholdAt, intensityAt } from './EnergyPropagation.js';
-import { type FragmentationBand, classifyFragmentationBand } from './FragmentationBand.js';
+import { type FragmentationBand, FRAGMENTATION_BANDS, classifyFragmentationBand } from './FragmentationBand.js';
 import { buildPlanEnergyField } from './BlastExecution.js';
 
 export const PREVIEW_RADIUS = 5;
@@ -177,4 +183,152 @@ export function previewPlanBands(plan: BlastPlan, grid: VoxelGrid, wetHoleIds: R
     cells.set(`${x},${y},${z}`, { x, y, z, intensity, band: classifyFragmentationBand(intensity) });
   });
   return { bbox, cells };
+}
+
+/** Share of a rock cell in each fragmentation band; sums to 1 (#2203). */
+export type BandShares = Record<FragmentationBand, number>;
+
+/** Band shares of each hole's rock cell, keyed by hole id. Holes with no rock in their cell are omitted (#2203). */
+export function holeBandMixes(map: PlanBandMap, holes: readonly DrillHole[]): Record<string, BandShares> {
+  const out: Record<string, BandShares> = {};
+  for (const [id, { counts, total }] of holeCellCounts(map, holes)) if (total > 0) out[id] = toShares(counts, total);
+  return out;
+}
+
+type BandCounts = Record<FragmentationBand, number>;
+
+function emptyCounts(): BandCounts {
+  return { intact: 0, cracked: 0, good: 0, fines: 0, dust: 0 };
+}
+
+function toShares(counts: BandCounts, total: number): BandShares {
+  const out = emptyCounts();
+  for (const b of FRAGMENTATION_BANDS) out[b] = counts[b] / total;
+  return out;
+}
+
+/** A hole's footprint: its column and half its spacing. */
+interface HoleCell { cx: number; cz: number; half: number }
+
+/** Nearest hole (Chebyshev distance in columns) whose half-spacing reaches column (x, z); null when none does. */
+export function ownerHoleOf<T extends HoleCell>(x: number, z: number, cells: readonly T[]): T | null {
+  let owner: T | null = null;
+  let best = Infinity;
+  for (const c of cells) {
+    const d = Math.max(Math.abs(x - c.cx), Math.abs(z - c.cz));
+    if (d < best && d <= c.half) { best = d; owner = c; }
+  }
+  return owner;
+}
+
+/** Band counts of each hole's rock cell: nearest hole by column, within half its spacing, one hole depth below the column's top. */
+function holeCellCounts(map: PlanBandMap, holes: readonly DrillHole[]): Map<string, { counts: BandCounts; total: number }> {
+  const columnTop = new Map<string, number>();
+  for (const c of map.cells.values()) {
+    const key = `${c.x},${c.z}`;
+    const top = columnTop.get(key);
+    if (top === undefined || c.y > top) columnTop.set(key, c.y);
+  }
+  const info = holes.map(h => {
+    const cx = Math.floor(h.x);
+    const cz = Math.floor(h.z);
+    return { hole: h, cx, cz, half: holeSpacingM(h, holes) / 2, top: columnTop.get(`${cx},${cz}`) };
+  }).filter(h => h.top !== undefined);
+  const out = new Map<string, { counts: BandCounts; total: number }>();
+  for (const c of map.cells.values()) {
+    const owner = ownerHoleOf(c.x, c.z, info);
+    if (!owner || owner.top === undefined) continue;
+    if (c.y > owner.top || c.y <= owner.top - owner.hole.depth) continue;
+    let entry = out.get(owner.hole.id);
+    if (!entry) out.set(owner.hole.id, entry = { counts: emptyCounts(), total: 0 });
+    entry.counts[c.band]++;
+    entry.total++;
+  }
+  return out;
+}
+
+/** Band shares of all holes' cells pooled; null when no hole has rock in its cell (#2203). */
+export function planBandShares(map: PlanBandMap, holes: readonly DrillHole[]): BandShares | null {
+  const pooled = emptyCounts();
+  let total = 0;
+  for (const entry of holeCellCounts(map, holes).values()) {
+    for (const b of FRAGMENTATION_BANDS) pooled[b] += entry.counts[b];
+    total += entry.total;
+  }
+  return total > 0 ? toShares(pooled, total) : null;
+}
+
+/** Powder factors (kg/m3) at which a hole's rock is mostly good fragmentation (#2203). */
+export interface PowderFactorRange {
+  minKgPerM3: number;
+  maxKgPerM3: number;
+}
+
+/** A plan charging every hole with `amountKg` of the explosive (capped to what fits the hole) under `stemmingM` (#2203). */
+export function uniformChargePlan(
+  holes: readonly DrillHole[],
+  explosiveId: string,
+  amountKg: number,
+  stemmingM: number,
+): BlastPlan {
+  const charges: Record<string, HoleCharge> = {};
+  for (const h of holes) {
+    const fit = maxFittingChargeKg(h.depth, stemmingM, h.diameter);
+    charges[h.id] = { explosiveId, amountKg: Math.min(amountKg, fit), stemmingM };
+  }
+  return { holes: [...holes], charges };
+}
+
+/** Pooled band shares the explosive would give the pattern at `amountKg`; null with no holes or no rock (#2203). */
+export function previewExplosiveBandShares(
+  holes: readonly DrillHole[],
+  grid: VoxelGrid,
+  explosiveId: string,
+  amountKg: number,
+  stemmingM: number,
+  wetHoleIds: ReadonlySet<string> = new Set(),
+): BandShares | null {
+  if (holes.length === 0) return null;
+  const plan = uniformChargePlan(holes, explosiveId, amountKg, stemmingM);
+  return planBandShares(previewPlanBands(plan, grid, wetHoleIds), holes);
+}
+
+/** Per hole, the powder-factor range that makes its rock mostly good fragmentation with this explosive; null when none does (#2203). */
+export function recommendedPowderFactors(
+  holes: readonly DrillHole[],
+  grid: VoxelGrid,
+  explosiveId: string,
+  stemmingM: number,
+  wetHoleIds: ReadonlySet<string> = new Set(),
+): Record<string, PowderFactorRange | null> {
+  const out: Record<string, PowderFactorRange | null> = {};
+  // Per hole: powder factor and good share at each swept fraction of the heaviest charge that fits it.
+  const samples: Record<string, { pf: number; good: number }[]> = {};
+  for (const h of holes) { out[h.id] = null; samples[h.id] = []; }
+  if (holes.length === 0 || !getExplosive(explosiveId)) return out;
+  for (let i = 1; i <= RECOMMENDED_SWEEP_STEPS; i++) {
+    const charges: Record<string, HoleCharge> = {};
+    for (const h of holes) {
+      const amountKg = maxFittingChargeKg(h.depth, stemmingM, h.diameter) * (i / RECOMMENDED_SWEEP_STEPS);
+      charges[h.id] = { explosiveId, amountKg, stemmingM };
+    }
+    const mixes = holeBandMixes(previewPlanBands({ holes: [...holes], charges }, grid, wetHoleIds), holes);
+    const pfs = holePowderFactors(holes, charges);
+    for (const h of holes) {
+      const mix = mixes[h.id];
+      if (mix) samples[h.id]!.push({ pf: pfs[h.id] ?? 0, good: mix.good });
+    }
+  }
+  for (const h of holes) {
+    const list = samples[h.id]!;
+    let best = -1;
+    for (let i = 0; i < list.length; i++) if (best < 0 || list[i]!.good > list[best]!.good) best = i;
+    if (best < 0 || list[best]!.good < RECOMMENDED_GOOD_SHARE_MIN) continue;
+    let lo = best;
+    let hi = best;
+    while (lo > 0 && list[lo - 1]!.good >= RECOMMENDED_GOOD_SHARE_MIN) lo--;
+    while (hi < list.length - 1 && list[hi + 1]!.good >= RECOMMENDED_GOOD_SHARE_MIN) hi++;
+    out[h.id] = { minKgPerM3: list[lo]!.pf, maxKgPerM3: list[hi]!.pf };
+  }
+  return out;
 }
