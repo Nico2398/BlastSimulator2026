@@ -4046,6 +4046,7 @@
   "mining.optimize.locked": "Nécessite le logiciel niveau {tier}+ (actuel : {current}) : l'optimiseur de charge",
   "mining.optimize.no_holes": "Rien à optimiser : aucun trou foré.",
   "mining.optimize.summary": "Optimiseur de charge : {holes} trous, {kg} kg sur {limit} kg autorisés, coût {cost}. Roche de bonne taille {good} %.",
+  "mining.optimize.summary_unlimited": "Optimiseur de charge : {holes} trous, {kg} kg, coût {cost}. Roche de bonne taille {good} %.",
   "mining.optimize.hole_line": "  {hole} : {explosive} {amount}kg",
   "mining.optimize.skipped": "Aucun explosif proposé ne convient : {holes}.",
   "mining.optimize.over_permit": "Même les charges les plus légères dépassent la limite du permis de {limit} kg.",

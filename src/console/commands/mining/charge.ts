@@ -159,10 +159,11 @@ export function optimizeChargesCommand(
   if (!proposal) return { success: false, output: locked };
 
   const ids = Object.keys(proposal.charges);
-  const lines = [t('mining.optimize.summary', {
+  const limited = Number.isFinite(proposal.permitKgLimit);
+  const lines = [t(limited ? 'mining.optimize.summary' : 'mining.optimize.summary_unlimited', {
     holes: ids.length,
     kg: +proposal.totalKg.toFixed(1),
-    limit: Number.isFinite(proposal.permitKgLimit) ? proposal.permitKgLimit : '∞',
+    limit: proposal.permitKgLimit,
     cost: formatMoney(proposal.cost),
     good: Math.round((proposal.bandShares?.good ?? 0) * 100),
   })];

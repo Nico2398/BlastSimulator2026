@@ -4046,6 +4046,7 @@
   "mining.optimize.locked": "Requires software tier {tier}+ (current: {current}): the Charge Optimizer",
   "mining.optimize.no_holes": "Nothing to optimize: no drilled holes.",
   "mining.optimize.summary": "Charge optimizer: {holes} holes, {kg} kg of {limit} kg permitted, cost {cost}. Good rock {good}%.",
+  "mining.optimize.summary_unlimited": "Charge optimizer: {holes} holes, {kg} kg, cost {cost}. Good rock {good}%.",
   "mining.optimize.hole_line": "  {hole}: {explosive} {amount}kg",
   "mining.optimize.skipped": "No offered explosive suits: {holes}.",
   "mining.optimize.over_permit": "Even the lightest charges exceed the permit limit of {limit} kg.",
