@@ -418,14 +418,17 @@ jobs:
       # A step timeout ends the step, not the agent it started: the attempt's
       # `claude` process can go on working, and pushing, beside whatever
       # comes next. Stopped here, before the settle check reads the issue and
-      # before a retry or the rescue touches its branch. The stopper comes
-      # from this workflow's commit, not the branch the agent left checked out.
+      # before a retry or the rescue touches its branch — with the `npm run
+      # long` commands it left unfinished, which are detached from `claude` and
+      # would otherwise hold a retry's sessions on the settled-turn hook. The
+      # stopper comes from this workflow's commit, not the branch the agent left
+      # checked out.
       - name: Stop what the first attempt left running
         if: always() && steps.claude.outcome != 'skipped'
         shell: bash
         run: |
           git -C "$GITHUB_WORKSPACE" show "$GITHUB_SHA:.github/scripts/agent-processes.cjs" > "$RUNNER_TEMP/agent-processes.cjs"
-          node "$RUNNER_TEMP/agent-processes.cjs" stop claude
+          node "$RUNNER_TEMP/agent-processes.cjs" stop claude --handles "$GITHUB_WORKSPACE/.agentic/long"
 
       # `always()`: a crashed, failed, timed-out or early-ended attempt is
       # exactly the case this gate exists to catch. A cancelled job (the
@@ -529,7 +532,7 @@ jobs:
         shell: bash
         run: |
           git -C "$GITHUB_WORKSPACE" show "$GITHUB_SHA:.github/scripts/agent-processes.cjs" > "$RUNNER_TEMP/agent-processes.cjs"
-          node "$RUNNER_TEMP/agent-processes.cjs" stop claude
+          node "$RUNNER_TEMP/agent-processes.cjs" stop claude --handles "$GITHUB_WORKSPACE/.agentic/long"
 
       # Reported, not acted on: the rescue step below reads the state itself and
       # owns what happens next. This exists so the job log names the outcome of
