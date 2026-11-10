@@ -328,8 +328,8 @@ export class ChargeStep {
       }),
       el('span', { text: t('ui.blast_workshop.charge.vibration', { value: explosive.vibrationMod }) }),
     );
-    if (explosive.waterSensitive && anyWet) {
-      const badge = el('span', { attrs: { style: 'display:flex;align-items:center;gap:3px;color:var(--bsx-info)' } });
+    if (explosive.waterSensitive) {
+      const badge = el('span', { attrs: { 'data-role': 'water-badge', style: `display:flex;align-items:center;gap:3px;color:${anyWet ? 'var(--bsx-info)' : 'var(--bsx-text-secondary)'}` } });
       badge.append(iconEl('water', 9), el('span', { text: t('ui.blast_workshop.charge.water_sensitive') }));
       statsRow.appendChild(badge);
     }

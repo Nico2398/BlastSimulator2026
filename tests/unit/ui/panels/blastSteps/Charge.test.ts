@@ -20,6 +20,7 @@ import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
 import { chargeKgLimitWarning, permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
 import { stemmingExplain } from '../../../../../src/ui/blastWorkshopExplain.js';
 import { pinnedDryCycle, pinnedCycle, rainAfterCycle } from '../../../../helpers/weatherCycles.js';
+import { recommendedRangeText } from '../../../../../src/ui/bandMix.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -75,14 +76,14 @@ describe('ChargeStep', () => {
     expect(card(step, 'boomite').dataset['selected']).toBe('false');
   });
 
-  it('shows the WATER-SENSITIVE badge only for water-sensitive explosives while a hole is wet', () => {
+  it('shows the WATER-SENSITIVE badge on every water-sensitive explosive, wet or dry', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
 
     step.update(state, 'sunny'); // not raining — no wet holes
     const waterSensitiveId = ['pop_rock', 'krackle', 'shatternite', 'obliviax'].find(id => getExplosive(id)?.waterSensitive)!;
-    expect(card(step, waterSensitiveId).textContent).not.toContain('WATER-SENSITIVE');
+    expect(card(step, waterSensitiveId).textContent).toContain('WATER-SENSITIVE');
 
     wetAllHoles(state); // the hole holds water now, whatever the weather
     step.update(state, 'heavy_rain');
@@ -1709,10 +1710,9 @@ describe('ChargeStep — explosive cards, powder factor and band mix (#2203)', (
       step.update(state, 'sunny');
       const range = recommendedPowderFactors(state.drillHoles, grid, 'boomite', CHARGE_DEFAULT_STEMMING_M)[h1.id];
       const shown = text(row(step, h1.id), HOLE_REC);
-      if (range) {
-        expect(showsNumber(shown, range.minKgPerM3)).toBe(true);
-        expect(showsNumber(shown, range.maxKgPerM3)).toBe(true);
-      }
+      expect(range).not.toBeUndefined();
+      // Exact text, null included: the row says what the model says, whichever way it answers.
+      expect(shown).toBe(recommendedRangeText(range ?? null));
     });
 
     it('pick up a charge that lands after the first render', () => {

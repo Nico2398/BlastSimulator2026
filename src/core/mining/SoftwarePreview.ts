@@ -207,6 +207,20 @@ function toShares(counts: BandCounts, total: number): BandShares {
   return out;
 }
 
+/** A hole's footprint: its column and half its spacing. */
+export interface HoleCell { cx: number; cz: number; half: number }
+
+/** Nearest hole (Chebyshev distance in columns) whose half-spacing reaches column (x, z); null when none does. */
+export function ownerHoleOf<T extends HoleCell>(x: number, z: number, cells: readonly T[]): T | null {
+  let owner: T | null = null;
+  let best = Infinity;
+  for (const c of cells) {
+    const d = Math.max(Math.abs(x - c.cx), Math.abs(z - c.cz));
+    if (d < best && d <= c.half) { best = d; owner = c; }
+  }
+  return owner;
+}
+
 /** Band counts of each hole's rock cell: nearest hole by column, within half its spacing, one hole depth below the column's top. */
 function holeCellCounts(map: PlanBandMap, holes: readonly DrillHole[]): Map<string, { counts: BandCounts; total: number }> {
   const columnTop = new Map<string, number>();
@@ -219,16 +233,10 @@ function holeCellCounts(map: PlanBandMap, holes: readonly DrillHole[]): Map<stri
     const cx = Math.floor(h.x);
     const cz = Math.floor(h.z);
     return { hole: h, cx, cz, half: holeSpacingM(h, holes) / 2, top: columnTop.get(`${cx},${cz}`) };
-  });
+  }).filter(h => h.top !== undefined);
   const out = new Map<string, { counts: BandCounts; total: number }>();
   for (const c of map.cells.values()) {
-    let owner: (typeof info)[number] | null = null;
-    let best = Infinity;
-    for (const h of info) {
-      if (h.top === undefined) continue;
-      const d = Math.max(Math.abs(c.x - h.cx), Math.abs(c.z - h.cz));
-      if (d < best && d <= h.half) { best = d; owner = h; }
-    }
+    const owner = ownerHoleOf(c.x, c.z, info);
     if (!owner || owner.top === undefined) continue;
     if (c.y > owner.top || c.y <= owner.top - owner.hole.depth) continue;
     let entry = out.get(owner.hole.id);

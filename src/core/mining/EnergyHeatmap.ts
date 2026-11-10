@@ -7,7 +7,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { type FragmentationBand, FRAGMENTATION_BANDS, classifyFragmentationBand } from './FragmentationBand.js';
 import {
   type PlanBandCell, type PlanBandMap, type BandShares, type PowderFactorRange,
-  previewPlanBands, holeBandMixes, recommendedPowderFactors,
+  previewPlanBands, holeBandMixes, recommendedPowderFactors, ownerHoleOf,
 } from './SoftwarePreview.js';
 import { holePowderFactors, holeSpacingM } from './ChargePlan.js';
 import { HEATMAP_COLUMN_BAND_MIN_SHARE } from '../config/balance.js';
@@ -74,7 +74,7 @@ export function sectionAtZ(map: PlanBandMap, z: number): PlanBandCell[] {
   return out;
 }
 
-/** Sets `hole` on every column inside a charged hole's cell: nearest charged hole by column, within half its spacing (#2203). */
+/** Sets `hole` on every column inside a charged hole's cell: nearest hole by column, within half its spacing (#2203). */
 function annotateHoles(
   columns: ColumnBandSummary[],
   plan: BlastPlan,
@@ -95,15 +95,11 @@ function annotateHoles(
     if (!sweep) sweeps.set(key, sweep = recommendedPowderFactors(plan.holes, grid, charge.explosiveId, charge.stemmingM, wetHoleIds));
     return sweep[holeId] ?? null;
   };
-  const cells = charged.map(h => ({ h, cx: Math.floor(h.x), cz: Math.floor(h.z), half: holeSpacingM(h, plan.holes) / 2 }));
+  // Every hole competes for a column, charged or not: a column an uncharged hole owns shows no readout.
+  const cells = plan.holes.map(h => ({ h, cx: Math.floor(h.x), cz: Math.floor(h.z), half: holeSpacingM(h, plan.holes) / 2 }));
   return columns.map(col => {
-    let owner: (typeof cells)[number] | null = null;
-    let best = Infinity;
-    for (const c of cells) {
-      const d = Math.max(Math.abs(col.x - c.cx), Math.abs(col.z - c.cz));
-      if (d < best && d <= c.half) { best = d; owner = c; }
-    }
-    const shares = owner ? mixes[owner.h.id] : undefined;
+    const owner = ownerHoleOf(col.x, col.z, cells);
+    const shares = owner && plan.charges[owner.h.id] !== undefined ? mixes[owner.h.id] : undefined;
     if (!owner || !shares) return col;
     const holeId = owner.h.id;
     let memo: { value: PowderFactorRange | null } | null = null;
