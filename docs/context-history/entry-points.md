@@ -37,3 +37,7 @@ An import-graph measurement drove the selection: a third of `src/` reaches ~98 %
 ### ▶ There is no later turn — the commands that outrun one call (Nov 2026)
 
 The list named `npm run test` at ~270 s and `npm run scenarios` at ~90 s. Measured again while the timeouts above were investigated: the whole suite took 734 s on a 4-core sandbox before its slowest files stopped repeating identical sandbox starts (the heaviest went from 181 s to 45 s), and the scenario batch 117–123 s serially, about a minute once it fanned out across worker processes. The whole suite stopped being a session command at the same time: `verify` runs it only for a diff that changes how every test runs.
+
+## Verification Gate — the `visual` row captures the steps that show a change (Nov 2026)
+
+The row named `--screenshots`, a capture at every step, which is how the visual-tester came to spend up to three hours re-running scenarios CI plays in seconds (`docs/context-history/agent-visual-tester.md`).

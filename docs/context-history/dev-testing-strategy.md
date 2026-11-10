@@ -54,3 +54,7 @@ The `Coverage thresholds` job ran the whole suite a second time, unsharded, unde
 ## CI Launch Strategy — interaction shard balance (Nov 2026)
 
 On CI run 42579175214 the ten interaction shards carried equal static cost (1735–1739 units) and took 254–708 s; the static proxy correlated with measured seconds at 0.57. Balanced on those measured seconds, the same split is 447–449 s per shard.
+
+## Visual Validation Protocol — targeted captures (Nov 2026)
+
+The protocol ran each scenario with `--screenshots`; `--screenshot-steps` captures only the steps that show the change (`docs/context-history/agent-visual-tester.md`).

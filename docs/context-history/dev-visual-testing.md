@@ -17,3 +17,7 @@ A real failure this diagnostic order was built to catch: `hireEmployee` created 
 ## Batch runner — command-mode fan-out (Nov 2026)
 
 `npm run scenarios` ran 246 definitions serially in one process: 117–123 s with three of four cores idle, 5.5 minutes in CI's command-mode job, on every `verify` that owed the `scenario` channel. A shared longest-first queue across worker processes keeps every worker busy; a static split by step count was simulated at 34.7 s for the slowest of four workers against 29.4 s for the queue.
+
+## `--screenshot-steps` (Nov 2026)
+
+Capturing every step of a scenario with `--screenshots` cost a software-rendered frame per step and per camera angle: 273 s against 19 s uncaptured on money-surfaces-visual in a sandbox, and about 59 minutes against 28 s in CI for tutorial-steps-visual on a runner. `--screenshot-steps` renders only the steps a check looks at (46 s for the last step of money-surfaces-visual).

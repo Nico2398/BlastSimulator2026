@@ -246,15 +246,15 @@ Select by what the change touches: every scenario whose steps name the command, 
 
 After any rendering change:
 1. `npm run dev &`
-2. Run each selected scenario with screenshots:
+2. Run each selected scenario, capturing the steps that show the change:
    ```bash
-   npm run scenario -- --scenario <name> --mode interaction --screenshots
+   npm run scenario -- --scenario <name> --mode interaction --screenshot-steps <steps>
    ```
 3. **Open every screenshot** in `screenshots/scenario-{name}-interaction/` with the Read tool and describe what it shows
 4. Verify each description against what the scenario's own step `description` and `expect` say should be on screen
 5. If any check fails → fix rendering → re-run
 
-Screenshots opt-in via `--screenshots`. CI runs without it (no screenshots, state-only validation).
+Screenshots are opt-in: `--screenshot-steps <steps>` captures the steps named (0-based, `last` for the end state), `--screenshots` every step. Each capture renders a frame in software, so a check captures only what it looks at. CI runs without either (state-only validation).
 Use `npm run scenarios` / `npm run scenarios:interaction` for batch runs.
 
 Capturing a screenshot is not inspecting it. A rendering change stays unverified until an image has been read. Full procedure: `dev-visual-testing` skill.
