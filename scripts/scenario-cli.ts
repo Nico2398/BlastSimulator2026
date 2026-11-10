@@ -23,6 +23,11 @@ export interface ParsedArgs {
   viewport: { width: number; height: number };
   mode: string;
   screenshots: boolean;
+  /**
+   * The steps to capture when only some are wanted (`--screenshot-steps`);
+   * undefined captures every step `screenshots` enables.
+   */
+  screenshotSteps?: ReadonlySet<number>;
   reportDrift: boolean;
   skipBlastPlayback: boolean;
   realTutorialClock: boolean;
@@ -38,6 +43,35 @@ function parseViewsArg(raw: string): ShotDef[] {
   }).filter(s => s.name && !isNaN(s.yaw) && !isNaN(s.pitch));
 }
 
+/**
+ * The steps `--screenshot-steps` names, 0-based as the `step-NN` files are:
+ * `3`, `2-5`, `last`, comma-separated. Every capture renders a frame in
+ * software without a GPU — seconds each, and a scenario captured at every step
+ * ran 40–125× longer than CI's uncaptured run of it — so a check looks at the
+ * steps that show its change and no others. Refuses a step the scenario does
+ * not have rather than capturing nothing.
+ */
+export function parseStepSelection(spec: string, stepCount: number): { steps: ReadonlySet<number> } | { error: string } {
+  const steps = new Set<number>();
+  const tokens = spec.split(',').map((token) => token.trim()).filter(Boolean);
+  if (tokens.length === 0) return { error: '--screenshot-steps names no step' };
+  if (stepCount === 0) return { error: '--screenshot-steps: the scenario has no steps to capture' };
+  for (const token of tokens) {
+    const range = /^(\d+)-(\d+)$/.exec(token);
+    const bounds = token === 'last' ? [stepCount - 1, stepCount - 1]
+      : range ? [Number(range[1]), Number(range[2])]
+      : /^\d+$/.test(token) ? [Number(token), Number(token)]
+      : undefined;
+    if (!bounds) return { error: `--screenshot-steps: "${token}" is not a step index, a range a-b, or last` };
+    const [from, to] = bounds as [number, number];
+    if (from > to || from < 0 || to >= stepCount) {
+      return { error: `--screenshot-steps: "${token}" is outside steps 0-${stepCount - 1}` };
+    }
+    for (let step = from; step <= to; step++) steps.add(step);
+  }
+  return { steps };
+}
+
 export function parseArgs(): ParsedArgs {
   const args = process.argv.slice(2);
   let name = 'scenario';
@@ -50,6 +84,7 @@ export function parseArgs(): ParsedArgs {
   let viewport = { width: 1280, height: 720 };
   let mode = 'command'; // default mode
   let screenshots = false;
+  let screenshotStepsSpec: string | undefined;
   let reportDrift = false;
   let skipBlastPlayback = false;
   let realTutorialClock = false;
@@ -116,9 +151,23 @@ export function parseArgs(): ParsedArgs {
       i++;
     } else if (args[i] === '--screenshots') {
       screenshots = true;
+    } else if (args[i] === '--screenshot-steps' && args[i + 1]) {
+      screenshotStepsSpec = args[i + 1]!;
+      screenshots = true;
+      i++;
     } else if (args[i] === '--report-drift') {
       reportDrift = true;
     }
+  }
+
+  let screenshotSteps: ReadonlySet<number> | undefined;
+  if (screenshotStepsSpec !== undefined) {
+    const selection = parseStepSelection(screenshotStepsSpec, steps.length);
+    if ('error' in selection) {
+      console.error(selection.error);
+      process.exit(1);
+    }
+    screenshotSteps = selection.steps;
   }
 
   return {
@@ -132,6 +181,7 @@ export function parseArgs(): ParsedArgs {
     viewport,
     mode,
     screenshots,
+    ...(screenshotSteps !== undefined ? { screenshotSteps } : {}),
     reportDrift,
     skipBlastPlayback,
     realTutorialClock,

@@ -206,10 +206,16 @@ export async function runScenarioInteraction(
   // ScenarioDef.realTutorialClock ?? false: the tutorial guide clock follows
   // the real timer, as for a player (#1598).
   realTutorialClock = false,
+  // `--screenshot-steps`: with screenshots enabled, capture only these steps
+  // (0-based). Every capture renders a frame in software; capturing every step
+  // of a long scenario cost the visual check an hour where CI's uncaptured run
+  // of the same scenario took seconds.
+  captureSteps?: ReadonlySet<number>,
 ): Promise<StepResult[]> {
   const outDir = resolve(screenshotDir, `scenario-${name}-interaction`);
   mkdirSync(outDir, { recursive: true });
   const results: StepResult[] = [];
+  const captures = (step: number): boolean => enableScreenshots && (captureSteps === undefined || captureSteps.has(step));
 
   const { browser, page } = await initBrowser({
     port,
@@ -270,7 +276,7 @@ export async function runScenarioInteraction(
               step, i, findWaitUntilAction(step) !== undefined,
               async () => {
                 const r = await executeInteractionActions(
-                  page, step, enableScreenshots, outDir, paddedIdx, cmdSlug,
+                  page, step, captures(i), outDir, paddedIdx, cmdSlug,
                   reportProgress,
                   undefined,
                   excluding,
@@ -315,7 +321,7 @@ export async function runScenarioInteraction(
         // and a capture failure still fails the step.
         await captureStepEvidence({
           page, step, stepIndex: i, paddedIdx, cmdSlug, interactionResult, stepScreenshotPaths,
-          outDir, enableScreenshots, frames, intervalMs, shots, skipBlastPlayback, results,
+          outDir, enableScreenshots: captures(i), frames, intervalMs, shots, skipBlastPlayback, results,
         });
       } catch (err: unknown) {
         // The level can end during this very step (the tick after the last sale

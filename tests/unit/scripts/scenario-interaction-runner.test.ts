@@ -358,3 +358,49 @@ describe('step deadline excludes capture time (#1224)', () => {
     expect(results).toHaveLength(1);
   });
 });
+
+// A capture renders a frame in software without a GPU: a visual check that
+// captured every step of a long scenario ran for an hour where CI's
+// uncaptured run of the same scenario took seconds. `--screenshot-steps`
+// narrows the captures to the steps that show the change.
+describe('captureSteps: only the selected steps are captured', () => {
+  beforeEach(() => {
+    fakePage = { evaluate: vi.fn(async () => undefined) };
+    fakePageRef.current = fakePage;
+    executeInteractionActionsMock.mockClear();
+    captureFrameMock.mockClear();
+  });
+
+  const run = (enableScreenshots: boolean, captureSteps?: ReadonlySet<number>) => runScenarioInteraction(
+    'capture-steps-fixture',
+    [genericStep(), genericStep(), genericStep()],
+    shotsFixture, 5173, undefined, 1, 200,
+    { width: 1280, height: 720 },
+    enableScreenshots, '/tmp/screenshots',
+    false, // skipBlastPlayback
+    false, // realTutorialClock
+    captureSteps,
+  );
+  // executeInteractionActions(page, step, enableScreenshots, ...): its third argument per step.
+  const actionCaptureFlags = (): unknown[] => executeInteractionActionsMock.mock.calls.map((call) => (call as unknown[])[2]);
+
+  it('captures the selected step only — its frame and its shot — and tells the step actions so', async () => {
+    await run(true, new Set([1]));
+    // One step frame plus one per shot, for step 1 alone.
+    expect(captureFrameMock).toHaveBeenCalledTimes(1 + shotsFixture.length);
+    expect(captureFrameMock.mock.calls.every((call) => String((call as unknown[])[1]).includes('step-01'))).toBe(true);
+    expect(actionCaptureFlags()).toEqual([false, true, false]);
+  });
+
+  it('captures every step when no selection is given', async () => {
+    await run(true);
+    expect(captureFrameMock).toHaveBeenCalledTimes(3 * (1 + shotsFixture.length));
+    expect(actionCaptureFlags()).toEqual([true, true, true]);
+  });
+
+  it('captures nothing with screenshots off, whatever the selection', async () => {
+    await run(false, new Set([0, 1, 2]));
+    expect(captureFrameMock).not.toHaveBeenCalled();
+    expect(actionCaptureFlags()).toEqual([false, false, false]);
+  });
+});
