@@ -86,7 +86,11 @@ export class ChargeOptimizerBlock {
     const applyAll = button('primary', t('ui.blast_workshop.optimizer.apply_all', { count: ids.length }), {
       dataAction: 'apply-proposal',
       disabled: ids.length === 0,
-      onClick: () => { for (const id of ids) this.send(chargeCommand(id, p.charges[id]!)); },
+      onClick: () => {
+        // Applied: the proposal is spent, the hole rows below now show what was ordered.
+        this.proposal = null;
+        for (const id of ids) this.send(chargeCommand(id, p.charges[id]!));
+      },
     });
     wrap.appendChild(applyAll);
     for (const id of ids) wrap.appendChild(this.holeRow(id, p));

@@ -178,8 +178,8 @@ export class ChargeStep {
 
     // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
-      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.paidOnFillEl, this.permitKgEl, this.permitKgWarningEl,
-      this.optimizer.root, this.holeList.root, this.drainEl, tubingHeader, this.tubingCardEl,
+      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.optimizer.root, this.patternLineEl, this.paidOnFillEl, this.permitKgEl, this.permitKgWarningEl,
+      this.holeList.root, this.drainEl, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
   }
