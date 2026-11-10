@@ -5,8 +5,7 @@
 // fragmentation mask and names, per charged hole, what went wrong.
 
 import { VoxelGrid } from '../world/VoxelGrid.js';
-import { getExplosive } from '../world/ExplosiveCatalog.js';
-import { waterEffect } from './BlastCalc.js';
+import { isWaterSensitiveCharge } from './WetHoles.js';
 import { buildHoleSeeds, contains, indexOf } from './EnergyPropagation.js';
 import type { BlastPlan } from './BlastPlan.js';
 import type { EnergyField } from './EnergyPropagation.js';
@@ -57,8 +56,7 @@ export function analyseHoleFailures(input: HoleFailureInput): HoleFailure[] {
     }
 
     if (!chargeBroke) {
-      const explosive = getExplosive(charge.explosiveId);
-      const fizzled = wetHoleIds.has(hole.id) && !!explosive && waterEffect(true, explosive.waterSensitive, false) < 1;
+      const fizzled = wetHoleIds.has(hole.id) && isWaterSensitiveCharge(charge);
       if (fizzled) {
         failures.push({ holeId: hole.id, kind: 'fizzled' });
       } else {

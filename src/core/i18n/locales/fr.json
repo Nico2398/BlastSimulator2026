@@ -3979,6 +3979,7 @@
   "ui.blast_workshop.report.dud_title": "Raté total : le tir n'a abattu aucune roche.",
   "ui.blast_workshop.report.dud_hint": "Aucune charge n'a atteint l'énergie dont la roche a besoin pour se fragmenter. Voir la raison de chaque trou ci-dessous.",
   "ui.blast_workshop.report.hole_reason_below_threshold": "Trou {hole} : énergie sous le seuil de la roche. Il aurait fallu environ {pct} % d'énergie en plus.",
+  "ui.blast_workshop.report.hole_reason_no_energy": "Trou {hole} : aucune énergie utilisable n'a atteint sa roche.",
   "ui.blast_workshop.report.hole_reason_fizzled": "Trou {hole} : la charge a raté dans l'eau.",
   "ui.blast_workshop.report.hole_reason_buried": "Trou {hole} : trop de roche au-dessus de la charge ({metres} m restés scellés).",
   "ui.blast_workshop.report.hole_reasons_more": "+{count} autres trous ont échoué.",

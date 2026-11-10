@@ -3979,6 +3979,7 @@
   "ui.blast_workshop.report.dud_title": "Total dud: the shot broke no rock.",
   "ui.blast_workshop.report.dud_hint": "No charge reached the energy the rock needs to fragment. See the reason for each hole below.",
   "ui.blast_workshop.report.hole_reason_below_threshold": "Hole {hole}: energy below what the rock needs. About {pct}% more energy would have been needed.",
+  "ui.blast_workshop.report.hole_reason_no_energy": "Hole {hole}: no usable energy reached its rock.",
   "ui.blast_workshop.report.hole_reason_fizzled": "Hole {hole}: the charge fizzled in water.",
   "ui.blast_workshop.report.hole_reason_buried": "Hole {hole}: too much rock above the charge ({metres} m stayed sealed).",
   "ui.blast_workshop.report.hole_reasons_more": "+{count} more holes failed.",

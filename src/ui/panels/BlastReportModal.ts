@@ -327,7 +327,9 @@ export class BlastReportModal {
     }
     for (const f of failures.slice(0, BLAST_REPORT_MAX_HOLE_REASONS)) {
       const text = f.kind === 'below_threshold'
-        ? t('ui.blast_workshop.report.hole_reason_below_threshold', { hole: f.holeId, pct: f.moreEnergyPct ?? 0 })
+        ? (f.moreEnergyPct !== undefined
+          ? t('ui.blast_workshop.report.hole_reason_below_threshold', { hole: f.holeId, pct: f.moreEnergyPct })
+          : t('ui.blast_workshop.report.hole_reason_no_energy', { hole: f.holeId }))
         : f.kind === 'fizzled'
           ? t('ui.blast_workshop.report.hole_reason_fizzled', { hole: f.holeId })
           : t('ui.blast_workshop.report.hole_reason_buried', { hole: f.holeId, metres: (f.rockAboveM ?? 0).toFixed(0) });
