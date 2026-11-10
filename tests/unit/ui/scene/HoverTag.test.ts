@@ -329,7 +329,7 @@ describe('HoverTag', () => {
   describe('energy heatmap line (#2200)', () => {
     const column = {
       x: 12, z: 8, band: 'fines' as const, worstBand: 'dust' as const, goodShare: 0.2, maxIntensity: 3.39,
-      counts: { intact: 0, cracked: 0, good: 2, fines: 6, dust: 1 },
+      counts: { intact: 0, cracked: 0, coarse: 0, good: 2, fines: 6, dust: 1 },
     };
     const hover = (): PickResult => ({ entity: null, terrain: { point: new THREE.Vector3(), tileX: 12, tileZ: 8, distance: 1 } });
 
@@ -357,10 +357,10 @@ describe('HoverTag', () => {
     });
   });
   describe('hole readout (#2203 C5)', () => {
-    const shares = { intact: 0.2, cracked: 0.1, good: 0.4, fines: 0.2, dust: 0.1 };
+    const shares = { intact: 0.2, cracked: 0.1, coarse: 0, good: 0.4, fines: 0.2, dust: 0.1 };
     const columnWithHole = (recommended: () => { minKgPerM3: number; maxKgPerM3: number } | null) => ({
       x: 12, z: 8, band: 'good' as const, worstBand: 'dust' as const, goodShare: 0.4, maxIntensity: 1.7,
-      counts: { intact: 2, cracked: 1, good: 4, fines: 2, dust: 1 },
+      counts: { intact: 2, cracked: 1, coarse: 0, good: 4, fines: 2, dust: 1 },
       hole: { holeId: 'H7', powderFactor: 0.2371, shares, recommended },
     });
     const hover = (): PickResult => ({ entity: null, terrain: { point: new THREE.Vector3(), tileX: 12, tileZ: 8, distance: 1 } });

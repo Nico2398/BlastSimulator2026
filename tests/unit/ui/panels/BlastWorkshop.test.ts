@@ -369,7 +369,7 @@ describe('BlastWorkshop — energy heatmap legend', () => {
     expect(isShown(workshop.root, workshop.root.querySelector(LEGEND))).toBe(false);
   });
 
-  it('shows five band entries once the heatmap is on, each naming the band and its consequence', () => {
+  it('shows one entry per band once the heatmap is on, each naming the band and its consequence', () => {
     const { workshop, state } = heatmapFixture();
     workshop.setEnergyHeatmapVisible(true);
     workshop.update(state, 'sunny');
@@ -380,7 +380,7 @@ describe('BlastWorkshop — energy heatmap legend', () => {
     expect(entries.map(e => e.dataset['band']).sort()).toEqual([...FRAGMENTATION_BANDS].sort());
     const texts = entries.map(e => (e.textContent ?? '').trim());
     for (const t of texts) expect(t.length).toBeGreaterThanOrEqual(12);
-    expect(new Set(texts).size).toBe(5);
+    expect(new Set(texts).size).toBe(FRAGMENTATION_BANDS.length);
   });
 
   it('disappears again when switched off', () => {

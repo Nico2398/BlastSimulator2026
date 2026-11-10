@@ -151,7 +151,7 @@ export function optimizeCharges(
         const r = ranges.get(h.id)!;
         charges[h.id] = { explosiveId, amountKg: roundTenth(Math.min(r.hi, Math.max(r.lo, a))), stemmingM: options.stemmingM };
       }
-      const map = previewPlanBands({ holes: usable, charges }, grid, wet);
+      const map = previewPlanBands({ holes: usable, charges }, grid, wet, { fate: false });
       const mixes = holeBandMixes(map, usable);
       for (const h of usable) {
         const c = charges[h.id]!;

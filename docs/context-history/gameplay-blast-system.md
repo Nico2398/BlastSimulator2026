@@ -87,3 +87,10 @@ Records why the rules in the `gameplay-blast-system` skill exist: the issues tha
 
 ## 2026-11-10 (#2203)
 Added per-hole readouts paragraph under Energy heatmap: powder factor, band mix, recommended range, card band mix.
+
+## Coarse band and recommended range (blast legibility review, 2026-11-10)
+
+- Review after the #2197–#2204 batch, on uniform benches and the sandbox opening pattern (3x3, 4 m, 8 m, 89 mm, 2.5 m stemming): about half the rock a standard shot breaks out (lifted burden, floor to grade) has intensity below 1, and the heatmap and band mixes showed it as "Intact: rock stays put" (molite/krackle 8 kg: 351 of 648 broken voxels). It now reads `coarse` (`fragmentationBandOf`), in the preview and in `executeBlast`'s band volumes alike.
+- `recommendedPowderFactors` returned null for every hole of every rock and explosive on that pattern: the good band is a shell round the charge, so the best charge reaches 8-27% good, never the 0.5 the absolute bar asked. The range is now relative to the best sample (`RECOMMENDED_RELATIVE_GOOD_SHARE` 0.8), with `RECOMMENDED_GOOD_SHARE_MIN` lowered to 0.05 as the "this explosive cannot do it" floor (titanite/boomite best 3%).
+- The software table's names are the in-game ones (`ui.blast_workshop.preview.tier_*`); the old names described the pre-#2201 line-up.
+

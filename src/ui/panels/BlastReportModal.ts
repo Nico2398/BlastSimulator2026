@@ -303,6 +303,8 @@ export class BlastReportModal {
     if (!bands) return [];
     const m3 = (v: number): string => `${v.toFixed(0)} m³`;
     return [
+      // `coarse` is absent from reports saved before it existed.
+      { key: t('ui.blast_workshop.report.stat_band_coarse'), value: m3(bands.coarse ?? 0) },
       { key: t('ui.blast_workshop.report.stat_band_cracked'), value: m3(bands.cracked) },
       { key: t('ui.blast_workshop.report.stat_band_good'), value: m3(bands.good) },
       { key: t('ui.blast_workshop.report.stat_band_fines'), value: m3(bands.fines) },

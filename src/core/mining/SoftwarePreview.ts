@@ -10,13 +10,14 @@ import { getDominantRockId, firstEmptyLayerAboveGround, clampToGridColumn } from
 import { getRock, type RockType } from '../world/RockCatalog.js';
 import {
   SEEDS_BASE, SEEDS_PER_INTENSITY, MAX_SEEDS_PER_VOXEL, FRAGMENTATION_MULTIPLIER,
-  RECOMMENDED_GOOD_SHARE_MIN, RECOMMENDED_SWEEP_STEPS,
+  RECOMMENDED_GOOD_SHARE_MIN, RECOMMENDED_RELATIVE_GOOD_SHARE, RECOMMENDED_SWEEP_STEPS,
 } from '../config/balance.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { type HoleCharge, holeSpacingM, holePowderFactors, maxFittingChargeKg } from './ChargePlan.js';
-import { type EnergyField, effectiveAt, thresholdAt, intensityAt } from './EnergyPropagation.js';
-import { type FragmentationBand, FRAGMENTATION_BANDS, classifyFragmentationBand } from './FragmentationBand.js';
+import { type EnergyField, effectiveAt, thresholdAt, intensityAt, contains, indexOf } from './EnergyPropagation.js';
+import { type FragmentationBand, FRAGMENTATION_BANDS, fragmentationBandOf } from './FragmentationBand.js';
 import { buildPlanEnergyField } from './BlastExecution.js';
+import { identifyFragmentedVoxels } from './VoxelFragmentation.js';
 
 export const PREVIEW_RADIUS = 5;
 
@@ -168,19 +169,38 @@ export interface PlanBandMap {
   cells: ReadonlyMap<string, PlanBandCell>;
 }
 
+/** Options for `previewPlanBands`. */
+interface PlanBandOptions {
+  /**
+   * Run the blast's own fragmentation passes so rock that breaks out without enough energy
+   * (lifted burden, floor to grade, unsupported rock) reads `coarse` rather than intact.
+   * Default true. Sweeps that only compare good shares skip it: `coarse` never takes a cell
+   * from the good, fines or dust bands, so their good share is the same either way.
+   */
+  fate?: boolean;
+}
+
 /**
- * The fragmentation bands the plan would produce, read from the blast's own energy field.
- * Needs no software tier (#2200).
+ * The fragmentation bands the plan would produce, read from the blast's own energy field and,
+ * unless `fate` is false, its own fragmentation passes. Needs no software tier (#2200).
  */
-export function previewPlanBands(plan: BlastPlan, grid: VoxelGrid, wetHoleIds: ReadonlySet<string> = new Set()): PlanBandMap {
+export function previewPlanBands(
+  plan: BlastPlan,
+  grid: VoxelGrid,
+  wetHoleIds: ReadonlySet<string> = new Set(),
+  { fate = true }: PlanBandOptions = {},
+): PlanBandMap {
   const cells = new Map<string, PlanBandCell>();
   const ctx = computeHoleContext(plan, grid);
   const bbox = getBlastBBox(plan, ctx);
   const field = hasChargedHole(plan) ? buildPlanEnergyField(plan, grid, wetHoleIds) : null;
   if (!field) return { bbox, cells };
+  // weakenCracked false: a preview must never weaken the rock it reads.
+  const mask = fate ? identifyFragmentedVoxels(field, grid, false).mask : null;
   forEachBBoxVoxel(grid, bbox, (x, y, z) => {
     const intensity = intensityAt(field, x, y, z);
-    cells.set(`${x},${y},${z}`, { x, y, z, intensity, band: classifyFragmentationBand(intensity) });
+    const broken = mask !== null && contains(field, x, y, z) && mask[indexOf(field, x, y, z)] === 1;
+    cells.set(`${x},${y},${z}`, { x, y, z, intensity, band: fragmentationBandOf(intensity, broken) });
   });
   return { bbox, cells };
 }
@@ -198,7 +218,7 @@ export function holeBandMixes(map: PlanBandMap, holes: readonly DrillHole[]): Re
 type BandCounts = Record<FragmentationBand, number>;
 
 function emptyCounts(): BandCounts {
-  return { intact: 0, cracked: 0, good: 0, fines: 0, dust: 0 };
+  return { intact: 0, cracked: 0, coarse: 0, good: 0, fines: 0, dust: 0 };
 }
 
 function toShares(counts: BandCounts, total: number): BandShares {
@@ -258,7 +278,7 @@ export function planBandShares(map: PlanBandMap, holes: readonly DrillHole[]): B
   return total > 0 ? toShares(pooled, total) : null;
 }
 
-/** Powder factors (kg/m3) at which a hole's rock is mostly good fragmentation (#2203). */
+/** Powder factors (kg/m3) at which a hole's rock fragments best (#2203). */
 export interface PowderFactorRange {
   minKgPerM3: number;
   maxKgPerM3: number;
@@ -293,7 +313,11 @@ export function previewExplosiveBandShares(
   return planBandShares(previewPlanBands(plan, grid, wetHoleIds), holes);
 }
 
-/** Per hole, the powder-factor range that makes its rock mostly good fragmentation with this explosive; null when none does (#2203). */
+/**
+ * Per hole, the powder-factor range that fragments its rock best with this explosive: the run of swept charges
+ * around the best one whose good share stays within `RECOMMENDED_RELATIVE_GOOD_SHARE` of it. Null when even the
+ * best charge leaves less than `RECOMMENDED_GOOD_SHARE_MIN` of the rock in the good band (#2203).
+ */
 export function recommendedPowderFactors(
   holes: readonly DrillHole[],
   grid: VoxelGrid,
@@ -312,7 +336,7 @@ export function recommendedPowderFactors(
       const amountKg = maxFittingChargeKg(h.depth, stemmingM, h.diameter) * (i / RECOMMENDED_SWEEP_STEPS);
       charges[h.id] = { explosiveId, amountKg, stemmingM };
     }
-    const mixes = holeBandMixes(previewPlanBands({ holes: [...holes], charges }, grid, wetHoleIds), holes);
+    const mixes = holeBandMixes(previewPlanBands({ holes: [...holes], charges }, grid, wetHoleIds, { fate: false }), holes);
     const pfs = holePowderFactors(holes, charges);
     for (const h of holes) {
       const mix = mixes[h.id];
@@ -324,10 +348,11 @@ export function recommendedPowderFactors(
     let best = -1;
     for (let i = 0; i < list.length; i++) if (best < 0 || list[i]!.good > list[best]!.good) best = i;
     if (best < 0 || list[best]!.good < RECOMMENDED_GOOD_SHARE_MIN) continue;
+    const floor = list[best]!.good * RECOMMENDED_RELATIVE_GOOD_SHARE;
     let lo = best;
     let hi = best;
-    while (lo > 0 && list[lo - 1]!.good >= RECOMMENDED_GOOD_SHARE_MIN) lo--;
-    while (hi < list.length - 1 && list[hi + 1]!.good >= RECOMMENDED_GOOD_SHARE_MIN) hi++;
+    while (lo > 0 && list[lo - 1]!.good >= floor) lo--;
+    while (hi < list.length - 1 && list[hi + 1]!.good >= floor) hi++;
     out[h.id] = { minKgPerM3: list[lo]!.pf, maxKgPerM3: list[hi]!.pf };
   }
   return out;

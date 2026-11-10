@@ -16,14 +16,15 @@ import {
   type PlanBandCell,
   type PlanBandMap,
 } from '../../../src/core/mining/SoftwarePreview.js';
-import { buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js';
+import { buildPlanEnergyField, executeBlast } from '../../../src/core/mining/BlastExecution.js';
+import { identifyFragmentedVoxels } from '../../../src/core/mining/VoxelFragmentation.js';
 import { intensityAt } from '../../../src/core/mining/EnergyPropagation.js';
-import { classifyFragmentationBand, FRAGMENTATION_BANDS } from '../../../src/core/mining/FragmentationBand.js';
+import { classifyFragmentationBand, fragmentationBandOf, FRAGMENTATION_BANDS } from '../../../src/core/mining/FragmentationBand.js';
 import { VoxelGrid, firstEmptyLayerAboveGround } from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
-import { batchCharge, chargeFitsHole, holeSpacingM, powderFactor } from '../../../src/core/mining/ChargePlan.js';
+import { batchCharge, chargeFitsHole, holeSpacingM, powderFactor, maxFittingChargeKg } from '../../../src/core/mining/ChargePlan.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
-import { RECOMMENDED_GOOD_SHARE_MIN, FRAGMENTATION_MULTIPLIER, FRAGMENTATION_BAND_FINES_MIN, FRAGMENTATION_BAND_DUST_MIN, CRACKED_VOXEL_ENERGY_RATIO } from '../../../src/core/config/balance.js';
+import { RECOMMENDED_GOOD_SHARE_MIN, RECOMMENDED_RELATIVE_GOOD_SHARE, RECOMMENDED_SWEEP_STEPS, FRAGMENTATION_MULTIPLIER, FRAGMENTATION_BAND_FINES_MIN, FRAGMENTATION_BAND_DUST_MIN, CRACKED_VOXEL_ENERGY_RATIO } from '../../../src/core/config/balance.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
 
@@ -208,17 +209,54 @@ function singleHolePlan(amountKg: number, stemmingM: number, explosiveId = 'boom
 }
 
 describe('SoftwarePreview — previewPlanBands', () => {
-  it('reports each cell with the intensity of the blast\'s own energy field and its classified band', () => {
+  it('reports each cell with the intensity of the blast\'s own energy field and its band given its fate', () => {
     const { grid, plan } = makeTestPlan();
     const field = buildPlanEnergyField(plan, grid)!;
+    const broken = new Set(identifyFragmentedVoxels(field, grid, false).fragmented.map(v => `${v.x},${v.y},${v.z}`));
     const map = previewPlanBands(plan, grid);
 
     expect(map.cells.size).toBeGreaterThan(0);
     for (const [key, cell] of map.cells) {
       expect(key).toBe(`${cell.x},${cell.y},${cell.z}`);
       expect(cell.intensity).toBe(intensityAt(field, cell.x, cell.y, cell.z));
-      expect(cell.band).toBe(classifyFragmentationBand(cell.intensity));
+      expect(cell.band).toBe(fragmentationBandOf(cell.intensity, broken.has(key)));
     }
+  });
+
+  it('shows rock that breaks out without enough energy as coarse, never as rock that stays put', () => {
+    // The sandbox opening pattern in a deep bed: its undermined cap lifts and breaks out as blocks.
+    const grid = bedGrid('molite', 24);
+    const plan = uniformChargePlan(patternHoles(3, 3, 4, 8), 'krackle', 8, 2.5);
+    const field = buildPlanEnergyField(plan, grid)!;
+    const fragmentation = identifyFragmentedVoxels(field, grid, false);
+    expect(fragmentation.liftedCount).toBeGreaterThan(0);
+    const broken = new Set(fragmentation.fragmented.map(v => `${v.x},${v.y},${v.z}`));
+    const cells = [...previewPlanBands(plan, grid).cells.values()];
+    const coarse = cells.filter(c => c.band === 'coarse');
+    expect(coarse.length).toBeGreaterThan(0);
+    for (const c of coarse) {
+      expect(broken.has(`${c.x},${c.y},${c.z}`)).toBe(true);
+      expect(c.intensity).toBeLessThan(FRAGMENTATION_MULTIPLIER);
+    }
+    for (const c of cells.filter(c => c.band === 'intact' || c.band === 'cracked')) {
+      expect(broken.has(`${c.x},${c.y},${c.z}`)).toBe(false);
+    }
+  });
+
+  it('counts as many coarse voxels as the blast itself reports in coarse volume', () => {
+    const plan = uniformChargePlan(patternHoles(3, 3, 4, 8), 'krackle', 8, 2.5);
+    const coarse = [...previewPlanBands(plan, bedGrid('molite', 24)).cells.values()].filter(c => c.band === 'coarse').length;
+    expect(coarse).toBeGreaterThan(0);
+    const result = executeBlast(plan, bedGrid('molite', 24), [])!;
+    expect(result.bandVolumes.coarse).toBe(coarse);
+  });
+
+  it('with fate off, bands are intensity bands only and the good share is unchanged', () => {
+    const { grid, plan, hole } = singleHolePlan(8, 3);
+    const withFate = previewPlanBands(plan, grid);
+    const without = previewPlanBands(plan, grid, new Set(), { fate: false });
+    for (const c of without.cells.values()) expect(c.band).toBe(classifyFragmentationBand(c.intensity));
+    expect(holeBandMixes(without, [hole])[hole.id]!.good).toBeCloseTo(holeBandMixes(withFate, [hole])[hole.id]!.good, 12);
   });
 
   it('covers every filled voxel of the plan\'s blast box and nothing else', () => {
@@ -260,11 +298,11 @@ describe('SoftwarePreview — previewPlanBands', () => {
     expect(map.cells.size).toBe(0);
   });
 
-  it('every intensity is non-negative and every band is one of the five', () => {
+  it('every intensity is non-negative and every band is one of the six', () => {
     const { grid, plan } = makeTestPlan();
     for (const cell of previewPlanBands(plan, grid).cells.values()) {
       expect(cell.intensity).toBeGreaterThanOrEqual(0);
-      expect(['intact', 'cracked', 'good', 'fines', 'dust']).toContain(cell.band);
+      expect(['intact', 'cracked', 'coarse', 'good', 'fines', 'dust']).toContain(cell.band);
     }
   });
 
@@ -590,8 +628,7 @@ describe('SoftwarePreview — previewExplosiveBandShares (#2203 C4)', () => {
 });
 
 describe('SoftwarePreview — recommendedPowderFactors (#2203 C3)', () => {
-  // Shallow 3 x 3 patterns, 3 m apart: the rock cell around each hole is small enough for the good band to
-  // cover half of it somewhere in the charge sweep.
+  // Shallow 3 x 3 patterns, 3 m apart: small rock cells, so the good band covers a large share of them.
   const FIXTURES = [
     { rock: 'sandite', explosive: 'boomite', stemming: 1 },
     { rock: 'sandite', explosive: 'krackle', stemming: 2 },
@@ -610,7 +647,7 @@ describe('SoftwarePreview — recommendedPowderFactors (#2203 C3)', () => {
     }
   });
 
-  it('finds a range for at least one hole where a charge makes the rock mostly good', () => {
+  it('finds a range for at least one hole of the shallow fixtures', () => {
     const found = FIXTURES.some(({ rock, explosive, stemming }) => {
       const ranges = recommendedPowderFactors(holes, bedGrid(rock, 14), explosive, stemming);
       return Object.values(ranges).some(r => r !== null);
@@ -631,7 +668,8 @@ describe('SoftwarePreview — recommendedPowderFactors (#2203 C3)', () => {
         const amountKg = pf * spacing * spacing * hole.depth;
         const plan = uniformChargePlan(holes, explosive, amountKg, stemming);
         const mix = holeBandMixes(previewPlanBands(plan, grid), holes)[hole.id]!;
-        expect(mix.good, `${rock}/${explosive} ${hole.id}`).toBeGreaterThanOrEqual(RECOMMENDED_GOOD_SHARE_MIN - 1e-9);
+        // Inside the range the good share stays near the best sample's, itself at least the minimum.
+        expect(mix.good, `${rock}/${explosive} ${hole.id}`).toBeGreaterThanOrEqual(RECOMMENDED_GOOD_SHARE_MIN * RECOMMENDED_RELATIVE_GOOD_SHARE - 0.02);
         expect(powderFactor(plan.charges[hole.id]!.amountKg, hole.depth, spacing)).toBeCloseTo(pf, 6);
         checked++;
       }
@@ -645,7 +683,37 @@ describe('SoftwarePreview — recommendedPowderFactors (#2203 C3)', () => {
     for (const range of Object.values(ranges)) expect(range).toBeNull();
   });
 
-  it('is null for a hole no charge can reach a mostly-good mix in', () => {
+  it('gives every hole of a standard pattern a range when the explosive suits the rock (regression: "No charge" everywhere)', () => {
+    // The sandbox opening pattern: 3 x 3, 4 m apart, 8 m holes, 89 mm, 2.5 m stemming, in a deep bed.
+    const standard = patternHoles(3, 3, 4, 8);
+    for (const [rock, explosive] of [['molite', 'krackle'], ['cruite', 'boomite'], ['clunkite', 'shatternite']] as const) {
+      const ranges = recommendedPowderFactors(standard, bedGrid(rock, 24), explosive, 2.5);
+      for (const hole of standard) expect(ranges[hole.id], `${rock}/${explosive} ${hole.id}`).not.toBeNull();
+    }
+  });
+
+  it('recommends the charges that fragment the rock nearly as well as the best one, the best included', () => {
+    const standard = patternHoles(3, 3, 4, 8);
+    const grid = bedGrid('molite', 24);
+    const centre = standard[4]!;
+    const range = recommendedPowderFactors(standard, grid, 'krackle', 2.5)[centre.id]!;
+    const spacing = holeSpacingM(centre, standard);
+    const fit = maxFittingChargeKg(centre.depth, 2.5, centre.diameter);
+    const samples = Array.from({ length: RECOMMENDED_SWEEP_STEPS }, (_, i) => {
+      const kg = fit * ((i + 1) / RECOMMENDED_SWEEP_STEPS);
+      const mix = holeBandMixes(previewPlanBands(uniformChargePlan(standard, 'krackle', kg, 2.5), grid), standard)[centre.id]!;
+      return { pf: powderFactor(kg, centre.depth, spacing), good: mix.good };
+    });
+    const best = samples.reduce((a, b) => (b.good > a.good ? b : a));
+    expect(best.pf).toBeGreaterThanOrEqual(range.minKgPerM3 - 1e-9);
+    expect(best.pf).toBeLessThanOrEqual(range.maxKgPerM3 + 1e-9);
+    for (const sample of samples) {
+      if (sample.pf < range.minKgPerM3 - 1e-9 || sample.pf > range.maxKgPerM3 + 1e-9) continue;
+      expect(sample.good).toBeGreaterThanOrEqual(best.good * RECOMMENDED_RELATIVE_GOOD_SHARE - 1e-9);
+    }
+  });
+
+  it('is null for a hole no charge of the explosive fragments well', () => {
     // Black powder in hard rock, holes 8 m apart: the good band never covers more than a sliver of the cell.
     const wide = patternHoles(1, 2, 8, 8);
     const ranges = recommendedPowderFactors(wide, bedGrid('titanite', 14), 'pop_rock', 2);

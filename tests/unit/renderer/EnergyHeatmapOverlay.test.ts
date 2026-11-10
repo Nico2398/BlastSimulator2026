@@ -7,7 +7,7 @@ import { FRAGMENTATION_BANDS, FRAGMENTATION_BAND_COLORS, type FragmentationBand 
 import { HEATMAP_OVERLAY_OPACITY } from '../../../src/core/config/balance.js';
 
 function column(x: number, z: number, band: FragmentationBand, over: Partial<ColumnBandSummary> = {}): ColumnBandSummary {
-  const counts = { intact: 0, cracked: 0, good: 0, fines: 0, dust: 0 };
+  const counts = { intact: 0, cracked: 0, coarse: 0, good: 0, fines: 0, dust: 0 };
   counts[band] = 4;
   return { x, z, band, worstBand: band, goodShare: band === 'good' ? 1 : 0, maxIntensity: 1, counts, ...over };
 }

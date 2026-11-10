@@ -523,7 +523,7 @@ function emptyBlastResult(): BlastResult {
     totalOreValue: 0, rating: 'mediocre', crackedVoxels: 0, clearedVoxels: 0,
     clearedRegion: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 }, destroyedBuildings: [],
     maxThrowDistance: 0, projectileCount: 0, flights: [], clearedColumns: [], brokeOut: true,
-    bandVolumes: { intact: 0, cracked: 0, good: 0, fines: 0, dust: 0 }, dustLoss: { massKg: 0, oreValue: 0 },
+    bandVolumes: { intact: 0, cracked: 0, coarse: 0, good: 0, fines: 0, dust: 0 }, dustLoss: { massKg: 0, oreValue: 0 },
   };
 }
 
@@ -871,7 +871,7 @@ describe('buildBlastReport — band and failure fields (#2202)', () => {
   });
 
   it('copies bandVolumes from the result (C6)', () => {
-    const bandVolumes = { intact: 0, cracked: 12, good: 80, fines: 30, dust: 9 };
+    const bandVolumes = { intact: 0, cracked: 12, coarse: 0, good: 80, fines: 30, dust: 9 };
     const report = buildBlastReport({ ...emptyBlastResult(), bandVolumes }, 0, 0);
     expect(report.bandVolumes).toEqual(bandVolumes);
   });

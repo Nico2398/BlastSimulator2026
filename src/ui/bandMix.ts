@@ -13,10 +13,10 @@ function cssColor(hex: number): string {
   return `#${hex.toString(16).padStart(6, '0')}`;
 }
 
-/** "Intact 10% · Cracked 20% · Good 40% · …" — every band, whole percents. */
+/** "Intact 10% · Cracked 20% · Coarse 5% · Good 40% · …" — every band, whole percents. */
 function bandMixText(shares: BandShares): string {
   return FRAGMENTATION_BANDS
-    .map(b => `${t(`blast.band.${b}`)} ${Math.round(shares[b] * PERCENT)}%`)
+    .map(b => `${t(`blast.band.${b}`)} ${Math.round((shares[b] ?? 0) * PERCENT)}%`)
     .join(' · ');
 }
 
@@ -24,7 +24,7 @@ function bandMixText(shares: BandShares): string {
 export function bandMixEl(shares: BandShares, role: string): HTMLElement {
   const bar = el('div', { attrs: { style: 'display:flex;height:5px;border-radius:2px;overflow:hidden;width:100%' } });
   for (const b of FRAGMENTATION_BANDS) {
-    if (shares[b] <= 0) continue;
+    if (!(shares[b] > 0)) continue;
     bar.appendChild(el('span', { attrs: { style: `flex:${shares[b]};background:${cssColor(FRAGMENTATION_BAND_COLORS[b])}` } }));
   }
   const wrap = el('div', {
@@ -39,7 +39,7 @@ export function powderFactorText(kgPerM3: number): string {
   return t('ui.blast_workshop.charge.powder_factor', { value: kgPerM3.toFixed(2) });
 }
 
-/** The recommended powder-factor range, or the sentence saying no tested charge gives mostly good rock. */
+/** The recommended powder-factor range, or the sentence saying no tested charge of the explosive fragments the rock well. */
 export function recommendedRangeText(range: PowderFactorRange | null): string {
   if (!range) return t('ui.blast_workshop.charge.recommended_none');
   return t('ui.blast_workshop.charge.recommended', {
