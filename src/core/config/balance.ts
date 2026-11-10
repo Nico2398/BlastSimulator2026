@@ -881,6 +881,11 @@ export const CRACKED_VOXEL_ENERGY_RATIO = 0.5;
 export const FRAGMENTATION_BAND_FINES_MIN = 2;
 export const FRAGMENTATION_BAND_DUST_MIN = 4;
 
+/** Good-band share of a hole's rock at or above which its charge counts as mostly green (#2203). */
+export const RECOMMENDED_GOOD_SHARE_MIN = 0.5;
+/** Charge levels sampled, as fractions of a hole's heaviest fitting charge, to find its recommended powder factor (#2203). */
+export const RECOMMENDED_SWEEP_STEPS = 12;
+
 /** Share of a dust-band voxel's mass and ore lost to the cloud. */
 export const DUST_LOSS_SHARE = 0.03;
 

@@ -39,6 +39,7 @@ import { MIN_STEMMING_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, HO
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { defaultChargeKg } from '../../../core/economy/PermitDefaults.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
+import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { permitPreview, chargeKgLimitWarning } from '../permitPreview.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
@@ -178,6 +179,9 @@ export class ChargeStep {
   get root(): HTMLElement { return this.el; }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+
+  /** Grid the cards and hole rows read their predicted band mix from (#2203). */
+  setGridProvider(_fn: () => VoxelGrid | null): void { /* TODO skeleton */ }
 
   refreshLocale(): void {
     this.locale.refresh();

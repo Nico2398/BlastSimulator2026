@@ -4,6 +4,7 @@
 // call one shared computation instead of repeating it.
 
 import { type BlastPlan, hasChargedHole } from './BlastPlan.js';
+import type { DrillHole } from './DrillPlan.js';
 import type { VoxelGrid, VoxelData } from '../world/VoxelGrid.js';
 import { getDominantRockId, firstEmptyLayerAboveGround, clampToGridColumn } from '../world/VoxelGrid.js';
 import { getRock, type RockType } from '../world/RockCatalog.js';
@@ -177,4 +178,56 @@ export function previewPlanBands(plan: BlastPlan, grid: VoxelGrid, wetHoleIds: R
     cells.set(`${x},${y},${z}`, { x, y, z, intensity, band: classifyFragmentationBand(intensity) });
   });
   return { bbox, cells };
+}
+
+/** Share of a rock cell in each fragmentation band; sums to 1 (#2203). */
+export type BandShares = Record<FragmentationBand, number>;
+
+/** Band shares of each hole's rock cell, keyed by hole id. Holes with no rock in their cell are omitted (#2203). */
+export function holeBandMixes(_map: PlanBandMap, _holes: readonly DrillHole[]): Record<string, BandShares> {
+  throw new Error('not implemented');
+}
+
+/** Band shares of all holes' cells pooled; null when no hole has rock in its cell (#2203). */
+export function planBandShares(_map: PlanBandMap, _holes: readonly DrillHole[]): BandShares | null {
+  throw new Error('not implemented');
+}
+
+/** Powder factors (kg/m3) at which a hole's rock is mostly good fragmentation (#2203). */
+export interface PowderFactorRange {
+  minKgPerM3: number;
+  maxKgPerM3: number;
+}
+
+/** A plan charging every hole with `amountKg` of the explosive (capped to what fits the hole) under `stemmingM` (#2203). */
+export function uniformChargePlan(
+  _holes: readonly DrillHole[],
+  _explosiveId: string,
+  _amountKg: number,
+  _stemmingM: number,
+): BlastPlan {
+  throw new Error('not implemented');
+}
+
+/** Pooled band shares the explosive would give the pattern at `amountKg`; null with no holes or no rock (#2203). */
+export function previewExplosiveBandShares(
+  _holes: readonly DrillHole[],
+  _grid: VoxelGrid,
+  _explosiveId: string,
+  _amountKg: number,
+  _stemmingM: number,
+  _wetHoleIds: ReadonlySet<string> = new Set(),
+): BandShares | null {
+  throw new Error('not implemented');
+}
+
+/** Per hole, the powder-factor range that makes its rock mostly good fragmentation with this explosive; null when none does (#2203). */
+export function recommendedPowderFactors(
+  _holes: readonly DrillHole[],
+  _grid: VoxelGrid,
+  _explosiveId: string,
+  _stemmingM: number,
+  _wetHoleIds: ReadonlySet<string> = new Set(),
+): Record<string, PowderFactorRange | null> {
+  throw new Error('not implemented');
 }

@@ -8,6 +8,7 @@ import {
   MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
   CHARGE_FIT_EPSILON, DRILL_HOLE_DEFAULT_DIAMETER_M,
 } from '../config/balance.js';
+import type { DrillHole } from './DrillPlan.js';
 import { chargeKgPerMetre, holeCapacityFactor } from './HoleDiameter.js';
 
 export interface HoleCharge {
@@ -166,4 +167,24 @@ export function explosiveHoleLimits(
 ): { minKg: number; maxKg: number } {
   const factor = holeCapacityFactor(diameterM);
   return { minKg: explosive.minChargeKg * factor, maxKg: explosive.maxChargeKg * factor };
+}
+
+type HolePoint = Pick<DrillHole, 'id' | 'x' | 'z'>;
+
+/** Spacing a hole is given for its rock cell: distance to the nearest other hole, the default grid spacing when alone (#2203). */
+export function holeSpacingM(_hole: HolePoint, _holes: readonly HolePoint[]): number {
+  throw new Error('not implemented');
+}
+
+/** Kilograms of explosive per m3 of rock in a hole's cell of `spacingM` x `spacingM` x `depthM` (#2203). */
+export function powderFactor(_amountKg: number, _depthM: number, _spacingM: number): number {
+  throw new Error('not implemented');
+}
+
+/** Powder factor of every charged hole, keyed by hole id (#2203). */
+export function holePowderFactors(
+  _holes: readonly DrillHole[],
+  _charges: Readonly<Record<string, HoleCharge>>,
+): Record<string, number> {
+  throw new Error('not implemented');
 }

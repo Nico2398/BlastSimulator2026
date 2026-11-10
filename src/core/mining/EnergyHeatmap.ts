@@ -5,10 +5,22 @@
 import type { BlastPlan } from './BlastPlan.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { type FragmentationBand, FRAGMENTATION_BANDS, classifyFragmentationBand } from './FragmentationBand.js';
-import { type PlanBandCell, type PlanBandMap, previewPlanBands } from './SoftwarePreview.js';
+import { type PlanBandCell, type PlanBandMap, type BandShares, type PowderFactorRange, previewPlanBands } from './SoftwarePreview.js';
 import { HEATMAP_COLUMN_BAND_MIN_SHARE } from '../config/balance.js';
 
+/** What the heatmap hover says about the hole whose rock cell a column sits in (#2203). */
+export interface HoleReadout {
+  holeId: string;
+  /** kg of explosive per m3 of the hole's rock. */
+  powderFactor: number;
+  shares: BandShares;
+  /** Recommended range for this rock with the hole's own explosive and stemming; computed on first call. */
+  recommended(): PowderFactorRange | null;
+}
+
 export interface ColumnBandSummary {
+  /** Set on columns inside a charged hole's cell. */
+  hole?: HoleReadout;
   x: number;
   z: number;
   /** Displayed band: the finest band covering at least HEATMAP_COLUMN_BAND_MIN_SHARE of the column. */
