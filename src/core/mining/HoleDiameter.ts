@@ -3,12 +3,14 @@
 
 import {
   CHARGE_KG_PER_METRE,
+  CHARGE_REFERENCE_DENSITY,
   DRILL_HOLE_DEFAULT_DIAMETER_M,
   DRILL_HOLE_DIAMETER_OPTIONS_M,
   DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M,
   DRILL_RIG_MAX_DIAMETER_M,
 } from '../config/balance.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
+import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { lowestRigTierReaching } from './RigLimits.js';
 
 /** Cross-section ratio of a hole against the default diameter. */
@@ -18,9 +20,14 @@ export function holeCapacityFactor(diameterM: number = DRILL_HOLE_DEFAULT_DIAMET
   return ratio * ratio;
 }
 
-/** Kg of explosive per metre of a hole of `diameterM`; scales with cross-section. */
-export function chargeKgPerMetre(diameterM: number = DRILL_HOLE_DEFAULT_DIAMETER_M): number {
-  return CHARGE_KG_PER_METRE * holeCapacityFactor(diameterM);
+/**
+ * Kg of explosive per metre of a hole of `diameterM`: scales with the bore's cross-section
+ * and with the explosive's loaded density. No explosive (or an unknown one) reads the
+ * reference density.
+ */
+export function chargeKgPerMetre(diameterM: number = DRILL_HOLE_DEFAULT_DIAMETER_M, explosiveId?: string): number {
+  const density = explosiveId === undefined ? CHARGE_REFERENCE_DENSITY : (getExplosive(explosiveId)?.density ?? CHARGE_REFERENCE_DENSITY);
+  return CHARGE_KG_PER_METRE * holeCapacityFactor(diameterM) * (density / CHARGE_REFERENCE_DENSITY);
 }
 
 /** Lowest drill rig tier able to bore `diameterM`. */

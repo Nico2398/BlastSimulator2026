@@ -762,6 +762,7 @@ function* buildBlastEnergyFieldSteps(
       Math.floor(hole.z),
       box.minY,
       hole.diameter,
+      charge.explosiveId,
     ));
   }
 

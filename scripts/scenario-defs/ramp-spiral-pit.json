@@ -75,7 +75,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "description": "Load every hole.",
+      "description": "Load every hole with an explicit 5 kg partial charge (a console-only bootstrap, the exact allowlisted scaffolding command; the pit is setup, not the thing under test). Not the fill a player's Charge All would load: filled to the 2 m stemming each hole takes 8 kg, and under the kernel energy model that shot breaks ~2.3 kt, a pile that lies unhauled until the road exists and drives ecology to 0, ending the level in an ecological shutdown (#1733) at tick 628 with 9 segments still undug. 5 kg breaks ~1.8 kt: ecology bottoms out near 1.5 around tick 640 and recovers, and the pit stays about 9 m across (spiral legs east 9, south 18, west 11).",
       "interaction": [
         {
           "type": "command",

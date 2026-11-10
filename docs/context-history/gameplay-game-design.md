@@ -104,3 +104,9 @@ Records why the rules in `.claude/skills/gameplay-game-design/SKILL.md` exist: t
 - Previous wording of the probe line: "The ladder probe (seed 42, desert_badlands) reaches grade 1 at t978 (digger) / t1088 (full), grade 2 at t3762 (digger); grades 3-5 are reached by no policy (delivered ore is ~9 kg/tick, so grade 3's 150 t lies ~16,700 ticks after grade 2)". Replaced once the reference site reached grade 3 at t11836 (#2089, #2091, #2093); the windows were made hand-measured design targets, not CI checks, by owner decision (#2063, #2072, #2076).
 
 - Rubble offers sized against barren stock after ore concentration: #2142.
+
+## 2026-11-10 — Permit by area (blast design rework)
+
+- Permits cap the charge kg and the pattern area per blast (`patternAreaM2`, the spacing × burden cells of the plan's holes) instead of the hole count, so a finer mesh over the same ground costs drilling (`DRILL_COST_PER_METRE`), not permit. Each grade's area is what its former hole limit covered at the default 4 m × 4 m cell: 9 / 16 / 36 / 81 / 196 / 400 holes became 144 / 256 / 576 / 1,296 / 3,136 / 6,400 m²; endless classes scale the area ×1.4 (`PERMIT_CLASS_AREA_FACTOR`, replacing `PERMIT_CLASS_HOLES_FACTOR`) with no `MAX_DRILL_GRID_HOLES` cap.
+- Previous wording: "each grade caps total charge kg and holes per blast ... (grade 0: 40 kg, 9 holes, $250; grade 1: 120 kg, 16 holes, $1,000; grade 5: 25,000 kg, 400 holes, $50,000; above 5, x1.6 kg, x1.4 holes capped at `MAX_DRILL_GRID_HOLES`, x1.5 fee per class)"; the footer read `9 / 9 holes`, and the Drill grid strip warned when cols x rows exceeded the hole limit.
+- Same rework, same skill: charges fill each hole up to the stemming (the explosive catalog's min/max kg per hole became a loaded density), and the tier-4 optimizer proposes an explosive and a stemming per hole instead of a kg. The blast-side record is in `gameplay-blast-system`'s history.

@@ -4,13 +4,20 @@ import {
   createEnergyField,
   seedEnergy,
   indexOf,
+  intensityAt,
   type BlastBox,
 } from '../../../src/core/mining/EnergyPropagation.js';
 import { identifyFragmentedVoxels, type FragmentationResult, type VoxelCoord } from '../../../src/core/mining/VoxelFragmentation.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/config/balance.js';
+import {
+  FRAGMENTATION_MULTIPLIER,
+  MAX_SEEDS_PER_VOXEL,
+  OVERSIZED_FRAGMENT_THRESHOLD,
+  SEEDS_BASE,
+  SEEDS_PER_INTENSITY,
+} from '../../../src/core/config/balance.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -54,11 +61,38 @@ function blastAndCarve(grid: VoxelGrid, energy: number, height: number, seed = 7
 
 // ── Seed counts ───────────────────────────────────────────────────────────────
 
+/** Mean seed count over many draws at one intensity. */
+function meanSeeds(intensity: number, draws = 2000, seed = 1): number {
+  const rng = new Random(seed);
+  let total = 0;
+  for (let i = 0; i < draws; i++) total += seedCountForIntensity(intensity, rng);
+  return total / draws;
+}
+
 describe('FragmentGeneration — seedCountForIntensity', () => {
-  it('a barely-broken voxel usually contributes no seed, so its rock joins a neighbour', () => {
+  it('a voxel at its breaking point contributes SEEDS_BASE seeds', () => {
+    expect(Math.abs(meanSeeds(FRAGMENTATION_MULTIPLIER) - SEEDS_BASE)).toBeLessThan(0.05);
+  });
+
+  it('adds SEEDS_PER_INTENSITY seeds per unit of intensity above the breaking point', () => {
+    for (const above of [0.5, 1.25]) {
+      const expected = SEEDS_BASE + SEEDS_PER_INTENSITY * above;
+      expect(Math.abs(meanSeeds(FRAGMENTATION_MULTIPLIER + above) - expected), `+${above}`).toBeLessThan(0.05);
+    }
+  });
+
+  it('rock broken with less energy than its threshold seeds the base scaled by its intensity', () => {
+    // Lifted burden, rock floored to grade, unsupported rock: broken without the energy to fragment it.
+    for (const intensity of [0.1, 0.3]) {
+      const expected = SEEDS_BASE * intensity / FRAGMENTATION_MULTIPLIER;
+      expect(Math.abs(meanSeeds(intensity) - expected), `intensity ${intensity}`).toBeLessThan(0.05);
+    }
+  });
+
+  it('so most rock broken with little energy contributes no seed, and its rock joins a neighbour', () => {
     const rng = new Random(1);
     let none = 0;
-    for (let i = 0; i < 200; i++) if (seedCountForIntensity(1.0, rng) === 0) none++;
+    for (let i = 0; i < 200; i++) if (seedCountForIntensity(0.1, rng) === 0) none++;
     expect(none).toBeGreaterThan(100);
   });
 
@@ -78,16 +112,18 @@ describe('FragmentGeneration — seedCountForIntensity', () => {
     };
     expect(mean(6)).toBeGreaterThan(mean(2));
     expect(mean(2)).toBeGreaterThan(mean(1));
+    expect(mean(1)).toBeGreaterThan(mean(0.5));
   });
 
   it('is capped so one voxel cannot produce unbounded dust', () => {
     const rng = new Random(5);
-    for (let i = 0; i < 50; i++) expect(seedCountForIntensity(1e6, rng)).toBeLessThanOrEqual(8);
+    for (let i = 0; i < 50; i++) expect(seedCountForIntensity(1e6, rng)).toBeLessThanOrEqual(MAX_SEEDS_PER_VOXEL);
   });
 
   it('never returns a negative count for unbroken rock', () => {
     const rng = new Random(5);
     expect(seedCountForIntensity(0, rng)).toBe(0);
+    expect(seedCountForIntensity(-2, rng)).toBe(0);
   });
 });
 
@@ -105,8 +141,9 @@ describe('FragmentGeneration — volume conservation', () => {
 
   it('holds for a small blast too', () => {
     const grid = solidGrid(9);
-    const { fragmentation, fragments } = blastAndCarve(grid, CRUITE * 12, 9, 4, { x: 4, y: 4, z: 4 });
+    const { fragmentation, fragments } = blastAndCarve(grid, CRUITE * 60, 9, 4, { x: 4, y: 4, z: 4 });
 
+    expect(fragments.length).toBeGreaterThan(0);
     const total = fragments.reduce((s, f) => s + f.volumeM3, 0);
     expect(total).toBeCloseTo(fragmentation.fragmented.length, 6);
   });
@@ -121,13 +158,29 @@ describe('FragmentGeneration — volume conservation', () => {
 
 // ── Fragment size responds to the blast ───────────────────────────────────────
 
+// A charge 4 m under the surface of a bench (rock y 0..9, open air above). A modest one breaks
+// the rock round it and lifts the cap above it — rock broken with less energy than its
+// threshold, which seeds little and comes out in boulders. A heavier one fragments the cap too.
+const BENCH_SIZE = 15;
+const BENCH_TOP_Y = 9;
+const BENCH_CHARGE = { x: 7, y: BENCH_TOP_Y - 4, z: 7 };
+const MODEST_CHARGE = CRUITE * 60;
+const HEAVY_CHARGE = CRUITE * 600;
+
+function benchBlast(energy: number, seed: number) {
+  const grid = new VoxelGrid(BENCH_SIZE, BENCH_SIZE);
+  for (let z = 0; z < BENCH_SIZE; z++) {
+    for (let y = 0; y <= BENCH_TOP_Y; y++) {
+      for (let x = 0; x < BENCH_SIZE; x++) grid.setVoxel(x, y, z, rockVoxel('cruite'));
+    }
+  }
+  return blastAndCarve(grid, energy, BENCH_SIZE, seed, BENCH_CHARGE);
+}
+
 describe('FragmentGeneration — fragment size follows the blast', () => {
   it('a heavier charge breaks the same rock into smaller pieces', () => {
-    const gentle = solidGrid(15);
-    const violent = solidGrid(15);
-
-    const a = blastAndCarve(gentle, CRUITE * 40, 15, 21, { x: 7, y: 7, z: 7 });
-    const b = blastAndCarve(violent, CRUITE * 600, 15, 21, { x: 7, y: 7, z: 7 });
+    const a = benchBlast(MODEST_CHARGE, 21);
+    const b = benchBlast(HEAVY_CHARGE, 21);
 
     const meanSize = (fs: Array<{ volumeM3: number }>): number =>
       fs.reduce((s, f) => s + f.volumeM3, 0) / fs.length;
@@ -136,16 +189,17 @@ describe('FragmentGeneration — fragment size follows the blast', () => {
   });
 
   it('a modest blast leaves oversized boulders a hauler cannot take', () => {
-    const grid = solidGrid(15);
-    const { fragments } = blastAndCarve(grid, CRUITE * 40, 15, 33, { x: 7, y: 7, z: 7 });
+    const { fragmentation, fragments } = benchBlast(MODEST_CHARGE, 33);
 
+    // The cap over the charge was lifted rather than fragmented.
+    expect(fragmentation.liftedCount).toBeGreaterThan(0);
     const oversized = fragments.filter(f => f.volumeM3 > OVERSIZED_FRAGMENT_THRESHOLD);
     expect(oversized.length).toBeGreaterThan(0);
   });
 
   it('a heavier charge leaves a smaller share of the rock as oversized boulders', () => {
-    const gentle = blastAndCarve(solidGrid(15), CRUITE * 40, 15, 33, { x: 7, y: 7, z: 7 });
-    const violent = blastAndCarve(solidGrid(15), CRUITE * 600, 15, 33, { x: 7, y: 7, z: 7 });
+    const gentle = benchBlast(MODEST_CHARGE, 33);
+    const violent = benchBlast(HEAVY_CHARGE, 33);
 
     const oversizedShare = (fs: Array<{ volumeM3: number }>): number =>
       fs.filter(f => f.volumeM3 > OVERSIZED_FRAGMENT_THRESHOLD).length / fs.length;
@@ -154,17 +208,20 @@ describe('FragmentGeneration — fragment size follows the blast', () => {
   });
 
   it('fragments span more than one voxel where the rock barely broke', () => {
-    const grid = solidGrid(15);
-    const { fragments } = blastAndCarve(grid, CRUITE * 40, 15, 33, { x: 7, y: 7, z: 7 });
+    const { field, fragments } = benchBlast(MODEST_CHARGE, 33);
+    const barelyBroken = (s: { x: number; y: number; z: number }): boolean =>
+      intensityAt(field, s.x, s.y, s.z) < FRAGMENTATION_MULTIPLIER;
 
-    // A fragment drawing on several source voxels is one that bridged them.
-    expect(fragments.some(f => f.sources.length > 1)).toBe(true);
+    // Rock that took less than its threshold seeds little, so it went into a fragment bridging it
+    // with its neighbours.
+    expect(fragments.some(f => f.sources.length > 1 && f.sources.some(barelyBroken))).toBe(true);
   });
 
   it('no fragment is larger than the rock that was removed', () => {
     const grid = solidGrid(11);
     const { fragmentation, fragments } = blastAndCarve(grid, CRUITE * 100, 11, 8, { x: 5, y: 5, z: 5 });
 
+    expect(fragments.length).toBeGreaterThan(0);
     for (const f of fragments) {
       expect(f.volumeM3).toBeLessThanOrEqual(fragmentation.fragmented.length);
       expect(f.volumeM3).toBeGreaterThan(0);

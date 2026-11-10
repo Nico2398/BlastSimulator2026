@@ -14,13 +14,15 @@
 // Drill.ts) turns a confirmed rectangle into exactly one console command,
 //
 //   cols = max(1, round((x2 - x1) / spacing) + 1)
-//   rows = max(1, round((z2 - z1) / spacing) + 1)
-//   drill_plan grid rows:<rows> cols:<cols> spacing:<spacing> depth:<depth> …
-//              start:<x1>,<z1>
+//   rows = max(1, round((z2 - z1) / burden) + 1)
+//   drill_plan grid rows:<rows> cols:<cols> spacing:<spacing> [burden:<burden>]
+//              [pattern:staggered] depth:<depth> … start:<x1>,<z1>
 //
-// where `spacing` and `depth` are the strip's own steppers — they start at
-// DEFAULT_SPACING_M / DEFAULT_DEPTH_M and only move when the step itself
-// clicks `[data-field="spacing"]` / `[data-field="depth"]`. So a step that
+// where `spacing`, `burden` and `depth` are the strip's own steppers — they start at
+// DEFAULT_SPACING_M / DEFAULT_DEPTH_M (the burden follows the spacing until its own
+// stepper moves) and only move when the step itself sets `[data-field="spacing"]` /
+// `[data-field="burden"]` / `[data-field="depth"]` — and the layout is the
+// `[data-action="grid-layout"]` toggle, aligned until clicked. So a step that
 // declares `drill_plan grid …` and drags the tool has a fully determined
 // interaction-mode result, and a mismatch against its own declared command is
 // never intentional.
@@ -68,7 +70,7 @@ const SPACING_RANGE = { min: 1, max: 20 };
  * The part of a grid plan both channels must agree on: how many holes, at
  * what pitch, starting where.
  */
-interface PlanShape { rows: number; cols: number; startX: number; startZ: number; spacing: number }
+interface PlanShape { rows: number; cols: number; startX: number; startZ: number; spacing: number; burden: number; layout: string }
 
 /** Parse `drill_plan grid rows:2 cols:3 spacing:5 depth:8 start:14,14`. */
 function parseDeclaredGrid(command: string): PlanShape | null {
@@ -81,10 +83,14 @@ function parseDeclaredGrid(command: string): PlanShape | null {
   // `named['origin'] ?? named['start'] ?? '0,0'`), so both spellings and the
   // absent case are all comparable against the drag's own corner.
   const start = /\b(?:origin|start):(-?\d+),(-?\d+)/.exec(command);
+  const spacing = num('spacing', DEFAULT_SPACING_M);
   return {
     rows: num('rows', 1),
     cols: num('cols', 1),
-    spacing: num('spacing', DEFAULT_SPACING_M),
+    spacing,
+    // drillPlan.ts: the burden defaults to the spacing, the layout to an aligned grid.
+    burden: num('burden', spacing),
+    layout: /\bpattern:(\w+)/.exec(command)?.[1] ?? 'square',
     startX: start === null ? 0 : Number(start[1]),
     startZ: start === null ? 0 : Number(start[2]),
   };
@@ -112,6 +118,29 @@ function applySpacingAction(spacing: number, action: InteractionStepAction): num
   return spacing + (which[1] === 'last' ? 1 : -1);
 }
 
+/** The strip's grid settings as the once-constructed DrillStep holds them across a file. */
+interface StripState { spacing: number; burden: number; burdenSet: boolean; layout: 'square' | 'staggered' }
+
+/**
+ * What one action does to the strip: spacing as `applySpacingAction`; a `setStepper` on the burden
+ * sets it and unhooks it from the spacing (until then each spacing step drags it along); a click on
+ * `[data-action="grid-layout"]` toggles the layout.
+ */
+function applyStripAction(strip: StripState, action: InteractionStepAction): StripState {
+  const spacing = Math.min(SPACING_RANGE.max, Math.max(SPACING_RANGE.min, applySpacingAction(strip.spacing, action)));
+  let { burden, burdenSet, layout } = strip;
+  if (action.type === 'setStepper' && /\[data-field="burden"\]/.test(action.selector)) {
+    burden = Math.min(SPACING_RANGE.max, Math.max(SPACING_RANGE.min, action.value));
+    burdenSet = true;
+  } else if (!burdenSet) {
+    burden = spacing;
+  }
+  if ((action.type === 'clickSelector' || action.type === 'clickIfPresent') && /data-action="grid-layout"/.test(action.selector)) {
+    layout = layout === 'staggered' ? 'square' : 'staggered';
+  }
+  return { spacing, burden, burdenSet, layout };
+}
+
 /** Whether a step's own interaction drags the grid tool at all (stateless sanity check). */
 function stepDragsGridTool(step: ScenarioStepDef): boolean {
   const actions = step.interaction;
@@ -131,7 +160,7 @@ function stepDragsGridTool(step: ScenarioStepDef): boolean {
  */
 function simulateFileGridDrags(steps: readonly ScenarioStepDef[]): Map<number, PlanShape> {
   const results = new Map<number, PlanShape>();
-  let spacing = DEFAULT_SPACING_M;
+  let strip: StripState = { spacing: DEFAULT_SPACING_M, burden: DEFAULT_SPACING_M, burdenSet: false, layout: 'square' };
 
   steps.forEach((step, stepIndex) => {
     const actions = step.interaction;
@@ -139,18 +168,20 @@ function simulateFileGridDrags(steps: readonly ScenarioStepDef[]): Map<number, P
 
     let drag: { x1: number; z1: number; x2: number; z2: number } | null = null;
     for (const action of actions) {
-      spacing = Math.min(SPACING_RANGE.max, Math.max(SPACING_RANGE.min, applySpacingAction(spacing, action)));
+      strip = applyStripAction(strip, action);
       if (action.type === 'dragTiles') drag = action;
     }
 
     if (!stepDragsGridTool(step) || drag === null) return;
 
     results.set(stepIndex, {
-      cols: Math.max(1, Math.round((drag.x2 - drag.x1) / spacing) + 1),
-      rows: Math.max(1, Math.round((drag.z2 - drag.z1) / spacing) + 1),
+      cols: Math.max(1, Math.round((drag.x2 - drag.x1) / strip.spacing) + 1),
+      rows: Math.max(1, Math.round((drag.z2 - drag.z1) / strip.burden) + 1),
       startX: drag.x1,
       startZ: drag.z1,
-      spacing,
+      spacing: strip.spacing,
+      burden: strip.burden,
+      layout: strip.layout,
     });
   });
 
@@ -168,7 +199,13 @@ describe('repo-wide — a grid-tool drag orders the grid its step declares (issu
     expect(dragging.length).toBeGreaterThan(0);
   });
 
-  it('every grid-tool drag orders the same number of holes, at the same origin and spacing, as its own command declares', () => {
+  it('sanity: a scenario drags a burdened, staggered grid, so burden and layout are checked too', () => {
+    const shapes = ALL_SCENARIO_NAMES.flatMap(file =>
+      [...simulateFileGridDrags(loadScenarioDef(file, SCENARIO_DIR).steps as ScenarioStepDef[]).values()]);
+    expect(shapes.some(s => s.burden !== s.spacing && s.layout === 'staggered')).toBe(true);
+  });
+
+  it('every grid-tool drag orders the same number of holes, at the same origin, spacing, burden and layout, as its own command declares', () => {
     const violations: string[] = [];
 
     for (const file of ALL_SCENARIO_NAMES) {
@@ -183,7 +220,7 @@ describe('repo-wide — a grid-tool drag orders the grid its step declares (issu
           violations.push(`  ${file}.json step[${stepIndex}]: drags the grid tool but its command is "${step.command}" — expected a "drill_plan grid …"`);
           return;
         }
-        const mismatches = (['rows', 'cols', 'startX', 'startZ', 'spacing'] as const)
+        const mismatches = (['rows', 'cols', 'startX', 'startZ', 'spacing', 'burden', 'layout'] as const)
           .filter(key => declared[key] !== computed[key])
           .map(key => `${key} declared ${declared[key]} but the drag produces ${computed[key]}`);
         if (mismatches.length > 0) {

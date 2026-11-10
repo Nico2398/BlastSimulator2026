@@ -341,7 +341,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -350,11 +350,6 @@
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
         },
         {
           "type": "setStepper",
@@ -406,23 +401,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "charge hole:H1 explosive:boomite amount:8 stemming:2",
+      "command": "charge hole:H1 explosive:boomite stemming:2",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "8 kg"
         },
         {
           "type": "assert",
@@ -435,7 +419,7 @@
           "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The Charge All step above already pinned the panel to [data-step=\"2\"] (a manual tab click disarms autoAdvance), so the Per Hole rows stay visible. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach this hole's declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
+      "description": "Per-hole charging is a real control (gap G3): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> stemming:<stemming>m` from the panel's current product card and stemming (ChargeStep.chargeHole, Charge.ts) -- the hole is filled with explosive up to the stemming, so the stemming stepper alone sets how much goes in. The Charge All step above already pinned the panel to [data-step=\"2\"] (a manual tab click disarms autoAdvance), so the Per Hole rows stay visible. Stemming 2 m in this 6 m hole fills H1 with 8 kg of boomite. The stemming is a plain instance field on ChargeStep with no reset path, so it carries over from the previous charge step in the same page session -- asserted before each commit rather than assumed.",
       "role": "player",
       "expect": {
         "note": "count is unchanged — every hole was already charged by Charge All; this step overrides H1 alone",
@@ -466,36 +450,25 @@
       "timeout": 200
     },
     {
-      "command": "charge hole:H2 explosive:boomite amount:3 stemming:1",
+      "command": "charge hole:H2 explosive:boomite stemming:4.5",
       "interaction": [
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 3
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 1
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "3 kg"
+          "value": 4.5
         },
         {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "1.0 m"
+          "expectedValue": "4.5 m"
         },
         {
           "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H2\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "The opposite override on the neighbouring hole: 5 amount decrements (8 -> 3kg) and 10 stemming decrements (3.0 -> 1.0m) off what the H1 row left behind, then H2's own commit button.",
+      "description": "The opposite override on the neighbouring hole: 4.5 m of stemming leaves 1.5 m of the 6 m hole to fill, 3 kg of boomite against H1's 8 kg, then H2's own commit button.",
       "role": "player",
       "expect": {
         "increased": [

@@ -1,15 +1,20 @@
 // BlastSimulator2026 — Blast step 1: energy propagation through the voxel grid
 //
-// Explosive energy is deposited into the voxels holding the charge, and each
-// voxel keeps what its rock can absorb before handing the rest to its solid
-// neighbours. Rock that swallows the whole charge keeps the blast local; rock
-// that overflows spreads the fracture outward. Air neither absorbs nor carries
-// energy, so a free face vents it and a void shields whatever is behind it.
+// Each charged hole spreads its energy through the rock around it. A voxel
+// receives a share that falls off exponentially with its distance to the
+// charge, measured through rock (`BLAST_ENERGY_DECAY_M`): air carries nothing,
+// so a void shields whatever is behind it, and every joule of a hole ends up in
+// rock it can reach. Shares from different holes add up. That is what makes the
+// drill pattern a design choice: holes close together overlap and fill the rock
+// evenly, holes far apart leave a hot core round each hole and cold rock between.
+//
+// A voxel breaks when what it received reaches its threshold (its rock, made
+// cheaper near a free face); how far past the threshold it went is how finely it
+// breaks (`intensityAt`), and the excess is what can throw it.
 //
 // Everything runs on flat typed arrays over the blast's bounding box: a blast
-// touches tens of thousands of voxels and the propagation loop revisits them
-// many times over, so per-voxel object or string-key allocation is the one
-// thing this must not do.
+// touches tens of thousands of voxels, so per-voxel object or string-key
+// allocation is the one thing this must not do.
 //
 // See the gameplay-blast-system skill, "Step 1 — Energy Propagation".
 
@@ -18,15 +23,11 @@ import { drain, type Steps } from '../engine/Steps.js';
 import { getRock } from '../world/RockCatalog.js';
 import { chargeKgPerMetre } from './HoleDiameter.js';
 import {
-  MAX_PROPAGATION_ITERATIONS,
   BLAST_GRADE_FLOOR_OFFSET_M,
-  PROPAGATION_ENERGY_EPSILON,
-  TRANSMISSION_LOSS_BASE,
-  TRANSMISSION_LOSS_POROSITY_SCALE,
+  BLAST_ENERGY_DECAY_M,
+  BLAST_ENERGY_REACH_M,
   UNCONFINED_THRESHOLD_FACTOR,
   CONFINEMENT_FULL_DEPTH,
-  FREE_FACE_BIAS,
-  FREE_FACE_LATERAL_RANGE_M,
   BLAST_SLICE_CELLS,
 } from '../config/balance.js';
 
@@ -59,13 +60,12 @@ export function clampBoxToGrid(box: BlastBox, grid: VoxelGrid): BlastBox | null 
 // ── Field ───────────────────────────────────────────────────────────────────
 
 /**
- * The 26-neighbour offsets a voxel shares its overflow with, minus the 8 corner
- * ones: face and edge neighbours only.
+ * The 26-neighbour offsets a distance through rock steps along, minus the 8
+ * corner ones: face and edge neighbours only.
  *
- * Six face neighbours alone make energy spread along grid axes, which produces
- * diamond-shaped craters. Adding the twelve edge neighbours and weighting each
- * share by 1/distance approximates an isotropic wave closely enough that the
- * crater reads as round.
+ * Six face neighbours alone measure distance along grid axes, which produces
+ * diamond-shaped craters. Adding the twelve edge neighbours (each a √2 step)
+ * approximates a Euclidean distance closely enough that the crater reads as round.
  */
 const NEIGHBOUR_OFFSETS: ReadonlyArray<readonly [number, number, number, number]> = (() => {
   const out: Array<[number, number, number, number]> = [];
@@ -86,52 +86,38 @@ const NEIGHBOUR_COUNT = NEIGHBOUR_OFFSETS.length;
 const NEIGHBOUR_DX = Int32Array.from(NEIGHBOUR_OFFSETS, o => o[0]);
 const NEIGHBOUR_DY = Int32Array.from(NEIGHBOUR_OFFSETS, o => o[1]);
 const NEIGHBOUR_DZ = Int32Array.from(NEIGHBOUR_OFFSETS, o => o[2]);
-/** `1 / dist` per neighbour — the same double the loop used to compute inline. */
-const NEIGHBOUR_INV_DIST = Float64Array.from(NEIGHBOUR_OFFSETS, o => 1 / o[3]);
-
-/**
- * Spread weight toward one neighbour: 1/distance, boosted by the relief it gains
- * toward a free face. Air above (`rising`) always pulls; a side or lower face
- * pulls only from within `FREE_FACE_LATERAL_RANGE_M`, so a distant excavation
- * cannot steal energy from charges it does not serve (#1793).
- */
-function freeFaceWeight(invDist: number, ownDistAir: number, neighbourDistAir: number, rising: boolean): number {
-  if (!rising && ownDistAir > FREE_FACE_LATERAL_RANGE_M) return invDist;
-  return invDist * (1 + FREE_FACE_BIAS * Math.max(0, ownDistAir - neighbourDistAir));
-}
+/** Length (m) of the step to each neighbour. */
+const NEIGHBOUR_DIST = Float64Array.from(NEIGHBOUR_OFFSETS, o => o[3]);
 
 /**
  * Per-voxel blast state over one bounding box.
  *
- * `effective` is the energy a voxel kept (what fragments it), `overflowOut` the
- * total that passed through and left again (what throws the resulting
- * fragments). They answer different questions and both are needed downstream.
+ * A voxel's received energy is split in two: `effective`, the part up to its
+ * threshold (what breaks it), and `overflowOut`, the excess beyond it (what
+ * throws the resulting fragments). Their sum over the threshold is how hard the
+ * voxel was hit (`intensityAt`).
  */
 export interface EnergyField {
   readonly box: BlastBox;
   readonly nx: number;
   readonly ny: number;
   readonly nz: number;
-  /** Energy retained by each voxel. */
+  /** Energy each voxel received, up to its threshold. */
   readonly effective: Float32Array;
-  /** Energy that overflowed out of each voxel over the whole propagation. */
+  /** Energy each voxel received beyond its threshold. */
   readonly overflowOut: Float32Array;
   /** Absorption capacity of each voxel; 0 for air. */
   readonly threshold: Float32Array;
   /** 1 where the voxel is air (or not owned by the site), 0 where it is rock. */
   readonly air: Uint8Array;
-  /** Fraction of pass-through energy each voxel loses to heat and noise. */
-  readonly loss: Float32Array;
   /** Metres from each voxel to the nearest free face; 0 for air itself. */
   readonly distAir: Float32Array;
   /** World Y of the highest charged-hole bottom (the blast's grade); null when nothing is charged. */
   gradeY: number | null;
   /** Total energy handed to `seedEnergy`. */
   seeded: number;
-  /** Energy lost to damping, vented into air, or stranded at the iteration cap. */
+  /** Energy no rock kept: a charge in air, a hole with no rock in reach, or the share spent under a hole's bottom. */
   dissipated: number;
-  /** Propagation iterations actually run. */
-  iterations: number;
 }
 
 /** Flat index of a world coordinate. Callers must check `contains` first. */
@@ -157,7 +143,7 @@ export function thresholdAt(field: EnergyField, x: number, y: number, z: number)
   return contains(field, x, y, z) ? field.threshold[indexOf(field, x, y, z)]! : 0;
 }
 
-/** Overflow that left a world coordinate, or 0 outside the field. */
+/** Energy received beyond the threshold at a world coordinate, or 0 outside the field. */
 export function overflowAt(field: EnergyField, x: number, y: number, z: number): number {
   return contains(field, x, y, z) ? field.overflowOut[indexOf(field, x, y, z)]! : 0;
 }
@@ -168,15 +154,10 @@ export function isAirAt(field: EnergyField, x: number, y: number, z: number): bo
 }
 
 /**
- * How hard a voxel was hit, relative to what its rock can take.
+ * How hard a voxel was hit: the energy it received over what its rock can take.
  *
- * Retained energy alone cannot answer this: absorption stops at the voxel's
- * threshold, so every broken voxel retains exactly its threshold and the ratio
- * is pinned at 1.0 no matter how violent the blast was. What separates rock
- * that barely cracked from rock next to the charge is how much energy passed
- * *through* it, so intensity counts what it kept plus what it handed on.
- *
- * 1.0 means "just barely broke". Values well above that mean fine rubble.
+ * 1.0 means "just barely broke". Values well above that mean fine rubble; the
+ * fragmentation bands (`FragmentationBand.ts`) name the ranges.
  */
 export function intensityAt(field: EnergyField, x: number, y: number, z: number): number {
   if (!contains(field, x, y, z)) return 0;
@@ -245,28 +226,6 @@ const FACE_STEPS: ReadonlyArray<readonly [number, number, number]> = [
 ];
 
 /**
- * How much of the energy passing through a voxel is lost rather than handed on.
- *
- * Porous rock damps a shock wave; dense rock carries it. Deriving this from the
- * catalog's existing porosity keeps one number describing one property instead
- * of a second hand-tuned field that could contradict it.
- */
-function transmissionLossOf(grid: VoxelGrid, x: number, y: number, z: number): number {
-  const { rocks } = grid.compositionAt(x, y, z);
-  let porosity = 0;
-  let weight = 0;
-  for (const rock of rocks) {
-    const def = getRock(rock.rockId);
-    if (!def) continue;
-    porosity += rock.coefficient * def.porosity;
-    weight += rock.coefficient;
-  }
-  if (weight <= 0) return TRANSMISSION_LOSS_BASE;
-  const loss = TRANSMISSION_LOSS_BASE + TRANSMISSION_LOSS_POROSITY_SCALE * (porosity / weight);
-  return Math.min(0.95, Math.max(0, loss));
-}
-
-/**
  * Absorption capacity of one voxel: its rock mix weighted by each rock's
  * `energyAbsorption`, scaled by the fracture modifier so rock cracked by an
  * earlier blast gives way sooner.
@@ -324,12 +283,10 @@ export function* createEnergyFieldSteps(
     overflowOut: new Float32Array(count),
     threshold: new Float32Array(count),
     air: new Uint8Array(count),
-    loss: new Float32Array(count),
     distAir: new Float32Array(count),
     gradeY: null,
     seeded: 0,
     dissipated: 0,
-    iterations: 0,
   };
 
   // Pass 1: what is rock, and what does that rock cost to break in confinement.
@@ -344,7 +301,6 @@ export function* createEnergyFieldSteps(
           continue;
         }
         field.threshold[i] = threshold;
-        field.loss[i] = transmissionLossOf(grid, x, y, z);
       }
     }
   }
@@ -375,8 +331,9 @@ export interface EnergySeed {
  * Turn a charged hole into per-voxel energy seeds.
  *
  * The explosive sits at the bottom of the hole and fills the length its own
- * mass occupies — one metre of hole per `chargeKgPerMetre(diameterM)` kilograms, which grows with the bore (#1934) — with the rest of
- * the hole above it inert. Its energy is split evenly over those voxels, so
+ * mass occupies — one metre of hole per `chargeKgPerMetre(diameterM, explosiveId)` kilograms,
+ * which grows with the bore (#1934) and the explosive's density — with the rest of the hole
+ * above it inert. A filled hole's column reaches the stemming. Its energy is split evenly over those voxels, so
  * doubling the charge lengthens the column and keeps the energy per voxel
  * roughly constant, which is what makes a bigger charge break *more* rock
  * rather than the same rock more gently.
@@ -399,6 +356,7 @@ export function buildHoleSeeds(
   z: number,
   floorY = 0,
   diameterM?: number,
+  explosiveId?: string,
 ): EnergySeed[] {
   if (!(totalEnergy > 0) || depth <= 0 || amountKg <= 0) return [];
 
@@ -407,7 +365,7 @@ export function buildHoleSeeds(
   // keeps the charge whole: seeds outside the field are dropped, so an
   // over-deep hole would otherwise lose that share of its explosive silently.
   const bottomY = Math.max(floorY, Math.floor(surfaceY - depth));
-  const chargeCells = Math.max(1, Math.round(amountKg / chargeKgPerMetre(diameterM)));
+  const chargeCells = Math.max(1, Math.round(amountKg / chargeKgPerMetre(diameterM, explosiveId)));
   // Nor can the charge reach past the collar, however much of it there is.
   const topY = Math.max(bottomY, Math.min(surfaceY - 1, bottomY + chargeCells - 1));
   const cellCount = topY - bottomY + 1;
@@ -419,171 +377,192 @@ export function buildHoleSeeds(
 }
 
 /**
- * Deposit `seeds` and let the overflow spread until it is spent.
+ * Spread every hole's energy through the rock around it.
  *
- * Each pass moves whatever overflowed in the previous pass one voxel outward,
- * so the number of passes bounds how far energy can travel. Every joule ends up
- * either retained in a voxel (`effective`) or accounted for in `dissipated` —
- * damped away, vented into air, or stranded when the iteration guard trips.
+ * Seeds are grouped by column — one hole per column. Each hole's energy is
+ * shared out over the rock it can reach within `BLAST_ENERGY_REACH_M`, measured
+ * through rock from its nearest charged voxel: a voxel at distance d gets a
+ * share proportional to exp(-d / `BLAST_ENERGY_DECAY_M`), and the shares of one
+ * hole sum to its whole energy. Shares from several holes add up. Rock below a
+ * hole's bottom takes its share without keeping it: the shock damages the floor
+ * but does not dig it, so a pattern of equal holes floors flat at their bottom.
+ *
+ * Every joule ends up either in a rock voxel or in `dissipated` (a charge sitting
+ * in air, a hole with no rock in reach, the share spent under a hole's bottom).
  */
 export function seedEnergy(field: EnergyField, seeds: readonly EnergySeed[]): void {
   drain(seedEnergySteps(field, seeds));
 }
 
-/** `seedEnergy`, yielding every `BLAST_SLICE_CELLS` frontier cells (#1603). */
-export function* seedEnergySteps(field: EnergyField, seeds: readonly EnergySeed[]): Steps<void> {
-  // The frontier lives in flat arrays over the box rather than Maps: one wave
-  // of a large blast revisits tens of thousands of cells, and a Map allocated
-  // per wave is what used to dominate this function's cost.
-  const cellCount = field.effective.length;
-  let currentEnergy = new Float64Array(cellCount);
-  let nextEnergy = new Float64Array(cellCount);
-  const seeded: number[] = [];
-  // Marks cells already on the next frontier, replacing a Set-and-sort per
-  // wave; `nextEnergy[ti] === 0` cannot double as the mark because two shares
-  // can cancel to exactly zero.
-  const queued = new Uint8Array(cellCount);
-  // Neighbour scratch, reused across every cell of every wave.
-  const targetScratch = new Int32Array(NEIGHBOUR_OFFSETS.length);
-  const weightScratch = new Float64Array(NEIGHBOUR_OFFSETS.length);
-  yield;
+/** One hole's charged voxels (flat indices) and its total energy. */
+interface HoleSource { cells: number[]; energy: number; bottomY: number }
 
-  // Lowest charged voxel per hole column: the hole's bottom.
-  const holeBottoms = new Map<number, number>();
+/** `seedEnergy`, yielding once per hole (#1603). */
+export function* seedEnergySteps(field: EnergyField, seeds: readonly EnergySeed[]): Steps<void> {
+  const cellCount = field.effective.length;
+  const { nx, ny } = field;
+  const received = new Float64Array(cellCount);
+
+  // Group the seeds by hole column; a seed in air has nothing to push.
+  const holes = new Map<number, HoleSource>();
   for (const seed of seeds) {
-    if (!Number.isFinite(seed.energy) || seed.energy <= PROPAGATION_ENERGY_EPSILON) continue;
+    if (!Number.isFinite(seed.energy) || seed.energy <= 0) continue;
     if (!contains(field, seed.x, seed.y, seed.z)) continue;
     const i = indexOf(field, seed.x, seed.y, seed.z);
     field.seeded += seed.energy;
-    // A charge sitting in air (an already-blasted pocket) has nothing to push.
     if (field.air[i] === 1) {
       field.dissipated += seed.energy;
       continue;
     }
     const column = (seed.x - field.box.minX) + field.nx * (seed.z - field.box.minZ);
-    const known = holeBottoms.get(column);
-    if (known === undefined || seed.y < known) holeBottoms.set(column, seed.y);
-    if (currentEnergy[i] === 0) seeded.push(i);
-    currentEnergy[i]! += seed.energy;
+    let hole = holes.get(column);
+    if (!hole) holes.set(column, hole = { cells: [], energy: 0, bottomY: seed.y });
+    hole.cells.push(i);
+    hole.energy += seed.energy;
+    if (seed.y < hole.bottomY) hole.bottomY = seed.y;
   }
-  // The frontier is a flat index list in a preallocated buffer, sorted in place
-  // per wave (#1603): a number[] re-sorted through a comparator every wave was
-  // a measurable share of a large blast. Two seeds can land in one cell; keep
-  // each active cell listed once, in ascending order so the wave sweeps cells
-  // deterministically.
-  for (const bottom of holeBottoms.values()) {
-    const grade = bottom + BLAST_GRADE_FLOOR_OFFSET_M;
+  // The blast's grade is the highest charged-hole bottom.
+  for (const hole of holes.values()) {
+    const grade = hole.bottomY + BLAST_GRADE_FLOOR_OFFSET_M;
     if (field.gradeY === null || grade > field.gradeY) field.gradeY = grade;
   }
+
+  const reach = new HoleReach(field);
+  for (const hole of holes.values()) {
+    yield;
+    const visited = reach.from(hole.cells);
+    let total = 0;
+    for (let k = 0; k < visited.length; k++) total += Math.exp(-reach.distance[visited[k]!]! / BLAST_ENERGY_DECAY_M);
+    if (!(total > 0)) {
+      field.dissipated += hole.energy;
+      continue;
+    }
+    const perWeight = hole.energy / total;
+    // The rock under a hole's bottom takes its share of the shock but is not dug: the floor
+    // of the crater is the bottom of the holes. Its share is spent there, not passed back up.
+    const floorRow = hole.bottomY - field.box.minY;
+    for (let k = 0; k < visited.length; k++) {
+      const i = visited[k]!;
+      const share = perWeight * Math.exp(-reach.distance[i]! / BLAST_ENERGY_DECAY_M);
+      if (Math.floor(i / nx) % ny < floorRow) field.dissipated += share;
+      else received[i]! += share;
+    }
+  }
+
   yield;
-  let currentActive = new Int32Array(cellCount);
-  let nextActive = new Int32Array(cellCount);
-  const firstWave = [...new Set(seeded)].sort((a, b) => a - b);
-  currentActive.set(firstWave);
-  let currentCount = firstWave.length;
-  let nextCount = 0;
+  for (let i = 0; i < cellCount; i++) {
+    const energy = received[i]!;
+    if (energy <= 0) continue;
+    const threshold = field.threshold[i]!;
+    field.effective[i] = Math.min(energy, threshold);
+    field.overflowOut[i] = Math.max(0, energy - threshold);
+  }
+}
 
-  const { nx, ny, nz } = field;
-  // Neighbour k of flat index i is i + NEIGHBOUR_STEP[k] once its local
-  // coordinate is known to stay inside the box — the same neighbours, in the
-  // same order, as walking NEIGHBOUR_OFFSETS through contains()/indexOf().
-  const neighbourStep = Int32Array.from(NEIGHBOUR_OFFSETS, ([dx, dy, dz]) => dx + nx * (dy + ny * dz));
+/**
+ * Shortest distances through rock from a hole's charged voxels, out to
+ * `BLAST_ENERGY_REACH_M`: Dijkstra over the face and edge neighbours, air never
+ * entered. Buffers are allocated once per field and reused for every hole.
+ */
+class HoleReach {
+  /** Distance (m) of every voxel the last `from` call reached. */
+  readonly distance: Float64Array;
+  private readonly stamp: Int32Array;
+  private run = 0;
+  private heapCost: Float64Array;
+  private heapCell: Int32Array;
+  private readonly neighbourStep: Int32Array;
 
-  let iterations = 0;
+  constructor(private readonly field: EnergyField) {
+    const count = field.effective.length;
+    this.distance = new Float64Array(count);
+    this.stamp = new Int32Array(count);
+    this.heapCost = new Float64Array(1024);
+    this.heapCell = new Int32Array(1024);
+    const { nx, ny } = field;
+    this.neighbourStep = Int32Array.from(NEIGHBOUR_OFFSETS, ([dx, dy, dz]) => dx + nx * (dy + ny * dz));
+  }
 
-  while (currentCount > 0 && iterations < MAX_PROPAGATION_ITERATIONS) {
-    iterations++;
-
-    for (let a = 0; a < currentCount; a++) {
-      if ((a & (BLAST_SLICE_CELLS - 1)) === 0) yield;
-      const i = currentActive[a]!;
-      const incoming = currentEnergy[i]!;
-      currentEnergy[i] = 0;
-      if (incoming <= PROPAGATION_ENERGY_EPSILON) {
-        field.dissipated += incoming;
-        continue;
+  /** Voxels within reach of `sources`, nearest first; their distances are in `distance`. */
+  from(sources: readonly number[]): number[] {
+    const { field, distance, stamp } = this;
+    const { nx, ny, nz } = field;
+    const run = ++this.run;
+    const visited: number[] = [];
+    let size = 0;
+    const push = (cell: number, cost: number): void => {
+      if (size === this.heapCost.length) this.grow();
+      let k = size++;
+      while (k > 0) {
+        const parent = (k - 1) >> 1;
+        // Ties break on the cell index so the sweep order never depends on push order.
+        if (this.heapCost[parent]! < cost || (this.heapCost[parent] === cost && this.heapCell[parent]! <= cell)) break;
+        this.heapCost[k] = this.heapCost[parent]!;
+        this.heapCell[k] = this.heapCell[parent]!;
+        k = parent;
       }
-
-      const capacity = field.threshold[i]! - field.effective[i]!;
-      const absorbed = Math.min(incoming, Math.max(0, capacity));
-      if (absorbed > 0) field.effective[i] = field.effective[i]! + absorbed;
-
-      const leftover = incoming - absorbed;
-      if (leftover <= PROPAGATION_ENERGY_EPSILON) {
-        field.dissipated += leftover;
-        continue;
+      this.heapCost[k] = cost;
+      this.heapCell[k] = cell;
+    };
+    const pop = (): void => {
+      const lastCost = this.heapCost[--size]!;
+      const lastCell = this.heapCell[size]!;
+      let k = 0;
+      for (;;) {
+        let child = 2 * k + 1;
+        if (child >= size) break;
+        const right = child + 1;
+        if (right < size && (this.heapCost[right]! < this.heapCost[child]!
+          || (this.heapCost[right] === this.heapCost[child] && this.heapCell[right]! < this.heapCell[child]!))) child = right;
+        if (this.heapCost[child]! > lastCost || (this.heapCost[child] === lastCost && this.heapCell[child]! >= lastCell)) break;
+        this.heapCost[k] = this.heapCost[child]!;
+        this.heapCell[k] = this.heapCell[child]!;
+        k = child;
       }
-      field.overflowOut[i] = field.overflowOut[i]! + leftover;
+      this.heapCost[k] = lastCost;
+      this.heapCell[k] = lastCell;
+    };
 
-      const lost = leftover * field.loss[i]!;
-      field.dissipated += lost;
-      const transmit = leftover - lost;
-
-      // Decode the flat index back to box-local coordinates to walk neighbours.
-      const lx = i % nx;
-      const ly = Math.floor(i / nx) % ny;
-      const lz = Math.floor(i / (nx * ny));
-
-      const ownDistAir = field.distAir[i]!;
-
-      let weightTotal = 0;
-      let targetCount = 0;
+    for (const cell of sources) {
+      if (stamp[cell] === run) continue;
+      stamp[cell] = run;
+      distance[cell] = 0;
+      push(cell, 0);
+    }
+    // `settled` marks voxels already finalised this run (stamp alone says "seen").
+    const settledMark = -run;
+    while (size > 0) {
+      const cost = this.heapCost[0]!;
+      const cell = this.heapCell[0]!;
+      pop();
+      if (stamp[cell] === settledMark || cost > distance[cell]!) continue;
+      stamp[cell] = settledMark;
+      visited.push(cell);
+      const lx = cell % nx;
+      const ly = Math.floor(cell / nx) % ny;
+      const lz = Math.floor(cell / (nx * ny));
       for (let k = 0; k < NEIGHBOUR_COUNT; k++) {
         const ax = lx + NEIGHBOUR_DX[k]!, ay = ly + NEIGHBOUR_DY[k]!, az = lz + NEIGHBOUR_DZ[k]!;
         if (ax < 0 || ay < 0 || az < 0 || ax >= nx || ay >= ny || az >= nz) continue;
-        const ni = i + neighbourStep[k]!;
-        if (field.air[ni] === 1) continue;
-        if (field.effective[ni]! >= field.threshold[ni]!) continue;
-        // Gas takes the path that offers relief. Spreading overflow evenly in
-        // every direction makes the blast a sphere that dies at a fixed radius
-        // and never reaches the surface, however large the charge — the burden
-        // has to fail *toward* the free face, the way a real bench blast does.
-        const w = freeFaceWeight(NEIGHBOUR_INV_DIST[k]!, ownDistAir, field.distAir[ni]!, NEIGHBOUR_DY[k]! > 0);
-        targetScratch[targetCount] = ni;
-        weightScratch[targetCount] = w;
-        targetCount++;
-        weightTotal += w;
-      }
-
-      if (weightTotal <= 0) {
-        // Fully enclosed by air, saturated rock, or the box edge: this energy
-        // has nowhere left to go.
-        field.dissipated += transmit;
-        continue;
-      }
-
-      for (let k = 0; k < targetCount; k++) {
-        const ti = targetScratch[k]!;
-        const share = transmit * (weightScratch[k]! / weightTotal);
-        if (queued[ti] === 0) {
-          queued[ti] = 1;
-          nextActive[nextCount++] = ti;
-        }
-        nextEnergy[ti]! += share;
+        const next = cell + this.neighbourStep[k]!;
+        if (field.air[next] === 1 || stamp[next] === settledMark) continue;
+        const nextCost = cost + NEIGHBOUR_DIST[k]!;
+        if (nextCost > BLAST_ENERGY_REACH_M) continue;
+        if (stamp[next] === run && distance[next]! <= nextCost) continue;
+        stamp[next] = run;
+        distance[next] = nextCost;
+        push(next, nextCost);
       }
     }
-
-    const swapEnergy = currentEnergy;
-    currentEnergy = nextEnergy;
-    nextEnergy = swapEnergy;
-    // Ascending order keeps the sweep deterministic whatever order neighbours
-    // joined the frontier in.
-    nextActive.subarray(0, nextCount).sort();
-    for (let a = 0; a < nextCount; a++) queued[nextActive[a]!] = 0;
-    const swapActive = currentActive;
-    currentActive = nextActive;
-    nextActive = swapActive;
-    currentCount = nextCount;
-    nextCount = 0;
+    return visited;
   }
 
-  // Whatever is still in flight when the guard trips is energy we chose not to
-  // keep tracking — count it so the conservation invariant still holds.
-  for (let a = 0; a < currentCount; a++) {
-    const i = currentActive[a]!;
-    field.dissipated += currentEnergy[i]!;
-    currentEnergy[i] = 0;
+  private grow(): void {
+    const cost = new Float64Array(this.heapCost.length * 2);
+    cost.set(this.heapCost);
+    const cell = new Int32Array(this.heapCell.length * 2);
+    cell.set(this.heapCell);
+    this.heapCost = cost;
+    this.heapCell = cell;
   }
-
-  field.iterations = iterations;
 }

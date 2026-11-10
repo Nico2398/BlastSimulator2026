@@ -342,8 +342,8 @@
       "commandOutcome": "either"
     },
     {
-      "command": "charge hole:* explosive:boomite amount:8 stemming:1.8",
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): stemming raised 1.0 m -> 1.8 m, the fix for the freight_warehouse dying in interaction mode while command mode kept it alive. Root cause is flyrock, not the crater: a building is destroyed either by a cleared voxel landing inside its footprint (BlastExecution.ts step 5b) or by a thrown fragment coming to rest within HIT_RADIUS=2.0 m of its centre with >=500 J (processProjections, Damage.ts, called from the blast command). At 1.0 m stemming on 6 m holes the charge vents to the surface and throws 444 projections up to ~52 m across a 64x64 m site, so *every* tile on the map is inside flyrock range and warehouse survival is a lottery on where those 444 land. What decides that is the auto-sequence delay layout, which keys off state.drillHoles' array ORDER, and interaction mode fills that array in real-time drill-completion order rather than command mode's fixed plan order. Sandbox-measured over 64 shuffled completion orders on this exact setup: at amount:8 stemming:1 the warehouse survives 42/64 (closest projection landed 0.2 m from its centre, peak damage 9345 vs 150 HP); at amount:8 stemming:1.8 it survives 64/64, closest landing 3.8 m -- nearly 2x the 2.0 m hit radius, with no hit recorded at all. Rejected alternatives, both sandbox-measured: (a) moving the warehouse further out does nothing, because flyrock at 1.0 m stemming is sprayed over the whole site -- (38,25) 11/24, (40,25) 11/24, (42,25) 11/24, (45,25) 12/24, i.e. still a coin flip 16 tiles away, and at 1.8 m stemming (45,25) is actually *worse* (29/32) than (35,25) (64/64); (b) cutting the charge to 6 kg also holds, but throws away the overcharge this file exists to visualise (77 projections vs 147). Stemming is the physically right knob anyway -- flyrock is what an under-stemmed hole produces, and 1.0 m of stemming on a 6 m hole is barely a sixth of the column. The blast stays CATASTROPHIC and gets *bigger*, not tamer: confining it puts more energy into the rock (1247 cleared voxels vs 1114), it still throws 147 projections ~51 m for the projection preview to draw, and ecology/nuisance still drop. Panel clicks follow the value: DEFAULT_STEMMING_M=2 with 0.2 m per click (Charge.ts), so one decrement now instead of five.",
+      "command": "charge hole:* explosive:boomite stemming:1.8",
+      "description": "role: player (issue #515): the Charge step's stemming stepper and product-card explosive selector are real controls — this reaches the declared explosive/stemming via clicks instead of Charge All using whatever the panel's fields already showed. Fill mode: each 6 m hole fills up to the 1.8 m stemming, 8.4 kg of boomite (the history below measured the old explicit 8 kg). #553-followup (issue #586 CI): stemming raised 1.0 m -> 1.8 m, the fix for the freight_warehouse dying in interaction mode while command mode kept it alive. Root cause is flyrock, not the crater: a building is destroyed either by a cleared voxel landing inside its footprint (BlastExecution.ts step 5b) or by a thrown fragment coming to rest within HIT_RADIUS=2.0 m of its centre with >=500 J (processProjections, Damage.ts, called from the blast command). At 1.0 m stemming on 6 m holes the charge vents to the surface and throws 444 projections up to ~52 m across a 64x64 m site, so *every* tile on the map is inside flyrock range and warehouse survival is a lottery on where those 444 land. What decides that is the auto-sequence delay layout, which keys off state.drillHoles' array ORDER, and interaction mode fills that array in real-time drill-completion order rather than command mode's fixed plan order. Sandbox-measured over 64 shuffled completion orders on this exact setup: at amount:8 stemming:1 the warehouse survives 42/64 (closest projection landed 0.2 m from its centre, peak damage 9345 vs 150 HP); at amount:8 stemming:1.8 it survives 64/64, closest landing 3.8 m -- nearly 2x the 2.0 m hit radius, with no hit recorded at all. Rejected alternatives, both sandbox-measured: (a) moving the warehouse further out does nothing, because flyrock at 1.0 m stemming is sprayed over the whole site -- (38,25) 11/24, (40,25) 11/24, (42,25) 11/24, (45,25) 12/24, i.e. still a coin flip 16 tiles away, and at 1.8 m stemming (45,25) is actually *worse* (29/32) than (35,25) (64/64); (b) cutting the charge to 6 kg also holds, but throws away the overcharge this file exists to visualise (77 projections vs 147). Stemming is the physically right knob anyway -- flyrock is what an under-stemmed hole produces, and 1.0 m of stemming on a 6 m hole is barely a sixth of the column. The blast stays CATASTROPHIC and gets *bigger*, not tamer: confining it puts more energy into the rock (1247 cleared voxels vs 1114), it still throws 147 projections ~51 m for the projection preview to draw, and ecology/nuisance still drop. Panel clicks follow the value: DEFAULT_STEMMING_M=2 with 0.2 m per click (Charge.ts), so one decrement now instead of five.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -355,23 +355,12 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 1.8
         },
         {
           "type": "assert",
           "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "8 kg"
         },
         {
           "type": "assert",
@@ -596,7 +585,14 @@
       ],
       "description": "#557/#947: drain the real walkout the horn button just ordered. #947 (this session's own fix): dropped the old `wait_until field:dangerZoneClear equals:true` -- the driller (employee #1) auto-dismounts drill_rig #1 the instant its drilling task finishes, so the rig is undriven by the time Sound the Horn fires, and clearZone (Zone.ts) now refuses to even order a driverless vehicle out of the danger zone -- it reports it stranded instead, exactly the driving-itself-out-of-the-blast-zone bug #947 fixes. `dangerZoneClear` requires every vehicle AND every employee clear (isDangerZoneClear, Zone.ts), so with the rig permanently stranded inside the box, that field can now never read true here -- a `wait_until` on it would stall the full `max_ticks` budget every run, so this is a plain tick pad instead, split into several `tick`/`event choose 0` pairs (command mode's own tick loop refuses to advance past a pending event -- `resolveEventIfPending`, this step's own interaction entry, is interaction-mode-only and does nothing in command mode's own tick loop). Employees #6/#7 (and #1/#2, also caught in the padded zone) walk out for real across these pairs; their evacuation succeeding is what the blast step's own `deathCount: 0` below actually proves, not `dangerZoneClear`.",
       "role": "setup",
-      "commandOutcome": "either"
+      "commandOutcome": "either",
+      "expect": {
+        "decreased": [
+          "ecology",
+          "nuisance"
+        ],
+        "note": "Fill mode: the armed detonation fires inside this first walkout batch (tick 599; the batch stops as it fires), so the vibration dip in ecology/nuisance lands here. Under the old trajectory two events halted this batch at tick 586 and the shot landed in the next one; by the third batch nuisance is already recovering toward 50 (47.39 -> 48.39 over 619 -> 639), so the dip is asserted on the batch the shot actually fires in."
+      }
     },
     {
       "command": "event choose 0",
@@ -643,11 +639,7 @@
         "equals": {
           "dangerZoneClear": true
         },
-        "note": "#2143: the armed detonation fires inside this tick batch (the vibration dip in ecology/nuisance lands here). #1042: dangerZoneClear reads true here, not false -- the #947 stranded-driverless-drill_rig case (see the first tick step's own description) is exactly what #1042's evacuation driver-boarding now resolves: an idle employee boards the driverless rig and drives it clear instead of leaving it stranded, so the zone genuinely clears by this point rather than staying blocked forever.",
-        "decreased": [
-          "ecology",
-          "nuisance"
-        ]
+        "note": "The armed detonation fires in the first walkout batch (see its note), where the ecology/nuisance dip is asserted. #1042: dangerZoneClear reads true here, not false -- the #947 stranded-driverless-drill_rig case (see the first tick step's own description) is exactly what #1042's evacuation driver-boarding now resolves: an idle employee boards the driverless rig and drives it clear instead of leaving it stranded, so the zone genuinely clears by this point rather than staying blocked forever."
       }
     },
     {

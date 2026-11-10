@@ -71,9 +71,15 @@ export interface FragmentGenerationResult {
   throttled: boolean;
 }
 
-/** How many seed points a voxel contributes, given how hard it was hit. */
+/**
+ * How many seed points a voxel contributes, given how hard it was hit: `SEEDS_BASE` at its
+ * breaking point, `SEEDS_PER_INTENSITY` more per unit of intensity above it, and the base
+ * scaled down by intensity below it (rock broken without enough energy to fragment it).
+ */
 export function seedCountForIntensity(intensity: number, rng: Random): number {
-  const expected = SEEDS_BASE + SEEDS_PER_INTENSITY * Math.max(0, intensity - FRAGMENTATION_MULTIPLIER);
+  const expected = intensity < FRAGMENTATION_MULTIPLIER
+    ? SEEDS_BASE * Math.max(0, intensity) / FRAGMENTATION_MULTIPLIER
+    : SEEDS_BASE + SEEDS_PER_INTENSITY * (intensity - FRAGMENTATION_MULTIPLIER);
   const whole = Math.floor(expected);
   const remainder = expected - whole;
   const count = whole + (rng.chance(remainder) ? 1 : 0);

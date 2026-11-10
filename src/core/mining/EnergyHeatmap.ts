@@ -7,9 +7,9 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { type FragmentationBand, FRAGMENTATION_BANDS, classifyFragmentationBand } from './FragmentationBand.js';
 import {
   type PlanBandCell, type PlanBandMap, type BandShares, type PowderFactorRange,
-  previewPlanBands, holeBandMixes, recommendedPowderFactors, ownerHoleOf,
+  previewPlanBands, holeBandMixes, recommendedPowderFactors, ownerHoleOf, holeCellOf,
 } from './SoftwarePreview.js';
-import { holePowderFactors, holeSpacingM } from './ChargePlan.js';
+import { holePowderFactors } from './ChargePlan.js';
 import { HEATMAP_COLUMN_BAND_MIN_SHARE } from '../config/balance.js';
 
 /** What the heatmap hover says about the hole whose rock cell a column sits in (#2203). */
@@ -18,7 +18,7 @@ export interface HoleReadout {
   /** kg of explosive per m3 of the hole's rock. */
   powderFactor: number;
   shares: BandShares;
-  /** Recommended range for this rock with the hole's own explosive and stemming; computed on first call. */
+  /** Recommended range for this rock with the hole's own explosive, over the stemmings it can be filled to; computed on first call. */
   recommended(): PowderFactorRange | null;
 }
 
@@ -90,17 +90,17 @@ function annotateHoles(
   if (charged.length === 0) return columns;
   const mixes = holeBandMixes(bands, plan.holes);
   const factors = holePowderFactors(plan.holes, plan.charges);
-  // One sweep per (explosive, stemming) pair, shared by every hole charged that way.
+  // One sweep per explosive, shared by every hole charged with it.
   const sweeps = new Map<string, Record<string, PowderFactorRange | null>>();
   const recommendedFor = (holeId: string): PowderFactorRange | null => {
     const charge = plan.charges[holeId]!;
-    const key = `${charge.explosiveId}|${charge.stemmingM}`;
+    const key = charge.explosiveId;
     let sweep = sweeps.get(key);
-    if (!sweep) sweeps.set(key, sweep = recommendedPowderFactors(plan.holes, grid, charge.explosiveId, charge.stemmingM, wetHoleIds));
+    if (!sweep) sweeps.set(key, sweep = recommendedPowderFactors(plan.holes, grid, charge.explosiveId, wetHoleIds));
     return sweep[holeId] ?? null;
   };
   // Every hole competes for a column, charged or not: a column an uncharged hole owns shows no readout.
-  const cells = plan.holes.map(h => ({ h, cx: Math.floor(h.x), cz: Math.floor(h.z), half: holeSpacingM(h, plan.holes) / 2 }));
+  const cells = plan.holes.map(h => ({ h, ...holeCellOf(h, plan.holes) }));
   return columns.map(col => {
     const owner = ownerHoleOf(col.x, col.z, cells);
     const shares = owner && plan.charges[owner.h.id] !== undefined ? mixes[owner.h.id] : undefined;

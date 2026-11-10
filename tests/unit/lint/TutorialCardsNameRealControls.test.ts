@@ -43,9 +43,9 @@ const CARD_CONTROLS: Record<string, string[]> = {
     'ui.blast_workshop.drill.spacing',
     'ui.blast_workshop.drill.depth',
   ],
+  // The kg stepper is gone: every hole is filled up to the stemming, so the card names Stemming and the button.
   'stage.charge_all': [
     'ui.blast_workshop.charge.charge_all',
-    'ui.blast_workshop.charge.amount',
     'ui.blast_workshop.charge.stemming',
   ],
   'stage.execute': ['ui.blast_workshop.footer.fire'],
@@ -94,7 +94,7 @@ describe.each(Object.keys(LOCALES))('tutorial stepper values are named on the ca
   const locale = LOCALES[code] as Record<string, string>;
   const cases: Array<[string, string[]]> = [
     ['tutorial.stage.drill_area', ['4', '8']],
-    ['tutorial.stage.charge_all', ['7', '2.5']],
+    ['tutorial.stage.charge_all', ['2.5']],
   ];
   it.each(cases)('%s names its values', (cardKey, values) => {
     const card = locale[cardKey] as string;

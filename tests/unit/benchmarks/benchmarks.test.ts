@@ -27,7 +27,8 @@ import type { Building } from '../../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
 import { classifyQueuedOrders } from '../../../src/core/engine/OrderReachability.js';
-import { DEBRIS_CLASSIFY_PER_TICK, DEBRIS_DISPATCH_PER_TICK } from '../../../src/core/config/balance.js';
+import { DEBRIS_CLASSIFY_PER_TICK, DEBRIS_DISPATCH_PER_TICK, EXPLOSIVE_ENERGY_SCALE } from '../../../src/core/config/balance.js';
+import { computeInitialEnergy } from '../../../src/core/mining/BlastCalc.js';
 import { claimOnePoolCandidate } from '../../../src/core/engine/EmployeeDispatchSteps.js';
 import { selectBestActionForEmployee } from '../../../src/core/engine/ActionSelection.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
@@ -340,13 +341,18 @@ describe('Performance Benchmarks', () => {
     it('completes energy propagation + fragmentation in under 50ms', () => {
       const { grid, holes, charges, depths, surfaceYs } = setupThousandVoxelBlast();
 
+      // Each hole carries the energy the blast itself gives its charge (as BlastExecution seeds it):
+      // a hole's energy is shared over all the rock in its reach, so a token figure breaks nothing.
       const seeds = holes.flatMap(hole => buildHoleSeeds(
         surfaceYs[hole.id] ?? 10,
         depths[hole.id] ?? 8,
         charges[hole.id]!.amountKg,
-        charges[hole.id]!.amountKg * 1000,
+        computeInitialEnergy(charges[hole.id]!, depths[hole.id] ?? 8) * EXPLOSIVE_ENERGY_SCALE,
         Math.floor(hole.x),
         Math.floor(hole.z),
+        0,
+        hole.diameter,
+        charges[hole.id]!.explosiveId,
       ));
       const box = clampBoxToGrid(
         { minX: grid.minX, minY: 0, minZ: grid.minZ, maxX: grid.maxX, maxY: THOUSAND_VOXEL_GRID_HEIGHT, maxZ: grid.maxZ },

@@ -100,11 +100,11 @@ describe('The known un-converted player steps are converted to real UI interacti
 describe('blast-visual-full.json H1/H2 charge-override steps click the per-hole button with clickIfPresent (#694)', () => {
   const TARGETS = [
     {
-      command: 'charge hole:H1 explosive:boomite amount:8 stemming:2',
+      command: 'charge hole:H1 explosive:boomite stemming:2',
       selector: '#bs-blast-panel [data-hole="H1"] [data-action="charge-hole"]',
     },
     {
-      command: 'charge hole:H2 explosive:boomite amount:3 stemming:1',
+      command: 'charge hole:H2 explosive:boomite stemming:4.5',
       selector: '#bs-blast-panel [data-hole="H2"] [data-action="charge-hole"]',
     },
   ] as const;
@@ -136,7 +136,7 @@ describe('blast-visual-full.json H1/H2 charge-override steps click the per-hole 
       const actions = step!.interaction!;
       const precedingActions = actions.slice(0, -1);
       for (const action of precedingActions) {
-        // `setStepper` joined the vocabulary after #694: the amount stepper
+        // `setStepper` joined the vocabulary after #694: the stemming stepper
         // these steps drive is set by value now rather than clicked N times,
         // and that is the one preceding action whose type legitimately moved.
         expect(

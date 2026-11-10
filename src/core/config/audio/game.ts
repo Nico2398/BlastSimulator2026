@@ -29,7 +29,8 @@ export const DIRECTOR_CONFIG = {
 export const EVENT_CUES = {
   haulLoad: { maxPerFlush: 2, entityCooldownS: 1.5, spacingS: 0 },
   haulDump: { maxPerFlush: 2, entityCooldownS: 1.5, spacingS: 0 },
-  boulder: { maxPerFlush: 1, entityCooldownS: 2, spacingS: 0 },
+  /** A breaker working boulders is a rhythm, not a burst: a blast's pile of boulders must not hammer at 8x. */
+  boulder: { maxPerFlush: 1, entityCooldownS: 2, spacingS: 4 },
   vehicleStart: { maxPerFlush: 1, entityCooldownS: 5, spacingS: 5 },
   horn: { maxPerFlush: 1, entityCooldownS: 30, spacingS: 0 },
   /** A backup alarm is the sound of a worksite and the most tiring one: one truck at a time, a quarter minute apart. */
@@ -173,6 +174,14 @@ export const BLAST_AUDIO_CONFIG = {
     maxBins: 40,
     /** Flights represented by one bin when choosing the bin count. */
     flightsPerBin: 8,
+    /**
+     * Shortest stretch of landings one bin stands for (s). A well-stemmed shot drops its rock where it
+     * broke, so thousands of fragments land within a moment: that is one short rumble, not forty
+     * distinct impacts in the same second.
+     */
+    minBinS: 0.1,
+    /** However brief the landings, a collapse keeps up to this many bins, so it never shrinks to a lone thud. */
+    burstBins: 6,
     /** A bin of at most this many fragments landing slower than `lightMaxSpeed` is pebbles. */
     lightMaxCount: 3,
     lightMaxSpeed: 14,

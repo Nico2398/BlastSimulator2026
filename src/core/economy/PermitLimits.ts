@@ -1,4 +1,4 @@
-// BlastSimulator2026 — Permit limits: per-blast charge/hole caps and inspections (#1923)
+// BlastSimulator2026 — Permit limits: per-blast charge/area caps and inspections (#1923)
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
@@ -10,17 +10,18 @@ import { isEventShielded, markShielded } from './BribeProtection.js';
 import { pushModifier } from '../events/ActiveModifiers.js';
 import { clampScore } from '../scores/ScoreManager.js';
 import {
-  PERMIT_LIMITS, PERMIT_CLASS_CHARGE_FACTOR, PERMIT_CLASS_HOLES_FACTOR, PERMIT_CLASS_FEE_FACTOR,
+  PERMIT_LIMITS, PERMIT_CLASS_CHARGE_FACTOR, PERMIT_CLASS_AREA_FACTOR, PERMIT_CLASS_FEE_FACTOR,
   PERMIT_INSPECTION_BASE_CHANCE, PERMIT_FINE_FEE_MULTIPLIER, PERMIT_CAUGHT_NEIGHBOUR_PENALTY,
   PERMIT_STRIKES_TO_SUSPEND, type PermitLimitConfig, PERMIT_STRIKE_WINDOW_TICKS, PERMIT_SUSPENSION_TICKS,
-  MAX_DRILL_GRID_HOLES, INSPECTION_EVENT_TAG,
+  INSPECTION_EVENT_TAG,
 } from '../config/balance.js';
 
 
 interface PreFireCheck {
   limits: PermitLimitConfig;
   planKg: number;
-  planHoles: number;
+  /** Area (m²) of the plan's pattern cells (`patternAreaM2`). */
+  planAreaM2: number;
   over: boolean;
   fee: number;
   /** Largest fractional excess over either limit; 0 when within limits. */
@@ -44,33 +45,33 @@ export function permitLimitsFor(grade: number): PermitLimitConfig {
   const k = grade - LAST_NAMED_GRADE;
   return {
     maxChargeKg: Math.round(top.maxChargeKg * PERMIT_CLASS_CHARGE_FACTOR ** k),
-    maxHoles: Math.min(MAX_DRILL_GRID_HOLES, Math.round(top.maxHoles * PERMIT_CLASS_HOLES_FACTOR ** k)),
+    maxAreaM2: Math.round(top.maxAreaM2 * PERMIT_CLASS_AREA_FACTOR ** k),
     fee: Math.round(top.fee * PERMIT_CLASS_FEE_FACTOR ** k),
   };
 }
 
 function limitsUnlockParams(grade: number): Record<string, string | number> {
   const l = permitLimitsFor(grade);
-  return { maxChargeKg: l.maxChargeKg, maxHoles: l.maxHoles, fee: formatMoney(l.fee) };
+  return { maxChargeKg: l.maxChargeKg, maxAreaM2: l.maxAreaM2, fee: formatMoney(l.fee) };
 }
 const LIMIT_LINE_GRADES = [...Array.from({ length: LAST_NAMED_GRADE }, (_, i) => i + 1), 'class' as const];
 for (const grade of LIMIT_LINE_GRADES) {
   registerUnlockLine({ grade, leading: true, key: 'progression.unlock.limits', params: limitsUnlockParams });
 }
 
-/** Compare a blast plan against the permit of `grade`. */
+/** Compare a blast plan — its charges and the area (m²) of its pattern cells — against the permit of `grade`. */
 export function preFireCheck(
   grade: number,
   charges: Readonly<Record<string, { amountKg: number }>>,
-  holeCount: number,
+  planAreaM2: number,
 ): PreFireCheck {
   const limits = permitLimitsFor(grade);
   let planKg = 0;
   for (const c of Object.values(charges)) planKg += c.amountKg;
   const kgOver = Math.max(0, planKg - limits.maxChargeKg) / limits.maxChargeKg;
-  const holesOver = Math.max(0, holeCount - limits.maxHoles) / limits.maxHoles;
-  const overshoot = Math.max(kgOver, holesOver);
-  return { limits, planKg, planHoles: holeCount, over: overshoot > 0, fee: limits.fee, overshoot };
+  const areaOver = Math.max(0, planAreaM2 - limits.maxAreaM2) / limits.maxAreaM2;
+  const overshoot = Math.max(kgOver, areaOver);
+  return { limits, planKg, planAreaM2, over: overshoot > 0, fee: limits.fee, overshoot };
 }
 
 /** Strikes still inside the window at `tick`. */

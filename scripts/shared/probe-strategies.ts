@@ -72,7 +72,8 @@ import {
 import { gradeDef } from '../../src/core/economy/MineGrade.js';
 import { fleetBestRigLimit } from '../../src/core/mining/RigLimits.js';
 import { rampCutSlopeRatio } from '../../src/core/mining/Ramp.js';
-import { chargeColumnM, explosiveHoleLimits, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
+import { chargeColumnM, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
+import type { ExplosiveType } from '../../src/core/world/ExplosiveCatalog.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
 import { getEventById } from '../../src/core/events/EventPool.js';
 import { isActive } from '../../src/core/events/ActiveModifiers.js';
@@ -1238,15 +1239,20 @@ function craterFloorReachable(state: GameState, crater: Pattern & { span: number
   return reached * 2 >= crater.span * crater.span;
 }
 
+/** Kilograms of `explosive` filling a fresh ladder hole of bore `d` up to the shot's stemming. */
+function fullHoleKg(explosive: ExplosiveType, d: number): number {
+  return floorToKgResolution(maxFittingChargeKg(LADDER_HOLE_DEPTH_M, SHOT.stemming, d, explosive.id));
+}
+
 /**
- * Bore, of those the best rig drills, whose fullest charge of `explosive` stands the longest column (it breaks out of the
- * deepest hole); the widest of equals, which carries the most charge. A wider bore spreads the same kilograms shorter:
- * 0.165 m holes break out of 9 m of krackle where 0.089 and 0.127 m holes break out of 11 m.
+ * Bore, of those the best rig drills, whose full charge of `explosive` stands the longest column (it breaks out of the
+ * deepest hole); the widest of equals, which carries the most charge. A filled hole's column runs to the stemming in
+ * every bore, so this is the widest bore the rig drills.
  */
-function deepestBreakoutDiameter(explosive: Parameters<typeof explosiveHoleLimits>[0], rigMaxDiameterM: number): number {
+function deepestBreakoutDiameter(explosive: ExplosiveType, rigMaxDiameterM: number): number {
   const bores = DRILL_HOLE_DIAMETER_OPTIONS_M.filter(d => d <= rigMaxDiameterM + DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M);
   if (bores.length === 0) return pickDiameter(rigMaxDiameterM);
-  const column = (d: number): number => Math.round(chargeColumnM(floorToKgResolution(explosiveHoleLimits(explosive, d).maxKg), d) * 10) / 10;
+  const column = (d: number): number => Math.round(chargeColumnM(fullHoleKg(explosive, d), d, explosive.id) * 10) / 10;
   return bores.reduce((best, d) => (column(d) > column(best) || (column(d) === column(best) && d > best) ? d : best));
 }
 
@@ -1312,11 +1318,11 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   // of the deepest holes; the permit then sets how many holes, and the charge how close they stand. Spreading the
   // permit over its most holes left 7.5 kg holes 4 m apart: a shaft round each hole, full-height rock between (#2091).
   const diameterM = deepestBreakoutDiameter(explosive, rigDiameterM);
-  const fullKg = floorToKgResolution(explosiveHoleLimits(explosive, diameterM).maxKg);
+  const fullKg = fullHoleKg(explosive, diameterM);
   const holeDepth = decideLadderHoleDepth({
     rigMaxDepthM: fleetBestRigLimit(DRILL_RIG_MAX_DEPTH_M, vehicles), remainingDepthM: nextGradeDepthM(state) - pitM,
     floorOpen: deepen && depthOpen, lastShotFailed: m.lastShotFailed, currentCapM: m.holeCapM, freshHoleDepthM: LADDER_HOLE_DEPTH_M,
-    breakoutDepthM: breakoutHoleDepthM(chargeColumnM(fullKg, diameterM), LADDER_TIGHT_BURDEN_M),
+    breakoutDepthM: breakoutHoleDepthM(chargeColumnM(fullKg, diameterM, explosive.id), LADDER_TIGHT_BURDEN_M),
   });
   // A ramp steeper than the fleet climbs reaches only so deep: shrink the holes to what the haulers still reach.
   const ramp = deepen && crater ? m.ramps[craterKey(crater)] : undefined;
@@ -1330,14 +1336,14 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const shaftDepthM = deepen && depthOpen ? shaftHoleDepthM({ floorDepthM: craterDepthM(s.grid, crater), nextGradeDepthM: nextGradeDepthM(state), rigMaxDepthM }) : null;
   const shaft = shaftDepthM !== null;
   const depth = shaftDepthM ?? (shrunk ? Math.max(1, Math.floor(reachableShotDepthM(ramp.runM, climb, holeDepth))) : holeDepth);
-  const fullSide = fullHoleSide(limit, fullKg);
+  const spacing = holeSpacingForChargeM(fullKg);
+  const fullSide = fullHoleSide(limit, fullKg, spacing);
   const sized: LadderShot = {
-    rows: fullSide, cols: fullSide, spacing: holeSpacingForChargeM(fullKg), depth, kgPerHole: fullKg, stemming: SHOT.stemming, diameterM,
+    rows: fullSide, cols: fullSide, spacing, depth, kgPerHole: fullKg, stemming: SHOT.stemming, diameterM,
   };
-  /** Heaviest hole charge that stays inside the permit's total charge for an n x n pattern, the explosive's and the hole's own limits. */
+  /** Heaviest hole charge that stays inside the permit's total charge for an n x n pattern and fits the hole. */
   const kgFor = (n: number): number => floorToKgResolution(Math.min(
-    limit.maxChargeKg / (n * n), explosiveHoleLimits(explosive, sized.diameterM).maxKg,
-    maxFittingChargeKg(depth, sized.stemming, sized.diameterM),
+    limit.maxChargeKg / (n * n), maxFittingChargeKg(depth, sized.stemming, sized.diameterM, explosive.id),
   ));
 
   // Deepen the latest crater whose rubble is cleared (holes under rubble never finish); none clear: a fresh site meanwhile.

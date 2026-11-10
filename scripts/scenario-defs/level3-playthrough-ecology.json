@@ -480,7 +480,7 @@
       "description": "#1895: a cash-bought charge order waits out the explosives delivery, 400 idle ticks; on continuous shifts with no rest the idle crew's morale collapses and it revolts before the shipment arrives. The default shift policy carries it through the wait."
     },
     {
-      "command": "charge hole:* explosive:krackle amount:10 stemming:1",
+      "command": "charge hole:* explosive:krackle stemming:1",
       "interaction": [
         {
           "type": "clickSelector",
@@ -496,23 +496,12 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 10
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 1
         },
         {
           "type": "assert",
           "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 kg"
         },
         {
           "type": "assert",
@@ -525,7 +514,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Charge All commits the panel's current product card / amount / stemming (ChargeStep.chargeAll, Charge.ts): the krackle product card selects the explosive, 5 amount increments take 5 -> 10kg (krackle's maximum) and 5 stemming decrements take 2.0 -> 1.0m. #553-followup round 3 (issue #586 CI, second bug surfaced only once the move_here fix above let the run reach this far for the first time): the preceding step switches the active toolbar panel to Fleet to select the drill_rig, and this step never switched it back to Blast before clicking `[data-step=\"2\"]` -- CI failed with `element has zero size (0x0)`, the same panel-still-on-a-different-tab symptom already diagnosed and fixed for blast-execution-visual.json's grids 2-4 in this same round (both bugs pre-date this specific investigation: b9367f6, #553's original landing commit, already had this exact gap, just never reached in interaction mode until move_here itself started working). Added the missing `#bs-toolbar [data-panel=\"blast\"]` reopen click, matching that sibling fix.",
+      "description": "Charge All commits the panel's current product card / stemming (ChargeStep.chargeAll, Charge.ts): the krackle product card selects the explosive and the stemming stepper is set to 1.0m, so each 6m hole fills with 5m of krackle (14.3kg; the old explicit charge was 10kg). #553-followup round 3 (issue #586 CI, second bug surfaced only once the move_here fix above let the run reach this far for the first time): the preceding step switches the active toolbar panel to Fleet to select the drill_rig, and this step never switched it back to Blast before clicking `[data-step=\"2\"]` -- CI failed with `element has zero size (0x0)`, the same panel-still-on-a-different-tab symptom already diagnosed and fixed for blast-execution-visual.json's grids 2-4 in this same round (both bugs pre-date this specific investigation: b9367f6, #553's original landing commit, already had this exact gap, just never reached in interaction mode until move_here itself started working). Added the missing `#bs-toolbar [data-panel=\"blast\"]` reopen click, matching that sibling fix.",
       "role": "player",
       "expect": {
         "equals": {
@@ -608,7 +597,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 154,
+          "tickCount": 204,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -619,7 +608,7 @@
         "changedBy": {
           "cash": -1000
         },
-        "note": "#1890: the stretched shared event cooldown shifts the event draws and charge timing (tick 184 -> 173); every downstream tickCount/score pin re-measured, outcomes (deaths, level state) unchanged. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
+        "note": "Fill mode: the 1m-stemming krackle fill (14.3kg per hole, was 10kg) takes longer to load, so charging lands at tick 204 (was 154); every downstream tickCount pin moves by the same 50 ticks and the post-blast ecology/nuisance pins were re-measured (the bigger shot costs more), deathCount 11 unchanged. #1890: the stretched shared event cooldown shifts the event draws and charge timing (tick 184 -> 173); every downstream tickCount/score pin re-measured, outcomes (deaths, level state) unchanged. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -637,7 +626,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 154,
+          "tickCount": 204,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -666,7 +655,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 154,
+          "tickCount": 204,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -695,7 +684,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 154,
+          "tickCount": 204,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -724,7 +713,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 154,
+          "tickCount": 204,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -753,7 +742,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 154,
+          "tickCount": 204,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -782,7 +771,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 154,
+          "tickCount": 204,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -807,7 +796,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 154,
+          "tickCount": 204,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -832,7 +821,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 154,
+          "tickCount": 204,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -938,8 +927,8 @@
           "employeeCount": 12,
           "wellBeing": 99.95,
           "safety": 50,
-          "ecology": 44.83863403876688,
-          "nuisance": 37.096585096917195,
+          "ecology": 39.142724889390315,
+          "nuisance": 22.85681222347579,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1019,11 +1008,11 @@
       "description": "#1895: a cash-bought charge order waits out the explosives delivery, 400 idle ticks; on continuous shifts with no rest the idle crew's morale collapses and it revolts before the shipment arrives. The default shift policy carries it through the wait."
     },
     {
-      "command": "charge hole:* explosive:krackle amount:10 stemming:1",
+      "command": "charge hole:* explosive:krackle stemming:1",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
+          "command": "charge hole:* explosive:krackle stemming:1"
         }
       ],
       "description": "Left as a command, guard role, and not reachable by any click sequence for a reason distinct from this file's earlier pre-#553 \"invalid amount\" findings (patterns 4/6, further down this file's own history): with holeCount at 0, the Drill step never has a single physically-drilled hole to hand off to Charge, so charge-all has nothing to act on and the panel's own step-advance leaves it unreachable -- there is no button a player could click through to a charge. The console has no such gate: createCharge (ChargePlan.ts) charges 0 of the 0 holes that exist, chargedCount stays 0, and the command itself reports success (\"Charged 0 holes\") rather than throwing.",
@@ -1111,8 +1100,8 @@
           "employeeCount": 12,
           "wellBeing": 99.95,
           "safety": 50,
-          "ecology": 44.83863403876688,
-          "nuisance": 37.096585096917195,
+          "ecology": 39.142724889390315,
+          "nuisance": 22.85681222347579,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1135,7 +1124,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 174,
+          "tickCount": 224,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 11,
@@ -1162,15 +1151,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 174,
+          "tickCount": 224,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 11,
           "employeeCount": 12,
           "wellBeing": 99.95,
           "safety": 9.146359655622655,
-          "ecology": 40.82873041386964,
-          "nuisance": 36.482925484585905,
+          "ecology": 33.48398563013067,
+          "nuisance": 21.784061117378943,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1190,7 +1179,7 @@
       "description": "#945: tickCount corrected 331 -> 333, following the `tick 20` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 174,
+          "tickCount": 224,
           "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1212,13 +1201,13 @@
       "expect": {
         "note": "#1778: pins re-measured for comfort-band morale recovery. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone.",
         "equals": {
-          "tickCount": 174,
+          "tickCount": 224,
           "deathCount": 11,
           "employeeCount": 12,
           "wellBeing": 99.95,
           "safety": 9.146359655622655,
-          "ecology": 40.82873041386964,
-          "nuisance": 36.482925484585905,
+          "ecology": 33.48398563013067,
+          "nuisance": 21.784061117378943,
           "levelEnded": false,
           "levelEndReason": null
         }
@@ -1237,13 +1226,13 @@
       "expect": {
         "note": "#1778: pins re-measured for comfort-band morale recovery. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone.",
         "equals": {
-          "tickCount": 174,
+          "tickCount": 224,
           "deathCount": 11,
           "employeeCount": 12,
           "wellBeing": 99.95,
           "safety": 9.146359655622655,
-          "ecology": 40.82873041386964,
-          "nuisance": 36.482925484585905,
+          "ecology": 33.48398563013067,
+          "nuisance": 21.784061117378943,
           "levelEnded": false,
           "levelEndReason": null,
           "bankrupt": false

@@ -40,7 +40,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "description": "Order a charge: nothing is paid at ordering, the order only queues.",
+      "description": "Order a charge: nothing is paid at ordering, the order only queues. Explicit 5 kg partial charge: this is console-only bootstrap scaffolding, and BOOTSTRAP_COMMAND_ALLOWLIST admits this exact command (the fill form without `amount:` is not on it).",
       "role": "bootstrap",
       "interaction": [
         {

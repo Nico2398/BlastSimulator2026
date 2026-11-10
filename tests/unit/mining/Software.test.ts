@@ -220,8 +220,8 @@ describe('Software — previewHoleDetails', () => {
 describe('Software — wet-hole modelling (#1347)', () => {
   const allWet = (plan: { holes: Array<{ id: string }> }) => new Set(plan.holes.map(h => h.id));
 
-  /** Same grid/pattern as makeTestPlan, but charged with the given explosive. */
-  function planWith(explosiveId: string, amountKg = 8, stemmingM = 0.5) {
+  /** Same grid/pattern as makeTestPlan, but charged with the given explosive (`amountKg` null fills each hole to the stemming). */
+  function planWith(explosiveId: string, amountKg: number | null = 8, stemmingM = 0.5) {
     const { grid } = makeTestPlan();
     const holes = createGridPlan(holeCounter, { x: 10, z: 10 }, 2, 2, 3, 6, 0.089);
     const depths: Record<string, number> = {};
@@ -230,14 +230,16 @@ describe('Software — wet-hole modelling (#1347)', () => {
     return { grid, plan: assembleBlastPlan(holes, charges) };
   }
 
-  it('previewEnergy retains less total energy over a smaller footprint when holes are wet (water-sensitive explosive)', () => {
-    // Per-voxel energy saturates at the rock's absorption threshold, so max/min can
-    // coincide; the total retained and the number of energised voxels do not.
+  it('previewEnergy retains less energy in every voxel when holes are wet (water-sensitive explosive)', () => {
+    // Each hole spreads its energy over the rock within BLAST_ENERGY_REACH_M, however strong the charge,
+    // so a wet hole energises the same voxels, each with less. Per-voxel energy saturates at the rock's
+    // absorption threshold, so max/min can coincide; the total retained does not.
     const { grid, plan } = planWith('big_bada_boom');
     const dry = previewEnergy(plan, grid, 0)!;
     const wet = previewEnergy(plan, grid, 0, allWet(plan))!;
     const total = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
-    expect(wet.energyMap.size).toBeLessThan(dry.energyMap.size);
+    expect(wet.energyMap.size).toBe(dry.energyMap.size);
+    for (const [key, energy] of wet.energyMap) expect(energy, key).toBeLessThanOrEqual(dry.energyMap.get(key)! + 1e-9);
     expect(total(wet.energyMap)).toBeLessThan(total(dry.energyMap));
     expect(wet.maxEnergy).toBeLessThanOrEqual(dry.maxEnergy);
   });
@@ -273,7 +275,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
   });
 
   it('previewHoleDetails reflects wet holes: coarser fragments or no projection', () => {
-    const { grid, plan } = planWith('big_bada_boom', 8, 1.8); // heavy charge: collar voxel is energised, so wet is measurable
+    const { grid, plan } = planWith('big_bada_boom', null, 1.8); // filled to 1.8 m: the collar voxel is energised, so wet is measurable
     const dry = previewHoleDetails(plan, grid, 2);
     const wet = previewHoleDetails(plan, grid, 2, allWet(plan));
     const changed = plan.holes.some(h => {
@@ -289,7 +291,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
   });
 
   it('only the wet holes are weakened in previewHoleDetails', () => {
-    const { grid, plan } = planWith('big_bada_boom', 8, 1.8); // heavy charge: collar voxel is energised, so wet is measurable
+    const { grid, plan } = planWith('big_bada_boom', null, 1.8); // filled to 1.8 m: the collar voxel is energised, so wet is measurable
     const dry = previewHoleDetails(plan, grid, 1);
     const first = plan.holes[0]!.id;
     const wet = previewHoleDetails(plan, grid, 1, new Set([first]));

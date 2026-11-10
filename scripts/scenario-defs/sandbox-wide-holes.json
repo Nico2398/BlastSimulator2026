@@ -1,6 +1,6 @@
 {
   "name": "sandbox-wide-holes",
-  "description": "Hole diameter (#1934): with only a tier-1 rig a 127 mm grid is refused and 16 kg will not load into an 89 mm, 8 m hole. After buying a tier-2 rig the player steps the Drill diameter to 127 mm, drills two 8 m holes, loads 16 kg into each (about 4.07 kg/m instead of 2) and fires.",
+  "description": "Hole diameter (#1934): with only a tier-1 rig a 127 mm grid is refused, and an 89 mm, 8 m hole holds 12 kg of boomite under 2 m of stemming (2 kg/m), so a 16 kg charge does not fit it. After buying a tier-2 rig the player steps the Drill diameter to 127 mm, drills two 8 m holes, fills each with boomite to the same 2 m of stemming (24.4 kg, about 4.07 kg/m instead of 2) and fires.",
   "steps": [
     {
       "command": "sandbox start biome:desert_badlands kit:full seed:42 grade:4",
@@ -95,14 +95,10 @@
     },
     {
       "command": "charge hole:H1 explosive:boomite amount:16 stemming:2",
-      "role": "guard",
+      "role": "player",
       "commandOutcome": "refused",
-      "description": "16 kg with 2 m stemming needs a 8 m column; an 89 mm hole (2 kg/m) in an 8 m hole holds 12 kg at most, so the charge is refused. The Charge step is set to the same 16 kg load with a product that allows it (obliviax), which the 8 m hole cannot hold.",
+      "description": "An 89 mm hole holds 2 kg of boomite per metre, so filled to 2 m of stemming the 8 m hole takes 12 kg: 16 kg does not fit. Command mode asks the console for an explicit 16 kg partial charge (a script-only form; the Charge step only ever fills the hole) and is refused with the 12 kg maximum. In the browser the player opens the Charge step with boomite and 2 m of stemming and reads 12 kg in its Per hole readout, the most this hole takes; nothing is ordered. Before fill mode this step was a guard on the kg stepper (16 kg of obliviax blocked Charge All); that stepper is gone, so there is no control left to block.",
       "interaction": [
-        {
-          "type": "command",
-          "command": "charge hole:H1 explosive:boomite amount:16 stemming:2"
-        },
         {
           "type": "ensurePanel",
           "panel": "blast"
@@ -113,25 +109,27 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"obliviax\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 16
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
         },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-blast-panel [data-role=\"charge-per-hole\"]",
+          "property": "textContent",
+          "expectedValue": "12 kg",
+          "timeoutMs": 5000
         }
       ],
       "expect": {
-        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
         "equals": {
-          "orderedChargeCount": 0
+          "orderedChargeCount": 0,
+          "chargedCount": 0
         },
-        "note": "the Charge step cannot order a 16 kg load into an 89 mm, 8 m hole (interaction mode only)"
+        "note": "16 kg is refused at 89 mm (command mode); the Per hole readout shows the 12 kg the hole holds (interaction mode)"
       }
     },
     {
@@ -314,9 +312,9 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:16 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "role": "player",
-      "description": "16 kg per hole: refused at 89 mm, fits a 127 mm hole 8 m deep (about 4.07 kg/m, boomite limit scaled to about 16.3 kg).",
+      "description": "Fill both 127 mm holes with boomite up to 2 m of stemming: 24.4 kg each (about 4.07 kg/m), twice the 12 kg the 89 mm hole held at the same stemming. The Per hole readout shows the fill before Charge All orders it.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -328,17 +326,19 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 16
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
         },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-blast-panel [data-role=\"charge-per-hole\"]",
+          "property": "textContent",
+          "expectedValue": "24.4 kg",
+          "timeoutMs": 5000
         },
         {
           "type": "clickSelector",
@@ -354,7 +354,7 @@
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
       "role": "setup",
-      "description": "The blaster loads both 16 kg charges.",
+      "description": "The blaster loads both 24.4 kg charges.",
       "interaction": [
         {
           "type": "waitUntil",

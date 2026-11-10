@@ -14,10 +14,12 @@ export interface ExplosiveType {
   readonly costPerKg: number;
   /** If true, loses effectiveness in wet/flooded holes. */
   readonly waterSensitive: boolean;
-  /** Minimum charge per hole in kg. */
-  readonly minChargeKg: number;
-  /** Maximum charge per hole in kg. */
-  readonly maxChargeKg: number;
+  /**
+   * Loaded density (g/cm³). A charge fills its hole from the bottom up to the stemming, so
+   * density is what sets how many kilograms — and how much energy — one metre of hole holds
+   * (`chargeKgPerMetre`): a light explosive suits soft rock, a dense one hard rock.
+   */
+  readonly density: number;
   /** Multiplier on ground vibration (1.0 = normal). Higher = more vibration. */
   readonly vibrationMod: number;
 }
@@ -30,8 +32,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     energyPerKg: 200,        // Black powder basis: ~0.3 MJ/kg × 100, boosted for playability
     costPerKg: 5,
     waterSensitive: true,
-    minChargeKg: 0.5,
-    maxChargeKg: 3,
+    density: 0.55,           // Fluffy black-powder knockoff: mostly air
     vibrationMod: 0.4,
   },
   {
@@ -41,8 +42,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     energyPerKg: 340,        // ANFO basis: ~3.4 MJ/kg × 100
     costPerKg: 12,
     waterSensitive: true,
-    minChargeKg: 1,
-    maxChargeKg: 8,
+    density: 0.8,            // ANFO
     vibrationMod: 0.7,
   },
   {
@@ -52,8 +52,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     energyPerKg: 400,        // Emulsion basis: ~3.8 MJ/kg × 100, rounded
     costPerKg: 20,
     waterSensitive: false,    // Water-resistant emulsion
-    minChargeKg: 1,
-    maxChargeKg: 10,
+    density: 1.15,           // Emulsion
     vibrationMod: 0.8,
   },
   {
@@ -63,8 +62,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     energyPerKg: 550,        // Dynamite basis: ~7.5 MJ/kg × 70 (game-scaled)
     costPerKg: 35,
     waterSensitive: true,
-    minChargeKg: 1,
-    maxChargeKg: 12,
+    density: 1.3,            // Dynamite
     vibrationMod: 1.2,
   },
   {
@@ -74,8 +72,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     energyPerKg: 700,        // C4-ish: ~5.9 MJ/kg × 120 (game-scaled)
     costPerKg: 55,
     waterSensitive: false,
-    minChargeKg: 1,
-    maxChargeKg: 15,
+    density: 1.55,           // Plastic
     vibrationMod: 1.0,
   },
   {
@@ -85,8 +82,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     energyPerKg: 850,        // Heavy ANFO boosted: ~4.5 MJ/kg × 190
     costPerKg: 80,
     waterSensitive: false,
-    minChargeKg: 2,
-    maxChargeKg: 20,
+    density: 1.2,            // Heavy ANFO
     vibrationMod: 1.6,        // Defining trait: high vibration
   },
   {
@@ -96,8 +92,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     energyPerKg: 1000,       // Military-grade shaped charge territory
     costPerKg: 120,
     waterSensitive: true,
-    minChargeKg: 2,
-    maxChargeKg: 20,
+    density: 1.4,
     vibrationMod: 1.2,
   },
   {
@@ -107,8 +102,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     energyPerKg: 1300,       // Fantasy endgame. Nuclear-adjacent.
     costPerKg: 200,
     waterSensitive: false,
-    minChargeKg: 3,
-    maxChargeKg: 25,
+    density: 1.6,
     vibrationMod: 2.0,        // Village-shaking
   },
 ] as const;

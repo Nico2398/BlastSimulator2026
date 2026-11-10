@@ -4,7 +4,7 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import type { DrillHole } from './DrillPlan.js';
 import {
   createCharge, computeChargeHoleDurationTicks,
-  type HoleCharge, type ChargeError,
+  type HoleCharge, type ChargeError, type PatternCharge,
 } from './ChargePlan.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
@@ -113,7 +113,7 @@ export function planReplacementLoss(
  * explosive the level no longer offers is cleared
  * rather than returned.
  */
-function takePatternOrClearIfUnavailable(state: GameState): HoleCharge | null {
+function takePatternOrClearIfUnavailable(state: GameState): PatternCharge | null {
   const pattern = state.patternCharge;
   if (pattern == null) return null;
   if (!isExplosiveAvailable(state.campaign.activeLevelId, pattern.explosiveId)) {
@@ -123,8 +123,8 @@ function takePatternOrClearIfUnavailable(state: GameState): HoleCharge | null {
   return pattern;
 }
 
-/** Order the pattern charge for one hole, funds checked per hole. Caller guarantees the hole is uncovered. */
-function orderPatternCharge(state: GameState, hole: DrillHole, pattern: HoleCharge): AutoChargeOutcome | { error: string } {
+/** Order the pattern charge for one hole (filled to its own depth when the pattern fills). Caller guarantees the hole is uncovered. */
+function orderPatternCharge(state: GameState, hole: DrillHole, pattern: PatternCharge): AutoChargeOutcome | { error: string } {
   const created = createCharge(pattern.explosiveId, pattern.amountKg, pattern.stemmingM, hole.depth, hole.diameter);
   if ('error' in created) return { error: created.error };
   dispatchChargeAction(state, hole, created.charge);

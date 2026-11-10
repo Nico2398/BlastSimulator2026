@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { SelectionOverlay } from '../../../src/renderer/SelectionOverlay.js';
 import type { SurfaceHeightSampler } from '../../../src/renderer/GroundTint.js';
+import { gridCellPositions } from '../../../src/core/mining/DrillPlan.js';
 
 let scene: THREE.Scene;
 
@@ -275,5 +276,85 @@ describe('SelectionOverlay — refused tint (#1396)', () => {
     const colors = lineColors();
     expect(colors.length).toBeGreaterThan(0);
     expect(colors.every((c) => c === BLOCKED)).toBe(true);
+  });
+});
+
+describe('SelectionOverlay — drill-hole markers at exact cells', () => {
+  /**
+   * The cell of every drill-hole marker in the scene, sorted. A marker is the only LineLoop a rect
+   * selection draws (its border and corners are plain Lines): a ring centred on its cell's middle.
+   */
+  function markerCells(): { x: number; z: number }[] {
+    scene.updateMatrixWorld(true);
+    const cells: { x: number; z: number }[] = [];
+    const v = new THREE.Vector3();
+    scene.traverse((o) => {
+      if (!(o instanceof THREE.LineLoop)) return;
+      const pos = o.geometry.getAttribute('position') as THREE.BufferAttribute;
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+        minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+        minZ = Math.min(minZ, v.z); maxZ = Math.max(maxZ, v.z);
+      }
+      // `+ 0` folds the -0 a ring centred on x = 0.5 can round to.
+      cells.push({ x: Math.round((minX + maxX) / 2 - 0.5) + 0, z: Math.round((minZ + maxZ) / 2 - 0.5) + 0 });
+    });
+    return cells.sort((a, b) => a.z - b.z || a.x - b.x);
+  }
+  const sorted = (cells: readonly { x: number; z: number }[]) => [...cells].sort((a, b) => a.z - b.z || a.x - b.x);
+
+  it('holeCells draws one marker on each listed cell and nowhere else', () => {
+    const overlay = new SelectionOverlay(scene, () => 0, () => 0);
+    const holeCells = [{ x: 0, z: 0 }, { x: 4, z: 2 }, { x: 8, z: 7 }];
+
+    overlay.update({ shape: 'rect', x1: 0, z1: 0, x2: 10, z2: 10, holeCells });
+
+    expect(markerCells()).toEqual(sorted(holeCells));
+  });
+
+  it('a staggered grid with a burden is marked on the holes it drills, odd rows shifted', () => {
+    const overlay = new SelectionOverlay(scene, () => 0, () => 0);
+    const holeCells = gridCellPositions({ x: 10, z: 10 }, 3, 3, 4, 3, 'staggered');
+
+    overlay.update({ shape: 'rect', x1: 10, z1: 10, x2: 18, z2: 16, holeCells });
+
+    expect(markerCells()).toEqual(sorted(holeCells));
+    expect(markerCells()).toContainEqual({ x: 12, z: 13 });
+    expect(markerCells()).not.toContainEqual({ x: 10, z: 13 });
+  });
+
+  it('holeCells overrides holeSpacing: the square spacing markers are not drawn as well', () => {
+    const overlay = new SelectionOverlay(scene, () => 0, () => 0);
+    const holeCells = [{ x: 1, z: 1 }, { x: 5, z: 4 }];
+
+    overlay.update({ shape: 'rect', x1: 0, z1: 0, x2: 8, z2: 8, holeSpacing: 1, holeCells });
+
+    expect(markerCells()).toEqual(sorted(holeCells));
+  });
+
+  it('boundary: an empty holeCells list draws no marker even with a spacing given', () => {
+    const overlay = new SelectionOverlay(scene, () => 0, () => 0);
+
+    overlay.update({ shape: 'rect', x1: 0, z1: 0, x2: 8, z2: 8, holeSpacing: 4, holeCells: [] });
+
+    expect(markerCells()).toEqual([]);
+  });
+
+  it('without holeCells, holeSpacing still marks a square grid from the corner', () => {
+    const overlay = new SelectionOverlay(scene, () => 0, () => 0);
+
+    overlay.update({ shape: 'rect', x1: 0, z1: 0, x2: 8, z2: 8, holeSpacing: 4 });
+
+    expect(markerCells()).toEqual(gridCellPositions({ x: 0, z: 0 }, 3, 3, 4));
+  });
+
+  it('a new update replaces the markers of the previous one', () => {
+    const overlay = new SelectionOverlay(scene, () => 0, () => 0);
+    overlay.update({ shape: 'rect', x1: 0, z1: 0, x2: 8, z2: 8, holeCells: gridCellPositions({ x: 0, z: 0 }, 3, 3, 4) });
+
+    overlay.update({ shape: 'rect', x1: 0, z1: 0, x2: 8, z2: 8, holeCells: [{ x: 2, z: 2 }] });
+
+    expect(markerCells()).toEqual([{ x: 2, z: 2 }]);
   });
 });

@@ -186,6 +186,21 @@ describe('planBlast debris rain', () => {
     expect(hit?.atS).toBe(2);
   });
 
+  it('packs landings that come within a moment into fewer impacts: one per minBinS, burstBins at the least', () => {
+    const rainOf = (from: number, to: number) =>
+      plan(blast({ flights: flights(2000, from, to) })).filter(c => c.sound === 'debris_hit' || c.sound === 'debris_pebble');
+    // A well-stemmed collapse: 2000 fragments down within 1.2 s are a rumble of at most 12 impacts, not 40.
+    const second = rainOf(0.8, 2.0);
+    expect(second.length).toBeLessThanOrEqual(Math.ceil(1.2 / cfg.rain.minBinS));
+    expect(second.length).toBeGreaterThanOrEqual(cfg.rain.burstBins);
+    // Landings within a tenth of a second still keep burstBins impacts, never a lone thud.
+    const instant = rainOf(0.8, 0.9);
+    expect(instant.length).toBeLessThanOrEqual(cfg.rain.burstBins);
+    expect(instant.length).toBeGreaterThan(1);
+    // A long fall is unaffected: its bins are already wider than minBinS.
+    expect(rainOf(0.8, 9).length).toBeGreaterThanOrEqual(cfg.rain.minBins);
+  });
+
   it('copes with no flights and with flights that all land together', () => {
     expect(plan(blast()).filter(c => c.sound.startsWith('debris'))).toEqual([]);
     const together = plan(blast({ flights: flights(500, 4, 4) })).filter(c => c.sound.startsWith('debris'));

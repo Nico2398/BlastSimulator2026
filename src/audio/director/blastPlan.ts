@@ -89,7 +89,9 @@ function binFlights(flights: readonly BlastFlight[]): Bin[] {
   const landings = flights.map(f => f.delayS + f.durationS);
   const first = landings.reduce((a, b) => Math.min(a, b), Infinity);
   const span = landings.reduce((a, b) => Math.max(a, b), -Infinity) - first;
-  const binCount = clamp(Math.round(flights.length / CFG.rain.flightsPerBin), CFG.rain.minBins, CFG.rain.maxBins);
+  const byCount = clamp(Math.round(flights.length / CFG.rain.flightsPerBin), CFG.rain.minBins, CFG.rain.maxBins);
+  // Landings packed into a moment make fewer, fuller bins: one per `minBinS` of the span, `burstBins` at the least.
+  const binCount = Math.max(1, Math.min(byCount, Math.max(CFG.rain.burstBins, Math.ceil(span / CFG.rain.minBinS))));
   const bins: Bin[] = Array.from({ length: binCount }, () => ({ count: 0, sumLandingS: 0, sumSpeed: 0, sumX: 0, sumZ: 0 }));
   flights.forEach((flight, i) => {
     const landing = landings[i] ?? first;

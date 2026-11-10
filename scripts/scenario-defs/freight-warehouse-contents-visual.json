@@ -163,7 +163,7 @@
       ]
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "description": "Charge all six holes by real clicks. Boomite is bought per charge at cash price: no explosive stock is held.",
       "role": "player",
       "expect": {
@@ -179,11 +179,6 @@
         {
           "type": "ensureStep",
           "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
         },
         {
           "type": "setStepper",

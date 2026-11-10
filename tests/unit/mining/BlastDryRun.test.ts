@@ -32,6 +32,15 @@ function shotAt(x: number, z: number, idStart: number): BlastPlan {
   return assembleBlastPlan(holes, charges);
 }
 
+/** A 3x3 pattern of 8 m holes 6 m apart, filled with pop_rock under 3.5 m of stemming. */
+function boulderShot(): BlastPlan {
+  const holes = createGridPlan({ nextHoleId: 1 }, { x: 14, z: 14 }, 3, 3, 6, 8, 0.089);
+  const depths: Record<string, number> = {};
+  for (const h of holes) depths[h.id] = h.depth;
+  const { charges } = batchCharge(holes.map(h => h.id), depths, 'pop_rock', null, 3.5);
+  return assembleBlastPlan(holes, charges);
+}
+
 /** Flat 20 m bench; a first 3x3 shot is fired, leaving a crater the second shot sits beside. */
 function craterGrid(): { grid: VoxelGrid; second: BlastPlan } {
   const grid = buildWallGrid({ plateauTop: 20 });
@@ -91,12 +100,15 @@ describe('dryRunBlast', () => {
   });
 
   it('applies the oversize rating cap: forecast equals the report rating, below the base rating', () => {
-    const plan = standardShot().plan;
-    const real = executeBlast(plan, buildWallGrid({ plateauTop: 20 }), [], GROUND)!;
+    // The weakest explosive in holes 6 m apart through medium rock: the rock between the holes
+    // comes out in boulders (measured under the kernel model: about 43% of the fragments oversized).
+    const plan = boulderShot();
+    const molite = () => buildWallGrid({ plateauTop: 20, rock: 'molite' });
+    const real = executeBlast(plan, molite(), [], GROUND)!;
     const report = buildBlastReport(real, 0, 0);
     expect(report.ratingCap).toBe('oversize');
     expect(real.rating).toBe('perfect');
-    const forecast = dryRunBlast(plan, buildWallGrid({ plateauTop: 20 }), [], GROUND, NO_WET)!;
+    const forecast = dryRunBlast(plan, molite(), [], GROUND, NO_WET)!;
     expect(forecast.rating).toBe('good');
     expect(forecast.rating).toBe(report.rating);
   });

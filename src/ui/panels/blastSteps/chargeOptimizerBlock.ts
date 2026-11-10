@@ -18,15 +18,15 @@ const SECTION_STYLE = 'display:flex;flex-direction:column;gap:6px;padding:10px;b
 const TEXT_STYLE = 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)';
 const MONO_STYLE = 'font:500 11px/1.4 var(--bsx-font-mono);color:var(--bsx-text-muted)';
 
-/** The command that orders one proposed charge, the same one the hole row and Charge All send. */
+/** The command that orders one proposed charge — the hole filled up to the proposed stemming, as the hole row and Charge All do. */
 function chargeCommand(holeId: string, c: HoleCharge): string {
-  return `charge hole:${holeId} explosive:${c.explosiveId} amount:${c.amountKg}kg stemming:${c.stemmingM}m`;
+  return `charge hole:${holeId} explosive:${c.explosiveId} stemming:${c.stemmingM}m`;
 }
 
 export class ChargeOptimizerBlock {
   readonly root: HTMLElement;
   private proposal: ChargeProposal | null = null;
-  /** Stemming and holes the proposal was computed for: a different pattern makes it stale. */
+  /** Holes the proposal was computed for: a different pattern makes it stale. */
   private proposalKey = '';
 
   constructor(private readonly send: (cmd: string) => void) {
@@ -34,7 +34,7 @@ export class ChargeOptimizerBlock {
   }
 
   /** Repaint from the stored proposal; computes nothing. */
-  render(state: GameState, stemmingM: number, grid: VoxelGrid | null): void {
+  render(state: GameState, grid: VoxelGrid | null): void {
     const holes = state.drillHoles;
     if (state.softwareTier < SOFTWARE_TIER_OPTIMIZER) {
       this.proposal = null;
@@ -48,15 +48,15 @@ export class ChargeOptimizerBlock {
       this.root.replaceChildren();
       return;
     }
-    const key = `${stemmingM}|${holes.map(h => `${h.id}:${h.depth}:${h.diameter}`).join(',')}`;
+    const key = holes.map(h => `${h.id}:${h.depth}:${h.diameter}`).join(',');
     if (key !== this.proposalKey) this.proposal = null;
 
     const optimize = button('ghost', t('ui.blast_workshop.optimizer.optimize'), {
       dataAction: 'optimize-charges',
       onClick: () => {
-        this.proposal = previewChargeOptimization(holes, grid, state.softwareTier, optimizerOptionsFor(state, stemmingM));
+        this.proposal = previewChargeOptimization(holes, grid, state.softwareTier, optimizerOptionsFor(state));
         this.proposalKey = key;
-        this.render(state, stemmingM, grid);
+        this.render(state, grid);
       },
     });
     const children: HTMLElement[] = [optimize];
@@ -105,7 +105,7 @@ export class ChargeOptimizerBlock {
     const head = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
     head.append(
       el('span', {
-        text: t('ui.blast_workshop.optimizer.hole_line', { hole: id, explosive: explosive ? t(explosive.nameKey) : c.explosiveId, amount: c.amountKg }),
+        text: t('ui.blast_workshop.optimizer.hole_line', { hole: id, explosive: explosive ? t(explosive.nameKey) : c.explosiveId, amount: c.amountKg, stemming: c.stemmingM }),
         attrs: { style: `${TEXT_STYLE};flex:1` },
       }),
       button('ghost', t('ui.blast_workshop.optimizer.apply_hole'), {

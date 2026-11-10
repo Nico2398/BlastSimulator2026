@@ -18,7 +18,7 @@ export function permitStrikesText(strikeTicks: readonly number[], tick: number):
 export function permitLimitTexts(grade: number, strikeTicks: readonly number[], tick: number): PermitLimitTexts {
   const limits = permitLimitsFor(grade);
   return {
-    limits: t('permit.status.limits', { kg: limits.maxChargeKg, holes: limits.maxHoles, fee: formatMoney(limits.fee) }),
+    limits: t('permit.status.limits', { kg: limits.maxChargeKg, area: limits.maxAreaM2, fee: formatMoney(limits.fee) }),
     strikes: permitStrikesText(strikeTicks, tick),
   };
 }

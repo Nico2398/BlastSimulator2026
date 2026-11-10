@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Blast Workshop: Drill step (redesign P4)
 // Grid tool (rect placement) + Add Hole (point placement), both via the P3
-// placement kit; a live pattern/spacing/depth/diameter strip; the hole list
+// placement kit; a live spacing/burden/layout/depth/diameter strip with what the
+// placement costs (metres, rig time, cash, permit area); the hole list
 // with a WET/TUBED/DRY status chip per row and a per-hole delete button; and
 // the Saved Plans block (gap G6, `blast_plan save|load`) below it — the plan is
 // built here, so this is where it is banked and brought back.
@@ -13,8 +14,13 @@ import { LocaleTextRegistry } from '../../localeText.js';
 import { SavedPlansList, savedPlansSignature } from './SavedPlansList.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { gridCellPositions, fleetDrillReachM, fleetDrillDiameterM, holeNumericId } from '../../../core/mining/DrillPlan.js';
-import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
+import {
+  gridCellPositions, fleetDrillReachM, fleetDrillDiameterM, holeNumericId, drillHoleCost, estimateDrillWorkTicks,
+} from '../../../core/mining/DrillPlan.js';
+import type { DrillHole, GridLayout, PlannedHole } from '../../../core/mining/DrillPlan.js';
+import type { VehicleTier } from '../../../core/entities/Vehicle.js';
+import { formatMoney } from '../../../core/economy/formatMoney.js';
+import { formatGameDuration } from '../../formatGameDuration.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
 import { buriedHolesOf } from '../../../core/mining/BuriedHoles.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
@@ -24,7 +30,7 @@ import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 import type { ConfirmModalConfig } from '../ConfirmModal.js';
 import { planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
-import { gridHoleLimitWarning, permitPreview } from '../permitPreview.js';
+import { gridAreaLimitWarning, permitPreview } from '../permitPreview.js';
 import { defaultGridDepthM } from '../../../core/economy/PermitDefaults.js';
 import { holeStatusExplain, drillFieldExplain } from '../../blastWorkshopExplain.js';
 import { buildReplacePatternConfirm } from '../../replacePatternConfirm.js';
@@ -41,11 +47,11 @@ const DEFAULT_DIAMETER_M = DRILL_HOLE_DEFAULT_DIAMETER_M;
 export class DrillStep {
   private readonly el: HTMLElement;
   private readonly patternValueEl: HTMLElement;
-  private readonly spacingValueEl: HTMLElement;
+  private readonly meshValueEl: HTMLElement;
   private readonly depthValueEl: HTMLElement;
   private readonly holesNoteEl: HTMLElement;
-  /** "used / limit holes" against the permit, always visible (#2167). */
-  private readonly permitHolesEl: HTMLElement;
+  /** "used / limit m²" of pattern area against the permit, always visible (#2167). */
+  private readonly permitAreaEl: HTMLElement;
   private readonly holeListEl: HTMLElement;
   private readonly clearRowEl: HTMLElement;
   private readonly clearBtn: HTMLButtonElement;
@@ -58,11 +64,15 @@ export class DrillStep {
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
 
   private gridSpacing = DEFAULT_SPACING_M;
+  /** Distance between the grid's rows; follows the spacing (a square mesh) until the player steps it. */
+  private gridBurden = DEFAULT_SPACING_M;
+  private playerAdjustedBurden = false;
+  private gridLayout: GridLayout = 'square';
   private gridDepth = DEFAULT_DEPTH_M;
   /** False until the player steps the depth: until then it follows the permit grade (#2101). */
   private playerAdjustedDepth = false;
   private gridDiameter = DEFAULT_DIAMETER_M;
-  private lastGridPattern: { rows: number; cols: number } | null = null;
+  private lastGridPattern: { rows: number; cols: number; layout: GridLayout } | null = null;
 
   private confirmingClear = false;
   private lastSignature = '';
@@ -115,21 +125,22 @@ export class DrillStep {
       wrap.append(label, value);
       return { wrap, value };
     };
-    const pattern = stripCell('ui.blast_workshop.drill.pattern', true);
-    const spacing = stripCell('ui.blast_workshop.drill.spacing', true, 'ui.explain.drill_field_spacing');
+    const pattern = stripCell('ui.blast_workshop.drill.pattern', true, 'ui.explain.drill_field_pattern');
+    const mesh = stripCell('ui.blast_workshop.drill.mesh', true, 'ui.explain.drill_field_mesh');
     const depth = stripCell('ui.blast_workshop.drill.depth', false, 'ui.explain.drill_field_depth');
     this.patternValueEl = pattern.value;
-    this.spacingValueEl = spacing.value;
+    this.meshValueEl = mesh.value;
+    this.meshValueEl.dataset['role'] = 'drill-mesh';
     this.depthValueEl = depth.value;
-    const statStrip = el('div', { children: [pattern.wrap, spacing.wrap, depth.wrap] });
+    const statStrip = el('div', { children: [pattern.wrap, mesh.wrap, depth.wrap] });
     statStrip.style.cssText = 'display:flex;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-well);overflow:hidden';
 
     this.holesNoteEl = el('span', { className: 'bsx-section-note' });
     const holesHeader = el('div', { className: 'bsx-section' });
     const holesLabelEl = this.locale.bindText(el('span', { className: 'bsx-section-label' }), 'ui.blast_workshop.drill.holes_section');
-    this.permitHolesEl = el('span', { className: 'bsx-section-note' });
-    this.permitHolesEl.dataset['role'] = 'permit-holes';
-    holesHeader.append(holesLabelEl, el('span', { className: 'bsx-section-rule' }), this.permitHolesEl, this.holesNoteEl);
+    this.permitAreaEl = el('span', { className: 'bsx-section-note' });
+    this.permitAreaEl.dataset['role'] = 'permit-area';
+    holesHeader.append(holesLabelEl, el('span', { className: 'bsx-section-rule' }), this.permitAreaEl, this.holesNoteEl);
 
     // Bounded + independently scrollable, same reasoning as Charge's product
     // list: a full tutorial-sized plan (16 holes) would otherwise push saved
@@ -172,13 +183,13 @@ export class DrillStep {
     const buried = buriedHolesOf(state);
 
     const signature = JSON.stringify({
-      holes: holes.map(h => [h.id, h.x, h.z, h.depth, h.diameter]),
-      ordered: ordered.map(h => [h.id, h.x, h.z, h.depth, h.diameter]),
+      holes: holes.map(h => [h.id, h.x, h.z, h.depth, h.diameter, h.spacingM, h.burdenM]),
+      ordered: ordered.map(h => [h.id, h.x, h.z, h.depth, h.diameter, h.spacingM, h.burdenM]),
       tubed: [...state.tubingState.installedHoles].sort(),
       wet: [...wet].sort(),
       buried: [...buried].sort(),
       pattern: this.lastGridPattern,
-      spacing: this.gridSpacing, depth: this.gridDepth, diameter: this.gridDiameter,
+      spacing: this.gridSpacing, burden: this.gridBurden, layout: this.gridLayout, depth: this.gridDepth, diameter: this.gridDiameter,
       confirmingClear: this.confirmingClear,
       savedPlans: savedPlansSignature(state.savedPlans),
       permitGrade: state.grade?.grade ?? null,
@@ -186,15 +197,18 @@ export class DrillStep {
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
-    this.patternValueEl.textContent = this.lastGridPattern ? `${this.lastGridPattern.cols} × ${this.lastGridPattern.rows}` : '—';
-    this.spacingValueEl.textContent = `${this.gridSpacing.toFixed(1)} m`;
+    const last = this.lastGridPattern;
+    this.patternValueEl.textContent = last
+      ? `${last.cols} × ${last.rows}${last.layout === 'staggered' ? ` · ${t('ui.blast_workshop.drill.layout_staggered')}` : ''}`
+      : '—';
+    this.meshValueEl.textContent = `${this.gridSpacing} × ${this.gridBurden} m`;
     this.depthValueEl.textContent = `${this.gridDepth.toFixed(1)} m`;
 
     this.holesNoteEl.textContent = buried.size > 0
       ? t('ui.blast_workshop.drill.planned_buried', { count: totalCount, buried: buried.size })
       : t('ui.blast_workshop.drill.planned', { count: totalCount });
     this.clearBtn.disabled = totalCount === 0;
-    this.renderPermitHoles(state, totalCount);
+    this.renderPermitArea(state);
 
     this.renderClearRow(totalCount);
     this.savedPlans.render(state.savedPlans);
@@ -209,10 +223,15 @@ export class DrillStep {
     );
   }
 
-  private renderPermitHoles(state: GameState, totalCount: number): void {
-    const preview = permitPreview(state.grade, { holes: new Array(totalCount), charges: {} }, state.tickCount);
-    this.permitHolesEl.textContent = preview ? preview.holesText : '';
-    this.permitHolesEl.dataset['over'] = String(preview?.holesOver ?? false);
+  private renderPermitArea(state: GameState): void {
+    const preview = permitPreview(state.grade, { holes: this.planHoles(state), charges: {} }, state.tickCount);
+    this.permitAreaEl.textContent = preview ? preview.areaText : '';
+    this.permitAreaEl.dataset['over'] = String(preview?.areaOver ?? false);
+  }
+
+  /** Every hole of the plan, drilled or still ordered. */
+  private planHoles(state: GameState): (DrillHole | PlannedHole)[] {
+    return [...state.drillHoles, ...state.plannedDrillHoles];
   }
 
   refreshLocale(): void {
@@ -325,11 +344,48 @@ export class DrillStep {
     this.commandNoticeEl.style.color = res && !res.success ? 'var(--bsx-danger, #ff5b4c)' : 'var(--bsx-text-muted)';
   }
 
-  /** Cells of the grid the selection would generate that lie under a footprint; bounded by MAX_DRILL_GRID_HOLES. */
-  private coveredGridCount(sel: { x1: number; z1: number }, rows: number, cols: number): number {
-    if (!this.lastState || rows * cols > MAX_DRILL_GRID_HOLES) return 0;
-    const cells = gridCellPositions({ x: sel.x1, z: sel.z1 }, rows, cols, this.gridSpacing);
-    return partitionByFootprint(cells, buildingFootprintOccupants(this.lastState)).skipped;
+  /** Columns × rows the selection lays out at the current spacing (along x) and burden (along z). */
+  private gridShape(sel: { x1: number; z1: number; x2: number; z2: number }): { rows: number; cols: number } {
+    return {
+      cols: Math.max(1, Math.round((sel.x2 - sel.x1) / this.gridSpacing) + 1),
+      rows: Math.max(1, Math.round((sel.z2 - sel.z1) / this.gridBurden) + 1),
+    };
+  }
+
+  /**
+   * Cells the selection's grid would drill, those under a building footprint dropped (and counted);
+   * null past MAX_DRILL_GRID_HOLES, which the command refuses whole.
+   */
+  private gridCells(sel: { x1: number; z1: number }, rows: number, cols: number): { clear: { x: number; z: number }[]; skipped: number } | null {
+    if (rows * cols > MAX_DRILL_GRID_HOLES) return null;
+    const cells = gridCellPositions({ x: sel.x1, z: sel.z1 }, rows, cols, this.gridSpacing, this.gridBurden, this.gridLayout);
+    return this.lastState ? partitionByFootprint(cells, buildingFootprintOccupants(this.lastState)) : { clear: cells, skipped: 0 };
+  }
+
+  /** Highest drill-rig tier the fleet owns; tier 1 with none. */
+  private bestRigTier(): VehicleTier {
+    let best: VehicleTier = 1;
+    for (const v of this.lastState?.vehicles.vehicles ?? []) if (v.type === 'drill_rig' && v.tier > best) best = v.tier;
+    return best;
+  }
+
+  /**
+   * What drilling `holeCount` holes at the current depth and bore costs — metres, rig work and cash —
+   * and, when the mine holds a permit, the pattern area of the plan once they land against it.
+   */
+  private drillReadout(holeCount: number, holesAfter: readonly (DrillHole | PlannedHole)[]): string[] {
+    if (holeCount <= 0) return [];
+    const holes = Array.from({ length: holeCount }, () => ({ depth: this.gridDepth, diameter: this.gridDiameter }));
+    const lines = [t('ui.blast_workshop.drill.drill_readout', {
+      holes: holeCount,
+      metres: Math.round(holeCount * this.gridDepth * 10) / 10,
+      time: formatGameDuration(estimateDrillWorkTicks(holes, this.bestRigTier())),
+      cost: formatMoney(holeCount * drillHoleCost(this.gridDepth, this.gridDiameter)),
+    })];
+    const preview = permitPreview(this.lastState?.grade, { holes: holesAfter, charges: {} }, this.lastState?.tickCount ?? 0);
+    // Over the permit, the placement's warning (result notes) already names the area and the limit.
+    if (preview && !preview.areaOver) lines.push(t('ui.blast_workshop.drill.permit_area', { area: preview.areaText }));
+    return lines;
   }
 
   private coveredCount(cells: { id: string; x: number; z: number }[]): number {
@@ -380,12 +436,16 @@ export class DrillStep {
 
   /** Strip field stepping a clamped grid setting; re-renders the strip on change. */
   private stepField(
-    key: 'spacing' | 'depth', label: string, prop: 'gridSpacing' | 'gridDepth',
+    key: 'spacing' | 'burden' | 'depth', label: string, prop: 'gridSpacing' | 'gridBurden' | 'gridDepth',
     min: number, max: number, refresh: () => void,
   ) {
     const step = (delta: number, bound: (a: number, b: number) => number, limit: number) => () => {
       if (prop === 'gridDepth') this.playerAdjustedDepth = true;
-      this[prop] = bound(limit, this[prop] + delta); this.lastSignature = ''; refresh();
+      if (prop === 'gridBurden') this.playerAdjustedBurden = true;
+      this[prop] = bound(limit, this[prop] + delta);
+      // Until the player sets a burden of their own, rows sit as far apart as the holes in them.
+      if (prop === 'gridSpacing' && !this.playerAdjustedBurden) this.gridBurden = this.gridSpacing;
+      this.lastSignature = ''; refresh();
     };
     return {
       key, label, explain: drillFieldExplain(key), value: this[prop], format: (v: number) => `${v} m`,
@@ -425,6 +485,28 @@ export class DrillStep {
     refresh();
   }
 
+  /** Toggle on the grid strip between holes in line and every other row shifted half a spacing. */
+  private layoutAction(refresh: () => void) {
+    return {
+      key: 'grid-layout',
+      label: t('ui.blast_workshop.drill.layout_button', {
+        layout: t(this.gridLayout === 'staggered' ? 'ui.blast_workshop.drill.layout_staggered' : 'ui.blast_workshop.drill.layout_square'),
+      }),
+      onClick: () => {
+        this.gridLayout = this.gridLayout === 'staggered' ? 'square' : 'staggered';
+        this.lastSignature = '';
+        refresh();
+      },
+    };
+  }
+
+  /** The console command laying out the grid: burden and layout only when they differ from a square, aligned mesh. */
+  private gridCommand(sel: { x1: number; z1: number }, rows: number, cols: number): string {
+    const burden = this.gridBurden !== this.gridSpacing ? ` burden:${this.gridBurden}` : '';
+    const layout = this.gridLayout === 'staggered' ? ' pattern:staggered' : '';
+    return `drill_plan grid rows:${rows} cols:${cols} spacing:${this.gridSpacing}${burden}${layout} depth:${this.gridDepth} diameter:${this.gridDiameter} start:${sel.x1},${sel.z1}`;
+  }
+
   private armGridTool(): void {
     this.armTool('rect', (kit, refresh) => {
       const { controller, overlay, strip } = kit;
@@ -432,17 +514,19 @@ export class DrillStep {
       this.clampDiameterToFleet();
       const sel = controller.selection;
       const region = controller.activeRegion;
+      const { rows, cols } = sel ? this.gridShape(sel) : { rows: 0, cols: 0 };
+      const cells = sel ? this.gridCells(sel, rows, cols) : null;
       overlay.update(sel ? {
         shape: 'rect', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2,
         region: region ? { x1: region.x1, z1: region.z1, x2: region.x2, z2: region.z2 } : null,
-        holeSpacing: this.gridSpacing,
+        holeCells: cells?.clear ?? [],
       } : null);
 
-      const cols = sel ? Math.max(1, Math.round((sel.x2 - sel.x1) / this.gridSpacing) + 1) : 0;
-      const rows = sel ? Math.max(1, Math.round((sel.z2 - sel.z1) / this.gridSpacing) + 1) : 0;
-      const coveredCount = sel ? this.coveredGridCount(sel, rows, cols) : 0;
+      const coveredCount = cells?.skipped ?? 0;
       const allCovered = sel !== null && rows * cols > 0 && coveredCount >= rows * cols;
-      const permitWarning = sel ? gridHoleLimitWarning(this.lastState?.grade, cols * rows - coveredCount, this.lastHoleCount, this.lastState?.tickCount) : null;
+      // The grid replaces the plan: the permit measures its holes alone.
+      const holesAfter = (cells?.clear ?? []).map((c, i) => ({ id: `G${i}`, x: c.x, z: c.z, depth: this.gridDepth, diameter: this.gridDiameter, spacingM: this.gridSpacing, burdenM: this.gridBurden }));
+      const permitWarning = sel ? gridAreaLimitWarning(this.lastState?.grade, holesAfter, this.lastState?.tickCount) : null;
       const refusal = hoverRefusal(controller, allCovered ? t('mining.drill_plan.grid_all_blocked') : null);
       strip.show({
         icon: 'grid',
@@ -450,21 +534,24 @@ export class DrillStep {
         subtitle: sel ? `${cols} × ${rows}` : '',
         fields: [
           this.stepField('spacing', t('ui.blast_workshop.drill.spacing'), 'gridSpacing', 1, 20, refresh),
+          this.stepField('burden', t('ui.blast_workshop.drill.burden'), 'gridBurden', 1, 20, refresh),
           this.stepField('depth', t('ui.blast_workshop.drill.depth'), 'gridDepth', DRILL_HOLE_MIN_DEPTH_M, this.reachM(), refresh),
           this.diameterField(refresh),
         ],
+        actions: [this.layoutAction(refresh)],
         result: sel
           ? `${cols} × ${rows} ${t('ui.blast_workshop.drill.holes_section')}${coveredCount > 0 ? ` — ${t('ui.blast_workshop.drill.grid_skipped_preview', { count: coveredCount })}` : ''}${permitWarning ? ` — ${permitWarning}` : ''}`
           : '—',
+        readout: this.drillReadout(holesAfter.length, holesAfter),
         confirmEnabled: controller.canConfirm && !allCovered,
         confirmDisabledReason: refusal.reason,
         instruction: `${t('ui.blast_workshop.drill.grid_tool_hint')}\n${t('ui.blast_workshop.drill.depth_reach', { reach: this.reachM() })}`,
       });
     }, (sel, overlay) => {
-      const cols = Math.max(1, Math.round((sel.x2 - sel.x1) / this.gridSpacing) + 1);
-      const rows = Math.max(1, Math.round((sel.z2 - sel.z1) / this.gridSpacing) + 1);
-      const cmd = `drill_plan grid rows:${rows} cols:${cols} spacing:${this.gridSpacing} depth:${this.gridDepth} diameter:${this.gridDiameter} start:${sel.x1},${sel.z1}`;
-      const run = (command: string): void => this.afterConfirm(overlay, command, () => { this.lastGridPattern = { rows, cols }; });
+      const { rows, cols } = this.gridShape(sel);
+      const cmd = this.gridCommand(sel, rows, cols);
+      const layout = this.gridLayout;
+      const run = (command: string): void => this.afterConfirm(overlay, command, () => { this.lastGridPattern = { rows, cols, layout }; });
       // Replacing a drilled/charged pattern asks first (#1345).
       const st = this.lastState;
       const loss = st && this.onConfirmRequestCb ? planReplacementLoss(st) : null;
@@ -485,7 +572,11 @@ export class DrillStep {
       const covered = sel ? this.coveredCount([{ id: 'add', x: sel.x1, z: sel.z1 }]) > 0 : false;
       const footprintReason = covered && sel ? t('mining.drill_plan.refused_footprint', { x: Math.floor(sel.x1), z: Math.floor(sel.z1) }) : null;
       const refusal = hoverRefusal(controller, footprintReason);
-      const permitWarning = sel && !covered ? gridHoleLimitWarning(this.lastState?.grade, 1, this.lastHoleCount, this.lastState?.tickCount) : null;
+      // An added hole joins the plan: the permit measures the whole plan with it.
+      const holesAfter = sel && !covered && this.lastState
+        ? [...this.planHoles(this.lastState), { id: 'add', x: sel.x1, z: sel.z1, depth: this.gridDepth, diameter: this.gridDiameter }]
+        : [];
+      const permitWarning = holesAfter.length > 0 ? gridAreaLimitWarning(this.lastState?.grade, holesAfter, this.lastState?.tickCount) : null;
       overlay.update(sel ? { shape: 'point', x: sel.x1, z: sel.z1, refused: refusal.refused } : null);
 
       strip.show({
@@ -497,6 +588,7 @@ export class DrillStep {
           this.diameterField(refresh),
         ],
         result: sel ? `1${permitWarning ? ` — ${permitWarning}` : ''}` : '—',
+        readout: sel && !covered ? this.drillReadout(1, holesAfter) : [],
         confirmEnabled: controller.canConfirm && !covered,
         confirmDisabledReason: refusal.reason,
         instruction: `${t('ui.blast_workshop.drill.add_hole_hint')}\n${t('ui.blast_workshop.drill.depth_reach', { reach: this.reachM() })}`,

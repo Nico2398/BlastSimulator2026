@@ -23,7 +23,8 @@ import { t } from '../../../src/core/i18n/I18n.js';
 import { carveRampSegment } from '../../../src/core/mining/Ramp.js';
 import { computeVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
 import { TUBING_COST } from '../../../src/core/mining/Tubing.js';
-import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../src/core/config/balance.js';
+import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH, DRILL_HOLE_DEFAULT_DIAMETER_M, CHARGE_DEFAULT_STEMMING_M } from '../../../src/core/config/balance.js';
+import { fillChargeKg } from '../../../src/core/mining/ChargePlan.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { formatTaskCompletion } from '../../../src/console/commands/tickTaskCompletion.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
@@ -692,11 +693,14 @@ describe('blast_preview', () => {
 // ── blast_preview — state.lastBlastPreview ───────────────────────────────────
 
 describe('blast_preview — state.lastBlastPreview', () => {
+  // Charged the way a player charges it: the hole filled up to 2 m of stemming (12 kg of boomite).
+  // A lone 5 kg partial charge spreads its energy too thin to break any rock, which would leave the
+  // fragment and projection counts below with nothing to count.
   function makePlan(ctx: MiningContext, tier?: number): void {
     if (tier !== undefined) ctx.state!.softwareTier = tier;
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
-    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
   }
 
@@ -1391,7 +1395,7 @@ describe('chargeCommand — stemming floor', () => {
     expect(Object.keys(ctx.state!.chargesByHole).length).toBe(0);
   });
 
-  it('omitting the stemming: argument entirely defaults to MIN_STEMMING_M and succeeds', () => {
+  it('omitting the stemming: argument entirely defaults to CHARGE_DEFAULT_STEMMING_M (the panel\'s opening stemming) and succeeds', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
@@ -1401,7 +1405,84 @@ describe('chargeCommand — stemming floor', () => {
     expect(result.success).toBe(true);
     driveChargePlanToCompletion(ctx);
     expect(ctx.state!.chargesByHole['H1']).toBeDefined();
-    expect(ctx.state!.chargesByHole['H1']!.stemmingM).toBe(MIN_STEMMING_M);
+    expect(ctx.state!.chargesByHole['H1']!.stemmingM).toBe(CHARGE_DEFAULT_STEMMING_M);
+    expect(ctx.state!.chargesByHole['H1']!.stemmingM).toBeGreaterThan(MIN_STEMMING_M);
+  });
+});
+
+// ── chargeCommand — fill mode ────────────────────────────────────────────────
+// With no amount: the hole is filled from the bottom up to the stemming, which is how
+// the Charge step charges. An explicit amount stays a partial charge, for scripts.
+
+describe('chargeCommand — fill mode (no amount:)', () => {
+  function drilledContext(rows = 1, cols = 1, depth = '8'): MiningContext {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: String(rows), cols: String(cols), spacing: '3', depth });
+    driveDrillPlanToCompletion(ctx);
+    return ctx;
+  }
+
+  it('fills a hole up to the stemming and says how many kg that took', () => {
+    const ctx = drilledContext();
+    const hole = ctx.state!.drillHoles[0]!;
+    const result = chargeCommand(ctx, [], { hole: hole.id, explosive: 'boomite', stemming: '2m' });
+    const kg = fillChargeKg(hole.depth, 2, hole.diameter, 'boomite');
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(`Charge ordered for ${hole.id}: boomite ${kg}kg, stemming 2m`);
+    expect(ctx.state!.plannedChargesByHole[hole.id]).toEqual({ explosiveId: 'boomite', amountKg: kg, stemmingM: 2 });
+  });
+
+  it('fills with the explosive\'s own density: krackle packs more kg than boomite into the same hole', () => {
+    const ctx = drilledContext();
+    const hole = ctx.state!.drillHoles[0]!;
+    chargeCommand(ctx, [], { hole: hole.id, explosive: 'krackle', stemming: '2.5m' });
+    const planned = ctx.state!.plannedChargesByHole[hole.id]!;
+    expect(planned.amountKg).toBe(fillChargeKg(hole.depth, 2.5, hole.diameter, 'krackle'));
+    expect(planned.amountKg).toBeGreaterThan(fillChargeKg(hole.depth, 2.5, hole.diameter, 'boomite'));
+  });
+
+  it('an explicit amount still orders that partial charge', () => {
+    const ctx = drilledContext();
+    const hole = ctx.state!.drillHoles[0]!;
+    expect(chargeCommand(ctx, [], { hole: hole.id, explosive: 'boomite', amount: '5kg', stemming: '2m' }).success).toBe(true);
+    expect(ctx.state!.plannedChargesByHole[hole.id]!.amountKg).toBe(5);
+  });
+
+  it('refuses a stemming that leaves no room for explosive, naming why, and orders nothing', () => {
+    const ctx = drilledContext();
+    const hole = ctx.state!.drillHoles[0]!;
+    const result = chargeCommand(ctx, [], { hole: hole.id, explosive: 'boomite', stemming: `${hole.depth}m` });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('mining.charge.no_room', { stemming: hole.depth, depth: hole.depth }));
+    expect(ctx.state!.plannedChargesByHole[hole.id]).toBeUndefined();
+  });
+
+  it('hole:* stores a fill pattern (null amount), orders every hole filled, and says so', () => {
+    const ctx = drilledContext(1, 2);
+    const result = chargeCommand(ctx, [], { hole: '*', explosive: 'krackle', stemming: '2.5m' });
+    expect(result.success).toBe(true);
+    expect(result.output).toContain(t('mining.charge.pattern_set_fill', { explosive: t('explosive.krackle.name'), stemming: 2.5 }));
+    expect(ctx.state!.patternCharge).toEqual({ explosiveId: 'krackle', amountKg: null, stemmingM: 2.5 });
+    for (const h of ctx.state!.drillHoles) {
+      expect(ctx.state!.plannedChargesByHole[h.id], h.id).toEqual({
+        explosiveId: 'krackle', amountKg: fillChargeKg(h.depth, 2.5, h.diameter, 'krackle'), stemmingM: 2.5,
+      });
+    }
+  });
+
+  it('hole:* with an explicit amount keeps the fixed-kg pattern line', () => {
+    const ctx = drilledContext(1, 2);
+    const result = chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    expect(result.success).toBe(true);
+    expect(result.output).toContain(t('mining.charge.pattern_set', { explosive: t('explosive.boomite.name'), amount: 5, stemming: 2 }));
+    expect(ctx.state!.patternCharge).toEqual({ explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
+  });
+
+  it('charge show reports the fill pattern', () => {
+    const ctx = drilledContext(1, 2);
+    chargeCommand(ctx, [], { hole: '*', explosive: 'krackle', stemming: '2.5m' });
+    const shown = chargeCommand(ctx, ['show'], {});
+    expect(shown.output).toContain(t('mining.charge.pattern_set_fill', { explosive: t('explosive.krackle.name'), stemming: 2.5 }));
   });
 });
 

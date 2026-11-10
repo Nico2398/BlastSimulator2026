@@ -2,10 +2,11 @@
 //
 // Every sandbox site opens with one close, shallow, reachable, sellable ore
 // pocket: it sits near the starting buildings, the digger can drive to it,
-// the reference grade-0 shot (3x3 holes, 4 m apart, 5 m deep, Krackle 4 kg,
-// 2.5 m stemming) centred on it breaks out a crater and yields its sized band of
-// ore (STARTER_DEPOSIT_YIELD_KG_*, #2126), and finding it still takes a survey -
-// nothing in the game state marks it.
+// the reference grade-0 shot (3x3 holes, 4 m apart, 5 m deep, 150 mm, each
+// filled with krackle up to the stemming the Charge step opens at for the
+// grade-0 permit: 4.5 m, 4 kg a hole) centred on it breaks out a crater and
+// yields its sized band of ore (STARTER_DEPOSIT_YIELD_KG_*, #2126), and finding
+// it still takes a survey - nothing in the game state marks it.
 
 import { describe, it, expect, afterAll } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
@@ -15,6 +16,7 @@ import type { StarterDeposit } from '../../src/core/world/StarterDeposit.js';
 import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
+import { defaultStemmingM } from '../../src/core/economy/PermitDefaults.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast, type BlastResult } from '../../src/core/mining/BlastExecution.js';
 import { isOversized } from '../../src/core/mining/BoulderFragmentation.js';
@@ -58,12 +60,15 @@ function depositOf(config: TerrainConfig): StarterDeposit {
   return d!;
 }
 
-/** The reference shot, centred on the deposit: grid origin (x-4, z-4). */
+/** The reference shot, centred on the deposit: grid origin (x-4, z-4), filled at the permit's stemming as Charge All loads it. */
 function fireShotOnDeposit(ctx: GameContext, d: StarterDeposit): BlastResult {
   const holes = createGridPlan({ nextHoleId: 1 }, { x: d.x - HALF, z: d.z - HALF }, 3, 3, 4, 5, 0.15);
   const depths: Record<string, number> = {};
-  for (const h of holes) depths[h.id] = h.depth;
-  const { charges } = batchCharge(holes.map(h => h.id), depths, 'krackle', 4, 2.5);
+  const diameters: Record<string, number> = {};
+  for (const h of holes) { depths[h.id] = h.depth; diameters[h.id] = h.diameter; }
+  const stemmingM = defaultStemmingM(ctx.state!.grade?.grade, holes, 'krackle');
+  const { charges, errors } = batchCharge(holes.map(h => h.id), depths, 'krackle', null, stemmingM, diameters);
+  expect(errors, 'reference shot charges').toEqual([]);
   const result = executeBlast(
     assembleBlastPlan(holes, charges), ctx.grid!, [], undefined, undefined, undefined, undefined,
     resolveMarketId(ctx.state!),

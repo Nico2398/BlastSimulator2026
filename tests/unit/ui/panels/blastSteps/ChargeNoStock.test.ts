@@ -6,7 +6,8 @@ import { ChargeStep } from '../../../../../src/ui/panels/blastSteps/Charge.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { getExplosive } from '../../../../../src/core/world/ExplosiveCatalog.js';
-import { CHARGE_DEFAULT_AMOUNT_KG } from '../../../../../src/core/config/balance.js';
+import { fillChargeKg } from '../../../../../src/core/mining/ChargePlan.js';
+import { CHARGE_DEFAULT_STEMMING_M } from '../../../../../src/core/config/balance.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -71,12 +72,15 @@ describe('ChargeStep has no stock section (#2153)', () => {
   });
 });
 
+// Every hole is filled up to the stemming the step opens at: what one 8 m, 89 mm hole holds of the explosive.
+const filledKg = (explosiveId: string): number => fillChargeKg(8, CHARGE_DEFAULT_STEMMING_M, 0.089, explosiveId);
+
 describe('ChargeStep prices the whole pattern at list price (#2153)', () => {
   it('the Charge All button shows the full list price of the pattern', () => {
     const { step } = makeStep();
     step.update(patternState(3), 'sunny');
     const btn = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
-    const full = 3 * CHARGE_DEFAULT_AMOUNT_KG * getExplosive('boomite')!.costPerKg;
+    const full = 3 * filledKg('boomite') * getExplosive('boomite')!.costPerKg;
     expect(btn.textContent).toContain(`$${full}`);
   });
 
@@ -96,7 +100,7 @@ describe('ChargeStep prices the whole pattern at list price (#2153)', () => {
     card(step, 'krackle').click();
     step.update(patternState(2), 'sunny');
     const btn = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
-    const full = 2 * CHARGE_DEFAULT_AMOUNT_KG * getExplosive('krackle')!.costPerKg;
+    const full = Math.round(2 * filledKg('krackle') * getExplosive('krackle')!.costPerKg);
     expect(btn.textContent).toContain(`$${full}`);
   });
 

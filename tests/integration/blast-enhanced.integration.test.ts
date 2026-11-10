@@ -216,14 +216,18 @@ describe('Blast enhanced', () => {
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'cruite', 5, 30, 0, 12, 5, 30);
 
-    // dynatomics 25kg (1300E/kg × 25 = 32500E) on cruite (threshold 200)
-    // → grossly overcharged → projections, bad/catastrophic rating
+    // 150 mm holes filled with dynatomics (1300E/kg, the densest explosive) up to
+    // 1 m of stemming, on cruite (threshold 200): about 80 kg a hole, its column
+    // reaching right under the collar → grossly overcharged → projections,
+    // bad/catastrophic rating. (14 kg of it, one metre of column at the bottom
+    // of the hole, throws only a handful of fragments: mediocre.)
     const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 3, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
-    for (const h of holes) holeDepths[h.id] = h.depth;
+    const holeDiameters: Record<string, number> = {};
+    for (const h of holes) { holeDepths[h.id] = h.depth; holeDiameters[h.id] = h.diameter; }
 
-    const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', 14, 1);
+    const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', null, 1, holeDiameters);
     const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);

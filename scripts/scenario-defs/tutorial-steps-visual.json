@@ -782,7 +782,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:7 stemming:2.5",
+      "command": "charge hole:* explosive:boomite stemming:2.5",
       "timeout": 90,
       "interaction": [
         {
@@ -792,12 +792,6 @@
         {
           "type": "ensureStep",
           "step": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "7 kg"
         },
         {
           "type": "assert",
@@ -811,7 +805,7 @@
         }
       ],
       "role": "player",
-      "description": "Charge All with the panel defaults (CHARGE_DEFAULT_AMOUNT_KG = 7 kg, CHARGE_DEFAULT_STEMMING_M, #1724), mirroring tutorialSteps.ts's 'charge' stage: no amount/stemming stepper clicks, because the panel defaults are exactly the declared plan (#1330). tutorial_start (step 1) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #926: the click only queues the order -- charging is real, per-hole, queued work, so the tutorial stays on 'charge' (and the panel stays on its Charge tab) until every hole has actually landed; the wait step right after drains it and is where the tutorial step advance is asserted, not here.",
+      "description": "Charge All with the panel defaults (boomite filled up to CHARGE_DEFAULT_STEMMING_M, #1724), mirroring tutorialSteps.ts's 'charge' stage: no stemming stepper clicks, because the panel defaults are exactly the declared plan (#1330). tutorial_start (step 1) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #926: the click only queues the order -- charging is real, per-hole, queued work, so the tutorial stays on 'charge' (and the panel stays on its Charge tab) until every hole has actually landed; the wait step right after drains it and is where the tutorial step advance is asserted, not here.",
       "expect": {
         "tutorialStep": "charge",
         "increased": [

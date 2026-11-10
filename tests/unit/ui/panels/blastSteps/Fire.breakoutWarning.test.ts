@@ -5,10 +5,13 @@ import { FireStep } from '../../../../../src/ui/panels/blastSteps/Fire.js';
 import { sandboxPadGrid, breakoutShotState } from '../../../../helpers/breakoutWarningFixture.js';
 import { nothingBreaksGrid, nothingBreaksState } from '../../../../helpers/breaksNothingFixture.js';
 import { setLocale, t } from '../../../../../src/core/i18n/I18n.js';
+import { fillChargeKg } from '../../../../../src/core/mining/ChargePlan.js';
 import type { VoxelGrid } from '../../../../../src/core/world/VoxelGrid.js';
 import type { GameState } from '../../../../../src/core/state/GameState.js';
 
 const ROW = '[data-role="breakout-check"]';
+/** Shatternite a 12 m hole holds filled to the fixture's 2.5 m of stemming: it breaks out. */
+const SHATTERNITE_12M_FILL_KG = fillChargeKg(12, 2.5, 0.089, 'shatternite');
 
 function render(grid: VoxelGrid | null, state: GameState): FireStep {
   setLocale('en');
@@ -39,16 +42,16 @@ describe('FireStep breakout warning', () => {
     expect(render(sandboxPadGrid(), state).root.querySelector(ROW)).not.toBeNull();
   });
 
-  it('shows the row for a partial seal (10 m x 10 kg Krackle)', () => {
-    expect(render(sandboxPadGrid(), breakoutShotState(10, 'krackle', 10)).root.querySelector(ROW)).not.toBeNull();
+  it('shows the row for a partial seal (10 m x 12 kg Krackle)', () => {
+    expect(render(sandboxPadGrid(), breakoutShotState(10, 'krackle', 12)).root.querySelector(ROW)).not.toBeNull();
   });
 
   it('shows no row for the 8 m x 8 kg shot', () => {
     expect(render(sandboxPadGrid(), breakoutShotState(8, 'krackle', 8)).root.querySelector(ROW)).toBeNull();
   });
 
-  it('shows no row for 12 m x 15 kg Shatternite', () => {
-    expect(render(sandboxPadGrid(), breakoutShotState(12, 'shatternite', 15)).root.querySelector(ROW)).toBeNull();
+  it('shows no row for a 12 m hole filled with Shatternite', () => {
+    expect(render(sandboxPadGrid(), breakoutShotState(12, 'shatternite', SHATTERNITE_12M_FILL_KG)).root.querySelector(ROW)).toBeNull();
   });
 
   it('shows no row without a grid', () => {

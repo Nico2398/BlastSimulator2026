@@ -4,9 +4,10 @@ import { createRunner } from '../../../src/console/createRunner.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { permitLimitsFor } from '../../../src/core/economy/PermitLimits.js';
-import { explosiveHoleLimits, chargeFitsHole } from '../../../src/core/mining/ChargePlan.js';
+import { chargeFitsHole, fillChargeKg } from '../../../src/core/mining/ChargePlan.js';
+import { stemmingSweepRangeM } from '../../../src/core/mining/SoftwarePreview.js';
 import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
-import { MIN_STEMMING_M } from '../../../src/core/config/balance.js';
+import { MIN_STEMMING_M, STEMMING_FULL_DEPTH_FRACTION } from '../../../src/core/config/balance.js';
 import { wetAllHoles } from '../../helpers/holeWater.js';
 import { mixedRockGrid, gridFingerprint } from '../../helpers/optimizerFixtures.js';
 
@@ -100,16 +101,15 @@ describe('optimize_charges apply:true', () => {
     expect(chargeActions(state).map(a => a.payload['holeId'] as string).sort()).toEqual(ids);
   });
 
-  it('each ordered charge respects the explosive range and the hole under the stemming', () => {
+  it('each ordered charge fills its hole up to the proposed stemming, and fits', () => {
     const { runner, state } = setup();
     runner.run('optimize_charges apply:true');
     for (const h of state.drillHoles) {
       const c = state.plannedChargesByHole[h.id]!;
-      const e = getExplosive(c.explosiveId)!;
-      const { minKg, maxKg } = explosiveHoleLimits(e, h.diameter);
-      expect(c.amountKg, h.id).toBeGreaterThanOrEqual(minKg - 1e-9);
-      expect(c.amountKg, h.id).toBeLessThanOrEqual(maxKg + 1e-9);
-      expect(chargeFitsHole(c.amountKg, c.stemmingM, h.depth, h.diameter), h.id).toBe(true);
+      expect(getExplosive(c.explosiveId), h.id).toBeDefined();
+      expect(c.amountKg, h.id).toBeGreaterThan(0);
+      expect(c.amountKg, h.id).toBe(fillChargeKg(h.depth, c.stemmingM, h.diameter, c.explosiveId));
+      expect(chargeFitsHole(c.amountKg, c.stemmingM, h.depth, h.diameter, c.explosiveId), h.id).toBe(true);
     }
   });
 
@@ -124,17 +124,37 @@ describe('optimize_charges apply:true', () => {
     }
   });
 
-  it('stemming:<m>m sets the stemming of every proposed charge', () => {
+  it('chooses each hole\'s stemming itself, within the range that throws no rock', () => {
     const { runner, state } = setup();
-    expect(runner.run('optimize_charges stemming:3m apply:true').success).toBe(true);
-    for (const c of Object.values(state.plannedChargesByHole)) expect(c.stemmingM).toBe(3);
+    expect(runner.run('optimize_charges apply:true').success).toBe(true);
+    for (const h of state.drillHoles) {
+      const c = state.plannedChargesByHole[h.id]!;
+      const range = stemmingSweepRangeM(h.depth)!;
+      // Swept stemmings are rounded to the 0.1 m the panel steps in.
+      expect(c.stemmingM, h.id).toBeGreaterThanOrEqual(range.lo - 0.05);
+      expect(c.stemmingM, h.id).toBeLessThanOrEqual(range.hi + 0.05);
+    }
   });
 
-  it('uses a default stemming when none is given', () => {
+  it('never stems a hole as short as the 0.5 m minimum: at least the full-stemming fraction of its depth', () => {
     const { runner, state } = setup();
     runner.run('optimize_charges apply:true');
-    for (const c of Object.values(state.plannedChargesByHole)) {
-      expect(c.stemmingM).toBeGreaterThanOrEqual(MIN_STEMMING_M);
+    for (const h of state.drillHoles) {
+      const c = state.plannedChargesByHole[h.id]!;
+      expect(c.stemmingM, h.id).toBeGreaterThan(MIN_STEMMING_M);
+      expect(c.stemmingM, h.id).toBeGreaterThanOrEqual(h.depth * STEMMING_FULL_DEPTH_FRACTION - 0.05);
+    }
+  });
+
+  it('prints each hole\'s explosive, kg and stemming, as ordered', () => {
+    const { runner, state } = setup();
+    const res = runner.run('optimize_charges apply:true');
+    for (const h of state.drillHoles) {
+      const c = state.plannedChargesByHole[h.id]!;
+      const line = res.output.split('\n').find(l => l.trim().startsWith(`${h.id}:`));
+      expect(line, h.id).toBeDefined();
+      expect(line).toContain(`${c.amountKg}kg`);
+      expect(line).toContain(`stemming ${c.stemmingM}m`);
     }
   });
 

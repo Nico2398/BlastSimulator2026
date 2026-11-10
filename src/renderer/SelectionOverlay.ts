@@ -49,6 +49,8 @@ export interface OverlayCellsUpdate {
   region?: { x1: number; z1: number; x2: number; z2: number } | null;
   /** Spacing (tiles) between drill-hole markers; omit for no markers (building/ramp footprints don't drill). */
   holeSpacing?: number;
+  /** Exact drill-hole cells (a burden or staggered grid); overrides `holeSpacing`'s square markers. */
+  holeCells?: ReadonlyArray<{ x: number; z: number }>;
   /** Paint the cells red: the action would be refused (#1396). */
   refused?: boolean;
 }
@@ -230,7 +232,9 @@ export class SelectionOverlay {
     this.group.add(this.makeBorder(x0, z0, x1, z1, outline));
     this.group.add(...this.makeCorners(x0, z0, x1, z1, outline));
 
-    if (u.holeSpacing && u.holeSpacing > 0) {
+    if (u.holeCells) {
+      for (const c of u.holeCells) this.group.add(this.makeHoleMarker(c.x, c.z));
+    } else if (u.holeSpacing && u.holeSpacing > 0) {
       for (let z = z0; z <= z1; z += u.holeSpacing) {
         for (let x = x0; x <= x1; x += u.holeSpacing) {
           this.group.add(this.makeHoleMarker(x, z));

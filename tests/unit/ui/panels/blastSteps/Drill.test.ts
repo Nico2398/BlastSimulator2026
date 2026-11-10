@@ -3,18 +3,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DrillStep } from '../../../../../src/ui/panels/blastSteps/Drill.js';
 import { wetAllHoles } from '../../../../helpers/holeWater.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
-import { addHole, holeNumericId } from '../../../../../src/core/mining/DrillPlan.js';
+import {
+  addHole, holeNumericId, createGridPlan, gridCellPositions, drillHoleCost, estimateDrillWorkTicks,
+} from '../../../../../src/core/mining/DrillPlan.js';
+import type { DrillHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { installTubing, buyTubing } from '../../../../../src/core/mining/Tubing.js';
-import { DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../../../src/core/config/balance.js';
+import {
+  DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, HOLE_CELL_MAX_SIDE_M,
+} from '../../../../../src/core/config/balance.js';
 import { t, setLocale } from '../../../../../src/core/i18n/I18n.js';
 import { addBlastFragments } from '../../../../../src/core/economy/Logistics.js';
+import { formatMoney } from '../../../../../src/core/economy/formatMoney.js';
+import { formatGameDuration } from '../../../../../src/ui/formatGameDuration.js';
 import { holeStatusExplain, drillFieldExplain } from '../../../../../src/ui/blastWorkshopExplain.js';
 import type { EntityOpener } from '../../../../../src/ui/entityLinks.js';
 import type { FragmentData } from '../../../../../src/core/mining/BlastExecution.js';
-import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
-import { gridHoleLimitWarning, permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
+import { createGradeState, type GradeState } from '../../../../../src/core/economy/MineGrade.js';
+import { gridAreaLimitWarning, permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
 import type { ConfirmModalConfig } from '../../../../../src/ui/panels/ConfirmModal.js';
 import type { PlacementKit } from '../../../../../src/ui/scene/PlacementKit.js';
+import { ParamStrip } from '../../../../../src/ui/scene/ParamStrip.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../../../src/ui/scene/PlacementController.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -59,6 +67,21 @@ function makeStep(): { step: DrillStep; container: HTMLElement; gameConsole: Ret
   const gameConsole = vi.fn().mockReturnValue({ success: true, output: '' });
   step.setGameConsole(gameConsole);
   return { step, container, gameConsole };
+}
+
+/** A grid placement's holes as the permit measures them: one `spacing` × `burden` cell each. */
+function gridPlanHoles(x1: number, z1: number, rows: number, cols: number, spacing = DRILL_GRID_DEFAULT_SPACING_M, burden = spacing): DrillHole[] {
+  return createGridPlan({ nextHoleId: 1 }, { x: x1, z: z1 }, rows, cols, spacing, 8, DRILL_HOLE_DEFAULT_DIAMETER_M, burden);
+}
+
+/** The grid strip's RESULT with no note after it: every cell clear of buildings and the plan within the permit. */
+function plainGridResult(cols: number, rows: number): string {
+  return `${cols} × ${rows} ${t('ui.blast_workshop.drill.holes_section')}`;
+}
+
+/** The strip readout line giving the area of `holes` against the permit of `grade`. */
+function permitAreaLine(grade: GradeState | undefined, holes: readonly Pick<DrillHole, 'id' | 'x' | 'z' | 'spacingM' | 'burdenM'>[]): string {
+  return t('ui.blast_workshop.drill.permit_area', { area: permitPreview(grade, { holes, charges: {} }, 0)!.areaText });
 }
 
 beforeEach(() => { holeCounter.nextHoleId = 1; });
@@ -360,10 +383,19 @@ function makeStateWithFootprint() {
   return state;
 }
 
-function lastStripArg(strip: { show: ReturnType<typeof vi.fn> }) {
-  return strip.show.mock.calls.at(-1)![0] as {
-    result: string; confirmEnabled: boolean; confirmDisabledReason?: string;
-  };
+/** What the placement strip was last asked to show. */
+interface StripShown {
+  subtitle: string;
+  fields: { key: string; label: string; explain?: string; value: number; onInc: () => void; onDec: () => void }[];
+  actions?: { key: string; label: string; onClick: () => void }[];
+  result: string;
+  readout?: string[];
+  confirmEnabled: boolean;
+  confirmDisabledReason?: string;
+}
+
+function lastStripArg(strip: { show: ReturnType<typeof vi.fn> }): StripShown {
+  return strip.show.mock.calls.at(-1)![0] as StripShown;
 }
 
 describe('DrillStep — footprint awareness (#1359)', () => {
@@ -683,7 +715,9 @@ describe('DrillStep — depth stepper capped at fleet reach (#1679)', () => {
   });
 });
 
-describe('DrillStep — permit hole-limit warning (#1925)', () => {
+// The permit caps the ground a shot works (Σ spacing × burden of its holes), not how many holes do it:
+// grade 0 allows 144 m², nine holes of the default 4 m × 4 m cell.
+describe('DrillStep — permit area warning (#1925)', () => {
   function sized(progression: boolean, x2: number, z2: number) {
     const { step } = makeStep();
     const { kit, controller, strip } = makeMockKit();
@@ -695,28 +729,40 @@ describe('DrillStep — permit hole-limit warning (#1925)', () => {
     controller.simulateSelect({ x1: 10, z1: 10, x2, z2 });
     return { arg: lastStripArg(strip), strip };
   }
-  const textOf = (a: unknown) => JSON.stringify(a).toLowerCase();
 
-  it('a 4x4 grid over the nine-hole limit shows a warning in the strip, confirm stays enabled', () => {
-    // spacing 4: 12m x 12m -> 4 x 4 = 16 holes
+  it('a 4x4 grid over the grade-0 area limit shows a warning in the strip, confirm stays enabled', () => {
+    // Default 4 m mesh: 12 m x 12 m -> 4 x 4 holes of 16 m² = 256 m².
     const { arg } = sized(true, 22, 22);
+    const warning = gridAreaLimitWarning(createGradeState(), gridPlanHoles(10, 10, 4, 4));
+    expect(warning).not.toBeNull();
     expect(arg.confirmEnabled).toBe(true);
-    expect(textOf(arg)).toContain(gridHoleLimitWarning(createGradeState(), 16)!.toLowerCase());
+    expect(arg.result).toContain(warning!);
     // Literal check so the assertion does not merely echo the helper under test.
-    expect(textOf(arg)).toContain('/ 9');
+    expect(arg.result).toContain('256 / 144 m²');
   });
 
-  it('a 3x3 grid at the limit shows no warning', () => {
+  it('a 3x3 grid exactly at the area limit shows no warning', () => {
     const { arg } = sized(true, 18, 18);
+    expect(gridAreaLimitWarning(createGradeState(), gridPlanHoles(10, 10, 3, 3))).toBeNull();
     expect(arg.confirmEnabled).toBe(true);
-    expect(gridHoleLimitWarning(createGradeState(), 9)).toBeNull();
-    expect(textOf(arg)).not.toContain('permit');
+    expect(arg.result).toBe(plainGridResult(3, 3));
   });
 
   it('the same oversize grid on a non-progression site shows no warning', () => {
     const { arg } = sized(false, 22, 22);
     expect(arg.confirmEnabled).toBe(true);
-    expect(textOf(arg)).not.toContain('permit');
+    expect(arg.result).toBe(plainGridResult(4, 4));
+  });
+
+  it('the burden counts as much as the spacing: nine holes at 4 x 5 m go over the limit', () => {
+    const { strip } = sized(true, 18, 18);
+    lastStripArg(strip).fields.find(f => f.key === 'burden')!.onInc();
+
+    // z 10..18 at a 5 m burden still rounds to 3 rows: 3 x 3 holes of 20 m² = 180 m².
+    const arg = lastStripArg(strip);
+    expect(arg.subtitle).toBe('3 × 3');
+    expect(arg.result).toContain(gridAreaLimitWarning(createGradeState(), gridPlanHoles(10, 10, 3, 3, 4, 5))!);
+    expect(arg.result).toContain('180 / 144 m²');
   });
 });
 
@@ -776,17 +822,362 @@ describe('DrillStep — diameter stepper follows fleet rigs (#1934)', () => {
   });
 });
 
-// ── Plan-total permit warnings and the used / limit readout (#2167) ─────────
+// ── Grid shape: burden, staggered rows, the mesh cell ───────────────────────
 
-describe('DrillStep — permit warning counts the whole plan (#2167)', () => {
-  /** Grade-0 state (9 holes allowed) already holding `drilled` drilled and `planned` ordered holes, far from the test grids. */
-  function stateWithHoles(drilled: number, planned: number, progression = true) {
+describe('DrillStep — burden stepper and staggered layout', () => {
+  /** The grid tool armed over x 10..18 / z 10..14: 3 columns × 2 rows on the default 4 m mesh. */
+  function armGrid(state = makeState()) {
+    const made = makeStep();
+    const mock = makeMockKit();
+    made.step.setPlacementKit(mock.kit);
+    made.step.update(state, 'sunny');
+    (made.step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    mock.controller.simulateSelect({ x1: 10, z1: 10, x2: 18, z2: 14 });
+    return { ...made, ...mock, state };
+  }
+  type Armed = ReturnType<typeof armGrid>;
+  const field = (h: Armed, key: string) => lastStripArg(h.strip).fields.find(f => f.key === key)!;
+  const layoutButton = (h: Armed) => lastStripArg(h.strip).actions?.find(a => a.key === 'grid-layout');
+  const layoutLabel = (layout: 'square' | 'staggered') =>
+    t('ui.blast_workshop.drill.layout_button', { layout: t(`ui.blast_workshop.drill.layout_${layout}`) });
+  /** Confirm the selection; the drill_plan grid command it dispatched. */
+  const confirmed = (h: Armed): string => {
+    h.controller.simulateConfirm();
+    return h.gameConsole.mock.calls.map(c => String(c[0])).filter(c => c.startsWith('drill_plan grid')).at(-1) ?? '';
+  };
+  /** The stat strip's mesh value once the step has re-rendered. */
+  const mesh = (h: Armed): string | null => {
+    h.step.update(h.state, 'sunny');
+    return h.step.root.querySelector('[data-role="drill-mesh"]')?.textContent ?? null;
+  };
+
+  it('the grid strip steps spacing, burden, depth and diameter, the burden opening at the spacing', () => {
+    const h = armGrid();
+    expect(lastStripArg(h.strip).fields.map(f => f.key)).toEqual(['spacing', 'burden', 'depth', 'diameter']);
+    expect(field(h, 'burden').label).toBe(t('ui.blast_workshop.drill.burden'));
+    expect(field(h, 'burden').value).toBe(DRILL_GRID_DEFAULT_SPACING_M);
+    expect(field(h, 'burden').value).toBe(field(h, 'spacing').value);
+  });
+
+  it('the burden follows the spacing until the player steps it, then keeps its own value', () => {
+    const h = armGrid();
+    field(h, 'spacing').onInc();
+    expect([field(h, 'spacing').value, field(h, 'burden').value]).toEqual([5, 5]);
+    field(h, 'spacing').onDec();
+    field(h, 'spacing').onDec();
+    expect([field(h, 'spacing').value, field(h, 'burden').value]).toEqual([3, 3]);
+
+    field(h, 'burden').onInc();
+    expect([field(h, 'spacing').value, field(h, 'burden').value]).toEqual([3, 4]);
+    for (let i = 0; i < 3; i++) field(h, 'spacing').onInc();
+    expect([field(h, 'spacing').value, field(h, 'burden').value]).toEqual([6, 4]);
+  });
+
+  it('boundary: the burden stepper stays between 1 and 20 m', () => {
+    const h = armGrid();
+    for (let i = 0; i < 30; i++) field(h, 'burden').onDec();
+    expect(field(h, 'burden').value).toBe(1);
+    for (let i = 0; i < 30; i++) field(h, 'burden').onInc();
+    expect(field(h, 'burden').value).toBe(20);
+  });
+
+  it('rows come from the burden: the same 4 m deep selection lays out 3 rows at a 2 m burden', () => {
+    const h = armGrid();
+    expect(lastStripArg(h.strip).subtitle).toBe('3 × 2');
+    field(h, 'burden').onDec();
+    field(h, 'burden').onDec();
+
+    expect(lastStripArg(h.strip).subtitle).toBe('3 × 3');
+    const cmd = confirmed(h);
+    expect(cmd).toContain('rows:3');
+    expect(cmd).toContain('cols:3');
+    expect(cmd).toContain(' burden:2');
+  });
+
+  it('the command names the burden only when it differs from the spacing', () => {
+    expect(confirmed(armGrid())).not.toContain('burden:');
+
+    const followed = armGrid();
+    field(followed, 'spacing').onInc(); // the burden follows to 5 m: still a square mesh
+    const followedCmd = confirmed(followed);
+    expect(followedCmd).toContain('spacing:5');
+    expect(followedCmd).not.toContain('burden:');
+
+    const stepped = armGrid();
+    field(stepped, 'burden').onDec();
+    expect(confirmed(stepped)).toContain(' burden:3');
+  });
+
+  it('the layout button toggles between aligned and staggered rows', () => {
+    const h = armGrid();
+    expect(layoutButton(h)?.label).toBe(layoutLabel('square'));
+    layoutButton(h)!.onClick();
+    expect(layoutButton(h)?.label).toBe(layoutLabel('staggered'));
+    layoutButton(h)!.onClick();
+    expect(layoutButton(h)?.label).toBe(layoutLabel('square'));
+    expect(layoutLabel('square')).not.toBe(layoutLabel('staggered'));
+  });
+
+  it('the command adds pattern:staggered only while the layout is staggered', () => {
+    expect(confirmed(armGrid())).not.toContain('pattern:');
+
+    const staggered = armGrid();
+    layoutButton(staggered)!.onClick();
+    expect(confirmed(staggered)).toContain(' pattern:staggered');
+
+    const toggledBack = armGrid();
+    layoutButton(toggledBack)!.onClick();
+    layoutButton(toggledBack)!.onClick();
+    expect(confirmed(toggledBack)).not.toContain('pattern:');
+  });
+
+  it('a staggered grid with its own burden sends one command naming both, in the console syntax', () => {
+    const h = armGrid();
+    field(h, 'burden').onDec();
+    layoutButton(h)!.onClick();
+
+    // z 10..14 at a 3 m burden still rounds to 2 rows.
+    expect(confirmed(h)).toBe(
+      `drill_plan grid rows:2 cols:3 spacing:4 burden:3 pattern:staggered depth:8 diameter:${DRILL_HOLE_DEFAULT_DIAMETER_M} start:10,10`,
+    );
+  });
+
+  it('the stat strip shows the mesh as spacing × burden', () => {
+    const h = armGrid();
+    expect(mesh(h)).toBe('4 × 4 m');
+    field(h, 'spacing').onInc();
+    expect(mesh(h)).toBe('5 × 5 m');
+    field(h, 'burden').onDec();
+    expect(mesh(h)).toBe('5 × 4 m');
+  });
+
+  it('the pattern cell names a staggered layout once such a grid is confirmed', () => {
+    const staggered = armGrid();
+    layoutButton(staggered)!.onClick();
+    confirmed(staggered);
+    staggered.step.update(staggered.state, 'sunny');
+    expect(staggered.step.root.textContent).toContain(`3 × 2 · ${t('ui.blast_workshop.drill.layout_staggered')}`);
+
+    const aligned = armGrid();
+    confirmed(aligned);
+    aligned.step.update(aligned.state, 'sunny');
+    expect(aligned.step.root.textContent).toContain('3 × 2');
+    expect(aligned.step.root.textContent).not.toContain(t('ui.blast_workshop.drill.layout_staggered'));
+  });
+});
+
+describe('DrillStep — burden and layout controls on the real strip', () => {
+  /** The grid tool armed over x 10..18 / z 10..14, drawing into a real ParamStrip a player clicks. */
+  function armWithRealStrip() {
+    const { step, gameConsole } = makeStep();
+    const mock = makeMockKit();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const kit = { controller: mock.controller, overlay: mock.overlay, strip: new ParamStrip(host) } as unknown as PlacementKit;
+    step.setPlacementKit(kit);
+    step.update(makeState(), 'sunny');
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    mock.controller.simulateSelect({ x1: 10, z1: 10, x2: 18, z2: 14 });
+    const confirmed = (): string => {
+      mock.controller.simulateConfirm();
+      return gameConsole.mock.calls.map(c => String(c[0])).filter(c => c.startsWith('drill_plan grid')).at(-1) ?? '';
+    };
+    return { host, confirmed };
+  }
+  // The strip rebuilds on every change: query afresh after each click.
+  const shown = (host: HTMLElement, key: string) => host.querySelector(`[data-field="${key}"] .bsx-stepper-value`)?.textContent;
+  const stepButton = (host: HTMLElement, key: string, dir: 'dec' | 'inc') =>
+    host.querySelectorAll<HTMLButtonElement>(`[data-field="${key}"] .bsx-stepper-btn`)[dir === 'dec' ? 0 : 1]!;
+  const layoutButton = (host: HTMLElement) => host.querySelector<HTMLButtonElement>('[data-action="grid-layout"]');
+
+  it('a [data-field="burden"] stepper follows the spacing until clicked, and its clicks reach the command', () => {
+    const { host, confirmed } = armWithRealStrip();
+    expect(shown(host, 'burden')).toBe('4 m');
+
+    stepButton(host, 'spacing', 'inc').click();
+    expect(shown(host, 'burden')).toBe('5 m');
+    stepButton(host, 'burden', 'dec').click();
+
+    expect(shown(host, 'spacing')).toBe('5 m');
+    expect(shown(host, 'burden')).toBe('4 m');
+    expect(confirmed()).toContain(' spacing:5 burden:4 ');
+  });
+
+  it('the [data-action="grid-layout"] button flips its label and the command between aligned and staggered', () => {
+    const { host, confirmed } = armWithRealStrip();
+    const label = (layout: 'square' | 'staggered') =>
+      t('ui.blast_workshop.drill.layout_button', { layout: t(`ui.blast_workshop.drill.layout_${layout}`) });
+    expect(layoutButton(host)?.textContent).toBe(label('square'));
+
+    layoutButton(host)!.click();
+
+    expect(layoutButton(host)?.textContent).toBe(label('staggered'));
+    expect(confirmed()).toContain(' pattern:staggered ');
+  });
+});
+
+describe('DrillStep — the overlay marks the holes the grid drills', () => {
+  function armed(state: ReturnType<typeof makeState>, sel: { x1: number; z1: number; x2: number; z2: number }) {
+    const { step } = makeStep();
+    const { kit, controller, overlay, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(state, 'sunny');
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect(sel);
+    return { overlay, strip };
+  }
+  const lastOverlay = (overlay: { update: ReturnType<typeof vi.fn> }) =>
+    overlay.update.mock.calls.at(-1)![0] as { holeCells?: { x: number; z: number }[]; holeSpacing?: number };
+
+  it('an aligned grid marks every cell of its mesh as exact cells, not as a spacing hint', () => {
+    const { overlay } = armed(makeState(), { x1: 10, z1: 10, x2: 18, z2: 14 });
+    expect(lastOverlay(overlay).holeCells).toEqual(gridCellPositions({ x: 10, z: 10 }, 2, 3, 4));
+    expect(lastOverlay(overlay).holeSpacing).toBeUndefined();
+  });
+
+  it('a burden and a staggered layout move the marks onto the holes they drill', () => {
+    const { overlay, strip } = armed(makeState(), { x1: 10, z1: 10, x2: 18, z2: 16 });
+    lastStripArg(strip).fields.find(f => f.key === 'burden')!.onDec();
+    lastStripArg(strip).actions!.find(a => a.key === 'grid-layout')!.onClick();
+
+    // z 10..16 at a 3 m burden: 3 rows, the middle one shifted 2 m.
+    expect(lastOverlay(overlay).holeCells).toEqual(gridCellPositions({ x: 10, z: 10 }, 3, 3, 4, 3, 'staggered'));
+    expect(lastOverlay(overlay).holeCells).toContainEqual({ x: 12, z: 13 });
+  });
+
+  it('cells under a building are not marked: they will not be drilled', () => {
+    const { overlay } = armed(makeStateWithFootprint(), { x1: 10, z1: 10, x2: 26, z2: 14 });
+    const cells = lastOverlay(overlay).holeCells!;
+    expect(cells).toHaveLength(9);
+    expect(cells).not.toContainEqual({ x: 10, z: 10 });
+    expect(cells).toEqual(gridCellPositions({ x: 10, z: 10 }, 2, 5, 4).filter(c => !(c.x === 10 && c.z === 10)));
+  });
+
+  it('boundary: a grid too large for the command marks nothing rather than enumerating it', () => {
+    // 101 x 101 cells at the 4 m default spacing > MAX_DRILL_GRID_HOLES.
+    const { overlay } = armed(makeStateWithFootprint(), { x1: 10, z1: 10, x2: 410, z2: 410 });
+    expect(lastOverlay(overlay).holeCells).toEqual([]);
+  });
+});
+
+describe('DrillStep — drilling readout: metres, rig work and cost', () => {
+  function armed(tool: 'grid-tool' | 'add-hole-tool', state: ReturnType<typeof makeState>, sel: { x1: number; z1: number; x2: number; z2: number }) {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(state, 'sunny');
+    (step.root.querySelector(`[data-action="${tool}"]`) as HTMLButtonElement).click();
+    controller.simulateSelect(sel);
+    return { strip, field: (key: string) => lastStripArg(strip).fields.find(f => f.key === key)! };
+  }
+
+  /** The readout line for `count` holes of `depth` m × `diameter` m drilled at the pace of a tier-`tier` rig. */
+  function drillLine(count: number, depth: number, diameter: number, tier: 1 | 2 | 3): string {
+    const holes = Array.from({ length: count }, () => ({ depth, diameter }));
+    return t('ui.blast_workshop.drill.drill_readout', {
+      holes: count,
+      metres: count * depth,
+      time: formatGameDuration(estimateDrillWorkTicks(holes, tier)),
+      cost: formatMoney(count * drillHoleCost(depth, diameter)),
+    });
+  }
+
+  const GRID_3X3 = { x1: 10, z1: 10, x2: 18, z2: 18 };
+
+  it('the grid readout gives the metres, the rig work and the cash its holes cost', () => {
+    // No permit and no rig: 8 m holes of 89 mm at a tier-1 rig's pace.
+    const readout = lastStripArg(armed('grid-tool', makeState(), GRID_3X3).strip).readout!;
+    expect(readout).toEqual([drillLine(9, 8, DRILL_HOLE_DEFAULT_DIAMETER_M, 1)]);
+    // 9 holes; 9 x 8 m = 72 m; 9 x $96 = $864.
+    expect(readout[0]).toContain('9 holes');
+    expect(readout[0]).toContain('72 m');
+    expect(readout[0]).toContain('$864');
+  });
+
+  it('the rig work is estimated with the best rig the fleet owns', () => {
+    const fleet = stateWithRigTier(1);
+    fleet.vehicles.vehicles.push({ id: 901, type: 'drill_rig', tier: 3 } as unknown as (typeof fleet.vehicles.vehicles)[number]);
+    const best = lastStripArg(armed('grid-tool', fleet, GRID_3X3).strip).readout![0]!;
+    const slow = lastStripArg(armed('grid-tool', stateWithRigTier(1), GRID_3X3).strip).readout![0]!;
+
+    expect(best).toBe(drillLine(9, 8, DRILL_HOLE_DEFAULT_DIAMETER_M, 3));
+    expect(slow).toBe(drillLine(9, 8, DRILL_HOLE_DEFAULT_DIAMETER_M, 1));
+    expect(best).not.toBe(slow);
+  });
+
+  it('the readout follows the depth and bore steppers', () => {
+    const { strip, field } = armed('grid-tool', stateWithRigTier(2), GRID_3X3);
+    field('depth').onInc();
+    field('diameter').onInc();
+
+    // 9 holes of 9 m at 127 mm: 81 m, 9 x $154 = $1,386.
+    const readout = lastStripArg(strip).readout!;
+    expect(readout).toEqual([drillLine(9, 9, 0.127, 2)]);
+    expect(readout[0]).toContain('81 m');
+    expect(readout[0]).toContain('$1,386');
+  });
+
+  it('cells under a building are not drilled, so they add no metres and no cost', () => {
+    const { strip } = armed('grid-tool', makeStateWithFootprint(), { x1: 10, z1: 10, x2: 26, z2: 14 });
+    expect(lastStripArg(strip).readout).toEqual([drillLine(9, 8, DRILL_HOLE_DEFAULT_DIAMETER_M, 1)]);
+  });
+
+  it('on a permit site a second line gives the grid area against the permit', () => {
+    const state = makeState();
+    state.grade = createGradeState();
+    const { strip, field } = armed('grid-tool', state, GRID_3X3);
+    const depth = field('depth').value; // the grade's opening depth
+
+    const readout = lastStripArg(strip).readout!;
+    expect(readout).toEqual([
+      drillLine(9, depth, DRILL_HOLE_DEFAULT_DIAMETER_M, 1),
+      permitAreaLine(state.grade, gridPlanHoles(10, 10, 3, 3)),
+    ]);
+    expect(readout[1]).toContain('144 / 144 m²');
+  });
+
+  it('before a selection there is nothing to price', () => {
+    const { step } = makeStep();
+    const { kit, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(makeState(), 'sunny');
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    expect(lastStripArg(strip).readout).toEqual([]);
+  });
+
+  it('add hole: the readout prices the one hole', () => {
+    const readout = lastStripArg(armed('add-hole-tool', makeState(), { x1: 25, z1: 30, x2: 25, z2: 30 }).strip).readout!;
+    expect(readout).toEqual([drillLine(1, 8, DRILL_HOLE_DEFAULT_DIAMETER_M, 1)]);
+    expect(readout[0]).toContain('$96');
+  });
+
+  it('add hole: a tile under a building is not drilled, so it shows no readout', () => {
+    const { strip } = armed('add-hole-tool', makeStateWithFootprint(), { x1: 10, z1: 10, x2: 10, z2: 10 });
+    expect(lastStripArg(strip).readout).toEqual([]);
+  });
+});
+
+// ── Plan-area permit warnings and the used / limit readout (#2167) ──────────
+
+describe('DrillStep — the permit warning measures the plan a placement leaves (#2167)', () => {
+  /**
+   * State holding `drilled` drilled then `planned` ordered holes on one row 4 m apart from (100, 100):
+   * once the row has two holes each works a 4 m × 4 m cell (16 m²). Grade 0 (144 m²) unless `progression` is off.
+   */
+  function stateWithRow(drilled: number, planned: number, progression = true) {
     const state = makeState();
     if (progression) state.grade = createGradeState();
     for (let i = 0; i < drilled; i++) addHole(holeCounter, state.drillHoles, 100 + i * 4, 100, 8, 0.15);
-    for (let i = 0; i < planned; i++) addHole(holeCounter, state.plannedDrillHoles, 100 + i * 4, 140, 8, 0.15);
+    for (let i = 0; i < planned; i++) addHole(holeCounter, state.plannedDrillHoles, 100 + (drilled + i) * 4, 100, 8, 0.15);
     return state;
   }
+
+  /** The tile 4 m past the last of `count` row holes: a hole added there works one more 16 m² cell. */
+  const nextInRow = (count: number) => ({ x1: 100 + count * 4, z1: 100, x2: 100 + count * 4, z2: 100 });
+
+  /** The plan an added hole at `sel` leaves: every hole already in `state`, plus it. */
+  const withAdded = (state: ReturnType<typeof makeState>, sel: { x1: number; z1: number }) =>
+    [...state.drillHoles, ...state.plannedDrillHoles, { id: 'add', x: sel.x1, z: sel.z1 }];
 
   function armed(tool: 'grid-tool' | 'add-hole-tool', state: ReturnType<typeof makeState>, sel: { x1: number; z1: number; x2: number; z2: number }) {
     const { step } = makeStep();
@@ -798,157 +1189,196 @@ describe('DrillStep — permit warning counts the whole plan (#2167)', () => {
     return { arg: lastStripArg(strip), step, controller, strip };
   }
 
-  // Default spacing 4 m: x 10..14 / z 10..14 is 2 x 2 = 4 holes; 10..18 is 3 x 3 = 9.
+  // Default 4 m mesh: x/z 10..14 is 2 x 2 holes (64 m²), 10..18 is 3 x 3 (144 m²), 10..22 is 4 x 4 (256 m²).
   const GRID_2X2 = { x1: 10, z1: 10, x2: 14, z2: 14 };
   const GRID_3X3 = { x1: 10, z1: 10, x2: 18, z2: 18 };
+  const GRID_4X4 = { x1: 10, z1: 10, x2: 22, z2: 22 };
 
-  it('a grid that fits alone but overflows with the existing holes warns with the plan total', () => {
-    const { arg } = armed('grid-tool', stateWithHoles(3, 3), GRID_2X2);
-    const warning = gridHoleLimitWarning(createGradeState(), 4, 6)!;
+  it('grid tool: a grid replaces the plan, so the holes already planned do not count toward its area', () => {
+    // Ten existing holes (160 m²) are over the permit on their own; the 2 x 2 grid replacing them is 64 m².
+    const state = stateWithRow(6, 4);
+    expect(permitPreview(state.grade, { holes: [...state.drillHoles, ...state.plannedDrillHoles], charges: {} }, 0)!.areaOver).toBe(true);
+
+    const { arg } = armed('grid-tool', state, GRID_2X2);
+
+    expect(arg.result).toBe(plainGridResult(2, 2));
+    expect(arg.readout).toContain(permitAreaLine(state.grade, gridPlanHoles(10, 10, 2, 2)));
+    expect(arg.readout!.join('\n')).toContain('64 / 144 m²');
+    expect(arg.confirmEnabled).toBe(true);
+  });
+
+  it('grid tool: a grid over the limit warns with the same text whatever the plan held before', () => {
+    const warning = gridAreaLimitWarning(createGradeState(), gridPlanHoles(10, 10, 4, 4))!;
     expect(warning).toBeTruthy();
-    expect(arg.result).toContain(warning);
-    expect(arg.result).toContain('10');
+    expect(armed('grid-tool', stateWithRow(0, 0), GRID_4X4).arg.result).toContain(warning);
+    expect(armed('grid-tool', stateWithRow(3, 3), GRID_4X4).arg.result).toContain(warning);
+  });
+
+  it('grid tool: a grid exactly at the limit shows no warning and reads the full area', () => {
+    const { arg } = armed('grid-tool', stateWithRow(0, 0), GRID_3X3);
+    expect(arg.result).toBe(plainGridResult(3, 3));
+    expect(arg.readout!.join('\n')).toContain('144 / 144 m²');
     expect(arg.confirmEnabled).toBe(true);
   });
 
-  it('drilled and ordered holes both count toward the existing total', () => {
-    // 4 new holes: 5 drilled alone -> 9, within; 5 drilled + 1 ordered -> 10, over.
-    expect(JSON.stringify(armed('grid-tool', stateWithHoles(5, 0), GRID_2X2).arg).toLowerCase()).not.toContain('permit');
-    const overByOrdered = armed('grid-tool', stateWithHoles(5, 1), GRID_2X2).arg.result;
-    expect(overByOrdered).toContain(gridHoleLimitWarning(createGradeState(), 4, 6)!);
-    const overByDrilled = armed('grid-tool', stateWithHoles(6, 0), GRID_2X2).arg.result;
-    expect(overByDrilled).toContain(gridHoleLimitWarning(createGradeState(), 4, 6)!);
-  });
-
-  it('a grid whose total lands exactly on the limit shows no warning', () => {
-    const { arg } = armed('grid-tool', stateWithHoles(3, 2), GRID_2X2);
-    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
-    expect(gridHoleLimitWarning(createGradeState(), 4, 5)).toBeNull();
-    expect(arg.confirmEnabled).toBe(true);
-  });
-
-  it('a grid at the limit with no existing holes shows no warning', () => {
-    const { arg } = armed('grid-tool', stateWithHoles(0, 0), GRID_3X3);
-    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
-  });
-
-  it('the warning carries the consequence text for the plan total', () => {
-    const { arg } = armed('grid-tool', stateWithHoles(6, 0), GRID_3X3);
-    const consequence = permitPreview(createGradeState(), { holes: new Array(15).fill({}), charges: {} }, 0)!.consequenceText;
+  it('the warning carries the consequence text for the grid area, and the readout leaves the area to it', () => {
+    const { arg } = armed('grid-tool', stateWithRow(0, 0), GRID_4X4);
+    const consequence = permitPreview(createGradeState(), { holes: gridPlanHoles(10, 10, 4, 4), charges: {} }, 0)!.consequenceText;
     expect(consequence.length).toBeGreaterThan(0);
     expect(arg.result).toContain(consequence);
+    // Only the drilling line: the warning already names the area and the limit.
+    expect(arg.readout).toHaveLength(1);
+    expect(arg.readout!.join('\n')).not.toContain(t('ui.blast_workshop.drill.permit_area', { area: '' }).trim());
   });
 
-  it('footprint-covered cells are not new holes: a 10-cell grid with one cell under a building fits the limit', () => {
-    // 5 x 2 = 10 cells at (10,10)..(26,14); the building covers (10,10), so 9 holes are new.
+  it('footprint-covered cells are not drilled: a 10-cell grid with one cell under a building fits the limit', () => {
+    // 5 x 2 = 10 cells at (10,10)..(26,14); the building covers (10,10), so 9 holes (144 m²) are drilled.
     const state = makeStateWithFootprint();
     state.grade = createGradeState();
     const covered = armed('grid-tool', state, { x1: 10, z1: 10, x2: 26, z2: 14 });
-    expect(covered.arg.result).toContain('skipped');
-    expect(covered.arg.result).not.toContain(gridHoleLimitWarning(createGradeState(), 10)!);
-    expect(JSON.stringify(covered.arg).toLowerCase()).not.toContain('permit');
+    expect(covered.arg.result).toBe(`${plainGridResult(5, 2)} — ${t('ui.blast_workshop.drill.grid_skipped_preview', { count: 1 })}`);
+    expect(covered.arg.readout!.join('\n')).toContain('144 / 144 m²');
 
-    // Control: the same 10 cells away from the building are all new and overflow.
+    // Control: the same 10 cells away from the building are all drilled — 160 m² — and overflow.
     const clear = makeStateWithFootprint();
     clear.grade = createGradeState();
     const free = armed('grid-tool', clear, { x1: 200, z1: 200, x2: 216, z2: 204 });
-    expect(free.arg.result).toContain(gridHoleLimitWarning(createGradeState(), 10)!);
+    expect(free.arg.result).toContain(gridAreaLimitWarning(createGradeState(), gridPlanHoles(200, 200, 2, 5))!);
+    expect(free.arg.result).toContain('160 / 144 m²');
   });
 
-  it('no grade: never warns, however many holes exist or are added', () => {
-    const { arg } = armed('grid-tool', stateWithHoles(30, 30, false), { x1: 10, z1: 10, x2: 40, z2: 40 });
-    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
+  it('no grade: never warns, however large the grid, and reads no permit area', () => {
+    // 30 m / 4 m = 7.5 rounds to 8 steps: 9 x 9 holes, 1296 m².
+    const { arg } = armed('grid-tool', stateWithRow(30, 30, false), { x1: 10, z1: 10, x2: 40, z2: 40 });
+    expect(arg.result).toBe(plainGridResult(9, 9));
+    expect(arg.readout).toHaveLength(1);
     expect(arg.confirmEnabled).toBe(true);
   });
 
-  it('add hole: the tenth hole warns with the same text, confirm stays enabled', () => {
-    const { arg } = armed('add-hole-tool', stateWithHoles(5, 4), { x1: 10, z1: 10, x2: 10, z2: 10 });
-    const warning = gridHoleLimitWarning(createGradeState(), 1, 9)!;
+  it('add hole: the tenth hole of a 4 m row takes the plan past 144 m² and warns, confirm stays enabled', () => {
+    const state = stateWithRow(5, 4);
+    const sel = nextInRow(9);
+    const { arg } = armed('add-hole-tool', state, sel);
+    const warning = gridAreaLimitWarning(createGradeState(), withAdded(state, sel))!;
     expect(warning).toBeTruthy();
-    expect(JSON.stringify(arg)).toContain(warning);
+    expect(arg.result).toBe(`1 — ${warning}`);
+    expect(arg.result).toContain('160 / 144 m²');
     expect(arg.confirmEnabled).toBe(true);
   });
 
-  it('add hole: the ninth hole stays within the limit and shows no warning', () => {
-    const { arg } = armed('add-hole-tool', stateWithHoles(5, 3), { x1: 10, z1: 10, x2: 10, z2: 10 });
-    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
+  it('add hole: the ninth hole lands exactly on the limit and shows no warning', () => {
+    const { arg } = armed('add-hole-tool', stateWithRow(5, 3), nextInRow(8));
+    expect(arg.result).toBe('1');
+    expect(arg.readout!.join('\n')).toContain('144 / 144 m²');
     expect(arg.confirmEnabled).toBe(true);
   });
 
-  it('add hole: with no existing holes there is no warning', () => {
-    const { arg } = armed('add-hole-tool', stateWithHoles(0, 0), { x1: 10, z1: 10, x2: 10, z2: 10 });
-    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
+  it('add hole: drilled and ordered holes both count toward the plan', () => {
+    expect(armed('add-hole-tool', stateWithRow(9, 0), nextInRow(9)).arg.result).toContain('160 / 144 m²');
+    expect(armed('add-hole-tool', stateWithRow(0, 9), nextInRow(9)).arg.result).toContain('160 / 144 m²');
+    expect(armed('add-hole-tool', stateWithRow(4, 4), nextInRow(8)).arg.result).toBe('1');
+  });
+
+  it('add hole: the area decides, not the count — a ninth hole set apart from the row works the widest cell and warns', () => {
+    // Eight row holes (128 m²) plus one far from them, given a HOLE_CELL_MAX_SIDE_M square (64 m²): 192 m².
+    const state = stateWithRow(5, 3);
+    const sel = { x1: 10, z1: 10, x2: 10, z2: 10 };
+    const { arg } = armed('add-hole-tool', state, sel);
+    expect(arg.result).toContain(gridAreaLimitWarning(createGradeState(), withAdded(state, sel))!);
+    expect(arg.result).toContain(`${8 * 16 + HOLE_CELL_MAX_SIDE_M ** 2} / 144 m²`);
+  });
+
+  it('add hole: with no existing holes a lone hole works one default cell and shows no warning', () => {
+    const { arg } = armed('add-hole-tool', stateWithRow(0, 0), { x1: 10, z1: 10, x2: 10, z2: 10 });
+    expect(arg.result).toBe('1');
+    expect(arg.readout!.join('\n')).toContain(`${DRILL_GRID_DEFAULT_SPACING_M ** 2} / 144 m²`);
   });
 
   it('add hole: no grade never warns', () => {
-    const { arg } = armed('add-hole-tool', stateWithHoles(20, 20, false), { x1: 10, z1: 10, x2: 10, z2: 10 });
-    expect(JSON.stringify(arg).toLowerCase()).not.toContain('permit');
+    const { arg } = armed('add-hole-tool', stateWithRow(20, 20, false), nextInRow(40));
+    expect(arg.result).toBe('1');
+    expect(arg.readout).toHaveLength(1);
   });
 
   it('confirming an over-permit grid still dispatches the drill_plan command', () => {
     const { step, gameConsole } = makeStep();
     const { kit, controller } = makeMockKit();
     step.setPlacementKit(kit);
-    step.update(stateWithHoles(6, 0), 'sunny');
+    step.update(stateWithRow(0, 0), 'sunny');
     (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
-    controller.simulateSelect(GRID_3X3);
+    controller.simulateSelect(GRID_4X4);
     controller.simulateConfirm();
     expect(gameConsole.mock.calls.some(c => String(c[0]).startsWith('drill_plan grid'))).toBe(true);
   });
 });
 
-describe('DrillStep — permit used / limit readout (#2167)', () => {
-  const readout = (step: DrillStep) => step.root.querySelector('[data-role="permit-holes"]') as HTMLElement | null;
+describe('DrillStep — permit area used / limit in the holes header (#2167)', () => {
+  const readout = (step: DrillStep) => step.root.querySelector('[data-role="permit-area"]') as HTMLElement | null;
 
+  /** `drilled` drilled then `planned` ordered holes on one row 4 m apart: 16 m² each once there are two. */
   function withHoles(drilled: number, planned: number, progression = true) {
     const state = makeState();
     if (progression) state.grade = createGradeState();
-    for (let i = 0; i < drilled; i++) addHole(holeCounter, state.drillHoles, 10 + i * 3, 10, 8, 0.15);
-    for (let i = 0; i < planned; i++) addHole(holeCounter, state.plannedDrillHoles, 10 + i * 3, 30, 8, 0.15);
+    for (let i = 0; i < drilled; i++) addHole(holeCounter, state.drillHoles, 10 + i * 4, 10, 8, 0.15);
+    for (let i = 0; i < planned; i++) addHole(holeCounter, state.plannedDrillHoles, 10 + (drilled + i) * 4, 10, 8, 0.15);
     return state;
   }
 
-  it('shows "0 / 9" with no holes at all when the mine has a grade', () => {
+  it('shows "0 / 144 m²" with no holes at all when the mine has a grade', () => {
     const { step } = makeStep();
     step.update(withHoles(0, 0), 'sunny');
     expect(readout(step)).not.toBeNull();
-    expect(readout(step)!.textContent).toContain('0 / 9');
-    expect(readout(step)!.textContent).toBe(permitPreview(createGradeState(), { holes: [], charges: {} }, 0)!.holesText);
+    expect(readout(step)!.textContent).toBe('0 / 144 m²');
+    expect(readout(step)!.textContent).toBe(permitPreview(createGradeState(), { holes: [], charges: {} }, 0)!.areaText);
   });
 
-  it('counts drilled and planned holes together as used', () => {
+  it('measures drilled and planned holes together', () => {
     const { step } = makeStep();
-    step.update(withHoles(3, 2), 'sunny');
-    expect(readout(step)!.textContent).toContain('5 / 9');
+    const state = withHoles(3, 2);
+    step.update(state, 'sunny');
+    expect(readout(step)!.textContent).toBe('80 / 144 m²');
+    expect(readout(step)!.textContent).toBe(
+      permitPreview(state.grade, { holes: [...state.drillHoles, ...state.plannedDrillHoles], charges: {} }, 0)!.areaText,
+    );
   });
 
   it('follows the plan as holes are added', () => {
     const { step } = makeStep();
     step.update(withHoles(2, 0), 'sunny');
-    expect(readout(step)!.textContent).toContain('2 / 9');
+    expect(readout(step)!.textContent).toBe('32 / 144 m²');
     step.update(withHoles(2, 4), 'sunny');
-    expect(readout(step)!.textContent).toContain('6 / 9');
+    expect(readout(step)!.textContent).toBe('96 / 144 m²');
+  });
+
+  it('a grid hole counts its own spacing × burden cell', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    state.grade = createGradeState();
+    state.plannedDrillHoles.push(...createGridPlan(holeCounter, { x: 10, z: 10 }, 3, 3, 4, 8, DRILL_HOLE_DEFAULT_DIAMETER_M, 3));
+    step.update(state, 'sunny');
+    // 9 holes of 4 m x 3 m.
+    expect(readout(step)!.textContent).toBe('108 / 144 m²');
   });
 
   it('at the limit it is not marked over', () => {
     const { step } = makeStep();
     step.update(withHoles(5, 4), 'sunny');
-    expect(readout(step)!.textContent).toContain('9 / 9');
-    expect(readout(step)!.dataset['over']).not.toBe('true');
+    expect(readout(step)!.textContent).toBe('144 / 144 m²');
+    expect(readout(step)!.dataset['over']).toBe('false');
   });
 
   it('over the limit it is marked data-over="true"', () => {
     const { step } = makeStep();
     step.update(withHoles(6, 4), 'sunny');
-    expect(readout(step)!.textContent).toContain('10 / 9');
+    expect(readout(step)!.textContent).toBe('160 / 144 m²');
     expect(readout(step)!.dataset['over']).toBe('true');
   });
 
-  it('the over mark clears when the plan drops back to the limit', () => {
+  it('the over mark clears when the plan drops back under the limit', () => {
     const { step } = makeStep();
     step.update(withHoles(6, 4), 'sunny');
     step.update(withHoles(4, 2), 'sunny');
-    expect(readout(step)!.textContent).toContain('6 / 9');
+    expect(readout(step)!.textContent).toBe('96 / 144 m²');
     expect(readout(step)!.dataset['over']).not.toBe('true');
   });
 
@@ -964,7 +1394,7 @@ describe('DrillStep — permit used / limit readout (#2167)', () => {
   it('empties again when the grade disappears', () => {
     const { step } = makeStep();
     step.update(withHoles(2, 0), 'sunny');
-    expect(readout(step)!.textContent).toContain('2 / 9');
+    expect(readout(step)!.textContent).toBe('32 / 144 m²');
     step.update(withHoles(2, 0, false), 'sunny');
     expect(readout(step)?.textContent ?? '').toBe('');
   });
@@ -972,6 +1402,7 @@ describe('DrillStep — permit used / limit readout (#2167)', () => {
   it('being over the permit disables nothing in the step', () => {
     const { step } = makeStep();
     step.update(withHoles(8, 8), 'sunny');
+    expect(readout(step)!.dataset['over']).toBe('true');
     expect((step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).disabled).toBe(false);
     expect((step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).disabled).toBe(false);
     expect((step.root.querySelector('[data-action="clear-holes"]') as HTMLButtonElement).disabled).toBe(false);
@@ -1083,7 +1514,7 @@ describe('DrillStep — drill setting explanations (#2168)', () => {
   const fieldsOf = (strip: { show: ReturnType<typeof vi.fn> }) =>
     (strip.show.mock.calls.at(-1)![0] as { fields: ExplainField[] }).fields;
 
-  it('the grid tool strip gives Spacing, Depth and Diameter each an explanation', () => {
+  it('the grid tool strip gives Spacing, Burden, Depth and Diameter each an explanation', () => {
     const { step } = makeStep();
     const { kit, controller, strip } = makeMockKit();
     step.setPlacementKit(kit);
@@ -1092,7 +1523,7 @@ describe('DrillStep — drill setting explanations (#2168)', () => {
     controller.simulateSelect({ x1: 10, z1: 10, x2: 16, z2: 16 });
 
     const fields = fieldsOf(strip);
-    for (const key of ['spacing', 'depth', 'diameter'] as const) {
+    for (const key of ['spacing', 'burden', 'depth', 'diameter'] as const) {
       const f = fields.find(x => x.key === key)!;
       expect(f, key).toBeDefined();
       expect(f.explain, key).toBe(drillFieldExplain(key));
@@ -1113,22 +1544,37 @@ describe('DrillStep — drill setting explanations (#2168)', () => {
     expect(fields.find(x => x.key === 'diameter')!.explain).toBe(drillFieldExplain('diameter'));
   });
 
-  it('the three setting explanations differ from each other', () => {
-    const texts = (['spacing', 'depth', 'diameter'] as const).map(drillFieldExplain);
-    expect(new Set(texts).size).toBe(3);
+  it('the four setting explanations differ from each other', () => {
+    const texts = (['spacing', 'burden', 'depth', 'diameter'] as const).map(drillFieldExplain);
+    expect(new Set(texts).size).toBe(4);
   });
 
-  for (const [field, labelKey] of [['spacing', 'ui.blast_workshop.drill.spacing'], ['depth', 'ui.blast_workshop.drill.depth']] as const) {
-    it(`the stat strip's ${field} label carries the ${field} explanation`, () => {
+  // The stat strip reads Pattern, Mesh (spacing × burden) and Depth; the spacing has no cell of its own.
+  // The depth cell explains depth in the depth stepper's words.
+  for (const [cell, labelKey, explanation, explainKey] of [
+    ['pattern', 'ui.blast_workshop.drill.pattern', () => t('ui.explain.drill_field_pattern'), 'ui.explain.drill_field_pattern'],
+    ['mesh', 'ui.blast_workshop.drill.mesh', () => t('ui.explain.drill_field_mesh'), 'ui.explain.drill_field_mesh'],
+    ['depth', 'ui.blast_workshop.drill.depth', () => drillFieldExplain('depth'), 'ui.explain.drill_field_depth'],
+  ] as const) {
+    it(`the stat strip's ${cell} label carries the ${cell} explanation`, () => {
       const { step } = makeStep();
       step.update(makeState(), 'sunny');
       const label = [...step.root.querySelectorAll<HTMLElement>('span')].find(s => s.textContent === t(labelKey))!;
       expect(label).toBeDefined();
       const holder = label.closest<HTMLElement>('[data-explain]');
       expect(holder).not.toBeNull();
-      expect(holder!.dataset['explain']).toBe(drillFieldExplain(field));
+      expect(holder!.dataset['explain']).toBe(explanation());
+      expect(holder!.dataset['explain']).not.toBe(explainKey); // a real text, not a missing key
     });
   }
+
+  it('the stat strip no longer has a Spacing cell: spacing and burden read together as the mesh', () => {
+    const { step } = makeStep();
+    step.update(makeState(), 'sunny');
+    const labels = [...step.root.querySelectorAll<HTMLElement>('span')].map(s => s.textContent);
+    expect(labels).toContain(t('ui.blast_workshop.drill.mesh'));
+    expect(labels).not.toContain(t('ui.blast_workshop.drill.spacing'));
+  });
 });
 
 describe('DrillStep — hole rows open the inspector (#2168)', () => {

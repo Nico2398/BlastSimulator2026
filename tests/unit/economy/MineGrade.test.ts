@@ -596,7 +596,9 @@ describe('unlockLinesFor (#1926)', () => {
     const lines = unlockLinesFor(g);
     expect(lines.length).toBeGreaterThanOrEqual(3);
     const limits = permitLimitsFor(g);
-    expect(lines[0]!.params).toMatchObject({ maxChargeKg: limits.maxChargeKg, maxHoles: limits.maxHoles, fee: formatMoney(limits.fee) });
+    expect(lines[0]!.params).toMatchObject({ maxChargeKg: limits.maxChargeKg, maxAreaM2: limits.maxAreaM2, fee: formatMoney(limits.fee) });
+    setLocale('en');
+    expect(t(lines[0]!.key, lines[0]!.params)).toContain(`${limits.maxAreaM2} m² of pattern`);
     const keys = lines.map(l => l.key);
     expect(keys.indexOf(`progression.unlock.flavour.${g}`)).toBe(1);
     expect(keys.indexOf(`progression.unlock.hint.${g}`)).toBe(2);
@@ -635,7 +637,7 @@ describe('unlockLinesFor (#1926)', () => {
     for (const g of [6, 7, 12]) {
       const lines = unlockLinesFor(g);
       const limits = permitLimitsFor(g);
-      expect(lines[0]!.params).toMatchObject({ maxChargeKg: limits.maxChargeKg, maxHoles: limits.maxHoles, fee: formatMoney(limits.fee) });
+      expect(lines[0]!.params).toMatchObject({ maxChargeKg: limits.maxChargeKg, maxAreaM2: limits.maxAreaM2, fee: formatMoney(limits.fee) });
       const keys = lines.map(l => l.key);
       expect(keys).toContain('progression.unlock.flavour.class');
       expect(keys).toContain('progression.unlock.hint.class');

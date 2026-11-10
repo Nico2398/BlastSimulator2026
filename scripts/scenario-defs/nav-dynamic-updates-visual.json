@@ -91,7 +91,7 @@
       }
     },
     {
-      "command": "charge hole:H1 explosive:boomite amount:8kg stemming:2m",
+      "command": "charge hole:H1 explosive:boomite stemming:2m",
       "interaction": [
         {
           "type": "clickSelector",
@@ -100,11 +100,6 @@
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
         },
         {
           "type": "assert",
@@ -117,12 +112,6 @@
         },
         {
           "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "8 kg"
-        },
-        {
-          "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
           "expectedValue": "2.0 m"
@@ -132,7 +121,7 @@
           "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "role: player (issue #515): the old \"no UI feature\" reasoning is stale — Charge.ts's own header comment records that per-hole charging (gap G3) got a real control, ChargeHoleList's `[data-hole=\"H1\"] [data-action=\"charge-hole\"]`, which commits the panel's current product/amount/stemming to one hole instead of all of them.",
+      "description": "role: player (issue #515): the old \"no UI feature\" reasoning is stale — Charge.ts's own header comment records that per-hole charging (gap G3) got a real control, ChargeHoleList's `[data-hole=\"H1\"] [data-action=\"charge-hole\"]`, which fills one hole (instead of all of them) with the panel's current product up to its current stemming: 4 m of boomite, 8 kg.",
       "expect": {
         "increased": [
           "orderedChargeCount"
@@ -180,6 +169,27 @@
       "role": "observe"
     },
     {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",
+      "role": "setup",
+      "description": "Wait for H1 to dry before firing, as a player would (#1801). The hole holds water when its charge lands (tick 51), and wet boomite fizzles at a tenth of its energy; under the kernel energy model that tenth, spread over the rock around the hole, breaks nothing (the old model still cleared 7 voxels), so the blast below would leave the terrain -- and the NavGrid this file is about -- untouched. The hole dries within ~41 ticks.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0,
+          "chargedCount": 1
+        }
+      }
+    },
+    {
       "command": "blast",
       "interaction": [
         {
@@ -217,7 +227,8 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0
-        }
+        },
+        "note": "The dry shot clears 164 voxels around (10,10), so the NavGrid has real terrain change to rebuild; it also kills the driller and blaster at the hole and destroys the drill_rig (#1) and charging truck (#5) parked there."
       }
     },
     {
@@ -232,7 +243,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Purchase a vehicle and send it across the grid — its position should advance tick by tick via the NavGrid-aware pathfinding stepper. #553: staffed:true's fleet (drill_rig/debris_hauler/rock_digger/rock_fragmenter, ids 1-4) means this purchase is the fleet's 5th vehicle, not its 1st — and the blast above left only 3 of the original 4 alive (the drill_rig that had just drilled H1 sat inside its own blast radius), so this new debris_hauler becomes #5 and brings the count to 4. cash is 16318, not 16306: the drill_plan command above now passes diameter:0.089, matching the Drill panel's own DEFAULT_DIAMETER_M (Drill.ts) that the click always used for H1 — computeDrillHoleDurationTicks (DrillPlan.ts) scales duration by diameter, so the console text used to drill H1 ~2 ticks slower than the click's real hole (0.15m default vs 0.089m), leaving the drill_rig busy (fuelCostPerTick+maintenanceCostPerTick, balance.ts) 2 ticks longer and draining $12 more than the real click ever did.",
+      "description": "Purchase a vehicle and send it across the grid — its position should advance tick by tick via the NavGrid-aware pathfinding stepper. staffed:true's fleet is 5 vehicles (drill_rig, debris_hauler, rock_digger, rock_fragmenter, charging truck; ids 1-5), and the blast above destroyed the drill_rig and the charging truck parked inside its radius, so this new debris_hauler becomes #6 and brings the count from 3 to 4.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -253,7 +264,7 @@
           "cash": -25000
         },
         "equals": {
-          "vehicleCount": 5
+          "vehicleCount": 4
         }
       }
     },
@@ -329,7 +340,7 @@
           "cash": 0
         },
         "equals": {
-          "vehicleCount": 5
+          "vehicleCount": 4
         }
       }
     },

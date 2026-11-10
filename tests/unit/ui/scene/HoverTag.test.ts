@@ -9,6 +9,7 @@ import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
 import { addHole, holeNumericId } from '../../../../src/core/mining/DrillPlan.js';
 import type { PickResult } from '../../../../src/ui/scene/ScenePicking.js';
+import type { PowderFactorRange } from '../../../../src/core/mining/SoftwarePreview.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -358,7 +359,7 @@ describe('HoverTag', () => {
   });
   describe('hole readout (#2203 C5)', () => {
     const shares = { intact: 0.2, cracked: 0.1, coarse: 0, good: 0.4, fines: 0.2, dust: 0.1 };
-    const columnWithHole = (recommended: () => { minKgPerM3: number; maxKgPerM3: number } | null) => ({
+    const columnWithHole = (recommended: () => PowderFactorRange | null) => ({
       x: 12, z: 8, band: 'good' as const, worstBand: 'dust' as const, goodShare: 0.4, maxIntensity: 1.7,
       counts: { intact: 2, cracked: 1, coarse: 0, good: 4, fines: 2, dust: 1 },
       hole: { holeId: 'H7', powderFactor: 0.2371, shares, recommended },
@@ -368,7 +369,7 @@ describe('HoverTag', () => {
 
     it('shows the hole\'s id, powder factor and recommended range under the heatmap line', () => {
       const { tag, root } = makeTag();
-      tag.update(hover(), makeState(), false, columnWithHole(() => ({ minKgPerM3: 0.1812, maxKgPerM3: 0.3374 })));
+      tag.update(hover(), makeState(), false, columnWithHole(() => ({ minKgPerM3: 0.1812, maxKgPerM3: 0.3374, minStemmingM: 2.4, maxStemmingM: 4.7 })));
       const line = root.querySelector('[data-role="hover-hole"]');
       expect(line).not.toBeNull();
       expect(root.querySelector('[data-role="hover-heatmap"]')).not.toBeNull();
@@ -377,6 +378,23 @@ describe('HoverTag', () => {
       expect(has(text, 0.2371)).toBe(true);
       expect(has(text, 0.1812)).toBe(true);
       expect(has(text, 0.3374)).toBe(true);
+    });
+
+    it('the recommended range names the stemming that fills the hole to it', () => {
+      const { tag, root } = makeTag();
+      tag.update(hover(), makeState(), false, columnWithHole(() => ({ minKgPerM3: 0.1812, maxKgPerM3: 0.3374, minStemmingM: 2.4, maxStemmingM: 4.7 })));
+      const text = root.querySelector('[data-role="hover-hole-recommended"]')!.textContent!;
+      expect(text).toContain('2.4');
+      expect(text).toContain('4.7');
+    });
+
+    it('a range of one sample reads as one value, not "a–a"', () => {
+      const { tag, root } = makeTag();
+      tag.update(hover(), makeState(), false, columnWithHole(() => ({ minKgPerM3: 0.0912, maxKgPerM3: 0.0904, minStemmingM: 1.8, maxStemmingM: 1.8 })));
+      const text = root.querySelector('[data-role="hover-hole-recommended"]')!.textContent!;
+      expect(text).toContain('0.09 kg/m³');
+      expect(text).toContain('1.8 m');
+      expect(text).not.toContain('–');
     });
 
     it('shows the hole\'s band mix as percentages', () => {

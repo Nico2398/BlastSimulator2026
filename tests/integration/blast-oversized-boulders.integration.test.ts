@@ -4,11 +4,10 @@
 // rock_fragmenter must be able to drive to it and break it in place via the
 // real "vehicle break" console command, replacing it in logistics with
 // haulable sub-fragments that preserve total volume. Mirrors
-// economy.integration.test.ts's "completes the full economy loop" case and
-// blast-undercharge.json's charge parameters (small charge = oversized
-// fragments, zero projections).
+// economy.integration.test.ts's "completes the full economy loop" case; the
+// shot is undercharged by its explosive (the weakest one, filled to the
+// stemming, holes wide apart = oversized fragments, zero projections).
 
-import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { isFragmentSealed } from '../../src/core/economy/SealedFragments.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext } from '../../src/console/commands/world.js';
@@ -100,11 +99,15 @@ function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300): void {
  * Drill+charge+blast an undercharged, wide-spacing pattern at
  * (18,19) — same origin as economy.integration.test.ts's full-loop case: it
  * sits on the same flat NavGrid bench as the vehicle spawn and warehouse, so
- * fragments land somewhere a vehicle can actually reach. Mirrors
- * blast-undercharge.json's charge parameters (2kg, wide 5m spacing), which
- * reliably leaves a couple of oversized fragments with zero projections.
+ * fragments land somewhere a vehicle can actually reach. The holes, 5 m
+ * apart, are filled up to the stemming with pop_rock, the weakest explosive
+ * (1.375 kg/m): measured under the kernel energy model it breaks out with a
+ * few hundred oversized fragments and zero projections. A partial 2 kg
+ * charge, the old undercharge, now breaks nothing at all here.
  */
 function blastUndercharged(ctx: GameContext): void {
+  // Pop_rock fizzles in a hole that holds water: the weather is pinned dry, rain is not what this test is about.
+  ctx.state!.weather = { ...ctx.state!.weather, current: 'sunny', pinned: true };
   hireDrillerAndRig(ctx);
 
   const drillResult = drillPlanCommand(ctx as any, ['grid'], {
@@ -119,16 +122,22 @@ function blastUndercharged(ctx: GameContext): void {
 
   const chargeResult = chargeCommand(ctx as any, [], {
     hole: '*',
-    explosive: 'boomite',
-    amount: '2kg',
+    explosive: 'pop_rock',
     stemming: '2m',
   });
   expect(chargeResult.success).toBe(true);
   deliverExplosivesNow(ctx.state!); // timing downstream of the charge is the subject, not the delivery wait (#1895)
   driveChargePlanToCompletion(ctx);
 
+  // The shot breaks out, and the blaster and the two rigs stand parked on the pattern (the lone driller
+  // crews one rig at a time, so the other cannot be driven off). Losing them is not what this test is
+  // about: park the whole crew and fleet on the far edge of the site first.
+  for (const e of ctx.state!.employees.employees) { e.x = 2; e.z = 2; e.destinationX = null; e.destinationZ = null; }
+  for (const v of ctx.state!.vehicles.vehicles) { v.x = 2; v.z = 2; }
+
   const blastResult = blastCommand(ctx as any, [], {});
   expect(blastResult.success).toBe(true);
+  expect(ctx.state!.lastBlastReport!.projectionCount).toBe(0);
 }
 
 describe('Blast → oversized boulder → break in place (#484)', () => {
@@ -151,14 +160,10 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
 
     const oversizedTracked = ctx.state!.logistics.fragments.find(f => isOversized(f.fragment.volume));
     expect(oversizedTracked).toBeDefined();
-    // The undercharged blast leaves its rubble sealed under the cap, and sealed rock gets no order (#1774).
-    // Rest this one boulder on the open ground of its column, as a thrown boulder would lie.
+    // The shot broke out, so its boulders lie open, not sealed under a cap (sealed rock gets no order, #1774).
     const boulderPos = oversizedTracked!.fragment.position;
-    const restY = computeVoxelColumnSurfaceY(ctx.grid!, Math.floor(boulderPos.x), Math.floor(boulderPos.z))! + 1;
-    (boulderPos as { y: number }).y = restY;
     expect(isFragmentSealed(ctx.grid!, boulderPos)).toBe(false);
     const oversizedId = oversizedTracked!.fragment.id;
-    const oversizedVolume = oversizedTracked!.fragment.volume;
 
     // 2. Crew a debris_hauler and attempt to haul the oversized fragment — must be refused.
     const hireHaulerDriver = employeeCommand(ctx, ['hire'], { role: 'driver' });
@@ -190,9 +195,7 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     // above, which never races because it fails deterministically before any
     // vehicle state changes), but this step's whole premise (drive a crewed
     // fragmenter to the boulder and break it) is now exactly what auto-dispatch
-    // does unprompted, so assert that automatic outcome instead. The rubble
-    // field can hold more than one oversized fragment, so this waits out
-    // however many the fragmenter works through before it reaches ours.
+    // does unprompted, so assert that automatic outcome instead.
     const hireFragmenterDriver = employeeCommand(ctx, ['hire'], { role: 'driver' });
     expect(hireFragmenterDriver.success).toBe(true);
     const fragmenterDriverId = ctx.state!.employees.employees
@@ -207,22 +210,24 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     expect(assignFragmenter.success).toBe(true);
 
     // The undercharged, wide-spacing blast leaves a whole rubble field with
-    // many oversized fragments (#484 only breaks the ONE targeted boulder),
-    // and self-dispatch (#552) works through whichever it reaches first —
-    // not necessarily ours. So "the resulting pieces" can't be scoped against
-    // one snapshot taken before the wait: any other boulder the fragmenter
-    // finishes first would leave its own pieces in that diff too. A single
-    // fragmenter completes at most one break per tick, so re-snapshotting on
-    // every iteration and keeping only the one taken immediately before
-    // oversizedId itself vanishes isolates exactly its own split.
+    // many oversized fragments (#484 only breaks one boulder at a time), and
+    // self-dispatch (#552) works through whichever it reaches first, so the
+    // boulder this checks is the first one the fragmenter breaks, not a
+    // chosen one. A single fragmenter completes at most one break per tick,
+    // so the tick in which an oversized fragment vanishes, diffed against the
+    // snapshot taken just before it, isolates exactly its own split.
+    const oversizedVolumes = new Map(
+      ctx.state!.logistics.fragments.filter(f => isOversized(f.fragment.volume)).map(f => [f.fragment.id, f.fragment.volume]),
+    );
     let idsJustBeforeBreak = new Set(ctx.state!.logistics.fragments.map(f => f.fragment.id));
-    let ticks = 0;
-    while (ctx.state!.logistics.fragments.some(f => f.fragment.id === oversizedId) && ticks < 500) {
+    let brokenId: number | undefined;
+    for (let ticks = 0; ticks < 500 && brokenId === undefined; ticks++) {
       idsJustBeforeBreak = new Set(ctx.state!.logistics.fragments.map(f => f.fragment.id));
       tickCommand(ctx, ['1'], {});
-      ticks++;
+      const present = new Set(ctx.state!.logistics.fragments.map(f => f.fragment.id));
+      brokenId = [...oversizedVolumes.keys()].find(id => idsJustBeforeBreak.has(id) && !present.has(id));
     }
-    expect(ctx.state!.logistics.fragments.some(f => f.fragment.id === oversizedId)).toBe(false);
+    expect(brokenId, 'the crewed rock_fragmenter broke no oversized fragment').toBeDefined();
 
     const pieces = ctx.state!.logistics.fragments.filter(
       f => f.state === 'on_ground' && !idsJustBeforeBreak.has(f.fragment.id),
@@ -234,7 +239,7 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
       expect(isOversized(p.fragment.volume)).toBe(false);
       totalVolume += p.fragment.volume;
     }
-    expect(Math.abs(totalVolume - oversizedVolume)).toBeLessThan(1e-6);
+    expect(Math.abs(totalVolume - oversizedVolumes.get(brokenId!)!)).toBeLessThan(1e-6);
 
     // 4. Build a freight_warehouse and haul one resulting piece; stored mass
     // must grow by exactly that piece's mass.
@@ -294,7 +299,7 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     expect(haulPiece.success).toBe(true);
 
     const storedBefore = ctx.state!.logistics.storedMassKg;
-    ticks = 0;
+    let ticks = 0;
     while (ctx.state!.logistics.storedMassKg === storedBefore && ticks < 60) {
       tickCommand(ctx, ['1'], {});
       ticks++;

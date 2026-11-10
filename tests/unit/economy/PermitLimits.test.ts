@@ -15,9 +15,12 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { Random, rollSeed } from '../../../src/core/math/Random.js';
 import { isActive } from '../../../src/core/events/ActiveModifiers.js';
-import { MAX_DRILL_GRID_HOLES, PERMIT_LIMITS } from '../../../src/core/config/balance.js';
+import { DRILL_GRID_DEFAULT_SPACING_M, PERMIT_CLASS_AREA_FACTOR, PERMIT_LIMITS } from '../../../src/core/config/balance.js';
 
 const SEED = 42;
+
+/** Pattern area (m²) of `holes` holes on the default 4 m x 4 m grid cell, what `patternAreaM2` measures for such a grid. */
+const areaOf = (holes: number): number => holes * DRILL_GRID_DEFAULT_SPACING_M ** 2;
 
 function charges(count: number, kgEach: number): Record<string, { amountKg: number }> {
   const out: Record<string, { amountKg: number }> = {};
@@ -48,24 +51,25 @@ function findTick(overshoot: number, wantInspected: boolean, salt = 0): number {
 
 describe('permitLimitsFor', () => {
   it.each([
-    [0, 40, 9, 250],
-    [1, 120, 16, 1_000],
-    [2, 800, 36, 3_000],
-    [3, 2_500, 81, 8_000],
-    [4, 8_000, 196, 20_000],
-    [5, 25_000, 400, 50_000],
-  ])('grade %i: %i kg, %i holes, $%i fee', (grade, kg, holes, fee) => {
-    expect(permitLimitsFor(grade)).toEqual({ maxChargeKg: kg, maxHoles: holes, fee });
+    [0, 40, 144, 250],
+    [1, 120, 256, 1_000],
+    [2, 800, 576, 3_000],
+    [3, 2_500, 1_296, 8_000],
+    [4, 8_000, 3_136, 20_000],
+    [5, 25_000, 6_400, 50_000],
+  ])('grade %i: %i kg, %i m², $%i fee', (grade, kg, area, fee) => {
+    expect(permitLimitsFor(grade)).toEqual({ maxChargeKg: kg, maxAreaM2: area, fee });
   });
 
-  it('grade 6 is the first endless class: 1.6x charge, 1.4x holes, 1.5x fee', () => {
-    expect(permitLimitsFor(6)).toEqual({ maxChargeKg: 40_000, maxHoles: 560, fee: 75_000 });
+  it('grade 6 is the first endless class: 1.6x charge, 1.4x area, 1.5x fee', () => {
+    expect(PERMIT_CLASS_AREA_FACTOR).toBe(1.4);
+    expect(permitLimitsFor(6)).toEqual({ maxChargeKg: 40_000, maxAreaM2: 8_960, fee: 75_000 });
   });
 
   it('grade 7 compounds the class factors', () => {
     expect(permitLimitsFor(7)).toEqual({
       maxChargeKg: Math.round(25_000 * 1.6 ** 2),
-      maxHoles: Math.round(400 * 1.4 ** 2),
+      maxAreaM2: Math.round(6_400 * 1.4 ** 2),
       fee: Math.round(50_000 * 1.5 ** 2),
     });
   });
@@ -75,18 +79,16 @@ describe('permitLimitsFor', () => {
       const l = permitLimitsFor(5 + k);
       expect(l.maxChargeKg).toBe(Math.round(25_000 * 1.6 ** k));
       expect(l.fee).toBe(Math.round(50_000 * 1.5 ** k));
-      expect(l.maxHoles).toBe(Math.min(MAX_DRILL_GRID_HOLES, Math.round(400 * 1.4 ** k)));
+      expect(l.maxAreaM2).toBe(Math.round(6_400 * 1.4 ** k));
     }
   });
 
-  it('hole limit never exceeds the drill grid cap', () => {
-    expect(permitLimitsFor(40).maxHoles).toBe(MAX_DRILL_GRID_HOLES);
-    expect(permitLimitsFor(200).maxHoles).toBe(MAX_DRILL_GRID_HOLES);
-  });
-
-  it('charge and fee keep growing past the hole cap', () => {
-    expect(permitLimitsFor(41).maxChargeKg).toBeGreaterThan(permitLimitsFor(40).maxChargeKg);
-    expect(permitLimitsFor(41).fee).toBeGreaterThan(permitLimitsFor(40).fee);
+  it('charge, area and fee keep growing deep into the endless classes: the area has no hole cap to stop at', () => {
+    for (const grade of [40, 200]) {
+      expect(permitLimitsFor(grade + 1).maxChargeKg).toBeGreaterThan(permitLimitsFor(grade).maxChargeKg);
+      expect(permitLimitsFor(grade + 1).maxAreaM2).toBeGreaterThan(permitLimitsFor(grade).maxAreaM2);
+      expect(permitLimitsFor(grade + 1).fee).toBeGreaterThan(permitLimitsFor(grade).fee);
+    }
   });
 
   it('limits grow with every grade', () => {
@@ -95,7 +97,7 @@ describe('permitLimitsFor', () => {
       const b = permitLimitsFor(grade + 1);
       expect(b.maxChargeKg).toBeGreaterThan(a.maxChargeKg);
       expect(b.fee).toBeGreaterThan(a.fee);
-      expect(b.maxHoles).toBeGreaterThanOrEqual(a.maxHoles);
+      expect(b.maxAreaM2).toBeGreaterThan(a.maxAreaM2);
     }
   });
 
@@ -114,46 +116,55 @@ describe('permitLimitsFor', () => {
 });
 
 describe('preFireCheck', () => {
-  it('the standard opening (9 holes at 4 kg = 36 kg) is within the grade-0 permit', () => {
-    const c = preFireCheck(0, charges(9, 4), 9);
+  it('the standard opening (a 4 m 3x3 at 4 kg a hole: 36 kg over 144 m²) is within the grade-0 permit', () => {
+    const c = preFireCheck(0, charges(9, 4), areaOf(9));
     expect(c.over).toBe(false);
     expect(c.overshoot).toBe(0);
     expect(c.planKg).toBe(36);
-    expect(c.planHoles).toBe(9);
+    expect(c.planAreaM2).toBe(144);
     expect(c.fee).toBe(250);
-    expect(c.limits).toEqual({ maxChargeKg: 40, maxHoles: 9, fee: 250 });
+    expect(c.limits).toEqual({ maxChargeKg: 40, maxAreaM2: 144, fee: 250 });
   });
 
   it('exactly at both limits is not over', () => {
-    const c = preFireCheck(0, charges(8, 5), 9);
+    const c = preFireCheck(0, charges(8, 5), areaOf(9));
     expect(c.planKg).toBe(40);
+    expect(c.planAreaM2).toBe(permitLimitsFor(0).maxAreaM2);
     expect(c.over).toBe(false);
     expect(c.overshoot).toBe(0);
   });
 
   it('a 3x3 at 5 kg per hole (45 kg) is over by 12.5%', () => {
-    const c = preFireCheck(0, charges(9, 5), 9);
+    const c = preFireCheck(0, charges(9, 5), areaOf(9));
     expect(c.planKg).toBe(45);
     expect(c.over).toBe(true);
     expect(c.overshoot).toBeCloseTo(0.125, 10);
   });
 
-  it('too many holes alone is over', () => {
-    const c = preFireCheck(0, charges(12, 1), 12);
+  it('too much area alone is over, by its fraction of the limit', () => {
+    const c = preFireCheck(0, charges(12, 1), areaOf(12));
     expect(c.over).toBe(true);
-    expect(c.overshoot).toBeCloseTo(3 / 9, 10);
+    expect(c.overshoot).toBeCloseTo((192 - 144) / 144, 10);
+  });
+
+  it('a hair over the area limit is over', () => {
+    const c = preFireCheck(0, {}, 144.5);
+    expect(c.over).toBe(true);
+    expect(c.overshoot).toBeCloseTo(0.5 / 144, 10);
   });
 
   it('the larger of the two shares counts', () => {
-    // 45 kg is 12.5% over, 18 holes is 100% over.
-    const c = preFireCheck(0, charges(9, 5), 18);
+    // 45 kg is 12.5% over, 288 m² is 100% over.
+    const c = preFireCheck(0, charges(9, 5), areaOf(18));
     expect(c.overshoot).toBeCloseTo(1, 10);
+    // 80 kg is 100% over, 160 m² is 11% over.
+    expect(preFireCheck(0, charges(8, 10), areaOf(10)).overshoot).toBeCloseTo(1, 10);
   });
 
-  it('holes count comes from the argument, kg from the charges', () => {
-    const c = preFireCheck(0, charges(2, 5), 9);
+  it('the area comes from the argument, the kg from the charges', () => {
+    const c = preFireCheck(0, charges(2, 5), areaOf(9));
     expect(c.planKg).toBe(10);
-    expect(c.planHoles).toBe(9);
+    expect(c.planAreaM2).toBe(144);
     expect(c.over).toBe(false);
   });
 
@@ -161,26 +172,33 @@ describe('preFireCheck', () => {
     const c = preFireCheck(0, {}, 0);
     expect(c.over).toBe(false);
     expect(c.planKg).toBe(0);
+    expect(c.planAreaM2).toBe(0);
     expect(c.overshoot).toBe(0);
   });
 
   it('a higher grade admits the same plan and charges its own fee', () => {
-    const c = preFireCheck(1, charges(9, 5), 9);
+    const c = preFireCheck(1, charges(9, 5), areaOf(9));
     expect(c.over).toBe(false);
     expect(c.fee).toBe(1_000);
     expect(c.limits).toEqual(permitLimitsFor(1));
   });
 
   it('the fee is due even when the plan is tiny', () => {
-    expect(preFireCheck(2, charges(1, 1), 1).fee).toBe(3_000);
+    expect(preFireCheck(2, charges(1, 1), areaOf(1)).fee).toBe(3_000);
   });
 
   it('works on an endless class', () => {
     const l = permitLimitsFor(7);
-    const c = preFireCheck(7, charges(1, l.maxChargeKg * 2), 1);
+    const c = preFireCheck(7, charges(1, l.maxChargeKg * 2), areaOf(1));
     expect(c.over).toBe(true);
     expect(c.overshoot).toBeCloseTo(1, 10);
     expect(c.fee).toBe(l.fee);
+  });
+
+  it('measures an endless class\'s area against its own, larger limit', () => {
+    const l = permitLimitsFor(6);
+    expect(preFireCheck(6, {}, l.maxAreaM2).over).toBe(false);
+    expect(preFireCheck(6, {}, l.maxAreaM2 * 1.5).overshoot).toBeCloseTo(0.5, 10);
   });
 });
 
@@ -276,7 +294,7 @@ describe('liveStrikes', () => {
 
 describe('resolveOvershoot', () => {
   const overshoot = 0.125;
-  const check = () => preFireCheck(0, charges(9, 5), 9);
+  const check = () => preFireCheck(0, charges(9, 5), areaOf(9));
 
   it('a caught blast pays the fine under fines, loses 5 neighbour points and takes a strike', () => {
     const tick = findTick(overshoot, true);
@@ -356,7 +374,7 @@ describe('resolveOvershoot', () => {
   });
 
   it('a larger overshoot costs a larger fine', () => {
-    const big = preFireCheck(0, charges(8, 10), 18); // 100% over
+    const big = preFireCheck(0, charges(8, 10), areaOf(18)); // 100% over on both
     const tick = findTick(1, true);
     const { state, g, emitter } = site(tick);
     const v = resolveOvershoot(state, g, big, emitter);

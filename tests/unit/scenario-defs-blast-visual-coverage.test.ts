@@ -35,20 +35,18 @@ describe('blast-execution-visual — collapse / projection / large-blast coverag
   it('includes a low-charge blast guaranteed to collapse in place with zero projections', () => {
     const scenario = loadScenarioDef(SCENARIO_NAME, SCENARIO_DIR);
     const commands = commandsOf(scenario.steps);
-    // Verified via command-mode run: rows:2 cols:2 spacing:4 depth:6 + amount:2
-    // stemming:2 boomite yields "Projections: 0" in the blast report — every
-    // fragment collapses, none crosses PROJECTION_VELOCITY_THRESHOLD.
-    expect(commands).toContain('charge hole:* explosive:boomite amount:2 stemming:2');
+    // Each hole is filled up to the stemming: 5 m of stemming in the 6 m holes leaves a 1 m column,
+    // 2 kg of boomite — every fragment collapses, none crosses PROJECTION_SPEED_THRESHOLD.
+    expect(commands).toContain('charge hole:* explosive:boomite stemming:5');
   });
 
   it('includes a max-charge, min-stemming blast guaranteed to produce projected fragments', () => {
     const scenario = loadScenarioDef(SCENARIO_NAME, SCENARIO_DIR);
     const commands = commandsOf(scenario.steps);
-    // boomite's valid range is [1-8]kg (src/core/world/ExplosiveCatalog.ts) — 8kg with
-    // minimal stemming maximises surfaceProximityFactor and stemming efficiency together.
-    // 0.5m, not 0, because the stemming stepper floors there (Charge.ts adjustStemming,
-    // Math.max(0.5, ...)) — the command must match what interaction mode can actually click.
-    const heavyOvercharges = commands.filter(c => c === 'charge hole:* explosive:boomite amount:8 stemming:0.5');
+    // Filled up to the minimum stemming, a hole holds the most explosive it can and vents it:
+    // the heaviest charge with the worst stemming. 0.5m, not 0, because the stemming stepper
+    // floors there (MIN_STEMMING_M) — the command must match what interaction mode can click.
+    const heavyOvercharges = commands.filter(c => c === 'charge hole:* explosive:boomite stemming:0.5');
     // Used once for the dedicated projection demo, once again for the large blast.
     expect(heavyOvercharges.length).toBeGreaterThanOrEqual(2);
   });

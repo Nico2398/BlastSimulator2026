@@ -89,15 +89,10 @@
       }
     },
     {
-      "command": "charge hole:* explosive:krackle amount:6 stemming:2",
+      "command": "charge hole:* explosive:krackle stemming:2",
       "role": "player",
-      "description": "Load 6 kg of Krackle per hole, drawn from the kit's starter stock.",
+      "description": "Fill each 6 m hole with Krackle up to the 2 m stemming (11.5 kg per hole), drawn from the kit's starter stock.",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 6
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
@@ -185,15 +180,15 @@
       }
     },
     {
-      "command": "wait_until field:tickCount equals:270 max_ticks:50",
+      "command": "wait_until field:tickCount equals:323 max_ticks:50",
       "role": "setup",
       "timeout": 300,
-      "description": "The classifier stamps the shot's rubble out of reach on the first ticks after the blast, and the offer reads those stamps. The sim does not advance by itself while the harness waits on the report, so the ticks are driven here.",
+      "description": "The classifier stamps the shot's rubble out of reach on the first ticks after the blast, and the offer reads those stamps. The sim does not advance by itself while the harness waits on the report, so the ticks are driven here. Fill mode: the heavier fill loads slower, so the shot fires at tick 307 (was 254) and the wait runs to 323, the same 16 ticks after it (was 270).",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "tickCount",
-          "equals": 270,
+          "equals": 323,
           "maxTicks": 50,
           "timeoutMs": 120000
         },
@@ -265,10 +260,38 @@
       ]
     },
     {
+      "command": "tick 60",
+      "role": "setup",
+      "timeout": 120,
+      "description": "The rubble on the crater floor is now reachable: the unreachable-order ghosts clear. Measured under fill mode (11.5 kg of Krackle per hole): the ramp is dug by tick 889 and over the next 60 ticks the ghosts fall ~6800 -> ~2760, where they stay (the bigger crater keeps part of its floor out of the one ramp's reach).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 60"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "unreachableGhostCount"
+        ]
+      }
+    },
+    {
+      "command": "contract auto rubble off",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract auto rubble off"
+        }
+      ],
+      "description": "Stop auto-accepting rubble-disposal contracts for the window below: they take 3-6.5 t straight off the heap every 50-80 ticks, which would hide the haulers' deliveries from the heap's own reading."
+    },
+    {
       "command": "tick 100",
       "role": "setup",
       "timeout": 120,
-      "description": "The rubble on the crater floor is now reachable: the unreachable-order ghosts clear and the haulers carry spoil out to the heap. Ore is sold on the way (auto-sell), so stored ore is no signal. The window is 100 ticks: spoil stored on the heap starts draining after that, and since each load costs the hauler HAUL_LOAD_TICKS the drain wins over 300 ticks or more (tick 300 ends at 6630 kg from 7370, tick 800 at 4071; measured for #2199).",
+      "description": "The haulers carry the crater's spoil out to the heap. Ore is sold on the way (auto-sell), so stored ore is no signal; with rubble-disposal contracts no longer drawing on it, the heap only grows while the crater is hauled out.",
       "interaction": [
         {
           "type": "command",
@@ -276,9 +299,6 @@
         }
       ],
       "expect": {
-        "decreased": [
-          "unreachableGhostCount"
-        ],
         "increased": [
           "storedSpoilKg"
         ]

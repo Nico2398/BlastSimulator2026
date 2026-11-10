@@ -16,7 +16,7 @@ import type { TaskCompletionReport } from './TickPipeline.js';
 import { Random } from '../math/Random.js';
 import { completeVehicleGatedAction } from './VehicleReservation.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../mining/SurveyCalc.js';
-import { landDrilledHole } from '../mining/DrillPlan.js';
+import { landDrilledHole, drillHoleCost } from '../mining/DrillPlan.js';
 import { landLoadedCharge } from '../mining/ChargePlan.js';
 import { canAffordChargeLoad, loadChargeExplosive } from '../mining/ChargeLoad.js';
 import { prefetchBlastZone } from '../mining/BlastExecution.js';
@@ -26,7 +26,7 @@ import { carveLevelColumns } from '../mining/LevelGround.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { getVehicleDefByTier } from '../entities/Vehicle.js';
-import { addIncome } from '../economy/Finance.js';
+import { addIncome, deductExpense } from '../economy/Finance.js';
 import { completeUpgrade, checkUpgradeFootprint } from './BuildingUpgrade.js';
 import { completeDemolition } from './BuildingDemolition.js';
 import { readDemolishPayload } from './DemolishPayload.js';
@@ -196,6 +196,8 @@ export function applyTaskCompletion(
         const [planned] = state.plannedDrillHoles.splice(plannedIdx, 1);
         const drilled = landDrilledHole(planned!);
         state.drillHoles.push(drilled);
+        // Paid as the hole is finished: what a finer mesh over the same ground costs (DRILL_COST_PER_METRE).
+        deductExpense(state, drillHoleCost(drilled.depth, drilled.diameter), 'drilling', `Drilling: hole ${drilled.id}`);
         autoChargeHole(state, drilled);
         if (state.navGrid && grid) {
           const cx = Math.floor(drilled.x);

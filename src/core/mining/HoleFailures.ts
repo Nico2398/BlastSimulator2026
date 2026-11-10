@@ -40,7 +40,7 @@ export function analyseHoleFailures(input: HoleFailureInput): HoleFailure[] {
     const surfaceY = holeSurfaceYs[hole.id] ?? 0;
     const hx = Math.floor(hole.x);
     const hz = Math.floor(hole.z);
-    const cells = buildHoleSeeds(surfaceY, hole.depth, charge.amountKg, 1, hx, hz, field.box.minY, hole.diameter);
+    const cells = buildHoleSeeds(surfaceY, hole.depth, charge.amountKg, 1, hx, hz, field.box.minY, hole.diameter, charge.explosiveId);
     if (cells.length === 0) continue;
 
     let chargeBroke = false;

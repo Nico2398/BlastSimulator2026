@@ -160,7 +160,7 @@
       }
     },
     {
-      "command": "charge hole:H1 explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:H1 explosive:boomite stemming:2",
       "role": "player",
       "description": "#2203: the player charges hole the first hole with the selected card by clicking its row button (orders the charge; the blaster loads it next step).",
       "interaction": [

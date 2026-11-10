@@ -2,7 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PERMIT_LIMITS } from '../../../src/core/config/balance.js';
+import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
+import { patternAreaM2 } from '../../../src/core/mining/ChargePlan.js';
 import { RELOAD_FRACTION, shouldReload, SHOT } from '../../../scripts/shared/probe-strategies.js';
+
+/** Permit area (m²) of the reference opening's grid, as the permit measures the holes `drill_plan grid` lays out. */
+const shotAreaM2 = (): number =>
+  patternAreaM2(createGridPlan({ nextHoleId: 1 }, { x: 0, z: 0 }, SHOT.rows, SHOT.cols, SHOT.spacing, SHOT.depth, 0.089));
 
 describe('probe reload gate', () => {
   it('RELOAD_FRACTION is one half', () => {
@@ -47,22 +53,23 @@ describe('reference opening SHOT (#1944)', () => {
     expect(SHOT.rows * SHOT.cols * SHOT.kg).toBeLessThanOrEqual(limit.maxChargeKg);
   });
 
-  it('hole count fits the grade-0 permit', () => {
-    expect(SHOT.rows * SHOT.cols).toBeLessThanOrEqual(limit.maxHoles);
+  it('pattern area fits the grade-0 permit', () => {
+    expect(shotAreaM2()).toBe(SHOT.rows * SHOT.cols * SHOT.spacing ** 2);
+    expect(shotAreaM2()).toBeLessThanOrEqual(limit.maxAreaM2);
   });
 });
 
 describe('PERMIT_LIMITS monotonic (#1944)', () => {
-  it('maxChargeKg and maxHoles strictly rise grade 0 < 1 < 2', () => {
+  it('maxChargeKg and maxAreaM2 strictly rise grade 0 < 1 < 2', () => {
     for (const g of [0, 1]) {
       expect(PERMIT_LIMITS[g]!.maxChargeKg).toBeLessThan(PERMIT_LIMITS[g + 1]!.maxChargeKg);
-      expect(PERMIT_LIMITS[g]!.maxHoles).toBeLessThan(PERMIT_LIMITS[g + 1]!.maxHoles);
+      expect(PERMIT_LIMITS[g]!.maxAreaM2).toBeLessThan(PERMIT_LIMITS[g + 1]!.maxAreaM2);
     }
   });
 
   it('grade-1 limits accommodate the grade-0 reference opening', () => {
     expect(PERMIT_LIMITS[1]!.maxChargeKg).toBeGreaterThanOrEqual(SHOT.rows * SHOT.cols * SHOT.kg);
-    expect(PERMIT_LIMITS[1]!.maxHoles).toBeGreaterThanOrEqual(SHOT.rows * SHOT.cols);
+    expect(PERMIT_LIMITS[1]!.maxAreaM2).toBeGreaterThanOrEqual(shotAreaM2());
   });
 });
 

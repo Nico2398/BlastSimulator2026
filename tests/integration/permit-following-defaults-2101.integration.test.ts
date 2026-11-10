@@ -1,22 +1,24 @@
 // BlastSimulator2026 — Integration: the permit-following Blast Workshop defaults (#2101).
 //
-// A grade-0 site (the sandbox's permit) is limited to nine holes and 40 kg a blast. The panel's
-// untouched defaults used to be 8 m holes and 7 kg a hole: nine holes charged at the default
-// overran the permit, drew a strike, and (with the kit explosive) overflowed the hole. The
-// defaults now follow the permit, so a player who steps nothing fires a clean, legal blast.
-// Played through the console as the panel would send it: a 3x3 grid at the grade-0 default
-// depth, charged at the grade-0 default amount of the default explosive.
+// A grade-0 site (the sandbox's permit) is limited to 40 kg and 144 m² of pattern a blast. The panel's untouched
+// defaults used to overrun it: nine holes charged at the default drew a strike, and (with the kit explosive)
+// overflowed the hole. The defaults now follow the permit, so a player who steps nothing fires a clean, legal
+// blast: the Drill step opens at the grade-0 depth, and the Charge step at the stemming that keeps the holes,
+// each filled with explosive up to it, inside the permit's kilograms.
+// Played through the console as the panel would send it: a 3x3 grid at the grade-0 default depth, filled with the
+// default explosive up to the grade-0 default stemming (no amount: Charge All fills every hole).
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
-import { defaultChargeKg, defaultGridDepthM } from '../../src/core/economy/PermitDefaults.js';
-import { preFireCheck } from '../../src/core/economy/PermitLimits.js';
+import { defaultGridDepthM, defaultStemmingM } from '../../src/core/economy/PermitDefaults.js';
+import { permitLimitsFor, preFireCheck } from '../../src/core/economy/PermitLimits.js';
+import { fillChargeKg, patternAreaM2 } from '../../src/core/mining/ChargePlan.js';
+import type { DrillHole } from '../../src/core/mining/DrillPlan.js';
 import {
   CHARGE_DEFAULT_STEMMING_M,
-  DRILL_HOLE_DEFAULT_DIAMETER_M,
   SANDBOX_FLAT_PAD_SIZE,
 } from '../../src/core/config/balance.js';
 import { fundForDeliveryWait, clearBlastZone } from '../helpers/playthrough.js';
@@ -56,14 +58,14 @@ function flattestPad(grid: VoxelGrid, depthM: number): { x0: number; z0: number 
 interface Played {
   state: GameState;
   outputs: { command: string; success: boolean; output: string }[];
-  chargeKg: number;
+  stemmingM: number;
   depthM: number;
-  holesAtFire: number;
+  holesAtFire: DrillHole[];
   chargesAtFire: GameState['chargesByHole'];
   planCheck: ReturnType<typeof preFireCheck>;
 }
 
-/** Sandbox start, then the untouched-defaults shot: drill, charge, fire. */
+/** Sandbox start, then the untouched-defaults shot: drill, fill every hole up to the default stemming, fire. */
 function playDefaultShot(seed: number, kit: 'full' | 'digger'): Played {
   const { runner, ctx } = createRunner();
   const outputs: Played['outputs'] = [];
@@ -78,24 +80,23 @@ function playDefaultShot(seed: number, kit: 'full' | 'digger'): Played {
   refresh(state);
 
   const depthM = defaultGridDepthM(state.grade?.grade);
-  const chargeKg = defaultChargeKg(
-    state.grade?.grade, GRID_SIDE * GRID_SIDE, depthM, CHARGE_DEFAULT_STEMMING_M, DRILL_HOLE_DEFAULT_DIAMETER_M,
-  );
   const pad = flattestPad((ctx as GameContext).grid!, depthM);
 
   run(`drill_plan grid rows:${GRID_SIDE} cols:${GRID_SIDE} spacing:${SPACING_M} depth:${depthM} start:${pad.x0 + 1},${pad.z0 + 1}`);
   tickWhile(run, state, () => state.plannedDrillHoles.length === 0, 1500);
-  run(`charge hole:* explosive:${DEFAULT_EXPLOSIVE} amount:${chargeKg}kg stemming:${CHARGE_DEFAULT_STEMMING_M}m`);
+  // The stemming the Charge step opens at, for the holes it sees (drilled and still planned).
+  const stemmingM = defaultStemmingM(state.grade?.grade, [...state.drillHoles, ...state.plannedDrillHoles], DEFAULT_EXPLOSIVE);
+  run(`charge hole:* explosive:${DEFAULT_EXPLOSIVE} stemming:${stemmingM}m`);
   tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
 
-  const holesAtFire = state.drillHoles.length;
+  const holesAtFire = state.drillHoles.map(h => ({ ...h }));
   const chargesAtFire = { ...state.chargesByHole };
-  const planCheck = preFireCheck(state.grade?.grade ?? 0, chargesAtFire, holesAtFire);
+  const planCheck = preFireCheck(state.grade?.grade ?? 0, chargesAtFire, patternAreaM2(holesAtFire));
 
   clearBlastZone(run, state);
   run('blast detonate');
   tickWhile(run, state, () => state.lastBlastReport !== null, 600);
-  return { state, outputs, chargeKg, depthM, holesAtFire, chargesAtFire, planCheck };
+  return { state, outputs, stemmingM, depthM, holesAtFire, chargesAtFire, planCheck };
 }
 
 describe.each([
@@ -115,23 +116,39 @@ describe.each([
 
   it('drills nine holes and charges every one of them', () => {
     const played = shot();
-    expect(played.holesAtFire).toBe(GRID_SIDE * GRID_SIDE);
+    expect(played.holesAtFire).toHaveLength(GRID_SIDE * GRID_SIDE);
     expect(Object.keys(played.chargesAtFire)).toHaveLength(GRID_SIDE * GRID_SIDE);
   }, T);
 
-  it('the charge command never reports the amount overflowing a hole', () => {
+  it('the default stemming is raised above 2.5 m: filled at the default, the nine holes would overrun the permit', () => {
     const played = shot();
+    const filledAt = (stemmingM: number): number =>
+      played.holesAtFire.reduce((sum, h) => sum + fillChargeKg(h.depth, stemmingM, h.diameter, DEFAULT_EXPLOSIVE), 0);
+    expect(filledAt(CHARGE_DEFAULT_STEMMING_M)).toBeGreaterThan(permitLimitsFor(0).maxChargeKg);
+    expect(played.stemmingM).toBeGreaterThan(CHARGE_DEFAULT_STEMMING_M);
+    expect(played.stemmingM).toBeLessThan(played.depthM);
+  }, T);
+
+  it('every hole is filled up to that stemming, and the charge command never reports a hole it cannot fill', () => {
+    const played = shot();
+    for (const h of played.holesAtFire) {
+      const charge = played.chargesAtFire[h.id]!;
+      expect(charge.explosiveId, h.id).toBe(DEFAULT_EXPLOSIVE);
+      expect(charge.stemmingM, h.id).toBe(played.stemmingM);
+      expect(charge.amountKg, h.id).toBe(fillChargeKg(h.depth, played.stemmingM, h.diameter, DEFAULT_EXPLOSIVE));
+      expect(charge.amountKg, h.id).toBeGreaterThan(0);
+    }
     const text = played.outputs.map(o => o.output).join('\n');
     expect(text).not.toMatch(/Maximum that fits/i);
     expect(text).not.toMatch(/overflows/i);
-    expect(text).not.toMatch(/at most \d+(\.\d+)? kg fits/i);
+    expect(text).not.toMatch(/No room for explosive/i);
   }, T);
 
-  it('the plan stays within the grade-0 permit before firing', () => {
+  it('the plan stays within the grade-0 permit before firing, in kilograms and in pattern area', () => {
     const played = shot();
     expect(played.planCheck.over).toBe(false);
     expect(played.planCheck.planKg).toBeLessThanOrEqual(played.planCheck.limits.maxChargeKg);
-    expect(played.planCheck.planHoles).toBeLessThanOrEqual(played.planCheck.limits.maxHoles);
+    expect(played.planCheck.planAreaM2).toBeLessThanOrEqual(played.planCheck.limits.maxAreaM2);
   }, T);
 
   it('firing draws no permit strike', () => {

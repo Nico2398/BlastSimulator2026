@@ -9,7 +9,7 @@ import { resolveMarketId } from '../../../core/campaign/Level.js';
 import { drain, type Steps } from '../../../core/engine/Steps.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
-import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
+import { patternAreaM2, plannedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { addBlastFragments, reserveFragmentIds } from '../../../core/economy/Logistics.js';
 import type { WarehouseLoss } from '../../../core/economy/FreightWarehouses.js';
 import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
@@ -136,7 +136,7 @@ export function* fireBlastSteps(
   const permitLines: string[] = [];
   const grade = ctx.state!.grade;
   if (grade) {
-    const check = preFireCheck(grade.grade, plan.charges, plan.holes.length);
+    const check = preFireCheck(grade.grade, plan.charges, patternAreaM2(plan.holes));
     recordBlastChargeShare(grade, check.planKg, check.limits.maxChargeKg);
     deductExpense(ctx.state!, check.fee, 'permits', 'Blast Notification Form B-52');
     permitLines.push(t('mining.blast.permit_fee', { fee: formatMoney(check.fee) }));

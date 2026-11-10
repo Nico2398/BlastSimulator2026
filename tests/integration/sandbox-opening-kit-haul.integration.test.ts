@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Integration: opening-kit blast, ramp, haul (#1719).
 //
 // The Normal sandbox opening kit (no fragmenter, no staffed:true) fires a 3x3
-// shot, then orders a ramp into the crater. A ramp layer's work target is its
+// shot (krackle filled to 3.9 m of stemming: 6.0 kg in each 6 m hole), then
+// orders a ramp into the crater. A ramp layer's work target is its
 // band centre; when that sits over the crater the digger cannot stand there
 // and the last layers stayed `target_unreachable` forever, so the ramp never
 // finished and almost none of the ore was hauled (2-12 t). The lead layer must
@@ -76,7 +77,7 @@ function openingKitHaul(side: 'west' | 'east') {
 
   expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${SHOT_START}`)).toMatchObject({ success: true });
   tickWhile(run, state, () => state.plannedDrillHoles.length === 0, 1500);
-  expect(run('charge hole:* explosive:krackle amount:6 stemming:2')).toMatchObject({ success: true });
+  expect(run('charge hole:* explosive:krackle stemming:3.9')).toMatchObject({ success: true });
   tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
   expect(run('blast detonate')).toMatchObject({ success: true });
   tickWhile(run, state, () => state.lastBlastReport !== null, 600);

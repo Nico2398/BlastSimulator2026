@@ -547,7 +547,7 @@ describe('BlastWorkshop — energy heatmap section', () => {
     expect(sectionCells(workshop.root)).toHaveLength(0);
   });
 
-  it('#2200 C8: an overcharged hole under heavy stemming reads fines or dust at the bottom of its column and intact or cracked near the collar', () => {
+  it('#2200 C8: an overcharged hole under heavy stemming reads fines or dust at its charge and intact or cracked near the collar', () => {
     const { workshop } = makeWorkshop();
     const state = makeState();
     const hole = addHole(holeCounter, state.drillHoles, 12, 12, 8, 0.15);
@@ -563,9 +563,14 @@ describe('BlastWorkshop — energy heatmap section', () => {
     const column = marked.flatMap(el => (el.matches('[data-band]') ? [el] : Array.from(el.querySelectorAll<HTMLElement>('[data-band]'))));
     expect(column.length).toBeGreaterThan(3);
 
-    const ends = [column[0]!.dataset['band']!, column[column.length - 1]!.dataset['band']!];
+    // Top to bottom: the collar under its stemming is coarse, the charge at the bottom of the hole is
+    // ground fine, and the floor under the hole's bottom keeps none of the energy, so it stays intact.
+    const bands = column.map(c => c.dataset['band']!);
     const fine = (b: string) => b === 'fines' || b === 'dust';
     const coarse = (b: string) => b === 'intact' || b === 'cracked';
-    expect((fine(ends[0]!) && coarse(ends[1]!)) || (coarse(ends[0]!) && fine(ends[1]!))).toBe(true);
+    expect(coarse(bands[0]!)).toBe(true);
+    const lastFine = bands.map(fine).lastIndexOf(true);
+    expect(lastFine).toBeGreaterThan(0);
+    expect(bands.slice(lastFine + 1).every(b => b === 'intact')).toBe(true);
   });
 });

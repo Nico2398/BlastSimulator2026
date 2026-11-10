@@ -1,19 +1,42 @@
 // BlastSimulator2026 — permitPreview view model (#1925): plan vs the mine's permit.
+// The permit caps a blast's kilograms and the ground it works: the area of its holes' pattern cells
+// (`patternAreaM2`), measured from the real holes — never how many holes do it.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { permitPreview, gridHoleLimitWarning, chargeKgLimitWarning } from '../../../../src/ui/panels/permitPreview.js';
+import { permitPreview, gridAreaLimitWarning, chargeKgLimitWarning } from '../../../../src/ui/panels/permitPreview.js';
 import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
 import { permitLimitsFor, preFireCheck, inspectionChance, inspectionFine, liveStrikes } from '../../../../src/core/economy/PermitLimits.js';
-import { PERMIT_STRIKE_WINDOW_TICKS, PERMIT_STRIKES_TO_SUSPEND } from '../../../../src/core/config/balance.js';
+import {
+  DRILL_GRID_DEFAULT_SPACING_M, PERMIT_STRIKE_WINDOW_TICKS, PERMIT_STRIKES_TO_SUSPEND,
+} from '../../../../src/core/config/balance.js';
 import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
 import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
+import type { DrillHole } from '../../../../src/core/mining/DrillPlan.js';
 
-/** Plan of `holes` holes with `kgPerHole` kg each. */
-function plan(holes: number, kgPerHole: number) {
-  const ids = Array.from({ length: holes }, (_, i) => ({ id: i + 1 }));
+/** A hole as the permit measures it: where it stands and the pattern cell it was drilled in. */
+type PermitHole = Pick<DrillHole, 'id' | 'x' | 'z' | 'spacingM' | 'burdenM'>;
+
+/** Cell side (m) of the test patterns: the default 4 m grid the permit areas are written for, 16 m² a hole. */
+const CELL_M = DRILL_GRID_DEFAULT_SPACING_M;
+const CELL_M2 = CELL_M * CELL_M;
+
+/**
+ * `count` holes of one grid pattern `cellM` apart, rows of ten, each recording its `cellM` x `cellM` cell as a
+ * drilled grid does. `firstId` continues an earlier batch of the same pattern (ids and positions both).
+ */
+function gridHoles(count: number, cellM = CELL_M, firstId = 1): PermitHole[] {
+  return Array.from({ length: count }, (_, i) => {
+    const index = firstId - 1 + i;
+    return { id: `H${index + 1}`, x: (index % 10) * cellM, z: Math.floor(index / 10) * cellM, spacingM: cellM, burdenM: cellM };
+  });
+}
+
+/** Plan of `holes` grid holes `cellM` apart with `kgPerHole` kg each. */
+function plan(holes: number, kgPerHole: number, cellM = CELL_M) {
+  const pattern = gridHoles(holes, cellM);
   const charges: Record<string, { amountKg: number }> = {};
-  for (const h of ids) charges[String(h.id)] = { amountKg: kgPerHole };
-  return { holes: ids, charges };
+  for (const h of pattern) charges[h.id] = { amountKg: kgPerHole };
+  return { holes: pattern, charges };
 }
 
 describe('permitPreview', () => {
@@ -21,31 +44,39 @@ describe('permitPreview', () => {
     expect(permitPreview(undefined, plan(3, 5), 0)).toBeNull();
   });
 
-  it('within limit: shows used / limit kg and holes at grade 0 and is not over', () => {
+  it('within limit: shows used / limit kg and area at grade 0 and is not over', () => {
     const p = permitPreview(createGradeState(), plan(9, 4), 0)!;
     expect(p.over).toBe(false);
+    expect(p.kgOver).toBe(false);
+    expect(p.areaOver).toBe(false);
     expect(p.kgText).toContain('36 / 40 kg');
-    expect(p.holesText).toContain('9 / 9 holes');
+    expect(p.areaText).toContain('144 / 144 m²');
   });
 
   it('exactly at both limits is not over', () => {
     const lim = permitLimitsFor(0);
-    const p = permitPreview(createGradeState(), plan(lim.maxHoles, lim.maxChargeKg / lim.maxHoles), 0)!;
+    const holes = lim.maxAreaM2 / CELL_M2;
+    expect(Number.isInteger(holes)).toBe(true);
+    const p = permitPreview(createGradeState(), plan(holes, lim.maxChargeKg / holes), 0)!;
     expect(p.over).toBe(false);
   });
 
   it('over by kg only', () => {
     const p = permitPreview(createGradeState(), plan(9, 5), 0)!;
     expect(p.over).toBe(true);
+    expect(p.kgOver).toBe(true);
+    expect(p.areaOver).toBe(false);
     expect(p.kgText).toContain('45 / 40 kg');
-    expect(p.holesText).toContain('9 / 9 holes');
+    expect(p.areaText).toContain('144 / 144 m²');
     expect(p.warningText.length).toBeGreaterThan(0);
   });
 
-  it('over by holes only', () => {
+  it('over by area only', () => {
     const p = permitPreview(createGradeState(), plan(10, 1), 0)!;
     expect(p.over).toBe(true);
-    expect(p.holesText).toContain('10 / 9 holes');
+    expect(p.areaOver).toBe(true);
+    expect(p.kgOver).toBe(false);
+    expect(p.areaText).toContain('160 / 144 m²');
     expect(p.kgText).toContain('10 / 40 kg');
   });
 
@@ -53,7 +84,33 @@ describe('permitPreview', () => {
     const p = permitPreview(createGradeState(), plan(12, 5), 0)!;
     expect(p.over).toBe(true);
     expect(p.kgText).toContain('60 / 40 kg');
-    expect(p.holesText).toContain('12 / 9 holes');
+    expect(p.areaText).toContain('192 / 144 m²');
+  });
+
+  it('measures the ground, not the hole count: a finer mesh over the same area fits the permit', () => {
+    // Sixteen holes on a 3 m mesh work 144 m², the grade-0 area; on the 4 m mesh they work 256 m².
+    const fine = permitPreview(createGradeState(), plan(16, 2, 3), 0)!;
+    expect(fine.over).toBe(false);
+    expect(fine.areaText).toContain('144 / 144 m²');
+    const coarse = permitPreview(createGradeState(), plan(16, 2), 0)!;
+    expect(coarse.areaOver).toBe(true);
+    expect(coarse.areaText).toContain('256 / 144 m²');
+  });
+
+  it('a hole drilled without a pattern cell is measured from where it stands: a square as wide as its nearest neighbour is far', () => {
+    const handPlaced = (gap: number): PermitHole[] =>
+      Array.from({ length: 9 }, (_, i) => ({ id: `A${i}`, x: (i % 3) * gap, z: Math.floor(i / 3) * gap }));
+    const tight = permitPreview(createGradeState(), { holes: handPlaced(4), charges: {} }, 0)!;
+    expect(tight.areaText).toContain('144 / 144 m²');
+    expect(tight.over).toBe(false);
+    const spread = permitPreview(createGradeState(), { holes: handPlaced(5), charges: {} }, 0)!;
+    expect(spread.areaText).toContain('225 / 144 m²');
+    expect(spread.areaOver).toBe(true);
+  });
+
+  it('rounds the area to whole square metres', () => {
+    // Nine 3.5 m cells: 110.25 m².
+    expect(permitPreview(createGradeState(), plan(9, 1, 3.5), 0)!.areaText).toContain('110 / 144 m²');
   });
 
   it('within the limit carries an empty warning', () => {
@@ -97,10 +154,10 @@ describe('permitPreview', () => {
 describe('permitPreview consequence (#2166)', () => {
   beforeEach(() => { setLocale('en'); });
 
-  /** What the Contract says the consequence is, derived from the permit rules for `p`'s plan. */
+  /** What the Contract says the consequence is, derived from the permit rules for `p`'s plan (16 m² a hole). */
   function expected(holes: number, kgPerHole: number, strikeTicks: number[], tick: number) {
     const pl = plan(holes, kgPerHole);
-    const check = preFireCheck(0, pl.charges, pl.holes.length);
+    const check = preFireCheck(0, pl.charges, holes * CELL_M2);
     const chance = inspectionChance(check.overshoot);
     const fine = inspectionFine(check.fee, check.overshoot);
     const strikes = liveStrikes(strikeTicks, tick).length;
@@ -125,7 +182,7 @@ describe('permitPreview consequence (#2166)', () => {
     expect(p.fine).toBeGreaterThan(0);
   });
 
-  it('over by holes only: chance and fine follow the hole overshoot', () => {
+  it('over by area only: chance and fine follow the area overshoot', () => {
     const e = expected(10, 1, [], 0);
     const p = preview(10, 1);
     expect(p.inspectionChance).toBe(e.chance);
@@ -136,6 +193,13 @@ describe('permitPreview consequence (#2166)', () => {
   it('a bigger overshoot raises the chance and the fine', () => {
     const small = preview(9, 5);
     const big = preview(9, 6);
+    expect(big.inspectionChance).toBeGreaterThan(small.inspectionChance);
+    expect(big.fine).toBeGreaterThan(small.fine);
+  });
+
+  it('a bigger area overshoot raises the chance and the fine too', () => {
+    const small = preview(10, 1);
+    const big = preview(11, 1);
     expect(big.inspectionChance).toBeGreaterThan(small.inspectionChance);
     expect(big.fine).toBeGreaterThan(small.fine);
   });
@@ -179,7 +243,8 @@ describe('permitPreview consequence (#2166)', () => {
 
   it('exactly at both limits: nothing to warn about', () => {
     const lim = permitLimitsFor(0);
-    const p = permitPreview(createGradeState(), plan(lim.maxHoles, lim.maxChargeKg / lim.maxHoles), 0)!;
+    const holes = lim.maxAreaM2 / CELL_M2;
+    const p = permitPreview(createGradeState(), plan(holes, lim.maxChargeKg / holes), 0)!;
     expect(p.over).toBe(false);
     expect(p.inspectionChance).toBe(0);
     expect(p.fine).toBe(0);
@@ -189,6 +254,7 @@ describe('permitPreview consequence (#2166)', () => {
   it('an empty plan carries no consequence', () => {
     const p = permitPreview(createGradeState(), plan(0, 0), 0)!;
     expect(p.over).toBe(false);
+    expect(p.areaText).toContain('0 / 144 m²');
     expect(p.consequenceText).toBe('');
     expect(p.fine).toBe(0);
   });
@@ -202,69 +268,84 @@ describe('permitPreview consequence (#2166)', () => {
       expect(line).toBeTruthy();
       for (const param of ['{chance}', '{fine}', '{strikes}', '{limit}']) expect(line).toContain(param);
       expect(loc['permit.preview.warning']).toContain('{consequence}');
+      for (const param of ['{used}', '{limit}']) expect(loc['permit.preview.area']).toContain(param);
     }
     expect(en['permit.preview.consequence']).not.toBe(fr['permit.preview.consequence']);
   });
 });
 
-/** The consequence text the Contract attaches to a plan of `holes` holes and `kg` kg in total. */
+/** The consequence text the Contract attaches to a plan of `holes` 16 m² grid holes and `kg` kg in total. */
 function consequenceFor(holes: number, kg: number, strikeTicks: number[] = [], tick = 0): string {
   const g = createGradeState();
   g.strikeTicks = strikeTicks;
-  const ids = Array.from({ length: holes }, (_, i) => ({ id: i + 1 }));
-  return permitPreview(g, { holes: ids, charges: kg > 0 ? { total: { amountKg: kg } } : {} }, tick)!.consequenceText;
+  return permitPreview(g, { holes: gridHoles(holes), charges: kg > 0 ? { total: { amountKg: kg } } : {} }, tick)!.consequenceText;
 }
 
-describe('gridHoleLimitWarning (#2167: plan total)', () => {
+describe('gridAreaLimitWarning (#2167: the whole plan after the placement)', () => {
   beforeEach(() => { setLocale('en'); });
 
   it('null for an undefined grade', () => {
-    expect(gridHoleLimitWarning(undefined, 500)).toBeNull();
-    expect(gridHoleLimitWarning(undefined, 500, 500)).toBeNull();
+    expect(gridAreaLimitWarning(undefined, gridHoles(500))).toBeNull();
+    expect(gridAreaLimitWarning(undefined, gridHoles(500), 500)).toBeNull();
   });
 
   it('null at the limit', () => {
-    expect(gridHoleLimitWarning(createGradeState(), 9)).toBeNull();
+    expect(gridAreaLimitWarning(createGradeState(), gridHoles(9))).toBeNull();
   });
 
   it('null below the limit', () => {
-    expect(gridHoleLimitWarning(createGradeState(), 1)).toBeNull();
+    expect(gridAreaLimitWarning(createGradeState(), gridHoles(1))).toBeNull();
+    expect(gridAreaLimitWarning(createGradeState(), [])).toBeNull();
   });
 
-  it('null when added + existing sit exactly at the limit', () => {
-    expect(gridHoleLimitWarning(createGradeState(), 4, 5)).toBeNull();
+  it('null when the planned holes and the added ones sit exactly at the limit', () => {
+    expect(gridAreaLimitWarning(createGradeState(), [...gridHoles(5), ...gridHoles(4, CELL_M, 6)])).toBeNull();
   });
 
-  it('a grid that fits alone but overflows with existing holes warns', () => {
-    expect(gridHoleLimitWarning(createGradeState(), 9)).toBeNull();
-    expect(gridHoleLimitWarning(createGradeState(), 9, 3)).not.toBeNull();
+  it('a grid that fits alone but overflows with the holes already planned warns', () => {
+    const grid = gridHoles(9, CELL_M, 4);
+    expect(gridAreaLimitWarning(createGradeState(), grid)).toBeNull();
+    expect(gridAreaLimitWarning(createGradeState(), [...gridHoles(3), ...grid])).not.toBeNull();
   });
 
-  it('one existing hole too many over the limit warns even for a single added hole', () => {
-    expect(gridHoleLimitWarning(createGradeState(), 1, 9)).not.toBeNull();
-    expect(gridHoleLimitWarning(createGradeState(), 1, 8)).toBeNull();
+  it('one hole too many over the limit warns even for a single added hole', () => {
+    expect(gridAreaLimitWarning(createGradeState(), [...gridHoles(9), ...gridHoles(1, CELL_M, 10)])).not.toBeNull();
+    expect(gridAreaLimitWarning(createGradeState(), [...gridHoles(8), ...gridHoles(1, CELL_M, 9)])).toBeNull();
   });
 
-  it('states the plan total and the limit', () => {
-    const w = gridHoleLimitWarning(createGradeState(), 9, 3)!;
-    expect(w).toContain('12');
-    expect(w).toContain(String(permitLimitsFor(0).maxHoles));
+  it('states the plan area and the limit', () => {
+    const w = gridAreaLimitWarning(createGradeState(), [...gridHoles(3), ...gridHoles(9, CELL_M, 4)])!;
+    expect(w).toContain('192');
+    expect(w).toContain(String(permitLimitsFor(0).maxAreaM2));
   });
 
-  it('the total is existing + added, not the added count alone', () => {
-    const w = gridHoleLimitWarning(createGradeState(), 10, 5)!;
-    expect(w).toContain('15');
+  it('the area is the whole plan\'s, not the added holes\' alone', () => {
+    const w = gridAreaLimitWarning(createGradeState(), [...gridHoles(5), ...gridHoles(10, CELL_M, 6)])!;
+    expect(w).toContain('240');
   });
 
-  it('carries the consequence text of the plan total', () => {
-    const w = gridHoleLimitWarning(createGradeState(), 9, 3)!;
+  it('counts area, not holes: sixteen holes on a 3 m mesh fit where sixteen on a 4 m mesh do not', () => {
+    expect(gridAreaLimitWarning(createGradeState(), gridHoles(16, 3))).toBeNull();
+    expect(gridAreaLimitWarning(createGradeState(), gridHoles(16))).toContain('256');
+  });
+
+  it('a hole added by hand (no pattern cell) counts the square to its nearest neighbour', () => {
+    // Eight grid holes in one row (x = 0..28) work 128 m²; a hand hole 4 m past the row adds 16 m², 5 m past it 25 m².
+    const row = gridHoles(8);
+    expect(gridAreaLimitWarning(createGradeState(), [...row, { id: 'add', x: 32, z: 0 }])).toBeNull();
+    const w = gridAreaLimitWarning(createGradeState(), [...row, { id: 'add', x: 33, z: 0 }])!;
+    expect(w).toContain('153');
+  });
+
+  it('carries the consequence text of the plan area', () => {
+    const w = gridAreaLimitWarning(createGradeState(), [...gridHoles(3), ...gridHoles(9, CELL_M, 4)])!;
     expect(w).toContain(consequenceFor(12, 0));
     expect(consequenceFor(12, 0).length).toBeGreaterThan(0);
   });
 
-  it('a bigger plan total carries a bigger consequence than a smaller one', () => {
-    const small = gridHoleLimitWarning(createGradeState(), 10)!;
-    const big = gridHoleLimitWarning(createGradeState(), 20)!;
+  it('a bigger plan area carries a bigger consequence than a smaller one', () => {
+    const small = gridAreaLimitWarning(createGradeState(), gridHoles(10))!;
+    const big = gridAreaLimitWarning(createGradeState(), gridHoles(20))!;
     expect(small).toContain(consequenceFor(10, 0));
     expect(big).toContain(consequenceFor(20, 0));
     expect(small).not.toContain(consequenceFor(20, 0));
@@ -273,7 +354,7 @@ describe('gridHoleLimitWarning (#2167: plan total)', () => {
   it('counts only live strikes at the given tick in the consequence', () => {
     const g = createGradeState();
     g.strikeTicks = [900, 1500];
-    const w = gridHoleLimitWarning(g, 10, 0, 2000)!;
+    const w = gridAreaLimitWarning(g, gridHoles(10), 2000)!;
     expect(w).toContain(consequenceFor(10, 0, [900, 1500], 2000));
     expect(w).not.toContain(consequenceFor(10, 0, [], 2000));
   });
@@ -281,20 +362,23 @@ describe('gridHoleLimitWarning (#2167: plan total)', () => {
   it('tick defaults to 0', () => {
     const g = createGradeState();
     g.strikeTicks = [10];
-    expect(gridHoleLimitWarning(g, 10)).toContain(consequenceFor(10, 0, [10], 0));
+    expect(gridAreaLimitWarning(g, gridHoles(10))).toContain(consequenceFor(10, 0, [10], 0));
   });
 
   it('en and fr both define the warning text', () => {
     const read = (l: string): Record<string, string> => JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8'));
     setLocale('fr');
     try {
-      const w = gridHoleLimitWarning(createGradeState(), 9, 3)!;
-      expect(w).toContain('12');
+      const w = gridAreaLimitWarning(createGradeState(), [...gridHoles(3), ...gridHoles(9, CELL_M, 4)])!;
+      expect(w).toContain('192');
       expect(w).toContain(consequenceFor(12, 0));
       expect(w).not.toMatch(/^permit\./);
     } finally { setLocale('en'); }
     expect(Object.keys(read('en')).filter(k => k.startsWith('permit.preview.')).sort())
       .toEqual(Object.keys(read('fr')).filter(k => k.startsWith('permit.preview.')).sort());
+    for (const l of ['en', 'fr']) {
+      for (const param of ['{area}', '{limit}', '{consequence}']) expect(read(l)['permit.preview.grid_warning']).toContain(param);
+    }
   });
 });
 

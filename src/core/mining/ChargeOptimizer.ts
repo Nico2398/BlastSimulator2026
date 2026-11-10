@@ -1,12 +1,12 @@
 // BlastSimulator2026 — Charge optimizer (#2204)
-// Proposes, per hole, the explosive and kg that maximise good-band rock within the permit kg limit.
+// Proposes, per hole, the explosive and the stemming (each hole filled up to it) that maximise
+// good-band rock within the permit kg limit. Stemming is only swept over lengths that throw no
+// rock (`stemmingSweepRangeM`), so the proposal never trades flyrock for fragmentation.
 
 import type { DrillHole } from './DrillPlan.js';
+import { chargeOrderCost, fillChargeKg, type HoleCharge } from './ChargePlan.js';
 import {
-  chargeOrderCost, explosiveHoleLimits, maxFittingChargeKg, chargeFitsHole, type HoleCharge,
-} from './ChargePlan.js';
-import {
-  previewPlanBands, holeBandMixes, planBandShares, type BandShares,
+  previewPlanBands, holeBandMixes, planBandShares, stemmingSweepRangeM, type BandShares,
 } from './SoftwarePreview.js';
 import { isWaterSensitiveCharge, wetHoleIdsFor } from './WetHoles.js';
 import type { GameState } from '../state/GameState.js';
@@ -19,7 +19,6 @@ import { OPTIMIZER_SWEEP_STEPS, OPTIMIZER_MIN_SWEEP_STEPS, OPTIMIZER_WORK_BUDGET
 export interface OptimizeChargesOptions {
   /** Explosives the level offers. */
   explosiveIds: readonly string[];
-  stemmingM: number;
   /** Wet holes: no water-sensitive explosive is proposed for them. */
   wetHoleIds?: ReadonlySet<string>;
   /** Permit kg limit for the whole plan; unlimited when omitted. */
@@ -39,36 +38,31 @@ export interface ChargeProposal {
   skippedHoleIds: string[];
 }
 
-/** One swept charge for a hole and the good share its rock cell got from it. */
-interface Sample { explosiveId: string; kg: number; good: number; cost: number }
+/** One swept charge for a hole (filled up to `stemmingM`) and the good share its rock cell got from it. */
+interface Sample { explosiveId: string; stemmingM: number; kg: number; good: number; cost: number }
 
-/** One uniform-style candidate plan: an explosive swept across the pattern, each hole clamped to its own range. */
+/** One uniform-style candidate plan: an explosive swept across the pattern, each hole at the same point of its own stemming range. */
 interface Candidate { charges: Record<string, HoleCharge>; totalKg: number; pooledGood: number; complete: boolean }
 
-/** Amounts swept per explosive: the full sweep for small patterns, fewer as holes x explosives grow past the work budget. */
+/** Stemmings swept per explosive: the full sweep for small patterns, fewer as holes x explosives grow past the work budget. */
 export function optimizerSweepSteps(holeCount: number, explosiveCount: number): number {
   const affordable = Math.floor(OPTIMIZER_WORK_BUDGET / Math.max(1, holeCount * explosiveCount));
   return Math.max(OPTIMIZER_MIN_SWEEP_STEPS, Math.min(OPTIMIZER_SWEEP_STEPS, affordable));
 }
 
-const roundTenth = (kg: number): number => Math.round(kg * 10) / 10;
-
-/** Smallest and largest kg (0.1 kg grid) of the explosive that suit the hole; null when none does. */
-function holeKgRange(hole: DrillHole, explosiveId: string, stemmingM: number): { lo: number; hi: number } | null {
-  const explosive = getExplosive(explosiveId);
-  if (!explosive) return null;
-  const limits = explosiveHoleLimits(explosive, hole.diameter);
-  const lo = roundTenth(Math.ceil(limits.minKg * 10 - 1e-9) / 10);
-  const hi = roundTenth(Math.floor(Math.min(limits.maxKg, maxFittingChargeKg(hole.depth, stemmingM, hole.diameter)) * 10 + 1e-9) / 10);
-  if (!(lo <= hi) || !chargeFitsHole(lo, stemmingM, hole.depth, hole.diameter)) return null;
-  return { lo, hi };
+/** True when the explosive may be proposed for the hole: it fits, and is not water-sensitive in a wet hole. */
+function eligible(hole: DrillHole, explosiveId: string, o: OptimizeChargesOptions): boolean {
+  const range = stemmingSweepRangeM(hole.depth);
+  if (!range || !(fillChargeKg(hole.depth, range.lo, hole.diameter, explosiveId) > 0)) return false;
+  if (o.wetHoleIds?.has(hole.id) && isWaterSensitiveCharge({ explosiveId, amountKg: 1, stemmingM: range.lo })) return false;
+  return true;
 }
 
-function eligible(hole: DrillHole, explosiveId: string, o: OptimizeChargesOptions): { lo: number; hi: number } | null {
-  const range = holeKgRange(hole, explosiveId, o.stemmingM);
-  if (!range) return null;
-  if (o.wetHoleIds?.has(hole.id) && isWaterSensitiveCharge({ explosiveId, amountKg: range.lo, stemmingM: o.stemmingM })) return null;
-  return range;
+/** Stemming of sample `i` out of `steps` for a hole: most explosive first. */
+function sweptStemmingM(hole: DrillHole, i: number, steps: number): number {
+  const range = stemmingSweepRangeM(hole.depth)!;
+  const t = steps <= 1 ? 0 : i / (steps - 1);
+  return Math.round((range.lo + (range.hi - range.lo) * t) * 10) / 10;
 }
 
 function sumKg(charges: Readonly<Record<string, HoleCharge>>): number {
@@ -131,37 +125,35 @@ export function optimizeCharges(
   const wet = options.wetHoleIds ?? new Set<string>();
   const limit = options.maxTotalKg ?? Infinity;
   const explosiveIds = options.explosiveIds.filter(id => getExplosive(id) !== undefined);
-  const active = holes.filter(h => explosiveIds.some(id => eligible(h, id, options) !== null));
+  const active = holes.filter(h => explosiveIds.some(id => eligible(h, id, options)));
   const activeIds = new Set(active.map(h => h.id));
   const skippedHoleIds = holes.filter(h => !activeIds.has(h.id)).map(h => h.id);
   const samples = new Map<string, Sample[]>(active.map(h => [h.id, []]));
   const candidates: Candidate[] = [];
 
   for (const explosiveId of explosiveIds) {
-    const ranges = new Map(active.map(h => [h.id, eligible(h, explosiveId, options)] as const));
-    const usable = active.filter(h => ranges.get(h.id));
+    const usable = active.filter(h => eligible(h, explosiveId, options));
     if (usable.length === 0) continue;
-    const gLo = Math.min(...usable.map(h => ranges.get(h.id)!.lo));
-    const gHi = Math.max(...usable.map(h => ranges.get(h.id)!.hi));
-    const steps = gHi > gLo ? optimizerSweepSteps(active.length, explosiveIds.length) : 1;
+    const steps = optimizerSweepSteps(active.length, explosiveIds.length);
     for (let i = 0; i < steps; i++) {
-      const a = steps === 1 ? gLo : gLo + (gHi - gLo) * (i / (steps - 1));
       const charges: Record<string, HoleCharge> = {};
       for (const h of usable) {
-        const r = ranges.get(h.id)!;
-        charges[h.id] = { explosiveId, amountKg: roundTenth(Math.min(r.hi, Math.max(r.lo, a))), stemmingM: options.stemmingM };
+        const stemmingM = sweptStemmingM(h, i, steps);
+        const amountKg = fillChargeKg(h.depth, stemmingM, h.diameter, explosiveId);
+        if (amountKg > 0) charges[h.id] = { explosiveId, amountKg, stemmingM };
       }
-      const map = previewPlanBands({ holes: usable, charges }, grid, wet, { fate: false });
-      const mixes = holeBandMixes(map, usable);
-      for (const h of usable) {
+      const charged = usable.filter(h => charges[h.id] !== undefined);
+      const map = previewPlanBands({ holes: charged, charges }, grid, wet, { fate: false });
+      const mixes = holeBandMixes(map, charged);
+      for (const h of charged) {
         const c = charges[h.id]!;
         const list = samples.get(h.id)!;
-        if (list.some(s => s.explosiveId === explosiveId && s.kg === c.amountKg)) continue;
-        list.push({ explosiveId, kg: c.amountKg, good: mixes[h.id]?.good ?? 0, cost: chargeOrderCost(explosiveId, c.amountKg) });
+        if (list.some(s => s.explosiveId === explosiveId && s.stemmingM === c.stemmingM)) continue;
+        list.push({ explosiveId, stemmingM: c.stemmingM, kg: c.amountKg, good: mixes[h.id]?.good ?? 0, cost: chargeOrderCost(explosiveId, c.amountKg) });
       }
       candidates.push({
-        charges, totalKg: sumKg(charges), pooledGood: planBandShares(map, usable)?.good ?? 0,
-        complete: usable.length === active.length,
+        charges, totalKg: sumKg(charges), pooledGood: planBandShares(map, charged)?.good ?? 0,
+        complete: charged.length === active.length,
       });
     }
   }
@@ -170,7 +162,7 @@ export function optimizeCharges(
   for (const h of active) picks.set(h.id, pickCheapest(samples.get(h.id)!));
   if (limit < Infinity) trimToLimit(picks, samples, limit);
   let charges: Record<string, HoleCharge> = {};
-  for (const [id, s] of picks) charges[id] = { explosiveId: s.explosiveId, amountKg: s.kg, stemmingM: options.stemmingM };
+  for (const [id, s] of picks) charges[id] = { explosiveId: s.explosiveId, amountKg: s.kg, stemmingM: s.stemmingM };
 
   const evaluate = (c: Record<string, HoleCharge>) => {
     const map = previewPlanBands({ holes: active, charges: c }, grid, wet);
@@ -203,11 +195,9 @@ export function optimizeCharges(
 /** Optimizer options for the game's level, wet holes and permit grade (unlimited without a grade). */
 export function optimizerOptionsFor(
   state: Pick<GameState, 'campaign' | 'grade' | 'drillHoles' | 'holeWater'>,
-  stemmingM: number,
 ): OptimizeChargesOptions {
   return {
     explosiveIds: resolveAvailableExplosives(state.campaign.activeLevelId),
-    stemmingM,
     wetHoleIds: wetHoleIdsFor(state),
     ...(state.grade ? { maxTotalKg: permitLimitsFor(state.grade.grade).maxChargeKg } : {}),
   };

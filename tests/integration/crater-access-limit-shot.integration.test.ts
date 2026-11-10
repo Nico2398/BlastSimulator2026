@@ -28,9 +28,23 @@ import {
 const THIN = 40;
 /** Ticks allowed for the crew to dig an access ramp and then clear the crater floor. */
 const DIG_TICKS = 4000;
-const SHOT: LimitShot = { side: 4, spacing: 4, depth: 8, kgPerHole: 10, x0: 30, z0: 30, explosive: 'krackle', diameter: 0.089 };
+/**
+ * A 4x4 shot of pop_rock, the explosive fitted to the levelled sandite: its crater floor breaks flush to grade (all
+ * columns at 8 m), and the 3x3 shot that deepens it floors at 15 m with a 12 m terrace round it. 7.5 kg a hole, a
+ * little under the 8.2 kg that fill the hole to the fixture's 2 m of stemming; measured, the deepened floor is hauled
+ * out (13 of 38 fragments left, on the terrace) at 7.5 kg and at krackle's 10 kg (28 of 75); the 8.2 kg fill leaves
+ * 26 of 48, its terrace being wider.
+ */
+const SHOT_EXPLOSIVE = 'pop_rock';
+const SHOT_KG_PER_HOLE = 7.5;
+const SHOT: LimitShot = {
+  side: 4, spacing: 4, depth: 8, kgPerHole: SHOT_KG_PER_HOLE, x0: 30, z0: 30, explosive: SHOT_EXPLOSIVE, diameter: 0.089,
+};
 
-/** Depth the player asks of the long access ramp; the order lands it on the floor its end row shows (#2045). */
+/**
+ * Depth the player asks of the long access ramp; the order lands it on the floor its end row shows (#2045): the
+ * deepening shot floors at the bottom of its holes, 15 m down.
+ */
 const PLAYER_RAMP_DEPTH = 15;
 /** Ticks the core is given to open a crater by itself; it must not. */
 const IDLE_TICKS = 2000;
@@ -62,6 +76,9 @@ const strandedOrders = (site: CraterSite) => site.state.pendingActions.filter(a 
 
 function limitSite(): CraterSite {
   const site = makeCraterSite([], { grade: 2 });
+  // Pop_rock fizzles in a hole that holds water, and rain falls on this site while the holes are drilled: the
+  // weather is not what these tests are about, so it is pinned dry.
+  site.state.weather = { ...site.state.weather, current: 'sunny', pinned: true };
   expect(addSpoilHeaps(site.run, 6)).toBeGreaterThan(0);
   return site;
 }
@@ -172,16 +189,18 @@ describe('a shot that deepens an opened crater (#2086, #2095)', () => {
     const { state, run } = site;
     const before = unsealedOnGround(site);
     expect(before).toBeGreaterThan(0);
-    // 15 m down from the surface needs 42 m of road at 20 degrees: down the east side, then west into the crater.
-    expect(run(`build_ramp path:55,5;55,37;43,37 depth:${PLAYER_RAMP_DEPTH}`)).toMatchObject({ success: true });
+    // 15 m down from the surface needs 42 m of road at 20 degrees: down the east side, then west into the crater,
+    // through the 12 m terrace (x 41-42) and onto the deepened floor (x 34-40).
+    const ordered = run(`build_ramp path:55,3;55,37;40,37 depth:${PLAYER_RAMP_DEPTH}`) as { success: boolean; output: string };
+    expect(ordered.success, ordered.output).toBe(true);
 
     tickSite(site, () => state.plannedRamps.length === 0, DIG_TICKS);
     expect(state.plannedRamps).toEqual([]);
     // The ramp lands flush on the deepened floor: its end tile is on the vehicle network.
-    expect(siteVehicleReach(state)!(43, 37)).toBe(true);
+    expect(siteVehicleReach(state)!(40, 37)).toBe(true);
     tickSite(site, () => false, DIG_TICKS);
-    // What stays is rubble on the lumps, the pillar and the old ledge the shot left standing above or apart from
-    // that floor: no ramp reaches those, the player levels the ground or leaves them (the pip says so).
+    // What stays is rubble on the terrace and the old floor the shot left standing above the deepened one: no ramp
+    // reaches those, the player levels the ground or leaves them (the pip says so).
     expect(unsealedOnGround(site)).toBeLessThan(before / 2);
     const leftover = state.logistics.fragments.filter(f => f.state === 'on_ground' && !isFragmentSealed(site.ctx.grid!, f.fragment.position));
     const orders = new Map(state.pendingActions.map(a => [a.payload['fragmentId'], a]));

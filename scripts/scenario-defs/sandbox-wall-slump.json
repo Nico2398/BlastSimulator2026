@@ -267,9 +267,9 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:8 stemming:2.5",
+      "command": "charge hole:* explosive:boomite stemming:4",
       "role": "player",
-      "description": "Load the hole.",
+      "description": "Load the hole up to 4 m of stemming: a 4 m column of boomite (8 kg) at the bottom of the 8 m hole, sized to open the second bench without eating the berm. Filled to 2.5 m of stemming the hole would take 11 kg, and under the kernel energy model that shot breaks through the 3 m berm and 5 faces slump (3.5 m, 9 kg, still slumps one).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -281,13 +281,8 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 2.5
+          "value": 4
         },
         {
           "type": "clickSelector",
@@ -476,9 +471,9 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:8 stemming:2.5",
+      "command": "charge hole:* explosive:boomite stemming:2.5",
       "role": "player",
-      "description": "Load the hole.",
+      "description": "Load the hole up to 2.5 m of stemming (9 kg of boomite in the 7 m hole).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -487,11 +482,6 @@
         {
           "type": "ensureStep",
           "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
         },
         {
           "type": "setStepper",

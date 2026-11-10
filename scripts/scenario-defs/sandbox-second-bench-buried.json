@@ -22,9 +22,9 @@
       }
     },
     {
-      "command": "drill_plan add x:36 z:31 depth:2 diameter:89",
+      "command": "drill_plan add x:37 z:31 depth:2 diameter:89",
       "role": "player",
-      "description": "Order one 89 mm, 2 m hole on the virgin bench; it will be blasted away.",
+      "description": "Order one 89 mm, 2 m hole on the virgin bench; it will be blasted away. At (37,31), one tile further from the ramp than before: under the kernel energy model the same 2 kg shot fired at (36,31) throws ~114 fragments (was ~49) and spills some up the ramp lane (x=33, just above the crater floor); that rubble wedges the ramp, the haulers never reach the crater (every haul order stays debris_out_of_reach) and the buried hole is never drilled.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -54,12 +54,12 @@
         },
         {
           "type": "focusTile",
-          "x": 36,
+          "x": 37,
           "z": 31
         },
         {
           "type": "pickTile",
-          "x": 36,
+          "x": 37,
           "z": 31
         },
         {
@@ -181,7 +181,7 @@
       ]
     },
     {
-      "command": "charge hole:* explosive:boomite amount:2 stemming:1",
+      "command": "charge hole:* explosive:boomite stemming:1",
       "role": "player",
       "description": "Load 2 kg into the hole.",
       "interaction": [
@@ -192,11 +192,6 @@
         {
           "type": "ensureStep",
           "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 2
         },
         {
           "type": "setStepper",
@@ -295,9 +290,9 @@
       }
     },
     {
-      "command": "drill_plan add x:36 z:31 depth:2 diameter:89",
+      "command": "drill_plan add x:37 z:31 depth:2 diameter:89",
       "role": "player",
-      "description": "Second bench: plan a hole on the crater floor, under the fresh rubble. The order is accepted (planning is never refused).",
+      "description": "Second bench: plan a hole on the crater floor at the first hole's spot, under the fresh rubble. The order is accepted (planning is never refused).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -327,12 +322,12 @@
         },
         {
           "type": "focusTile",
-          "x": 36,
+          "x": 37,
           "z": 31
         },
         {
           "type": "pickTile",
-          "x": 36,
+          "x": 37,
           "z": 31
         },
         {

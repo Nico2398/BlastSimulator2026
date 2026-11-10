@@ -803,13 +803,8 @@
       "description": "#1895: a cash-bought charge order waits out the explosives delivery, 400 idle ticks; on continuous shifts with no rest the idle crew's morale collapses and it revolts before the shipment arrives. The default shift policy carries it through the wait."
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",

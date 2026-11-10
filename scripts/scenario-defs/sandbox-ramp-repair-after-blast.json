@@ -174,7 +174,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:2 stemming:1",
+      "command": "charge hole:* explosive:boomite stemming:1",
       "role": "player",
       "description": "Load 2 kg into the hole.",
       "interaction": [
@@ -185,11 +185,6 @@
         {
           "type": "ensureStep",
           "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 2
         },
         {
           "type": "setStepper",

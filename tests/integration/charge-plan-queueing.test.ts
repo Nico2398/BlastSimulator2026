@@ -24,6 +24,9 @@ import { t } from '../../src/core/i18n/I18n.js';
 import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { readFileSync } from 'node:fs';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
+import { fillChargeKg } from '../../src/core/mining/ChargePlan.js';
+import { chargeKgPerMetre } from '../../src/core/mining/HoleDiameter.js';
+import { DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../src/core/config/balance.js';
 
 /** tickUntil with the payroll covered, so a long drill-and-charge run is never derailed by upkeep. */
 function tickFunded(run: (cmd: string) => unknown, state: GameState, predicate: () => boolean, maxTicks: number): void {
@@ -231,10 +234,11 @@ describe('charge hole:<id> — queues one charge_hole action instead of writing 
     const holeId = state.drillHoles[0]!.id;
     const cashBefore = state.cash;
 
-    // boomite's maxChargeKg is well under 999.
+    // 999 kg of boomite fills far more column than the 8 m hole holds (no per-explosive kg range anymore).
     const result = run(`charge hole:${holeId} explosive:boomite amount:999 stemming:2`);
 
     expect(result.success).toBe(false);
+    expect(result.output).toMatch(/Maximum that fits: 12 kg/);
     expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);
     expect(state.plannedChargesByHole[holeId]).toBeUndefined();
     expect(state.cash).toBe(cashBefore);
@@ -608,18 +612,30 @@ describe('charge column overflow is refused at order time (#1361)', () => {
     expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);
   });
 
-  it('a krackle 10 kg + 2 m stemming order on a 6 m hole is refused with the 8 kg maximum in the message and nothing is spent', () => {
+  it('a krackle 12 kg + 2 m stemming order on a 6 m hole is refused with krackle\'s own 11.5 kg maximum in the message and nothing is spent', () => {
     const { run, state } = setupSixMetreHole();
     const holeId = state.drillHoles[0]!.id;
     const cashBefore = state.cash;
+    // Krackle is denser than boomite, so the same 4 m of column holds more of it: (6 - 2) * 2.875 = 11.5 kg.
+    const krackleMax = (6 - 2) * chargeKgPerMetre(DRILL_HOLE_DEFAULT_DIAMETER_M, 'krackle');
+    expect(krackleMax).toBeCloseTo(11.5, 6);
+    expect(krackleMax).toBeGreaterThan((6 - 2) * chargeKgPerMetre(DRILL_HOLE_DEFAULT_DIAMETER_M, 'boomite'));
 
-    const result = run(`charge hole:${holeId} explosive:krackle amount:10 stemming:2`);
+    const result = run(`charge hole:${holeId} explosive:krackle amount:12 stemming:2`);
 
     expect(result.success).toBe(false);
-    expect(result.output).toMatch(/\b8(\.0)?\b/);
+    expect(result.output).toMatch(/Maximum that fits: 11\.5 kg/);
     expect(state.cash).toBe(cashBefore);
     expect(state.plannedChargesByHole[holeId]).toBeUndefined();
     expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);
+  });
+
+  it('krackle 10 kg + 2 m stemming, which overflowed the 6 m hole at boomite\'s density, fits krackle\'s denser column', () => {
+    const { run, state } = setupSixMetreHole();
+    const holeId = state.drillHoles[0]!.id;
+
+    expect(run(`charge hole:${holeId} explosive:krackle amount:10 stemming:2`).success).toBe(true);
+    expect(state.plannedChargesByHole[holeId]).toEqual({ explosiveId: 'krackle', amountKg: 10, stemmingM: 2 });
   });
 
   it('the exact boundary (boomite 8 kg + 2 m stemming on a 6 m hole) is accepted', () => {
@@ -726,7 +742,7 @@ describe('charge hole:* sets the pattern charge applied to every hole, including
     expect(blast.output).not.toContain('Missing charge');
   });
 
-  it('a second charge hole:* with every hole covered orders nothing, spends nothing and is refused with mining.charge.nothing_to_charge', () => {
+  it('a second charge hole:* with every hole covered orders nothing, spends nothing and is refused with mining.charge.all_covered', () => {
     const { run, state } = setupDrilled(2, 2);
     expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
     const cashAfterFirst = state.cash;
@@ -736,7 +752,8 @@ describe('charge hole:* sets the pattern charge applied to every hole, including
     const second = run('charge hole:* explosive:boomite amount:5 stemming:2');
 
     expect(second.success).toBe(false);
-    expect(second.output).toBe(t('mining.charge.nothing_to_charge'));
+    // Every drilled hole is covered: the refusal says so rather than claiming there are no holes.
+    expect(second.output).toBe(t('mining.charge.all_covered'));
     expect(state.cash).toBe(cashAfterFirst);
     expect(chargeActionsOf(state)).toHaveLength(actionsAfterFirst);
   });
@@ -798,6 +815,67 @@ describe('charge hole:* sets the pattern charge applied to every hole, including
     expect(run('charge hole:* explosive:boomite amount:3 stemming:2').success).toBe(true);
     expect(run('charge hole:H1 explosive:boomite amount:6 stemming:2').success).toBe(true);
     expect(state.patternCharge).toEqual({ explosiveId: 'boomite', amountKg: 3, stemmingM: 2 });
+  });
+});
+
+describe('a charge with no amount fills the hole up to the stemming', () => {
+  it('charge hole:<id> orders the kilograms the hole holds under its stemming, and a denser explosive holds more', () => {
+    const { run, state } = setupDrilled(1, 2);
+    const fillBoomite = fillChargeKg(8, 2, DRILL_HOLE_DEFAULT_DIAMETER_M, 'boomite');
+    const fillKrackle = fillChargeKg(8, 2, DRILL_HOLE_DEFAULT_DIAMETER_M, 'krackle');
+    expect(fillBoomite).toBe(12); // 6 m of column at 2 kg/m
+    expect(fillKrackle).toBeGreaterThan(fillBoomite);
+
+    const boomite = run('charge hole:H1 explosive:boomite stemming:2');
+    const krackle = run('charge hole:H2 explosive:krackle stemming:2');
+
+    expect(boomite.success).toBe(true);
+    expect(boomite.output).toContain(`boomite ${fillBoomite}kg`);
+    expect(krackle.success).toBe(true);
+    expect(state.plannedChargesByHole['H1']).toEqual({ explosiveId: 'boomite', amountKg: fillBoomite, stemmingM: 2 });
+    expect(state.plannedChargesByHole['H2']).toEqual({ explosiveId: 'krackle', amountKg: fillKrackle, stemmingM: 2 });
+  });
+
+  it('more stemming leaves less explosive in the hole', () => {
+    const { run, state } = setupDrilled(1, 2);
+    expect(run('charge hole:H1 explosive:boomite stemming:2').success).toBe(true);
+    expect(run('charge hole:H2 explosive:boomite stemming:4').success).toBe(true);
+    expect(state.plannedChargesByHole['H2']!.amountKg).toBeLessThan(state.plannedChargesByHole['H1']!.amountKg);
+    expect(state.plannedChargesByHole['H2']!.amountKg).toBe(fillChargeKg(8, 4, DRILL_HOLE_DEFAULT_DIAMETER_M, 'boomite'));
+  });
+
+  it('charge hole:* stores a fill pattern, fills each hole to its own depth, and fills holes drilled later too', () => {
+    const { run, state } = newStaffed();
+    expect(run('drill_plan grid rows:1 cols:3 spacing:4 depth:8 start:12,12').success).toBe(true);
+    tickUntil(run, () => state.drillHoles.length >= 1, 3000);
+    state.drillHoles[0]!.depth = 6; // a shallower hole holds less
+
+    const result = run('charge hole:* explosive:boomite stemming:2');
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain(t('mining.charge.pattern_set_fill', { explosive: t('explosive.boomite.name'), stemming: 2 }));
+    expect(state.patternCharge).toEqual({ explosiveId: 'boomite', amountKg: null, stemmingM: 2 });
+    tickFunded(run, state, () => Object.keys(state.chargesByHole).length === 3, 4000);
+    expect(Object.keys(state.chargesByHole)).toHaveLength(3);
+    for (const hole of state.drillHoles) {
+      expect(state.chargesByHole[hole.id], hole.id).toEqual({
+        explosiveId: 'boomite', amountKg: fillChargeKg(hole.depth, 2, hole.diameter, 'boomite'), stemmingM: 2,
+      });
+    }
+    expect(state.chargesByHole[state.drillHoles[0]!.id]!.amountKg).toBeLessThan(state.chargesByHole[state.drillHoles[1]!.id]!.amountKg);
+  });
+
+  it('stemming that leaves no room for explosive is refused with mining.charge.no_room, ordering and spending nothing', () => {
+    const { run, state } = setupDrilled(1, 1);
+    const cashBefore = state.cash;
+
+    const result = run('charge hole:H1 explosive:boomite stemming:8');
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('mining.charge.no_room', { stemming: 8, depth: 8 }));
+    expect(state.cash).toBe(cashBefore);
+    expect(chargeActionsOf(state)).toHaveLength(0);
+    expect(state.plannedChargesByHole['H1']).toBeUndefined();
   });
 });
 

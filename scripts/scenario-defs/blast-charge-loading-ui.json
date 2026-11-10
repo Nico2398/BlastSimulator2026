@@ -105,7 +105,7 @@
       "role": "setup"
     },
     {
-      "command": "charge hole:H1 explosive:boomite amount:3 stemming:2",
+      "command": "charge hole:H1 explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -113,19 +113,8 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 3
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "3 kg"
         },
         {
           "type": "assert",
@@ -148,19 +137,8 @@
       }
     },
     {
-      "command": "charge hole:H2 explosive:boomite amount:8 stemming:2",
+      "command": "charge hole:H2 explosive:boomite stemming:2",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "8 kg"
-        },
         {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
@@ -182,23 +160,12 @@
       }
     },
     {
-      "command": "charge hole:H3 explosive:boomite amount:5 stemming:1",
+      "command": "charge hole:H3 explosive:boomite stemming:1",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 1
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "5 kg"
         },
         {
           "type": "assert",
@@ -266,18 +233,12 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "5 kg"
         },
         {
           "type": "assert",
@@ -356,7 +317,7 @@
       "role": "setup"
     },
     {
-      "command": "charge hole:H5 explosive:boomite amount:7 stemming:2",
+      "command": "charge hole:H5 explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "clickSelector",
@@ -364,19 +325,8 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 7
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "7 kg"
         },
         {
           "type": "assert",
@@ -437,11 +387,6 @@
           "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
         },
         {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 9
-        },
-        {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
@@ -475,11 +420,6 @@
       "timeout": 60,
       "description": "#1361 recovery: step the amount back down to 8 kg (4 m column + 2 m stemming = 6 m, exactly fits). The reason line must disappear and Charge All must be usable again.",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
-        },
         {
           "type": "waitForProperty",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"] + div",

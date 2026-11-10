@@ -9,9 +9,11 @@ import {
   PREVIEW_RADIUS,
   holeBandMixes,
   planBandShares,
-  uniformChargePlan,
   previewExplosiveBandShares,
   recommendedPowderFactors,
+  stemmingSweepRangeM,
+  holeCellOf,
+  ownerHoleOf,
   type BandShares,
   type PlanBandCell,
   type PlanBandMap,
@@ -22,9 +24,14 @@ import { intensityAt } from '../../../src/core/mining/EnergyPropagation.js';
 import { classifyFragmentationBand, fragmentationBandOf, FRAGMENTATION_BANDS } from '../../../src/core/mining/FragmentationBand.js';
 import { VoxelGrid, firstEmptyLayerAboveGround } from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
-import { batchCharge, chargeFitsHole, holeSpacingM, powderFactor, maxFittingChargeKg } from '../../../src/core/mining/ChargePlan.js';
+import { batchCharge, holeCellSize, powderFactor, fillChargeKg } from '../../../src/core/mining/ChargePlan.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
-import { RECOMMENDED_GOOD_SHARE_MIN, RECOMMENDED_RELATIVE_GOOD_SHARE, RECOMMENDED_SWEEP_STEPS, FRAGMENTATION_MULTIPLIER, FRAGMENTATION_BAND_FINES_MIN, FRAGMENTATION_BAND_DUST_MIN, CRACKED_VOXEL_ENERGY_RATIO } from '../../../src/core/config/balance.js';
+import {
+  RECOMMENDED_GOOD_SHARE_MIN, RECOMMENDED_RELATIVE_GOOD_SHARE, RECOMMENDED_SWEEP_STEPS, FRAGMENTATION_MULTIPLIER,
+  FRAGMENTATION_BAND_FINES_MIN, FRAGMENTATION_BAND_DUST_MIN, CRACKED_VOXEL_ENERGY_RATIO,
+  SEEDS_BASE, SEEDS_PER_INTENSITY, MAX_SEEDS_PER_VOXEL, OVERSIZED_FRAGMENT_THRESHOLD,
+  MIN_STEMMING_M, MIN_CHARGE_COLUMN_M, STEMMING_FULL_DEPTH_FRACTION, DRILL_GRID_DEFAULT_SPACING_M,
+} from '../../../src/core/config/balance.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
 
@@ -107,10 +114,23 @@ describe('SoftwarePreview — predictFragmentation', () => {
     expect(predictFragmentation(6).sizeM3).toBeLessThan(predictFragmentation(2).sizeM3);
   });
 
-  it('predicts pieces larger than a voxel where the rock barely broke', () => {
-    // Under one seed per voxel the rock joins a neighbour, so the piece coming
-    // out is bigger than the voxel it was measured in.
-    expect(predictFragmentation(1).sizeM3).toBeGreaterThan(1);
+  it('where the rock barely broke, predicts SEEDS_BASE pieces: haulable, not oversized', () => {
+    // Two seeds per voxel at the good bound give fragments of about 0.5 m3, the haul threshold.
+    const barely = predictFragmentation(FRAGMENTATION_MULTIPLIER);
+    expect(barely.pieces).toBeCloseTo(SEEDS_BASE, 12);
+    expect(barely.sizeM3).toBeCloseTo(1 / SEEDS_BASE, 12);
+    expect(barely.sizeM3).toBeLessThanOrEqual(OVERSIZED_FRAGMENT_THRESHOLD);
+  });
+
+  it('adds SEEDS_PER_INTENSITY pieces per unit of intensity above the break', () => {
+    const atFines = predictFragmentation(FRAGMENTATION_BAND_FINES_MIN);
+    expect(atFines.pieces).toBeCloseTo(SEEDS_BASE + SEEDS_PER_INTENSITY * (FRAGMENTATION_BAND_FINES_MIN - FRAGMENTATION_MULTIPLIER), 12);
+    expect(atFines.sizeM3).toBeCloseTo(1 / atFines.pieces, 12);
+  });
+
+  it('caps the pieces at MAX_SEEDS_PER_VOXEL, however hard the rock is hit', () => {
+    expect(predictFragmentation(FRAGMENTATION_BAND_DUST_MIN * 10).pieces).toBe(MAX_SEEDS_PER_VOXEL);
+    expect(predictFragmentation(1_000).sizeM3).toBeCloseTo(1 / MAX_SEEDS_PER_VOXEL, 12);
   });
 });
 describe('SoftwarePreview — getBlastBBox', () => {
@@ -224,9 +244,10 @@ describe('SoftwarePreview — previewPlanBands', () => {
   });
 
   it('shows rock that breaks out without enough energy as coarse, never as rock that stays put', () => {
-    // The sandbox opening pattern in a deep bed: its undermined cap lifts and breaks out as blocks.
+    // The sandbox opening pattern in a deep bed, filled with krackle up to 2.5 m of stemming:
+    // its undermined cap lifts and breaks out as blocks.
     const grid = bedGrid('molite', 24);
-    const plan = uniformChargePlan(patternHoles(3, 3, 4, 8), 'krackle', 8, 2.5);
+    const plan = fillPlan(patternHoles(3, 3, 4, 8), 'krackle', 2.5);
     const field = buildPlanEnergyField(plan, grid)!;
     const fragmentation = identifyFragmentedVoxels(field, grid, false);
     expect(fragmentation.liftedCount).toBeGreaterThan(0);
@@ -244,7 +265,7 @@ describe('SoftwarePreview — previewPlanBands', () => {
   });
 
   it('counts as many coarse voxels as the blast itself reports in coarse volume', () => {
-    const plan = uniformChargePlan(patternHoles(3, 3, 4, 8), 'krackle', 8, 2.5);
+    const plan = fillPlan(patternHoles(3, 3, 4, 8), 'krackle', 2.5);
     const coarse = [...previewPlanBands(plan, bedGrid('molite', 24)).cells.values()].filter(c => c.band === 'coarse').length;
     expect(coarse).toBeGreaterThan(0);
     const result = executeBlast(plan, bedGrid('molite', 24), [])!;
@@ -437,6 +458,18 @@ describe('SoftwarePreview — holeBandMixes (#2203 C2)', () => {
     expect(withDeep['H1']).toEqual(without['H1']);
   });
 
+  it('a grid hole\'s cell is its spacing x burden: a voxel along the burden past half the spacing still counts', () => {
+    // Spacing 2 m along x, burden 6 m between rows: H1 at (10, 10) works x 9..11 and z 7..13.
+    const grid = createGridPlan({ nextHoleId: 1 }, { x: 10, z: 10 }, 2, 2, 2, 4, 0.089, 6);
+    const map = mapOfCells([
+      ...column(10, 10, 8, [I_GOOD]), cellAt(10, 8, 12, I_DUST),
+      ...column(12, 10, 8, [I_GOOD]), ...column(10, 16, 8, [I_GOOD]), ...column(12, 16, 8, [I_GOOD]),
+    ]);
+    const mixes = holeBandMixes(map, grid);
+    expect(mixes['H1']!.dust).toBeCloseTo(0.5, 10);
+    expect(mixes['H3']!.dust).toBeCloseTo(0, 10);
+  });
+
   it('reads a hole at a fractional position from the cell of its floored coordinates', () => {
     const h3 = drillHole('H3', 20.7, 10.4);
     const map = mapOfCells([...column(20, 10, 8, [I_GOOD, I_GOOD, I_GOOD, I_GOOD]), ...cells]);
@@ -529,57 +562,128 @@ function patternHoles(rows: number, cols: number, spacing: number, depth: number
   return createGridPlan(counter, { x: 10, z: 10 }, rows, cols, spacing, depth, diameter);
 }
 
-describe('SoftwarePreview — uniformChargePlan (#2203)', () => {
-  it('charges every hole with the explosive, amount and stemming', () => {
-    const holes = patternHoles(2, 2, 3, 8);
-    const plan = uniformChargePlan(holes, 'krackle', 3, 2);
-    expect(plan.holes).toEqual(holes);
-    expect(Object.keys(plan.charges).sort()).toEqual(holes.map(h => h.id).sort());
-    for (const h of holes) {
-      expect(plan.charges[h.id]).toEqual({ explosiveId: 'krackle', amountKg: 3, stemmingM: 2 });
+/** Every hole filled with the explosive up to `stemmingM`, the way Charge All does it (batchCharge in fill mode). */
+function fillPlan(holes: readonly DrillHole[], explosiveId: string, stemmingM: number) {
+  const depths: Record<string, number> = {};
+  const diameters: Record<string, number> = {};
+  for (const h of holes) { depths[h.id] = h.depth; diameters[h.id] = h.diameter; }
+  const { charges } = batchCharge(holes.map(h => h.id), depths, explosiveId, null, stemmingM, diameters);
+  return assembleBlastPlan([...holes], charges);
+}
+
+/** Stemming of sweep sample `i` of `steps` for a hole, as the recommended-range sweep spaces them (most explosive first). */
+function sweepStemmingM(depth: number, i: number, steps: number): number {
+  const range = stemmingSweepRangeM(depth)!;
+  return Math.round((range.lo + (range.hi - range.lo) * (i / (steps - 1))) * 10) / 10;
+}
+
+/** Powder factor of `hole` filled with the explosive up to `stemmingM`, over its own pattern cell. */
+function fillPowderFactor(hole: DrillHole, holes: readonly DrillHole[], explosiveId: string, stemmingM: number): number {
+  const cell = holeCellSize(hole, holes);
+  return powderFactor(fillChargeKg(hole.depth, stemmingM, hole.diameter, explosiveId), hole.depth, cell.spacingM, cell.burdenM);
+}
+
+describe('SoftwarePreview — stemmingSweepRangeM', () => {
+  it('runs from the full-stemming length (a fraction of the depth) to leaving the shortest charge column', () => {
+    const range = stemmingSweepRangeM(8)!;
+    expect(range.lo).toBeCloseTo(8 * STEMMING_FULL_DEPTH_FRACTION, 12);
+    expect(range.hi).toBeCloseTo(8 - MIN_CHARGE_COLUMN_M, 12);
+  });
+
+  it('never starts below the minimum stemming in a shallow hole', () => {
+    const range = stemmingSweepRangeM(1.5)!;
+    expect(1.5 * STEMMING_FULL_DEPTH_FRACTION).toBeLessThan(MIN_STEMMING_M);
+    expect(range.lo).toBe(MIN_STEMMING_M);
+    expect(range.hi).toBeCloseTo(1.5 - MIN_CHARGE_COLUMN_M, 12);
+  });
+
+  it('widens with the depth of the hole', () => {
+    const a = stemmingSweepRangeM(4)!;
+    const b = stemmingSweepRangeM(12)!;
+    expect(b.hi - b.lo).toBeGreaterThan(a.hi - a.lo);
+  });
+
+  it('boundary: a hole just deep enough for the minimum stemming and the shortest column sweeps one stemming', () => {
+    const depth = MIN_STEMMING_M + MIN_CHARGE_COLUMN_M;
+    const range = stemmingSweepRangeM(depth)!;
+    expect(range.lo).toBeCloseTo(range.hi, 12);
+  });
+
+  it('rejection: null for a hole too shallow to hold both', () => {
+    expect(stemmingSweepRangeM(MIN_STEMMING_M + MIN_CHARGE_COLUMN_M - 0.1)).toBeNull();
+    expect(stemmingSweepRangeM(0)).toBeNull();
+  });
+
+  it('every stemming in the range leaves explosive in the hole', () => {
+    for (const depth of [1, 3, 6, 8, 15]) {
+      const range = stemmingSweepRangeM(depth)!;
+      for (const stemming of [range.lo, range.hi]) {
+        expect(fillChargeKg(depth, stemming, 0.089, 'pop_rock'), `${depth} m @ ${stemming}`).toBeGreaterThan(0);
+      }
     }
   });
+});
 
-  it('caps the amount to what fits the hole under that stemming', () => {
-    const holes = patternHoles(1, 2, 3, 4);
-    const plan = uniformChargePlan(holes, 'boomite', 500, 2);
-    for (const h of holes) {
-      const charge = plan.charges[h.id]!;
-      expect(charge.amountKg).toBeGreaterThan(0);
-      expect(charge.amountKg).toBeLessThan(500);
-      expect(chargeFitsHole(charge.amountKg, 2, h.depth, h.diameter)).toBe(true);
-      expect(charge.explosiveId).toBe('boomite');
-      expect(charge.stemmingM).toBe(2);
-    }
+describe('SoftwarePreview — holeCellOf and ownerHoleOf', () => {
+  it('a grid hole\'s footprint is its column and half its spacing (x) and burden (z)', () => {
+    const holes = createGridPlan({ nextHoleId: 1 }, { x: 10, z: 10 }, 2, 2, 4, 8, 0.089, 6);
+    expect(holeCellOf(holes[0]!, holes)).toEqual({ cx: 10, cz: 10, halfX: 2, halfZ: 3 });
   });
 
-  it('caps each hole to its own depth', () => {
-    const shallow = drillHole('H1', 10, 10, 4);
-    const deep = drillHole('H2', 14, 10, 10);
-    const plan = uniformChargePlan([shallow, deep], 'boomite', 500, 2);
-    expect(plan.charges['H1']!.amountKg).toBeLessThan(plan.charges['H2']!.amountKg);
+  it('a hand-placed hole gets half its nearest-neighbour square, and a fractional position floors to its column', () => {
+    const a = drillHole('H1', 10.7, 10.2);
+    const b = drillHole('H2', 13.7, 10.2);
+    expect(holeCellOf(a, [a, b])).toEqual({ cx: 10, cz: 10, halfX: 1.5, halfZ: 1.5 });
   });
 
-  it('is an empty plan for no holes', () => {
-    const plan = uniformChargePlan([], 'boomite', 3, 2);
-    expect(plan.holes).toEqual([]);
-    expect(plan.charges).toEqual({});
+  it('a lone hand-placed hole gets half the default grid spacing', () => {
+    const a = drillHole('H1', 5, 5);
+    expect(holeCellOf(a, [a])).toEqual({ cx: 5, cz: 5, halfX: DRILL_GRID_DEFAULT_SPACING_M / 2, halfZ: DRILL_GRID_DEFAULT_SPACING_M / 2 });
+  });
+
+  const cellAtHole = (id: string, cx: number, cz: number, halfX: number, halfZ: number) => ({ id, cx, cz, halfX, halfZ });
+
+  it('ownerHoleOf: a column inside a rectangular cell belongs to it along the long side, not past it along the short one', () => {
+    const cells = [cellAtHole('A', 10, 10, 1, 3)];
+    expect(ownerHoleOf(10, 13, cells)?.id).toBe('A');
+    expect(ownerHoleOf(11, 10, cells)?.id).toBe('A');
+    expect(ownerHoleOf(12, 10, cells)).toBeNull();
+    expect(ownerHoleOf(10, 14, cells)).toBeNull();
+  });
+
+  it('ownerHoleOf: the cell the column sits deepest inside wins (distance relative to each half-cell)', () => {
+    // 2 m from A along x is the edge of its 2 m half-cell; 2 m from B along z is a third of its 6 m half-cell.
+    const cells = [cellAtHole('A', 10, 10, 2, 2), cellAtHole('B', 12, 8, 6, 6)];
+    expect(ownerHoleOf(12, 10, cells)?.id).toBe('B');
+  });
+
+  it('ownerHoleOf: between equal relative distances, the nearer hole wins', () => {
+    const cells = [cellAtHole('A', 10, 10, 4, 2), cellAtHole('B', 13, 10, 2, 1)];
+    // (12, 10): A at dx 2 of 4 -> 0.5; B at dx 1 of 2 -> 0.5; B is nearer.
+    expect(ownerHoleOf(12, 10, cells)?.id).toBe('B');
+    expect(ownerHoleOf(12, 10, [...cells].reverse())?.id).toBe('B');
+  });
+
+  it('ownerHoleOf: null when no cell reaches the column, or with no cells', () => {
+    expect(ownerHoleOf(30, 30, [cellAtHole('A', 10, 10, 2, 2)])).toBeNull();
+    expect(ownerHoleOf(10, 10, [])).toBeNull();
   });
 });
 
 describe('SoftwarePreview — previewExplosiveBandShares (#2203 C4)', () => {
+  // 150 mm holes 3 m apart, 6 m deep: the sweep range of each hole runs 1.8 m to 5.5 m of stemming.
   const holes = patternHoles(2, 2, 3, 6, 0.15);
 
   it('is null with no holes', () => {
-    expect(previewExplosiveBandShares([], bedGrid(), 'boomite', 4, 2)).toBeNull();
+    expect(previewExplosiveBandShares([], bedGrid(), 'boomite', 2)).toBeNull();
   });
 
   it('is null when the pattern stands over no rock', () => {
-    expect(previewExplosiveBandShares(holes, new VoxelGrid(40, 40), 'boomite', 4, 2)).toBeNull();
+    expect(previewExplosiveBandShares(holes, new VoxelGrid(40, 40), 'boomite', 2)).toBeNull();
   });
 
   it('returns shares in 0..1 that sum to 1', () => {
-    const shares = previewExplosiveBandShares(holes, bedGrid(), 'boomite', 5, 2)!;
+    const shares = previewExplosiveBandShares(holes, bedGrid(), 'boomite', 3)!;
     expect(shares).not.toBeNull();
     expect(sumShares(shares)).toBeCloseTo(1, 10);
     for (const b of FRAGMENTATION_BANDS) {
@@ -588,89 +692,119 @@ describe('SoftwarePreview — previewExplosiveBandShares (#2203 C4)', () => {
     }
   });
 
-  it('is the pooled band shares of the uniform plan on the same field the heatmap reads', () => {
+  it('is the pooled band shares of every hole filled to the stemming, on the same field the heatmap reads', () => {
     const grid = bedGrid();
-    const direct = planBandShares(previewPlanBands(uniformChargePlan(holes, 'boomite', 6, 2), grid), holes)!;
-    const shares = previewExplosiveBandShares(holes, grid, 'boomite', 6, 2)!;
+    const direct = planBandShares(previewPlanBands(fillPlan(holes, 'boomite', 3), grid), holes)!;
+    const shares = previewExplosiveBandShares(holes, grid, 'boomite', 3)!;
     for (const b of FRAGMENTATION_BANDS) expect(shares[b], b).toBeCloseTo(direct[b], 10);
   });
 
-  it('a heavier charge crushes more of the rock to fines and dust', () => {
+  it('fills each hole to its own depth, leaving out a hole the stemming leaves no room in', () => {
     const grid = bedGrid();
-    const light = previewExplosiveBandShares(holes, grid, 'boomite', 4, 2)!;
-    const heavy = previewExplosiveBandShares(holes, grid, 'boomite', 20, 2)!;
+    const mixed = [drillHole('H1', 10, 10, 6), drillHole('H2', 13, 10, 4), drillHole('H3', 10, 13, 2)];
+    // 2.5 m of stemming fills H1 and H2 (to their own depths) and leaves no room in H3, which stays uncharged.
+    const plan = fillPlan(mixed, 'krackle', 2.5);
+    expect(Object.keys(plan.charges).sort()).toEqual(['H1', 'H2']);
+    expect(plan.charges['H1']!.amountKg).toBeGreaterThan(plan.charges['H2']!.amountKg);
+    const direct = planBandShares(previewPlanBands(plan, grid), mixed)!;
+    expect(previewExplosiveBandShares(mixed, grid, 'krackle', 2.5)).toEqual(direct);
+  });
+
+  it('less stemming fills more explosive and crushes more of the rock to fines and dust', () => {
+    const grid = bedGrid();
+    const heavy = previewExplosiveBandShares(holes, grid, 'boomite', 2)!;
+    const light = previewExplosiveBandShares(holes, grid, 'boomite', 5)!;
     expect(heavy.fines + heavy.dust).toBeGreaterThan(light.fines + light.dust);
     expect(heavy.intact).toBeLessThan(light.intact);
   });
 
-  it('a stronger explosive at the same weight gives a different mix', () => {
+  it('a stronger, denser explosive filled to the same stemming gives a different, finer mix', () => {
     const grid = bedGrid();
-    const weak = previewExplosiveBandShares(holes, grid, 'pop_rock', 3, 2)!;
-    const strong = previewExplosiveBandShares(holes, grid, 'dynatomics', 3, 2)!;
+    const weak = previewExplosiveBandShares(holes, grid, 'pop_rock', 4.5)!;
+    const strong = previewExplosiveBandShares(holes, grid, 'dynatomics', 4.5)!;
     expect(strong).not.toEqual(weak);
     expect(strong.intact).toBeLessThan(weak.intact);
+    expect(strong.fines + strong.dust).toBeGreaterThan(weak.fines + weak.dust);
   });
 
   it('wet holes weaken a water-sensitive explosive and leave a resistant one alone', () => {
     const grid = bedGrid();
     const wet = new Set(holes.map(h => h.id));
-    const sensitiveDry = previewExplosiveBandShares(holes, grid, 'big_bada_boom', 8, 1)!;
-    const sensitiveWet = previewExplosiveBandShares(holes, grid, 'big_bada_boom', 8, 1, wet)!;
+    const sensitiveDry = previewExplosiveBandShares(holes, grid, 'big_bada_boom', 3)!;
+    const sensitiveWet = previewExplosiveBandShares(holes, grid, 'big_bada_boom', 3, wet)!;
     expect(sensitiveWet).not.toEqual(sensitiveDry);
     expect(sensitiveWet.intact).toBeGreaterThan(sensitiveDry.intact);
-    expect(previewExplosiveBandShares(holes, grid, 'krackle', 8, 1, wet)).toEqual(previewExplosiveBandShares(holes, grid, 'krackle', 8, 1));
+    expect(sensitiveWet.fines + sensitiveWet.dust).toBeLessThan(sensitiveDry.fines + sensitiveDry.dust);
+    expect(previewExplosiveBandShares(holes, grid, 'krackle', 3, wet)).toEqual(previewExplosiveBandShares(holes, grid, 'krackle', 3));
   });
 
   it('an omitted wet set equals an explicit empty one', () => {
     const grid = bedGrid();
-    expect(previewExplosiveBandShares(holes, grid, 'boomite', 5, 2, new Set())).toEqual(previewExplosiveBandShares(holes, grid, 'boomite', 5, 2));
+    expect(previewExplosiveBandShares(holes, grid, 'boomite', 3, new Set())).toEqual(previewExplosiveBandShares(holes, grid, 'boomite', 3));
   });
 });
 
 describe('SoftwarePreview — recommendedPowderFactors (#2203 C3)', () => {
   // Shallow 3 x 3 patterns, 3 m apart: small rock cells, so the good band covers a large share of them.
   const FIXTURES = [
-    { rock: 'sandite', explosive: 'boomite', stemming: 1 },
-    { rock: 'sandite', explosive: 'krackle', stemming: 2 },
-    { rock: 'cruite', explosive: 'krackle', stemming: 2 },
+    { rock: 'sandite', explosive: 'boomite' },
+    { rock: 'sandite', explosive: 'krackle' },
+    { rock: 'cruite', explosive: 'krackle' },
   ];
   const holes = patternHoles(3, 3, 3, 3);
 
   it('answers for every hole, each a valid range or null', () => {
-    const { rock, explosive, stemming } = FIXTURES[0]!;
-    const ranges = recommendedPowderFactors(holes, bedGrid(rock, 14), explosive, stemming);
-    expect(Object.keys(ranges).sort()).toEqual(holes.map(h => h.id).sort());
-    for (const range of Object.values(ranges)) {
-      if (range === null) continue;
-      expect(range.minKgPerM3).toBeGreaterThan(0);
-      expect(range.maxKgPerM3).toBeGreaterThanOrEqual(range.minKgPerM3);
+    for (const { rock, explosive } of FIXTURES) {
+      const ranges = recommendedPowderFactors(holes, bedGrid(rock, 14), explosive);
+      expect(Object.keys(ranges).sort()).toEqual(holes.map(h => h.id).sort());
+      for (const [id, range] of Object.entries(ranges)) {
+        if (range === null) continue;
+        const sweep = stemmingSweepRangeM(3)!;
+        expect(range.minKgPerM3, id).toBeGreaterThan(0);
+        expect(range.maxKgPerM3, id).toBeGreaterThanOrEqual(range.minKgPerM3);
+        expect(range.maxStemmingM, id).toBeGreaterThanOrEqual(range.minStemmingM);
+        // Swept stemmings are rounded to the 0.1 m the panel steps in.
+        expect(range.minStemmingM, id).toBeGreaterThanOrEqual(sweep.lo - 0.05);
+        expect(range.maxStemmingM, id).toBeLessThanOrEqual(sweep.hi + 0.05);
+      }
+    }
+  });
+
+  it('pairs the stemmings with the powder factors they fill to: least stemming, most explosive', () => {
+    for (const { rock, explosive } of FIXTURES) {
+      const ranges = recommendedPowderFactors(holes, bedGrid(rock, 14), explosive);
+      for (const hole of holes) {
+        const range = ranges[hole.id];
+        if (!range) continue;
+        expect(fillPowderFactor(hole, holes, explosive, range.minStemmingM), hole.id).toBeCloseTo(range.maxKgPerM3, 12);
+        expect(fillPowderFactor(hole, holes, explosive, range.maxStemmingM), hole.id).toBeCloseTo(range.minKgPerM3, 12);
+      }
     }
   });
 
   it('finds a range for at least one hole of the shallow fixtures', () => {
-    const found = FIXTURES.some(({ rock, explosive, stemming }) => {
-      const ranges = recommendedPowderFactors(holes, bedGrid(rock, 14), explosive, stemming);
+    const found = FIXTURES.some(({ rock, explosive }) => {
+      const ranges = recommendedPowderFactors(holes, bedGrid(rock, 14), explosive);
       return Object.values(ranges).some(r => r !== null);
     });
     expect(found).toBe(true);
   });
 
-  it('charging every hole at a powder factor inside its range gives that hole a good share of at least the minimum', () => {
+  it('filling every hole at a stemming inside its range gives that hole a good share of at least the minimum', () => {
     let checked = 0;
-    for (const { rock, explosive, stemming } of FIXTURES) {
+    for (const { rock, explosive } of FIXTURES) {
       const grid = bedGrid(rock, 14);
-      const ranges = recommendedPowderFactors(holes, grid, explosive, stemming);
+      const ranges = recommendedPowderFactors(holes, grid, explosive);
       for (const hole of holes) {
         const range = ranges[hole.id];
         if (!range) continue;
-        const spacing = holeSpacingM(hole, holes);
-        const pf = (range.minKgPerM3 + range.maxKgPerM3) / 2;
-        const amountKg = pf * spacing * spacing * hole.depth;
-        const plan = uniformChargePlan(holes, explosive, amountKg, stemming);
-        const mix = holeBandMixes(previewPlanBands(plan, grid), holes)[hole.id]!;
+        const stemming = Math.round(((range.minStemmingM + range.maxStemmingM) / 2) * 10) / 10;
+        const mix = holeBandMixes(previewPlanBands(fillPlan(holes, explosive, stemming), grid), holes)[hole.id]!;
         // Inside the range the good share stays near the best sample's, itself at least the minimum.
         expect(mix.good, `${rock}/${explosive} ${hole.id}`).toBeGreaterThanOrEqual(RECOMMENDED_GOOD_SHARE_MIN * RECOMMENDED_RELATIVE_GOOD_SHARE - 0.02);
-        expect(powderFactor(plan.charges[hole.id]!.amountKg, hole.depth, spacing)).toBeCloseTo(pf, 6);
+        const pf = fillPowderFactor(hole, holes, explosive, stemming);
+        expect(pf).toBeGreaterThanOrEqual(range.minKgPerM3 - 1e-9);
+        expect(pf).toBeLessThanOrEqual(range.maxKgPerM3 + 1e-9);
         checked++;
       }
     }
@@ -678,58 +812,76 @@ describe('SoftwarePreview — recommendedPowderFactors (#2203 C3)', () => {
   });
 
   it('is null for every hole when the pattern stands over no rock', () => {
-    const ranges = recommendedPowderFactors(holes, new VoxelGrid(40, 40), 'boomite', 1);
+    const ranges = recommendedPowderFactors(holes, new VoxelGrid(40, 40), 'boomite');
+    expect(Object.keys(ranges).sort()).toEqual(holes.map(h => h.id).sort());
+    for (const range of Object.values(ranges)) expect(range).toBeNull();
+  });
+
+  it('is null for every hole for an unknown explosive', () => {
+    const ranges = recommendedPowderFactors(holes, bedGrid('sandite', 14), 'nonexistent');
     expect(Object.keys(ranges).sort()).toEqual(holes.map(h => h.id).sort());
     for (const range of Object.values(ranges)) expect(range).toBeNull();
   });
 
   it('gives every hole of a standard pattern a range when the explosive suits the rock (regression: "No charge" everywhere)', () => {
-    // The sandbox opening pattern: 3 x 3, 4 m apart, 8 m holes, 89 mm, 2.5 m stemming, in a deep bed.
+    // The sandbox opening pattern: 3 x 3, 4 m apart, 8 m holes, 89 mm, in a deep bed.
     const standard = patternHoles(3, 3, 4, 8);
     for (const [rock, explosive] of [['molite', 'krackle'], ['cruite', 'boomite'], ['clunkite', 'shatternite']] as const) {
-      const ranges = recommendedPowderFactors(standard, bedGrid(rock, 24), explosive, 2.5);
+      const ranges = recommendedPowderFactors(standard, bedGrid(rock, 24), explosive);
       for (const hole of standard) expect(ranges[hole.id], `${rock}/${explosive} ${hole.id}`).not.toBeNull();
     }
   });
 
-  it('recommends the charges that fragment the rock nearly as well as the best one, the best included', () => {
+  it('recommends the stemmings that fragment the rock nearly as well as the best one, the best included', () => {
     const standard = patternHoles(3, 3, 4, 8);
     const grid = bedGrid('molite', 24);
     const centre = standard[4]!;
-    const range = recommendedPowderFactors(standard, grid, 'krackle', 2.5)[centre.id]!;
-    const spacing = holeSpacingM(centre, standard);
-    const fit = maxFittingChargeKg(centre.depth, 2.5, centre.diameter);
+    const range = recommendedPowderFactors(standard, grid, 'krackle')[centre.id]!;
+    expect(range).not.toBeNull();
     const samples = Array.from({ length: RECOMMENDED_SWEEP_STEPS }, (_, i) => {
-      const kg = fit * ((i + 1) / RECOMMENDED_SWEEP_STEPS);
-      const mix = holeBandMixes(previewPlanBands(uniformChargePlan(standard, 'krackle', kg, 2.5), grid), standard)[centre.id]!;
-      return { pf: powderFactor(kg, centre.depth, spacing), good: mix.good };
+      const stemming = sweepStemmingM(centre.depth, i, RECOMMENDED_SWEEP_STEPS);
+      const mix = holeBandMixes(previewPlanBands(fillPlan(standard, 'krackle', stemming), grid), standard)[centre.id]!;
+      return { stemming, pf: fillPowderFactor(centre, standard, 'krackle', stemming), good: mix.good };
     });
     const best = samples.reduce((a, b) => (b.good > a.good ? b : a));
+    expect(best.stemming).toBeGreaterThanOrEqual(range.minStemmingM);
+    expect(best.stemming).toBeLessThanOrEqual(range.maxStemmingM);
     expect(best.pf).toBeGreaterThanOrEqual(range.minKgPerM3 - 1e-9);
     expect(best.pf).toBeLessThanOrEqual(range.maxKgPerM3 + 1e-9);
     for (const sample of samples) {
-      if (sample.pf < range.minKgPerM3 - 1e-9 || sample.pf > range.maxKgPerM3 + 1e-9) continue;
+      if (sample.stemming < range.minStemmingM || sample.stemming > range.maxStemmingM) continue;
       expect(sample.good).toBeGreaterThanOrEqual(best.good * RECOMMENDED_RELATIVE_GOOD_SHARE - 1e-9);
     }
+    // The run's ends are swept samples: what the panel shows can be dialled in exactly.
+    expect(samples.map(x => x.stemming)).toContain(range.minStemmingM);
+    expect(samples.map(x => x.stemming)).toContain(range.maxStemmingM);
   });
 
   it('is null for a hole no charge of the explosive fragments well', () => {
     // Black powder in hard rock, holes 8 m apart: the good band never covers more than a sliver of the cell.
     const wide = patternHoles(1, 2, 8, 8);
-    const ranges = recommendedPowderFactors(wide, bedGrid('titanite', 14), 'pop_rock', 2);
+    const ranges = recommendedPowderFactors(wide, bedGrid('titanite', 14), 'pop_rock');
     for (const hole of wide) expect(ranges[hole.id]).toBeNull();
   });
 
+  it('is null for a hole too shallow to sweep, and still answers for the others', () => {
+    const grid = bedGrid('sandite', 14);
+    const mixed = [...holes, drillHole('HX', 20, 20, MIN_STEMMING_M + MIN_CHARGE_COLUMN_M - 0.2)];
+    const ranges = recommendedPowderFactors(mixed, grid, 'boomite');
+    expect(ranges['HX']).toBeNull();
+    expect(Object.keys(ranges).sort()).toEqual(mixed.map(h => h.id).sort());
+  });
+
   it('is empty with no holes', () => {
-    expect(recommendedPowderFactors([], bedGrid(), 'boomite', 2)).toEqual({});
+    expect(recommendedPowderFactors([], bedGrid(), 'boomite')).toEqual({});
   });
 
   it('accepts the wet holes like the other previews', () => {
-    const { rock, explosive, stemming } = FIXTURES[0]!;
+    const { rock, explosive } = FIXTURES[0]!;
     const grid = bedGrid(rock, 14);
-    const dry = recommendedPowderFactors(holes, grid, explosive, stemming);
-    expect(recommendedPowderFactors(holes, grid, explosive, stemming, new Set())).toEqual(dry);
-    const wet = recommendedPowderFactors(holes, grid, explosive, stemming, new Set(holes.map(h => h.id)));
+    const dry = recommendedPowderFactors(holes, grid, explosive);
+    expect(recommendedPowderFactors(holes, grid, explosive, new Set())).toEqual(dry);
+    const wet = recommendedPowderFactors(holes, grid, explosive, new Set(holes.map(h => h.id)));
     expect(Object.keys(wet).sort()).toEqual(Object.keys(dry).sort());
   });
 });

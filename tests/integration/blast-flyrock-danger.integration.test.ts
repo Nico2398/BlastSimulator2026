@@ -115,14 +115,27 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 1500): void 
   }
 }
 
-/** Fire a 3×3 pattern at (15,15) with the given stemming. */
+/**
+ * Stemming of a reckless shot: the explosive fills each hole to half a metre
+ * under its collar (the createCharge floor), right under the free face.
+ */
+const RECKLESS_STEMMING = '0.5';
+/**
+ * Stemming of a careful shot. The holes are filled up to the stemming, so it
+ * also sets how far below the collar the charge stops: measured under the
+ * kernel energy model on this 3 m pattern, 2 m of stemming still throws rock
+ * 33 m and 2.5 m 32 m (12 projections), 3 m throws nothing.
+ */
+const CAREFUL_STEMMING = '3';
+
+/** Fire a 3×3 pattern at (15,15), each hole filled with boomite up to the given stemming, as a player charges it. */
 function blastAt(ctx: MiningContext, stemming: string): string {
   drillPlanCommand(ctx, ['grid'], { rows: '3', cols: '3', spacing: '3', depth: '8', start: '15,15' });
   driveDrillPlanToCompletion(ctx);
   // Charging bills explosives at order time (#1341); these tests are about
   // flyrock, not budget, so fund the order explicitly.
   fundForDeliveryWait(ctx.state!);
-  const ordered = chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming });
+  const ordered = chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', stemming });
   expect(ordered.success, ordered.output).toBe(true);
   driveChargePlanToCompletion(ctx);
   const result = blastCommand(ctx, [], {});
@@ -131,11 +144,11 @@ function blastAt(ctx: MiningContext, stemming: string): string {
 }
 
 /**
- * Stand a crew just outside the pattern — holes span x=15..21, z=15..21, so
- * this is clear of the ground that disappears (at every stemming this suite
- * fires, including the well-stemmed '2' case, which clears *more* ground than
- * a poorly-stemmed shot since more of its energy goes down instead of up) but
- * well inside a minimally-stemmed (0.5m, the createCharge floor) shot's throw.
+ * Stand a crew just outside the ground the blast removes — holes span
+ * x=15..21, z=15..21, and the energy of each hole reaches 4.5 m through rock,
+ * so the cleared footprint runs x=12..24, z=12..24 at both stemmings this
+ * suite fires — but well inside a minimally-stemmed (0.5m, the createCharge
+ * floor) shot's throw.
  *
  * Hired as 'driver', not 'driller' (#554): a 'driller' is 'blasting'-
  * qualified (ROLE_STARTING_QUALIFICATIONS), and charge_hole — unlike
@@ -150,7 +163,7 @@ function crewBesideTheBlast(ctx: MiningContext, count = 12): number[] {
   const rng = new Random(7);
   const ids: number[] = [];
   for (let i = 0; i < count; i++) {
-    const hire = hireEmployee(ctx.state!.employees, 'driver', rng, 24 + (i % 4), 14 + Math.floor(i / 4));
+    const hire = hireEmployee(ctx.state!.employees, 'driver', rng, 26 + (i % 4), 14 + Math.floor(i / 4));
     if (hire.employee) ids.push(hire.employee.id);
   }
   return ids;
@@ -169,19 +182,19 @@ describe('Blast flyrock — danger reaches the crew', () => {
     const crew = crewBesideTheBlast(ctx);
     const before = aliveCount(ctx, crew);
 
-    blastAt(ctx, '0.5');
+    blastAt(ctx, RECKLESS_STEMMING);
 
     expect(before).toBeGreaterThan(0);
     expect(aliveCount(ctx, crew), 'minimally stemmed flyrock hurt nobody').toBeLessThan(before);
     expect(ctx.state!.damage.accidents.length).toBeGreaterThan(0);
   });
 
-  it('the same charge, properly stemmed, leaves the crew alone', () => {
+  it('the same pattern, properly stemmed, leaves the crew alone', () => {
     const ctx = makeCtx();
     const crew = crewBesideTheBlast(ctx);
     const before = aliveCount(ctx, crew);
 
-    blastAt(ctx, '2');
+    blastAt(ctx, CAREFUL_STEMMING);
 
     expect(aliveCount(ctx, crew)).toBe(before);
   });
@@ -190,7 +203,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     const ctx = makeCtx();
     crewBesideTheBlast(ctx);
 
-    blastAt(ctx, '0.5');
+    blastAt(ctx, RECKLESS_STEMMING);
 
     const casualties = ctx.state!.damage.accidents.filter(a => a.type === 'death' || a.type === 'injury');
     expect(casualties.length).toBeGreaterThan(0);
@@ -203,7 +216,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
   it('a blast with nobody around hurts nobody', () => {
     const ctx = makeCtx();
 
-    blastAt(ctx, '0.5');
+    blastAt(ctx, RECKLESS_STEMMING);
 
     expect(ctx.state!.damage.accidents.filter(a => a.type === 'death').length).toBe(0);
     expect(ctx.state!.damage.deathCount).toBe(0);
@@ -215,7 +228,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     // Right on top of the pattern, not beside it.
     const onTheBlast = hireEmployee(ctx.state!.employees, 'driller', rng, 16, 16).employee;
 
-    blastAt(ctx, '2'); // a careful blast — the ground still disappears
+    blastAt(ctx, CAREFUL_STEMMING); // a careful blast — the ground still disappears
 
     expect(onTheBlast.alive, 'stood on the blast and survived').toBe(false);
     expect(ctx.state!.damage.deathCount).toBeGreaterThan(0);
@@ -226,7 +239,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     const ctx = makeCtx();
     const parked = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', 16, 16).vehicle;
 
-    blastAt(ctx, '2');
+    blastAt(ctx, CAREFUL_STEMMING);
 
     expect(ctx.state!.vehicles.vehicles.some(v => v.id === parked.id)).toBe(false);
   });
@@ -240,7 +253,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     // gate), which is exactly the "well clear" this test means to prove.
     const farAway = hireEmployee(ctx.state!.employees, 'driver', rng, 44, 44).employee;
 
-    blastAt(ctx, '0.5');
+    blastAt(ctx, RECKLESS_STEMMING);
 
     expect(farAway.alive).toBe(true);
     expect(farAway.injured).toBe(false);
@@ -248,7 +261,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('reports how far the rock was thrown, and rates the blast on it', () => {
     const reckless = makeCtx();
-    const output = blastAt(reckless, '0.5');
+    const output = blastAt(reckless, RECKLESS_STEMMING);
 
     expect(output).toMatch(/Furthest throw: \d+\.\d m/);
   });
@@ -261,7 +274,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     );
     expect(placed.success, placed.error).toBe(true);
 
-    blastAt(ctx, '2'); // a careful blast — the footprint still disappears
+    blastAt(ctx, CAREFUL_STEMMING); // a careful blast — the footprint still disappears
 
     expect(ctx.state!.buildings.buildings.some(b => b.id === placed.building!.id)).toBe(false);
   });
@@ -285,7 +298,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
     // Truck-worked charging spans many payroll ticks (#1649); fund it like blastAt does.
     fundForDeliveryWait(ctx.state!);
-    chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
+    chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', stemming: RECKLESS_STEMMING });
     driveChargePlanToCompletion(ctx);
     const result = blastCommand(ctx, [], {});
     expect(result.success, result.output).toBe(true);
@@ -305,18 +318,18 @@ describe('Blast flyrock — danger reaches the crew', () => {
   // distance-attenuated kinetic-energy model), not today's silent miss —
   // they are expected to fail until that attenuation exists.
   //
-  // (26,15)/(27,16)/(26,21) sit 3-6m past the reckless pattern's own cleared
-  // footprint (x14-23, z13-22 for this exact plan/seed) — inside
-  // BLAST_DANGER_MARGIN_M, outside HIT_RADIUS of where the current model's
-  // fragments actually land, and confirmed (40-seed sweep) to take zero
-  // outcome under the current hard 2m cutoff every single time.
+  // (26,15)/(27,16)/(26,21) sit 2-4m past the reckless pattern's own cleared
+  // footprint (x12-24, z12-24 for this exact plan/seed under the kernel
+  // energy model; x14-23, z13-22 when the 40-seed sweep below was run) —
+  // inside BLAST_DANGER_MARGIN_M, and confirmed (40-seed sweep) to take zero
+  // outcome under the old hard 2m cutoff every single time.
   describe('the distance-attenuated debris gap: a few metres inside the zone, off any cleared column', () => {
     it('hurts or kills an employee standing just past the cleared footprint', () => {
       const ctx = makeCtx();
       const rng = new Random(2000);
       const bystander = hireEmployee(ctx.state!.employees, 'driver', rng, 26, 15).employee;
 
-      blastAt(ctx, '0.5');
+      blastAt(ctx, RECKLESS_STEMMING);
 
       const tookOutcome = !bystander.alive || bystander.injured;
       expect(tookOutcome, 'bystander a few metres inside the zone took no outcome at all').toBe(true);
@@ -326,7 +339,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
       const ctx = makeCtx();
       const parked = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', 27, 16).vehicle;
 
-      blastAt(ctx, '0.5');
+      blastAt(ctx, RECKLESS_STEMMING);
 
       const destroyed = !ctx.state!.vehicles.vehicles.some(v => v.id === parked.id);
       const damaged = ctx.state!.damage.accidents.some(a =>
@@ -342,7 +355,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
       );
       expect(placed.success, placed.error).toBe(true);
 
-      blastAt(ctx, '0.5');
+      blastAt(ctx, RECKLESS_STEMMING);
 
       const destroyed = !ctx.state!.buildings.buildings.some(b => b.id === placed.building!.id);
       const damaged = ctx.state!.damage.accidents.some(a =>
@@ -370,7 +383,7 @@ describe('Blast-destroyed Freight Warehouse stock loss (#1372)', () => {
     const events: Array<{ buildingId: number; massKg: number }> = [];
     ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
 
-    const output = blastAt(ctx, '0.5');
+    const output = blastAt(ctx, RECKLESS_STEMMING);
 
     expect(state.buildings.buildings.some(b => b.id === id)).toBe(false);
     expect(events).toHaveLength(1);

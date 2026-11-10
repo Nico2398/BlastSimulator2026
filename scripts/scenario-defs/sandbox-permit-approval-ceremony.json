@@ -168,7 +168,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -177,11 +177,6 @@
         {
           "type": "ensureStep",
           "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 6
         },
         {
           "type": "setStepper",
@@ -460,7 +455,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -469,11 +464,6 @@
         {
           "type": "ensureStep",
           "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 6
         },
         {
           "type": "setStepper",

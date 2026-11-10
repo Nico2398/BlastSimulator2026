@@ -18,8 +18,9 @@ import {
   CRACKED_VOXEL_ENERGY_RATIO,
   FRAGMENTATION_BAND_FINES_MIN,
   FRAGMENTATION_BAND_DUST_MIN,
+  DRILL_GRID_DEFAULT_SPACING_M,
 } from '../../../src/core/config/balance.js';
-import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
+import { createGridPlan, type DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge, holePowderFactors } from '../../../src/core/mining/ChargePlan.js';
 import { holeBandMixes, recommendedPowderFactors } from '../../../src/core/mining/SoftwarePreview.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
@@ -384,12 +385,33 @@ describe('EnergyHeatmap — hole readout on columns (#2203 C5)', () => {
     }
   });
 
-  it('the recommended range is computed on demand and matches the preview of the hole\'s own explosive and stemming', () => {
+  it('the recommended range is computed on demand and matches the preview of the hole\'s own explosive', () => {
     const { grid, holes, plan } = fourHoles();
     const readout = columnAt(planHeatmap(plan, grid).columns, holes[0]!.x, holes[0]!.z)!.hole!;
     expect(typeof readout.recommended).toBe('function');
-    expect(readout.recommended()).toEqual(recommendedPowderFactors(holes, grid, 'boomite', 2)[holes[0]!.id]);
+    expect(readout.recommended()).toEqual(recommendedPowderFactors(holes, grid, 'boomite')[holes[0]!.id]);
     expect(readout.recommended()).toEqual(readout.recommended());
+  });
+
+  it('the recommendation is keyed by explosive: the hole\'s own stemming does not change it', () => {
+    // The sweep fills each hole over its own stemming range, so the stemming a hole is charged with is not an input.
+    const { grid, holes, charges } = fourHoles();
+    const restemmed = { ...charges, [holes[0]!.id]: { explosiveId: 'boomite', amountKg: 3, stemmingM: 4 } };
+    const a = columnAt(planHeatmap(assembleBlastPlan(holes, charges), grid).columns, holes[0]!.x, holes[0]!.z)!.hole!;
+    const b = columnAt(planHeatmap(assembleBlastPlan(holes, restemmed), grid).columns, holes[0]!.x, holes[0]!.z)!.hole!;
+    expect(a.recommended()).not.toBeNull();
+    expect(b.recommended()).toEqual(a.recommended());
+  });
+
+  it('a hole charged with another explosive reads that explosive\'s recommendation', () => {
+    const { grid, holes, charges } = fourHoles();
+    const mixed = { ...charges, [holes[1]!.id]: { explosiveId: 'krackle', amountKg: 5, stemmingM: 2 } };
+    const { columns } = planHeatmap(assembleBlastPlan(holes, mixed), grid);
+    const krackle = columnAt(columns, holes[1]!.x, holes[1]!.z)!.hole!;
+    const boomite = columnAt(columns, holes[0]!.x, holes[0]!.z)!.hole!;
+    expect(krackle.recommended()).toEqual(recommendedPowderFactors(holes, grid, 'krackle')[holes[1]!.id]);
+    expect(boomite.recommended()).toEqual(recommendedPowderFactors(holes, grid, 'boomite')[holes[0]!.id]);
+    expect(krackle.recommended()).not.toEqual(boomite.recommended());
   });
 
   it('an uncharged hole leaves its columns without a readout', () => {
@@ -401,12 +423,34 @@ describe('EnergyHeatmap — hole readout on columns (#2203 C5)', () => {
     expect(columnAt(columns, holes[0]!.x, holes[0]!.z)!.hole!.holeId).toBe(holes[0]!.id);
   });
 
-  it('a lone charged hole is read at the default grid spacing', () => {
+  it('a lone hand-placed charged hole is read at the default grid spacing', () => {
+    const { grid } = makeTestPlan();
+    const hole: DrillHole = { id: 'H1', x: 12, z: 12, depth: 8, diameter: 0.089 };
+    const plan = assembleBlastPlan([hole], { [hole.id]: { explosiveId: 'boomite', amountKg: 8, stemmingM: 2 } });
+    const col = columnAt(planHeatmap(plan, grid).columns, 12, 12)!;
+    expect(col.hole!.powderFactor).toBeCloseTo(8 / (DRILL_GRID_DEFAULT_SPACING_M ** 2 * 8), 10);
+  });
+
+  it('a lone hole drilled as a grid is read at its grid cell', () => {
     const { grid } = makeTestPlan();
     const [hole] = createGridPlan(holeCounter, { x: 12, z: 12 }, 1, 1, 3, 8, 0.089);
     const plan = assembleBlastPlan([hole!], { [hole!.id]: { explosiveId: 'boomite', amountKg: 8, stemmingM: 2 } });
     const col = columnAt(planHeatmap(plan, grid).columns, 12, 12)!;
-    expect(col.hole!.powderFactor).toBeCloseTo(8 / (4 * 4 * 8), 10);
+    expect(col.hole!.powderFactor).toBeCloseTo(8 / (3 * 3 * 8), 10);
+  });
+
+  it('a rectangular grid cell: powder factor over spacing x burden, and columns owned along the burden past half the spacing', () => {
+    // Spacing 2 m along x, burden 6 m between rows: the hole at (10, 10) works x 9..11, z 7..13.
+    const { grid } = makeTestPlan();
+    const holes = createGridPlan(holeCounter, { x: 10, z: 10 }, 2, 2, 2, 6, 0.15, 6);
+    const charges = Object.fromEntries(holes.map(h => [h.id, { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 }]));
+    const { columns } = planHeatmap(assembleBlastPlan(holes, charges), grid);
+    const own = columnAt(columns, 10, 10)!.hole!;
+    expect(own.holeId).toBe(holes[0]!.id);
+    expect(own.powderFactor).toBeCloseTo(5 / (2 * 6 * 6), 10);
+    // Two metres along the burden: inside the 6 m deep cell, though farther than half the 2 m spacing.
+    expect(columnAt(columns, 10, 12)!.hole!.holeId).toBe(holes[0]!.id);
+    expect(columnAt(columns, 10, 14)!.hole!.holeId).toBe(holes[2]!.id);
   });
 
   it('an empty plan has no columns and so no readouts', () => {

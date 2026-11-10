@@ -18,7 +18,6 @@ import {
   NEED_HARD_THRESHOLDS,
   DRILL_GRID_DEFAULT_SPACING_M,
   DRILL_GRID_DEFAULT_DEPTH_M,
-  CHARGE_DEFAULT_AMOUNT_KG,
   CHARGE_DEFAULT_STEMMING_M,
   CHARGE_KG_PER_METRE,
 } from '../../../src/core/config/balance.js';
@@ -283,18 +282,16 @@ describe('Drill grid tool defaults (#1072)', () => {
 });
 
 describe('Charge panel defaults (#1330)', () => {
-  it('CHARGE_DEFAULT_AMOUNT_KG is 7 (smallest charge that breaks out on the sandbox pad and the tutorial pit, #1724)', () => {
-    expect(CHARGE_DEFAULT_AMOUNT_KG).toBe(7);
-  });
-
   it('CHARGE_DEFAULT_STEMMING_M is 2.5', () => {
     expect(CHARGE_DEFAULT_STEMMING_M).toBe(2.5);
   });
 });
 
 describe('Charge defaults fit the default hole (#1724)', () => {
-  it('the default charge column plus the default stemming fits inside the default hole depth', () => {
-    const column = CHARGE_DEFAULT_AMOUNT_KG / CHARGE_KG_PER_METRE;
-    expect(column + CHARGE_DEFAULT_STEMMING_M).toBeLessThanOrEqual(DRILL_GRID_DEFAULT_DEPTH_M);
+  it('the default stemming leaves the default hole a charge column: filling it loads explosive', () => {
+    const column = DRILL_GRID_DEFAULT_DEPTH_M - CHARGE_DEFAULT_STEMMING_M;
+    expect(column).toBeGreaterThan(0);
+    // Boomite, the reference density, fills an 89 mm hole at CHARGE_KG_PER_METRE.
+    expect(column * CHARGE_KG_PER_METRE).toBeGreaterThan(0);
   });
 });

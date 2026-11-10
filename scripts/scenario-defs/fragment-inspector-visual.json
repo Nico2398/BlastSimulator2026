@@ -94,14 +94,9 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
-      "description": "#1774: 6 kg breakout charge (BURDEN_BREAKOUT_MAX, balance.ts) -- the 5 kg shot left the rubble sealed under the cap, and sealed rock gets no haul/fragment order, so collectedOreTotal never rose. Amount is set through its stepper so interaction mode charges the same 6 kg; stemming 2 matches DEFAULT_STEMMING_M (Charge.ts).",
+      "command": "charge hole:* explosive:boomite stemming:2",
+      "description": "Fill each 8 m hole with boomite up to 2 m of stemming (6 m column, 12 kg at 2 kg/m): a breakout charge, so the rubble is not sealed under the cap (sealed rock gets no haul/fragment order, #1774). The Charge step's stemming stepper sets the same 2 m, so interaction mode loads the same fill.",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 6
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
@@ -205,8 +200,8 @@
       }
     },
     {
-      "command": "build freight_warehouse at:12,17",
-      "description": "Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) -- small relative to the blast's total haulable mass, which is the whole point of this scenario.",
+      "command": "build freight_warehouse at:11,17",
+      "description": "Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) -- small relative to the blast's total haulable mass, which is the whole point of this scenario. Built at (11,17): the fill-mode shot's crater rim reaches x=15 on rows 19-22, so the old (12,17) footprint straddled it and was refused as too steep.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -227,7 +222,7 @@
         },
         {
           "type": "pickTile",
-          "x": 12,
+          "x": 11,
           "z": 17
         },
         {

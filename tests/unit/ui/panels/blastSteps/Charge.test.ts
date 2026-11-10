@@ -6,15 +6,15 @@ import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { getExplosive, getAllExplosives } from '../../../../../src/core/world/ExplosiveCatalog.js';
 import { wetAllHoles, setHoleWater } from '../../../../helpers/holeWater.js';
 import { drainRainReasonText } from '../../../../../src/ui/panels/blastSteps/ChargeHoleList.js';
-import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
+import { createCharge, fillChargeKg } from '../../../../../src/core/mining/ChargePlan.js';
 import { VoxelGrid } from '../../../../../src/core/world/VoxelGrid.js';
-import { recommendedPowderFactors } from '../../../../../src/core/mining/SoftwarePreview.js';
+import { recommendedPowderFactors, stemmingSweepRangeM } from '../../../../../src/core/mining/SoftwarePreview.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
 import { TUBING_COST } from '../../../../../src/core/mining/Tubing.js';
-import { CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M } from '../../../../../src/core/config/balance.js';
+import { CHARGE_DEFAULT_STEMMING_M, MIN_STEMMING_M } from '../../../../../src/core/config/balance.js';
 import { dispatchChargeAction } from '../../../../../src/core/mining/ChargeOrder.js';
-import { explosiveHoleLimits } from '../../../../../src/core/mining/ChargePlan.js';
 import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js';
+import { formatMoney } from '../../../../../src/core/economy/formatMoney.js';
 import { setLocale } from '../../../../../src/core/i18n/I18n.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
 import { chargeKgLimitWarning, permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
@@ -45,6 +45,30 @@ function card(step: ChargeStep, explosiveId: string): HTMLButtonElement {
 /** Put every hole under water (tight rock unless a porosity is given), as a storm would have. */
 function soak(state: ReturnType<typeof makeState>, porosity = 0.03): void {
   for (const h of state.drillHoles) state.holeWater[h.id] = { level: 0.9, porosity };
+}
+
+/** The stemming stepper's shown value, e.g. "2.5 m". */
+function stemmingText(step: ChargeStep): string {
+  return step.root.querySelector('[data-field="stemming"] .bsx-stepper-value')!.textContent ?? '';
+}
+
+/** The stemming stepper's minus and plus buttons. */
+function stemmingButtons(step: ChargeStep): { minus: HTMLButtonElement; plus: HTMLButtonElement } {
+  const buttons = Array.from(step.root.querySelectorAll<HTMLButtonElement>('[data-field="stemming"] .bsx-stepper-btn'));
+  return { minus: buttons[0]!, plus: buttons[buttons.length - 1]! };
+}
+
+/** Click the stemming stepper until it shows `m` metres (0.1 m steps). */
+function stepStemmingTo(step: ChargeStep, m: number): void {
+  const { minus, plus } = stemmingButtons(step);
+  const want = `${m.toFixed(1)} m`;
+  for (let i = 0; i < 200 && stemmingText(step) !== want; i++) (parseFloat(stemmingText(step)) < m ? plus : minus).click();
+  expect(stemmingText(step)).toBe(want);
+}
+
+/** The read-only "Per hole" readout: what each hole holds filled up to the stemming. */
+function perHoleText(step: ChargeStep): string {
+  return step.root.querySelector('[data-role="charge-per-hole"]')!.textContent ?? '';
 }
 
 beforeEach(() => { holeCounter.nextHoleId = 1; });
@@ -102,7 +126,7 @@ describe('ChargeStep', () => {
     expect(card(step, dryId).textContent).not.toContain('WATER-SENSITIVE');
   });
 
-  it('Charge All dispatches the selected explosive, amount, and stemming for every hole', () => {
+  it('Charge All fills every hole with the selected explosive up to the stemming: explosive and stemming, no amount', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
@@ -113,28 +137,23 @@ describe('ChargeStep', () => {
     chargeAllBtn.click();
 
     const cmd = gameConsole.mock.calls[0]![0] as string;
-    expect(cmd).toContain('charge hole:*');
-    expect(cmd).toContain('explosive:krackle');
-    expect(cmd).toContain(`amount:${CHARGE_DEFAULT_AMOUNT_KG}kg`);
-    expect(cmd).toContain(`stemming:${CHARGE_DEFAULT_STEMMING_M}m`);
-    // #1330: the retuned panel defaults, spelled out
-    expect(cmd).toContain('amount:7kg');
+    expect(cmd).toBe(`charge hole:* explosive:krackle stemming:${CHARGE_DEFAULT_STEMMING_M}m`);
+    expect(cmd).not.toContain('amount:');
+    // #1330: the panel's default stemming, spelled out
     expect(cmd).toContain('stemming:2.5m');
   });
 
-  it('keeps the overflow reason line as the Charge All button next sibling (#1361 scenario selector)', () => {
+  it('keeps the no-room reason line as the Charge All button next sibling (#1361 scenario selector)', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 6, 0.089);
     step.update(state, 'sunny');
     card(step, 'krackle').click();
     const chargeAllBtn = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
-    const stepper = step.root.querySelector('[data-field="amount"]') as HTMLElement;
-    const plus = Array.from(stepper.querySelectorAll('button')).pop() as HTMLButtonElement;
-    for (let i = 0; i < 10; i++) plus.click();
+    stepStemmingTo(step, 6);
     step.update(state, 'sunny');
     expect(chargeAllBtn.disabled).toBe(true);
-    expect(chargeAllBtn.nextElementSibling?.textContent ?? '').toContain('Shallowest hole is 6 m');
+    expect(chargeAllBtn.nextElementSibling?.textContent ?? '').toBe(t('ui.blast_workshop.charge.no_room_reason', { depth: 6, stemming: 6 }));
   });
 
   it('renders one per-hole row per drill hole, keyed by data-hole, each with its own charge button', () => {
@@ -149,7 +168,7 @@ describe('ChargeStep', () => {
     expect(step.root.querySelector(`[data-hole="${h2.id}"] [data-action="charge-hole"]`)).not.toBeNull();
   });
 
-  it('a per-hole Charge button dispatches charge for that hole alone, with the panel\'s selected explosive/amount/stemming', () => {
+  it('a per-hole Charge button dispatches charge for that hole alone, with the panel\'s selected explosive and stemming', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
@@ -160,25 +179,22 @@ describe('ChargeStep', () => {
     (step.root.querySelector(`[data-hole="${h2.id}"] [data-action="charge-hole"]`) as HTMLButtonElement).click();
 
     expect(gameConsole).toHaveBeenCalledTimes(1);
-    expect(gameConsole).toHaveBeenCalledWith(`charge hole:${h2.id} explosive:krackle amount:${CHARGE_DEFAULT_AMOUNT_KG}kg stemming:${CHARGE_DEFAULT_STEMMING_M}m`);
+    expect(gameConsole).toHaveBeenCalledWith(`charge hole:${h2.id} explosive:krackle stemming:${CHARGE_DEFAULT_STEMMING_M}m`);
   });
 
-  it('a per-hole Charge button picks up the amount/stemming steppers, not the defaults', () => {
+  it('a per-hole Charge button picks up the stemming stepper, not the default', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     step.update(state, 'sunny');
 
-    const amountIncBtn = step.root.querySelectorAll('.bsx-stepper-btn')[1] as HTMLButtonElement;
-    amountIncBtn.click(); // default kg → default + 1 kg
-    const stemmingIncBtn = step.root.querySelectorAll('.bsx-stepper-btn')[3] as HTMLButtonElement;
-    stemmingIncBtn.click(); // default m → one stemming step up (step size not pinned here)
-    const stemmingShown = parseFloat(step.root.querySelector('[data-field="stemming"] .bsx-stepper-value')!.textContent!);
+    stemmingButtons(step).plus.click(); // default m → one stemming step up (step size not pinned here)
+    const stemmingShown = parseFloat(stemmingText(step));
     expect(stemmingShown).toBeGreaterThan(CHARGE_DEFAULT_STEMMING_M);
 
     (step.root.querySelector(`[data-hole="${h1.id}"] [data-action="charge-hole"]`) as HTMLButtonElement).click();
 
-    expect(gameConsole).toHaveBeenCalledWith(`charge hole:${h1.id} explosive:boomite amount:${CHARGE_DEFAULT_AMOUNT_KG + 1}kg stemming:${stemmingShown}m`);
+    expect(gameConsole).toHaveBeenCalledWith(`charge hole:${h1.id} explosive:boomite stemming:${stemmingShown}m`);
   });
 
   it('marks a charged hole distinguishable from an uncharged one and shows its charge', () => {
@@ -219,36 +235,76 @@ describe('ChargeStep', () => {
     expect(step.root.textContent).toContain('No holes to charge yet');
   });
 
-  it('amount stepper clamps to the selected explosive\'s min/max charge', () => {
-    const { step } = makeStep();
-    step.update(makeState(), 'sunny');
-    card(step, 'pop_rock').click(); // narrower min/max than the default boomite
+  // ── the kg each hole holds is read, never stepped ─────────────────────────
 
-    const popRock = getExplosive('pop_rock')!;
-    const decBtn = step.root.querySelectorAll('.bsx-stepper-btn')[0] as HTMLButtonElement;
-    for (let i = 0; i < 20; i++) decBtn.click();
-    const amountValue = step.root.querySelector('.bsx-stepper-value') as HTMLElement;
-    expect(Number(amountValue.textContent!.replace(' kg', ''))).toBe(popRock.minChargeKg);
+  it('has no kg stepper: the stemming is the one stepper of the step', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    step.update(state, 'sunny');
+    expect(step.root.querySelector('[data-field="amount"]')).toBeNull();
+    expect(step.root.querySelectorAll('.bsx-stepper')).toHaveLength(1);
+    expect(step.root.querySelector('[data-field="stemming"] .bsx-stepper')).not.toBeNull();
+    const perHole = step.root.querySelector('[data-role="charge-per-hole"]')!;
+    expect(perHole.querySelector('button, input')).toBeNull();
+  });
+
+  it('the per-hole readout shows what the hole holds of the selected explosive, filled up to the stemming', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    step.update(state, 'sunny');
+    expect(perHoleText(step)).toBe(`${fillChargeKg(8, CHARGE_DEFAULT_STEMMING_M, 0.089, 'boomite')} kg`);
+    expect(perHoleText(step)).toBe('11 kg');
+
+    card(step, 'pop_rock').click(); // lighter: fewer kg fill the same hole
+    step.update(state, 'sunny');
+    expect(perHoleText(step)).toBe(`${fillChargeKg(8, CHARGE_DEFAULT_STEMMING_M, 0.089, 'pop_rock')} kg`);
+
+    card(step, 'dynatomics').click(); // denser: more kg in the same hole
+    step.update(state, 'sunny');
+    expect(perHoleText(step)).toBe(`${fillChargeKg(8, CHARGE_DEFAULT_STEMMING_M, 0.089, 'dynatomics')} kg`);
+  });
+
+  it('the per-hole readout follows the stemming: more stemming, less explosive', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    step.update(state, 'sunny');
+    stepStemmingTo(step, 4);
+    step.update(state, 'sunny');
+    expect(perHoleText(step)).toBe(`${fillChargeKg(8, 4, 0.089, 'boomite')} kg`);
+    expect(perHoleText(step)).toBe('8 kg');
+  });
+
+  it('the per-hole readout spans the holes when they hold different amounts, and is a dash without holes', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    step.update(state, 'sunny');
+    expect(perHoleText(step)).toBe('—');
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.089);
+    step.update(state, 'sunny');
+    // 4 m hole: 1.5 m under 2.5 m of stemming = 3 kg of boomite; 8 m hole: 11 kg.
+    expect(perHoleText(step)).toBe('3–11 kg');
   });
 
   it('one stemming increment moves 2.5 -> 2.6 (0.1 m step)', () => {
     const { step } = makeStep();
     step.update(makeState(), 'sunny');
 
-    const stemmingValue = step.root.querySelectorAll('.bsx-stepper-value')[1] as HTMLElement;
-    expect(stemmingValue.textContent).toBe('2.5 m');
-    (step.root.querySelectorAll('.bsx-stepper-btn')[3] as HTMLButtonElement).click();
-    expect(stemmingValue.textContent).toBe('2.6 m');
+    expect(stemmingText(step)).toBe('2.5 m');
+    stemmingButtons(step).plus.click();
+    expect(stemmingText(step)).toBe('2.6 m');
   });
 
   it('stemming stepper floors at 0.5m', () => {
     const { step } = makeStep();
     step.update(makeState(), 'sunny');
 
-    const stemmingDecBtn = step.root.querySelectorAll('.bsx-stepper-btn')[2] as HTMLButtonElement;
-    for (let i = 0; i < 20; i++) stemmingDecBtn.click();
-    const stemmingValue = step.root.querySelectorAll('.bsx-stepper-value')[1] as HTMLElement;
-    expect(stemmingValue.textContent).toBe('0.5 m');
+    for (let i = 0; i < 30; i++) stemmingButtons(step).minus.click();
+    expect(stemmingText(step)).toBe(`${MIN_STEMMING_M.toFixed(1)} m`);
+    expect(stemmingText(step)).toBe('0.5 m');
   });
 
   it('shows the tubing "settled" card when every hole is dry and tubed', () => {
@@ -525,24 +581,40 @@ describe('ChargeStep level-limited product list (#1357)', () => {
 });
 
 
-describe('ChargeStep — column overflow guard (#1361)', () => {
+// A charge fills its hole, so it can never overflow it: what can go wrong is a stemming that leaves no room.
+describe('ChargeStep — no-room guard (#1361)', () => {
   const reasonText = (step: ChargeStep): string =>
     Array.from(step.root.querySelectorAll('.bsx-reason')).map(e => e.textContent ?? '').join(' | ');
   const chargeAll = (step: ChargeStep) => step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
 
-  it('shows a reason line with the max kg and disables Charge All when amount + stemming overflow the shallowest hole', () => {
+  it('shows a reason line naming the shallowest hole and disables Charge All when the stemming leaves no room in it', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
-    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.089); // shallowest: default 7 kg (3.5 m column) + 2.5 m stemming > 4 m
+    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.089);
+    step.update(state, 'sunny');
+    expect(chargeAll(step).disabled).toBe(false);
+
+    stepStemmingTo(step, 4); // the 4 m hole is all stemming now
     step.update(state, 'sunny');
 
     expect(chargeAll(step).disabled).toBe(true);
-    // max for the 4 m hole under 2.5 m stemming = (4 - 2.5) * 2 = 3 kg
-    expect(reasonText(step)).toMatch(/at most 3 kg/);
+    expect(reasonText(step)).toContain(t('ui.blast_workshop.charge.no_room_reason', { depth: 4, stemming: 4 }));
   });
 
-  it('shows no overflow reason and leaves Charge All enabled when the charge fits every hole', () => {
+  it('boundary: the last stemming that leaves room keeps Charge All enabled', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.089);
+    step.update(state, 'sunny');
+    stepStemmingTo(step, 3.9); // 0.1 m of boomite: 0.2 kg
+    step.update(state, 'sunny');
+    expect(perHoleText(step)).toBe('0.2 kg');
+    expect(chargeAll(step).disabled).toBe(false);
+    expect(chargeAll(step).nextElementSibling?.textContent ?? '').toBe('');
+  });
+
+  it('shows no reason and leaves Charge All enabled when every hole has room under the stemming', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
@@ -555,7 +627,7 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
     expect(chargeAll(step).nextElementSibling?.textContent ?? '').toBe('');
   });
 
-  it('shows no overflow reason, only the no-holes reason, when there are no holes (#1345)', () => {
+  it('shows no no-room reason, only the no-holes reason, when there are no holes (#1345)', () => {
     const { step } = makeStep();
     step.update(makeState(), 'sunny');
 
@@ -570,6 +642,9 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.089);
     step.update(state, 'sunny');
+    stepStemmingTo(step, 4.5);
+    step.update(state, 'sunny');
+    expect(chargeAll(step).disabled).toBe(true);
 
     chargeAll(step).click();
 
@@ -639,6 +714,17 @@ describe('ChargeStep — pattern line, refusal notice (#1345)', () => {
     state.patternCharge = null;
     step.update(state, 'sunny');
     expect(step.root.querySelector('[data-info="pattern-charge"]')).toBeNull();
+  });
+
+  it('a fill pattern (no amount) says each hole is filled up to its stemming', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    state.patternCharge = { explosiveId: 'krackle', amountKg: null, stemmingM: 3 };
+    step.update(state, 'sunny');
+    expect(step.root.querySelector('[data-info="pattern-charge"]')!.textContent).toBe(t('ui.blast_workshop.charge.pattern_line_fill', {
+      explosive: t(getExplosive('krackle')!.nameKey), stemming: 3,
+    }));
   });
 
   it('shows a refused command output as a notice and hides it after a successful one', () => {
@@ -737,13 +823,24 @@ describe('ChargeStep prices the pattern at list price (#2153)', () => {
     expect(gameConsole.mock.calls[0]![0]).toContain('charge hole:*');
   });
 
-  it('shows holes x amount x list price for the pattern', () => {
+  it('shows holes x fill x list price for the pattern', () => {
     const { step } = makeStep();
     const state = makeState();
     for (let i = 0; i < 3; i++) addHole(holeCounter, state.drillHoles, 10 + 3 * i, 10, 8, 0.089);
     step.update(state, 'sunny');
-    const full = 3 * CHARGE_DEFAULT_AMOUNT_KG * getExplosive('boomite')!.costPerKg;
+    const full = 3 * fillChargeKg(8, CHARGE_DEFAULT_STEMMING_M, 0.089, 'boomite') * getExplosive('boomite')!.costPerKg;
     expect(step.root.textContent).toContain(`$${full}`);
+  });
+
+  it('prices each hole at its own fill when the holes differ', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 13, 10, 5, 0.089);
+    step.update(state, 'sunny');
+    const kg = fillChargeKg(8, CHARGE_DEFAULT_STEMMING_M, 0.089, 'boomite') + fillChargeKg(5, CHARGE_DEFAULT_STEMMING_M, 0.089, 'boomite');
+    const line = (step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement).textContent ?? '';
+    expect(line).toContain(`$${formatMoney(kg * getExplosive('boomite')!.costPerKg)}`);
   });
 
   it('has no stock rows, stock buy control or paid-from line', () => {
@@ -794,49 +891,59 @@ describe('ChargeStep has no delivery wait (#2143)', () => {
 });
 
 describe('ChargeStep — hole diameter (#1934)', () => {
-  it('capacity line names the narrowest hole\'s bore and kg per metre', () => {
+  it('capacity line names the narrowest hole\'s bore and the selected explosive\'s kg per metre', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.127);
     addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.165);
     step.update(state, 'sunny');
 
-    const line = step.root.querySelector('[data-info="hole-capacity"]')!.textContent;
-    expect(line).toBe(t('ui.blast_workshop.charge.hole_capacity', {
-      diameter: 127, kgPerMetre: +chargeKgPerMetre(0.127).toFixed(2),
+    const line = () => step.root.querySelector('[data-info="hole-capacity"]')!.textContent;
+    expect(line()).toBe(t('ui.blast_workshop.charge.hole_capacity', {
+      diameter: 127, kgPerMetre: +chargeKgPerMetre(0.127, 'boomite').toFixed(2), explosive: t(getExplosive('boomite')!.nameKey),
+    }));
+
+    card(step, 'krackle').click(); // denser: more kg in each metre
+    step.update(state, 'sunny');
+    expect(line()).toBe(t('ui.blast_workshop.charge.hole_capacity', {
+      diameter: 127, kgPerMetre: +chargeKgPerMetre(0.127, 'krackle').toFixed(2), explosive: t(getExplosive('krackle')!.nameKey),
     }));
   });
 
-  it('kg max label scales with the narrowest hole', () => {
+  it('each card\'s kg per metre scales with the narrowest hole', () => {
+    const perMetre = (s: ChargeStep, id: string) => card(s, id).querySelector('[data-role="explosive-per-metre"]')!.textContent ?? '';
     const { step } = makeStep();
     const narrow = makeState();
     addHole(holeCounter, narrow.drillHoles, 10, 10, 8, 0.089);
     step.update(narrow, 'sunny');
-    const narrowLabel = card(step, 'boomite').textContent;
 
     const { step: wideStep } = makeStep();
     const wide = makeState();
     addHole(holeCounter, wide.drillHoles, 10, 10, 8, 0.127);
     wideStep.update(wide, 'sunny');
 
-    const boomite = getExplosive('boomite')!;
-    const maxOf = (d: number) => Math.round(explosiveHoleLimits(boomite, d).maxKg * 10) / 10;
-    expect(narrowLabel).toContain(`${maxOf(0.089)} kg max`);
-    expect(card(wideStep, 'boomite').textContent).toContain(`${maxOf(0.127)} kg max`);
+    expect(perMetre(step, 'boomite')).toContain(`${+chargeKgPerMetre(0.089, 'boomite').toFixed(1)} kg/m`);
+    expect(perMetre(wideStep, 'boomite')).toContain(`${+chargeKgPerMetre(0.127, 'boomite').toFixed(1)} kg/m`);
+    expect(perMetre(wideStep, 'boomite')).not.toBe(perMetre(step, 'boomite'));
   });
 
-  it('Charge All amount is raised to the widest hole\'s minimum', () => {
+  it('Charge All fills each hole to its own bore: the readout spans the narrow and the wide hole', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.165);
     step.update(state, 'sunny');
     card(step, 'boomite').click();
+    step.update(state, 'sunny');
+
+    const narrowKg = fillChargeKg(8, CHARGE_DEFAULT_STEMMING_M, 0.089, 'boomite');
+    const wideKg = fillChargeKg(8, CHARGE_DEFAULT_STEMMING_M, 0.165, 'boomite');
+    expect(wideKg).toBeGreaterThan(narrowKg);
+    expect(perHoleText(step)).toBe(`${narrowKg}–${wideKg} kg`);
 
     (step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement).click();
-    const minWide = explosiveHoleLimits(getExplosive('boomite')!, 0.165).minKg;
-    const amount = Number(/amount:([\d.]+)/.exec(gameConsole.mock.calls[0]![0] as string)![1]);
-    expect(amount).toBeGreaterThanOrEqual(minWide);
+    // One command for the pattern: the core fills each hole to its own depth and bore.
+    expect(gameConsole.mock.calls[0]![0]).toBe(`charge hole:* explosive:boomite stemming:${CHARGE_DEFAULT_STEMMING_M}m`);
   });
 });
 
@@ -913,21 +1020,21 @@ describe('ChargeStep initial explosive (#2016)', () => {
     expect(selectedIds(step)).toEqual(['boomite']);
   });
 
-  it('clamps the amount to the preselected explosive\'s limits in the narrowest hole', () => {
+  it('fills with the preselected explosive: the readout and the Charge All line show its fill of the hole', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     state.campaign.activeLevelId = 'dusty_hollow';
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
-    state.patternCharge = { explosiveId: 'pop_rock', amountKg: 4, stemmingM: 2 };
+    state.patternCharge = { explosiveId: 'pop_rock', amountKg: null, stemmingM: 2 };
     step.update(state, 'sunny');
 
-    const { maxKg } = explosiveHoleLimits(getExplosive('pop_rock')!, 0.089);
-    expect(CHARGE_DEFAULT_AMOUNT_KG).toBeGreaterThan(maxKg);
+    const kg = fillChargeKg(8, CHARGE_DEFAULT_STEMMING_M, 0.089, 'pop_rock');
+    expect(kg).toBeLessThan(fillChargeKg(8, CHARGE_DEFAULT_STEMMING_M, 0.089, 'boomite'));
     expect(selectedIds(step)).toEqual(['pop_rock']);
-    expect(chargeAllBtn(step).textContent).toContain(`${maxKg} kg`);
-    expect(step.root.querySelector('[data-field="amount"] .bsx-stepper-value')!.textContent).toBe(`${maxKg} kg`);
+    expect(perHoleText(step)).toBe(`${kg} kg`);
+    expect(chargeAllBtn(step).textContent).toContain(`${kg} kg`);
     chargeAllBtn(step).click();
-    expect(gameConsole.mock.calls[0]![0]).toContain(`amount:${maxKg}kg`);
+    expect(gameConsole.mock.calls[0]![0]).toBe(`charge hole:* explosive:pop_rock stemming:${CHARGE_DEFAULT_STEMMING_M}m`);
   });
 });
 
@@ -1346,22 +1453,15 @@ describe('ChargeStep — drain and tubing warnings only when they matter (#2149)
 // ── Projected plan kg against the permit (#2167) ────────────────────────────
 
 describe('ChargeStep — projected plan kg against the permit (#2167)', () => {
+  // 12 m holes of 89 mm: each takes (12 - stemming) x 2 kg of boomite when filled. Grade 0 allows 40 kg.
   const DIAMETER_M = 0.089;
   const kgEl = (step: ChargeStep) => step.root.querySelector('[data-role="permit-kg"]') as HTMLElement | null;
   const warnEl = (step: ChargeStep) => step.root.querySelector('[data-role="permit-kg-warning"]') as HTMLElement | null;
-  const amountText = (step: ChargeStep) =>
-    (step.root.querySelector('[data-field="amount"] .bsx-stepper-value') as HTMLElement).textContent ?? '';
   const chargeAllBtn = (step: ChargeStep) => step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
 
-  /** Click the amount stepper until it shows `kg`, then let the panel refresh from the state. */
-  function setAmount(step: ChargeStep, state: ReturnType<typeof makeState>, kg: number): void {
-    const buttons = Array.from(step.root.querySelectorAll('[data-field="amount"] button')) as HTMLButtonElement[];
-    const minus = buttons[0]!;
-    const plus = buttons[buttons.length - 1]!;
-    for (let i = 0; i < 60 && amountText(step) !== `${kg} kg`; i++) {
-      (parseInt(amountText(step), 10) < kg ? plus : minus).click();
-    }
-    expect(amountText(step)).toBe(`${kg} kg`);
+  /** Step the stemming to `m`, then let the panel refresh from the state. */
+  function setStemming(step: ChargeStep, state: ReturnType<typeof makeState>, m: number): void {
+    stepStemmingTo(step, m);
     step.update(state, 'sunny');
   }
 
@@ -1374,30 +1474,52 @@ describe('ChargeStep — projected plan kg against the permit (#2167)', () => {
     return state;
   }
 
-  it('shows used / limit kg as holes x amount when within the permit', () => {
+  it('shows used / limit kg as the holes filled to the stemming when within the permit', () => {
     const { step } = makeStep();
     const state = stateWith(8);
     step.update(state, 'sunny');
-    setAmount(step, state, 4);
-    expect(kgEl(step)!.textContent).toBe(permitPreview(state.grade, { holes: new Array(8).fill({}), charges: { all: { amountKg: 32 } } }, 0)!.kgText);
+    setStemming(step, state, 10); // 2 m of boomite: 4 kg a hole
+    expect(kgEl(step)!.textContent).toBe(permitPreview(state.grade, { holes: [], charges: { all: { amountKg: 8 * fillChargeKg(12, 10, DIAMETER_M, 'boomite') } } }, 0)!.kgText);
     expect(kgEl(step)!.textContent).toContain('32 / 40');
   });
 
-  it('follows the amount stepper', () => {
+  it('opens at the stemming that keeps the filled pattern within the permit', () => {
     const { step } = makeStep();
     const state = stateWith(8);
     step.update(state, 'sunny');
-    setAmount(step, state, 3);
+    // 8 holes x (12 - 9.5) m x 2 kg/m = 40 kg: the least stemming the permit allows.
+    expect(stemmingText(step)).toBe('9.5 m');
+    expect(kgEl(step)!.textContent).toContain('40 / 40');
+    expect(warnEl(step)?.textContent ?? '').toBe('');
+  });
+
+  it('follows the stemming stepper', () => {
+    const { step } = makeStep();
+    const state = stateWith(8);
+    step.update(state, 'sunny');
+    setStemming(step, state, 10.5);
     expect(kgEl(step)!.textContent).toContain('24 / 40');
-    setAmount(step, state, 4);
+    setStemming(step, state, 10);
     expect(kgEl(step)!.textContent).toContain('32 / 40');
+  });
+
+  it('follows the explosive: a denser one fills the same holes with more kg', () => {
+    const { step } = makeStep();
+    const state = stateWith(8);
+    step.update(state, 'sunny');
+    setStemming(step, state, 10);
+    card(step, 'krackle').click();
+    step.update(state, 'sunny');
+    const kg = Math.round(8 * fillChargeKg(12, 10, DIAMETER_M, 'krackle') * 10) / 10;
+    expect(kg).toBeGreaterThan(32);
+    expect(kgEl(step)!.textContent).toContain(`${kg} / 40`);
   });
 
   it('within the limit: no warning', () => {
     const { step } = makeStep();
     const state = stateWith(8);
     step.update(state, 'sunny');
-    setAmount(step, state, 4);
+    setStemming(step, state, 10);
     expect(warnEl(step)?.textContent ?? '').toBe('');
   });
 
@@ -1405,7 +1527,7 @@ describe('ChargeStep — projected plan kg against the permit (#2167)', () => {
     const { step } = makeStep();
     const state = stateWith(8);
     step.update(state, 'sunny');
-    setAmount(step, state, 5);
+    setStemming(step, state, 9.5);
     expect(kgEl(step)!.textContent).toContain('40 / 40');
     expect(warnEl(step)?.textContent ?? '').toBe('');
   });
@@ -1414,7 +1536,7 @@ describe('ChargeStep — projected plan kg against the permit (#2167)', () => {
     const { step } = makeStep();
     const state = stateWith(9);
     step.update(state, 'sunny');
-    setAmount(step, state, 5);
+    setStemming(step, state, 9.5); // 9 x 5 kg
     expect(kgEl(step)!.textContent).toContain('45 / 40');
     const warning = chargeKgLimitWarning(state.grade, 45, state.tickCount)!;
     expect(warning).toBeTruthy();
@@ -1425,13 +1547,13 @@ describe('ChargeStep — projected plan kg against the permit (#2167)', () => {
     expect(warnEl(step)!.textContent).toContain(consequence);
   });
 
-  it('the warning clears when the amount drops back within the limit', () => {
+  it('the warning clears when more stemming brings the plan back within the limit', () => {
     const { step } = makeStep();
     const state = stateWith(9);
     step.update(state, 'sunny');
-    setAmount(step, state, 5);
+    setStemming(step, state, 9.5);
     expect(warnEl(step)!.textContent).not.toBe('');
-    setAmount(step, state, 4);
+    setStemming(step, state, 10);
     expect(kgEl(step)!.textContent).toContain('36 / 40');
     expect(warnEl(step)?.textContent ?? '').toBe('');
   });
@@ -1442,7 +1564,7 @@ describe('ChargeStep — projected plan kg against the permit (#2167)', () => {
     state.grade!.strikeTicks = [900, 1500];
     state.tickCount = 2000;
     step.update(state, 'sunny');
-    setAmount(step, state, 5);
+    setStemming(step, state, 9.5);
     expect(warnEl(step)!.textContent).toContain(chargeKgLimitWarning(state.grade, 45, 2000)!);
     expect(warnEl(step)!.textContent).not.toContain(chargeKgLimitWarning(createGradeState(), 45, 2000)!);
   });
@@ -1451,7 +1573,7 @@ describe('ChargeStep — projected plan kg against the permit (#2167)', () => {
     const { step } = makeStep();
     const state = stateWith(4, 6);
     step.update(state, 'sunny');
-    setAmount(step, state, 5);
+    setStemming(step, state, 9.5);
     expect(kgEl(step)!.textContent).toContain('20 / 40');
     expect(warnEl(step)?.textContent ?? '').toBe('');
   });
@@ -1467,7 +1589,8 @@ describe('ChargeStep — projected plan kg against the permit (#2167)', () => {
     const { step } = makeStep();
     const state = stateWith(15, 0, false);
     step.update(state, 'sunny');
-    setAmount(step, state, 8);
+    // No permit: the panel keeps the default stemming and fills 15 deep holes (285 kg).
+    expect(stemmingText(step)).toBe(`${CHARGE_DEFAULT_STEMMING_M.toFixed(1)} m`);
     expect(warnEl(step)?.textContent ?? '').toBe('');
     expect(kgEl(step)?.textContent ?? '').toBe('');
   });
@@ -1476,12 +1599,12 @@ describe('ChargeStep — projected plan kg against the permit (#2167)', () => {
     const { step, gameConsole } = makeStep();
     const state = stateWith(9);
     step.update(state, 'sunny');
-    setAmount(step, state, 5);
+    setStemming(step, state, 9.5);
     expect(warnEl(step)!.textContent).not.toBe('');
     expect(chargeAllBtn(step).disabled).toBe(false);
     chargeAllBtn(step).click();
     expect(gameConsole).toHaveBeenCalledWith(expect.stringContaining('charge hole:* '));
-    expect(gameConsole.mock.calls[0]![0]).toContain('amount:5kg');
+    expect(gameConsole.mock.calls[0]![0]).toBe('charge hole:* explosive:boomite stemming:9.5m');
   });
 });
 
@@ -1499,13 +1622,24 @@ describe('ChargeStep — stemming field explains itself (#2168)', () => {
     expect(holder!.dataset['explain']!.length).toBeGreaterThan(0);
   });
 
-  it('the amount field is not given the stemming explanation', () => {
+  it('the per-hole field explains the fill, not the stemming', () => {
     const { step } = makeStep();
     step.update(makeState(), 'sunny');
-    const amount = step.root.querySelector('[data-field="amount"]') as HTMLElement;
-    expect(amount).not.toBeNull();
-    const explains = [...amount.querySelectorAll<HTMLElement>('[data-explain]')].map(e => e.dataset['explain']);
+    const perHoleField = step.root.querySelector('[data-role="charge-per-hole"]')!.parentElement as HTMLElement;
+    const explains = [...perHoleField.querySelectorAll<HTMLElement>('[data-explain]')].map(e => e.dataset['explain']);
+    expect(explains).toContain(t('ui.blast_workshop.charge.per_hole_explain'));
     expect(explains).not.toContain(stemmingExplain());
+  });
+
+  it('the per-hole explanation follows a language switch after refreshLocale', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    step.update(state, 'sunny');
+    setLocale('fr');
+    step.refreshLocale();
+    step.update(state, 'sunny');
+    const perHoleField = step.root.querySelector('[data-role="charge-per-hole"]')!.parentElement as HTMLElement;
+    expect(perHoleField.querySelector<HTMLElement>('[data-explain]')!.dataset['explain']).toBe(t('ui.blast_workshop.charge.per_hole_explain'));
   });
 
   it('the explanation follows a language switch after refreshLocale', () => {
@@ -1538,7 +1672,7 @@ describe('ChargeStep — explosive cards, powder factor and band mix (#2203)', (
     return grid;
   }
 
-  /** Two 10 m holes 2 m apart on rock, the first one charged with 6 kg of boomite. */
+  /** Two 10 m holes 2 m apart on rock, the first one charged with 6 kg of boomite (a partial charge, as a script orders it). */
   function patternState() {
     const state = makeState();
     const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 10, 0.089);
@@ -1564,7 +1698,7 @@ describe('ChargeStep — explosive cards, powder factor and band mix (#2203)', (
       }
     });
 
-    it('keep the price, the heaviest charge a hole takes and the water badge', () => {
+    it('keep the price, what one metre of the hole holds (kg and energy) and the water badge', () => {
       const { step } = makeStep();
       const state = makeState();
       addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
@@ -1572,11 +1706,33 @@ describe('ChargeStep — explosive cards, powder factor and band mix (#2203)', (
       step.update(state, 'heavy_rain');
       for (const c of cards(step)) {
         const explosive = getExplosive(c.dataset['explosive']!)!;
+        const kgPerMetre = chargeKgPerMetre(0.089, explosive.id);
+        // Energy per metre in the card's own units: its energy per kg times the kg a metre holds.
+        const energyPerMetre = Math.round(kgPerMetre * explosive.energyPerKg);
         expect(c.textContent, explosive.id).toContain(`$${explosive.costPerKg.toFixed(2)} / kg`);
-        expect(c.textContent, explosive.id).toContain(String(Math.round(explosiveHoleLimits(explosive, 0.089).maxKg * 10) / 10));
+        const perMetre = c.querySelector<HTMLElement>('[data-role="explosive-per-metre"]')!;
+        expect(perMetre.textContent, explosive.id).toBe(t('ui.blast_workshop.charge.per_metre_card', {
+          kg: +kgPerMetre.toFixed(1), energy: formatMoney(energyPerMetre),
+        }));
+        // Its explanation names the density that sets those kilograms.
+        expect(perMetre.dataset['explain'], explosive.id).toBe(t('ui.blast_workshop.charge.per_metre_explain', { density: explosive.density, diameter: 89 }));
       }
       expect(card(step, 'krackle').textContent).not.toContain('WATER-SENSITIVE');
       expect(card(step, 'boomite').textContent).toContain('WATER-SENSITIVE');
+    });
+
+    it('a denser, stronger explosive shows more kg and more energy in each metre', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+      step.update(state, 'sunny');
+      const figures = (id: string) => {
+        const shown = card(step, id).querySelector('[data-role="explosive-per-metre"]')!.textContent!;
+        const [kg, energy] = shown.match(/[\d.,]+/g)!.map(n => Number(n.replace(/,/g, '')));
+        return { kg: kg!, energy: energy! };
+      };
+      expect(figures('dynatomics').kg).toBeGreaterThan(figures('pop_rock').kg);
+      expect(figures('dynatomics').energy).toBeGreaterThan(figures('pop_rock').energy);
     });
 
     it('show no band mix without a grid, and still render', () => {
@@ -1618,7 +1774,7 @@ describe('ChargeStep — explosive cards, powder factor and band mix (#2203)', (
       }
     });
 
-    it('differ between a weak and a strong explosive at the same kilograms', () => {
+    it('differ between a weak and a strong explosive filled to the same stemming', () => {
       const { step } = makeStep();
       const grid = rockGrid();
       step.setGridProvider(() => grid);
@@ -1629,7 +1785,7 @@ describe('ChargeStep — explosive cards, powder factor and band mix (#2203)', (
       expect(weak.innerHTML).not.toBe(strong.innerHTML);
     });
 
-    it('follow the chosen kilograms', () => {
+    it('follow the chosen stemming', () => {
       const { step } = makeStep();
       const grid = rockGrid();
       step.setGridProvider(() => grid);
@@ -1637,8 +1793,7 @@ describe('ChargeStep — explosive cards, powder factor and band mix (#2203)', (
       step.update(state, 'sunny');
       card(step, 'krackle').click();
       const before = card(step, 'krackle').querySelector(BAND_MIX)!.innerHTML;
-      const minus = step.root.querySelectorAll('.bsx-stepper-btn')[0] as HTMLButtonElement;
-      for (let i = 0; i < 4; i++) minus.click();
+      stepStemmingTo(step, 6); // far less krackle in each hole
       step.update(state, 'sunny');
       const after = card(step, 'krackle').querySelector(BAND_MIX)!.innerHTML;
       expect(after).not.toBe(before);
@@ -1703,17 +1858,44 @@ describe('ChargeStep — explosive cards, powder factor and band mix (#2203)', (
       expect(row(step, h2.id).querySelector(HOLE_REC)).not.toBeNull();
     });
 
-    it('the recommended range shown is the model\'s for the selected explosive and stemming', () => {
+    it('the recommended range shown is the model\'s for the selected explosive', () => {
       const { step } = makeStep();
       const grid = rockGrid();
       step.setGridProvider(() => grid);
       const { state, h1 } = patternState();
       step.update(state, 'sunny');
-      const range = recommendedPowderFactors(state.drillHoles, grid, 'boomite', CHARGE_DEFAULT_STEMMING_M)[h1.id];
+      const range = recommendedPowderFactors(state.drillHoles, grid, 'boomite')[h1.id];
       const shown = text(row(step, h1.id), HOLE_REC);
       expect(range).not.toBeUndefined();
       // Exact text, null included: the row says what the model says, whichever way it answers.
       expect(shown).toBe(recommendedRangeText(range ?? null));
+    });
+
+    it('the recommended range does not move with the panel\'s stemming: the sweep chooses the stemming itself', () => {
+      const { step } = makeStep();
+      const grid = rockGrid();
+      step.setGridProvider(() => grid);
+      const { state, h1 } = patternState();
+      step.update(state, 'sunny');
+      const before = text(row(step, h1.id), HOLE_REC);
+      expect(before).not.toBe(recommendedRangeText(null));
+      stepStemmingTo(step, 5);
+      step.update(state, 'sunny');
+      expect(text(row(step, h1.id), HOLE_REC)).toBe(before);
+    });
+
+    it('the recommended range follows the selected explosive', () => {
+      const { step } = makeStep();
+      const grid = rockGrid();
+      step.setGridProvider(() => grid);
+      const { state, h1 } = patternState();
+      step.update(state, 'sunny');
+      const boomite = text(row(step, h1.id), HOLE_REC);
+      card(step, 'dynatomics').click();
+      step.update(state, 'sunny');
+      const range = recommendedPowderFactors(state.drillHoles, grid, 'dynatomics')[h1.id];
+      expect(text(row(step, h1.id), HOLE_REC)).toBe(recommendedRangeText(range ?? null));
+      expect(text(row(step, h1.id), HOLE_REC)).not.toBe(boomite);
     });
 
     it('pick up a charge that lands after the first render', () => {
@@ -1784,11 +1966,18 @@ describe('ChargeStep — charge optimizer (#2204)', () => {
     return { step, gameConsole, state, holes };
   }
 
+  /** A proposal is applied as fill commands: explosive and stemming, no amount (the hole is filled up to it). */
   function parseCharge(cmd: string) {
-    const m = /^charge hole:(\S+) explosive:(\S+) amount:([\d.]+)kg stemming:([\d.]+)m$/.exec(cmd);
+    const m = /^charge hole:(\S+) explosive:(\S+) stemming:([\d.]+)m$/.exec(cmd);
     expect(m, cmd).not.toBeNull();
-    return { hole: m![1]!, explosive: m![2]!, amountKg: parseFloat(m![3]!), stemmingM: parseFloat(m![4]!) };
+    return { hole: m![1]!, explosive: m![2]!, stemmingM: parseFloat(m![3]!) };
   }
+
+  /** Kg the command orders: the hole filled with the explosive up to the stemming. */
+  const filledKg = (holes: ReturnType<typeof optState>['holes'], c: ReturnType<typeof parseCharge>): number => {
+    const hole = holes.find(h => h.id === c.hole)!;
+    return fillChargeKg(hole.depth, c.stemmingM, hole.diameter, c.explosive);
+  };
 
   describe('gate', () => {
     it('shows the Optimize charges button at tier 4 with drilled holes and a grid', () => {
@@ -1920,35 +2109,50 @@ describe('ChargeStep — charge optimizer (#2204)', () => {
   });
 
   describe('apply', () => {
-    it('Apply all sends one charge command per proposed hole with explosive, kg and stemming, in one click', () => {
-      const { step, gameConsole } = openProposal();
+    it('Apply all sends one charge command per proposed hole with explosive and stemming, in one click', () => {
+      const { step, gameConsole, holes } = openProposal();
       const rows = proposalRows(step).map(r => r.dataset['hole']!).sort();
       (step.root.querySelector(APPLY_ALL) as HTMLButtonElement).click();
       const cmds = gameConsole.mock.calls.map(c => parseCharge(c[0] as string));
       expect(cmds.map(c => c.hole).sort()).toEqual(rows);
       for (const c of cmds) {
         expect(getExplosive(c.explosive), c.hole).toBeDefined();
-        expect(c.stemmingM).toBe(CHARGE_DEFAULT_STEMMING_M);
-        expect(c.amountKg).toBeGreaterThan(0);
+        expect(filledKg(holes, c), c.hole).toBeGreaterThan(0);
       }
     });
 
-    it('every command is within the explosive range for the hole and fits under the stemming', () => {
+    it('every command fills its hole up to a stemming that throws no rock', () => {
       const { step, gameConsole, holes } = openProposal();
       (step.root.querySelector(APPLY_ALL) as HTMLButtonElement).click();
+      expect(gameConsole.mock.calls.length).toBeGreaterThan(0);
       for (const call of gameConsole.mock.calls) {
         const c = parseCharge(call[0] as string);
-        const { minKg, maxKg } = explosiveHoleLimits(getExplosive(c.explosive)!, holes.find(h => h.id === c.hole)!.diameter);
-        expect(c.amountKg, c.hole).toBeGreaterThanOrEqual(minKg - 0.05);
-        expect(c.amountKg, c.hole).toBeLessThanOrEqual(maxKg + 0.05);
+        const range = stemmingSweepRangeM(holes.find(h => h.id === c.hole)!.depth)!;
+        // Swept stemmings are rounded to the 0.1 m the panel steps in.
+        expect(c.stemmingM, c.hole).toBeGreaterThanOrEqual(range.lo - 0.05);
+        expect(c.stemmingM, c.hole).toBeLessThanOrEqual(range.hi + 0.05);
+      }
+    });
+
+    it('each row names the kg its hole will hold: the fill its command orders', () => {
+      const { step, gameConsole, holes } = openProposal();
+      const rows = proposalRows(step);
+      expect(rows.length).toBeGreaterThan(0);
+      for (const r of rows) {
+        (r.querySelector(APPLY_HOLE) as HTMLButtonElement).click();
+        const c = parseCharge(gameConsole.mock.calls[gameConsole.mock.calls.length - 1]![0] as string);
+        expect(c.hole).toBe(r.dataset['hole']);
+        expect(r.textContent, c.hole).toContain(`${filledKg(holes, c)} kg`);
+        expect(r.textContent, c.hole).toContain(`${c.stemmingM} m`);
       }
     });
 
     it('the commands total within the permit kg limit of the grade', () => {
-      const { step, gameConsole } = openProposal();
+      const { step, gameConsole, holes } = openProposal();
       (step.root.querySelector(APPLY_ALL) as HTMLButtonElement).click();
-      const total = gameConsole.mock.calls.reduce((s, c) => s + parseCharge(c[0] as string).amountKg, 0);
-      expect(total).toBeLessThanOrEqual(permitLimitsFor(0).maxChargeKg + 0.05 * gameConsole.mock.calls.length);
+      const total = gameConsole.mock.calls.reduce((sum, c) => sum + filledKg(holes, parseCharge(c[0] as string)), 0);
+      expect(total).toBeGreaterThan(0);
+      expect(total).toBeLessThanOrEqual(permitLimitsFor(0).maxChargeKg + 1e-9);
     });
 
     it('a row Apply sends one command for that hole only', () => {
@@ -1959,7 +2163,7 @@ describe('ChargeStep — charge optimizer (#2204)', () => {
       expect(parseCharge(gameConsole.mock.calls[0]![0] as string).hole).toBe(target.id);
     });
 
-    it('the row Apply sends the explosive and kg its row proposes, the same as Apply all does for that hole', () => {
+    it('the row Apply sends the explosive and stemming its row proposes, the same as Apply all does for that hole', () => {
       const first = openProposal();
       const target = first.holes[2]!;
       (rowFor(first.step, target.id)!.querySelector(APPLY_HOLE) as HTMLButtonElement).click();

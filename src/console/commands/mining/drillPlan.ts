@@ -7,7 +7,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGameWithSub, resolveHoleId, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState, emitHoleCellsChanged } from './shared.js';
 import {
-  gridCellPositions, createHolesAt, addHole, removeHole,
+  gridCellPositions, createHolesAt, addHole, removeHole, GRID_LAYOUTS, type GridLayout,
   computeDrillHoleDurationTicks, drillDepthRefusal, drillDiameterRefusal,
 } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
@@ -139,10 +139,19 @@ export function drillPlanCommand(
     const rows = parseInt(named['rows'] ?? '3', 10);
     const cols = parseInt(named['cols'] ?? '3', 10);
     const spacing = parseFloat(named['spacing'] ?? '3');
+    // Rows sit `burden` apart (default: the spacing); `pattern:staggered` shifts every other row half a spacing.
+    const burden = parseFloat(named['burden'] ?? String(spacing));
+    const layout = (named['pattern'] ?? 'square') as GridLayout;
     const depth = parseFloat(named['depth'] ?? '8');
 
     if (!Number.isFinite(rows) || !Number.isFinite(cols) || rows < 1 || cols < 1) {
       return { success: false, output: t('mining.drill_plan.invalid_grid') };
+    }
+    if (!(spacing > 0) || !(burden > 0)) {
+      return { success: false, output: t('mining.drill_plan.invalid_spacing') };
+    }
+    if (!GRID_LAYOUTS.includes(layout)) {
+      return { success: false, output: t('mining.drill_plan.invalid_pattern', { options: GRID_LAYOUTS.join(', ') }) };
     }
     if (rows * cols > MAX_DRILL_GRID_HOLES) {
       return {
@@ -155,7 +164,7 @@ export function drillPlanCommand(
     if ('refusal' in sized) return sized.refusal;
     const diameter = sized.diameter;
 
-    const cells = gridCellPositions({ x: origin[0] ?? 0, z: origin[1] ?? 0 }, rows, cols, spacing);
+    const cells = gridCellPositions({ x: origin[0] ?? 0, z: origin[1] ?? 0 }, rows, cols, spacing, burden, layout);
 
     // Claim before committing the plan: a grid reaching ground the site
     // cannot have is refused whole, rather than landing half on the map.
@@ -185,7 +194,7 @@ export function drillPlanCommand(
     // in pendingActions/plannedDrillHoles.
     clearDrillPlan(ctx);
     const counter = { nextHoleId: 1 };
-    const survivors = createHolesAt(counter, clear, depth, diameter);
+    const survivors = createHolesAt(counter, clear, depth, diameter, { spacingM: spacing, burdenM: burden });
     ctx.state!.nextHoleId = counter.nextHoleId;
 
     for (const hole of survivors) {
@@ -193,7 +202,8 @@ export function drillPlanCommand(
       ctx.state!.plannedDrillHoles.push(hole);
     }
 
-    const base = `Drill plan: ${rows}×${cols} grid, ${ctx.state!.plannedDrillHoles.length} holes ordered, spacing ${spacing}m, depth ${depth}m`;
+    const shape = burden === spacing ? `spacing ${spacing}m` : `spacing ${spacing}m, burden ${burden}m`;
+    const base = `Drill plan: ${rows}×${cols} ${layout === 'staggered' ? 'staggered ' : ''}grid, ${ctx.state!.plannedDrillHoles.length} holes ordered, ${shape}, depth ${depth}m`;
     return {
       success: true,
       output: skipped > 0 ? `${base}\n${t('mining.drill_plan.grid_skipped', { count: skipped })}` : base,

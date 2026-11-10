@@ -6,7 +6,10 @@ import {
 } from '../../../src/core/mining/FragmentVelocity.js';
 import {
   createEnergyField,
+  effectiveAt,
+  overflowAt,
   seedEnergy,
+  thresholdAt,
   type BlastBox,
 } from '../../../src/core/mining/EnergyPropagation.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
@@ -53,6 +56,23 @@ function chargedField(
   const field = createEnergyField(grid, wholeGrid(grid, height));
   seedEnergy(field, [{ ...at, energy }]);
   return field;
+}
+
+/**
+ * Energy a lone seed at `at` needs for the voxel `target` to receive `times` its threshold.
+ * A hole's energy is shared over all the rock in its reach, so the share at `target` is a
+ * fixed fraction of it set by the geometry alone: one probe with a unit seed measures it.
+ */
+function energyGiving(
+  grid: VoxelGrid,
+  at: { x: number; y: number; z: number },
+  target: { x: number; y: number; z: number },
+  times: number,
+  height = 15,
+): number {
+  const probe = chargedField(grid, at, 1, height);
+  const share = effectiveAt(probe, target.x, target.y, target.z) + overflowAt(probe, target.x, target.y, target.z);
+  return times * thresholdAt(probe, target.x, target.y, target.z) / share;
 }
 
 function source(x: number, y: number, z: number, weight = 1): VoxelContribution {
@@ -131,25 +151,34 @@ describe('FragmentVelocity — computeFragmentVelocity', () => {
 
   it('an unstemmed hole throws rock far harder than a stemmed one', () => {
     const grid = bench();
-    // Big enough that leftover energy actually reaches this fragment, small
-    // enough that neither result runs into the speed cap.
-    const field = chargedField(grid, { x: 7, y: 5, z: 7 }, CRUITE * 100);
+    const charge = { x: 7, y: 5, z: 7 };
     const origin = { x: 7, y: 8, z: 7 };
+    // Twice the fragment's threshold reaches it: real leftover energy, yet small
+    // enough that neither result runs into the speed cap.
+    const field = chargedField(grid, charge, energyGiving(grid, charge, origin, 2));
     const sources = [source(7, 8, 7)];
+    expect(overflowAt(field, 7, 8, 7)).toBeGreaterThan(0);
 
     const stemmed = computeFragmentVelocity(origin, sources, 1000, field, throwFractionForBlowout(0));
     const unstemmed = computeFragmentVelocity(origin, sources, 1000, field, throwFractionForBlowout(1));
 
+    expect(speedOf(unstemmed)).toBeLessThan(MAX_PROJECTION_VELOCITY);
     expect(speedOf(unstemmed)).toBeGreaterThan(speedOf(stemmed) * 3);
   });
 
   it('rock near the surface is thrown, rock buried deep only settles', () => {
     const grid = bench(21, 17);
-    const field = chargedField(grid, { x: 10, y: 8, z: 10 }, CRUITE * 3000, 21);
+    // A charge 4 m under the surface: the voxel 4 m above it (at the surface) and the one
+    // 4 m beside it (4 m deep in the mass) receive the same share of its energy.
+    const field = chargedField(grid, { x: 10, y: 13, z: 10 }, CRUITE * 3000, 21);
+    const received = (x: number, y: number): number => effectiveAt(field, x, y, 10) + overflowAt(field, x, y, 10);
+    expect(received(10, 17)).toBeCloseTo(received(14, 13), 3);
+    expect(overflowAt(field, 14, 13, 10)).toBeGreaterThan(0);
 
     const shallow = computeFragmentVelocity({ x: 10, y: 17, z: 10 }, [source(10, 17, 10)], 1000, field, 1);
-    const deep = computeFragmentVelocity({ x: 10, y: 8, z: 10 }, [source(10, 8, 10)], 1000, field, 1);
+    const deep = computeFragmentVelocity({ x: 14, y: 13, z: 10 }, [source(14, 13, 10)], 1000, field, 1);
 
+    expect(speedOf(deep)).toBeGreaterThan(0);
     expect(speedOf(shallow)).toBeGreaterThan(speedOf(deep));
   });
 

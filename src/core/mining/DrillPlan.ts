@@ -2,7 +2,7 @@
 // A drill plan is a set of holes. Each hole has position, depth, and diameter.
 
 import { type VoxelGrid, computeVoxelColumnSurfaceY, renormaliseVoxelColumnAfterCarve } from '../world/VoxelGrid.js';
-import type { Vehicle, VehicleTier } from '../entities/Vehicle.js';
+import { computeRigDurationTicks, type Vehicle, type VehicleTier } from '../entities/Vehicle.js';
 import { fleetBestRigLimit, lowestRigTierReaching } from './RigLimits.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import {
@@ -12,6 +12,8 @@ import {
   DRILL_RIG_MAX_DEPTH_M,
   DRILL_RIG_MAX_DIAMETER_M,
   DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M,
+  DRILL_COST_PER_METRE,
+  DRILL_HOLE_DEFAULT_DIAMETER_M,
 } from '../config/balance.js';
 
 export interface DrillHole {
@@ -24,6 +26,22 @@ export interface DrillHole {
   depth: number;
   /** Hole diameter in meters (real drill holes: 75–150mm). */
   diameter: number;
+  /** Distance (m) to the next hole along its row, when drilled as part of a grid pattern. */
+  spacingM?: number;
+  /** Distance (m) between its pattern's rows (the burden), when drilled as part of a grid pattern. */
+  burdenM?: number;
+}
+
+/** How a grid's rows sit against each other: holes in line, or every other row shifted half a spacing. */
+export type GridLayout = 'square' | 'staggered';
+
+/** The grid layouts a drill plan may order, as typed in the console. */
+export const GRID_LAYOUTS: readonly GridLayout[] = ['square', 'staggered'];
+
+/** Pattern cell of a hole: its spacing along the row and the burden between rows. */
+export interface HoleCellSize {
+  spacingM: number;
+  burdenM: number;
 }
 
 /**
@@ -40,33 +58,48 @@ interface HoleIdCounter {
   nextHoleId: number;
 }
 
-/** Surface positions of a rows × cols grid pattern, row-major from `origin`. */
+/**
+ * Surface positions of a rows × cols grid pattern, row-major from `origin`: holes `spacing` apart
+ * along x, rows `burden` apart along z. A staggered grid shifts every other row by half a spacing
+ * (rounded down to whole metres, so holes stay on cells) and drops that row's last hole so the
+ * pattern stays inside the rows × cols rectangle: each hole then faces the gap between two holes
+ * of the next row, which spreads its energy over the rock an aligned grid leaves between rows.
+ */
 export function gridCellPositions(
   origin: { x: number; z: number },
   rows: number,
   cols: number,
   spacing: number,
+  burden: number = spacing,
+  layout: GridLayout = 'square',
 ): { x: number; z: number }[] {
   const cells: { x: number; z: number }[] = [];
+  const shift = layout === 'staggered' && cols > 1 ? Math.floor(spacing / 2) : 0;
   for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      cells.push({ x: origin.x + c * spacing, z: origin.z + r * spacing });
+    const shifted = r % 2 === 1 && shift > 0;
+    const offset = shifted ? shift : 0;
+    for (let c = 0; c < (shifted ? cols - 1 : cols); c++) {
+      cells.push({ x: origin.x + c * spacing + offset, z: origin.z + r * burden });
     }
   }
   return cells;
 }
 
-/** Create one hole per position, taking consecutive ids from `counter`. */
+/** Create one hole per position, taking consecutive ids from `counter`; `cell` records the pattern they belong to. */
 export function createHolesAt(
   counter: HoleIdCounter,
   cells: ReadonlyArray<{ x: number; z: number }>,
   depth: number,
   diameter: number,
+  cell?: HoleCellSize,
 ): PlannedHole[] {
-  return cells.map(cell => ({ id: `H${counter.nextHoleId++}`, x: cell.x, z: cell.z, depth, diameter }));
+  return cells.map(c => ({
+    id: `H${counter.nextHoleId++}`, x: c.x, z: c.z, depth, diameter,
+    ...(cell ? { spacingM: cell.spacingM, burdenM: cell.burdenM } : {}),
+  }));
 }
 
-/** Create a grid drill pattern. */
+/** Create a grid drill pattern: `spacing` along each row, rows `burden` apart, in line or staggered. */
 export function createGridPlan(
   counter: HoleIdCounter,
   origin: { x: number; z: number },
@@ -75,8 +108,13 @@ export function createGridPlan(
   spacing: number,
   depth: number,
   diameter: number,
+  burden: number = spacing,
+  layout: GridLayout = 'square',
 ): PlannedHole[] {
-  return createHolesAt(counter, gridCellPositions(origin, rows, cols, spacing), depth, diameter);
+  return createHolesAt(
+    counter, gridCellPositions(origin, rows, cols, spacing, burden, layout), depth, diameter,
+    { spacingM: spacing, burdenM: burden },
+  );
 }
 
 /** Add a single hole to an existing plan. */
@@ -140,6 +178,8 @@ export function landDrilledHole(planned: PlannedHole): DrillHole {
     z: planned.z,
     depth: planned.depth,
     diameter: planned.diameter,
+    ...(planned.spacingM !== undefined ? { spacingM: planned.spacingM } : {}),
+    ...(planned.burdenM !== undefined ? { burdenM: planned.burdenM } : {}),
   };
 }
 
@@ -157,6 +197,18 @@ export function computeDrillHoleDurationTicks(depth: number, diameter: number): 
       * (diameter / DRILL_HOLE_REFERENCE_DIAMETER_M),
     ),
   );
+}
+
+/** Cash a finished hole costs to drill: `DRILL_COST_PER_METRE` per metre, scaled by the bore. */
+export function drillHoleCost(depth: number, diameter: number): number {
+  return Math.round(DRILL_COST_PER_METRE * depth * (diameter / DRILL_HOLE_DEFAULT_DIAMETER_M));
+}
+
+/** Rig work (ticks) a set of holes takes with a rig of `rigTier`, crew at base proficiency; travel between holes excluded. */
+export function estimateDrillWorkTicks(holes: ReadonlyArray<Pick<DrillHole, 'depth' | 'diameter'>>, rigTier: VehicleTier): number {
+  let ticks = 0;
+  for (const h of holes) ticks += computeRigDurationTicks(computeDrillHoleDurationTicks(h.depth, h.diameter), rigTier);
+  return ticks;
 }
 
 export interface DigVoxelResult {

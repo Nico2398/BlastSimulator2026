@@ -45,7 +45,8 @@ function makeHole(id: string, x: number, z: number, depth = 8): DrillHole {
   return { id, x, z, depth, diameter: 0.089 };
 }
 
-function chargedPlan(holes: DrillHole[], kg = 8, explosive = 'krackle'): BlastPlan {
+/** Charges every hole under 2 m of stemming: filled to it, as the player charges, unless `kg` asks for a partial charge. */
+function chargedPlan(holes: DrillHole[], kg: number | null = null, explosive = 'krackle'): BlastPlan {
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
   const { charges } = batchCharge(holes.map(h => h.id), depths, explosive, kg, 2);
@@ -53,6 +54,7 @@ function chargedPlan(holes: DrillHole[], kg = 8, explosive = 'krackle'): BlastPl
 }
 
 const HOLE = makeHole('H1', 20, 20, 8);
+/** One filled hole: its charge reaches the stemming, so all the rock it breaks opens to the surface. */
 const PLAN = chargedPlan([HOLE]);
 const PRICE = getOre('blingite')!.valuePerKg;
 
@@ -220,9 +222,11 @@ describe('estimateBlastOreValue — broken voxels valued at their depth (#1703)'
   it('grows with the charge: a bigger blast breaks more rock', () => {
     const grid = makeGrid();
     const survey = makeSurvey();
-    const small = estimateBlastOreValue(chargedPlan([HOLE], 2), [survey], grid);
-    const large = estimateBlastOreValue(chargedPlan([HOLE], 8), [survey], grid);
+    // 8 kg at the bottom of the hole against the hole filled to its stemming.
+    const small = estimateBlastOreValue(chargedPlan([HOLE], 8), [survey], grid);
+    const large = estimateBlastOreValue(PLAN, [survey], grid);
 
+    expect(small).toBeGreaterThan(0);
     expect(large).toBeGreaterThan(small);
   });
 

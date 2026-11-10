@@ -33,7 +33,6 @@ import { isFillableSaleOffer, hasFillableOreSaleOffer } from '../../src/core/eco
 import {
   DRILL_GRID_DEFAULT_SPACING_M,
   DRILL_GRID_DEFAULT_DEPTH_M,
-  CHARGE_DEFAULT_AMOUNT_KG,
   CHARGE_DEFAULT_STEMMING_M,
   ORE_PRICES,
   TUTORIAL_HIRING_SCRIPT,
@@ -51,6 +50,12 @@ function makeCtx(): GameContext {
 
 /** Starting cash comes from the level catalogue, not a copy of it. */
 const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
+
+/**
+ * What the Charge step's Charge All sends when the player takes its defaults: boomite (the step's preselected
+ * explosive) filling every hole up to CHARGE_DEFAULT_STEMMING_M, the stemming it opens at on a site without a permit.
+ */
+const CHARGE_ALL_DEFAULTS = `charge hole:* explosive:boomite stemming:${CHARGE_DEFAULT_STEMMING_M}`;
 
 describe('Tutorial flow', () => {
   let ctx: GameContext;
@@ -208,7 +213,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
       }
       tickResolvingEvents(run);
     }
-    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(run(CHARGE_ALL_DEFAULTS).success).toBe(true);
     deliverExplosivesNow(ctx.state!); // the subject is automatic hauling after the blast, not the delivery wait (#1895)
     // #554: charging is real work too — drain the ordered charges the same
     // way the drill plan above was drained before blasting.
@@ -261,7 +266,7 @@ describe('the tutorial no longer refuses to fire on an occupied zone (#1362)', (
       }
       tickResolvingEvents(runCmd);
     }
-    expect(runCmd('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
+    expect(runCmd(CHARGE_ALL_DEFAULTS).success).toBe(true);
     for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of ctx.state!.employees.employees) {
@@ -516,7 +521,7 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
     const holeCount = ctx.state!.drillHoles.length;
     expect(holeCount).toBeGreaterThan(1);
 
-    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(run(CHARGE_ALL_DEFAULTS).success).toBe(true);
 
     const step = TUTORIAL_STEPS.find(s => s.id === 'charge')!;
     let sawPartialCharge = false;
@@ -701,9 +706,7 @@ describe('panel default parameters on the tutorial square rate good or better (#
     expect(state.plannedDrillHoles.length).toBe(0);
     expect(state.drillHoles.length).toBe(9);
 
-    const charge = run(
-      `charge hole:* explosive:boomite amount:${CHARGE_DEFAULT_AMOUNT_KG} stemming:${CHARGE_DEFAULT_STEMMING_M}`,
-    );
+    const charge = run(CHARGE_ALL_DEFAULTS);
     expect(charge.success, charge.output).toBe(true);
     for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
       fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll

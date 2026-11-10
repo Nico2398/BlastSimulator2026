@@ -238,7 +238,7 @@ export class FireStep {
   private makePermitRow(permit: PermitPreview): HTMLElement {
     const ok = !permit.over;
     const row = this.makeCheckRow(ok, t(ok ? 'ui.blast_workshop.fire.check_permit_ok' : 'ui.blast_workshop.fire.check_permit_over', {
-      kg: permit.kgText, holes: permit.holesText, consequence: permit.consequenceText,
+      kg: permit.kgText, area: permit.areaText, consequence: permit.consequenceText,
     }));
     row.dataset['role'] = 'permit-check';
     row.dataset['ok'] = String(ok);

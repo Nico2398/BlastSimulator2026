@@ -5,7 +5,7 @@
 // ── Categories ──
 
 export type IncomeCategory = 'sales' | 'contracts' | 'bonus' | 'refund' | 'smuggling' | 'events';
-export type ExpenseCategory = 'salaries' | 'equipment' | 'fines' | 'maintenance' | 'fuel' | 'materials' | 'construction' | 'corruption' | 'mafia' | 'needs' | 'explosives' | 'vehicle_maintenance' | 'contracts' | 'permits' | 'dividends' | 'events';
+export type ExpenseCategory = 'salaries' | 'equipment' | 'fines' | 'maintenance' | 'fuel' | 'materials' | 'construction' | 'corruption' | 'mafia' | 'needs' | 'explosives' | 'vehicle_maintenance' | 'contracts' | 'permits' | 'dividends' | 'events' | 'drilling';
 
 // ── Transaction records ──
 

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRunner } from '../../../src/console/createRunner.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
-import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
+import { batchCharge, fillChargeKg } from '../../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import type { BlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
@@ -44,11 +44,19 @@ function actualBrokeOut(plan: BlastPlan): boolean {
   return result!.brokeOut;
 }
 
+/**
+ * Under the kernel energy model what breaks out is the burden over the charge: a hole filled to its
+ * 2.5 m of stemming always opens, a partial charge at the bottom of a deep hole seals. Measured on
+ * this pad at 2.5 m of stemming: a 10 m hole seals whole at 10 kg of Krackle, a third of its rock
+ * at 11-12.5 kg and only a little from 13 kg.
+ */
 const BREAKS_OUT: Array<[string, number, string, number, number]> = [
   ['8 m x 8 kg Krackle (defaults-like)', 8, 'krackle', 8, D89],
-  ['10 m x 10 kg Krackle', 10, 'krackle', 10, D89],
-  ['12 m x 15 kg Shatternite', 12, 'shatternite', 15, D89],
+  ['10 m filled with Krackle', 10, 'krackle', fillChargeKg(10, 2.5, D89, 'krackle'), D89],
+  ['12 m filled with Shatternite', 12, 'shatternite', fillChargeKg(12, 2.5, D89, 'shatternite'), D89],
 ];
+/** About a third of this shot's rock stays sealed under intact cap. */
+const PARTIAL: [number, string, number] = [10, 'krackle', 12];
 const SEALS: Array<[string, number, string, number, number]> = [
   ['11 m x 10 kg Krackle', 11, 'krackle', 10, D89],
   ['12 m x 10 kg Krackle', 12, 'krackle', 10, D89],
@@ -140,8 +148,8 @@ describe('breakoutWarningKind', () => {
     expect(breakoutWarningKind(predictBreakout(plan, grid)!)).toBeNull();
   });
 
-  it("warns 'partial' for the 10 m Krackle shot (about a third of its rock stays sealed)", () => {
-    const { plan } = shot(10, 'krackle', 10);
+  it("warns 'partial' for the 10 m x 12 kg Krackle shot (about a third of its rock stays sealed)", () => {
+    const { plan } = shot(...PARTIAL);
     const p = predictBreakout(plan, grid)!;
     expect(p.sealedShare).toBeGreaterThanOrEqual(BLAST_SEALED_SHARE_PARTIAL);
     expect(p.sealedShare).toBeLessThan(1);
@@ -193,16 +201,17 @@ describe("breakoutWarningKind 'nothing' (#2197)", () => {
 
 describe('predictBreakout fragmented and sealedKeys (#2053)', () => {
   it('fragmented lists every broken voxel, one entry per voxel', () => {
-    const { plan } = shot(10, 'krackle', 10);
+    const { plan } = shot(...PARTIAL);
     const p = predictBreakout(plan, grid)!;
     expect(p.fragmented.length).toBe(p.brokenVoxels);
     expect(new Set(p.fragmented.map(v => `${v.x},${v.y},${v.z}`)).size).toBe(p.brokenVoxels);
   });
 
   it('sealedKeys holds exactly sealedVoxels keys, all among the broken voxels', () => {
-    const { plan } = shot(10, 'krackle', 10);
+    const { plan } = shot(...PARTIAL);
     const p = predictBreakout(plan, grid)!;
     expect(p.sealedVoxels).toBeGreaterThan(0);
+    expect(p.sealedVoxels).toBeLessThan(p.brokenVoxels);
     expect(p.sealedKeys.size).toBe(p.sealedVoxels);
     const broken = new Set(p.fragmented.map(v => `${v.x},${v.y},${v.z}`));
     for (const key of p.sealedKeys) expect(broken.has(key)).toBe(true);

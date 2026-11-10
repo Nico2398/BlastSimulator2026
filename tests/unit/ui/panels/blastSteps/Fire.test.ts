@@ -284,11 +284,12 @@ describe('FireStep — no Horn button (#1362)', () => {
 
 // #1925: "Within permit" checklist row, progression sites only; never blocks.
 describe('FireStep — within-permit checklist (#1925)', () => {
+  /** `holes` holes in a row 4 m apart (a 16 m² cell each, as the permit measures them), each charged with `kgPerHole`. */
   function permitState(holes: number, kgPerHole: number, progression = true): GameState {
     const state = makeState();
     if (progression) state.grade = createGradeState();
     for (let i = 0; i < holes; i++) {
-      const hole = addHole(holeCounter, state.drillHoles, 20 + i * 3, 20, 8, 0.15);
+      const hole = addHole(holeCounter, state.drillHoles, 20 + i * 4, 20, 8, 0.15);
       const r = createCharge('krackle', kgPerHole, 2, hole.depth);
       if ('charge' in r) state.chargesByHole[hole.id] = r.charge;
     }
@@ -297,12 +298,13 @@ describe('FireStep — within-permit checklist (#1925)', () => {
   }
   const row = (s: FireStep) => s.root.querySelector('[data-role="permit-check"]') as HTMLElement | null;
 
-  it('shows a Within permit row as ok within the limit', () => {
+  it('shows a Within permit row as ok within the limit, with the plan kg and pattern area', () => {
     const { step } = makeStep();
     step.update(permitState(9, 4), 'sunny');
     expect(row(step)).not.toBeNull();
     expect(row(step)!.dataset['ok']).toBe('true');
     expect(row(step)!.textContent).toContain('36 / 40 kg');
+    expect(row(step)!.textContent).toContain('144 / 144 m²');
   });
 
   it('shows the row as a warning when over the limit', () => {
@@ -310,6 +312,14 @@ describe('FireStep — within-permit checklist (#1925)', () => {
     step.update(permitState(9, 5), 'sunny');
     expect(row(step)).not.toBeNull();
     expect(row(step)!.dataset['ok']).toBe('false');
+  });
+
+  it('shows the row as a warning when the pattern works more ground than the permit, under its kg', () => {
+    const { step } = makeStep();
+    step.update(permitState(10, 1), 'sunny');
+    expect(row(step)!.dataset['ok']).toBe('false');
+    expect(row(step)!.textContent).toContain('10 / 40 kg');
+    expect(row(step)!.textContent).toContain('160 / 144 m²');
   });
 
   it('is absent on a non-progression site', () => {
@@ -333,7 +343,7 @@ describe('FireStep — within-permit checklist (#1925)', () => {
     step.update(state, 'sunny');
     const p = permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount)!;
     expect(p.consequenceText.length).toBeGreaterThan(0);
-    expect(row(step)!.textContent).toBe(t('ui.blast_workshop.fire.check_permit_over', { kg: p.kgText, holes: p.holesText, consequence: p.consequenceText }));
+    expect(row(step)!.textContent).toBe(t('ui.blast_workshop.fire.check_permit_over', { kg: p.kgText, area: p.areaText, consequence: p.consequenceText }));
     expect(row(step)!.textContent).toContain(p.consequenceText);
   });
 
@@ -342,10 +352,8 @@ describe('FireStep — within-permit checklist (#1925)', () => {
     const state = permitState(9, 4);
     step.update(state, 'sunny');
     expect(row(step)!.dataset['ok']).toBe('true');
-    expect(row(step)!.textContent).toBe(t('ui.blast_workshop.fire.check_permit_ok', {
-      kg: permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount)!.kgText,
-      holes: permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount)!.holesText,
-    }));
+    const p = permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount)!;
+    expect(row(step)!.textContent).toBe(t('ui.blast_workshop.fire.check_permit_ok', { kg: p.kgText, area: p.areaText }));
   });
 
   it('never renders the raw overshoot', () => {
@@ -354,11 +362,13 @@ describe('FireStep — within-permit checklist (#1925)', () => {
     expect(step.root.textContent!.toLowerCase()).not.toContain('overshoot');
   });
 
-  it('en and fr define the over-permit row with kg, holes and the consequence', () => {
+  it('en and fr define the permit rows with kg, area and (over the limit) the consequence', () => {
     for (const l of ['en', 'fr']) {
       const loc = JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8')) as Record<string, string>;
-      const text = loc['ui.blast_workshop.fire.check_permit_over']!;
-      for (const param of ['{kg}', '{holes}', '{consequence}']) expect(text).toContain(param);
+      const over = loc['ui.blast_workshop.fire.check_permit_over']!;
+      for (const param of ['{kg}', '{area}', '{consequence}']) expect(over).toContain(param);
+      const ok = loc['ui.blast_workshop.fire.check_permit_ok']!;
+      for (const param of ['{kg}', '{area}']) expect(ok).toContain(param);
     }
   });
 });
