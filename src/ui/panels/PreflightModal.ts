@@ -13,7 +13,7 @@
 // uiActionProbe's `confirm` region keep resolving it without changes there.
 
 import { t } from '../../core/i18n/I18n.js';
-import { el, statGrid } from '../dom.js';
+import { el, statGrid, explainable } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -315,22 +315,41 @@ export class PreflightModal {
       }));
       return;
     }
-    const label = el('span', {
-      text: t('ui.blast_workshop.preflight.predicted_at_tier', { tier: preview.tier }),
+    const k = (key: string): string => `ui.blast_workshop.preflight.${key}`;
+    const label = explainable(el('span', {
+      text: t(k('predicted_at_tier'), { tier: preview.tier }),
       attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-micro)' },
-    });
+    }), t(k('predicted_at_tier_explain')));
+    const locked = (key: string): HTMLElement => explainable(
+      el('span', { text: t(k(key)), attrs: { style: 'color:var(--bsx-text-micro)' } }),
+      t(k('predicted_at_tier_explain')),
+    );
     const line = el('div');
-    line.style.cssText = 'display:flex;gap:16px;font:500 12px/1 var(--bsx-font-mono);color:var(--bsx-text-secondary)';
-    line.append(el('span', { text: t('ui.blast_workshop.preflight.predicted_voxels', { count: preview.energy.affectedVoxels }) }));
-    if (!preview.fragments) line.appendChild(el('span', { text: t('ui.blast_workshop.preflight.predicted_locked_fragments'), attrs: { style: 'color:var(--bsx-text-micro)' } }));
+    line.style.cssText = 'display:flex;flex-wrap:wrap;gap:16px;font:500 12px/1 var(--bsx-font-mono);color:var(--bsx-text-secondary)';
+    line.append(explainable(
+      el('span', { text: t(k('predicted_voxels'), { count: preview.energy.affectedVoxels }) }),
+      t(k('predicted_voxels_explain')),
+    ));
+    const fragments = preview.fragments;
+    line.appendChild(fragments
+      ? explainable(
+        el('span', { text: t(k('predicted_fragments'), {
+          oversized: fragments.oversizedFragments,
+          fines: (fragments.finesVolumeM3 + fragments.dustVolumeM3).toFixed(1),
+          loss: formatMoney(fragments.dustLossValue),
+        }) }),
+        t(k('predicted_fragments_explain')),
+      )
+      : locked('predicted_locked_fragments'));
     const projections = preview.projections;
     if (!projections) {
-      line.appendChild(el('span', { text: t('ui.blast_workshop.preflight.predicted_locked_projections'), attrs: { style: 'color:var(--bsx-text-micro)' } }));
+      line.appendChild(locked('predicted_locked_projections'));
     } else {
+      const forecast = (text: string): HTMLElement => explainable(el('span', { text }), t(k('predicted_forecast_explain')));
       line.append(
-        el('span', { text: t('ui.blast_workshop.preflight.predicted_rating', { rating: t(`blast.rating.${projections.predictedRating}`) }) }),
-        el('span', { text: t('ui.blast_workshop.preflight.predicted_thrown_share', { share: Math.round(projections.thrownShare * 100) }) }),
-        el('span', { text: t('ui.blast_workshop.preflight.predicted_furthest_throw', { metres: Math.round(projections.furthestThrowM) }) }),
+        forecast(t(k('predicted_rating'), { rating: t(`blast.rating.${projections.predictedRating}`) })),
+        forecast(t(k('predicted_thrown_share'), { share: Math.round(projections.thrownShare * 100) })),
+        forecast(t(k('predicted_furthest_throw'), { metres: Math.round(projections.furthestThrowM) })),
       );
     }
     this.predictedEl.replaceChildren(label, line);

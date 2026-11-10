@@ -115,7 +115,14 @@ jobs:
 
             for (const n of closing) {
               core.info(`Closing issue #${n} (referenced in merged PR body).`);
-              await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed', state_reason: 'completed' });
+              const { data: closed } = await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed', state_reason: 'completed' });
+              // An epic carries `epic` and nothing else, open or closed
+              // (`agentic-issue-creation`): it was never queued, so there is no
+              // lifecycle to settle. Its own fix PR closes it like any issue.
+              if ((closed?.labels || []).some((l) => (typeof l === 'string' ? l : l.name) === 'epic')) {
+                core.info(`#${n} is an epic — closed, and left carrying \`epic\` alone.`);
+                continue;
+              }
               // The Definition of Done (`agentic-autonomous-pipeline`): a closed
               // issue carries `done` and nothing that says the work is still
               // queued, owned, halted or waiting. The merge gate has already made

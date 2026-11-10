@@ -84,3 +84,6 @@ Records why the rules in the `gameplay-blast-system` skill exist: the issues tha
 
 - Core no longer orders crater access for buried holes; the player does: #2095.
 - Buried-hole rubble exempt from barren-yields-to-ore (#2089).
+
+## 2026-11-10 (#2203)
+Added per-hole readouts paragraph under Energy heatmap: powder factor, band mix, recommended range, card band mix.

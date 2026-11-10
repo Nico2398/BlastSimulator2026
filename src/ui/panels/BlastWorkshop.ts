@@ -23,6 +23,7 @@ import { DrillStep } from './blastSteps/Drill.js';
 import { ChargeStep } from './blastSteps/Charge.js';
 import { PreviewStep } from './blastSteps/Preview.js';
 import { FireStep } from './blastSteps/Fire.js';
+import { EnergyHeatmapView } from './blastSteps/EnergyHeatmapView.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 
 
@@ -45,6 +46,7 @@ export class BlastWorkshop extends PanelBase {
   private readonly chargeStep: ChargeStep;
   private readonly previewStep: PreviewStep;
   private readonly fireStep: FireStep;
+  private readonly heatmapView: EnergyHeatmapView;
 
   private activeStep: StepId = 1;
   /** True from the moment the panel opens until the player manually picks a tab — keeps the tutorial's "open panel, click this step's control" flow landing on the right step without locking out manual review of a completed one. */
@@ -101,7 +103,8 @@ export class BlastWorkshop extends PanelBase {
     this.previewStep = new PreviewStep(bodyOuter);
     this.fireStep = new FireStep(bodyOuter);
 
-    this.el.append(header, stripWrap, bodyOuter);
+    this.heatmapView = new EnergyHeatmapView(this.el);
+    this.el.append(header, stripWrap, this.heatmapView.root, bodyOuter);
     // Constructed last (and appends itself into `this.el`, same self-mounting
     // convention as every other component here) so it lands after the body
     // as a sticky flex sibling, not nested inside it.
@@ -116,8 +119,10 @@ export class BlastWorkshop extends PanelBase {
   /** Passes the voxel-grid provider down to the sticky footer's estimate (#1703). */
   setGridProvider(fn: () => VoxelGrid | null): void {
     this.footer.setGridProvider(fn);
+    this.chargeStep.setGridProvider(fn);
     this.previewStep.setGridProvider(fn);
     this.fireStep.setGridProvider(fn);
+    this.heatmapView.setGridProvider(fn);
   }
 
   /** Wire the generic entity opener to the steps that link to entities (#2168). */
@@ -142,6 +147,20 @@ export class BlastWorkshop extends PanelBase {
   }
 
   setFireRequestedHandler(cb: () => void): void { this.footer.setFireRequestedHandler(cb); }
+
+  /** Register the callback fired when the player toggles the energy heatmap (#2200). */
+  setEnergyHeatmapToggleHandler(cb: (visible: boolean) => void): void {
+    this.heatmapView.setToggleHandler(cb);
+  }
+
+  /** Reflect the heatmap preference without firing the handler (#2200). */
+  setEnergyHeatmapVisible(visible: boolean): void {
+    this.heatmapView.setVisible(visible);
+  }
+
+  get energyHeatmapVisible(): boolean {
+    return this.heatmapView.isVisible;
+  }
 
   override show(): void {
     super.show();
@@ -172,6 +191,7 @@ export class BlastWorkshop extends PanelBase {
     this.chargeStep.update(state);
     this.previewStep.update(state);
     this.fireStep.update(state);
+    this.heatmapView.update(state);
     this.footer.update(state);
   }
 
@@ -181,6 +201,7 @@ export class BlastWorkshop extends PanelBase {
     this.chargeStep.refreshLocale();
     this.previewStep.refreshLocale();
     this.fireStep.refreshLocale();
+    this.heatmapView.refreshLocale();
     this.footer.refreshLocale();
     // Forces the next update()-driven renderTabs() to rebuild even though the
     // game state it reads hasn't changed — only the locale has.
@@ -192,6 +213,7 @@ export class BlastWorkshop extends PanelBase {
     this.chargeStep.dispose();
     this.previewStep.dispose();
     this.fireStep.dispose();
+    this.heatmapView.dispose();
     this.footer.dispose();
     super.dispose();
   }

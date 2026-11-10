@@ -3,6 +3,7 @@
 // syncSurveyOverlay() — the console-driven "reflect current MiningContext onto
 // the already-built scene" step shared by syncFromContext() and finishLevelLoad().
 
+import { planHeatmap, type ColumnBandSummary } from '../core/mining/EnergyHeatmap.js';
 import { isProgressionSite, type GameState } from '../core/state/GameState.js';
 import { firstEmptyLayerAboveGround, type VoxelGrid } from '../core/world/VoxelGrid.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
@@ -29,6 +30,8 @@ import { columnOreValuePerM3 } from '../core/mining/BlastValueEstimate.js';
 import { isSurveyStale } from '../core/mining/SurveyStaleness.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 import { assembleBlastPlan } from '../core/mining/BlastPlan.js';
+import { previewProjections } from '../core/mining/Software.js';
+import { projectionZoneColumns } from '../core/mining/ProjectionZones.js';
 import { wetHoleIdsFor } from '../core/mining/WetHoles.js';
 import { findFacesAtRisk, gridSurface, predictWallFaces, type WallFace } from '../core/mining/WallStability.js';
 import { WALL_WARN_RATIO } from '../core/config/balance.js';
@@ -330,5 +333,35 @@ export function syncWallOverlay(terrain: TerrainMesh | null, faces: ReadonlyArra
   if (!terrain) return;
   const overlay = terrain.getWallOverlay();
   if (visibilityPreference && faces.length > 0) overlay.show(faces);
+  else overlay.hide();
+}
+
+/** Column summaries of the armed plan's energy heatmap (#2200); empty without a grid or a charged hole. */
+export function buildHeatmapColumns(state: GameState, grid: VoxelGrid | null): ColumnBandSummary[] {
+  if (!grid || grid.sizeX <= 0 || grid.sizeZ <= 0) return [];
+  return planHeatmap(assembleBlastPlan(state.drillHoles, state.chargesByHole), grid, wetHoleIdsFor(state)).columns;
+}
+
+/** Ground columns the armed plan would throw rock from (#2201); empty below software T2, without a grid or a charged hole. */
+export function buildProjectionZoneColumns(state: GameState, grid: VoxelGrid | null): Array<{ x: number; z: number }> {
+  if (!grid || grid.sizeX <= 0 || grid.sizeZ <= 0) return [];
+  const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
+  const preview = previewProjections(plan, grid, state.softwareTier, wetHoleIdsFor(state));
+  return preview ? projectionZoneColumns(preview.projectionZonePositions) : [];
+}
+
+/** Show the projection zone overlay with `columns` when there are any; hide it otherwise. */
+export function syncProjectionZones(terrain: TerrainMesh | null, columns: ReadonlyArray<{ x: number; z: number }>): void {
+  if (!terrain) return;
+  const overlay = terrain.getProjectionZoneOverlay();
+  if (columns.length > 0) overlay.show(columns);
+  else overlay.hide();
+}
+
+/** Show the heatmap overlay with `columns` when the player has it on; hide it otherwise. */
+export function syncEnergyHeatmap(terrain: TerrainMesh | null, columns: ReadonlyArray<ColumnBandSummary>, visibilityPreference: boolean): void {
+  if (!terrain) return;
+  const overlay = terrain.getEnergyHeatmapOverlay();
+  if (visibilityPreference && columns.length > 0) overlay.show(columns);
   else overlay.hide();
 }

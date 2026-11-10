@@ -34,7 +34,7 @@ import { board } from '../../../src/core/engine/Mount.js';
 import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
-import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+import { RAMP_DEFAULT_WIDTH, BLAST_PREVIEW_SHAPE } from '../../../src/core/config/balance.js';
 import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 /** Cost per metre of a default-width ramp. */
 const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
@@ -584,39 +584,45 @@ describe('blast_preview', () => {
     expect(result.output).toContain('Missing charge');
   });
 
-  // ── software tier 0 — all locked ────────────────────────────────────────────
+  /** The header line of a section, whatever the lock text after it says. */
+  function sectionLine(output: string, name: string): string {
+    const line = output.split('\n').find(l => l.includes(`--- ${name} ---`));
+    if (!line) throw new Error(`no "${name}" section in:\n${output}`);
+    return line;
+  }
+  const locked = (output: string, name: string): boolean => /requires/i.test(sectionLine(output, name));
 
-  it('tier 0 — complete plan, all sections require higher software tier', () => {
+  // ── software tier 0 — energy is free, the rest locked ───────────────────────
+
+  it('tier 0 — energy shows data with no software, the other three sections are locked (#2201)', () => {
     const ctx = makeMiningContext();
     makePlan(ctx);
 
     const result = blastPreviewCommand(ctx, [], {});
     expect(result.success).toBe(true);
-    const matches = result.output.match(/Requires software tier/g);
-    expect(matches).toHaveLength(4);
+    expect(locked(result.output, 'Energy Map')).toBe(false);
+    expect(result.output).toContain('Affected voxels');
+    expect(result.output).toContain('Max energy');
+    expect(locked(result.output, 'Fragmentation')).toBe(true);
+    expect(locked(result.output, 'Projections')).toBe(true);
+    expect(locked(result.output, 'Vibrations')).toBe(true);
   });
 
-  // ── software tier 1 — energy unlocked ───────────────────────────────────────
+  it('tier 0 — each lock names the tier that opens it: fragments 1, projections 2, vibrations 3 (#2201)', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx);
 
-  it('tier 1 — energy section shows data, fragmentation+projections+vibrations require higher tier', () => {
+    const output = blastPreviewCommand(ctx, [], {}).output;
+    expect(sectionLine(output, 'Fragmentation')).toMatch(/\b(tier |T)1\b/i);
+    expect(sectionLine(output, 'Projections')).toMatch(/\b(tier |T)2\b/i);
+    expect(sectionLine(output, 'Vibrations')).toMatch(/\b(tier |T)3\b/i);
+  });
+
+  // ── software tier 1 — fragment distribution unlocked ────────────────────────
+
+  it('tier 1 — energy + fragmentation show data, projections+vibrations require higher tier', () => {
     const ctx = makeMiningContext();
     makePlan(ctx, 1);
-
-    const result = blastPreviewCommand(ctx, [], {});
-    expect(result.success).toBe(true);
-    expect(result.output).toContain('Affected voxels');
-    expect(result.output).toContain('Min energy');
-    expect(result.output).toContain('Max energy');
-    // Remaining 3 sections still locked
-    const matches = result.output.match(/Requires software tier/g);
-    expect(matches).toHaveLength(3);
-  });
-
-  // ── software tier 2 — energy + frag unlocked ────────────────────────────────
-
-  it('tier 2 — energy + fragmentation show data, projections+vibrations require higher tier', () => {
-    const ctx = makeMiningContext();
-    makePlan(ctx, 2);
 
     const result = blastPreviewCommand(ctx, [], {});
     expect(result.success).toBe(true);
@@ -626,16 +632,17 @@ describe('blast_preview', () => {
     expect(result.output).toContain('Fractured');
     expect(result.output).toContain('Cracked');
     expect(result.output).toContain('Average fragment size');
-    // Remaining 2 sections still locked
-    const matches = result.output.match(/Requires software tier/g);
-    expect(matches).toHaveLength(2);
+    expect(locked(result.output, 'Energy Map')).toBe(false);
+    expect(locked(result.output, 'Fragmentation')).toBe(false);
+    expect(locked(result.output, 'Projections')).toBe(true);
+    expect(locked(result.output, 'Vibrations')).toBe(true);
   });
 
-  // ── software tier 3 — energy + frag + projections unlocked ─────────────────
+  // ── software tier 2 — projections unlocked ─────────────────────────────────
 
-  it('tier 3 — energy + fragmentation + projections show data, vibrations require higher tier', () => {
+  it('tier 2 — energy + fragmentation + projections show data, vibrations require higher tier', () => {
     const ctx = makeMiningContext();
-    makePlan(ctx, 3);
+    makePlan(ctx, 2);
 
     const result = blastPreviewCommand(ctx, [], {});
     expect(result.success).toBe(true);
@@ -644,16 +651,15 @@ describe('blast_preview', () => {
     expect(result.output).toContain('Projection zone voxels');
     expect(result.output).toContain('Projected fragments');
     expect(result.output).toContain('Collapse fragments');
-    // Remaining 1 section still locked
-    const matches = result.output.match(/Requires software tier/g);
-    expect(matches).toHaveLength(1);
+    expect(locked(result.output, 'Projections')).toBe(false);
+    expect(locked(result.output, 'Vibrations')).toBe(true);
   });
 
-  // ── software tier 4 — all unlocked ─────────────────────────────────────────
+  // ── software tier 3 — vibrations unlocked: everything shows ────────────────
 
-  it('tier 4 — all sections show data', () => {
+  it('tier 3 — all sections show data (#2201)', () => {
     const ctx = makeMiningContext();
-    makePlan(ctx, 4);
+    makePlan(ctx, 3);
 
     const result = blastPreviewCommand(ctx, [], {});
     expect(result.success).toBe(true);
@@ -661,13 +667,25 @@ describe('blast_preview', () => {
     expect(result.output).toContain('Fragmentation');
     expect(result.output).toContain('Projections');
     expect(result.output).toContain('Vibrations');
-    expect(result.output).toContain('Affected voxels');
+    expect(result.output).toContain('Max vibration');
+    expect(result.output).toContain('Affected villages');
+    expect(result.output).not.toMatch(/Requires/i);
+  });
+
+  // ── software tier 4 — the optimizer has no preview content: same as tier 3 ─
+
+  it('tier 4 — all sections show data, same as tier 3', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 4);
+
+    const result = blastPreviewCommand(ctx, [], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Energy Map');
     expect(result.output).toContain('Fractured');
     expect(result.output).toContain('Projection zone voxels');
     expect(result.output).toContain('Max vibration');
     expect(result.output).toContain('Affected villages');
-    // All unlocked — no "Requires software tier" messages
-    expect(result.output).not.toMatch(/Requires software tier/);
+    expect(result.output).not.toMatch(/Requires/i);
   });
 });
 
@@ -693,60 +711,81 @@ describe('blast_preview — state.lastBlastPreview', () => {
     expect(ctx.state!.lastBlastPreview).toBeNull();
   });
 
-  it('tier 0 — every section is null, tier is recorded', () => {
+  it('tier 0 — energy is filled, every tier-gated section is null, tier and shape are recorded (#2201)', () => {
     const ctx = makeMiningContext();
     makePlan(ctx);
 
     blastPreviewCommand(ctx, [], {});
 
-    expect(ctx.state!.lastBlastPreview).toEqual({
-      tier: 0, energy: null, fragments: null, projections: null, vibrations: null,
-    });
+    const preview = ctx.state!.lastBlastPreview!;
+    expect(preview.shape).toBe(BLAST_PREVIEW_SHAPE);
+    expect(preview.tier).toBe(0);
+    expect(preview.energy).not.toBeNull();
+    expect(preview.energy.affectedVoxels).toBeGreaterThan(0);
+    expect(preview.energy.maxEnergy).toBeGreaterThanOrEqual(preview.energy.minEnergy);
+    expect(preview.fragments).toBeNull();
+    expect(preview.projections).toBeNull();
+    expect(preview.vibrations).toBeNull();
   });
 
-  it('tier 1 — energy populated with real numbers, later sections still null', () => {
+  it('tier 1 — energy and fragments populated, later sections still null', () => {
     const ctx = makeMiningContext();
     makePlan(ctx, 1);
 
     blastPreviewCommand(ctx, [], {});
 
     const preview = ctx.state!.lastBlastPreview!;
+    expect(preview.shape).toBe(BLAST_PREVIEW_SHAPE);
     expect(preview.tier).toBe(1);
-    expect(preview.energy).not.toBeNull();
-    expect(preview.energy!.affectedVoxels).toBeGreaterThan(0);
-    expect(preview.energy!.maxEnergy).toBeGreaterThanOrEqual(preview.energy!.minEnergy);
-    expect(preview.fragments).toBeNull();
+    expect(preview.energy.affectedVoxels).toBeGreaterThan(0);
+    expect(preview.fragments).not.toBeNull();
     expect(preview.projections).toBeNull();
     expect(preview.vibrations).toBeNull();
   });
 
-  it('tier 2 — fragments populated, avgFragmentSizeCm converted from the raw 0-1 fraction', () => {
+  it('tier 1 — fragments carry the distribution: band volumes, oversized count and dust loss (#2201)', () => {
     const ctx = makeMiningContext();
-    makePlan(ctx, 2);
+    makePlan(ctx, 1);
+
+    blastPreviewCommand(ctx, [], {});
+
+    const f = ctx.state!.lastBlastPreview!.fragments!;
+    expect(f.fragmentCount).toBeGreaterThan(0);
+    expect(f.oversizedFragments).toBeGreaterThanOrEqual(0);
+    expect(f.goodVolumeM3).toBe(f.bandVolumes.good);
+    expect(f.finesVolumeM3).toBe(f.bandVolumes.fines);
+    expect(f.dustVolumeM3).toBe(f.bandVolumes.dust);
+    expect(f.dustLossMassKg).toBeGreaterThanOrEqual(0);
+    expect(f.dustLossValue).toBeGreaterThanOrEqual(0);
+  });
+
+  it('tier 1 — avgFragmentSizeCm is converted from the raw 0-1 fraction', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 1);
 
     blastPreviewCommand(ctx, [], {});
 
     const fragments = ctx.state!.lastBlastPreview!.fragments!;
     expect(fragments.fractured + fragments.cracked + fragments.unaffected).toBeGreaterThan(0);
-    // A fraction of one voxel edge (VOXEL_SIZE_CM=100) never exceeds 100cm.
     expect(fragments.avgFragmentSizeCm).toBeGreaterThan(0);
     expect(fragments.avgFragmentSizeCm).toBeLessThanOrEqual(100);
   });
 
-  it('tier 3 — projections populated with a non-negative collapseFragments', () => {
+  it('tier 2 — projections populated with a non-negative collapseFragments', () => {
     const ctx = makeMiningContext();
-    makePlan(ctx, 3);
+    makePlan(ctx, 2);
 
     blastPreviewCommand(ctx, [], {});
 
     const projections = ctx.state!.lastBlastPreview!.projections!;
     expect(projections.projectionZoneVoxels).toBeGreaterThanOrEqual(0);
     expect(projections.collapseFragments).toBeGreaterThanOrEqual(0);
+    expect(ctx.state!.lastBlastPreview!.vibrations).toBeNull();
   });
 
-  it("tier 4 — vibrations populated at the level's villages (#1343)", () => {
+  it("tier 3 — vibrations populated at the level's villages (#1343)", () => {
     const ctx = makeMiningContext();
-    makePlan(ctx, 4);
+    makePlan(ctx, 3);
 
     blastPreviewCommand(ctx, [], {});
 
@@ -759,9 +798,20 @@ describe('blast_preview — state.lastBlastPreview', () => {
     expect(preview.projections).not.toBeNull();
   });
 
-  it('tier 2 — average fragment size is printed in cm, not m³ (#1968)', () => {
+  it('tier 4 — the optimizer adds no preview content: the snapshot equals tier 3 apart from the tier', () => {
+    const three = makeMiningContext();
+    makePlan(three, 3);
+    blastPreviewCommand(three, [], {});
+    const four = makeMiningContext();
+    makePlan(four, 4);
+    blastPreviewCommand(four, [], {});
+
+    expect({ ...four.state!.lastBlastPreview!, tier: 3 }).toEqual(three.state!.lastBlastPreview);
+  });
+
+  it('tier 1 — average fragment size is printed in cm, not m³ (#1968)', () => {
     const ctx = makeMiningContext();
-    makePlan(ctx, 2);
+    makePlan(ctx, 1);
 
     const result = blastPreviewCommand(ctx, [], {});
 
@@ -770,9 +820,9 @@ describe('blast_preview — state.lastBlastPreview', () => {
     expect(result.output).not.toContain('m³');
   });
 
-  it('tier 3 — projections carry the dry-run forecast (#1968)', () => {
+  it('tier 2 — projections carry the dry-run forecast (#1968)', () => {
     const ctx = makeMiningContext();
-    makePlan(ctx, 3);
+    makePlan(ctx, 2);
 
     blastPreviewCommand(ctx, [], {});
 
@@ -784,9 +834,9 @@ describe('blast_preview — state.lastBlastPreview', () => {
     expect(p.furthestThrowM!).toBeGreaterThanOrEqual(0);
   });
 
-  it('tier 4 — villages report the measured count and the count above the vibration floor (#1968)', () => {
+  it('tier 3 — villages report the measured count and the count above the vibration floor (#1968)', () => {
     const ctx = makeMiningContext();
-    makePlan(ctx, 4);
+    makePlan(ctx, 3);
 
     const result = blastPreviewCommand(ctx, [], {});
 
@@ -803,10 +853,10 @@ describe('blast_preview — state.lastBlastPreview', () => {
     blastPreviewCommand(ctx, [], {});
     expect(ctx.state!.lastBlastPreview!.tier).toBe(1);
 
-    ctx.state!.softwareTier = 4;
+    ctx.state!.softwareTier = 3;
     blastPreviewCommand(ctx, [], {});
 
-    expect(ctx.state!.lastBlastPreview!.tier).toBe(4);
+    expect(ctx.state!.lastBlastPreview!.tier).toBe(3);
     expect(ctx.state!.lastBlastPreview!.vibrations).not.toBeNull();
   });
 });
@@ -2195,35 +2245,70 @@ describe('previewCommand (#790 characterization)', () => {
     expect(result.output).toBe('Usage: preview energy|fragments|projections|vibrations');
   });
 
-  it('tier 0 — energy/fragments/projections/vibrations all require higher tier', () => {
+  it('tier 0 — energy works with no software, the other three require a tier (#2201)', () => {
     const ctx = makeMiningContext();
     makePlan(ctx, 0);
 
     const energy = previewCommand(ctx, ['energy'], {});
-    expect(energy.success).toBe(false);
-    expect(energy.output).toBe('Requires software tier 1+ (current: 0)');
+    expect(energy.success).toBe(true);
+    expect(energy.output).toMatch(/^Energy preview: \d+ voxels, max=[\d.]+, min=[\d.]+$/);
 
-    const fragments = previewCommand(ctx, ['fragments'], {});
-    expect(fragments.success).toBe(false);
-    expect(fragments.output).toBe('Requires software tier 2+ (current: 0)');
-
-    const projections = previewCommand(ctx, ['projections'], {});
-    expect(projections.success).toBe(false);
-    expect(projections.output).toBe('Requires software tier 3+ (current: 0)');
-
-    const vibrations = previewCommand(ctx, ['vibrations'], {});
-    expect(vibrations.success).toBe(false);
-    expect(vibrations.output).toBe('Requires software tier 4+ (current: 0)');
+    for (const [sub, tier] of [['fragments', 1], ['projections', 2], ['vibrations', 3]] as const) {
+      const result = previewCommand(ctx, [sub], {});
+      expect(result.success, sub).toBe(false);
+      expect(result.output, sub).toMatch(/requires/i);
+      expect(result.output, sub).toContain(String(tier));
+    }
   });
 
-  it('tier 1+ — energy sub returns a populated summary', () => {
+  it('each subcommand opens at its own tier and stays open above it (#2201)', () => {
+    const open: Record<string, number> = { energy: 0, fragments: 1, projections: 2, vibrations: 3 };
+    for (let tier = 0; tier <= 4; tier++) {
+      const ctx = makeMiningContext();
+      makePlan(ctx, tier);
+      for (const [sub, needs] of Object.entries(open)) {
+        expect(previewCommand(ctx, [sub], {}).success, `${sub} at tier ${tier}`).toBe(tier >= needs);
+      }
+    }
+  });
+
+  it('tier 1 — fragments returns a populated summary', () => {
     const ctx = makeMiningContext();
     makePlan(ctx, 1);
 
-    const result = previewCommand(ctx, ['energy'], {});
+    const result = previewCommand(ctx, ['fragments'], {});
 
     expect(result.success).toBe(true);
-    expect(result.output).toMatch(/^Energy preview: \d+ voxels, max=[\d.]+, min=[\d.]+$/);
+    expect(result.output).toMatch(/\d+ fractured, \d+ cracked, \d+ unaffected/);
+  });
+
+  it('tier 2 — projections returns a populated summary', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 2);
+
+    const result = previewCommand(ctx, ['projections'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toMatch(/\d+ voxels in projection zone/);
+  });
+
+  it('tier 3 — vibrations returns a populated summary', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 3);
+
+    const result = previewCommand(ctx, ['vibrations'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toMatch(/max=[\d.]+/);
+  });
+
+  it('energy gives the same answer at every tier', () => {
+    const outputs = [0, 2, 4].map(tier => {
+      const ctx = makeMiningContext();
+      makePlan(ctx, tier);
+      return previewCommand(ctx, ['energy'], {}).output;
+    });
+    expect(new Set(outputs).size).toBe(1);
   });
 
   it('unknown subcommand returns the usage message', () => {

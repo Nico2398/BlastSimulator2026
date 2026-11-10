@@ -1128,10 +1128,20 @@ describe('the Definition of Ready', () => {
     expect(verdict.missing).toEqual(['`scope:naavmesh` is not a known scope']);
   });
 
+  // An epic is a parent: its sub-issues are the tasks. Labelled by mistake as if
+  // it were one, it would hand a single run the whole batch.
+  it('is never met by an epic, whatever else it carries', () => {
+    const verdict = rules.readinessVerdict({ labels: ['epic', 'agent-task', 'scope:ui', 'ready'] });
+    expect(verdict.ready).toBe(false);
+    expect(verdict.missing).toHaveLength(1);
+    expect(verdict.missing[0]).toContain('`epic`');
+  });
+
   it.each([
     ['no scope label', ['ready', 'agent-task']],
     ['no agent-task label', ['ready', 'scope:ui']],
     ['an unknown scope', ['ready', 'agent-task', 'scope:naavmesh']],
+    ['the epic label', ['ready', 'agent-task', 'scope:ui', 'epic']],
   ])('keeps an issue with %s out of every assignment, and takes the next one', async (_, labels) => {
     const api = fakeApi([
       { number: 20, labels },

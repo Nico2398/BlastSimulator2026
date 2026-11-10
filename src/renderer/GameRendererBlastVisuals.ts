@@ -8,6 +8,7 @@ import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import {
   BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS,
   BLAST_ORIGIN_SURFACE_SEARCH_MARGIN,
+  SOFTWARE_TIER_FRAGMENTS,
 } from '../core/config/balance.js';
 import { assembleBlastPlan } from '../core/mining/BlastPlan.js';
 import { previewHoleDetails } from '../core/mining/Software.js';
@@ -168,7 +169,7 @@ export function showBlastPlanOverlay(deps: BlastVisualsDeps, ctx: MiningContext)
   // already-drilled holes have a charge to preview against — an ordered
   // hole (#553) has no charge/frag-size data yet.
   let holeDetails: Record<string, import('../core/mining/Software.js').HolePreviewDetail> = {};
-  if (softwareTier >= 2 && ctx.grid && drillHoles.length > 0) {
+  if (softwareTier >= SOFTWARE_TIER_FRAGMENTS && ctx.grid && drillHoles.length > 0) {
     const plan = assembleBlastPlan(drillHoles, chargesByHole);
     holeDetails = previewHoleDetails(plan, ctx.grid, softwareTier, wetHoleIdSet(ctx));
   }

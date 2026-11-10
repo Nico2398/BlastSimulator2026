@@ -271,3 +271,7 @@ On 2026-11-07, with `AGENTIC_MAX_PARALLEL_RUNS` at 6, #2163 (`scope:ui`, `scope:
 ## The loop budget — fixed verification per iteration
 
 The sentence used to price one iteration at 15 to 30 minutes on a two-core runner: a full `npm run test`, a full `npm run scenarios`, a CI round. `verify` now runs only the test files a diff reaches and the scenarios in parallel, and CI's critical path was cut from a 45-minute unsharded coverage job, so the price is stated without a figure that would go stale again.
+
+## Definition of Done — the epic exception
+
+Added on 2026-11-09 with the epic system: the owner's rule is that an epic carries `epic` alone, open or closed, so the merge chain closes an epic its fix pull request names without applying `done`.

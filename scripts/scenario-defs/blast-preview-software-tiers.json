@@ -98,7 +98,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite amount:5 stemming:1",
       "interaction": [
         {
           "type": "clickSelector",
@@ -112,7 +112,7 @@
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 2
+          "value": 1
         },
         {
           "type": "clickSelector",
@@ -156,11 +156,11 @@
       }
     },
     {
-      "command": "preview energy",
+      "command": "preview fragments",
       "interaction": [
         {
           "type": "command",
-          "command": "preview energy"
+          "command": "preview fragments"
         }
       ],
       "role": "observe",
@@ -186,11 +186,11 @@
       }
     },
     {
-      "command": "preview energy",
+      "command": "preview fragments",
       "interaction": [
         {
           "type": "command",
-          "command": "preview energy"
+          "command": "preview fragments"
         }
       ],
       "role": "observe"
@@ -215,11 +215,19 @@
       }
     },
     {
-      "command": "preview fragments",
+      "command": "preview projections",
       "interaction": [
         {
+          "type": "focusTile",
+          "x": 17,
+          "z": 17,
+          "distance": 22,
+          "yaw": 0,
+          "pitch": 70
+        },
+        {
           "type": "command",
-          "command": "preview fragments"
+          "command": "preview projections"
         }
       ],
       "role": "observe"
@@ -244,11 +252,11 @@
       }
     },
     {
-      "command": "preview projections",
+      "command": "preview vibrations",
       "interaction": [
         {
           "type": "command",
-          "command": "preview projections"
+          "command": "preview vibrations"
         }
       ],
       "role": "observe"

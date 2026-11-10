@@ -326,4 +326,105 @@ describe('HoverTag', () => {
     tag.dispose();
     expect(container.contains(root)).toBe(false);
   });
+  describe('energy heatmap line (#2200)', () => {
+    const column = {
+      x: 12, z: 8, band: 'fines' as const, worstBand: 'dust' as const, goodShare: 0.2, maxIntensity: 3.39,
+      counts: { intact: 0, cracked: 0, good: 2, fines: 6, dust: 1 },
+    };
+    const hover = (): PickResult => ({ entity: null, terrain: { point: new THREE.Vector3(), tileX: 12, tileZ: 8, distance: 1 } });
+
+    it('heatmap-only: shows the tile and the band with its exact intensity', () => {
+      const { tag, root } = makeTag();
+      tag.update(hover(), makeState(), false, column);
+      expect(root.style.display).toBe('');
+      const line = root.querySelector('[data-role="hover-heatmap"]');
+      expect(line?.textContent).toContain('3.39');
+    });
+
+    it('survey and heatmap: both lines in one tag', () => {
+      const state = makeState();
+      addSurvey(state);
+      const { tag, root } = makeTag();
+      tag.update(hover(), state, true, column);
+      expect(root.querySelector('[data-role="hover-heatmap"]')).not.toBeNull();
+      expect(root.textContent).toContain('grumpite');
+    });
+
+    it('no heatmap and no overlay: hidden as before', () => {
+      const { tag, root } = makeTag();
+      tag.update(hover(), makeState(), false, null);
+      expect(root.style.display).toBe('none');
+    });
+  });
+  describe('hole readout (#2203 C5)', () => {
+    const shares = { intact: 0.2, cracked: 0.1, good: 0.4, fines: 0.2, dust: 0.1 };
+    const columnWithHole = (recommended: () => { minKgPerM3: number; maxKgPerM3: number } | null) => ({
+      x: 12, z: 8, band: 'good' as const, worstBand: 'dust' as const, goodShare: 0.4, maxIntensity: 1.7,
+      counts: { intact: 2, cracked: 1, good: 4, fines: 2, dust: 1 },
+      hole: { holeId: 'H7', powderFactor: 0.2371, shares, recommended },
+    });
+    const hover = (): PickResult => ({ entity: null, terrain: { point: new THREE.Vector3(), tileX: 12, tileZ: 8, distance: 1 } });
+    const has = (text: string, value: number): boolean => [1, 2, 3].some(d => text.includes(value.toFixed(d)));
+
+    it('shows the hole\'s id, powder factor and recommended range under the heatmap line', () => {
+      const { tag, root } = makeTag();
+      tag.update(hover(), makeState(), false, columnWithHole(() => ({ minKgPerM3: 0.1812, maxKgPerM3: 0.3374 })));
+      const line = root.querySelector('[data-role="hover-hole"]');
+      expect(line).not.toBeNull();
+      expect(root.querySelector('[data-role="hover-heatmap"]')).not.toBeNull();
+      const text = line!.textContent!;
+      expect(text).toContain('H7');
+      expect(has(text, 0.2371)).toBe(true);
+      expect(has(text, 0.1812)).toBe(true);
+      expect(has(text, 0.3374)).toBe(true);
+    });
+
+    it('shows the hole\'s band mix as percentages', () => {
+      const { tag, root } = makeTag();
+      tag.update(hover(), makeState(), false, columnWithHole(() => null));
+      const text = root.querySelector('[data-role="hover-hole"]')!.textContent!;
+      expect(text).toContain('40%');
+    });
+
+    it('still shows the hole when no range reaches a mostly-good mix', () => {
+      const { tag, root } = makeTag();
+      tag.update(hover(), makeState(), false, columnWithHole(() => null));
+      expect(root.style.display).toBe('');
+      const text = root.querySelector('[data-role="hover-hole"]')!.textContent!;
+      expect(text).toContain('H7');
+      expect(has(text, 0.2371)).toBe(true);
+    });
+
+    it('asks for the recommended range when the hole is shown', () => {
+      let asked = 0;
+      const { tag } = makeTag();
+      tag.update(hover(), makeState(), false, columnWithHole(() => { asked++; return null; }));
+      expect(asked).toBeGreaterThan(0);
+    });
+
+    it('a heatmap column with no hole shows no hole line', () => {
+      const { tag, root } = makeTag();
+      const { hole: _hole, ...plain } = columnWithHole(() => null);
+      tag.update(hover(), makeState(), false, plain);
+      expect(root.querySelector('[data-role="hover-heatmap"]')).not.toBeNull();
+      expect(root.querySelector('[data-role="hover-hole"]')).toBeNull();
+    });
+
+    it('survey, heatmap and hole: all three lines in one tag', () => {
+      const state = makeState();
+      addSurvey(state);
+      const { tag, root } = makeTag();
+      tag.update(hover(), state, true, columnWithHole(() => null));
+      expect(root.querySelector('[data-role="hover-hole"]')).not.toBeNull();
+      expect(root.querySelector('[data-role="hover-heatmap"]')).not.toBeNull();
+      expect(root.textContent).toContain('grumpite');
+    });
+
+    it('hides again when the heatmap goes away', () => {
+      const { tag, root } = makeTag();
+      tag.update(hover(), makeState(), false, columnWithHole(() => null));
+      tag.update(hover(), makeState(), false, null);
+      expect(root.style.display).toBe('none');
+    });
+  });
 });

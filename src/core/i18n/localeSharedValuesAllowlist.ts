@@ -68,8 +68,6 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'sandbox.field.biome',        // "Biome"
   'ui.blast_workshop.preflight.stat_charge', // "Charge"
   'ui.blast_workshop.preflight.predicted_voxels', // "{count} voxels" — technical term, unchanged in French
-  'ui.blast_workshop.preflight.predicted_locked_fragments', // "fragments — T2"
-  'ui.blast_workshop.preflight.predicted_locked_projections', // "projections — T3"
   'ui.blast_workshop.report.stat_fragments', // "Fragments"
   'ui.blast_workshop.report.stat_volume', // "Volume"
   'ui.blast_workshop.report.stat_projections', // "Projections"
@@ -102,4 +100,5 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'inspector.vehicle.fragments', // "Fragments" — same word in French
   'inspector.vehicle.eta_value', // "{n} h" — unit-only format
   'inspector.vehicle.kg', // "{kg} kg" — SI symbol format
+  'ui.blast_workshop.charge.powder_factor', // "{value} kg/m³" — SI unit format
 ];

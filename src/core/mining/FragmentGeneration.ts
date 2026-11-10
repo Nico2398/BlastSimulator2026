@@ -33,6 +33,7 @@ import {
   BLAST_SLICE_CELLS,
 } from '../config/balance.js';
 import { type EnergyField, intensityAt } from './EnergyPropagation.js';
+import { classifyFragmentationBand, bandMassRetention } from './FragmentationBand.js';
 import type { FragmentationResult, VoxelCoord } from './VoxelFragmentation.js';
 import {
   computeAverageRockComposition,
@@ -54,6 +55,8 @@ export interface GeneratedFragment {
   volumeM3: number;
   massKg: number;
   composition: VoxelRockComposition;
+  /** Mass lost to dust-band source voxels; `massKg` and `oreDensities` are already net of it (#2198). */
+  lostMassKg: number;
   oreDensities: Record<string, number>;
   rockId: string;
   /** The voxels this fragment was carved from, weighted by how much it took. */
@@ -108,6 +111,13 @@ export function* generateFragmentsSteps(
   for (let i = 0; i < voxels.length; i++) {
     if ((i & (BLAST_SLICE_CELLS - 1)) === 0) yield;
     voxelIndex.set(voxelKey(voxels[i]!), i);
+  }
+
+  // What survives each voxel's band: dust-band rock loses a share of its mass and ore.
+  const retention = new Float64Array(voxels.length);
+  for (let i = 0; i < voxels.length; i++) {
+    const v = voxels[i]!;
+    retention[i] = bandMassRetention(classifyFragmentationBand(intensityAt(field, v.x, v.y, v.z)));
   }
 
   const { seeds, seedsByVoxel, throttled } = yield* scatterSeeds(voxels, field, rng);
@@ -191,11 +201,11 @@ export function* generateFragmentsSteps(
   for (let si = 0; si < seeds.length; si++) {
     if ((si & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
     if (clusterSize[si] === 0) continue;
-    const fragment = buildFragment(clustered.subarray(clusterStart[si]!, clusterStart[si + 1]!), voxels, grid, rng);
+    const fragment = buildFragment(clustered.subarray(clusterStart[si]!, clusterStart[si + 1]!), voxels, grid, rng, retention);
     if (fragment) fragments.push(fragment);
   }
   for (const component of splitOrphanComponents(orphans, voxels, voxelIndex)) {
-    const fragment = buildFragment(component, voxels, grid, rng);
+    const fragment = buildFragment(component, voxels, grid, rng, retention);
     if (fragment) fragments.push(fragment);
   }
 
@@ -388,6 +398,7 @@ function buildFragment(
   voxels: readonly VoxelCoord[],
   grid: VoxelGrid,
   rng: Random,
+  retention: Float64Array,
 ): GeneratedFragment | null {
   if (slots.length === 0) return null;
 
@@ -445,11 +456,19 @@ function buildFragment(
 
   const volumeM3 = n * SUB_CELL_VOLUME;
 
+  // Dust-band source voxels lose a share of their mass and ore; the fragment keeps its geometry.
+  let keptWeight = 0;
+  for (const [vi, count] of counts) keptWeight += retention[vi]! * count;
+  const kept = keptWeight / n;
+  if (kept < 1) for (const oreId in oreDensities) oreDensities[oreId] = oreDensities[oreId]! * kept;
+  const grossMassKg = volumeM3 * density;
+
   return {
     origin: vec3(sumX / n, sumY / n, sumZ / n),
     halfExtents: vec3((maxX - minX) / 2, (maxY - minY) / 2, (maxZ - minZ) / 2),
     volumeM3,
-    massKg: volumeM3 * density,
+    massKg: grossMassKg * kept,
+    lostMassKg: grossMassKg * (1 - kept),
     composition,
     oreDensities,
     rockId: dominantRockOf(composition),

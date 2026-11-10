@@ -16,6 +16,7 @@ import { addReachBuildings, addReachPattern } from '../../../helpers/blastReachF
 import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
 import { permitPreview } from '../../../../src/ui/panels/permitPreview.js';
 import { buildWallGrid, standardShot } from '../../../helpers/wallWarningFixture.js';
+import { makePreviewSummary } from '../../../helpers/blastPreviewFixture.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -95,20 +96,16 @@ describe('PreflightModal', () => {
     expect(modal.root.textContent).toContain('Run Analysis in the Preview step');
   });
 
-  it('shows real predicted numbers, and marks locked tiers, once a preview has run', () => {
+  it('shows the predicted line, and marks locked tiers with the software that opens them, once a preview has run', () => {
     const { modal } = makeModal();
     modal.show();
     const state = chargedPlan();
-    state.softwareTier = 1;
-    state.lastBlastPreview = {
-      tier: 1, energy: { affectedVoxels: 314, minEnergy: 1, maxEnergy: 9 },
-      fragments: null, projections: null, vibrations: null,
-    };
+    state.softwareTier = 0;
+    state.lastBlastPreview = makePreviewSummary(0);
     modal.update(state, 'sunny');
 
-    expect(modal.root.textContent).toContain('314 voxels');
-    expect(modal.root.textContent).toContain('fragments — T2');
-    expect(modal.root.textContent).toContain('projections — T3');
+    expect(modal.root.textContent).toContain('blasting software T1');
+    expect(modal.root.textContent).toContain('blasting software T2');
   });
 
   it('warns about holes that hold water, and shows the ok line once they are dry', () => {

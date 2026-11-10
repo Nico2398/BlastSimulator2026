@@ -52,7 +52,7 @@ export interface WetBlastHoles {
 }
 
 /** True when the charge's explosive is known and would fizzle in a wet hole. Unknown explosive => false. */
-function isWaterSensitiveCharge(charge: HoleCharge): boolean {
+export function isWaterSensitiveCharge(charge: HoleCharge): boolean {
   const explosive = getExplosive(charge.explosiveId);
   return explosive !== undefined && waterEffect(true, explosive.waterSensitive, false) < 1;
 }

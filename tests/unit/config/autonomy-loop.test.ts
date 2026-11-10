@@ -297,6 +297,7 @@ describe('intake keeps `ready` honest', () => {
     expect(wakes('labeled', 'scope:ui')).toBe(true);
     expect(wakes('unlabeled', 'scope:ui')).toBe(true);
     expect(wakes('unlabeled', 'agent-task')).toBe(true);
+    expect(wakes('labeled', 'epic')).toBe(true);
     // The pipeline's own bookkeeping, which happens on every assignment.
     expect(wakes('labeled', 'in-progress')).toBe(false);
     expect(wakes('unlabeled', 'ready')).toBe(false);
@@ -353,6 +354,19 @@ describe('intake keeps `ready` honest', () => {
     expect(run.comments).toEqual([]);
     const closed = await intake('labeled', { labels: ['ready'], state: 'closed' });
     expect(closed.labels).toEqual(['ready']);
+  });
+
+  it('takes `ready` off an epic, which is never queued itself', async () => {
+    const run = await intake('labeled', { labels: ['epic', 'agent-task', 'ready', 'scope:ui'] });
+    expect(run.labels).toEqual(['epic', 'agent-task', 'scope:ui']);
+    expect(run.comments).toHaveLength(1);
+    expect(run.comments[0]).toContain('`epic`');
+  });
+
+  it('leaves an epic that carries nothing else untouched and says nothing', async () => {
+    const run = await intake('opened', { labels: ['epic'] });
+    expect(run.labels).toEqual(['epic']);
+    expect(run.comments).toEqual([]);
   });
 
   it('drops a stale `done` from a reopened issue', async () => {
@@ -413,7 +427,7 @@ describe('intake keeps `ready` honest', () => {
       { name: 'ready', color: '0e8a16', description: 'Eligible for pipeline assignment' },
     ]);
     expect(run.updated).toEqual(['ready']);
-    expect(run.created).toEqual(expect.arrayContaining(['in-progress', 'done']));
+    expect(run.created).toEqual(expect.arrayContaining(['in-progress', 'done', 'epic']));
     expect(run.created).not.toContain('agent-task');
     // Scope labels belong to the `scope-colors` job, which paints them.
     for (const scope of Object.keys(rules.SCOPES)) expect(run.created).not.toContain(`scope:${scope}`);
@@ -523,8 +537,11 @@ describe('the merge chain leaves a closed issue meeting the Definition of Done',
     const github: any = {
       rest: {
         issues: {
+          // Like the real endpoint, the update answers with the issue as it now is.
           update: async ({ issue_number, state, state_reason }: any) => {
-            Object.assign(issues.get(issue_number)!, { state, stateReason: state_reason });
+            const found = issues.get(issue_number)!;
+            Object.assign(found, { state, stateReason: state_reason });
+            return { data: { number: issue_number, state, labels: found.labels.map((name) => ({ name })) } };
           },
           addLabels: async ({ issue_number, labels: added }: any) => {
             issues.get(issue_number)!.labels.push(...added);
@@ -563,6 +580,16 @@ describe('the merge chain leaves a closed issue meeting the Definition of Done',
     expect(issues.get(1200)!.labels).toContain('scope:nav');
     expect(issues.get(1252)!.labels).toContain('scope:scenarios');
     expect(outputs.issue).toBe('1200');
+  });
+
+  // An epic carries `epic` and nothing else, open or closed.
+  it('closes an epic its fix PR names, and leaves it carrying `epic` alone', async () => {
+    const { issues } = await mergeChain('Closes #300\nCloses #301\n', {
+      300: ['epic'],
+      301: ['agent-task', 'scope:ui', 'in-progress'],
+    });
+    expect(issues.get(300)).toMatchObject({ state: 'closed', stateReason: 'completed', labels: ['epic'] });
+    expect(issues.get(301)!.labels).toContain('done');
   });
 
   it('reads a prose mention as nothing', async () => {

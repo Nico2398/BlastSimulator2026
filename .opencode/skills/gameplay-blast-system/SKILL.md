@@ -129,6 +129,34 @@ voxel count, exactly.
 A fragment carries the volume-weighted rock and ore of the voxels it was carved from
 (`FragmentComposition.ts`), plus the bounding box the renderer scales it to.
 
+### Fragmentation bands
+
+`classifyFragmentationBand(intensity)` (`FragmentationBand.ts`) is the only place that names the
+ranges; the blast, previews, heatmap and report all read it. A bound belongs to the band above it.
+
+| Intensity | Band | Colour | Consequence |
+|---|---|---|---|
+| < `CRACKED_VOXEL_ENERGY_RATIO` (0.5) | intact | blue | none |
+| 0.5 – `FRAGMENTATION_MULTIPLIER` (1) | cracked | pale blue | weakened, not broken |
+| 1 – `FRAGMENTATION_BAND_FINES_MIN` (2) | good | green | haulable fragments |
+| 2 – `FRAGMENTATION_BAND_DUST_MIN` (4) | fines | orange | smaller, more numerous fragments (more loads to haul) |
+| ≥ 4 | dust | red | finest fragments; loses `DUST_LOSS_SHARE` of its mass and ore |
+
+Fragment size follows from the seed curve above, which already shrinks fragments monotonically
+across the bands. The explosive's tier never gates a band; the rock's threshold does. Overcharge does
+not throw rock by itself: projections stay governed by stemming and the free face, so a heavily
+stemmed overcharge crushes the rock near the charge (fines, dust) and leaves the rock near the collar
+coarse or unbroken. `BlastResult.bandVolumes` holds the m³ per band and `BlastResult.dustLoss` the
+mass (kg) and ore value lost to dust; fragments are already net of that loss, their volume is not.
+
+The blast report (`BlastReportModal`) shows the band volumes, the kg lost to dust, and why holes failed. `analyseHoleFailures` (`HoleFailures.ts`, run by `executeBlastSteps`) returns one `HoleFailure` per charged hole whose charge broke no rock: `fizzled` (wet hole, water-sensitive explosive) or `below_threshold` (with `moreEnergyPct`, a linear estimate from the best charge-cell energy/threshold ratio), or whose column stayed sealed above it: `buried` (with `rockAboveM`). A shot with `clearedVoxels === 0` gets the dud explanation; `BLAST_REPORT_MAX_HOLE_REASONS` caps the lines, and `finesShare` >= `OVERCHARGE_NOTE_MIN_FINES_SHARE` adds the overcharge note.
+
+### Energy heatmap (Blast Workshop)
+
+The workshop's heatmap toggle (`toggle-energy-heatmap`, every software tier including none) shows the plan's own energy field (`previewPlanBands` in `SoftwarePreview.ts`, built on `buildPlanEnergyField`) coloured by `classifyFragmentationBand`; colours are `FRAGMENTATION_BAND_COLORS` (`FragmentationBand.ts`), shared by overlay, section and legend. `planHeatmap` (`EnergyHeatmap.ts`) caches one result per grid/holes/charges/wet-holes/`editRevision`, so redraws and hovers cost nothing. Measured recompute: 100 holes 106 ms, 256 holes 183 ms, 576 holes (139k voxels) 257 ms; cached read under 1 ms. Two views: a top-down terrain overlay (`EnergyHeatmapOverlay`, a `GroundTintLayer`, opacity `HEATMAP_OVERLAY_OPACITY`) with one colour per column, and a vertical section (`EnergyHeatmapView`) through the row of voxels sharing the selected hole's z. A column shows the finest band covering at least `HEATMAP_COLUMN_BAND_MIN_SHARE` (0.15) of its filled voxels, so a lone fines voxel does not paint a whole column. Hover (panel cells and the scene `HoverTag`) names exact intensity and band. The console `preview energy` is ungated, like the heatmap.
+
+**Per-hole readouts (every tier).** A hole owns the cells nearest it by Chebyshev distance within half its spacing (`holeSpacingM`, `ChargePlan.ts`) and within its depth below the column's top; `holeBandMixes` (`SoftwarePreview.ts`) turns a `PlanBandMap` into five band shares per hole. `powderFactor` is kg per spacing² x depth. The Charge step's hole rows (charged holes: powder factor and band mix; all holes: recommended range) and the heatmap's `HoverTag` read the same `planHeatmap` result (`col.hole`). `recommendedPowderFactors` sweeps `RECOMMENDED_SWEEP_STEPS` fractions of each hole's max fitting charge and returns the contiguous run around the best sample whose good share is at least `RECOMMENDED_GOOD_SHARE_MIN` (0.5), or `null` ("No charge gives mostly good rock"). Explosive cards show the pattern's band mix for that explosive at the chosen kg (`previewExplosiveBandShares`) plus energy (`Energy N/kg`, game units), kg range and vibration. `ChargeReadouts` memoizes the sweeps per pattern, wet holes and `editRevision`.
+
 ## Step 4 — Throw, Flight and the Muck Pile
 
 **Three things decide whether rock is thrown rather than merely broken:**
@@ -342,10 +370,12 @@ Firing with ordered-but-undrilled holes (`plannedDrillHoles`) warns in the prefl
 | Tier | Name | Shows |
 |------|------|-------|
 | 0 | None | Blind blasting |
-| 1 | "BlastView Basic" | Energy heatmap |
-| 2 | "FragPredict" | Expected fragment size |
-| 3 | "ProjectoScan" | Projection risk zones |
-| 4 | "VibroMap Pro" | Vibration at the level's villages |
+| 1 | "BlastView Basic" | Fragment size distribution: average size, oversized count, band volumes (good, fines, dust), value lost to dust |
+| 2 | "FragPredict" | Projection risk zones tinted on the terrain (`ProjectionZoneOverlay`), plus the dry-run figures: predicted rating, thrown share, furthest throw |
+| 3 | "ProjectoScan" | Vibration at the level's villages |
+| 4 | "VibroMap Pro" | Charge optimizer (no content yet) |
+
+Energy is free at every tier through the workshop heatmap. Tier prices stay `SOFTWARE_TIER_COSTS` (500 / 2000 / 5000 / 12000) and a saved game keeps its tier number, so it gets that tier's new content. Tier numbers come from `SOFTWARE_TIER_FRAGMENTS`, `SOFTWARE_TIER_PROJECTIONS`, `SOFTWARE_TIER_VIBRATIONS` and `SOFTWARE_TIER_OPTIMIZER` in `balance.ts`. One dry run (`dryRunBlast`) serves T1 and T2 in `blast_preview`; `fragmentDistributionFrom` reads the T1 figures off it. The Preview step at tier 0 shows no gated stat and points to the heatmap; a locked row reads "Requires blasting software T{n}: <what it shows>", and every row is `explainable`. `lastBlastPreview.shape` (`BLAST_PREVIEW_SHAPE`) marks the content line-up; a save carrying another shape loads the preview as null. The console `preview energy` is ungated; `preview fragments|projections|vibrations` follow the tiers above.
 
 Previews run the **same** propagation the blast does (`buildPlanEnergyField`) and the same seeding
 and velocity maths. A preview that models the rock differently from the game is worse than no

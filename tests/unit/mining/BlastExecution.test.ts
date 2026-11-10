@@ -18,6 +18,7 @@ import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
 import { oreValuePerKg } from '../../../src/core/economy/Market.js';
 import { GRAVITY, ORE_DENSITY_KG_M3 } from '../../../src/core/config/balance.js';
 import { advance } from '../../../src/core/engine/Steps.js';
+import type { HoleFailure } from '../../../src/core/mining/HoleFailures.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -522,6 +523,7 @@ function emptyBlastResult(): BlastResult {
     totalOreValue: 0, rating: 'mediocre', crackedVoxels: 0, clearedVoxels: 0,
     clearedRegion: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 }, destroyedBuildings: [],
     maxThrowDistance: 0, projectileCount: 0, flights: [], clearedColumns: [], brokeOut: true,
+    bandVolumes: { intact: 0, cracked: 0, good: 0, fines: 0, dust: 0 }, dustLoss: { massKg: 0, oreValue: 0 },
   };
 }
 
@@ -751,5 +753,160 @@ describe('executeBlast — sealed vs broken-out ore (#2003)', () => {
     const voxelValue = VoxelGrid.CELL_SIZE ** 3 * 0.2 * ORE_DENSITY_KG_M3 * oreValuePerKg('blingite');
     expect(result.clearedVoxels).toBeGreaterThan(0);
     expect(result.totalOreValue + result.sealedOreValue!).toBeCloseTo(result.clearedVoxels * voxelValue, 4);
+  });
+});
+
+// ── Why a hole did not open its rock (#2202) ───────────────────────────────
+
+describe('executeBlast — hole failures (#2202)', () => {
+  type Spec = { x: number; z: number; depth: number; charge?: { explosiveId: string; amountKg: number } };
+
+  /** One 1×1 hole per spec over a molite block; ids follow spec order. */
+  function shot(specs: Spec[], topY = 10, wetIndexes: number[] = []) {
+    const grid = new VoxelGrid(40, 40);
+    fillRegion(grid, 'molite', 2, 30, 0, topY, 2, 30, 'blingite', 0.2);
+    const holes = specs.map(sp => createGridPlan(holeCounter, { x: sp.x, z: sp.z }, 1, 1, 4, sp.depth, 0.089)[0]!);
+    const charges: Record<string, { explosiveId: string; amountKg: number; stemmingM: number }> = {};
+    specs.forEach((sp, i) => { if (sp.charge) charges[holes[i]!.id] = { ...sp.charge, stemmingM: 2 }; });
+    const wet = new Set(wetIndexes.map(i => holes[i]!.id));
+    const result = executeBlast(assembleBlastPlan(holes, charges), grid, [], undefined, undefined, undefined, wet);
+    return { result: result!, holes };
+  }
+  const boomite = (amountKg: number) => ({ explosiveId: 'boomite', amountKg });
+
+  it('sets holeFailures on every executed blast, empty when every hole opened', () => {
+    const { result } = shot([{ x: 12, z: 12, depth: 4, charge: boomite(8) }]);
+    expect(result.clearedVoxels).toBeGreaterThan(0);
+    expect(Array.isArray(result.holeFailures)).toBe(true);
+    expect(result.holeFailures).toEqual([]);
+  });
+
+  it('has no entry for any hole of a pattern that opened its rock', () => {
+    const grid = new VoxelGrid(40, 40);
+    fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.089);
+    const depths: Record<string, number> = {};
+    for (const h of holes) depths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), depths, 'boomite', 8, 2);
+    const result = executeBlast(assembleBlastPlan(holes, charges), grid, [])!;
+    expect(result.holeFailures).toEqual([]);
+  });
+
+  it('names only the dud when its neighbour opened normally (C1, C2)', () => {
+    const { result, holes } = shot([
+      { x: 6, z: 6, depth: 4, charge: boomite(8) },
+      { x: 24, z: 24, depth: 4, charge: boomite(0.05) },
+    ]);
+    expect(result.clearedVoxels).toBeGreaterThan(0);
+    expect(result.holeFailures).toHaveLength(1);
+    const failure = result.holeFailures![0]!;
+    expect(failure.holeId).toBe(holes[1]!.id);
+    expect(failure.kind).toBe('below_threshold');
+    expect(failure.moreEnergyPct!).toBeGreaterThan(0);
+    expect(Number.isInteger(failure.moreEnergyPct)).toBe(true);
+  });
+
+  it('a shot that breaks nothing yields exactly one failure per charged hole (C5)', () => {
+    const { result, holes } = shot([
+      { x: 6, z: 6, depth: 8, charge: boomite(0.05) },
+      { x: 15, z: 24, depth: 8, charge: boomite(0.05) },
+      { x: 24, z: 6, depth: 8, charge: boomite(0.05) },
+    ]);
+    expect(result.clearedVoxels).toBe(0);
+    const ids = result.holeFailures!.map(f => f.holeId);
+    expect(ids).toHaveLength(3);
+    expect(new Set(ids)).toEqual(new Set(holes.map(h => h.id)));
+    for (const f of result.holeFailures!) expect(f.kind).toBe('below_threshold');
+  });
+
+  it('reports a wet water-sensitive hole that broke nothing as fizzled (C3)', () => {
+    const { result, holes } = shot([
+      { x: 6, z: 6, depth: 4, charge: boomite(8) },
+      { x: 24, z: 24, depth: 4, charge: boomite(0.2) },
+    ], 10, [1]);
+    expect(result.holeFailures).toHaveLength(1);
+    expect(result.holeFailures![0]!.holeId).toBe(holes[1]!.id);
+    expect(result.holeFailures![0]!.kind).toBe('fizzled');
+  });
+
+  it('the same two holes dry both open, so the water caused the failure', () => {
+    const { result } = shot([
+      { x: 6, z: 6, depth: 4, charge: boomite(8) },
+      { x: 24, z: 24, depth: 4, charge: boomite(0.2) },
+    ]);
+    expect(result.holeFailures).toEqual([]);
+  });
+
+  it('reports a charge that broke but stayed sealed under intact rock as buried (C4)', () => {
+    const { result, holes } = shot([{ x: 15, z: 15, depth: 28, charge: boomite(0.2) }], 30);
+    expect(result.clearedVoxels).toBeGreaterThan(0);
+    expect(result.brokeOut).toBe(false);
+    expect(result.holeFailures).toHaveLength(1);
+    const failure = result.holeFailures![0]!;
+    expect(failure.holeId).toBe(holes[0]!.id);
+    expect(failure.kind).toBe('buried');
+    expect(failure.rockAboveM!).toBeGreaterThan(0);
+    expect(failure.rockAboveM!).toBeLessThan(28);
+  });
+
+  it('does not change what the blast does to the terrain', () => {
+    const a = shot([{ x: 12, z: 12, depth: 4, charge: boomite(8) }]).result;
+    holeCounter.nextHoleId = 1;
+    const b = shot([{ x: 12, z: 12, depth: 4, charge: boomite(8) }]).result;
+    expect(b.clearedVoxels).toBe(a.clearedVoxels);
+    expect(b.holeFailures).toEqual(a.holeFailures);
+  });
+});
+
+describe('buildBlastReport — band and failure fields (#2202)', () => {
+  const failures: HoleFailure[] = [
+    { holeId: 'H1', kind: 'below_threshold', moreEnergyPct: 40 },
+    { holeId: 'H2', kind: 'fizzled' },
+    { holeId: 'H3', kind: 'buried', rockAboveM: 7 },
+  ];
+
+  it('copies holeFailures from the result (C6)', () => {
+    const report = buildBlastReport({ ...emptyBlastResult(), holeFailures: failures }, 0, 0);
+    expect(report.holeFailures).toEqual(failures);
+  });
+
+  it('copies bandVolumes from the result (C6)', () => {
+    const bandVolumes = { intact: 0, cracked: 12, good: 80, fines: 30, dust: 9 };
+    const report = buildBlastReport({ ...emptyBlastResult(), bandVolumes }, 0, 0);
+    expect(report.bandVolumes).toEqual(bandVolumes);
+  });
+
+  it('carries the dust loss as kg and ore value (C6)', () => {
+    const report = buildBlastReport({ ...emptyBlastResult(), dustLoss: { massKg: 1234.5, oreValue: 678 } }, 0, 0);
+    expect(report.dustLossKg).toBe(1234.5);
+    expect(report.dustLossOreValue).toBe(678);
+  });
+
+  it('reports a zero dust loss as zero, not absent', () => {
+    const report = buildBlastReport(emptyBlastResult(), 0, 0);
+    expect(report.dustLossKg).toBe(0);
+    expect(report.dustLossOreValue).toBe(0);
+  });
+
+  it('carries an empty failure list through as empty', () => {
+    const report = buildBlastReport({ ...emptyBlastResult(), holeFailures: [] }, 0, 0);
+    expect(report.holeFailures).toEqual([]);
+  });
+
+  it('carries a real blast\'s bands, dust loss and failures into its report', () => {
+    const grid = new VoxelGrid(40, 40);
+    fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 1, 2, 4, 8, 0.089);
+    const charges = {
+      [holes[0]!.id]: { explosiveId: 'boomite', amountKg: 8, stemmingM: 2 },
+      [holes[1]!.id]: { explosiveId: 'boomite', amountKg: 0.05, stemmingM: 2 },
+    };
+    const result = executeBlast(assembleBlastPlan(holes, charges), grid, [])!;
+    const report = buildBlastReport(result, 5, 0);
+    expect(report.bandVolumes).toEqual(result.bandVolumes);
+    expect(report.dustLossKg).toBe(result.dustLoss.massKg);
+    expect(report.dustLossOreValue).toBe(result.dustLoss.oreValue);
+    expect(report.holeFailures).toEqual(result.holeFailures);
+    expect(Array.isArray(report.holeFailures)).toBe(true);
   });
 });

@@ -470,9 +470,10 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
    * as it is loaded (#2153; the sandbox starting cash is unchanged): 498,088.2.
    * Re-measured once a hauler stood HAUL_LOAD_TICKS = 1 at each fragment it loaded (#2199; the same run read 516,693.7
    * with the dwell off, and hauls 88 loads in 1500 ticks against 95): 448,106.0.
+   * Re-measured once dust-band rock lost DUST_LOSS_SHARE of its mass and ore (#2198): 420,205.8.
    * Floor is that measurement, rounded down.
    */
-  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 448_106;
+  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 420_205;
 
   interface OpeningTrace {
     endedAtTick: number | null;

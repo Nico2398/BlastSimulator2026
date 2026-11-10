@@ -7,6 +7,8 @@ import { getExplosive, getAllExplosives } from '../../../../../src/core/world/Ex
 import { wetAllHoles, setHoleWater } from '../../../../helpers/holeWater.js';
 import { drainRainReasonText } from '../../../../../src/ui/panels/blastSteps/ChargeHoleList.js';
 import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
+import { VoxelGrid } from '../../../../../src/core/world/VoxelGrid.js';
+import { recommendedPowderFactors } from '../../../../../src/core/mining/SoftwarePreview.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
 import { TUBING_COST } from '../../../../../src/core/mining/Tubing.js';
 import { CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M } from '../../../../../src/core/config/balance.js';
@@ -18,6 +20,7 @@ import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
 import { chargeKgLimitWarning, permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
 import { stemmingExplain } from '../../../../../src/ui/blastWorkshopExplain.js';
 import { pinnedDryCycle, pinnedCycle, rainAfterCycle } from '../../../../helpers/weatherCycles.js';
+import { recommendedRangeText } from '../../../../../src/ui/bandMix.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -73,14 +76,14 @@ describe('ChargeStep', () => {
     expect(card(step, 'boomite').dataset['selected']).toBe('false');
   });
 
-  it('shows the WATER-SENSITIVE badge only for water-sensitive explosives while a hole is wet', () => {
+  it('shows the WATER-SENSITIVE badge on every water-sensitive explosive, wet or dry', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
 
     step.update(state, 'sunny'); // not raining — no wet holes
     const waterSensitiveId = ['pop_rock', 'krackle', 'shatternite', 'obliviax'].find(id => getExplosive(id)?.waterSensitive)!;
-    expect(card(step, waterSensitiveId).textContent).not.toContain('WATER-SENSITIVE');
+    expect(card(step, waterSensitiveId).textContent).toContain('WATER-SENSITIVE');
 
     wetAllHoles(state); // the hole holds water now, whatever the weather
     step.update(state, 'heavy_rain');
@@ -1513,5 +1516,224 @@ describe('ChargeStep — stemming field explains itself (#2168)', () => {
     step.update(state, 'sunny');
     const holder = step.root.querySelector<HTMLElement>('[data-field="stemming"] [data-explain]')!;
     expect(holder.dataset['explain']).toBe(stemmingExplain());
+  });
+});
+
+
+// ── explosive cards and hole rows read the blast model (#2203) ───────────────
+
+describe('ChargeStep — explosive cards, powder factor and band mix (#2203)', () => {
+  const BAND_MIX = '[data-role="explosive-band-mix"]';
+  const HOLE_PF = '[data-role="hole-powder-factor"]';
+  const HOLE_MIX = '[data-role="hole-band-mix"]';
+  const HOLE_REC = '[data-role="hole-recommended"]';
+
+  function rockGrid(): VoxelGrid {
+    const grid = new VoxelGrid(40, 40);
+    const voxel = { composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+    for (let z = 3; z <= 34; z++)
+      for (let y = 0; y <= 12; y++)
+        for (let x = 3; x <= 34; x++) grid.setVoxel(x, y, z, voxel);
+    return grid;
+  }
+
+  /** Two 10 m holes 2 m apart on rock, the first one charged with 6 kg of boomite. */
+  function patternState() {
+    const state = makeState();
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 10, 0.089);
+    const h2 = addHole(holeCounter, state.drillHoles, 12, 10, 10, 0.089);
+    state.chargesByHole[h1.id] = { explosiveId: 'boomite', amountKg: 6, stemmingM: CHARGE_DEFAULT_STEMMING_M };
+    return { state, h1, h2 };
+  }
+
+  const text = (root: ParentNode, selector: string): string => root.querySelector(selector)?.textContent?.trim() ?? '';
+  const cards = (step: ChargeStep): HTMLElement[] => Array.from(step.root.querySelectorAll('[data-action="select-explosive"]'));
+  const row = (step: ChargeStep, id: string): HTMLElement => step.root.querySelector(`[data-hole="${id}"]`) as HTMLElement;
+  const showsNumber = (shown: string, value: number): boolean => [1, 2, 3].some(d => shown.includes(value.toFixed(d)));
+
+  describe('explosive cards', () => {
+    it('never label the energy MJ/kg, and still show the energy figure', () => {
+      const { step } = makeStep();
+      step.update(makeState(), 'sunny');
+      expect(cards(step).length).toBeGreaterThan(0);
+      for (const c of cards(step)) {
+        const explosive = getExplosive(c.dataset['explosive']!)!;
+        expect(c.textContent, explosive.id).not.toContain('MJ/kg');
+        expect(c.textContent, explosive.id).toContain(String(explosive.energyPerKg));
+      }
+    });
+
+    it('keep the price, the heaviest charge a hole takes and the water badge', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+      wetAllHoles(state);
+      step.update(state, 'heavy_rain');
+      for (const c of cards(step)) {
+        const explosive = getExplosive(c.dataset['explosive']!)!;
+        expect(c.textContent, explosive.id).toContain(`$${explosive.costPerKg.toFixed(2)} / kg`);
+        expect(c.textContent, explosive.id).toContain(String(Math.round(explosiveHoleLimits(explosive, 0.089).maxKg * 10) / 10));
+      }
+      expect(card(step, 'krackle').textContent).not.toContain('WATER-SENSITIVE');
+      expect(card(step, 'boomite').textContent).toContain('WATER-SENSITIVE');
+    });
+
+    it('show no band mix without a grid, and still render', () => {
+      const { step } = makeStep();
+      const { state } = patternState();
+      step.update(state, 'sunny');
+      expect(cards(step).length).toBeGreaterThan(0);
+      for (const c of cards(step)) expect(text(c, BAND_MIX), c.dataset['explosive']).toBe('');
+    });
+
+    it('show no band mix when the grid provider has no grid, and still render', () => {
+      const { step } = makeStep();
+      step.setGridProvider(() => null);
+      const { state } = patternState();
+      step.update(state, 'sunny');
+      expect(cards(step).length).toBeGreaterThan(0);
+      for (const c of cards(step)) expect(text(c, BAND_MIX), c.dataset['explosive']).toBe('');
+    });
+
+    it('show no band mix when no hole is drilled', () => {
+      const { step } = makeStep();
+      step.setGridProvider(() => rockGrid());
+      step.update(makeState(), 'sunny');
+      expect(cards(step).length).toBeGreaterThan(0);
+      for (const c of cards(step)) expect(text(c, BAND_MIX), c.dataset['explosive']).toBe('');
+    });
+
+    it('each show the band mix its explosive would give the pattern', () => {
+      const { step } = makeStep();
+      const grid = rockGrid();
+      step.setGridProvider(() => grid);
+      const { state } = patternState();
+      step.update(state, 'sunny');
+      expect(cards(step).length).toBeGreaterThan(0);
+      for (const c of cards(step)) {
+        const mix = c.querySelector(BAND_MIX);
+        expect(mix, c.dataset['explosive']).not.toBeNull();
+        expect(mix!.textContent!.trim().length + mix!.children.length, c.dataset['explosive']).toBeGreaterThan(0);
+      }
+    });
+
+    it('differ between a weak and a strong explosive at the same kilograms', () => {
+      const { step } = makeStep();
+      const grid = rockGrid();
+      step.setGridProvider(() => grid);
+      const { state } = patternState();
+      step.update(state, 'sunny');
+      const weak = card(step, 'pop_rock').querySelector(BAND_MIX)!;
+      const strong = card(step, 'dynatomics').querySelector(BAND_MIX)!;
+      expect(weak.innerHTML).not.toBe(strong.innerHTML);
+    });
+
+    it('follow the chosen kilograms', () => {
+      const { step } = makeStep();
+      const grid = rockGrid();
+      step.setGridProvider(() => grid);
+      const { state } = patternState();
+      step.update(state, 'sunny');
+      card(step, 'krackle').click();
+      const before = card(step, 'krackle').querySelector(BAND_MIX)!.innerHTML;
+      const minus = step.root.querySelectorAll('.bsx-stepper-btn')[0] as HTMLButtonElement;
+      for (let i = 0; i < 4; i++) minus.click();
+      step.update(state, 'sunny');
+      const after = card(step, 'krackle').querySelector(BAND_MIX)!.innerHTML;
+      expect(after).not.toBe(before);
+    });
+
+    it('need no software tier', () => {
+      const { step } = makeStep();
+      const grid = rockGrid();
+      step.setGridProvider(() => grid);
+      const { state } = patternState();
+      expect(state.softwareTier).toBe(0);
+      step.update(state, 'sunny');
+      expect(card(step, 'boomite').querySelector(BAND_MIX)).not.toBeNull();
+    });
+  });
+
+  describe('hole rows', () => {
+    it('show the powder factor of a charged hole: kilograms over spacing squared times depth', () => {
+      const { step } = makeStep();
+      const { state, h1 } = patternState();
+      step.update(state, 'sunny');
+      // 6 kg, nearest hole 2 m away, 10 m deep: 6 / (2 x 2 x 10)
+      expect(showsNumber(text(row(step, h1.id), HOLE_PF), 0.15)).toBe(true);
+    });
+
+    it('show no powder factor and no band mix on an uncharged hole', () => {
+      const { step } = makeStep();
+      const grid = rockGrid();
+      step.setGridProvider(() => grid);
+      const { state, h2 } = patternState();
+      step.update(state, 'sunny');
+      expect(text(row(step, h2.id), HOLE_PF)).toBe('');
+      expect(text(row(step, h2.id), HOLE_MIX)).toBe('');
+    });
+
+    it('show the band mix of a charged hole once a grid is set', () => {
+      const { step } = makeStep();
+      const grid = rockGrid();
+      step.setGridProvider(() => grid);
+      const { state, h1 } = patternState();
+      step.update(state, 'sunny');
+      const mix = row(step, h1.id).querySelector(HOLE_MIX);
+      expect(mix).not.toBeNull();
+      expect(mix!.textContent!.trim().length + mix!.children.length).toBeGreaterThan(0);
+    });
+
+    it('show no band mix without a grid, but keep the powder factor', () => {
+      const { step } = makeStep();
+      const { state, h1 } = patternState();
+      step.update(state, 'sunny');
+      expect(text(row(step, h1.id), HOLE_MIX)).toBe('');
+      expect(text(row(step, h1.id), HOLE_PF)).not.toBe('');
+    });
+
+    it('show a recommended range on every hole once a grid is set', () => {
+      const { step } = makeStep();
+      const grid = rockGrid();
+      step.setGridProvider(() => grid);
+      const { state, h1, h2 } = patternState();
+      step.update(state, 'sunny');
+      expect(row(step, h1.id).querySelector(HOLE_REC)).not.toBeNull();
+      expect(row(step, h2.id).querySelector(HOLE_REC)).not.toBeNull();
+    });
+
+    it('the recommended range shown is the model\'s for the selected explosive and stemming', () => {
+      const { step } = makeStep();
+      const grid = rockGrid();
+      step.setGridProvider(() => grid);
+      const { state, h1 } = patternState();
+      step.update(state, 'sunny');
+      const range = recommendedPowderFactors(state.drillHoles, grid, 'boomite', CHARGE_DEFAULT_STEMMING_M)[h1.id];
+      const shown = text(row(step, h1.id), HOLE_REC);
+      expect(range).not.toBeUndefined();
+      // Exact text, null included: the row says what the model says, whichever way it answers.
+      expect(shown).toBe(recommendedRangeText(range ?? null));
+    });
+
+    it('pick up a charge that lands after the first render', () => {
+      const { step } = makeStep();
+      const { state, h2 } = patternState();
+      step.update(state, 'sunny');
+      expect(text(row(step, h2.id), HOLE_PF)).toBe('');
+      state.chargesByHole[h2.id] = { explosiveId: 'boomite', amountKg: 4, stemmingM: CHARGE_DEFAULT_STEMMING_M };
+      step.update(state, 'sunny');
+      // 4 kg over 2 x 2 x 10
+      expect(showsNumber(text(row(step, h2.id), HOLE_PF), 0.1)).toBe(true);
+    });
+
+    it('a lone hole is read at the default grid spacing', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      const h = addHole(holeCounter, state.drillHoles, 10, 10, 10, 0.089);
+      state.chargesByHole[h.id] = { explosiveId: 'boomite', amountKg: 8, stemmingM: CHARGE_DEFAULT_STEMMING_M };
+      step.update(state, 'sunny');
+      // 8 kg over 4 x 4 x 10
+      expect(showsNumber(text(row(step, h.id), HOLE_PF), 0.05)).toBe(true);
+    });
   });
 });

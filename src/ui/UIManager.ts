@@ -340,6 +340,16 @@ export class UIManager {
     this.surveyPanel.setWallOverlayVisible(visible);
   }
 
+  /** Wire the blast workshop's energy heatmap toggle (#2200). */
+  setEnergyHeatmapToggleHandler(cb: (visible: boolean) => void): void {
+    this.blastUI.setEnergyHeatmapToggleHandler(cb);
+  }
+
+  /** Reflect the energy heatmap preference in the workshop's toggle (#2200). */
+  setEnergyHeatmapVisible(visible: boolean): void {
+    this.blastUI.setEnergyHeatmapVisible(visible);
+  }
+
   setSpeedChangeHandler(cb: (speed: number) => void): void {
     this.onSpeedChangeCb = cb;
   }

@@ -116,6 +116,40 @@ describe('dryRunBlast', () => {
   });
 });
 
+describe('dryRunBlast — fragment distribution (#2201)', () => {
+  it('carries the real blast band volumes, oversized count and dust loss (fresh ground)', () => {
+    const plan = standardShot().plan;
+    const forecast = dryRunBlast(plan, buildWallGrid({ plateauTop: 20 }), [], GROUND, NO_WET)!;
+    const real = executeBlast(plan, buildWallGrid({ plateauTop: 20 }), [], GROUND)!;
+    expect(forecast.bandVolumes).toEqual(real.bandVolumes);
+    expect(forecast.oversizedFragments).toBe(real.oversizedFragments);
+    expect(forecast.dustLossMassKg).toBeCloseTo(real.dustLoss.massKg, 6);
+    expect(forecast.dustLossValue).toBeCloseTo(real.dustLoss.oreValue, 6);
+  });
+
+  it('carries them beside a crater too', () => {
+    const a = craterGrid();
+    const b = craterGrid();
+    const forecast = dryRunBlast(a.second, a.grid, [], GROUND, NO_WET)!;
+    const real = executeBlast(b.second, b.grid, [], GROUND)!;
+    expect(forecast.bandVolumes).toEqual(real.bandVolumes);
+    expect(forecast.oversizedFragments).toBe(real.oversizedFragments);
+  });
+
+  it('has a volume for every fragmentation band, none negative', () => {
+    const forecast = dryRunBlast(standardShot().plan, buildWallGrid({ plateauTop: 20 }), [], GROUND, NO_WET)!;
+    expect(Object.keys(forecast.bandVolumes).sort()).toEqual(['cracked', 'dust', 'fines', 'good', 'intact']);
+    for (const v of Object.values(forecast.bandVolumes)) expect(v).toBeGreaterThanOrEqual(0);
+    expect(forecast.dustLossMassKg).toBeGreaterThanOrEqual(0);
+    expect(forecast.dustLossValue).toBeGreaterThanOrEqual(0);
+    expect(Number.isInteger(forecast.oversizedFragments)).toBe(true);
+  });
+
+  it('a no-hole plan has no forecast to read a distribution from', () => {
+    expect(dryRunBlast(assembleBlastPlan([], {}), buildWallGrid({ plateauTop: 20 }), [], GROUND, NO_WET)).toBeNull();
+  });
+});
+
 describe('isHazardRating', () => {
   it.each<[BlastRating, boolean]>([
     ['perfect', false], ['good', false], ['mediocre', false], ['bad', true], ['catastrophic', true],

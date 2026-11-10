@@ -4,11 +4,13 @@ import {
   chargeColumnM, maxChargeKgForHole,
   chargeFitsHole, maxFittingChargeKg, explosiveHoleLimits,
   plannedChargesCost,
+  holeSpacingM, powderFactor, holePowderFactors,
 } from '../../../src/core/mining/ChargePlan.js';
 import * as chargePlan from '../../../src/core/mining/ChargePlan.js';
 import type { PlannedCharge } from '../../../src/core/mining/ChargePlan.js';
 import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDuration.js';
-import { VEHICLE_TIER_MULTIPLIERS, MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG, CHARGE_KG_PER_METRE } from '../../../src/core/config/balance.js';
+import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
+import { DRILL_GRID_DEFAULT_SPACING_M, VEHICLE_TIER_MULTIPLIERS, MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG, CHARGE_KG_PER_METRE } from '../../../src/core/config/balance.js';
 
 describe('ChargePlan', () => {
   it('charging a hole stores explosive type and amount', () => {
@@ -438,5 +440,118 @@ describe('explosiveHoleLimits (#1934)', () => {
   it('createCharge honours the scaled catalog max: boomite 16 kg fits at 127 mm, 17 kg does not', () => {
     expect('charge' in createCharge('boomite', 16, 2, 8, 0.127)).toBe(true);
     expect('error' in createCharge('boomite', 17, 2, 8, 0.127)).toBe(true);
+  });
+});
+
+// ── powder factor (#2203) ────────────────────────────────────────────────────
+
+const pt = (id: string, x: number, z: number) => ({ id, x, z });
+const drilled = (id: string, x: number, z: number, depth = 8): DrillHole => ({ id, x, z, depth, diameter: 0.089 });
+
+describe('holeSpacingM (#2203 C1)', () => {
+  it('is the distance to the nearest other hole', () => {
+    const a = pt('H1', 10, 10);
+    expect(holeSpacingM(a, [a, pt('H2', 13, 10), pt('H3', 10, 18)])).toBe(3);
+  });
+
+  it('picks the nearest of several, whichever side it sits on', () => {
+    const a = pt('H1', 10, 10);
+    expect(holeSpacingM(a, [pt('H2', 20, 10), a, pt('H3', 10, 6)])).toBe(4);
+  });
+
+  it('measures straight-line distance, not a grid step', () => {
+    const a = pt('H1', 0, 0);
+    expect(holeSpacingM(a, [a, pt('H2', 3, 4)])).toBeCloseTo(5, 10);
+  });
+
+  it('a lone hole gets the default grid spacing', () => {
+    const a = pt('H1', 10, 10);
+    expect(holeSpacingM(a, [a])).toBe(DRILL_GRID_DEFAULT_SPACING_M);
+    expect(holeSpacingM(a, [])).toBe(DRILL_GRID_DEFAULT_SPACING_M);
+  });
+
+  it('does not count the hole itself as its own neighbour', () => {
+    const a = pt('H1', 10, 10);
+    expect(holeSpacingM(a, [a, pt('H2', 17, 10)])).toBe(7);
+  });
+
+  it('is symmetric for a pair', () => {
+    const a = pt('H1', 2, 3);
+    const b = pt('H2', 6, 6);
+    expect(holeSpacingM(a, [a, b])).toBe(holeSpacingM(b, [a, b]));
+  });
+});
+
+describe('powderFactor (#2203 C1)', () => {
+  it('is kg over the cell volume spacing x spacing x depth', () => {
+    expect(powderFactor(10, 8, 4)).toBeCloseTo(10 / (4 * 4 * 8), 12);
+    expect(powderFactor(6, 6, 2)).toBeCloseTo(0.25, 12);
+  });
+
+  it('doubles with the charge', () => {
+    expect(powderFactor(8, 6, 3)).toBeCloseTo(2 * powderFactor(4, 6, 3), 12);
+  });
+
+  it('falls with the square of the spacing', () => {
+    expect(powderFactor(6, 6, 6)).toBeCloseTo(powderFactor(6, 6, 3) / 4, 12);
+  });
+
+  it('is 0 for no charge', () => {
+    expect(powderFactor(0, 8, 4)).toBe(0);
+  });
+
+  it('is 0, not Infinity or NaN, for a zero or negative depth', () => {
+    expect(powderFactor(5, 0, 4)).toBe(0);
+    expect(powderFactor(5, -2, 4)).toBe(0);
+  });
+
+  it('is 0, not Infinity or NaN, for a zero or negative spacing', () => {
+    expect(powderFactor(5, 8, 0)).toBe(0);
+    expect(powderFactor(5, 8, -1)).toBe(0);
+  });
+});
+
+describe('holePowderFactors (#2203 C1)', () => {
+  const holes = [drilled('H1', 10, 10, 8), drilled('H2', 14, 10, 8), drilled('H3', 10, 12, 6)];
+
+  it('keys every charged hole by id', () => {
+    const charges = {
+      H1: { explosiveId: 'boomite', amountKg: 4, stemmingM: 2 },
+      H2: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
+    };
+    expect(Object.keys(holePowderFactors(holes, charges)).sort()).toEqual(['H1', 'H2']);
+  });
+
+  it('computes amount / (spacing^2 x depth) with the hole\'s own nearest-neighbour spacing', () => {
+    const charges = {
+      H1: { explosiveId: 'boomite', amountKg: 4, stemmingM: 2 },
+      H3: { explosiveId: 'krackle', amountKg: 3, stemmingM: 1 },
+    };
+    const pf = holePowderFactors(holes, charges);
+    // H1 and H3 are 2 m apart; H2 is 4 m from H1.
+    expect(pf['H1']).toBeCloseTo(4 / (2 * 2 * 8), 12);
+    expect(pf['H3']).toBeCloseTo(3 / (2 * 2 * 6), 12);
+  });
+
+  it('leaves an uncharged hole out', () => {
+    const pf = holePowderFactors(holes, { H2: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 } });
+    expect(pf['H1']).toBeUndefined();
+    expect(pf['H3']).toBeUndefined();
+    expect(pf['H2']).toBeCloseTo(5 / (4 * 4 * 8), 12);
+  });
+
+  it('is empty with no charges', () => {
+    expect(holePowderFactors(holes, {})).toEqual({});
+    expect(holePowderFactors([], {})).toEqual({});
+  });
+
+  it('a single charged hole uses the default grid spacing', () => {
+    const pf = holePowderFactors([drilled('H9', 5, 5, 8)], { H9: { explosiveId: 'boomite', amountKg: 8, stemmingM: 2 } });
+    expect(pf['H9']).toBeCloseTo(8 / (DRILL_GRID_DEFAULT_SPACING_M ** 2 * 8), 12);
+  });
+
+  it('ignores a charge for a hole that is not in the list', () => {
+    const pf = holePowderFactors([drilled('H1', 0, 0)], { GHOST: { explosiveId: 'boomite', amountKg: 4, stemmingM: 2 } });
+    expect(pf).toEqual({});
   });
 });

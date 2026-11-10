@@ -10,6 +10,8 @@ import type { GameState } from '../../core/state/GameState.js';
 import { isSurveyStale } from '../../core/mining/SurveyStaleness.js';
 import { findSurveyForColumn, surveyColumnKey } from '../../core/mining/SurveyColumn.js';
 import { oreDepthBands } from '../../core/mining/SurveyDepthProfile.js';
+import type { ColumnBandSummary, HoleReadout } from '../../core/mining/EnergyHeatmap.js';
+import { bandMixEl, powderFactorText, recommendedRangeText } from '../bandMix.js';
 import type { PickResult } from './ScenePicking.js';
 
 /** Space reserved above the anchor for the tag before it flips to render below instead. */
@@ -41,13 +43,15 @@ export class HoverTag {
 
   /**
    * Show the tag for a resting cursor over a surveyed terrain tile while the
-   * survey overlay is visible; hide it in every other case.
+   * survey overlay is visible, or over a column of the energy heatmap (#2200) — its band and
+   * peak intensity; hide it in every other case.
    */
-  update(hover: PickResult | null, state: GameState, overlayVisible: boolean): void {
+  update(hover: PickResult | null, state: GameState, overlayVisible: boolean, heatmap: ColumnBandSummary | null = null): void {
     const terrain = hover?.terrain;
-    if (!hover || !terrain || hover.entity || !overlayVisible) { this.hide(); return; }
+    if (!hover || !terrain || hover.entity || (!overlayVisible && !heatmap)) { this.hide(); return; }
 
-    const content = this.renderTerrain(terrain, state);
+    const surveyContent = overlayVisible ? this.renderTerrain(terrain, state) : null;
+    const content = this.withHeatmap(surveyContent, terrain, heatmap);
     if (!content) { this.hide(); return; }
 
     this.root.replaceChildren(content);
@@ -80,6 +84,37 @@ export class HoverTag {
       this.root.style.top = `${Math.round(screenY - ANCHOR_OFFSET_PX)}px`;
       this.root.style.transform = 'translate(-50%, -100%)';
     }
+  }
+
+  private withHeatmap(survey: HTMLElement | null, terrain: NonNullable<PickResult['terrain']>, heatmap: ColumnBandSummary | null): HTMLElement | null {
+    if (!heatmap) return survey;
+    const wrap = survey ?? el('div');
+    if (!survey) {
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:5px';
+      wrap.appendChild(el('div', {
+        className: 'bsx-mono',
+        text: t('shell.hovertag.tile', { x: terrain.tileX, z: terrain.tileZ }),
+        attrs: { style: 'font-size:10px;color:var(--bsx-text-micro);letter-spacing:.08em' },
+      }));
+    }
+    wrap.appendChild(el('div', {
+      className: 'bsx-mono',
+      text: t('shell.hovertag.heatmap', { band: t(`blast.band.${heatmap.band}`), intensity: heatmap.maxIntensity.toFixed(2) }),
+      attrs: { 'data-role': 'hover-heatmap', style: 'font-size:11px' },
+    }));
+    if (heatmap.hole) wrap.appendChild(this.holeReadout(heatmap.hole));
+    return wrap;
+  }
+
+  /** The hole whose rock cell the column sits in: powder factor, band mix and recommended range (#2203). */
+  private holeReadout(hole: HoleReadout): HTMLElement {
+    const box = el('div', { attrs: { 'data-role': 'hover-hole', 'data-hole': hole.holeId, style: 'display:flex;flex-direction:column;gap:3px;font-size:11px;min-width:180px' } });
+    box.append(
+      el('span', { className: 'bsx-mono', text: t('shell.hovertag.hole', { hole: hole.holeId, factor: powderFactorText(hole.powderFactor) }) }),
+      bandMixEl(hole.shares, 'hover-hole-band-mix'),
+      el('span', { className: 'bsx-mono', text: recommendedRangeText(hole.recommended()), attrs: { 'data-role': 'hover-hole-recommended', style: 'color:var(--bsx-text-secondary)' } }),
+    );
+    return box;
   }
 
   private renderTerrain(terrain: NonNullable<PickResult['terrain']>, state: GameState): HTMLElement | null {

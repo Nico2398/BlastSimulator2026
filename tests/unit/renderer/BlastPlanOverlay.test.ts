@@ -139,17 +139,17 @@ describe('BlastPlanOverlay', () => {
     overlay.dispose();
   });
 
-  it('tier 4 software adds vibration wave rings', () => {
+  it('tier 3 software adds vibration wave rings (#2201)', () => {
     const scene = new THREE.Scene();
     const overlay = new BlastPlanOverlay(scene);
+    overlay.show(makeOptions(2, 2)); // tier 2
+    const countTier2 = overlayGroup(scene).children.length;
+
+    overlay.clear();
     overlay.show(makeOptions(3, 2)); // tier 3
     const countTier3 = overlayGroup(scene).children.length;
 
-    overlay.clear();
-    overlay.show(makeOptions(4, 2)); // tier 4
-    const countTier4 = overlayGroup(scene).children.length;
-
-    expect(countTier4).toBeGreaterThan(countTier3);
+    expect(countTier3).toBeGreaterThan(countTier2);
     overlay.dispose();
   });
 

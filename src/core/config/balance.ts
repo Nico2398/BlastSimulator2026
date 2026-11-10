@@ -875,6 +875,20 @@ export const FRAGMENTATION_MULTIPLIER = 1.0;
  *  survives the blast but is left weakened. */
 export const CRACKED_VOXEL_ENERGY_RATIO = 0.5;
 
+/** Intensity at which rock turns from good fragmentation to fines (orange), and from fines to dust (red).
+ *  The 1 / 2 / 4 bounds come from the original blast spec. Intact < CRACKED_VOXEL_ENERGY_RATIO <= cracked
+ *  < FRAGMENTATION_MULTIPLIER <= good < FINES_MIN <= fines < DUST_MIN <= dust. */
+export const FRAGMENTATION_BAND_FINES_MIN = 2;
+export const FRAGMENTATION_BAND_DUST_MIN = 4;
+
+/** Good-band share of a hole's rock at or above which its charge counts as mostly green (#2203). */
+export const RECOMMENDED_GOOD_SHARE_MIN = 0.5;
+/** Charge levels sampled, as fractions of a hole's heaviest fitting charge, to find its recommended powder factor (#2203). */
+export const RECOMMENDED_SWEEP_STEPS = 12;
+
+/** Share of a dust-band voxel's mass and ore lost to the cloud. */
+export const DUST_LOSS_SHARE = 0.03;
+
 /** Multiplier applied to a cracked voxel's fracture modifier, so rock that took a
  *  near-miss gives way more easily to the next blast. */
 export const CRACKED_VOXEL_WEAKENING = 0.7;
@@ -3481,3 +3495,32 @@ export const CRATER_ACCESS_FLOOR_LEVEL_M = 0.5;
  * (`CRATER_ACCESS_FLOOR_LEVEL_M`).
  */
 export const CRATER_ACCESS_MIN_DROP_M = 1;
+
+/** A heatmap column shows the finest fragmentation band covering at least this share of its filled voxels (#2200). */
+export const HEATMAP_COLUMN_BAND_MIN_SHARE = 0.15;
+
+/** Opacity of the top-down energy heatmap tint on the terrain (#2200). */
+export const HEATMAP_OVERLAY_OPACITY = 0.55;
+
+// ── Blasting software tiers (#2201) ──
+
+/** Software tier that unlocks each preview. Energy needs none: the workshop heatmap is free (#2200). */
+export const SOFTWARE_TIER_FRAGMENTS = 1;
+export const SOFTWARE_TIER_PROJECTIONS = 2;
+export const SOFTWARE_TIER_VIBRATIONS = 3;
+/** The charge optimizer (#2204) has no preview content yet. */
+export const SOFTWARE_TIER_OPTIMIZER = 4;
+
+/** Version of the persisted `lastBlastPreview` shape; a save carrying another one loads it as null. */
+export const BLAST_PREVIEW_SHAPE = 2;
+
+/** Tint of the projection risk zones on the terrain (#2201). */
+export const PROJECTION_ZONE_COLOR = 0xff4020;
+
+/** Opacity of the projection risk zone tint (#2201). */
+export const PROJECTION_ZONE_OPACITY = 0.5;
+
+/** Most holes the blast report lists a failure reason for before it folds the rest into "+N more" (#2202). */
+export const BLAST_REPORT_MAX_HOLE_REASONS = 6;
+/** Share of the broken rock crushed into fines or dust from which the report calls the shot overcharged (#2202). */
+export const OVERCHARGE_NOTE_MIN_FINES_SHARE = 0.25;

@@ -6,8 +6,9 @@ import { t } from '../i18n/I18n.js';
 import { computeRigDurationTicks, type VehicleTier } from '../entities/Vehicle.js';
 import {
   MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
-  CHARGE_FIT_EPSILON, DRILL_HOLE_DEFAULT_DIAMETER_M,
+  CHARGE_FIT_EPSILON, DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M,
 } from '../config/balance.js';
+import type { DrillHole } from './DrillPlan.js';
 import { chargeKgPerMetre, holeCapacityFactor } from './HoleDiameter.js';
 
 export interface HoleCharge {
@@ -166,4 +167,35 @@ export function explosiveHoleLimits(
 ): { minKg: number; maxKg: number } {
   const factor = holeCapacityFactor(diameterM);
   return { minKg: explosive.minChargeKg * factor, maxKg: explosive.maxChargeKg * factor };
+}
+
+type HolePoint = Pick<DrillHole, 'id' | 'x' | 'z'>;
+
+/** Spacing a hole is given for its rock cell: distance to the nearest other hole, the default grid spacing when alone (#2203). */
+export function holeSpacingM(hole: HolePoint, holes: readonly HolePoint[]): number {
+  let best = Infinity;
+  for (const other of holes) {
+    if (other.id === hole.id) continue;
+    best = Math.min(best, Math.hypot(other.x - hole.x, other.z - hole.z));
+  }
+  return Number.isFinite(best) && best > 0 ? best : DRILL_GRID_DEFAULT_SPACING_M;
+}
+
+/** Kilograms of explosive per m3 of rock in a hole's cell of `spacingM` x `spacingM` x `depthM` (#2203). */
+export function powderFactor(amountKg: number, depthM: number, spacingM: number): number {
+  if (!(depthM > 0) || !(spacingM > 0)) return 0;
+  return amountKg / (spacingM * spacingM * depthM);
+}
+
+/** Powder factor of every charged hole, keyed by hole id (#2203). */
+export function holePowderFactors(
+  holes: readonly DrillHole[],
+  charges: Readonly<Record<string, HoleCharge>>,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const hole of holes) {
+    const charge = charges[hole.id];
+    if (charge) out[hole.id] = powderFactor(charge.amountKg, hole.depth, holeSpacingM(hole, holes));
+  }
+  return out;
 }

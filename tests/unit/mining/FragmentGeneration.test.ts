@@ -3,9 +3,10 @@ import { generateFragments, seedCountForIntensity } from '../../../src/core/mini
 import {
   createEnergyField,
   seedEnergy,
+  indexOf,
   type BlastBox,
 } from '../../../src/core/mining/EnergyPropagation.js';
-import { identifyFragmentedVoxels } from '../../../src/core/mining/VoxelFragmentation.js';
+import { identifyFragmentedVoxels, type FragmentationResult, type VoxelCoord } from '../../../src/core/mining/VoxelFragmentation.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -180,7 +181,7 @@ describe('FragmentGeneration — fragment properties', () => {
     const { fragments } = blastAndCarve(grid, CRUITE * 80, 11, 6, { x: 5, y: 5, z: 5 });
 
     for (const f of fragments) {
-      expect(f.massKg).toBeCloseTo(f.volumeM3 * density, 4);
+      expect(f.massKg + f.lostMassKg).toBeCloseTo(f.volumeM3 * density, 4);
     }
   });
 
@@ -282,5 +283,116 @@ describe('FragmentGeneration — determinism', () => {
     const volB = b.fragments.reduce((s, f) => s + f.volumeM3, 0);
     expect(volB).toBeCloseTo(volA, 6);
     expect(b.fragments.map(f => f.origin)).not.toEqual(a.fragments.map(f => f.origin));
+  });
+});
+
+// ── Fragment size follows the fragmentation band (#2198) ─────────────────────
+
+/**
+ * A field over a solid grid in which every voxel of the block x/y/z in [3, 11) was hit
+ * with the intensity `intensityAt(x)` says, all of them broken. Intensity is written
+ * straight into the field (retained = threshold, overflow = the rest), so a test names
+ * the band it wants instead of hunting for a charge that produces it.
+ */
+function blockWithIntensity(intensityAt: (x: number, y: number, z: number) => number) {
+  const size = 14;
+  const grid = solidGrid(size);
+  const field = createEnergyField(grid, wholeGrid(grid, size));
+  const fragmented: VoxelCoord[] = [];
+  const mask = new Uint8Array(field.effective.length);
+  for (let z = 3; z < 11; z++) {
+    for (let y = 3; y < 11; y++) {
+      for (let x = 3; x < 11; x++) {
+        const i = indexOf(field, x, y, z);
+        const threshold = field.threshold[i]!;
+        field.effective[i] = threshold;
+        field.overflowOut[i] = threshold * (intensityAt(x, y, z) - 1);
+        mask[i] = 1;
+        fragmented.push({ x, y, z });
+      }
+    }
+  }
+  const fragmentation: FragmentationResult = {
+    fragmented, mask, cracked: [], detachedCount: 0, liftedCount: 0, gradedCount: 0,
+  };
+  return { grid, field, fragmentation };
+}
+
+/** Mean fragment volume of a uniformly hit block, averaged over several carving seeds. */
+function meanVolumeAtIntensity(intensity: number): number {
+  let total = 0;
+  const seeds = [1, 2, 3, 4, 5];
+  for (const seed of seeds) {
+    const { grid, field, fragmentation } = blockWithIntensity(() => intensity);
+    const { fragments } = generateFragments(fragmentation, field, grid, new Random(seed));
+    total += fragments.reduce((s, f) => s + f.volumeM3, 0) / fragments.length;
+  }
+  return total / seeds.length;
+}
+
+// Mid-band intensities: good [1, 2), fines [2, 4), dust [4, inf).
+const GOOD_INTENSITY = 1.5;
+const FINES_INTENSITY = 3;
+const DUST_INTENSITY = 6;
+
+describe('FragmentGeneration — fragment size follows the band', () => {
+  it('good-band rock carves into larger pieces than fines', () => {
+    expect(meanVolumeAtIntensity(GOOD_INTENSITY)).toBeGreaterThan(meanVolumeAtIntensity(FINES_INTENSITY));
+  });
+
+  it('fines carve into larger pieces than dust', () => {
+    expect(meanVolumeAtIntensity(FINES_INTENSITY)).toBeGreaterThan(meanVolumeAtIntensity(DUST_INTENSITY));
+  });
+
+  it('mean fragment volume shrinks good > fines > dust', () => {
+    const good = meanVolumeAtIntensity(GOOD_INTENSITY);
+    const fines = meanVolumeAtIntensity(FINES_INTENSITY);
+    const dust = meanVolumeAtIntensity(DUST_INTENSITY);
+    expect(good).toBeGreaterThan(fines);
+    expect(fines).toBeGreaterThan(dust);
+    expect(dust).toBeGreaterThan(0);
+  });
+
+  it('in one blast, rock in the dust half is finer than rock in the good half', () => {
+    const { grid, field, fragmentation } = blockWithIntensity(x => (x < 7 ? DUST_INTENSITY : GOOD_INTENSITY));
+    const { fragments } = generateFragments(fragmentation, field, grid, new Random(9));
+
+    const dustSide = fragments.filter(f => f.sources.every(s => s.x < 7));
+    const goodSide = fragments.filter(f => f.sources.every(s => s.x >= 7));
+    expect(dustSide.length).toBeGreaterThan(0);
+    expect(goodSide.length).toBeGreaterThan(0);
+    const mean = (fs: typeof fragments): number => fs.reduce((s, f) => s + f.volumeM3, 0) / fs.length;
+    expect(mean(dustSide)).toBeLessThan(mean(goodSide));
+  });
+
+  it('volume stays conserved whatever the band mix', () => {
+    const { grid, field, fragmentation } = blockWithIntensity(
+      (x, y) => (y < 5 ? DUST_INTENSITY : x < 7 ? FINES_INTENSITY : GOOD_INTENSITY),
+    );
+    const { fragments } = generateFragments(fragmentation, field, grid, new Random(4));
+
+    const total = fragments.reduce((s, f) => s + f.volumeM3, 0);
+    expect(total).toBeCloseTo(fragmentation.fragmented.length, 6);
+  });
+
+  it('seedCountForIntensity keeps its signature and still rises with intensity', () => {
+    const mean = (intensity: number): number => {
+      const rng = new Random(11);
+      let total = 0;
+      for (let i = 0; i < 300; i++) total += seedCountForIntensity(intensity, rng);
+      return total / 300;
+    };
+    expect(mean(DUST_INTENSITY)).toBeGreaterThan(mean(GOOD_INTENSITY));
+  });
+
+  it('is deterministic for a given seed in a banded block', () => {
+    const run = () => {
+      const { grid, field, fragmentation } = blockWithIntensity(x => (x < 7 ? DUST_INTENSITY : GOOD_INTENSITY));
+      return generateFragments(fragmentation, field, grid, new Random(21)).fragments;
+    };
+    const a = run();
+    const b = run();
+    expect(b.map(f => f.volumeM3)).toEqual(a.map(f => f.volumeM3));
+    expect(b.map(f => f.massKg)).toEqual(a.map(f => f.massKg));
   });
 });
