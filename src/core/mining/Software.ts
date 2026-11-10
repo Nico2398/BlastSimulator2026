@@ -429,11 +429,11 @@ export function previewVibrations(
 
 /** The charge optimizer's proposal for the pattern. Requires software tier >= 4; null below it (#2204). */
 export function previewChargeOptimization(
-  _holes: readonly DrillHole[],
-  _grid: VoxelGrid,
-  _softwareTier: number,
-  _options: OptimizeChargesOptions,
+  holes: readonly DrillHole[],
+  grid: VoxelGrid,
+  softwareTier: number,
+  options: OptimizeChargesOptions,
 ): ChargeProposal | null {
-  void optimizeCharges; void SOFTWARE_TIER_OPTIMIZER;
-  throw new Error('not implemented');
+  if (softwareTier < SOFTWARE_TIER_OPTIMIZER) return null;
+  return optimizeCharges(holes, grid, options);
 }

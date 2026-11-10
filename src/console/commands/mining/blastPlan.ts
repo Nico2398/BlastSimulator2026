@@ -21,6 +21,7 @@ import {
   SOFTWARE_TIER_FRAGMENTS,
   SOFTWARE_TIER_PROJECTIONS,
   SOFTWARE_TIER_VIBRATIONS,
+  SOFTWARE_TIER_OPTIMIZER,
   BLAST_PREVIEW_SHAPE,
 } from '../../../core/config/balance.js';
 import { dryRunBlast } from '../../../core/mining/BlastDryRun.js';
@@ -120,6 +121,7 @@ const TIER_SHOWS: Record<number, string> = {
   [SOFTWARE_TIER_FRAGMENTS]: 'fragment size distribution, oversized count, fines and dust volume, value lost to dust',
   [SOFTWARE_TIER_PROJECTIONS]: 'projection risk zones on the terrain and the dry-run rating, thrown share and furthest throw',
   [SOFTWARE_TIER_VIBRATIONS]: 'village vibration',
+  [SOFTWARE_TIER_OPTIMIZER]: 'the Charge Optimizer: best explosive and kg per hole (optimize_charges)',
 };
 
 function lockText(requiredTier: number, current: number): string {
