@@ -3329,16 +3329,17 @@
           "field": "orderedChargeCount",
           "equals": 0,
           "maxTicks": 3000,
-          "timeoutMs": 120000
+          "timeoutMs": 240000
         }
       ],
       "role": "setup",
-      "timeout": 125,
+      "timeout": 250,
       "expect": {
         "equals": {
           "orderedChargeCount": 0
         }
-      }
+      },
+      "description": "Drain pattern 3's charge orders: holes drilled during the wait are charged as they land (the pattern charge), so this wait spans the rest of the drilling too — about 1,100 ticks, over two real minutes at 8x, hence the 240 s budget."
     },
     {
       "command": "set_policy mode:continuous fatigue:0",

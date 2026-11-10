@@ -579,7 +579,7 @@
       "role": "player"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:3 start:16,30",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:3 start:32,42",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -613,18 +613,25 @@
           "value": 3
         },
         {
+          "type": "focusTile",
+          "x": 35,
+          "z": 45,
+          "distance": 30,
+          "pitch": 75
+        },
+        {
           "type": "dragTiles",
-          "x1": 16,
-          "z1": 30,
-          "x2": 22,
-          "z2": 36
+          "x1": 32,
+          "z1": 42,
+          "x2": 38,
+          "z2": 48
         },
         {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "Plan total 1: order a first 3x3 grid 3 m apart, 81 m\u00b2 of pattern on the 144 m\u00b2 permit: within it, so the strip shows no warning.",
+      "description": "Plan total 1: order a first 3x3 grid 3 m apart, 81 m\u00b2 of pattern on the 144 m\u00b2 permit: within it, so the strip shows no warning. Laid on untouched ground south of both craters (blast 2's crater now covers 8-28 x 28-36), framed from above.",
       "role": "player",
       "expect": {
         "equals": {
@@ -665,6 +672,13 @@
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
           "value": 3
+        },
+        {
+          "type": "focusTile",
+          "x": 22,
+          "z": 44,
+          "distance": 30,
+          "pitch": 75
         },
         {
           "type": "dragTiles",
