@@ -22,6 +22,8 @@ import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../../../core/mining/ChargePlan.js';
 import type { DrainBlock } from '../../../core/mining/HoleDrain.js';
+import type { BandShares, PowderFactorRange } from '../../../core/mining/SoftwarePreview.js';
+import { bandMixEl, powderFactorText, recommendedRangeText } from '../../bandMix.js';
 
 /** One hole's water, for its row: wet or not, and why it cannot be drained (null = can). */
 export interface HoleDrainView {
@@ -29,6 +31,16 @@ export interface HoleDrainView {
   block: DrainBlock | null;
   /** Charged untubed hole with a water-sensitive charge while rain falls. */
   rainExposed?: boolean;
+}
+
+/** What a hole's row says about its rock cell (#2203); every field absent when it cannot be known yet. */
+export interface HoleRowReadout {
+  /** Powder factor of the hole's charge; charged holes only. */
+  powderFactor?: number;
+  /** Band mix the charge gives the hole's rock; charged holes with a grid only. */
+  shares?: BandShares;
+  /** Recommended range for the panel's explosive and stemming; `null` = none reaches mostly good rock, absent = no grid. */
+  recommended?: PowderFactorRange | null;
 }
 
 /** Localized rain advisory for a rain-exposed hole's drain control; the control stays enabled. */
@@ -92,22 +104,24 @@ export class ChargeHoleList {
     plannedCharges?: Record<string, HoleCharge>,
     /** Per-hole water and drain availability (#1350). */
     drainViews: Readonly<Record<string, HoleDrainView>> = {},
+    /** Powder factor, band mix and recommended range per hole (#2203). */
+    readouts: Readonly<Record<string, HoleRowReadout>> = {},
   ): void {
     if (holes.length === 0) {
       this.listEl.replaceChildren(emptyState(t('ui.blast_workshop.charge.no_holes')));
       return;
     }
-    this.listEl.replaceChildren(...holes.map(h => this.makeRow(h, charges[h.id], plannedCharges?.[h.id], drainViews[h.id])));
+    this.listEl.replaceChildren(...holes.map(h => this.makeRow(h, charges[h.id], plannedCharges?.[h.id], drainViews[h.id], readouts[h.id])));
   }
 
   refreshLocale(): void { this.locale.refresh(); }
 
-  private makeRow(hole: DrillHole, charge: HoleCharge | undefined, planned: HoleCharge | undefined, drain: HoleDrainView | undefined): HTMLElement {
+  private makeRow(hole: DrillHole, charge: HoleCharge | undefined, planned: HoleCharge | undefined, drain: HoleDrainView | undefined, readout: HoleRowReadout | undefined): HTMLElement {
     const charged = charge !== undefined;
     const ordered = !charged && planned !== undefined;
     const row = el('div');
     row.style.cssText = [
-      'display:flex', 'align-items:center', 'gap:9px', 'height:32px', 'padding:0 10px',
+      'display:flex', 'flex-wrap:wrap', 'align-items:center', 'gap:4px 9px', 'min-height:32px', 'padding:3px 10px',
       `border:1px solid ${charged ? 'rgba(79,199,107,.35)' : ordered ? 'rgba(255,170,0,.35)' : 'var(--bsx-hairline)'}`,
       'border-radius:4px',
       `background:${charged ? 'rgba(79,199,107,.08)' : ordered ? 'rgba(255,170,0,.08)' : 'var(--bsx-card)'}`,
@@ -158,7 +172,24 @@ export class ChargeHoleList {
     if (charged) row.appendChild(el('div', { attrs: { style: 'color:var(--bsx-positive);display:flex' }, children: [iconEl('check', 11)] }));
     else if (ordered) row.appendChild(el('div', { attrs: { style: 'color:var(--bsx-amber);display:flex' }, children: [iconEl('clock', 11)] }));
     row.append(drainBtn, chargeBtn);
+    const detail = this.makeReadout(readout);
+    if (detail) row.appendChild(detail);
     return row;
+  }
+
+  /** Powder factor, band mix and recommended range under the row's main line (#2203). */
+  private makeReadout(readout: HoleRowReadout | undefined): HTMLElement | null {
+    if (!readout) return null;
+    const lineStyle = 'font:400 10px/1.2 var(--bsx-font-mono);color:var(--bsx-text-secondary)';
+    const box = el('div', { attrs: { style: 'flex:1 0 100%;display:flex;flex-direction:column;gap:3px' } });
+    if (readout.powderFactor !== undefined) {
+      box.appendChild(el('span', { text: powderFactorText(readout.powderFactor), attrs: { 'data-role': 'hole-powder-factor', style: lineStyle } }));
+    }
+    if (readout.shares) box.appendChild(bandMixEl(readout.shares, 'hole-band-mix'));
+    if (readout.recommended !== undefined) {
+      box.appendChild(el('span', { text: recommendedRangeText(readout.recommended), attrs: { 'data-role': 'hole-recommended', style: lineStyle } }));
+    }
+    return box.childElementCount > 0 ? box : null;
   }
 
   private chargedLabel(charge: HoleCharge): string {

@@ -100,4 +100,5 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'inspector.vehicle.fragments', // "Fragments" — same word in French
   'inspector.vehicle.eta_value', // "{n} h" — unit-only format
   'inspector.vehicle.kg', // "{kg} kg" — SI symbol format
+  'ui.blast_workshop.charge.powder_factor', // "{value} kg/m³" — SI unit format
 ];
