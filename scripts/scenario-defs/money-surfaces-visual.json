@@ -356,12 +356,12 @@
           "command": "state"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+          "type": "ensurePanel",
+          "panel": "contracts"
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
         },
         {
           "type": "screenshot"

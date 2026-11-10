@@ -114,8 +114,10 @@ npm run scenario -- --scenario blast-basic
 # Interaction mode (Puppeteer with real UI clicks)
 npm run scenario -- --scenario blast-basic --mode interaction
 
-# With screenshots for visual inspection
-npm run scenario -- --scenario blast-basic --mode interaction --screenshots
+# Screenshots of the steps that show a change (0-based, as the step-NN files; `last` = end state)
+npm run scenario -- --scenario blast-basic --mode interaction --screenshot-steps 4,last
+# Every step: --screenshots. Each capture renders a frame in software — seconds each
+# without a GPU — so it is for a short scenario you need to see whole.
 # Capture time is excluded from each step's deadline (scripts/shared/step-deadline.ts):
 # a step's `timeout` need not cover screenshot/shot/frame capture.
 
@@ -134,13 +136,18 @@ npm run scenarios:interaction
 
 # Filter by name
 npm run scenarios -- blast-basic tutorial-playthrough
+
+# Command mode, in this process only (no worker fan-out)
+npm run scenarios -- --jobs 1
 ```
+
+Command mode fans the batch out across worker processes, one per core up to six (`--jobs N` overrides), costliest scenario first; each scenario's output still prints whole, in name order, and a worker that dies fails the scenario it was running. Interaction mode and `--shard` run in one process.
 
 Interaction actions (clickSelector, waitForSelector, type, etc.) defined in scenario step `interaction` arrays. Type definitions in `scripts/shared/scenario-types.ts`. Steps without `interaction` use command execution. A step's `expect` (same file) is what proves game state actually moved during the step, not merely that nothing threw — role/expect mechanics: `dev-testing-strategy`.
 
 **Output per step:**
 - `step-NN-command.json` — game state + command output (always)
-- `step-NN-command.png` — screenshot (only with `--screenshots`)
+- `step-NN-command.png` — screenshot (only for a step `--screenshot-steps` names, or every step with `--screenshots`)
 - `report.json` — summary of all steps
 
 Scenario definitions in `scripts/scenario-defs/*.json`.
@@ -179,7 +186,8 @@ Work in this order. Stop at the first one that explains it.
 
 | Flag | Effect |
 |------|--------|
-| `--shots "name:yaw:pitch;..."` | Orbit to each camera angle per step → `step-NN-cmd-{name}.png` |
+| `--screenshot-steps 3,7-9,last` | Capture only these steps (0-based; implies screenshots); `--shots` and `--frames` apply to them alone |
+| `--shots "name:yaw:pitch;..."` | Orbit to each camera angle per captured step → `step-NN-cmd-{name}.png` |
 | `--frames N --interval MS` | N frames per step, for animated effects → `step-NN-cmd-fN.png` |
 | `--viewport "WxH"` | Capture at a different resolution |
 | `--puppeteer-path PATH` | Explicit browser binary |
@@ -215,8 +223,8 @@ Headless Chrome has no GPU. Expect:
 ## Before/After Screenshots
 
 When fixing visual issue:
-1. `--name "before-fix-ISSUE" --screenshots` before change; open the PNGs, describe the defect
-2. `--name "after-fix-ISSUE" --screenshots` after change; open the PNGs, describe the result
+1. Before the change, capture the steps that show the defect (`--screenshot-steps`, or `npm run screenshot` for one screen); open the PNGs, describe the defect
+2. After the change, capture the same steps; open the PNGs, describe the result
 3. Compare the two descriptions → confirm the defect is gone and nothing else moved
 
 ## Completion Criteria
@@ -232,6 +240,6 @@ When images could not be produced at all, say the visual channel is unverified a
 
 A screenshot shows a button. It does not show that the button is enabled, that a click reaches it, or that a player can satisfy its preconditions. What proves that: a `role: 'player'` scenario step, whose `interaction` array can never fall back to a console command (`checkStepActionAllowed`, `scripts/shared/interaction-executor.ts` — throws before the command reaches the game), combined with an `expect.usable`/`expect.blocked` check on the control it just clicked. A step whose click cannot complete fails the whole scenario and names the blocking control, the same diagnosis `__probeSelector`/`blockedBy` gives above.
 
-When the change touches a player-facing flow, run the scenario suite in interaction mode (`npm run scenarios:interaction`, or one named scenario with `npm run scenario -- --mode interaction --screenshots`) — no console command may stand in for a player action. Step roles and the allowlists each role is checked against: `dev-scenario-authoring` skill.
+When the change touches a player-facing flow, it is proven in interaction mode — no console command may stand in for a player action. CI runs every scenario that way on every push; locally, run the one you are adding or changing, `npm run scenario -- --scenario <name> --mode interaction`, with `--screenshot-steps` for the steps you need to see. Step roles and the allowlists each role is checked against: `dev-scenario-authoring` skill.
 
 History: docs/context-history/dev-visual-testing.md

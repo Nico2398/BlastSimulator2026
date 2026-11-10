@@ -25,11 +25,13 @@ The layers surface as four independent channels. Each catches what the others mi
 | Channel | Command | Proves | Misses |
 |---------|---------|--------|--------|
 | `static` | `npm run typecheck` | Types line up across `src/` and `scripts/` | Anything about runtime behaviour |
-| `logic` | `npm run test` | Unit + integration behaviour matches expectations | Whether the game renders |
+| `logic` | `npm run pipeline -- verify` (the tests the diff reaches); CI runs `npm run test`, the whole suite | Unit + integration behaviour matches expectations | Whether the game renders |
 | `scenario` | `npm run scenarios` | Full command sequences produce the expected game state — a command the console refuses now fails the step unless the step declares `commandOutcome: 'refused'`/`'either'` | Whether the UI is reachable |
 | `visual` | `npm run scenarios:interaction`, `npm run screenshot` | The game renders, the UI responds to real clicks, and a player can reach the goal by clicking alone | Numeric correctness — that is `logic` |
 
 The first three all drive the simulation through `src/console/`, whose commands are a superset of what the UI exposes. That is why they can be green on an unplayable game, and why a `role: 'player'` scenario step forbids console commands for anything a player would have to do (`checkStepActionAllowed`, `scripts/shared/interaction-executor.ts`). Procedures: `dev-visual-testing` skill; step roles: `dev-scenario-authoring` skill.
+
+`logic` runs in two places: in a session, `npm run pipeline -- verify` runs the test files the diff reaches; CI runs the whole suite on every push. `dev-finishing-work` holds which runs where.
 
 Two channels disagreeing means neither result stands. Investigate until they agree.
 
@@ -39,7 +41,7 @@ Two channels disagreeing means neither result stands. Investigate until they agr
 
 ```bash
 npm run verify:env        # which channels are live
-npm run validate          # TypeScript → coverage → integration → scenario defs → build
+npm run validate          # TypeScript → coverage (thresholds) → whole suite → build
 npm run typecheck         # TypeScript across src/ and scripts/
 npm run test              # Unit + integration tests
 npm run test:integration  # Integration tests only
@@ -69,7 +71,7 @@ None is a substitute for a channel, and all four run in CI on every push and pul
 |------|---------|----------------|---------------------|
 | Repo-wide duplication | `npm run qualimetry` | Duplicated **lines** across `src/` + `scripts/` stay under `.jscpd.json`'s `threshold` | job `Syntactic duplication check (jscpd)` |
 | Diff duplication | `npm run qualimetry:diff` | At most 10% of the lines a branch adds may sit inside a clone | same job, second step |
-| Coverage | `npm run test:coverage` | Per-file thresholds in `vitest.config.ts` | job `Coverage thresholds` |
+| Coverage | `npm run test:coverage` | Per-file thresholds in `vitest.config.ts` | measured in the `test` job's shards, judged by job `Coverage thresholds` (below) |
 | i18n parity | `npm run check:i18n` | Every non-allowlisted key differs between `en.json` and `fr.json`, and both key sets match | a step in the `TypeScript type check` job |
 | Dead code | `npm run check:dead-code` | No file under `src/`/`scripts/` goes unimported; no new unused export | `tests/unit/lint/NoDeadCode.test.ts`, so the `test` job |
 
@@ -89,8 +91,12 @@ nature.
 `tests/unit/benchmarks/` (asserts wall-clock times that v8 instrumentation inflates past their
 budgets) and `tests/unit/lint/` (static rules about scenario JSON and repo hygiene, not `src/`
 behaviour — nothing there adds to the measurement). An undeclared command refusal is failed by
-`npm run scenarios` through `checkCommandOutcome` in `runSteps`, not by a lint-directory replay. Both directories still run, unexcluded, in `npm run test` — the `logic`
-channel and CI's `test` job — so nothing goes unrun; only the coverage measurement is narrowed.
+`npm run scenarios` through `checkCommandOutcome` in `runSteps`, not by a lint-directory replay. It
+also excludes the shareholder-summit-competent playthrough, whose hottest branch counters overflow
+under instrumentation. The list is `COVERAGE_EXCLUDED_TESTS`. Every excluded file still runs:
+unexcluded in `npm run test`, and in CI each `test` shard runs its share of them uninstrumented
+(`vitest.coverage-excluded.config.ts`) after its measured share — so nothing goes unrun; only the
+coverage measurement is narrowed.
 
 ### What the coverage gate actually holds
 
@@ -117,6 +123,18 @@ host-API wrappers (`SceneManager`, `PostPipeline`, the IndexedDB and in-memory b
 only exercise against a mock of the browser API rather than against our own behaviour — the
 `scenario` and `visual` channels are what prove those. Nothing else under `src/` is exempt, `src/audio/`
 included: it runs against fake contexts and a recording player and meets the floor file by file.
+
+**How CI measures it.** The suite runs once, in the `test` job's shards: each shard measures its share
+of the files under coverage with the thresholds off (`vitest.coverage-shard.config.ts`) and uploads
+its raw V8 coverage. The `Coverage thresholds` job hands every shard's dump to vitest's own v8
+provider (`scripts/coverage-merge.ts`), which folds them in a fixed order, converts, adds every
+measured file no test loaded at 0% and checks the thresholds itself. Exit 0: every threshold holds;
+1: one does not, named by vitest; 2: the shard set is unusable — missing, extra, corrupt or from
+another split — and nothing was judged. Shards are balanced on per-file durations in
+`tests/shard-weights.json` (refresh: `npx tsx scripts/shard-weights.ts <CI JUnit or vitest JSON
+reports>`); a stale table costs balance only. To reproduce CI's verdict locally rather than
+`npm run test:coverage`'s, whose fold order follows completion order:
+`npx vitest run --config vitest.coverage-shard.config.ts --shard=1/1 && npx tsx scripts/coverage-merge.ts --dir coverage/shards --shards 1`.
 
 **Coverage measures execution, not verification.** A test that calls a function and asserts nothing
 scores 100%. These floors catch code the suite never reaches; they say nothing about whether the
@@ -228,15 +246,15 @@ Select by what the change touches: every scenario whose steps name the command, 
 
 After any rendering change:
 1. `npm run dev &`
-2. Run each selected scenario with screenshots:
+2. Run each selected scenario, capturing the steps that show the change:
    ```bash
-   npm run scenario -- --scenario <name> --mode interaction --screenshots
+   npm run scenario -- --scenario <name> --mode interaction --screenshot-steps <steps>
    ```
 3. **Open every screenshot** in `screenshots/scenario-{name}-interaction/` with the Read tool and describe what it shows
 4. Verify each description against what the scenario's own step `description` and `expect` say should be on screen
 5. If any check fails → fix rendering → re-run
 
-Screenshots opt-in via `--screenshots`. CI runs without it (no screenshots, state-only validation).
+Screenshots are opt-in: `--screenshot-steps <steps>` captures the steps named (0-based, `last` for the end state), `--screenshots` every step. Each capture renders a frame in software, so a check captures only what it looks at. CI runs without either (state-only validation).
 Use `npm run scenarios` / `npm run scenarios:interaction` for batch runs.
 
 Capturing a screenshot is not inspecting it. A rendering change stays unverified until an image has been read. Full procedure: `dev-visual-testing` skill.
@@ -258,11 +276,11 @@ CI has 3 tiers of scenario testing:
 
 | Tier | What | When | Time |
 |------|------|------|------|
-| **1 — Command** | Every scenario definition in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~2 min |
+| **1 — Command** | Every scenario definition in command mode (pure Node.js, no browser), fanned out across worker processes | Every push, PR, schedule, manual | about a minute |
 | **2 — Interaction** | Every scenario definition in interaction mode (Puppeteer, real browser), sharded | Every push and pull request, schedule (weekly), workflow_dispatch | a few minutes wall clock† |
 | **3 — Full** | Tiers 1 + 2, alongside every other job — nothing waits on the unit suite | Every push and pull request | the slowest job† |
 
-† No GPU means ~6 s/frame in software rasterisation, so a scenario page boots with drawing suspended (`?scenarioMode=1`, main.ts). Shards are cost-balanced (`selectShard`, `scripts/run-all-scenarios-cli.ts`), so the count in `SCENARIO_INTERACTION_SHARDS` is the lever: more shards, shorter wall clock, until the ~1 min of per-shard setup dominates. Figures go stale as the suite grows. Why both jobs run on every PR: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
+† No GPU means ~6 s/frame in software rasterisation, so a scenario page boots with drawing suspended (`?scenarioMode=1`, main.ts). Shards are balanced on each scenario's measured seconds (`scripts/run-all-scenarios-interaction-seconds.json`; a scenario the table lacks costs its static estimate, `estimateScenarioCost`), so the count in `SCENARIO_INTERACTION_SHARDS` is the lever: more shards, shorter wall clock, until the ~1 min of per-shard setup dominates. Each shard's log prints a `Timing:` line per scenario; `npx tsx scripts/run-all-scenarios-costs.ts --refresh <shard logs>` rewrites the table from a CI run. Figures go stale as the suite grows. Why both jobs run on every PR: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
 
 **Every scenario job runs on every pull request.** The in-session `visual` channel covers the one scenario that exercises a change — that is the working loop — and CI covers the rest. Why: `agentic-pipeline-pr-management`.
 

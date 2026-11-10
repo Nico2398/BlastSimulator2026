@@ -27,6 +27,15 @@ const DEFAULT_SLOT = 'quicksave';
 /** In-process quick-save slots, keyed by name. Cleared on process restart. */
 const quickSaveSlots = new Map<string, string>();
 
+/**
+ * Empty every quick-save slot. A scenario batch runs many scenarios in one
+ * process, and spreads them across worker processes in an order set by timing:
+ * a slot one scenario left behind must not be what the next one loads.
+ */
+export function clearQuickSaveSlots(): void {
+  quickSaveSlots.clear();
+}
+
 export function saveCommand(
   ctx: GameContext,
   args: string[],

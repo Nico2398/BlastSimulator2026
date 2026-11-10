@@ -1,15 +1,21 @@
 /**
  * BlastSimulator2026 — Batch Scenario Runner
  *
- * Runs ALL scenario JSON files in a single process (cold start once)
- * for maximum CI throughput. Reports per-scenario pass/fail with detailed
- * error information and exits with code 1 if any scenario fails.
+ * Runs ALL scenario JSON files and reports per-scenario pass/fail with
+ * detailed error information, exiting with code 1 if any scenario fails.
  *
  * Usage:
- *   npx tsx scripts/run-all-scenarios.ts [--mode command|interaction]
+ *   npx tsx scripts/run-all-scenarios.ts [--mode command|interaction] [--jobs N]
  *
- * Default mode: command (pure Node.js, no browser, ~24s for all 99).
- * Interaction mode: shared Puppeteer browser, ~2-3min for all 99.
+ * Command mode (the default; pure Node.js, no browser) fans the batch out
+ * across worker processes — one per core, at most `MAX_DEFAULT_JOBS`
+ * (`run-all-scenarios-fanout.ts`) — and prints each scenario's output whole,
+ * in alphabetical order, exactly as the serial runner did. `--jobs N` sets the
+ * worker count; `--jobs 1` runs every scenario in this one process against
+ * one shared engine, the path every command-mode batch took before.
+ * Interaction mode shares one Puppeteer browser in this process, and an
+ * explicit `--shard i/N` (CI's interaction shards) runs its slice in this
+ * process too: neither fans out.
  *
  * --report-drift (command mode only, issue #679): a step whose only
  * failures are equals/changedBy mismatches no longer marks the step (or its
@@ -23,41 +29,72 @@
  * This file is the thin CLI entrypoint; the actual work lives in its sibling
  * modules (issue #824): `run-all-scenarios-cli.ts` (arg parsing, sharding),
  * `run-all-scenarios-result.ts` (shared result/progress helpers),
- * `run-all-scenarios-command-batch.ts` (command-mode batch loop), and
+ * `run-all-scenarios-command-batch.ts` (command-mode batch loop),
+ * `run-all-scenarios-fanout.ts` and `run-all-scenarios-worker.ts` (the
+ * command-mode fan-out and its worker protocol), and
  * `run-all-scenarios-interaction-batch.ts` (interaction-mode batch loop).
  */
 
 import { readdirSync } from 'fs';
+import { availableParallelism } from 'os';
 import { resolve } from 'path';
-import { emitDriftReport, type ScenarioResult, type DriftRecord } from './shared/command-runner.js';
+import { fileURLToPath } from 'url';
+import { createGameEngine, emitDriftReport, type ScenarioResult, type DriftRecord } from './shared/command-runner.js';
 import { loadScenarioDef, SCENARIO_DIR } from './shared/scenario-utils.js';
 import { SCREENSHOT_DIR } from './shared/puppeteer-utils.js';
 import { parseArgs, selectShard, estimateScenarioCost } from './run-all-scenarios-cli.js';
-import { runBatchCommand } from './run-all-scenarios-command-batch.js';
+import { runBatchCommand, runCommandScenario } from './run-all-scenarios-command-batch.js';
 import { runBatchInteraction } from './run-all-scenarios-interaction-batch.js';
+import { resolveJobCount, runFanOutCommand } from './run-all-scenarios-fanout.js';
+import { serveScenarioWorkerProcess } from './run-all-scenarios-worker.js';
+import { interactionCostSeconds, loadScenarioSeconds } from './run-all-scenarios-costs.js';
 
 export { buildScenarioLoadFailure } from './run-all-scenarios-result.js';
 
 async function main(): Promise<void> {
-  const { mode, scenarios: filterScenarios, port, shard, reportDrift } = parseArgs();
+  const { mode, scenarios: filterScenarios, port, shard, reportDrift, jobs, worker } = parseArgs();
+
+  if (worker) {
+    // Without an IPC channel nothing would ever ask for a scenario, and the
+    // process would exit 0 having run none: a silent green channel.
+    if (!process.send) throw new Error('--worker is internal: it runs only as a fan-out child of `npm run scenarios`');
+    // A fan-out worker: one engine for every scenario its parent sends, as the
+    // in-process batch shares one; it exits when the parent says stop.
+    const engine = createGameEngine();
+    serveScenarioWorkerProcess(name => runCommandScenario(engine, name, reportDrift));
+    return;
+  }
+
+  const fansOut = mode !== 'interaction' && !shard;
+  if (jobs !== undefined && jobs > 1 && !fansOut) {
+    throw new Error('--jobs fans out a command-mode batch only; it does not combine with --mode interaction or --shard');
+  }
 
   const scenarioFiles = readdirSync(SCENARIO_DIR)
     .filter(f => f.endsWith('.json'))
     .map(f => f.replace(/\.json$/, ''))
     .sort();
 
-  const selected = filterScenarios.length > 0 ? filterScenarios : scenarioFiles;
-  // A definition that fails to load costs 1 here and is still run — the
-  // batch loop reports it as a failed scenario, which is where a bad file
-  // should surface, not as a crash before any shard starts.
+  // Each name once: the fan-out keys results by name, so a repeated name would
+  // let one copy's verdict overwrite the other's.
+  const selected = filterScenarios.length > 0 ? [...new Set(filterScenarios)] : scenarioFiles;
+  // A definition that fails to load costs 1 static unit here and is still run —
+  // the batch loop reports it as a failed scenario, which is where a bad file
+  // should surface, not as a crash before any shard starts. Interaction shards
+  // balance on measured seconds (run-all-scenarios-costs.ts): the static
+  // estimate alone left the slowest of ten shards at 2.8× the fastest.
+  const measured = mode === 'interaction' ? loadScenarioSeconds() : undefined;
   const costOf = (name: string): number => {
+    let staticCost = 1;
     try {
-      return estimateScenarioCost(loadScenarioDef(name, SCENARIO_DIR), mode);
+      staticCost = estimateScenarioCost(loadScenarioDef(name, SCENARIO_DIR), mode);
     } catch {
-      return 1;
+      // Still run, and still costed: the batch reports the bad file as a failed scenario.
     }
+    return measured ? interactionCostSeconds(name, staticCost, measured) : staticCost;
   };
   const names = shard ? selectShard(selected, shard, costOf) : selected;
+  const jobCount = fansOut ? resolveJobCount(jobs, availableParallelism(), names.length) : 1;
 
   console.log(`\nBlastSimulator2026 — Batch Scenario Runner`);
   console.log(`Mode: ${mode}`);
@@ -66,9 +103,14 @@ async function main(): Promise<void> {
 
   const startTime = Date.now();
   let results: ScenarioResult[];
+  let workerErrors: string[] = [];
 
   if (mode === 'interaction') {
     results = await runBatchInteraction(names, port);
+  } else if (jobCount > 1) {
+    ({ results, workerErrors } = await runFanOutCommand({
+      names, jobs: jobCount, reportDrift, costOf, entry: fileURLToPath(import.meta.url), startTime,
+    }));
   } else {
     results = runBatchCommand(names, reportDrift, startTime);
   }
@@ -83,7 +125,7 @@ async function main(): Promise<void> {
   const failures = results.filter(r => r.failed);
 
   console.log(`\n${'='.repeat(50)}`);
-  console.log(`BATCH COMPLETE — ${totalTime}s`);
+  console.log(`BATCH COMPLETE — ${totalTime}s${jobCount > 1 ? ` (${jobCount} worker processes)` : ''}`);
   console.log(`Total: ${results.length}, Passed: ${results.length - failures.length}, Failed: ${failures.length}`);
 
   // Interaction mode narrows each step's `expect` to the half a browser can
@@ -104,8 +146,14 @@ async function main(): Promise<void> {
       console.log(`  ❌ ${f.name} (${f.totalSteps} steps)`);
       if (f.error) console.log(`     ${f.error}`);
     }
-    process.exit(1);
   }
+  // A worker that died or exited badly fails the batch even when every
+  // scenario it reported passed: fail closed on a run that did not finish cleanly.
+  if (workerErrors.length > 0) {
+    console.log(`\nFailed worker processes:`);
+    for (const e of workerErrors) console.log(`  ❌ ${e}`);
+  }
+  if (failures.length > 0 || workerErrors.length > 0) process.exit(1);
 
   console.log(`\nAll scenarios passed.`);
   process.exit(0);

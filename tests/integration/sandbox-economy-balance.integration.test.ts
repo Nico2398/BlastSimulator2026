@@ -488,8 +488,24 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
     rampOk: boolean | null;
   }
 
-  /** The scripted standard opening: living quarters (tier 1), one 3x3 shot on the deposit, then sell to the horizon. */
+  /**
+   * Each (kit, ramp) opening played once for this block: the digger-with-ramp and the full-kit openings are each
+   * asserted on by two cases, and a 2000-tick play is 3-5 s; the run is deterministic (fixed seed) and the cases
+   * only read its trace, so the second case reads the same trace a replay would produce.
+   */
+  const openings = new Map<string, OpeningTrace>();
   function playOpening(kit: string, ramp?: string): OpeningTrace {
+    const key = `${kit}|${ramp ?? ''}`;
+    let trace = openings.get(key);
+    if (!trace) {
+      trace = runOpening(kit, ramp);
+      openings.set(key, trace);
+    }
+    return trace;
+  }
+
+  /** The scripted standard opening: living quarters (tier 1), one 3x3 shot on the deposit, then sell to the horizon. */
+  function runOpening(kit: string, ramp?: string): OpeningTrace {
     let rampOk: boolean | null = null;
     const trace: OpeningTrace = {
       endedAtTick: null, endReason: '', cashAtFirstBlast: null, cashAtHorizon: 0,

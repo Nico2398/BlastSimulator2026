@@ -32,6 +32,11 @@ describe('channelsFor', () => {
     expect(channelsFor(['.claude/hooks/blind-to-tests.mjs'])).toEqual(['context', 'logic']);
   });
 
+  it('owes logic for a workflow or composite action — the suites reading their YAML are their only local proof', () => {
+    expect(channelsFor(['.github/workflows/ci.yml'])).toEqual(['logic']);
+    expect(channelsFor(['.github/actions/agentic-assign/action.yml'])).toEqual(['logic']);
+  });
+
   it('owes scenario for a scenario definition', () => {
     expect(channelsFor(['scripts/scenario-defs/blast-basic.json'])).toEqual(['logic', 'scenario']);
   });
@@ -172,6 +177,12 @@ describe('pipeline CLI arguments', () => {
     expect(parsed.positional).toEqual(['tdd', 'red']);
     expect(parsed.values.get('label')).toEqual(['42-7', '42-7-s2']);
     expect(parsed.flags.has('no-commit')).toBe(true);
+  });
+
+  it("reads verify's --full as a bare flag, not as an option eating the next argument", () => {
+    const parsed = parseArgs(['verify', '--full', '--only', 'logic']);
+    expect(parsed.flags.has('full')).toBe(true);
+    expect(parsed.values.get('only')).toEqual(['logic']);
   });
 
   it('rejects an option with no value', () => {

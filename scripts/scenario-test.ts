@@ -13,11 +13,15 @@
  *   npx tsx scripts/scenario-test.ts --scenario blast-basic --viewport "1920x1080"
  *   npx tsx scripts/scenario-test.ts --scenario blast-basic --port 5174
  *   npx tsx scripts/scenario-test.ts --scenario blast-basic --puppeteer-path "/path/to/chrome"
+ *   npx tsx scripts/scenario-test.ts --scenario blast-basic --mode interaction --screenshot-steps 3,7-9,last
  *
  * --shots format: name:yaw:pitch;name:yaw:pitch  (degrees)
  *   Each shot is captured after every step, in addition to the default view.
  *   Screenshots: step-NN-cmd.png (default) + step-NN-cmd-shotname.png (each shot)
  *
+ * --screenshot-steps 3,7-9,last: capture only these steps (0-based, as the
+ *   step-NN files are numbered) — each capture renders a frame in software, so
+ *   capturing every step (--screenshots) of a long scenario costs minutes per step
  * --frames N: capture N sequential frames per step for animation verification
  * --interval MS: milliseconds between animation frames
  * --viewport "WxH": browser viewport size (default 1280x720)
@@ -95,7 +99,7 @@ async function runScenarioCommand(
 }
 
 // Main
-const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode, screenshots, reportDrift, skipBlastPlayback, realTutorialClock } = parseArgs();
+const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode, screenshots, screenshotSteps, reportDrift, skipBlastPlayback, realTutorialClock } = parseArgs();
 if (steps.length === 0) {
   console.error('No steps defined. Use --scenario <name> or --commands "cmd1; cmd2; ..."');
   process.exit(1);
@@ -107,7 +111,8 @@ if (mode === 'command') {
 } else {
   console.log(`Viewport: ${viewport.width}x${viewport.height}`);
   console.log(`Dev server port: ${port}`);
-  console.log(`Screenshots: ${screenshots ? 'enabled' : 'disabled (use --screenshots to enable)'}`);
+  console.log(`Screenshots: ${!screenshots ? 'disabled (--screenshot-steps <steps> to capture the steps that show a change)'
+    : screenshotSteps ? `steps ${[...screenshotSteps].join(', ')} only` : 'every step'}`);
   if (shots.length > 0) {
     console.log(`Multi-angle shots: ${shots.map(s => `${s.name}(${s.yaw}°,${s.pitch}°)`).join(', ')}`);
   }
@@ -148,7 +153,7 @@ if (mode === 'command') {
       process.exit(1);
     });
 } else {
-  runScenarioInteraction(name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, screenshots, SCREENSHOT_DIR, skipBlastPlayback, realTutorialClock)
+  runScenarioInteraction(name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, screenshots, SCREENSHOT_DIR, skipBlastPlayback, realTutorialClock, screenshotSteps)
     .then(exitForResults)
     .catch(err => {
       console.error('Scenario failed:', err);

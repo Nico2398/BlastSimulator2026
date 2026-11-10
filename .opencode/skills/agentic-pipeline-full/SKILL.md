@@ -15,8 +15,9 @@ description: >
 
  1. TDD cycle            → `agentic-pipeline-tdd`, label = <issue>-<runId>.
                            Ends on pipeline/feature-<label> with `verify` green.
- 2. [visual-loop]        → Player-facing change only (`verify` prints `OWED visual`).
-                           See "Visual feedback loop" below.
+ 2. [visual-loop]        → When `verify` prints `OWED visual`, or the issue's Verification
+                           section asks for a screen to be looked at. Neither → skip it:
+                           no @visual-tester. See "Visual feedback loop" below.
  3. [refactor]           → The lead cleans its own diff: duplication, long functions,
                            names, stale comments, a missing mirrored test — no behaviour
                            change. Commit `refactor: <what> (#<issue>)`, then `verify`.
@@ -37,12 +38,15 @@ A change that touches no executable code — skills, rules, agent definitions, R
 
 ```
 LOOP:
-  a. @visual-tester → Run the named scenarios with --shots and inspect every screenshot.
-                      Named: every scenario the issue's Verification section calls for,
-                      every definition under scripts/scenario-defs/ the diff touches, and
-                      any the lead adds because the change reaches it. Never the whole
-                      suite — the full interaction-mode run is CI's, on every pull request.
-                      Returns VISUAL: PASS, VISUAL: FAIL, or VISUAL: BLOCKED.
+  a. @visual-tester → Capture and inspect the frames that show the change.
+                      Brief, per check: the scenario and the steps to capture
+                      (`--screenshot-steps`), or the console setup of a screen
+                      (`npm run screenshot`). Checks: what the issue's Verification
+                      section calls for, the definitions under scripts/scenario-defs/
+                      the diff adds or changes, and any screen the change alters.
+                      Never every step of a scenario, never the whole suite — whether
+                      each scenario still plays is CI's interaction run, on every
+                      pull request. Returns VISUAL: PASS, VISUAL: FAIL, or VISUAL: BLOCKED.
                       BLOCKED → halt and escalate (the orchestrator's hard constraints).
                       PASS → exit the loop.
   b. [fix]          → The lead fixes ALL reported issues on pipeline/feature-<label>,
@@ -52,7 +56,7 @@ LOOP:
 ```
 
 - **Volumetric iterations fan out.** Five or more screenshots to capture and read back, or five or more scenario definitions to adapt, is a parallel batch wave — `agentic-pipeline-tdd`'s "Volumetric work goes out in parallel batches" holds the procedure.
-- Each iteration re-runs the same named scenarios and reports what remains. The visual-tester's report is words, never images: the screenshots stay in its context.
+- Each iteration re-captures the same steps and reports what remains. The visual-tester's report is words, never images: the screenshots stay in its context.
 - Three iterations is the cap, and the loop budget closes the loop sooner. A failure still present after the last iteration goes on the PR the way any red channel does — `agentic-pipeline-pr-management`.
 
 ### Failure loops

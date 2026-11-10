@@ -6,15 +6,21 @@
  * silently backgrounds a foreground call that outruns its own (shorter, and
  * smaller than 600s) default per-call timeout, and an agent that does not
  * override that default with an explicit one gets no warning before it happens.
- * Three of this project's own required commands are past the 600s cap, close
- * enough to it that a slower runner crosses it, or have already been hit by the
- * silent-background failure at their actual size:
+ * Commands this project uses are past the 600s cap, close enough to it that a
+ * slower runner crosses it, or have already been hit by the silent-background
+ * failure at their actual size:
  *
- *   npm run test      ~500s on a 2-core runner, grown from ~186s as the suite
- *                      grew — backgrounded mid-run in production twice (issue
- *                      #842's rescue, PR #872) despite being "under the cap"
- *   npm run scenarios ~559s   fits in a sandbox, not on a 2-core runner
  *   npm run ci:await  minutes to tens of minutes, by design — it waits on CI
+ *   npm run test      the whole suite, ~10 min on a 4-core sandbox (734 s
+ *                      before the hot-spot fixes the #2199 timeouts prompted) — backgrounded
+ *                      mid-run in production twice (issue #842's rescue, PR
+ *                      #872) at ~500 s, despite being "under the cap". It is
+ *                      CI's now; `npm run pipeline -- verify` runs it only when
+ *                      a diff changes how every test runs, its focused set
+ *                      would reach 60% of the suite, or the selection fails
+ *   npm run scenarios about a minute since it fans out across worker
+ *                      processes (~120 s serial, ~559 s on a 2-core runner
+ *                      before that)
  *
  * So an agent that must run one of these has to detach it and come back. The way
  * it came back is what cost this project three runs in four days. PRs #594, #603

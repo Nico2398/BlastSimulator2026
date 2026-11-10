@@ -49,3 +49,6 @@ __pycache__/
 
 # Blender auto-backups (written beside each .blend on save)
 *.blend1
+
+# Worktrees Claude Code creates for isolated sub-agents and workflows
+.claude/worktrees/

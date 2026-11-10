@@ -81,7 +81,7 @@ Four independent channels prove a change works, and each catches what the others
 | `npm run test:integration` | `vitest run tests/integration` | Integration tests only (small suites + full-level) | Validate cross-module behavior |
 | `npm run test:scenarios` | `vitest run tests/unit/scenario-defs-validation` | Validates all scenario JSON files parse correctly | Ensure scenario definitions are valid |
 | `npm run typecheck` | `tsc --noEmit` on `src/` and `scripts/` | TypeScript across both projects | Fastest check after an edit |
-| `npm run validate` | `tsc --noEmit && npm run test:coverage && npm run test:integration && npm run test:scenarios && vite build` | TypeScript type-check → tests with coverage → integration tests → scenario defs validation → production build | **Full PR gate** — must pass before merging |
+| `npm run validate` | `tsc --noEmit && npm run test:coverage && npm run test && vite build` | TypeScript type-check → tests with coverage → the whole suite → production build | Typecheck, per-file coverage thresholds, the whole suite and the production build on one machine |
 | `npm run verify:env` | `tsx scripts/verify-env.ts` | Reports each verification channel READY or BLOCKED, with remedies | Before relying on a channel |
 | `npm run validate:context` | `tsx scripts/validate-context.ts` | Agent/skill/rule frontmatter schemas, tool names, preloaded skills, hook paths, cross-runtime body sync | After editing anything under `.claude/`, `.github/`, `.opencode/` |
 | `npm run scenario` | `tsx scripts/scenario-test.ts` | Single scenario, command or interaction mode | Debug one scenario |
@@ -102,7 +102,7 @@ Four independent channels prove a change works, and each catches what the others
 | `scripts/visual-test.sh` | Bash | One-command screenshot capture: starts dev server, takes screenshot via Puppeteer, cleans up. | `bash scripts/visual-test.sh --name "scene" --commands "new_game seed:1"` |
 | `scripts/screenshot.ts` | TypeScript | Puppeteer-based headless screenshot script. Launches Chrome, optionally runs console commands, saves PNG to `screenshots/`. | `npx tsx scripts/screenshot.ts --name "after-blast" --commands "survey 25,30; blast"` |
 | `scripts/scenario-test.ts` | TypeScript | Single scenario runner. Loads a scenario JSON from `scripts/scenario-defs/`, runs steps in command or interaction mode. Command mode: pure Node.js (no browser). Interaction mode: Puppeteer browser with real UI clicks. Screenshots opt-in via `--screenshots`. Output: `screenshots/scenario-{name}-{mode}/` with per-step JSON state and report. | `npx tsx scripts/scenario-test.ts --scenario blast-basic --mode interaction` |
-| `scripts/run-all-scenarios.ts` | TypeScript | Batch scenario runner — runs all scenario definitions in a single process. Command mode: shared engine (~24s for all scenarios). Interaction mode: shared Puppeteer browser (~2-3min). Exit code 1 on any failure. Filters by scenario name. | `npx tsx scripts/run-all-scenarios.ts` |
+| `scripts/run-all-scenarios.ts` | TypeScript | Batch scenario runner — runs all scenario definitions. Command mode: worker processes, one per core up to six, each with its own engine (`--jobs 1` runs in one process). Interaction mode: one process, shared Puppeteer browser; CI shards it, balanced on measured seconds per scenario. Exit code 1 on any failure. Filters by scenario name. | `npx tsx scripts/run-all-scenarios.ts` |
 | `scripts/ui-diagnostic.ts` | TypeScript | Exhaustive UI button diagnostic. Opens game, clicks every interactive element across all panels. Output: `screenshots/ui-diagnostic/` with per-panel screenshots + `report.json`. | `npx tsx scripts/ui-diagnostic.ts` |
 | `scripts/check-tasks.sh` | Bash | Task consistency checker. Verifies completed tasks have expected source files, test files exist for core phases, i18n key parity, and no hardcoded strings. | `bash scripts/check-tasks.sh` |
 | `scripts/build-itch.sh` | Bash | Full itch.io deployment build: runs tests → TypeScript check → production build → creates `dist.zip`. | `bash scripts/build-itch.sh` |
@@ -188,7 +188,7 @@ All four layers must pass before any PR is merged. `npm run validate` enforces t
 
 - **Scenario definitions:** JSON files in `scripts/scenario-defs/` — each defines a sequence of console commands with optional interaction actions (clickSelector, waitForSelector, etc.)
 - **Two modes of execution:**
-  - **Command mode** (default): pure Node.js, no browser, ~24s for the full suite. Runs game logic directly via `scripts/run-all-scenarios.ts`.
+  - **Command mode** (default): pure Node.js, no browser, about a minute for every definition across worker processes (`--jobs 1` for one process). Runs game logic directly via `scripts/run-all-scenarios.ts`.
   - **Interaction mode** (`--mode interaction`): Puppeteer with real UI clicks, ~2-3min for the full suite via shared browser session.
 - **Batch runner (CI):** `npx tsx scripts/run-all-scenarios.ts [--mode command|interaction]` — runs all scenarios, exit 1 on failure
 - **Single scenario:** `npx tsx scripts/scenario-test.ts --scenario <name> [--mode command|interaction] [--screenshots]`

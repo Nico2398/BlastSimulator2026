@@ -60,9 +60,9 @@ Four independent channels prove a change works. Each catches what the others mis
 | Channel | Command | Proves | Required when |
 |---------|---------|--------|---------------|
 | `static` | `npm run typecheck` | Types line up across `src/` and `scripts/` | Every code change |
-| `logic` | `npm run test` | Unit + integration behaviour matches expectations | Every code change |
+| `logic` | `npm run pipeline -- verify` (the tests the diff reaches); CI runs `npm run test`, the whole suite | Unit + integration behaviour matches expectations | Every code change |
 | `scenario` | `npm run scenarios` | Full command sequences produce the expected game state | Gameplay, console, economy, campaign changes |
-| `visual` | `npm run screenshot`, `npm run scenario -- --mode interaction --screenshots` | The game renders correctly, the UI responds to real clicks, and a player can actually reach the goal by clicking — no console command stands in for a player action | Any change to `src/renderer/`, `src/ui/`, or anything a player sees; any change to a player-facing flow: tutorial, panels, hiring, skills, contracts, building, vehicles |
+| `visual` | `npm run screenshot`, `npm run scenario -- --mode interaction --screenshot-steps <steps>` | The game renders correctly, the UI responds to real clicks, and a player can actually reach the goal by clicking — no console command stands in for a player action | Any change to `src/renderer/`, `src/ui/`, or anything a player sees; any change to a player-facing flow: tutorial, panels, hiring, skills, contracts, building, vehicles |
 
 1. Run `npm run verify:env` when unsure a channel is usable. It reports each channel as READY or BLOCKED with the remedy.
 2. Pick every channel the change touches, not the cheapest one.
@@ -77,6 +77,8 @@ Four independent channels prove a change works. Each catches what the others mis
 
 **When a channel is genuinely unavailable** (no browser, dev server unreachable, screenshots never written), say so explicitly and mark the work unverified for that channel. Never substitute a state JSON dump for an image you were unable to inspect, and never report PASS for a channel you did not run.
 
+**`logic` is split between the session and CI.** `npm run pipeline -- verify` runs the test files the diff reaches — its changed tests, the tests that import a changed module, the mirrored test. CI runs the whole suite on every push, sharded and under the coverage gate. Report both: the focused run, and the CI result once read. A local whole-suite run repeats CI and is never owed.
+
 **▶ Passing the channels is not finishing.** Landing the work — pushing, opening the pull request, labelling it, and reading what CI says about the pushed head rather than assuming it — is its own procedure with its own failure modes. Load `dev-finishing-work` before claiming any coding task complete, and whenever a push, a pull request, or a CI result is involved.
 
 ## ▶ Claude Code only — running a command that outlives one Bash call
@@ -85,7 +87,7 @@ Four independent channels prove a change works. Each catches what the others mis
 
 ### ▶ There is no later turn
 
-**A backgrounded command whose result you plan to collect later is a lost run.** The Bash tool caps one foreground call at 600 000 ms, and three of the commands this project requires sit at or past that ceiling, or close enough that a foreground call without an explicit matching timeout gets silently backgrounded by this harness's own shorter default before it ever gets near the cap — `npm run test` is ~270 s on a 4-core sandbox and longer on a 2-core runner (do not re-classify it as "fits" from an old measurement), `npm run scenarios` is ~90 s in a sandbox, `npm run ci:await` waits as long as CI takes. So they have to be detached. *How* you come back for the result is what decides whether the run survives.
+**A backgrounded command whose result you plan to collect later is a lost run.** The Bash tool caps one foreground call at 600 000 ms, and some of the commands this project uses sit at or past that ceiling, or close enough that a foreground call without an explicit matching timeout gets silently backgrounded by this harness's own shorter default before it ever gets near the cap — `npm run ci:await` waits as long as CI takes; the whole `npm run test` suite takes about ten minutes on a 4-core sandbox, and `npm run pipeline -- verify` runs it when a diff changes how tests run or its focused set would reach most of the suite (otherwise `verify` runs the test files the diff reaches, and the whole suite is CI's) — so start every `verify` through the wrapper; `npm run scenarios` takes about a minute with its worker processes. Do not re-classify a command as "fits" from an old measurement. So they have to be detached. *How* you come back for the result is what decides whether the run survives.
 
 An unattended session — a GitHub Actions runner, Claude Code on the web — gets **one turn**. When that turn ends the process exits. A background-task notification is delivered on a later turn, and there is no later turn, so it is never delivered at all. Everything not yet pushed dies with the VM. This is the same rule that governs delegation (`require-foreground-agents.mjs`), arriving through the shell instead of through a sub-agent. Never end a turn on a backgrounded command, and never hand-roll a polling loop around one in its place.
 
@@ -136,7 +138,7 @@ Sort a finding by **size** and by **whether it is in your way**. Those two quest
 
 ```bash
 npm run verify:env      # which verification channels are live
-npm run pipeline -- verify  # only the channels this branch's diff owes; cached per tree, one line per channel
+npm run pipeline -- verify  # the channels this diff owes; logic = the tests the diff reaches (--full: whole suite); cached per tree
 npm run validate        # TypeScript → coverage (thresholds) → full suite → build
 npm run test            # Vitest unit + integration
 npm run scenarios       # all scenarios, command mode, no browser

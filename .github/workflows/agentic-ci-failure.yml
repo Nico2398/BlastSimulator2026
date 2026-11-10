@@ -503,7 +503,7 @@ jobs:
               '',
               `1. Check out the existing \`${pr.head.ref}\` and fetch it. Do **not** recreate it, and do not start a fresh TDD cycle.`,
               `2. \`git fetch origin ${conflict.base}\` and \`git merge origin/${conflict.base}\`, or rebase onto it. Resolve every conflict so both sides' intent survives. Regenerate lockfiles and generated files with their tooling, never by hand. A conflict in a mirrored context file is resolved once and mirrored to all three runtime directories.`,
-              '3. Re-run the verification channels the merge touched — at least `npm run typecheck` and `npm run test`, plus `npm run validate:context` if any context file conflicted.',
+              '3. Re-run the verification channels the merge touched: `npm run pipeline -- verify` through `npm run long`, plus `npm run validate:context` if any context file conflicted. The whole test suite is CI\'s — it runs on your push and `ci:await` reads it.',
               `4. Commit and push to \`${pr.head.ref}\` — after a rebase, with \`--force-with-lease\`. Never \`[skip ci]\`, never a bare \`--force\`.`,
               '5. Then **wait for CI to report** before ending the session: `npm run ci:await -- --pr ' + pr.number + '`. Green means done — the merge gate merges it. Red means fix it and push again.',
               '',

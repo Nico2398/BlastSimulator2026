@@ -7,10 +7,11 @@
 // output — not just its shape — fails loudly against a baseline captured on
 // `main` before the change.
 //
-// Pure function of `config` only: no mutable global state, no randomness of
-// its own (every noise field the generator touches is itself seeded from
-// `config.seed`), so the same config always hashes identically, on any
-// machine, any run.
+// Pure function of `config` only: no randomness of its own (every noise field
+// the generator touches is itself seeded from `config.seed`), and the one
+// piece of module state the generator holds — buildTerrainContext's bounded
+// memo — is keyed on the config's content and frozen, so it cannot be
+// observed. The same config always hashes identically, on any machine, any run.
 //
 // To regenerate a baseline after a genuinely intentional generation change:
 //   git checkout main -- src/core/world/TerrainGen.ts src/core/world/WorldGen.ts \

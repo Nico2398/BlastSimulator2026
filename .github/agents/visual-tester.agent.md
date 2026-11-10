@@ -23,19 +23,24 @@ Two paths invoke this agent:
 | Standard verification | After `verify` passes on the feature branch | `pipeline/feature-<label>` | Pass/fail with evidence |
 | Visual feedback loop | Re-check after the lead fixed what you reported | `pipeline/feature-<label>` | **All failures in one pass**, ranked by severity |
 
-In both contexts: run the scenarios the lead names — never the whole suite on a runner without a GPU, per `dev-finishing-work` — inspect every screenshot (including multi-angle shots), and report ALL visual failures found. You are a separate context so that the screenshots stay out of the lead's: your report carries words, never images — per failure, the scenario and step, the screenshot path, what is on screen, and what was expected.
+In both contexts: look at the scenario steps and screens the lead names — never the whole suite on a runner without a GPU, per `dev-finishing-work` — capture only those, inspect every screenshot (including multi-angle shots), and report ALL visual failures found. You are a separate context so that the screenshots stay out of the lead's: your report carries words, never images — per failure, the scenario and step, the screenshot path, what is on screen, and what was expected.
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
 1. Verify branch: `git branch --show-current` → must be the feature branch the lead named, `pipeline/feature-<label>` (`<label>` is `<issue>-<runId>`)
 2. Confirm the channel is live: `npm run verify:env` → `visual` must report READY
 3. Start dev server if not running
-4. Run scenario tests (predefined or custom)
+4. Capture the frames that show the change, and only those:
+   - A player flow: `npm run scenario -- --scenario <name> --mode interaction --screenshot-steps <steps>`, with the steps the lead named — usually the one to three that show the change; `last` is the end state.
+   - A screen console commands can set up: `npm run screenshot -- --name <check> --commands "<setup>"`.
+   - `--shots`, a capture per camera angle at each captured step, only for a change to 3D geometry, the camera or effects.
 5. **Open every screenshot with the Read tool** and describe what it shows
-6. Run `npm run a11y` and `npm run validate:state`
+6. `npm run a11y` only when the diff changes colours, CSS or theme tokens; `npm run validate:state -- --dir <dir>` only when a check relies on the state dumps
 7. Report: `## VISUAL: PASS`, `## VISUAL: FAIL`, or `## VISUAL: BLOCKED`
 
 **Report BLOCKED only when the evidence does not exist** — no browser, dev server unreachable, screenshots never written. Never report PASS for images you did not open.
+
+**Every capture renders a frame in software** — seconds each without a GPU — so `--screenshots`, which captures every step, turns a scenario CI runs in seconds into minutes per step. Whether every scenario still plays in a real browser is CI's to prove: its interaction shards run each one on every push. You run a scenario to look at the steps that matter, not to re-prove it.
 
 ## Environment Setup
 
@@ -56,7 +61,7 @@ npm run scenario -- --scenario blast-basic
 
 ### Interaction mode
 ```bash
-npm run scenario -- --scenario my-interaction-test --mode interaction --screenshots
+npm run scenario -- --scenario my-interaction-test --mode interaction --screenshot-steps 3,last
 ```
 
 Interaction mode executes Puppeteer actions (click, type, waitForSelector, scroll) from scenario step `interaction` arrays. Steps without `interaction` fall back to command execution. Type definitions in `scripts/shared/scenario-types.ts`.
@@ -147,10 +152,10 @@ Per scenario step:
 - [ ] JSON state dump matches visual presentation
 - [ ] Command output matches expected state changes
 - [ ] UI state (button visibility, panel states) correct
-- [ ] `npm run validate:state` on state dumps — no type errors
+- [ ] `npm run validate:state` on state dumps a check relies on — no type errors
 
 ### Accessibility
-- [ ] `npm run a11y` — all text elements meet WCAG AA contrast (4.5:1)
+- [ ] Colours, CSS or theme tokens changed: `npm run a11y` — all text elements meet WCAG AA contrast (4.5:1)
 - [ ] No zero-size or invisible buttons (caught by `npm run ui:diagnostic`)
 
 ### Performance / Stability
@@ -214,3 +219,5 @@ In visual feedback loop: report all issues found. The lead fixes all of them, th
 - `dev-visual-testing` skill — detailed testing procedures + evaluation criteria
 - `dev-architecture` — renderer module structure
 - `gameplay-game-design` — expected visual presentation
+
+History: docs/context-history/agent-visual-tester.md

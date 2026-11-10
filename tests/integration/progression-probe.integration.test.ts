@@ -1,60 +1,25 @@
+// BlastSimulator2026 — Progression probe integration: the quick matrix and the ladder strategy
+//
+// The probe runs to finite metrics, deterministically, and fails without crashing. Split from progression-probe.integration.test.ts so the probe's
+// long runs execute in parallel (tests/helpers/progressionProbe.ts says why).
+
 import { describe, it, expect } from 'vitest';
 import { parseArgs } from '../../scripts/shared/probe-config.js';
 import type { ProbeRunConfig } from '../../scripts/shared/probe-config.js';
 import { runMatrix, runProbe } from '../../scripts/shared/probe-strategies.js';
 import { toJson } from '../../scripts/shared/probe-report.js';
 import type { RunResult } from '../../scripts/shared/probe-metrics.js';
-import { runCommand, type RunnerWithContext } from '../../src/console/createRunner.js';
-import { pushModifier } from '../../src/core/events/ActiveModifiers.js';
-
-const METRIC_KEYS = [
-  'cashAt', 'lowPointCash', 'lowPointTick', 'bankruptTick', 'firstBlastSoldShareAt6000',
-  'blastsFired', 'warehouseFullTick', 'ticksHaulWaitedOnFullStorage', 'boulderSoldShare',
-  'gradeReachedTick', 'affordableTick', 'firstSaleTick', 'salesCostRatio', 'salesCostWindows',
-];
-
-/** Collect every leaf value with its path. */
-function leaves(v: unknown, path = ''): Array<[string, unknown]> {
-  if (v !== null && typeof v === 'object') {
-    return Object.entries(v as object).flatMap(([k, c]) => leaves(c, path ? `${path}.${k}` : k));
-  }
-  return [[path, v]];
-}
-
-function expectFiniteOrAllowedNull(r: RunResult, horizon: number): void {
-  // Off the progression ladder (no grade state) every pit sample reads null.
-  const offLadder = Object.values(r.metrics.pitDepthAt ?? {}).every(v => v === null);
-  for (const [path, value] of leaves(r.metrics)) {
-    if (value === null) {
-      const m = /^cashAt\.(\d+)$/.exec(path);
-      const pit = /^pitDepthAt\.(\d+)$/.exec(path);
-      const allowed =
-        (m !== null && Number(m[1]) > horizon) ||
-        (pit !== null && (offLadder || Number(pit[1]) > horizon)) ||
-        path === 'firstBlastSoldShareAt6000' ||
-        path === 'boulderSoldShare' ||
-        path === 'boulderOreSoldShare' ||
-        path === 'catalogBoughtTick' ||
-        path === 'bankruptTick' ||
-        path === 'firstSaleTick' ||
-        path === 'salesCostRatio' ||
-        path.startsWith('salesCostWindows.') ||
-        path === 'warehouseFullTick' ||
-        path.startsWith('affordableTick.');
-      expect(allowed, `unexpected null at ${path}`).toBe(true);
-    } else {
-      expect(typeof value, path).toBe('number');
-      expect(Number.isFinite(value as number), path).toBe(true);
-    }
-  }
-}
+import { METRIC_KEYS, expectFiniteOrAllowedNull } from '../helpers/progressionProbe.js';
 
 describe('progression probe integration', () => {
   const opts = parseArgs(['--quick', '--horizon', '1200', '--strategy', 'opening']);
+  /** The first case's matrix, kept as one of the determinism case's two runs (a run is ~2 s; the cases only read it). */
+  let firstMatrix: RunResult[] | undefined;
 
   it('runs the quick matrix to one finite result', () => {
     const seen: RunResult[] = [];
     const results = runMatrix(opts, r => seen.push(r));
+    firstMatrix = results;
     expect(results).toHaveLength(1);
     expect(seen).toHaveLength(1);
     const r = results[0]!;
@@ -70,7 +35,8 @@ describe('progression probe integration', () => {
   }, 60000);
 
   it('is deterministic: two runs serialize identically', () => {
-    const a = toJson(runMatrix(opts), opts);
+    // Two independent runs: the first case's (when it ran) and a fresh one.
+    const a = toJson(firstMatrix ?? runMatrix(opts), opts);
     const b = toJson(runMatrix(opts), opts);
     expect(a).toBe(b);
   }, 60000);
@@ -84,14 +50,6 @@ describe('progression probe integration', () => {
     expect(r.config).toEqual(cfg);
     expectFiniteOrAllowedNull(r, 600);
   }, 60000);
-
-  it('reinvest fires strictly more blasts than the opening on the same setup (#1974)', () => {
-    const base = { seed: 42, biome: 'desert_badlands', kit: 'digger', horizon: 6000 } as const;
-    const opening = runProbe({ ...base, strategy: 'opening' });
-    const reinvest = runProbe({ ...base, strategy: 'reinvest' });
-    expectFiniteOrAllowedNull(reinvest, 6000);
-    expect(reinvest.metrics.blastsFired).toBeGreaterThan(opening.metrics.blastsFired);
-  }, 300000);
 
   it('never crashes on failure: endReason is null or a reason the run loop produces', () => {
     const r = runProbe({
@@ -121,90 +79,4 @@ describe('ladder strategy (#1945)', () => {
     const o = parseArgs(['--quick', '--horizon', '600', '--strategy', 'ladder']);
     expect(toJson(runMatrix(o), o)).toBe(toJson(runMatrix(o), o));
   }, 120000);
-});
-
-describe('probe --start-delay (#2118)', () => {
-  const base: ProbeRunConfig = { seed: 42, biome: 'desert_badlands', kit: 'digger', strategy: 'opening', horizon: 1200 };
-
-  it('a delay of 0 leaves the run identical to no delay at all', () => {
-    const plain = runProbe(base);
-    const zero = runProbe({ ...base, startDelay: 0 });
-    expect(zero.metrics).toEqual(plain.metrics);
-    expect(zero.endTick).toBe(plain.endTick);
-    expect(zero.endReason).toBe(plain.endReason);
-  }, 120000);
-
-  it('with no delay the opening fires its first blast inside the horizon', () => {
-    expect(runProbe(base).metrics.blastsFired).toBeGreaterThanOrEqual(1);
-  }, 60000);
-
-  it('a delay nearly as long as the horizon keeps the first order, and so every blast, out of the run', () => {
-    const r = runProbe({ ...base, startDelay: 1150 });
-    expect(r.metrics.blastsFired).toBe(0);
-    expect(r.endTick).toBeGreaterThanOrEqual(1150);
-    expect(r.endTick).toBeLessThanOrEqual(1200);
-    expect(r.config.startDelay).toBe(1150);
-  }, 120000);
-
-  it('a delayed run is deterministic', () => {
-    const o = parseArgs(['--quick', '--strategy', 'opening', '--horizon', '700', '--start-delay', '300']);
-    expect(toJson(runMatrix(o), o)).toBe(toJson(runMatrix(o), o));
-  }, 240000);
-
-  it('events during the delay are answered by the run event policy: the delayed run still ends without a stall', () => {
-    const r = runProbe({ ...base, horizon: 900, startDelay: 600, eventPolicy: 'cheapest' });
-    if (r.endReason !== null) expect(r.endReason).toMatch(/^(opening_failed:\w+|game_over:.+)$/);
-    expect(r.endReason).not.toBe('stalled');
-    expect(r.endTick).toBeGreaterThanOrEqual(600);
-  }, 120000);
-
-  it('reinvest honours the delay too', () => {
-    const r = runProbe({ ...base, strategy: 'reinvest', horizon: 400, startDelay: 380 });
-    expect(r.metrics.blastsFired).toBe(0);
-  }, 120000);
-});
-
-/** `runProbe`'s start: the default sandbox start, then `then` on the started game; keeps the engine for the assertions. */
-function startSandbox(cfg: ProbeRunConfig, kept: { engine?: RunnerWithContext }, then: (engine: RunnerWithContext) => void = () => {}) {
-  return (engine: RunnerWithContext): boolean => {
-    kept.engine = engine;
-    if (!runCommand(engine, `sandbox start biome:${cfg.biome} kit:${cfg.kit} seed:${cfg.seed}`).success) return false;
-    then(engine);
-    return true;
-  };
-}
-
-describe('probe upkeep through the low tail (#2126)', () => {
-  /** Lifts after the opening shot is charged (about t250 on this site) and well inside one opening step. */
-  const BAN_END_TICK = 600;
-
-  it('the opening waits out an event\'s blasting ban and fires, instead of giving the run up', () => {
-    const cfg: ProbeRunConfig = { seed: 42, biome: 'desert_badlands', kit: 'digger', strategy: 'opening', horizon: 900 };
-    const r = runProbe(cfg, startSandbox(cfg, {}, (engine) => pushModifier(engine.ctx.state!.events, {
-      kind: 'blast_ban', sourceEventId: '', role: null, targetId: null, category: null, magnitude: 1, startTick: 0, endTick: BAN_END_TICK,
-    })));
-    expect(r.endReason).toBeNull();
-    expect(r.metrics.blastsFired).toBeGreaterThanOrEqual(1);
-  }, 120000);
-
-  it('reinvest keeps its shots off its own buildings', () => {
-    // red_canyon digger seed 1 drilled its third shot across its depots at t2070 and lost every building at t2524.
-    const cfg: ProbeRunConfig = { seed: 1, biome: 'red_canyon', kit: 'digger', strategy: 'reinvest', horizon: 2600, eventPolicy: 'cheapest' };
-    const kept: { engine?: RunnerWithContext } = {};
-    runProbe(cfg, startSandbox(cfg, kept));
-    const types = kept.engine!.ctx.state!.buildings.buildings.map(b => b.type);
-    expect(types).toContain('freight_warehouse');
-    expect(types).toContain('spoil_heap');
-  }, 240000);
-
-  it('reinvest leaves no building order waiting on a site its crew cannot climb to', () => {
-    // green_foothills digger seed 5 put its research centre on a terrace above the crew at t580.
-    const cfg: ProbeRunConfig = { seed: 5, biome: 'green_foothills', kit: 'digger', strategy: 'reinvest', horizon: 900, eventPolicy: 'cheapest' };
-    const kept: { engine?: RunnerWithContext } = {};
-    runProbe(cfg, startSandbox(cfg, kept));
-    const state = kept.engine!.ctx.state!;
-    const stuck = state.pendingActions.filter(a => a.type === 'place_building' && a.blockedReason === 'target_unreachable');
-    expect(stuck.map(a => `${a.targetX},${a.targetZ}`)).toEqual([]);
-    expect([...state.buildings.buildings, ...state.plannedBuildings].some(b => b.type === 'research_center')).toBe(true);
-  }, 180000);
 });

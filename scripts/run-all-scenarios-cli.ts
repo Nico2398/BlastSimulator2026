@@ -18,6 +18,22 @@ export interface ParsedArgs {
   port: number;
   shard?: ShardSpec;
   reportDrift: boolean;
+  /**
+   * `--jobs N`: how many worker processes a command-mode batch fans out
+   * across (`run-all-scenarios-fanout.ts`). Absent means the machine's
+   * default; `--jobs 1` runs every scenario in this process, as before.
+   */
+  jobs?: number;
+  /**
+   * Internal: this process is a fan-out worker, serving scenarios its parent
+   * sends over IPC (`run-all-scenarios-worker.ts`) — never typed by a person.
+   */
+  worker?: true;
+}
+
+export function parseJobsArg(raw: string): number {
+  if (!/^[1-9]\d*$/.test(raw)) throw new Error(`--jobs must be a positive integer, got "${raw}"`);
+  return parseInt(raw, 10);
 }
 
 export function parseShardArg(raw: string): ShardSpec {
@@ -37,10 +53,17 @@ export function parseArgs(): ParsedArgs {
   let port = DEV_SERVER_PORT;
   let shard: ShardSpec | undefined;
   let reportDrift = false;
+  let jobs: number | undefined;
+  let worker = false;
   const scenarios: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--mode' && args[i + 1]) {
+    if (args[i] === '--jobs' && args[i + 1]) {
+      jobs = parseJobsArg(args[i + 1]!);
+      i++;
+    } else if (args[i] === '--worker') {
+      worker = true;
+    } else if (args[i] === '--mode' && args[i + 1]) {
       mode = args[i + 1]!;
       i++;
     } else if (args[i] === '--port' && args[i + 1]) {
@@ -56,7 +79,15 @@ export function parseArgs(): ParsedArgs {
     }
   }
 
-  return { mode, scenarios, port, ...(shard ? { shard } : {}), reportDrift };
+  return {
+    mode,
+    scenarios,
+    port,
+    ...(shard ? { shard } : {}),
+    reportDrift,
+    ...(jobs !== undefined ? { jobs } : {}),
+    ...(worker ? { worker: true as const } : {}),
+  };
 }
 
 /** What one interaction action costs on average, the unit `estimateScenarioCost` counts in. */
@@ -78,13 +109,15 @@ const WAIT_SECOND_COST = 3;
  * the game rather than on the DOM cost beyond their count — a blast step's
  * report waits out the collapse playback, a `waitUntil` runs hundreds of
  * ticks, a fixed `wait` sleeps for its duration. Command mode: the number
- * of steps. Neither needs measured durations that go stale as the suite
- * changes. The weights were chosen against CI run 34855681700's measured
+ * of steps. The weights were chosen against CI run 34855681700's measured
  * per-scenario durations (13.1 s mean, 110 s max): balancing on the action
  * count alone put 311 s on one shard of ten against an ideal 185 s, these
  * weights 227 s, and no static proxy does much better across 10–14 shards —
  * the remaining gap is a handful of scenarios whose cost is not in their
- * definition at all.
+ * definition at all. By CI run 42579175214 that gap had grown to 708 s on the
+ * slowest shard against 254 s on the fastest, so interaction shards now
+ * balance on measured seconds and use this estimate only for a scenario the
+ * measured table does not hold yet (run-all-scenarios-costs.ts).
  */
 export function estimateScenarioCost(def: Pick<ScenarioDef, 'steps'>, mode: string): number {
   if (mode !== 'interaction') return def.steps.length;

@@ -49,3 +49,7 @@ Every non-obvious mechanism here carries a comment naming the run that made it n
 ## Rule 6 — A stranger's event wakes nothing
 
 Added after the 2026-11-06 audit of outside PRs #2150/#2151, which found five places where a stranger's comment, pull request, branch name or issue form reached the PAT — `agentic-autonomous-pipeline`'s history ("references/github-loop.md — Only the owner's events reach the pipeline") tells each one. The former Rule 6 ("Nothing here removes a line but you") became Rule 7. The runners' old `comment.user.type != 'Bot'` filter was replaced, not kept beside the new `author_association == 'OWNER'` clause: a bot is never `OWNER`, so the old clause guarded nothing the new one does not.
+
+## How a change here is proven — `verify` instead of the whole suite (Nov 2026)
+
+Step 4 named `npm run test`, the whole suite. `verify`'s `logic` channel runs the test files a diff reaches, and a change to a workflow, composite action or decision module reaches all of `tests/unit/config/` — the suites that read the shipped YAML and scripts — in about ten seconds.
