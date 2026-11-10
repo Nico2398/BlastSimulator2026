@@ -3512,6 +3512,14 @@ export const SOFTWARE_TIER_VIBRATIONS = 3;
 export const SOFTWARE_TIER_OPTIMIZER = 4;
 /** Charge amounts the optimizer tries per explosive, from the smallest to the heaviest that fits a hole. */
 export const OPTIMIZER_SWEEP_STEPS = 8;
+/** Fewest amounts per explosive a large pattern is still swept with. */
+export const OPTIMIZER_MIN_SWEEP_STEPS = 3;
+/**
+ * Cap on hole x explosive x amount evaluations of one proposal, so the largest grade's pattern stays usable.
+ * Measured (4-core sandbox, 8 explosives, 8 steps): 36 holes ~1.1 s, 400 holes (grade 5 permit) ~19 s;
+ * at this budget the 400-hole pattern sweeps 4 amounts and costs ~10 s, a one-off click.
+ */
+export const OPTIMIZER_WORK_BUDGET = 12_800;
 /** A hole takes the cheapest charge whose good-band share is within this of its best. */
 export const OPTIMIZER_GOOD_TOLERANCE = 0.02;
 

@@ -14,7 +14,7 @@ import { resolveAvailableExplosives } from '../campaign/Level.js';
 import { permitLimitsFor } from '../economy/PermitLimits.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import { OPTIMIZER_SWEEP_STEPS, OPTIMIZER_GOOD_TOLERANCE } from '../config/balance.js';
+import { OPTIMIZER_SWEEP_STEPS, OPTIMIZER_MIN_SWEEP_STEPS, OPTIMIZER_WORK_BUDGET, OPTIMIZER_GOOD_TOLERANCE } from '../config/balance.js';
 
 export interface OptimizeChargesOptions {
   /** Explosives the level offers. */
@@ -44,6 +44,12 @@ interface Sample { explosiveId: string; kg: number; good: number; cost: number }
 
 /** One uniform-style candidate plan: an explosive swept across the pattern, each hole clamped to its own range. */
 interface Candidate { charges: Record<string, HoleCharge>; totalKg: number; pooledGood: number; complete: boolean }
+
+/** Amounts swept per explosive: the full sweep for small patterns, fewer as holes x explosives grow past the work budget. */
+export function optimizerSweepSteps(holeCount: number, explosiveCount: number): number {
+  const affordable = Math.floor(OPTIMIZER_WORK_BUDGET / Math.max(1, holeCount * explosiveCount));
+  return Math.max(OPTIMIZER_MIN_SWEEP_STEPS, Math.min(OPTIMIZER_SWEEP_STEPS, affordable));
+}
 
 const roundTenth = (kg: number): number => Math.round(kg * 10) / 10;
 
@@ -137,7 +143,7 @@ export function optimizeCharges(
     if (usable.length === 0) continue;
     const gLo = Math.min(...usable.map(h => ranges.get(h.id)!.lo));
     const gHi = Math.max(...usable.map(h => ranges.get(h.id)!.hi));
-    const steps = gHi > gLo ? OPTIMIZER_SWEEP_STEPS : 1;
+    const steps = gHi > gLo ? optimizerSweepSteps(active.length, explosiveIds.length) : 1;
     for (let i = 0; i < steps; i++) {
       const a = steps === 1 ? gLo : gLo + (gHi - gLo) * (i / (steps - 1));
       const charges: Record<string, HoleCharge> = {};
