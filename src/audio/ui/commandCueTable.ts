@@ -147,6 +147,7 @@ export const SILENT_COMMANDS: Readonly<Record<string, string>> = {
   landscape_info: 'read-only report',
   preview: 'read-only report',
   blast_preview: 'read-only report',
+  optimize_charges: 'read-only proposal; the charge orders it places with apply:true have their own cues',
   weather: 'debug control; the weather beds follow the simulated weather, not the command',
   new_game: 'screen transition; loading and level start have their own cues',
   campaign: 'screen transition; level start and end have their own cues',

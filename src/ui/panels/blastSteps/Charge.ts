@@ -45,6 +45,7 @@ import { permitPreview, chargeKgLimitWarning } from '../permitPreview.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 import { bandMixEl } from '../../bandMix.js';
 import { ChargeReadouts } from './chargeReadouts.js';
+import { ChargeOptimizerBlock } from './chargeOptimizerBlock.js';
 
 
 const DEFAULT_EXPLOSIVE = 'boomite';
@@ -77,6 +78,8 @@ export class ChargeStep {
   private readonly permitKgEl: HTMLElement;
   private readonly permitKgWarningEl: HTMLElement;
   private readonly holeList: ChargeHoleList;
+  /** Tier-4 charge optimizer: button, locked hint and the proposal (#2204). */
+  private readonly optimizer: ChargeOptimizerBlock;
   private readonly tubingCardEl: HTMLElement;
   private readonly drainEl: HTMLElement;
 
@@ -165,6 +168,7 @@ export class ChargeStep {
     this.permitKgWarningEl.dataset['role'] = 'permit-kg-warning';
     this.noticeEl = el('div');
     this.noticeEl.style.display = 'none';
+    this.optimizer = new ChargeOptimizerBlock(cmd => this.runAndNotify(cmd));
     this.holeList = new ChargeHoleList(holeId => this.chargeHole(holeId), holeId => this.runAndNotify(`drain_hole hole:${holeId}`));
 
     const tubingHeader = el('div', { className: 'bsx-section' });
@@ -174,7 +178,7 @@ export class ChargeStep {
 
     // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
-      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.paidOnFillEl, this.permitKgEl, this.permitKgWarningEl,
+      productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.optimizer.root, this.patternLineEl, this.paidOnFillEl, this.permitKgEl, this.permitKgWarningEl,
       this.holeList.root, this.drainEl, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
@@ -253,6 +257,7 @@ export class ChargeStep {
       level: state.campaign.activeLevelId,
       selected: this.selectedExplosiveId, amt: this.amountKg, stem: this.stemmingM,
       permitGrade: state.grade?.grade ?? null,
+      tier: state.softwareTier,
       // Hole ids *and* their charges, not just a count: a per-hole charge
       // changes neither the hole list nor anything else in the signature, so a
       // count-only signature would leave the row it was fired from stale.
@@ -277,6 +282,7 @@ export class ChargeStep {
     this.updateCapacityLine();
     this.updateFitLine(tightestDepth, tightestDiameter, holes.length + state.plannedDrillHoles.length === 0);
     this.updatePatternLines(state);
+    this.optimizer.render(state, this.stemmingM, this.gridProvider());
     this.holeList.render(
       holes, state.chargesByHole, state.plannedChargesByHole, drainViews,
       this.readouts.rows(state.chargesByHole, this.selectedExplosiveId, this.stemmingM),
