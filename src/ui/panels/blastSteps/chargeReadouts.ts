@@ -47,23 +47,29 @@ export class ChargeReadouts {
     return this.cardMixes.get(key) ?? null;
   }
 
-  /** Per-hole readouts: powder factor and band mix for charged holes, the recommended range for every hole. Empty without a grid. */
+  /** Per-hole readouts: powder factor for charged holes; band mix and recommended range need a grid. */
   rows(charges: Readonly<Record<string, HoleCharge>>, explosiveId: string, stemmingM: number): Record<string, HoleRowReadout> {
     const out: Record<string, HoleRowReadout> = {};
     const grid = this.grid;
-    if (!grid || this.holes.length === 0) return out;
-    const rangeKey = `${explosiveId}|${stemmingM}`;
-    let ranges = this.ranges.get(rangeKey);
-    if (!ranges) this.ranges.set(rangeKey, ranges = recommendedPowderFactors(this.holes, grid, explosiveId, stemmingM, this.wet));
-    const plan = { holes: [...this.holes], charges: { ...charges } };
-    const mixes = holeBandMixes(planHeatmap(plan, grid, this.wet).bands, this.holes);
     const factors = holePowderFactors(this.holes, charges);
+    let ranges: Record<string, PowderFactorRange | null> | undefined;
+    let mixes: Record<string, BandShares> = {};
+    if (grid) {
+      const rangeKey = `${explosiveId}|${stemmingM}`;
+      ranges = this.ranges.get(rangeKey);
+      if (!ranges) this.ranges.set(rangeKey, ranges = recommendedPowderFactors(this.holes, grid, explosiveId, stemmingM, this.wet));
+      const plan = { holes: [...this.holes], charges: { ...charges } };
+      mixes = holeBandMixes(planHeatmap(plan, grid, this.wet).bands, this.holes);
+    }
     for (const hole of this.holes) {
-      const readout: HoleRowReadout = { recommended: ranges[hole.id] ?? null };
+      const readout: HoleRowReadout = {};
+      if (ranges) readout.recommended = ranges[hole.id] ?? null;
       const factor = factors[hole.id];
-      if (factor !== undefined) readout.powderFactor = factor;
-      const shares = mixes[hole.id];
-      if (shares) readout.shares = shares;
+      if (factor !== undefined) {
+        readout.powderFactor = factor;
+        const shares = mixes[hole.id];
+        if (shares) readout.shares = shares;
+      }
       out[hole.id] = readout;
     }
     return out;
