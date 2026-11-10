@@ -90,7 +90,7 @@ export class ChargeHoleList {
     // Bounded + independently scrollable, same reasoning as the Charge step's
     // product list: a full plan (16 holes)
     // would otherwise push the tubing block past the panel's fold.
-    this.listEl = scrollBoundedSection([], 160, { gap: 3 });
+    this.listEl = scrollBoundedSection([], 220, { gap: 3 });
 
     this.el.append(header, this.listEl);
   }
@@ -121,7 +121,7 @@ export class ChargeHoleList {
     const ordered = !charged && planned !== undefined;
     const row = el('div');
     row.style.cssText = [
-      'display:flex', 'flex-wrap:wrap', 'align-items:center', 'gap:4px 9px', 'min-height:32px', 'padding:3px 10px',
+      'display:flex', 'flex-shrink:0', 'flex-wrap:wrap', 'align-items:center', 'gap:4px 9px', 'min-height:32px', 'padding:3px 10px',
       `border:1px solid ${charged ? 'rgba(79,199,107,.35)' : ordered ? 'rgba(255,170,0,.35)' : 'var(--bsx-hairline)'}`,
       'border-radius:4px',
       `background:${charged ? 'rgba(79,199,107,.08)' : ordered ? 'rgba(255,170,0,.08)' : 'var(--bsx-card)'}`,
