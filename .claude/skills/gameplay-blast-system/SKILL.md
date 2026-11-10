@@ -138,9 +138,18 @@ ranges; the blast, previews, heatmap and report all read it. A bound belongs to 
 |---|---|---|---|
 | < `CRACKED_VOXEL_ENERGY_RATIO` (0.5) | intact | blue | none |
 | 0.5 – `FRAGMENTATION_MULTIPLIER` (1) | cracked | pale blue | weakened, not broken |
+| broken, < 1 | coarse | violet | breaks out as large blocks (oversize needs the rock breaker) |
 | 1 – `FRAGMENTATION_BAND_FINES_MIN` (2) | good | green | haulable fragments |
 | 2 – `FRAGMENTATION_BAND_DUST_MIN` (4) | fines | orange | smaller, more numerous fragments (more loads to haul) |
 | ≥ 4 | dust | red | finest fragments; loses `DUST_LOSS_SHARE` of its mass and ore |
+
+`coarse` is not an intensity range: it is rock the blast removes without enough energy to fragment it
+(lifted burden, floor to grade, unsupported rock). `classifyFragmentationBand` never returns it;
+`fragmentationBandOf(intensity, broken)` does, and every reader that knows a voxel's fate uses that —
+`executeBlast`'s band volumes and `previewPlanBands` (which runs `identifyFragmentedVoxels` read-only
+unless `{ fate: false }`). A preview must never label rock that comes out as rock that stays put:
+on a standard pattern about half of what breaks is coarse. Sweeps that only compare good shares
+(recommended range, optimizer) pass `fate: false`, since coarse never takes a cell from good, fines or dust.
 
 Fragment size follows from the seed curve above, which already shrinks fragments monotonically
 across the bands. The explosive's tier never gates a band; the rock's threshold does. Overcharge does
@@ -153,9 +162,9 @@ The blast report (`BlastReportModal`) shows the band volumes, the kg lost to dus
 
 ### Energy heatmap (Blast Workshop)
 
-The workshop's heatmap toggle (`toggle-energy-heatmap`, every software tier including none) shows the plan's own energy field (`previewPlanBands` in `SoftwarePreview.ts`, built on `buildPlanEnergyField`) coloured by `classifyFragmentationBand`; colours are `FRAGMENTATION_BAND_COLORS` (`FragmentationBand.ts`), shared by overlay, section and legend. `planHeatmap` (`EnergyHeatmap.ts`) caches one result per grid/holes/charges/wet-holes/`editRevision`, so redraws and hovers cost nothing. Measured recompute: 100 holes 106 ms, 256 holes 183 ms, 576 holes (139k voxels) 257 ms; cached read under 1 ms. Two views: a top-down terrain overlay (`EnergyHeatmapOverlay`, a `GroundTintLayer`, opacity `HEATMAP_OVERLAY_OPACITY`) with one colour per column, and a vertical section (`EnergyHeatmapView`) through the row of voxels sharing the selected hole's z. A column shows the finest band covering at least `HEATMAP_COLUMN_BAND_MIN_SHARE` (0.15) of its filled voxels, so a lone fines voxel does not paint a whole column. Hover (panel cells and the scene `HoverTag`) names exact intensity and band. The console `preview energy` is ungated, like the heatmap.
+The workshop's heatmap toggle (`toggle-energy-heatmap`, every software tier including none) shows the plan's own energy field (`previewPlanBands` in `SoftwarePreview.ts`, built on `buildPlanEnergyField`) coloured by `classifyFragmentationBand`; colours are `FRAGMENTATION_BAND_COLORS` (`FragmentationBand.ts`), shared by overlay, section and legend. `planHeatmap` (`EnergyHeatmap.ts`) caches one result per grid/holes/charges/wet-holes/`editRevision`, so redraws and hovers cost nothing. Measured recompute: 100 holes 106 ms, 256 holes 183 ms, 576 holes (139k voxels) 257 ms; cached read under 1 ms. The fate pass (coarse) adds at most ~15% to `previewPlanBands` (576 holes: 152 ms without, 175 ms with). Two views: a top-down terrain overlay (`EnergyHeatmapOverlay`, a `GroundTintLayer`, opacity `HEATMAP_OVERLAY_OPACITY`) with one colour per column, and a vertical section (`EnergyHeatmapView`) through the row of voxels sharing the selected hole's z. A column shows the finest band covering at least `HEATMAP_COLUMN_BAND_MIN_SHARE` (0.15) of its filled voxels, so a lone fines voxel does not paint a whole column. Hover (panel cells and the scene `HoverTag`) names exact intensity and band. The console `preview energy` is ungated, like the heatmap.
 
-**Per-hole readouts (every tier).** A hole owns the cells nearest it by Chebyshev distance within half its spacing (`holeSpacingM`, `ChargePlan.ts`) and within its depth below the column's top; `holeBandMixes` (`SoftwarePreview.ts`) turns a `PlanBandMap` into five band shares per hole. `powderFactor` is kg per spacing² x depth. The Charge step's hole rows (charged holes: powder factor and band mix; all holes: recommended range) and the heatmap's `HoverTag` read the same `planHeatmap` result (`col.hole`). `recommendedPowderFactors` sweeps `RECOMMENDED_SWEEP_STEPS` fractions of each hole's max fitting charge and returns the contiguous run around the best sample whose good share is at least `RECOMMENDED_GOOD_SHARE_MIN` (0.5), or `null` ("No charge gives mostly good rock"). Explosive cards show the pattern's band mix for that explosive at the chosen kg (`previewExplosiveBandShares`) plus energy (`Energy N/kg`, game units), kg range and vibration. `ChargeReadouts` memoizes the sweeps per pattern, wet holes and `editRevision`.
+**Per-hole readouts (every tier).** A hole owns the cells nearest it by Chebyshev distance within half its spacing (`holeSpacingM`, `ChargePlan.ts`) and within its depth below the column's top; `holeBandMixes` (`SoftwarePreview.ts`) turns a `PlanBandMap` into six band shares per hole. `powderFactor` is kg per spacing² x depth. The Charge step's hole rows (charged holes: powder factor and band mix; all holes: recommended range) and the heatmap's `HoverTag` read the same `planHeatmap` result (`col.hole`). `recommendedPowderFactors` sweeps `RECOMMENDED_SWEEP_STEPS` fractions of each hole's max fitting charge and returns the contiguous run around the best sample whose good share stays at or above `RECOMMENDED_RELATIVE_GOOD_SHARE` (0.8) of the best's, or `null` when even the best sample is below `RECOMMENDED_GOOD_SHARE_MIN` (0.05) ("No charge of this explosive fragments this rock well"). The good band is a shell round each charge column, so no charge of a standard pattern makes a hole's rock mostly green (best samples reach 8-27%); an absolute "mostly good" bar gave every hole of every rock no range. Explosive cards show the pattern's band mix for that explosive at the chosen kg (`previewExplosiveBandShares`) plus energy (`Energy N/kg`, game units), kg range and vibration. `ChargeReadouts` memoizes the sweeps per pattern, wet holes and `editRevision`.
 
 ## Step 4 — Throw, Flight and the Muck Pile
 
@@ -369,11 +378,11 @@ Firing with ordered-but-undrilled holes (`plannedDrillHoles`) warns in the prefl
 
 | Tier | Name | Shows |
 |------|------|-------|
-| 0 | None | Blind blasting |
-| 1 | "BlastView Basic" | Fragment size distribution: average size, oversized count, band volumes (good, fines, dust), value lost to dust |
-| 2 | "FragPredict" | Projection risk zones tinted on the terrain (`ProjectionZoneOverlay`), plus the dry-run figures: predicted rating, thrown share, furthest throw |
-| 3 | "ProjectoScan" | Vibration at the level's villages |
-| 4 | "VibroMap Pro" | Charge optimizer: "Optimize charges" in the Charge step, `optimize_charges` in the console |
+| 0 | None | Energy heatmap only (free, Blast Workshop toggle) |
+| 1 | "Fragment Distribution" | Fragment size distribution: average size, oversized count, band volumes (good, fines, dust), value lost to dust |
+| 2 | "Projection Risk" | Projection risk zones tinted on the terrain (`ProjectionZoneOverlay`), plus the dry-run figures: predicted rating, thrown share, furthest throw |
+| 3 | "Vibration Model" | Vibration at the level's villages |
+| 4 | "Charge Optimizer" | Charge optimizer: "Optimize charges" in the Charge step, `optimize_charges` in the console |
 
 Energy is free at every tier through the workshop heatmap. Tier prices stay `SOFTWARE_TIER_COSTS` (500 / 2000 / 5000 / 12000) and a saved game keeps its tier number, so it gets that tier's new content. Tier numbers come from `SOFTWARE_TIER_FRAGMENTS`, `SOFTWARE_TIER_PROJECTIONS`, `SOFTWARE_TIER_VIBRATIONS` and `SOFTWARE_TIER_OPTIMIZER` in `balance.ts`. One dry run (`dryRunBlast`) serves T1 and T2 in `blast_preview`; `fragmentDistributionFrom` reads the T1 figures off it. The Preview step at tier 0 shows no gated stat and points to the heatmap; a locked row reads "Requires blasting software T{n}: <what it shows>", and every row is `explainable`. `lastBlastPreview.shape` (`BLAST_PREVIEW_SHAPE`) marks the content line-up; a save carrying another shape loads the preview as null. The console `preview energy` is ungated; `preview fragments|projections|vibrations` follow the tiers above.
 

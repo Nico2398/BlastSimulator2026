@@ -32,7 +32,7 @@ export function makePreviewSummary(
     fragments: tier >= 1
       ? {
         fractured: 77, cracked: 3, unaffected: 1, avgFragmentSizeCm: f.avgFragmentSizeCm,
-        bandVolumes: { intact: 7, cracked: 6, good: f.goodVolumeM3, fines: f.finesVolumeM3, dust: f.dustVolumeM3 },
+        bandVolumes: { intact: 7, cracked: 6, coarse: 0, good: f.goodVolumeM3, fines: f.finesVolumeM3, dust: f.dustVolumeM3 },
         fragmentCount: 100,
         oversizedFragments: f.oversized,
         goodVolumeM3: f.goodVolumeM3,

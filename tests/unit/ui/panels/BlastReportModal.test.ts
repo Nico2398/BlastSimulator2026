@@ -1108,7 +1108,7 @@ describe('BlastReportModal — stat explanations (#2168)', () => {
 
 describe('BlastReportModal — bands, failed holes and overcharge (#2202)', () => {
   const K = 'ui.blast_workshop.report.';
-  const BAND_KEYS = ['stat_band_cracked', 'stat_band_good', 'stat_band_fines', 'stat_band_dust'] as const;
+  const BAND_KEYS = ['stat_band_coarse', 'stat_band_cracked', 'stat_band_good', 'stat_band_fines', 'stat_band_dust'] as const;
   const ALL_KEYS = [
     ...BAND_KEYS, 'stat_dust_lost', 'dud_title', 'dud_hint', 'hole_reason_below_threshold',
     'hole_reason_fizzled', 'hole_reason_buried', 'hole_reasons_more', 'sealed_holes_title', 'overcharge_hint',
@@ -1116,7 +1116,7 @@ describe('BlastReportModal — bands, failed holes and overcharge (#2202)', () =
 
   type Bands = NonNullable<BlastReport['bandVolumes']>;
   /** Distinct three-digit volumes so each is easy to find in the text. */
-  const BANDS: Bands = { intact: 0, cracked: 311, good: 422, fines: 233, dust: 144 };
+  const BANDS: Bands = { intact: 0, cracked: 311, coarse: 577, good: 422, fines: 233, dust: 144 };
 
   function textOf(overrides: Partial<BlastReport>): string {
     const { modal, setPlayback } = makeModal();
@@ -1176,10 +1176,10 @@ describe('BlastReportModal — bands, failed holes and overcharge (#2202)', () =
   // ── C8: volume per band and dust loss ──
 
   describe('rock volume per band and dust loss (C8)', () => {
-    it('labels the four broken bands and shows each one\'s volume in m3', () => {
+    it('labels the coarse, cracked and broken bands and shows each one\'s volume in m3', () => {
       const text = textOf({ bandVolumes: BANDS, dustLossKg: 876, dustLossOreValue: 55 });
       const expected: Array<[typeof BAND_KEYS[number], number]> = [
-        ['stat_band_cracked', 311], ['stat_band_good', 422], ['stat_band_fines', 233], ['stat_band_dust', 144],
+        ['stat_band_coarse', 577], ['stat_band_cracked', 311], ['stat_band_good', 422], ['stat_band_fines', 233], ['stat_band_dust', 144],
       ];
       for (const [key, volume] of expected) {
         const label = t(K + key);
@@ -1202,6 +1202,15 @@ describe('BlastReportModal — bands, failed holes and overcharge (#2202)', () =
       expect(near).toContain('kg');
     });
 
+    it('shows zero coarse blocks on a report saved before the coarse band existed', () => {
+      const { coarse: _dropped, ...legacy } = BANDS;
+      const text = textOf({ bandVolumes: legacy as Bands });
+      const label = t(K + 'stat_band_coarse');
+      const at = text.indexOf(label);
+      expect(at).toBeGreaterThanOrEqual(0);
+      expect(text.slice(at + label.length, at + label.length + 10)).toMatch(/^\s*0 m³/);
+    });
+
     it('shows a zero dust loss as zero when the bands are there', () => {
       const text = textOf({ bandVolumes: { ...BANDS, dust: 0 }, dustLossKg: 0, dustLossOreValue: 0 });
       const at = text.indexOf(t(K + 'stat_dust_lost'));
@@ -1220,7 +1229,7 @@ describe('BlastReportModal — bands, failed holes and overcharge (#2202)', () =
     });
 
     it('the band labels read differently from each other', () => {
-      expect(new Set(BAND_KEYS.map(k => t(K + k))).size).toBe(4);
+      expect(new Set(BAND_KEYS.map(k => t(K + k))).size).toBe(BAND_KEYS.length);
     });
   });
 
@@ -1322,7 +1331,7 @@ describe('BlastReportModal — bands, failed holes and overcharge (#2202)', () =
 
   describe('overcharge card (C11)', () => {
     it('shows the m3 crushed into fines or dust and the share when fines are a large part of the broken rock', () => {
-      const bandVolumes: Bands = { intact: 0, cracked: 5, good: 60, fines: 30, dust: 10 };
+      const bandVolumes: Bands = { intact: 0, cracked: 5, coarse: 0, good: 60, fines: 30, dust: 10 };
       expect(finesShare(bandVolumes)).toBeGreaterThanOrEqual(OVERCHARGE_NOTE_MIN_FINES_SHARE);
       const found = readNumbers(textOf({ bandVolumes }), K + 'overcharge_hint', {}, ['volume', 'pct']);
       expect(found).toHaveLength(1);
@@ -1331,7 +1340,7 @@ describe('BlastReportModal — bands, failed holes and overcharge (#2202)', () =
     });
 
     it('shows it exactly at the threshold share', () => {
-      const bandVolumes: Bands = { intact: 0, cracked: 0, good: 300, fines: 70, dust: 30 };
+      const bandVolumes: Bands = { intact: 0, cracked: 0, coarse: 0, good: 300, fines: 70, dust: 30 };
       expect(finesShare(bandVolumes)).toBe(OVERCHARGE_NOTE_MIN_FINES_SHARE);
       const found = readNumbers(textOf({ bandVolumes }), K + 'overcharge_hint', {}, ['volume', 'pct']);
       expect(found).toHaveLength(1);
@@ -1340,25 +1349,25 @@ describe('BlastReportModal — bands, failed holes and overcharge (#2202)', () =
     });
 
     it('counts dust-only crushing too', () => {
-      const found = readNumbers(textOf({ bandVolumes: { intact: 0, cracked: 0, good: 20, fines: 0, dust: 80 } }), K + 'overcharge_hint', {}, ['volume', 'pct']);
+      const found = readNumbers(textOf({ bandVolumes: { intact: 0, cracked: 0, coarse: 0, good: 20, fines: 0, dust: 80 } }), K + 'overcharge_hint', {}, ['volume', 'pct']);
       expect(found).toHaveLength(1);
       expect(found[0]!['volume']).toBeCloseTo(80, 5);
       expect(found[0]!['pct']).toBeCloseTo(80, 5);
     });
 
     it('stays away just below the threshold share', () => {
-      const bandVolumes: Bands = { intact: 0, cracked: 0, good: 301, fines: 69, dust: 30 };
+      const bandVolumes: Bands = { intact: 0, cracked: 0, coarse: 0, good: 301, fines: 69, dust: 30 };
       expect(finesShare(bandVolumes)).toBeLessThan(OVERCHARGE_NOTE_MIN_FINES_SHARE);
       expect(readNumbers(textOf({ bandVolumes }), K + 'overcharge_hint', {}, ['volume', 'pct'])).toEqual([]);
     });
 
     it('stays away for a clean shot of good rock', () => {
-      const bandVolumes: Bands = { intact: 0, cracked: 12, good: 500, fines: 0, dust: 0 };
+      const bandVolumes: Bands = { intact: 0, cracked: 12, coarse: 0, good: 500, fines: 0, dust: 0 };
       expect(readNumbers(textOf({ bandVolumes }), K + 'overcharge_hint', {}, ['volume', 'pct'])).toEqual([]);
     });
 
     it('stays away when nothing broke, however the cracked volume looks', () => {
-      const bandVolumes: Bands = { intact: 0, cracked: 40, good: 0, fines: 0, dust: 0 };
+      const bandVolumes: Bands = { intact: 0, cracked: 40, coarse: 0, good: 0, fines: 0, dust: 0 };
       expect(readNumbers(textOf({ ...NOTHING, bandVolumes, holeFailures: [] }), K + 'overcharge_hint', {}, ['volume', 'pct'])).toEqual([]);
     });
 

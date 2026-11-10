@@ -138,7 +138,7 @@ describe('dryRunBlast — fragment distribution (#2201)', () => {
 
   it('has a volume for every fragmentation band, none negative', () => {
     const forecast = dryRunBlast(standardShot().plan, buildWallGrid({ plateauTop: 20 }), [], GROUND, NO_WET)!;
-    expect(Object.keys(forecast.bandVolumes).sort()).toEqual(['cracked', 'dust', 'fines', 'good', 'intact']);
+    expect(Object.keys(forecast.bandVolumes).sort()).toEqual(['coarse', 'cracked', 'dust', 'fines', 'good', 'intact']);
     for (const v of Object.values(forecast.bandVolumes)) expect(v).toBeGreaterThanOrEqual(0);
     expect(forecast.dustLossMassKg).toBeGreaterThanOrEqual(0);
     expect(forecast.dustLossValue).toBeGreaterThanOrEqual(0);

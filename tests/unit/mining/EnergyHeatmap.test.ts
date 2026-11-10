@@ -59,7 +59,7 @@ describe('EnergyHeatmap — summarizeColumn', () => {
 
   it('counts voxels per band and sums to the column length', () => {
     const s = summarizeColumn([INTACT, INTACT, CRACKED, GOOD, GOOD, GOOD, FINES, DUST]);
-    expect(s.counts).toEqual({ intact: 2, cracked: 1, good: 3, fines: 1, dust: 1 });
+    expect(s.counts).toEqual({ intact: 2, cracked: 1, coarse: 0, good: 3, fines: 1, dust: 1 });
     expect(Object.values(s.counts).reduce((a, b) => a + b, 0)).toBe(8);
   });
 
@@ -146,7 +146,7 @@ describe('EnergyHeatmap — summarizeColumns', () => {
     expect(cols).toHaveLength(3);
     const at = (x: number, z: number) => cols.find(c => c.x === x && c.z === z)!;
 
-    expect(at(1, 1).counts).toEqual({ intact: 1, cracked: 0, good: 2, fines: 0, dust: 0 });
+    expect(at(1, 1).counts).toEqual({ intact: 1, cracked: 0, coarse: 0, good: 2, fines: 0, dust: 0 });
     expect(at(1, 1).band).toBe('good');
     expect(at(2, 1).band).toBe('dust');
     expect(at(2, 1).maxIntensity).toBe(DUST);

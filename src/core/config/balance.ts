@@ -881,8 +881,22 @@ export const CRACKED_VOXEL_ENERGY_RATIO = 0.5;
 export const FRAGMENTATION_BAND_FINES_MIN = 2;
 export const FRAGMENTATION_BAND_DUST_MIN = 4;
 
-/** Good-band share of a hole's rock at or above which its charge counts as mostly green (#2203). */
-export const RECOMMENDED_GOOD_SHARE_MIN = 0.5;
+/**
+ * Smallest good-band share a hole's best charge must reach for a recommended range to exist (#2203).
+ * Below it the explosive cannot fragment that rock at any charge that fits, and the Charge step says so.
+ *
+ * Not "mostly green": the good band is a shell round each charge column, so even the best charge of a
+ * standard pattern leaves most of a hole's rock coarse, cracked or intact. Measured on uniform benches
+ * (3x3, 4 m spacing, 8 m holes, 89 mm, 2.5 m stemming; per hole, centre/corner), the best sample reaches
+ * cruite/boomite 27%/18%, molite/krackle 12%/8%, clunkite/shatternite 14%/9%, obstiite/dynatomics 13%/9%,
+ * titanite/dynatomics 13%/9%, but titanite/boomite only 3%/2%. At 0.5 no hole of any rock ever had a range.
+ */
+export const RECOMMENDED_GOOD_SHARE_MIN = 0.05;
+/**
+ * The recommended range is the run of charges whose good share is at least this fraction of the hole's
+ * best sample: the charges that fragment the rock nearly as well as the best one does.
+ */
+export const RECOMMENDED_RELATIVE_GOOD_SHARE = 0.8;
 /** Charge levels sampled, as fractions of a hole's heaviest fitting charge, to find its recommended powder factor (#2203). */
 export const RECOMMENDED_SWEEP_STEPS = 12;
 
@@ -895,7 +909,7 @@ export const CRACKED_VOXEL_WEAKENING = 0.7;
 
 /** Edge length of one voxel in centimetres. Voxels are 1 m³ (see world/VoxelGrid),
  *  so a fragment's size fraction of a voxel converts to cm by this factor —
- *  used by the FragPredict (tier 2) software preview. */
+ *  used by the fragment-distribution (tier 1) software preview. */
 export const VOXEL_SIZE_CM = 100;
 
 // ─── Danger Zone ──────────────────────────────────────────────────────────────────

@@ -397,7 +397,7 @@ describe('Software — fragmentDistributionFrom (#2201)', () => {
     thrownShare: 10 / 120,
     furthestThrowM: 7,
     clearedVoxels: 55,
-    bandVolumes: { intact: 9, cracked: 8, good: 31, fines: 12, dust: 5 },
+    bandVolumes: { intact: 9, cracked: 8, coarse: 0, good: 31, fines: 12, dust: 5 },
     oversizedFragments: 4,
     dustLossMassKg: 1234,
     dustLossValue: 567,
@@ -422,7 +422,7 @@ describe('Software — fragmentDistributionFrom (#2201)', () => {
   it('a forecast of nothing broken gives a zeroed distribution', () => {
     const empty = {
       ...FORECAST, fragmentCount: 0, projectionCount: 0, thrownShare: 0, furthestThrowM: 0, clearedVoxels: 0,
-      bandVolumes: { intact: 0, cracked: 0, good: 0, fines: 0, dust: 0 },
+      bandVolumes: { intact: 0, cracked: 0, coarse: 0, good: 0, fines: 0, dust: 0 },
       oversizedFragments: 0, dustLossMassKg: 0, dustLossValue: 0,
     };
     const dist = fragmentDistributionFrom(empty);

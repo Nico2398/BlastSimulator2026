@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   classifyFragmentationBand,
+  fragmentationBandOf,
   bandMassRetention,
   heatmapBandColor,
   finesShare,
@@ -32,7 +33,7 @@ describe('FragmentationBand — band bounds are ordered balance constants', () =
   });
 
   it('lists every band once, coarsest first and dust last', () => {
-    expect([...FRAGMENTATION_BANDS]).toEqual(['intact', 'cracked', 'good', 'fines', 'dust']);
+    expect([...FRAGMENTATION_BANDS]).toEqual(['intact', 'cracked', 'coarse', 'good', 'fines', 'dust']);
   });
 });
 
@@ -104,10 +105,38 @@ describe('FragmentationBand — classifyFragmentationBand', () => {
     }
   });
 
-  it('a sweep reaches every band', () => {
+  it('a sweep reaches every intensity band, never coarse (coarse needs the voxel\'s fate)', () => {
     const seen = new Set<FragmentationBand>();
     for (let i = 0; i <= 1200; i++) seen.add(classifyFragmentationBand(i / 100));
-    expect([...seen].sort()).toEqual([...FRAGMENTATION_BANDS].sort());
+    expect([...seen].sort()).toEqual(FRAGMENTATION_BANDS.filter(b => b !== 'coarse').sort());
+  });
+});
+
+// ── fragmentationBandOf ──────────────────────────────────────────────────────
+
+describe('FragmentationBand — fragmentationBandOf', () => {
+  it('broken rock below the good bound is coarse, whatever its intensity', () => {
+    expect(fragmentationBandOf(0, true)).toBe('coarse');
+    expect(fragmentationBandOf(CRACKED_VOXEL_ENERGY_RATIO, true)).toBe('coarse');
+    expect(fragmentationBandOf(FRAGMENTATION_MULTIPLIER - EPS, true)).toBe('coarse');
+  });
+
+  it('broken rock at or above the good bound keeps its intensity band', () => {
+    expect(fragmentationBandOf(FRAGMENTATION_MULTIPLIER, true)).toBe('good');
+    expect(fragmentationBandOf(FRAGMENTATION_BAND_FINES_MIN, true)).toBe('fines');
+    expect(fragmentationBandOf(FRAGMENTATION_BAND_DUST_MIN, true)).toBe('dust');
+  });
+
+  it('rock that stays put is never coarse: it reads as classifyFragmentationBand', () => {
+    for (const i of [0, CRACKED_VOXEL_ENERGY_RATIO, FRAGMENTATION_MULTIPLIER - EPS, FRAGMENTATION_MULTIPLIER, 9]) {
+      expect(fragmentationBandOf(i, false)).toBe(classifyFragmentationBand(i));
+    }
+  });
+
+  it('coarse keeps all its mass and has its own colour', () => {
+    expect(bandMassRetention('coarse')).toBe(1);
+    const others = FRAGMENTATION_BANDS.filter(b => b !== 'coarse').map(b => FRAGMENTATION_BAND_COLORS[b]);
+    expect(others).not.toContain(FRAGMENTATION_BAND_COLORS.coarse);
   });
 });
 
@@ -203,7 +232,7 @@ describe('FragmentationBand — heatmapBandColor', () => {
 
 describe('FragmentationBand — finesShare (#2202)', () => {
   const volumes = (v: Partial<Record<FragmentationBand, number>>): Record<FragmentationBand, number> =>
-    ({ intact: 0, cracked: 0, good: 0, fines: 0, dust: 0, ...v });
+    ({ intact: 0, cracked: 0, coarse: 0, good: 0, fines: 0, dust: 0, ...v });
 
   it('is the fines plus dust volume over the good plus fines plus dust volume', () => {
     expect(finesShare(volumes({ good: 60, fines: 30, dust: 10 }))).toBeCloseTo(0.4, 10);
@@ -238,7 +267,17 @@ describe('FragmentationBand — finesShare (#2202)', () => {
 
   it('ignores intact and cracked volume: they are not broken rock', () => {
     const base = finesShare(volumes({ good: 60, fines: 30, dust: 10 }));
-    expect(finesShare(volumes({ intact: 5000, cracked: 1000, good: 60, fines: 30, dust: 10 }))).toBeCloseTo(base, 10);
+    expect(finesShare(volumes({ intact: 5000, cracked: 1000, coarse: 0, good: 60, fines: 30, dust: 10 }))).toBeCloseTo(base, 10);
+  });
+
+  it('counts coarse blocks as broken rock: they dilute the fines share', () => {
+    expect(finesShare(volumes({ coarse: 60, fines: 30, dust: 10 }))).toBeCloseTo(0.4, 10);
+    expect(finesShare(volumes({ coarse: 50, good: 50 }))).toBe(0);
+  });
+
+  it('reads a report saved before coarse existed as having none', () => {
+    const legacy = { intact: 0, cracked: 0, good: 60, fines: 30, dust: 10 };
+    expect(finesShare(legacy)).toBeCloseTo(0.4, 10);
   });
 
   it('stays within 0 and 1', () => {

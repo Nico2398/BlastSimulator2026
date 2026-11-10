@@ -39,15 +39,19 @@ export interface ColumnBandSummary {
 
 const FINEST_FIRST: readonly FragmentationBand[] = [...FRAGMENTATION_BANDS].reverse();
 
-/** Summary of one column from its voxels' intensities. */
-export function summarizeColumn(intensities: readonly number[]): Omit<ColumnBandSummary, 'x' | 'z'> {
-  const counts: Record<FragmentationBand, number> = { intact: 0, cracked: 0, good: 0, fines: 0, dust: 0 };
+/** One voxel of a column: its intensity alone (banded by intensity), or a preview cell already banded with its fate. */
+type ColumnVoxel = number | Pick<PlanBandCell, 'intensity' | 'band'>;
+
+/** Summary of one column from its voxels. */
+export function summarizeColumn(voxels: readonly ColumnVoxel[]): Omit<ColumnBandSummary, 'x' | 'z'> {
+  const counts = Object.fromEntries(FRAGMENTATION_BANDS.map(b => [b, 0])) as Record<FragmentationBand, number>;
   let maxIntensity = 0;
-  for (const i of intensities) {
-    counts[classifyFragmentationBand(i)]++;
-    if (i > maxIntensity) maxIntensity = i;
+  for (const v of voxels) {
+    const intensity = typeof v === 'number' ? v : v.intensity;
+    counts[typeof v === 'number' ? classifyFragmentationBand(v) : v.band]++;
+    if (intensity > maxIntensity) maxIntensity = intensity;
   }
-  const total = intensities.length;
+  const total = voxels.length;
   const worstBand = FINEST_FIRST.find(b => counts[b] > 0) ?? 'intact';
   const band = total === 0
     ? 'intact'
@@ -57,12 +61,12 @@ export function summarizeColumn(intensities: readonly number[]): Omit<ColumnBand
 
 /** One summary per (x, z) column of the map. */
 export function summarizeColumns(map: PlanBandMap): ColumnBandSummary[] {
-  const byColumn = new Map<string, { x: number; z: number; values: number[] }>();
+  const byColumn = new Map<string, { x: number; z: number; values: PlanBandCell[] }>();
   for (const c of map.cells.values()) {
     const key = `${c.x},${c.z}`;
     let col = byColumn.get(key);
     if (!col) byColumn.set(key, col = { x: c.x, z: c.z, values: [] });
-    col.values.push(c.intensity);
+    col.values.push(c);
   }
   return [...byColumn.values()].map(c => ({ x: c.x, z: c.z, ...summarizeColumn(c.values) }));
 }

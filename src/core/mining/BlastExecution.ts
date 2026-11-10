@@ -3,7 +3,7 @@
 // Pure function operating on GameState + VoxelGrid, no side effects.
 
 import { analyseHoleFailures, type HoleFailure } from './HoleFailures.js';
-import { type FragmentationBand, FRAGMENTATION_BANDS, classifyFragmentationBand, bandMassRetention } from './FragmentationBand.js';
+import { type FragmentationBand, FRAGMENTATION_BANDS, classifyFragmentationBand, fragmentationBandOf, bandMassRetention } from './FragmentationBand.js';
 import { oreValuePerKg, type MarketId } from '../economy/Market.js';
 import { isFragmentSealed } from '../economy/SealedFragments.js';
 import type { Vec3 } from '../math/Vec3.js';
@@ -440,7 +440,8 @@ export function* executeBlastSteps(
       if ((v & (BLAST_SLICE_CELLS - 1)) === 0) yield;
       const { x, y, z } = fragmentation.fragmented[v]!;
       const ores = grid.oresAt(x, y, z);
-      const band = classifyFragmentationBand(intensityAt(field, x, y, z));
+      // Broken rock with too little energy to fragment it (lifted, floored, unsupported) is `coarse`.
+      const band = fragmentationBandOf(intensityAt(field, x, y, z), true);
       bandVolumes[band] += VoxelGrid.CELL_SIZE ** 3;
       if (ores) {
         const oreValue = calculateOreValue(ores, VoxelGrid.CELL_SIZE, marketId);
