@@ -14,7 +14,7 @@ function cssColor(hex: number): string {
 }
 
 /** "Intact 10% · Cracked 20% · Good 40% · …" — every band, whole percents. */
-export function bandMixText(shares: BandShares): string {
+function bandMixText(shares: BandShares): string {
   return FRAGMENTATION_BANDS
     .map(b => `${t(`blast.band.${b}`)} ${Math.round(shares[b] * PERCENT)}%`)
     .join(' · ');
