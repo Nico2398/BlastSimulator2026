@@ -208,7 +208,7 @@ function toShares(counts: BandCounts, total: number): BandShares {
 }
 
 /** A hole's footprint: its column and half its spacing. */
-export interface HoleCell { cx: number; cz: number; half: number }
+interface HoleCell { cx: number; cz: number; half: number }
 
 /** Nearest hole (Chebyshev distance in columns) whose half-spacing reaches column (x, z); null when none does. */
 export function ownerHoleOf<T extends HoleCell>(x: number, z: number, cells: readonly T[]): T | null {
