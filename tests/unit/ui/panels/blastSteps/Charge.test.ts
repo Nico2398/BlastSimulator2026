@@ -21,6 +21,7 @@ import { chargeKgLimitWarning, permitPreview } from '../../../../../src/ui/panel
 import { stemmingExplain } from '../../../../../src/ui/blastWorkshopExplain.js';
 import { pinnedDryCycle, pinnedCycle, rainAfterCycle } from '../../../../helpers/weatherCycles.js';
 import { recommendedRangeText } from '../../../../../src/ui/bandMix.js';
+import { permitLimitsFor } from '../../../../../src/core/economy/PermitLimits.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -1734,6 +1735,253 @@ describe('ChargeStep — explosive cards, powder factor and band mix (#2203)', (
       step.update(state, 'sunny');
       // 8 kg over 4 x 4 x 10
       expect(showsNumber(text(row(step, h.id), HOLE_PF), 0.05)).toBe(true);
+    });
+  });
+});
+
+
+// ── tier-4 charge optimizer (#2204) ──────────────────────────────────────────
+
+describe('ChargeStep — charge optimizer (#2204)', () => {
+  const OPTIMIZE = '[data-action="optimize-charges"]';
+  const LOCKED = '[data-role="optimizer-locked"]';
+  const PROPOSAL = '[data-role="charge-proposal"]';
+  const APPLY_ALL = '[data-action="apply-proposal"]';
+  const APPLY_HOLE = '[data-action="apply-proposal-hole"]';
+  const PROPOSAL_ROW = '[data-role="proposal-hole"]';
+
+  afterEach(() => setLocale('en'));
+
+  function optGrid(): VoxelGrid {
+    const grid = new VoxelGrid(40, 40);
+    const voxel = { composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+    for (let z = 3; z <= 34; z++)
+      for (let y = 0; y <= 12; y++)
+        for (let x = 3; x <= 34; x++) grid.setVoxel(x, y, z, voxel);
+    return grid;
+  }
+
+  /** Three drilled, uncharged 10 m holes on rock, software tier as given, mine grade 0 (40 kg permit). */
+  function optState(tier: number) {
+    const state = makeState();
+    state.softwareTier = tier;
+    state.grade = createGradeState();
+    const holes = [10, 12, 14].map(x => addHole(holeCounter, state.drillHoles, x, 10, 10, 0.089));
+    return { state, holes };
+  }
+
+  const optBtn = (step: ChargeStep): HTMLButtonElement | null => step.root.querySelector(OPTIMIZE);
+  const proposalRows = (step: ChargeStep): HTMLElement[] => Array.from(step.root.querySelectorAll<HTMLElement>(`${PROPOSAL} ${PROPOSAL_ROW}`));
+  const rowFor = (step: ChargeStep, id: string): HTMLElement | null => step.root.querySelector(`${PROPOSAL} ${PROPOSAL_ROW}[data-hole="${id}"]`);
+
+  function openProposal(tier = 4) {
+    const { step, gameConsole } = makeStep();
+    step.setGridProvider(() => optGrid());
+    const { state, holes } = optState(tier);
+    step.update(state, 'sunny');
+    optBtn(step)!.click();
+    step.update(state, 'sunny');
+    return { step, gameConsole, state, holes };
+  }
+
+  function parseCharge(cmd: string) {
+    const m = /^charge hole:(\S+) explosive:(\S+) amount:([\d.]+)kg stemming:([\d.]+)m$/.exec(cmd);
+    expect(m, cmd).not.toBeNull();
+    return { hole: m![1]!, explosive: m![2]!, amountKg: parseFloat(m![3]!), stemmingM: parseFloat(m![4]!) };
+  }
+
+  describe('gate', () => {
+    it('shows the Optimize charges button at tier 4 with drilled holes and a grid', () => {
+      const { step } = makeStep();
+      step.setGridProvider(() => optGrid());
+      step.update(optState(4).state, 'sunny');
+      expect(optBtn(step)).not.toBeNull();
+      expect(optBtn(step)!.textContent).toContain('Optimize charges');
+      expect(step.root.querySelector(LOCKED)).toBeNull();
+    });
+
+    it('shows the button above tier 4 as well', () => {
+      const { step } = makeStep();
+      step.setGridProvider(() => optGrid());
+      step.update(optState(5).state, 'sunny');
+      expect(optBtn(step)).not.toBeNull();
+    });
+
+    it.each([0, 1, 2, 3])('below tier 4 (tier %i) shows a locked hint naming the Charge Optimizer and no button', (tier) => {
+      const { step } = makeStep();
+      step.setGridProvider(() => optGrid());
+      step.update(optState(tier).state, 'sunny');
+      expect(optBtn(step)).toBeNull();
+      const hint = step.root.querySelector(LOCKED);
+      expect(hint).not.toBeNull();
+      expect(hint!.textContent).toContain('Charge Optimizer');
+    });
+
+    it('shows no button without drilled holes', () => {
+      const { step } = makeStep();
+      step.setGridProvider(() => optGrid());
+      const state = makeState();
+      state.softwareTier = 4;
+      step.update(state, 'sunny');
+      expect(optBtn(step)).toBeNull();
+    });
+
+    it('shows no button without a grid', () => {
+      const { step } = makeStep();
+      step.update(optState(4).state, 'sunny');
+      expect(optBtn(step)).toBeNull();
+    });
+
+    it('shows no button when the grid provider has no grid', () => {
+      const { step } = makeStep();
+      step.setGridProvider(() => null);
+      step.update(optState(4).state, 'sunny');
+      expect(optBtn(step)).toBeNull();
+    });
+
+    it('shows the proposal block only after the button is clicked', () => {
+      const { step, gameConsole } = makeStep();
+      step.setGridProvider(() => optGrid());
+      const { state } = optState(4);
+      step.update(state, 'sunny');
+      expect(step.root.querySelector(PROPOSAL)).toBeNull();
+      optBtn(step)!.click();
+      step.update(state, 'sunny');
+      expect(step.root.querySelector(PROPOSAL)).not.toBeNull();
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+
+    it('the locked hint is translated', () => {
+      const { step } = makeStep();
+      step.setGridProvider(() => optGrid());
+      const { state } = optState(2);
+      step.update(state, 'sunny');
+      const en = step.root.querySelector(LOCKED)!.textContent;
+      setLocale('fr');
+      step.refreshLocale();
+      step.update(state, 'sunny');
+      const fr = step.root.querySelector(LOCKED)!.textContent;
+      expect(fr!.length).toBeGreaterThan(0);
+      expect(fr).not.toBe(en);
+    });
+
+    it('the button label is translated', () => {
+      const { step } = makeStep();
+      step.setGridProvider(() => optGrid());
+      const { state } = optState(4);
+      step.update(state, 'sunny');
+      const en = optBtn(step)!.textContent;
+      setLocale('fr');
+      step.refreshLocale();
+      step.update(state, 'sunny');
+      expect(optBtn(step)!.textContent).not.toBe(en);
+    });
+  });
+
+  describe('proposal', () => {
+    it('lists one row per proposed hole, keyed by data-hole', () => {
+      const { step, holes } = openProposal();
+      const ids = proposalRows(step).map(r => r.dataset['hole']).sort();
+      expect(ids).toEqual(holes.map(h => h.id).sort());
+    });
+
+    it('shows the band mix, the cost and the permit kg used', () => {
+      const { step } = openProposal();
+      const block = step.root.querySelector(PROPOSAL)!;
+      for (const role of ['proposal-band-mix', 'proposal-cost', 'proposal-permit-kg']) {
+        const el = block.querySelector(`[data-role="${role}"]`);
+        expect(el, role).not.toBeNull();
+        expect((el!.textContent ?? '').trim().length + el!.children.length, role).toBeGreaterThan(0);
+      }
+    });
+
+    it('shows the permit limit of the mine grade', () => {
+      const { step } = openProposal();
+      const text = step.root.querySelector(`${PROPOSAL} [data-role="proposal-permit-kg"]`)!.textContent!;
+      expect(text).toContain(String(permitLimitsFor(0).maxChargeKg));
+    });
+
+    it('each row has its own Apply button', () => {
+      const { step } = openProposal();
+      for (const r of proposalRows(step)) expect(r.querySelector(APPLY_HOLE), r.dataset['hole']).not.toBeNull();
+    });
+
+    it('sends no command by merely showing the proposal', () => {
+      const { gameConsole } = openProposal();
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+
+    it('a repeat update does not send anything either', () => {
+      const { step, gameConsole, state } = openProposal();
+      step.update(state, 'sunny');
+      step.update(state, 'sunny');
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('apply', () => {
+    it('Apply all sends one charge command per proposed hole with explosive, kg and stemming, in one click', () => {
+      const { step, gameConsole } = openProposal();
+      const rows = proposalRows(step).map(r => r.dataset['hole']!).sort();
+      (step.root.querySelector(APPLY_ALL) as HTMLButtonElement).click();
+      const cmds = gameConsole.mock.calls.map(c => parseCharge(c[0] as string));
+      expect(cmds.map(c => c.hole).sort()).toEqual(rows);
+      for (const c of cmds) {
+        expect(getExplosive(c.explosive), c.hole).toBeDefined();
+        expect(c.stemmingM).toBe(CHARGE_DEFAULT_STEMMING_M);
+        expect(c.amountKg).toBeGreaterThan(0);
+      }
+    });
+
+    it('every command is within the explosive range for the hole and fits under the stemming', () => {
+      const { step, gameConsole, holes } = openProposal();
+      (step.root.querySelector(APPLY_ALL) as HTMLButtonElement).click();
+      for (const call of gameConsole.mock.calls) {
+        const c = parseCharge(call[0] as string);
+        const { minKg, maxKg } = explosiveHoleLimits(getExplosive(c.explosive)!, holes.find(h => h.id === c.hole)!.diameter);
+        expect(c.amountKg, c.hole).toBeGreaterThanOrEqual(minKg - 0.05);
+        expect(c.amountKg, c.hole).toBeLessThanOrEqual(maxKg + 0.05);
+      }
+    });
+
+    it('the commands total within the permit kg limit of the grade', () => {
+      const { step, gameConsole } = openProposal();
+      (step.root.querySelector(APPLY_ALL) as HTMLButtonElement).click();
+      const total = gameConsole.mock.calls.reduce((s, c) => s + parseCharge(c[0] as string).amountKg, 0);
+      expect(total).toBeLessThanOrEqual(permitLimitsFor(0).maxChargeKg + 0.05 * gameConsole.mock.calls.length);
+    });
+
+    it('a row Apply sends one command for that hole only', () => {
+      const { step, gameConsole, holes } = openProposal();
+      const target = holes[1]!;
+      (rowFor(step, target.id)!.querySelector(APPLY_HOLE) as HTMLButtonElement).click();
+      expect(gameConsole).toHaveBeenCalledTimes(1);
+      expect(parseCharge(gameConsole.mock.calls[0]![0] as string).hole).toBe(target.id);
+    });
+
+    it('the row Apply sends the explosive and kg its row proposes, the same as Apply all does for that hole', () => {
+      const first = openProposal();
+      const target = first.holes[2]!;
+      (rowFor(first.step, target.id)!.querySelector(APPLY_HOLE) as HTMLButtonElement).click();
+      const single = parseCharge(first.gameConsole.mock.calls[0]![0] as string);
+
+      const second = openProposal();
+      (second.step.root.querySelector(APPLY_ALL) as HTMLButtonElement).click();
+      const all = second.gameConsole.mock.calls.map(c => parseCharge(c[0] as string)).find(c => c.hole === target.id)!;
+      expect(single).toEqual(all);
+    });
+
+    it('proposes no water-sensitive explosive for a wet hole', () => {
+      const { step, gameConsole } = makeStep();
+      step.setGridProvider(() => optGrid());
+      const { state, holes } = optState(4);
+      setHoleWater(state, [holes[0]!.id]);
+      step.update(state, 'sunny');
+      optBtn(step)!.click();
+      step.update(state, 'sunny');
+      (step.root.querySelector(APPLY_ALL) as HTMLButtonElement).click();
+      const wet = gameConsole.mock.calls.map(c => parseCharge(c[0] as string)).filter(c => c.hole === holes[0]!.id);
+      for (const c of wet) expect(getExplosive(c.explosive)!.waterSensitive).toBe(false);
     });
   });
 });
