@@ -77,3 +77,7 @@ Records why the rules in the `gameplay-vehicle-fleet` skill exist: the issues th
 
 - Every vehicle tier climbs the same 20° on a progression site, and a limited request has no diagonal shortcut up a ramp: #2045.
 - Stranded vehicle recovery removed with core crater access: #2095.
+
+## Haul trip size by tier
+
+- A haul trip carries at most its tier capacity over a fines-bound fragment (6, 10, 16 pieces), so only an over-fragmented shot meets the count: blast design rework, pull request 2223.

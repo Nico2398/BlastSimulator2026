@@ -5,8 +5,9 @@
 // within vehicle capacity and storage room, and the count within maxItems.
 
 import { describe, it, expect } from 'vitest';
-import { selectHaulBatch, type HaulCandidate } from '../../../src/core/economy/HaulBatch.js';
-import { HAUL_BATCH_MAX_ITEMS, HAUL_BATCH_RADIUS_CELLS } from '../../../src/core/config/balance.js';
+import { haulBatchMaxItems, selectHaulBatch, type HaulCandidate } from '../../../src/core/economy/HaulBatch.js';
+import { HAUL_BATCH_FINES_FRAGMENT_KG, HAUL_BATCH_RADIUS_CELLS } from '../../../src/core/config/balance.js';
+import { getVehicleDefByTier } from '../../../src/core/entities/Vehicle.js';
 
 const c = (fragmentId: number, massKg: number): HaulCandidate => ({ fragmentId, massKg });
 const ids = (batch: HaulCandidate[]) => batch.map(b => b.fragmentId);
@@ -34,7 +35,7 @@ describe('selectHaulBatch', () => {
   it('caps the batch at maxItems, primary included', () => {
     const extras = [2, 3, 4, 5, 6, 7, 8].map(i => c(i, 10));
     expect(selectHaulBatch(c(1, 10), extras, 4000, 99999, 3)).toHaveLength(3);
-    expect(selectHaulBatch(c(1, 10), extras, 4000, 99999, HAUL_BATCH_MAX_ITEMS)).toHaveLength(HAUL_BATCH_MAX_ITEMS);
+    expect(selectHaulBatch(c(1, 10), extras, 4000, 99999, haulBatchMaxItems(4000))).toHaveLength(haulBatchMaxItems(4000));
   });
 
   it('maxItems of 1 yields only the primary', () => {
@@ -71,8 +72,40 @@ describe('selectHaulBatch', () => {
     expect(extras).toEqual(copy);
   });
 
-  it('balance constants: radius 8 cells, max 6 items', () => {
+  it('balance constants: radius 8 cells, fines-bound fragment 625 kg', () => {
     expect(HAUL_BATCH_RADIUS_CELLS).toBe(8);
-    expect(HAUL_BATCH_MAX_ITEMS).toBe(6);
+    expect(HAUL_BATCH_FINES_FRAGMENT_KG).toBe(625);
+  });
+});
+
+describe('haulBatchMaxItems', () => {
+  const capacity = (tier: 1 | 2 | 3) => getVehicleDefByTier('debris_hauler', tier).capacity;
+
+  it('carries 6, 10 and 16 pieces on tier 1, 2 and 3 haulers', () => {
+    expect([1, 2, 3].map(t => haulBatchMaxItems(capacity(t as 1 | 2 | 3)))).toEqual([6, 10, 16]);
+  });
+
+  it('fills a truck on mass with fragments at the fines bound or heavier', () => {
+    for (const tier of [1, 2, 3] as const) {
+      const n = haulBatchMaxItems(capacity(tier));
+      const goodKg = HAUL_BATCH_FINES_FRAGMENT_KG * 1.1;
+      const extras = Array.from({ length: 30 }, (_, i) => c(i + 2, goodKg));
+      const batch = selectHaulBatch(c(1, goodKg), extras, capacity(tier), Infinity, n);
+      expect(batch.length).toBeLessThan(n + 1);
+      expect(batch.reduce((s, b) => s + b.massKg, 0) + goodKg).toBeGreaterThan(capacity(tier));
+    }
+  });
+
+  it('meets the count first with fines, leaving the bed part empty', () => {
+    const n = haulBatchMaxItems(capacity(3));
+    const extras = Array.from({ length: 40 }, (_, i) => c(i + 2, 200));
+    const batch = selectHaulBatch(c(1, 200), extras, capacity(3), Infinity, n);
+    expect(batch).toHaveLength(n);
+    expect(batch.length * 200).toBeLessThan(capacity(3) / 2);
+  });
+
+  it('never drops below one item for a tiny truck', () => {
+    expect(haulBatchMaxItems(100)).toBe(1);
+    expect(haulBatchMaxItems(0)).toBe(1);
   });
 });

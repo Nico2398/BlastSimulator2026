@@ -10,7 +10,7 @@ import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback, type RampFlowField } from '../nav/Pathfinding.js';
 import { rampFlowField } from '../mining/RampFlow.js';
-import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_BATCH_MAX_ITEMS, HAUL_LOAD_TICKS } from '../config/balance.js';
+import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_LOAD_TICKS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole, minVehicleTierFor } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
@@ -26,7 +26,7 @@ import { isOversized } from '../mining/BlastCalc.js';
 // never evaluated at module-load time.
 import { findHaulDepotApproach } from '../economy/HaulingTask.js';
 import { findNearbyHaulableFragments } from '../economy/HaulDispatch.js';
-import { selectHaulBatch } from '../economy/HaulBatch.js';
+import { haulBatchMaxItems, selectHaulBatch } from '../economy/HaulBatch.js';
 import { largestWarehouseFreeKg } from '../economy/FreightWarehouses.js';
 import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
 import { haulDestinationOf } from '../economy/SpoilHeaps.js';
@@ -604,7 +604,7 @@ function planFragmentTaskItinerary(
     candidates.map(c => ({ fragmentId: c.fragment.id, massKg: c.fragment.mass })),
     def.capacity,
     destination === 'spoil_heap' ? Infinity : largestWarehouseFreeKg(state.logistics, freightWarehouseSites(state.buildings)),
-    HAUL_BATCH_MAX_ITEMS,
+    haulBatchMaxItems(def.capacity),
   );
   for (const extra of batch.slice(1)) {
     const extraTracked = candidateById.get(extra.fragmentId)!; // batch extras are drawn from candidates

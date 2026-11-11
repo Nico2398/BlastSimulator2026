@@ -2554,8 +2554,15 @@ export const CANDIDATE_SKILL_BONUS_MAX = 1;
 /** Radius (cells) around the primary fragment within which a haul batch gathers extras (#1370). */
 export const HAUL_BATCH_RADIUS_CELLS = 8;
 
-/** Most fragments one haul trip carries (#1370). */
-export const HAUL_BATCH_MAX_ITEMS = 6;
+/**
+ * Mass (kg) of a fragment at the fines bound: 0.25 m³ of ~2500 kg/m³ rock (`SEEDS_BASE`/`SEEDS_PER_INTENSITY`).
+ * A haul trip carries at most a truck's capacity divided by this many fragments (`haulBatchMaxItems`): 6 for a
+ * tier-1 hauler, 10 for tier 2, 16 for tier 3. Good-band fragments are heavier, so a well-fragmented shot fills
+ * the bed on mass and never meets the count; a shot broken finer runs out of items first and takes more trips.
+ * Measured on five 3 x 3 benches (molite/cruite, 4 m mesh): boomite trips +1% over no count limit at tier 3,
+ * shatternite (mostly fines and dust) +26%, fines-rich cruite +22%.
+ */
+export const HAUL_BATCH_FINES_FRAGMENT_KG = 625;
 
 /**
  * Ticks a hauler stands at a fragment loading it, whatever its size or mass (#2199).

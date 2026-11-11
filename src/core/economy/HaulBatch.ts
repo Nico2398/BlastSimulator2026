@@ -1,4 +1,5 @@
 import type { HaulCargoItem } from '../entities/Vehicle.js';
+import { HAUL_BATCH_FINES_FRAGMENT_KG } from '../config/balance.js';
 /** A fragment that could ride in a haul batch (#1370). */
 export type HaulCandidate = HaulCargoItem;
 
@@ -25,4 +26,13 @@ export function selectHaulBatch(
     massKg += candidate.massKg;
   }
   return batch;
+}
+
+/**
+ * Most fragments one haul trip carries for a truck of `capacityKg`: as many
+ * fines-bound fragments as fill it (`HAUL_BATCH_FINES_FRAGMENT_KG`), at least one.
+ * A bigger truck carries more pieces, and only an over-fragmented shot meets the limit.
+ */
+export function haulBatchMaxItems(capacityKg: number): number {
+  return Math.max(1, Math.floor(capacityKg / HAUL_BATCH_FINES_FRAGMENT_KG));
 }
