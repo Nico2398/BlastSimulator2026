@@ -412,16 +412,18 @@ export async function flushLandscape(page: Page): Promise<number> {
 }
 
 /**
- * Force one real render outside the normal draw loop. `drawFrame()` — the
- * only place `camera.updateMatrixWorld()` runs — is gated behind
- * `drawingEnabled` (`SceneManager.ts`), which interaction mode leaves false
- * for the whole run (`suspendDrawing`). Any programmatic camera move that is
- * not immediately followed by a capture (`captureFrame` already calls this)
- * leaves the camera's cached projection pinned to wherever it was last
- * actually rendered — `CameraController`'s own position/target state can be
- * perfectly correct while every interaction-mode tile projection
- * (`pickTile`/`dragTiles`, `__worldToScreen`) still raycasts against the
- * stale one (#1244).
+ * Refresh world matrices after a programmatic camera move that no capture
+ * follows: raycasts and `__worldToScreen` read matrices only, so the draw a
+ * `forceRenderFrame` pays for (seconds without a GPU) buys a click nothing.
+ */
+export async function syncSceneMatrices(page: Page): Promise<void> {
+  await page.evaluate(() => (window as unknown as { __syncScene: () => void }).__syncScene());
+}
+
+/**
+ * Force one real render outside the normal draw loop, which interaction mode
+ * leaves suspended for the whole run (`suspendDrawing`). Only a capture needs
+ * pixels; a camera move that a click follows needs `syncSceneMatrices` (#1244).
  */
 export async function forceRenderFrame(page: Page): Promise<void> {
   await page.evaluate(() => {

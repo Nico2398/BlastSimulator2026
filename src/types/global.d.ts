@@ -22,6 +22,8 @@ declare global {
     __setTutorialClockFollowsTimer: (enabled: boolean) => void;
     __setRenderEnabled: (enabled: boolean) => void;
     __renderFrame: () => void;
+    /** Settle pending work and refresh world matrices without drawing (clicks and projections need nothing more). */
+    __syncScene: () => void;
     /** Landscape chunks the per-frame streamer still owes the current camera — 0 once it has converged. Harnesses check this before capturing. */
     __landscapePending: () => number;
     /** Build every landscape chunk still owed, bypassing the per-frame budget; returns how many were built. Harnesses call this before capturing. */

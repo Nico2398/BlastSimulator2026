@@ -221,6 +221,17 @@ export class SceneManager {
     return this.drawingEnabled;
   }
 
+  /**
+   * Bring the camera's and every object's world matrices up to date without
+   * drawing. Raycasts and world-to-screen projections read only these, so a
+   * harness that moved the camera and wants to click needs this, not a frame —
+   * a drawn frame costs seconds to tens of seconds without a GPU.
+   */
+  syncMatrices(): void {
+    this.scene.updateMatrixWorld();
+    this.camera.updateMatrixWorld();
+  }
+
   /** Draw exactly one frame, even while drawing is suspended. */
   renderFrame(): void {
     this.drawFrame();

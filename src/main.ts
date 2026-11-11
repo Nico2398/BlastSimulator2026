@@ -1018,6 +1018,9 @@ if (scenarioMode) scene.setDrawingEnabled(false);
 window.__modelsReady = () => modelsReady.then(r => ({ loaded: r.loaded.length, failed: r.failed }));
 // A forced frame shows settled terrain: a deferred blast remesh lands first (#1603).
 window.__renderFrame = () => { finishBlastJob(); gameRenderer.finishTerrainRemesh(); scene.renderFrame(); };
+// Everything __renderFrame settles except the draw itself: the state a click or
+// a projection reads. Harnesses call this after moving the camera, and draw only to capture.
+window.__syncScene = () => { finishBlastJob(); gameRenderer.finishTerrainRemesh(); scene.syncMatrices(); };
 // Landscape chunks still queued for the current camera position (#1153's
 // streamer is budgeted per frame). A capture taken while this is non-zero
 // shows sky where ground has not been built yet, with scenery floating in
