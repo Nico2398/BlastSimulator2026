@@ -572,6 +572,7 @@ function planFragmentTaskItinerary(
   if (action.type === 'haul_debris' && isOversized(tracked.fragment.volume)) return null;
 
   const approach = fragmentApproachCell(tracked.fragment, state, vehicle.id);
+  if (approach === null) return null; // no free side to stand on: the order waits for the pile around it to go
   const toFragmentLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, approach.x, approach.z, { kind: 'effect', effectId: action.type === 'haul_debris' ? 'haul_load' : 'boulder_split' }, def, 'exact', false);
   if (toFragmentLeg === null) return null;
   if (action.type === 'haul_debris') withLoadDwell(toFragmentLeg);
@@ -609,6 +610,7 @@ function planFragmentTaskItinerary(
   for (const extra of batch.slice(1)) {
     const extraTracked = candidateById.get(extra.fragmentId)!; // batch extras are drawn from candidates
     const extraApproach = fragmentApproachCell(extraTracked.fragment, state, vehicle.id);
+    if (extraApproach === null) continue; // buried extra: the trip just carries less
     const extraLeg = buildDriveLeg(state, fidelity, vehicle, lastX, lastZ, extraApproach.x, extraApproach.z, { kind: 'effect', effectId: 'haul_load', targetId: extra.fragmentId }, def, 'exact', false);
     if (extraLeg === null) continue; // unreachable extra: the trip just carries less
     withLoadDwell(extraLeg);

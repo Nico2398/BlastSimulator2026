@@ -32,6 +32,7 @@ import { isChargeUnaffordable } from '../mining/ChargeLoad.js';
 import { dockedFrom, withDockingCells } from '../nav/DockingReach.js';
 import { buildingRingCells, buildingRingTouches } from '../nav/BuildingApproach.js';
 import { haulDestinationOf } from '../economy/SpoilHeaps.js';
+import { fragmentApproachCandidates } from '../economy/FragmentApproach.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
 import { getBuildingDef } from '../entities/Building.js';
@@ -46,6 +47,12 @@ type OrderReachabilityVerdict = 'reachable' | 'unreachable';
 /** Per-actor-pool reachability query over the current nav grid. */
 interface OrderReachability {
   canReach(key: OrderActorKey, x: number, z: number): boolean;
+  /**
+   * Whether the pool reaches where `action` is worked from: its target cell, or for
+   * debris any free cell beside the rock (`fragmentApproachCandidates`), since a
+   * rock's own cells are rubble no mover enters.
+   */
+  canReachTarget(action: PendingAction): boolean;
   hasActor(key: OrderActorKey): boolean;
 }
 
@@ -164,8 +171,21 @@ export function buildOrderReachability(
     const key = orderActorKey(action);
     if (!pools.has(key)) pools.set(key, buildActorPool(state, action, cache, uniformRatio));
   }
+  const canReach = (key: OrderActorKey, x: number, z: number): boolean => pools.get(key)?.reachable?.has(x, z) ?? false;
+  let fragmentOf: ReturnType<typeof createFragmentLookup> | null = null;
   return {
-    canReach: (key, x, z) => pools.get(key)?.reachable?.has(x, z) ?? false,
+    canReach,
+    canReachTarget: action => {
+      const key = orderActorKey(action);
+      if (isAutoDebrisAction(action.type)) {
+        fragmentOf ??= createFragmentLookup(state);
+        const tracked = fragmentOf(action.payload['fragmentId'] as number);
+        if (tracked !== undefined && tracked.state === 'on_ground') {
+          return fragmentApproachCandidates(tracked.fragment, state).some(c => canReach(key, c.x, c.z));
+        }
+      }
+      return canReach(key, action.targetX, action.targetZ);
+    },
     hasActor: key => pools.get(key)?.hasActor ?? false,
   };
 }
@@ -235,7 +255,7 @@ function judgeActions(state: GameState, targets: ReadonlyArray<PendingAction>): 
   const judgementOf = (action: PendingAction): Judgement => {
     const key = orderActorKey(action);
     const hasActor = reach.hasActor(key);
-    const reachable = hasActor && reach.canReach(key, action.targetX, action.targetZ) && reachesDepot(action, key);
+    const reachable = hasActor && reach.canReachTarget(action) && reachesDepot(action, key);
     return { verdict: reachable ? 'reachable' : 'unreachable', hasActor };
   };
 
@@ -309,7 +329,7 @@ function rampTooSteepDetail(
   reachAtWalkingLimit: OrderReachability,
   steepestRamp: () => ReturnType<typeof steepestBlockingRamp>,
 ): PendingAction['blockedDetail'] | undefined {
-  if (action.requiredVehicleRole === null || !reachAtWalkingLimit.canReach(orderActorKey(action), action.targetX, action.targetZ)) return undefined;
+  if (action.requiredVehicleRole === null || !reachAtWalkingLimit.canReachTarget(action)) return undefined;
   const blocking = steepestRamp();
   if (blocking === null) return undefined;
   return {

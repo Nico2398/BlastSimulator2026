@@ -53,10 +53,11 @@ function fillSolidColumn(grid: VoxelGrid, x: number, z: number, yMax: number) {
 }
 
 /** Minimal FragmentData fixture resting on the ground at (x, z) (#954). */
+/** A fragment lying on the ground of `fillSolid(grid, 4)` (surface about y = 5): rubble blocks the cells it rests on. */
 function makeGroundFragment(id: number, x: number, z: number): FragmentData {
   return {
     id,
-    position: { x, y: 0, z },
+    position: { x, y: 5.5, z },
     volume: 1,
     mass: 100,
     rockId: 'cruite',

@@ -336,7 +336,7 @@ describe('requestHaulFragment — happy path', () => {
     expect(loadLegs).toHaveLength(1);
     expect(unloadLegs).toHaveLength(1);
 
-    const fragmentApproach = fragmentApproachCell(fragment, state, vehicle.id);
+    const fragmentApproach = fragmentApproachCell(fragment, state, vehicle.id)!;
     expect(loadLegs[0]!.destX).toBe(fragmentApproach.x);
     expect(loadLegs[0]!.destZ).toBe(fragmentApproach.z);
 
@@ -602,11 +602,9 @@ describe('fragmentApproachCell — shared between hauling and breaking (#484)', 
     requestBreakBoulder(breakState, breakVehicle.id, 1);
     const breakSplitLeg = legsWithEffect(employee.itinerary!, 'boulder_split')[0]!;
 
-    const expected = fragmentApproachCell(haulFragment);
-    expect(haulLoadLeg.destX).toBe(expected.x);
-    expect(haulLoadLeg.destZ).toBe(expected.z);
-    expect(breakSplitLeg.destX).toBe(expected.x);
-    expect(breakSplitLeg.destZ).toBe(expected.z);
+    // Both stand on the same free cell beside the rock, never on the rock itself.
+    expect({ x: breakSplitLeg.destX, z: breakSplitLeg.destZ }).toEqual({ x: haulLoadLeg.destX, z: haulLoadLeg.destZ });
+    expect(Math.max(Math.abs(haulLoadLeg.destX - 6), Math.abs(haulLoadLeg.destZ - 9))).toBe(1);
   });
 });
 
@@ -647,7 +645,8 @@ describe('requestHaulFragment — batched hauls (#1370)', () => {
   }
 
   const cluster = (n: number, mass: number, firstId = 1) =>
-    Array.from({ length: n }, (_, i) => makeFragment(firstId + i, 5 + (i % 4), 5 + Math.floor(i / 4), mass));
+    // Every other cell: rubble blocks the ground under each rock, so each one keeps a free side to load from.
+    Array.from({ length: n }, (_, i) => makeFragment(firstId + i, 5 + 2 * (i % 4), 5 + 2 * Math.floor(i / 4), mass));
 
   it('plans one extra haul_load leg per nearby small fragment, then a single unload leg last', () => {
     const { itinerary } = planBatch(cluster(3, 500));

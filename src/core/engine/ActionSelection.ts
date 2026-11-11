@@ -4,6 +4,7 @@
 // served. Zero imports from GameLoop.ts — avoids a dependency cycle back into
 // the tick orchestrator that calls these functions.
 
+import { fragmentApproachCandidates } from '../economy/FragmentApproach.js';
 import { type GameState, type PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { getLivingEmployees, holdsRequiredSkill } from '../entities/Employee.js';
@@ -541,9 +542,15 @@ function selectWithinIndex(
   // stamping pass: it asks every member of every bin it visits, with no pathfinding.
   const climbReach = employeeClimbReach(state);
   const navGrid = state.navGrid;
-  const reachable = (a: PendingAction): boolean =>
-    climbReach === null || navGrid === null
-    || climbReach.canReach(employee.x, employee.z, navGrid.clampX(a.targetX), navGrid.clampZ(a.targetZ));
+  // A rock's own cells are rubble no one enters: debris is reached at a free cell beside it.
+  const reachable = (a: PendingAction): boolean => {
+    if (climbReach === null || navGrid === null) return true;
+    const tracked = isAutoDebrisAction(a.type) ? fragmentOf(a.payload['fragmentId'] as number) : undefined;
+    if (tracked !== undefined && tracked.state === 'on_ground') {
+      return fragmentApproachCandidates(tracked.fragment, state).some(c => climbReach.canReach(employee.x, employee.z, c.x, c.z));
+    }
+    return climbReach.canReach(employee.x, employee.z, navGrid.clampX(a.targetX), navGrid.clampZ(a.targetZ));
+  };
   // Built once per search (#1817): ores an open ore_sale offer is short of rank their hauls first.
   const urgency = oreHaulUrgency(state.contracts.available, state.contracts.active, state.collectedOre);
   const oreUrgent = urgency.size > 0 && ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS > 0;

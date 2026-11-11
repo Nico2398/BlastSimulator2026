@@ -1568,34 +1568,6 @@ function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: 
 }
 
 /**
- * Temporarily zeroes every on-ground fragment's `NavCell.fragmentOccupancy`
- * for the duration of `fn`, then restores it — shared by
- * `findPathAvoidingOccupiedCells` below so its own reroute search doesn't
- * treat a fresh blast's own fragment pile as impassable on top of every
- * other occupied cell it's already avoiding.
- */
-function withFragmentsUnmarked<T>(state: GameState, grid: NavGrid, fn: () => T): T {
-  const unmarkedFragments: Array<{ x: number; z: number; prev: number }> = [];
-  try {
-    for (const tracked of state.logistics.fragments) {
-      if (tracked.state !== 'on_ground') continue;
-      const fx = Math.round(tracked.fragment.position.x);
-      const fz = Math.round(tracked.fragment.position.z);
-      const cell = grid.cellAt(fx, fz);
-      if (!cell || !cell.fragmentOccupancy) continue;
-      unmarkedFragments.push({ x: fx, z: fz, prev: cell.fragmentOccupancy });
-      cell.fragmentOccupancy = 0;
-    }
-    return fn();
-  } finally {
-    for (const mark of unmarkedFragments) {
-      const cell = grid.cellAt(mark.x, mark.z);
-      if (cell) cell.fragmentOccupancy = mark.prev;
-    }
-  }
-}
-
-/**
  * Generalizes the vehicle-only reroute search this replaced (#1206) to any
  * mover — foot or vehicle — and any occupant it must route around: every
  * cell currently held in `state.agentOccupancy` (excluding `mover`'s own) is
@@ -1656,10 +1628,10 @@ function findPathAvoidingOccupiedCells(
       }
     }
 
-    return withFragmentsUnmarked(state, grid, () => findPath(grid, {
+    return findPath(grid, {
       agentId: emp.id, fromX, fromZ, toX: destX, toZ: destZ, avoidVehicles: true,
       ...driveLimits,
-    }));
+    });
   } finally {
     for (const mark of marked) {
       const cell = grid.cellAt(mark.x, mark.z);

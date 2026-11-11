@@ -1065,16 +1065,23 @@ describe('reachability cache (#1427)', () => {
     expect(verdicts(state)[id]).toBe('reachable');
   });
 
-  it('fragment and vehicle occupancy writes do not invalidate', () => {
+  it('vehicle occupancy writes do not invalidate', () => {
     const { state } = stage();
     judgeQueuedOrders(state);
     fills.count = 0; fills.labels = 0;
-    state.navGrid!.addFragmentOccupant(8, 8);
-    state.navGrid!.removeFragmentOccupant(8, 8);
     state.navGrid!.cellAt(7, 7)!.vehicleOccupied = true;
     judgeQueuedOrders(state);
     expect(fills.count).toBe(0);
     expect(fills.labels).toBe(0);
+  });
+
+  it('fragment occupancy writes invalidate: rubble blocks every mover', () => {
+    const { state } = stage();
+    judgeQueuedOrders(state);
+    fills.labels = 0;
+    state.navGrid!.addFragmentOccupant(8, 8);
+    judgeQueuedOrders(state);
+    expect(fills.labels).toBeGreaterThan(0);
   });
 
   it('replacing the nav grid with an identical-looking one invalidates', () => {
@@ -1666,14 +1673,14 @@ describe('ramp covered by crater fragments (#2085)', () => {
    * own columns. By default the column is rubble only (no building), so rubble is all that separates digger
    * and ramp; `sealed` keeps the impassable wall under it, so the far side is genuinely cut off.
    */
-  function stageBuriedRamp(sealed = false): { state: GameState; id: number } {
+  function stageBuriedRamp(sealed = false, rubbleWall = true): { state: GameState; id: number } {
     const state = makeState(sealed);
     hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_digger, 'driving.excavator']);
     purchaseVehicle(state.vehicles, 'rock_digger', IN_A.x, IN_A.z);
     const cells = RAMP_X.map(x => ({ x, y: 0, z: RAMP_Z }));
     const covered = [
       ...RAMP_X.map(x => ({ x, z: RAMP_Z })),
-      ...Array.from({ length: HEIGHT }, (_, z) => ({ x: WALL_X, z })),
+      ...(rubbleWall ? Array.from({ length: HEIGHT }, (_, z) => ({ x: WALL_X, z })) : []),
     ];
     addBlastFragments(state.logistics, covered.map((c, i) => rubble(i + 1, c.x, c.z)), state.navGrid);
     const id = queue(state, 'dig_ramp_segment', { x: 13, z: RAMP_Z }, {
@@ -1689,18 +1696,27 @@ describe('ramp covered by crater fragments (#2085)', () => {
     return { state, id };
   }
 
-  it('classifies the lead segment reachable instead of target_unreachable', () => {
-    const { state, id } = stageBuriedRamp();
+  it('a ramp whose own cells lie under rubble is dug from a free side: the lead segment reads reachable', () => {
+    const { state, id } = stageBuriedRamp(false, false);
     classifyQueuedOrders(state);
     const action = state.pendingActions.find(a => a.id === id)!;
     expect(judgeQueuedOrders(state).get(id)).toBe('reachable');
     expect(action.blockedReason ?? null).not.toBe('target_unreachable');
+    expect(ghostOf(state, id).unreachable).toBe(false);
   });
 
-  it('leaves the lead segment ghost blue', () => {
+  it('a band of rubble across the site cuts the digger off: rubble blocks vehicles until it is hauled', () => {
     const { state, id } = stageBuriedRamp();
     classifyQueuedOrders(state);
-    expect(ghostOf(state, id).unreachable).toBe(false);
+    expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
+    // Hauling the band away opens the way again.
+    for (const tracked of [...state.logistics.fragments]) {
+      if (tracked.fragment.position.x !== WALL_X) continue;
+      state.navGrid!.removeFragmentFootprint(tracked.fragment);
+      state.logistics.fragments.splice(state.logistics.fragments.indexOf(tracked), 1);
+    }
+    classifyQueuedOrders(state);
+    expect(judgeQueuedOrders(state).get(id)).toBe('reachable');
   });
 
   it('a haul_debris order on the sealed cell still stays debris_out_of_reach', () => {

@@ -23,6 +23,7 @@ import {
   NAV_CLEARANCE_MAX_CELLS,
 } from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
+import { fragmentFootprintCells, fragmentRestsOn, type FootprintFragment } from './FragmentFootprint.js';
 import { NEIGHBOUR_OFFSETS_4, NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 
 // Read once: the step checks below run per A* neighbour and per flood-fill cell, and a transpiled import is a getter
@@ -192,6 +193,16 @@ export function hasClearance(cell: NavCell | undefined, requiredClearance: numbe
  * holds or can cheaply resolve its own cell reference. `undefined` (an
  * out-of-bounds or not-yet-built cell) is never occupied.
  */
+/**
+ * Whether rubble blocks a mover that needs `requiredClearance`: vehicles (which route at
+ * NAV_CLEARANCE_VEHICLE_CELLS) never drive over a fragment and load it from beside it
+ * (`fragmentApproachCell`); a worker on foot steps round rubble when there is a way round
+ * (`avoidVehicles`) and over it when there is not (an evacuation, a stranded crew).
+ */
+export function rubbleBlocksMover(requiredClearance: number): boolean {
+  return requiredClearance > NAV_CLEARANCE_EMPLOYEE_CELLS;
+}
+
 export function isCellOccupied(cell: NavCell | undefined): boolean {
   return !!cell && (cell.vehicleOccupied || (cell.fragmentOccupancy ?? 0) > 0);
 }
@@ -231,6 +242,13 @@ export class NavGrid {
    * directly, bypassing `setCellAt`, must call `bumpRevision`.
    */
   revision = 0;
+
+  /**
+   * Bumped whenever a cell's fragment occupancy changes. Rubble blocks every
+   * mover, so a reachability labelling is valid for one `revision` and one
+   * `fragmentRevision` together.
+   */
+  fragmentRevision = 0;
 
   /** Mark the grid as changed; invalidates caches keyed on `revision`. */
   bumpRevision(): void {
@@ -288,6 +306,7 @@ export class NavGrid {
     const cell = this.cellAt(x, z);
     if (!cell) return;
     cell.fragmentOccupancy = (cell.fragmentOccupancy ?? 0) + 1;
+    this.fragmentRevision++;
   }
 
   /**
@@ -299,7 +318,30 @@ export class NavGrid {
     const cell = this.cellAt(x, z);
     if (!cell) return;
     cell.fragmentOccupancy = Math.max(0, (cell.fragmentOccupancy ?? 0) - 1);
+    this.fragmentRevision++;
   }
+
+  /** Mark every cell `fragment` covers as occupied by it (`fragmentFootprintCells`). */
+  addFragmentFootprint(fragment: FootprintFragment): void {
+    const cells = fragmentFootprintCells(fragment).filter(c => fragmentRestsOn(fragment, this.cellAt(c.x, c.z)?.surfaceY));
+    for (const c of cells) this.addFragmentOccupant(c.x, c.z);
+    if (fragment.id !== undefined) this.fragmentCells.set(fragment.id, cells);
+  }
+
+  /**
+   * Undo `addFragmentFootprint` for `fragment`: the cells it was marked on, even if
+   * the ground under them changed since; recomputed at its current position when
+   * this grid never marked it (a fixture, or a fragment added before a rebuild).
+   */
+  removeFragmentFootprint(fragment: FootprintFragment): void {
+    const recorded = fragment.id === undefined ? undefined : this.fragmentCells.get(fragment.id);
+    const cells = recorded ?? fragmentFootprintCells(fragment).filter(c => fragmentRestsOn(fragment, this.cellAt(c.x, c.z)?.surfaceY));
+    for (const c of cells) this.removeFragmentOccupant(c.x, c.z);
+    if (fragment.id !== undefined) this.fragmentCells.delete(fragment.id);
+  }
+
+  /** The cells each fragment was marked on (`addFragmentFootprint`), so removing it unmarks exactly those. Runtime only. */
+  private readonly fragmentCells = new Map<number, Array<{ x: number; z: number }>>();
 
   /** Clamp world x into the covered box. */
   clampX(x: number): number {
@@ -433,9 +475,7 @@ export class NavGrid {
 
     const navGrid = new NavGrid(width, height, cells, maxSurfaceY, originX, originZ, maxVoxelY);
 
-    for (const fragment of groundFragments) {
-      navGrid.addFragmentOccupant(Math.round(fragment.position.x), Math.round(fragment.position.z));
-    }
+    for (const fragment of groundFragments) navGrid.addFragmentFootprint(fragment);
     for (const vehicle of vehicles) {
       if (isVehicleCurrentlyDriving(vehicle, employees)) continue;
       const cell = navGrid.cellAt(Math.round(vehicle.x), Math.round(vehicle.z));

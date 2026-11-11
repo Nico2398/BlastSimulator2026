@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Pathfinding: A* route finding over the NavGrid
 // Part of the navmesh system.
 
-import { NavGrid, isCellStepClimbable, isGridStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
+import { NavGrid, isCellStepClimbable, isGridStepClimbable, isCellOccupied, hasClearance, rubbleBlocksMover } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
 import {
   pathfindingNodeBudget, pathfindingRetryNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO,
@@ -240,6 +240,8 @@ export function isImpassable(
 ): boolean {
   if (isAgentCell) return false;
   if (cell.type === 'blocked' || cell.type === 'void') return true;
+  // Rubble blocks a vehicle whatever the route (`rubbleBlocksMover`): it loads a rock from beside it.
+  if (rubbleBlocksMover(requiredClearance) && (cell.fragmentOccupancy ?? 0) > 0) return true;
   if (avoidVehicles && isCellOccupied(cell)) return true;
   if (!skipClearance && !hasClearance(cell, requiredClearance)) return true;
   return false;

@@ -1,5 +1,6 @@
 // BlastSimulator2026 — Planned drill holes buried under on-ground rubble (#1937)
 
+import { fragmentFootprintCells, fragmentRestsOn } from '../nav/FragmentFootprint.js';
 import { isProgressionSite, type GameState, type PendingAction } from '../state/GameState.js';
 import { findById } from '../state/IdIndex.js';
 import type { TrackedFragment } from '../economy/Logistics.js';
@@ -19,13 +20,9 @@ export function cellKey(x: number, z: number): number {
   return (x + CELL_OFFSET) * CELL_STRIDE + (z + CELL_OFFSET);
 }
 
-/** Cells (Math.round, as the nav grid, inclusive) a footprint covers, passed to `visit`. */
+/** Cells a footprint covers, passed to `visit`: the nav grid's own rule (`fragmentFootprintCells`), so a hole reads buried exactly when rubble blocks its cell. */
 function forEachCoveredCell(f: FragmentFootprint, visit: (key: number) => void): void {
-  const x1 = Math.round(f.x + f.halfX);
-  const z1 = Math.round(f.z + f.halfZ);
-  for (let cx = Math.round(f.x - f.halfX); cx <= x1; cx++) {
-    for (let cz = Math.round(f.z - f.halfZ); cz <= z1; cz++) visit(cellKey(cx, cz));
-  }
+  for (const c of fragmentFootprintCells({ position: { x: f.x, z: f.z }, halfExtents: { x: f.halfX, z: f.halfZ } })) visit(cellKey(c.x, c.z));
 }
 
 /** Indexes every cell covered by the given fragment footprints. */
@@ -72,7 +69,16 @@ function rubbleIndexOf(state: GameState): BuriedCellIndex {
   const sealed = sealedFragmentIdsOf(state);
   const hit = rubbleCache.get(state);
   if (hit !== undefined && hit.tick === state.tickCount && hit.count === fragments.length && hit.sealed === sealed) return hit.value;
-  const value = buildBuriedCellIndex(fragments.filter(f => isHaulableRubble(f, sealed)).map(footprintOf));
+  // The cells each fragment lies on, by the nav grid's own rule (`addFragmentFootprint`): a hole reads
+  // buried exactly when rubble blocks its cell for the rig.
+  const nav = state.navGrid;
+  const value = new Set<number>();
+  for (const tracked of fragments) {
+    if (!isHaulableRubble(tracked, sealed)) continue;
+    for (const c of fragmentFootprintCells(tracked.fragment)) {
+      if (nav === null || fragmentRestsOn(tracked.fragment, nav.cellAt(c.x, c.z)?.surfaceY)) value.add(cellKey(c.x, c.z));
+    }
+  }
   rubbleCache.set(state, { tick: state.tickCount, count: fragments.length, value, sealed });
   return value;
 }
@@ -92,22 +98,29 @@ export function hasPlannedHolesOnSite(state: GameState): boolean {
   return isProgressionSite(state) && state.plannedDrillHoles.length > 0;
 }
 
+/** True when on-ground rubble covers the cell holding (x, z) (`rubbleIndexOf`). O(1) per query. */
+function rubbleCovers(state: GameState, x: number, z: number): boolean {
+  return isCellBuried(rubbleIndexOf(state), x, z);
+}
+
 /** Ids of planned holes buried under on-ground rubble; empty off progression sites. */
 export function buriedHolesOf(state: GameState): Set<string> {
   if (!hasPlannedHolesOnSite(state)) return new Set<string>();
-  return buriedHoleIds(rubbleIndexOf(state), state.plannedDrillHoles);
+  const ids = new Set<string>();
+  for (const h of state.plannedDrillHoles) if (rubbleCovers(state, h.x, h.z)) ids.add(h.id);
+  return ids;
 }
 
 /** True when the planned hole `holeId` is buried under on-ground rubble. */
 export function isHoleBuried(state: GameState, holeId: string): boolean {
   if (!isProgressionSite(state)) return false;
   const hole = state.plannedDrillHoles.find(h => h.id === holeId);
-  return hole !== undefined && isCellBuried(rubbleIndexOf(state), hole.x, hole.z);
+  return hole !== undefined && rubbleCovers(state, hole.x, hole.z);
 }
 
 /** True when the cell containing (x, z) lies under on-ground rubble; false off progression sites. O(1) per query. */
 function isCellUnderRubble(state: GameState, x: number, z: number): boolean {
-  return hasPlannedHolesOnSite(state) && isCellBuried(rubbleIndexOf(state), x, z);
+  return hasPlannedHolesOnSite(state) && rubbleCovers(state, x, z);
 }
 
 /** True for a queued drill_hole order whose planned hole lies under on-ground rubble (#1937). */

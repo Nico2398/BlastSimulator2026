@@ -29,15 +29,15 @@ export function accessSurface(state: GameState, grid: VoxelGrid): AccessSurface 
   const reach = siteVehicleReach(state);
   const nav = state.navGrid;
   if (reach === null || nav === null) return null;
-  const rubble = new Set(state.logistics.fragments.filter(f => f.state === 'on_ground')
-    .map(f => `${Math.round(f.fragment.position.x)},${Math.round(f.fragment.position.z)}`));
+  // The cells rubble lies on (`addFragmentFootprint`): what blocks a ramp's way.
+  const holdsRubbleAt = (x: number, z: number): boolean => (nav.cellAt(x, z)?.fragmentOccupancy ?? 0) > 0;
   const buildings = buildingFootprintOccupants(state);
   return {
     heightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
     contains: (x, z) => grid.containsColumn(x, z) && (nav.cellAt(x, z)?.type ?? 'void') !== 'void'
       && !buildings.some(b => isBuildingFootprintCell(b, x, z)),
     reachableFrom: reach,
-    holdsRubble: (x, z) => rubble.has(`${x},${z}`),
+    holdsRubble: holdsRubbleAt,
   };
 }
 

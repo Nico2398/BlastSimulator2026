@@ -236,7 +236,7 @@ describe('requestBreakBoulder — happy path', () => {
     const splitLegs = legsWithEffect(driver.itinerary!, 'boulder_split');
     expect(splitLegs).toHaveLength(1);
 
-    const approach = fragmentApproachCell(fragment, state, vehicle.id);
+    const approach = fragmentApproachCell(fragment, state, vehicle.id)!;
     expect(splitLegs[0]!.destX).toBe(approach.x);
     expect(splitLegs[0]!.destZ).toBe(approach.z);
   });

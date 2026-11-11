@@ -566,7 +566,7 @@ describe('haul_load fires HAUL_LOAD_TICKS ticks after arrival, not on arrival (#
     state.navGrid = makeFlatNavGrid(20);
     const { vehicle, driverId } = makeDrivenHauler(state, 5, 5);
     const driver = state.employees.employees.find(e => e.id === driverId)!;
-    addBlastFragments(state.logistics, [makeFragment(1, DEST.x, DEST.z, 0.3, 850)], state.navGrid);
+    addBlastFragments(state.logistics, [makeFragment(1, DEST.x + 1, DEST.z, 0.3, 850)], state.navGrid);
     const action = reserveFragmentAction(state, vehicle, driverId, 'haul_debris', 1, DEST);
     driver.activeActionId = action.id;
     driver.itinerary = {

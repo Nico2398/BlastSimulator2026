@@ -133,10 +133,11 @@ function makeTestGrid(): VoxelGrid {
 }
 
 /** Minimal FragmentData fixture resting on the ground at (x, z) (#954). */
-function makeGroundFragment(id: number, x: number, z: number): FragmentData {
+/** A fragment lying on the ground of `makeSolidGrid(…, 4)` (surface about y = 5); `y` places it elsewhere. */
+function makeGroundFragment(id: number, x: number, z: number, y = 5.5): FragmentData {
   return {
     id,
-    position: { x, y: 0, z },
+    position: { x, y, z },
     volume: 1,
     mass: 100,
     rockId: 'cruite',
@@ -1405,6 +1406,21 @@ describe('NavGrid.findNearestTraversableCell', () => {
   // so without this flag it is accepted unmoved even though foot travel
   // (Pathfinding.isImpassable, avoidVehicles: true) refuses to step onto it.
 
+  it('a wide fragment occupies every cell it covers, and removing it frees them all', () => {
+    const nav = makeNavGridFromTypes([
+      ['walkable', 'walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable', 'walkable'],
+      ['walkable', 'walkable', 'walkable', 'walkable'],
+    ]);
+    const rock = { position: { x: 1.5, z: 1 }, halfExtents: { x: 1, z: 0.3 } };
+    nav.addFragmentFootprint(rock);
+    const occupied = (x: number, z: number) => nav.cells[z]![x]!.fragmentOccupancy ?? 0;
+    expect([occupied(1, 1), occupied(2, 1)]).toEqual([1, 1]);
+    expect([occupied(0, 1), occupied(3, 1), occupied(1, 0), occupied(1, 2)]).toEqual([0, 0, 0, 0]);
+    nav.removeFragmentFootprint(rock);
+    expect([occupied(1, 1), occupied(2, 1)]).toEqual([0, 0]);
+  });
+
   it('with avoidOccupancy, treats a fragment-occupied cell as non-traversable and searches past it (#954)', () => {
     const nav = makeNavGridFromTypes([
       ['walkable', 'walkable', 'walkable'],
@@ -2086,6 +2102,12 @@ describe('NavGrid.buildNavGrid — occupancy seeding from groundFragments/vehicl
     expect(nav.cellAt(6, 6)!.fragmentOccupancy).toBeGreaterThan(0);
     // A cell with no fragment stays unoccupied.
     expect(nav.cellAt(0, 0)!.fragmentOccupancy ?? 0).toBe(0);
+  });
+
+  it('seeds nothing for a fragment below the surface (sealed under intact rock, or at the foot of a wall)', () => {
+    const grid = makeSolidGrid(10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], [], [makeGroundFragment(1, 6, 6, 1)], []);
+    expect(nav.cellAt(6, 6)!.fragmentOccupancy ?? 0).toBe(0);
   });
 
   it('accumulates fragmentOccupancy when multiple fragments share a cell', () => {

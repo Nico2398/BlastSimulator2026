@@ -2575,6 +2575,27 @@ export const HAUL_BATCH_FINES_FRAGMENT_KG = 625;
  */
 export const HAUL_LOAD_TICKS = 1;
 
+/**
+ * Least overlap (m) between a fragment's body and a NavGrid cell for the fragment to occupy that cell
+ * (`fragmentFootprintCells`): a rock that only grazes a neighbouring cell leaves it free.
+ */
+export const FRAGMENT_FOOTPRINT_MIN_OVERLAP_M = 0.1;
+
+/** How far (m) below a cell's surface a fragment's top may sit and still lie on that cell (`fragmentRestsOn`). */
+export const FRAGMENT_GROUND_TOLERANCE_M = 0.25;
+
+/**
+ * Highest step (m) between the ground a vehicle stands on and the ground under the rock it loads or breaks
+ * (`fragmentApproachCandidates`): a truck on a crater rim does not load a rock lying on the floor below.
+ */
+export const FRAGMENT_APPROACH_MAX_STEP_M = 1.5;
+
+/**
+ * How many cells (Chebyshev) from a rock's footprint a hauler or breaker may stand to work it: a loader's arm
+ * reaches past the nearest ring, so one vehicle parked beside a pile rarely closes its only side.
+ */
+export const FRAGMENT_APPROACH_REACH_CELLS = 2;
+
 /** Fewest stranded cells that make a placement report a cutoff (#1391). */
 export const PLACEMENT_CUTOFF_MIN_CELLS = 1;
 
