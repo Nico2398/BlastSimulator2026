@@ -101,11 +101,12 @@ const ENTITY_AIM_ATTEMPTS = 3;
 /**
  * Camera turns `clickEntity` tries, in order, when something of another kind
  * stands in front of the entity: almost straight down first — a vehicle or a
- * worker beside a muck pile is clear from above — then the four sides. Each
- * view costs a forced frame, seconds without a GPU, so the likeliest goes first.
+ * worker beside a muck pile is clear from above — then two opposite sides. Each
+ * view costs a forced frame, tens of seconds over a dense pile without a GPU, so
+ * the likeliest goes first and the list stays short.
  */
 const ENTITY_UNOCCLUDED_VIEWS: ReadonlyArray<{ yaw?: number; pitch?: number }> = [
-  { pitch: 80 }, { yaw: 0, pitch: 45 }, { yaw: 90 }, { yaw: 180 }, { yaw: 270 },
+  { pitch: 80 }, { yaw: 0, pitch: 45 }, { yaw: 180 },
 ];
 
 /**
