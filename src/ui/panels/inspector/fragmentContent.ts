@@ -71,7 +71,7 @@ function buildLocationSection(tracked: TrackedFragment, state: GameState, links:
 }
 
 function locationText(tracked: TrackedFragment): string {
-  return t(`inspector.fragment.${tracked.state}`);
+  return t(`inspector.fragment.status.${tracked.state}`);
 }
 
 export const fragmentContent: KindContent = {

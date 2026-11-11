@@ -271,7 +271,7 @@
     },
     {
       "command": "fragments status",
-      "description": "#1868: after the load a player clicks fragment 749 on the pile (same id as fragment-inspector-visual) and the inspector opens on it. Before the fix the click failed: no fragment is on the scene to click.",
+      "description": "#1868: after the load a player clicks a fragment on the pile (aimed at 3477, as in fragment-inspector-visual; the pick may land on the rock beside it, so the checks name no id) and the fragment inspector opens on it. Before the fix the click failed: no fragment is on the scene to click.",
       "timeout": 60,
       "interaction": [
         {
@@ -282,12 +282,12 @@
         {
           "type": "clickEntity",
           "kind": "fragment",
-          "id": 749,
+          "id": 3477,
           "distance": 4
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"749\"] .bs-fragment-rock"
+          "selector": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-rock"
         },
         {
           "type": "screenshot"
@@ -295,7 +295,7 @@
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-inspector[data-kind=\"fragment\"][data-id=\"749\"] .bs-fragment-rock",
+        "usable": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-rock",
         "note": "a fragment drawn from the loaded state is clickable and inspectable"
       }
     }

@@ -8,6 +8,7 @@ import { vehicleCargoByOre, vehicleCargoWarehouseId } from '../../../core/econom
 import { formatDollars, formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { vehicleCapacityText } from '../../catalogCardText.js';
+import { el } from '../../dom.js';
 import {
   buildingDisplayName, makeHpGauge, makeLoadGauge, makeStatusChip, vehicleDisplayName,
 } from '../../fleetDetailSections.js';
@@ -85,8 +86,11 @@ export function buildJobSection(v: Vehicle, state: GameState, links: InspectorLi
   return wrap;
 }
 
-/** Cargo of a hauler: load gauge, kg per ore, barren and fragment count; null for every other role. */
-export function buildCargoSection(v: Vehicle, state: GameState): HTMLElement | null {
+/**
+ * Cargo of a hauler: load gauge, kg per ore, barren and fragment count, the count followed by a link to the
+ * rock on top of the load (its own inspector says where it is headed); null for every other role.
+ */
+export function buildCargoSection(v: Vehicle, state: GameState, links: InspectorLinks): HTMLElement | null {
   const load = makeLoadGauge(v);
   if (!load) return null;
   const cargo = vehicleCargoByOre(v, state.logistics.fragments);
@@ -97,9 +101,18 @@ export function buildCargoSection(v: Vehicle, state: GameState): HTMLElement | n
   if (cargo.totalKg > 0) {
     rows.push(tagged(valueRow(t('inspector.vehicle.barren'), kgText(cargo.barrenKg)), 'data-cargo-barren'));
   }
-  rows.push(valueRow(t('inspector.vehicle.fragments'), String(cargo.fragmentCount)));
+  rows.push(valueRow(t('inspector.vehicle.fragments'), fragmentCountValue(v, state, cargo.fragmentCount, links)));
   const wrap = sectionOf(t('inspector.vehicle.cargo'), rows);
   return wrap;
+}
+
+/** The fragment count, then a link to the last rock loaded when the game still tracks it. */
+function fragmentCountValue(v: Vehicle, state: GameState, count: number, links: InspectorLinks): string | HTMLElement {
+  const last = v.cargo[v.cargo.length - 1];
+  if (!last || !state.logistics.fragments.some(f => f.fragment.id === last.fragmentId)) return String(count);
+  const value = el('span', { text: `${count} · ` });
+  value.append(entityLink(`#${last.fragmentId}`, 'fragment', last.fragmentId, links));
+  return value;
 }
 
 /** Driver row (name link, walking to board, unmanned, or no licensed driver with a Train button). */
