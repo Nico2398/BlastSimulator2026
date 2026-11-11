@@ -469,9 +469,9 @@ describe('GameRenderer.syncFromContext — state replacement redraws fragments (
     const ctx = makeCtx();
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     renderer.syncFromContext(ctx);
-    // Fragments spawned by a blast live in the mesh; the state's logistics
-    // list is not what drew them here.
+    // A blast registers its fragments on the ground and hands the same data to the renderer.
     ctx.lastBlastFragmentData = [frag(100, 10, 5, 10), frag(101, 12, 5, 10)];
+    addBlastFragments(ctx.state!.logistics, ctx.lastBlastFragmentData);
     renderer.onBlast(ctx);
     expect(drawnFragments(renderer)).toBe(2);
     const spawnSpy = vi.spyOn((renderer as any).fragments, 'spawnFragments');
@@ -482,6 +482,23 @@ describe('GameRenderer.syncFromContext — state replacement redraws fragments (
     expect(drawnFragments(renderer)).toBe(2);
     expect(renderer.entityWorldPosition('fragment', 100)).not.toBeNull();
     expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a second blast adds its pile to the first one still on the ground', () => {
+    const ctx = makeCtx();
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+    ctx.lastBlastFragmentData = [frag(100, 10, 5, 10), frag(101, 12, 5, 10)];
+    addBlastFragments(ctx.state!.logistics, ctx.lastBlastFragmentData);
+    renderer.onBlast(ctx);
+
+    ctx.lastBlastFragmentData = [frag(200, 30, 5, 30)];
+    addBlastFragments(ctx.state!.logistics, ctx.lastBlastFragmentData);
+    renderer.onBlast(ctx);
+
+    expect(drawnFragments(renderer)).toBe(3);
+    expect(renderer.entityWorldPosition('fragment', 100)).not.toBeNull();
+    expect(renderer.entityWorldPosition('fragment', 200)).not.toBeNull();
   });
 
   it('resets an in-flight blast animation when the state is replaced', () => {

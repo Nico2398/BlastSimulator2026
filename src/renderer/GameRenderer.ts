@@ -334,6 +334,8 @@ export class GameRenderer {
   /** Per-call entity/state sync shared by syncFromContext() and finishLevelLoad() (#474, extracted #767). */
   private syncEntities(ctx: MiningContext): void {
     if (!ctx.state) return;
+    // Hauled rock leaves the scene, dropped or newly broken rock appears (every on-ground fragment is drawn).
+    this.fragments?.syncOnGround(onGroundFragmentData(ctx.state.logistics));
     const result = syncGameRendererEntities({
       state: ctx.state,
       buildings: this.buildings,

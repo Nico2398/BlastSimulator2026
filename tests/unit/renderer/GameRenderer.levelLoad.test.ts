@@ -9,7 +9,6 @@ import { GameRenderer } from '../../../src/renderer/GameRenderer.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { makeGameContext, makeEmptyGameContext } from '../../helpers/gameContext.js';
 import { makeMockSceneManager } from '../../helpers/rendererFixtures.js';
-import { MAX_RENDERED_FRAGMENTS } from '../../../src/renderer/FragmentMesh.js';
 import { TerrainMesh } from '../../../src/renderer/TerrainMesh.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { FRAGMENT_MIN_RENDER_Y } from '../../../src/core/config/balance.js';
@@ -361,8 +360,6 @@ function drawnFragments(renderer: GameRenderer): number {
 // saved game's muckpile never appeared after Continue / Load Game.
 
 describe('GameRenderer — level load draws the state\'s on-ground fragments (#1868)', () => {
-  const MAX_RENDERED = MAX_RENDERED_FRAGMENTS;
-
   async function ctxWith(frags: FragmentData[], states: Array<'on_ground' | 'in_transit' | 'stored'> = []): Promise<MiningContext> {
     const ctx = await makeGameContext({ mineType: 'green_foothills', seed: '42', size: '64' });
     addBlastFragments(ctx.state!.logistics, frags);
@@ -425,19 +422,32 @@ describe('GameRenderer — level load draws the state\'s on-ground fragments (#1
     expect(renderer.entityWorldPosition('fragment', 2)).not.toBeNull();
   });
 
-  it('caps a huge pile at the render cap by sampling evenly across it', async () => {
-    const n = MAX_RENDERED + 1000;
+  it('draws every fragment of a huge pile, the last one included', async () => {
+    const n = 7000;
     const frags = Array.from({ length: n }, (_, i) => frag(i, 5 + (i % 50), 5, 5 + Math.floor(i / 50) % 50));
     const ctx = await ctxWith(frags);
     const renderer = new GameRenderer(makeMockSceneManager() as any);
 
     renderer.buildPlayableMesh(ctx);
 
-    expect(drawnFragments(renderer)).toBe(MAX_RENDERED);
-    // Even sampling reaches the tail of the array, a prefix would not.
-    let tail = 0;
-    for (let i = Math.floor(n * 0.9); i < n; i++) if (renderer.entityWorldPosition('fragment', i)) tail++;
-    expect(tail).toBeGreaterThan(0);
+    expect(drawnFragments(renderer)).toBe(n);
+    expect(renderer.entityWorldPosition('fragment', n - 1)).not.toBeNull();
+  });
+
+  it('takes a hauled fragment off the scene and puts a dropped one back on the next sync', async () => {
+    const ctx = await ctxWith([frag(1, 10, 5, 10), frag(2, 12, 5, 10)]);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    stagedLoad(renderer, ctx);
+
+    ctx.state!.logistics.fragments[0]!.state = 'in_transit';
+    renderer.syncFromContext(ctx);
+    expect(drawnFragments(renderer)).toBe(1);
+    expect(renderer.entityWorldPosition('fragment', 1)).toBeNull();
+
+    ctx.state!.logistics.fragments[0]!.state = 'on_ground';
+    renderer.syncFromContext(ctx);
+    expect(drawnFragments(renderer)).toBe(2);
+    expect(renderer.entityWorldPosition('fragment', 1)).not.toBeNull();
   });
 
   it('draws nothing when no fragment lies on the ground', async () => {

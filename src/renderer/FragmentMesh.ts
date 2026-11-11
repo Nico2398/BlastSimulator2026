@@ -15,7 +15,6 @@ import { drain, type Steps } from '../core/engine/Steps.js';
 import { rockIndexOf } from '../core/world/RockCatalog.js';
 import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { FRAGMENT_MIN_RENDER_Y } from '../core/config/balance.js';
-import { sampleEvenly } from './FragmentRenderSampling.js';
 import { buildFragmentGeometries } from './FragmentGeometry.js';
 import { buildBaseTransform, composeInstanceMatrix, type FragmentBaseTransform, type PlainVec3 } from './FragmentTransformMath.js';
 
@@ -26,14 +25,13 @@ import { buildBaseTransform, composeInstanceMatrix, type FragmentBaseTransform, 
 // this they stop being legible on screen and just alias.
 const MIN_RENDER_EXTENT = 0.25;
 
-// Maximum fragments rendered simultaneously (performance guard)
-export const MAX_RENDERED_FRAGMENTS = 2000;
-
 // Number of irregular shape variants
 const SHAPE_VARIANTS = 24;
 
-// Capacity per variant bucket — evenly split; some buckets may have slightly more
-const BUCKET_CAPACITY = Math.ceil(MAX_RENDERED_FRAGMENTS / SHAPE_VARIANTS);
+// Instances a variant bucket starts with. Every fragment on the ground is drawn —
+// the player hauls what they see — so a full bucket doubles rather than dropping
+// fragments; one instanced draw call per variant whatever the count.
+const INITIAL_BUCKET_CAPACITY = 128;
 
 // ---------- Shared geometry pool ----------
 
@@ -126,41 +124,61 @@ export class FragmentMesh {
     const geos = getSharedGeometries();
 
     for (let i = 0; i < SHAPE_VARIANTS; i++) {
-      const geo = geos[i]!;
-      const rockA = new THREE.InstancedBufferAttribute(new Float32Array(BUCKET_CAPACITY), 1);
-      const rockB = new THREE.InstancedBufferAttribute(new Float32Array(BUCKET_CAPACITY), 1);
-      const rockWeight = new THREE.InstancedBufferAttribute(new Float32Array(BUCKET_CAPACITY), 1);
-      const ore = new THREE.InstancedBufferAttribute(new Float32Array(BUCKET_CAPACITY * 2), 2);
-      geo.setAttribute('aRockA', rockA);
-      geo.setAttribute('aRockB', rockB);
-      geo.setAttribute('aRockWeight', rockWeight);
-      geo.setAttribute('aOre', ore);
-      this.instanceRockA.push(rockA);
-      this.instanceRockB.push(rockB);
-      this.instanceRockWeight.push(rockWeight);
-      this.instanceOre.push(ore);
-
-      const im = new THREE.InstancedMesh(geo, material, BUCKET_CAPACITY);
-      im.count = 0;
-      im.frustumCulled = false; // fragments fly around; disable per-instance culling
-      // Tagged for scene picking (P2): one InstancedMesh represents many
-      // fragments, so a raycast hit resolves via (bucketIndex, instanceId) →
-      // fragmentIdAt() rather than a single entityId like other entity kinds.
-      im.userData['entityKind'] = 'fragment';
-      im.userData['bucketIndex'] = i;
+      this.instanceRockA.push(instanceAttribute(INITIAL_BUCKET_CAPACITY, 1));
+      this.instanceRockB.push(instanceAttribute(INITIAL_BUCKET_CAPACITY, 1));
+      this.instanceRockWeight.push(instanceAttribute(INITIAL_BUCKET_CAPACITY, 1));
+      this.instanceOre.push(instanceAttribute(INITIAL_BUCKET_CAPACITY, 2));
+      this.bindAttributes(i, geos[i]!);
+      const im = this.makeBucketMesh(i, geos[i]!, material, INITIAL_BUCKET_CAPACITY);
       scene.add(im);
       this.instancedMeshes.push(im);
-      this.bucketSlotToFrag.push(new Array<number>(BUCKET_CAPACITY).fill(-1));
+      this.bucketSlotToFrag.push(new Array<number>(INITIAL_BUCKET_CAPACITY).fill(-1));
     }
   }
 
-  /** The preferred bucket if it has room, otherwise the next that does; -1 if all full. */
+  private bindAttributes(i: number, geo: THREE.BufferGeometry): void {
+    geo.setAttribute('aRockA', this.instanceRockA[i]!);
+    geo.setAttribute('aRockB', this.instanceRockB[i]!);
+    geo.setAttribute('aRockWeight', this.instanceRockWeight[i]!);
+    geo.setAttribute('aOre', this.instanceOre[i]!);
+  }
+
+  private makeBucketMesh(i: number, geo: THREE.BufferGeometry, material: THREE.Material, capacity: number): THREE.InstancedMesh {
+    const im = new THREE.InstancedMesh(geo, material, capacity);
+    im.count = 0;
+    im.frustumCulled = false; // fragments fly around; disable per-instance culling
+    // Tagged for scene picking (P2): one InstancedMesh represents many
+    // fragments, so a raycast hit resolves via (bucketIndex, instanceId) →
+    // fragmentIdAt() rather than a single entityId like other entity kinds.
+    im.userData['entityKind'] = 'fragment';
+    im.userData['bucketIndex'] = i;
+    return im;
+  }
+
+  /** Double a full bucket: an InstancedMesh's instance count is fixed at construction, so it is rebuilt with the instances copied over. */
+  private growBucket(i: number): void {
+    const old = this.instancedMeshes[i]!;
+    const capacity = this.bucketSlotToFrag[i]!.length * 2;
+    this.instanceRockA[i] = grownAttribute(this.instanceRockA[i]!, capacity);
+    this.instanceRockB[i] = grownAttribute(this.instanceRockB[i]!, capacity);
+    this.instanceRockWeight[i] = grownAttribute(this.instanceRockWeight[i]!, capacity);
+    this.instanceOre[i] = grownAttribute(this.instanceOre[i]!, capacity);
+    this.bindAttributes(i, old.geometry);
+    const im = this.makeBucketMesh(i, old.geometry, old.material as THREE.Material, capacity);
+    im.instanceMatrix.array.set(old.instanceMatrix.array);
+    im.count = old.count;
+    this.scene.remove(old);
+    old.dispose();
+    this.scene.add(im);
+    this.instancedMeshes[i] = im;
+    const slots = this.bucketSlotToFrag[i]!;
+    for (let k = slots.length; k < capacity; k++) slots.push(-1);
+  }
+
+  /** The preferred bucket, grown first when it is full. */
   private pickBucket(preferred: number): number {
-    for (let i = 0; i < SHAPE_VARIANTS; i++) {
-      const idx = (preferred + i) % SHAPE_VARIANTS;
-      if (this.bucketCount[idx]! < BUCKET_CAPACITY) return idx;
-    }
-    return -1;
+    if (this.bucketCount[preferred]! >= this.bucketSlotToFrag[preferred]!.length) this.growBucket(preferred);
+    return preferred;
   }
 
   /**
@@ -177,20 +195,15 @@ export class FragmentMesh {
    * instances are drawn only once all are written.
    */
   *spawnFragmentsSteps(fragments: FragmentData[]): Steps<void> {
-    // Sample evenly across the whole fragment array rather than taking the
-    // first N. Fragments come out ordered by where in the blast they were
-    // carved, so taking a prefix only ever shows one corner of a large blast.
-    const toRender = sampleEvenly(fragments, MAX_RENDERED_FRAGMENTS);
-
-    for (let k = 0; k < toRender.length; k++) {
+    for (let k = 0; k < fragments.length; k++) {
       if ((k & (SPAWN_SLICE - 1)) === 0) yield;
-      const frag = toRender[k]!;
+      const frag = fragments[k]!;
+      // Already drawn (the per-sync reconcile got to it first): keep its slot.
+      if (this.fragIdToSlot.has(frag.id)) continue;
       // Keyed on the shape seed, not the id — ids run consecutively so
       // `id % SHAPE_VARIANTS` marched through variants in lockstep, giving a
-      // visible repeating pattern. Falling through to any bucket with room
-      // keeps the full render budget usable once a variant fills up.
+      // visible repeating pattern.
       const meshIdx = this.pickBucket(frag.shapeSeed % SHAPE_VARIANTS);
-      if (meshIdx < 0) continue; // every bucket full
       const count = this.bucketCount[meshIdx]!;
 
       const im = this.instancedMeshes[meshIdx]!;
@@ -239,6 +252,18 @@ export class FragmentMesh {
       this.instanceRockWeight[i]!.needsUpdate = true;
       this.instanceOre[i]!.needsUpdate = true;
     }
+  }
+
+  /**
+   * Make the drawn fragments match the state's on-ground ones: a fragment a
+   * hauler loaded leaves the scene, one dropped back or newly broken appears.
+   * A no-op (one lookup per fragment) when nothing changed.
+   */
+  syncOnGround(onGround: readonly FragmentData[]): void {
+    if (onGround.length === this.fragIdToSlot.size && onGround.every(f => this.fragIdToSlot.has(f.id))) return;
+    const ids = new Set(onGround.map(f => f.id));
+    for (const id of [...this.fragIdToSlot.keys()]) if (!ids.has(id)) this.removeFragment(id);
+    this.spawnFragments(onGround.filter(f => !this.fragIdToSlot.has(f.id)));
   }
 
   /** Update fragment position/tumble/settle-scale during collapse playback. */
@@ -325,7 +350,7 @@ export class FragmentMesh {
     return this.bucketCount.reduce((a, b) => a + b, 0);
   }
 
-  /** Root objects raycastable for scene picking — the 8 shape-variant buckets, tagged in the constructor. */
+  /** Root objects raycastable for scene picking — the shape-variant buckets, tagged in the constructor. */
   pickables(): THREE.Object3D[] {
     return this.instancedMeshes;
   }
@@ -359,4 +384,14 @@ export class FragmentMesh {
     }
     this.instancedMeshes.length = 0;
   }
+}
+
+function instanceAttribute(capacity: number, itemSize: number): THREE.InstancedBufferAttribute {
+  return new THREE.InstancedBufferAttribute(new Float32Array(capacity * itemSize), itemSize);
+}
+
+function grownAttribute(old: THREE.InstancedBufferAttribute, capacity: number): THREE.InstancedBufferAttribute {
+  const grown = instanceAttribute(capacity, old.itemSize);
+  grown.array.set(old.array as Float32Array);
+  return grown;
 }

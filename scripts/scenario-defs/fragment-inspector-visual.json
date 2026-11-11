@@ -264,7 +264,7 @@
     },
     {
       "command": "fragments status",
-      "description": "A player clicks a loose fragment on top of the pile (aimed at 3477, a rock on top of the pile among the 2,000 the renderer draws; the pile is a few thousand rocks deep, so the pick may land on the rock beside it, and the checks name no id). The inspector shows its mass and localized rock, and says it lies on the ground. Command mode stand-in is a read-only status.",
+      "description": "A player clicks a loose fragment on top of the pile (aimed at 3477, a rock on top of the pile; the pile is a few thousand rocks deep, so the pick may land on the rock beside it, and the checks name no id). The inspector shows its mass and localized rock, and says it lies on the ground. Command mode stand-in is a read-only status.",
       "timeout": 60,
       "interaction": [
         {

@@ -59,7 +59,7 @@ export function pickScene(
   const closest = hits[0];
   if (!closest) return EMPTY_PICK;
 
-  const entity = resolveHitToEntity(closest, renderer);
+  const entity = resolveHitToEntity(rubbleCoveredHit(hits) ?? closest, renderer);
   if (entity) return { entity, terrain: null };
 
   const tileX = Math.floor(closest.point.x);
@@ -75,6 +75,28 @@ export function pickScene(
   }
 
   return { entity: null, terrain };
+}
+
+/**
+ * How far (m, along the ray) behind the rock in front a vehicle or a worker
+ * still wins the click. A hauler loading at a muck pile sits among rocks drawn
+ * over its cab; clicking the rocks on top of it selects the truck, while a
+ * truck parked well behind a heap stays hidden by it.
+ */
+const RUBBLE_SEE_THROUGH_M = 2.5;
+
+/** The first vehicle or worker hit within RUBBLE_SEE_THROUGH_M behind loose rock that is the closest hit, else null. */
+function rubbleCoveredHit(hits: readonly THREE.Intersection[]): THREE.Intersection | null {
+  const front = hits[0];
+  if (!front || front.object.userData['entityKind'] !== 'fragment') return null;
+  for (const hit of hits) {
+    if (hit.distance - front.distance > RUBBLE_SEE_THROUGH_M) return null;
+    if (hit.object.userData['entityKind'] === 'fragment') continue;
+    const tagged = resolveTaggedAncestor(hit.object);
+    if (tagged !== null && (tagged.kind === 'employee' || tagged.kind === 'vehicle')) return hit;
+    return null; // ground or a building comes first: nothing is under the rubble here
+  }
+  return null;
 }
 
 /** Movable or loose things a raw-ground pick looks through: fragments, employees, vehicles. */

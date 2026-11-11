@@ -98,6 +98,15 @@ const ENTITY_SETTLE_INTERVAL_MS = 25;
 const ENTITY_SETTLE_MAX_POLLS = 40;
 /** Re-aims allowed when the mesh moves while the camera is being aimed at it. */
 const ENTITY_AIM_ATTEMPTS = 3;
+/**
+ * Camera turns `clickEntity` tries, in order, when something of another kind
+ * stands in front of the entity: almost straight down first — a vehicle or a
+ * worker beside a muck pile is clear from above — then the four sides. Each
+ * view costs a forced frame, seconds without a GPU, so the likeliest goes first.
+ */
+const ENTITY_UNOCCLUDED_VIEWS: ReadonlyArray<{ yaw?: number; pitch?: number }> = [
+  { pitch: 80 }, { yaw: 0, pitch: 45 }, { yaw: 90 }, { yaw: 180 }, { yaw: 270 },
+];
 
 /**
  * Wait for the render loop's rAF callback to run twice. That callback drives
@@ -412,6 +421,27 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
         // Surfaces the glide in the run log, so a future miss is diagnosable
         // from CI output instead of needing a local repro that may not exist.
         console.log(`  clickEntity: ${action.kind} #${action.id} still gliding — re-aimed ${reAims}x`);
+      }
+      // Something can stand between the camera and the entity — a hauler parked
+      // behind a muck pile. A player turns the camera; so does the harness, and
+      // it clicks only once the centre of the screen resolves to the entity.
+      const centrePick = () => page.evaluate(() =>
+        (window as unknown as { __pickAtCanvasCentre: () => { kind: string; id: number } | null }).__pickAtCanvasCentre());
+      // Only something of another kind counts as in the way: a loose rock
+      // picked for its neighbour in the same pile is the click a player makes.
+      const isClear = (p: { kind: string; id: number } | null) => p === null || p.kind === action.kind;
+      let inFront = await centrePick();
+      for (const view of ENTITY_UNOCCLUDED_VIEWS) {
+        if (isClear(inFront)) break;
+        console.log(`  clickEntity: ${action.kind} #${action.id} behind ${inFront!.kind} #${inFront!.id} — turning the camera (yaw ${view.yaw ?? 'kept'}, pitch ${view.pitch ?? 'kept'})`);
+        await page.evaluate(({ yaw, pitch }: { yaw: number | null; pitch: number | null }) =>
+          (window as unknown as { __cameraOrbit: (yaw?: number, pitch?: number) => void }).__cameraOrbit(yaw ?? undefined, pitch ?? undefined),
+        { yaw: view.yaw ?? null, pitch: view.pitch ?? null });
+        await aimAt(pos);
+        inFront = await centrePick();
+      }
+      if (!isClear(inFront)) {
+        console.log(`  clickEntity: ${action.kind} #${action.id} hidden behind ${inFront ? `${inFront.kind} #${inFront.id}` : 'bare ground'} from every view tried`);
       }
       const viewport = page.viewport();
       await page.mouse.click((viewport?.width ?? 1280) / 2, (viewport?.height ?? 720) / 2);

@@ -50,16 +50,6 @@ function collectInstancedMeshes(scene: THREE.Scene): THREE.InstancedMesh[] {
   return scene.children.filter((c): c is THREE.InstancedMesh => (c as THREE.InstancedMesh).isInstancedMesh === true);
 }
 
-/** Collect the rendered position of every instance across every shape bucket in the scene. */
-function collectInstancePositions(scene: THREE.Scene): THREE.Vector3[] {
-  const positions: THREE.Vector3[] = [];
-  for (const child of scene.children) {
-    const im = child as THREE.InstancedMesh;
-    for (let i = 0; i < im.count; i++) positions.push(getInstancePosition(im, i));
-  }
-  return positions;
-}
-
 describe('FragmentMesh (InstancedMesh)', () => {
   let scene: THREE.Scene;
   let fm: FragmentMesh;
@@ -193,10 +183,33 @@ describe('FragmentMesh (InstancedMesh)', () => {
     }
   });
 
-  it('caps rendered fragments at MAX_RENDERED (2000)', () => {
-    const frags = Array.from({ length: 3000 }, (_, i) => makeFragment(i));
+  it('draws every fragment past any starting bucket size', () => {
+    const frags = Array.from({ length: 6000 }, (_, i) => makeFragment(i));
     fm.spawnFragments(frags);
-    expect(fm.count).toBeLessThanOrEqual(2000);
+    expect(fm.count).toBe(6000);
+    expect(fm.fragmentPosition(5999)).not.toBeNull();
+  });
+
+  it('keeps a grown bucket\'s earlier instances where they were', () => {
+    const frags = Array.from({ length: 4000 }, (_, i) => makeFragment(i, { position: { x: i, y: 0.5, z: 0 } }));
+    fm.spawnFragments(frags);
+    expect(fm.fragmentPosition(0)!.x).toBeCloseTo(0);
+    expect(fm.fragmentPosition(1234)!.x).toBeCloseTo(1234);
+    expect(collectInstancedMeshes(scene)).toHaveLength(24);
+  });
+
+  it('spawning a fragment already drawn leaves it alone', () => {
+    fm.spawnFragments([makeFragment(0), makeFragment(1)]);
+    fm.spawnFragments([makeFragment(1), makeFragment(2)]);
+    expect(fm.count).toBe(3);
+  });
+
+  it('syncOnGround drops fragments that left the ground and draws new ones', () => {
+    fm.spawnFragments([makeFragment(0), makeFragment(1), makeFragment(2)]);
+    fm.syncOnGround([makeFragment(0), makeFragment(2), makeFragment(3)]);
+    expect(fm.count).toBe(3);
+    expect(fm.fragmentPosition(1)).toBeNull();
+    expect(fm.fragmentPosition(3)).not.toBeNull();
   });
 
   it('dispose() removes all instanced meshes from scene', () => {
@@ -209,24 +222,6 @@ describe('FragmentMesh (InstancedMesh)', () => {
     const frags = Array.from({ length: 2000 }, (_, i) => makeFragment(i));
     expect(() => fm.spawnFragments(frags)).not.toThrow();
     expect(fm.count).toBe(2000);
-  });
-
-  it('samples the whole fragment array, not a leading prefix, when over the render cap', () => {
-    // Regression: a large blast's fragments are generated in raster-scan
-    // order, so a plain slice(0, cap) only ever showed one corner of the
-    // blast zone — a visible "grid at the crater rim" artifact. All 20000
-    // fragments span x=0..19999; rendered instances must cover that whole
-    // span, not just the low end.
-    const frags = Array.from({ length: 20000 }, (_, i) =>
-      makeFragment(i, { position: { x: i, y: 0.5, z: 0 } }));
-    fm.spawnFragments(frags);
-    // Sampling is hashed per-stratum (see sampleEvenly), so bucket fill isn't
-    // perfectly even — assert "close to the cap", not exactly at it.
-    expect(fm.count).toBeGreaterThan(1900);
-    expect(fm.count).toBeLessThanOrEqual(2000);
-
-    const xs = collectInstancePositions(scene).map(p => p.x);
-    expect(Math.max(...xs)).toBeGreaterThan(15000);
   });
 
   it('spreads fragments across the shape variants rather than marching through them in order', () => {

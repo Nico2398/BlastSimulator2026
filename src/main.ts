@@ -1121,6 +1121,12 @@ window.__entityWorldPosition = (kind, id) => {
   const pos = gameRenderer.entityWorldPosition(kind, id);
   return pos ? { x: pos.x, z: pos.z } : null;
 };
+// What a click at the canvas centre would select. A harness aiming at an entity
+// checks nothing stands in front of it, and turns the camera as a player would if something does.
+window.__pickAtCanvasCentre = () => {
+  const entity = pickScene(0, 0, scene.camera, gameRenderer).entity;
+  return entity ? { kind: entity.kind, id: entity.id } : null;
+};
 window.__placement = {
   isArmed: () => placementController.isArmed,
   currentPhase: () => placementController.currentPhase,
