@@ -12,7 +12,7 @@ import {
 } from './tutorialGuide.js';
 import { setPickerRegion } from './tutorialPickerRegion.js';
 import {
-  SPEED_BUTTON_GROUP, PAUSE_TOGGLE_SELECTOR, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS,
+  SPEED_BUTTON_GROUP, PAUSE_TOGGLE_SELECTOR, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS, LOCATE_SELECTOR,
 } from './tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from './panels/PanelBase.js';
 import { installActivationGuard } from './tutorialActivationGuard.js';
@@ -30,10 +30,13 @@ import { installActivationGuard } from './tutorialActivationGuard.js';
  * - the card's own Exit button and the Settings session controls (language,
  *   volume, Save & Load, Return to Menu) so the player can always leave or
  *   manage the session (#1332). Replay Tutorial stays gated.
+ * - the Locate crosshair on roster and fleet cards: it only moves the camera,
+ *   so it is navigation like opening a panel, and it answers "where is the
+ *   worker I just hired?".
  */
 export const BASE_PERMANENTLY_ALLOWED: readonly string[] = [
   SPEED_BUTTON_GROUP, PAUSE_TOGGLE_SELECTOR, PANEL_OPEN_SELECTOR, PANEL_CLOSE_SELECTOR,
-  TUTORIAL_EXIT_SELECTOR, ...SETTINGS_SESSION_SELECTORS,
+  TUTORIAL_EXIT_SELECTOR, ...SETTINGS_SESSION_SELECTORS, LOCATE_SELECTOR,
 ];
 
 export interface RailsStep {

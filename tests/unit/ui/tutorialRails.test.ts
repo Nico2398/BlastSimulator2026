@@ -9,7 +9,7 @@ import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor, PICKER_CANCEL } from '../../../src/ui/tutorialStages.js';
-import { PAUSE_TOGGLE_SELECTOR, SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS } from '../../../src/ui/tutorialStepHelpers.js';
+import { PAUSE_TOGGLE_SELECTOR, SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS, LOCATE_SELECTOR } from '../../../src/ui/tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { GUIDED_CLASS } from '../../../src/ui/tutorialGuide.js';
@@ -1719,5 +1719,44 @@ describe('TutorialRails — scrolls an off-screen target into view once per stag
     delete (btn as unknown as { scrollIntoView?: unknown }).scrollIntoView;
     const { rails } = railsForHire();
     expect(() => rails.refresh()).not.toThrow();
+  });
+});
+
+// The Locate crosshair on a roster or fleet card only moves the camera: navigation, like opening a
+// panel. A player who hired a worker he cannot spot has to be able to ask the game where he is.
+describe('Locate controls are always allowed', () => {
+  function locateButton(): HTMLElement {
+    const panel = document.createElement('div');
+    panel.id = 'bs-employee-panel';
+    const btn = document.createElement('button');
+    btn.dataset['action'] = 'locate';
+    panel.appendChild(btn);
+    document.body.appendChild(panel);
+    return withBox(btn);
+  }
+
+  it('the selector constant names the locate control', () => {
+    expect(LOCATE_SELECTOR).toBe('[data-action="locate"]');
+  });
+
+  it.each(['hire-surveyor', 'survey', 'drill-plan', 'blast'])('at step %s a locate button is live', (id) => {
+    toolbarCrew();
+    const locate = locateButton();
+    const rails = new TutorialRails();
+    rails.beginStep({ id }, state());
+    rails.refresh();
+    expect(locate.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('a locate button added after the step began is picked up on the next pass', () => {
+    toolbarCrew();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+
+    const locate = locateButton();
+    rails.refresh();
+
+    expect(locate.classList.contains(ALLOWED_CLASS)).toBe(true);
   });
 });

@@ -39,6 +39,13 @@ export const PAUSE_TOGGLE_SELECTOR = 'button[data-action="pause-toggle"]';
 export const TUTORIAL_EXIT_SELECTOR = '[data-action="tutorial-exit"]';
 
 /**
+ * The Locate crosshair on a roster or fleet card (`makeLocateButton`, locateButton.ts). It only moves the
+ * camera — navigation, like opening a panel — and it is how a player who just hired a worker he cannot
+ * spot asks the game where he is.
+ */
+export const LOCATE_SELECTOR = '[data-action="locate"]';
+
+/**
  * Settings session controls the rails always allow (#1332): language pills,
  * volume sliders, Save & Load, Return to Menu. Replay Tutorial is deliberately
  * absent — restarting the tutorial from inside it is not a session control.
