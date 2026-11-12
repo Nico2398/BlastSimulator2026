@@ -234,6 +234,9 @@ function isBeingBoarded(vehicle: Vehicle, employees: EmployeeState): boolean {
     leg.vehicleId === vehicle.id || (leg.onArrive.kind === 'board' && leg.onArrive.vehicleId === vehicle.id)));
 }
 
+/** A pilot's first trip: the driverless vehicle they take out before `own`, the vehicle they are mounted in. */
+interface FirstTripChain { own: Vehicle; rescued: Vehicle }
+
 /**
  * First-trip chains (#2230), by the id of the mounted in-zone driver: a driver who is the only licence holder of a
  * driverless in-zone vehicle, while his own vehicle has another licence holder to fetch it, takes the driverless one
@@ -245,8 +248,8 @@ function planFirstTripChains(
   employees: EmployeeState,
   evacuatedBefore: ReadonlySet<number>,
   kept: ReadonlyMap<number, EvacuationDestination>,
-): Map<number, { rescued: Vehicle }> {
-  const chains = new Map<number, { rescued: Vehicle }>();
+): Map<number, FirstTripChain> {
+  const chains = new Map<number, FirstTripChain>();
   const taken = new Set<number>();
   for (const own of vehicles.vehicles) {
     const driverId = vehicleDriverId(own);
@@ -260,7 +263,7 @@ function planFirstTripChains(
       && !isBeingBoarded(v, employees));
     if (!rescued) continue;
     taken.add(rescued.id);
-    chains.set(driverId, { rescued });
+    chains.set(driverId, { own, rescued });
   }
   return chains;
 }
@@ -320,6 +323,8 @@ export function clearZone(
     chainedDriverIds.add(driverId);
     chainedVehicleIds.add(chain.rescued.id);
     result.orderedVehicleIds.push(chain.rescued.id);
+    // The pilot's own vehicle keeps its seat until they step off: its other driver fetches it on a later pass.
+    result.awaitingRescuerVehicleIds.push(chain.own.id);
   }
 
   for (const v of vehicles.vehicles) {
@@ -331,10 +336,7 @@ export function clearZone(
         result.orderedVehicleIds.push(v.id);
         continue;
       }
-      if (chainedDriverIds.has(driverId)) {
-        result.awaitingRescuerVehicleIds.push(v.id);
-        continue;
-      }
+      if (chainedDriverIds.has(driverId)) continue;
       const dest = findDest(v.x, v.z, zone, v);
       if (dest) {
         // Already driven — plain reposition; moveTo's own implicit
