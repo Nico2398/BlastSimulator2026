@@ -225,4 +225,52 @@ export const KNOWN_TEXT_DEFECTS: readonly TextDefect[] = [
     problem: "Uses 'Emboutez' where 'Embauchez' is meant.",
     expectedFix: 'Emboutez -> Embauchez.',
   },
+  {
+    key: 'event.lawsuit_wrongful_death.res0',
+    locale: 'fr',
+    problem: 'Says "décès injustifié" (calque of wrongful death) where the desc and title say "homicide involontaire".',
+    expectedFix: 'Use "homicide involontaire" instead of "décès injustifié".',
+  },
+  {
+    key: 'event.lawsuit_mountaineer.desc',
+    locale: 'fr',
+    problem: 'Meaning inverted: the mountaineer sued for having seen the damaged mountain, not for the damage.',
+    expectedFix: 'Use "saccagé la montagne" instead of "vu la montagne saccagée".',
+  },
+  {
+    key: 'event.lawsuit_patent_troll.title',
+    locale: 'fr',
+    problem: '"Chasseur de Brevets" is a literal calque of patent troll; French says "troll des brevets".',
+    expectedFix: 'Use "Troll des Brevets" instead of "Chasseur de Brevets".',
+  },
+  {
+    key: 'event.lawsuit_noise_restraining.res0',
+    locale: 'fr',
+    problem: '"ordonnance restrictive" is a calque of restraining order; French says "ordonnance d\'éloignement".',
+    expectedFix: 'Use "éloignement" instead of "ordonnance restrictive".',
+  },
+  {
+    key: 'event.politics_celebrity_protest.res1',
+    locale: 'fr',
+    problem: 'Agreement error: "cet silence".',
+    expectedFix: 'Use "ce silence" instead of "cet silence".',
+  },
+  {
+    key: 'event.politics_client_scandal.res0',
+    locale: 'fr',
+    problem: '"client scandalisé" means shocked, not caught up in a scandal.',
+    expectedFix: 'Use "éclaboussé par le scandale" instead of "client scandalisé".',
+  },
+  {
+    key: 'event.politics_un_inspector.res1',
+    locale: 'fr',
+    problem: '"citation officielle" is a false friend (legal citation); the meaning is an official report or fine.',
+    expectedFix: 'Use "procès-verbal" instead of "citation officielle".',
+  },
+  {
+    key: 'event.politics_tax_reform.res1',
+    locale: 'fr',
+    problem: '"coquille offshore" is a calque of shell company; French says "société-écran".',
+    expectedFix: 'Use "société-écran" instead of "coquille offshore".',
+  },
 ] as const;
