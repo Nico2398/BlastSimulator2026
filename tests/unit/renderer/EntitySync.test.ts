@@ -21,6 +21,8 @@ import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { syncEntitySets, buildingFootprintSurfaceY } from '../../../src/renderer/EntitySync.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
+import { VehicleMesh } from '../../../src/renderer/VehicleMesh.js';
+import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
 import { BuildingMesh } from '../../../src/renderer/BuildingMesh.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
@@ -724,4 +726,283 @@ describe('syncEntitySets — edge cases of delayed removal (#1589)', () => {
     expect(characters.getGroup(employee.id)!.visible).toBe(true);
     expect(characters.getPosition(employee.id)!.x).toBeCloseTo(15, 6);
   });
+});
+
+
+// ── Mounted at batch start, hosted again or inside at batch end (#2224) ─────
+// The mesh of an employee who steps out of a vehicle and into a building (or back onto a vehicle) inside one
+// batch used to be skipped: syncEntitySets only drew people on foot at the end of the batch.
+
+const DT = 1 / 64; // exact in binary
+const SIZES = [1, 2, 4, 8] as const;
+
+type HostEvent = 'board' | 'enter' | 'alight' | 'leave';
+
+function multiTrail(points: Pt[], markers: Array<[number, HostEvent]>, host: Pt): MovementTrail {
+  return {
+    points,
+    relocated: false,
+    hostMarkers: markers.map(([pointIndex, event]) => ({
+      pointIndex, event,
+      hostKind: event === 'board' || event === 'alight' ? 'vehicle' : 'building',
+      hostX: host.x, hostZ: host.z,
+    })),
+  };
+}
+
+const row = (from: number, to: number, z = 10): Pt[] => {
+  const out: Pt[] = [];
+  for (let x = from; x <= to; x++) out.push({ x, z });
+  return out;
+};
+
+interface Seen { exists: boolean; visible: boolean; x: number; z: number }
+
+function watch(state: ReturnType<typeof createGame>, characters: CharacterMesh, id: number, seconds: number): Seen[] {
+  const out: Seen[] = [];
+  for (let i = 0; i < Math.round(seconds / DT); i++) {
+    characters.update(state.employees.employees, DT);
+    const g = characters.getGroup(id);
+    out.push({ exists: g !== null, visible: g?.visible === true, x: g?.position.x ?? NaN, z: g?.position.z ?? NaN });
+  }
+  return out;
+}
+
+describe('syncEntitySets — an employee mounted at batch start and inside a building at batch end is drawn (#2224)', () => {
+  // driving_center at (10,10): its west ring cell is (9,10).
+  function setup(rideCells: number, walkCells: number) {
+    const state = createGame({ seed: SEED });
+    const { building } = placeBuilding(state.buildings, 'driving_center', 10, 10, 64, 64);
+    const alightX = 9 - walkCells;
+    const rideStart = alightX - 1 - rideCells;
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), rideStart, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', rideStart, 10);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const characters = new CharacterMesh(new THREE.Scene());
+    const rendered = new Set<number>();
+    sync(state, characters, rendered);
+    expect(characters.count).toBe(0); // mounted at batch start: nothing drawn yet
+
+    // The batch: the vehicle carries the employee to alightX - 1, they step out onto alightX and walk to the door.
+    vehicle.x = alightX - 1;
+    vehicle.occupantIds = [];
+    employee.locomotion = { kind: 'on_foot' };
+    employee.x = 9;
+    employee.z = 10;
+    expect(enterBuilding(state, building!.id, employee.id).success).toBe(true);
+    const points = row(rideStart, 9);
+    employee.walkTrail = multiTrail(points, [[rideCells + 1, 'alight'], [points.length - 1, 'enter']], { x: building!.x, z: building!.z });
+    return { state, employee, vehicle, building: building!, characters, rendered, alightX, total: points.length - 1, rideCells };
+  }
+
+  for (const batch of SIZES) {
+    it(`batch of ${batch}: the employee is drawn, hidden for the ride, then walks from the alight cell to the door and goes`, () => {
+      const { state, employee, characters, rendered, alightX, total } = setup(batch, batch);
+      sync(state, characters, rendered);
+
+      expect(characters.count).toBe(1);
+      expect(characters.isRetiring(employee.id)).toBe(true);
+      expect(characters.getPosition(employee.id)!.x).toBeCloseTo(alightX, 6);
+
+      const frames = watch(state, characters, employee.id, 3);
+      const shown = frames.filter(f => f.visible);
+      expect(shown.length).toBeGreaterThan(0);
+      // Never drawn on the ride, never past the door, always on the row between the alight cell and the door.
+      for (const f of shown) {
+        expect(f.x).toBeGreaterThanOrEqual(alightX - 1e-6);
+        expect(f.x).toBeLessThanOrEqual(9 + 1e-6);
+        expect(f.z).toBeCloseTo(10, 6);
+      }
+      for (let i = 1; i < shown.length; i++) expect(shown[i]!.x).toBeGreaterThanOrEqual(shown[i - 1]!.x - 1e-9);
+      expect(shown[shown.length - 1]!.x).toBeGreaterThanOrEqual(9 - (total / MOVE_TWEEN_DURATION_S) * DT * 2 - 1e-6);
+      // Then the mesh is retired: nothing is left on screen.
+      expect(frames[frames.length - 1]!.exists).toBe(false);
+      expect(characters.count).toBe(0);
+      expect(characters.isRetiring(employee.id)).toBe(false);
+    });
+
+    it(`batch of ${batch}: the ride is hidden for D * ride length / trail length`, () => {
+      const { state, employee, characters, rendered, total, rideCells } = setup(batch, batch);
+      sync(state, characters, rendered);
+      const frames = watch(state, characters, employee.id, 3);
+      const firstShown = frames.findIndex(f => f.visible);
+      const expectedS = MOVE_TWEEN_DURATION_S * (rideCells + 1) / total;
+      expect(firstShown).toBeGreaterThan(0);
+      expect(Math.abs(firstShown * DT - expectedS)).toBeLessThanOrEqual(3 * DT);
+    });
+  }
+
+  it('a repeated sync while the walk to the door plays neither adds a second mesh nor restarts it', () => {
+    const { state, employee, characters, rendered } = setup(4, 4);
+    sync(state, characters, rendered);
+    watch(state, characters, employee.id, 1.0);
+    const before = characters.getPosition(employee.id)!;
+    sync(state, characters, rendered);
+    sync(state, characters, rendered);
+    expect(characters.count).toBe(1);
+    const after = characters.getPosition(employee.id)!;
+    expect(after.x).toBeCloseTo(before.x, 9);
+    expect(after.z).toBeCloseTo(before.z, 9);
+  });
+
+  it('the alight cell on the door ring (nothing to walk): the employee is still drawn, then goes', () => {
+    const { state, employee, characters, rendered } = setup(4, 0);
+    sync(state, characters, rendered);
+    expect(characters.count).toBe(1);
+    expect(characters.isRetiring(employee.id)).toBe(true);
+    watch(state, characters, employee.id, 3);
+    expect(characters.count).toBe(0);
+  });
+
+  it('is removed with the employee when they are deleted while the mesh is still hidden on the ride', () => {
+    const { state, employee, characters, rendered } = setup(4, 4);
+    sync(state, characters, rendered);
+    state.employees.employees = state.employees.employees.filter((e: Employee) => e.id !== employee.id);
+    sync(state, characters, rendered);
+    expect(characters.count).toBe(0);
+    expect(characters.isRetiring(employee.id)).toBe(false);
+  });
+
+  it('mounted at start and mounted again at the end (alight .. board): drawn walking to the vehicle, then retired', () => {
+    const state = createGame({ seed: SEED });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 6, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 6, 10);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const characters = new CharacterMesh(new THREE.Scene());
+    const rendered = new Set<number>();
+    sync(state, characters, rendered);
+    expect(characters.count).toBe(0);
+
+    // Out at (8,10) after a 2-cell ride, a 4-cell walk to a second vehicle at (12,10), boarded.
+    const second = purchaseVehicle(state.vehicles, 'drill_rig', 12, 10).vehicle;
+    second.occupantIds = [employee.id];
+    vehicle.occupantIds = [];
+    employee.locomotion = { kind: 'mounted', vehicleId: second.id };
+    employee.x = 12;
+    employee.z = 10;
+    employee.walkTrail = multiTrail(row(6, 12), [[3, 'alight'], [6, 'board']], { x: 8, z: 10 });
+    sync(state, characters, rendered);
+
+    expect(characters.count).toBe(1);
+    expect(characters.isRetiring(employee.id)).toBe(true);
+    const frames = watch(state, characters, employee.id, 3);
+    const shown = frames.filter(f => f.visible);
+    expect(shown.length).toBeGreaterThan(0);
+    for (const f of shown) {
+      expect(f.x).toBeGreaterThanOrEqual(9 - 1e-6); // the alight cell is (9,10), after the 3-cell ride
+      expect(f.x).toBeLessThanOrEqual(12 + 1e-6);
+    }
+    expect(characters.count).toBe(0);
+  });
+
+  it('mounted at start with only a board marker (never left the vehicle): still nothing drawn', () => {
+    const state = createGame({ seed: SEED });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 6, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 6, 10);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    employee.walkTrail = multiTrail(row(6, 9), [[0, 'board']], { x: 6, z: 10 });
+    const characters = new CharacterMesh(new THREE.Scene());
+    sync(state, characters, new Set());
+    expect(characters.count).toBe(0);
+  });
+
+  it('a relocated trail with an alight marker draws nothing for a hosted employee', () => {
+    const { state, employee, characters, rendered } = setup(2, 2);
+    employee.walkTrail = { ...employee.walkTrail!, relocated: true };
+    sync(state, characters, rendered);
+    expect(characters.count).toBe(0);
+  });
+});
+
+describe('syncEntitySets — vehicle and driver meshes follow one timeline (#2224)', () => {
+  const START = 20;
+
+  for (const batch of SIZES) {
+    it(`boarding, batch of ${batch}: the vehicle mesh does not move in any frame the walking driver is visible`, () => {
+      const state = createGame({ seed: SEED });
+      const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), START - batch, 10);
+      const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', START, 10);
+      const vehicles = new VehicleMesh(new THREE.Scene());
+      const characters = new CharacterMesh(new THREE.Scene());
+      const renderedV = new Set<number>();
+      const renderedE = new Set<number>();
+      const both = () => syncEntitySets(state, null, new Set(), vehicles, renderedV, characters, renderedE);
+      both();
+      expect(characters.count).toBe(1);
+
+      const ride = 2 * batch;
+      vehicle.x = START + ride;
+      vehicle.walkTrail = {
+        points: row(START, START + ride), relocated: false,
+        hostMarkers: [{ pointIndex: 0, event: 'board', hostKind: 'vehicle', hostX: START, hostZ: 10, riderId: employee.id, riderArc: batch }],
+      };
+      vehicle.occupantIds = [employee.id];
+      employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+      employee.x = vehicle.x;
+      employee.z = vehicle.z;
+      employee.walkTrail = multiTrail(row(START - batch, START + ride), [[batch, 'board']], { x: START, z: 10 });
+      both();
+
+      let shown = 0;
+      for (let i = 0; i < 96; i++) {
+        characters.update(state.employees.employees, DT);
+        vehicles.update(state.vehicles.vehicles, state.vehicles, state.employees.employees, DT);
+        if (characters.getGroup(employee.id)?.visible) {
+          shown++;
+          expect(vehicles.getPosition(vehicle.id)!.x).toBeCloseTo(START, 2);
+        }
+      }
+      expect(shown).toBeGreaterThan(0);
+      expect(characters.count).toBe(0);
+      expect(vehicles.getPosition(vehicle.id)!.x).toBeCloseTo(START + ride, 6);
+    });
+
+    it(`alighting, batch of ${batch}: the driver stays hidden until the vehicle mesh has stopped`, () => {
+      const state = createGame({ seed: SEED });
+      const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), START, 10);
+      const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', START, 10);
+      vehicle.occupantIds = [employee.id];
+      employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+      const vehicles = new VehicleMesh(new THREE.Scene());
+      const characters = new CharacterMesh(new THREE.Scene());
+      const renderedV = new Set<number>();
+      const renderedE = new Set<number>();
+      const both = () => syncEntitySets(state, null, new Set(), vehicles, renderedV, characters, renderedE);
+      both();
+      expect(characters.count).toBe(0);
+
+      const ride = 2 * batch;
+      vehicle.x = START + ride;
+      vehicle.occupantIds = [];
+      vehicle.walkTrail = {
+        points: row(START, START + ride), relocated: false,
+        hostMarkers: [{ pointIndex: ride, event: 'alight', hostKind: 'vehicle', hostX: START + ride, hostZ: 10, riderId: employee.id, riderArc: ride }],
+      };
+      employee.locomotion = { kind: 'on_foot' };
+      employee.x = START + ride + 1 + batch;
+      employee.z = 10;
+      employee.walkTrail = multiTrail(row(START, employee.x), [[ride + 1, 'alight']], { x: START + ride, z: 10 });
+      both();
+      expect(characters.count).toBe(1);
+
+      let prevX = vehicles.getPosition(vehicle.id)!.x;
+      let shown = 0;
+      for (let i = 0; i < 96; i++) {
+        characters.update(state.employees.employees, DT);
+        vehicles.update(state.vehicles.vehicles, state.vehicles, state.employees.employees, DT);
+        const vx = vehicles.getPosition(vehicle.id)!.x;
+        if (characters.getGroup(employee.id)?.visible) {
+          shown++;
+          expect(Math.abs(vx - (START + ride))).toBeLessThanOrEqual(1);
+          expect(Math.abs(vx - prevX)).toBeLessThan(1e-6);
+        }
+        prevX = vx;
+      }
+      expect(shown).toBeGreaterThan(0);
+      expect(vehicles.getPosition(vehicle.id)!.x).toBeCloseTo(START + ride, 6);
+    });
+  }
 });
