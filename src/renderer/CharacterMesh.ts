@@ -175,7 +175,7 @@ export class CharacterMesh {
       startSpanPlayback(tween, [exitSpan], fullTrailLength);
     }
     // A character leaving a vehicle stays hidden while it is still arriving (#2224).
-    const held = (tween.holdS ?? 0) > 0;
+    const held = tween.elapsedS < 0;
     group.visible = !held;
     this.characters.set(employee.id, {
       group, instance, animator, employee, evacuating: false,
@@ -403,15 +403,13 @@ export class CharacterMesh {
     position.z = step.z;
     if (heightAt) position.y = heightAt(step.x, step.z);
     // Hidden for the frame that crosses from one span to the next (the ride in between is not shown).
-    // ... and for the whole ride when a hold follows the span (#2224).
-    entry.gapHidden = (step.spanDone && !step.finished) || (entry.tween.holdS ?? 0) > 0;
+    entry.gapHidden = step.spanDone && !step.finished;
     if (step.finished && !entry.retiring) {
       // Snap the tween to its target so a later frame never glides back to the stale origin (#2224).
       const { tween } = entry;
       tween.spans = undefined;
       tween.path = null;
       tween.window = undefined;
-      tween.holdS = 0;
       tween.prevX = tween.targetX;
       tween.prevZ = tween.targetZ;
       tween.elapsedS = MOVE_TWEEN_DURATION_S;

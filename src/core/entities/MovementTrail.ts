@@ -15,7 +15,7 @@ export type TrailHostKind = 'vehicle' | 'building';
 export type TrailHostEvent = 'board' | 'enter' | 'alight' | 'leave';
 
 /** A host transition recorded on the trail: the trail point it happened at and the host's position. */
-export interface TrailHostMarker {
+interface TrailHostMarker {
   pointIndex: number;
   event: TrailHostEvent;
   hostKind: TrailHostKind;

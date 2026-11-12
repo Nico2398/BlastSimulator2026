@@ -24,8 +24,8 @@ export interface MovementTween {
   spans?: TrailSpan[] | undefined;
   /** Window of the tween in which `path` plays; the mesh holds outside it (#2224). */
   window?: RidingWindow | undefined;
-  /** Real seconds the mesh is still held hidden before/between spans (#2224). */
-  holdS?: number;
+  /** True when the current span follows a hidden stretch, so its clock carries rounding noise (#2224). */
+  afterHold?: boolean;
   /** Index into `spans` of the span currently playing (#1589). */
   spanIndex?: number;
   /** Real seconds the current span takes to play (#1589). */
@@ -38,9 +38,9 @@ export interface TrailSpan {
   /** True when the span ends at a board/enter marker, so the mesh retires there. */
   endsInHost: boolean;
   /** Arc length of the trail before this span's first point (#2224). */
-  startArc?: number | undefined;
+  startArc: number;
   /** Arc length of the hidden stretch (a ride) following this span, 0 for the last (#2224). */
-  gapAfter?: number | undefined;
+  gapAfter: number;
 }
 
 /** The fraction of a tween (0..1) during which a vehicle rides with its driver aboard (#2224). */
@@ -153,6 +153,7 @@ function spanDuration(span: TrailSpan | undefined, fullTrailLength: number): num
 
 // Distance below which the mesh is considered already at the first span's start.
 const LEAD_TOLERANCE = 1e-6;
+const SPAN_END_EPSILON_S = 1e-9;
 
 /**
  * Makes `spans` start from (x, z) — where the mesh really is — rather than popping to the trail start.
@@ -173,9 +174,11 @@ export function withLeadIn(
 export function startSpanPlayback(tween: MovementTween, spans: TrailSpan[], fullTrailLength: number): void {
   tween.spans = spans;
   tween.spanIndex = 0;
-  tween.elapsedS = 0;
+  // A negative clock is the hidden stretch before the span: it runs up to 0, then the span plays.
+  const hold = holdDuration(spans[0]?.startArc, fullTrailLength);
+  tween.elapsedS = -hold;
+  tween.afterHold = hold > 0;
   tween.spanDurationS = spanDuration(spans[0], fullTrailLength);
-  tween.holdS = holdDuration(spans[0]?.startArc, fullTrailLength);
 }
 
 /** Real seconds a hidden stretch of `arc` takes at the pace of the whole trail (#2224). */
@@ -201,23 +204,23 @@ export function stepSpanPlayback(
   const span = spans[index];
   if (!span || span.points.length === 0) return { x: renderX, z: renderZ, spanDone: true, finished: true };
   const duration = tween.spanDurationS ?? 0;
-  const hold = tween.holdS ?? 0;
-  if (hold > 0) {
-    // Hidden before the span (a ride): the clock runs, the position stays at the span's start.
-    tween.holdS = Math.max(0, hold - dt);
-    dt = Math.max(0, dt - hold);
-    if (tween.holdS > 0) return { x: span.points[0]!.x, z: span.points[0]!.z, spanDone: false, finished: false };
-  }
   tween.elapsedS += dt;
-  const done = tween.elapsedS >= duration;
+  if (tween.elapsedS < 0) {
+    // Hidden before the span (a ride): the position stays at the span's start.
+    return { x: span.points[0]!.x, z: span.points[0]!.z, spanDone: true, finished: false };
+  }
+  // A span reached through a hidden stretch ends strictly after its duration: the clock carries rounding noise.
+  const done = tween.elapsedS >= duration + (tween.afterHold ? SPAN_END_EPSILON_S : 0);
   const pos = pointAlongTrail(span.points, done ? 1 : tween.elapsedS / duration);
   if (!done) return { ...pos, spanDone: false, finished: false };
   const finished = index >= spans.length - 1;
   if (!finished) {
     tween.spanIndex = index + 1;
-    tween.elapsedS = 0;
+    const hold = holdDuration(span.gapAfter, fullTrailLength);
+    // The time this frame ran past the span's end carries into the hidden stretch that follows.
+    tween.elapsedS = hold > 0 ? tween.elapsedS - duration - hold : 0;
+    tween.afterHold = hold > 0;
     tween.spanDurationS = spanDuration(spans[index + 1], fullTrailLength);
-    tween.holdS = holdDuration(span.gapAfter, fullTrailLength);
   }
   return { ...pos, spanDone: true, finished };
 }
