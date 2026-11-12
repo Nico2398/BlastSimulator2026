@@ -1223,7 +1223,7 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
     const otherEmpId = hireOne(ctx, 'driller');
     assignSkill(state.employees, otherEmpId, 'driving.truck', 1);
     const otherEmp = getEmployee(ctx, otherEmpId);
-    leaveBuildingIfInside(state, otherEmp); // the new hire may have been sent to the quarters too (#2225)
+    leaveBuildingIfInside(state, otherEmp); // the hire is the driller who just rested, now inside the quarters (#2225)
     otherEmp.x = vehicle.x;
     otherEmp.z = vehicle.z;
     const boardResult = board(state, vehicle.id, otherEmpId);

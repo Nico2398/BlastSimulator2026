@@ -303,14 +303,12 @@ function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: numbe
  * moveToAndFreeVehicleOnArrival) continues on foot into the quarters, like the
  * walk path: a trailing foot leg to the ring approach cell (x, z) that ends by
  * entering the building. The vehicle stays parked where the driver left it. No-op
- * when the drive does not end in an alight (the driver keeps the vehicle) or the
- * building no longer resolves.
+ * when the drive does not end in an alight (the driver keeps the vehicle).
  */
 function enterQuartersAfterAlight(state: GameState, emp: Employee, buildingId: number, x: number, z: number): void {
   const itinerary = emp.itinerary;
   const last = itinerary?.legs[itinerary.legs.length - 1];
   if (!itinerary || !last || last.onArrive.kind !== 'alight') return;
-  if (!state.buildings.buildings.some(b => b.id === buildingId)) return;
   itinerary.legs.push({
     mode: 'foot',
     vehicleId: null,
@@ -334,7 +332,8 @@ function enterQuartersAfterAlight(state: GameState, emp: Employee, buildingId: n
  * pre-#1709 mount continuity applies (keep the vehicle, free it on arrival
  * unless hasClaimableSameRoleFollowUp). A
  * faster vehicle, or one whose driver may not alight (loaded haul,
- * canReleaseDriver), drives the trip through moveTo/planItinerary as before so
+ * canReleaseDriver), drives the trip; a driven trip into quarters always
+ * alights on arrival and then enters the building (#2225) through moveTo/planItinerary as before so
  * the worker never desyncs from the vehicle (I2_mounted_position_mismatch,
  * WorldInvariants.ts). `allowUnreachable: true` (#1178): a genuinely
  * unreachable target still installs a best-effort itinerary. Sets
@@ -348,7 +347,8 @@ function enterQuartersAfterAlight(state: GameState, emp: Employee, buildingId: n
  * who just parked), routes through `moveTo(state, emp.id, { buildingId }, ...)`
  * so the employee walks to the living_quarters' ring and enters it unseen on
  * arrival, like #1203's training-enrolment walk. A still-mounted (driven) trip
- * and the no-building rest-in-place case keep the plain (x, z) call. A
+ * drives to (x, z), then alights and enters the quarters (#2225); the
+ * no-building rest-in-place case keeps the plain (x, z) call. A
  * `buildingId` that no longer resolves (demolished between claim and dispatch)
  * falls back to the same plain (x, z) walk, since `moveTo`'s `{buildingId}`
  * overload refuses outright instead of installing a partial itinerary.
