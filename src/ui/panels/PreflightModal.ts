@@ -108,9 +108,14 @@ export class PreflightModal {
   private readonly cancelBtn: HTMLButtonElement;
   private readonly waitingEl: HTMLElement;
   private readonly refusalEl: HTMLElement;
-  private readonly footerEl: HTMLElement;
   private readonly fireAnywayBtn: HTMLButtonElement;
   private readonly cancelDetonationBtn: HTMLButtonElement;
+  private readonly boxEl: HTMLElement;
+  private readonly dockEl: HTMLElement;
+  private readonly chipEl: HTMLButtonElement;
+  /** The player hid the waiting card; the chip stands in for it until reopened or the sequence ends. */
+  private dockHidden = false;
+  private waiting = false;
 
   private gameConsole?: GameConsoleFn;
   private open = false;
@@ -131,6 +136,7 @@ export class PreflightModal {
     this.overlay.style.display = 'none';
 
     const box = el('div');
+    this.boxEl = box;
     box.style.cssText = 'width:568px;max-width:92vw;max-height:86vh;display:flex;flex-direction:column;border-radius:9px;background:var(--bsx-panel);border:1px solid rgba(255,91,76,.4);box-shadow:0 30px 80px rgba(0,0,0,.7);overflow:hidden';
 
     const stripe = el('div');
@@ -159,16 +165,15 @@ export class PreflightModal {
 
     this.waitingEl = el('div');
     this.waitingEl.dataset['role'] = 'preflight-waiting';
-    this.waitingEl.style.cssText = 'display:none;flex-direction:column;gap:6px;padding:11px;border:1px solid rgba(255,91,76,.4);border-radius:5px;background:rgba(255,91,76,.06)';
+    this.waitingEl.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:11px;border:1px solid rgba(255,91,76,.4);border-radius:5px;background:rgba(255,91,76,.06)';
 
     this.refusalEl = el('div');
     this.refusalEl.style.cssText = 'font:400 12px/1.45 var(--bsx-font-ui);color:var(--bsx-critical-text)';
     this.refusalEl.dataset['role'] = 'preflight-refusal';
 
-    body.append(this.refusalEl, this.waitingEl, this.statsEl, this.predictedEl, this.warningsEl);
+    body.append(this.refusalEl, this.statsEl, this.predictedEl, this.warningsEl);
 
     const footer = el('div');
-    this.footerEl = footer;
     footer.style.cssText = 'padding:14px 20px;background:var(--bsx-well);border-top:1px solid var(--bsx-hairline);display:flex;gap:9px';
     this.cancelBtn = el('button', { className: 'bsx-btn' });
     this.cancelBtn.style.cssText = 'flex:1;height:40px';
@@ -201,7 +206,30 @@ export class PreflightModal {
 
     footer.append(this.cancelBtn, this.detonateBtn);
     box.append(stripe, header, body, footer);
-    this.overlay.appendChild(box);
+
+    // Waiting state (#2233): a compact docked card and a chip, no scrim, so the rest of the UI stays usable.
+    this.dockEl = el('div');
+    this.dockEl.dataset['role'] = PREFLIGHT_DOCK_ROLE;
+    this.dockEl.style.cssText = 'display:none;position:fixed;left:16px;bottom:72px;width:340px;max-width:92vw;flex-direction:column;gap:9px;padding:11px;border-radius:9px;background:var(--bsx-panel);border:1px solid rgba(255,91,76,.4);box-shadow:0 10px 30px rgba(0,0,0,.5);pointer-events:auto';
+    const hideBtn = el('button', { className: 'bsx-btn' });
+    hideBtn.style.cssText = 'height:26px;padding:0 9px;align-self:flex-end';
+    hideBtn.dataset['action'] = PREFLIGHT_HIDE_ACTION;
+    this.locale.bindText(hideBtn, 'ui.blast_workshop.preflight.hide_waiting');
+    hideBtn.addEventListener('click', () => this.setDockHidden(true));
+    const dockButtons = el('div');
+    dockButtons.style.cssText = 'display:flex;gap:9px';
+    dockButtons.append(this.cancelDetonationBtn, this.fireAnywayBtn);
+    this.cancelDetonationBtn.style.cssText = 'flex:1;height:34px';
+    this.fireAnywayBtn.style.cssText = 'flex:1.3;height:34px';
+    this.dockEl.append(hideBtn, this.waitingEl, dockButtons);
+
+    this.chipEl = el('button', { className: 'bsx-btn' });
+    this.chipEl.dataset['role'] = PREFLIGHT_CHIP_ROLE;
+    this.chipEl.dataset['action'] = PREFLIGHT_SHOW_ACTION;
+    this.chipEl.style.cssText = 'display:none;position:fixed;left:16px;bottom:72px;height:32px;padding:0 12px;pointer-events:auto;color:var(--bsx-critical-text)';
+    this.chipEl.addEventListener('click', () => this.setDockHidden(false));
+
+    this.overlay.append(box, this.dockEl, this.chipEl);
     container.appendChild(this.overlay);
   }
 
@@ -209,8 +237,22 @@ export class PreflightModal {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
-  show(): void { this.open = true; this.awaitingDetonation = false; this.refusalEl.textContent = ''; this.overlay.style.display = ''; this.lastSignature = ''; }
-  hide(): void { this.open = false; this.overlay.style.display = 'none'; }
+  show(): void { this.open = true; this.awaitingDetonation = false; this.dockHidden = false; this.refusalEl.textContent = ''; this.overlay.style.display = ''; this.lastSignature = ''; }
+  /** While a detonation is armed, hiding collapses to the chip instead of closing: the shot stays findable. */
+  hide(): void {
+    if (this.open && this.waiting) { this.setDockHidden(true); return; }
+    this.open = false; this.overlay.style.display = 'none';
+  }
+
+  private setDockHidden(hidden: boolean): void {
+    this.dockHidden = hidden;
+    this.syncDock();
+  }
+
+  private syncDock(): void {
+    this.dockEl.style.display = this.waiting && !this.dockHidden ? 'flex' : 'none';
+    this.chipEl.style.display = this.waiting && this.dockHidden ? '' : 'none';
+  }
   get visible(): boolean { return this.open; }
 
   update(state: GameState, _weather?: WeatherState): void {
@@ -385,20 +427,28 @@ export class PreflightModal {
     if (result?.success) this.awaitingDetonation = true;
   }
 
-  /** Swap the footer and body between the pre-flight and the waiting state. */
+  /** Swap between the pre-flight box and the non-blocking waiting card. */
   private renderWaiting(phase: DetonationPhase): void {
     const waiting = phase.kind !== 'idle';
-    // Only the controls of the current state exist in the DOM.
-    this.footerEl.replaceChildren(...(waiting
-      ? [this.cancelDetonationBtn, this.fireAnywayBtn]
-      : [this.cancelBtn, this.detonateBtn]));
-    this.waitingEl.style.display = waiting ? 'flex' : 'none';
-    if (!waiting) { this.waitingEl.replaceChildren(); delete this.waitingEl.dataset['phase']; return; }
+    this.waiting = waiting;
+    this.boxEl.style.display = waiting ? 'none' : 'flex';
+    // The root stays mounted but never intercepts a click while waiting; only the dock and chip do.
+    this.overlay.style.pointerEvents = waiting ? 'none' : '';
+    this.overlay.style.background = waiting ? 'transparent' : '';
+    if (!waiting) {
+      this.dockHidden = false;
+      this.waitingEl.replaceChildren();
+      delete this.waitingEl.dataset['phase'];
+      this.syncDock();
+      return;
+    }
     this.waitingEl.dataset['phase'] = phase.kind;
     const { title, body } = waitingText(phase);
     this.waitingEl.replaceChildren(
       el('span', { text: title, attrs: { style: 'font:800 12px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-critical-text)' } }),
       el('span', { text: body, attrs: { style: 'font:400 12px/1.45 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
     );
+    this.chipEl.textContent = body;
+    this.syncDock();
   }
 }
