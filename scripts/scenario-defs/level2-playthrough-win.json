@@ -3125,6 +3125,17 @@
       }
     },
     {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "An event (drought cracks) fires during the drill wait. Resolved here in both modes through the event dialog's own buttons: left pending, the browser resolved it the moment its dialog covered the next control while command mode carried it on, and the two runs diverged ($20,000 and 64 ticks apart by the next charge).",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "drill_plan show",
       "interaction": [
         {
@@ -3717,10 +3728,10 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 96.46086805944589,
-          "safety": 0,
-          "ecology": 59.23347967306959,
-          "nuisance": 49.1134954011355
+          "wellBeing": 95.8480431263386,
+          "safety": 2.9404,
+          "ecology": 50.39829534276786,
+          "nuisance": 49.11844690611368
         },
         "changedBy": {
           "tickCount": 0
@@ -4229,7 +4240,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4254,7 +4265,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4276,7 +4287,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4298,7 +4309,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4319,7 +4330,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4342,7 +4353,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4363,7 +4374,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4391,7 +4402,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4410,7 +4421,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4433,7 +4444,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4463,7 +4474,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -4505,7 +4516,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4529,14 +4540,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 84.47776004188077,
+          "wellBeing": 87.56455888506632,
           "safety": 2.9404,
-          "ecology": 84.24166823774715,
-          "nuisance": 42.76380748318706
+          "ecology": 53.59515850394413,
+          "nuisance": 48.76380748318706
         },
         "changedBy": {
           "tickCount": 0
@@ -4556,14 +4567,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 84.47776004188077,
+          "wellBeing": 87.56455888506632,
           "safety": 2.9404,
-          "ecology": 84.24166823774715,
-          "nuisance": 42.76380748318706
+          "ecology": 53.59515850394413,
+          "nuisance": 48.76380748318706
         },
         "changedBy": {
           "tickCount": 0
