@@ -96,19 +96,16 @@ interface LocomotionResult {
   stuck: number[];
   abandoned: Array<{ employeeId: number; actionId: number | null }>;
   /**
-   * Vehicle ids whose position was written this tick in a way I4
-   * (`vehicle_moved_without_occupant`, WorldInvariants.ts) should treat as
-   * legitimate (#1115) — either a genuine, occupant-validated drive leg, OR a
-   * deliberate system relocation with no occupant at all (none
-   * remains since #2231: a driverless vehicle is never moved). Not a strict subset of `moved`: `moved` mixes employee AND vehicle
-   * ids from ordinary itinerary movement, while a driverless relocation
-   * writes the vehicle's position and records it here without ever pushing
-   * that same id into `moved`. WorldInvariants.ts's I4 check uses this as its
-   * authoritative "moved legitimately" signal instead of re-deriving it from
-   * before/after occupancy, which cannot tell a same-tick board-drive-alight
-   * cycle (occupantIds reads empty at both tick-start and tick-end, even
-   * though the vehicle was genuinely, briefly occupied while it moved) from a
-   * real "moved with nobody ever driving it" bug.
+   * Vehicle ids whose position was written this tick by a genuine,
+   * occupant-validated drive leg (#1115). A driverless vehicle is never
+   * moved, so none is ever listed. Not a strict subset of `moved`: `moved`
+   * mixes employee AND vehicle ids from ordinary itinerary movement.
+   * WorldInvariants.ts's I4 check uses this as its authoritative "moved
+   * legitimately" signal instead of re-deriving it from before/after
+   * occupancy, which cannot tell a same-tick board-drive-alight cycle
+   * (occupantIds reads empty at both tick-start and tick-end, even though the
+   * vehicle was genuinely, briefly occupied while it moved) from a real
+   * "moved with nobody ever driving it" bug.
    */
   vehiclesMoved: number[];
   /**

@@ -32,8 +32,8 @@ export interface MovementTrail {
   points: TrailPoint[];
   /**
    * True once the entity's position changed during the batch by something
-   * other than a recorded walk or host transition (a placement, a driverless
-   * relocation). The renderer snaps instead of gliding through such a jump.
+   * other than a recorded walk or host transition (a placement, a sidestep
+   * teleport). The renderer snaps instead of gliding through such a jump.
    */
   relocated: boolean;
   /** Board / enter / alight / leave transitions along `points`, in order. */

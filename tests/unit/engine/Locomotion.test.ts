@@ -1797,6 +1797,27 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
     expect(everAbandoned).toHaveLength(0);
   });
 
+  it('#2231: an idle rig drives clear of a foot mover\'s destination in steps, never jumping', () => {
+    const state = buildFlatNavGridState(10, 10);
+    const rng = new Random(SEED);
+    const { employee: rider } = hireEmployee(state.employees, 'driller', rng, 4, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 4, 2);
+    vehicle.occupantIds = [rider.id];
+    rider.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const { employee: mover } = hireEmployee(state.employees, 'blaster', rng, 0, 2);
+    expect(moveTo(state, mover.id, { x: 4, z: 2 }).success).toBe(true);
+
+    let maxStep = 0;
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + 20; i++) {
+      const px = vehicle.x;
+      const pz = vehicle.z;
+      tickLocomotion(state);
+      maxStep = Math.max(maxStep, Math.hypot(vehicle.x - px, vehicle.z - pz));
+    }
+    expect(vehicle.x === 4 && vehicle.z === 2, 'rig left the destination').toBe(false);
+    expect(maxStep).toBeLessThanOrEqual(2);
+  });
+
   it('#1709: a rig whose driller is busy (active action) is not relocated', () => {
     const state = buildFlatNavGridState(10, 10);
     const rng = new Random(SEED);
