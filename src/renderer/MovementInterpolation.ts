@@ -6,7 +6,7 @@
 
 import { BASE_TICK_MS } from '../core/config/balance.js';
 import { linearstep } from '../core/math/Linearstep.js';
-import { isSameTrailPoint, type MovementTrail, type TrailPoint } from '../core/entities/MovementTrail.js';
+import { isSameTrailPoint, MOVEMENT_TRAIL_MAX_POINTS, trailArcLength, type MovementTrail, type TrailPoint } from '../core/entities/MovementTrail.js';
 
 export interface MovementTween {
   prevX: number;
@@ -38,9 +38,9 @@ export interface TrailSpan {
   /** True when the span ends at a board/enter marker, so the mesh retires there. */
   endsInHost: boolean;
   /** Arc length of the trail before this span's first point (#2224). */
-  startArc: number;
+  startArc?: number | undefined;
   /** Arc length of the hidden stretch (a ride) following this span, 0 for the last (#2224). */
-  gapAfter: number;
+  gapAfter?: number | undefined;
 }
 
 /** The fraction of a tween (0..1) during which a vehicle rides with its driver aboard (#2224). */
@@ -65,7 +65,12 @@ export function visibleTrailSpans(trail: MovementTrail): TrailSpan[] {
   if (hostMarkers.length === 0) return [{ points: points.slice(), endsInHost: false, startArc: 0, gapAfter: 0 }];
   if (trail.relocated) return [];
   const last = points.length - 1;
+  const arcAt: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    arcAt.push(arcAt[i - 1]! + Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.z - points[i - 1]!.z));
+  }
   const spans: TrailSpan[] = [];
+  let spanEnd = 0;
   const firstEvent = hostMarkers[0]!.event;
   let inBody = !isExitEvent(firstEvent);
   let start = 0;
@@ -73,14 +78,17 @@ export function visibleTrailSpans(trail: MovementTrail): TrailSpan[] {
     const idx = Math.min(last, Math.max(0, m.pointIndex));
     const exits = isExitEvent(m.event);
     if (!exits && inBody) {
-      spans.push({ points: points.slice(start, idx + 1), endsInHost: true, startArc: 0, gapAfter: 0 });
+      spans.push({ points: points.slice(start, idx + 1), endsInHost: true, startArc: arcAt[start]!, gapAfter: 0 });
+      spanEnd = idx;
       inBody = false;
     } else if (exits && !inBody) {
       start = idx;
+      const prev = spans[spans.length - 1];
+      if (prev) prev.gapAfter = Math.max(0, arcAt[idx]! - arcAt[spanEnd]!);
       inBody = true;
     }
   }
-  if (inBody) spans.push({ points: points.slice(start), endsInHost: false, startArc: 0, gapAfter: 0 });
+  if (inBody) spans.push({ points: points.slice(start), endsInHost: false, startArc: arcAt[start]!, gapAfter: 0 });
   return spans;
 }
 
@@ -97,8 +105,11 @@ export function exitSpanOf(trail: MovementTrail | undefined): TrailSpan | undefi
  * The first visible span of a trail that begins hosted (it opens with an alight/leave), or undefined.
  * Its first point is where an employee mounted at batch start appears (#2224).
  */
-export function leavingHostSpanOf(_trail: MovementTrail | undefined): TrailSpan | undefined {
-  throw new Error('not implemented');
+export function leavingHostSpanOf(trail: MovementTrail | undefined): TrailSpan | undefined {
+  if (!trail || trail.relocated) return undefined;
+  const first = trail.hostMarkers[0];
+  if (!first || !isExitEvent(first.event)) return undefined;
+  return visibleTrailSpans(trail)[0];
 }
 
 /**
@@ -106,10 +117,24 @@ export function leavingHostSpanOf(_trail: MovementTrail | undefined): TrailSpan 
  * and the rider's own trail (#2224); undefined when the trail carries no usable rider marker.
  */
 export function ridingWindowOf(
-  _vehicleTrail: MovementTrail | undefined,
-  _riderTrailOf: (id: number) => MovementTrail | undefined,
+  vehicleTrail: MovementTrail | undefined,
+  riderTrailOf: (id: number) => MovementTrail | undefined,
 ): RidingWindow | undefined {
-  throw new Error('not implemented');
+  if (!vehicleTrail || vehicleTrail.relocated || vehicleTrail.points.length >= MOVEMENT_TRAIL_MAX_POINTS) return undefined;
+  const riderMarkers = vehicleTrail.hostMarkers.filter(m => m.riderId !== undefined && m.riderArc !== undefined);
+  const first = riderMarkers[0];
+  if (!first) return undefined;
+  const riderId = first.riderId!;
+  const mine = riderMarkers.filter(m => m.riderId === riderId);
+  const riderTrail = riderTrailOf(riderId);
+  if (!riderTrail || riderTrail.relocated || riderTrail.points.length >= MOVEMENT_TRAIL_MAX_POINTS) return undefined;
+  const total = trailArcLength(riderTrail.points);
+  if (total <= 0) return undefined;
+  const board = mine.find(m => m.event === 'board');
+  const alight = [...mine].reverse().find(m => m.event === 'alight');
+  const start = board ? Math.min(1, Math.max(0, board.riderArc! / total)) : 0;
+  const end = alight ? Math.min(1, Math.max(start, alight.riderArc! / total)) : 1;
+  return { start, end };
 }
 
 /** Arc length of a polyline. */
@@ -150,6 +175,13 @@ export function startSpanPlayback(tween: MovementTween, spans: TrailSpan[], full
   tween.spanIndex = 0;
   tween.elapsedS = 0;
   tween.spanDurationS = spanDuration(spans[0], fullTrailLength);
+  tween.holdS = holdDuration(spans[0]?.startArc, fullTrailLength);
+}
+
+/** Real seconds a hidden stretch of `arc` takes at the pace of the whole trail (#2224). */
+function holdDuration(arc: number | undefined, fullTrailLength: number): number {
+  if (!arc || arc <= 0 || fullTrailLength <= 0) return 0;
+  return MOVE_TWEEN_DURATION_S * arc / fullTrailLength;
 }
 
 /**
@@ -169,6 +201,13 @@ export function stepSpanPlayback(
   const span = spans[index];
   if (!span || span.points.length === 0) return { x: renderX, z: renderZ, spanDone: true, finished: true };
   const duration = tween.spanDurationS ?? 0;
+  const hold = tween.holdS ?? 0;
+  if (hold > 0) {
+    // Hidden before the span (a ride): the clock runs, the position stays at the span's start.
+    tween.holdS = Math.max(0, hold - dt);
+    dt = Math.max(0, dt - hold);
+    if (tween.holdS > 0) return { x: span.points[0]!.x, z: span.points[0]!.z, spanDone: false, finished: false };
+  }
   tween.elapsedS += dt;
   const done = tween.elapsedS >= duration;
   const pos = pointAlongTrail(span.points, done ? 1 : tween.elapsedS / duration);
@@ -178,6 +217,7 @@ export function stepSpanPlayback(
     tween.spanIndex = index + 1;
     tween.elapsedS = 0;
     tween.spanDurationS = spanDuration(spans[index + 1], fullTrailLength);
+    tween.holdS = holdDuration(span.gapAfter, fullTrailLength);
   }
   return { ...pos, spanDone: true, finished };
 }
@@ -269,7 +309,6 @@ export function stepTween(
   trail?: MovementTrail,
   window?: RidingWindow,
 ): { x: number; z: number } {
-  void window; // skeleton (#2224): the riding window is applied by the implementation
   // Target moved since the last step (new tick's position, a mid-glide
   // retarget, etc.) — restart from the entity's actual current rendered
   // position, not the tween's stale prev, or the mesh pops.
@@ -284,6 +323,7 @@ export function stepTween(
     // target the mesh was heading for — so the glide starts from where the
     // mesh really is and then takes every recorded hop.
     tween.path = trail ? [{ x: renderX, z: renderZ }, ...trail.points.slice(1)] : null;
+    tween.window = trail ? window : undefined;
   }
 
   // Hard reposition (zone-clear, training enrolment, etc.) — no gradual
@@ -295,7 +335,10 @@ export function stepTween(
 
   tween.elapsedS += dt;
   if (tween.path) {
-    return pointAlongTrail(tween.path, linearstep(0, MOVE_TWEEN_DURATION_S, tween.elapsedS));
+    const w = tween.window;
+    const from = w ? w.start * MOVE_TWEEN_DURATION_S : 0;
+    const to = w ? w.end * MOVE_TWEEN_DURATION_S : MOVE_TWEEN_DURATION_S;
+    return pointAlongTrail(tween.path, linearstep(from, to, tween.elapsedS));
   }
   return computeInterpolatedPosition(
     tween.prevX, tween.prevZ, tween.targetX, tween.targetZ,
