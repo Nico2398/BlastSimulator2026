@@ -39,11 +39,13 @@ export const PAUSE_TOGGLE_SELECTOR = 'button[data-action="pause-toggle"]';
 export const TUTORIAL_EXIT_SELECTOR = '[data-action="tutorial-exit"]';
 
 /**
- * The Locate crosshair on a roster or fleet card (`makeLocateButton`, locateButton.ts). It only moves the
- * camera — navigation, like opening a panel — and it is how a player who just hired a worker he cannot
- * spot asks the game where he is.
+ * The Locate crosshair on a Crew roster card (`makeLocateButton`, locateButton.ts). It focuses the camera
+ * on the worker and selects him, so his Inspector opens. No order is issued: it is navigation, like
+ * opening a panel, and it is how a player who just hired a worker he cannot spot asks the game where he
+ * is. Scoped to the Crew panel — the same attribute sits on Fleet, Survey and Build rows and on the
+ * Inspector's header, which stay gated.
  */
-export const LOCATE_SELECTOR = '[data-action="locate"]';
+export const CREW_LOCATE_SELECTOR = '#bs-employee-panel [data-action="locate"]';
 
 /**
  * Settings session controls the rails always allow (#1332): language pills,

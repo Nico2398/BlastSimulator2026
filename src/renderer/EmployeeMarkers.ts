@@ -35,6 +35,14 @@ interface Marker {
   material: THREE.SpriteMaterial;
 }
 
+/** What the camera says right now, for sizing and fading a pin. */
+interface CameraView {
+  /** The projection matrix's vertical scale, 1 / tan(fov / 2). */
+  p11: number;
+  /** The sprite scale whose projected height is MARKER_VIEWPORT_FRACTION of the viewport. */
+  size: number;
+}
+
 function cssColor(hex: number): string {
   return `#${hex.toString(16).padStart(6, '0')}`;
 }
@@ -100,6 +108,11 @@ export class EmployeeMarkers {
    * Sync pins against the roster: one for every employee `getAnchor` resolves to a
    * character mesh group, none for the rest. A pin follows its employee onto a new
    * group, and is dropped with an employee who left the roster.
+   *
+   * A pin is fitted to the camera as it is placed. The game loop runs update() before the
+   * tick whose sync adds a worker's mesh (stepping out of a vehicle or a building) and draws
+   * right after, so a pin left for the next update() would be drawn once at the default
+   * sprite scale: a teardrop covering the viewport.
    */
   sync(
     employees: readonly Pick<Employee, 'id' | 'role'>[],
@@ -118,8 +131,12 @@ export class EmployeeMarkers {
         marker = this.createMarker(role);
         this.markers.set(id, marker);
       }
-      if (marker.sprite.parent !== anchor) anchor.add(marker.sprite);
+      const placed = marker.sprite.parent !== anchor;
+      if (placed) anchor.add(marker.sprite);
       marker.sprite.position.set(0, overlayHeight(anchor) + TIP_LIFT, 0);
+      if (!placed) continue;
+      const view = this.view();
+      if (view) this.fit(marker, view);
     }
     this.markers.sweep(liveIds);
   }
@@ -127,22 +144,9 @@ export class EmployeeMarkers {
   /** Resize every pin for the camera and fade it out of close-ups. Call every frame. */
   update(): void {
     if (this.markers.count === 0) return;
-    const p11 = this.camera.projectionMatrix.elements[5]!;
-    if (!(p11 > 0)) return;
-    // A sprite with sizeAttenuation off is scaled by its view depth in the shader, so its projected
-    // height is scale.y * p11 in NDC; the viewport spans 2 NDC units.
-    const size = (2 * MARKER_VIEWPORT_FRACTION) / p11;
-    this.camera.getWorldPosition(this.eye);
-    for (const { sprite, material } of this.markers.values()) {
-      sprite.scale.set(size, size, 1);
-      const anchor = sprite.parent;
-      if (!anchor) continue;
-      const distance = Math.max(this.eye.distanceTo(sprite.getWorldPosition(this.world)), 1e-3);
-      const workerFraction = (overlayHeight(anchor) * p11) / (2 * distance);
-      const fade = (FADE_END - workerFraction) / (FADE_END - FADE_START);
-      material.opacity = Math.min(1, Math.max(0, fade));
-      sprite.visible = material.opacity > 0;
-    }
+    const view = this.view();
+    if (!view) return;
+    for (const marker of this.markers.values()) this.fit(marker, view);
   }
 
   /** Remove every pin from the scene. */
@@ -171,12 +175,37 @@ export class EmployeeMarkers {
     sprite.name = 'crew-pin';
     sprite.center.set(0.5, 0);
     sprite.renderOrder = MARKER_RENDER_ORDER;
-    // Sized by update(); culling against the unit quad's world sphere would drop a pin whose
+    // Hidden until fit() has sized it: a Sprite starts at scale 1, which under sizeAttenuation false
+    // covers the viewport.
+    sprite.visible = false;
+    // Sized by fit(); culling against the unit quad's world sphere would drop a pin whose
     // centre has just left the screen while its (view-scaled) quad is still on it.
     sprite.frustumCulled = false;
     // A marker, not a target: picking stays with the worker, and a Sprite raycast needs a raycaster camera.
     sprite.raycast = () => {};
     return { sprite, material };
+  }
+
+  /** The camera's facts for this call, or null when its projection cannot size anything. */
+  private view(): CameraView | null {
+    const p11 = this.camera.projectionMatrix.elements[5]!;
+    if (!(p11 > 0)) return null;
+    this.camera.getWorldPosition(this.eye);
+    // A sprite with sizeAttenuation off is scaled by its view depth in the shader, so its projected
+    // height is scale.y * p11 in NDC; the viewport spans 2 NDC units.
+    return { p11, size: (2 * MARKER_VIEWPORT_FRACTION) / p11 };
+  }
+
+  /** Size a pin for the camera and fade it by how large its worker is on screen. */
+  private fit({ sprite, material }: Marker, { p11, size }: CameraView): void {
+    sprite.scale.set(size, size, 1);
+    const anchor = sprite.parent;
+    if (!anchor) return;
+    const distance = Math.max(this.eye.distanceTo(sprite.getWorldPosition(this.world)), 1e-3);
+    const workerFraction = (overlayHeight(anchor) * p11) / (2 * distance);
+    const fade = (FADE_END - workerFraction) / (FADE_END - FADE_START);
+    material.opacity = Math.min(1, Math.max(0, fade));
+    sprite.visible = material.opacity > 0;
   }
 
   private textureFor(role: EmployeeRole): THREE.CanvasTexture | null {

@@ -9,12 +9,13 @@ import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor, PICKER_CANCEL } from '../../../src/ui/tutorialStages.js';
-import { PAUSE_TOGGLE_SELECTOR, SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS, LOCATE_SELECTOR } from '../../../src/ui/tutorialStepHelpers.js';
+import { PAUSE_TOGGLE_SELECTOR, SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS, CREW_LOCATE_SELECTOR } from '../../../src/ui/tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { GUIDED_CLASS } from '../../../src/ui/tutorialGuide.js';
 import { RAILED_CONTROL_SELECTOR, isRailedControl, isControlLive, installActivationGuard } from '../../../src/ui/tutorialActivationGuard.js';
 import { injectStyles } from '../../../src/ui/styles.js';
+import { makeLocateButton } from '../../../src/ui/locateButton.js';
 
 // #903: a stage shaped like train-driller's final one — a `target` that
 // disappears (replaced by an "in training" status view, crewDetailSections.ts)
@@ -1722,41 +1723,57 @@ describe('TutorialRails — scrolls an off-screen target into view once per stag
   });
 });
 
-// The Locate crosshair on a roster or fleet card only moves the camera: navigation, like opening a
-// panel. A player who hired a worker he cannot spot has to be able to ask the game where he is.
-describe('Locate controls are always allowed', () => {
-  function locateButton(): HTMLElement {
-    const panel = document.createElement('div');
-    panel.id = 'bs-employee-panel';
-    const btn = document.createElement('button');
-    btn.dataset['action'] = 'locate';
-    panel.appendChild(btn);
-    document.body.appendChild(panel);
+// The Locate crosshair on a Crew roster card focuses the camera on the worker and selects him (his
+// Inspector opens). No order is issued, so it is navigation like opening a panel, and a player who hired
+// a worker he cannot spot has to be able to ask the game where he is. It is scoped to the Crew panel: the
+// same attribute sits on Fleet, Survey and Build rows and on the Inspector header, which stay gated.
+describe('The Crew roster Locate control is always allowed', () => {
+  /** The real roster button, as CrewPanel builds it, inside a host with the given id. */
+  function locateIn(hostId: string): HTMLElement {
+    const host = document.createElement('div');
+    host.id = hostId;
+    const btn = makeLocateButton({ title: 'Locate', onClick: () => {} });
+    host.appendChild(btn);
+    document.body.appendChild(host);
     return withBox(btn);
   }
 
-  it('the selector constant names the locate control', () => {
-    expect(LOCATE_SELECTOR).toBe('[data-action="locate"]');
+  it('the selector constant names the locate control inside the Crew panel', () => {
+    expect(CREW_LOCATE_SELECTOR).toBe('#bs-employee-panel [data-action="locate"]');
   });
 
-  it.each(['hire-surveyor', 'survey', 'drill-plan', 'blast'])('at step %s a locate button is live', (id) => {
+  it('matches the button the roster really builds, not just a hand-made lookalike', () => {
+    const btn = locateIn('bs-employee-panel');
+    expect(btn.matches(CREW_LOCATE_SELECTOR)).toBe(true);
+  });
+
+  it.each(['hire-surveyor', 'survey', 'drill-plan', 'blast'])('at step %s the roster locate button is live', (id) => {
     toolbarCrew();
-    const locate = locateButton();
+    const locate = locateIn('bs-employee-panel');
     const rails = new TutorialRails();
     rails.beginStep({ id }, state());
     rails.refresh();
     expect(locate.classList.contains(ALLOWED_CLASS)).toBe(true);
   });
 
-  it('a locate button added after the step began is picked up on the next pass', () => {
+  it('a locate button rebuilt after the step began is picked up on the next pass', () => {
     toolbarCrew();
     const rails = new TutorialRails();
     rails.beginStep({ id: 'hire-surveyor' }, state());
     rails.refresh();
 
-    const locate = locateButton();
+    const locate = locateIn('bs-employee-panel');
     rails.refresh();
 
     expect(locate.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it.each(['bs-fleet-panel', 'bs-survey-panel', 'bs-inspector', 'bs-build-menu'])('the same button in #%s stays gated', (hostId) => {
+    toolbarCrew();
+    const locate = locateIn(hostId);
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+    expect(locate.classList.contains(ALLOWED_CLASS)).toBe(false);
   });
 });

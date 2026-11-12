@@ -50,19 +50,37 @@ describe('GameRenderer — crew pins', () => {
     expect(pinsUnderEmployees(sm.scene)).toHaveLength(1);
   });
 
-  it('keeps its size honest frame to frame: update() resizes the pin for the camera', () => {
+  it('fits the pin to the camera the moment its worker appears, before any frame update', () => {
+    // main.ts runs update() first and the tick (whose sync adds meshes) after it, and the frame is drawn
+    // right after that: a pin first sized in update() would be drawn once at the default sprite scale.
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    hireEmployee(ctx.state!.employees, 'surveyor', new Random(1), 16, 17);
+
+    renderer.syncFromContext(ctx);
+
+    const [pin] = pinsUnderEmployees(sm.scene);
+    expect(pin!.scale.y).toBeGreaterThan(0);
+    expect(pin!.scale.y).toBeLessThan(1);
+    expect(pin!.visible).toBe(true);
+  });
+
+  it('keeps the pin fitted frame to frame: update() resizes it when the camera moves', () => {
     const sm = makeMockSceneManager();
     const renderer = new GameRenderer(sm as any);
     const ctx = makeCtx();
     hireEmployee(ctx.state!.employees, 'surveyor', new Random(1), 16, 17);
     renderer.syncFromContext(ctx);
     const [pin] = pinsUnderEmployees(sm.scene);
-    expect(pin!.scale.y).toBe(1); // a fresh sprite, never sized
+    const before = pin!.scale.y;
 
+    sm.camera.fov = 90;
+    sm.camera.updateProjectionMatrix();
     renderer.update(0.016);
 
     expect(pin!.scale.y).toBeGreaterThan(0);
-    expect(pin!.scale.y).toBeLessThan(1);
+    expect(pin!.scale.y).not.toBeCloseTo(before, 4); // a wider field of view needs a bigger sprite scale
   });
 
   it('rebuilding the level drops the old pins with the old meshes', () => {

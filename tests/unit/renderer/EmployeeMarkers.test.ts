@@ -37,6 +37,14 @@ function aim(camera: THREE.PerspectiveCamera, distance: number): void {
   camera.updateMatrixWorld(true);
 }
 
+/** What the pin's quad covers on screen, as a fraction of the viewport's height. */
+function onScreenFraction(pin: THREE.Sprite, camera: THREE.Camera): number {
+  // A sprite with sizeAttenuation off is scaled by its view depth in the shader, so its projected
+  // height is scale.y * P[1][1] in NDC (the viewport spans 2 NDC units).
+  expect((pin.material as THREE.SpriteMaterial).sizeAttenuation).toBe(false);
+  return (pin.scale.y * camera.projectionMatrix.elements[5]!) / 2;
+}
+
 function crew(...roles: EmployeeRole[]): { id: number; role: EmployeeRole }[] {
   return roles.map((role, i) => ({ id: i + 1, role }));
 }
@@ -156,14 +164,6 @@ describe('EmployeeMarkers — one pin per rendered worker', () => {
 });
 
 describe('EmployeeMarkers — the same size on screen at every zoom', () => {
-  /** What the pin's quad covers on screen, as a fraction of the viewport's height. */
-  function onScreenFraction(pin: THREE.Sprite, camera: THREE.Camera): number {
-    // A sprite with sizeAttenuation off is scaled by its view depth in the shader, so its projected
-    // height is scale.y * P[1][1] in NDC (the viewport spans 2 NDC units).
-    expect((pin.material as THREE.SpriteMaterial).sizeAttenuation).toBe(false);
-    return (pin.scale.y * camera.projectionMatrix.elements[5]!) / 2;
-  }
-
   it('covers the same fraction of the viewport whatever the camera distance', () => {
     const scene = new THREE.Scene();
     const camera = makeCamera();
@@ -274,6 +274,66 @@ describe('EmployeeMarkers — the same size on screen at every zoom', () => {
     expect(material.depthTest).toBe(false);
     expect(material.depthWrite).toBe(false);
     expect(pin.renderOrder).toBeGreaterThanOrEqual(999);
+    markers.dispose();
+  });
+
+  // The game loop runs update() first and then the tick, whose sync adds the meshes of workers stepping
+  // out of a vehicle or building; the frame is drawn right after. A pin left at the default sprite scale
+  // (1) would cover ~96% of the viewport for that frame under sizeAttenuation false.
+  it('sizes a pin the moment it is synced, before any update() has run', () => {
+    const scene = new THREE.Scene();
+    const camera = makeCamera();
+    const markers = new EmployeeMarkers(camera);
+    aim(camera, 36.8);
+
+    markers.sync(crew('surveyor'), () => makeAnchor(scene));
+
+    const pin = markers.pinOf(1)!;
+    expect(onScreenFraction(pin, camera)).toBeCloseTo(MARKER_VIEWPORT_FRACTION, 6);
+    expect(pin.visible).toBe(true);
+    expect((pin.material as THREE.SpriteMaterial).opacity).toBe(1);
+    markers.dispose();
+  });
+
+  it('a pin synced into a close-up is already faded out, not shown for a frame', () => {
+    const scene = new THREE.Scene();
+    const camera = makeCamera();
+    const markers = new EmployeeMarkers(camera);
+    aim(camera, 4);
+
+    markers.sync(crew('surveyor'), () => makeAnchor(scene));
+
+    const pin = markers.pinOf(1)!;
+    expect(pin.visible).toBe(false);
+    expect((pin.material as THREE.SpriteMaterial).opacity).toBe(0);
+    markers.dispose();
+  });
+
+  it('keeps a pin it cannot size hidden, rather than drawing it at the default sprite scale', () => {
+    const scene = new THREE.Scene();
+    const camera = makeCamera();
+    camera.projectionMatrix.elements[5] = 0; // a degenerate projection: no usable field of view
+    const markers = new EmployeeMarkers(camera);
+
+    markers.sync(crew('surveyor'), () => makeAnchor(scene));
+
+    expect(markers.pinOf(1)!.visible).toBe(false);
+    markers.dispose();
+  });
+
+  it('a pin that follows its worker onto a new mesh is fitted again on arrival', () => {
+    const scene = new THREE.Scene();
+    const camera = makeCamera();
+    const markers = new EmployeeMarkers(camera);
+    const oldAnchor = makeAnchor(scene);
+    const newAnchor = makeAnchor(scene);
+    aim(camera, 36.8);
+    markers.sync(crew('surveyor'), () => oldAnchor);
+    aim(camera, 4); // the camera moved in between: the worker is now seen in a close-up
+
+    markers.sync(crew('surveyor'), () => newAnchor);
+
+    expect(markers.pinOf(1)!.visible).toBe(false);
     markers.dispose();
   });
 
