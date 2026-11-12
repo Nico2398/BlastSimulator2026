@@ -190,6 +190,81 @@ describe('computeClimbComponents (#1306)', () => {
   });
 });
 
+describe('computeClimbComponents.canReach with a fractional target (#2228)', () => {
+  const FRACTIONS = [0.3, 0.7] as const;
+  /** Offsets that stay inside the cell they start from under Math.round (cell x.3 and cell (x-1).7). */
+  const OFFSETS = [-0.3, 0.3] as const;
+
+  it('a fractional target on a reachable cell is reachable, at both fractions in both axes', () => {
+    const components = computeClimbComponents(makeGrid(threeRegions));
+    for (const fx of FRACTIONS) {
+      for (const fz of FRACTIONS) {
+        expect(components.canReach(3, 3, 6 + fx, 4 + fz), `to ${6 + fx},${4 + fz}`).toBe(true);
+        expect(components.canReach(15, 5, 15 + fx, 5 + fz), `to ${15 + fx},${5 + fz}`).toBe(true);
+      }
+    }
+  });
+
+  it('a fractional target on an unreachable cell is not reachable', () => {
+    const components = computeClimbComponents(makeGrid(threeRegions));
+    for (const fx of FRACTIONS) {
+      for (const fz of FRACTIONS) {
+        expect(components.canReach(3, 3, 14 + fx, 4 + fz), `to ${14 + fx},${4 + fz}`).toBe(false);
+        expect(components.canReach(3, 3, 24 + fx, 4 + fz), `to ${24 + fx},${4 + fz}`).toBe(false);
+      }
+    }
+  });
+
+  it('a fractional target rounds like the source: it answers as the cell it lies on', () => {
+    const components = computeClimbComponents(makeGrid(threeRegions));
+    // 10.3 rounds onto the wall at x = 10, 10.7 onto region B's first column.
+    expect(components.canReach(15, 5, 10.3, 5)).toBe(false);
+    expect(components.canReach(15, 5, 10.7, 5)).toBe(true);
+    expect(components.canReach(3, 3, 10.7, 5)).toBe(false);
+    expect(components.canReach(3, 3, 9.3, 5)).toBe(true);
+  });
+
+  it('answers a fractional target exactly like the rounded cell for every source kind', () => {
+    const grid = makeGrid((x, z) => {
+      if (x === 10 && z !== 4) return BLOCKED;
+      if (x === 15) return { surfaceY: z < 5 ? 0 : 50 };
+      if (x === 20) return { clearance: 0 };
+      if (x === 5 && z === 5) return BLOCKED; // a stranded source stands here
+      return x > 15 ? { surfaceY: 0 } : null;
+    });
+    const components = computeClimbComponents(grid, NAV_CLEARANCE_EMPLOYEE_CELLS);
+    let reachable = 0;
+    for (const [sx, sz] of [[3, 3], [12, 8], [25, 1], [5, 5], [20, 2]] as const) {
+      for (let z = 0; z < H; z++) {
+        for (let x = 0; x < W; x++) {
+          const expected = components.canReach(sx, sz, x, z);
+          if (expected) reachable++;
+          for (const dx of OFFSETS) {
+            for (const dz of OFFSETS) {
+              const tx = x + dx;
+              const tz = z + dz;
+              expect(components.canReach(sx, sz, tx, tz), `from ${sx},${sz} to ${tx},${tz}`).toBe(expected);
+            }
+          }
+        }
+      }
+    }
+    expect(reachable).toBeGreaterThan(0);
+  });
+
+  it('a stranded source reaches the fractional position of its own cell', () => {
+    const components = computeClimbComponents(makeGrid(threeRegions));
+    expect(components.canReach(10, 5, 10.3, 5.3)).toBe(true);
+    expect(components.canReach(10, 5, 9.7, 4.7)).toBe(true);
+  });
+
+  it('a fractional target outside the grid is still rejected', () => {
+    const components = computeClimbComponents(makeGrid());
+    expect(components.canReach(3, 3, -1.3, 3.3)).toBe(false);
+    expect(components.canReach(3, 3, W + 0.7, 3.7)).toBe(false);
+  });
+});
+
 describe('computeClimbReachableSetFromSources fill overrides (#1391)', () => {
   const rect = (minX: number, minZ: number, maxX: number, maxZ: number) => ({ minX, minZ, maxX, maxZ });
   /** Wall at x=10 with one open cell at z=5. */

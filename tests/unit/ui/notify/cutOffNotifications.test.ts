@@ -6,10 +6,14 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const stranded = vi.hoisted(() => ({ vehicleIds: [] as number[], employeeIds: [] as number[] }));
-vi.mock('../../../../src/core/engine/StrandedCrew.js', () => ({
-  findStrandedCrew: () => ({ vehicleIds: [...stranded.vehicleIds], employeeIds: [...stranded.employeeIds] }),
-}));
+const stranded = vi.hoisted(() => ({ vehicleIds: [] as number[], employeeIds: [] as number[], real: false }));
+vi.mock('../../../../src/core/engine/StrandedCrew.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../../src/core/engine/StrandedCrew.js')>('../../../../src/core/engine/StrandedCrew.js');
+  return {
+    findStrandedCrew: (state: Parameters<typeof actual.findStrandedCrew>[0]) =>
+      stranded.real ? actual.findStrandedCrew(state) : { vehicleIds: [...stranded.vehicleIds], employeeIds: [...stranded.employeeIds] },
+  };
+});
 
 import { NotificationCenter } from '../../../../src/ui/notify/NotificationCenter.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
@@ -18,6 +22,9 @@ import { purchaseVehicle } from '../../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../../src/core/math/Random.js';
 import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
 import { vehicleDisplayName } from '../../../../src/ui/fleetDetailSections.js';
+import { wireCrewNotifications } from '../../../../src/ui/notify/crewNotifications.js';
+import { EventEmitter } from '../../../../src/core/state/EventEmitter.js';
+import { NavGrid, type NavCell } from '../../../../src/core/nav/NavGrid.js';
 
 function setup() {
   setLocale('en');
@@ -30,7 +37,7 @@ function setup() {
 const cutOffPip = (pips: ReturnType<NotificationCenter['update']>) =>
   pips.find(p => p.label === t('notification.pip.cut_off_label', { count: 2 }) || p.label === t('notification.pip.cut_off_label', { count: 1 }));
 
-beforeEach(() => { stranded.vehicleIds = []; stranded.employeeIds = []; });
+beforeEach(() => { stranded.vehicleIds = []; stranded.employeeIds = []; stranded.real = false; });
 
 describe('cut-off alert (#2095)', () => {
   it('shows nothing while nothing is cut off', () => {
@@ -109,3 +116,58 @@ describe('cut-off notifications name their entity (#2169)', () => {
   });
 });
 
+describe('a walker crossing the crew plateau is not reported cut off (#2228)', () => {
+  const WIDTH = 24;
+  const HEIGHT = 12;
+  const WALL_X = 10;
+
+  /** Real StrandedCrew over an open floor, or two halves split by a wall at x = WALL_X. */
+  function realSetup(wall: boolean) {
+    stranded.real = true;
+    setLocale('en');
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < HEIGHT; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < WIDTH; x++) {
+        const blocked = wall && x === WALL_X;
+        row.push({ type: blocked ? 'blocked' : 'walkable', moveCost: blocked ? Infinity : 1.0, benchLevel: 0, vehicleOccupied: false });
+      }
+      cells.push(row);
+    }
+    state.navGrid = new NavGrid(WIDTH, HEIGHT, cells);
+    const hire = (x: number, z: number) => hireEmployee(state.employees, 'driver', new Random(state.employees.nextId), x, z).employee;
+    const center = new NotificationCenter();
+    wireCrewNotifications(new EventEmitter(), () => state, n => center.notify(n));
+    return { state, hire, center };
+  }
+
+  const cutOffBodies = (center: NotificationCenter, names: string[]) =>
+    center.getLog().filter(e => names.some(n => e.body === t('notification.cut_off_employee', { name: n })));
+
+  it('raises no cut-off toast or pip while an employee walks several cells on the plateau', () => {
+    const { state, hire, center } = realSetup(false);
+    const first = hire(3, 5);
+    const second = hire(4, 6);
+    const walker = hire(5, 5);
+    for (let step = 0; step <= 40; step++) {
+      walker.x = 5 + step * 0.1;
+      walker.z = 5 + (step % 2) * 0.3;
+      state.tickCount++;
+      const pips = center.update(state);
+      expect(cutOffPip(pips), `at x=${walker.x}`).toBeUndefined();
+    }
+    expect(cutOffBodies(center, [first.name, second.name, walker.name])).toEqual([]);
+  });
+
+  it('still toasts the employee who is walled off, so the alert is not simply silenced', () => {
+    const { state, hire, center } = realSetup(true);
+    hire(3, 5);
+    hire(4, 5);
+    const alone = hire(16.3, 5.7);
+    state.tickCount++;
+    const pips = center.update(state);
+    expect(cutOffBodies(center, [alone.name])).toHaveLength(1);
+    expect(cutOffPip(pips)).toBeDefined();
+  });
+});
