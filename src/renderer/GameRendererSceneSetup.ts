@@ -24,6 +24,7 @@ import { VehicleMesh } from './VehicleMesh.js';
 import { CharacterMesh } from './CharacterMesh.js';
 import { TaskProgressBar } from './TaskProgressBar.js';
 import { EmployeePictograms } from './EmployeePictograms.js';
+import { EmployeeMarkers } from './EmployeeMarkers.js';
 import { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import { SkyboxWeather } from './SkyboxWeather.js';
 import { WindState } from './ambient/WindState.js';
@@ -81,6 +82,8 @@ export interface SceneSetupDeps {
   characters: CharacterMesh | null;
   taskProgress: TaskProgressBar | null;
   pictograms: EmployeePictograms | null;
+  /** Role-coloured pins that keep every worker findable at any zoom. */
+  employeeMarkers: EmployeeMarkers | null;
   buildingOccupancyLabels: BuildingOccupancyLabels | null;
   skybox: SkyboxWeather | null;
   windState: WindState | null;
@@ -186,6 +189,10 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   // Non-working activity pictograms — billboarded above employees who
   // aren't working, naming why (#1013)
   deps.pictograms = new EmployeePictograms(scene, deps.sm.camera);
+
+  // Crew pins — a worker is a speck at the default framing, so each carries a pin that keeps one
+  // size on screen at any zoom
+  deps.employeeMarkers = new EmployeeMarkers(deps.sm.camera);
 
   // "<inside>/<capacity>" labels above people-holding buildings (#1205)
   deps.buildingOccupancyLabels = new BuildingOccupancyLabels(scene, deps.sm.camera);
@@ -432,6 +439,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.rallyFlag?.dispose();
   deps.taskProgress?.dispose();
   deps.pictograms?.dispose();
+  deps.employeeMarkers?.dispose();
   deps.buildingOccupancyLabels?.dispose();
 
   deps.terrain = null;
@@ -469,6 +477,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.rallyFlag = null;
   deps.taskProgress = null;
   deps.pictograms = null;
+  deps.employeeMarkers = null;
   deps.buildingOccupancyLabels = null;
   deps.lastGrid = null;
 

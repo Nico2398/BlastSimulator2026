@@ -594,6 +594,270 @@ describe('TutorialOverlay (12.4)', () => {
       // Restore
       delete (TUTORIAL_STEPS[0] as any).highlightTarget;
     });
+
+    describe('ripple layer (#2234)', () => {
+      const LAYER = '.bsx-ripple-layer';
+      let frameQueue: Map<number, FrameRequestCallback>;
+      let nextId: number;
+      let tick: number;
+
+      function frames(n: number): void {
+        for (let i = 0; i < n; i++) {
+          tick += 16;
+          const pending = [...frameQueue.values()];
+          frameQueue = new Map();
+          for (const cb of pending) cb(tick);
+        }
+      }
+
+      function stub(name: string, value: unknown): void {
+        vi.stubGlobal(name, value);
+        if ((window as unknown) !== (globalThis as unknown)) {
+          Object.defineProperty(window, name, { value, configurable: true, writable: true });
+        }
+      }
+
+      beforeEach(() => {
+        frameQueue = new Map();
+        nextId = 1;
+        tick = 0;
+        stub('requestAnimationFrame', (cb: FrameRequestCallback): number => {
+          const id = nextId++;
+          frameQueue.set(id, cb);
+          return id;
+        });
+        stub('cancelAnimationFrame', (id: number): void => { frameQueue.delete(id); });
+        stub('matchMedia', (query: string) => ({
+          matches: false, media: query, addEventListener: () => {}, removeEventListener: () => {},
+          addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false,
+        }));
+      });
+
+      afterEach(() => {
+        overlay?.dispose();
+        overlay = null;
+        vi.unstubAllGlobals();
+        document.querySelectorAll('#bs-toolbar, #bs-build-panel, #game-canvas').forEach((e) => e.remove());
+        document.body.classList.remove('bs-placement-armed');
+      });
+
+      function box(el: HTMLElement): HTMLElement {
+        el.getBoundingClientRect = () => ({
+          width: 40, height: 20, top: 100, left: 200, right: 240, bottom: 120, x: 200, y: 100,
+          toJSON: () => ({}),
+        }) as DOMRect;
+        return el;
+      }
+
+      function toolbarButton(panel: string): HTMLElement {
+        let bar = document.getElementById('bs-toolbar');
+        if (!bar) {
+          bar = document.createElement('div');
+          bar.id = 'bs-toolbar';
+          document.body.appendChild(bar);
+        }
+        const btn = document.createElement('button');
+        btn.dataset['panel'] = panel;
+        bar.appendChild(btn);
+        return box(btn);
+      }
+
+      function buyLivingQuarters(): HTMLElement {
+        const panel = document.createElement('div');
+        panel.id = 'bs-build-panel';
+        const wrap = document.createElement('div');
+        wrap.setAttribute('data-build-type', 'living_quarters');
+        const btn = document.createElement('button');
+        btn.className = 'bs-build-buy-btn';
+        wrap.appendChild(btn);
+        panel.appendChild(wrap);
+        document.body.appendChild(panel);
+        return box(btn);
+      }
+
+      function advanceTo(tut: any, id: string): void {
+        for (let i = 0; i < TUTORIAL_STEPS.length && TUTORIAL_STEPS[tut.stepIndex]!.id !== id; i++) tut.advanceToNextStep();
+        expect(TUTORIAL_STEPS[tut.stepIndex]!.id).toBe(id);
+      }
+
+      function startOnHireStep(): any {
+        toolbarButton('employees');
+        const tut = new TutorialOverlay(container) as any;
+        overlay = tut;
+        tut.start(createMockState());
+        return tut;
+      }
+
+      it('is absent before the tutorial starts', () => {
+        overlay = new TutorialOverlay(container);
+        expect(document.querySelector(LAYER)).toBeNull();
+      });
+
+      it('is present while a guided stage is live', () => {
+        startOnHireStep();
+        expect(document.querySelectorAll(LAYER)).toHaveLength(1);
+        expect(document.querySelector(LAYER)!.parentElement).toBe(document.body);
+      });
+
+      it('converges on the highlighted control', () => {
+        startOnHireStep();
+        frames(2);
+        const el = document.querySelector<HTMLElement>(LAYER)!;
+        expect(Number(el.dataset['rippleX'])).toBe(220);
+        expect(Number(el.dataset['rippleY'])).toBe(110);
+      });
+
+      it('stays a single layer across repeated guide passes', () => {
+        const tut = startOnHireStep();
+        const first = document.querySelector(LAYER);
+        tut.refreshGuide();
+        tut.refreshGuide();
+        frames(3);
+        expect(document.querySelectorAll(LAYER)).toHaveLength(1);
+        expect(document.querySelector(LAYER)).toBe(first);
+      });
+
+      it('is removed on exit()', () => {
+        const tut = startOnHireStep();
+        expect(document.querySelector(LAYER)).not.toBeNull();
+        tut.exit();
+        overlay = null;
+        expect(document.querySelector(LAYER)).toBeNull();
+        frames(3);
+        expect(document.querySelector(LAYER)).toBeNull();
+      });
+
+      it('is removed on dispose()', () => {
+        const tut = startOnHireStep();
+        expect(document.querySelector(LAYER)).not.toBeNull();
+        tut.dispose();
+        overlay = null;
+        expect(document.querySelector(LAYER)).toBeNull();
+        frames(3);
+        expect(document.querySelector(LAYER)).toBeNull();
+      });
+
+      it('is removed when the tutorial is suspended (teardown)', () => {
+        const tut = startOnHireStep();
+        expect(document.querySelector(LAYER)).not.toBeNull();
+        tut.suspend();
+        expect(document.querySelector(LAYER)).toBeNull();
+      });
+
+      it('is removed when the tutorial is abandoned', () => {
+        const tut = startOnHireStep();
+        tut.abandon();
+        expect(document.querySelector(LAYER)).toBeNull();
+      });
+
+      it('is removed on an unguided step (free-play)', () => {
+        const tut = startOnHireStep();
+        expect(document.querySelector(LAYER)).not.toBeNull();
+        advanceTo(tut, 'free-play');
+        tut.refreshGuide();
+        expect(document.querySelector(LAYER)).toBeNull();
+        frames(3);
+        expect(document.querySelector(LAYER)).toBeNull();
+      });
+
+      it('is absent on the congratulations card', () => {
+        const tut = startOnHireStep();
+        advanceTo(tut, 'congratulations');
+        tut.refreshGuide();
+        expect(document.querySelector(LAYER)).toBeNull();
+      });
+
+      it('is removed while the stage waits on an issued order, and returns afterwards', () => {
+        toolbarButton('build');
+        buyLivingQuarters();
+        const tut = new TutorialOverlay(container) as any;
+        overlay = tut;
+        const state = createMockState();
+        tut.start(state);
+        advanceTo(tut, 'build-living-quarters');
+        tut.refreshGuide();
+        expect(document.querySelector(LAYER)).not.toBeNull();
+
+        state.plannedBuildings = [
+          { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 },
+        ];
+        tut.refreshGuide();
+        expect(document.querySelector(LAYER)).toBeNull();
+        frames(3);
+        expect(document.querySelector(LAYER)).toBeNull();
+
+        state.plannedBuildings = [];
+        tut.refreshGuide();
+        expect(document.querySelector(LAYER)).not.toBeNull();
+      });
+
+      it('a new guided step after an unguided one brings the layer back', () => {
+        const tut = startOnHireStep();
+        advanceTo(tut, 'free-play');
+        tut.refreshGuide();
+        expect(document.querySelector(LAYER)).toBeNull();
+        tut.stepIndex = 0;
+        tut.rails.beginStep(TUTORIAL_STEPS[0], createMockState());
+        tut.refreshGuide();
+        expect(document.querySelector(LAYER)).not.toBeNull();
+      });
+
+      describe('tile-pick stages', () => {
+        function armPicker(): void {
+          toolbarButton('blast');
+          document.body.classList.add('bs-placement-armed');
+          const canvas = document.createElement('div');
+          canvas.id = 'game-canvas';
+          document.body.appendChild(canvas);
+          box(canvas);
+        }
+
+        function onDrillPlan(): any {
+          const tut = new TutorialOverlay(container) as any;
+          overlay = tut;
+          tut.start(createMockState());
+          advanceTo(tut, 'drill-plan');
+          armPicker();
+          return tut;
+        }
+
+        it('converges on the point the region projector returns', () => {
+          const tut = onDrillPlan();
+          const projector = vi.fn(() => ({ x: 640, y: 360 }));
+          tut.setRegionProjector(projector);
+          tut.refreshGuide();
+          frames(2);
+          const el = document.querySelector<HTMLElement>(LAYER)!;
+          expect(el).not.toBeNull();
+          expect(projector).toHaveBeenCalled();
+          expect(Number(el.dataset['rippleX'])).toBe(640);
+          expect(Number(el.dataset['rippleY'])).toBe(360);
+        });
+
+        it('shows nothing without a projector', () => {
+          const tut = onDrillPlan();
+          tut.refreshGuide();
+          expect(document.querySelector(LAYER)).toBeNull();
+        });
+
+        it('shows nothing when the projection is unavailable', () => {
+          const tut = onDrillPlan();
+          tut.setRegionProjector(() => null);
+          tut.refreshGuide();
+          expect(document.querySelector(LAYER)).toBeNull();
+        });
+
+        it('setRegionProjector(null) takes the projection away', () => {
+          const tut = onDrillPlan();
+          tut.setRegionProjector(() => ({ x: 640, y: 360 }));
+          tut.refreshGuide();
+          expect(document.querySelector(LAYER)).not.toBeNull();
+          tut.setRegionProjector(null);
+          tut.refreshGuide();
+          expect(document.querySelector(LAYER)).toBeNull();
+        });
+      });
+    });
   });
 
   describe('dispose()', () => {
@@ -1486,6 +1750,13 @@ describe('TutorialOverlay exit (#1332)', () => {
     expect(found).toBeInstanceOf(HTMLButtonElement);
     expect(found.getAttribute('data-action')).toBe('tutorial-exit');
     expect(host.contains(found)).toBe(true);
+  });
+
+  // Exit tutorial ends the guidance and keeps the run going — a player who clicked it hoping to leave for
+  // the main menu lands in free play, so the confirm says where the menu actually is.
+  it.each(['en', 'fr'] as const)('the exit confirm names the main-menu route in %s', (locale) => {
+    setLocale(locale);
+    expect(t('tutorial.exit_confirm_body')).toContain(t('ui.settings.return_to_menu'));
   });
 
   it('exit label differs between en and fr, and keys exist', () => {

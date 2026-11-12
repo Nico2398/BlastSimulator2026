@@ -9,12 +9,13 @@ import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor, PICKER_CANCEL } from '../../../src/ui/tutorialStages.js';
-import { PAUSE_TOGGLE_SELECTOR, SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS } from '../../../src/ui/tutorialStepHelpers.js';
+import { PAUSE_TOGGLE_SELECTOR, SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS, CREW_LOCATE_SELECTOR } from '../../../src/ui/tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { GUIDED_CLASS } from '../../../src/ui/tutorialGuide.js';
 import { RAILED_CONTROL_SELECTOR, isRailedControl, isControlLive, installActivationGuard } from '../../../src/ui/tutorialActivationGuard.js';
 import { injectStyles } from '../../../src/ui/styles.js';
+import { makeLocateButton } from '../../../src/ui/locateButton.js';
 import { PreflightModal } from '../../../src/ui/panels/PreflightModal.js';
 import { addHole } from '../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../src/core/mining/ChargePlan.js';
@@ -1725,6 +1726,61 @@ describe('TutorialRails — scrolls an off-screen target into view once per stag
   });
 });
 
+// The Locate crosshair on a Crew roster card focuses the camera on the worker and selects him (his
+// Inspector opens). No order is issued, so it is navigation like opening a panel, and a player who hired
+// a worker he cannot spot has to be able to ask the game where he is. It is scoped to the Crew panel: the
+// same attribute sits on Fleet, Survey and Build rows and on the Inspector header, which stay gated.
+describe('The Crew roster Locate control is always allowed', () => {
+  /** The real roster button, as CrewPanel builds it, inside a host with the given id. */
+  function locateIn(hostId: string): HTMLElement {
+    const host = document.createElement('div');
+    host.id = hostId;
+    const btn = makeLocateButton({ title: 'Locate', onClick: () => {} });
+    host.appendChild(btn);
+    document.body.appendChild(host);
+    return withBox(btn);
+  }
+
+  it('the selector constant names the locate control inside the Crew panel', () => {
+    expect(CREW_LOCATE_SELECTOR).toBe('#bs-employee-panel [data-action="locate"]');
+  });
+
+  it('matches the button the roster really builds, not just a hand-made lookalike', () => {
+    const btn = locateIn('bs-employee-panel');
+    expect(btn.matches(CREW_LOCATE_SELECTOR)).toBe(true);
+  });
+
+  it.each(['hire-surveyor', 'survey', 'drill-plan', 'blast'])('at step %s the roster locate button is live', (id) => {
+    toolbarCrew();
+    const locate = locateIn('bs-employee-panel');
+    const rails = new TutorialRails();
+    rails.beginStep({ id }, state());
+    rails.refresh();
+    expect(locate.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('a locate button rebuilt after the step began is picked up on the next pass', () => {
+    toolbarCrew();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+
+    const locate = locateIn('bs-employee-panel');
+    rails.refresh();
+
+    expect(locate.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it.each(['bs-fleet-panel', 'bs-survey-panel', 'bs-inspector', 'bs-build-menu'])('the same button in #%s stays gated', (hostId) => {
+    toolbarCrew();
+    const locate = locateIn(hostId);
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+    expect(locate.classList.contains(ALLOWED_CLASS)).toBe(false);
+  });
+});
+
 describe('TutorialRails — the real docked waiting card leaves the clock controls free (#2233)', () => {
   function worker(id: number, name: string): GameState['employees']['employees'][number] {
     return {
@@ -1827,4 +1883,122 @@ describe('TutorialRails — the real docked waiting card leaves the clock contro
       expect(['transparent', 'rgba(0, 0, 0, 0)']).toContain(modal.root.style.backgroundColor);
     });
   }
+});
+
+describe('TutorialRails — ripple target (#2234)', () => {
+  function toolbarBuild(): HTMLElement {
+    const bar = document.createElement('div');
+    bar.id = 'bs-toolbar';
+    const btn = document.createElement('button');
+    btn.dataset['panel'] = 'build';
+    bar.appendChild(btn);
+    document.body.appendChild(bar);
+    return withBox(btn);
+  }
+
+  function buyLivingQuartersButton(): HTMLElement {
+    const panel = document.createElement('div');
+    panel.id = 'bs-build-panel';
+    const wrap = document.createElement('div');
+    wrap.setAttribute('data-build-type', 'living_quarters');
+    const btn = document.createElement('button');
+    btn.className = 'bs-build-buy-btn';
+    wrap.appendChild(btn);
+    panel.appendChild(wrap);
+    document.body.appendChild(panel);
+    return withBox(btn);
+  }
+
+  it('is null when the rails have no stages', () => {
+    const rails = new TutorialRails();
+    expect(rails.refresh(state()).ripple).toBeNull();
+  });
+
+  it('is null on an unguided step', () => {
+    toolbarCrew();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.beginStep({ id: 'free-play', guided: false }, state());
+    expect(rails.refresh(state()).ripple).toBeNull();
+  });
+
+  it('is null on a step with nothing to point at', () => {
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'congratulations' }, state());
+    expect(rails.refresh(state()).ripple).toBeNull();
+  });
+
+  it('names the live stage\'s control while a guided stage is live', () => {
+    toolbarCrew();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    const view = rails.refresh(state());
+    expect(view.ripple).not.toBeNull();
+    expect(view.ripple!.selector).toBe(stagesFor('hire-surveyor')[0]!.target);
+    expect(view.ripple!.region ?? null).toBeNull();
+  });
+
+  it('follows the stage as it moves to the next control', () => {
+    toolbarCrew();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh(state());
+    hireSurveyor();
+    const view = rails.refresh(state());
+    expect(view.stageIndex).toBe(1);
+    expect(view.ripple!.selector).toBe(stagesFor('hire-surveyor')[1]!.target);
+  });
+
+  it('carries the region of a tile-pick stage', () => {
+    const bar = document.createElement('div');
+    bar.id = 'bs-toolbar';
+    const blast = document.createElement('button');
+    blast.dataset['panel'] = 'blast';
+    bar.appendChild(blast);
+    document.body.appendChild(bar);
+    withBox(blast);
+    document.body.classList.add('bs-placement-armed');
+    const canvas = document.createElement('div');
+    canvas.id = 'game-canvas';
+    document.body.appendChild(canvas);
+    withBox(canvas);
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'drill-plan' }, state());
+    const view = rails.refresh(state());
+    const region = stagesFor('drill-plan').find(s => s.region)!.region!;
+    expect(view.ripple).not.toBeNull();
+    expect(view.ripple!.region).toEqual(region);
+  });
+
+  it('is null while the stage is waiting on an issued order', () => {
+    toolbarBuild();
+    buyLivingQuartersButton();
+    const rails = new TutorialRails();
+    const s = state();
+    rails.beginStep({ id: 'build-living-quarters' }, s);
+
+    expect(rails.refresh(s).ripple).not.toBeNull();
+
+    s.plannedBuildings = [
+      { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 } as never,
+    ];
+    const waiting = rails.refresh(s);
+    expect(waiting.waiting).toBe(true);
+    expect(waiting.ripple).toBeNull();
+  });
+
+  it('comes back once the waiting clears', () => {
+    toolbarBuild();
+    buyLivingQuartersButton();
+    const rails = new TutorialRails();
+    const s = state();
+    rails.beginStep({ id: 'build-living-quarters' }, s);
+    s.plannedBuildings = [
+      { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 } as never,
+    ];
+    expect(rails.refresh(s).ripple).toBeNull();
+    s.plannedBuildings = [];
+    expect(rails.refresh(s).ripple).not.toBeNull();
+  });
 });
