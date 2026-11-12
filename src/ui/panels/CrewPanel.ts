@@ -285,7 +285,8 @@ export class CrewPanel extends PanelBase {
       attrs: { 'data-employee-id': String(e.id), 'data-employee-role': e.role, 'data-clickable': '' },
     });
 
-    const toggle = el('button', { className: 'bs-detail-toggle bsx-ecard-hit' });
+    // Coloured inline: a <button> otherwise paints buttontext, black on the dark card (textColour.test.ts).
+    const toggle = el('button', { className: 'bs-detail-toggle bsx-ecard-hit', attrs: { style: 'color:var(--bsx-text-primary)' } });
     toggle.addEventListener('click', () => {
       this.onSelectEmployeeCb?.(e.id);
     });

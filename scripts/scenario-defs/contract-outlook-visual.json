@@ -1,0 +1,1174 @@
+{
+  "name": "contract-outlook-visual",
+  "description": "Delivery outlook (#2243): with two active contracts on the same ore and one on another, the Contracts window shows one overview line per material - stock counted once, demand summed, gathering rate against needed pace, an outlook state per material and per contract - and every deadline on one timeline. Setup reuses economy-full-loop's real survey, drill, blast and haul so the gathering rate is the game's own, not seeded.",
+  "steps": [
+    {
+      "command": "campaign start level:tutorial_pit cash:350000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:tutorial_pit cash:350000"
+        }
+      ],
+      "description": "#553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, and (see below) a rock_fragmenter/second driver to clear the oversized fragments this same charge always produced, on top of the original driver/debris_hauler/freight_warehouse shopping list.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 350000
+        }
+      }
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1,
+          "qualificationCount": 1,
+          "proficiencyTotal": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:geology level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:geology level:5"
+        }
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "proficiencyTotal": 5
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "survey seismic x:12 z:12",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 12,
+          "z": 12
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "the seismic survey cost ($3000, SURVEY_COSTS.seismic) is charged up front when queued, not on completion -- Finding #32: this used to silently diverge state.finances.cash from the flat cash field this assertion reads, fixed at the root"
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 2,
+          "qualificationCount": 4,
+          "proficiencyTotal": 8
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:blasting level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:blasting level:5"
+        }
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "proficiencyTotal": 4
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed a drill_rig at all) now needs one before drill_plan can ever land. Vehicle #1; destroyed by the blast further down, so the debris_hauler purchased later becomes #2 and the rock_fragmenter #3.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "description": "Grants the driller (employee #2) the licence to drive the drill_rig just purchased -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow); left as a test-only bootstrap since this file's focus is the economy loop, not re-proving vehicle licensing.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "proficiencyTotal": 0
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.truck level:1"
+        }
+      ],
+      "description": "Truck licence: with blasting, the hire is dual-qualified for the charging truck (#1649).",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:14,6 diameter:0.089",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "dragTiles",
+          "x1": 14,
+          "z1": 6,
+          "x2": 18,
+          "z2": 10
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        }
+      },
+      "description": "#1197/#1231: start relocated 10,10 -> 14,6 (dragTiles rectangle moved the same 4,-4 offset, 10,10-14,14 -> 14,6-18,10) -- issue #1197's diagonal corner-cutting rule (isDiagonalCornerClear, Pathfinding.ts) closes an illegal diagonal hop past a blocked/void corner that the old solver silently allowed, and the original (10,10) grid's own blast crater left its debris in a NavGrid region that only that illegal hop ever made reachable: direct-traced (a standalone repro harness driving createRunner/runCommand through this exact command sequence, then NavGrid.computeClimbReachableSet from the debris_hauler/rock_fragmenter drivers' own real post-blast positions) shows every one of the ~217 pending haul_debris/fragment_debris targets sitting in a climb-disconnected pocket from where the crew ends up standing -- confirmed permanent, not slow, by running 2000+ extra ticks with zero storedMassKg movement. Debris landing in a pocket no ground crew can reach is a normal, player-owned outcome, not a defect (#1302; blast physics alone decides where debris lands) -- see blast-debris-stranded-ramp.json for that case. This file only needs a blast whose debris a crew can actually haul. (14,6) was chosen by testing several start positions with the same repro harness: post-blast, its debris is in the SAME large connected component as the freight_warehouse (reach size 3043 vs the old site's 1508, direct-traced), and a full run of this file's own hire/build/haul sequence against the new site reaches storedMassKg > 0 by tick 106 and grows past 1500kg by tick ~465 -- comfortably over the 330kg this file's own rubble_disposal contract needs. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below. spacing corrected from 4 to 3 (same Finding #42 class as the depth fix just above, found while chasing issue #553's diameter mismatch): this step never clicks the grid tool's spacing stepper either, so the real drag always used the panel's own DEFAULT_SPACING_M=3 (Drill.ts) -- the declared spacing:4 was never what the real click sent, and with rows/cols landing the same 2x2 either way (round(4/3)+1 == round(4/4)+1 == 2), it only silently shifted where the 4 holes actually sit, not how many -- a small amount of extra/less driller travel between real hole positions that the diameter fix alone didn't account for. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent."
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:600",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "#553: waits for the driller to drive the drill_rig to all 4 ordered holes and drill them -- a single 50-tick round lands the whole 2x2 grid on tutorial_pit's small map. #1151: was a hand-measured `tick 50` pad, calibrated under the old whole-voxel climb rule. Under the 30-degree slope gate the same plan lands at tick 51, so the pad expired before the plan was drilled and every later step cascaded off an undrilled site. Replaced with a waitUntil on the thing actually being waited for, per dev-scenario-authoring: it costs only the ticks the drilling really takes, and a stall now fails loudly and by name instead of silently handing the next step a half-drilled plan.",
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        }
+      },
+      "timeout": 125
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Defensive: a `tick N` step silently completes fewer ticks than requested if a random event fires mid-wait, and every subsequent tick then refuses until the event is resolved. No-op when nothing is pending.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "vehicle buy charging_truck",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#1649: charging is worked from a charging truck; buy one so the charge order can land.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite stemming:2",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 205,
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 200000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 4,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "fragments status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments status"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0
+        }
+      }
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "fragments status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments status"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "description": "#553: qualificationCount/proficiencyTotal bumped by 1 each over the pre-#553 baseline -- the driller (employee #2) now also carries the driving.drill_rig licence added above. #592: qualificationCount/proficiencyTotal dropped from 4/12 to 2/6 -- the blast a few steps above kills the driller (employee #2, holding blasting:5 + driving.drill_rig:1 -- confirmed via direct trace: `alive:false` on employee #2 immediately after the `blast` step), and qualificationCount/proficiencyTotal are now computed over living employees only (issue #592 -- a dead employee's frozen qualifications used to permanently pollute this aggregate). Only the surveyor (geology:5) is alive going into this hire, so 5 + this new driver's own driving.truck:1 = 6.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 3,
+          "qualificationCount": 3,
+          "proficiencyTotal": 7
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 3 skill:driving.truck level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 3 skill:driving.truck level:5"
+        }
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`. #592: proficiencyTotal dropped from 16 to 10 -- same living-employees-only computation as the hire step just above (6 + this level bump from 1 to 5, i.e. +4, = 10); the dead driller's frozen qualifications no longer count.",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "proficiencyTotal": 11
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "build freight_warehouse at:1,8",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 1,
+          "z": 8
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "role": "setup",
+      "description": "#1600: tutorial_pit offers one scripted candidate per role; 24 single ticks (a bigger `tick` stops early on a need event) reach the pool refresh that restores the driver hired above.",
+      "repeat": 24
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "description": "#553: this file's charge (amount:3kg boomite at spacing:4) always left some oversized boulders alongside the haulable rubble -- pre-#553, blast landed at tick 0 so the single debris_hauler driver's cost-ranked action window (ACTION_SELECTION_MAX_PATH_ATTEMPTS=5, ActionSelection.ts) never filled with fragment_debris the driver could never claim (no rock_fragmenter existed). Post-#553 the drilling wait shifts nothing about the blast's own geometry, but empirically the closest 5 pending actions to a debris_hauler driver's hire position are fragment_debris, and with no rock_fragmenter ever able to claim them they never clear -- permanently starving the driver's own haul_debris candidates out of its bounded top-5 window. A second driver crewing a rock_fragmenter (bought below, before the debris_hauler) clears that oversized boulder backlog so the debris_hauler's window actually reaches a haul_debris action. Employee #4. #592: qualificationCount/proficiencyTotal dropped from 5/17 to 3/11 -- same living-employees-only computation as the two steps above (the dead driller's blasting:5 + driving.drill_rig:1 still excluded): 2 living quals (surveyor geology:5, driver#3 driving.truck:5 -- profTotal 10) + this new driver's own driving.truck:1 = 3 quals / 11 proficiency.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 4,
+          "qualificationCount": 5,
+          "proficiencyTotal": 13
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 4 skill:driving.excavator level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:driving.excavator level:5"
+        }
+      ],
+      "description": "Unlike the driving.truck bootstrap above, this one grants a licence from nothing: employee #4 was hired as a driver (ROLE_STARTING_QUALIFICATION driving.truck only), and driving.excavator (the rock_fragmenter's licence) belongs to no hiring role at all -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow, and rock-fragmenter-breaking.json's identical bootstrap). Left as a test-only bootstrap since this file's focus is the hauling/contract loop, not re-proving excavator licensing. #592: proficiencyTotal dropped from 22 to 16 -- same living-employees-only computation as the steps above; this adds a brand-new qualification (11 + 5 = 16) rather than raising an existing one.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "proficiencyTotal": 17
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 4 skill:driving.rock_fragmenter level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:driving.rock_fragmenter level:5"
+        }
+      ],
+      "description": "Bootstrap the rock fragmenter licence for the same driver (#1339: the fragmenter needs its own licence).",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "proficiencyTotal": 22
+        }
+      }
+    },
+    {
+      "command": "vehicle buy rock_fragmenter",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#553: vehicle #2 -- #1 was the drill_rig purchased above, destroyed by the blast. Bought (and crewed, below) before the debris_hauler on purpose: newly purchased vehicles spawn staggered off the grid centre (VehicleCommands.ts), which on tutorial_pit's small map lands right in the single-file approach to the blast crater -- an idle vehicle parked there blocks any other vehicle needing the same cell (two vehicles never share one, EntityMovementTick.ts's isCellOccupiedByOtherVehicle). Buying and crewing the rock_fragmenter first, then waiting for it to actually depart its spawn tile before the debris_hauler ever exists, means neither vehicle is ever parked in the other's way.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "tick 5",
+      "description": "#553: lets the rock_fragmenter's driver board and drive off toward its first boulder, clearing its spawn tile before the debris_hauler purchase below ever lands a vehicle there.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#553: vehicle #3 -- #1 was the drill_rig (destroyed by the blast), #2 the rock_fragmenter bought above. No toolbar re-click here (unlike the rock_fragmenter buy above): the Vehicles panel toggles closed on a repeat click of its own already-active toolbar button (UIManager.togglePanel, `this.activePanel === name` branch) -- it's still open from that same purchase, with only a non-UI `tick 5` and an in-panel `vehicle driver 2 4` assign-button click in between, neither of which touches the toolbar. Re-clicking it here closed the panel instead of leaving it open, so the very next click (on the still-present-but-hidden debris_hauler tier button) failed with a real, reproducible \"element has zero size (0x0)\" in interaction mode -- the same toggle-button class of bug as the one tracked separately for blast-visual-full.json's vehicle panel.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 2
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 4 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 4 3"
+        }
+      ],
+      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "tick 10",
+      "description": "Long enough for the surveyor to reach (12,12) and complete the seismic survey queued at the very start.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 1",
+      "description": "#552: replaces the old manual 'vehicle haul 1 fragment:138' step and its .bs-vehicle-haul-btn click -- once the debris_hauler and its licensed driver exist, the on-ground fragment's own haul_debris PendingAction is claimed and driven to automatically, with no player command or button naming which fragment. Ordering a haul costs nothing, but this extra tick still drains its own tick's worth of salary/maintenance upkeep, so cash only decreases here rather than holding at the retired command's old exact equals:29770 (which itself never cost anything, only the tick around it did). The following tick-10 rounds let the drive-load-deliver cycle actually finish.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "tick 10",
+      "description": "#553: the debris_hauler driver's own cost-ranked action window only starts reaching a haul_debris candidate once the rock_fragmenter has cleared enough of the oversized boulders closer to the crater -- five rounds of tick 10 (with a defensive event-resolve after each, same pattern as the drill-plan wait above) cover that, ending on the round that actually lands storedMassKg > 0.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
+      "description": "Assert the warehouse ordered above actually landed (#556). The crew builds it across the tick blocks the file already runs, so this costs no ticks of its own — which is what keeps the haul below, and the contract accepted around it, on the trajectory this file measured.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 120",
+      "description": "Long enough for the rock_fragmenter to clear the boulders blocking the debris_hauler driver's own action window, and for the driver to then haul the first cleared fragment all the way to the freight_warehouse. #611: widened from tick 10 to tick 20 -- selectBestActionForEmployee's isClaimable pre-filter (issue #611) now applies over the whole candidate pool before ranking rather than only inside the bounded top-N reachability window, so an employee licensed for both vehicle roles in this file (driver #4, driving.truck + driving.excavator) reaches and reserves-ahead a haul_debris action for the debris_hauler (vehicle #3) sooner, then keeps working its own rock_fragmenter queue for longer before finally freeing up to drive the haul itself -- first pickup now lands around tick 169 (measured via direct trace) instead of within the original tick-10 round ending at 167, a couple of ticks too early to observe. 60 ticks reaches roughly tick 217 (#1365 widened the pad from 20 to 60), well past the first delivery. #1091-followup: the 'increased: storedMassKg' proof moved off this step -- #1090's dispatch-cost reordering now lands the freight_warehouse build (the wait_until step above) far earlier relative to this file's own tick budget, so by the time this step runs storage already sits at 1837.5/2000kg (pre#1531 T1 capacity; now 25000kg) (direct-traced, command mode) and stays flat for hundreds of further ticks: the only fragments left on the ground are all bigger than the 162.5kg of headroom remaining, so nothing further can be hauled in until the rubble_disposal delivery below frees capacity. The proof moved to the new tick-20 step right after that delivery, where headroom genuinely reopens. #1817: widened 60 -> 120 ticks: demand-weighted haul ranking sends the debris_hauler to farther fragments of the ore an open offer is short of first, so in interaction mode (different tick/UI trajectory) the first load reached storage after tick 267 and the contract steps below found no stock (traced: stored 0 at tick 267, 4462kg at 327; command mode 8925kg). Hauling itself is unchanged, only later.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 120"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "fragments status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments status"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "tick 80",
+      "description": "#1892: moved ahead of the contract accept. The warehouse holds 25000kg, so hauling is nowhere near capacity; the old plateau-then-reopen reasoning (a rubble delivery freeing headroom) no longer applies. Sales pay far above the profit target at this point, so the ore_sale below completes the level on its first tick after accept and no further tick can run: the proof that hauling keeps landing stock (storedMassKg grows over this window) has to come first. History: window widened 20 -> 40 (#1151, slope-gated routes) and 40 -> 80 (#1263, agent occupancy crossing) because the next load into storage lands after a long drive.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        },
+        {
+          "type": "command",
+          "command": "tick 80"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "storedMassKg"
+        ]
+      }
+    },
+    {
+      "command": "time speed 8",
+      "description": "#554-followup (issue #586 CI): the accept step below waits on a specific *type* of offer (rubble_disposal, 30% of generated contracts, Contract.ts's generateOneContract) being present in the pool at the moment of the click, not a fixed id -- but the pool only regenerates every REFRESH_INTERVAL=20 ticks (Contract.ts), and interaction mode's own real-clock tick pacing (no GPU, ~6s/frame, #475) advances the game far slower in real time than command mode's tick-driven loop, so a static `waitForSelector` at its 10s default timeout could easily expire inside a single lull between refreshes, or catch a refresh whose 3 fresh slots (CONTRACTS_PER_REFRESH) happened not to roll rubble_disposal. Speeding up time here (matching the charge steps' own `time speed 8`/`time speed 1` convention elsewhere in this file) and widening the wait's own timeout below buys enough real-time-to-game-tick throughput to cover several refresh cycles instead of a fraction of one, so the wait resolves on the pool's own eventual regeneration rather than racing a single snapshot of it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 8"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "contract accept type:ore_sale material:dirtite",
+      "role": "player",
+      "timeout": 245,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept",
+          "timeout": 240000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top [data-action=\"pause-toggle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      },
+      "description": "#2243: take a first dirtite contract through the Contracts window. The game is paused (HUD pause-toggle) once the offer shows, like economy-full-loop's accept step, so the outlook below reads a fixed moment."
+    },
+    {
+      "command": "time speed 1",
+      "description": "Restore normal speed after the widened accept wait above, paused again so the next accepts and the outlook read one moment (same pattern as economy-full-loop).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 1"
+        },
+        {
+          "type": "command",
+          "command": "time pause"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "contract accept type:supply material:dirtite",
+      "role": "player",
+      "timeout": 40,
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] .bs-contract-accept",
+          "timeout": 30000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "activeContractCount": 2
+        }
+      },
+      "description": "#2243: a second contract on the same ore - a bulk supply order for dirtite: the outlook must sum both demands against one stock, never count the stock twice."
+    },
+    {
+      "command": "contract accept type:ore_sale material:rustite",
+      "role": "player",
+      "timeout": 40,
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-accept",
+          "timeout": 30000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-accept"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "activeContractCount": 3
+        }
+      },
+      "description": "#2243: a contract on another ore, so the outlook holds two material lines."
+    },
+    {
+      "command": "contract status",
+      "description": "#2243: the delivery outlook leads the Contracts window with one line per material - dirtite (two contracts, one stock) and rustite - each with what is in hand, what is due, the gathering rate the hauls above produced against the pace the deadlines need, and an on-track/at-risk/will-miss state; the deadline timeline lists all three contracts. Readable without scrolling inside the overview. The accept clicks scrolled the window to their cards; a real wheel brings it back to the top, where the outlook sits.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bsx-outlook-row[data-outlook-material=\"dirtite\"][data-outlook]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bsx-outlook-row[data-outlook-material=\"rustite\"][data-outlook]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-timeline [data-timeline-contract]:nth-child(3)"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-material=\"dirtite\"] .bs-contract-outlook[data-outlook]"
+        },
+        {
+          "type": "mousemove",
+          "x": 420,
+          "y": 400
+        },
+        {
+          "type": "wheel",
+          "deltaX": 0,
+          "deltaY": -8000
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-contract-panel .bsx-window-body",
+          "property": "scrollTop",
+          "expectedValue": 0,
+          "timeoutMs": 5000
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "activeContractCount": 3
+        }
+      }
+    }
+  ]
+}

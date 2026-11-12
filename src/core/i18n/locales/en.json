@@ -4964,14 +4964,14 @@
   "ui.outlook.contracts": "{count} contract(s)",
   "ui.outlook.kg": "{kg} kg",
   "ui.outlook.rate": "{kg} kg/h",
-  "ui.outlook.in_transit": "+{kg} kg in transit",
-  "ui.outlook.on_ground": "{kg} kg still on the ground",
+  "ui.outlook.in_transit": "+{mass} in transit",
+  "ui.outlook.on_ground": "{mass} on the ground",
   "ui.outlook.in_storage": "in storage",
   "ui.outlook.next_due": "next in {hours}h",
   "ui.outlook.need_rate": "need {rate}",
   "ui.outlook.need_none": "stock covers it",
-  "ui.outlook.spare": "{kg} kg spare",
-  "ui.outlook.short": "{kg} kg short",
+  "ui.outlook.spare": "{mass} spare",
+  "ui.outlook.short": "{mass} short",
   "ui.outlook.state_covered": "In stock",
   "ui.outlook.state_on_track": "On track",
   "ui.outlook.state_at_risk": "At risk",
@@ -4992,5 +4992,6 @@
   "ui.outlook.timeline_note": "Bar length is the time left; the light part is what is already delivered",
   "ui.outlook.timeline_label": "{material} #{id} · {kg} kg",
   "ui.outlook.hours_left": "{hours}h",
-  "ui.outlook.now": "now"
+  "ui.outlook.now": "now",
+  "ui.outlook.tonnes": "{t} t"
 }

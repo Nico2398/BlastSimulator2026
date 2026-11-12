@@ -19,9 +19,19 @@ const OUTLOOK_COLOR: Record<ContractOutlook, string> = {
 };
 /** Barren rock has no ore colour; it reads as stone. */
 const RUBBLE_COLOR = '#8a94a2';
-/** Timeline axis: at least a day, rounded up to whole half-days. */
+/** Timeline axis: at least a day, labelled on the first step that keeps it to a handful of ticks. */
 const TIMELINE_MIN_HOURS = 24;
-const TIMELINE_STEP_HOURS = 12;
+const TIMELINE_STEPS_HOURS = [12, 24, 48, 96, 168, 336] as const;
+const TIMELINE_MAX_TICKS = 8;
+/** From this mass up, a figure reads in tonnes so it fits its cell. */
+const TONNES_FROM_KG = 10_000;
+
+/** A mass short enough for a table cell: kilograms, tonnes once it is large. */
+function massText(kg: number): string {
+  if (kg < TONNES_FROM_KG) return t('ui.outlook.kg', { kg: wholeKg(kg) });
+  const tonnes = kg / 1000;
+  return t('ui.outlook.tonnes', { t: (tonnes < 100 ? Math.round(tonnes * 10) / 10 : Math.round(tonnes)).toLocaleString('en-US') });
+}
 
 export function materialName(materialId: string): string {
   return materialId === RUBBLE_MATERIAL_ID ? t('ui.contracts.material_rubble') : t(getOre(materialId)?.nameKey ?? materialId);
@@ -74,7 +84,8 @@ function supplyBar(line: MaterialOutlook): HTMLElement {
 function cell(big: string, small: string, bigColor?: string): HTMLElement {
   const b = el('span', { className: 'bsx-outlook-big', text: big });
   if (bigColor) b.style.color = bigColor;
-  return el('div', { className: 'bsx-outlook-cell', children: [b, el('span', { className: 'bsx-outlook-small', text: small })] });
+  // The small line may still clip in a narrow window; its full text stays a hover away.
+  return el('div', { className: 'bsx-outlook-cell', children: [b, el('span', { className: 'bsx-outlook-small', text: small, attrs: { title: small } })] });
 }
 
 /** Why a material reads the way it does, in numbers. */
@@ -91,13 +102,13 @@ function outlookRow(line: MaterialOutlook): HTMLElement {
   const swatch = el('span', { className: 'bsx-outlook-swatch' });
   swatch.style.background = materialColor(line.materialId);
   const handNote = [
-    line.inTransitKg > 0 ? t('ui.outlook.in_transit', { kg: wholeKg(line.inTransitKg) }) : '',
-    line.onGroundKg > 0 ? t('ui.outlook.on_ground', { kg: wholeKg(line.onGroundKg) }) : '',
+    line.inTransitKg > 0 ? t('ui.outlook.in_transit', { mass: massText(line.inTransitKg) }) : '',
+    line.onGroundKg > 0 ? t('ui.outlook.on_ground', { mass: massText(line.onGroundKg) }) : '',
   ].filter(Boolean).join(' · ') || t('ui.outlook.in_storage');
   const next = line.contracts[0];
   const spare = line.spareKg >= 0
-    ? t('ui.outlook.spare', { kg: wholeKg(line.spareKg) })
-    : t('ui.outlook.short', { kg: wholeKg(-line.spareKg) });
+    ? t('ui.outlook.spare', { mass: massText(line.spareKg) })
+    : t('ui.outlook.short', { mass: massText(-line.spareKg) });
   return el('div', {
     className: 'bsx-outlook-row',
     attrs: { 'data-outlook-material': line.materialId, 'data-outlook': line.outlook },
@@ -107,8 +118,8 @@ function outlookRow(line: MaterialOutlook): HTMLElement {
         el('span', { className: 'bsx-outlook-small', text: t('ui.outlook.contracts', { count: line.contracts.length }) }),
       ] }),
       supplyBar(line),
-      cell(t('ui.outlook.kg', { kg: wholeKg(inHand) }), handNote),
-      cell(t('ui.outlook.kg', { kg: wholeKg(line.demandKg) }), next ? t('ui.outlook.next_due', { hours: Math.round(next.hoursLeft) }) : ''),
+      cell(massText(inHand), handNote),
+      cell(massText(line.demandKg), next ? t('ui.outlook.next_due', { hours: Math.round(next.hoursLeft) }) : ''),
       cell(rateText(line.rateKgPerHour), line.neededRateKgPerHour > 0 ? t('ui.outlook.need_rate', { rate: rateText(line.neededRateKgPerHour) }) : t('ui.outlook.need_none'), line.neededRateKgPerHour > 0 ? pace : undefined),
       el('div', { className: 'bsx-outlook-cell', attrs: { style: 'align-items:flex-start' }, children: [
         outlookPill(line.outlook, lineExplain(line)),
@@ -164,7 +175,8 @@ export function makeTimelineSection(active: readonly Contract[], tick: number, l
   const hours = (c: Contract): number => contractHoursLeft(c, tick);
   const ordered = [...running].sort((a, b) => hours(a) - hours(b) || a.id - b.id);
   const maxHours = Math.max(TIMELINE_MIN_HOURS, ...ordered.map(hours));
-  const axisHours = Math.ceil(maxHours / TIMELINE_STEP_HOURS) * TIMELINE_STEP_HOURS;
+  const step = TIMELINE_STEPS_HOURS.find(s => maxHours / s <= TIMELINE_MAX_TICKS) ?? TIMELINE_STEPS_HOURS[TIMELINE_STEPS_HOURS.length - 1]!;
+  const axisHours = Math.ceil(maxHours / step) * step;
   const rows = ordered.map(c => {
     const outlook = outlookOf.get(c.id) ?? 'covered';
     const bar = el('div', { className: 'bsx-timeline-bar' });
@@ -184,7 +196,7 @@ export function makeTimelineSection(active: readonly Contract[], tick: number, l
     });
   });
   const ticks = el('div', { className: 'bsx-timeline-ticks' });
-  for (let h = 0; h <= axisHours; h += TIMELINE_STEP_HOURS) {
+  for (let h = 0; h <= axisHours; h += step) {
     const tickEl = el('span', { text: h === 0 ? t('ui.outlook.now') : `${h}h` });
     tickEl.style.left = `${(h / axisHours) * 100}%`;
     ticks.appendChild(tickEl);

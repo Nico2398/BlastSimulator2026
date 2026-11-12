@@ -1326,7 +1326,8 @@ describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
     panel.update(runningState());
     const strip = stripOf(panel)!;
     expect(strip.classList.contains('bsx-section')).toBe(false);
-    expect(strip.closest('[data-scroll-key]')).toBeNull();
+    // The window body itself is keyed (its one scroll area, #2242); the strip sits outside every list section.
+    expect(strip.closest('[data-scroll-key]:not(.bsx-window-body)')).toBeNull();
     expect(strip.querySelector('[data-scroll-key]')).toBeNull();
     expect((Array.from(getBodyEl(panel).children) as HTMLElement[]).filter(c => c.classList.contains('bsx-section'))).toHaveLength(3);
   });
