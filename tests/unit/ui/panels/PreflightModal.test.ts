@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { PreflightModal } from '../../../../src/ui/panels/PreflightModal.js';
+import { PreflightModal, PREFLIGHT_DOCK_ROLE, PREFLIGHT_HIDE_ACTION, PREFLIGHT_CHIP_ROLE, PREFLIGHT_SHOW_ACTION } from '../../../../src/ui/panels/PreflightModal.js';
 import { setHoleWater, wetAllHoles } from '../../../helpers/holeWater.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../src/core/mining/DrillPlan.js';
@@ -1182,5 +1182,341 @@ describe('PreflightModal — wet-hole row and consequences (#2166)', () => {
     expect(row).not.toBeNull();
     expect(row!.textContent).toMatch(/collapse/i);
     expect(row!.textContent).toContain('Cruite');
+  });
+});
+
+// ── #2233: waiting card docks without a scrim, collapses to a chip ───────────
+
+describe('PreflightModal — non-blocking waiting dock (#2233)', () => {
+  const DOCK = `[data-role="${PREFLIGHT_DOCK_ROLE}"]`;
+  const HIDE = `[data-action="${PREFLIGHT_HIDE_ACTION}"]`;
+  const CHIP = `[data-role="${PREFLIGHT_CHIP_ROLE}"]`;
+  const SHOW = `[data-action="${PREFLIGHT_SHOW_ACTION}"]`;
+  const WAITING = '[data-role="preflight-waiting"]';
+  const FIRE_ANYWAY = '[data-action="preflight-fire-anyway"]';
+  const CANCEL_DET = '[data-action="preflight-cancel-detonation"]';
+  type Waiting = 'evacuating' | 'stranded' | 'held' | 'ready';
+  const WAITING_PHASES: Waiting[] = ['evacuating', 'stranded', 'held', 'ready'];
+
+  function worker(id: number, name: string, x: number, z: number): GameState['employees']['employees'][number] {
+    return {
+      id, name, role: 'driller', salary: 500, morale: 60,
+      unionized: false, injured: false, alive: true, x, z,
+      qualifications: [], trainingState: null, activeActionId: null,
+      fatigue: 0, collapsing: false, interruptedActionPayload: null,
+      ticksWorked: 0, restTicksRemaining: null, restNeedKey: null, taskTicksRemaining: null,
+      activeTaskSkill: null, destinationX: null, destinationZ: null,
+      moveConsecutiveFailures: 0, isMoveStuck: false,
+      pendingRestDuration: null, pendingRestNeedKey: null, pendingTaskDuration: null,
+      pendingActionType: null, pendingActionPayload: null, pendingDriverVehicleId: null,
+      taskQueue: [], locomotion: { kind: 'on_foot' },
+      itinerary: null, vehicleWaitingTicks: 0,
+    };
+  }
+
+  /** Charged hole at (10,10); danger zone (-5,-5)-(25,25). Two workers inside unless the phase needs none. */
+  function waitingState(phase: Waiting): GameState {
+    const state = chargedPlan();
+    const stranded: number[] = [];
+    if (phase === 'evacuating' || phase === 'stranded') {
+      state.employees.employees.push(worker(7, 'Oz Trill', 11, 11));
+      if (phase === 'evacuating') state.employees.employees.push(worker(8, 'Ivy Chen', 12, 12));
+      if (phase === 'stranded') stranded.push(7);
+    }
+    if (phase === 'held') wetAllHoles(state);
+    state.pendingDetonation = { armedTick: 0, strandedEmployeeIds: stranded, strandedVehicleIds: [], lastEvacuationTick: 0 };
+    return state;
+  }
+
+  function q(modal: PreflightModal, sel: string): HTMLElement | null {
+    return modal.root.querySelector(sel) as HTMLElement | null;
+  }
+
+  /** In the DOM and not display:none on itself or any ancestor up to the modal root. */
+  function shown(modal: PreflightModal, node: HTMLElement | null): boolean {
+    for (let n: HTMLElement | null = node; n; n = n.parentElement) {
+      if (n.hidden || getComputedStyle(n).display === 'none') return false;
+      if (n === modal.root) return true;
+    }
+    return false;
+  }
+
+  const transparent = (e: HTMLElement): boolean => ['transparent', 'rgba(0, 0, 0, 0)'].includes(e.style.backgroundColor);
+
+  function open(phase: Waiting): { modal: PreflightModal; state: GameState; gameConsole: ReturnType<typeof vi.fn> } {
+    const { modal, gameConsole } = makeModal();
+    modal.show();
+    const state = waitingState(phase);
+    modal.update(state, 'sunny');
+    return { modal, state, gameConsole };
+  }
+
+  describe.each(WAITING_PHASES)('%s: docked card, no scrim (C1)', (phase) => {
+    it('the overlay root lets every pointer event through and paints no scrim', () => {
+      const { modal } = open(phase);
+      expect(modal.root.style.pointerEvents).toBe('none');
+      expect(transparent(modal.root)).toBe(true);
+    });
+
+    it('the waiting card is a pointer-active dock, child of the root', () => {
+      const { modal } = open(phase);
+      const dock = q(modal, DOCK);
+      expect(dock).not.toBeNull();
+      expect(dock!.parentElement).toBe(modal.root);
+      expect(dock!.style.pointerEvents).toBe('auto');
+      expect(shown(modal, dock)).toBe(true);
+    });
+
+    it('the dock holds the waiting block (with data-phase) and both detonation controls', () => {
+      const { modal } = open(phase);
+      const dock = q(modal, DOCK)!;
+      const waiting = dock.querySelector(WAITING) as HTMLElement | null;
+      expect(waiting).not.toBeNull();
+      expect(waiting!.dataset['phase']).toBe(phase);
+      expect(dock.querySelector(CANCEL_DET)).not.toBeNull();
+      expect(dock.querySelector(FIRE_ANYWAY)).not.toBeNull();
+      expect(dock.querySelector(HIDE)).not.toBeNull();
+    });
+
+    it('the controls in the dock still dispatch `blast cancel` and `blast`', () => {
+      const { modal, gameConsole } = open(phase);
+      (q(modal, DOCK)!.querySelector(CANCEL_DET) as HTMLButtonElement).click();
+      expect(gameConsole).toHaveBeenLastCalledWith('blast cancel');
+      (q(modal, DOCK)!.querySelector(FIRE_ANYWAY) as HTMLButtonElement).click();
+      expect(gameConsole).toHaveBeenLastCalledWith('blast');
+    });
+
+    it('nothing but the dock can catch a pointer: other visible root children pass events through', () => {
+      const { modal } = open(phase);
+      for (const child of Array.from(modal.root.children) as HTMLElement[]) {
+        if (child === q(modal, DOCK) || child === q(modal, CHIP)) continue;
+        expect(shown(modal, child) ? child.style.pointerEvents : 'none').toBe('none');
+      }
+    });
+
+    it('the chip is not shown while the dock is open', () => {
+      const { modal } = open(phase);
+      expect(shown(modal, q(modal, CHIP))).toBe(false);
+    });
+  });
+
+  describe('pre-flight state is unchanged (C2)', () => {
+    it('idle open modal keeps the scrim overlay and its pointer capture', () => {
+      const { modal } = makeModal();
+      modal.show();
+      modal.update(chargedPlan(), 'sunny');
+      expect(modal.root.style.pointerEvents).not.toBe('none');
+      expect(transparent(modal.root)).toBe(false);
+      expect(modal.root.style.display).not.toBe('none');
+    });
+
+    it('idle shows the full box with both footer buttons and no dock or chip', () => {
+      const { modal } = makeModal();
+      modal.show();
+      modal.update(chargedPlan(), 'sunny');
+      expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.title'));
+      expect(q(modal, '[data-action="preflight-cancel"]')).not.toBeNull();
+      expect(q(modal, '[data-action="preflight-detonate"]')).not.toBeNull();
+      expect(shown(modal, q(modal, DOCK))).toBe(false);
+      expect(shown(modal, q(modal, CHIP))).toBe(false);
+    });
+
+    it('opening before any update is already the scrim overlay', () => {
+      const { modal } = makeModal();
+      modal.show();
+      expect(modal.root.style.pointerEvents).not.toBe('none');
+      expect(shown(modal, q(modal, DOCK))).toBe(false);
+    });
+
+    it('a modal reopened after a finished sequence is a scrim overlay again', () => {
+      const { modal, state } = open('evacuating');
+      state.pendingDetonation = null;
+      modal.update(state, 'sunny');
+      expect(modal.visible).toBe(false);
+
+      modal.show();
+      modal.update(chargedPlan(), 'sunny');
+      expect(modal.root.style.pointerEvents).not.toBe('none');
+      expect(transparent(modal.root)).toBe(false);
+      expect(shown(modal, q(modal, DOCK))).toBe(false);
+    });
+
+    it('arming flips scrim to dock on the next update and cancelling closes it', () => {
+      const { modal } = makeModal();
+      modal.show();
+      const state = chargedPlan();
+      modal.update(state, 'sunny');
+      expect(modal.root.style.pointerEvents).not.toBe('none');
+
+      state.pendingDetonation = { armedTick: 0, strandedEmployeeIds: [], strandedVehicleIds: [], lastEvacuationTick: 0 };
+      modal.update(state, 'sunny');
+      expect(modal.root.style.pointerEvents).toBe('none');
+      expect(shown(modal, q(modal, DOCK))).toBe(true);
+
+      state.pendingDetonation = null;
+      modal.update(state, 'sunny');
+      expect(modal.visible).toBe(false);
+      expect(modal.root.style.display).toBe('none');
+    });
+  });
+
+  describe.each(WAITING_PHASES)('%s: hide control collapses the dock to a chip (C3)', (phase) => {
+    function collapsed(): ReturnType<typeof open> {
+      const ctx = open(phase);
+      (q(ctx.modal, HIDE) as HTMLButtonElement).click();
+      return ctx;
+    }
+
+    it('hides the dock and shows the chip', () => {
+      const { modal } = collapsed();
+      expect(shown(modal, q(modal, DOCK))).toBe(false);
+      expect(shown(modal, q(modal, CHIP))).toBe(true);
+    });
+
+    it('does not cancel: no console call, shot still armed, modal still open', () => {
+      const { modal, state, gameConsole } = collapsed();
+      expect(gameConsole).not.toHaveBeenCalled();
+      expect(state.pendingDetonation).not.toBeNull();
+      expect(modal.visible).toBe(true);
+      expect(modal.root.style.display).not.toBe('none');
+    });
+
+    it('the chip is a button that reopens the dock, without any console call', () => {
+      const { modal, gameConsole } = collapsed();
+      const chip = q(modal, CHIP)!;
+      expect(chip.tagName).toBe('BUTTON');
+      expect(chip.dataset['action']).toBe(PREFLIGHT_SHOW_ACTION);
+      expect(chip.matches(SHOW)).toBe(true);
+      chip.click();
+      expect(shown(modal, q(modal, DOCK))).toBe(true);
+      expect(shown(modal, q(modal, CHIP))).toBe(false);
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+
+    it('the chip takes pointer events and the root still lets the rest through', () => {
+      const { modal } = collapsed();
+      expect(q(modal, CHIP)!.style.pointerEvents).toBe('auto');
+      expect(modal.root.style.pointerEvents).toBe('none');
+      expect(transparent(modal.root)).toBe(true);
+    });
+
+    it('stays collapsed across further updates', () => {
+      const { modal, state } = collapsed();
+      modal.update(state, 'sunny');
+      modal.update(state, 'sunny');
+      expect(shown(modal, q(modal, DOCK))).toBe(false);
+      expect(shown(modal, q(modal, CHIP))).toBe(true);
+    });
+
+    it('the chip is labelled, not empty', () => {
+      const { modal } = collapsed();
+      expect((q(modal, CHIP)!.textContent ?? '').trim().length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('chip content and collapse lifecycle (C3, C4)', () => {
+    it('the chip shows the remaining count and follows it as the crew leaves', () => {
+      const { modal, state } = open('evacuating');
+      (q(modal, HIDE) as HTMLButtonElement).click();
+      expect(q(modal, CHIP)!.textContent).toContain('2');
+
+      state.employees.employees[1]!.x = 200;
+      state.employees.employees[1]!.z = 200;
+      modal.update(state, 'sunny');
+      expect(q(modal, CHIP)!.textContent).toContain('1');
+      expect(q(modal, CHIP)!.textContent).not.toContain('2');
+    });
+
+    it('the dock keeps updating its waiting block while the chip is open and reopens in the current phase', () => {
+      const { modal, state } = open('evacuating');
+      (q(modal, HIDE) as HTMLButtonElement).click();
+      state.employees.employees.length = 0;
+      modal.update(state, 'sunny');
+      (q(modal, CHIP) as HTMLButtonElement).click();
+      expect((q(modal, WAITING) as HTMLElement).dataset['phase']).toBe('ready');
+    });
+
+    it('a chip collapse can be repeated: hide, show, hide', () => {
+      const { modal } = open('stranded');
+      (q(modal, HIDE) as HTMLButtonElement).click();
+      (q(modal, CHIP) as HTMLButtonElement).click();
+      (q(modal, HIDE) as HTMLButtonElement).click();
+      expect(shown(modal, q(modal, DOCK))).toBe(false);
+      expect(shown(modal, q(modal, CHIP))).toBe(true);
+    });
+
+    it('a collapsed modal closes when the sequence ends (cancelled elsewhere)', () => {
+      const { modal, state } = open('evacuating');
+      (q(modal, HIDE) as HTMLButtonElement).click();
+      state.pendingDetonation = null;
+      modal.update(state, 'sunny');
+      expect(modal.visible).toBe(false);
+      expect(modal.root.style.display).toBe('none');
+    });
+
+    it('re-opening for a new sequence shows the dock, not the old collapse', () => {
+      const { modal, state } = open('evacuating');
+      (q(modal, HIDE) as HTMLButtonElement).click();
+      state.pendingDetonation = null;
+      modal.update(state, 'sunny');
+
+      modal.show();
+      const next = waitingState('evacuating');
+      modal.update(next, 'sunny');
+      expect(shown(modal, q(modal, DOCK))).toBe(true);
+      expect(shown(modal, q(modal, CHIP))).toBe(false);
+    });
+  });
+
+  describe('hide() while waiting collapses instead of closing (C4)', () => {
+    it.each(WAITING_PHASES)('%s: modal stays open, dock becomes the chip, shot untouched', (phase) => {
+      const { modal, state, gameConsole } = open(phase);
+      modal.hide();
+      expect(modal.visible).toBe(true);
+      expect(modal.root.style.display).not.toBe('none');
+      expect(shown(modal, q(modal, DOCK))).toBe(false);
+      expect(shown(modal, q(modal, CHIP))).toBe(true);
+      expect(state.pendingDetonation).not.toBeNull();
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+
+    it('the chip then reopens the dock', () => {
+      const { modal } = open('evacuating');
+      modal.hide();
+      (q(modal, CHIP) as HTMLButtonElement).click();
+      expect(shown(modal, q(modal, DOCK))).toBe(true);
+    });
+
+    it('stays open across updates after the collapse', () => {
+      const { modal, state } = open('evacuating');
+      modal.hide();
+      modal.update(state, 'sunny');
+      expect(modal.visible).toBe(true);
+    });
+
+    it('hide() on the idle pre-flight still closes it', () => {
+      const { modal } = makeModal();
+      modal.show();
+      modal.update(chargedPlan(), 'sunny');
+      modal.hide();
+      expect(modal.visible).toBe(false);
+      expect(modal.root.style.display).toBe('none');
+    });
+
+    it('the pre-flight Cancel button still closes the idle modal', () => {
+      const { modal } = makeModal();
+      modal.show();
+      modal.update(chargedPlan(), 'sunny');
+      (q(modal, '[data-action="preflight-cancel"]') as HTMLButtonElement).click();
+      expect(modal.visible).toBe(false);
+    });
+
+    it('when the sequence ends the modal closes as before', () => {
+      const { modal, state } = open('ready');
+      state.pendingDetonation = null;
+      modal.update(state, 'sunny');
+      expect(modal.visible).toBe(false);
+      expect(modal.root.style.display).toBe('none');
+    });
   });
 });

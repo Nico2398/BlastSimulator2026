@@ -1488,6 +1488,13 @@ describe('TutorialOverlay exit (#1332)', () => {
     expect(host.contains(found)).toBe(true);
   });
 
+  // Exit tutorial ends the guidance and keeps the run going — a player who clicked it hoping to leave for
+  // the main menu lands in free play, so the confirm says where the menu actually is.
+  it.each(['en', 'fr'] as const)('the exit confirm names the main-menu route in %s', (locale) => {
+    setLocale(locale);
+    expect(t('tutorial.exit_confirm_body')).toContain(t('ui.settings.return_to_menu'));
+  });
+
   it('exit label differs between en and fr, and keys exist', () => {
     const keys = ['tutorial.exit', 'tutorial.exit_tooltip', 'tutorial.exit_confirm_title', 'tutorial.exit_confirm_body', 'tutorial.exit_confirm_button'];
     const en = keys.map(k => t(k));

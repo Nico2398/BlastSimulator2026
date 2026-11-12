@@ -207,7 +207,7 @@ export class UIManager {
     });
     // Full-screen modals close before the panel underneath them does.
     this.escLayers.push(() => {
-      if (this.preflightModal.visible) { this.preflightModal.hide(); return true; }
+      if (this.preflightModal.escapable) { this.preflightModal.hide(); return true; }
       if (this.blastReportModal.visible) { this.blastReportModal.hide(); return true; }
       if (this.confirmModal.visible) { this.confirmModal.hide(); return true; }
       return false;

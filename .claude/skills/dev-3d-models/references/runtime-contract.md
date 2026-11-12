@@ -82,6 +82,11 @@ shader variants in advance (`warmupShaders`).
 - Task bars and pictograms float above each model's own top, read from its
   bounds (`overlayHeight`), so a tall surveyor and a short manager both clear
   their hats.
+- Each worker with a mesh also carries a crew pin (`EmployeeMarkers`): a
+  role-coloured sprite above that overlay slot, drawn at a fixed fraction of the
+  viewport's height whatever the zoom, and faded out of close-ups once the worker
+  himself is large on screen. A model that is a speck at the default framing
+  stays findable through it.
 - Vehicles spin each `Wheel*` node by `distance / radius`, where the radius is
   **measured from the node's own bounds** — a bicycle wheel and a monster tyre
   both roll true, with no per-model constant. Axles run along the model's
