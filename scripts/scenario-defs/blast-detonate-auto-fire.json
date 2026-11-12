@@ -192,6 +192,61 @@
       }
     },
     {
+      "command": "time speed 8 resume:true",
+      "role": "player",
+      "timeout": 60,
+      "description": "#2233: while the crew is still evacuating, the player picks 8x on the top bar. The waiting dock is non-blocking (no scrim), so the click lands.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top button[data-speed=\"8\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "timeScale": 8,
+          "isPaused": false,
+          "deathCount": 0
+        }
+      }
+    },
+    {
+      "command": "time pause",
+      "role": "player",
+      "timeout": 60,
+      "description": "#2233: pause lands during the evacuation through the real pause segment; the dock does not cover the top bar.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top [data-action=\"pause-toggle\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "isPaused": true,
+          "deathCount": 0
+        }
+      }
+    },
+    {
+      "command": "time speed 8 resume:true",
+      "role": "player",
+      "timeout": 60,
+      "description": "#2233: resume at 8x so the sequence still auto-fires.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top button[data-speed=\"8\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "isPaused": false,
+          "deathCount": 0
+        }
+      }
+    },
+    {
       "command": "wait_until field:holeCount equals:0 max_ticks:600",
       "timeout": 330,
       "role": "setup",
