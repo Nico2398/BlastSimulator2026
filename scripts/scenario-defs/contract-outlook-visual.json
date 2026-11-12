@@ -10,11 +10,13 @@
           "command": "campaign start level:tutorial_pit cash:350000"
         }
       ],
-      "description": "#553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, and (see below) a rock_fragmenter/second driver to clear the oversized fragments this same charge always produced, on top of the original driver/debris_hauler/freight_warehouse shopping list.",
+      "description": "Same opening as economy-full-loop: a tutorial pit with the cash for the drill rig, charging truck, hauler, rock fragmenter, warehouse and crew the real blast-and-haul below needs.",
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 350000
+          "cash": 350000,
+          "employeeCount": 0,
+          "activeContractCount": 0
         }
       }
     },

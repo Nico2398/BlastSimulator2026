@@ -4946,7 +4946,7 @@
   "ui.fleet.kpi_vehicles": "Véhicules",
   "ui.fleet.kpi_working": "Au travail",
   "ui.fleet.kpi_waiting": "En attente",
-  "ui.fleet.kpi_waiting_sub": "inactifs ou sans conducteur",
+  "ui.fleet.kpi_waiting_sub": "inactifs ou sans chauffeur",
   "ui.fleet.kpi_stuck": "Bloqués",
   "ui.fleet.kpi_damaged": "Endommagés",
   "ui.fleet.kpi_damaged_sub": "sous la moitié des PV",

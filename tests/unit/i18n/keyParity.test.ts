@@ -531,7 +531,9 @@ describe('en.json / fr.json — key-set parity', () => {
     // Blast design rework (fill-to-stemming charges, burden/staggered grid, drilling cost, permit by area): +2 permit area keys (permit.preview.area, ui.blast_workshop.drill.permit_area), +2 drill readout keys (ui.blast_workshop.drill.drill_readout, ui.finances.category.drilling), +10 burden/staggered grid keys (ui.blast_workshop.drill.mesh/burden/layout_button/layout_square/layout_staggered, mining.drill_plan.invalid_spacing/invalid_pattern, ui.explain.drill_field_burden/_mesh/_pattern), +8 fill-charge keys (ui.blast_workshop.charge.per_hole/per_hole_explain/per_metre_card/per_metre_explain/no_room_reason/pattern_line_fill, mining.charge.no_room/pattern_set_fill), -4 removed kg-stepper/holes keys (ui.blast_workshop.charge.amount/kg_range/too_much_for_hole, permit.preview.holes): 4911.
     // Same rework: +2 charge refusals (mining.charge.all_covered, mining.charge.invalid_amount): 4913.
     // Same rework: +3 standalone fragment status keys (inspector.fragment.status.on_ground/in_transit/stored): 4916.
-    expect(Object.keys(en).length).toBe(4916);
+    // UI rework (#2241-#2243): +79 keys — crew and fleet key figures, staff coverage tiles,
+    // the contract delivery outlook and timeline, and the window section labels.
+    expect(Object.keys(en).length).toBe(4995);
   });
 
   it('carries the weak-explosive warning key no more, and the breaks-nothing keys in both locales (#2197)', () => {
