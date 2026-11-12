@@ -93,3 +93,44 @@ describe('findStrandedCrew (#2095)', () => {
     expect([vehicle.x, vehicle.z]).toEqual([EAST.x + 2, EAST.z]);
   });
 });
+
+describe('findStrandedCrew with walkers between cells (#2228)', () => {
+  const FRACTIONAL = [{ x: 5.3, z: 5.7 }, { x: 5.7, z: 5.3 }, { x: 6.3, z: 4.3 }, { x: 6.7, z: 6.7 }];
+
+  it('does not list a walker at a fractional position on the crew plateau', () => {
+    for (const at of FRACTIONAL) {
+      const state = makeState();
+      hire(state, WEST);
+      hire(state, { x: WEST.x + 1, z: WEST.z });
+      hire(state, at);
+      expect(findStrandedCrew(state).employeeIds, `walker at ${at.x},${at.z}`).toEqual([]);
+    }
+  });
+
+  it('does not list a fractional walker on the open floor either', () => {
+    const state = makeState(false);
+    hire(state, WEST);
+    hire(state, { x: EAST.x + 0.3, z: EAST.z + 0.7 });
+    hire(state, { x: EAST.x - 0.3, z: EAST.z - 0.7 });
+    expect(findStrandedCrew(state).employeeIds).toEqual([]);
+  });
+
+  it('still lists a walled-off employee standing at a fractional position', () => {
+    for (const at of [{ x: EAST.x + 0.3, z: EAST.z + 0.7 }, { x: EAST.x + 0.7, z: EAST.z + 0.3 }]) {
+      const state = makeState();
+      hire(state, WEST);
+      hire(state, { x: WEST.x + 1, z: WEST.z });
+      const alone = hire(state, at);
+      expect(findStrandedCrew(state).employeeIds, `walker at ${at.x},${at.z}`).toEqual([alone.id]);
+    }
+  });
+
+  it('lists only the walled-off one when a plateau walker and a walled-off one are both between cells', () => {
+    const state = makeState();
+    hire(state, WEST);
+    hire(state, { x: WEST.x + 1, z: WEST.z });
+    hire(state, { x: WEST.x + 2.3, z: WEST.z + 0.7 });
+    const alone = hire(state, { x: EAST.x + 0.7, z: EAST.z + 0.3 });
+    expect(findStrandedCrew(state).employeeIds).toEqual([alone.id]);
+  });
+});
