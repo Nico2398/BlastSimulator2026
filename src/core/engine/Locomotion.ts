@@ -1011,7 +1011,11 @@ function handleAgentOccupancyBlock(
   // call via the occupancy ledger directly, which is authoritative for
   // "is X held by someone other than me" regardless of which cell this
   // tick's own hop got blocked on.
-  const destinationHeldByOther = !occupancy.isFreeFor(mover, leg.destX, leg.destZ);
+  // A board leg's destination is the vehicle it boards, held by it by construction (#2231): that is its
+  // goal, not someone in the way.
+  const destinationHolder = occupancy.holderOf(leg.destX, leg.destZ);
+  const destinationHeldByOther = !occupancy.isFreeFor(mover, leg.destX, leg.destZ)
+    && !(leg.onArrive.kind === 'board' && destinationHolder?.kind === 'vehicle' && destinationHolder.id === leg.onArrive.vehicleId);
 
   // #1278: before any reroute/sidestep/spread attempt, check whether whoever
   // holds the destination cell is simply standing there idle (an employee
@@ -1236,7 +1240,9 @@ function handleAgentOccupancyBlock(
   }
 
   // Destination spreading (see spreadLegDestination for which legs qualify).
-  if (destinationHeldByOther && spreadLegDestination(state, mover, leg, leg.destX, leg.destZ)) {
+  const parkedOnDestination = destinationHeldByOther
+    && idleParkedVehicleOf(state, occupancy.holderOf(leg.destX, leg.destZ)) !== undefined;
+  if (destinationHeldByOther && spreadLegDestination(state, mover, leg, leg.destX, leg.destZ, parkedOnDestination)) {
     // Deliberately NOT resetting `vehicleWaitingTicks` here (unlike the
     // reroute/sidestep branches above, both of which just moved the
     // mover for real): a retarget alone is not a resolution, only a new
@@ -1487,13 +1493,18 @@ function findNearestFreeCellForAgent(state: GameState, mover: Occupant, originX:
  * one specific vehicle/building cell it names), and never a `leg.neverSpread`
  * leg — a hole-work leg (#1291) or a relocated occupant's own return trip
  * (#1278 follow-up); see that field's own doc comment, Itinerary.ts.
+ * `parkedOnDestination` (#2231) lifts that lock: a driverless vehicle on the cell is never moved, and a
+ * hole is serviced at its own x/z whatever tile the rig stands on (the arrival gate reads the itinerary,
+ * not the position), so the leg settles on a neighbouring cell instead of waiting forever.
  * Records the pre-spread destination once, on the FIRST spread only (#1274):
  * the stable identity of the chokepoint the mover is queued on, so the jam
  * detector (TrafficJams.ts) can still cluster movers after each was retargeted.
  * Returns whether the leg was retargeted.
  */
-function spreadLegDestination(state: GameState, mover: Occupant, leg: Leg, originX: number, originZ: number): boolean {
-  const needsExactUnsharedCell = leg.arrival !== 'adjacent' && !leg.neverSpread
+function spreadLegDestination(
+  state: GameState, mover: Occupant, leg: Leg, originX: number, originZ: number, parkedOnDestination = false,
+): boolean {
+  const needsExactUnsharedCell = leg.arrival !== 'adjacent' && (!leg.neverSpread || parkedOnDestination)
     && (leg.onArrive.kind === 'none' || leg.onArrive.kind === 'effect');
   if (!needsExactUnsharedCell) return false;
   const spread = findNearestFreeCellForAgent(state, mover, originX, originZ);
