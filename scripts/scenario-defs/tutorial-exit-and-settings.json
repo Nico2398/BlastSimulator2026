@@ -24,10 +24,11 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Player opens Settings mid-tutorial (panel navigation is always allowed).",
+      "description": "Player opens Settings mid-tutorial (panel navigation is always allowed). The way back to the main menu is in reach the moment the panel opens, with no scrolling: awaitUsable inPlace probes the layout as it stands (it used to sit ~350 px below the fold, behind the keyboard list, and a player never found it).",
       "role": "player",
       "interaction": [
         { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
+        { "type": "awaitUsable", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]", "inPlace": true },
         { "type": "awaitUsable", "selector": "#bs-settings-panel [data-lang=\"fr\"]" }
       ],
       "expect": { "usable": "#bs-settings-panel [data-lang=\"fr\"]" }
