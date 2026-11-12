@@ -453,12 +453,12 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     {
       target: '[data-role="preflight-waiting"][data-phase="evacuating"]',
       hintKey: 'tutorial.stage.detonation_clearing',
-      also: ['[data-action="preflight-cancel-detonation"]'],
+      also: ['[data-action="preflight-cancel-detonation"]', '[data-action="preflight-hide-waiting"]', '[data-action="preflight-show-waiting"]'],
     },
     {
       target: '[data-role="preflight-waiting"][data-phase="stranded"]',
       hintKey: 'tutorial.stage.detonation_stranded',
-      also: ['[data-action="preflight-cancel-detonation"]'],
+      also: ['[data-action="preflight-cancel-detonation"]', '[data-action="preflight-hide-waiting"]', '[data-action="preflight-show-waiting"]'],
     },
   ],
 
