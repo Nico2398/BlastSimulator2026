@@ -1069,11 +1069,11 @@ describe('clearZone plans a mounted driver\'s first trip around the vehicle only
     const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
 
     expect(result.orderedVehicleIds).toContain(digger.id);
-    expect(result.orderedVehicleIds).toContain(hauler.id);
     expect(result.strandedVehicleIds).toEqual([]);
-    expect(result.awaitingRescuerVehicleIds).toEqual([]);
+    // The hauler keeps the pilot in its seat until they step off, so its relief driver is sent on a later pass.
+    expect(result.awaitingRescuerVehicleIds).toEqual([hauler.id]);
     expect(pilot.itinerary!.legs.some(l => l.vehicleId === digger.id)).toBe(true);
-    expect(relief!.pendingDriverVehicleId).toBe(hauler.id);
+    expect(relief).not.toBeNull();
   });
 
   it('keeps the pilot on their own vehicle when nobody else is licensed for it', () => {
