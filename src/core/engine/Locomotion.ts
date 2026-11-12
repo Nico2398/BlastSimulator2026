@@ -1242,7 +1242,10 @@ function handleAgentOccupancyBlock(
   // Destination spreading (see spreadLegDestination for which legs qualify).
   const parkedOnDestination = destinationHeldByOther
     && idleParkedVehicleOf(state, occupancy.holderOf(leg.destX, leg.destZ)) !== undefined;
-  if (destinationHeldByOther && spreadLegDestination(state, mover, leg, leg.destX, leg.destZ, parkedOnDestination)) {
+  if (destinationHeldByOther && spreadLegDestination(
+    state, mover, leg, leg.destX, leg.destZ, parkedOnDestination,
+    isDrive ? { agentId: emp.id, fromX: emp.x, fromZ: emp.z, limits: driveLimits } : undefined,
+  )) {
     // Deliberately NOT resetting `vehicleWaitingTicks` here (unlike the
     // reroute/sidestep branches above, both of which just moved the
     // mover for real): a retarget alone is not a resolution, only a new
@@ -1477,14 +1480,23 @@ function isReservedByAnotherExactLeg(state: GameState, mover: Occupant, x: numbe
  * sidestep and destination-spreading steps. Null when nothing nearby
  * qualifies.
  */
-function findNearestFreeCellForAgent(state: GameState, mover: Occupant, originX: number, originZ: number): { x: number; z: number } | null {
+function findNearestFreeCellForAgent(
+  state: GameState, mover: Occupant, originX: number, originZ: number, reach?: SpreadReach,
+): { x: number; z: number } | null {
   const occupancy = state.agentOccupancy;
   if (!occupancy) return null;
+  const grid = state.navGrid;
   return findNearestFreeCell(
-    state.navGrid, originX, originZ,
-    (x, z) => !occupancy.isFreeFor(mover, x, z) || isReservedByAnotherExactLeg(state, mover, x, z),
+    grid, originX, originZ,
+    (x, z) => !occupancy.isFreeFor(mover, x, z) || isReservedByAnotherExactLeg(state, mover, x, z)
+      || (reach !== undefined && grid !== null && !findPath(grid, {
+        agentId: reach.agentId, fromX: reach.fromX, fromZ: reach.fromZ, toX: x, toZ: z, avoidVehicles: false, ...reach.limits,
+      }).found),
   );
 }
+
+/** Where a retargeted leg must still be reachable from, so a vehicle never settles on a cell it cannot drive to (#2231). */
+interface SpreadReach { agentId: number; fromX: number; fromZ: number; limits: DriveLimits }
 
 /**
  * "Destination spreading": retargets `leg` onto the nearest free cell around
@@ -1502,12 +1514,12 @@ function findNearestFreeCellForAgent(state: GameState, mover: Occupant, originX:
  * Returns whether the leg was retargeted.
  */
 function spreadLegDestination(
-  state: GameState, mover: Occupant, leg: Leg, originX: number, originZ: number, parkedOnDestination = false,
+  state: GameState, mover: Occupant, leg: Leg, originX: number, originZ: number, parkedOnDestination = false, reach?: SpreadReach,
 ): boolean {
   const needsExactUnsharedCell = leg.arrival !== 'adjacent' && (!leg.neverSpread || parkedOnDestination)
     && (leg.onArrive.kind === 'none' || leg.onArrive.kind === 'effect');
   if (!needsExactUnsharedCell) return false;
-  const spread = findNearestFreeCellForAgent(state, mover, originX, originZ);
+  const spread = findNearestFreeCellForAgent(state, mover, originX, originZ, reach);
   if (!spread) return false;
   if (leg.originalDestX == null) {
     leg.originalDestX = leg.destX;
