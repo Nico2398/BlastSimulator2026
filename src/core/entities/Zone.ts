@@ -23,6 +23,8 @@ export interface ZoneBounds {
 
 export interface ZoneState {
   activeZone: ZoneBounds | null;
+  /** Employees ordered out by the current evacuation (#2230); one who has since left the zone is not sent back for a vehicle. */
+  evacuatedEmployeeIds?: number[];
 }
 
 export function createZoneState(): ZoneState {
@@ -40,7 +42,14 @@ export interface EvacuationDestination { x: number; z: number }
  * found — the entity is stranded.
  */
 /** A safe cell outside `zone` reachable from (fromX, fromZ); for a vehicle being driven out, reachable by that vehicle. */
-export type SafeDestinationFinder = (fromX: number, fromZ: number, zone: ZoneBounds, vehicle?: Vehicle) => EvacuationDestination | null;
+export type SafeDestinationFinder = (
+  fromX: number, fromZ: number, zone: ZoneBounds, vehicle?: Vehicle, avoidCells?: ReadonlySet<string>,
+) => EvacuationDestination | null;
+
+/** Key of a destination cell, for the `avoidCells` set of a SafeDestinationFinder (#2230). */
+export function evacuationCellKey(_x: number, _z: number): string {
+  throw new Error('not implemented');
+}
 
 /** Outcome of evacuating a zone: who made it out, and who is stranded. */
 export interface EvacuationResult {
