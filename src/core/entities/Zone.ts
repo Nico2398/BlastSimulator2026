@@ -5,10 +5,13 @@ import type { Vehicle, VehicleState } from './Vehicle.js';
 import type { Employee, EmployeeState } from './Employee.js';
 import type { GameState } from '../state/GameState.js';
 import { vehicleDriverId } from './Vehicle.js';
+import { isMounted } from './EmployeeLocomotion.js';
 import { moveTo, alightOnArrival } from '../engine/MoveTo.js';
 import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
 import type { EvacuationDriverReachabilityCheck } from './VehicleDriverAssignment.js';
-import { findBestEvacuationDriver, findAvailableDriverForReposition, findRestingLicensedDriver } from './VehicleDriverAssignment.js';
+import {
+  findBestEvacuationDriver, findAvailableDriverForReposition, findRestingLicensedDriver, hasOtherLicensedDriver, canDriveTier,
+} from './VehicleDriverAssignment.js';
 
 // ── Zone bounds ──
 
@@ -23,6 +26,8 @@ export interface ZoneBounds {
 
 export interface ZoneState {
   activeZone: ZoneBounds | null;
+  /** Employees ordered out by the current evacuation (#2230); one who has since left the zone is not sent back for a vehicle. */
+  evacuatedEmployeeIds?: number[];
 }
 
 export function createZoneState(): ZoneState {
@@ -40,7 +45,14 @@ export interface EvacuationDestination { x: number; z: number }
  * found — the entity is stranded.
  */
 /** A safe cell outside `zone` reachable from (fromX, fromZ); for a vehicle being driven out, reachable by that vehicle. */
-export type SafeDestinationFinder = (fromX: number, fromZ: number, zone: ZoneBounds, vehicle?: Vehicle) => EvacuationDestination | null;
+export type SafeDestinationFinder = (
+  fromX: number, fromZ: number, zone: ZoneBounds, vehicle?: Vehicle, avoidCells?: ReadonlySet<string>,
+) => EvacuationDestination | null;
+
+/** Key of a destination cell, for the `avoidCells` set of a SafeDestinationFinder (#2230). */
+export function evacuationCellKey(x: number, z: number): string {
+  return `${Math.round(x)},${Math.round(z)}`;
+}
 
 /** Outcome of evacuating a zone: who made it out, and who is stranded. */
 export interface EvacuationResult {
@@ -92,6 +104,8 @@ export function collectInZoneDriverIds(zone: ZoneBounds, vehicles: VehicleState)
   return ids;
 }
 
+const NO_EMPLOYEES: ReadonlySet<number> = new Set();
+
 /** What the evacuation does with one driverless in-zone vehicle (#2100). */
 type DriverlessEvacuationPlan =
   | { kind: 'stranded' }
@@ -117,9 +131,11 @@ export function planDriverlessEvacuation(
   inZoneDriverIds: ReadonlySet<number>,
   findSafeDestination: SafeDestinationFinder,
   canEmployeeReachVehicle: EvacuationDriverReachabilityCheck,
+  evacuatedEmployeeIds: ReadonlySet<number> = NO_EMPLOYEES,
+  avoidCells?: ReadonlySet<string>,
 ): DriverlessEvacuationPlan {
   // A vehicle nobody can drive anywhere is stranded regardless of who might be free to board it.
-  const dest = findSafeDestination(v.x, v.z, zone, v);
+  const dest = findSafeDestination(v.x, v.z, zone, v, avoidCells);
   if (!dest) return { kind: 'stranded' };
 
   const candidateEmployeeIds = employees.employees
@@ -143,16 +159,113 @@ export function planDriverlessEvacuation(
   }
   // Any free licensed crew member qualifies, wherever they stand (#1648, #1746).
   let driver: Employee | null = inZoneDriver;
+  // Nobody ordered out of the zone is sent back for a vehicle while another licence holder could fetch it; only the
+  // sole licence holder is (#2230). A held-back employee leaves the vehicle awaiting that other driver.
+  let heldBack = false;
   if (!driver) {
-    const rescuer = findAvailableDriverForReposition(v, vehicles, employees);
+    let rescuer = findAvailableDriverForReposition(v, vehicles, employees, evacuatedEmployeeIds);
+    if (rescuer === null && evacuatedEmployeeIds.size > 0) {
+      const returning = findAvailableDriverForReposition(v, vehicles, employees);
+      if (returning !== null && hasOtherLicensedDriver(v, employees, evacuatedEmployeeIds)) heldBack = true;
+      else rescuer = returning;
+    }
     driver = rescuer !== null && canEmployeeReachVehicle(rescuer, v) ? rescuer : null;
   }
   if (!driver) {
-    return findRestingLicensedDriver(v, vehicles, employees, canEmployeeReachVehicle) !== null
+    return heldBack || findRestingLicensedDriver(v, vehicles, employees, canEmployeeReachVehicle) !== null
       ? { kind: 'awaiting' }
       : { kind: 'stranded' };
   }
   return { kind: 'drive', driver, dest };
+}
+
+/** Final destination of the journey `emp` is on, null when it is on none. */
+function journeyDestination(emp: Employee): EvacuationDestination | null {
+  const last = emp.itinerary?.legs[emp.itinerary.legs.length - 1];
+  if (last) return { x: last.destX, z: last.destZ };
+  if (emp.destinationX !== null && emp.destinationZ !== null) return { x: emp.destinationX, z: emp.destinationZ };
+  return null;
+}
+
+/**
+ * In-zone evacuees already making progress to a cell outside the zone, by employee id (#2230): a walker with a
+ * destination, a driver on an evacuation drive, neither stuck. Re-ordering them would only retarget a journey in progress.
+ */
+function collectKeptDestinations(zone: ZoneBounds, employees: EmployeeState): Map<number, EvacuationDestination> {
+  const kept = new Map<number, EvacuationDestination>();
+  for (const emp of employees.employees) {
+    if (!emp.alive || !isInZone(emp.x, emp.z, zone)) continue;
+    if (emp.isMoveStuck || emp.moveConsecutiveFailures > 0 || emp.destinationX === null) continue;
+    const itinerary = emp.itinerary;
+    const evacuationDrive = itinerary !== null && itinerary.goal.kind === 'reposition'
+      && itinerary.legs[itinerary.legs.length - 1]?.onArrive.kind === 'alight';
+    if (isMounted(emp.locomotion) ? !evacuationDrive : emp.activeActionId !== null) continue;
+    const dest = journeyDestination(emp);
+    if (dest && !isInZone(dest.x, dest.z, zone)) kept.set(emp.id, dest);
+  }
+  return kept;
+}
+
+/**
+ * Cells a new evacuation destination must avoid (#2230): where an entity outside the zone stands or is headed, and
+ * where an evacuee in progress is going.
+ */
+function collectClaimedCells(
+  zone: ZoneBounds,
+  vehicles: VehicleState,
+  employees: EmployeeState,
+  kept: ReadonlyMap<number, EvacuationDestination>,
+): Set<string> {
+  const claimed = new Set<string>();
+  for (const dest of kept.values()) claimed.add(evacuationCellKey(dest.x, dest.z));
+  for (const v of vehicles.vehicles) if (!isInZone(v.x, v.z, zone)) claimed.add(evacuationCellKey(v.x, v.z));
+  for (const emp of employees.employees) {
+    if (!emp.alive || isInZone(emp.x, emp.z, zone)) continue;
+    claimed.add(evacuationCellKey(emp.x, emp.z));
+    const dest = journeyDestination(emp);
+    if (dest) claimed.add(evacuationCellKey(dest.x, dest.z));
+  }
+  return claimed;
+}
+
+/** True when an alive employee is already on an itinerary that boards or drives `vehicle`. */
+function isBeingBoarded(vehicle: Vehicle, employees: EmployeeState): boolean {
+  return employees.employees.some(e => e.alive && e.itinerary !== null && e.itinerary.legs.some(leg =>
+    leg.vehicleId === vehicle.id || (leg.onArrive.kind === 'board' && leg.onArrive.vehicleId === vehicle.id)));
+}
+
+/** A pilot's first trip: the driverless vehicle they take out before `own`, the vehicle they are mounted in. */
+interface FirstTripChain { own: Vehicle; rescued: Vehicle }
+
+/**
+ * First-trip chains (#2230), by the id of the mounted in-zone driver: a driver who is the only licence holder of a
+ * driverless in-zone vehicle, while his own vehicle has another licence holder to fetch it, takes the driverless one
+ * out first instead of being sent back for it after leaving.
+ */
+function planFirstTripChains(
+  zone: ZoneBounds,
+  vehicles: VehicleState,
+  employees: EmployeeState,
+  evacuatedBefore: ReadonlySet<number>,
+  kept: ReadonlyMap<number, EvacuationDestination>,
+): Map<number, FirstTripChain> {
+  const chains = new Map<number, FirstTripChain>();
+  const taken = new Set<number>();
+  for (const own of vehicles.vehicles) {
+    const driverId = vehicleDriverId(own);
+    if (driverId === null || !isInZone(own.x, own.z, zone) || kept.has(driverId) || evacuatedBefore.has(driverId)) continue;
+    const driver = employees.employees.find(e => e.id === driverId);
+    const alone = new Set([driverId]);
+    if (!driver || !hasOtherLicensedDriver(own, employees, alone)) continue;
+    const rescued = vehicles.vehicles.find(v =>
+      !taken.has(v.id) && vehicleDriverId(v) === null && isInZone(v.x, v.z, zone)
+      && canDriveTier(driver, v.type, v.tier) && !hasOtherLicensedDriver(v, employees, alone)
+      && !isBeingBoarded(v, employees));
+    if (!rescued) continue;
+    taken.add(rescued.id);
+    chains.set(driverId, { own, rescued });
+  }
+  return chains;
 }
 
 /**
@@ -190,12 +303,41 @@ export function clearZone(
   // needs to rescan the vehicle list per employee to know this.
   const inZoneDriverIds = collectInZoneDriverIds(zone, vehicles);
 
+  // #2230: an evacuee already making progress to a safe cell keeps it, and every destination handed out is a cell
+  // nobody else stands on or heads for.
+  const evacuatedBefore = new Set(state.zone.evacuatedEmployeeIds ?? []);
+  const keptDestinations = collectKeptDestinations(zone, employees);
+  const claimedCells = collectClaimedCells(zone, vehicles, employees, keptDestinations);
+  const findDest: SafeDestinationFinder = (fromX, fromZ, z, vehicle) => findSafeDestination(fromX, fromZ, z, vehicle, claimedCells);
+  const orderedDriverIds: number[] = [];
+  const chains = planFirstTripChains(zone, vehicles, employees, evacuatedBefore, keptDestinations);
+  // First trip (#2230): the only licence holder of a driverless vehicle takes it out before his own, which waits for
+  // its other driver; ordered up front so the vehicle loop below leaves both alone.
+  const chainedVehicleIds = new Set<number>();
+  const chainedDriverIds = new Set<number>();
+  for (const [driverId, chain] of chains) {
+    const chainDest = findDest(chain.rescued.x, chain.rescued.z, zone, chain.rescued);
+    if (!chainDest || !orderDriverClear(state, driverId, chainDest, chain.rescued.id).success) continue;
+    claimedCells.add(evacuationCellKey(chainDest.x, chainDest.z));
+    orderedDriverIds.push(driverId);
+    chainedDriverIds.add(driverId);
+    chainedVehicleIds.add(chain.rescued.id);
+    result.orderedVehicleIds.push(chain.rescued.id);
+    // The pilot's own vehicle keeps its seat until they step off: its other driver fetches it on a later pass.
+    result.awaitingRescuerVehicleIds.push(chain.own.id);
+  }
+
   for (const v of vehicles.vehicles) {
     if (!isInZone(v.x, v.z, zone)) continue;
 
     const driverId = vehicleDriverId(v);
     if (driverId !== null) {
-      const dest = findSafeDestination(v.x, v.z, zone, v);
+      if (keptDestinations.has(driverId)) {
+        result.orderedVehicleIds.push(v.id);
+        continue;
+      }
+      if (chainedDriverIds.has(driverId)) continue;
+      const dest = findDest(v.x, v.z, zone, v);
       if (dest) {
         // Already driven — plain reposition; moveTo's own implicit
         // continuity (already mounted in `v`) plans straight to a drive
@@ -209,6 +351,8 @@ export function clearZone(
         // vehicle is clear, exactly like an ordinary on-foot evacuee.
         const ordered = orderDriverClear(state, driverId, dest);
         if (ordered.success) {
+          claimedCells.add(evacuationCellKey(dest.x, dest.z));
+          orderedDriverIds.push(driverId);
           result.orderedVehicleIds.push(v.id);
         } else {
           result.strandedVehicleIds.push(v.id);
@@ -219,9 +363,10 @@ export function clearZone(
       continue;
     }
 
+    if (chainedVehicleIds.has(v.id) || isBeingBoarded(v, employees)) continue;
     const plan = planDriverlessEvacuation(
       v, zone, vehicles, employees, boardingEmployeeIds, inZoneDriverIds,
-      findSafeDestination, canEmployeeReachVehicle,
+      findSafeDestination, canEmployeeReachVehicle, evacuatedBefore, claimedCells,
     );
     if (plan.kind === 'stranded') {
       result.strandedVehicleIds.push(v.id);
@@ -245,6 +390,8 @@ export function clearZone(
       continue;
     }
     boardingEmployeeIds.add(driver.id);
+    claimedCells.add(evacuationCellKey(dest.x, dest.z));
+    orderedDriverIds.push(driver.id);
     result.orderedVehicleIds.push(v.id);
   }
 
@@ -255,14 +402,23 @@ export function clearZone(
     // Already driving an in-zone vehicle clear (driver-present branch above
     // already staged its destination) — no foot destination needed too.
     if (inZoneDriverIds.has(emp.id)) continue;
+    // Already walking out and not stuck (#2230): the destination holds.
+    if (keptDestinations.has(emp.id)) {
+      result.orderedEmployeeIds.push(emp.id);
+      continue;
+    }
 
-    const dest = findSafeDestination(emp.x, emp.z, zone);
+    const dest = findDest(emp.x, emp.z, zone);
     if (dest && moveTo(state, emp.id, { x: dest.x, z: dest.z }, { allowUnreachable: true }).success) {
+      claimedCells.add(evacuationCellKey(dest.x, dest.z));
       result.orderedEmployeeIds.push(emp.id);
     } else {
       result.strandedEmployeeIds.push(emp.id);
     }
   }
+
+  const evacuated = (state.zone.evacuatedEmployeeIds ??= []);
+  for (const id of [...result.orderedEmployeeIds, ...orderedDriverIds]) if (!evacuated.includes(id)) evacuated.push(id);
 
   return result;
 }
