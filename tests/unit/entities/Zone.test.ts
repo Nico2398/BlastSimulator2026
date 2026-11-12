@@ -3,6 +3,7 @@ import {
   clearZone,
   isZoneClear,
   isInZone,
+  evacuationCellKey,
   computeDangerZone,
   countZoneOccupants,
   isDangerZoneClear,
@@ -833,5 +834,495 @@ describe('isDangerZoneClear', () => {
     purchaseVehicle(vehicles, 'debris_hauler', 100, 100);
 
     expect(isDangerZoneClear(holes, vehicles, employees)).toBe(true);
+  });
+});
+
+
+// ── #2230: no re-entry, first-trip planning, held destinations, no shared cells ──────────────────────────────
+
+/** Where an employee's current itinerary ends, or null without one. */
+function itineraryEnd(employee: Employee): { x: number; z: number } | null {
+  const legs = employee.itinerary?.legs;
+  if (!legs || legs.length === 0) return null;
+  const last = legs[legs.length - 1]!;
+  return { x: last.destX, z: last.destZ };
+}
+
+/** Finds the cell 5 m past the zone's east edge, or the next free one along it when that cell is in `avoidCells`. */
+const findAvoidingDestination: SafeDestinationFinder = (_fromX, fromZ, z, _vehicle, avoidCells) => {
+  for (let dz = 0; dz < 30; dz++) {
+    const cell = { x: z.x2 + 5, z: fromZ + dz };
+    if (!avoidCells?.has(evacuationCellKey(cell.x, cell.z))) return cell;
+  }
+  return null;
+};
+
+/** A finder that always answers one fixed cell, whatever it is asked. */
+function fixedDestination(x: number, z: number): SafeDestinationFinder {
+  return () => ({ x, z });
+}
+
+describe('evacuationCellKey (#2230)', () => {
+  it('is the same string for the same cell', () => {
+    expect(typeof evacuationCellKey(35, 20)).toBe('string');
+    expect(evacuationCellKey(35, 20)).toBe(evacuationCellKey(35, 20));
+  });
+
+  it('differs for different cells, whichever axis differs', () => {
+    expect(evacuationCellKey(3, 4)).not.toBe(evacuationCellKey(4, 3));
+    expect(evacuationCellKey(35, 20)).not.toBe(evacuationCellKey(35, 21));
+    expect(evacuationCellKey(35, 20)).not.toBe(evacuationCellKey(36, 20));
+  });
+
+  it('does not run the digits of the two axes together', () => {
+    expect(evacuationCellKey(1, 23)).not.toBe(evacuationCellKey(12, 3));
+    expect(evacuationCellKey(-1, 5)).not.toBe(evacuationCellKey(1, 5));
+  });
+});
+
+describe('clearZone records who it ordered out (#2230)', () => {
+  it('appends an employee ordered out of the zone to zone.evacuatedEmployeeIds', () => {
+    const state = makeState(2301);
+    const { vehicles, employees } = state;
+    const { employee } = hireEmployee(employees, 'driller', new Random(2301), 20, 20);
+
+    clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(state.zone.evacuatedEmployeeIds).toContain(employee.id);
+  });
+
+  it('does not list an employee who was already outside the zone', () => {
+    const state = makeState(2302);
+    const { vehicles, employees } = state;
+    const { employee: inside } = hireEmployee(employees, 'driller', new Random(2302), 20, 20);
+    const { employee: outside } = hireEmployee(employees, 'driller', new Random(2303), 5, 5);
+
+    clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(state.zone.evacuatedEmployeeIds).toContain(inside.id);
+    expect(state.zone.evacuatedEmployeeIds).not.toContain(outside.id);
+  });
+
+  it('appends to the ids already listed instead of replacing them', () => {
+    const state = makeState(2304);
+    const { vehicles, employees } = state;
+    state.zone.evacuatedEmployeeIds = [987];
+    const { employee } = hireEmployee(employees, 'driller', new Random(2304), 20, 20);
+
+    clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(state.zone.evacuatedEmployeeIds).toContain(987);
+    expect(state.zone.evacuatedEmployeeIds).toContain(employee.id);
+  });
+
+  it('lists nobody when the zone holds nobody', () => {
+    const state = makeState(2305);
+    hireEmployee(state.employees, 'driller', new Random(2305), 5, 5);
+
+    clearZone(zone, state, state.vehicles, state.employees, findSafeDestination, () => true);
+
+    expect(state.zone.evacuatedEmployeeIds ?? []).toEqual([]);
+  });
+});
+
+describe('clearZone does not send an employee who left the zone back in for a vehicle (#2230, C1)', () => {
+  /**
+   * A driverless excavator stands in the zone. `leaver` (lowest id, nearest to it) was ordered out earlier and now stands
+   * outside the zone. `other` is a second licensed driver, placed by each case.
+   */
+  function fixture(seed: number, otherAt: { x: number; z: number } | null) {
+    const state = makeState(seed);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    const { employee: leaver } = hireEmployee(employees, 'driver', new Random(seed), 35, 20);
+    assignSkill(employees, leaver.id, 'driving.excavator', 1);
+    const other = otherAt === null ? null : hireEmployee(employees, 'driver', new Random(seed + 1), otherAt.x, otherAt.z).employee;
+    if (other) assignSkill(employees, other.id, 'driving.excavator', 1);
+    state.zone.evacuatedEmployeeIds = [leaver.id];
+    return { state, vehicles, employees, vehicle, leaver, other };
+  }
+
+  it('picks another licensed driver standing outside who was never ordered out, even though the leaver is nearer', () => {
+    const { state, vehicles, employees, vehicle, leaver, other } = fixture(2310, { x: 40, z: 40 });
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(leaver.pendingDriverVehicleId).toBeNull();
+    expect(leaver.itinerary).toBeNull();
+    expect(other!.pendingDriverVehicleId).toBe(vehicle.id);
+    expect(result.orderedVehicleIds).toContain(vehicle.id);
+    expect(result.strandedVehicleIds).not.toContain(vehicle.id);
+  });
+
+  it('leaves the vehicle awaiting a rescuer when the only other licensed driver is resting, and still does not order the leaver', () => {
+    const { state, vehicles, employees, vehicle, leaver, other } = fixture(2311, { x: 40, z: 40 });
+    other!.restTicksRemaining = 30;
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(result.awaitingRescuerVehicleIds).toContain(vehicle.id);
+    expect(result.orderedVehicleIds).not.toContain(vehicle.id);
+    expect(result.strandedVehicleIds).not.toContain(vehicle.id);
+    expect(leaver.pendingDriverVehicleId).toBeNull();
+    expect(leaver.itinerary).toBeNull();
+  });
+
+  it('leaves the vehicle awaiting when the other licensed driver is about to rest (pending rest), the leaver still stays out', () => {
+    const { state, vehicles, employees, vehicle, leaver, other } = fixture(2312, { x: 40, z: 40 });
+    other!.pendingRestDuration = 30;
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(result.awaitingRescuerVehicleIds).toContain(vehicle.id);
+    expect(leaver.itinerary).toBeNull();
+  });
+
+  it('takes another licensed driver standing in the zone, and not the leaver', () => {
+    const { state, vehicles, employees, vehicle, leaver, other } = fixture(2313, { x: 20, z: 20 });
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(other!.pendingDriverVehicleId).toBe(vehicle.id);
+    expect(leaver.pendingDriverVehicleId).toBeNull();
+    expect(leaver.itinerary).toBeNull();
+    expect(result.orderedVehicleIds).toContain(vehicle.id);
+  });
+
+  it('still orders the leaver when no other licensed driver exists for that vehicle (exception: nobody else can rescue it)', () => {
+    const { state, vehicles, employees, vehicle, leaver } = fixture(2314, null);
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(leaver.pendingDriverVehicleId).toBe(vehicle.id);
+    expect(result.orderedVehicleIds).toContain(vehicle.id);
+    expect(result.strandedVehicleIds).not.toContain(vehicle.id);
+  });
+
+  it('still orders the leaver when the only other licensed driver is injured and cannot rescue it', () => {
+    const { state, vehicles, employees, vehicle, leaver, other } = fixture(2315, { x: 40, z: 40 });
+    other!.injured = true;
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(leaver.pendingDriverVehicleId).toBe(vehicle.id);
+    expect(result.orderedVehicleIds).toContain(vehicle.id);
+  });
+
+  it('still orders the leaver when the other employee holds no licence for that vehicle', () => {
+    const state = makeState(2316);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    const { employee: leaver } = hireEmployee(employees, 'driver', new Random(2316), 35, 20);
+    hireEmployee(employees, 'driller', new Random(2317), 40, 40); // blasting + drill rig only, no excavator licence
+    state.zone.evacuatedEmployeeIds = [leaver.id];
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(leaver.pendingDriverVehicleId).toBe(vehicle.id);
+    expect(result.orderedVehicleIds).toContain(vehicle.id);
+  });
+
+  it('treats an employee who is listed but has drifted back into the zone like any other employee in the zone', () => {
+    const state = makeState(2318);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    const { employee: drifter } = hireEmployee(employees, 'driver', new Random(2318), 16, 16);
+    state.zone.evacuatedEmployeeIds = [drifter.id];
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(drifter.pendingDriverVehicleId).toBe(vehicle.id);
+    expect(result.orderedVehicleIds).toContain(vehicle.id);
+  });
+
+  it('keeps ordering a licensed driver who was never listed, as before', () => {
+    const state = makeState(2319);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    const { employee } = hireEmployee(employees, 'driver', new Random(2319), 35, 20);
+    state.zone.evacuatedEmployeeIds = [];
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(employee.pendingDriverVehicleId).toBe(vehicle.id);
+    expect(result.orderedVehicleIds).toContain(vehicle.id);
+  });
+});
+
+describe('clearZone plans a mounted driver\'s first trip around the vehicle only they can rescue (#2230, C2)', () => {
+  // The hauler needs a truck licence, the digger an excavator licence. `pilot` ('driver') holds both and is mounted in the
+  // hauler inside the zone; the digger stands driverless in the zone. `relief` ('blaster') holds the truck licence only.
+  function fixture(seed: number, withRelief: boolean) {
+    const state = makeState(seed);
+    const { vehicles, employees } = state;
+    const { vehicle: hauler } = purchaseVehicle(vehicles, 'debris_hauler', 15, 15);
+    const { vehicle: digger } = purchaseVehicle(vehicles, 'rock_digger', 20, 20);
+    const { employee: pilot } = hireEmployee(employees, 'driver', new Random(seed), hauler.x, hauler.z);
+    mountDriver(hauler, pilot);
+    const relief = withRelief ? hireEmployee(employees, 'blaster', new Random(seed + 1), 40, 40).employee : null;
+    return { state, vehicles, employees, hauler, digger, pilot, relief };
+  }
+
+  it('orders the pilot to take the digger out on their first trip, and leaves the hauler awaiting its relief driver', () => {
+    const { state, vehicles, employees, hauler, digger, pilot } = fixture(2320, true);
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(result.orderedVehicleIds).toContain(digger.id);
+    expect(result.strandedVehicleIds).toEqual([]);
+    // The hauler keeps the pilot in its seat until they step off, so its relief driver is sent on a later pass.
+    expect(result.awaitingRescuerVehicleIds).toEqual([hauler.id]);
+    expect(pilot.itinerary!.legs.some(l => l.vehicleId === digger.id)).toBe(true);
+  });
+
+  it('keeps the pilot on their own vehicle when nobody else is licensed for it', () => {
+    const { state, vehicles, employees, hauler, digger, pilot } = fixture(2321, false);
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(result.orderedVehicleIds).toContain(hauler.id);
+    expect(pilot.itinerary!.legs.some(l => l.vehicleId === digger.id)).toBe(false);
+    expect(pilot.pendingDriverVehicleId).toBeNull();
+  });
+
+  it('leaves the pilot on their own vehicle when another licensed driver in the zone can take the digger', () => {
+    const { state, vehicles, employees, hauler, digger, pilot } = fixture(2322, true);
+    const { employee: crewmate } = hireEmployee(employees, 'driver', new Random(2323), 21, 21);
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(result.orderedVehicleIds).toContain(digger.id);
+    expect(result.orderedVehicleIds).toContain(hauler.id);
+    expect(crewmate.pendingDriverVehicleId).toBe(digger.id);
+    expect(pilot.itinerary!.legs.some(l => l.vehicleId === digger.id)).toBe(false);
+  });
+});
+
+describe('clearZone keeps the destination of an evacuee that is making progress (#2230, C3)', () => {
+  const first = findSafeDestination; // east edge + 5, same z
+  const second = fixedDestination(50, 25);
+
+  it('does not re-issue the walk of an employee already heading for a cell outside the zone', () => {
+    const state = makeState(2330);
+    const { vehicles, employees } = state;
+    const { employee } = hireEmployee(employees, 'driller', new Random(2330), 20, 20);
+    clearZone(zone, state, vehicles, employees, first, () => true);
+    const destination = { x: employee.destinationX, z: employee.destinationZ };
+    const itinerary = employee.itinerary;
+    expect(destination.x).toBeGreaterThan(zone.x2);
+
+    const again = clearZone(zone, state, vehicles, employees, second, () => true);
+
+    expect({ x: employee.destinationX, z: employee.destinationZ }).toEqual(destination);
+    expect(employee.itinerary).toBe(itinerary);
+    expect(again.orderedEmployeeIds).toContain(employee.id);
+    expect(again.strandedEmployeeIds).not.toContain(employee.id);
+  });
+
+  it('keeps the destination across many calls', () => {
+    const state = makeState(2331);
+    const { vehicles, employees } = state;
+    const { employee } = hireEmployee(employees, 'driller', new Random(2331), 20, 20);
+    clearZone(zone, state, vehicles, employees, first, () => true);
+    const destination = { x: employee.destinationX, z: employee.destinationZ };
+
+    for (let i = 0; i < 5; i++) {
+      const result = clearZone(zone, state, vehicles, employees, fixedDestination(50 + i, 25 + i), () => true);
+      expect(result.orderedEmployeeIds).toContain(employee.id);
+    }
+
+    expect({ x: employee.destinationX, z: employee.destinationZ }).toEqual(destination);
+  });
+
+  it('does not re-issue the evacuation drive of a driver already driving out', () => {
+    const state = makeState(2332);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'debris_hauler', 15, 15);
+    const { employee: driver } = hireEmployee(employees, 'driller', new Random(2332), vehicle.x, vehicle.z);
+    mountDriver(vehicle, driver);
+    clearZone(zone, state, vehicles, employees, first, () => true);
+    const itinerary = driver.itinerary;
+    const end = itineraryEnd(driver);
+    expect(end!.x).toBeGreaterThan(zone.x2);
+
+    const again = clearZone(zone, state, vehicles, employees, second, () => true);
+
+    expect(driver.itinerary).toBe(itinerary);
+    expect(itineraryEnd(driver)).toEqual(end);
+    expect(again.orderedVehicleIds).toContain(vehicle.id);
+    expect(again.strandedVehicleIds).not.toContain(vehicle.id);
+  });
+
+  it('chooses a new destination for an evacuee that is stuck', () => {
+    const state = makeState(2333);
+    const { vehicles, employees } = state;
+    const { employee } = hireEmployee(employees, 'driller', new Random(2333), 20, 20);
+    clearZone(zone, state, vehicles, employees, first, () => true);
+    employee.isMoveStuck = true;
+    employee.moveConsecutiveFailures = 10;
+
+    const again = clearZone(zone, state, vehicles, employees, second, () => true);
+
+    expect(employee.destinationX).toBe(50);
+    expect(employee.destinationZ).toBe(25);
+    expect(again.orderedEmployeeIds).toContain(employee.id);
+  });
+
+  it('chooses a new destination once the walk has started failing, before it is flagged stuck', () => {
+    const state = makeState(2334);
+    const { vehicles, employees } = state;
+    const { employee } = hireEmployee(employees, 'driller', new Random(2334), 20, 20);
+    clearZone(zone, state, vehicles, employees, first, () => true);
+    employee.moveConsecutiveFailures = 1;
+
+    clearZone(zone, state, vehicles, employees, second, () => true);
+
+    expect(employee.destinationX).toBe(50);
+    expect(employee.destinationZ).toBe(25);
+  });
+
+  it('chooses a new destination for a driver whose evacuation drive is stuck', () => {
+    const state = makeState(2335);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'debris_hauler', 15, 15);
+    const { employee: driver } = hireEmployee(employees, 'driller', new Random(2335), vehicle.x, vehicle.z);
+    mountDriver(vehicle, driver);
+    clearZone(zone, state, vehicles, employees, first, () => true);
+    driver.isMoveStuck = true;
+    driver.moveConsecutiveFailures = 10;
+
+    const again = clearZone(zone, state, vehicles, employees, second, () => true);
+
+    expect(itineraryEnd(driver)).toEqual({ x: 50, z: 25 });
+    expect(again.orderedVehicleIds).toContain(vehicle.id);
+  });
+
+  it('chooses a new destination when the old one lies inside the zone', () => {
+    const state = makeState(2336);
+    const { vehicles, employees } = state;
+    const { employee } = hireEmployee(employees, 'driller', new Random(2336), 20, 20);
+    clearZone(zone, state, vehicles, employees, fixedDestination(25, 25), () => true); // a stale destination inside the zone
+    expect(isInZone(employee.destinationX!, employee.destinationZ!, zone)).toBe(true);
+
+    const again = clearZone(zone, state, vehicles, employees, second, () => true);
+
+    expect(employee.destinationX).toBe(50);
+    expect(employee.destinationZ).toBe(25);
+    expect(again.orderedEmployeeIds).toContain(employee.id);
+  });
+
+  it('still strands an evacuee with a stale destination inside the zone when nowhere safe is left', () => {
+    const state = makeState(2337);
+    const { vehicles, employees } = state;
+    const { employee } = hireEmployee(employees, 'driller', new Random(2337), 20, 20);
+    clearZone(zone, state, vehicles, employees, fixedDestination(25, 25), () => true);
+
+    const again = clearZone(zone, state, vehicles, employees, noSafeDestination, () => true);
+
+    expect(again.strandedEmployeeIds).toContain(employee.id);
+    expect(again.orderedEmployeeIds).not.toContain(employee.id);
+  });
+});
+
+describe('clearZone hands out no cell twice and none an entity stands on (#2230, C4)', () => {
+  it('gives employees leaving from the same spot pairwise distinct destinations', () => {
+    const state = makeState(2340);
+    const { vehicles, employees } = state;
+    const rng = new Random(2340);
+    const crew = [15, 16, 17, 18].map(x => hireEmployee(employees, 'driller', rng, x, 20).employee);
+
+    const result = clearZone(zone, state, vehicles, employees, findAvoidingDestination, () => true);
+
+    for (const e of crew) expect(result.orderedEmployeeIds).toContain(e.id);
+    const keys = crew.map(e => evacuationCellKey(e.destinationX!, e.destinationZ!));
+    expect(new Set(keys).size).toBe(crew.length);
+    for (const e of crew) expect(isInZone(e.destinationX!, e.destinationZ!, zone)).toBe(false);
+  });
+
+  it('gives an employee and a driven vehicle leaving from the same spot different destinations', () => {
+    const state = makeState(2341);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'debris_hauler', 15, 20);
+    const { employee: driver } = hireEmployee(employees, 'driller', new Random(2341), vehicle.x, vehicle.z);
+    mountDriver(vehicle, driver);
+    const { employee: walker } = hireEmployee(employees, 'driller', new Random(2342), 16, 20);
+
+    clearZone(zone, state, vehicles, employees, findAvoidingDestination, () => true);
+
+    const driveEnd = itineraryEnd(driver)!;
+    expect(evacuationCellKey(driveEnd.x, driveEnd.z)).not.toBe(evacuationCellKey(walker.destinationX!, walker.destinationZ!));
+  });
+
+  it('passes the cells already handed out in this call to the finder as avoidCells', () => {
+    const state = makeState(2342);
+    const { vehicles, employees } = state;
+    const rng = new Random(2342);
+    hireEmployee(employees, 'driller', rng, 15, 20);
+    hireEmployee(employees, 'driller', rng, 16, 20);
+    const seen: Array<ReadonlySet<string> | undefined> = [];
+    const recording: SafeDestinationFinder = (fromX, fromZ, z, v, avoid) => {
+      seen.push(avoid ? new Set(avoid) : undefined);
+      return findAvoidingDestination(fromX, fromZ, z, v, avoid);
+    };
+
+    clearZone(zone, state, vehicles, employees, recording, () => true);
+
+    expect(seen).toHaveLength(2);
+    expect(seen[1]!.has(evacuationCellKey(zone.x2 + 5, 20))).toBe(true);
+  });
+
+  it('never hands a new evacuee the destination of one whose walk it keeps', () => {
+    const state = makeState(2343);
+    const { vehicles, employees } = state;
+    const { employee: early } = hireEmployee(employees, 'driller', new Random(2343), 20, 20);
+    clearZone(zone, state, vehicles, employees, findAvoidingDestination, () => true);
+    const keptDestination = { x: early.destinationX, z: early.destinationZ };
+    const { employee: late } = hireEmployee(employees, 'driller', new Random(2344), 21, 20);
+
+    clearZone(zone, state, vehicles, employees, findAvoidingDestination, () => true);
+
+    expect({ x: early.destinationX, z: early.destinationZ }).toEqual(keptDestination);
+    expect(evacuationCellKey(late.destinationX!, late.destinationZ!)).not.toBe(evacuationCellKey(keptDestination.x!, keptDestination.z!));
+  });
+
+  it('never hands out a cell another employee stands on', () => {
+    const state = makeState(2344);
+    const { vehicles, employees } = state;
+    hireEmployee(employees, 'driller', new Random(2344), zone.x2 + 5, 20); // idle outside, on the cell the finder would pick
+    const { employee: walker } = hireEmployee(employees, 'driller', new Random(2345), 20, 20);
+    const seen: ReadonlySet<string>[] = [];
+    const recording: SafeDestinationFinder = (fromX, fromZ, z, v, avoid) => {
+      if (avoid) seen.push(new Set(avoid));
+      return findAvoidingDestination(fromX, fromZ, z, v, avoid);
+    };
+
+    clearZone(zone, state, vehicles, employees, recording, () => true);
+
+    expect(seen.some(s => s.has(evacuationCellKey(zone.x2 + 5, 20)))).toBe(true);
+    expect(evacuationCellKey(walker.destinationX!, walker.destinationZ!)).not.toBe(evacuationCellKey(zone.x2 + 5, 20));
+  });
+
+  it('never hands out a cell a vehicle stands on', () => {
+    const state = makeState(2345);
+    const { vehicles, employees } = state;
+    purchaseVehicle(vehicles, 'debris_hauler', zone.x2 + 5, 20); // parked outside, on the cell the finder would pick
+    const { employee: walker } = hireEmployee(employees, 'driller', new Random(2346), 20, 20);
+
+    clearZone(zone, state, vehicles, employees, findAvoidingDestination, () => true);
+
+    expect(evacuationCellKey(walker.destinationX!, walker.destinationZ!)).not.toBe(evacuationCellKey(zone.x2 + 5, 20));
+  });
+
+  it('strands an evacuee the finder cannot place once every cell it would pick is avoided', () => {
+    const state = makeState(2346);
+    const { vehicles, employees } = state;
+    const { employee } = hireEmployee(employees, 'driller', new Random(2346), 20, 20);
+    const refusingWhenAvoiding: SafeDestinationFinder = (_x, _z, _zone, _v, avoid) => (avoid && avoid.size > 0 ? null : { x: zone.x2 + 5, z: 20 });
+    purchaseVehicle(vehicles, 'debris_hauler', zone.x2 + 5, 20);
+
+    const result = clearZone(zone, state, vehicles, employees, refusingWhenAvoiding, () => true);
+
+    expect(result.strandedEmployeeIds).toContain(employee.id);
+    expect(result.orderedEmployeeIds).not.toContain(employee.id);
   });
 });

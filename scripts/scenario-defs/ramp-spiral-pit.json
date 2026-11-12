@@ -191,6 +191,23 @@
       }
     },
     {
+      "command": "tick 20",
+      "timeout": 60,
+      "description": "#2230: let the crew finish the last ramp layer in progress: the wait above ends when the queue drains, not when the hauler driver is idle, and a shift in the evacuation timing moved that moment. The reposition below needs an idle licensed driver.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
       "command": "vehicle reposition 2 20 26",
       "description": "Order the hauler down to the spiral's bottom leg; its route is the spiral road. 20,26 not the dead end 15,25: the rock_digger that dug the last segment parks idle at 16,25 with its driver beside it, and the 3-wide dead end leaves a hauler there no way past. 20,26, not 20,25: the road is dug after the blast, and rubble now lies on the bottom leg's north lane ((16,25), (17,25), (20,25), (21,25)); rubble blocks vehicles over its footprint, so no route ends on 20,25. The middle lane is clear; measured (command mode), the hauler stands at (20,26) after the tick 120 below and back at (1,10) after the return trip.",
       "interaction": [
