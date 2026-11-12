@@ -20,6 +20,8 @@ export function windowBody(className?: string): HTMLElement {
   const body = el('div', { className: className ? `bsx-window-body ${className}` : 'bsx-window-body' });
   // Inline, like panelBody: the body scrolls even before the window stylesheet is on the page.
   body.style.cssText = 'flex:1 1 auto;overflow-y:auto';
+  // Keyed so a rebuild through replaceChildrenKeepingScroll carries the player's scroll over (#1592).
+  body.dataset['scrollKey'] = 'window-body';
   return body;
 }
 

@@ -206,6 +206,10 @@
           "timeoutMs": 0
         },
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]"
+        },
+        {
           "type": "clickEntity",
           "kind": "building",
           "id": 2
@@ -213,6 +217,10 @@
         {
           "type": "awaitUsable",
           "selector": "#bs-inspector[data-kind=\"building\"][data-id=\"2\"]"
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
         },
         {
           "type": "awaitUsable",

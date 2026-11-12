@@ -442,7 +442,12 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
         console.log(`  clickEntity: ${action.kind} #${action.id} hidden behind ${inFront ? `${inFront.kind} #${inFront.id}` : 'bare ground'} from every view tried`);
       }
       const viewport = page.viewport();
-      await page.mouse.click((viewport?.width ?? 1280) / 2, (viewport?.height ?? 720) / 2);
+      const cx = (viewport?.width ?? 1280) / 2;
+      const cy = (viewport?.height ?? 720) / 2;
+      // A central window (#2242) or the inspector over the middle of the screen would take this
+      // click instead of the entity — a player closes it first, and the step must too.
+      await requireCanvasAt(page, cx, cy, `under ${action.kind} #${action.id}`);
+      await page.mouse.click(cx, cy);
       break;
     }
     case 'zoomOut': {

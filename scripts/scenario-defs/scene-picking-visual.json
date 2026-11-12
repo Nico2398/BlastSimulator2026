@@ -302,6 +302,10 @@
           "command": "state"
         },
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]"
+        },
+        {
           "type": "clickEntity",
           "kind": "employee",
           "id": 1
