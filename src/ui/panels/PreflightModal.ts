@@ -40,6 +40,12 @@ import type { GameState } from '../../core/state/GameState.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
+/** Hooks of the non-blocking waiting card shown while a detonation is armed (#2233). */
+export const PREFLIGHT_DOCK_ROLE = 'preflight-dock';
+export const PREFLIGHT_HIDE_ACTION = 'preflight-hide-waiting';
+export const PREFLIGHT_CHIP_ROLE = 'preflight-waiting-chip';
+export const PREFLIGHT_SHOW_ACTION = 'preflight-show-waiting';
+
 interface Warning { ok: boolean; text: string; role?: string; buildingType?: string }
 
 /** The dry-charges row: wet beats rain risk beats all-clear. */
