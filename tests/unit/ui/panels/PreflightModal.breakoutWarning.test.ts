@@ -5,10 +5,13 @@ import { PreflightModal } from '../../../../src/ui/panels/PreflightModal.js';
 import { sandboxPadGrid, breakoutShotState } from '../../../helpers/breakoutWarningFixture.js';
 import { nothingBreaksGrid, nothingBreaksState } from '../../../helpers/breaksNothingFixture.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
+import { fillChargeKg } from '../../../../src/core/mining/ChargePlan.js';
 import type { VoxelGrid } from '../../../../src/core/world/VoxelGrid.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 
 const ROW = '[data-role="preflight-breakout-warning"]';
+/** Shatternite a 12 m hole holds filled to the fixture's 2.5 m of stemming: it breaks out. */
+const SHATTERNITE_12M_FILL_KG = fillChargeKg(12, 2.5, 0.089, 'shatternite');
 
 function open(grid: VoxelGrid | null, state: GameState): { modal: PreflightModal; gameConsole: ReturnType<typeof vi.fn> } {
   setLocale('en');
@@ -45,8 +48,8 @@ describe('PreflightModal breakout warning', () => {
     expect(open(sandboxPadGrid(), state).modal.root.querySelector(ROW)).not.toBeNull();
   });
 
-  it('warns for a partial seal (10 m x 10 kg Krackle)', () => {
-    expect(open(sandboxPadGrid(), breakoutShotState(10, 'krackle', 10)).modal.root.querySelector(ROW)).not.toBeNull();
+  it('warns for a partial seal (10 m x 12 kg Krackle)', () => {
+    expect(open(sandboxPadGrid(), breakoutShotState(10, 'krackle', 12)).modal.root.querySelector(ROW)).not.toBeNull();
   });
 
   it('warns for 127 mm holes with 20 kg Krackle at 12 m', () => {
@@ -57,8 +60,8 @@ describe('PreflightModal breakout warning', () => {
     expect(open(sandboxPadGrid(), breakoutShotState(8, 'krackle', 8)).modal.root.querySelector(ROW)).toBeNull();
   });
 
-  it('adds no row for 12 m x 15 kg Shatternite, which breaks out', () => {
-    expect(open(sandboxPadGrid(), breakoutShotState(12, 'shatternite', 15)).modal.root.querySelector(ROW)).toBeNull();
+  it('adds no row for a 12 m hole filled with Shatternite, which breaks out', () => {
+    expect(open(sandboxPadGrid(), breakoutShotState(12, 'shatternite', SHATTERNITE_12M_FILL_KG)).modal.root.querySelector(ROW)).toBeNull();
   });
 
   it('adds no row without a grid', () => {

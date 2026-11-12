@@ -114,7 +114,7 @@ describe('syncHaulDispatch — creates haul_debris actions', () => {
       const fragment = state.logistics.fragments.find(
         f => f.fragment.id === (action.payload as { fragmentId: number }).fragmentId,
       )!.fragment;
-      const approach = fragmentApproachCell(fragment, state);
+      const approach = fragmentApproachCell(fragment)!; // the rock's own cell: an order targets the rock, its hauler stands beside it
       expect(action.targetX).toBe(approach.x);
       expect(action.targetZ).toBe(approach.z);
     }

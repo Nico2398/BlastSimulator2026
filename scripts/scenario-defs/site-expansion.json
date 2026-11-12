@@ -276,17 +276,12 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "timeout": 150,
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
         },
         {
           "type": "setStepper",

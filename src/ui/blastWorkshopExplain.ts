@@ -9,7 +9,7 @@ import { PROJECTION_SPEED_THRESHOLD, STEMMING_FULL_DEPTH_FRACTION, STEMMING_MIN_
 import { wetFizzlePercent } from '../core/mining/WetHoles.js';
 
 export type HoleStatusKind = 'wet' | 'tubed' | 'dry' | 'ordered' | 'buried';
-export type DrillFieldKind = 'spacing' | 'depth' | 'diameter';
+export type DrillFieldKind = 'spacing' | 'burden' | 'depth' | 'diameter';
 export type ReportStatKind = 'cleared' | 'cracked' | 'fragments' | 'volume' | 'projections';
 
 /** What a hole's status chip means for the charge in it. */

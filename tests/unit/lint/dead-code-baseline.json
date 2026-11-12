@@ -122,7 +122,6 @@
     "src/renderer/BlastEffects.ts:HoleDetonation",
     "src/renderer/BlastPlanOverlay.ts:CHARGE_ORDERED_COLOR",
     "src/renderer/BlastPlanOverlay.ts:CHARGE_ORDERED_OPACITY",
-    "src/renderer/FragmentRenderSampling.ts:hash01",
     "src/renderer/GameRendererPicking.ts:raycastTerrainOrLandscape",
     "src/renderer/GameRendererSceneSetup.ts:DUST_DEVIL_BIOMES",
     "src/renderer/GameRendererSceneSetup.ts:FIREFLY_BIOMES",

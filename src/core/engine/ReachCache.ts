@@ -15,12 +15,14 @@ import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/bala
 
 /**
  * Derived reachability per game state, never serialized. Valid for one nav grid
- * at one `revision`: labellings ignore occupancy, so only a cell write
- * invalidates. One labelling per clearance and climb limit, built the first time a pool needs it.
+ * at one `revision` and one `fragmentRevision`: labellings ignore vehicles and
+ * crew but not rubble, which blocks every mover. One labelling per clearance and
+ * climb limit, built the first time a pool needs it.
  */
 export interface ReachCache {
   navGrid: NavGrid;
   revision: number;
+  fragmentRevision: number;
   components: Map<string, ClimbComponents>;
 }
 
@@ -34,8 +36,9 @@ export function cacheFor(state: GameState): ReachCache | null {
     return null;
   }
   let cache = reachCaches.get(state);
-  if (cache === undefined || cache.navGrid !== navGrid || cache.revision !== navGrid.revision) {
-    cache = { navGrid, revision: navGrid.revision, components: new Map() };
+  if (cache === undefined || cache.navGrid !== navGrid || cache.revision !== navGrid.revision
+    || cache.fragmentRevision !== navGrid.fragmentRevision) {
+    cache = { navGrid, revision: navGrid.revision, fragmentRevision: navGrid.fragmentRevision, components: new Map() };
     reachCaches.set(state, cache);
   }
   return cache;

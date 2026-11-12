@@ -186,7 +186,7 @@ describe('mining.ts usage strings — English literal + fr divergence', () => {
     },
     {
       name: 'charge missing explosive',
-      englishLiteral: 'Missing explosive. Usage: charge hole:1 explosive:boomite amount:5kg stemming:2m',
+      englishLiteral: 'Missing explosive. Usage: charge hole:1 explosive:boomite stemming:2.5m (each hole is filled up to the stemming)',
       run: (ctx) => chargeCommand(ctx, [], {}),
     },
     {

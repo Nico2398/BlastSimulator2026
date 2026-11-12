@@ -147,11 +147,13 @@ function playRedCanyonOpening(): { run: Run; ctx: GameContext } {
   ok('build living_quarters at:30,48');
   ok('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32');
   tickUntil(run, state(), 800, () => state().plannedDrillHoles.length === 0);
-  ok('charge hole:* explosive:krackle amount:8 stemming:2.5');
+  // Each hole filled with krackle up to 2.5 m of stemming, as the Charge step loads it.
+  ok('charge hole:* explosive:krackle stemming:2.5');
   tickUntil(run, state(), 800, () => Object.keys(state().plannedChargesByHole).length === 0);
   clearBlastZone(run, state());
   ok('blast detonate');
-  ok('build_ramp start:40,8 end:40,31 depth:8');
+  // The filled shot's floor lies ~8.5 m under the rim at z=31: 26 m keeps the ramp within the slope limit.
+  ok('build_ramp start:40,5 end:40,31 depth:9');
   return { run, ctx };
 }
 

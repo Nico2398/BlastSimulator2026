@@ -1,6 +1,6 @@
 {
   "name": "blast-unevacuated-casualties",
-  "description": "The punishment path for issue #557: drill, charge a pattern, then fire WITHOUT ever running `zone clear` — the staffed driller/blaster crew and the drill_rig they drove out on are left standing exactly where their own work left them. Deterministic on seed 42: the crew dies, one vehicle is destroyed, and the incident record shows it. This is the cost the tutorial's evacuate-zone step (and blastCommand's tutorial-mode refusal) exist to prevent.",
+  "description": "The punishment path for issue #557: drill, charge a pattern, then fire WITHOUT ever running `zone clear` — the staffed driller/blaster crew and the drill_rig they drove out on are left standing exactly where their own work left them. Deterministic on seed 42: the crew dies with a bystander driver, two vehicles are destroyed, and the incident record shows it. This is the cost the tutorial's evacuate-zone step (and blastCommand's tutorial-mode refusal) exist to prevent.",
   "steps": [
     {
       "command": "new_game seed:42 cash:200000 staffed:true",
@@ -92,14 +92,9 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "Deliberately under-stemmed (0.5m on 8m holes) — the reckless overcharge this file is built around, matching the flyrock-danger integration suite's own reckless config.",
+      "command": "charge hole:* explosive:boomite stemming:0.5",
+      "description": "Deliberately under-stemmed (0.5m on 8m holes): each hole fills with 7.5m of boomite (15kg at 2kg/m) — the reckless overcharge this file is built around, matching the flyrock-danger integration suite's own reckless config.",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
@@ -334,12 +329,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 2
+          "deathCount": 3
         },
         "decreased": [
           "vehicleCount"
         ],
-        "note": "Deterministic on seed 42: the driller and blaster who charged this pattern die where they stood; the drill_rig they drove out on (and a second vehicle) is destroyed too. #947 CI-fix: deathCount re-pinned 3 -> 2. The drill_plan step's own diameter/depth parity fix (above) changes how many ticks drilling+charging take before this step's own fire, which shifts this seed's RNG draw sequence downstream (fragment ejection is randomized per fragment, not positional-only) enough that the bystander driver #928 pinned as a third casualty (Pete Crater, ~17m from the nearest hole) is no longer in a projectile's path — confirmed identical (deathCount 2, driller+blaster only, Pete Crater alive) in both command mode and a real interaction-mode run once drilling/charging simulate the same diameter and depth in both channels; previously interaction mode silently drilled shallower (6m not 8m) and narrower (89mm UI default vs the command's unstated 150mm fallback) holes than command mode simulated, so the two channels' own pre-#947 pinned value was never actually reproduced by a real browser session, only by command mode's own now-corrected timing. Nobody was evacuated — that's the whole point of this file."
+        "note": "Deterministic on seed 42: the driller and blaster who charged this pattern die where they stood (#1, #2 at 20,22), and the drill_rig they drove out on and a second vehicle are destroyed. Fill-mode re-pin 2 -> 3: holes now fill to the 0.5m stemming (15kg each, the old pin loaded 8kg), so flyrock (fragment 151, ~3.4kJ) also kills the bystander driver Gus Pickaxe (#3) at (7,12), about 15m from the pattern. Nobody was evacuated — that's the whole point of this file."
       }
     },
     {
@@ -353,7 +348,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 2
+          "deathCount": 3
         }
       }
     }

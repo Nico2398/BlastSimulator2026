@@ -22,6 +22,7 @@ import { isOnBuildingRing } from '../../../src/core/nav/BuildingApproach.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
 import { fundForDeliveryWait } from '../../helpers/playthrough.js';
+import { BLAST_SLICE_STRIP_COLUMNS } from '../../../src/core/config/balance.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -772,26 +773,34 @@ describe('NavGrid patching — event names (#1161)', () => {
     expect(events.slice(-2)).toEqual(['nav:occupancy_changed', 'nav:occupancy_changed']);
   });
 
-  it('blast emits terrain:updated exactly once (the real carve) and nav:occupancy_changed exactly once (the corrective post-clear patch)', () => {
+  it('blast announces its carve once as terrain:updated and the corrective post-clear patch once as nav:occupancy_changed', () => {
     const ctx = makeCtx();
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '12' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     driveChargePlanToCompletion(ctx);
 
-    const events: string[] = [];
-    ctx.emitter.on('terrain:updated', () => events.push('terrain:updated'));
-    ctx.emitter.on('nav:occupancy_changed', () => events.push('nav:occupancy_changed'));
+    type Strip = { minX: number; maxX: number };
+    const terrain: Strip[] = [];
+    const occupancy: Strip[] = [];
+    ctx.emitter.on('terrain:updated', e => terrain.push(e.region));
+    ctx.emitter.on('nav:occupancy_changed', e => occupancy.push(e.region));
 
     const result = blastCommand(ctx, [], {});
     expect(result.success).toBe(true);
 
-    const terrainCount = events.filter(e => e === 'terrain:updated').length;
-    const occupancyCount = events.filter(e => e === 'nav:occupancy_changed').length;
-    // executeBlast's own carve emits terrain:updated once. The corrective
-    // post-drillHoles-clear re-patch must switch to nav:occupancy_changed —
-    // today it double-fires terrain:updated instead.
-    expect(terrainCount).toBe(1);
-    expect(occupancyCount).toBe(1);
+    // Each announcement goes out in column strips (#1603, emitRegionInStrips): one pass tiles the
+    // region left to right, every column exactly once. A second terrain:updated pass — the
+    // corrective re-patch double-firing it instead of nav:occupancy_changed — would start over.
+    const tilesOnce = (strips: Strip[]): void => {
+      expect(strips.length).toBeGreaterThan(0);
+      for (const strip of strips) expect(strip.maxX - strip.minX + 1).toBeLessThanOrEqual(BLAST_SLICE_STRIP_COLUMNS);
+      for (let k = 1; k < strips.length; k++) expect(strips[k]!.minX).toBe(strips[k - 1]!.maxX + 1);
+    };
+    tilesOnce(terrain);
+    tilesOnce(occupancy);
+    // The corrective patch covers the very columns the carve announced.
+    expect(occupancy[0]!.minX).toBe(terrain[0]!.minX);
+    expect(occupancy[occupancy.length - 1]!.maxX).toBe(terrain[terrain.length - 1]!.maxX);
   });
 });

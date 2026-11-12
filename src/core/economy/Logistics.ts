@@ -57,7 +57,7 @@ export function reserveFragmentIds(state: LogisticsState, count: number): number
 
 /**
  * Add fragments from a blast result to the ground. `navGrid`, when provided,
- * registers each fragment's cell as an occupant via NavGrid.addFragmentOccupant
+ * registers every cell each fragment covers as occupied (NavGrid.addFragmentFootprint)
  * (#954) so foot pathfinding treats it as impassable.
  */
 export function addBlastFragments(state: LogisticsState, fragments: FragmentData[], navGrid: NavGrid | null = null): void {
@@ -68,7 +68,7 @@ export function addBlastFragments(state: LogisticsState, fragments: FragmentData
       vehicleId: null,
       warehouseId: null,
     });
-    navGrid?.addFragmentOccupant(Math.round(f.position.x), Math.round(f.position.z));
+    navGrid?.addFragmentFootprint(f);
   }
 }
 
@@ -524,10 +524,7 @@ export function returnFragmentToGround(
   }
 
   if (navGrid) {
-    navGrid.addFragmentOccupant(
-      Math.round(tracked.fragment.position.x),
-      Math.round(tracked.fragment.position.z),
-    );
+    navGrid.addFragmentFootprint(tracked.fragment);
   }
 
   return true;

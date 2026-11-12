@@ -501,7 +501,7 @@
           "command": "charge hole:* explosive:boomite amount:8 stemming:0.5"
         }
       ],
-      "description": "role: bootstrap (issue #515): `stemming:0.5` is the Charge panel's own floor — `adjustStemming` clamps at `Math.max(0.5, ...)` (Charge.ts) — the minimal stemming value reachable by any click sequence. `createCharge` (ChargePlan.ts) now enforces the same MIN_STEMMING_M floor (#527), so this step stays a `bootstrap` role for its `hole:*` batch shorthand, not to reach a value a player could not.",
+      "description": "role: bootstrap (issue #515): `stemming:0.5` is the Charge panel's own floor — `adjustStemming` clamps at `Math.max(0.5, ...)` (Charge.ts) — the minimal stemming value reachable by any click sequence. `createCharge` (ChargePlan.ts) now enforces the same MIN_STEMMING_M floor (#527), so this step stays a `bootstrap` role for its `hole:*` batch shorthand, not to reach a value a player could not. Keeps the explicit 8 kg: a bootstrap step runs a console script, not the Charge step (which only fills), and BOOTSTRAP_COMMAND_ALLOWLIST admits this exact command.",
       "expect": {
         "increased": [
           "orderedChargeCount"

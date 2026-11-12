@@ -28,10 +28,17 @@ const BREAKOUT = 'rock-fragmenter-breaking';
 const isBreakout = (name: string): boolean => name === BREAKOUT;
 const WORLD_PER_MINUTE = 15;
 const BREAKOUT_WORLD_PER_MINUTE = 18;
-const BUSIEST_SECOND = 16;
-const BREAKOUT_BUSIEST_SECOND = 23;
+/**
+ * The shot second, re-measured under the kernel energy model: holes are filled to their stemming and the rock breaks
+ * finer (about three times the fragments), so more of it moves and the debris rain fills more of its bins (25 to 40
+ * a blast, BLAST_AUDIO_CONFIG.rain). Measured 19 sounds and 13 voices (survey-then-blast-playthrough: 11 pebbles and
+ * the 3 duds of its wet holes beside the five layers); the breakout shot 29 sounds and 16 voices (13 pebbles, 9 hits).
+ * Before it: 12 and 9, and 21 and 14 for the breakout shot. The engine caps at 32.
+ */
+const BUSIEST_SECOND = 21;
+const BREAKOUT_BUSIEST_SECOND = 31;
 const WORLD_PER_SECOND = 4;
-const MAX_VOICES = 12;
+const MAX_VOICES = 14;
 /**
  * Measured on the breakout game after #1787 (flush crater floors) moved its random-event clock: 5 world sounds in
  * one second (t=320 s: a politics event's alert lands beside a hammer, a vehicle start and a boulder break) and 13
@@ -42,7 +49,12 @@ const MAX_VOICES = 12;
 const BREAKOUT_WORLD_PER_SECOND = 5;
 const WORLD_PER_30S = 21;
 const BREAKOUT_WORLD_PER_30S = 22; // 22 measured in the window around that same burst
-const BREAKOUT_MAX_VOICES = 14;
+const BREAKOUT_MAX_VOICES = 17;
+/**
+ * Blast and debris sounds within 15 s of a shot. A blast asks for its five layers, its duds (3 at most) and up to 40
+ * bins of debris rain (BLAST_AUDIO_CONFIG.rain); measured at most 37 under the kernel energy model.
+ */
+const BLAST_TIMELINE_SOUNDS = 40;
 
 const RUN_TIMEOUT_MS = 90_000;
 const SECONDS_PER_MINUTE = 60;
@@ -80,10 +92,10 @@ describe.each(SCENARIOS)('%s at 1x', (name) => {
     expectWorldWithinBudget(sim(), { per1s: isBreakout(name) ? BREAKOUT_WORLD_PER_SECOND : WORLD_PER_SECOND, per10s: 12, per30s: isBreakout(name) ? BREAKOUT_WORLD_PER_30S : WORLD_PER_30S }, isBreakout(name) ? { boulder_break: 14 } : {});
   });
 
-  it('keeps the busiest second, a blast, under 16 sounds (23 for the breakout shot) and 12 voices at once', () => {
-    // Measured 12 sounds in a second (weather-flood's blast), 9 voices at most; the engine caps at 32. The breakout
-    // shot of rock-fragmenter-breaking has flying rubble to voice (13 debris_pebble, 2 debris_hit, 2 vehicle_scrap,
-    // an alert in its first second): 21 sounds, limit 23.
+  it('keeps the busiest second, a blast, under 21 sounds (31 for the breakout shot) and 14 voices (17) at once', () => {
+    // Measured under the kernel energy model (see BUSIEST_SECOND): 19 sounds and 13 voices; the breakout shot of
+    // rock-fragmenter-breaking has flying rubble to voice (13 debris_pebble, 9 debris_hit, 2 vehicle_scrap, an alert
+    // in its first second): 29 sounds and 16 voices.
     const stats = summarize(sim().recorder.plays, sim().realS);
     expect(stats.maxPerSecond).toBeLessThanOrEqual(isBreakout(name) ? BREAKOUT_BUSIEST_SECOND : BUSIEST_SECOND);
     expect(stats.maxVoices).toBeLessThanOrEqual(isBreakout(name) ? BREAKOUT_MAX_VOICES : MAX_VOICES);
@@ -121,9 +133,10 @@ describe.each(SCENARIOS)('%s at 1x', (name) => {
     }
   });
 
-  it('plays one blast as one timeline: five main layers, at most 26 sounds in all', () => {
-    // Measured 10 to 26 blast and debris sounds within 15 s of a shot (the cap on simultaneous debris is 10 + 8). The 26 is
-    // vibration-budget's rumblox overcharge since #2197: the tier gate is gone, so it breaks more rock and sheds more debris.
+  it('plays one blast as one timeline: five main layers, at most 40 sounds in all', () => {
+    // Measured 8 to 37 blast and debris sounds within 15 s of a shot under the kernel energy model (10 to 26 before):
+    // the finer fragmentation moves more rock, so the rain fills more of its bins. The 37 is vibration-budget's
+    // rumblox overcharge (#2197: the tier gate is gone, so it breaks more rock and sheds more debris).
     const plays = sim().recorder.plays;
     const shots = plays.filter(p => p.id === 'blast_snap');
     expect(shots.length).toBeGreaterThan(0);
@@ -132,7 +145,7 @@ describe.each(SCENARIOS)('%s at 1x', (name) => {
     }
     for (const shot of shots) {
       const timeline = plays.filter(p => p.accepted && isBlastSound(p.id) && p.id !== 'blast_beep' && p.startS >= shot.startS - 0.01 && p.startS < shot.startS + 15);
-      expect(timeline.length).toBeLessThanOrEqual(26);
+      expect(timeline.length).toBeLessThanOrEqual(BLAST_TIMELINE_SOUNDS);
     }
   });
 });

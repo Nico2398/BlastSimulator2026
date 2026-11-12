@@ -1,6 +1,6 @@
 {
   "name": "blast-workshop-sealed-estimate",
-  "description": "Sealed ore estimate (#2053): after a survey, a 12 m x 10 kg Krackle hole breaks rock that stays sealed, so the Blast Workshop footer counts none of it in EST. ORE VALUE and shows a sealed-ore line. Swapping it for a shorter 6 m hole (7 kg) that breaks out hides the sealed line.",
+  "description": "Sealed ore estimate (#2053): after a survey, a 12 m Krackle hole filled under 7 m of stemming breaks rock that stays sealed, so the Blast Workshop footer counts none of it in EST. ORE VALUE and shows a sealed-ore line. Swapping it for a shorter 6 m hole filled to 2.5 m of stemming, which breaks out, hides the sealed line.",
   "steps": [
     {
       "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true",
@@ -196,7 +196,7 @@
       "timeout": 330
     },
     {
-      "command": "charge hole:* explosive:krackle amount:10 stemming:2.5",
+      "command": "charge hole:* explosive:krackle stemming:7",
       "role": "player",
       "interaction": [
         {
@@ -213,20 +213,15 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 10
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 2.5
+          "value": 7
         },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Load 10 kg of Krackle: far too little to break the 12 m column out.",
+      "description": "Fill the 12 m hole with Krackle under 7 m of stemming: a 5 m column (14.3 kg) sitting so deep that everything it breaks stays under an intact cap. The 7 m pattern stemming also leaves no room in the 6 m hole ordered later, so that hole lands uncharged.",
       "expect": {
         "increased": [
           "orderedChargeCount"
@@ -377,7 +372,7 @@
       "timeout": 330
     },
     {
-      "command": "charge hole:* explosive:krackle amount:7 stemming:2.5",
+      "command": "charge hole:* explosive:krackle stemming:2.5",
       "role": "player",
       "interaction": [
         {
@@ -394,11 +389,6 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 7
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2.5
         },
@@ -407,7 +397,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Charge the shorter hole with 7 kg of Krackle, the most a 6 m column fits.",
+      "description": "Fill the shorter hole with Krackle up to 2.5 m of stemming (10 kg): a column near enough to the surface to break out.",
       "expect": {
         "increased": [
           "orderedChargeCount"

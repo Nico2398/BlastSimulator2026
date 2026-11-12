@@ -100,8 +100,8 @@ describe('runAction — focusTile wires __cameraOrbit alongside __cameraFocus', 
   function withStubbedWindow(run: (stub: { __cameraFocus: ReturnType<typeof vi.fn>; __cameraOrbit: ReturnType<typeof vi.fn> }) => void): { cameraFocus: ReturnType<typeof vi.fn>; cameraOrbit: ReturnType<typeof vi.fn> } {
     const cameraFocus = vi.fn();
     const cameraOrbit = vi.fn();
-    const renderFrame = vi.fn();
-    const stub = { __cameraFocus: cameraFocus, __cameraOrbit: cameraOrbit, __renderFrame: renderFrame };
+    const syncScene = vi.fn();
+    const stub = { __cameraFocus: cameraFocus, __cameraOrbit: cameraOrbit, __syncScene: syncScene };
     const original = (globalThis as { window?: unknown }).window;
     (globalThis as { window?: unknown }).window = stub;
     try {

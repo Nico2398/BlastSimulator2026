@@ -4,10 +4,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { financesCommand, contractCommand } from '../../src/console/commands/economy.js';
-import { buildCommand } from '../../src/console/commands/entities.js';
+import { buildCommand, zoneCommand } from '../../src/console/commands/entities.js';
 import { employeeCommand } from '../../src/console/commands/employees.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
-import { tickCommand } from '../../src/console/commands/events.js';
+import { tickCommand, eventCommand } from '../../src/console/commands/events.js';
 import {
   drillPlanCommand,
   chargeCommand,
@@ -43,6 +43,7 @@ import { refreshLogisticsCapacity } from '../../src/core/engine/BuildingTaskHelp
 import { destroyBuilding } from '../../src/core/entities/Building.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { deliverExplosivesNow } from '../helpers/playthrough.js';
+import { BLAST_ZONE_CLEAR_MARGIN } from '../../scripts/shared/player-actions.js';
 import { addFreightWarehouse, ensureFreightWarehouse } from '../helpers/freightWarehouse.js';
 import { ORE_PRICES as ALL_ORE_PRICES, FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
 import { driveChargePlanToCompletion } from './full-level/helpers.js';
@@ -166,6 +167,28 @@ function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300): void {
     }
     tickCommand(ctx, ['1'], {});
   }
+}
+
+/**
+ * Order everyone out of the drilled pattern's blast radius and tick until the zone reads
+ * clear, as a careful player does before firing — the command-function twin of
+ * `clearBlastZone` (scripts/shared/player-actions.ts), same margin.
+ */
+function evacuateBlastZone(ctx: GameContext, maxTicks = 80): void {
+  const xs = ctx.state!.drillHoles.map(h => h.x);
+  const zs = ctx.state!.drillHoles.map(h => h.z);
+  const m = BLAST_ZONE_CLEAR_MARGIN;
+  const ordered = zoneCommand(ctx, ['clear'], {
+    x1: String(Math.min(...xs) - m), z1: String(Math.min(...zs) - m),
+    x2: String(Math.max(...xs) + m), z2: String(Math.max(...zs) + m),
+  });
+  expect(ordered.success, ordered.output).toBe(true);
+  const isClear = () => { const z = zoneCommand(ctx, ['status'], {}).output; return z.includes('CLEAR') && !z.includes('NOT'); };
+  for (let i = 0; i < maxTicks && !isClear(); i++) {
+    tickCommand(ctx, ['1'], {});
+    if (ctx.state!.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+  }
+  expect(isClear(), 'blast zone clear before firing').toBe(true);
 }
 
 // ── Economy ──────────────────────────────────────────────────────────────────
@@ -784,10 +807,10 @@ describe('Economy', () => {
     expect(drillResult.success).toBe(true);
     driveDrillPlanToCompletion(ctx);
 
+    // Each hole filled with boomite up to its 2 m of stemming, as the Charge step loads it.
     const chargeResult = chargeCommand(ctx as any, [], {
       hole: '*',
       explosive: 'boomite',
-      amount: '8kg',
       stemming: '2m',
     });
     expect(chargeResult.success).toBe(true);
@@ -1043,8 +1066,9 @@ describe('Economy', () => {
   //         excludes remaining ones — including ore-bearing ones, since
   //         nothing frees warehouse room except a player's own contract sale.
   //
-  // Seed 20's 3x3 grid at (18,19) deterministically exposes ~355 ore-bearing
-  // fragments alongside plenty of plain rock (sandbox-confirmed against the
+  // Seed 20's 3x3 grid at (18,19) deterministically exposes thousands of
+  // ore-bearing fragments (~5,400 of ~8,800 under the per-hole energy kernel)
+  // alongside plenty of plain rock (sandbox-confirmed against the
   // real terrain/blast pipeline, no fixture injection needed, driven through
   // this file's own driveDrillPlanToCompletion/driveChargePlanToCompletion
   // helpers): under today's pure-travel-time ranking, the warehouse fills
@@ -1062,7 +1086,12 @@ describe('Economy', () => {
 
   it('collects ore automatically once ore-priority ranking lets ore-bearing fragments jump a full warehouse queue (#671)', () => {
     ctx = makeGameContext({ mineType: 'desert', seed: '20', size: '64', staffed: true, cash: '200000' });
-    // Krackle 10 kg, spacing 4: a charge that breaks out (#1724). A weaker one leaves the rock sealed, which gets no haul order (#1774).
+    // Collected ore is the stock under test: auto-sell would sell it off inside the window (measured: 2.6 t collected
+    // by tick 100, all sold by tick 199), so it is turned off, as a player keeping stock for a contract would.
+    ctx.state!.contracts.autoSell = false;
+    // Krackle filling each 8 m hole up to 2.5 m of stemming, holes 4 m apart: the reference design the blast energy is
+    // calibrated on (EXPLOSIVE_ENERGY_SCALE), and a charge that breaks out (#1724). A weaker one leaves the rock sealed,
+    // which gets no haul order (#1774).
 
     const drillResult = drillPlanCommand(ctx as any, ['grid'], {
       origin: '18,19', rows: '3', cols: '3', spacing: '4', depth: '8',
@@ -1071,11 +1100,14 @@ describe('Economy', () => {
     driveDrillPlanToCompletion(ctx);
 
     const chargeResult = chargeCommand(ctx as any, [], {
-      hole: '*', explosive: 'krackle', amount: '10kg', stemming: '2m',
+      hole: '*', explosive: 'krackle', stemming: '2.5m',
     });
     expect(chargeResult.success).toBe(true);
     driveChargePlanToCompletion(ctx);
 
+    // The staffed crew parks on the pattern after drilling and charging; fired with them on it, the
+    // shot kills four of the five. A player orders them out first.
+    evacuateBlastZone(ctx);
     const blastResult = blastCommand(ctx as any, [], {});
     expect(blastResult.success).toBe(true);
 

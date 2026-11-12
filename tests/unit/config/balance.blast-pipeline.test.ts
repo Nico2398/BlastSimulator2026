@@ -4,7 +4,9 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  MAX_PROPAGATION_ITERATIONS,
+  BLAST_ENERGY_DECAY_M,
+  BLAST_ENERGY_REACH_M,
+  BLAST_ZONE_RADIUS,
   FRAGMENTATION_MULTIPLIER,
   SURFACE_PROXIMITY_DECAY,
   MAX_PROJECTION_VELOCITY,
@@ -16,12 +18,21 @@ import {
 // ─── Step 1: Energy Propagation ─────────────────────────────────────────────────
 
 describe('Step 1 — Energy Propagation', () => {
-  it('MAX_PROPAGATION_ITERATIONS is exported from balance.ts', () => {
-    expect(MAX_PROPAGATION_ITERATIONS).toBeDefined();
+  it('BLAST_ENERGY_DECAY_M is 1.3 — a hole\'s share falls by e every 1.3 m of rock', () => {
+    expect(BLAST_ENERGY_DECAY_M).toBe(1.3);
   });
 
-  it('MAX_PROPAGATION_ITERATIONS is 500 — computational guard for the overflow loop', () => {
-    expect(MAX_PROPAGATION_ITERATIONS).toBe(500);
+  it('BLAST_ENERGY_REACH_M is 4.5 — the farthest rock (through rock) a hole\'s energy is spread to', () => {
+    expect(BLAST_ENERGY_REACH_M).toBe(4.5);
+  });
+
+  it('BLAST_ENERGY_REACH_M stays under BLAST_ZONE_RADIUS, so the blast box always holds a hole\'s reach', () => {
+    expect(BLAST_ENERGY_REACH_M).toBeLessThan(BLAST_ZONE_RADIUS);
+  });
+
+  it('BLAST_ENERGY_REACH_M spans several decay lengths, so the share cut off at the edge is small', () => {
+    expect(BLAST_ENERGY_DECAY_M).toBeGreaterThan(0);
+    expect(Math.exp(-BLAST_ENERGY_REACH_M / BLAST_ENERGY_DECAY_M)).toBeLessThan(0.05);
   });
 });
 
@@ -88,8 +99,8 @@ describe('Collection Rules', () => {
     expect(OVERSIZED_FRAGMENT_THRESHOLD).toBeDefined();
   });
 
-  it('OVERSIZED_FRAGMENT_THRESHOLD is 0.5 — fragments larger than 0.5 m³ require secondary breaking', () => {
-    expect(OVERSIZED_FRAGMENT_THRESHOLD).toBe(0.5);
+  it('OVERSIZED_FRAGMENT_THRESHOLD is 2.0 — fragments larger than 2.0 m³ require secondary breaking', () => {
+    expect(OVERSIZED_FRAGMENT_THRESHOLD).toBe(2.0);
   });
 
   // ── Structural invariant ───────────────────────────────────────────────────

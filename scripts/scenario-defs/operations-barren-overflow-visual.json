@@ -200,16 +200,11 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "ensurePanel",
           "panel": "blast"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
         },
         {
           "type": "setStepper",
@@ -496,7 +491,7 @@
     },
     {
       "command": "tick 80",
-      "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable here, and the haulers keep filling the warehouse (~1.0t to ~13.9t at tick 290 on the aligned trajectory). #1722/#1723: ore and spoil are different orders; which lands first depends on which reachable rock bin the hauler weighs first. Asserting stored ore keeps this step about 'hauling keeps delivering'.",
+      "description": "Automatic hauling keeps running: barren rock keeps reaching the spoil heap. #1722/#1723: ore and spoil are different orders; which lands first depends on which reachable rock bin the hauler weighs first, and contract sales empty the warehouse every few dozen ticks, so the step asserts the heap, which barren deliveries keep filling far faster than rubble contracts draw it down.",
       "interaction": [
         {
           "type": "command",
@@ -506,9 +501,9 @@
       "role": "setup",
       "expect": {
         "increased": [
-          "cash"
+          "storedSpoilKg"
         ],
-        "note": "#2146: minor events are non-blocking notices now. Over this window income lands (contract #74 delivery and other event/notice effects, no longer halted by minor events) and outweighs the upkeep drain, so cash rises (685164 -> ~692120) instead of falling. The window is 80 ticks, re-derived for #2199 (a hauler stands HAUL_LOAD_TICKS at each fragment): cash read 677713 after 60, 684372 after 100 and 682520 after 120, all below the start, while 80 ends above it."
+        "note": "Rubble blocks vehicles (trucks load from beside the pile; loaded hauls judged by their truck): cash is no longer asserted here. Re-measured (command mode, deterministic): over 519 -> 599 the ore the haulers bring in is auto-sold as it lands (ticks 523, 559, 588: $26,310) plus a rubble-clearance payout ($646), which outweighs the window's upkeep ($22,450), so cash rises 781877 -> 786383. Whether a sale lands inside an 80-tick window is a property of the haul timing, not of what this file proves; the step asserts the heap filling (storedSpoilKg ~2.9t -> ~8.0t). Fill mode re-measure: each 6 m hole now fills to the 2 m stemming (8 kg, the old pin loaded 5 kg), so charging ends at tick 489 (was 423) and the event draws move. The income that used to land inside this window now lands just before it (the event resolved by the step above pays $100,000), so over these 80 ticks only the upkeep drain shows: cash falls 781662 -> ~775860 while the haulers keep delivering barren rock to the heap (storedSpoilKg ~0.5t -> ~4.6t). #2146: minor events are non-blocking notices now. Over this window income lands (contract #74 delivery and other event/notice effects, no longer halted by minor events) and outweighs the upkeep drain, so cash rises (685164 -> ~692120) instead of falling. The window is 80 ticks, re-derived for #2199 (a hauler stands HAUL_LOAD_TICKS at each fragment): cash read 677713 after 60, 684372 after 100 and 682520 after 120, all below the start, while 80 ends above it."
       }
     },
     {

@@ -109,13 +109,8 @@
       "role": "setup"
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
@@ -200,7 +195,7 @@
       "role": "setup"
     },
     {
-      "command": "charge hole:H1 explosive:boomite amount:8 stemming:2",
+      "command": "charge hole:H1 explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "clickSelector",
@@ -208,19 +203,8 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "8 kg"
         },
         {
           "type": "assert",

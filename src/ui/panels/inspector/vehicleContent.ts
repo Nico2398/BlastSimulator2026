@@ -20,7 +20,7 @@ function sectionBuilders(v: Vehicle, state: GameState, links: InspectorLinks): A
     ['bs-vehicle-condition', () => buildConditionSection(v, state)],
     ['bs-vehicle-repair', () => buildRepairSection(v, state)],
     ['bs-vehicle-job', () => buildJobSection(v, state, links)],
-    ['bs-vehicle-cargo', () => buildCargoSection(v, state)],
+    ['bs-vehicle-cargo', () => buildCargoSection(v, state, links)],
     ['bs-vehicle-driver', () => buildDriverSection(v, state, links)],
     ['bs-vehicle-specs', () => buildSpecsSection(v)],
     ['bs-vehicle-cost', () => buildCostSection(v, state)],

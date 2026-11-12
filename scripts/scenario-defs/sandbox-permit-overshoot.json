@@ -11,7 +11,7 @@
           "command": "sandbox start biome:desert_badlands kit:full seed:42"
         }
       ],
-      "description": "Progression site at grade 0: the Backyard Dig Permit allows 40 kg and 9 holes per blast.",
+      "description": "Progression site at grade 0: the Backyard Dig Permit allows 40 kg of charge and 144 m\u00b2 of pattern per blast.",
       "expect": {
         "equals": {
           "mineGrade": {
@@ -30,7 +30,7 @@
           "command": "permit status"
         }
       ],
-      "description": "Grade 0 permit: limits 40 kg / 9 holes and the $250 notification fee are listed, no inspection chance."
+      "description": "Grade 0 permit: limits 40 kg / 144 m\u00b2 and the $250 notification fee are listed, no inspection chance."
     },
     {
       "command": "event choose 0",
@@ -144,7 +144,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:krackle amount:10 stemming:2",
+      "command": "charge hole:* explosive:krackle stemming:2",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -160,11 +160,6 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 10
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
         },
@@ -173,7 +168,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Blast 1: order 10 kg per hole, 90 kg in all against the 40 kg limit.",
+      "description": "Blast 1: fill every 7 m hole with krackle up to 2 m of stemming, 14.3 kg a hole and 128.7 kg in all against the 40 kg limit (the 81 m\u00b2 of pattern is within the 144 m\u00b2 allowed).",
       "expect": {
         "increased": [
           "orderedChargeCount"
@@ -236,7 +231,7 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
-      "description": "Blast 1: arm the 90 kg shot; it fires once the danger zone is clear.",
+      "description": "Blast 1: arm the 128.7 kg shot; it fires once the danger zone is clear.",
       "timeout": 90,
       "role": "player"
     },
@@ -342,7 +337,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:5 spacing:3 depth:3 start:16,30",
+      "command": "drill_plan grid rows:2 cols:5 spacing:4 depth:3 start:10,30",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -368,7 +363,7 @@
         {
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"spacing\"]",
-          "value": 3
+          "value": 4
         },
         {
           "type": "setStepper",
@@ -377,17 +372,17 @@
         },
         {
           "type": "dragTiles",
-          "x1": 16,
+          "x1": 10,
           "z1": 30,
-          "x2": 28,
-          "z2": 33
+          "x2": 26,
+          "z2": 34
         },
         {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "Blast 2: order a 2x5 pattern of shallow holes: ten holes against the nine-hole limit.",
+      "description": "Blast 2: order a 2x5 pattern of shallow holes 4 m apart: ten 16 m\u00b2 cells, 160 m\u00b2 against the 144 m\u00b2 permit.",
       "role": "player"
     },
     {
@@ -422,7 +417,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:krackle amount:1 stemming:2",
+      "command": "charge hole:* explosive:krackle stemming:2",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -438,11 +433,6 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 1
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
         },
@@ -451,7 +441,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Blast 2: order 1 kg per hole: only 10 kg in all, but ten holes against the limit of nine.",
+      "description": "Blast 2: fill the 3 m holes with krackle up to 2 m of stemming: 2.8 kg a hole, only 28 kg in all, but 160 m\u00b2 of pattern against the 144 m\u00b2 allowed.",
       "expect": {
         "increased": [
           "orderedChargeCount"
@@ -514,7 +504,7 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
-      "description": "Blast 2: arm the shot with ten holes (over the nine-hole limit) and a bribed inspector: never inspected.",
+      "description": "Blast 2: arm the shot with 160 m\u00b2 of pattern (over the 144 m\u00b2 permit) and a bribed inspector: never inspected.",
       "timeout": 90,
       "role": "player"
     },
@@ -589,7 +579,7 @@
       "role": "player"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:3 start:16,30",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:3 start:32,42",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -623,18 +613,25 @@
           "value": 3
         },
         {
+          "type": "focusTile",
+          "x": 35,
+          "z": 45,
+          "distance": 30,
+          "pitch": 75
+        },
+        {
           "type": "dragTiles",
-          "x1": 16,
-          "z1": 30,
-          "x2": 22,
-          "z2": 36
+          "x1": 32,
+          "z1": 42,
+          "x2": 38,
+          "z2": 48
         },
         {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "Plan total 1: order a first 3x3 grid, 9 holes on the nine-hole permit: exactly at the limit, so the strip shows no warning.",
+      "description": "Plan total 1: order a first 3x3 grid 3 m apart, 81 m\u00b2 of pattern on the 144 m\u00b2 permit: within it, so the strip shows no warning. Laid on untouched ground south of both craters (blast 2's crater now covers 8-28 x 28-36), framed from above.",
       "role": "player",
       "expect": {
         "equals": {
@@ -643,7 +640,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:3 start:16,40",
+      "command": "drill_plan grid rows:3 cols:4 spacing:4 depth:3 start:16,40",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -669,7 +666,7 @@
         {
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"spacing\"]",
-          "value": 3
+          "value": 4
         },
         {
           "type": "setStepper",
@@ -677,11 +674,18 @@
           "value": 3
         },
         {
+          "type": "focusTile",
+          "x": 22,
+          "z": 44,
+          "distance": 30,
+          "pitch": 75
+        },
+        {
           "type": "dragTiles",
           "x1": 16,
           "z1": 40,
-          "x2": 22,
-          "z2": 46
+          "x2": 28,
+          "z2": 48
         },
         {
           "type": "screenshot"
@@ -696,11 +700,11 @@
           "timeoutMs": 0
         }
       ],
-      "description": "Plan total 2: drag a second 3x3 grid while the first 9 holes are still on the plan. The strip warns 18 holes against the 9 allowed with the inspection chance, fine and strikes (screenshot), but Confirm stays enabled and the grid is ordered (it replaces the first, so 9 holes stay ordered).",
+      "description": "Plan total 2: drag a second grid, 3x4 holes 4 m apart: 192 m\u00b2 of pattern against the 144 m\u00b2 allowed. The strip warns 192 / 144 m\u00b2 with the inspection chance, fine and strikes (screenshot), but Confirm stays enabled and the grid is ordered (it replaces the first, so its 12 holes are the plan).",
       "role": "player",
       "expect": {
         "equals": {
-          "orderedHoleCount": 9
+          "orderedHoleCount": 12
         }
       }
     }

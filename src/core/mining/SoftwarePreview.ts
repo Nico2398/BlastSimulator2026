@@ -11,9 +11,10 @@ import { getRock, type RockType } from '../world/RockCatalog.js';
 import {
   SEEDS_BASE, SEEDS_PER_INTENSITY, MAX_SEEDS_PER_VOXEL, FRAGMENTATION_MULTIPLIER,
   RECOMMENDED_GOOD_SHARE_MIN, RECOMMENDED_RELATIVE_GOOD_SHARE, RECOMMENDED_SWEEP_STEPS,
+  MIN_STEMMING_M, MIN_CHARGE_COLUMN_M, STEMMING_FULL_DEPTH_FRACTION,
 } from '../config/balance.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
-import { type HoleCharge, holeSpacingM, holePowderFactors, maxFittingChargeKg } from './ChargePlan.js';
+import { type HoleCharge, holeCellSize, holePowderFactors, fillChargeKg } from './ChargePlan.js';
 import { type EnergyField, effectiveAt, thresholdAt, intensityAt, contains, indexOf } from './EnergyPropagation.js';
 import { type FragmentationBand, FRAGMENTATION_BANDS, fragmentationBandOf } from './FragmentationBand.js';
 import { buildPlanEnergyField } from './BlastExecution.js';
@@ -81,8 +82,8 @@ export function predictFragmentation(intensity: number): { pieces: number; sizeM
     MAX_SEEDS_PER_VOXEL,
     SEEDS_BASE + SEEDS_PER_INTENSITY * (intensity - FRAGMENTATION_MULTIPLIER),
   );
-  // Below one seed per voxel the rock joins a neighbouring fragment, so the
-  // piece coming out is larger than the voxel it was measured in.
+  // A broken voxel seeds at least SEEDS_BASE pieces; the floor only guards a zero base,
+  // where the rock would join a neighbouring fragment rather than vanish.
   const pieces = Math.max(seeds, 0.01);
   return { pieces, sizeM3: 1 / pieces };
 }
@@ -227,21 +228,35 @@ function toShares(counts: BandCounts, total: number): BandShares {
   return out;
 }
 
-/** A hole's footprint: its column and half its spacing. */
-interface HoleCell { cx: number; cz: number; half: number }
+/** A hole's footprint: its column, and half its spacing (along x) and burden (along z). */
+interface HoleCell { cx: number; cz: number; halfX: number; halfZ: number }
 
-/** Nearest hole (Chebyshev distance in columns) whose half-spacing reaches column (x, z); null when none does. */
+/** The footprint of `hole` in `holes`: its column and half its pattern cell (`holeCellSize`). */
+export function holeCellOf(hole: DrillHole, holes: readonly DrillHole[]): HoleCell {
+  const cell = holeCellSize(hole, holes);
+  return { cx: Math.floor(hole.x), cz: Math.floor(hole.z), halfX: cell.spacingM / 2, halfZ: cell.burdenM / 2 };
+}
+
+/**
+ * The hole whose pattern cell holds column (x, z): the smallest distance relative to its own half-cell
+ * (the nearer hole of equals); null when no cell reaches the column.
+ */
 export function ownerHoleOf<T extends HoleCell>(x: number, z: number, cells: readonly T[]): T | null {
   let owner: T | null = null;
   let best = Infinity;
+  let bestDist = Infinity;
   for (const c of cells) {
-    const d = Math.max(Math.abs(x - c.cx), Math.abs(z - c.cz));
-    if (d < best && d <= c.half) { best = d; owner = c; }
+    const dx = Math.abs(x - c.cx);
+    const dz = Math.abs(z - c.cz);
+    const d = Math.max(dx / c.halfX, dz / c.halfZ);
+    if (d > 1) continue;
+    const dist = Math.hypot(dx, dz);
+    if (d < best || (d === best && dist < bestDist)) { best = d; bestDist = dist; owner = c; }
   }
   return owner;
 }
 
-/** Band counts of each hole's rock cell: nearest hole by column, within half its spacing, one hole depth below the column's top. */
+/** Band counts of each hole's rock cell: the hole whose pattern cell holds the column, one hole depth below the column's top. */
 function holeCellCounts(map: PlanBandMap, holes: readonly DrillHole[]): Map<string, { counts: BandCounts; total: number }> {
   const columnTop = new Map<string, number>();
   for (const c of map.cells.values()) {
@@ -250,9 +265,8 @@ function holeCellCounts(map: PlanBandMap, holes: readonly DrillHole[]): Map<stri
     if (top === undefined || c.y > top) columnTop.set(key, c.y);
   }
   const info = holes.map(h => {
-    const cx = Math.floor(h.x);
-    const cz = Math.floor(h.z);
-    return { hole: h, cx, cz, half: holeSpacingM(h, holes) / 2, top: columnTop.get(`${cx},${cz}`) };
+    const cell = holeCellOf(h, holes);
+    return { hole: h, ...cell, top: columnTop.get(`${cell.cx},${cell.cz}`) };
   }).filter(h => h.top !== undefined);
   const out = new Map<string, { counts: BandCounts; total: number }>();
   for (const c of map.cells.values()) {
@@ -278,69 +292,90 @@ export function planBandShares(map: PlanBandMap, holes: readonly DrillHole[]): B
   return total > 0 ? toShares(pooled, total) : null;
 }
 
-/** Powder factors (kg/m3) at which a hole's rock fragments best (#2203). */
+/** Powder factors (kg/m3) at which a hole's rock fragments best, and the stemming that fills the hole to them (#2203). */
 export interface PowderFactorRange {
   minKgPerM3: number;
   maxKgPerM3: number;
+  /** Stemming (m) giving `maxKgPerM3` (less stemming, more explosive). */
+  minStemmingM: number;
+  /** Stemming (m) giving `minKgPerM3`. */
+  maxStemmingM: number;
 }
 
-/** A plan charging every hole with `amountKg` of the explosive (capped to what fits the hole) under `stemmingM` (#2203). */
-export function uniformChargePlan(
+/** A plan filling every hole with the explosive up to `stemmingM` of stemming; holes with no room are left out. */
+function fillChargePlan(
   holes: readonly DrillHole[],
   explosiveId: string,
-  amountKg: number,
   stemmingM: number,
 ): BlastPlan {
   const charges: Record<string, HoleCharge> = {};
   for (const h of holes) {
-    const fit = maxFittingChargeKg(h.depth, stemmingM, h.diameter);
-    charges[h.id] = { explosiveId, amountKg: Math.min(amountKg, fit), stemmingM };
+    const amountKg = fillChargeKg(h.depth, stemmingM, h.diameter, explosiveId);
+    if (amountKg > 0) charges[h.id] = { explosiveId, amountKg, stemmingM };
   }
   return { holes: [...holes], charges };
 }
 
-/** Pooled band shares the explosive would give the pattern at `amountKg`; null with no holes or no rock (#2203). */
+/** Pooled band shares the explosive would give the pattern filled up to `stemmingM`; null with no holes or no rock (#2203). */
 export function previewExplosiveBandShares(
   holes: readonly DrillHole[],
   grid: VoxelGrid,
   explosiveId: string,
-  amountKg: number,
   stemmingM: number,
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): BandShares | null {
   if (holes.length === 0) return null;
-  const plan = uniformChargePlan(holes, explosiveId, amountKg, stemmingM);
+  const plan = fillChargePlan(holes, explosiveId, stemmingM);
   return planBandShares(previewPlanBands(plan, grid, wetHoleIds), holes);
 }
 
 /**
- * Per hole, the powder-factor range that fragments its rock best with this explosive: the run of swept charges
- * around the best one whose good share stays within `RECOMMENDED_RELATIVE_GOOD_SHARE` of it. Null when even the
- * best charge leaves less than `RECOMMENDED_GOOD_SHARE_MIN` of the rock in the good band (#2203).
+ * Stemming (m) a hole is swept over: from the full-stemming length (`STEMMING_FULL_DEPTH_FRACTION` of its depth,
+ * never below `MIN_STEMMING_M`), which throws no rock, to leaving `MIN_CHARGE_COLUMN_M` of explosive.
+ */
+export function stemmingSweepRangeM(holeDepth: number): { lo: number; hi: number } | null {
+  const lo = Math.max(MIN_STEMMING_M, holeDepth * STEMMING_FULL_DEPTH_FRACTION);
+  const hi = holeDepth - MIN_CHARGE_COLUMN_M;
+  return hi >= lo ? { lo, hi } : null;
+}
+
+/** Stemming of sample `i` out of `steps` for a hole: evenly from most explosive (i = 0) to least. */
+function sweptStemmingM(range: { lo: number; hi: number }, i: number, steps: number): number {
+  const t = steps <= 1 ? 0 : i / (steps - 1);
+  return Math.round((range.lo + (range.hi - range.lo) * t) * 10) / 10;
+}
+
+/**
+ * Per hole, the powder-factor range that fragments its rock best with this explosive, filling the hole: the run of
+ * swept stemmings around the best one whose good share stays within `RECOMMENDED_RELATIVE_GOOD_SHARE` of it. Null
+ * when even the best charge leaves less than `RECOMMENDED_GOOD_SHARE_MIN` of the rock in the good band (#2203).
  */
 export function recommendedPowderFactors(
   holes: readonly DrillHole[],
   grid: VoxelGrid,
   explosiveId: string,
-  stemmingM: number,
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): Record<string, PowderFactorRange | null> {
   const out: Record<string, PowderFactorRange | null> = {};
-  // Per hole: powder factor and good share at each swept fraction of the heaviest charge that fits it.
-  const samples: Record<string, { pf: number; good: number }[]> = {};
+  // Per hole, in sweep order (most explosive first): powder factor, stemming and good share.
+  const samples: Record<string, { pf: number; stemming: number; good: number }[]> = {};
   for (const h of holes) { out[h.id] = null; samples[h.id] = []; }
   if (holes.length === 0 || !getExplosive(explosiveId)) return out;
-  for (let i = 1; i <= RECOMMENDED_SWEEP_STEPS; i++) {
+  for (let i = 0; i < RECOMMENDED_SWEEP_STEPS; i++) {
     const charges: Record<string, HoleCharge> = {};
     for (const h of holes) {
-      const amountKg = maxFittingChargeKg(h.depth, stemmingM, h.diameter) * (i / RECOMMENDED_SWEEP_STEPS);
-      charges[h.id] = { explosiveId, amountKg, stemmingM };
+      const range = stemmingSweepRangeM(h.depth);
+      if (!range) continue;
+      const stemmingM = sweptStemmingM(range, i, RECOMMENDED_SWEEP_STEPS);
+      const amountKg = fillChargeKg(h.depth, stemmingM, h.diameter, explosiveId);
+      if (amountKg > 0) charges[h.id] = { explosiveId, amountKg, stemmingM };
     }
     const mixes = holeBandMixes(previewPlanBands({ holes: [...holes], charges }, grid, wetHoleIds, { fate: false }), holes);
     const pfs = holePowderFactors(holes, charges);
     for (const h of holes) {
       const mix = mixes[h.id];
-      if (mix) samples[h.id]!.push({ pf: pfs[h.id] ?? 0, good: mix.good });
+      const charge = charges[h.id];
+      if (mix && charge) samples[h.id]!.push({ pf: pfs[h.id] ?? 0, stemming: charge.stemmingM, good: mix.good });
     }
   }
   for (const h of holes) {
@@ -353,7 +388,11 @@ export function recommendedPowderFactors(
     let hi = best;
     while (lo > 0 && list[lo - 1]!.good >= floor) lo--;
     while (hi < list.length - 1 && list[hi + 1]!.good >= floor) hi++;
-    out[h.id] = { minKgPerM3: list[lo]!.pf, maxKgPerM3: list[hi]!.pf };
+    // The sweep runs from most explosive to least: the run's first sample has the highest powder factor.
+    out[h.id] = {
+      minKgPerM3: list[hi]!.pf, maxKgPerM3: list[lo]!.pf,
+      minStemmingM: list[lo]!.stemming, maxStemmingM: list[hi]!.stemming,
+    };
   }
   return out;
 }

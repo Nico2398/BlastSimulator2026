@@ -118,6 +118,13 @@ describe('fragment inspector', () => {
     expect(loc.textContent).not.toContain('Bound for');
   });
 
+  it('states where the fragment is in a status line that stands on its own', () => {
+    const f = frag(5, 1000, { goldite: 0.2 });
+    expect(viewOf(makeState([tracked(f, 'on_ground')]), 5).status).toBe('On the ground');
+    expect(viewOf(makeState([tracked(f, 'in_transit', '3', 7)]), 5).status).toBe('In transit');
+    expect(viewOf(makeState([tracked(f, 'stored', null, 7)]), 5).status).toBe('Stored');
+  });
+
   it('links the warehouse a stored fragment sits in', () => {
     const s = makeState([tracked(frag(5, 1000, { goldite: 0.2 }), 'stored', null, 7)]);
     const loc = mount(viewOf(s, 5)).querySelector('.bs-fragment-location')!;

@@ -98,6 +98,14 @@ const ENTITY_SETTLE_INTERVAL_MS = 25;
 const ENTITY_SETTLE_MAX_POLLS = 40;
 /** Re-aims allowed when the mesh moves while the camera is being aimed at it. */
 const ENTITY_AIM_ATTEMPTS = 3;
+/**
+ * Camera turns `clickEntity` tries, in order, when something of another kind
+ * stands in front of the entity: almost straight down first — a vehicle or a
+ * worker beside a muck pile is clear from above — then two opposite sides.
+ */
+const ENTITY_UNOCCLUDED_VIEWS: ReadonlyArray<{ yaw?: number; pitch?: number }> = [
+  { pitch: 80 }, { yaw: 0, pitch: 45 }, { yaw: 180 },
+];
 
 /**
  * Wait for the render loop's rAF callback to run twice. That callback drives
@@ -367,9 +375,9 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
 
       // Aim at where the mesh has come to rest, not where it happened to be
       // mid-glide — see ENTITY_SETTLE_EPSILON for why a moving mesh makes the
-      // click miss entirely. Forcing a frame does not help: `__renderFrame`
-      // calls `drawFrame` only, never the loop's `onUpdate`, so it refreshes
-      // camera matrices without advancing the tween.
+      // click miss entirely. Syncing the scene does not help: `__syncScene`
+      // refreshes matrices only, never runs the loop's `onUpdate`, so it
+      // does not advance the tween.
       for (let i = 0; i < ENTITY_SETTLE_MAX_POLLS; i++) {
         await new Promise(r => setTimeout(r, ENTITY_SETTLE_INTERVAL_MS));
         const next = await readPos();
@@ -382,20 +390,19 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       const aimAt = (at: { x: number; z: number }) =>
         page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
           (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
-          // Interaction mode suspends the draw loop (#475) — force a frame so
-          // the new camera position and the scene's entity transforms are
-          // current before the click below raycasts.
-          (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
+          // Interaction mode suspends the draw loop (#475) — refresh the world
+          // matrices so the new camera position and the scene's entity
+          // transforms are current before the click below raycasts. No draw:
+          // a raycast reads matrices, not pixels.
+          (window as unknown as { __syncScene: () => void }).__syncScene();
         }, { x: at.x, z: at.z, distance: action.distance ?? 15 });
 
       // Settling above samples over time, which a throttled rAF can defeat:
       // a background page in batch mode advances the tween in bursts, so two
       // reads an interval apart can both land in a still gap and read as
-      // settled while the mesh is still short of its target. The forced frame
-      // is also the most expensive step here (a real draw, seconds without a
-      // GPU) and frames land during it. So confirm the mesh is still where we
-      // aimed, and re-aim at where it actually got to if not — never click a
-      // point it has already left.
+      // settled while the mesh is still short of its target. So confirm the
+      // mesh is still where we aimed, and re-aim at where it actually got to
+      // if not — never click a point it has already left.
       let reAims = 0;
       for (;;) {
         await aimAt(pos);
@@ -413,6 +420,27 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
         // from CI output instead of needing a local repro that may not exist.
         console.log(`  clickEntity: ${action.kind} #${action.id} still gliding — re-aimed ${reAims}x`);
       }
+      // Something can stand between the camera and the entity — a hauler parked
+      // behind a muck pile. A player turns the camera; so does the harness, and
+      // it clicks only once the centre of the screen resolves to the entity.
+      const centrePick = () => page.evaluate(() =>
+        (window as unknown as { __pickAtCanvasCentre: () => { kind: string; id: number } | null }).__pickAtCanvasCentre());
+      // Only something of another kind counts as in the way: a loose rock
+      // picked for its neighbour in the same pile is the click a player makes.
+      const isClear = (p: { kind: string; id: number } | null) => p === null || p.kind === action.kind;
+      let inFront = await centrePick();
+      for (const view of ENTITY_UNOCCLUDED_VIEWS) {
+        if (isClear(inFront)) break;
+        console.log(`  clickEntity: ${action.kind} #${action.id} behind ${inFront!.kind} #${inFront!.id} — turning the camera (yaw ${view.yaw ?? 'kept'}, pitch ${view.pitch ?? 'kept'})`);
+        await page.evaluate(({ yaw, pitch }: { yaw: number | null; pitch: number | null }) =>
+          (window as unknown as { __cameraOrbit: (yaw?: number, pitch?: number) => void }).__cameraOrbit(yaw ?? undefined, pitch ?? undefined),
+        { yaw: view.yaw ?? null, pitch: view.pitch ?? null });
+        await aimAt(pos);
+        inFront = await centrePick();
+      }
+      if (!isClear(inFront)) {
+        console.log(`  clickEntity: ${action.kind} #${action.id} hidden behind ${inFront ? `${inFront.kind} #${inFront.id}` : 'bare ground'} from every view tried`);
+      }
       const viewport = page.viewport();
       await page.mouse.click((viewport?.width ?? 1280) / 2, (viewport?.height ?? 720) / 2);
       break;
@@ -428,7 +456,7 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       }
       // Matrices refreshed like clickEntity's camera move above — the
       // following pickTile/dragTiles raycasts against this new framing.
-      await page.evaluate(() => (window as unknown as { __renderFrame?: () => void }).__renderFrame?.());
+      await page.evaluate(() => (window as unknown as { __syncScene: () => void }).__syncScene());
       break;
     }
     case 'focusTile': {
@@ -437,7 +465,7 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
         if (yaw !== undefined || pitch !== undefined) {
           (window as unknown as { __cameraOrbit: (yaw?: number, pitch?: number) => void }).__cameraOrbit(yaw, pitch);
         }
-        (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
+        (window as unknown as { __syncScene: () => void }).__syncScene();
       }, { x: action.x, z: action.z, distance: action.distance ?? 25, pitch: action.pitch, yaw: action.yaw });
       break;
     }

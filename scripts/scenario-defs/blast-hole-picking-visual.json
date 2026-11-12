@@ -165,7 +165,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "timeout": 60,
       "description": "Charge the hole through the Blast Workshop (the inspector only reads it): step tab Charge, amount and stemming steppers, charge-all. The hole inspector from the previous step is deliberately left open (#1895).",
       "interaction": [
@@ -176,11 +176,6 @@
         {
           "type": "ensureStep",
           "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 6
         },
         {
           "type": "setStepper",

@@ -1,15 +1,20 @@
 // @vitest-environment jsdom
-// #2101: the Charge step's opening amount follows the site's permit grade, and
-// the player's own stepping always beats that default.
+// #2101: the Charge step opens at the stemming that keeps the site's permit once every hole is filled up to it,
+// and the player's own stepping always beats that default. A hole is charged by filling it from the bottom up to
+// the stemming: the kilograms it will hold are a read-only readout (data-role="charge-per-hole"), never a stepper.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ChargeStep } from '../../../../../src/ui/panels/blastSteps/Charge.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
-import { CHARGE_DEFAULT_AMOUNT_KG } from '../../../../../src/core/config/balance.js';
+import { defaultStemmingM } from '../../../../../src/core/economy/PermitDefaults.js';
+import { CHARGE_DEFAULT_STEMMING_M } from '../../../../../src/core/config/balance.js';
+import { setLocale, t } from '../../../../../src/core/i18n/I18n.js';
 
 const holeCounter = { nextHoleId: 1 };
 const DIAMETER_M = 0.089;
+/** What the step preselects without a pattern charge; boomite fills 2 kg a metre of an 89 mm hole. */
+const DEFAULT_EXPLOSIVE = 'boomite';
 
 type State = ReturnType<typeof makeState>;
 
@@ -46,37 +51,65 @@ function planNine(state: State, depth: number): void {
   }
 }
 
-function amountField(step: ChargeStep): HTMLElement {
-  return step.root.querySelector('[data-field="amount"]') as HTMLElement;
+function stemmingField(step: ChargeStep): HTMLElement {
+  return step.root.querySelector('[data-field="stemming"]') as HTMLElement;
 }
 
-function amountText(step: ChargeStep): string {
-  return (amountField(step).querySelector('.bsx-stepper-value') as HTMLElement).textContent ?? '';
+function stemmingText(step: ChargeStep): string {
+  return (stemmingField(step).querySelector('.bsx-stepper-value') as HTMLElement).textContent ?? '';
 }
 
-function amountButtons(step: ChargeStep): { minus: HTMLButtonElement; plus: HTMLButtonElement } {
-  const buttons = Array.from(amountField(step).querySelectorAll('button')) as HTMLButtonElement[];
+function stemmingButtons(step: ChargeStep): { minus: HTMLButtonElement; plus: HTMLButtonElement } {
+  const buttons = Array.from(stemmingField(step).querySelectorAll('button')) as HTMLButtonElement[];
   return { minus: buttons[0]!, plus: buttons[buttons.length - 1]! };
 }
 
-function chargeAll(step: ChargeStep): void {
-  (step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement).click();
+function perHole(step: ChargeStep): HTMLElement {
+  return step.root.querySelector('[data-role="charge-per-hole"]') as HTMLElement;
 }
 
-beforeEach(() => { holeCounter.nextHoleId = 1; });
+function chargeAllButton(step: ChargeStep): HTMLButtonElement {
+  return step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
+}
 
-describe('ChargeStep permit-following default amount (#2101)', () => {
-  it('opens at the grade-0 permit share when nine 5 m holes are drilled and the stemming is untouched', () => {
+function chargeAll(step: ChargeStep): void {
+  chargeAllButton(step).click();
+}
+
+const permitKgWarning = (step: ChargeStep): string =>
+  step.root.querySelector('[data-role="permit-kg-warning"]')?.textContent ?? '';
+
+beforeEach(() => {
+  holeCounter.nextHoleId = 1;
+  setLocale('en');
+});
+
+describe('ChargeStep permit-following default stemming (#2101)', () => {
+  it('opens at the grade-0 permit stemming when nine 5 m holes are drilled and the stemming is untouched', () => {
     const { step } = makeStep();
     const state = makeState(0);
     drillNine(state, 5);
 
     step.update(state, 'sunny');
 
-    expect(amountText(step)).toBe('4 kg');
+    // Filled at 2.5 m the nine holes would take 45 kg; at 2.8 m each holds 4.4 kg, 39.6 kg in all.
+    expect(stemmingText(step)).toBe('2.8 m');
+    expect(stemmingText(step)).toBe(`${defaultStemmingM(0, state.drillHoles, DEFAULT_EXPLOSIVE).toFixed(1)} m`);
+    expect(perHole(step).textContent).toBe('4.4 kg');
   });
 
-  it('Charge All sends that permit-following amount when the stepper is untouched', () => {
+  it('has no kg stepper: what each hole holds is read-only', () => {
+    const { step } = makeStep();
+    const state = makeState(0);
+    drillNine(state, 5);
+    step.update(state, 'sunny');
+
+    expect(step.root.querySelector('[data-field="amount"]')).toBeNull();
+    expect(perHole(step)).not.toBeNull();
+    expect(perHole(step).querySelectorAll('button')).toHaveLength(0);
+  });
+
+  it('Charge All fills every hole up to that stemming: it sends the stemming, never an amount', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState(0);
     drillNine(state, 5);
@@ -84,9 +117,21 @@ describe('ChargeStep permit-following default amount (#2101)', () => {
 
     chargeAll(step);
 
+    expect(gameConsole).toHaveBeenCalledTimes(1);
     const cmd = gameConsole.mock.calls[0]![0] as string;
-    expect(cmd).toContain('amount:4kg');
-    expect(cmd).not.toContain('amount:7kg');
+    expect(cmd).toBe(`charge hole:* explosive:${DEFAULT_EXPLOSIVE} stemming:2.8m`);
+    expect(cmd).not.toContain('amount:');
+  });
+
+  it('the untouched default keeps the plan inside the permit: no over-permit warning', () => {
+    const { step } = makeStep();
+    const state = makeState(0);
+    drillNine(state, 5);
+
+    step.update(state, 'sunny');
+
+    expect(step.root.querySelector('[data-role="permit-kg"]')!.textContent).toBe('39.6 / 40 kg');
+    expect(permitKgWarning(step)).toBe('');
   });
 
   it('counts planned holes toward the permit share', () => {
@@ -96,108 +141,150 @@ describe('ChargeStep permit-following default amount (#2101)', () => {
 
     step.update(state, 'sunny');
 
-    expect(amountText(step)).toBe('4 kg');
+    expect(stemmingText(step)).toBe('2.8 m');
     chargeAll(step);
-    // Charge All may be disabled until holes are drilled; when it dispatches, it uses the shown amount.
-    for (const call of gameConsole.mock.calls) expect(call[0] as string).toContain('amount:4kg');
+    // When Charge All dispatches before the holes are drilled, it sets the pattern at the shown stemming.
+    for (const call of gameConsole.mock.calls) expect(call[0] as string).toContain('stemming:2.8m');
   });
 
-  it('keeps the old default on a site without a permit', () => {
+  it('keeps the default stemming on a site without a permit, and Charge All fills the holes at it', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState(undefined);
     drillNine(state, 5);
 
     step.update(state, 'sunny');
 
-    expect(amountText(step)).toBe(`${CHARGE_DEFAULT_AMOUNT_KG} kg`);
-    expect(amountText(step)).toBe('7 kg');
+    expect(stemmingText(step)).toBe(`${CHARGE_DEFAULT_STEMMING_M.toFixed(1)} m`);
+    expect(stemmingText(step)).toBe('2.5 m');
+    expect(perHole(step).textContent).toBe('5 kg');
+    expect(chargeAllButton(step).disabled).toBe(false);
     chargeAll(step);
-    // 7 kg overflows a 5 m hole at the default stemming, so Charge All stays disabled and sends nothing.
-    for (const call of gameConsole.mock.calls) expect(call[0] as string).toContain('amount:7kg');
+    expect(gameConsole.mock.calls[0]![0]).toBe(`charge hole:* explosive:${DEFAULT_EXPLOSIVE} stemming:2.5m`);
   });
 
-  it('shows the old default when no holes are planned or drilled, grade 0 or not', () => {
+  it('shows the default stemming and no per-hole kg when no holes are planned or drilled, grade 0 or not', () => {
     for (const grade of [0, undefined]) {
       const { step } = makeStep();
       step.update(makeState(grade), 'sunny');
-      expect(amountText(step)).toBe('7 kg');
+      expect(stemmingText(step)).toBe('2.5 m');
+      expect(perHole(step).textContent).toBe('—');
     }
   });
 
-  it('derives the default from the shallowest hole, not the first', () => {
+  it('counts every hole by its own depth, not the first one\'s', () => {
     const { step } = makeStep();
     const state = makeState(0);
     drillNine(state, 8);
-    // One short hole: capacity there (4 - 2.5) * 2 = 3 kg, tighter than the permit share.
-    state.drillHoles[4]!.depth = 4;
+    // One 6 m hole holds less than the 8 m ones: the pattern needs 5.6 m of stemming where nine 8 m holes need 5.8 m.
+    state.drillHoles[4]!.depth = 6;
 
     step.update(state, 'sunny');
 
-    expect(amountText(step)).toBe('3 kg');
+    expect(stemmingText(step)).toBe('5.6 m');
+    // 8 m holes hold (8 - 5.6) x 2 = 4.8 kg, the 6 m hole 0.8 kg.
+    expect(perHole(step).textContent).toBe('0.8–4.8 kg');
   });
 
-  it('on a deeper grade-0 pattern, the permit share (not the hole) is the limit', () => {
+  it('on a deeper grade-0 pattern the permit (not the hole) sets the charge: more stemming, the same kg a hole', () => {
     const { step } = makeStep();
     const state = makeState(0);
     drillNine(state, 12);
 
     step.update(state, 'sunny');
 
-    expect(amountText(step)).toBe('4 kg');
+    expect(stemmingText(step)).toBe('9.8 m');
+    expect(perHole(step).textContent).toBe('4.4 kg');
   });
 
-  it('a grade 1 site derives its default from its own, larger permit', () => {
+  it('a grade 1 site derives its stemming from its own, larger permit', () => {
     const { step } = makeStep();
     const state = makeState(1);
     drillNine(state, 5);
 
     step.update(state, 'sunny');
 
-    // Hole-bound (5 kg fits a 5 m hole at 2.5 m stemming), permit-feasible at grade 1.
-    expect(amountText(step)).toBe('5 kg');
+    // 45 kg filled at the default stemming fits grade 1's 120 kg.
+    expect(stemmingText(step)).toBe('2.5 m');
+    expect(perHole(step).textContent).toBe('5 kg');
   });
 
-  it('a grade 2 site with deep holes is limited by the explosive, never by the grade-0 permit', () => {
+  it('a grade 2 site with deep holes fills them under the default stemming, never the grade-0 permit\'s', () => {
     const { step } = makeStep();
     const state = makeState(2);
     drillNine(state, 12);
 
     step.update(state, 'sunny');
 
-    const shown = parseInt(amountText(step), 10);
-    expect(shown).toBeGreaterThan(4);
+    expect(stemmingText(step)).toBe('2.5 m');
+    expect(perHole(step).textContent).toBe('19 kg');
+  });
+
+  it('a pattern no stemming keeps inside the permit opens at the default, and the over-permit warning says so', () => {
+    const { step } = makeStep();
+    const state = makeState(0);
+    drillNine(state, 8);
+    // Keeping 40 kg would take 5.4 m of stemming: deeper than this 4 m hole, which would stay empty.
+    state.drillHoles[4]!.depth = 4;
+
+    step.update(state, 'sunny');
+
+    expect(stemmingText(step)).toBe('2.5 m');
+    expect(permitKgWarning(step)).not.toBe('');
+    expect(chargeAllButton(step).disabled).toBe(false);
+  });
+
+  it('the picked explosive sets the default too: a denser one opens at more stemming', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState(0);
+    drillNine(state, 5);
+    step.update(state, 'sunny');
+    expect(stemmingText(step)).toBe('2.8 m');
+
+    (step.root.querySelector('[data-action="select-explosive"][data-explosive="krackle"]') as HTMLButtonElement).click();
+    step.update(state, 'sunny');
+
+    // Krackle (1.15 g/cm³) fills 2.875 kg a metre: 3.5 m of stemming leaves 4.3 kg a hole, 38.7 kg in all.
+    expect(stemmingText(step)).toBe('3.5 m');
+    expect(perHole(step).textContent).toBe('4.3 kg');
+    chargeAll(step);
+    expect(gameConsole.mock.calls[0]![0]).toBe('charge hole:* explosive:krackle stemming:3.5m');
   });
 });
 
 describe('ChargeStep player value beats the permit default (#2101)', () => {
-  it('stepping the amount down sticks across later updates', () => {
+  it('stepping the stemming up sticks across later updates', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState(0);
     drillNine(state, 5);
     step.update(state, 'sunny');
 
-    amountButtons(step).minus.click();
+    stemmingButtons(step).plus.click();
     step.update(state, 'sunny');
     step.update(state, 'sunny');
 
-    expect(amountText(step)).toBe('3 kg');
+    expect(stemmingText(step)).toBe('2.9 m');
+    expect(perHole(step).textContent).toBe('4.2 kg');
     chargeAll(step);
-    expect(gameConsole.mock.calls[0]![0] as string).toContain('amount:3kg');
+    expect(gameConsole.mock.calls[0]![0] as string).toContain('stemming:2.9m');
   });
 
-  it('stepping the amount up past the permit share is honoured, not clamped back', () => {
+  it('stepping the stemming under the permit default is honoured, not clamped back: the plan warns, Charge All still sends it', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState(0);
     drillNine(state, 8);
     step.update(state, 'sunny');
-    expect(amountText(step)).toBe('4 kg');
+    expect(stemmingText(step)).toBe('5.8 m');
 
-    amountButtons(step).plus.click();
+    stemmingButtons(step).minus.click();
     step.update(state, 'sunny');
 
-    expect(amountText(step)).toBe('5 kg');
+    expect(stemmingText(step)).toBe('5.7 m');
+    // (8 - 5.7) x 2 = 4.6 kg a hole, 41.4 kg in all: over the 40 kg permit.
+    expect(perHole(step).textContent).toBe('4.6 kg');
+    expect(permitKgWarning(step)).not.toBe('');
+    expect(chargeAllButton(step).disabled).toBe(false);
     chargeAll(step);
-    expect(gameConsole.mock.calls[0]![0] as string).toContain('amount:5kg');
+    expect(gameConsole.mock.calls[0]![0] as string).toContain('stemming:5.7m');
   });
 
   it('a player value survives more holes arriving afterwards', () => {
@@ -205,14 +292,15 @@ describe('ChargeStep player value beats the permit default (#2101)', () => {
     const state = makeState(0);
     drillNine(state, 8);
     step.update(state, 'sunny');
-    amountButtons(step).plus.click();
-    amountButtons(step).plus.click();
-    expect(amountText(step)).toBe('6 kg');
+    stemmingButtons(step).minus.click();
+    stemmingButtons(step).minus.click();
+    expect(stemmingText(step)).toBe('5.6 m');
 
     addHole(holeCounter, state.drillHoles, 30, 30, 8, DIAMETER_M);
+    expect(defaultStemmingM(0, state.drillHoles, DEFAULT_EXPLOSIVE)).not.toBe(5.6);
     step.update(state, 'sunny');
 
-    expect(amountText(step)).toBe('6 kg');
+    expect(stemmingText(step)).toBe('5.6 m');
   });
 
   it('a player value survives the permit changing under it', () => {
@@ -220,31 +308,39 @@ describe('ChargeStep player value beats the permit default (#2101)', () => {
     const state = makeState(0);
     drillNine(state, 8);
     step.update(state, 'sunny');
-    amountButtons(step).minus.click();
-    expect(amountText(step)).toBe('3 kg');
+    stemmingButtons(step).plus.click();
+    expect(stemmingText(step)).toBe('5.9 m');
 
     state.grade = createGradeState();
     state.grade.grade = 1;
+    expect(defaultStemmingM(1, state.drillHoles, DEFAULT_EXPLOSIVE)).not.toBe(5.9);
     step.update(state, 'sunny');
 
-    expect(amountText(step)).toBe('3 kg');
+    expect(stemmingText(step)).toBe('5.9 m');
   });
 
-  it('still refuses an amount that overflows the shallowest hole, as before', () => {
+  it('still refuses a stemming that leaves the shallowest hole no room for explosive', () => {
     const { step } = makeStep();
-    const state = makeState(0);
-    drillNine(state, 5);
+    const state = makeState(undefined);
+    drillNine(state, 8);
+    state.drillHoles[4]!.depth = 4;
     step.update(state, 'sunny');
-    const chargeAllBtn = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
-    expect(chargeAllBtn.disabled).toBe(false);
+    expect(stemmingText(step)).toBe('2.5 m');
+    expect(chargeAllButton(step).disabled).toBe(false);
 
-    // 4 kg default -> 5 kg fits the 5 m hole, 6 kg overflows it.
-    amountButtons(step).plus.click();
-    amountButtons(step).plus.click();
+    // 2.5 m -> 4.0 m: the 4 m hole is all stemming.
+    for (let i = 0; i < 15; i++) stemmingButtons(step).plus.click();
     step.update(state, 'sunny');
 
-    expect(amountText(step)).toBe('6 kg');
-    expect(chargeAllBtn.disabled).toBe(true);
-    expect(chargeAllBtn.nextElementSibling?.textContent ?? '').toContain('Shallowest hole is 5 m');
+    expect(stemmingText(step)).toBe('4.0 m');
+    expect(chargeAllButton(step).disabled).toBe(true);
+    expect(chargeAllButton(step).nextElementSibling?.textContent ?? '')
+      .toContain(t('ui.blast_workshop.charge.no_room_reason', { stemming: 4, depth: 4 }));
+
+    stemmingButtons(step).minus.click();
+    step.update(state, 'sunny');
+
+    expect(chargeAllButton(step).disabled).toBe(false);
+    expect(chargeAllButton(step).nextElementSibling?.textContent ?? '').toBe('');
   });
 });

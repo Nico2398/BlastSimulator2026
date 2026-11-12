@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
-import { batchCharge } from '../../src/core/mining/ChargePlan.js';
+import { batchCharge, chargeColumnM, fillChargeKg } from '../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast, type BlastResult } from '../../src/core/mining/BlastExecution.js';
 import { summariseMuckPile } from '../../src/core/mining/MuckPileSummary.js';
@@ -25,7 +25,8 @@ const holeCounter = { nextHoleId: 1 };
 interface Shot {
   rock?: string;
   explosive?: string;
-  kg?: number;
+  /** Kilograms per hole; null fills each hole up to the stemming, as the player charges it. */
+  kg?: number | null;
   stemming?: number;
   spacing?: number;
   depth?: number;
@@ -33,13 +34,17 @@ interface Shot {
   cols?: number;
   /** Ore density carried by every voxel of the block (default none). */
   ore?: Record<string, number>;
+  /** Hole bore (m, default 0.089). */
+  diameter?: number;
+  /** Highest rock layer of the block (default 10). */
+  top?: number;
 }
 
-/** A block of one rock, 21×11×21, surface at y=10. */
-function bench(rock: string, ore: Record<string, number> = {}): VoxelGrid {
+/** A block of one rock, 21 wide and deep, from y=0 up to `top` (21x11x21 by default, surface at y=10). */
+function bench(rock: string, ore: Record<string, number> = {}, top = 10): VoxelGrid {
   const grid = new VoxelGrid(40, 40);
   for (let z = 5; z <= 25; z++) {
-    for (let y = 0; y <= 10; y++) {
+    for (let y = 0; y <= top; y++) {
       for (let x = 5; x <= 25; x++) {
         grid.setVoxel(x, y, z, {
           composition: { rocks: [{ rockId: rock, coefficient: 1.0 }] },
@@ -61,15 +66,17 @@ function fire(shot: Shot): BlastResult {
 function fireOnto(shot: Shot): { result: BlastResult; grid: VoxelGrid } {
   const {
     rock = 'molite', explosive = 'boomite', kg = 8, stemming = 2,
-    spacing = 4, depth = 8, rows = 2, cols = 3, ore = {},
+    spacing = 4, depth = 8, rows = 2, cols = 3, ore = {}, diameter = 0.089, top = 10,
   } = shot;
 
   holeCounter.nextHoleId = 1;
-  const grid = bench(rock, ore);
-  const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, rows, cols, spacing, depth, 0.089);
+  const grid = bench(rock, ore, top);
+  const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, rows, cols, spacing, depth, diameter);
   const depths: Record<string, number> = {};
-  for (const h of holes) depths[h.id] = h.depth;
-  const { charges } = batchCharge(holes.map(h => h.id), depths, explosive, kg, stemming);
+  const diameters: Record<string, number> = {};
+  for (const h of holes) { depths[h.id] = h.depth; diameters[h.id] = h.diameter; }
+  const { charges, errors } = batchCharge(holes.map(h => h.id), depths, explosive, kg, stemming, diameters);
+  expect(errors, 'a hole refused its charge').toEqual([]);
   const plan = assembleBlastPlan(holes, charges);
 
   const result = executeBlast(plan, grid, []);
@@ -97,29 +104,31 @@ describe('Blast balance — more explosive does more', () => {
   });
 
   it('a stronger explosive at the same weight breaks more', () => {
-    // 4 kg is inside the valid loading range of both.
+    // 4 kg fits the hole for both (a shorter column of the denser dynatomics).
     expect(fire({ explosive: 'dynatomics', kg: 4 }).clearedVoxels)
       .toBeGreaterThan(fire({ explosive: 'boomite', kg: 4 }).clearedVoxels);
   });
 });
 
 describe('Blast balance — stemming decides whether rock is thrown', () => {
+  // The player picks the stemming and the explosive fills the hole up to it (kg: null): a minimally
+  // stemmed hole carries its charge to within half a metre of the collar, right under the free face.
   it('a minimally stemmed hole throws rock further than a stemmed one', () => {
-    expect(fire({ rock: 'cruite', stemming: 0.5 }).maxThrowDistance)
-      .toBeGreaterThan(fire({ rock: 'cruite', stemming: 3 }).maxThrowDistance);
+    expect(fire({ rock: 'cruite', stemming: 0.5, kg: null }).maxThrowDistance)
+      .toBeGreaterThan(fire({ rock: 'cruite', stemming: 3, kg: null }).maxThrowDistance);
   });
 
   it('a properly stemmed shot produces no dangerous projections', () => {
-    expect(fire({ stemming: 3 }).projectionCount).toBe(0);
+    expect(fire({ stemming: 3, kg: null }).projectionCount).toBe(0);
   });
 
-  it('a minimally stemmed overcharge does', () => {
-    expect(fire({ stemming: 0.5, kg: 8 }).projectionCount).toBeGreaterThan(0);
+  it('a hole filled to within half a metre of its collar does', () => {
+    expect(fire({ stemming: 0.5, kg: null }).projectionCount).toBeGreaterThan(0);
   });
 
   it('and is rated worse for it', () => {
-    const careless = fire({ stemming: 0.5, kg: 8 });
-    const careful = fire({ stemming: 3, kg: 8 });
+    const careless = fire({ stemming: 0.5, kg: null });
+    const careful = fire({ stemming: 3, kg: null });
 
     expect(['bad', 'catastrophic']).toContain(careless.rating);
     expect(['perfect', 'good']).toContain(careful.rating);
@@ -162,36 +171,56 @@ describe('Blast balance — the explosive never changes the rock (#2197)', () =>
     const reference = thresholdsOf({ explosive: 'dynatomics' });
     expect(reference.some(v => v > 0)).toBe(true);
     for (const e of getAllExplosives()) {
-      expect(thresholdsOf({ explosive: e.id, kg: e.minChargeKg }), e.id).toEqual(reference);
+      expect(thresholdsOf({ explosive: e.id, kg: null }), e.id).toEqual(reference);
     }
   });
 
+  // Equal energy from the same charge column. An explosive's density sets how long a column its
+  // kilograms stand, so equal energy only lands on the same voxels when both columns are one cell:
+  // 340 x 8 = 400 x 6.8 = 2720, each under 1.5 m of a 165 mm bore.
+  const EQUAL_ENERGY_BORE_M = 0.165;
+  const equalEnergy = { boomite: 8, krackle: 6.8 } as const;
+
+  it('the equal-energy pair stands the same one-cell charge column', () => {
+    for (const [explosive, kg] of Object.entries(equalEnergy)) {
+      expect(Math.round(chargeColumnM(kg, EQUAL_ENERGY_BORE_M, explosive)), explosive).toBe(1);
+    }
+    expect(getAllExplosives().find(e => e.id === 'boomite')!.energyPerKg * equalEnergy.boomite)
+      .toBeCloseTo(getAllExplosives().find(e => e.id === 'krackle')!.energyPerKg * equalEnergy.krackle, 6);
+  });
+
   it('two explosives delivering equal energy break the same rock identically', () => {
-    // 340 x 4 = 400 x 3.4 = 1360: boomite and krackle sat a tier apart before #2197, and molite
-    // (tier 2) used to cost boomite four times the energy it cost krackle.
-    const boomite = fire({ rock: 'molite', explosive: 'boomite', kg: 4, depth: 6 });
-    const krackle = fire({ rock: 'molite', explosive: 'krackle', kg: 3.4, depth: 6 });
+    // boomite and krackle sat a tier apart before #2197, and molite (tier 2) used to cost boomite
+    // four times the energy it cost krackle.
+    const boomite = fire({ rock: 'molite', explosive: 'boomite', kg: equalEnergy.boomite, depth: 6, diameter: EQUAL_ENERGY_BORE_M });
+    const krackle = fire({ rock: 'molite', explosive: 'krackle', kg: equalEnergy.krackle, depth: 6, diameter: EQUAL_ENERGY_BORE_M });
     expect(boomite.clearedVoxels).toBeGreaterThan(0);
     expect(krackle.clearedVoxels).toBe(boomite.clearedVoxels);
   });
 
   it('equal energy also breaks tougher rock identically, whatever the former tiers', () => {
     // clunkite (tier 3): boomite fell two tiers short before #2197 and broke none of it.
-    const boomite = fire({ rock: 'clunkite', explosive: 'boomite', kg: 4, depth: 6 });
-    const krackle = fire({ rock: 'clunkite', explosive: 'krackle', kg: 3.4, depth: 6 });
+    const boomite = fire({ rock: 'clunkite', explosive: 'boomite', kg: equalEnergy.boomite, depth: 6, diameter: EQUAL_ENERGY_BORE_M });
+    const krackle = fire({ rock: 'clunkite', explosive: 'krackle', kg: equalEnergy.krackle, depth: 6, diameter: EQUAL_ENERGY_BORE_M });
     expect(krackle.clearedVoxels).toBeGreaterThan(0);
     expect(boomite.clearedVoxels).toBe(krackle.clearedVoxels);
   });
 
+  // The weakest explosive's fullest charge: a 165 mm bore filled up to the stemming (18.9 kg of pop_rock
+  // in a 6 m hole). In an 89 mm hole pop_rock holds 1.375 kg/m and, filled, breaks no obstiite in a 6, 8 or 10 m hole.
+  const WIDEST_BORE_M = 0.165;
+  const popRockFull = { rock: 'obstiite', explosive: 'pop_rock', kg: null, depth: 6, diameter: WIDEST_BORE_M } as const;
+
   it('a weak explosive at its maximum charge still breaks some hard rock', () => {
-    const popRock = fire({ rock: 'obstiite', explosive: 'pop_rock', kg: 3, depth: 6 });
+    const popRock = fire(popRockFull);
     expect(popRock.clearedVoxels).toBeGreaterThan(0);
   });
 
   it('what a weak explosive breaks grows with its energy, not all-or-nothing', () => {
-    const half = fire({ rock: 'obstiite', explosive: 'pop_rock', kg: 1.5, depth: 6 }).clearedVoxels;
-    const full = fire({ rock: 'obstiite', explosive: 'pop_rock', kg: 3, depth: 6 }).clearedVoxels;
-    const strong = fire({ rock: 'obstiite', explosive: 'dynatomics', kg: 3, depth: 6 }).clearedVoxels;
+    const fullKg = fillChargeKg(popRockFull.depth, 2, WIDEST_BORE_M, 'pop_rock');
+    const half = fire({ ...popRockFull, kg: Math.floor(fullKg * 5) / 10 }).clearedVoxels;
+    const full = fire(popRockFull).clearedVoxels;
+    const strong = fire({ ...popRockFull, explosive: 'dynatomics', kg: fullKg }).clearedVoxels;
     expect(full).toBeGreaterThan(half);
     expect(strong).toBeGreaterThan(full);
   });
@@ -204,13 +233,13 @@ describe('Blast balance — the explosive never changes the rock (#2197)', () =>
   });
 
   it('the real blast clears exactly the voxels the preview field predicts, weak explosive on hard rock', () => {
-    const shot = { rock: 'obstiite', explosive: 'pop_rock', kg: 3, depth: 6 };
-    const { result } = fireOnto(shot);
+    const { result } = fireOnto(popRockFull);
     holeCounter.nextHoleId = 1;
-    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 6, 0.089);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 6, WIDEST_BORE_M);
     const depths: Record<string, number> = {};
-    for (const h of holes) depths[h.id] = h.depth;
-    const { charges } = batchCharge(holes.map(h => h.id), depths, 'pop_rock', 3, 2);
+    const diameters: Record<string, number> = {};
+    for (const h of holes) { depths[h.id] = h.depth; diameters[h.id] = h.diameter; }
+    const { charges } = batchCharge(holes.map(h => h.id), depths, 'pop_rock', null, 2, diameters);
     const grid = bench('obstiite');
     const preview = buildPlanEnergyField(assembleBlastPlan(holes, charges), grid)!;
     expect(result.clearedVoxels).toBeGreaterThan(0);
@@ -432,12 +461,17 @@ describe('Blast balance — a correct, a doubled and a heavy charge on one patte
 });
 
 describe('Blast balance — a heavily stemmed overcharge stratifies the rock', () => {
-  const SURFACE_TOP = 11; // bench voxels fill y 0..10
+  // A deep bench: rock goes on 11 m below the hole bottom, as it does on a real site. On the default
+  // 11 m block a 10 m hole ends 1 m above the block's open underside, and the charge's energy (which
+  // reaches 4.5 m through rock) blows the rock between down into that void.
+  const TOP = 20;
+  const SURFACE_TOP = TOP + 1; // bench voxels fill y 0..TOP
   const STEMMING = 6;
   const DEPTH = 10;
+  const KG = 8;
 
-  /** Hole bottom y = SURFACE_TOP - DEPTH; charge 8 kg of krackle fills 4 m above it. */
-  const CHARGE_TOP = SURFACE_TOP - DEPTH + 4;
+  /** Hole bottom y = SURFACE_TOP - DEPTH; 8 kg of krackle stands round(8 / 2.875) = 3 cells above it. */
+  const CHARGE_TOP = SURFACE_TOP - DEPTH + Math.round(chargeColumnM(KG, 0.089, 'krackle'));
 
   function singleHolePlan(kg: number, stemming: number, depth: number) {
     holeCounter.nextHoleId = 1;
@@ -451,7 +485,7 @@ describe('Blast balance — a heavily stemmed overcharge stratifies the rock', (
   /** Fragmentation-band volumes by height, for the broken rock of a single-hole shot. */
   function bandsByLayer(kg: number) {
     const plan = singleHolePlan(kg, STEMMING, DEPTH);
-    const grid = bench('cruite');
+    const grid = bench('cruite', {}, TOP);
     const field = buildPlanEnergyField(plan, grid)!;
     expect(field, 'plan was rejected').not.toBeNull();
     const fragmentation = identifyFragmentedVoxels(field, grid);
@@ -472,17 +506,17 @@ describe('Blast balance — a heavily stemmed overcharge stratifies the rock', (
   };
 
   it('puts fines and dust near the charge', () => {
-    const { finesOrDust } = bandsByLayer(8);
+    const { finesOrDust } = bandsByLayer(KG);
     expect(sum(finesOrDust, 0, CHARGE_TOP + 1)).toBeGreaterThan(0);
   });
 
   it('puts more fines and dust at the charge than in the stemming above it', () => {
-    const { finesOrDust } = bandsByLayer(8);
+    const { finesOrDust } = bandsByLayer(KG);
     expect(sum(finesOrDust, 0, CHARGE_TOP + 1)).toBeGreaterThan(sum(finesOrDust, CHARGE_TOP + 1, SURFACE_TOP));
   });
 
   it('leaves the collar coarse or unbroken: no fines or dust in the top metres', () => {
-    const { field } = bandsByLayer(8);
+    const { field } = bandsByLayer(KG);
     const { box } = field;
     for (let y = SURFACE_TOP - 3; y < SURFACE_TOP; y++) {
       for (let z = box.minZ; z < box.maxZ; z++) {
@@ -495,8 +529,8 @@ describe('Blast balance — a heavily stemmed overcharge stratifies the rock', (
   });
 
   it('throws no more rock than a correctly charged hole', () => {
-    const stemmed = fire({ rock: 'cruite', explosive: 'krackle', kg: 8, stemming: STEMMING, depth: DEPTH, rows: 1, cols: 1 });
-    const correct = fire({ rock: 'cruite', explosive: 'krackle', kg: 4, stemming: 2, depth: 8, rows: 1, cols: 1 });
+    const stemmed = fire({ rock: 'cruite', explosive: 'krackle', kg: KG, stemming: STEMMING, depth: DEPTH, rows: 1, cols: 1, top: TOP });
+    const correct = fire({ rock: 'cruite', explosive: 'krackle', kg: 4, stemming: 2, depth: 8, rows: 1, cols: 1, top: TOP });
 
     expect(stemmed.clearedVoxels).toBeGreaterThan(0);
     expect(stemmed.projectionCount).toBeLessThanOrEqual(correct.projectionCount);
@@ -504,7 +538,7 @@ describe('Blast balance — a heavily stemmed overcharge stratifies the rock', (
   });
 
   it('reports the finer rock of the overcharge in the band volumes', () => {
-    const stemmed = fire({ rock: 'cruite', explosive: 'krackle', kg: 8, stemming: STEMMING, depth: DEPTH, rows: 1, cols: 1 });
+    const stemmed = fire({ rock: 'cruite', explosive: 'krackle', kg: KG, stemming: STEMMING, depth: DEPTH, rows: 1, cols: 1, top: TOP });
     expect(stemmed.bandVolumes!.fines + stemmed.bandVolumes!.dust).toBeGreaterThan(0);
   });
 });

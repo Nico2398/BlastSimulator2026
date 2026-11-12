@@ -5,8 +5,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DrillStep } from '../../../../../src/ui/panels/blastSteps/Drill.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
-import { gridHoleLimitWarning } from '../../../../../src/ui/panels/permitPreview.js';
-import { DRILL_GRID_DEFAULT_DEPTH_M } from '../../../../../src/core/config/balance.js';
+import { gridAreaLimitWarning } from '../../../../../src/ui/panels/permitPreview.js';
+import { createGridPlan } from '../../../../../src/core/mining/DrillPlan.js';
+import { t } from '../../../../../src/core/i18n/I18n.js';
+import { DRILL_GRID_DEFAULT_DEPTH_M, DRILL_GRID_DEFAULT_SPACING_M, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../../../src/core/config/balance.js';
 import type { PlacementKit } from '../../../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../../../src/ui/scene/PlacementController.js';
 
@@ -205,22 +207,46 @@ describe('DrillStep player depth beats the permit default (#2101)', () => {
   });
 });
 
-describe('DrillStep permit hole-limit warning is unchanged by the depth default (#2101)', () => {
-  it('a 4x4 grid on a grade-0 site still warns about the nine-hole limit', () => {
+// The permit caps the area a grid works (Σ spacing × burden), which the depth never enters:
+// grade 0 allows 144 m², a 3 × 3 grid of the default 4 m × 4 m cells.
+describe('DrillStep permit area warning is unchanged by the depth default (#2101)', () => {
+  /** The grid tool's holes over x/z 10.. as the permit measures them: `rows` × `cols` default cells, at `depth`. */
+  const gridHoles = (rows: number, cols: number, depth: number) => createGridPlan(
+    { nextHoleId: 1 }, { x: 10, z: 10 }, rows, cols, DRILL_GRID_DEFAULT_SPACING_M, depth, DRILL_HOLE_DEFAULT_DIAMETER_M,
+  );
+
+  it('a 4x4 grid on a grade-0 site still warns about the 144 m² area limit', () => {
     const h = setup(makeState(0));
     openGrid(h, 22, 22);
 
     const arg = stripArg(h);
+    const warning = gridAreaLimitWarning(createGradeState(), gridHoles(4, 4, depthField(h).value));
+    expect(warning).not.toBeNull();
     expect(arg.confirmEnabled).toBe(true);
-    expect(JSON.stringify(arg).toLowerCase()).toContain(gridHoleLimitWarning(createGradeState(), 16)!.toLowerCase());
-    expect(JSON.stringify(arg)).toContain('/ 9');
+    expect(arg.result).toContain(warning!);
+    // 16 holes of 16 m² = 256 m², whatever depth the grade opens the grid at.
+    expect(arg.result).toContain('256 / 144 m²');
   });
 
   it('a 3x3 grid on a grade-0 site shows no permit warning', () => {
     const h = setup(makeState(0));
     openGrid(h, 18, 18);
 
+    expect(gridAreaLimitWarning(createGradeState(), gridHoles(3, 3, depthField(h).value))).toBeNull();
     expect(stripArg(h).confirmEnabled).toBe(true);
-    expect(JSON.stringify(stripArg(h)).toLowerCase()).not.toContain('permit');
+    expect(stripArg(h).result).toBe(`3 × 3 ${t('ui.blast_workshop.drill.holes_section')}`);
+  });
+
+  it('stepping the depth leaves the warning exactly as it was', () => {
+    const h = setup(makeState(0));
+    openGrid(h, 22, 22);
+    const before = stripArg(h).result;
+
+    depthField(h).onInc();
+    depthField(h).onInc();
+
+    expect(depthField(h).value).toBe(7);
+    expect(stripArg(h).result).toBe(before);
+    expect(stripArg(h).result).toContain('256 / 144 m²');
   });
 });

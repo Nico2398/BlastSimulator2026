@@ -241,6 +241,25 @@ describe('vehicle inspector — cargo', () => {
     expect(cargo.textContent).toContain('2');
   });
 
+  it('the fragment count links the last rock loaded, and selecting it opens that fragment', () => {
+    const { s } = haulerOnTheRoad();
+    const { links, select } = makeLinks();
+    const cargo = mount(viewOf(s, links)).querySelector('.bs-vehicle-cargo')!;
+    const link = cargo.querySelector<HTMLElement>('[data-select-kind="fragment"]')!;
+    // The cargo is [5, 6]: 6 went in last, on top of the load.
+    expect(link.dataset['selectId']).toBe('6');
+    expect(link.textContent).toBe('#6');
+    link.click();
+    expect(select).toHaveBeenCalledWith('fragment', 6);
+  });
+
+  it('a cargo fragment the game no longer tracks gets no link, only the count', () => {
+    const v = makeVehicle({ cargo: [{ fragmentId: 404, massKg: 300 }] });
+    const cargo = mount(viewOf(makeState(v))).querySelector('.bs-vehicle-cargo')!;
+    expect(cargo.querySelector('[data-select-kind="fragment"]')).toBeNull();
+    expect(cargo.textContent).toContain(t('inspector.vehicle.fragments'));
+  });
+
   it('an empty hauler shows no ore rows', () => {
     const cargo = mount(viewOf(makeState(makeVehicle()))).querySelector('.bs-vehicle-cargo')!;
     expect(cargo.querySelector('[data-cargo-ore]')).toBeNull();

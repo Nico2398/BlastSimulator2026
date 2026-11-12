@@ -3,6 +3,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { Random } from '../../../src/core/math/Random.js';
+import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
+import { dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
+import { setFreightRoom } from '../../helpers/freightWarehouse.js';
 import {
   fleetRoles, lostVehicleRoles, reachableHaulableOreKg, reinvestHaulersWanted, unreachableNewestBuildOrder, REINVEST_HAUL_ORDERS_PER_HAULER,
   REINVEST_MAX_HAULERS,
@@ -55,6 +62,46 @@ describe('lostVehicleRoles (#2126)', () => {
   });
 });
 
+/** A flat 24x12 site split by a wall at x=10: hauler, its driver and the warehouse west of it. */
+const WALL_X = 10;
+const NEAR = { x: 6, z: 6 };
+const ACROSS_WALL = { x: 18, z: 8 };
+
+function walledSite(state: GameState): void {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < 12; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < 24; x++) {
+      const wall = x === WALL_X;
+      row.push({ type: wall ? 'blocked' : 'walkable', moveCost: wall ? Infinity : 1.0, benchLevel: 0, vehicleOccupied: false });
+    }
+    cells.push(row);
+  }
+  state.navGrid = new NavGrid(24, 12, cells);
+  const { employee } = hireEmployee(state.employees, 'driver', new Random(42), 3, 5);
+  assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler as never, 1);
+  purchaseVehicle(state.vehicles, 'debris_hauler', 4, 5);
+  const built = placeBuilding(state.buildings, 'freight_warehouse', 5, 8, 64, 64);
+  if (!built.success) throw new Error(built.error);
+  setFreightRoom(state, 5000);
+}
+
+function withFragmentAt(state: GameState, id: number, at: { x: number; z: number }): void {
+  const f = fragment(id);
+  f.position = { x: at.x, y: 0, z: at.z };
+  f.origin = { ...f.position };
+  state.logistics.fragments.push({ fragment: f, state: 'on_ground', vehicleId: null, warehouseId: null });
+}
+
+function queueHaul(state: GameState, fragmentId: number, at: { x: number; z: number }): number {
+  const id = state.nextPendingActionId++;
+  dispatchPendingAction(state, {
+    id, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+    targetX: at.x, targetZ: at.z, targetY: 0, payload: { fragmentId }, targetEmployeeId: null,
+  }, { skipQualificationCheck: true });
+  return id;
+}
+
 describe('reachableHaulableOreKg (#2126)', () => {
   let state: GameState;
   beforeEach(() => {
@@ -70,12 +117,25 @@ describe('reachableHaulableOreKg (#2126)', () => {
     expect(reachableHaulableOreKg(state)).toBeCloseTo(2 * one);
   });
 
-  it('leaves out a fragment whose haul order is out of reach', () => {
-    withFragment(state, 1);
-    withFragment(state, 2);
+  it('leaves out a fragment the terrain strands: it lies across a wall no vehicle crosses', () => {
+    walledSite(state);
+    withFragmentAt(state, 1, NEAR);
+    withFragmentAt(state, 2, ACROSS_WALL);
     const both = reachableHaulableOreKg(state);
-    withHaulOrder(state, 2, 'debris_out_of_reach');
+    queueHaul(state, 1, NEAR);
+    queueHaul(state, 2, ACROSS_WALL);
     expect(reachableHaulableOreKg(state)).toBeCloseTo(both / 2);
+  });
+
+  it('keeps a fragment whose order reads debris_out_of_reach only because rubble rings it: the pile is worked from its edge', () => {
+    walledSite(state);
+    withFragmentAt(state, 1, NEAR);
+    withFragmentAt(state, 2, { x: NEAR.x + 1, z: NEAR.z });
+    const both = reachableHaulableOreKg(state);
+    queueHaul(state, 1, NEAR);
+    const id = queueHaul(state, 2, { x: NEAR.x + 1, z: NEAR.z });
+    state.pendingActions.find(a => a.id === id)!.blockedReason = 'debris_out_of_reach';
+    expect(reachableHaulableOreKg(state)).toBeCloseTo(both);
   });
 
   it('keeps a fragment blocked for another reason, and never counts a boulder', () => {

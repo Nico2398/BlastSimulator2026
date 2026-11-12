@@ -17,16 +17,23 @@ import {
   PERMIT_LIMITS,
   VEHICLE_TIER_UNLOCK_GRADE,
 } from '../../../src/core/config/balance.js';
+import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
+import { patternAreaM2 } from '../../../src/core/mining/ChargePlan.js';
 
 const BASE: LadderShot = { rows: 3, cols: 3, spacing: 4, depth: 5, kgPerHole: 4, stemming: 2.5, diameterM: 0.089 };
 const WIDE = 0.165;
 
+/** Permit area (m²) of a shot's square grid, as the permit measures the holes `drill_plan grid` lays out. */
+function shotAreaM2(shot: Pick<LadderShot, 'rows' | 'cols' | 'spacing' | 'depth' | 'diameterM'>): number {
+  return patternAreaM2(createGridPlan({ nextHoleId: 1 }, { x: 0, z: 0 }, shot.rows, shot.cols, shot.spacing, shot.depth, shot.diameterM));
+}
+
 describe('limitSizedShot', () => {
   for (const grade of [0, 1, 2, 3, 4, 5]) {
-    it(`grade ${grade}: never exceeds the permit charge or hole limit`, () => {
+    it(`grade ${grade}: never exceeds the permit charge or area limit`, () => {
       const limit = PERMIT_LIMITS[grade]!;
       const shot = limitSizedShot(limit, BASE, WIDE);
-      expect(shot.rows * shot.cols).toBeLessThanOrEqual(limit.maxHoles);
+      expect(shotAreaM2(shot)).toBeLessThanOrEqual(limit.maxAreaM2);
       expect(shot.rows * shot.cols * shot.kgPerHole).toBeLessThanOrEqual(limit.maxChargeKg + 1e-9);
       expect(shot.rows).toBe(shot.cols);
       expect(shot.rows).toBeGreaterThanOrEqual(1);
@@ -56,10 +63,22 @@ describe('limitSizedShot', () => {
   });
 
   it('limits too small for the base shot collapse to a single hole', () => {
-    const s = limitSizedShot({ maxChargeKg: 0.5, maxHoles: 1 }, BASE, 0.089);
-    expect(s.rows).toBe(1);
-    expect(s.cols).toBe(1);
-    expect(s.kgPerHole).toBeLessThanOrEqual(0.5);
+    for (const maxAreaM2 of [BASE.spacing ** 2, 1]) {
+      const s = limitSizedShot({ maxChargeKg: 0.5, maxAreaM2 }, BASE, 0.089);
+      expect(s.rows).toBe(1);
+      expect(s.cols).toBe(1);
+      expect(s.kgPerHole).toBeLessThanOrEqual(0.5);
+    }
+  });
+
+  it('the permit counts area, not holes: a closer spacing fits more holes in the same permit', () => {
+    // Grade 2's 576 m² holds 36 cells of 4 m but 144 of 2 m; 800 kg still gives every one of them at least 1 kg.
+    const wide = limitSizedShot(PERMIT_LIMITS[2]!, BASE, WIDE);
+    const close = limitSizedShot(PERMIT_LIMITS[2]!, { ...BASE, spacing: 2 }, WIDE);
+    expect(wide.rows * wide.cols).toBe(36);
+    expect(close.rows * close.cols).toBe(144);
+    expect(shotAreaM2(close)).toBeLessThanOrEqual(PERMIT_LIMITS[2]!.maxAreaM2);
+    expect(close.rows * close.cols * close.kgPerHole).toBeLessThanOrEqual(PERMIT_LIMITS[2]!.maxChargeKg + 1e-9);
   });
 
   it('never exceeds the rig diameter cap', () => {
@@ -86,16 +105,34 @@ describe('holeSpacingForChargeM (#2091)', () => {
 });
 
 describe('fullHoleSide (#2091)', () => {
-  it('fills the hole count when the charge limit allows it: grade 2 fits 36 holes of 10 kg in 800 kg', () => {
-    expect(fullHoleSide(PERMIT_LIMITS[2]!, 10)).toBe(6);
+  it('fills the permit area when the charge limit allows it: grade 2\'s 576 m² holds 36 4 m cells, 36 holes of 10 kg fit 800 kg', () => {
+    expect(fullHoleSide(PERMIT_LIMITS[2]!, 10, 4)).toBe(6);
   });
 
   it('is held by the charge limit when it binds first: grade 1 fits 12 holes of 10 kg in 120 kg, a 3x3', () => {
-    expect(fullHoleSide(PERMIT_LIMITS[1]!, 10)).toBe(3);
+    expect(fullHoleSide(PERMIT_LIMITS[1]!, 10, 4)).toBe(3);
+  });
+
+  it('a closer spacing fits more holes in the same area, until the charge binds', () => {
+    // Grade 2: 576 m² holds 144 cells of 2 m; 800 kg holds 80 holes of 10 kg, an 8x8.
+    expect(fullHoleSide(PERMIT_LIMITS[2]!, 10, 2)).toBe(8);
+    expect(fullHoleSide(PERMIT_LIMITS[2]!, 10, 2)).toBeGreaterThan(fullHoleSide(PERMIT_LIMITS[2]!, 10, 4));
+    // Grade 1: 256 m² holds 64 cells of 2 m, but 120 kg only 12 holes of 10 kg.
+    expect(fullHoleSide(PERMIT_LIMITS[1]!, 10, 2)).toBe(3);
+  });
+
+  it('never lays out more cells than the permit area holds', () => {
+    for (const grade of [0, 1, 2, 3, 4, 5]) {
+      for (const spacing of [2, 3, 4]) {
+        const side = fullHoleSide(PERMIT_LIMITS[grade]!, 1, spacing);
+        expect(side * side * spacing * spacing, `grade ${grade}, ${spacing} m`).toBeLessThanOrEqual(PERMIT_LIMITS[grade]!.maxAreaM2);
+      }
+    }
   });
 
   it('is at least one hole when even one full hole is over the limit', () => {
-    expect(fullHoleSide(PERMIT_LIMITS[0]!, 50)).toBe(1);
+    expect(fullHoleSide(PERMIT_LIMITS[0]!, 50, 4)).toBe(1);
+    expect(fullHoleSide({ maxChargeKg: 40, maxAreaM2: 1 }, 4, 4)).toBe(1);
   });
 });
 

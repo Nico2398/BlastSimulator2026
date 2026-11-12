@@ -25,6 +25,8 @@ import { findBuildingApproachCell } from '../../../src/core/nav/BuildingApproach
 import { rampFootprint } from '../../../src/core/mining/RampWidening.js';
 import type { RampDef } from '../../../src/core/mining/Ramp.js';
 import type { PlaceBuildingActionPayload } from '../../../src/core/engine/PlaceBuildingAction.js';
+import { drillHoleCost } from '../../../src/core/mining/DrillPlan.js';
+import type { PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 
 const SEED = 42;
 
@@ -469,5 +471,75 @@ describe('applyTaskCompletion — charge_hole generates the rock it will blast (
 
     expect(report.chargeLoaded?.holeId).toBe('H1');
     expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: 7 });
+  });
+});
+
+describe('applyTaskCompletion — a drilled hole is paid for as it lands', () => {
+  /** A blaster finishing the drill_hole order of `hole`, still in the plan's ordered holes. */
+  function drillFixture(hole: PlannedHole) {
+    const state = createGame({ seed: SEED });
+    const { employee } = hireEmployee(state.employees, 'blaster', new Random(SEED), 0, 0);
+    state.plannedDrillHoles.push({ ...hole });
+    state.tickCount = 37;
+    const finish = () => applyTaskCompletion(state, null, employee, baseProgress({
+      actionType: 'drill_hole',
+      actionPayload: { holeId: hole.id },
+    }), new EventEmitter());
+    return { state, finish };
+  }
+
+  const drillingExpenses = (state: ReturnType<typeof createGame>) =>
+    state.finances.transactions.filter(tx => tx.type === 'expense' && tx.category === 'drilling');
+
+  it('books drillHoleCost of the hole as one \'drilling\' expense, named after the hole', () => {
+    const { state, finish } = drillFixture({ id: 'H3', x: 20, z: 20, depth: 8, diameter: 0.089 });
+    const cashBefore = state.cash;
+
+    const report = finish();
+
+    expect(report.drillHole).toEqual({ holeId: 'H3', x: 20, z: 20 });
+    const cost = drillHoleCost(8, 0.089);
+    expect(cost).toBe(96);
+    expect(state.cash).toBe(cashBefore - cost);
+    expect(drillingExpenses(state)).toEqual([
+      { tick: 37, amount: cost, type: 'expense', category: 'drilling', description: 'Drilling: hole H3' },
+    ]);
+  });
+
+  it('prices the hole at its own depth and bore', () => {
+    const { state, finish } = drillFixture({ id: 'H1', x: 4, z: 6, depth: 7, diameter: 0.127 });
+    const cashBefore = state.cash;
+
+    finish();
+
+    // 12 x 7 x 127/89 = 119.87 -> $120, above the $84 the same depth costs at 89 mm.
+    expect(drillHoleCost(7, 0.127)).toBe(120);
+    expect(state.cash).toBe(cashBefore - 120);
+    expect(drillingExpenses(state).map(tx => tx.amount)).toEqual([120]);
+  });
+
+  it('lands the hole with the pattern cell it was ordered in', () => {
+    const { state, finish } = drillFixture({ id: 'H2', x: 14, z: 13, depth: 8, diameter: 0.089, spacingM: 4, burdenM: 3 });
+
+    finish();
+
+    expect(state.plannedDrillHoles).toEqual([]);
+    expect(state.drillHoles).toEqual([{ id: 'H2', x: 14, z: 13, depth: 8, diameter: 0.089, spacingM: 4, burdenM: 3 }]);
+  });
+
+  it('rejection: a drill order whose hole left the plan lands nothing and books nothing', () => {
+    const { state } = drillFixture({ id: 'H1', x: 4, z: 6, depth: 8, diameter: 0.089 });
+    const { employee } = hireEmployee(state.employees, 'blaster', new Random(SEED + 1), 0, 0);
+    const cashBefore = state.cash;
+
+    const report = applyTaskCompletion(state, null, employee, baseProgress({
+      actionType: 'drill_hole',
+      actionPayload: { holeId: 'H99' },
+    }), new EventEmitter());
+
+    expect(report.drillHole).toBeUndefined();
+    expect(state.cash).toBe(cashBefore);
+    expect(drillingExpenses(state)).toEqual([]);
+    expect(state.drillHoles).toEqual([]);
   });
 });

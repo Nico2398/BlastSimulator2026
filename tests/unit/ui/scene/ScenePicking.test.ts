@@ -131,6 +131,35 @@ describe('pickScene', () => {
     fm.dispose();
   });
 
+  describe('a vehicle under loose rock', () => {
+    function rockOverHauler(rockY: number) {
+      const scene = new THREE.Scene();
+      const vm = new VehicleMesh(scene);
+      const vehicle = { id: 3, type: 'debris_hauler', x: 5, z: 5, hp: 100, tier: 1, cargo: [], occupantIds: [] } as never;
+      vm.addVehicle(vehicle, { vehicles: [vehicle], nextId: 4, driverBoardingCount: 0, reservations: [] } as never, [], 0);
+      const fm = new FragmentMesh(scene, new THREE.MeshBasicMaterial());
+      fm.spawnFragments([{
+        id: 12, position: { x: 5, y: rockY, z: 5 }, volume: 1, mass: 1000,
+        rockId: 'sandite', oreDensities: {}, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+        halfExtents: { x: 0.4, y: 0.4, z: 0.4 }, shapeSeed: 12, origin: { x: 5, y: rockY, z: 5 },
+      }]);
+      scene.updateMatrixWorld(true);
+      const renderer = makeFakeRenderer({ pickables: [...vm.pickables(), ...fm.pickables()], fragments: fm });
+      const pick = pickScene(0, 0, makeTopDownCamera(5, 5), renderer);
+      vm.dispose();
+      fm.dispose();
+      return pick;
+    }
+
+    it('a click on a rock drawn just over a hauler selects the hauler', () => {
+      expect(rockOverHauler(3.5).entity).toEqual(expect.objectContaining({ kind: 'vehicle', id: 3 }));
+    });
+
+    it('a rock well above the hauler keeps the click', () => {
+      expect(rockOverHauler(12).entity).toEqual(expect.objectContaining({ kind: 'fragment', id: 12 }));
+    });
+  });
+
   it('raw-ground picks (selectRamps=false) see through fragments to the terrain beneath', () => {
     const scene = new THREE.Scene();
     const fm = new FragmentMesh(scene, new THREE.MeshBasicMaterial());

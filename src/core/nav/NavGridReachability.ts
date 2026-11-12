@@ -7,7 +7,7 @@
 // so `NavGrid.findNearestReachableCell` etc. remain the public entry points.
 
 import type { NavGrid, NavCell } from './NavGrid.js';
-import { isStepClimbable, isGridStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
+import { isStepClimbable, isGridStepClimbable, isCellOccupied, hasClearance, rubbleBlocksMover } from './NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 import { NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { isDiagonalCornerClear } from './Pathfinding.js';
@@ -770,8 +770,11 @@ export function computeClimbComponents(
   const { width, height, originX, originZ } = navGrid;
   const label = new Int32Array(width * height);
   const stack = new Int32Array(width * height);
+  // Rubble blocks vehicles (`rubbleBlocksMover`): at vehicle clearance a cell under a fragment joins no component.
+  const rubbleBlocks = rubbleBlocksMover(requiredClearance);
   const isGood = (cell: NavCell | null | undefined): cell is NavCell =>
-    cell != null && cell.type !== 'blocked' && cell.type !== 'void' && hasClearance(cell, requiredClearance);
+    cell != null && cell.type !== 'blocked' && cell.type !== 'void' && !(rubbleBlocks && (cell.fragmentOccupancy ?? 0) > 0)
+    && hasClearance(cell, requiredClearance);
 
   let next = 0;
   for (let start = 0; start < label.length; start++) {

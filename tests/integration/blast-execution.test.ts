@@ -20,9 +20,10 @@ import { computeDangerZone, isInZone } from '../../src/core/entities/Zone.js';
 import {
   BLAST_DANGER_MARGIN_M, NAV_MAX_SLOPE_RATIO,
   DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M,
-  CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M } from '../../src/core/config/balance.js';
+  CHARGE_DEFAULT_STEMMING_M } from '../../src/core/config/balance.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { buildBlastReport } from '../../src/core/mining/BlastExecution.js';
+import { totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 
 /** tickUntilFresh that also keeps payroll from bankrupting the run: charging is worked from a truck by one crew member (#1649), so a charge pass spans far more payroll ticks than the starting cash covers. */
 function tickFunded(run: (cmd: string) => unknown, state: GameState, predicate: () => boolean, maxTicks: number): void {
@@ -934,16 +935,20 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
 
 // ── #1723: a blast breaks its floor down to grade, so the crater is drivable ──
 
-/** Sandbox desert_badlands seed 42, a 3x3 spacing-S 8 m grid at (28,18), krackle `kg` kg, stemming 2.5 — the issue's measured pattern. */
-function sandboxCraterBlast(kg: number, spacing: number) {
+/** A 3x3 design: explosive, kg per hole (null fills each hole up to the stemming), stemming, spacing. */
+interface CraterDesign { explosive: string; kg: number | null; stemming: number; spacing: number }
+
+/** Sandbox desert_badlands seed 42, a 3x3 8 m grid of `design` at (28,18) — the issue's measured site. */
+function sandboxCraterBlast(design: CraterDesign) {
   const { runner, ctx } = createRunner();
   expect(runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42').success).toBe(true);
   const grid = ctx.grid!;
   const counter = { nextHoleId: 1 };
-  const holes = createGridPlan(counter, { x: 28, z: 18 }, 3, 3, spacing, 8, 0.089);
+  const holes = createGridPlan(counter, { x: 28, z: 18 }, 3, 3, design.spacing, 8, 0.089);
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
-  const { charges } = batchCharge(holes.map(h => h.id), depths, 'krackle', kg, 2.5);
+  const { charges, errors } = batchCharge(holes.map(h => h.id), depths, design.explosive, design.kg, design.stemming);
+  expect(errors).toEqual([]);
   const plan = assembleBlastPlan(holes, charges);
 
   const before = new Map<string, number>();
@@ -993,25 +998,30 @@ function largestDrivablePatch(grid: VoxelGrid, crater: Array<{ x: number; z: num
 }
 
 describe('Blast execution — floor broken to grade (#1723)', () => {
-  // 6 kg at spacing 4 is not covered: it leaves nine separate pits with intact
-  // rock between the holes (issue #1723's table), so no grade makes them one
-  // drivable patch. The measured patterns are 8 kg and 10 kg.
-  for (const kg of [8, 10]) {
-    it(`krackle ${kg} kg, spacing 4: at least 80% of the crater's columns are one slope-connected patch`, () => {
-      const { grid, crater } = sandboxCraterBlast(kg, 4);
+  // Holes 4 m apart filled up to the default stemming, from the weakest explosive to a strong one: each
+  // hole floors at its own bottom, so whatever the explosive the crater is one drivable floor.
+  const designs: CraterDesign[] = [
+    { explosive: 'boomite', kg: null, stemming: CHARGE_DEFAULT_STEMMING_M, spacing: 4 },
+    { explosive: 'pop_rock', kg: null, stemming: CHARGE_DEFAULT_STEMMING_M, spacing: 4 },
+    { explosive: 'krackle', kg: null, stemming: CHARGE_DEFAULT_STEMMING_M, spacing: 4 },
+    { explosive: 'krackle', kg: 8, stemming: CHARGE_DEFAULT_STEMMING_M, spacing: 4 },
+  ];
+  for (const design of designs) {
+    it(`${design.explosive} ${design.kg === null ? 'filled' : `${design.kg} kg`} under ${design.stemming} m of stemming, spacing ${design.spacing}: at least 80% of the crater's columns are one slope-connected patch`, () => {
+      const { grid, crater } = sandboxCraterBlast(design);
       expect(crater.length).toBeGreaterThan(20);
       expect(largestDrivablePatch(grid, crater) / crater.length).toBeGreaterThanOrEqual(0.8);
     });
   }
 
-  it('krackle 8 kg: the pre-blast estimate breaks exactly the voxels the blast clears', () => {
-    const { result, estimatedBroken } = sandboxCraterBlast(8, 4);
+  it('the pre-blast estimate breaks exactly the voxels the blast clears', () => {
+    const { result, estimatedBroken } = sandboxCraterBlast(designs[0]!);
     expect(estimatedBroken).toBeGreaterThan(0);
     expect(estimatedBroken).toBe(result.clearedVoxels);
   });
 
-  it('krackle 8 kg: the fragments carry every cleared voxel (volume conserved)', () => {
-    const { result } = sandboxCraterBlast(8, 4);
+  it('the fragments carry every cleared voxel (volume conserved)', () => {
+    const { result } = sandboxCraterBlast(designs[0]!);
     const volume = result.fragments.reduce((sum, f) => sum + f.volume, 0);
     expect(volume).toBeCloseTo(result.clearedVoxels, 0);
   });
@@ -1046,8 +1056,10 @@ describe('Blast execution — haulers keep hauling reachable debris past a crate
 
     const WINDOW = 400;
     const start = state().tickCount;
-    const movedFragments = () => state().logistics.fragments.filter(f => f.state !== 'on_ground').length;
-    const movedAtStart = movedFragments();
+    // Mass delivered: ore to the warehouse, barren rock to the spoil heap (#1530). A delivered barren piece leaves
+    // `logistics.fragments`, so counting pieces off the ground only sees the ones riding in a truck at that tick.
+    const hauledKg = () => state().logistics.storedMassKg + totalSpoilKg(state().buildings.buildings);
+    const hauledAtStart = hauledKg();
     let idleWhileReachable = 0;
     let peakQueued = -1;
     for (let i = 0; i < WINDOW; i++) {
@@ -1068,8 +1080,8 @@ describe('Blast execution — haulers keep hauling reachable debris past a crate
     expect(idleWhileReachable).toBeLessThan(WINDOW / 10);
     // Reachable rock keeps being hauled. The core's own crater-access ramp (#2082) opens the whole crater
     // to the crew early in the window and fragmenting its rubble spawns new haul orders as fast as they
-    // drain, so progress is counted in fragments moved off the ground, not in a shrinking queue.
-    if (peakQueued > 0) expect(movedFragments()).toBeGreaterThan(movedAtStart);
+    // drain, so progress is counted in mass delivered, not in a shrinking queue.
+    if (peakQueued > 0) expect(hauledKg()).toBeGreaterThan(hauledAtStart);
   }, 240_000);
 });
 
@@ -1092,8 +1104,8 @@ function loweredColumns(grid: VoxelGrid, before: Map<string, number>): string[] 
   return lowered;
 }
 
-/** Sandbox desert_badlands seed 42 flat pad: a 3x3 krackle pattern at (28,18). */
-function sandboxBlast(spacing: number, depth: number, kg: number, stemming: number) {
+/** Sandbox desert_badlands seed 42 flat pad: a 3x3 krackle pattern at (28,18); `kg` null fills each hole up to the stemming. */
+function sandboxBlast(spacing: number, depth: number, kg: number | null, stemming: number) {
   const { runner, ctx } = createRunner();
   expect(runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42').success).toBe(true);
   const grid = ctx.grid!;
@@ -1149,9 +1161,9 @@ describe('Blast execution — a charge too deep to break out (#1724)', () => {
     expect(buildBlastReport(result, 0, 0).ratingCap).not.toBe('no_breakout');
   });
 
-  it('the default plan (grid, charge and stemming defaults) breaks out on the sandbox flat pad and lowers the surface', () => {
+  it('the default plan (grid defaults, holes filled under the default stemming) breaks out on the sandbox flat pad and lowers the surface', () => {
     const { grid, result, before } = sandboxBlast(
-      DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M,
+      DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M, null, CHARGE_DEFAULT_STEMMING_M,
     );
     expect(result.clearedVoxels).toBeGreaterThan(0);
     expect(result.brokeOut).toBe(true);
@@ -1162,7 +1174,7 @@ describe('Blast execution — a charge too deep to break out (#1724)', () => {
 
   it('the default plan carries every cleared voxel in a fragment (volume conserved) and opens a crater', () => {
     const { grid, result, before } = sandboxBlast(
-      DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M,
+      DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M, null, CHARGE_DEFAULT_STEMMING_M,
     );
     expect(loweredColumns(grid, before).length).toBeGreaterThanOrEqual(9);
     // Volume is conserved: every cleared voxel is carried by a fragment.
@@ -1172,7 +1184,7 @@ describe('Blast execution — a charge too deep to break out (#1724)', () => {
 });
 
 describe('Blast execution — the tutorial plan opens the box cut (#1724)', () => {
-  it('tutorial_pit: ramp, then the 3x3 spacing 4 depth 8 plan charged with the defaults, breaks out and lowers the surface', () => {
+  it('tutorial_pit: ramp, then the 3x3 spacing 4 depth 8 plan filled under the default stemming, breaks out and lowers the surface', () => {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
     const topUp = (): void => {
@@ -1195,7 +1207,7 @@ describe('Blast execution — the tutorial plan opens the box cut (#1724)', () =
     expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:14,24').success).toBe(true);
     tickWhile(() => ctx.state!.plannedDrillHoles.length > 0, 1500);
     expect(ctx.state!.drillHoles.length).toBe(9);
-    expect(run(`charge hole:* explosive:boomite amount:${CHARGE_DEFAULT_AMOUNT_KG} stemming:${CHARGE_DEFAULT_STEMMING_M}`).success).toBe(true);
+    expect(run(`charge hole:* explosive:boomite stemming:${CHARGE_DEFAULT_STEMMING_M}`).success).toBe(true);
     tickWhile(() => Object.keys(ctx.state!.plannedChargesByHole).length > 0, 3000);
     expect(Object.keys(ctx.state!.plannedChargesByHole)).toHaveLength(0);
 

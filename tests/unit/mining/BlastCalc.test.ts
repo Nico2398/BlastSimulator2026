@@ -121,30 +121,30 @@ describe('BlastCalc — totalChargeKg', () => {
 
 describe('BlastCalc — fragmentBoulder', () => {
   // ── Deterministic fixtures ──────────────────────────────────────────────────
-  // Oversized boulder: 2.0 m³, granite density 2 700 kg/m³ → 5 400 kg.
+  // Oversized boulder: 6.0 m³ (above the 2.0 m³ threshold), granite density 2 700 kg/m³ → 16 200 kg.
   // oreDensities are fractions that must sum to 1 (blingite 30 % + dirtite 70 %).
   const oversizedBoulder: Boulder = {
     id: 1,
-    volume: 2.0,
-    mass: 5_400,
+    volume: 6.0,
+    mass: 16_200,
     rockId: 'granite',
     oreDensities: { blingite: 0.3, dirtite: 0.7 },
   };
 
-  // Non-oversized boulder: 0.3 m³ — below the 0.5 m³ threshold.
+  // Non-oversized boulder: 1.0 m³ — below the 2.0 m³ threshold.
   const normalBoulder: Boulder = {
     id: 2,
-    volume: 0.3,
-    mass: 810,
+    volume: 1.0,
+    mass: 2_700,
     rockId: 'granite',
     oreDensities: { blingite: 0.3, dirtite: 0.7 },
   };
 
-  // Exactly-at-threshold boulder: 0.5 m³ — boundary, must NOT be oversized.
+  // Exactly-at-threshold boulder: 2.0 m³ — boundary, must NOT be oversized.
   const boundaryBoulder: Boulder = {
     id: 3,
-    volume: 0.5,
-    mass: 1_350,
+    volume: 2.0,
+    mass: 5_400,
     rockId: 'granite',
     oreDensities: { dirtite: 1.0 },
   };
@@ -153,7 +153,7 @@ describe('BlastCalc — fragmentBoulder', () => {
 
   it('isOversized returns true for volume strictly above the threshold', () => {
     expect(isOversized(OVERSIZED_FRAGMENT_THRESHOLD + 0.001)).toBe(true);
-    expect(isOversized(1.0)).toBe(true);
+    expect(isOversized(3.0)).toBe(true);
     expect(isOversized(10.0)).toBe(true);
   });
 
@@ -528,7 +528,7 @@ describe('BlastCalc — computeInitialEnergy', () => {
 describe('BlastCalc — isFragmentOversized', () => {
   it('returns true for volume strictly above the threshold', () => {
     expect(isFragmentOversized(OVERSIZED_FRAGMENT_THRESHOLD + 0.001)).toBe(true);
-    expect(isFragmentOversized(1.0)).toBe(true);
+    expect(isFragmentOversized(3.0)).toBe(true);
     expect(isFragmentOversized(10.0)).toBe(true);
   });
 
@@ -543,9 +543,10 @@ describe('BlastCalc — isFragmentOversized', () => {
   });
 
   it('is consistent with isOversized behavior for same volume values', () => {
-    expect(isFragmentOversized(0.3)).toBe(isOversized(0.3));
-    expect(isFragmentOversized(0.5)).toBe(isOversized(0.5));
-    expect(isFragmentOversized(0.7)).toBe(isOversized(0.7));
+    // Below, at and above the 2.0 m³ threshold.
+    expect(isFragmentOversized(1.5)).toBe(isOversized(1.5));
+    expect(isFragmentOversized(2.0)).toBe(isOversized(2.0));
+    expect(isFragmentOversized(2.5)).toBe(isOversized(2.5));
   });
 });
 // -- effectiveHoleEnergy: no upward component (#2197) --

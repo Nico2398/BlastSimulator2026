@@ -65,8 +65,8 @@ describe('the charge step charges from cash at loading (#2153)', () => {
     return state;
   }
 
-  it('scripts only a charge command: boomite at the default amount and stemming', () => {
-    expect(step('charge').commands).toEqual(['charge hole:* explosive:boomite amount:7 stemming:2.5']);
+  it('scripts only a charge command: boomite filled up to the default stemming', () => {
+    expect(step('charge').commands).toEqual(['charge hole:* explosive:boomite stemming:2.5']);
   });
 
   it('completes once every hole is charged, with no stock anywhere', () => {

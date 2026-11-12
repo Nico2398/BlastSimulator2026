@@ -1297,6 +1297,21 @@ describe('isImpassable — isAgentCell exemption (#954)', () => {
     expect(isImpassable(cell, false, false)).toBe(false);
   });
 
+  it('rubble blocks a vehicle (vehicle clearance) even when avoidVehicles is false', () => {
+    const cell = makeCell('walkable');
+    cell.fragmentOccupancy = 1;
+    cell.clearance = 5;
+    expect(isImpassable(cell, false, false, NAV_CLEARANCE_VEHICLE_CELLS)).toBe(true);
+    expect(isImpassable(cell, false, true, NAV_CLEARANCE_VEHICLE_CELLS)).toBe(false); // its own cell never blocks it
+  });
+
+  it('a vehicle-occupied cell still blocks only when avoidVehicles is true', () => {
+    const cell = makeCell('walkable');
+    cell.vehicleOccupied = true;
+    expect(isImpassable(cell, false, false)).toBe(false);
+    expect(isImpassable(cell, true, false)).toBe(true);
+  });
+
   it('does NOT block a genuinely blocked (building) cell for isAgentCell true (#1025 — corrected contract: the agent\'s own current cell is never impassable to itself, not even blocked/void)', () => {
     // #1025: a fatigue-frozen employee gets clampToGrid'd onto a discrete
     // cell; if a building's footprint later occupies that exact cell, the

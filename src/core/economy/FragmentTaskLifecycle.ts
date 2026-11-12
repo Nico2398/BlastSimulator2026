@@ -116,7 +116,9 @@ export function findNearestReachableFragment(
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
     if (!extraEligible(tracked)) continue;
-    const { x: fx, z: fz } = fragmentApproachCell(tracked.fragment, state, vehicleId);
+    const approach = fragmentApproachCell(tracked.fragment, state, vehicleId);
+    if (approach === null) continue; // no free side yet: buried in its pile
+    const { x: fx, z: fz } = approach;
     if (!reachable.has(fx, fz)) continue;
     const distSq = (fx - originX) ** 2 + (fz - originZ) ** 2;
     if (distSq < bestDistSq) {

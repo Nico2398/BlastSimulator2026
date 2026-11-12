@@ -488,8 +488,20 @@ export const ORE_REPORT_ABSURDIUM_FRACTION = 0.3;
 
 // ─── Mining & Blasting ─────────────────────────────────────────────────────────
 
-/** Maximum fragment volume (m³) that can be hauled directly without secondary fragmentation. */
-export const OVERSIZED_FRAGMENT_THRESHOLD = 0.5;
+/**
+ * Maximum fragment volume (m³) that can be hauled directly without secondary fragmentation: above it a
+ * rock is a boulder for the fragmenter. Boulders come from the collar under the stemming and from weakly
+ * broken rock at the pattern's edges. Set where a well-designed shot leaves none: on the tutorial pit's
+ * guided 3x3 (4 m, 8 m deep, boomite filled under 2.5 m) the largest piece is 2.0 m³, while an
+ * underfilled or over-stemmed shot on the same ground leaves 13-62 pieces above it, up to 11 m³.
+ */
+export const OVERSIZED_FRAGMENT_THRESHOLD = 2.0;
+
+/**
+ * Largest fragment volume (m³) a vehicle drives over: one sub-cell of rock (`SUB_CELL_RESOLUTION`), the
+ * smallest piece a blast makes. Anything bigger blocks vehicles over its footprint (`fragmentBlocksVehicles`).
+ */
+export const FRAGMENT_DRIVABLE_MAX_VOLUME_M3 = 0.125;
 
 /** Speed threshold (m/s) above which a fragment is classified as a dangerous projection.
  *  Real blasting: fly-rock can travel 500m+ at high speed. Scaled for gameplay. */
@@ -504,11 +516,6 @@ export const STEMMING_MIN_EFFICIENCY = 0.5;
 /** Epsilon for blast energy attenuation formula (prevents division by zero). */
 export const BLAST_ENERGY_EPSILON = 4.0;
 
-/** Energy below this (game energy units) is not worth propagating further, and is
- *  written off as dissipated. Rock absorption thresholds start at 200, so this is
- *  four orders of magnitude below anything that could fracture a voxel. */
-export const PROPAGATION_ENERGY_EPSILON = 0.01;
-
 /** Remaining mass below this (kg) after splitting a stored fragment is treated
  *  as fully consumed rather than left behind as a negligible remainder. */
 export const FRAGMENT_SPLIT_EPSILON_KG = 1e-6;
@@ -517,19 +524,33 @@ export const FRAGMENT_SPLIT_EPSILON_KG = 1e-6;
  *  Freight Warehouses provide, so before the first one is built nothing can be stored (#1369). */
 export const INITIAL_STORAGE_CAPACITY_KG = 0;
 
-/** Fraction of the energy passing through a voxel that is lost to heat and noise
- *  rather than handed to its neighbours, as
- *  `BASE + POROSITY_SCALE × porosity`.
- *  Porous rock damps a shock wave, dense rock carries it: across the catalog's
- *  porosity range (0.02–0.35) this spans roughly 9%–22% loss per voxel, which is
- *  what stops energy travelling forever and gives every blast a finite radius. */
-export const TRANSMISSION_LOSS_BASE = 0.08;
-export const TRANSMISSION_LOSS_POROSITY_SCALE = 0.40;
+/**
+ * Decay length (m) of a charge's energy through rock: the energy a voxel receives from a
+ * hole falls by e for every this many metres of rock between them (`EnergyPropagation`).
+ *
+ * This is what makes the drill pattern a real choice. Holes closer together than about
+ * twice this length overlap and fill the rock evenly; holes much farther apart leave a
+ * hot core round each hole (fines, dust) and cold rock between them (coarse, intact).
+ * Measured on uniform benches (12 x 12 m patterns, 8 m holes, the best explosive, bore and
+ * stemming per spacing): the best good-band share is ~70% at 2-3 m, ~60% at 4 m and
+ * 25-45% at 6 m, depending on the rock.
+ */
+export const BLAST_ENERGY_DECAY_M = 1.3;
 
-/** Kilograms of explosive that fill one metre of drill hole. Sets how long a
- *  charge column is, so a bigger charge works on a taller slice of rock instead
- *  of pushing harder on the same voxel. */
+/**
+ * Farthest (m, through rock) a hole's energy is spread. Below 3% of the energy a voxel at
+ * the hole receives; kept under `BLAST_ZONE_RADIUS` so the blast box always holds it.
+ */
+export const BLAST_ENERGY_REACH_M = 4.5;
+
+/** Kilograms of explosive at `CHARGE_REFERENCE_DENSITY` that fill one metre of an 89 mm hole.
+ *  A charge fills its hole from the bottom up to the stemming, so this — scaled by the
+ *  bore's cross-section and the explosive's own density (`chargeKgPerMetre`) — sets how
+ *  much explosive, and so how much energy, each metre of hole holds. */
 export const CHARGE_KG_PER_METRE = 2.0;
+
+/** Loaded density (g/cm³) `CHARGE_KG_PER_METRE` is written for: boomite, the ANFO-like default. */
+export const CHARGE_REFERENCE_DENSITY = 0.8;
 
 /** Metres of float tolerance when testing charge column + stemming against hole
  *  depth, so an exact fit (8 kg + 2 m in a 6 m hole) is not refused by rounding. */
@@ -562,6 +583,15 @@ export const DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M = 0.0005;
  *  against when its interaction array never clicks the spacing stepper. Four
  *  metres so the tutorial's 8x8 drill region computes a 3x3 grid untouched (#1330). */
 export const DRILL_GRID_DEFAULT_SPACING_M = 4;
+
+/** Drilling cost per metre of an 89 mm hole (bits, rods, compressor time), paid as each hole is finished.
+ *  Scales with the bore. It is what a finer mesh costs: the same ground in more, shorter-spaced holes. */
+export const DRILL_COST_PER_METRE = 12;
+
+/** Widest rock cell side (m) a hole placed on its own is given (`holeCellSize`, `patternAreaM2`): about
+ *  twice the reach of its energy (`BLAST_ENERGY_REACH_M`), so a lone hole far from the others is not
+ *  counted as working a field it cannot touch. */
+export const HOLE_CELL_MAX_SIDE_M = 8;
 /** Hole depth (m) the grid tool's placement strip opens at before the player
  *  steps it (#1069), same reasoning as DRILL_GRID_DEFAULT_SPACING_M; 8 m matches the tutorial's
  *  scripted plan (#1330). */
@@ -582,32 +612,14 @@ export const CHARGE_HOLE_REFERENCE_AMOUNT_KG = 5;
  *  never under-stem what a player could ever click. */
 export const MIN_STEMMING_M = 0.5;
 
-/** Default explosive amount (kg) the Charge panel opens with, and the tutorial's
- *  scripted charge (#1330, #1724). Chosen as the smallest charge that breaks out
- *  of an 8 m, 4 m-spaced 3x3 pattern with every hole's column lowered, on both
- *  the sandbox flat pad and the tutorial pit, rating at least good. Measured with
- *  boomite and 2.5 m stemming (executeBlast; sandbox desert_badlands seed 42 pad at
- *  28,18, tutorial_pit after the seismic survey, build_ramp 10,23-10,35 depth 6 and
- *  drill_plan at 14,24):
- *    kg    sandbox lowered/9, rating      tutorial lowered/9, rating
- *    4     0   bad (no_breakout)          0   good (2 columns open at the edge)
- *    4.5   0   bad (no_breakout)          0   good
- *    5     9   good                       5   good
- *    6     9   good                       5   good (1 projection)
- *    6.5   9   good                       6   good
- *    7     9   good                       9   good (1 projection, 5.5 m throw)
- *    8     9   good                       9   mediocre (8 projections)
- *  4 kg in a 8 m hole is a 2 m column under 6 m of burden: more than
- *  BURDEN_BREAKOUT_MAX of cap, so the rock stays sealed in the ground (#1724). 7 kg
- *  is the first charge the tutorial pit needs; it fits the hole (3.5 m column +
- *  2.5 m stemming <= 8 m). */
-export const CHARGE_DEFAULT_AMOUNT_KG = 7;
+/** Shortest explosive column (m) the recommended-range and optimizer sweeps leave in a hole. */
+export const MIN_CHARGE_COLUMN_M = 0.5;
 
 /** Default stemming column (m) the Charge panel opens with, and the tutorial's
  *  scripted stemming (#1330, #1724). Stemming works fully from 30 % of the hole depth
  *  (`stemmingFactor`: 2.4 m of an 8 m hole), so 2.5 m is the shortest round column
- *  that gives full confinement: 1.5 m and 2 m throw rock, and anything longer
- *  changed no measured result (sweep 2-5 m at 5-7 kg). */
+ *  that gives full confinement: 1.5 m and 2 m throw rock, and each metre more holds
+ *  back a metre of explosive, since every hole is filled up to its stemming. */
 export const CHARGE_DEFAULT_STEMMING_M = 2.5;
 
 /**
@@ -633,11 +645,12 @@ export const MAX_DRILL_GRID_HOLES = 10_000;
 export const MAX_RAMP_LENGTH = 1_000;
 
 /** Converts catalog `energyPerKg` into the energy units voxel absorption thresholds
- *  are written in. The catalog numbers were tuned against an inverse-square field
- *  whose epsilon amplified them at close range; propagation conserves energy instead,
- *  so the conversion is explicit. Calibrated so a well-stemmed pattern breaks a
- *  realistic volume per kilogram (powder factor ≈ 0.3 kg/m³). */
-export const EXPLOSIVE_ENERGY_SCALE = 10.0;
+ *  are written in. Calibrated so the default design — 89 mm holes 4 m apart, 8 m deep,
+ *  filled with boomite (the reference density) under 2.5 m of stemming — fragments a medium
+ *  rock (molite) best: about 60% of the pattern's rock in the good band; krackle there is
+ *  already half fines. Softer rock wants a weaker explosive
+ *  or wider holes apart, harder rock a stronger one, a wider bore or a tighter mesh. */
+export const EXPLOSIVE_ENERGY_SCALE = 25.0;
 
 /** Kinetic energy (in joules) that one unit of blast energy imparts to a fragment
  *  it throws. Absorption thresholds are a balance scale rather than joules, so
@@ -649,8 +662,10 @@ export const PROJECTION_ENERGY_TO_KINETIC = 39000.0;
  *  perfectly stemmed. Stemming keeps the gases working on the rock instead of
  *  venting up the hole, so a well-stemmed shot breaks its burden and drops it,
  *  while an unstemmed one throws it — the difference between a good blast and
- *  flyrock over the pit. */
-export const MIN_THROW_FRACTION = 0.05;
+ *  flyrock over the pit. Small enough that an overcharge under full stemming
+ *  throws nothing (boomite filled on a 3 m mesh: dust, no flyrock): too much
+ *  explosive is paid in fines, too little stemming in flyrock. */
+export const MIN_THROW_FRACTION = 0.02;
 
 /** Fraction of its confined absorption threshold that rock at an open face needs
  *  before it breaks. Unconfined rock can shear and move instead of being crushed
@@ -660,22 +675,6 @@ export const UNCONFINED_THRESHOLD_FACTOR = 0.35;
 
 /** Metres of rock over a voxel before it counts as fully confined. */
 export const CONFINEMENT_FULL_DEPTH = 6.0;
-
-/** How strongly overflow prefers neighbours that are closer to a free face, per
- *  metre of relief gained. Spread evenly in all directions, a blast is a sphere
- *  that stalls at a fixed radius no matter how big the charge; real burden fails
- *  toward the face, which is what lets a bench blast break out to surface and
- *  what makes an over-buried charge fail to. */
-export const FREE_FACE_BIAS = 2.0;
-
-/** Metres from a side or lower free face within which rock still pulls overflow
- *  toward it. Farther out, only air above keeps its pull. A lateral void (an
- *  access ramp dug to a pattern's edge before the shot) otherwise drags energy
- *  away from the charges that are nowhere near it and leaves full-height
- *  pillars between holes that the same shot breaks cleanly without the void
- *  (#1793). Set to one hole spacing: a charge that sits at a face keeps its
- *  bench behaviour, rock a spacing further in is served by the sky as before. */
-export const FREE_FACE_LATERAL_RANGE_M = 4;
 
 /** Thickest cap of intact rock (metres) that a blast can lift off an excavation
  *  it has undermined. Thicker burden bridges the gap and stays standing, which is
@@ -692,9 +691,9 @@ export const BLAST_ZONE_RADIUS = 5;
 
 /** Pre-fire estimate accuracy target (#1703): with a fresh seismic/core survey covering
  *  the pattern, an ordinary blast's EST. ORE VALUE lands within +-35% of the actual ore
- *  value. Working target, not a guarantee (seed 42: desert_badlands (32,22) boomite 8kg,
- *  green_foothills (32,32) krackle 8kg, alpine_granite (36,16) shatternite 4kg; 3x3
- *  pattern, spacing 4, depth 8). */
+ *  value. Working target, not a guarantee (seed 42: desert_badlands (32,22) boomite,
+ *  green_foothills (32,32) krackle, alpine_granite (36,16) shatternite, each hole filled
+ *  under 2.5 m of stemming; 3x3 pattern, spacing 4, depth 8). */
 export const BLAST_ESTIMATE_TOLERANCE = 0.35;
 
 // ─── Fragment generation (blast step 3) ────────────────────────────────────────
@@ -705,11 +704,15 @@ export const BLAST_ESTIMATE_TOLERANCE = 0.35;
 export const SUB_CELL_RESOLUTION = 2;
 
 /** Seed points a barely-broken voxel contributes, and how many more it adds per
- *  unit of intensity above its breaking point. Below 1 the base means most gently
- *  broken voxels contribute none at all, so their rock joins a neighbour's
- *  fragment — which is exactly how an undercharged blast produces boulders. */
-export const SEEDS_BASE = 0.35;
-export const SEEDS_PER_INTENSITY = 0.8;
+ *  unit of intensity above its breaking point. Rock broken with less energy than
+ *  that (coarse: lifted burden, floor to grade, unsupported rock) contributes the
+ *  base scaled by its intensity, so most of it seeds nothing and joins a
+ *  neighbour's fragment — which is how an undercharged blast produces boulders.
+ *  Two seeds per voxel at the good bound give fragments of about 0.5 m³ (well under
+ *  `OVERSIZED_FRAGMENT_THRESHOLD`), four at the fines bound 0.25 m³, eight at the
+ *  dust bound the 0.125 m³ floor of the sub-cell grid. */
+export const SEEDS_BASE = 2.0;
+export const SEEDS_PER_INTENSITY = 2.0;
 
 /** Ceiling on seeds from a single voxel, so one violently overcharged voxel cannot
  *  produce arbitrarily fine dust. */
@@ -861,12 +864,6 @@ export const BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS = 3;
  *  outside the blast's own crater rather than exactly on its edge. */
 export const BLAST_ORIGIN_SURFACE_SEARCH_MARGIN = 3;
 
-/** Maximum iterations for the energy propagation overflow loop.
- *  Prevents infinite loops when energy is trapped with no dissipating neighbors.
- *  Real blasting energy dissipates in microseconds; this is a computational guard.
- *  Each iteration distributes overflow to neighbors. 500 iterations ensures
- *  energy can traverse at least 500 voxels (500 m) before forced termination. */
-export const MAX_PROPAGATION_ITERATIONS = 500;
 /** Energy must reach this multiple of a voxel's threshold to fragment it. */
 export const FRAGMENTATION_MULTIPLIER = 1.0;
 
@@ -883,13 +880,9 @@ export const FRAGMENTATION_BAND_DUST_MIN = 4;
 
 /**
  * Smallest good-band share a hole's best charge must reach for a recommended range to exist (#2203).
- * Below it the explosive cannot fragment that rock at any charge that fits, and the Charge step says so.
- *
- * Not "mostly green": the good band is a shell round each charge column, so even the best charge of a
- * standard pattern leaves most of a hole's rock coarse, cracked or intact. Measured on uniform benches
- * (3x3, 4 m spacing, 8 m holes, 89 mm, 2.5 m stemming; per hole, centre/corner), the best sample reaches
- * cruite/boomite 27%/18%, molite/krackle 12%/8%, clunkite/shatternite 14%/9%, obstiite/dynatomics 13%/9%,
- * titanite/dynatomics 13%/9%, but titanite/boomite only 3%/2%. At 0.5 no hole of any rock ever had a range.
+ * Below it the explosive cannot fragment that rock at any stemming, and the Charge step says so (titanite
+ * filled with boomite, for one, breaks nothing). A floor, not a "mostly green" bar: the range is relative
+ * to the hole's own best sample (`RECOMMENDED_RELATIVE_GOOD_SHARE`).
  */
 export const RECOMMENDED_GOOD_SHARE_MIN = 0.05;
 /**
@@ -897,7 +890,7 @@ export const RECOMMENDED_GOOD_SHARE_MIN = 0.05;
  * best sample: the charges that fragment the rock nearly as well as the best one does.
  */
 export const RECOMMENDED_RELATIVE_GOOD_SHARE = 0.8;
-/** Charge levels sampled, as fractions of a hole's heaviest fitting charge, to find its recommended powder factor (#2203). */
+/** Stemmings sampled across a hole's sweep range (`stemmingSweepRangeM`), each filling it, to find its recommended powder factor (#2203). */
 export const RECOMMENDED_SWEEP_STEPS = 12;
 
 /** Share of a dust-band voxel's mass and ore lost to the cloud. */
@@ -2573,8 +2566,15 @@ export const CANDIDATE_SKILL_BONUS_MAX = 1;
 /** Radius (cells) around the primary fragment within which a haul batch gathers extras (#1370). */
 export const HAUL_BATCH_RADIUS_CELLS = 8;
 
-/** Most fragments one haul trip carries (#1370). */
-export const HAUL_BATCH_MAX_ITEMS = 6;
+/**
+ * Mass (kg) of a fragment at the fines bound: 0.25 m³ of ~2500 kg/m³ rock (`SEEDS_BASE`/`SEEDS_PER_INTENSITY`).
+ * A haul trip carries at most a truck's capacity divided by this many fragments (`haulBatchMaxItems`): 6 for a
+ * tier-1 hauler, 10 for tier 2, 16 for tier 3. Good-band fragments are heavier, so a well-fragmented shot fills
+ * the bed on mass and never meets the count; a shot broken finer runs out of items first and takes more trips.
+ * Measured on five 3 x 3 benches (molite/cruite, 4 m mesh): boomite trips +1% over no count limit at tier 3,
+ * shatternite (mostly fines and dust) +26%, fines-rich cruite +22%.
+ */
+export const HAUL_BATCH_FINES_FRAGMENT_KG = 625;
 
 /**
  * Ticks a hauler stands at a fragment loading it, whatever its size or mass (#2199).
@@ -2586,6 +2586,30 @@ export const HAUL_BATCH_MAX_ITEMS = 6;
  * HAUL_LOAD_TICKS more per extra fragment.
  */
 export const HAUL_LOAD_TICKS = 1;
+
+/**
+ * Least overlap (m) between a fragment's body and a NavGrid cell for the fragment to occupy that cell
+ * (`fragmentFootprintCells`): a rock that only grazes a neighbouring cell leaves it free.
+ */
+export const FRAGMENT_FOOTPRINT_MIN_OVERLAP_M = 0.1;
+
+/** How far (m) below a cell's surface a fragment's top may sit and still lie on that cell (`fragmentRestsOn`). */
+export const FRAGMENT_GROUND_TOLERANCE_M = 0.25;
+
+/**
+ * Highest step (m) between the ground a vehicle stands on and the ground under the rock it loads or breaks
+ * (`fragmentApproachCandidates`): a truck on a crater rim does not load a rock lying on the floor below.
+ */
+export const FRAGMENT_APPROACH_MAX_STEP_M = 1.5;
+
+/**
+ * How many cells (Chebyshev) from a rock's footprint a hauler or breaker may stand to work it: a loader's arm
+ * reaches past the nearest ring, so one vehicle parked beside a pile rarely closes its only side.
+ */
+export const FRAGMENT_APPROACH_REACH_CELLS = 2;
+
+/** Ticks a debris order whose plan just found no route is passed over by the crew's searches before it is tried again. */
+export const DEBRIS_FAILED_PLAN_RETRY_TICKS = 20;
 
 /** Fewest stranded cells that make a placement report a cutoff (#1391). */
 export const PLACEMENT_CUTOFF_MIN_CELLS = 1;
@@ -3136,7 +3160,7 @@ export const ORE_DEPOSIT_CORE_GAIN = 3;
 /** Width of the soft falloff at a deposit edge, in deposit-field units. */
 export const ORE_DEPOSIT_EDGE_WIDTH = 0.4;
 
-/** Offset in metres of the floored grade plane from the lowest charged-hole bottom; 0 = flush with it. */
+/** Offset in metres of the floored grade plane from the highest charged-hole bottom; 0 = flush with it. */
 export const BLAST_GRADE_FLOOR_OFFSET_M = 0;
 
 /** Max depth in metres a blast may cut below its grade plane, so a deep outlier hole cannot gouge the pit floor. */
@@ -3242,25 +3266,30 @@ export const MINE_GRADE_CLASS_FEE_FACTOR = 2;
 /** Processing ticks of every endless class. */
 export const MINE_GRADE_CLASS_PROCESSING_TICKS = 144;
 
-/** Blast limits and filing fee of one permit grade. */
+/**
+ * Blast limits and filing fee of one permit grade. The permit caps the explosive and the ground a shot
+ * works (the area of its holes' pattern cells, `patternAreaM2`), not how many holes do it: a finer mesh
+ * over the same ground costs drilling, never permit.
+ */
 export interface PermitLimitConfig {
   maxChargeKg: number;
-  maxHoles: number;
+  maxAreaM2: number;
   fee: number;
 }
-/** Per-blast limits of grades 0-5, keyed by grade number. */
+/** Per-blast limits of grades 0-5, keyed by grade number. Each area is what the grade's former hole
+ *  limit covered at the default 4 m x 4 m cell (9, 16, 36, 81, 196 and 400 holes). */
 export const PERMIT_LIMITS: Readonly<Record<number, PermitLimitConfig>> = {
-  0: { maxChargeKg: 40, maxHoles: 9, fee: 250 },
-  1: { maxChargeKg: 120, maxHoles: 16, fee: 1_000 },
-  2: { maxChargeKg: 800, maxHoles: 36, fee: 3_000 },
-  3: { maxChargeKg: 2_500, maxHoles: 81, fee: 8_000 },
-  4: { maxChargeKg: 8_000, maxHoles: 196, fee: 20_000 },
-  5: { maxChargeKg: 25_000, maxHoles: 400, fee: 50_000 },
+  0: { maxChargeKg: 40, maxAreaM2: 144, fee: 250 },
+  1: { maxChargeKg: 120, maxAreaM2: 256, fee: 1_000 },
+  2: { maxChargeKg: 800, maxAreaM2: 576, fee: 3_000 },
+  3: { maxChargeKg: 2_500, maxAreaM2: 1_296, fee: 8_000 },
+  4: { maxChargeKg: 8_000, maxAreaM2: 3_136, fee: 20_000 },
+  5: { maxChargeKg: 25_000, maxAreaM2: 6_400, fee: 50_000 },
 };
 /** Charge-limit multiplier per endless class above the last named grade. */
 export const PERMIT_CLASS_CHARGE_FACTOR = 1.6;
-/** Hole-limit multiplier per endless class. */
-export const PERMIT_CLASS_HOLES_FACTOR = 1.4;
+/** Area-limit multiplier per endless class. */
+export const PERMIT_CLASS_AREA_FACTOR = 1.4;
 /** Fee multiplier per endless class. */
 export const PERMIT_CLASS_FEE_FACTOR = 1.5;
 /** Inspection chance at full (100%) overshoot. */
@@ -3524,14 +3553,17 @@ export const SOFTWARE_TIER_PROJECTIONS = 2;
 export const SOFTWARE_TIER_VIBRATIONS = 3;
 /** The charge optimizer (#2204). */
 export const SOFTWARE_TIER_OPTIMIZER = 4;
-/** Charge amounts the optimizer tries per explosive, from the smallest to the heaviest that fits a hole. */
-export const OPTIMIZER_SWEEP_STEPS = 8;
-/** Fewest amounts per explosive a large pattern is still swept with. */
+/**
+ * Stemmings the optimizer tries per explosive, each hole filled up to them, from the most explosive to the least.
+ * Good share moves in steps of a few points between neighbouring stemmings, so under a tight permit (only the
+ * last few stemmings fit) 8 samples left the proposal behind a hand plan; 16 resolves the permit's edge.
+ */
+export const OPTIMIZER_SWEEP_STEPS = 16;
+/** Fewest stemmings per explosive a large pattern is still swept with. */
 export const OPTIMIZER_MIN_SWEEP_STEPS = 3;
 /**
- * Cap on hole x explosive x amount evaluations of one proposal, so the largest grade's pattern stays usable.
- * Measured (4-core sandbox, 8 explosives, 8 steps): 36 holes ~1.1 s, 400 holes (grade 5 permit) ~19 s;
- * at this budget the 400-hole pattern sweeps 4 amounts and costs ~10 s, a one-off click.
+ * Cap on hole x explosive x stemming evaluations of one proposal, so the largest grade's pattern stays usable:
+ * small patterns get the full sweep, the 400-hole pattern (grade 5 permit) sweeps 4 stemmings, a one-off click.
  */
 export const OPTIMIZER_WORK_BUDGET = 12_800;
 /** A hole takes the cheapest charge whose good-band share is within this of its best. */

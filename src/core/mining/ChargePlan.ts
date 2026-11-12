@@ -1,19 +1,26 @@
 // BlastSimulator2026 — Charge plan definition
 // Assigns explosives and stemming to each hole in the drill plan.
 
-import { getExplosive, type ExplosiveType } from '../world/ExplosiveCatalog.js';
+import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { t } from '../i18n/I18n.js';
 import { computeRigDurationTicks, type VehicleTier } from '../entities/Vehicle.js';
 import {
   MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
-  CHARGE_FIT_EPSILON, DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M,
+  CHARGE_FIT_EPSILON, DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, HOLE_CELL_MAX_SIDE_M,
 } from '../config/balance.js';
-import type { DrillHole } from './DrillPlan.js';
-import { chargeKgPerMetre, holeCapacityFactor } from './HoleDiameter.js';
+import type { DrillHole, HoleCellSize } from './DrillPlan.js';
+import { chargeKgPerMetre } from './HoleDiameter.js';
 
 export interface HoleCharge {
   explosiveId: string;
   amountKg: number;
+  stemmingM: number;
+}
+
+/** The pattern's charge settings: a null `amountKg` fills every hole up to the stemming. */
+export interface PatternCharge {
+  explosiveId: string;
+  amountKg: number | null;
   stemmingM: number;
 }
 
@@ -22,23 +29,22 @@ export interface ChargeError {
   message: string;
 }
 
-/** Validate and create a charge for a single hole. */
+/**
+ * Validate and create a charge for a single hole.
+ *
+ * `amountKg` null fills the hole: the explosive runs from the bottom up to the stemming
+ * (`fillChargeKg`), which is how a hole is charged. An explicit amount is a partial charge
+ * sitting at the bottom of the hole, kept for scripts.
+ */
 export function createCharge(
   explosiveId: string,
-  amountKg: number,
+  amountKg: number | null,
   stemmingM: number,
   holeDepth: number,
   diameterM: number = DRILL_HOLE_DEFAULT_DIAMETER_M,
 ): { charge: HoleCharge } | { error: string } {
-  const explosive = getExplosive(explosiveId);
-  if (!explosive) {
+  if (!getExplosive(explosiveId)) {
     return { error: `Unknown explosive: "${explosiveId}"` };
-  }
-  const { minKg, maxKg } = explosiveHoleLimits(explosive, diameterM);
-  if (!Number.isFinite(amountKg) || amountKg < minKg || amountKg > maxKg) {
-    return {
-      error: `Amount ${amountKg}kg out of range [${minKg}–${maxKg}kg] for ${explosiveId}`,
-    };
   }
   if (!Number.isFinite(stemmingM) || stemmingM < MIN_STEMMING_M) {
     return { error: `Stemming ${stemmingM}m below minimum ${MIN_STEMMING_M}m` };
@@ -46,27 +52,34 @@ export function createCharge(
   if (stemmingM > holeDepth) {
     return { error: `Stemming ${stemmingM}m exceeds hole depth ${holeDepth}m` };
   }
-  if (!chargeFitsHole(amountKg, stemmingM, holeDepth, diameterM)) {
+  if (amountKg !== null && (!Number.isFinite(amountKg) || amountKg <= 0)) {
+    return { error: t('mining.charge.invalid_amount', { amount: String(amountKg) }) };
+  }
+  const amount = amountKg ?? fillChargeKg(holeDepth, stemmingM, diameterM, explosiveId);
+  if (!(amount > 0)) {
+    return { error: t('mining.charge.no_room', { stemming: stemmingM, depth: holeDepth }) };
+  }
+  if (!chargeFitsHole(amount, stemmingM, holeDepth, diameterM, explosiveId)) {
     return {
       error: t('mining.charge.column_exceeds_hole', {
-        amount: amountKg,
-        column: +chargeColumnM(amountKg, diameterM).toFixed(2),
+        amount,
+        column: +chargeColumnM(amount, diameterM, explosiveId).toFixed(2),
         stemming: stemmingM,
         depth: holeDepth,
-        max: maxFittingChargeKg(holeDepth, stemmingM, diameterM),
+        max: maxFittingChargeKg(holeDepth, stemmingM, diameterM, explosiveId),
       }),
     };
   }
-  return { charge: { explosiveId, amountKg, stemmingM } };
+  return { charge: { explosiveId, amountKg: amount, stemmingM } };
 }
 
 
-/** Batch-charge all holes with the same settings. Returns errors for invalid ones. */
+/** Batch-charge all holes with the same settings (`amountKg` null fills each hole). Returns errors for invalid ones. */
 export function batchCharge(
   holeIds: string[],
   holeDepths: Record<string, number>,
   explosiveId: string,
-  amountKg: number,
+  amountKg: number | null,
   stemmingM: number,
   holeDiameters?: Record<string, number>,
 ): { charges: Record<string, HoleCharge>; errors: ChargeError[] } {
@@ -139,34 +152,30 @@ export function plannedChargesCost(chargesByHole: Readonly<Record<string, HoleCh
   return Object.values(chargesByHole).reduce((sum, c) => sum + chargeOrderCost(c.explosiveId, c.amountKg), 0);
 }
 
-/** Metres of hole column that `amountKg` of explosive occupies. */
-export function chargeColumnM(amountKg: number, diameterM?: number): number {
-  return amountKg / chargeKgPerMetre(diameterM);
+/** Metres of hole column that `amountKg` of the explosive occupies (reference density when none is given). */
+export function chargeColumnM(amountKg: number, diameterM?: number, explosiveId?: string): number {
+  return amountKg / chargeKgPerMetre(diameterM, explosiveId);
 }
 
 /** Raw (unrounded) heaviest charge that fits a hole of `holeDepth` under `stemmingM`; never negative. */
-export function maxChargeKgForHole(holeDepth: number, stemmingM: number, diameterM?: number): number {
-  return Math.max(0, (holeDepth - stemmingM) * chargeKgPerMetre(diameterM));
+export function maxChargeKgForHole(holeDepth: number, stemmingM: number, diameterM?: number, explosiveId?: string): number {
+  return Math.max(0, (holeDepth - stemmingM) * chargeKgPerMetre(diameterM, explosiveId));
 }
 
 /** True when `amountKg` plus `stemmingM` of stemming fits a hole of `holeDepth` (within float tolerance). */
-export function chargeFitsHole(amountKg: number, stemmingM: number, holeDepth: number, diameterM?: number): boolean {
-  return chargeColumnM(amountKg, diameterM) + stemmingM <= holeDepth + CHARGE_FIT_EPSILON;
+export function chargeFitsHole(amountKg: number, stemmingM: number, holeDepth: number, diameterM?: number, explosiveId?: string): boolean {
+  return chargeColumnM(amountKg, diameterM, explosiveId) + stemmingM <= holeDepth + CHARGE_FIT_EPSILON;
 }
 
 /** Heaviest charge to show/accept for a hole: floored to 0.1 kg so the displayed maximum is itself accepted. */
-export function maxFittingChargeKg(holeDepth: number, stemmingM: number, diameterM?: number): number {
-  const kg = maxChargeKgForHole(holeDepth, stemmingM, diameterM) + CHARGE_FIT_EPSILON;
+export function maxFittingChargeKg(holeDepth: number, stemmingM: number, diameterM?: number, explosiveId?: string): number {
+  const kg = maxChargeKgForHole(holeDepth, stemmingM, diameterM, explosiveId) + CHARGE_FIT_EPSILON;
   return Math.floor(kg * 10) / 10;
 }
 
-/** Charge-per-hole limits (kg) of an explosive in a hole of `diameterM`; scales with hole capacity (#1934). */
-export function explosiveHoleLimits(
-  explosive: Pick<ExplosiveType, 'minChargeKg' | 'maxChargeKg'>,
-  diameterM: number,
-): { minKg: number; maxKg: number } {
-  const factor = holeCapacityFactor(diameterM);
-  return { minKg: explosive.minChargeKg * factor, maxKg: explosive.maxChargeKg * factor };
+/** Kg a hole holds when filled from the bottom up to `stemmingM` of stemming: how a hole is charged. */
+export function fillChargeKg(holeDepth: number, stemmingM: number, diameterM?: number, explosiveId?: string): number {
+  return maxFittingChargeKg(holeDepth, stemmingM, diameterM, explosiveId);
 }
 
 type HolePoint = Pick<DrillHole, 'id' | 'x' | 'z'>;
@@ -178,13 +187,35 @@ export function holeSpacingM(hole: HolePoint, holes: readonly HolePoint[]): numb
     if (other.id === hole.id) continue;
     best = Math.min(best, Math.hypot(other.x - hole.x, other.z - hole.z));
   }
-  return Number.isFinite(best) && best > 0 ? best : DRILL_GRID_DEFAULT_SPACING_M;
+  return Number.isFinite(best) && best > 0 ? Math.min(best, HOLE_CELL_MAX_SIDE_M) : DRILL_GRID_DEFAULT_SPACING_M;
 }
 
-/** Kilograms of explosive per m3 of rock in a hole's cell of `spacingM` x `spacingM` x `depthM` (#2203). */
-export function powderFactor(amountKg: number, depthM: number, spacingM: number): number {
-  if (!(depthM > 0) || !(spacingM > 0)) return 0;
-  return amountKg / (spacingM * spacingM * depthM);
+/**
+ * The rock cell a hole works: its pattern's spacing along the row and burden between rows when it
+ * was drilled as part of a grid, else a square as wide as the distance to its nearest neighbour.
+ */
+export function holeCellSize(hole: HolePoint & Pick<DrillHole, 'spacingM' | 'burdenM'>, holes: readonly HolePoint[]): HoleCellSize {
+  if (hole.spacingM !== undefined && hole.burdenM !== undefined && hole.spacingM > 0 && hole.burdenM > 0) {
+    return { spacingM: hole.spacingM, burdenM: hole.burdenM };
+  }
+  const side = holeSpacingM(hole, holes);
+  return { spacingM: side, burdenM: side };
+}
+
+/** Area (m²) of the rock cells a pattern works: what a blast permit measures (sum over its holes). */
+export function patternAreaM2(holes: readonly (HolePoint & Pick<DrillHole, 'spacingM' | 'burdenM'>)[]): number {
+  let area = 0;
+  for (const hole of holes) {
+    const cell = holeCellSize(hole, holes);
+    area += cell.spacingM * cell.burdenM;
+  }
+  return area;
+}
+
+/** Kilograms of explosive per m3 of rock in a hole's cell of `spacingM` x `burdenM` x `depthM` (#2203). */
+export function powderFactor(amountKg: number, depthM: number, spacingM: number, burdenM: number = spacingM): number {
+  if (!(depthM > 0) || !(spacingM > 0) || !(burdenM > 0)) return 0;
+  return amountKg / (spacingM * burdenM * depthM);
 }
 
 /** Powder factor of every charged hole, keyed by hole id (#2203). */
@@ -195,7 +226,9 @@ export function holePowderFactors(
   const out: Record<string, number> = {};
   for (const hole of holes) {
     const charge = charges[hole.id];
-    if (charge) out[hole.id] = powderFactor(charge.amountKg, hole.depth, holeSpacingM(hole, holes));
+    if (!charge) continue;
+    const cell = holeCellSize(hole, holes);
+    out[hole.id] = powderFactor(charge.amountKg, hole.depth, cell.spacingM, cell.burdenM);
   }
   return out;
 }

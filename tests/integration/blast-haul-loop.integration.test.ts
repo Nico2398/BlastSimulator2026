@@ -4,7 +4,10 @@
 // floors the rock between the holes to grade, the crater floor is a grid of
 // 1-4 m steps (far over NAV_MAX_SLOPE_DEGREES) and a ramp opens only its own
 // landing. Measured pattern: sandbox desert_badlands seed 42, 3x3 grid,
-// spacing 4, depth 8, krackle 8 kg, stemming 2.5; ramp 32,46 -> 32,27 depth 8.
+// spacing 4, depth 8, krackle filled to 5.2 m of stemming (8.0 kg a hole);
+// ramp 32,55 -> 32,27 depth 8: 28 m, the shortest the ramp order accepts down
+// to the floor this shot leaves (9.7 m under the rim, measured under the
+// per-hole energy kernel).
 // Drives the real console command layer: no DOM, no Three.js.
 
 import { describe, it, expect } from 'vitest';
@@ -15,6 +18,7 @@ import { employeeClimbReach } from '../../src/core/engine/OrderReachability.js';
 import { upgradeFreightWarehousesToTier3 } from '../helpers/freightWarehouse.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
+import { totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 
 const RAMP_LANDING = { x: 32, z: 27 };
 
@@ -39,7 +43,7 @@ function blastAndRamp() {
 
   expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:28,18')).toMatchObject({ success: true });
   tickWhile(run, state, () => state.plannedDrillHoles.length === 0, 800);
-  expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
+  expect(run('charge hole:* explosive:krackle stemming:5.2')).toMatchObject({ success: true });
   tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
 
   const before = new Map<string, number>();
@@ -59,7 +63,7 @@ function blastAndRamp() {
     .filter(f => inCrater.has(`${Math.round(f.fragment.position.x)},${Math.round(f.fragment.position.z)}`))
     .map(f => f.fragment.id));
 
-  expect(run('build_ramp start:32,50 end:32,27 depth:8')).toMatchObject({ success: true });
+  expect(run('build_ramp start:32,55 end:32,27 depth:8')).toMatchObject({ success: true });
   tickWhile(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 3000);
   expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
   return { run, state, crater, craterFragmentIds };
@@ -100,11 +104,15 @@ describe('blast, ramp to the floor, haul (#1723)', () => {
     // Hauled debris leaves its crater column, so follow the fragments that started there by id.
     const hauled = () => state.logistics.fragments.filter(f =>
       craterFragmentIds.has(f.fragment.id) && f.state !== 'on_ground').length;
-    const storedBefore = state.logistics.storedMassKg;
-    tickWhile(run, state, () => hauled() > 0 && state.logistics.storedMassKg > storedBefore, 1500);
+    // Barren rock lands on the spoil heap, ore in the warehouse (#1530): count both. Rubble blocks the truck, so it
+    // loads the crater's pile from its edge and hauls the loose rock around the crater as it comes; the first
+    // trips can all be barren, so the warehouse alone is not what "the hauler hauls" means.
+    const hauledKg = () => state.logistics.storedMassKg + totalSpoilKg(state.buildings.buildings);
+    const hauledBefore = hauledKg();
+    tickWhile(run, state, () => hauled() > 0 && hauledKg() > hauledBefore, 1500);
 
     expect(hauled()).toBeGreaterThan(0);
-    expect(state.logistics.storedMassKg).toBeGreaterThan(storedBefore);
+    expect(hauledKg()).toBeGreaterThan(hauledBefore);
     expect(assertWorldInvariants(state)).toEqual([]);
   }, 600_000);
 });

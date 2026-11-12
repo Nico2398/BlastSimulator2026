@@ -2,6 +2,7 @@
 // Pure reads of GameState: nothing here orders, charges or digs. The progression probe orders what this plans; the
 // player's offer (`proposeAccessRamp`) shows it first.
 
+import { withRubbleSetAside } from '../engine/TerrainStrandedDebris.js';
 import type { GameState } from '../state/GameState.js';
 import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../world/VoxelGrid.js';
 import { clusterStrandedFloors, planCraterAccess, type AccessSurface, type StrandedFloor } from './CraterAccess.js';
@@ -26,18 +27,20 @@ const ACCESS_MIN_STRANDED_ORDERS = 3;
  * on a ramp blocks it.
  */
 export function accessSurface(state: GameState, grid: VoxelGrid): AccessSurface | null {
-  const reach = siteVehicleReach(state);
+  // The network as the terrain shapes it: rubble blocks vehicles only until it is hauled, so a rock inside a pile on a
+  // connected floor is not a floor needing a ramp (`TerrainStrandedDebris.ts`).
+  const reach = withRubbleSetAside(state, () => siteVehicleReach(state));
   const nav = state.navGrid;
   if (reach === null || nav === null) return null;
-  const rubble = new Set(state.logistics.fragments.filter(f => f.state === 'on_ground')
-    .map(f => `${Math.round(f.fragment.position.x)},${Math.round(f.fragment.position.z)}`));
+  // The cells rubble lies on (`addFragmentFootprint`): what blocks a ramp's way.
+  const holdsRubbleAt = (x: number, z: number): boolean => (nav.cellAt(x, z)?.fragmentOccupancy ?? 0) > 0;
   const buildings = buildingFootprintOccupants(state);
   return {
     heightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
     contains: (x, z) => grid.containsColumn(x, z) && (nav.cellAt(x, z)?.type ?? 'void') !== 'void'
       && !buildings.some(b => isBuildingFootprintCell(b, x, z)),
     reachableFrom: reach,
-    holdsRubble: (x, z) => rubble.has(`${x},${z}`),
+    holdsRubble: holdsRubbleAt,
   };
 }
 

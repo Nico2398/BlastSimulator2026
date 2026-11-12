@@ -115,7 +115,8 @@ function nearestRingCell(
 
 /** True when a cell's own type makes it a candidate ring cell at all. */
 function isRingCandidateType(cell: NavCell): boolean {
-  return cell.type !== 'blocked' && cell.type !== 'void';
+  // Rubble blocks every mover: a ring cell under a rock is no place to stand until it is hauled.
+  return cell.type !== 'blocked' && cell.type !== 'void' && !((cell.fragmentOccupancy ?? 0) > 0);
 }
 
 /**

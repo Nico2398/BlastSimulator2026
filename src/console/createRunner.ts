@@ -200,13 +200,13 @@ export function createRunner(): RunnerWithContext {
   );
 
   // --- Mining commands (Phase 3) ---
-  runner.register('drill_plan', 'Manage drill plan (grid|add|show; diameter: 89|127|165 mm)', (args, named) =>
+  runner.register('drill_plan', 'Manage drill plan (grid|add|show; grid takes spacing: burden: pattern:square|staggered; diameter: 89|127|165 mm)', (args, named) =>
     drillPlanCommand(ctx, args, named),
   );
-  runner.register('charge', 'Set charges (hole:* explosive:X amount:Ykg stemming:Zm)', (args, named) =>
+  runner.register('charge', 'Fill holes with explosive up to the stemming (hole:* explosive:X stemming:Zm; amount:Ykg for a partial charge)', (args, named) =>
     chargeCommand(ctx, args, named),
   );
-  runner.register('optimize_charges', 'Tier-4 charge optimizer proposal (stemming:Zm apply:true)', (args, named) =>
+  runner.register('optimize_charges', 'Tier-4 charge optimizer proposal: explosive and stemming per hole (apply:true)', (args, named) =>
     optimizeChargesCommand(ctx, args, named),
   );
   runner.register('blast', 'Execute the current blast plan', (args, named) =>

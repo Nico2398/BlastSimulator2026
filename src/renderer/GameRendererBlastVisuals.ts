@@ -85,8 +85,8 @@ export function* onBlastSteps(deps: BlastVisualsDeps, ctx: MiningContext): Steps
   // much longer) duration, which the blast report modal reads as its floor.
   deps.fragmentAnimator?.begin(ctx.lastBlastFlights ?? []);
 
+  // Earlier blasts' rock still on the ground stays drawn: the new pile is added to it.
   if (deps.fragments && ctx.lastBlastFragmentData && ctx.lastBlastFragmentData.length > 0) {
-    deps.fragments.clearAll();
     yield* deps.fragments.spawnFragmentsSteps(ctx.lastBlastFragmentData);
     yield;
   }

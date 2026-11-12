@@ -68,7 +68,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
+      "command": "charge hole:* explosive:boomite stemming:2m",
       "timeout": 30,
       "description": "Declared boomite/5kg/2m is exactly what the Charge panel shows on a fresh page (DEFAULT_EXPLOSIVE/DEFAULT_AMOUNT_KG/DEFAULT_STEMMING_M, Charge.ts), so Charge All commits the declared values with no stepper click at all — asserted rather than assumed. The Blast Workshop is opened here (same shape as blast-fire-step-visual.json's charge step); the step below no longer needs its own panel-open click since the panel is already open by then.",
       "interaction": [
@@ -82,19 +82,8 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "5 kg"
         },
         {
           "type": "assert",

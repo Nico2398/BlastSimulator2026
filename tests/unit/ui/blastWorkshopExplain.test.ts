@@ -12,7 +12,8 @@ import { stemmingFactor, stemmingEfficiency } from '../../../src/core/mining/Bla
 afterEach(() => setLocale('en'));
 
 const STATUSES: readonly HoleStatusKind[] = ['wet', 'tubed', 'dry', 'ordered', 'buried'];
-const FIELDS: readonly DrillFieldKind[] = ['spacing', 'depth', 'diameter'];
+// Every DrillFieldKind: a field missing here leaves its explanation untested in both locales.
+const FIELDS: readonly DrillFieldKind[] = ['spacing', 'burden', 'depth', 'diameter'];
 const STATS: readonly ReportStatKind[] = ['cleared', 'cracked', 'fragments', 'volume', 'projections'];
 
 /** A bare i18n key leaking through t() when a translation is missing. */

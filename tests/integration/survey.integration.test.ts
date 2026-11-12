@@ -29,7 +29,7 @@ import { executeBlast, type FragmentData } from '../../src/core/mining/BlastExec
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
-import { ORE_DENSITY_KG_M3 } from '../../src/core/config/balance.js';
+import { ORE_DENSITY_KG_M3, CHARGE_DEFAULT_STEMMING_M } from '../../src/core/config/balance.js';
 import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { findSurveyForColumn } from '../../src/core/mining/SurveyColumn.js';
 import { oreDepthSpan } from '../../src/core/mining/SurveyDepthProfile.js';
@@ -1034,18 +1034,21 @@ describe('Survey system — blast estimate vs actual ore (#1703)', () => {
     biome: string;
     /** Pattern centre (x, z). */
     centre: { x: number; z: number };
+    /** Filled up to `CHARGE_DEFAULT_STEMMING_M` of stemming, as a player charges a hole. */
     explosive: string;
-    kg: number;
     /** Sandbox seed; deposits (#1682) leave some seed/biome sites barren, so each is chosen on ore. */
     seed: number;
   }
+  // The estimate rates broken-out ore only (#2053), so each shot must break out: an 8 kg shatternite charge
+  // (2 m of column at the bottom of the 8 m holes) sealed all of alpine's ore. Seeds re-measured when the starter
+  // deposit landed (#2116). Measured, filled shots: seismic 0.88 / 0.78 / 0.92, core samples 0.93 / 0.92 / 0.94.
   const SITES: Site[] = [
-    { biome: 'desert_badlands', centre: { x: 36, z: 32 }, explosive: 'boomite', kg: 8, seed: 42 },
-    { biome: 'green_foothills', centre: { x: 32, z: 32 }, explosive: 'krackle', kg: 8, seed: 42 },
-    { biome: 'alpine_granite', centre: { x: 36, z: 32 }, explosive: 'shatternite', kg: 8, seed: 13 }, // 4 kg sealed all ore; the estimate now rates broken-out ore only (#2053); seed re-measured when the starter deposit landed (#2116)
+    { biome: 'desert_badlands', centre: { x: 36, z: 32 }, explosive: 'boomite', seed: 42 },
+    { biome: 'green_foothills', centre: { x: 32, z: 32 }, explosive: 'krackle', seed: 42 },
+    { biome: 'alpine_granite', centre: { x: 36, z: 32 }, explosive: 'shatternite', seed: 13 },
   ];
 
-  /** Fresh sandbox at full ore grade (ore_grade:1: survey accuracy is under test, and the 0.05 estimate rounding swamps the sandbox default 0.08, #1944), the site seed, plus the 3x3 / spacing 4 / depth 8 pattern centred on the site. */
+  /** Fresh sandbox at full ore grade (ore_grade:1: survey accuracy is under test, and the 0.05 estimate rounding swamps the sandbox default 0.08, #1944), the site seed, plus the 3x3 / spacing 4 / depth 8 pattern centred on the site, each hole filled. */
   function setup(site: Site) {
     const { runner, ctx } = createRunner();
     expect(runner.run(`sandbox start biome:${site.biome} seed:${site.seed} ore_grade:1`).success).toBe(true);
@@ -1054,7 +1057,8 @@ describe('Survey system — blast estimate vs actual ore (#1703)', () => {
     const holes = createGridPlan(counter, { x: site.centre.x - 4, z: site.centre.z - 4 }, 3, 3, 4, 8, 0.089);
     const depths: Record<string, number> = {};
     for (const h of holes) depths[h.id] = h.depth;
-    const { charges } = batchCharge(holes.map(h => h.id), depths, site.explosive, site.kg, 2);
+    const { charges, errors } = batchCharge(holes.map(h => h.id), depths, site.explosive, null, CHARGE_DEFAULT_STEMMING_M);
+    expect(errors).toEqual([]);
     return { grid, plan: assembleBlastPlan(holes, charges) };
   }
 
@@ -1087,7 +1091,7 @@ describe('Survey system — blast estimate vs actual ore (#1703)', () => {
   }
 
   for (const site of SITES) {
-    describe(`${site.biome} (${site.centre.x},${site.centre.z}) ${site.explosive} ${site.kg} kg`, () => {
+    describe(`${site.biome} (${site.centre.x},${site.centre.z}) ${site.explosive} filled`, () => {
       for (const [label, build] of [['seismic survey', seismic], ['core samples', coreSamples]] as const) {
         it(`${label}: EST. ORE VALUE lands within the tolerance of the actual ore value`, () => {
           const { grid, plan } = setup(site);

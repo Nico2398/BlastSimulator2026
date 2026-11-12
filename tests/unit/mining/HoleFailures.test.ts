@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { VoxelGrid, firstEmptyLayerAboveGround } from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan, type DrillHole } from '../../../src/core/mining/DrillPlan.js';
+import { fillChargeKg } from '../../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan, type BlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js';
 import { identifyFragmentedVoxels } from '../../../src/core/mining/VoxelFragmentation.js';
@@ -61,6 +62,8 @@ function analyse(plan: BlastPlan, grid: VoxelGrid, wet: ReadonlySet<string> = ne
 
 const boomite = (amountKg: number) => ({ explosiveId: 'boomite', amountKg });
 const krackle = (amountKg: number) => ({ explosiveId: 'krackle', amountKg });
+/** Boomite a 4 m hole holds filled to the plan's 2 m of stemming: opens its rock dry, not wet. */
+const FILLED_4M_HOLE_KG = fillChargeKg(4, 2, 0.089, 'boomite');
 
 describe('analyseHoleFailures — holes that opened', () => {
   it('reports nothing for a hole whose charge broke out to the surface', () => {
@@ -134,7 +137,7 @@ describe('analyseHoleFailures — below_threshold (C2)', () => {
 describe('analyseHoleFailures — fizzled (C3)', () => {
   it('flags a wet hole with a water-sensitive charge that broke nothing', () => {
     const grid = solidBlock('molite', 10);
-    const { plan, holes } = planOf([{ x: 12, z: 12, depth: 4, charge: boomite(0.2) }]);
+    const { plan, holes } = planOf([{ x: 12, z: 12, depth: 4, charge: boomite(FILLED_4M_HOLE_KG) }]);
     const failures = analyse(plan, grid, new Set([holes[0]!.id]));
     expect(failures).toHaveLength(1);
     expect(failures[0]!.holeId).toBe(holes[0]!.id);
@@ -145,7 +148,7 @@ describe('analyseHoleFailures — fizzled (C3)', () => {
 
   it('the same charge dry opens its rock, so it is the water that fizzled it', () => {
     const grid = solidBlock('molite', 10);
-    const { plan } = planOf([{ x: 12, z: 12, depth: 4, charge: boomite(0.2) }]);
+    const { plan } = planOf([{ x: 12, z: 12, depth: 4, charge: boomite(FILLED_4M_HOLE_KG) }]);
     expect(analyse(plan, grid)).toEqual([]);
   });
 
@@ -164,16 +167,20 @@ describe('analyseHoleFailures — fizzled (C3)', () => {
 
   it('ignores wet ids that are not holes of the plan', () => {
     const grid = solidBlock('molite', 10);
-    const { plan } = planOf([{ x: 12, z: 12, depth: 4, charge: boomite(0.2) }]);
+    const { plan } = planOf([{ x: 12, z: 12, depth: 4, charge: boomite(FILLED_4M_HOLE_KG) }]);
     expect(analyse(plan, grid, new Set(['hole-not-in-this-plan']))).toEqual([]);
   });
 });
 
 describe('analyseHoleFailures — buried (C4)', () => {
-  /** One light charge at the bottom of a hole under a thick intact cap. */
+  /**
+   * One light charge at the bottom of a hole under a thick intact cap: 4 kg of boomite fills
+   * 2 m of the hole and breaks the rock round it (measured under the kernel model: 3-5 kg stay
+   * buried in both the 8 m and the 28 m hole; 2 kg breaks nothing at 28 m, 6 kg opens the 8 m one).
+   */
   function buried(depth: number, topY: number) {
     const grid = solidBlock('molite', topY);
-    const { plan, holes } = planOf([{ x: 15, z: 15, depth, charge: boomite(0.2) }]);
+    const { plan, holes } = planOf([{ x: 15, z: 15, depth, charge: boomite(4) }]);
     return { failures: analyse(plan, grid), holeId: holes[0]!.id };
   }
 

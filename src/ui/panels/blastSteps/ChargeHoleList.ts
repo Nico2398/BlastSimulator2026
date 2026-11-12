@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Blast Workshop / Charge step: per-hole charge rows.
 //
-// Gap G3: `charge hole:<id> explosive:… amount:…kg stemming:…m` is a real
+// Gap G3: `charge hole:<id> explosive:… stemming:…m` (fill the hole up to the stemming) is a real
 // gameplay command that had no button at all — the Charge step only ever
 // exposed CHARGE ALL, so a player could not charge one hole differently from
 // the rest while the console could. This is the missing control: one row per

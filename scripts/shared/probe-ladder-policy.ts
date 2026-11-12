@@ -246,8 +246,8 @@ export interface LadderHoleDepthInput {
 }
 
 /**
- * Burden (m) of intact rock over a hole's charge column that the charge still lifts. Measured beside
- * CHARGE_DEFAULT_AMOUNT_KG: an 8 m hole breaks out with 5 kg (5.5 m of burden) and seals with 4.5 kg (5.75 m),
+ * Burden (m) of intact rock over a hole's charge column that the charge still lifts. Measured with the old
+ * 7 kg panel default beside it: an 8 m hole broke out with 5 kg (5.5 m of burden) and sealed with 4.5 kg (5.75 m),
  * so this keeps half a metre in hand.
  */
 export const LADDER_MAX_BURDEN_M = 5;

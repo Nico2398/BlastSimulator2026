@@ -32,6 +32,15 @@ function shotAt(x: number, z: number, idStart: number): BlastPlan {
   return assembleBlastPlan(holes, charges);
 }
 
+/** One 4.5 m hole with 1 kg of pop_rock under 1.5 m of stemming: just enough to break out. */
+function boulderShot(): BlastPlan {
+  const holes = createGridPlan({ nextHoleId: 1 }, { x: 14, z: 14 }, 1, 1, 4, 4.5, 0.089);
+  const depths: Record<string, number> = {};
+  for (const h of holes) depths[h.id] = h.depth;
+  const { charges } = batchCharge(holes.map(h => h.id), depths, 'pop_rock', 1, 1.5);
+  return assembleBlastPlan(holes, charges);
+}
+
 /** Flat 20 m bench; a first 3x3 shot is fired, leaving a crater the second shot sits beside. */
 function craterGrid(): { grid: VoxelGrid; second: BlastPlan } {
   const grid = buildWallGrid({ plateauTop: 20 });
@@ -91,12 +100,18 @@ describe('dryRunBlast', () => {
   });
 
   it('applies the oversize rating cap: forecast equals the report rating, below the base rating', () => {
-    const plan = standardShot().plan;
-    const real = executeBlast(plan, buildWallGrid({ plateauTop: 20 }), [], GROUND)!;
+    // A charge that barely breaks out lifts its collar whole: one 3.75 m³ boulder beside two small
+    // pieces (measured: 1 of 3 fragments above OVERSIZED_FRAGMENT_THRESHOLD 2.0 m³, 33% > the 30%
+    // BLAST_OVERSIZE_SHARE_CAP; 1 of 3 at 4 m and 5 m deep too). At the 2.0 m³ threshold no
+    // multi-hole pattern on this bench reaches the cap: the best measured was 27% (2x2, 1 kg holes),
+    // and the 3x3 of 8 m pop_rock holes this test used before leaves 4-8%.
+    const plan = boulderShot();
+    const bench = () => buildWallGrid({ plateauTop: 20 });
+    const real = executeBlast(plan, bench(), [], GROUND)!;
     const report = buildBlastReport(real, 0, 0);
     expect(report.ratingCap).toBe('oversize');
     expect(real.rating).toBe('perfect');
-    const forecast = dryRunBlast(plan, buildWallGrid({ plateauTop: 20 }), [], GROUND, NO_WET)!;
+    const forecast = dryRunBlast(plan, bench(), [], GROUND, NO_WET)!;
     expect(forecast.rating).toBe('good');
     expect(forecast.rating).toBe(report.rating);
   });

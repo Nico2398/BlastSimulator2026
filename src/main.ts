@@ -1018,6 +1018,9 @@ if (scenarioMode) scene.setDrawingEnabled(false);
 window.__modelsReady = () => modelsReady.then(r => ({ loaded: r.loaded.length, failed: r.failed }));
 // A forced frame shows settled terrain: a deferred blast remesh lands first (#1603).
 window.__renderFrame = () => { finishBlastJob(); gameRenderer.finishTerrainRemesh(); scene.renderFrame(); };
+// Everything __renderFrame settles except the draw itself: the state a click or
+// a projection reads. Harnesses call this after moving the camera, and draw only to capture.
+window.__syncScene = () => { finishBlastJob(); gameRenderer.finishTerrainRemesh(); scene.syncMatrices(); };
 // Landscape chunks still queued for the current camera position (#1153's
 // streamer is budgeted per frame). A capture taken while this is non-zero
 // shows sky where ground has not been built yet, with scenery floating in
@@ -1120,6 +1123,12 @@ window.__cameraReset = () => {
 window.__entityWorldPosition = (kind, id) => {
   const pos = gameRenderer.entityWorldPosition(kind, id);
   return pos ? { x: pos.x, z: pos.z } : null;
+};
+// What a click at the canvas centre would select. A harness aiming at an entity
+// checks nothing stands in front of it, and turns the camera as a player would if something does.
+window.__pickAtCanvasCentre = () => {
+  const entity = pickScene(0, 0, scene.camera, gameRenderer).entity;
+  return entity ? { kind: entity.kind, id: entity.id } : null;
 };
 window.__placement = {
   isArmed: () => placementController.isArmed,

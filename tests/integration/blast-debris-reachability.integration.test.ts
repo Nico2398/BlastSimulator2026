@@ -10,7 +10,9 @@
 //
 // Fixture (empirically traced on tutorial_pit): a single-hole blast at (18,10)
 // (rows:1 cols:1 spacing:3 depth:6 diameter:0.089) with charge amount:5
-// stemming:2 leaves exactly 9 NavGrid cells (POCKET_CELLS in blastFixtures) —
+// stemming:2 leaves exactly 10 NavGrid cells (KERNEL_POCKET_CELLS below: the 9
+// POCKET_CELLS of blastFixtures plus (20,10) since the energy spreads by the
+// per-hole kernel) —
 // amount:3 was used before the blast floored to grade (#1723): its extra
 // pit-floor debris then parked a fragmenter on the pocket's rim cell, so the
 // fixture moved to the 5 kg pocket, whose debris stays inside the pit —
@@ -29,6 +31,7 @@ import { describe, it, expect } from 'vitest';
 import { isFragmentSealed } from '../../src/core/economy/SealedFragments.js';
 import { isAutoDebrisAction } from '../../src/core/economy/HaulDispatch.js';
 import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
+import { fragmentFootprintCells, fragmentRestsOn } from '../../src/core/nav/FragmentFootprint.js';
 import type { MiningContext } from '../../src/console/commands/mining/types.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
@@ -36,13 +39,54 @@ import type { GameState, PendingAction } from '../../src/core/state/GameState.js
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import {
   tickUntilFresh,
-  isPocketCell,
+  POCKET_CELLS,
   drillChargeAndBlast,
-  drillGridChargeAndBlast,
+  buyChargingTruck,
   crewRockDigger,
   hireDriver,
 } from '../helpers/blastFixtures.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
+import { clearRubble, terrainStrandedDebris } from '../helpers/rubble.js';
+import { CHARGE_DEFAULT_STEMMING_M } from '../../src/core/config/balance.js';
+
+/**
+ * The NavGrid cells the (18,10) amount:5 shot leaves climb-disconnected from the freight_warehouse's approach cell,
+ * traced with `siteVehicleReach` once the reachable debris is hauled: blastFixtures' POCKET_CELLS (#1723) and, since
+ * the energy spreads by the per-hole kernel, the cell east of the hole's pit.
+ */
+const KERNEL_POCKET_CELLS: ReadonlySet<string> = new Set([...POCKET_CELLS, '20,10']);
+function isPocketCell(x: number, z: number): boolean {
+  return KERNEL_POCKET_CELLS.has(`${x},${z}`);
+}
+
+/**
+ * Whether the rock `action` works rests in the pocket only: every cell of its footprint it rests on
+ * (`fragmentRestsOn`) is a pocket cell. Hauled or missing rock reads false.
+ */
+function restsInPocket(state: GameState, action: PendingAction): boolean {
+  const tracked = state.logistics.fragments.find(f => f.fragment.id === action.payload['fragmentId'] && f.state === 'on_ground');
+  if (tracked === undefined) return false;
+  const rested = fragmentFootprintCells(tracked.fragment)
+    .filter(c => fragmentRestsOn(tracked.fragment, state.navGrid?.cellAt(c.x, c.z)?.surfaceY));
+  return rested.length > 0 && rested.every(c => isPocketCell(c.x, c.z));
+}
+
+
+// ── Charging the shots (per-hole energy kernel) ──────────────────────────────
+// The crater shots below are charged as a player charges them: each hole filled up to the stemming, with pop_rock,
+// the explosive fitted to the desert's soft rock (cruite, sandite, molite), so the crater geometry each test traces
+// was measured on a well-fitted shot. Pop_rock fizzles in a hole that holds water, so the weather of the sandbox
+// sites is pinned dry: rain is not what these tests probe (tutorial_pit's sky is fixed sunny already).
+
+/** `charge hole:*` of the crater shots: pop_rock filled up to `stemmingM`. */
+function fittedCharge(stemmingM: number = CHARGE_DEFAULT_STEMMING_M): string {
+  return `charge hole:* explosive:pop_rock stemming:${stemmingM}`;
+}
+
+/** Pins the site's weather dry for the whole run, so a water-sensitive charge never fizzles in a rain-filled hole. */
+function pinDryWeather(state: GameState): void {
+  state.weather = { ...state.weather, current: 'sunny', pinned: true };
+}
 
 /**
  * Crews a rock_fragmenter and a debris_hauler (mirrors economy-full-loop.json's
@@ -104,8 +148,13 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
       expect(state.logistics.storedMassKg).toBe(0);
 
       const early = debrisActions(state);
-      const pocketEarly = early.filter(a => isPocketCell(a.targetX, a.targetZ));
-      const reachableEarly = early.filter(a => !isPocketCell(a.targetX, a.targetZ));
+      // Where a rock lies is where it rests (`fragmentRestsOn`), not the cell its order targets: a hauler works a rock
+      // from a free cell up to two cells away, within a 1.5 m step of the ground the rock rests on. A rock across the
+      // pocket's rim, resting at the rim's height, is loaded from the rim; a rock leaning on the rim wall from below
+      // rests on the pocket floor and stays out of reach. Measured on this shot: 8 of the 125 orders targeting a pocket
+      // cell are rock lying at rim height, and 20 orders targeting a rim cell are rock resting in the pocket.
+      const pocketEarly = early.filter(a => restsInPocket(state, a));
+      const reachableEarly = early.filter(a => !restsInPocket(state, a));
       expect(pocketEarly.length).toBeGreaterThan(0);
       expect(reachableEarly.length).toBeGreaterThan(0);
       for (const action of pocketEarly) {
@@ -122,7 +171,7 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
       const remaining = debrisActions(state);
       expect(remaining.length).toBeGreaterThan(0);
       for (const action of remaining) {
-        expect(isPocketCell(action.targetX, action.targetZ)).toBe(true);
+        expect(restsInPocket(state, action)).toBe(true);
         expect(action.blockedReason).toBe('debris_out_of_reach');
         expect(action.status).toBe('queued');
       }
@@ -147,7 +196,7 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
   );
 
   it(
-    'starts hauling stranded debris once a ramp connects the pocket, and the debris_out_of_reach stamp clears',
+    'starts hauling stranded debris once a ramp connects the pocket, and the terrain strands none of it again',
     () => {
       // Generous cash: wages over the long wait for the plateau must not starve the ramp order.
       const { run, state } = drillChargeAndBlast(18, 10, 5, 5_000_000);
@@ -172,13 +221,16 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
       expect(state.pendingActions.some(a => a.type === 'dig_ramp_segment')).toBe(false);
 
       // Classification runs at the start of each employee tick, so the stamps from before the final segment completed
-      // are refreshed one tick later. Let one pass run, then any stamp is a regression: the ramp connected the pocket for good.
+      // are refreshed one tick later. Let one pass run, then any order the terrain strands is a regression: the ramp
+      // connected the pocket for good. Rubble blocks vehicles, so the pocket's pile is worked from its edge and its inner
+      // rock may read debris_out_of_reach until the rock around it is hauled; that is the pile, not the terrain, so the
+      // check sets rubble aside (`terrainStrandedDebris`).
       tickUntilFresh(run, state, () => false, 1);
-      let sawOutOfReach = false;
+      let sawTerrainStranded = false;
       let sawTargetUnreachable = false;
       tickUntilFresh(run, state, () => {
+        if (terrainStrandedDebris(state).length > 0) sawTerrainStranded = true;
         for (const a of state.pendingActions) {
-          if (a.blockedReason === 'debris_out_of_reach') sawOutOfReach = true;
           if (a.blockedReason === 'target_unreachable') sawTargetUnreachable = true;
         }
         return debrisActions(state).length === 0;
@@ -188,7 +240,7 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
       expect(debrisActions(state)).toHaveLength(0);
       expect(state.logistics.fragments.filter(f => f.state === 'on_ground' && isPocketCell(Math.round(f.fragment.position.x), Math.round(f.fragment.position.z)))).toHaveLength(0);
       expect(hauledKg() - storedBeforeRamp).toBeGreaterThanOrEqual(strandedMassKg - 1e-6);
-      expect(sawOutOfReach).toBe(false);
+      expect(sawTerrainStranded).toBe(false);
       expect(sawTargetUnreachable).toBe(false);
       expectNoWorldInvariantViolations(state);
     },
@@ -244,23 +296,23 @@ function tickToppedUntil(run: (cmd: string) => unknown, state: GameState, until:
   for (let i = 0; i < max && !until(); i++) { topUp(state); run('tick 1'); }
 }
 
-/**
- * Clears the rubble of earlier blasts so a new pattern can be drilled over it. Holes under on-ground rubble
- * stay buried until it is hauled off (#1937); these cases test blast geometry, not hauling pace.
- */
-function clearRubble(state: GameState): void {
-  state.logistics.fragments = state.logistics.fragments.filter(f => f.state !== 'on_ground');
-  state.pendingActions = state.pendingActions.filter(a => !isAutoDebrisAction(a.type));
-}
+// Holes under on-ground rubble stay buried until it is hauled off (#1937), so the shots below clear the rubble of
+// earlier blasts before drilling over it (`clearRubble`): these cases test blast geometry, not hauling pace.
 
-/** Drills, charges and fires a 3x3 Krackle pattern (spacing 4, depth 8) at SEALED_SHOT_START. */
-function fireKrackleShot(run: (cmd: string) => unknown, state: GameState, amountKg: number): void {
+/**
+ * Stemming of the shot that fails to break out: krackle filled under 6.5 m is 4.3 kg, a 1.5 m column at the bottom of
+ * each 8 m hole, too deep for its energy (it reaches 4.5 m through rock) to break the cap.
+ */
+const SEALED_STEMMING_M = 6.5;
+
+/** Drills, charges and fires a 3x3 Krackle pattern (spacing 4, depth 8) at SEALED_SHOT_START, each hole filled up to `stemmingM`. */
+function fireKrackleShot(run: (cmd: string) => unknown, state: GameState, stemmingM: number): void {
   state.lastBlastReport = null;
   clearRubble(state);
   expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SEALED_SHOT_START}`)).toMatchObject({ success: true });
   tickToppedUntil(run, state, () => state.plannedDrillHoles.length === 0, 1500);
   expect(state.plannedDrillHoles).toHaveLength(0);
-  const chargeResult = run(`charge hole:* explosive:krackle amount:${amountKg} stemming:2`);
+  const chargeResult = run(`charge hole:* explosive:krackle stemming:${stemmingM}`);
   expect(chargeResult).toMatchObject({ success: true });
   tickToppedUntil(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
   expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
@@ -301,8 +353,8 @@ describe('Rock sealed under an intact cap is not debris work (#1774)', () => {
       expect(state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active)).toBe(true);
       expect(run(`build spoil_heap at:${SEALED_HEAP_AT}`)).toMatchObject({ success: true });
 
-      // Sealed blast: 4 kg Krackle never breaks out of the 8 m holes.
-      fireKrackleShot(run, state, 4);
+      // Sealed blast: krackle filled under 6.5 m of stemming never breaks out of the 8 m holes.
+      fireKrackleShot(run, state, SEALED_STEMMING_M);
       expect(state.lastBlastReport!.ratingCap).toBe('no_breakout');
 
       const sealed = sealedFragmentIds(state, grid);
@@ -325,7 +377,7 @@ describe('Rock sealed under an intact cap is not debris work (#1774)', () => {
       // A breakout blast over the same void opens it: its rock is ordinary debris.
       // Fragment ids restart at 0 every blast, so earlier rock is told apart by identity, not id.
       const trackedBefore = new Set(state.logistics.fragments);
-      fireKrackleShot(run, state, 10);
+      fireKrackleShot(run, state, CHARGE_DEFAULT_STEMMING_M);
       expect(state.lastBlastReport!.ratingCap).not.toBe('no_breakout');
       const fresh = state.logistics.fragments.filter(f => !trackedBefore.has(f) && f.state === 'on_ground');
       expect(fresh.length).toBeGreaterThan(0);
@@ -387,12 +439,42 @@ interface PatternBlast {
   footprintSurfaces: number[];
 }
 
-function blastFlatPattern(spacing: number, amount: number): PatternBlast {
+/**
+ * blastFixtures' `drillGridChargeAndBlast` (tutorial_pit, a hired driller on a drill_rig and a charging truck, 6 m
+ * holes), with each hole filled up to 2 m of stemming with pop_rock, the explosive fitted to the flattened sandite.
+ */
+function drillGridFillAndBlast(opts: {
+  rows: number; cols: number; spacing: number; startX: number; startZ: number; flatten: (ctx: MiningContext) => void;
+}): { run: (cmd: string) => unknown; state: GameState; ctx: MiningContext } {
+  const { runner, ctx } = createRunner();
+  const run = (cmd: string) => runner.run(cmd);
+  expect(run('campaign start level:tutorial_pit cash:5000000')).toMatchObject({ success: true });
+  const state = ctx.state!;
+  opts.flatten(ctx);
+
+  expect(run('employee hire role:driller')).toMatchObject({ success: true });
+  const driller = state.employees.employees.find(e => e.role === 'driller')!;
+  expect(run('vehicle buy drill_rig')).toMatchObject({ success: true });
+  expect(run(`employee assign_skill ${driller.id} skill:driving.drill_rig level:1`)).toMatchObject({ success: true });
+  buyChargingTruck(run, state, driller.id);
+
+  expect(run(`drill_plan grid rows:${opts.rows} cols:${opts.cols} spacing:${opts.spacing} depth:6 start:${opts.startX},${opts.startZ} diameter:0.089`)).toMatchObject({ success: true });
+  tickUntilFresh(run, state, () => state.plannedDrillHoles.length === 0, 3000);
+  expect(state.drillHoles.length).toBe(opts.rows * opts.cols);
+  expect(run(fittedCharge(2))).toMatchObject({ success: true });
+  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 3000);
+  expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
+  expect(run('blast')).toMatchObject({ success: true });
+  expect(state.lastBlastReport).not.toBeNull();
+  return { run, state, ctx };
+}
+
+function blastFlatPattern(spacing: number): PatternBlast {
   let preSurfaceY = 0;
   const startX = 18 - spacing;
   const startZ = 10 - spacing;
-  const { run, state, ctx } = drillGridChargeAndBlast({
-    rows: 3, cols: 3, spacing, startX, startZ, amount,
+  const { run, state, ctx } = drillGridFillAndBlast({
+    rows: 3, cols: 3, spacing, startX, startZ,
     flatten: c => { preSurfaceY = flattenSite(c); },
   });
   const grid = ctx.grid!;
@@ -413,12 +495,12 @@ function craterFloorY(surfaces: number[]): number {
 }
 
 describe('A 3x3 pattern floors to a flush crater at any spacing (#1740)', () => {
-  // Charge per hole is sized so each spacing breaks one continuous crater (a lighter charge leaves unbroken pillars between holes).
-  for (const { spacing, amount } of [{ spacing: 4, amount: 8 }, { spacing: 3, amount: 6 }]) {
+  // Each hole is filled with pop_rock up to 2 m of stemming: at both spacings it breaks one continuous crater.
+  for (const spacing of [4, 3]) {
     it(
       `${spacing} m spacing: no footprint column ends below the crater floor, and no debris is out of reach once a ramp reaches the crater`,
       () => {
-        const { run, state, grid, preSurfaceY, footprintSurfaces } = blastFlatPattern(spacing, amount);
+        const { run, state, grid, preSurfaceY, footprintSurfaces } = blastFlatPattern(spacing);
         // Pattern-edge columns the blast never reached still stand at the original surface; every column it did break must sit on one floor.
         const crater = footprintSurfaces.filter(y => y < preSurfaceY);
         const floorY = craterFloorY(crater);
@@ -427,7 +509,9 @@ describe('A 3x3 pattern floors to a flush crater at any spacing (#1740)', () => 
         const pits = crater.filter(y => y !== floorY);
         expect(pits, `columns off the crater floor ${floorY}: ${pits.join(',')}`).toHaveLength(0);
 
-        // A ramp from the flat rim down to the floor: nothing in the crater may stay stamped out of reach.
+        // A ramp from the flat rim down to the floor: no crater debris may stay out of reach for want of a way down.
+        // Rubble blocks vehicles, so the pile itself is worked from its edge and its inner rock reads
+        // debris_out_of_reach until then; the claim here is about the terrain, so rubble is set aside (`terrainStrandedDebris`).
         expect(computeVoxelColumnSurfaceY(grid, 18, 10)).toBe(floorY);
         crewHaulingAndBuildDepot(run, state);
         crewRockDigger(run, state);
@@ -442,12 +526,11 @@ describe('A 3x3 pattern floors to a flush crater at any spacing (#1740)', () => 
         // Debris thrown outside the pattern may land on the surrounding site; the ramp must serve the crater itself.
         const inCrater = (a: PendingAction): boolean =>
           a.targetX >= 18 - spacing && a.targetX <= 18 + spacing && a.targetZ >= 10 - spacing && a.targetZ <= 10 + spacing;
-        const strandedInCrater = (): number =>
-          state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach' && inCrater(a)).length;
+        const strandedInCrater = (): number => terrainStrandedDebris(state).filter(inCrater).length;
         tickUntilFresh(run, state, () => false, 2);
         tickUntilFresh(run, state, () => strandedInCrater() === 0, 1500); // the crew classifies a few pieces per tick
         expect(debrisActions(state).filter(inCrater).length).toBeGreaterThan(0);
-        expect(strandedInCrater(), 'crater debris still stamped debris_out_of_reach after the ramp').toBe(0);
+        expect(strandedInCrater(), 'crater debris the terrain still strands after the ramp').toBe(0);
       },
       600000,
     );
@@ -459,7 +542,8 @@ describe('A 3x3 pattern floors to a flush crater at any spacing (#1740)', () => 
 // spacing a 2x2 pocket at the centre of four holes (or a line cell between two)
 // has only sub-grade neighbours, so the pit survived and its rubble was stranded.
 // Repro: sandbox desert_badlands seed 42, 3x3 Krackle 8 kg, spacing 3, depth 8,
-// stemming 2.5 at (28,18); the pocket is cells (29-30, 22-23).
+// stemming 2.5 at (28,18); the pocket is cells (29-30, 22-23). Fired now as pop_rock
+// filled under 3 m of stemming, the fill that suits the close 3 m pattern.
 
 interface SandboxShot {
   run: (cmd: string) => ReturnType<ReturnType<typeof createRunner>['runner']['run']>;
@@ -470,13 +554,14 @@ interface SandboxShot {
   craterSurfaces: number[];
 }
 
-/** Sandbox seed 42: 3x3 Krackle 8 kg, spacing 3, depth 8, stemming 2.5, starting at (startX, startZ). */
+/** Sandbox seed 42: 3x3, spacing 3, depth 8, each hole filled with pop_rock under 3 m of stemming, starting at (startX, startZ). */
 function blastSandboxPattern(biome: string, startX: number, startZ: number): SandboxShot {
   const { runner, ctx } = createRunner();
   const run = (c: string) => runner.run(c);
   expect(run(`sandbox start biome:${biome} difficulty:normal seed:42 staffed:true`)).toMatchObject({ success: true });
   const state = ctx.state!;
   state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
+  pinDryWeather(state);
   const grid = ctx.grid!;
   const refresh = (): void => {
     fundForDeliveryWait(state);
@@ -489,7 +574,7 @@ function blastSandboxPattern(biome: string, startX: number, startZ: number): San
 
   expect(run(`drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:${startX},${startZ}`)).toMatchObject({ success: true });
   tickWhile(() => state.plannedDrillHoles.length === 0, 800);
-  expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
+  expect(run(fittedCharge(3))).toMatchObject({ success: true });
   tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 800);
 
   const before = new Map<string, number>();
@@ -509,7 +594,7 @@ function blastSandboxPattern(biome: string, startX: number, startZ: number): San
 
 describe('A 3 m pattern on desert seed 42 leaves no one-voxel pocket and no stranded debris (#1792)', () => {
   it(
-    'no crater column ends under its neighbours\' floor, and no order stays debris_out_of_reach once a ramp reaches the crater',
+    'no crater column ends under its neighbours\' floor, and the terrain strands no order once a ramp reaches the crater',
     () => {
       const { run, state, grid, tickWhile, craterSurfaces } = blastSandboxPattern('desert_badlands', 28, 18);
       expect(craterSurfaces.length).toBeGreaterThan(20);
@@ -520,16 +605,18 @@ describe('A 3 m pattern on desert seed 42 leaves no one-voxel pocket and no stra
         for (const x of [29, 30]) expect(computeVoxelColumnSurfaceY(grid, x, z), `pocket cell ${x},${z}`).toBe(floorY);
       }
 
-      expect(run('build_ramp start:32,49 end:32,26 depth:8')).toMatchObject({ success: true });
+      // The crater spans z 17-25: the ramp ends two tiles inside its edge, not on the rim (#1827, #2045).
+      expect(run('build_ramp start:32,47 end:32,23 depth:8')).toMatchObject({ success: true });
       tickWhile(() => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 3000);
       expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
 
       // Classification runs at the start of each employee tick: give it a pass after the last segment, then wait for the sweep.
       tickWhile(() => false, 2);
-      const stranded = (): number => state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach').length;
+      // Rubble blocks vehicles: the pile is worked from its edge, so only what the terrain strands counts (`terrainStrandedDebris`).
+      const stranded = (): number => terrainStrandedDebris(state).length;
       tickWhile(() => stranded() === 0, 1500);
       expect(debrisActions(state).length).toBeGreaterThan(0);
-      expect(stranded(), 'orders still stamped debris_out_of_reach after the ramp').toBe(0);
+      expect(stranded(), 'orders the terrain still strands after the ramp').toBe(0);
     },
     600000,
   );
@@ -550,15 +637,17 @@ describe('A 3 m pattern on desert seed 42 leaves no one-voxel pocket and no stra
 // 2x2 full-height pillars, and 44 orders were stamped debris_out_of_reach. Digging the
 // ramp after the blast (the control) floors cleanly.
 // Repro: sandbox Easy desert_badlands seed 42, 3x3 Krackle 8 kg, spacing 4, depth 8,
-// stemming 2.5 at (28,18); ramp (32,46) -> (32,27).
+// stemming 2.5 at (28,18); ramp (32,46) -> (32,27). Fired now as pop_rock filled under 2.5 m.
 
 const PATTERN_START_X = 28;
 const PATTERN_START_Z = 18;
-// 28 m long (start z=54, not 46): a 9 m drop at the 20 degree vehicle limit needs 25.2 m (#2045). Depth 9, not 8: the ramp line now starts on the rim's continuous ground (16.26, #2043) rather than the integer top
-// voxel (16), so the whole line sits 0.26 m higher. The shot floors the crater to 8.5 and clips the ramp's lowest
-// cells to it, leaving the first untouched ramp cell (z=30) standing above the crater floor: 9.50 at depth 8, a 1 m
-// wall past what a diagonal step climbs (tan 30 * sqrt 2 = 0.82); 8.66 at depth 9, a 0.16 m step.
-const RAMP_COMMAND = 'build_ramp start:32,54 end:32,26 depth:9';
+// 28 m long (start z=54, not 46): a 9 m drop at the 20 degree vehicle limit needs 25.2 m (#2045). The ramp line
+// starts on the rim's continuous ground (16.26, #2043) rather than the integer top voxel (16), so the whole line sits
+// 0.26 m higher. The shot floors the crater (z 17-28) to 8.5, and at depth 8 the ramp's foot (8.26 at z=26) meets
+// that floor. Depth 9 suited the larger crater of the explicit 8 kg krackle shot (to z=29), whose floor clipped the
+// ramp's lowest cells; dug first into this smaller one it leaves its foot 1.3 m under the floor (7.2 at z=27), a wall
+// past what a diagonal step climbs (tan 30 * sqrt 2 = 0.82).
+const RAMP_COMMAND = 'build_ramp start:32,54 end:32,26 depth:8';
 /** The pillar cells that stood at full height with the ramp dug first: between the north and middle hole rows. */
 const PILLAR_CELLS: Array<[number, number]> = [];
 for (const z of [20, 21]) for (const x of [30, 31, 33, 34]) PILLAR_CELLS.push([x, z]);
@@ -575,6 +664,7 @@ function blastRampScenario(rampFirst: boolean): RampShot {
   expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42 staffed:true')).toMatchObject({ success: true });
   const state = ctx.state!;
   state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
+  pinDryWeather(state);
   const grid = ctx.grid!;
   const tickWhile = (until: () => boolean, max: number): void => {
     for (let i = 0; i < max && !until(); i++) {
@@ -597,7 +687,7 @@ function blastRampScenario(rampFirst: boolean): RampShot {
   tickWhile(() => state.plannedDrillHoles.length === 0, 3000);
   expect(state.plannedDrillHoles).toHaveLength(0);
   expect(state.drillHoles).toHaveLength(9);
-  expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
+  expect(run(fittedCharge())).toMatchObject({ success: true });
   tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 3000);
   expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
   if (rampFirst) {
@@ -624,7 +714,7 @@ function blastRampScenario(rampFirst: boolean): RampShot {
 
 describe('A 4 m pattern shot after its access ramp was dug leaves no pillar and no stranded debris (#1793)', () => {
   it(
-    'ramp first: every crater column, pillar cells included, reads the floor, and no order is debris_out_of_reach',
+    'ramp first: every crater column, pillar cells included, reads the floor, and the terrain strands no order',
     () => {
       const { state, grid, tickWhile, craterSurfaces, floorY } = blastRampScenario(true);
       expect(craterSurfaces.length).toBeGreaterThan(30);
@@ -637,14 +727,15 @@ describe('A 4 m pattern shot after its access ramp was dug leaves no pillar and 
       // The ramp is already dug: no further order is needed. Classification runs at the start of each employee tick.
       tickWhile(() => false, 3);
       expect(debrisActions(state).length).toBeGreaterThan(0);
-      const stranded = state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach');
-      expect(stranded.length, `${stranded.length} orders debris_out_of_reach, e.g. at ${stranded.slice(0, 5).map(a => `${a.targetX},${a.targetZ}`).join(' ')}`).toBe(0);
+      // Rubble blocks vehicles: the pile is worked from its edge, so only what the terrain strands counts (`terrainStrandedDebris`).
+      const stranded = terrainStrandedDebris(state);
+      expect(stranded.length, `${stranded.length} orders the terrain strands, e.g. at ${stranded.slice(0, 5).map(a => `${a.targetX},${a.targetZ}`).join(' ')}`).toBe(0);
     },
     600000,
   );
 
   it(
-    'ramp after (control): every crater column reads the floor, and no order stays debris_out_of_reach once the ramp is dug',
+    'ramp after (control): every crater column reads the floor, and the terrain strands no order once the ramp is dug',
     () => {
       const { run, state, grid, tickWhile, craterSurfaces, floorY } = blastRampScenario(false);
       expect(craterSurfaces.length).toBeGreaterThan(30);
@@ -659,10 +750,11 @@ describe('A 4 m pattern shot after its access ramp was dug leaves no pillar and 
       expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
 
       tickWhile(() => false, 2);
-      const stranded = (): number => state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach').length;
+      // Rubble blocks vehicles: the pile is worked from its edge, so only what the terrain strands counts (`terrainStrandedDebris`).
+      const stranded = (): number => terrainStrandedDebris(state).length;
       tickWhile(() => stranded() === 0, 1500);
       expect(debrisActions(state).length).toBeGreaterThan(0);
-      expect(stranded(), 'orders still stamped debris_out_of_reach after the ramp').toBe(0);
+      expect(stranded(), 'orders the terrain still strands after the ramp').toBe(0);
     },
     600000,
   );
@@ -673,13 +765,14 @@ describe('A 4 m pattern shot after its access ramp was dug leaves no pillar and 
 // entirely under its threshold, walled in by broken columns (the centre of four
 // holes 4 m apart, on a second bench or harder rock), stood as a full-height pillar.
 // Repro: sandbox desert_badlands seed 42, Krackle 8 kg, stemming 2.5, 4 m spacing, depth 8.
+// Fired now as pop_rock filled under 2.5 m.
 
 interface BenchSession {
   run: SandboxShot['run'];
   state: GameState;
   grid: VoxelGrid;
   tickWhile: SandboxShot['tickWhile'];
-  /** Drills, charges and fires a Krackle 8 kg pattern at 4 m spacing, depth 8, from the current surface. */
+  /** Drills, charges and fires a pattern at 4 m spacing, depth 8, from the current surface, each hole filled with pop_rock under 2.5 m. */
   shoot: (rows: number, cols: number, startX: number, startZ: number) => void;
 }
 
@@ -690,6 +783,7 @@ function startBenchSession(biome: string, seed: number): BenchSession {
   const state = ctx.state!;
   delete state.grade; // a 16 m two-bench pit would slump (#1941); the bench breakout geometry is under test
   state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
+  pinDryWeather(state);
   const grid = ctx.grid!;
   const tickWhile = (until: () => boolean, max: number): void => {
     for (let i = 0; i < max && !until(); i++) {
@@ -704,7 +798,7 @@ function startBenchSession(biome: string, seed: number): BenchSession {
     expect(run(`drill_plan grid rows:${rows} cols:${cols} spacing:4 depth:8 start:${startX},${startZ}`)).toMatchObject({ success: true });
     tickWhile(() => state.plannedDrillHoles.length === 0, 3000);
     expect(state.plannedDrillHoles).toHaveLength(0);
-    expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
+    expect(run(fittedCharge())).toMatchObject({ success: true });
     tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 3000);
     expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
     state.lastBlastReport = null;
@@ -736,7 +830,7 @@ function columnsOffFloor(grid: VoxelGrid, x0: number, x1: number, z0: number, z1
 
 describe('A second bench drilled from a crater floor leaves no pillar at the centre of four holes (#1825)', () => {
   it(
-    'two 3x3 shots at (36,32): the first floors to 8, the second to 0 with no column left above it, and no order is debris_out_of_reach once a ramp reaches the floor',
+    'two 3x3 shots at (36,32): the first floors to 8, the second to 0 with no column left above it, and the terrain strands no order once a ramp reaches the floor',
     () => {
       const { run, state, grid, tickWhile, shoot } = startBenchSession('desert_badlands', 42);
 
@@ -756,10 +850,34 @@ describe('A second bench drilled from a crater floor leaves no pillar at the cen
       // Classification runs at the start of each employee tick: give it a pass after the last segment, then wait for the sweep.
       tickWhile(() => false, 2);
       const inPit = (a: PendingAction): boolean => a.targetX >= 36 && a.targetX <= 44 && a.targetZ >= 32 && a.targetZ <= 40;
-      const stranded = (): number => state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach' && inPit(a)).length;
-      tickWhile(() => stranded() === 0, 1500);
+      // Rubble blocks vehicles: the pile is worked from its edge, so only what the terrain strands counts (`terrainStrandedDebris`).
+      // The second shot leaves the first bench's floor (8) standing as one-cell berms in the crater wall, at the midpoints
+      // of the pattern's outer edge, one cell outside it ((38,31) (42,31) (35,34) (45,34) (35,38) (45,38) (38,41) (42,41)).
+      // A rock that rests on a berm lies 8 m above the floor and 8 m below the rim: no truck reaches it within the 1.5 m
+      // step a hauler loads across, so it is stranded by the wall, not by a pillar in the pit. Measured: 20 such orders.
+      // Every rock resting on the pit floor alone must be reachable from the ramp.
+      const restsOnBerm = (a: PendingAction): boolean => {
+        const tracked = state.logistics.fragments.find(f => f.fragment.id === a.payload['fragmentId']);
+        return tracked !== undefined && fragmentFootprintCells(tracked.fragment).some(c =>
+          computeVoxelColumnSurfaceY(grid, c.x, c.z)! > 0 && fragmentRestsOn(tracked.fragment, state.navGrid!.cellAt(c.x, c.z)?.surfaceY));
+      };
+      const bermCellsOf = (a: PendingAction): string[] => {
+        const tracked = state.logistics.fragments.find(f => f.fragment.id === a.payload['fragmentId'])!;
+        return fragmentFootprintCells(tracked.fragment)
+          .filter(c => computeVoxelColumnSurfaceY(grid, c.x, c.z)! > 0 && fragmentRestsOn(tracked.fragment, state.navGrid!.cellAt(c.x, c.z)?.surfaceY))
+          .map(c => `${c.x},${c.z}`);
+      };
+      const strandedOnFloor = (): PendingAction[] => terrainStrandedDebris(state).filter(a => inPit(a) && !restsOnBerm(a));
+      tickWhile(() => strandedOnFloor().length === 0, 1500);
       expect(debrisActions(state).filter(inPit).length).toBeGreaterThan(0);
-      expect(stranded(), 'pit orders still stamped debris_out_of_reach after the ramp').toBe(0);
+      const floorStranded = strandedOnFloor();
+      expect(floorStranded.length, `pit-floor orders the terrain still strands after the ramp, e.g. at ${floorStranded.slice(0, 5).map(a => `${a.targetX},${a.targetZ}`).join(' ')}`).toBe(0);
+      // The berms are in the crater wall, outside the pattern: none stands inside the pit the claim above is about.
+      const bermCells = new Set(terrainStrandedDebris(state).filter(inPit).flatMap(bermCellsOf));
+      for (const key of bermCells) {
+        const [x, z] = key.split(',').map(Number) as [number, number];
+        expect(x >= 36 && x <= 44 && z >= 32 && z <= 40, `berm ${key} inside the pattern`).toBe(false);
+      }
     },
     600000,
   );
@@ -805,11 +923,12 @@ describe('The same 3x3 pattern behaves alike on any bench and any desert seed (#
 // ramp itself is what would connect, so it stayed target_unreachable and the crater stayed
 // out of reach. Repro: sandbox Easy desert_badlands seed 42, tier-1 Living Quarters (30,48),
 // 3x3 Krackle 8 kg shot at (36,32), spacing 4, depth 8, then `build_ramp start:40,12 end:40,<z> depth:8`.
-// The crater floor is 8 over x 35-45, z 31-41; z=36 ends 5 tiles inside it.
+// Fired now as pop_rock filled under 2.5 m: the crater floor is 8 over x 35-45, z 31-41; z=36 ends 5 tiles inside it.
 
 interface CraterRampOutcome {
   allDone: boolean;
   unreachableSegments: number;
+  /** Debris orders the terrain strands once the ramp is dug, rubble set aside (`terrainStrandedDebris`). */
   outOfReach: number;
   haulOrFragmentOrders: number;
 }
@@ -820,6 +939,7 @@ function rampIntoCrater(endZ: number, biome = 'desert_badlands', depth = 8): Cra
   expect(run(`sandbox start biome:${biome} difficulty:easy seed:42 staffed:true`)).toMatchObject({ success: true });
   const state = ctx.state!;
   state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
+  pinDryWeather(state);
   const tickWhile = (until: () => boolean, max: number): void => {
     for (let i = 0; i < max && !until(); i++) {
       fundForDeliveryWait(state);
@@ -835,7 +955,7 @@ function rampIntoCrater(endZ: number, biome = 'desert_badlands', depth = 8): Cra
   expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32')).toMatchObject({ success: true });
   tickWhile(() => state.plannedDrillHoles.length === 0, 3000);
   expect(state.plannedDrillHoles).toHaveLength(0);
-  expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
+  expect(run(fittedCharge())).toMatchObject({ success: true });
   tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 3000);
   state.lastBlastReport = null;
   expect(run('blast detonate')).toMatchObject({ success: true });
@@ -851,8 +971,9 @@ function rampIntoCrater(endZ: number, biome = 'desert_badlands', depth = 8): Cra
   tickWhile(rampDone, 4000); // the 20 degree limit makes the ramp ~35% longer than the old 30 degree one (#2045)
   // Classification runs at the start of each employee tick: give it a pass after the last segment.
   for (let i = 0; i < 3; i++) run('tick 1');
-  // Stamps clear on the next sweep once the crater is connected; a ramp that never connects it keeps them.
-  const stranded = (): number => state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach').length;
+  // A ramp that never connects the crater leaves its debris out of reach. Rubble blocks vehicles, so the pile is worked
+  // from its edge and its inner rock reads debris_out_of_reach until then: only what the terrain strands counts here.
+  const stranded = (): number => terrainStrandedDebris(state).length;
   if (rampDone()) tickWhile(() => stranded() === 0, 1500);
 
   const segmentActions = playerRamps().flatMap(r => r.segments.map(s => state.pendingActions.find(a => a.id === s.actionId)));
@@ -860,19 +981,19 @@ function rampIntoCrater(endZ: number, biome = 'desert_badlands', depth = 8): Cra
   return {
     allDone: rampDone(),
     unreachableSegments: segmentActions.filter(a => a !== undefined && a.blockedReason === 'target_unreachable').length,
-    outOfReach: debris.filter(a => a.blockedReason === 'debris_out_of_reach').length,
+    outOfReach: stranded(),
     haulOrFragmentOrders: debris.length,
   };
 }
 
 describe('A ramp ending inside an already-dug crater finishes and connects it (#1827)', () => {
   it(
-    'build_ramp 40,12 -> 40,36: every segment is dug, none is target_unreachable, no haul or fragment order is debris_out_of_reach',
+    'build_ramp 40,12 -> 40,36: every segment is dug, none is target_unreachable, the terrain strands no haul or fragment order',
     () => {
       const r = rampIntoCrater(36);
       expect(r.unreachableSegments, 'segments stuck target_unreachable').toBe(0);
       expect(r.allDone, 'every ramp segment dug').toBe(true);
-      expect(r.outOfReach, 'haul/fragment orders debris_out_of_reach').toBe(0);
+      expect(r.outOfReach, 'haul/fragment orders the terrain strands').toBe(0);
     },
     600000,
   );
@@ -915,7 +1036,7 @@ describe('A depth-8 ramp into a red_canyon crater meets the crater floor (#1852)
       const r = rampIntoCrater(31, 'red_canyon', 8);
       expect(r.allDone, 'every ramp segment dug').toBe(true);
       expect(r.haulOrFragmentOrders).toBeGreaterThan(0);
-      expect(r.outOfReach, 'haul/fragment orders debris_out_of_reach').toBeLessThan(150);
+      expect(r.outOfReach, 'haul/fragment orders the terrain strands').toBeLessThan(150);
     },
     600000,
   );

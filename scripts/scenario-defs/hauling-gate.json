@@ -196,16 +196,11 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "ensurePanel",
           "panel": "blast"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
         },
         {
           "type": "setStepper",
@@ -494,21 +489,18 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 25",
-      "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable here, and the haulers keep filling the warehouse (~1.0t to ~13.9t at tick 290 on the aligned trajectory). #1722/#1723: ore and spoil are different orders; which lands first depends on which reachable rock bin the hauler weighs first. Asserting stored ore keeps this step about 'hauling keeps delivering'. #2146: minor events are non-blocking notices now, so the clock no longer stops at them; contract deliveries (which sell stored ore) land inside the old tick 60 / tick 40 windows and could drain the warehouse to net zero, so the first window is re-measured to tick 25 (tick 60 -> 25) and the second stays at tick 40 from the shifted start; both still net-increase storedMassKg.",
+      "command": "tick 30",
+      "description": "Automatic hauling keeps running, and the haulers keep delivering rock to the depots. #1722/#1723: ore and spoil are different orders; which lands first depends on which reachable rock bin the hauler weighs first. Asserting a depot's stock keeps this step about 'hauling keeps delivering'. #2146: contract deliveries sell the stored ore every 25-50 ticks and empty the warehouse, so each window is measured to end on a delivery plateau, not just after a sale. Fill-mode re-measure (tick 25 -> 30): the bigger shot's first deliveries land earlier (787.5 kg stored at tick 245), a sale empties the warehouse to 176 kg at tick 255, and the next loads land at ~272, so the window ends at 275 with ~1.0t stored. The tick 40 window below then ends at 315 (~2.8t, the sale after it lands at ~320) and the spoil window at 455. Rubble blocks vehicles: trucks now load each rock from a free cell beside the pile, which changes the order the rock comes off it. Re-measured (command mode, deterministic): 2.1t of ore is stored at tick 245, the first spoil lands inside this window (heap 0 -> ~3.5t by tick 275), and the contract deliveries at ticks 254 and 261 sell the stored ore, so the warehouse only refills to ~1.4t by 275 and the two payouts outweigh the window's upkeep (cash 163,771 -> 164,628). So this window asserts the spoil the haulers deliver; the ore delivery is asserted by the tick 40 window below (~1.4t at 275 to ~2.0t at 315, ending on a delivery plateau), and the upkeep drain is no longer a property of a hauling window that holds contract payouts.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 25"
+          "command": "tick 30"
         }
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
-          "cash"
-        ],
         "increased": [
-          "storedMassKg"
+          "storedSpoilKg"
         ]
       }
     },
@@ -545,7 +537,7 @@
     },
     {
       "command": "tick 40",
-      "description": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position. #553: cash is not asserted decreased either -- the event choose 0 above may itself have moved cash (income or cost, event-dependent). The warehouse keeps filling (~13.9t to ~20.8t); it tops out at ~24.4t of its 25t around tick 365, when no further ore fragment fits. #1709: workers due a rest during vehicle work now park a slow vehicle and walk to the rest building (chooseRestTrip), which shifts delivery timing.",
+      "description": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position. #553: cash is not asserted decreased either -- the event choose 0 above may itself have moved cash (income or cost, event-dependent). The warehouse keeps receiving ore between contract sales (~1.0t at tick 275 to ~2.8t at tick 315, measured under fill-mode charges). #1709: workers due a rest during vehicle work now park a slow vehicle and walk to the rest building (chooseRestTrip), which shifts delivery timing.",
       "interaction": [
         {
           "type": "command",

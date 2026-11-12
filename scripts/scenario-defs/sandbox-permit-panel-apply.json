@@ -157,7 +157,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -166,11 +166,6 @@
         {
           "type": "ensureStep",
           "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 6
         },
         {
           "type": "setStepper",
@@ -306,7 +301,7 @@
       }
     },
     {
-      "command": "build_ramp start:12,34 end:34,34 depth:6",
+      "command": "build_ramp start:12,34 end:33,34 depth:6",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -341,7 +336,7 @@
           "type": "dragTiles",
           "x1": 12,
           "z1": 34,
-          "x2": 34,
+          "x2": 33,
           "z2": 34
         },
         {
@@ -349,7 +344,7 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "Ramp into the crater right after blast 1 so the digger and hauler move its ore while blast 2 is prepared (payroll runs every tick; the starting cash cannot afford a serial run).",
+      "description": "Ramp into the crater right after blast 1 so the digger and hauler move its ore while blast 2 is prepared (payroll runs every tick; the starting cash cannot afford a serial run). The ramp ends on the crater's rim at (33,34): the filled 6 m holes floor the crater flat from x=34, so its foot meets the floor there.",
       "role": "player"
     },
     {
@@ -449,7 +444,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -458,11 +453,6 @@
         {
           "type": "ensureStep",
           "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 6
         },
         {
           "type": "setStepper",

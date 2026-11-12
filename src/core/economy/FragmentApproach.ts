@@ -1,76 +1,102 @@
-// BlastSimulator2026 — Walkable approach cell for a boulder fragment
+// BlastSimulator2026 — Where a vehicle stands to load or break a fragment
 //
-// The NavGrid cell a vehicle must reach to load or break a fragment. Both
-// HaulingTask.ts (loading) and BoulderBreaking.ts (breaking) call this one
-// function so the two workflows can never drift onto different rules —
-// unlike a building (see BuildingApproach.ts's findBuildingApproachCell,
-// which targets a walkable ring cell adjacent to the building since the
-// building's own tile is NavGrid-blocked), a fragment sits directly on a
-// walkable tile, so the target is simply that tile: the fragment's own
-// position, rounded to grid coordinates.
+// Rubble blocks the nav grid over the whole footprint of each rock
+// (`fragmentFootprintCells`), for every mover: a truck does not drive over a
+// muck pile, it parks beside the rock it loads, the way a building is docked
+// from its ring (BuildingApproach.ts). Both HaulingTask.ts (loading) and
+// BoulderBreaking.ts (breaking) call this one function so the two workflows
+// can never drift onto different rules.
 //
-// The primary cell can itself be occupied by another vehicle — most notably
-// a rock_fragmenter that just finished a BoulderBreaking task, which parks
-// (idle, but still occupying per EntityMovementTick.ts's
-// isCellOccupiedByOtherVehicle) on exactly the cell its sub-fragments spawn
-// on. A second vehicle later dispatched to one of those sub-fragments would
-// target that same occupied cell and — since an idle vehicle never leaves it
-// on its own and TRAFFIC_JAM detection needs multiple queued vehicles —
-// wait there forever (#484). When the primary cell is occupied, fall back to
-// the nearest free walkable neighbour instead, mirroring how
-// findBuildingApproachCell already resolves a blocked primary target to a
-// walkable cell nearby.
+// The candidates are the cells touching the rock's footprint that are open
+// ground, free of other rubble and of other vehicles. A rock buried in the
+// middle of a pile has none until the rocks around it are hauled: a pile is
+// worked from its edge.
+
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { GameState } from '../state/GameState.js';
+import { fragmentBlocksVehicles, fragmentFootprintCells, fragmentRestsOn, fragmentRingCells } from '../nav/FragmentFootprint.js';
+import type { NavCell } from '../nav/NavGrid.js';
+import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
+import { vehicleReachesCell } from '../engine/ReachCache.js';
+import { FRAGMENT_APPROACH_MAX_STEP_M, FRAGMENT_APPROACH_REACH_CELLS } from '../config/balance.js';
 
 /**
- * The NavGrid cell a vehicle must reach to load or break `fragment`.
- *
- * When `state` (and thus the live vehicle roster) is supplied and the
- * fragment's own cell is occupied by a vehicle other than `excludeVehicleId`,
- * returns the nearest free, walkable neighbouring cell instead — recomputed
- * every call, so it tracks the occupant moving away on a later tick. Falls
- * back to the primary cell when no free neighbour exists (caller's own
- * stuck-detection handles a genuinely unreachable target) or when `state` is
- * omitted (callers that only need the nominal cell, e.g. reachability probes
- * that don't care about a transient occupant).
+ * The open cells beside `fragment` a vehicle can stand on to work it: traversable,
+ * under no rubble. Every candidate without a nav grid is the rock's own cell.
+ */
+export function fragmentApproachCandidates(fragment: FragmentData, state: Pick<GameState, 'navGrid'>): Array<{ x: number; z: number; ring: number }> {
+  const nav = state.navGrid;
+  if (!nav) return [{ x: Math.round(fragment.position.x), z: Math.round(fragment.position.z), ring: 0 }];
+  // The ground the rock lies on: the highest surface among the cells under it that it rests on (`fragmentRestsOn`). A
+  // rock on a bench edge with its centre over the pit below is worked from the bench; a rock stacked on a pile from
+  // the floor the pile stands on. Its centre cell's surface when none is known.
+  let ground: number | undefined;
+  for (const c of fragmentFootprintCells(fragment)) {
+    const surfaceY = nav.cellAt(c.x, c.z)?.surfaceY;
+    if (surfaceY === undefined || !fragmentRestsOn(fragment, surfaceY)) continue;
+    if (ground === undefined || surfaceY > ground) ground = surfaceY;
+  }
+  ground ??= nav.cellAt(Math.round(fragment.position.x), Math.round(fragment.position.z))?.surfaceY;
+  // Gravel is driven over: its own cells are where a truck stands to scoop it.
+  const own = fragmentBlocksVehicles(fragment) ? [] : fragmentFootprintCells(fragment).map(c => ({ ...c, ring: 0 }));
+  const ring = [...own, ...fragmentRingCells(fragment, FRAGMENT_APPROACH_REACH_CELLS)];
+  const ground1 = new Set(ring.filter(c => c.ring === 1 && isGround(nav.cellAt(c.x, c.z))).map(c => `${c.x},${c.z}`));
+  return ring.filter(c => {
+    const cell = nav.cellAt(c.x, c.z);
+    if (!isGround(cell) || (cell.fragmentOccupancy ?? 0) > 0) return false;
+    // An arm reaches over rubble, not through a wall: past the nearest ring, a neighbour in it must be ground.
+    if (c.ring > 1 && !NEIGHBOUR_OFFSETS_8.some(([dx, dz]) => ground1.has(`${c.x + dx},${c.z + dz}`))) return false;
+    return ground === undefined || cell.surfaceY === undefined || Math.abs(cell.surfaceY - ground) <= FRAGMENT_APPROACH_MAX_STEP_M;
+  });
+}
+
+function isGround(cell: NavCell | undefined): cell is NavCell {
+  return cell !== undefined && cell.type !== 'blocked' && cell.type !== 'void';
+}
+
+/**
+ * The cell a vehicle drives to in order to load or break `fragment`: the
+ * candidate beside it (`fragmentApproachCandidates`) that no other vehicle and
+ * no worker on foot holds, preferring one the vehicle `excludeVehicleId` can drive to, then the
+ * ring nearest the rock, then the cell nearest that vehicle (else nearest the rock). Null when the rock has no free side —
+ * buried in its pile, or boxed in by parked vehicles — and the order waits.
+ * Without `state` (or a nav grid) the rock's own rounded cell, the nominal
+ * target probes and ghosts use.
  */
 export function fragmentApproachCell(
   fragment: FragmentData,
   state?: GameState,
   excludeVehicleId?: number,
-): { x: number; z: number } {
-  const primary = {
-    x: Math.round(fragment.position.x),
-    z: Math.round(fragment.position.z),
-  };
+): { x: number; z: number } | null {
+  const own = { x: Math.round(fragment.position.x), z: Math.round(fragment.position.z) };
+  if (!state || !state.navGrid) return own;
 
-  if (!state) return primary;
-  if (!isCellOccupiedByOtherVehicle(state, primary.x, primary.z, excludeVehicleId)) return primary;
+  const vehicle = excludeVehicleId === undefined ? undefined : state.vehicles.vehicles.find(v => v.id === excludeVehicleId);
+  const driverIds = new Set(vehicle?.occupantIds ?? []);
+  const free = fragmentApproachCandidates(fragment, state)
+    .filter(c => !isCellOccupiedByOtherVehicle(state, c.x, c.z, excludeVehicleId) && !isCellHeldByOtherWorker(state, c.x, c.z, driverIds));
+  if (free.length === 0) return null;
+  // A vehicle is sent only where it can drive: with none of the free sides in its reach the order waits.
+  const pool = vehicle ? free.filter(c => vehicleReachesCell(state, vehicle, c.x, c.z)) : free;
+  if (pool.length === 0) return null;
+  const from = vehicle ? { x: vehicle.x, z: vehicle.z } : fragment.position;
 
-  let best: { x: number; z: number } | null = null;
+  let best = pool[0]!;
   let bestDistSq = Infinity;
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dz = -1; dz <= 1; dz++) {
-      if (dx === 0 && dz === 0) continue;
-      const x = primary.x + dx;
-      const z = primary.z + dz;
-
-      if (state.navGrid) {
-        const cell = state.navGrid.cellAt(x, z);
-        if (!cell || cell.type === 'blocked' || cell.type === 'void') continue;
-      }
-      if (isCellOccupiedByOtherVehicle(state, x, z, excludeVehicleId)) continue;
-
-      const distSq = dx * dx + dz * dz;
-      if (distSq < bestDistSq) {
-        bestDistSq = distSq;
-        best = { x, z };
-      }
+  for (const c of pool) {
+    const distSq = (c.x - from.x) ** 2 + (c.z - from.z) ** 2;
+    if (c.ring < best.ring || (c.ring === best.ring && distSq < bestDistSq)) {
+      bestDistSq = distSq;
+      best = c;
     }
   }
+  return { x: best.x, z: best.z };
+}
 
-  return best ?? primary;
+/** A worker standing on the cell (on foot, not the vehicle's own crew): the truck would stop short of them. */
+function isCellHeldByOtherWorker(state: GameState, x: number, z: number, crew: ReadonlySet<number>): boolean {
+  return state.employees.employees.some(e => e.alive && !crew.has(e.id) && e.locomotion?.kind !== 'mounted'
+    && Math.round(e.x) === x && Math.round(e.z) === z);
 }
 
 function isCellOccupiedByOtherVehicle(
@@ -79,5 +105,5 @@ function isCellOccupiedByOtherVehicle(
   z: number,
   excludeVehicleId?: number,
 ): boolean {
-  return state.vehicles.vehicles.some(v => v.id !== excludeVehicleId && v.x === x && v.z === z);
+  return state.vehicles.vehicles.some(v => v.id !== excludeVehicleId && Math.round(v.x) === x && Math.round(v.z) === z);
 }

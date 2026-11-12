@@ -7,7 +7,8 @@ import {
   VEHICLE_TIER_UNLOCK_GRADE,
 } from '../../src/core/config/balance.js';
 
-export interface PermitLimit { maxChargeKg: number; maxHoles: number }
+/** What a permit allows per blast: total charge (kg) and pattern area (m², one spacing × burden cell per hole). */
+export interface PermitLimit { maxChargeKg: number; maxAreaM2: number }
 
 export interface LadderShot {
   rows: number;
@@ -46,9 +47,14 @@ export function floorToKgResolution(kg: number): number {
   return Math.floor(kg * KG_RESOLUTION) / KG_RESOLUTION;
 }
 
+/** Holes of a square `spacingM` mesh whose cells fit the permit area; at least 1. */
+function holesWithinArea(limit: PermitLimit, spacingM: number): number {
+  return Math.max(1, Math.floor(limit.maxAreaM2 / (spacingM * spacingM)));
+}
+
 /** Largest square grid and per-hole charge within `limit`, never exceeding either. */
 export function limitSizedShot(limit: PermitLimit, base: LadderShot, maxDiameterM: number): LadderShot {
-  const holes = Math.max(1, Math.min(limit.maxHoles, Math.floor(limit.maxChargeKg / MIN_KG_PER_HOLE)));
+  const holes = Math.max(1, Math.min(holesWithinArea(limit, base.spacing), Math.floor(limit.maxChargeKg / MIN_KG_PER_HOLE)));
   const side = Math.max(1, Math.floor(Math.sqrt(holes)));
   const perHole = floorToKgResolution(limit.maxChargeKg / (side * side));
   return { ...base, rows: side, cols: side, kgPerHole: perHole, diameterM: pickDiameter(maxDiameterM) };
@@ -68,9 +74,9 @@ const KG_PER_SPACING_M = 5;
 const MIN_HOLE_SPACING_M = 2;
 const MAX_HOLE_SPACING_M = 4;
 
-/** Side of the largest square pattern of holes each charged with `kgPerHole` that `limit` allows; at least 1. */
-export function fullHoleSide(limit: PermitLimit, kgPerHole: number): number {
-  const holes = Math.min(limit.maxHoles, Math.floor(limit.maxChargeKg / kgPerHole));
+/** Side of the largest square pattern of holes `spacingM` apart, each charged with `kgPerHole`, that `limit` allows; at least 1. */
+export function fullHoleSide(limit: PermitLimit, kgPerHole: number, spacingM: number): number {
+  const holes = Math.min(holesWithinArea(limit, spacingM), Math.floor(limit.maxChargeKg / kgPerHole));
   return Math.max(1, Math.floor(Math.sqrt(holes)));
 }
 

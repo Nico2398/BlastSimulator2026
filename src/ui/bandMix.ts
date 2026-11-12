@@ -43,7 +43,12 @@ export function powderFactorText(kgPerM3: number): string {
 export function recommendedRangeText(range: PowderFactorRange | null): string {
   if (!range) return t('ui.blast_workshop.charge.recommended_none');
   return t('ui.blast_workshop.charge.recommended', {
-    min: range.minKgPerM3.toFixed(2),
-    max: range.maxKgPerM3.toFixed(2),
+    pf: spanText(range.minKgPerM3.toFixed(2), range.maxKgPerM3.toFixed(2)),
+    stemming: spanText(range.minStemmingM.toFixed(1), range.maxStemmingM.toFixed(1)),
   });
+}
+
+/** "a–b", or just "a" when the two ends read the same (a range of one sample). */
+function spanText(lo: string, hi: string): string {
+  return lo === hi ? lo : `${lo}–${hi}`;
 }

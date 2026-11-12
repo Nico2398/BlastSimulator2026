@@ -1119,16 +1119,19 @@ describe('Campaign star persistence (#1311)', () => {
 const KIT_LEVELS = ['grumpstone_ridge', 'treranium_depths'] as const;
 
 /**
- * What a careful player drills and loads for each level's rock and ore (level 3 is hardness 4-5: boomite/krackle
- * break nothing there). Grumpstone Ridge carries ore at the surface, so a shallow hole finds it. Treranium Depths'
- * ore starts ~12 m below the surface, so its holes go deep. Its charge is dynatomics, not obliviax: deep holes
- * flood with the weather, and a wet hole fizzles a water-sensitive charge (obliviax) into a bankrupting dud,
- * while dynatomics is water-resistant. 24 kg per hole in 14 m holes is what breaks out of that hard rock (#1724): a charge that
- * stays sealed under its cap leaves rock that gets no haul order (#1774), and 16 kg or 24 m holes never opened the cap.
+ * What a careful player drills and loads for each level's rock and ore (level 3 is hardness 4-5: boomite and krackle
+ * barely dent it). Each hole is filled with the explosive up to the stemming, as the Charge step loads it.
+ * Grumpstone Ridge carries ore at the surface, so a shallow hole finds it: krackle under 2 m of stemming (11.5 kg a
+ * 6 m hole) breaks it out cleanly. Treranium Depths' ore starts ~12 m below the surface, so its holes go deep. Its
+ * charge is dynatomics, not obliviax: deep holes flood with the weather, and a wet hole fizzles a water-sensitive
+ * charge (obliviax) into a bankrupting dud, while dynatomics is water-resistant. In that hard rock the stemming is the
+ * design (#1724): under 4 m (40 kg a 14 m hole) the shot breaks out with no fly-rock; under 2 m (48 kg) it throws
+ * hundreds of projections (CATASTROPHIC); under 6 m (32 kg) it stays sealed under its cap, and sealed rock gets no
+ * haul order (#1774).
  */
-const FIRST_BLAST: Readonly<Record<(typeof KIT_LEVELS)[number], { depth: number; charge: string }>> = {
-  grumpstone_ridge: { depth: 6, charge: 'explosive:krackle amount:8' },
-  treranium_depths: { depth: 14, charge: 'explosive:dynatomics amount:24' },
+const FIRST_BLAST: Readonly<Record<(typeof KIT_LEVELS)[number], { depth: number; explosive: string; stemmingM: number }>> = {
+  grumpstone_ridge: { depth: 6, explosive: 'krackle', stemmingM: 2 },
+  treranium_depths: { depth: 14, explosive: 'dynatomics', stemmingM: 4 },
 };
 
 // The shot is aimed this far from the rig, out of the blast radius of the free warehouse and spoil heap beside the
@@ -1225,9 +1228,10 @@ describe.each(KIT_LEVELS)('first blast to first sale on %s from the starting kit
       if (!run(`drill_plan grid rows:2 cols:2 spacing:4 depth:${FIRST_BLAST[levelId].depth} start:${x},${z}`).success) continue;
       tickUntil(run, state, 800, () => over() || state.plannedDrillHoles.length === 0);
       expect(state.drillHoles.length, 'the crew drilled the holes').toBeGreaterThan(0);
-      expect(run(`charge hole:* ${FIRST_BLAST[levelId].charge} stemming:2`).success).toBe(true);
-      // Balance finding (#1895): the treranium_depths kit cannot pay its crew through the delivery wait for a 96 kg dynatomics order
-      // (bankruptcy at ~tick 490 on the kit's cash). The grant below stands in for a balance decision (a pre-stocked
+      const { explosive, stemmingM } = FIRST_BLAST[levelId];
+      expect(run(`charge hole:* explosive:${explosive} stemming:${stemmingM}`).success).toBe(true);
+      // Balance finding (#1895): the treranium_depths kit cannot pay its crew through the delivery wait for a 160 kg dynatomics order
+      // (bankruptcy at ~tick 465 on the kit's cash). The grant below stands in for a balance decision (a pre-stocked
       // warehouse in the kit, a cheaper opening pattern or a shorter wait); remove it once that lands.
       if (levelId === 'treranium_depths') state.cash += 100_000;
       tickUntil(run, state, 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);

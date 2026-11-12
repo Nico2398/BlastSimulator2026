@@ -5,9 +5,10 @@
 // scripts/shared/command-runner.ts) and asserts on the resulting game state,
 // rather than just checking the JSON files parse. These pin down the
 // pass/fail combinations the visual-coherence fixes are supposed to produce:
-//   - building-destruction-visual: the charge amount bug (amount:10, out of
-//     boomite's [1,8]kg range) must no longer produce "Missing charge", and
-//     the blast must destroy the warehouses in its footprint.
+//   - building-destruction-visual: the charge (once amount:10, out of
+//     boomite's old [1,8]kg range; now each hole filled up to the stemming)
+//     must not produce "Missing charge", and the blast must destroy the
+//     warehouses in its footprint.
 //   - building-tier-system-visual / building-research-visual /
 //     building-research-progression-visual: once tier-gating is wired, a
 //     direct Tier 2/3 build must be rejected before research completes, and

@@ -105,10 +105,12 @@ function clearPatternOfCrew(runner: ConsoleRunner, ctx: GameContext, maxTicks = 
 
 // Weather ticks with the game (#1403), so a weather set before the long drill
 // and charge drives has drifted by blast time. Pin it right before the blast.
-function drillChargeBlast(runner: ConsoleRunner, ctx: GameContext, explosiveId: string, weather = 'sunny') {
+/** Drills a 2x3 pattern, charges it with `amountKg` per hole (null fills each hole up to the stemming), clears the crew, sets `weather` and fires. */
+function drillChargeBlast(runner: ConsoleRunner, ctx: GameContext, explosiveId: string, weather = 'sunny', amountKg: number | null = 8) {
   runner.run('drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12');
   driveDrillPlanToCompletion(runner, ctx);
-  runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
+  const amount = amountKg === null ? '' : `amount:${amountKg} `;
+  expect(runner.run(`charge hole:* explosive:${explosiveId} ${amount}stemming:2`).success).toBe(true);
   driveChargePlanToCompletion(runner, ctx);
   clearPatternOfCrew(runner, ctx);
   applyWeather(runner, ctx, weather);
@@ -285,13 +287,18 @@ describe('blast report lists wet and fizzled holes (#1348)', () => {
 });
 
 describe('fizzle share caps the blast rating (#1675)', () => {
+  // The holes are filled up to the stemming, as a player charges them. A fizzled charge keeps a tenth of
+  // its energy, and the cap is only what rates the shot bad while that residue still breaks some rock: a
+  // shot that breaks nothing is rated bad as a dud before any cap applies (8 kg of boomite fizzled is one).
   it('a fully fizzled boomite blast in rain reports ratingCap fizzled_failure and rating bad', () => {
     const wet = createRunner();
     wet.runner.run('new_game seed:42 staffed:true');
     wet.runner.run('weather set heavy_rain');
-    expect(drillChargeBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain').success).toBe(true);
+    expect(drillChargeBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain', null).success).toBe(true);
     const report = wet.ctx.state!.lastBlastReport!;
+    expect(report.wetHoleIds?.length).toBeGreaterThan(0);
     expect(report.fizzledHoleIds).toEqual(report.wetHoleIds);
+    expect(report.clearedVoxels, 'the fizzled residue broke no rock: the dud rule, not the cap, rated it').toBeGreaterThan(0);
     expect(report.ratingCap).toBe('fizzled_failure');
     expect(report.rating).toBe('bad');
   });
@@ -313,7 +320,7 @@ describe('fizzle share caps the blast rating (#1675)', () => {
     const wet = createRunner();
     wet.runner.run('new_game seed:42 staffed:true');
     wet.runner.run('weather set heavy_rain');
-    const result = drillChargeBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain');
+    const result = drillChargeBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain', null);
     expect(result.output).toContain(t('mining.blast.rating_cap_fizzled_failure', { base: wet.ctx.state!.lastBlastReport!.baseRating?.toUpperCase() ?? '' }));
   });
 });

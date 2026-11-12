@@ -115,10 +115,7 @@ function loadFragment(state: GameState, vehicle: Vehicle, tracked: TrackedFragme
   const fragmentId = tracked.fragment.id;
   if (!pickupFragment(state.logistics, fragmentId, String(vehicle.id), freightWarehouseSites(state.buildings), vehicle.x, vehicle.z, spoilHeapSites(state.buildings), oreGradeScaleOf(state.world))) return false;
 
-  state.navGrid?.removeFragmentOccupant(
-    Math.round(tracked.fragment.position.x),
-    Math.round(tracked.fragment.position.z),
-  );
+  state.navGrid?.removeFragmentFootprint(tracked.fragment);
   vehicle.cargo.push({ fragmentId, massKg: tracked.fragment.mass });
   emitter?.emit('vehicle:haul_loaded', { vehicleId: vehicle.id, fragmentId });
   return true;
@@ -244,9 +241,7 @@ export function applyBoulderSplit(state: GameState, vehicle: Vehicle, emitter?: 
   let nextId = reserveFragmentIds(state.logistics, result.fragments.length);
   const idx = state.logistics.fragments.indexOf(tracked);
   if (idx >= 0) state.logistics.fragments.splice(idx, 1);
-  const cellX = Math.round(tracked.fragment.position.x);
-  const cellZ = Math.round(tracked.fragment.position.z);
-  state.navGrid?.removeFragmentOccupant(cellX, cellZ);
+  state.navGrid?.removeFragmentFootprint(tracked.fragment);
 
   // Fixture/parent fragments built by hand (e.g. in tests) may omit
   // halfExtents even though FragmentData declares it required — fall back to
@@ -271,7 +266,7 @@ export function applyBoulderSplit(state: GameState, vehicle: Vehicle, emitter?: 
       origin: { ...tracked.fragment.origin },
     };
     state.logistics.fragments.push({ fragment: newFragment, state: 'on_ground', vehicleId: null, warehouseId: null });
-    state.navGrid?.addFragmentOccupant(cellX, cellZ);
+    state.navGrid?.addFragmentFootprint(newFragment);
     pieceIds.push(newFragment.id);
   }
 

@@ -8,7 +8,7 @@ import { createCharge, batchCharge } from '../../../core/mining/ChargePlan.js';
 import {
   dispatchChargeAction, chargePatternHoles, isHoleChargeCovered,
 } from '../../../core/mining/ChargeOrder.js';
-import { MIN_STEMMING_M, SOFTWARE_TIER_OPTIMIZER } from '../../../core/config/balance.js';
+import { CHARGE_DEFAULT_STEMMING_M, SOFTWARE_TIER_OPTIMIZER } from '../../../core/config/balance.js';
 import { previewChargeOptimization } from '../../../core/mining/Software.js';
 import { optimizerOptionsFor } from '../../../core/mining/ChargeOptimizer.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -28,9 +28,7 @@ export function chargeCommand(
     const orderedEntries = Object.entries(ctx.state!.plannedChargesByHole);
     const loadedEntries = Object.entries(ctx.state!.chargesByHole);
     const pattern = ctx.state!.patternCharge;
-    const patternLine = pattern ? t('mining.charge.pattern_set', {
-      explosive: explosiveName(pattern.explosiveId), amount: pattern.amountKg, stemming: pattern.stemmingM,
-    }) : null;
+    const patternLine = pattern ? patternSetLine(pattern.explosiveId, pattern.amountKg, pattern.stemmingM) : null;
     if (orderedEntries.length === 0 && loadedEntries.length === 0) {
       return { success: true, output: patternLine ?? t('mining.charge.none_set') };
     }
@@ -46,8 +44,9 @@ export function chargeCommand(
 
   const holeSpec = named['hole'] ?? '';
   const explosiveId = named['explosive'] ?? '';
-  const amount = parseFloat((named['amount'] ?? '0').replace('kg', ''));
-  const stemming = parseFloat((named['stemming'] ?? String(MIN_STEMMING_M)).replace('m', ''));
+  // No amount fills each hole up to the stemming; an explicit one is a partial charge at the bottom.
+  const amount = named['amount'] === undefined ? null : parseFloat(named['amount'].replace('kg', ''));
+  const stemming = parseFloat((named['stemming'] ?? String(CHARGE_DEFAULT_STEMMING_M)).replace('m', ''));
 
   if (!explosiveId) return { success: false, output: t('mining.charge.missing_explosive') };
   const notOffered = levelExplosiveFailure(ctx.state!.campaign.activeLevelId, explosiveId);
@@ -68,7 +67,7 @@ export function chargeCommand(
   if ('error' in result) return { success: false, output: result.error };
 
   dispatchChargeAction(ctx.state!, hole, result.charge);
-  return { success: true, output: `Charge ordered for ${holeId}: ${explosiveId} ${amount}kg, stemming ${stemming}m` };
+  return { success: true, output: `Charge ordered for ${holeId}: ${explosiveId} ${result.charge.amountKg}kg, stemming ${stemming}m` };
 }
 
 /**
@@ -99,17 +98,25 @@ function explosiveName(id: string): string {
   return e ? t(e.nameKey) : id;
 }
 
+/** "Pattern charge: Boomite, filled to 2.5 m of stemming" (or a fixed kg for a partial pattern). */
+function patternSetLine(explosiveId: string, amountKg: number | null, stemming: number): string {
+  return amountKg === null
+    ? t('mining.charge.pattern_set_fill', { explosive: explosiveName(explosiveId), stemming })
+    : t('mining.charge.pattern_set', { explosive: explosiveName(explosiveId), amount: amountKg, stemming });
+}
+
 /**
  * `charge hole:*` — store the pattern charge and order every uncovered drilled
  * hole; holes drilled later are charged on landing (#1345). Funds are checked
  * per hole, an unaffordable one waits instead of failing the batch.
  */
-function chargePattern(state: GameState, explosiveId: string, amount: number, stemming: number): CommandResult {
+function chargePattern(state: GameState, explosiveId: string, amount: number | null, stemming: number): CommandResult {
   const drilled = state.drillHoles;
   const uncovered = drilled.filter(h => !isHoleChargeCovered(state, h.id));
   const skippedCount = drilled.length - uncovered.length;
   if (uncovered.length === 0 && state.plannedDrillHoles.length === 0) {
-    return { success: false, output: t('mining.charge.nothing_to_charge') };
+    // Holes that are all charged (or ordered) are not the same refusal as no holes at all.
+    return { success: false, output: t(drilled.length > 0 ? 'mining.charge.all_covered' : 'mining.charge.nothing_to_charge') };
   }
 
   const depths: Record<string, number> = {};
@@ -131,14 +138,14 @@ function chargePattern(state: GameState, explosiveId: string, amount: number, st
       ordered: result.ordered.length, skipped: skippedCount,
     }));
   }
-  lines.push(t('mining.charge.pattern_set', { explosive: explosiveName(explosiveId), amount, stemming }));
+  lines.push(patternSetLine(explosiveId, amount, stemming));
   if (result.invalid.length > 0) {
     lines.push(...result.invalid.map(e => `  ${e.holeId}: ${e.message}`));
   }
   return { success: true, output: lines.join('\n') };
 }
 
-/** `optimize_charges [stemming:<m>m] [apply:true]` — the tier-4 charge proposal for the drilled pattern (#2204). */
+/** `optimize_charges [apply:true]` — the tier-4 charge proposal for the drilled pattern (#2204). */
 export function optimizeChargesCommand(
   ctx: MiningContext,
   _args: string[],
@@ -151,11 +158,7 @@ export function optimizeChargesCommand(
   if (state.softwareTier < SOFTWARE_TIER_OPTIMIZER) return { success: false, output: locked };
   if (state.drillHoles.length === 0) return { success: false, output: t('mining.optimize.no_holes') };
 
-  const stemmingM = named['stemming'] !== undefined ? parseFloat(named['stemming'].replace('m', '')) : MIN_STEMMING_M;
-  if (!Number.isFinite(stemmingM) || stemmingM < MIN_STEMMING_M) {
-    return { success: false, output: `Stemming ${named['stemming']} below minimum ${MIN_STEMMING_M}m` };
-  }
-  const proposal = previewChargeOptimization(state.drillHoles, ctx.grid!, state.softwareTier, optimizerOptionsFor(state, stemmingM));
+  const proposal = previewChargeOptimization(state.drillHoles, ctx.grid!, state.softwareTier, optimizerOptionsFor(state));
   if (!proposal) return { success: false, output: locked };
 
   const ids = Object.keys(proposal.charges);
@@ -169,7 +172,7 @@ export function optimizeChargesCommand(
   })];
   for (const id of ids) {
     const c = proposal.charges[id]!;
-    lines.push(t('mining.optimize.hole_line', { hole: id, explosive: explosiveName(c.explosiveId), amount: c.amountKg }));
+    lines.push(t('mining.optimize.hole_line', { hole: id, explosive: explosiveName(c.explosiveId), amount: c.amountKg, stemming: c.stemmingM }));
   }
   if (proposal.skippedHoleIds.length > 0) lines.push(t('mining.optimize.skipped', { holes: proposal.skippedHoleIds.join(', ') }));
   if (!proposal.withinPermit) lines.push(t('mining.optimize.over_permit', { limit: proposal.permitKgLimit }));

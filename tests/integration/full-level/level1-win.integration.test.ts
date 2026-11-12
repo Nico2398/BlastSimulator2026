@@ -129,9 +129,9 @@ function playLevel1(run: Run, state: GameState, style: PlayStyle): void {
     if (!plan.success) { if (shot > 40) return; continue; }
     tickUntil(run, state, 600, () => done() || state.plannedDrillHoles.length === 0);
     if (done()) return;
-    // #1774: 7 kg (CHARGE_DEFAULT_AMOUNT_KG) breaks the 8 m holes out to the surface; 5 kg left the rubble sealed under
-    // its cap, where no haul order reaches it, so nothing was sold.
-    run('charge hole:* explosive:boomite amount:7 stemming:2');
+    // #1774: 7 kg breaks the 8 m holes out to the surface; 5 kg left the rubble sealed under its cap, where no haul
+    // order reaches it, so nothing was sold. Filled to 4.5 m of stemming, each 8 m hole holds 7.0 kg of boomite.
+    run('charge hole:* explosive:boomite stemming:4.5');
     tickUntil(run, state, 600, () => done() || Object.keys(state.plannedChargesByHole).length === 0);
     if (done()) return;
     run('sequence auto');

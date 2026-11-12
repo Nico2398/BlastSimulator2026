@@ -4,7 +4,8 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 import type { Transaction } from '../../../src/core/economy/Finance.js';
 
 const small = { id: 1, volume: 0.1, oreDensities: { iron: 0.5 } };
-const boulder = { id: 2, volume: 2, oreDensities: { iron: 0.5 } };
+// 3 m³: a boulder, above OVERSIZED_FRAGMENT_THRESHOLD (2.0 m³).
+const boulder = { id: 2, volume: 3, oreDensities: { iron: 0.5 } };
 
 interface SyntheticOpts {
   tick: number;

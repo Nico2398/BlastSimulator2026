@@ -8,7 +8,7 @@ import {
   VoxelGrid, setVoxelColumnSurfaceHeight, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight,
 } from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
-import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
+import { batchCharge, fillChargeKg } from '../../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { executeBlast, executeBlastSteps, buildBlastReport, villagePositions, averageVibrationMod, prefetchBlastZone, type BlastResult } from '../../../src/core/mining/BlastExecution.js';
 import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
@@ -84,13 +84,14 @@ describe('executeBlast — crater', () => {
 
   it('leaves rock standing where the charge is buried too deep to break out', () => {
     // A single small charge at the bottom of a very deep hole: it breaks rock
-    // around itself, but the burden above is far too thick to lift.
+    // around itself, but the burden above is far too thick to lift. The same
+    // 8 kg of boomite breaks out of the 8 m holes of the crater test above.
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 30, 5, 25);
 
     const holes = createGridPlan(holeCounter, { x: 15, z: 15 }, 1, 1, 4, 28, 0.089);
     const holeDepths: Record<string, number> = { [holes[0]!.id]: holes[0]!.depth };
-    const { charges } = batchCharge([holes[0]!.id], holeDepths, 'boomite', 2, 2);
+    const { charges } = batchCharge([holes[0]!.id], holeDepths, 'boomite', 8, 2);
     const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, []);
@@ -178,6 +179,32 @@ describe('executeBlast — crater', () => {
 // out of executeBlast leaves that residue at the stale values it started
 // with, while the real wiring rewrites them to the canonical band — so
 // that test genuinely fails without this file's own call sites running.
+
+describe('executeBlast — stemming, not the charge, decides the flyrock', () => {
+  /** A 3x3 boomite pattern 3 m apart in 8 m holes on a molite bench, each hole filled up to `stemmingM`. */
+  function overchargedPattern(stemmingM: number): BlastResult {
+    const grid = new VoxelGrid(52, 52);
+    fillRegion(grid, 'molite', 2, 48, 0, 30, 2, 48);
+    const holes = createGridPlan(holeCounter, { x: 21, z: 21 }, 3, 3, 3, 8, 0.089);
+    const depths = Object.fromEntries(holes.map(h => [h.id, h.depth]));
+    const { charges, errors } = batchCharge(holes.map(h => h.id), depths, 'boomite', null, stemmingM);
+    expect(errors).toEqual([]);
+    return executeBlast(assembleBlastPlan(holes, charges), grid, [])!;
+  }
+
+  it('an overcharged mesh under full stemming grinds its rock fine but throws nothing', () => {
+    // 3 m apart, 11 kg a hole is near twice the powder factor molite wants; 2.5 m of stemming confines it fully.
+    const result = overchargedPattern(2.5);
+    expect(result.clearedVoxels).toBeGreaterThan(0);
+    expect(result.projectionCount).toBe(0);
+    expect(result.maxThrowDistance).toBe(0);
+  });
+
+  it('the same mesh under too little stemming throws rock', () => {
+    const result = overchargedPattern(0.5);
+    expect(result.projectionCount).toBeGreaterThan(0);
+  });
+});
 
 describe('executeBlastSteps — the same blast, a slice at a time (#1603)', () => {
   function chargedSite() {
@@ -300,7 +327,8 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
-    const { charges } = batchCharge(holeIds, holeDepths, 'krackle', 8, 2);
+    // Filled to the stemming, as the player charges: breaks through the crust.
+    const { charges } = batchCharge(holeIds, holeDepths, 'krackle', null, 2);
     return { grid, plan: assembleBlastPlan(holes, charges) };
   }
 
@@ -484,8 +512,8 @@ describe('buildBlastReport', () => {
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
-    // Light stemming so the blast actually throws rock (traced throw > 0).
-    const { charges } = batchCharge(holeIds, holeDepths, 'krackle', 8, 0.5);
+    // Filled under light stemming so the blast actually throws rock (traced throw > 0).
+    const { charges } = batchCharge(holeIds, holeDepths, 'krackle', null, 0.5);
     const plan = assembleBlastPlan(holes, charges);
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
@@ -682,7 +710,8 @@ describe('executeBlast — sealed vs broken-out ore (#2003)', () => {
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 30, 5, 25, 'blingite', 0.2);
     const holes = createGridPlan(holeCounter, { x: 15, z: 15 }, 1, 1, 4, 28, 0.089);
-    const { charges } = batchCharge([holes[0]!.id], { [holes[0]!.id]: holes[0]!.depth }, 'boomite', 2, 2);
+    // A partial charge at the bottom of the hole: 4 m of boomite under 24 m of unloaded hole.
+    const { charges } = batchCharge([holes[0]!.id], { [holes[0]!.id]: holes[0]!.depth }, 'boomite', 8, 2);
     return executeBlast(assembleBlastPlan(holes, charges), grid, [])!;
   }
 
@@ -747,7 +776,7 @@ describe('executeBlast — sealed vs broken-out ore (#2003)', () => {
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 30, 5, 25, 'blingite', 0.2);
     const holes = createGridPlan(holeCounter, { x: 15, z: 15 }, 1, 1, 4, 28, 0.089);
-    const { charges } = batchCharge([holes[0]!.id], { [holes[0]!.id]: holes[0]!.depth }, 'boomite', 2, 2);
+    const { charges } = batchCharge([holes[0]!.id], { [holes[0]!.id]: holes[0]!.depth }, 'boomite', 8, 2);
     const result = executeBlast(assembleBlastPlan(holes, charges), grid, [])!;
     // Uniform ore: every cleared voxel holds the same value, so the sum is cleared voxels x one voxel's worth.
     const voxelValue = VoxelGrid.CELL_SIZE ** 3 * 0.2 * ORE_DENSITY_KG_M3 * oreValuePerKg('blingite');
@@ -773,6 +802,8 @@ describe('executeBlast — hole failures (#2202)', () => {
     return { result: result!, holes };
   }
   const boomite = (amountKg: number) => ({ explosiveId: 'boomite', amountKg });
+  /** Boomite a 4 m hole holds filled to the shot's 2 m of stemming. */
+  const FILLED_4M_HOLE_KG = fillChargeKg(4, 2, 0.089, 'boomite');
 
   it('sets holeFailures on every executed blast, empty when every hole opened', () => {
     const { result } = shot([{ x: 12, z: 12, depth: 4, charge: boomite(8) }]);
@@ -822,7 +853,7 @@ describe('executeBlast — hole failures (#2202)', () => {
   it('reports a wet water-sensitive hole that broke nothing as fizzled (C3)', () => {
     const { result, holes } = shot([
       { x: 6, z: 6, depth: 4, charge: boomite(8) },
-      { x: 24, z: 24, depth: 4, charge: boomite(0.2) },
+      { x: 24, z: 24, depth: 4, charge: boomite(FILLED_4M_HOLE_KG) },
     ], 10, [1]);
     expect(result.holeFailures).toHaveLength(1);
     expect(result.holeFailures![0]!.holeId).toBe(holes[1]!.id);
@@ -832,13 +863,13 @@ describe('executeBlast — hole failures (#2202)', () => {
   it('the same two holes dry both open, so the water caused the failure', () => {
     const { result } = shot([
       { x: 6, z: 6, depth: 4, charge: boomite(8) },
-      { x: 24, z: 24, depth: 4, charge: boomite(0.2) },
+      { x: 24, z: 24, depth: 4, charge: boomite(FILLED_4M_HOLE_KG) },
     ]);
     expect(result.holeFailures).toEqual([]);
   });
 
   it('reports a charge that broke but stayed sealed under intact rock as buried (C4)', () => {
-    const { result, holes } = shot([{ x: 15, z: 15, depth: 28, charge: boomite(0.2) }], 30);
+    const { result, holes } = shot([{ x: 15, z: 15, depth: 28, charge: boomite(8) }], 30);
     expect(result.clearedVoxels).toBeGreaterThan(0);
     expect(result.brokeOut).toBe(false);
     expect(result.holeFailures).toHaveLength(1);

@@ -1,6 +1,6 @@
 {
   "name": "ghost-reachability-visual",
-  "description": "#1306: a queued order's ghost is red when none of the actors able to perform THAT action can reach it, or none exists, and blue otherwise; a queued building shows its own model as a fresnel hologram. Flow (paused explicitly by a `pause` step; campaign start does not pause) on tutorial_pit (the stranded-pocket blast of blast-debris-stranded-ramp.json): a warehouse is ordered with nobody hired (red hologram, accepted and charged anyway), hiring turns it blue while the game is paused, a blast leaves debris no hauler exists for (red), a ramp ordered before any excavator crew exists reads red and turns blue when the licensed driver and a rock_digger appear, and once the haul crew exists and the ramp connects the pocket nothing is red. Every colour change is observed through unreachableGhostCount (state dump) and the screenshots of the hologram and ramp ghosts.",
+  "description": "#1306: a queued order's ghost is red when none of the actors able to perform THAT action can reach it, or none exists, and blue otherwise; a queued building shows its own model as a fresnel hologram. Flow (paused explicitly by a `pause` step; campaign start does not pause) on tutorial_pit (the stranded-pocket blast of blast-debris-stranded-ramp.json): a warehouse is ordered with nobody hired (red hologram, accepted and charged anyway), hiring turns it blue while the game is paused, a blast leaves debris no hauler exists for (red), a ramp ordered before any excavator crew exists reads red and turns blue when the licensed driver and a rock_digger appear, and once the haul crew exists and the ramp connects the pocket the rocks a hauler can stand beside turn blue (the pile is worked from its edge, so rock inside it stays red until the rock around it is hauled). Every colour change is observed through unreachableGhostCount (state dump) and the screenshots of the hologram and ramp ghosts.",
   "steps": [
     {
       "command": "campaign start level:tutorial_pit cash:2000000",
@@ -316,7 +316,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:3 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -331,11 +331,6 @@
           "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
         },
         {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 3
-        },
-        {
           "type": "assert",
           "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
         },
@@ -343,12 +338,6 @@
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "3 kg"
         },
         {
           "type": "assert",
@@ -895,7 +884,7 @@
     },
     {
       "command": "tick 150",
-      "description": "With the ramp built and the haul crew in place, the debris is hauled with no further order -- the debris that sat in the pocket is reachable now (#1302). storedMassKg grows from 0. Once the haul crew exists and the ramp connects the pocket, no debris ghost is red any more (#1306: red -> blue as actors and the navmesh change).",
+      "description": "With the ramp built and the haul crew in place, the debris is hauled with no further order -- the debris that sat in the pocket is reachable now (#1302). storedMassKg grows from 0. Once the haul crew exists and the ramp connects the pocket, the ghosts of every rock a hauler can stand beside turn blue (#1306: red -> blue as actors and the navmesh change). Rubble blocks vehicles over its footprint and a truck loads a rock from a free cell beside it, so the pile is worked from its edge: a rock inside it reads debris_out_of_reach, and its ghost stays red, until the rock around it is hauled. Measured (command mode): 414 red debris ghosts before this step, 313 after it -- all of them inside the pile; with every rock's occupancy set aside none is out of reach (no terrain pocket is left), and the red count no longer reaches 0 because the warehouse fills before the pile drains.",
       "interaction": [
         {
           "type": "command",
@@ -907,9 +896,9 @@
         "increased": [
           "storedMassKg"
         ],
-        "equals": {
-          "unreachableGhostCount": 0
-        }
+        "decreased": [
+          "unreachableGhostCount"
+        ]
       }
     },
     {

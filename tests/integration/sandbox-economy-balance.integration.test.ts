@@ -14,6 +14,8 @@ import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
+import { defaultStemmingM } from '../../src/core/economy/PermitDefaults.js';
+import type { GameState } from '../../src/core/state/GameState.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast, type BlastResult } from '../../src/core/mining/BlastExecution.js';
 import { resolveMarketId, resolveContractOres } from '../../src/core/campaign/Level.js';
@@ -23,6 +25,7 @@ import { Random } from '../../src/core/math/Random.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
+  DRILL_HOLE_DEFAULT_DIAMETER_M,
   ORE_DENSITY_KG_M3,
   RUBBLE_CHEAP_STOCK_SHARE_MAX,
   RUBBLE_PAID_STOCK_SHARE_MAX,
@@ -70,14 +73,20 @@ function flattestPad(grid: VoxelGrid, depthM: number): { x0: number; z0: number 
   return best;
 }
 
-/** The ordinary 3x3 bench shot (5 m holes, 4 m spacing, 2 m stemming, krackle 4 kg: the probe opening SHOT, #1944, unless a tougher biome needs more) fired through executeBlast on the sandbox's market. */
-function fireReferenceShot(ctx: GameContext, holeDepth = 5, explosive = 'krackle', chargeKg = 4): BlastResult {
+/**
+ * The ordinary 3x3 bench shot (5 m holes 4 m apart, krackle: the probe opening SHOT's pattern, #1944) fired through
+ * executeBlast on the sandbox's market. Each hole is filled up to the stemming the Charge step opens at for the site's
+ * permit (`defaultStemmingM`: 3.5 m, 4.3 kg a hole, inside the grade-0 40 kg), as its Charge All loads it.
+ */
+function fireReferenceShot(ctx: GameContext, holeDepth = 5, explosive = 'krackle'): BlastResult {
   const grid = ctx.grid!;
   const pad = flattestPad(grid, holeDepth);
-  const holes = createGridPlan({ nextHoleId: 1 }, { x: pad.x0 + 1, z: pad.z0 + 1 }, 3, 3, 4, holeDepth, 0.15);
+  const holes = createGridPlan({ nextHoleId: 1 }, { x: pad.x0 + 1, z: pad.z0 + 1 }, 3, 3, 4, holeDepth, DRILL_HOLE_DEFAULT_DIAMETER_M);
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
-  const { charges } = batchCharge(holes.map(h => h.id), depths, explosive, chargeKg, 2);
+  const stemmingM = defaultStemmingM(ctx.state!.grade?.grade, holes, explosive);
+  const { charges, errors } = batchCharge(holes.map(h => h.id), depths, explosive, null, stemmingM);
+  expect(errors, 'reference shot charges').toEqual([]);
   const result = executeBlast(
     assembleBlastPlan(holes, charges), grid, [], undefined, undefined, undefined, undefined,
     resolveMarketId(ctx.state!),
@@ -95,6 +104,15 @@ function oreKgByType(result: BlastResult): Record<string, number> {
 }
 
 const sum = (xs: Iterable<number>) => { let s = 0; for (const x of xs) s += x; return s; };
+
+/**
+ * `charge hole:*` as the Charge step's Charge All sends it: `explosive` filling every hole up to the stemming the step
+ * opens at for the site's permit and pattern (`defaultStemmingM`), which keeps the shot inside the permit's kg.
+ */
+function chargeAllAtPermitStemming(state: GameState, explosive = 'krackle'): string {
+  const stemming = defaultStemmingM(state.grade?.grade, [...state.drillHoles, ...state.plannedDrillHoles], explosive);
+  return `charge hole:* explosive:${explosive} stemming:${stemming}`;
+}
 
 describe('sandbox economy: the market the sandbox opens on', () => {
   it('sandbox start selects the production market on the contract board', () => {
@@ -122,9 +140,9 @@ describe('sandbox economy: the market the sandbox opens on', () => {
 
 describe('sandbox economy: value consistency', () => {
   // Both shots sit on the flattest pad that holds ore in the blast depth.
-  it.each([[DESERT, 42, 'krackle', 6], ['tropical_karst', 42, 'dynatomics', 8]] as const)('blast report ore value equals sum of kg x market price (%s seed %i, %s)', (biome, seed, explosive, chargeKg) => {
+  it.each([[DESERT, 42, 'krackle'], ['tropical_karst', 42, 'dynatomics']] as const)('blast report ore value equals sum of kg x market price (%s seed %i, %s)', (biome, seed, explosive) => {
     const { ctx } = startSandbox(biome, seed);
-    const result = fireReferenceShot(ctx, 6, explosive, chargeKg);
+    const result = fireReferenceShot(ctx, 6, explosive);
     const kg = oreKgByType(result);
     const expected = sum(Object.entries(kg).map(([ore, k]) => k * oreValuePerKg(ore, 'production')));
     // oreKgByType counts every fragment; the report splits it into broken-out and sealed (#2003).
@@ -159,7 +177,8 @@ describe('sandbox economy: contract board offer volume against a shot', () => {
   const boards = Array.from({ length: BOARD_SEEDS }, (_, i) => offersOver(1000 + i));
 
   // Re-measured at SANDBOX_ORE_GRADE_SCALE 0.08 (#1944): the 3x3 depth-5 shot holds 17.5 t of ore (was 340 t at scale 1).
-  it('the reference shot yields about twenty tonnes of ore', () => {
+  // Under the per-hole energy kernel the same shot breaks out far more of the starter pocket: 38.2 t.
+  it('the reference shot yields tens of tonnes of ore', () => {
     expect(totalOreKg).toBeGreaterThan(10_000);
   });
 
@@ -387,8 +406,11 @@ describe('sandbox economy: reference shot vs crew cost', () => {
     const ratio = result.totalOreValue / (SANDBOX_REFERENCE_CREW_COST_PER_TICK * SANDBOX_REFERENCE_SHOT_CYCLE_TICKS);
     // The flattest desert pad is the starter deposit's (#2116). Re-measured when the pocket became rustite at 0.30 (#2126):
     // 4.531, was 1.153 for its dirtite at 0.14 (#2117 prices); the 0.9-1.8x band scales with it.
-    expect(ratio).toBeGreaterThanOrEqual(3.5);
-    expect(ratio).toBeLessThanOrEqual(6);
+    // Re-measured under the per-hole energy kernel, the shot filled at the grade-0 permit's stemming: 6.07 (the explicit
+    // 4 kg charge it replaced reads 6.06). The shot breaks out 38.2 t of the pocket against 17.5 t before; the band keeps
+    // the 3.5-6x band's proportions round the measurement.
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    expect(ratio).toBeLessThanOrEqual(8);
   });
 });
 
@@ -399,6 +421,10 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
   const MIDPOINT = 1000;
   // Seed 42's ore deposit sits near (40,33) (#1682): the first shot opens it, a ramp from the west
   // joins the crater floor to the haul network (#1719) and the bunkhouse keeps the crew's morale up.
+  // Both patterns are filled at the stemming the Charge step opens at for the grade-0 permit (4.5 m for the 3x3,
+  // 2.6 m for the 2x2: ~39 kg each), as a careful player loads them. The over-permit 6 kg a hole this ran before stalls
+  // the haul under the per-hole energy kernel: from t~1200 every haul order but a few dozen reads debris_out_of_reach,
+  // 10 contracts are filled by t2000 (55 with these charges) and the crew's pay drains cash from 299k at t1000 to 33k.
   const FIRST_SHOT = '36,30';
   const SECOND_SHOT = '16,22';
   const RAMP = 'start:12,34 end:34,34 depth:6';
@@ -416,7 +442,7 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
     // Shot 1: 3x3, drilled, charged and fired by the opening crew.
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${FIRST_SHOT}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    logged('charge hole:* explosive:krackle amount:6 stemming:2');
+    logged(chargeAllAtPermitStemming(state));
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     expect(logged('blast').success).toBe(true);
@@ -430,7 +456,7 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
     if (!over()) {
       expect(logged(`drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:${SECOND_SHOT}`).success).toBe(true);
       playUntil(800, () => state.plannedDrillHoles.length === 0);
-      logged('charge hole:* explosive:krackle amount:6 stemming:2');
+      logged(chargeAllAtPermitStemming(state));
       playUntil(CHARGE_WAIT_TICKS, () => Object.keys(state.plannedChargesByHole).length === 0);
       expect(Object.keys(state.plannedChargesByHole), `second pattern still uncharged ${CHARGE_WAIT_TICKS} ticks after ordering`).toEqual([]);
       clearBlastZone(logged, state);
@@ -452,8 +478,11 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
   const HORIZON = 2000;
   const BUILD = 'living_quarters at:30,48 tier:1';
   const SHOT_START = '36,30';
-  // 6 kg a hole (54 kg) sits over the 40 kg grade-0 permit on purpose: the digger kit has no fragmenter, and the permit-sized
-  // 4 kg / 4.4 kg shots leave about half the fragments oversized, so it could not haul enough to pay its crew (#1944 plan doc).
+  // The shot is filled at the stemming the Charge step opens at for the grade-0 permit (3.5 m: 4.3 kg a hole, 38.7 kg).
+  // It used to load 6 kg a hole (54 kg, over the 40 kg permit) on purpose: the permit-sized 4 kg / 4.4 kg shots left about
+  // half the fragments oversized, so the digger kit (no fragmenter) could not haul enough to pay its crew (#1944 plan doc).
+  // Under the per-hole energy kernel the permit-sized shot leaves 309 of 2,978 fragments oversized, and the digger kit
+  // ends richer with it (487,539 at tick 2000) than with the 6 kg load (467,343).
   /** The ramp the digger kit's rock digger carves into the first crater (#1874); same line as the solvent-sandbox test. */
   const DIGGER_RAMP = 'start:12,34 end:34,34 depth:6';
   /**
@@ -471,9 +500,15 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
    * Re-measured once a hauler stood HAUL_LOAD_TICKS = 1 at each fragment it loaded (#2199; the same run read 516,693.7
    * with the dwell off, and hauls 88 loads in 1500 ticks against 95): 448,106.0.
    * Re-measured once dust-band rock lost DUST_LOSS_SHARE of its mass and ore (#2198): 420,205.8.
-   * Floor is that measurement, rounded down.
+   * Re-measured under the per-hole energy kernel (EXPLOSIVE_ENERGY_SCALE 25, drilling paid per metre), the shot filled at
+   * the grade-0 permit's stemming: 630,090.0 (the 6 kg load it replaced read 698,831.7).
+   * Re-measured once the kernel stopped breaking the rock under each hole's bottom (the crater floors flat at grade,
+   * so the shot breaks and sells less ore but every fragment stays reachable): 525,660.5.
+   * Re-measured once rubble blocked vehicles over its footprint, so a truck loads the muck pile from its edge instead of
+   * driving onto it, and boulders start at 2 m³: 495,672.7. Floor is that measurement less about 5%, so a small balance
+   * move does not fail it while a stalled haul still does.
    */
-  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 420_205;
+  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 470_000;
 
   interface OpeningTrace {
     endedAtTick: number | null;
@@ -525,7 +560,7 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
     expect(trace.buildOk, 'living quarters placed').toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:5 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    logged('charge hole:* explosive:krackle amount:6 stemming:2');
+    logged(chargeAllAtPermitStemming(state));
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     if (!over()) {
@@ -583,6 +618,9 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
   }, 600_000);
 });
 
+/** Stemming that leaves 8.0 kg of krackle in each 8 m hole of the full-grade 3x3 shots below (#1789, #1817, #1828). */
+const DEEP_SHOT_STEMMING_M = 5.2;
+
 describe('sandbox economy: a supply contract can be filled (#1789)', () => {
   const HORIZON = 5000;
   const BUILD = 'living_quarters at:30,48 tier:1';
@@ -603,7 +641,7 @@ describe('sandbox economy: a supply contract can be filled (#1789)', () => {
     expect(logged(`build ${BUILD}`).success).toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    logged('charge hole:* explosive:krackle amount:8 stemming:2');
+    logged(`charge hole:* explosive:krackle stemming:${DEEP_SHOT_STEMMING_M}`);
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     expect(logged('blast').success).toBe(true);
@@ -651,7 +689,7 @@ describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => 
     expect(logged(`build ${BUILD}`).success).toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    logged('charge hole:* explosive:krackle amount:8 stemming:2');
+    logged(`charge hole:* explosive:krackle stemming:${DEEP_SHOT_STEMMING_M}`);
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     expect(logged('blast').success).toBe(true);
@@ -722,7 +760,7 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
     expect(logged(`build ${BUILD}`).success).toBe(true);
     expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
-    logged('charge hole:* explosive:krackle amount:8 stemming:2');
+    logged(`charge hole:* explosive:krackle stemming:${DEEP_SHOT_STEMMING_M}`);
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);
     expect(logged('blast').success).toBe(true);
@@ -771,7 +809,10 @@ describe('sandbox economy: the kit-only opening, no explosive warehouse (#1963)'
    */
   const HORIZON = 1500;
   const BUILD = 'living_quarters at:30,48 tier:1';
-  /** The #1944 reference shot on the deposit: 3x3 x 5 m, Krackle 4 kg (36 kg), inside the grade-0 permit (40 kg, 9 holes). Measured at 36,32. */
+  /**
+   * The #1944 reference shot on the deposit: 3x3 x 5 m of krackle, filled at the stemming the Charge step opens at for the
+   * grade-0 permit (3.5 m: 4.3 kg a hole, 38.7 kg), inside it (40 kg, 144 m²). Measured at 36,32.
+   */
   const SHOT_START = '36,32';
   /** Ramp of the sequence measured in issue #1963 (main 02137db). */
   const RAMP = 'start:40,12 end:40,31 depth:5';
@@ -790,7 +831,7 @@ describe('sandbox economy: the kit-only opening, no explosive warehouse (#1963)'
     expect(drill.success, `drill_plan: ${drill.output}`).toBe(true);
     playUntil(800, () => state.plannedDrillHoles.length === 0);
     // The kit owns no explosive warehouse and this test builds none: the load pays list price from cash (#2143).
-    const charge = logged('charge hole:* explosive:krackle amount:4 stemming:2');
+    const charge = logged(chargeAllAtPermitStemming(state));
     expect(charge.success, `charge (${label()}): ${charge.output}`).toBe(true);
     playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
     clearBlastZone(logged, state);

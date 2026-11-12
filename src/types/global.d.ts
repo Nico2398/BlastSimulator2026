@@ -22,6 +22,8 @@ declare global {
     __setTutorialClockFollowsTimer: (enabled: boolean) => void;
     __setRenderEnabled: (enabled: boolean) => void;
     __renderFrame: () => void;
+    /** Settle pending work and refresh world matrices without drawing (clicks and projections need nothing more). */
+    __syncScene: () => void;
     /** Landscape chunks the per-frame streamer still owes the current camera — 0 once it has converged. Harnesses check this before capturing. */
     __landscapePending: () => number;
     /** Build every landscape chunk still owed, bypassing the per-frame budget; returns how many were built. Harnesses call this before capturing. */
@@ -30,6 +32,8 @@ declare global {
     __modelsReady: () => Promise<{ loaded: number; failed: string[] }>;
     __debugGridInfo: () => Record<string, unknown>;
     __entityWorldPosition: (kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole', id: number) => { x: number; z: number } | null;
+    /** The entity a click at the canvas centre would select, or null for bare ground. */
+    __pickAtCanvasCentre: () => { kind: string; id: number } | null;
     /** Scenario-harness hooks for the P3 in-scene placement tool — see PlacementController.paintRect for why this bypasses real pointer events. */
     __placement: {
       isArmed: () => boolean;

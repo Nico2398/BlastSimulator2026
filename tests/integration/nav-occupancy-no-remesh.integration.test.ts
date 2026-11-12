@@ -31,6 +31,7 @@ import {
   type MiningContext,
 } from '../../src/console/commands/mining.js';
 import { driveChargePlanToCompletion } from './full-level/helpers.js';
+import { BLAST_SLICE_STRIP_COLUMNS } from '../../src/core/config/balance.js';
 
 // ── Helpers (mirror tests/unit/console/navgrid-patching.test.ts) ───────────
 
@@ -113,9 +114,17 @@ describe('nav:occupancy_changed never triggers a terrain remesh (#1161)', () => 
     const result = blastCommand(ctx, [], {});
     expect(result.success).toBe(true);
 
-    // executeBlast's own carve remeshes once. The corrective post-clear
-    // re-patch (today a second terrain:updated) must switch to
-    // nav:occupancy_changed, so it must NOT add a second remesh.
-    expect(spy.mock.calls.length - callsBeforeBlast).toBe(1);
+    // executeBlast's own carve remeshes its cleared region once, announced in
+    // strips of BLAST_SLICE_STRIP_COLUMNS columns (#1603): this crater spans
+    // more than one strip. The corrective post-clear re-patch (once a second
+    // terrain:updated) must switch to nav:occupancy_changed, so no column of
+    // the region may be remeshed twice.
+    const regions = spy.mock.calls.slice(callsBeforeBlast).map(([, region]) => region);
+    expect(regions.length).toBeGreaterThan(0);
+    const columnsX = regions.flatMap(r => Array.from({ length: r.maxX - r.minX + 1 }, (_, i) => r.minX + i));
+    expect(new Set(columnsX).size, `remeshed x ranges: ${regions.map(r => `${r.minX}-${r.maxX}`).join(', ')}`).toBe(columnsX.length);
+    const minX = Math.min(...columnsX);
+    const maxX = Math.max(...columnsX);
+    expect(regions.length).toBe(Math.ceil((maxX - minX + 1) / BLAST_SLICE_STRIP_COLUMNS));
   });
 });

@@ -29,6 +29,17 @@
       ]
     },
     {
+      "command": "contract auto sell off",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract auto sell off"
+        }
+      ],
+      "description": "This scenario reads the warehouse's per-ore rows; automatic ore sale (#2145) sells each load as it lands, so the rows would show only between a delivery and its sale."
+    },
+    {
       "command": "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15",
       "description": "Order the 2x3 pattern by real clicks, as in blast-charge-visual.",
       "role": "player",
@@ -163,7 +174,7 @@
       ]
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "description": "Charge all six holes by real clicks. Boomite is bought per charge at cash price: no explosive stock is held.",
       "role": "player",
       "expect": {
@@ -179,11 +190,6 @@
         {
           "type": "ensureStep",
           "step": 2
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
         },
         {
           "type": "setStepper",

@@ -310,7 +310,7 @@ describe('applyBoulderSplit', () => {
     const state = createGame({ seed: SEED });
     state.navGrid = makeFlatNavGrid(20);
     const { vehicle, driverId } = makeDrivenFragmenter(state, 5, 5);
-    const fragment = makeFragment(1, 5, 5, 1.3, 2600);
+    const fragment = makeFragment(1, 5, 5, 3.0, 6000); // a boulder: above OVERSIZED_FRAGMENT_THRESHOLD (2.0 m³)
     fragment.oreDensities = { blingite: 0.4, cruarium: 0.1 };
     state.logistics.nextFragmentId = 2; // fixture id 1 is already on the ground
     addBlastFragments(state.logistics, [fragment], state.navGrid);
@@ -397,7 +397,7 @@ describe('applyArrivalEffect', () => {
   it('dispatches "boulder_split" to applyBoulderSplit', () => {
     const state = createGame({ seed: SEED });
     const { vehicle, driverId } = makeDrivenFragmenter(state, 5, 5);
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 1.3, 2600)]);
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 3.0, 6000)]);
     state.logistics.nextFragmentId = 2; // fixture id 1 is already on the ground
     reserveFragmentAction(state, vehicle, driverId, 'fragment_debris', 1, { x: 5, z: 5 });
 
@@ -566,7 +566,7 @@ describe('haul_load fires HAUL_LOAD_TICKS ticks after arrival, not on arrival (#
     state.navGrid = makeFlatNavGrid(20);
     const { vehicle, driverId } = makeDrivenHauler(state, 5, 5);
     const driver = state.employees.employees.find(e => e.id === driverId)!;
-    addBlastFragments(state.logistics, [makeFragment(1, DEST.x, DEST.z, 0.3, 850)], state.navGrid);
+    addBlastFragments(state.logistics, [makeFragment(1, DEST.x + 1, DEST.z, 0.3, 850)], state.navGrid);
     const action = reserveFragmentAction(state, vehicle, driverId, 'haul_debris', 1, DEST);
     driver.activeActionId = action.id;
     driver.itinerary = {

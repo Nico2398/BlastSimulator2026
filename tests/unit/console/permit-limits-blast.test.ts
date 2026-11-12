@@ -5,7 +5,7 @@ import { createRunner } from '../../../src/console/createRunner.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { Random, rollSeed } from '../../../src/core/math/Random.js';
-import { inspectionFine, rollInspection } from '../../../src/core/economy/PermitLimits.js';
+import { inspectionFine, permitLimitsFor, rollInspection } from '../../../src/core/economy/PermitLimits.js';
 import { isActive } from '../../../src/core/events/ActiveModifiers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { fundForDeliveryWait } from '../../helpers/playthrough.js';
@@ -13,7 +13,7 @@ import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 const SEED = 42;
 const FEE = 250;
 
-/** Sandbox site with a 3x3 pattern drilled and charged at `kgPerHole`, ready to fire. */
+/** Sandbox site with a 4 m 3x3 pattern (144 m², the grade-0 area) drilled and charged at `kgPerHole`, ready to fire. */
 function loadedSite(kgPerHole: number) {
   const { runner, ctx } = createRunner();
   const run = (c: string) => runner.run(c);
@@ -59,7 +59,7 @@ describe('blast on a progression site, within the permit (#1923)', () => {
   beforeAll(() => setLocale('en'));
 
   it('pays only the notification fee, under permits', () => {
-    const { run, state } = loadedSite(4); // 36 kg, 9 holes: the standard opening
+    const { run, state } = loadedSite(4); // 36 kg over 144 m²: the standard opening
     const cash = state.cash;
     const r = run('blast');
     expect(r.success, r.output).toBe(true);
@@ -332,8 +332,8 @@ describe('permit status shows limits, fee and strikes (#1923)', () => {
     const { run } = sandbox();
     const r = run('permit status');
     expect(r.success).toBe(true);
-    expect(r.output).toContain('40');
-    expect(r.output).toMatch(/\b9\b/);
+    expect(r.output).toContain(`${permitLimitsFor(0).maxChargeKg} kg`);
+    expect(r.output).toContain(`${permitLimitsFor(0).maxAreaM2} m²`);
     expect(r.output).toContain(formatMoney(FEE));
   });
 
@@ -361,6 +361,7 @@ describe('permit status shows limits, fee and strikes (#1923)', () => {
     state.grade!.grade = 1;
     const r = run('permit status');
     expect(r.output).toContain('120');
+    expect(r.output).toContain(`${permitLimitsFor(1).maxAreaM2} m²`);
     expect(r.output).toContain(formatMoney(1_000));
   });
 

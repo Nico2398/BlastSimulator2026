@@ -223,23 +223,33 @@ describe('locomotion serves the load dwell before the load applies (#2199)', () 
     expect(paid.loadedAt.get(1)).toBe(free.loadedAt.get(1)! + HAUL_LOAD_TICKS);
   });
 
+  /** Where the trip's first load leg stands: beside the rock, since rubble blocks the rock's own cells. */
+  const loadStand = (trip: ReturnType<typeof planHaul>) => {
+    const leg = trip.itinerary.legs.find(l => l.onArrive.kind === 'effect' && l.onArrive.effectId === 'haul_load')!;
+    return { x: leg.destX, z: leg.destZ };
+  };
+
   it('cargo stays empty and the vehicle stays put through the dwell', () => {
     const free = runTrip(planHaul(cluster(1), { withoutDwell: true }));
-    const paid = runTrip(planHaul(cluster(1)));
+    const plan = planHaul(cluster(1));
+    const stand = loadStand(plan);
+    const paid = runTrip(plan);
     const arrivedAt = free.loadedAt.get(1)!;
     for (let t = arrivedAt; t < arrivedAt + HAUL_LOAD_TICKS; t++) {
       expect(paid.cargo[t]).toEqual([]);
-      // The free run drives on the tick it loads, so only the fragment's own cell is a fixed point.
-      expect(paid.at[t]).toEqual({ x: 5, z: 5 });
+      // The free run drives on the tick it loads, so only the cell beside the rock is a fixed point.
+      expect(paid.at[t]).toEqual(stand);
     }
     expect(paid.cargo[arrivedAt + HAUL_LOAD_TICKS]).toEqual([1]);
   });
 
   it('the vehicle does not move on, and does not unload, until the load has landed', () => {
-    const paid = runTrip(planHaul(cluster(1)));
+    const plan = planHaul(cluster(1));
+    const stand = loadStand(plan);
+    const paid = runTrip(plan);
     const loadedTick = paid.loadedAt.get(1)!;
-    // It waited on the fragment's cell until the tick the load landed (the landing tick drives on).
-    expect(paid.at[loadedTick - 1]).toEqual({ x: 5, z: 5 });
+    // It waited beside the rock until the tick the load landed (the landing tick drives on).
+    expect(paid.at[loadedTick - 1]).toEqual(stand);
     for (let t = 0; t < loadedTick; t++) expect(paid.cargo[t]).toEqual([]);
   });
 

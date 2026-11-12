@@ -56,13 +56,29 @@ function wholeGrid(grid: VoxelGrid, height: number): BlastBox {
 
 const CRUITE = getRock('cruite')!.energyAbsorption; // 200
 
+/**
+ * Energy a lone seed at (x, y, z) needs for that voxel to receive `times` its own threshold.
+ *
+ * A hole shares its energy over all the rock within `BLAST_ENERGY_REACH_M`, weighted
+ * exp(-d / BLAST_ENERGY_DECAY_M), so the charged voxel keeps only a fraction of it. That
+ * fraction is linear in the energy and depends on the geometry alone, so one probe with a
+ * unit seed measures it.
+ */
+function energyFor(grid: VoxelGrid, box: BlastBox, x: number, y: number, z: number, times: number): number {
+  const probe = createEnergyField(grid, box);
+  seedEnergy(probe, [{ x, y, z, energy: 1 }]);
+  const i = indexOf(probe, x, y, z);
+  return times * probe.threshold[i]! / (probe.effective[i]! + probe.overflowOut[i]!);
+}
+
 // ── Energy-driven fragmentation ───────────────────────────────────────────────
 
 describe('VoxelFragmentation — energy pass', () => {
   it('a voxel that reached its threshold breaks', () => {
     const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid, 7));
-    seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 3 }]);
+    const box = wholeGrid(grid, 7);
+    const field = createEnergyField(grid, box);
+    seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: energyFor(grid, box, 3, 3, 3, 3) }]);
 
     const result = identifyFragmentedVoxels(field, grid);
 
@@ -71,8 +87,9 @@ describe('VoxelFragmentation — energy pass', () => {
 
   it('a voxel that never reached its threshold survives', () => {
     const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid, 7));
-    seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 0.6 }]);
+    const box = wholeGrid(grid, 7);
+    const field = createEnergyField(grid, box);
+    seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: energyFor(grid, box, 3, 3, 3, 0.6) }]);
 
     const result = identifyFragmentedVoxels(field, grid);
 
@@ -84,13 +101,15 @@ describe('VoxelFragmentation — energy pass', () => {
     const big = solidGrid(15);
     const smallField = createEnergyField(small, wholeGrid(small, 15));
     const bigField = createEnergyField(big, wholeGrid(big, 15));
+    const unit = energyFor(small, wholeGrid(small, 15), 7, 7, 7, 1);
 
-    seedEnergy(smallField, [{ x: 7, y: 7, z: 7, energy: CRUITE * 20 }]);
-    seedEnergy(bigField, [{ x: 7, y: 7, z: 7, energy: CRUITE * 200 }]);
+    seedEnergy(smallField, [{ x: 7, y: 7, z: 7, energy: unit * 2 }]);
+    seedEnergy(bigField, [{ x: 7, y: 7, z: 7, energy: unit * 20 }]);
 
     const smallResult = identifyFragmentedVoxels(smallField, small);
     const bigResult = identifyFragmentedVoxels(bigField, big);
 
+    expect(smallResult.fragmented.length).toBeGreaterThan(0);
     expect(bigResult.fragmented.length).toBeGreaterThan(smallResult.fragmented.length);
   });
 
@@ -99,7 +118,8 @@ describe('VoxelFragmentation — energy pass', () => {
     const hard = solidGrid(11, 'titanite');
     const softField = createEnergyField(soft, wholeGrid(soft, 11));
     const hardField = createEnergyField(hard, wholeGrid(hard, 11));
-    const charge = CRUITE * 40;
+    // Four times what the soft rock at the charge needs: it breaks well past the charged voxel.
+    const charge = energyFor(soft, wholeGrid(soft, 11), 5, 5, 5, 4);
 
     seedEnergy(softField, [{ x: 5, y: 5, z: 5, energy: charge }]);
     seedEnergy(hardField, [{ x: 5, y: 5, z: 5, energy: charge }]);
@@ -107,6 +127,7 @@ describe('VoxelFragmentation — energy pass', () => {
     const softResult = identifyFragmentedVoxels(softField, soft);
     const hardResult = identifyFragmentedVoxels(hardField, hard);
 
+    expect(softResult.fragmented.length).toBeGreaterThan(1);
     expect(softResult.fragmented.length).toBeGreaterThan(hardResult.fragmented.length);
   });
 
@@ -142,10 +163,18 @@ describe('VoxelFragmentation — energy pass', () => {
 // ── Cracking ──────────────────────────────────────────────────────────────────
 
 describe('VoxelFragmentation — cracking', () => {
-  it('rock that took real energy but held together is recorded as cracked', () => {
+  /** A 7-cube with a lone seed at its centre that gives the centre voxel `times` its threshold. */
+  function crackCube(times: number) {
     const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid, 7));
-    seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 0.7 }]);
+    const box = wholeGrid(grid, 7);
+    const energy = energyFor(grid, box, 3, 3, 3, times);
+    const field = createEnergyField(grid, box);
+    seedEnergy(field, [{ x: 3, y: 3, z: 3, energy }]);
+    return { grid, field };
+  }
+
+  it('rock that took real energy but held together is recorded as cracked', () => {
+    const { grid, field } = crackCube(0.7);
 
     const result = identifyFragmentedVoxels(field, grid);
 
@@ -154,9 +183,7 @@ describe('VoxelFragmentation — cracking', () => {
   });
 
   it('cracked rock is weakened for the next blast', () => {
-    const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid, 7));
-    seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 0.7 }]);
+    const { grid, field } = crackCube(0.7);
 
     identifyFragmentedVoxels(field, grid);
 
@@ -164,9 +191,7 @@ describe('VoxelFragmentation — cracking', () => {
   });
 
   it('rock that took almost nothing is left alone', () => {
-    const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid, 7));
-    seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 0.2 }]);
+    const { grid, field } = crackCube(0.2);
 
     const result = identifyFragmentedVoxels(field, grid);
 
@@ -175,12 +200,13 @@ describe('VoxelFragmentation — cracking', () => {
   });
 
   it('a broken voxel is not also counted as cracked', () => {
-    const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid, 7));
-    seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 5 }]);
+    const { grid, field } = crackCube(5);
 
     const result = identifyFragmentedVoxels(field, grid);
 
+    // Both sets are populated: a broken core and a cracked shell round it.
+    expect(result.fragmented.length).toBeGreaterThan(0);
+    expect(result.cracked.length).toBeGreaterThan(0);
     for (const cracked of result.cracked) {
       expect(isFragmented(result, field, cracked.x, cracked.y, cracked.z)).toBe(false);
     }
@@ -239,12 +265,15 @@ describe('VoxelFragmentation — unsupported rock', () => {
     grid.setVoxel(2, 3, 3, rockVoxel('cruite'));   // island
     grid.setVoxel(3, 3, 3, rockVoxel('cruite'));   // island
 
-    const field = createEnergyField(grid, wholeGrid(grid, 7));
-    seedEnergy(field, [{ x: 1, y: 3, z: 3, energy: CRUITE * 1.2 }]);
+    const box = wholeGrid(grid, 7);
+    const field = createEnergyField(grid, box);
+    // Just enough to break the bridge: the island beside it only cracks.
+    seedEnergy(field, [{ x: 1, y: 3, z: 3, energy: energyFor(grid, box, 1, 3, 3, 1.2) }]);
 
     const result = identifyFragmentedVoxels(field, grid);
 
     expect(isFragmented(result, field, 1, 3, 3)).toBe(true);
+    expect(result.cracked).toContainEqual({ x: 2, y: 3, z: 3 });
     // x=3 touches neither shell face, and its only path out went through the bridge.
     expect(isFragmented(result, field, 2, 3, 3)).toBe(true);
     expect(result.detachedCount).toBeGreaterThan(0);
@@ -331,8 +360,9 @@ describe('VoxelFragmentation — post-carve renormalisation (#1148)', () => {
 
   /** Fragments and clears the column's topmost voxel, mirroring BlastExecution's own identify -> toClear -> clearVoxel loop. */
   function fragmentAndClearTop(grid: VoxelGrid, oldTopY: number) {
-    const field = createEnergyField(grid, wholeGrid(grid, FIXTURE_GRID_SIZE));
-    seedEnergy(field, [{ x: COLUMN_X, y: oldTopY, z: COLUMN_Z, energy: CRUITE * 5 }]);
+    const box = wholeGrid(grid, FIXTURE_GRID_SIZE);
+    const field = createEnergyField(grid, box);
+    seedEnergy(field, [{ x: COLUMN_X, y: oldTopY, z: COLUMN_Z, energy: energyFor(grid, box, COLUMN_X, oldTopY, COLUMN_Z, 5) }]);
     const fragResult = identifyFragmentedVoxels(field, grid);
     expect(isFragmented(fragResult, field, COLUMN_X, oldTopY, COLUMN_Z)).toBe(true);
     for (const { x, y, z } of fragResult.fragmented) grid.clearVoxel(x, y, z);
@@ -663,13 +693,18 @@ describe('VoxelFragmentation — floorToGrade', () => {
 
   it('identifyFragmentedVoxels reports the voxels it floored, 0 without a grade', () => {
     const grid = solidGrid(SIZE);
-    const field = createEnergyField(grid, wholeGrid(grid, SIZE));
-    seedEnergy(field, [{ x: 6, y: 10, z: 6, energy: CRUITE * 10 }]);
-    expect(identifyFragmentedVoxels(field, grid, false).gradedCount).toBe(0);
+    const box = wholeGrid(grid, SIZE);
+    // Three times the charged voxel's threshold: a small ball of broken rock round it.
+    const energy = energyFor(grid, box, 6, 10, 6, 3);
+    const field = createEnergyField(grid, box);
+    seedEnergy(field, [{ x: 6, y: 10, z: 6, energy }]);
+    const atOwnGrade = identifyFragmentedVoxels(field, grid, false);
+    expect(atOwnGrade.fragmented.length).toBeGreaterThan(0);
+    expect(atOwnGrade.gradedCount).toBe(0);
 
     const grid2 = solidGrid(SIZE);
     const field2 = createEnergyField(grid2, wholeGrid(grid2, SIZE));
-    seedEnergy(field2, [{ x: 6, y: 10, z: 6, energy: CRUITE * 10 }]);
+    seedEnergy(field2, [{ x: 6, y: 10, z: 6, energy }]);
     // seedEnergy derives gradeY from the charge bottoms; override it afterwards
     // to put the grade plane below the broken zone.
     (field2 as { gradeY: number | null }).gradeY = 2;
@@ -887,7 +922,7 @@ describe('VoxelFragmentation — floorToGrade', () => {
 
   // ── Real energy: 3x3 holes 4 m apart (#1825) ────────────────────────────────
 
-  /** 16^3 grid, rock up to (excluding) `surfaceY`, air above. */
+  /** 16x16 grid, rock up to (excluding) `surfaceY`, air above. */
   function benchGrid(surfaceY: number): VoxelGrid {
     const grid = new VoxelGrid(16, 16);
     for (let z = 0; z < 16; z++) {
@@ -900,17 +935,25 @@ describe('VoxelFragmentation — floorToGrade', () => {
 
   const HOLES = [2, 6, 10];
   const CENTRES: Array<[number, number]> = [[4, 4], [4, 8], [8, 4], [8, 8]];
+  /** The box runs two rows past the tallest bench, so even the intact surface has open air over it, as a fired blast's box does. */
+  const PATTERN_BOX_TOP_Y = 18;
+  /**
+   * Energy per charged voxel. Measured under the kernel model: from about CRUITE x 25 per voxel
+   * every column between the outer holes breaks (centres included, when not hardened), and from
+   * about CRUITE x 45 the hole bottoms break two voxels under grade; the middle of that range.
+   */
+  const ENERGY_PER_CHARGED_VOXEL = CRUITE * 32;
 
   /** 3x3 holes 4 m apart, charged along their lower 7 m; the centre columns are given a threshold no charge reaches. */
   function patternMask(surfaceY: number, hardCentres: boolean) {
     const grid = benchGrid(surfaceY);
-    const field = createEnergyField(grid, wholeGrid(grid, 16));
+    const field = createEnergyField(grid, { ...wholeGrid(grid, 16), maxY: PATTERN_BOX_TOP_Y });
     if (hardCentres) {
       for (const [cx, cz] of CENTRES) for (let y = 0; y < 16; y++) field.threshold[indexOf(field, cx, y, cz)] = 1e12;
     }
     const seeds = [];
     for (const hx of HOLES) for (const hz of HOLES) {
-      for (let y = surfaceY - 8; y <= surfaceY - 2; y++) seeds.push({ x: hx, y, z: hz, energy: CRUITE * 60 });
+      for (let y = surfaceY - 8; y <= surfaceY - 2; y++) seeds.push({ x: hx, y, z: hz, energy: ENERGY_PER_CHARGED_VOXEL });
     }
     seedEnergy(field, seeds);
     const result = identifyFragmentedVoxels(field, grid, false);

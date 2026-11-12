@@ -23,7 +23,9 @@ import { clearBlastZone, playContracts, playTick, type Run } from '../helpers/pl
 // 1296 not 1304: ore saturation (#1930) and the continuous ramp anchor (#2043) shift haul timing, so ticks 1300-1304 land mid-step of vehicle 2 where the live occupancy cell lags the rounded position.
 // Back to 1296 from 1288 once huts inside a spent blast zone serve rests (#2089): 1288 lands mid-step of vehicle 5.
 // 1296 again with ore concentrated on arrival and the one-shot spoil heap (#2142): haulers carry barren rock now, so 1303-1321 land mid-step; 1294-1302 are all clean.
-const SAVE_AT_TICK = 1296;
+// 1321 since the holes are filled up to the stemming and the energy spreads by the per-hole kernel: the bigger crater
+// and its longer ramp move the hauls, so 1284-1299 land mid-step (vehicle 5 at 1296); 1319-1323 are all clean.
+const SAVE_AT_TICK = 1321;
 /** Ticks played after the save, in both the control run and the replay. The issue used 1000; 600 keeps the file near 60 s and the first divergence is at +10..+35. */
 const ROUND_TRIP_TICKS = 600;
 const SLOT = 'round-trip';
@@ -43,12 +45,15 @@ function playStandardOpening(run: Run, ctx: GameContext, untilElapsed: number): 
   expect(run('build living_quarters at:30,48').success).toBe(true);
   expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32').success).toBe(true);
   playUntil(800, () => state.plannedDrillHoles.length === 0);
-  run('charge hole:* explosive:krackle amount:8 stemming:2.5');
+  // Each hole filled with krackle up to 2.5 m of stemming, as the Charge step loads it.
+  expect(run('charge hole:* explosive:krackle stemming:2.5').success).toBe(true);
   playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
   clearBlastZone(run, state);
   expect(run('blast detonate').success).toBe(true);
   // The ramp into the crater (x=39..41): digging it lowers columns beside cells whose type depends on them.
-  expect(run('build_ramp start:40,8 end:40,31 depth:8').success).toBe(true);
+  // The filled shot's floor lies ~8.8 m under the rim at z=31: 26 m keeps the ramp within the slope limit.
+  const ramp = run('build_ramp start:40,5 end:40,31 depth:9');
+  expect(ramp.success, ramp.output).toBe(true);
   playUntil(untilElapsed, () => false);
 }
 

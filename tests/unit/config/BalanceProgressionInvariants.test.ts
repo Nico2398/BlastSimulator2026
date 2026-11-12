@@ -13,11 +13,16 @@ import {
   SANDBOX_ORE_GRADE_SCALE,
 } from '../../../src/core/config/balance.js';
 import { buyerDeadlineRange } from '../../../src/core/economy/BuyerTiers.js';
+import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
+import { patternAreaM2 } from '../../../src/core/mining/ChargePlan.js';
 import { SHOT } from '../../../scripts/shared/probe-strategies.js';
 import { GRADE_TARGET_WINDOWS, limitSizedShot } from '../../../scripts/shared/probe-ladder.js';
 
 const GRADES = [1, 2, 3, 4, 5];
 const target = (g: number, kind: string) => MINE_GRADES[g]!.targets.find(t => t.kind === kind)?.value;
+/** Permit area (m²) of the rows x cols grid `spacing` apart both ways a shot drills, as the permit measures it. */
+const squareGridAreaM2 = (rows: number, cols: number, spacing: number): number =>
+  patternAreaM2(createGridPlan({ nextHoleId: 1 }, { x: 0, z: 0 }, rows, cols, spacing, SHOT.depth, 0.089));
 
 describe('progression balance invariants (#1945)', () => {
   it('grade fees strictly increase across grades 1-5', () => {
@@ -32,17 +37,17 @@ describe('progression balance invariants (#1945)', () => {
     for (let g = 3; g <= 5; g++) expect(target(g, 'depth_m')!).toBeGreaterThan(target(g - 1, 'depth_m')!);
   });
 
-  it('permit charge and hole limits strictly increase across grades 0-5', () => {
+  it('permit charge and area limits strictly increase across grades 0-5', () => {
     for (let g = 1; g <= 5; g++) {
       expect(PERMIT_LIMITS[g]!.maxChargeKg).toBeGreaterThan(PERMIT_LIMITS[g - 1]!.maxChargeKg);
-      expect(PERMIT_LIMITS[g]!.maxHoles).toBeGreaterThan(PERMIT_LIMITS[g - 1]!.maxHoles);
+      expect(PERMIT_LIMITS[g]!.maxAreaM2).toBeGreaterThan(PERMIT_LIMITS[g - 1]!.maxAreaM2);
     }
   });
 
   it('the grade-1 reference shot fits the grade-1 permit', () => {
     const limit = PERMIT_LIMITS[1]!;
     expect(SHOT.rows * SHOT.cols * SHOT.kg).toBeLessThanOrEqual(limit.maxChargeKg);
-    expect(SHOT.rows * SHOT.cols).toBeLessThanOrEqual(limit.maxHoles);
+    expect(squareGridAreaM2(SHOT.rows, SHOT.cols, SHOT.spacing)).toBeLessThanOrEqual(limit.maxAreaM2);
   });
 
   it('the ladder shot grows with the permit yet stays inside it for grades 1-5', () => {
@@ -50,7 +55,7 @@ describe('progression balance invariants (#1945)', () => {
       kgPerHole: SHOT.kg, stemming: SHOT.stemming, diameterM: 0.089 };
     for (const g of GRADES) {
       const s = limitSizedShot(PERMIT_LIMITS[g]!, base, 0.165);
-      expect(s.rows * s.cols).toBeLessThanOrEqual(PERMIT_LIMITS[g]!.maxHoles);
+      expect(squareGridAreaM2(s.rows, s.cols, s.spacing)).toBeLessThanOrEqual(PERMIT_LIMITS[g]!.maxAreaM2);
       expect(s.rows * s.cols * s.kgPerHole).toBeLessThanOrEqual(PERMIT_LIMITS[g]!.maxChargeKg + 1e-9);
     }
     const g1 = limitSizedShot(PERMIT_LIMITS[1]!, base, 0.165);

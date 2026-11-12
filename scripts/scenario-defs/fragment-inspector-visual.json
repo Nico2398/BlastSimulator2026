@@ -94,14 +94,9 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
-      "description": "#1774: 6 kg breakout charge (BURDEN_BREAKOUT_MAX, balance.ts) -- the 5 kg shot left the rubble sealed under the cap, and sealed rock gets no haul/fragment order, so collectedOreTotal never rose. Amount is set through its stepper so interaction mode charges the same 6 kg; stemming 2 matches DEFAULT_STEMMING_M (Charge.ts).",
+      "command": "charge hole:* explosive:boomite stemming:2",
+      "description": "Fill each 8 m hole with boomite up to 2 m of stemming (6 m column, 12 kg at 2 kg/m): a breakout charge, so the rubble is not sealed under the cap (sealed rock gets no haul/fragment order, #1774). The Charge step's stemming stepper sets the same 2 m, so interaction mode loads the same fill.",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 6
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
@@ -205,8 +200,8 @@
       }
     },
     {
-      "command": "build freight_warehouse at:12,17",
-      "description": "Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) -- small relative to the blast's total haulable mass, which is the whole point of this scenario.",
+      "command": "build freight_warehouse at:11,17",
+      "description": "Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) -- small relative to the blast's total haulable mass, which is the whole point of this scenario. Built at (11,17): the fill-mode shot's crater rim reaches x=15 on rows 19-22, so the old (12,17) footprint straddled it and was refused as too steep.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -227,7 +222,7 @@
         },
         {
           "type": "pickTile",
-          "x": 12,
+          "x": 11,
           "z": 17
         },
         {
@@ -269,8 +264,8 @@
     },
     {
       "command": "fragments status",
-      "description": "A player clicks a loose fragment (clickEntity ids are tuned for seed 10 and this 9-hole blast in interaction mode; 749 is the top rock of the pile at the pick point, a sandite boulder, so a barren one). The inspector shows its mass and localized rock, and says it lies on the ground. Command mode stand-in is a read-only status.",
-      "timeout": 60,
+      "description": "A player clicks a loose fragment on top of the pile (aimed at 3477, a rock on top of the pile; the pile is a few thousand rocks deep, so the pick may land on the rock beside it, and the checks name no id). The inspector shows its mass and localized rock, and says it lies on the ground. Command mode stand-in is a read-only status.",
+      "timeout": 150,
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -285,16 +280,16 @@
         {
           "type": "clickEntity",
           "kind": "fragment",
-          "id": 749,
+          "id": 3477,
           "distance": 4
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"749\"] .bs-fragment-rock"
+          "selector": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-rock"
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"749\"] .bs-fragment-location"
+          "selector": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-location"
         },
         {
           "type": "screenshot"
@@ -302,7 +297,7 @@
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-inspector[data-kind=\"fragment\"][data-id=\"749\"] .bs-fragment-rock",
+        "usable": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-rock",
         "note": "rock and ore kg are readable where the player clicks"
       }
     },
@@ -328,8 +323,8 @@
     },
     {
       "command": "fragments status",
-      "description": "With the hauler loaded the player clicks a fragment it carries (whichever one the pick lands on: ids and pile depth are tuned for seed 10 only loosely, so the checks name no id). The location section reads In transit on <vehicle>, with the hauler as a link.",
-      "timeout": 60,
+      "description": "With the hauler loaded the player clicks the hauler and, in its cargo, the rock it last loaded: the pile is thousands of rocks deep, so the one in the bed is reached through the hauler rather than picked out of the heap. The fragment inspector's location section reads In transit on <vehicle>, with the hauler as a link.",
+      "timeout": 150,
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -338,9 +333,16 @@
         },
         {
           "type": "clickEntity",
-          "kind": "fragment",
-          "id": 761,
-          "distance": 4
+          "kind": "vehicle",
+          "id": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"] .bs-vehicle-cargo [data-select-kind=\"fragment\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"] .bs-vehicle-cargo [data-select-kind=\"fragment\"]"
         },
         {
           "type": "awaitUsable",

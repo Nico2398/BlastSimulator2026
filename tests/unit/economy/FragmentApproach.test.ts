@@ -1,20 +1,16 @@
-// BlastSimulator2026 — Tests for FragmentApproach.fragmentApproachCell (#484)
+// BlastSimulator2026 — Tests for FragmentApproach (#484)
 //
-// The 1-argument (nominal-cell) form is already exercised indirectly by
-// HaulingTask.test.ts and BoulderBreaking.approach.test.ts. The 2-argument
-// occupied-cell fallback — the exact fix for #484's livelock (a
-// rock_fragmenter parked on a fragment's own cell permanently blocking a
-// debris_hauler targeting the same cell) — has no direct coverage anywhere.
-// This file covers `state`/`excludeVehicleId`, the occupied-primary-cell
-// nearest-free-neighbour search, and its fallback when every neighbour is
-// unusable.
+// Rubble blocks the nav grid over each rock's footprint for every mover, so a
+// vehicle loads or breaks a rock from a free cell beside it: never from the
+// rock's own cells, never from under other rubble, never from a cell another
+// vehicle holds. A rock with no free side waits for the pile around it to go.
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
-import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
+import { fragmentApproachCandidates, fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
 
 const SEED = 42;
 
@@ -47,101 +43,95 @@ const ALL_NEIGHBOR_OFFSETS: readonly [number, number][] = [
   [1, -1], [1, 0], [1, 1],
 ];
 
-describe('fragmentApproachCell — primary cell free', () => {
-  it('returns the fragment\'s own rounded position when no state is supplied (1-arg form)', () => {
-    const fragment = makeFragment(1, 5, 7);
-    expect(fragmentApproachCell(fragment)).toEqual({ x: 5, z: 7 });
+const isNeighbourOf = (c: { x: number; z: number }, x: number, z: number) =>
+  Math.max(Math.abs(c.x - x), Math.abs(c.z - z)) === 1;
+
+describe('fragmentApproachCell', () => {
+  it('is the rock\'s own rounded cell without state (the nominal target)', () => {
+    expect(fragmentApproachCell(makeFragment(1, 5, 7))).toEqual({ x: 5, z: 7 });
   });
 
-  it('returns the primary cell when state is supplied but no vehicle occupies it', () => {
+  it('stands beside the rock, never on it, nearest the vehicle asking', () => {
     const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(64);
     const fragment = makeFragment(1, 5, 7);
+    state.navGrid.addFragmentFootprint(fragment);
+    const hauler = purchaseVehicle(state.vehicles, 'debris_hauler', 9, 7).vehicle;
 
-    expect(fragmentApproachCell(fragment, state)).toEqual({ x: 5, z: 7 });
+    const result = fragmentApproachCell(fragment, state, hauler.id)!;
+    expect(result).toEqual({ x: 6, z: 7 });
   });
 
-  it('returns the primary cell when the only vehicle there is the excluded one', () => {
+  it('a wide rock is approached from beside its whole footprint', () => {
     const state = createGame({ seed: SEED });
-    const fragment = makeFragment(1, 5, 7);
-    const vehicle = purchaseVehicle(state.vehicles, 'rock_fragmenter', 5, 7).vehicle;
+    state.navGrid = makeFlatNavGrid(64);
+    const wide = { ...makeFragment(1, 10.5, 7), halfExtents: { x: 2, y: 0.5, z: 0.4 } };
+    state.navGrid.addFragmentFootprint(wide);
+    const hauler = purchaseVehicle(state.vehicles, 'debris_hauler', 20, 7).vehicle;
 
-    expect(fragmentApproachCell(fragment, state, vehicle.id)).toEqual({ x: 5, z: 7 });
+    // Footprint spans x 9..12 on row 7: the nearest free side to the east is x = 13.
+    expect(fragmentApproachCell(wide, state, hauler.id)).toEqual({ x: 13, z: 7 });
+  });
+
+  it('skips a side another vehicle holds, but not one the asking vehicle holds', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(64);
+    const fragment = makeFragment(1, 5, 7);
+    state.navGrid.addFragmentFootprint(fragment);
+    purchaseVehicle(state.vehicles, 'rock_fragmenter', 6, 7);
+    const requester = purchaseVehicle(state.vehicles, 'debris_hauler', 4, 7).vehicle;
+
+    expect(fragmentApproachCell(fragment, state, requester.id)).toEqual({ x: 4, z: 7 });
+  });
+
+  it('reaches past the nearest ring when that ring is rubble', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(64);
+    const centre = makeFragment(1, 5, 7);
+    state.navGrid.addFragmentFootprint(centre);
+    for (const [dx, dz] of ALL_NEIGHBOR_OFFSETS) state.navGrid.addFragmentFootprint(makeFragment(10 + dx * 3 + dz, 5 + dx, 7 + dz));
+    const result = fragmentApproachCell(centre, state)!;
+    expect(Math.max(Math.abs(result.x - 5), Math.abs(result.z - 7))).toBe(2);
+  });
+
+  it('a rock buried deeper than a loader reaches has no side to stand on until the pile around it is hauled', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(64);
+    const centre = makeFragment(1, 5, 7);
+    state.navGrid.addFragmentFootprint(centre);
+    let id = 10;
+    const around: ReturnType<typeof makeFragment>[] = [];
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (dx !== 0 || dz !== 0) around.push(makeFragment(id++, 5 + dx, 7 + dz));
+    for (const f of around) state.navGrid.addFragmentFootprint(f);
+
+    expect(fragmentApproachCell(centre, state)).toBeNull();
+    const west = around.find(f => f.position.x === 3 && f.position.z === 7)!;
+    state.navGrid.removeFragmentFootprint(west);
+    expect(fragmentApproachCell(centre, state)).toEqual({ x: 3, z: 7 });
+  });
+
+  it('never stands on blocked ground', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(64);
+    const fragment = makeFragment(1, 5, 7);
+    state.navGrid.addFragmentFootprint(fragment);
+    for (const [dx, dz] of ALL_NEIGHBOR_OFFSETS) {
+      if (dx === 0 && dz === 1) continue;
+      state.navGrid.setCellAt(5 + dx, 7 + dz, { type: 'blocked', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+    }
+    expect(fragmentApproachCell(fragment, state)).toEqual({ x: 5, z: 8 });
   });
 });
 
-describe('fragmentApproachCell — primary cell occupied by another vehicle', () => {
-  it('falls back to the nearest free walkable neighbour', () => {
+describe('fragmentApproachCandidates', () => {
+  it('lists the free cells within a loader\'s reach of the footprint', () => {
     const state = createGame({ seed: SEED });
     state.navGrid = makeFlatNavGrid(64);
     const fragment = makeFragment(1, 5, 7);
-    // Occupies the fragment's own cell — mirrors a rock_fragmenter parked
-    // where its own sub-fragments spawned (#484's original livelock).
-    purchaseVehicle(state.vehicles, 'rock_fragmenter', 5, 7);
-
-    const result = fragmentApproachCell(fragment, state, /* excludeVehicleId */ 999);
-
-    // Not the occupied primary cell...
-    expect(result).not.toEqual({ x: 5, z: 7 });
-    // ...but a genuine 8-neighbour of it.
-    expect(Math.abs(result.x - 5)).toBeLessThanOrEqual(1);
-    expect(Math.abs(result.z - 7)).toBeLessThanOrEqual(1);
-    // Nearest candidate: iteration order (dx=-1..1, dz=-1..1) picks the
-    // first minimal-distance free cell, which is the cardinal (-1, 0)
-    // neighbour ahead of any diagonal.
-    expect(result).toEqual({ x: 4, z: 7 });
-  });
-
-  it('excludes the requesting vehicle\'s own occupancy of a neighbour from the search', () => {
-    const state = createGame({ seed: SEED });
-    state.navGrid = makeFlatNavGrid(64);
-    const fragment = makeFragment(1, 5, 7);
-    const other = purchaseVehicle(state.vehicles, 'rock_fragmenter', 5, 7).vehicle;
-    // The requesting vehicle itself already sits on the nearest neighbour
-    // cell — it must not be treated as blocking its own path there.
-    const requester = purchaseVehicle(state.vehicles, 'debris_hauler', 4, 7).vehicle;
-
-    const result = fragmentApproachCell(fragment, state, requester.id);
-
-    expect(result).toEqual({ x: 4, z: 7 });
-    expect(other.x).toBe(5);
-  });
-
-  it('falls back to the primary cell when every neighbour is occupied or unwalkable', () => {
-    const state = createGame({ seed: SEED });
-    state.navGrid = makeFlatNavGrid(64);
-    const fragment = makeFragment(1, 5, 7);
-    purchaseVehicle(state.vehicles, 'rock_fragmenter', 5, 7);
-
-    // Block half the ring via the NavGrid, occupy the other half with vehicles.
-    ALL_NEIGHBOR_OFFSETS.forEach(([dx, dz], i) => {
-      const x = 5 + dx;
-      const z = 7 + dz;
-      if (i % 2 === 0) {
-        state.navGrid!.setCellAt(x, z, { type: 'blocked', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
-      } else {
-        purchaseVehicle(state.vehicles, 'debris_hauler', x, z);
-      }
-    });
-
-    const result = fragmentApproachCell(fragment, state, /* excludeVehicleId */ 999);
-
-    // Documented fallback (see FragmentApproach.ts): `best ?? primary` — the
-    // caller's own stuck-detection handles a genuinely unreachable target
-    // rather than this function throwing or looping.
-    expect(result).toEqual({ x: 5, z: 7 });
-  });
-
-  it('falls back to the primary cell when state has no navGrid and every neighbour is occupied', () => {
-    const state = createGame({ seed: SEED });
-    // No navGrid assigned — mirrors a caller that only has vehicle data.
-    const fragment = makeFragment(1, 5, 7);
-    purchaseVehicle(state.vehicles, 'rock_fragmenter', 5, 7);
-    ALL_NEIGHBOR_OFFSETS.forEach(([dx, dz]) => {
-      purchaseVehicle(state.vehicles, 'debris_hauler', 5 + dx, 7 + dz);
-    });
-
-    const result = fragmentApproachCell(fragment, state, /* excludeVehicleId */ 999);
-
-    expect(result).toEqual({ x: 5, z: 7 });
+    state.navGrid.addFragmentFootprint(fragment);
+    const cells = fragmentApproachCandidates(fragment, state);
+    // The nearest ring and the one past it, nearest first.
+    expect(cells).toHaveLength(24);
+    expect(cells.slice(0, 8).every(c => isNeighbourOf(c, 5, 7))).toBe(true);
   });
 });

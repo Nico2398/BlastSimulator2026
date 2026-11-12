@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createGridPlan, addHole, removeHole, holeNumericId, maxHoleNumericId, digVoxel, landDrilledHole, computeDrillHoleDurationTicks, fleetDrillReachM, drillDepthRefusal, minDrillRigTier, fleetDrillDiameterM, drillDiameterRefusal } from '../../../src/core/mining/DrillPlan.js';
+import {
+  createGridPlan, addHole, removeHole, holeNumericId, maxHoleNumericId, digVoxel, landDrilledHole, computeDrillHoleDurationTicks,
+  fleetDrillReachM, drillDepthRefusal, minDrillRigTier, fleetDrillDiameterM, drillDiameterRefusal,
+  gridCellPositions, createHolesAt, GRID_LAYOUTS, drillHoleCost, estimateDrillWorkTicks,
+} from '../../../src/core/mining/DrillPlan.js';
 import { computeRigDurationTicks } from '../../../src/core/entities/Vehicle.js';
 import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDuration.js';
 import type { DigVoxelResult, PlannedHole } from '../../../src/core/mining/DrillPlan.js';
@@ -13,6 +17,8 @@ import {
   DRILL_HOLE_REFERENCE_DEPTH_M,
   DRILL_HOLE_REFERENCE_DIAMETER_M,
   DRILL_RIG_MAX_DEPTH_M,
+  DRILL_COST_PER_METRE,
+  DRILL_HOLE_DEFAULT_DIAMETER_M,
 } from '../../../src/core/config/balance.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -133,6 +139,27 @@ describe('landDrilledHole', () => {
     expect(drilled.z).toBe(planned.z);
     expect(drilled.depth).toBe(planned.depth);
     expect(drilled.diameter).toBe(planned.diameter);
+  });
+
+  // A drilled hole keeps the pattern cell it was ordered in: the permit area and powder factor read it.
+  it('keeps the spacing and burden of the grid the hole was ordered in', () => {
+    const planned: PlannedHole = { id: 'H4', x: 14, z: 13, depth: 8, diameter: 0.089, spacingM: 4, burdenM: 3 };
+
+    expect(landDrilledHole(planned)).toEqual({ id: 'H4', x: 14, z: 13, depth: 8, diameter: 0.089, spacingM: 4, burdenM: 3 });
+  });
+
+  it('a hole ordered outside any grid lands with no pattern cell at all, not undefined fields', () => {
+    const drilled = landDrilledHole({ id: 'H1', x: 0, z: 0, depth: 8, diameter: 0.15 });
+
+    expect('spacingM' in drilled).toBe(false);
+    expect('burdenM' in drilled).toBe(false);
+  });
+
+  it('boundary: copies each of spacing and burden on its own', () => {
+    const drilled = landDrilledHole({ id: 'H2', x: 0, z: 0, depth: 8, diameter: 0.15, spacingM: 5 });
+
+    expect(drilled.spacingM).toBe(5);
+    expect('burdenM' in drilled).toBe(false);
   });
 });
 
@@ -621,5 +648,195 @@ describe('computeRigDurationTicks (#1935)', () => {
   it('proficiency, need and living-quarters multipliers still apply on top of the tier', () => {
     expect(computeRigDurationTicks(base, 2, 4, 0.9, 0.85))
       .toBe(computeTaskDuration(base / 1.4, 4, 0.9, 0.85, 1));
+  });
+});
+
+// ── Grid shape: burden between rows, aligned or staggered rows ──
+
+describe('gridCellPositions — burden and layout', () => {
+  it('defaults to a square, aligned mesh: rows as far apart as the holes in them', () => {
+    expect(gridCellPositions({ x: 20, z: 25 }, 2, 3, 3)).toEqual([
+      { x: 20, z: 25 }, { x: 23, z: 25 }, { x: 26, z: 25 },
+      { x: 20, z: 28 }, { x: 23, z: 28 }, { x: 26, z: 28 },
+    ]);
+  });
+
+  it('puts holes `spacing` apart along x and rows `burden` apart along z, row-major', () => {
+    expect(gridCellPositions({ x: 0, z: 0 }, 3, 2, 4, 3)).toEqual([
+      { x: 0, z: 0 }, { x: 4, z: 0 },
+      { x: 0, z: 3 }, { x: 4, z: 3 },
+      { x: 0, z: 6 }, { x: 4, z: 6 },
+    ]);
+  });
+
+  it('staggered shifts every odd row by half a spacing and drops its last hole; even rows stay in line with the origin', () => {
+    const cells = gridCellPositions({ x: 10, z: 0 }, 4, 3, 4, 3, 'staggered');
+
+    expect(cells).toEqual([
+      { x: 10, z: 0 }, { x: 14, z: 0 }, { x: 18, z: 0 },
+      { x: 12, z: 3 }, { x: 16, z: 3 },
+      { x: 10, z: 6 }, { x: 14, z: 6 }, { x: 18, z: 6 },
+      { x: 12, z: 9 }, { x: 16, z: 9 },
+    ]);
+  });
+
+  it('a staggered grid stays inside the rows x cols rectangle it was laid out on', () => {
+    const origin = { x: 10, z: 10 };
+    for (const spacing of [2, 3, 4, 5, 6]) {
+      const cells = gridCellPositions(origin, 5, 4, spacing, 3, 'staggered');
+      const farX = origin.x + 3 * spacing;
+      expect(Math.max(...cells.map(c => c.x)), `spacing ${spacing}`).toBeLessThanOrEqual(farX);
+      expect(Math.min(...cells.map(c => c.x)), `spacing ${spacing}`).toBe(origin.x);
+    }
+  });
+
+  it('a half spacing that is not a whole metre is rounded down, so holes stay on cells', () => {
+    // 5 m spacing: odd rows shift floor(2.5) = 2 m.
+    const cells = gridCellPositions({ x: 0, z: 0 }, 2, 2, 5, 5, 'staggered');
+    expect(cells.slice(2)).toEqual([{ x: 2, z: 5 }]);
+    // 3 m spacing: floor(1.5) = 1 m.
+    expect(gridCellPositions({ x: 0, z: 0 }, 2, 2, 3, 3, 'staggered')[2]).toEqual({ x: 1, z: 3 });
+  });
+
+  it('boundary: a one-column staggered grid lies in line, with nothing to stagger against', () => {
+    expect(gridCellPositions({ x: 0, z: 0 }, 3, 1, 4, 3, 'staggered')).toEqual(gridCellPositions({ x: 0, z: 0 }, 3, 1, 4, 3));
+  });
+
+  it('boundary: at 1 m spacing the half-spacing shift rounds to 0, so a staggered grid lies in line', () => {
+    expect(gridCellPositions({ x: 0, z: 0 }, 3, 3, 1, 2, 'staggered')).toEqual(gridCellPositions({ x: 0, z: 0 }, 3, 3, 1, 2));
+  });
+
+  it('an explicit square layout is the default one', () => {
+    expect(gridCellPositions({ x: 5, z: 5 }, 3, 4, 4, 3, 'square')).toEqual(gridCellPositions({ x: 5, z: 5 }, 3, 4, 4, 3));
+  });
+
+  it('a single row is never shifted, whatever the layout', () => {
+    expect(gridCellPositions({ x: 0, z: 0 }, 1, 3, 4, 3, 'staggered')).toEqual([{ x: 0, z: 0 }, { x: 4, z: 0 }, { x: 8, z: 0 }]);
+  });
+
+  it('rejection: no rows or no columns gives no cells', () => {
+    expect(gridCellPositions({ x: 0, z: 0 }, 0, 3, 4, 3, 'staggered')).toEqual([]);
+    expect(gridCellPositions({ x: 0, z: 0 }, 3, 0, 4)).toEqual([]);
+  });
+});
+
+describe('GRID_LAYOUTS', () => {
+  it('lists the two layouts a drill plan may order, aligned first', () => {
+    expect(GRID_LAYOUTS).toEqual(['square', 'staggered']);
+  });
+
+  it('an aligned grid lays out rows × cols holes; a staggered one a hole fewer on every odd row', () => {
+    expect(gridCellPositions({ x: 0, z: 0 }, 3, 4, 4, 3, 'square')).toHaveLength(12);
+    expect(gridCellPositions({ x: 0, z: 0 }, 3, 4, 4, 3, 'staggered')).toHaveLength(4 + 3 + 4);
+  });
+});
+
+describe('createHolesAt / createGridPlan record the pattern cell', () => {
+  it('createHolesAt stamps every hole with the cell it is given', () => {
+    const counter = { nextHoleId: 1 };
+    const holes = createHolesAt(counter, [{ x: 1, z: 2 }, { x: 5, z: 2 }], 8, 0.089, { spacingM: 4, burdenM: 3 });
+
+    expect(holes).toEqual([
+      { id: 'H1', x: 1, z: 2, depth: 8, diameter: 0.089, spacingM: 4, burdenM: 3 },
+      { id: 'H2', x: 5, z: 2, depth: 8, diameter: 0.089, spacingM: 4, burdenM: 3 },
+    ]);
+    expect(counter.nextHoleId).toBe(3);
+  });
+
+  it('createHolesAt without a cell leaves the holes without spacing or burden', () => {
+    const [hole] = createHolesAt({ nextHoleId: 1 }, [{ x: 1, z: 2 }], 8, 0.089);
+
+    expect('spacingM' in hole!).toBe(false);
+    expect('burdenM' in hole!).toBe(false);
+  });
+
+  it('boundary: no positions, no holes, and the counter does not move', () => {
+    const counter = { nextHoleId: 7 };
+    expect(createHolesAt(counter, [], 8, 0.089, { spacingM: 4, burdenM: 4 })).toEqual([]);
+    expect(counter.nextHoleId).toBe(7);
+  });
+
+  it('createGridPlan records its spacing and, by default, a burden equal to it', () => {
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 2, 2, 5, 8, 0.089);
+
+    expect(holes.every(h => h.spacingM === 5 && h.burdenM === 5)).toBe(true);
+  });
+
+  it('createGridPlan with a burden and a staggered layout drills exactly the staggered cells and records both', () => {
+    const holes = createGridPlan(holeCounter, { x: 10, z: 10 }, 3, 3, 4, 8, 0.089, 3, 'staggered');
+
+    expect(holes.map(h => ({ x: h.x, z: h.z }))).toEqual(gridCellPositions({ x: 10, z: 10 }, 3, 3, 4, 3, 'staggered'));
+    expect(holes[3]).toMatchObject({ x: 12, z: 13 }); // first hole of row 1, shifted 2 m
+    expect(holes.every(h => h.spacingM === 4 && h.burdenM === 3)).toBe(true);
+  });
+});
+
+// ── Drilling costs money and rig time ──
+
+describe('drillHoleCost', () => {
+  it('an 89 mm hole costs DRILL_COST_PER_METRE ($12) per metre: an 8 m hole is $96', () => {
+    expect(DRILL_COST_PER_METRE).toBe(12);
+    expect(drillHoleCost(8, DRILL_HOLE_DEFAULT_DIAMETER_M)).toBe(96);
+    expect(drillHoleCost(8, DRILL_HOLE_DEFAULT_DIAMETER_M)).toBe(DRILL_COST_PER_METRE * 8);
+  });
+
+  it('is linear in depth for a given bore', () => {
+    expect(drillHoleCost(16, 0.089)).toBe(2 * drillHoleCost(8, 0.089));
+    expect(drillHoleCost(4, 0.089)).toBe(drillHoleCost(8, 0.089) / 2);
+  });
+
+  it('scales with the bore relative to 89 mm: a wider hole costs more per metre', () => {
+    // 12 x 8 x 127/89 = 136.98 -> 137; 12 x 8 x 165/89 = 177.98 -> 178.
+    expect(drillHoleCost(8, 0.127)).toBe(137);
+    expect(drillHoleCost(8, 0.165)).toBe(178);
+    expect(drillHoleCost(8, 0.165)).toBeGreaterThan(drillHoleCost(8, 0.127));
+  });
+
+  it('rounds to whole dollars', () => {
+    // 12 x 1 x 127/89 = 17.12
+    expect(drillHoleCost(1, 0.127)).toBe(17);
+    for (const [depth, diameter] of [[7.3, 0.127], [5, 0.165], [2.5, 0.089]] as const) {
+      expect(Number.isInteger(drillHoleCost(depth, diameter))).toBe(true);
+    }
+  });
+
+  it('boundary: a hole of no depth costs nothing', () => {
+    expect(drillHoleCost(0, 0.089)).toBe(0);
+  });
+});
+
+describe('estimateDrillWorkTicks', () => {
+  const holes = (n: number, depth = 8, diameter = 0.089) => Array.from({ length: n }, () => ({ depth, diameter }));
+
+  it('is each hole\'s rig work at that tier, summed', () => {
+    const set = [{ depth: 8, diameter: 0.089 }, { depth: 12, diameter: 0.127 }, { depth: 3, diameter: 0.165 }];
+    for (const tier of [1, 2, 3] as const) {
+      const expected = set.reduce((sum, h) => sum + computeRigDurationTicks(computeDrillHoleDurationTicks(h.depth, h.diameter), tier), 0);
+      expect(estimateDrillWorkTicks(set, tier), `tier ${tier}`).toBe(expected);
+    }
+  });
+
+  it('a better rig drills the same holes in fewer ticks', () => {
+    const nine = holes(9);
+    const t1 = estimateDrillWorkTicks(nine, 1);
+    const t2 = estimateDrillWorkTicks(nine, 2);
+    const t3 = estimateDrillWorkTicks(nine, 3);
+    expect(t2).toBeLessThan(t1);
+    expect(t3).toBeLessThan(t2);
+  });
+
+  it('more holes take longer: the estimate adds up across holes', () => {
+    expect(estimateDrillWorkTicks(holes(9), 1)).toBe(9 * estimateDrillWorkTicks(holes(1), 1));
+    expect(estimateDrillWorkTicks(holes(3), 2)).toBeGreaterThan(estimateDrillWorkTicks(holes(2), 2));
+  });
+
+  it('a deeper or wider hole takes longer on the same rig', () => {
+    expect(estimateDrillWorkTicks(holes(1, 16), 1)).toBeGreaterThan(estimateDrillWorkTicks(holes(1, 8), 1));
+    expect(estimateDrillWorkTicks(holes(1, 8, 0.165), 1)).toBeGreaterThan(estimateDrillWorkTicks(holes(1, 8, 0.089), 1));
+  });
+
+  it('boundary: no holes is no work', () => {
+    expect(estimateDrillWorkTicks([], 1)).toBe(0);
+    expect(estimateDrillWorkTicks([], 3)).toBe(0);
   });
 });

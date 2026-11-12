@@ -6,7 +6,7 @@
 // click vocabulary could only drive by *counting*: N clicks on
 // `.bsx-stepper-btn:last-child` meant "the default plus N", and the default
 // lived in `src/`. The moment `DRILL_GRID_DEFAULT_SPACING_M`, a charge
-// panel's `CHARGE_DEFAULT_AMOUNT_KG` or a strip's persistence across steps changed,
+// panel's `CHARGE_DEFAULT_STEMMING_M` or a strip's persistence across steps changed,
 // every count was silently wrong while its command still read right —
 // PR #1070's first red shard was exactly that: `spacing:5` declared beside a
 // drag whose strip still sat at 3 m, ordering 24 holes where 6 were expected.
@@ -19,7 +19,7 @@
 //      control's displayed value and clicks until it matches, so the JSON
 //      carries the figure, not a count that assumes a start.
 //   2. Where a step's own command declares the same parameter — `spacing:`,
-//      `depth:`, `amount:`, `stemming:` — the `setStepper`
+//      `burden:`, `depth:`, `stemming:` — the `setStepper`
 //      value equals it. That is the whole invariant in one comparison: the
 //      value command mode runs is the value interaction mode clicks to.
 //
@@ -38,8 +38,8 @@ const ALL_SCENARIO_NAMES = scenarioFiles(SCENARIO_DIR);
 /** `[data-field="…"]` → the console parameter the same figure travels under. */
 export const STEPPER_FIELD_TO_COMMAND_PARAM: Readonly<Record<string, string>> = {
   spacing: 'spacing',
+  burden: 'burden',
   depth: 'depth',
-  amount: 'amount',
   stemming: 'stemming',
   width: 'width',
   diameter: 'diameter',
@@ -53,7 +53,7 @@ export function stepperField(selector: string): string | null {
 
 /**
  * The figure a command declares for `param`, unit suffix stripped: the
- * Charge panel emits `amount:5kg stemming:2.0m`, and scenario authors
+ * Charge panel emits `stemming:2.5m`, and scenario authors
  * write either form.
  */
 export function declaredParam(command: string, param: string): number | null {

@@ -181,7 +181,7 @@ export class BlastFooter {
       attrs: { 'data-role': role, style: `font:600 11px/1 var(--bsx-font-mono);color:${over ? 'var(--bsx-amber)' : 'var(--bsx-text-secondary)'}` },
     });
     const usage = el('div', { attrs: { style: 'display:flex;gap:14px' } });
-    usage.append(value('permit-kg', permit.kgText, permit.kgOver), value('permit-holes', permit.holesText, permit.holesOver));
+    usage.append(value('permit-kg', permit.kgText, permit.kgOver), value('permit-area', permit.areaText, permit.areaOver));
     this.permitEl.replaceChildren(usage);
     if (permit.over) {
       this.permitEl.append(el('span', {

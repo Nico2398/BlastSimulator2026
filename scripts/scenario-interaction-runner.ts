@@ -26,7 +26,7 @@ import {
   DEFAULT_STEP_TIMEOUT,
   captureFrame,
   suspendDrawing,
-  forceRenderFrame,
+  syncSceneMatrices,
 } from './shared/puppeteer-utils.js';
 import { checkGoal, gameState, InteractionFailure, setTutorialRealClock } from './shared/interaction-driver.js';
 import { stateIfInteractionOnlyStepMoot } from './shared/interaction-level-skip.js';
@@ -151,7 +151,7 @@ async function captureStepEvidence(ctx: StepCaptureContext): Promise<void> {
     }
     if (shots.length > 0) {
       await page.evaluate(() => (window as any).__cameraReset());
-      await forceRenderFrame(page);
+      await syncSceneMatrices(page);
       await waitOneFrame(page);
     }
   }

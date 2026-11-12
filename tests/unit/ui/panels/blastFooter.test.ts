@@ -437,13 +437,14 @@ describe('BlastFooter has no delivery wait (#2143)', () => {
   });
 });
 
-// #1925: permit usage row on progression sites.
+// #1925: permit usage row on progression sites: the plan's kg and the area of its holes' cells.
 describe('BlastFooter — permit usage (#1925)', () => {
+  /** `holes` holes in a row 4 m apart (a 16 m² cell each, as the permit measures them), each charged with `kgPerHole`. */
   function permitState(holes: number, kgPerHole: number, progression = true) {
     const state = makeState();
     if (progression) state.grade = createGradeState();
     for (let i = 0; i < holes; i++) {
-      const hole = addHole(holeCounter, state.drillHoles, 10 + i * 3, 10, 8, 0.15);
+      const hole = addHole(holeCounter, state.drillHoles, 10 + i * 4, 10, 8, 0.15);
       const r = createCharge('krackle', kgPerHole, 2, hole.depth);
       if ('charge' in r) state.chargesByHole[hole.id] = r.charge;
     }
@@ -454,14 +455,15 @@ describe('BlastFooter — permit usage (#1925)', () => {
   const warning = (f: BlastFooter) => f.root.querySelector('[data-role="permit-warning"]') as HTMLElement | null;
   const visible = (e: HTMLElement | null) => !!e && e.style.display !== 'none';
 
-  it('shows kg and holes against the grade-0 limits', () => {
+  it('shows kg and pattern area against the grade-0 limits', () => {
     const { footer } = makeFooter();
     footer.update(permitState(9, 4));
     expect(visible(usage(footer))).toBe(true);
     expect(usage(footer)!.textContent).toContain('36 / 40 kg');
-    expect(usage(footer)!.textContent).toContain('9 / 9 holes');
+    expect(usage(footer)!.textContent).toContain('144 / 144 m²');
     expect(usage(footer)!.querySelector('[data-role="permit-kg"]')!.textContent).toBe('36 / 40 kg');
-    expect(usage(footer)!.querySelector('[data-role="permit-holes"]')!.textContent).toBe('9 / 9 holes');
+    expect(usage(footer)!.querySelector('[data-role="permit-area"]')!.textContent).toBe('144 / 144 m²');
+    expect(usage(footer)!.querySelector('[data-role="permit-holes"]')).toBeNull();
     expect(visible(warning(footer))).toBe(false);
   });
 
@@ -480,11 +482,26 @@ describe('BlastFooter — permit usage (#1925)', () => {
     expect(warning(footer)!.textContent!.length).toBeGreaterThan(0);
   });
 
-  it('warns when over the hole limit alone', () => {
+  it('warns when over the area limit alone', () => {
     const { footer } = makeFooter();
     footer.update(permitState(10, 1));
-    expect(usage(footer)!.textContent).toContain('10 / 9 holes');
+    expect(usage(footer)!.querySelector('[data-role="permit-area"]')!.textContent).toBe('160 / 144 m²');
+    expect(usage(footer)!.querySelector('[data-role="permit-kg"]')!.textContent).toBe('10 / 40 kg');
+    expect(usage(footer)!.dataset['over']).toBe('true');
     expect(visible(warning(footer))).toBe(true);
+  });
+
+  it('flags each value on its own: only the one over its limit turns amber', () => {
+    const amber = (f: BlastFooter, role: string) =>
+      (usage(f)!.querySelector(`[data-role="${role}"]`) as HTMLElement).style.color.includes('amber');
+    const overArea = makeFooter().footer;
+    overArea.update(permitState(10, 1));
+    expect(amber(overArea, 'permit-area')).toBe(true);
+    expect(amber(overArea, 'permit-kg')).toBe(false);
+    const overKg = makeFooter().footer;
+    overKg.update(permitState(9, 5));
+    expect(amber(overKg, 'permit-kg')).toBe(true);
+    expect(amber(overKg, 'permit-area')).toBe(false);
   });
 
   it('FIRE stays enabled and clickable while over the limit', () => {
@@ -540,34 +557,45 @@ describe('BlastFooter sealed ore (#2053)', () => {
   }
   const dollars = (el: HTMLElement) => Number((el.textContent ?? '').replace(/[^0-9.]/g, ''));
 
-  function setup(depth: number, kg: number) {
+  // Charges fill the hole up to the stemming, as Charge All loads them. Under 2 m of stemming the column runs
+  // near the surface and breaks out; under 8 m of stemming in a 12 m hole it sits too deep and seals.
+  const FREE_FACE_STEMMING_M = 2;
+  const SEALING_STEMMING_M = 8;
+
+  /** Krackle filling a `depth` m hole up to `stemmingM` of stemming. */
+  function filled(depth: number, stemmingM: number) {
+    const res = createCharge('krackle', null, stemmingM, depth);
+    if (!('charge' in res)) throw new Error(res.error);
+    return res.charge;
+  }
+
+  function setup(depth: number, stemmingM: number) {
     const { footer } = makeFooter();
     const grid = makeOreGrid();
     footer.setGridProvider(() => grid);
     const state = makeState();
     const hole = addHole(holeCounter, state.drillHoles, 20, 20, depth, 0.089);
-    const res = createCharge('krackle', kg, 2, hole.depth);
-    if ('charge' in res) state.chargesByHole[hole.id] = res.charge;
+    state.chargesByHole[hole.id] = filled(hole.depth, stemmingM);
     state.surveyResults.push(makeCoverageSurvey(0, 39));
     footer.update(state);
     return { footer, state, grid, hole };
   }
 
   it('a free-face plan shows EST. ORE VALUE and no sealed line', () => {
-    const { footer } = setup(8, 8);
+    const { footer } = setup(8, FREE_FACE_STEMMING_M);
     expect(dollars(statValue(footer.root, 'ui.blast_workshop.footer.est_ore_value'))).toBeGreaterThan(0);
     expect(isShown(sealedEl(footer))).toBe(false);
   });
 
   it('a fully sealed plan counts no ore in EST. ORE VALUE and shows the sealed line', () => {
-    const { footer } = setup(12, 10);
+    const { footer } = setup(12, SEALING_STEMMING_M);
     expect(dollars(statValue(footer.root, 'ui.blast_workshop.footer.est_ore_value'))).toBe(0);
     expect(isShown(sealedEl(footer))).toBe(true);
     expect(sealedEl(footer)!.textContent).toMatch(/\$\d/);
   });
 
   it('a fully sealed plan has a margin of minus the plan cost, never positive', () => {
-    const { footer } = setup(12, 10);
+    const { footer } = setup(12, SEALING_STEMMING_M);
     const margin = statValue(footer.root, 'ui.blast_workshop.footer.margin').textContent ?? '';
     const cost = statValue(footer.root, 'ui.blast_workshop.footer.plan_cost').textContent ?? '';
     expect(margin.startsWith('-')).toBe(true);
@@ -575,41 +603,39 @@ describe('BlastFooter sealed ore (#2053)', () => {
   });
 
   it('the sealed line uses the i18n text with the formatted figure', () => {
-    const { footer } = setup(12, 10);
+    const { footer } = setup(12, SEALING_STEMMING_M);
     const raw = t(SEALED_KEY, { value: 'ZZZ' });
     const prefix = raw.slice(0, raw.indexOf('ZZZ'));
     expect(sealedEl(footer)!.textContent!.startsWith(prefix)).toBe(true);
   });
 
   it('the sealed line appears when a deeper charge replaces a free-face one, and hides again', () => {
-    const { footer, state, hole } = setup(8, 8);
+    const { footer, state, hole } = setup(8, FREE_FACE_STEMMING_M);
     expect(isShown(sealedEl(footer))).toBe(false);
-    const deep = createCharge('krackle', 10, 2, 12);
     state.drillHoles[0] = { ...hole, depth: 12 };
-    if ('charge' in deep) state.chargesByHole[hole.id] = deep.charge;
+    state.chargesByHole[hole.id] = filled(12, SEALING_STEMMING_M);
     footer.update(state);
     expect(isShown(sealedEl(footer))).toBe(true);
-    const shallow = createCharge('krackle', 8, 2, 8);
     state.drillHoles[0] = { ...hole, depth: 8 };
-    if ('charge' in shallow) state.chargesByHole[hole.id] = shallow.charge;
+    state.chargesByHole[hole.id] = filled(8, FREE_FACE_STEMMING_M);
     footer.update(state);
     expect(isShown(sealedEl(footer))).toBe(false);
   });
 
   it('no sealed line without a survey or without a grid', () => {
-    const { footer, state } = setup(12, 10);
+    const { footer, state } = setup(12, SEALING_STEMMING_M);
     state.surveyResults.length = 0;
     footer.update(state);
     expect(isShown(sealedEl(footer))).toBe(false);
 
-    const noGrid = setup(12, 10);
+    const noGrid = setup(12, SEALING_STEMMING_M);
     noGrid.footer.setGridProvider(() => null);
     noGrid.footer.update(noGrid.state);
     expect(isShown(sealedEl(noGrid.footer))).toBe(false);
   });
 
   it('re-renders the sealed line in French after setLocale + refreshLocale', () => {
-    const { footer, state } = setup(12, 10);
+    const { footer, state } = setup(12, SEALING_STEMMING_M);
     expect(sealedEl(footer)!.textContent).toContain('stays sealed');
     setLocale('fr');
     footer.refreshLocale();

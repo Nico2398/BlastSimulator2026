@@ -75,7 +75,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "description": "Load every hole.",
+      "description": "Load every hole with an explicit 5 kg partial charge (a console-only bootstrap, the exact allowlisted scaffolding command; the pit is setup, not the thing under test). Not the fill a player's Charge All would load: filled to the 2 m stemming each hole takes 8 kg, and under the kernel energy model that shot breaks ~2.3 kt, a pile that lies unhauled until the road exists and drives ecology to 0, ending the level in an ecological shutdown (#1733) at tick 628 with 9 segments still undug. 5 kg breaks ~1.8 kt: ecology bottoms out near 1.5 around tick 640 and recovers, and the pit stays about 9 m across (spiral legs east 9, south 18, west 11).",
       "interaction": [
         {
           "type": "command",
@@ -191,12 +191,12 @@
       }
     },
     {
-      "command": "vehicle reposition 2 20 25",
-      "description": "Order the hauler down to the spiral's bottom leg; its route is the spiral road. 20,25 not the dead end 15,25: the rock_digger that dug the last segment parks idle at 16,25 with its driver beside it, and the 3-wide dead end leaves a hauler there no way past.",
+      "command": "vehicle reposition 2 20 26",
+      "description": "Order the hauler down to the spiral's bottom leg; its route is the spiral road. 20,26 not the dead end 15,25: the rock_digger that dug the last segment parks idle at 16,25 with its driver beside it, and the 3-wide dead end leaves a hauler there no way past. 20,26, not 20,25: the road is dug after the blast, and rubble now lies on the bottom leg's north lane ((16,25), (17,25), (20,25), (21,25)); rubble blocks vehicles over its footprint, so no route ends on 20,25. The middle lane is clear; measured (command mode), the hauler stands at (20,26) after the tick 120 below and back at (1,10) after the return trip.",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle reposition 2 20 25"
+          "command": "vehicle reposition 2 20 26"
         }
       ],
       "role": "bootstrap"

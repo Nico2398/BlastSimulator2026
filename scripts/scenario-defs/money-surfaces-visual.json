@@ -123,15 +123,10 @@
       "timeout": 125
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
+      "command": "charge hole:* explosive:boomite stemming:2m",
       "timeout": 30,
       "role": "player",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",

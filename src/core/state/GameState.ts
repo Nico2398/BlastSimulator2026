@@ -15,7 +15,7 @@ import type { OreSaturationState } from '../economy/OreSaturation.js';
 import type { PendingDetonation } from '../engine/DetonationSequence.js';
 import type { AgentOccupancy } from '../nav/AgentOccupancy.js';
 import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
-import type { HoleCharge, PlannedCharge } from '../mining/ChargePlan.js';
+import type { HoleCharge, PatternCharge, PlannedCharge } from '../mining/ChargePlan.js';
 import type { SurveyResult } from '../mining/SurveyCalc.js';
 import type { BlastOreReport } from '../mining/BlastOreReport.js';
 import type { BlastReport } from '../mining/BlastExecution.js';
@@ -444,8 +444,8 @@ export interface GameState {
   /** Armed detonation awaiting evacuation; null = none (#1362). */
   pendingDetonation: PendingDetonation | null;
 
-  /** Charge applied automatically to each newly drilled hole; null = none (#1345). */
-  patternCharge?: HoleCharge | null;
+  /** Charge applied automatically to each newly drilled hole; null = none (#1345). A null `amountKg` fills each hole. */
+  patternCharge?: PatternCharge | null;
 
   /** Named saved blast plans. */
   savedPlans: Record<string, SavedBlastPlan>;

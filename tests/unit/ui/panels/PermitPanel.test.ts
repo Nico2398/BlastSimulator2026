@@ -50,12 +50,13 @@ afterEach(() => {
 });
 
 describe('PermitPanel (#1924)', () => {
-  it('shows charge, hole and fee limits of the current grade', () => {
+  it('shows charge, pattern area and fee limits of the current grade', () => {
     panel.update(progression());
     const lim = permitLimitsFor(0);
     const text = q('[data-role="permit-limits"]')!.textContent!;
     expect(text).toContain(`${lim.maxChargeKg} kg`);
-    expect(text).toContain(`${lim.maxHoles} holes`);
+    expect(text).toContain(`${lim.maxAreaM2} m²`);
+    expect(text).not.toMatch(/\bholes\b/);
     expect(text).toContain(formatMoney(lim.fee));
     expect(q('[data-role="permit-strikes"]')!.textContent).toBe(t('permit.status.strikes', { count: 0 }));
   });

@@ -35,6 +35,7 @@ import { playContracts, playTick, clearBlastZone, FORBIDDEN_COMMAND, type Run } 
 import { SPOIL_HEAP_CAPACITY_KG } from '../../src/core/config/balance.js';
 import { resolveActionCost } from '../../src/core/engine/ActionSelection.js';
 import { octileHeuristic } from '../../src/core/nav/Pathfinding.js';
+import { fragmentApproachCandidates } from '../../src/core/economy/FragmentApproach.js';
 
 const HEAP_COST = 2000;
 
@@ -579,8 +580,13 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
   /** Drilling and charging it (~500 ticks beside the hauling) is ordered early enough to be ready by then. */
   const SECOND_SHOT_ORDERED_AT = 1100;
   const WINDOW_TICKS = 1000;
-  /** The repro's first-shot-only share was 12%; with the second shot it was 36%. */
-  const MAX_BARREN_SHARE = 0.15;
+  /**
+   * The repro's first-shot-only share was 12%; with the second shot it was 36%. Rubble blocks vehicles, so a pile is
+   * loaded from its edge and the ore inside it waits for the rock around it: barren edge rock is then the only rock a
+   * truck can take, and goes to the heap with no ore haul open (no violation above). Measured: 15.3% (5.8 t of 37.8 t,
+   * 2 barren trips). The bound stays well under the bug's 36%.
+   */
+  const MAX_BARREN_SHARE = 0.2;
   const ORE_PROBES = 8;
 
   it('no barren trip starts while a reachable ore haul with warehouse room is open, and barren stays a small share of the tonnage', () => {
@@ -631,7 +637,13 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
       const pool = state.pendingActions.filter(a => a.status === 'queued' && a.targetEmployeeId === null && isAutoDebrisAction(a.type));
       for (const e of state.employees.employees) {
         if (e.activeActionId !== null || !state.vehicles.vehicles.some(v => v.type === 'debris_hauler' && vehicleDriverId(v) === e.id)) continue;
-        const reachable = (a: typeof pool[number]) => climb === null || climb.canReach(e.x, e.z, state.navGrid!.clampX(a.targetX), state.navGrid!.clampZ(a.targetZ));
+        // The search's own pre-filter: a rock is reached at a free cell beside it, not on the rubble it lies on.
+        const reachable = (a: typeof pool[number]) => {
+          if (climb === null) return true;
+          const t = fragmentOf(a.payload['fragmentId'] as number);
+          if (t !== undefined && t.state === 'on_ground') return fragmentApproachCandidates(t.fragment, state).some(c => climb.canReach(e.x, e.z, c.x, c.z));
+          return climb.canReach(e.x, e.z, state.navGrid!.clampX(a.targetX), state.navGrid!.clampZ(a.targetZ));
+        };
         const seen = new Set(thinDebrisCandidates(
           state, e, pool, a => isAutoDebrisAction(a.type), a => haulActionIsWarehouseBound(state, a, fragmentOf),
           a => isHaulOrFragmentActionClaimable(state, a, fragmentOf, fits) && findVehicleForClaim(state, a, e).ok, reachable,

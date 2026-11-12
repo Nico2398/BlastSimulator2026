@@ -1,6 +1,6 @@
 {
   "name": "blast-charge-loading-ui",
-  "description": "Visual verification of charge loading UI: per-hole charges, explosive types, amounts, charge-all, visual indicators. #554: charging a hole now queues a charge_hole PendingAction (a blaster loads one hole at a time, on foot) instead of writing chargesByHole instantly — every commit click here is followed by a wait_until step proving the count only advances once the order actually lands, with a mid-loading screenshot proving the ordered-but-unloaded ghost/ORDERED overlay is visually distinct from a landed charge.",
+  "description": "Visual verification of charge loading UI: per-hole charges, explosive types, fills up to the stemming, charge-all, visual indicators. #554: charging a hole now queues a charge_hole PendingAction (a blaster loads one hole at a time, on foot) instead of writing chargesByHole instantly — every commit click here is followed by a wait_until step proving the count only advances once the order actually lands, with a mid-loading screenshot proving the ordered-but-unloaded ghost/ORDERED overlay is visually distinct from a landed charge.",
   "steps": [
     {
       "command": "new_game seed:42 cash:500000 staffed:true",
@@ -105,7 +105,7 @@
       "role": "setup"
     },
     {
-      "command": "charge hole:H1 explosive:boomite amount:3 stemming:2",
+      "command": "charge hole:H1 explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -113,19 +113,8 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 3
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "3 kg"
         },
         {
           "type": "assert",
@@ -138,7 +127,7 @@
           "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. 2 amount decrements (5 -> 3kg) reach this hole's declared 3kg; stemming is already at the 2.0m default and boomite is already the selected product, so neither needs a click. #554: the commit click only *orders* the charge (queues one charge_hole PendingAction and writes a PlannedCharge into state.plannedChargesByHole) — chargesByHole, and therefore chargedCount, does not move until a blaster physically walks to the hole and finishes loading it, so chargedCount must still read 0 immediately after this click.",
+      "description": "Per-hole charging is a real control (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> stemming:<stemming>m` from the panel's current product card and stemming (ChargeStep.chargeHole, Charge.ts): the hole is filled up to the stemming, so the stemming stepper alone sets how much goes in (2 m of stemming fills a 6 m hole with 8 kg of boomite).",
       "role": "player",
       "expect": {
         "equals": {
@@ -148,19 +137,8 @@
       }
     },
     {
-      "command": "charge hole:H2 explosive:boomite amount:8 stemming:2",
+      "command": "charge hole:H2 explosive:boomite stemming:2",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "8 kg"
-        },
         {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
@@ -172,7 +150,7 @@
           "selector": "#bs-blast-panel [data-hole=\"H2\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "5 amount increments (3 -> 8kg) off what the H1 row left behind. 8kg is exactly boomite's maxChargeKg, so this is the largest charge the amount stepper will hand a boomite hole — one more click is a no-op, not an overshoot. Ordered while H1's own charge_hole action is still in flight (or already queued behind it) — a single blaster works one hole at a time, so this order and H1's sit side by side in plannedChargesByHole until each is claimed in turn.",
+      "description": "Same stemming as the H1 row, so H2 gets the same 8 kg fill. Ordered while H1's own charge_hole action is still in flight (or already queued behind it) — a single blaster works one hole at a time, so this order and H1's sit side by side in the queue.",
       "role": "player",
       "expect": {
         "equals": {
@@ -182,23 +160,12 @@
       }
     },
     {
-      "command": "charge hole:H3 explosive:boomite amount:5 stemming:1",
+      "command": "charge hole:H3 explosive:boomite stemming:1",
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 1
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "5 kg"
         },
         {
           "type": "assert",
@@ -211,7 +178,7 @@
           "selector": "#bs-blast-panel [data-hole=\"H3\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "3 amount decrements (8 -> 5kg) and 5 stemming decrements (2.0 -> 1.0m) — the first step in this file to move stemming off its default. Three holes (H1, H2, H3) are now ordered but not yet loaded at once — enough for the wait_until step right after this one to catch a genuinely mixed state (some landed, some still ghost) rather than draining a single order.",
+      "description": "5 stemming decrements (2.0 -> 1.0 m) — the first step in this file to move stemming off its default; at 1 m the 6 m hole takes a 10 kg fill. Three holes (H1, H2, H3) are now ordered but not yet loaded at once — enough for the wait_until step right after this one to catch a genuinely mixed state (some landed, some still ghost) rather than draining a single order.",
       "role": "player",
       "expect": {
         "equals": {
@@ -266,18 +233,12 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "5 kg"
         },
         {
           "type": "assert",
@@ -297,7 +258,7 @@
         },
         "note": "#554: Charge All queues a charge_hole order for every hole — including H1/H2/H3, replacing their outstanding order — but chargesByHole is untouched until each one actually lands, so the count stays at 3 right after the click"
       },
-      "description": "Charge All commits whatever the steppers currently show, and the H3 row above left them at 5kg/1.0m — so reaching this step's declared 5kg/2m needs 5 stemming increments (1.0 -> 2.0m) before the click. Without them the click would silently order every hole at 1.0m stemming while the command field claimed 2m: exactly the class of drift the amount/stemming asserts are here to fail loudly on. #554: this orders 9 fresh charge_hole actions (one per hole, cancelling/replacing H1/H2/H3's already-landed entries with a new pending order and queuing H4-H9 for the first time) — none of the 9 lands the instant the button is clicked."
+      "description": "Charge All commits whatever the stemming stepper currently shows, and the H3 row above left it at 1.0 m — so reaching this step's declared 2 m needs the stepper set back before the click. Without that the click would silently order every hole at 1.0 m stemming while the command field claimed 2 m: exactly the class of drift the stemming assert is here to fail loudly on."
     },
     {
       "command": "wait_until field:chargedCount equals:6 max_ticks:9400",
@@ -356,7 +317,7 @@
       "role": "setup"
     },
     {
-      "command": "charge hole:H5 explosive:boomite amount:7 stemming:2",
+      "command": "charge hole:H5 explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "clickSelector",
@@ -364,19 +325,8 @@
         },
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 7
-        },
-        {
-          "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "7 kg"
         },
         {
           "type": "assert",
@@ -389,7 +339,7 @@
           "selector": "#bs-blast-panel [data-hole=\"H5\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "A single hole re-ordered after Charge All has already fully landed, which is the whole point of the per-hole rows. The explicit [data-step=\"2\"] click is required: Charge All completed the plan, so the still-armed autoAdvance had already moved the panel on to Sequence and the Per Hole rows were hidden. 2 amount increments (5 -> 7kg) and 5 stemming increments (2.0 -> 3.0m) then reach the declared values. #554: this queues a fresh charge_hole order for H5 — chargesByHole['H5'] keeps its old (5kg/2m) value until the new order lands, so chargedCount is unaffected by this click.",
+      "description": "A single hole re-ordered after Charge All has already fully landed, which is the whole point of the per-hole rows. The explicit [data-step=\"2\"] click is required: Charge All completed the plan, so the still-armed autoAdvance had already moved the panel on to Sequence and the Per Hole rows were hidden. The stemming stays at the declared 2 m.",
       "role": "player",
       "expect": {
         "equals": {
@@ -430,28 +380,24 @@
     {
       "command": "state",
       "timeout": 60,
-      "description": "#1361 overflow state. Holes are 6 m deep and stemming is 2.0 m, so a column of amount/2 m fits only up to 8 kg. Select Krackle (10 kg max, so the stepper can go past the limit; boomite caps at 8 kg and never overflows), step the amount to 9 kg: 4.5 m column + 2 m stemming > 6 m. The Charge step must show the reason line 'Shallowest hole is 6 m. At this stemming at most 8 kg fits.' and disable Charge All. The stepper keeps the 9 kg the player asked for.",
+      "description": "No-room guard (#1361, fill mode): 6 m of stemming in the 6 m holes leaves no room for explosive. The Charge step must show the reason line '6 m of stemming leaves no room for explosive in the 6 m hole.' and disable Charge All. The stepper keeps the 6 m the player asked for.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
-        },
-        {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 9
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 6
         },
         {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "2.0 m"
+          "expectedValue": "6.0 m"
         },
         {
           "type": "waitForProperty",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"] + div",
           "property": "textContent",
-          "expectedValue": "Shallowest hole is 6 m. At this stemming at most 8 kg fits.",
+          "expectedValue": "6 m of stemming leaves no room for explosive in the 6 m hole.",
           "timeoutMs": 10000
         },
         {
@@ -459,26 +405,23 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]",
           "property": "disabled",
           "expectedValue": true
-        },
-        {
-          "type": "screenshot"
         }
       ],
       "role": "player",
       "expect": {
         "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
-        "note": "9 kg + 2 m stemming overflows the 6 m shallowest hole: Charge All is disabled and the reason line is shown (#1361)"
+        "note": "6 m of stemming fills nothing in a 6 m hole: Charge All is blocked with the reason shown."
       }
     },
     {
       "command": "state",
       "timeout": 60,
-      "description": "#1361 recovery: step the amount back down to 8 kg (4 m column + 2 m stemming = 6 m, exactly fits). The reason line must disappear and Charge All must be usable again.",
+      "description": "No-room recovery: step the stemming back down to 2 m (an 8 kg fill). The reason line must disappear and Charge All must be usable again.",
       "interaction": [
         {
           "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 8
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
         },
         {
           "type": "waitForProperty",
@@ -492,15 +435,12 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]",
           "property": "disabled",
           "expectedValue": false
-        },
-        {
-          "type": "screenshot"
         }
       ],
       "role": "player",
       "expect": {
         "usable": "#bs-blast-panel [data-action=\"charge-all\"]",
-        "note": "8 kg fits the 6 m hole at 2 m stemming: Charge All re-enabled (#1361)"
+        "note": "2 m of stemming leaves a 4 m column: Charge All is usable again."
       }
     }
   ],

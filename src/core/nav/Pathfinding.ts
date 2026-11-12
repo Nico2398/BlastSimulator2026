@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Pathfinding: A* route finding over the NavGrid
 // Part of the navmesh system.
 
-import { NavGrid, isCellStepClimbable, isGridStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
+import { NavGrid, isCellStepClimbable, isGridStepClimbable, isCellOccupied, hasClearance, rubbleBlocksMover } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
 import {
   pathfindingNodeBudget, pathfindingRetryNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO,
@@ -240,6 +240,8 @@ export function isImpassable(
 ): boolean {
   if (isAgentCell) return false;
   if (cell.type === 'blocked' || cell.type === 'void') return true;
+  // Rubble blocks a vehicle whatever the route (`rubbleBlocksMover`): it loads a rock from beside it.
+  if (rubbleBlocksMover(requiredClearance) && (cell.fragmentOccupancy ?? 0) > 0) return true;
   if (avoidVehicles && isCellOccupied(cell)) return true;
   if (!skipClearance && !hasClearance(cell, requiredClearance)) return true;
   return false;
@@ -910,11 +912,19 @@ function getStepCost(grid: NavGrid, ax: number, az: number, bx: number, bz: numb
 
 /**
  * Per nav grid: the revision these were recorded at, and the `avoidVehicles: false` searches that found no path.
- * Such a search reads terrain only (type, clearance, surface height, all of which bump `NavGrid.revision`) and its
- * clamped endpoints, so its answer holds until the revision moves. A failed search explores the whole component, and
+ * On foot such a search reads terrain only (type, clearance, surface height, all of which bump `NavGrid.revision`)
+ * and its clamped endpoints, so its answer holds until the revision moves; at vehicle clearance it reads rubble as
+ * well, so it also holds only until `fragmentRevision` moves. A failed search explores the whole component, and
  * the same unreachable pair is asked again every tick (a stuck mover repaths, dispatch re-costs the candidate).
  */
-const failedTerrainSearches = new WeakMap<NavGrid, { revision: number; keys: Set<string> }>();
+const failedTerrainSearches = new WeakMap<NavGrid, {
+  revision: number;
+  /** Searches that ignore rubble (on foot). */
+  keys: Set<string>;
+  /** Searches rubble blocks (`rubbleBlocksMover`): valid for one `fragmentRevision` as well. */
+  rubbleKeys: Set<string>;
+  fragmentRevision: number;
+}>();
 
 /**
  * Find the shortest path on a NavGrid using A* with 8-directional movement and octile heuristic.
@@ -937,13 +947,20 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
 
   let failed = failedTerrainSearches.get(grid);
   if (failed === undefined || failed.revision !== grid.revision) {
-    failed = { revision: grid.revision, keys: new Set() };
+    failed = { revision: grid.revision, keys: new Set(), rubbleKeys: new Set(), fragmentRevision: grid.fragmentRevision };
     failedTerrainSearches.set(grid, failed);
   }
+  // At vehicle clearance rubble blocks too, so a failure there holds only until rubble moves.
+  const rubble = rubbleBlocksMover(requiredClearance);
+  if (rubble && failed.fragmentRevision !== grid.fragmentRevision) {
+    failed.rubbleKeys = new Set();
+    failed.fragmentRevision = grid.fragmentRevision;
+  }
+  const keys = rubble ? failed.rubbleKeys : failed.keys;
   const key = `${sx},${sz},${gx},${gz},${requiredClearance},${maxSlopeRatio}`;
-  if (failed.keys.has(key)) return { found: false, waypoints: [], totalCost: 0 };
+  if (keys.has(key)) return { found: false, waypoints: [], totalCost: 0 };
   const result = searchPath(grid, request, sx, sz, gx, gz, requiredClearance, maxSlopeRatio);
-  if (!result.found) failed.keys.add(key);
+  if (!result.found) keys.add(key);
   return result;
 }
 

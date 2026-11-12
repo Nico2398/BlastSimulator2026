@@ -264,7 +264,7 @@ extra `load` leg (step `targetId` = fragment id) per nearby fragment chosen by `
 (`HaulBatch.ts`). Candidates are on-ground, non-oversized, within `HAUL_BATCH_RADIUS_CELLS`
 (nearest first), with a queued, unclaimed `haul_debris` that no other employee's itinerary already
 plans to load (a shared extra left the second truck to arrive at an empty spot, so loads fell as the
-fleet grew); at most `HAUL_BATCH_MAX_ITEMS` ride, and
+fleet grew); at most `haulBatchMaxItems(capacity)` ride — the tier capacity over `HAUL_BATCH_FINES_FRAGMENT_KG` (6, 10, 16 for tiers 1-3), so good-band fragments fill a bed on mass and only an over-fragmented shot meets the count — and
 their cumulative mass stays within the tier capacity and `storageRoomKg`. The primary always rides,
 so a fragment heavier than the tier capacity rides alone (the load gauge clamps at 100%); an extra
 that overflows is skipped and a later, smaller one may still fit. On arrival an extra consumes its

@@ -1,11 +1,12 @@
 // BlastSimulator2026 — Integration: freight warehouse capacity is sized to the
 // ore a good Dusty Hollow blast actually produces (#1531).
 //
-// Reference shot: `campaign start level:dusty_hollow seed:1138`, a 1x2 grid
-// (spacing 3, depth 6) at rig+(14,13), boomite 2.2 kg (see REFERENCE_CHARGE_KG), stemming 2, auto
-// sequence, holes dry. Barren rock goes to a spoil heap (#1530), so only the
-// ORE-BEARING mass has to fit a warehouse. Measured on that shot (re-measured
-// at the 2.2 kg charge after #1792): ~45,888 kg ore-bearing.
+// Reference shot: `campaign start level:dusty_hollow seed:1138`, one 6 m hole at rig+(14,13)
+// filled with boomite up to 4 m of stemming (see REFERENCE_STEMMING_M), auto sequence, hole dry.
+// Barren rock goes to a spoil heap (#1530), so only the ORE-BEARING mass has to fit a warehouse.
+// Measured on that shot under the kernel energy model: ~48,600 kg ore-bearing (the old 1x2
+// pattern of 2.2 kg partial charges measured ~45,900 kg before it; under the kernel those
+// small bottom charges only crack 18 voxels loose).
 //
 // #1574: the level now opens with a spoil heap, which shifts when the rig
 // reaches the pattern and so which weather window the holes sit in. The old
@@ -42,21 +43,12 @@ interface Shot {
 }
 
 /**
- * Boomite per hole (kg) of the reference shot. A truly dry 1x2 pattern at 5 kg
- * clears ~115 voxels (~240 t of ore-bearing rock, #1648 measurement) — the
- * ~30 t the depots were sized on was a wet-hole fizzle. 2.2 kg dry keeps the
- * shot a good one (~46 t of ore-bearing rock; #1792 flush breakouts lift one-voxel rim
- * pockets back, so 2 kg no longer leaves a partial tier-1 depot) at the order of magnitude a
- * tier-1/2 depot is meant to take.
+ * Stemming (m) the reference hole is filled up to: 2 m of boomite (4 kg) in the 6 m hole, a good shot
+ * (rated perfect, ~48.6 t of ore-bearing rock) at the order of magnitude a tier-1/2 depot is meant to
+ * take. Filled to the default 2.5 m, two such holes break ~240 t, far past any tier-1/2 depot — a
+ * depot is sized to an early shot's ore, not to the biggest one.
  */
-const REFERENCE_CHARGE_KG = 2.2;
-
-/**
- * Boomite (kg) of the single-hole shot the hauling test fires. The 2 kg reference shot only cracks the rock loose
- * under its intact cap, where it is sealed and gets no haul order (#1774); this one breaks out to the surface, so
- * the rubble is reachable and gets hauled.
- */
-const BREAKOUT_CHARGE_KG = 4;
+const REFERENCE_STEMMING_M = 4;
 
 /** Ticks of hauling the verification slice runs (enough for several trips). */
 const HAUL_SLICE_TICKS = 400;
@@ -73,8 +65,8 @@ function crewRockFragmenter(run: Run, state: GameState): void {
   expect(run(`vehicle driver ${fragmenter.id} ${driver.id}`).success).toBe(true);
 }
 
-/** Fires the reference Dusty Hollow shot with `cols` holes of `chargeKg` boomite each and reads off its ore. */
-function fireReferenceShot(cols: number, chargeKg: number): Shot {
+/** Fires the reference Dusty Hollow shot, `cols` holes filled with boomite up to `stemmingM`, and reads off its ore. */
+function fireReferenceShot(cols: number, stemmingM: number): Shot {
   const { runner, ctx } = createRunner();
   const run: Run = (cmd) => runner.run(cmd);
   recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
@@ -94,7 +86,7 @@ function fireReferenceShot(cols: number, chargeKg: number): Shot {
   expect(run(`drill_plan grid rows:1 cols:${cols} spacing:3 depth:6 start:${x},${z}`).success).toBe(true);
   tickUntil(run, state, 600, () => state.plannedDrillHoles.length === 0);
   fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
-  run(`charge hole:* explosive:boomite amount:${chargeKg} stemming:2`);
+  run(`charge hole:* explosive:boomite stemming:${stemmingM}`);
   tickUntil(run, state, 600, () => Object.keys(state.plannedChargesByHole).length === 0);
   run('sequence auto');
   clearBlastZone(run, state);
@@ -114,7 +106,7 @@ function fireReferenceShot(cols: number, chargeKg: number): Shot {
 }
 
 beforeAll(() => {
-  shot = fireReferenceShot(2, REFERENCE_CHARGE_KG);
+  shot = fireReferenceShot(1, REFERENCE_STEMMING_M);
 }, 120_000);
 
 describe('freight warehouse capacity vs the reference Dusty Hollow blast (#1531)', () => {
@@ -147,7 +139,8 @@ describe('freight warehouse capacity vs the reference Dusty Hollow blast (#1531)
   });
 
   it('with a tier-2 warehouse, a spoil heap and a crewed hauler the ore hauled so far is stored, never blocked on storage, and the rest still fits', () => {
-    const { run, state } = fireReferenceShot(1, BREAKOUT_CHARGE_KG);
+    // The reference shot breaks out to the surface, so its rubble is reachable and gets hauled (#1774).
+    const { run, state } = fireReferenceShot(1, REFERENCE_STEMMING_M);
     state.cash = 5_000_000; // wages over the haul must not bankrupt the mine and freeze it
     expect(state.logistics.storageCapacityKg).toBe(cap(2));
     expect(run('build spoil_heap at:30,30').success).toBe(true);
@@ -157,7 +150,7 @@ describe('freight warehouse capacity vs the reference Dusty Hollow blast (#1531)
     const oreLeft = () => state.logistics.fragments.filter((t) => t.state !== 'stored' && !isBarrenFragment(t.fragment.oreDensities));
     const massOf = (list: { fragment: { mass: number } }[]) => list.reduce((sum, t) => sum + t.fragment.mass, 0);
     let storageFull = 0;
-    // A full haul of ~31 t by one hauler takes thousands of ticks (minutes of wall clock): a bounded slice of it
+    // A full haul of ~49 t by one hauler takes thousands of ticks (minutes of wall clock): a bounded slice of it
     // proves the property, the invariant below extrapolates it to the rest.
     tickUntil(run, state, HAUL_SLICE_TICKS, () => {
       // Crew welfare is not what this probes: a long unrelieved haul must not end the level in a revolt.

@@ -374,7 +374,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:3 stemming:2",
+      "command": "charge hole:* explosive:boomite stemming:2",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -389,11 +389,6 @@
           "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
         },
         {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 3
-        },
-        {
           "type": "assert",
           "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
         },
@@ -401,12 +396,6 @@
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
           "value": 2
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "3 kg"
         },
         {
           "type": "assert",
