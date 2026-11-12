@@ -1884,3 +1884,121 @@ describe('TutorialRails — the real docked waiting card leaves the clock contro
     });
   }
 });
+
+describe('TutorialRails — ripple target (#2234)', () => {
+  function toolbarBuild(): HTMLElement {
+    const bar = document.createElement('div');
+    bar.id = 'bs-toolbar';
+    const btn = document.createElement('button');
+    btn.dataset['panel'] = 'build';
+    bar.appendChild(btn);
+    document.body.appendChild(bar);
+    return withBox(btn);
+  }
+
+  function buyLivingQuartersButton(): HTMLElement {
+    const panel = document.createElement('div');
+    panel.id = 'bs-build-panel';
+    const wrap = document.createElement('div');
+    wrap.setAttribute('data-build-type', 'living_quarters');
+    const btn = document.createElement('button');
+    btn.className = 'bs-build-buy-btn';
+    wrap.appendChild(btn);
+    panel.appendChild(wrap);
+    document.body.appendChild(panel);
+    return withBox(btn);
+  }
+
+  it('is null when the rails have no stages', () => {
+    const rails = new TutorialRails();
+    expect(rails.refresh(state()).ripple).toBeNull();
+  });
+
+  it('is null on an unguided step', () => {
+    toolbarCrew();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.beginStep({ id: 'free-play', guided: false }, state());
+    expect(rails.refresh(state()).ripple).toBeNull();
+  });
+
+  it('is null on a step with nothing to point at', () => {
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'congratulations' }, state());
+    expect(rails.refresh(state()).ripple).toBeNull();
+  });
+
+  it('names the live stage\'s control while a guided stage is live', () => {
+    toolbarCrew();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    const view = rails.refresh(state());
+    expect(view.ripple).not.toBeNull();
+    expect(view.ripple!.selector).toBe(stagesFor('hire-surveyor')[0]!.target);
+    expect(view.ripple!.region ?? null).toBeNull();
+  });
+
+  it('follows the stage as it moves to the next control', () => {
+    toolbarCrew();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh(state());
+    hireSurveyor();
+    const view = rails.refresh(state());
+    expect(view.stageIndex).toBe(1);
+    expect(view.ripple!.selector).toBe(stagesFor('hire-surveyor')[1]!.target);
+  });
+
+  it('carries the region of a tile-pick stage', () => {
+    const bar = document.createElement('div');
+    bar.id = 'bs-toolbar';
+    const blast = document.createElement('button');
+    blast.dataset['panel'] = 'blast';
+    bar.appendChild(blast);
+    document.body.appendChild(bar);
+    withBox(blast);
+    document.body.classList.add('bs-placement-armed');
+    const canvas = document.createElement('div');
+    canvas.id = 'game-canvas';
+    document.body.appendChild(canvas);
+    withBox(canvas);
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'drill-plan' }, state());
+    const view = rails.refresh(state());
+    const region = stagesFor('drill-plan').find(s => s.region)!.region!;
+    expect(view.ripple).not.toBeNull();
+    expect(view.ripple!.region).toEqual(region);
+  });
+
+  it('is null while the stage is waiting on an issued order', () => {
+    toolbarBuild();
+    buyLivingQuartersButton();
+    const rails = new TutorialRails();
+    const s = state();
+    rails.beginStep({ id: 'build-living-quarters' }, s);
+
+    expect(rails.refresh(s).ripple).not.toBeNull();
+
+    s.plannedBuildings = [
+      { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 } as never,
+    ];
+    const waiting = rails.refresh(s);
+    expect(waiting.waiting).toBe(true);
+    expect(waiting.ripple).toBeNull();
+  });
+
+  it('comes back once the waiting clears', () => {
+    toolbarBuild();
+    buyLivingQuartersButton();
+    const rails = new TutorialRails();
+    const s = state();
+    rails.beginStep({ id: 'build-living-quarters' }, s);
+    s.plannedBuildings = [
+      { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 } as never,
+    ];
+    expect(rails.refresh(s).ripple).toBeNull();
+    s.plannedBuildings = [];
+    expect(rails.refresh(s).ripple).not.toBeNull();
+  });
+});
