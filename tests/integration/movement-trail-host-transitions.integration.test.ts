@@ -139,9 +139,9 @@ function riderArcsAt(rider: MovementTrail, event: 'board' | 'alight'): number[] 
   return arcs;
 }
 
-describe.each([1, 2, 4, 8])('vehicle rider markers over the tutorial-interactive replay, batches of %i ticks (#2224)', (batchSize) => {
+describe.each(['tutorial-interactive', 'level1-playthrough-win', 'level2-playthrough-win'].flatMap(s => [1, 2, 4, 8].map(b => [s, b] as const)))('vehicle rider markers over the %s replay, batches of %i ticks (#2224)', (scenario, batchSize) => {
   it('every driver board/alight leaves a rider marker on the vehicle trail whose riderArc matches the rider trail', () => {
-    const def = JSON.parse(readFileSync(resolve(__dirname, '../../scripts/scenario-defs/tutorial-interactive.json'), 'utf8')) as { steps: ScenarioStepDef[] };
+    const def = JSON.parse(readFileSync(resolve(__dirname, `../../scripts/scenario-defs/${scenario}.json`), 'utf8')) as { steps: ScenarioStepDef[] };
     const engine = createGameEngine();
     const { ctx } = engine;
 

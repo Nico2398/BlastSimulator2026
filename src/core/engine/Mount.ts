@@ -146,7 +146,7 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   employee.x = vehicle.x;
   employee.z = vehicle.z;
   markTransition(employee, 'board', 'vehicle', vehicle.x, vehicle.z);
-  markDriverOnVehicle(vehicle, employee, 'board');
+  if (vehicleDriverId(vehicle) === employeeId) markDriverOnVehicle(vehicle, employee, 'board');
   // #1206: a mounted employee holds no ground cell of their own — the
   // vehicle they now ride claims one instead (AgentOccupancy.ts's own
   // rebuild already excludes a mounted/inside employee; releasing here keeps
