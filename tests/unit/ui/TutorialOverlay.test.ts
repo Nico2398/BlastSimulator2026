@@ -1250,7 +1250,7 @@ describe('TutorialOverlay (12.4)', () => {
       setLocale('fr');
       tut.refreshLocale();
 
-      expect(titleEl.textContent).toBe('Étude du Terrain');
+      expect(titleEl.textContent).toBe('Sonder le Terrain');
       expect(textEl.textContent).toBe(
         'Effectuez maintenant un sondage sismique pour révéler les emplacements de minerai souterrains.',
       );
