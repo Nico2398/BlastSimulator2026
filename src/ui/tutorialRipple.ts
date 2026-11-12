@@ -60,6 +60,7 @@ export class TutorialRipple {
   /** Supply (or drop) the in-scene projection. */
   setProjector(projector: RegionProjector | null): void {
     this.projector = projector;
+    if (!projector && this.stage?.region) this.stop();
   }
 
   /** Start or keep the ripple for `stage`; null stops it. */
@@ -104,8 +105,10 @@ export class TutorialRipple {
     this.rings = [];
     for (let i = 0; i < RING_COUNT; i++) {
       const ring = document.createElement('div');
-      ring.style.cssText = 'position:fixed;pointer-events:none;box-sizing:border-box;border-radius:50%;'
-        + `border:${RING_WIDTH_PX}px solid var(--bsx-amber);opacity:0;`;
+      Object.assign(ring.style, {
+        position: 'fixed', pointerEvents: 'none', boxSizing: 'border-box', borderRadius: '50%',
+        borderStyle: 'solid', borderWidth: `${RING_WIDTH_PX}px`, borderColor: 'var(--bsx-amber)', opacity: '0',
+      });
       layer.appendChild(ring);
       this.rings.push(ring);
     }
