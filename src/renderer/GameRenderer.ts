@@ -51,6 +51,7 @@ import type { RallyFlagMesh } from './RallyFlagMesh.js';
 import type { TrafficJamMarkerLayer } from './TrafficJamMarkerLayer.js';
 import type { TaskProgressBar } from './TaskProgressBar.js';
 import type { EmployeePictograms } from './EmployeePictograms.js';
+import type { EmployeeMarkers } from './EmployeeMarkers.js';
 import type { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import type { SurveyConfidenceOverlayOptions } from './SurveyConfidenceOverlay.js';
 
@@ -120,6 +121,7 @@ export class GameRenderer {
   private rallyFlag: RallyFlagMesh | null = null;
   private taskProgress: TaskProgressBar | null = null;
   private pictograms: EmployeePictograms | null = null;
+  private employeeMarkers: EmployeeMarkers | null = null;
   private buildingOccupancyLabels: BuildingOccupancyLabels | null = null;
   private lastGrid: VoxelGrid | null = null;
   /** Last ghostPreviewsRevision synced — syncEntities() skips ghost-mesh resync when unchanged (#761). */
@@ -234,6 +236,11 @@ export class GameRenderer {
   /** Number of non-working-activity pictograms currently rendered — for diagnostics. */
   get pictogramCount(): number {
     return this.pictograms?.count ?? 0;
+  }
+
+  /** Number of crew pins currently rendered — for diagnostics. */
+  get employeeMarkerCount(): number {
+    return this.employeeMarkers?.count ?? 0;
   }
 
   /** Number of building occupancy labels currently rendered — for diagnostics. */
@@ -354,6 +361,7 @@ export class GameRenderer {
       lastSyncedTerrainRevision: this.lastSyncedTerrainRevision,
       taskProgress: this.taskProgress,
       pictograms: this.pictograms,
+      employeeMarkers: this.employeeMarkers,
       buildingOccupancyLabels: this.buildingOccupancyLabels,
       skybox: this.skybox,
       clouds: this.clouds,
@@ -524,6 +532,7 @@ export class GameRenderer {
 
     this.taskProgress?.update(dt);
     this.pictograms?.update(dt);
+    this.employeeMarkers?.update();
     this.buildingOccupancyLabels?.update(dt);
 
     if (this.vehicles && this.lastState) {
@@ -896,6 +905,7 @@ export class GameRenderer {
       characters: this.characters,
       taskProgress: this.taskProgress,
       pictograms: this.pictograms,
+      employeeMarkers: this.employeeMarkers,
       buildingOccupancyLabels: this.buildingOccupancyLabels,
       skybox: this.skybox,
       windState: this.windState,
@@ -960,6 +970,7 @@ export class GameRenderer {
     this.characters = deps.characters;
     this.taskProgress = deps.taskProgress;
     this.pictograms = deps.pictograms;
+    this.employeeMarkers = deps.employeeMarkers;
     this.buildingOccupancyLabels = deps.buildingOccupancyLabels;
     this.skybox = deps.skybox;
     this.windState = deps.windState;

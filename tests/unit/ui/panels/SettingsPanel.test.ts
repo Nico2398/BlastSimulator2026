@@ -631,6 +631,39 @@ describe('SettingsPanel — persists locale and volumes (#1324)', () => {
     panel.dispose();
   });
 
+  describe('the way out of the game is the first thing in the panel', () => {
+    // Return to Main Menu used to sit below the language, volume and 11-row keyboard sections: ~350 px
+    // under the fold of a 720p panel, with no scrollbar cue, so a player (in the tutorial above all)
+    // concluded the game offered no way back to the menu.
+    it('Return to Main Menu comes before the language, volume and keyboard sections', () => {
+      const { container, panel } = mount();
+      panel.update(createGame({ seed: 1, mineType: 'desert' }));
+      const menu = container.querySelector('[data-action="return-to-menu"]')!;
+      const firstLang = container.querySelector('[data-lang]')!;
+      const firstSlider = container.querySelector('input[type="range"]')!;
+      const credits = container.querySelector(`[data-action="${AUDIO_CREDITS_ACTION}"]`)!;
+
+      for (const later of [firstLang, firstSlider, credits]) {
+        // eslint-disable-next-line no-bitwise
+        expect(menu.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+      panel.dispose();
+    });
+
+    it('Replay Tutorial and Save & Load sit with it, ahead of the same sections', () => {
+      const { container, panel } = mount();
+      panel.update(createGame({ seed: 1, mineType: 'desert' }));
+      const firstLang = container.querySelector('[data-lang]')!;
+
+      for (const action of ['replay-tutorial', 'open-saves', 'return-to-menu']) {
+        const control = container.querySelector(`[data-action="${action}"]`)!;
+        // eslint-disable-next-line no-bitwise
+        expect(control.compareDocumentPosition(firstLang) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+      panel.dispose();
+    });
+  });
+
   describe('session buttons carry data-action hooks for the tutorial rails (#1332)', () => {
     it('Save & Load and Return to Menu are addressable by data-action under #bs-settings-panel', () => {
       const { container, panel } = mount();
