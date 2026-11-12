@@ -11,7 +11,7 @@ import { goalChipParams } from './tutorialStepsClosing.js';
 import { TUTORIAL_LEVEL_ID, isDefeatReason } from './tutorialTrigger.js';
 import { CARD_CLASS, GUIDED_CLASS } from './tutorialGuide.js';
 import { TutorialRails, type RailsStep } from './tutorialRails.js';
-import type { RegionProjector } from './tutorialRipple.js';
+import { TutorialRipple, type RegionProjector } from './tutorialRipple.js';
 import type { LocaleTextRegistry } from './localeText.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 
@@ -72,6 +72,7 @@ export class TutorialOverlay {
   private clearanceObserver: ResizeObserver | null = null;
   private lastClearancePx = -1;
   private readonly rails = new TutorialRails();
+  private readonly ripple = new TutorialRipple();
   private gameState: GameState | null = null;
   private snapshots: Record<string, unknown> | null = null;
   private congratulationsTimer: ReturnType<typeof setTimeout> | null = null;
@@ -172,8 +173,8 @@ export class TutorialOverlay {
   }
 
   /** Supply the in-scene projection the ripple needs on tile-pick stages. */
-  setRegionProjector(_projector: RegionProjector | null): void {
-    throw new Error('not implemented');
+  setRegionProjector(projector: RegionProjector | null): void {
+    this.ripple.setProjector(projector);
   }
 
   dispose(): void {
@@ -227,6 +228,7 @@ export class TutorialOverlay {
   private hideGuidedChrome(): void {
     document.body.classList.remove(GUIDED_CLASS, CARD_CLASS);
     this.goalChipEl.style.display = 'none';
+    this.ripple.stop();
     this.stopObservingCardResize();
     document.documentElement.style.removeProperty(CLEARANCE_VAR);
     this.lastClearancePx = -1;
@@ -515,6 +517,7 @@ export class TutorialOverlay {
     this.stageLine.classList.toggle('bs-tutorial-stage-line--waiting', view.waiting);
     this.stageLine.style.display = (view.waiting || view.hint) ? '' : 'none';
     this.waitingChipEl.style.display = view.waiting ? '' : 'none';
+    this.ripple.show(this.step().guided === false ? null : view.ripple);
     this.renderGoalChip();
     this.updateParamStripClearance();
   }

@@ -137,7 +137,7 @@ export class TutorialRails {
       stageTarget: stage?.target ?? null,
       waiting: waitStatus.waiting,
       waitingHint: waitStatus.waitingKey ? t(waitStatus.waitingKey) : '',
-      ripple: null,
+      ripple: stage && !waitStatus.waiting ? { selector: stage.target, region: stage.region ?? null } : null,
     };
   }
 
