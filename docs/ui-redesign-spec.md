@@ -317,13 +317,13 @@ Design intent: hidden-in-plain-sight. A discreet entry (e.g. unmarked briefcase 
 - All copy maximally satirical; all actions confirm; consequences (fines, arrest risk → lose condition) stated.
 
 ### 6.15 Settings (app-only after redesign)
-Language, audio volumes/mute per channel (master/ambient/SFX/UI at minimum — `AudioManager` supports categories), keyboard shortcut reference (mount the existing help content), quicksave/quickload, return to menu. Site policy moves out (6.8/6.13). Reachable from main menu (game-dependent items hidden pre-game) and in-game.
+Language, audio volumes/mute per channel (master/ambient/SFX/UI at minimum — `AudioManager` supports categories), keyboard shortcut reference (mount the existing help content), quicksave/quickload, return to menu. Site policy moves out (6.8/6.13). Reachable from main menu (game-dependent items hidden pre-game) and in-game. In-game, the session controls (Replay Tutorial, Save & Load, Return to Main Menu) lead the panel, so the way back to the menu is in reach without scrolling.
 
 ### 6.16 Save/Load
 Slot cards with name, date, campaign summary (level, day, cash), load/save/delete with confirms, autosave badge, export/import. Nice-to-have: slot thumbnail (canvas grab).
 
 ### 6.17 Tutorial
-Re-skin of the coach card (title, body, "do this" hint, step x/y, progress, PAUSED chip, command hints for power users) + highlight treatment on arbitrary controls. Must keep: bottom docking, never covering the highlighted control, rails inertness, tick-budget pause. One muted "Exit tutorial" button in the title row (behind a confirm; marks the tutorial completed) — no Next, no Skip. Rails always allow that button and the Settings session controls (language, volume, Save & Load, Return to Menu; not Replay Tutorial) (#1332). 23 steps currently reference: speed button, toolbar buttons (survey/blast/contracts/vehicles/build/employees/settings), score panel, balance, event badge — all must remain highlightable in the new layout.
+Re-skin of the coach card (title, body, "do this" hint, step x/y, progress, PAUSED chip, command hints for power users) + highlight treatment on arbitrary controls. Must keep: bottom docking, never covering the highlighted control, rails inertness, tick-budget pause. One muted "Exit tutorial" button in the title row (behind a confirm; marks the tutorial completed) — no Next, no Skip. Rails always allow that button and the Settings session controls (language, volume, Save & Load, Return to Menu; not Replay Tutorial) (#1332), and the Locate crosshair on Crew roster cards (camera focus and selection, no order). 23 steps currently reference: speed button, toolbar buttons (survey/blast/contracts/vehicles/build/employees/settings), score panel, balance, event badge — all must remain highlightable in the new layout.
 
 ### 6.18 Entity inspector (the contextual window)
 
