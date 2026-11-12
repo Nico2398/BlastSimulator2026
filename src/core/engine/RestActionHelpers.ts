@@ -299,6 +299,30 @@ function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: numbe
 }
 
 /**
+ * #2225: a driven rest trip that alights on arrival (see
+ * moveToAndFreeVehicleOnArrival) continues on foot into the quarters, like the
+ * walk path: a trailing foot leg to the ring approach cell (x, z) that ends by
+ * entering the building. The vehicle stays parked where the driver left it. No-op
+ * when the drive does not end in an alight (the driver keeps the vehicle) or the
+ * building no longer resolves.
+ */
+function enterQuartersAfterAlight(state: GameState, emp: Employee, buildingId: number, x: number, z: number): void {
+  const itinerary = emp.itinerary;
+  const last = itinerary?.legs[itinerary.legs.length - 1];
+  if (!itinerary || !last || last.onArrive.kind !== 'alight') return;
+  if (!state.buildings.buildings.some(b => b.id === buildingId)) return;
+  itinerary.legs.push({
+    mode: 'foot',
+    vehicleId: null,
+    destX: x,
+    destZ: z,
+    arrival: 'exact',
+    onArrive: { kind: 'enter_building', buildingId },
+    estTicks: 0,
+  });
+}
+
+/**
  * Start `emp` travelling to (x, z) as a rest destination by the faster of
  * walking and driving (chooseRestTrip, #1709). An on-foot employee walks. A
  * MOUNTED employee whose vehicle is slower than walking (a drill rig crawls at
@@ -351,8 +375,10 @@ export function beginRestTravel(state: GameState, emp: Employee, x: number, z: n
     : undefined;
   if (!viaBuilding?.success) {
     // Driven trip (#1122): see moveToAndFreeVehicleOnArrival.
-    if (isMounted(emp.locomotion)) moveToAndFreeVehicleOnArrival(state, emp, x, z, emitter);
-    else moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
+    if (isMounted(emp.locomotion)) {
+      moveToAndFreeVehicleOnArrival(state, emp, x, z, emitter);
+      if (buildingId !== undefined) enterQuartersAfterAlight(state, emp, buildingId, x, z);
+    } else moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
   }
   emp.pendingActionType = 'rest';
 }
