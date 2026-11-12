@@ -779,8 +779,8 @@ describe('Vehicle fleet', () => {
       // #1087 follow-up: an idle, unreserved blocker sitting on the
       // contended cell is no longer a permanent obstacle —
       // handleVehicleOccupancyBlock (VehicleOccupancyReroute.ts) now
-      // relocates one directly (relocateDriverlessVehicle when driverless,
-      // moveVehicle when driven — either shape) the first time any satellite
+      // walks it aside (a driven rig's driver drives it clear; a driverless
+      // one stays put — either shape) the first time any satellite
       // below hits the reroute threshold, which frees the target for every
       // satellite ticked afterward in this SAME tick and starves
       // detectTrafficJam of the >=TRAFFIC_JAM_MIN_AGENTS simultaneous

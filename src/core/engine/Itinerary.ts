@@ -89,7 +89,10 @@ export interface Leg {
    *   GameState.ts — #1291): the arrival gate only checks that the itinerary
    *   emptied, never where the mover stands, and the hole lands
    *   drilled/charged at its own planned x/z regardless, so a spread leg
-   *   would silently service the hole from the wrong tile.
+   *   would silently service the hole from the wrong tile. The one
+   *   exception: a parked driverless vehicle on the hole cell, which never
+   *   moves, so `spreadLegDestination` lifts the lock and the worker
+   *   settles beside it (the hole is still serviced at its own x/z).
    * - `relocateIdleDestinationBlocker`'s `returnAfterRelocate` return trip
    *   (#1278 follow-up, Locomotion.ts, alongside `returnTrip` below):
    *   reclaiming that ONE specific cell is the whole point, so a
