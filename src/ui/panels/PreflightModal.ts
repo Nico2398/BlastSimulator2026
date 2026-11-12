@@ -113,6 +113,7 @@ export class PreflightModal {
   private readonly boxEl: HTMLElement;
   private readonly dockEl: HTMLElement;
   private readonly chipEl: HTMLButtonElement;
+  private readonly dockButtonsEl: HTMLElement;
   /** The player hid the waiting card; the chip stands in for it until reopened or the sequence ends. */
   private dockHidden = false;
   private waiting = false;
@@ -165,7 +166,7 @@ export class PreflightModal {
 
     this.waitingEl = el('div');
     this.waitingEl.dataset['role'] = 'preflight-waiting';
-    this.waitingEl.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:11px;border:1px solid rgba(255,91,76,.4);border-radius:5px;background:rgba(255,91,76,.06)';
+    this.waitingEl.style.cssText = 'display:none;flex-direction:column;gap:6px;padding:11px;border:1px solid rgba(255,91,76,.4);border-radius:5px;background:rgba(255,91,76,.06)';
 
     this.refusalEl = el('div');
     this.refusalEl.style.cssText = 'font:400 12px/1.45 var(--bsx-font-ui);color:var(--bsx-critical-text)';
@@ -218,7 +219,7 @@ export class PreflightModal {
     hideBtn.addEventListener('click', () => this.setDockHidden(true));
     const dockButtons = el('div');
     dockButtons.style.cssText = 'display:flex;gap:9px';
-    dockButtons.append(this.cancelDetonationBtn, this.fireAnywayBtn);
+    this.dockButtonsEl = dockButtons;
     this.cancelDetonationBtn.style.cssText = 'flex:1;height:34px';
     this.fireAnywayBtn.style.cssText = 'flex:1.3;height:34px';
     this.dockEl.append(hideBtn, this.waitingEl, dockButtons);
@@ -262,7 +263,7 @@ export class PreflightModal {
     // has ended (fired or cancelled), whichever way (#1362).
     const phase = detonationPhase(state);
     if (phase.kind !== 'idle') this.awaitingDetonation = true;
-    else if (this.awaitingDetonation) { this.hide(); return; }
+    else if (this.awaitingDetonation) { this.waiting = false; this.hide(); return; }
 
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const planCost = plannedChargesCost(state.chargesByHole);
@@ -431,6 +432,9 @@ export class PreflightModal {
   private renderWaiting(phase: DetonationPhase): void {
     const waiting = phase.kind !== 'idle';
     this.waiting = waiting;
+    // Only the controls of the current state exist in the DOM.
+    this.dockButtonsEl.replaceChildren(...(waiting ? [this.cancelDetonationBtn, this.fireAnywayBtn] : []));
+    this.waitingEl.style.display = waiting ? 'flex' : 'none';
     this.boxEl.style.display = waiting ? 'none' : 'flex';
     // The root stays mounted but never intercepts a click while waiting; only the dock and chip do.
     this.overlay.style.pointerEvents = waiting ? 'none' : '';
