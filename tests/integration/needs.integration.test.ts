@@ -25,6 +25,7 @@ import { assignSkill } from '../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { purchaseVehicle, vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { board } from '../../src/core/engine/Mount.js';
+import { equipDemolition } from '../helpers/demolition.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { REGION } from '../../src/ui/tutorialStages.js';
@@ -1847,3 +1848,126 @@ describe('#1801 — the debris-hauler driver on long hauls recovers morale under
     expect(harsh.revolt || mean(harsh.wellBeingWindow) < mean(base.wellBeingWindow)).toBe(true);
   }, 900_000);
 }, 1_800_000);
+
+// #2225 — a driven rest trip ends INSIDE the quarters. A worker on a vehicle faster than walking
+// is driven to the quarters' approach cell, gets off, and goes in; the vehicle stays where he got off.
+describe('#2225 — chained vehicle jobs: a driver due a rest enters the quarters, vehicle left parked', () => {
+  const HORIZON_TICKS = 1500;
+  const SOFT_FATIGUE = 20; // below NEED_SOFT_THRESHOLDS.fatigue (25), above the hard threshold
+
+  interface DrivenRestRun {
+    forcedRest: boolean;
+    /** Where the driver stood when the first rest timer started (the trip's end). */
+    locomotionWhenRestStarted: string | null;
+    insideQuartersWhenRestStarted: boolean;
+    vehicleFreeWhenRestStarted: boolean;
+    restTripEstTicks: number | null;
+    restTripExecutedTicks: number | null;
+    demolishedAll: boolean;
+  }
+
+  function constructWarehouses(ctx: GameContext, ats: string[]): number[] {
+    const ids: number[] = [];
+    for (const at of ats) {
+      const before = ctx.state!.buildings.buildings.length;
+      const res = buildCommand(ctx, ['freight_warehouse'], { at });
+      if (!res.success) throw new Error(`Setup: freight_warehouse at ${at} refused — ${res.output}`);
+      for (let i = 0; i < 400 && ctx.state!.buildings.buildings.length === before; i++) {
+        for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
+        tickCommand(ctx, ['1'], {});
+      }
+      if (ctx.state!.buildings.buildings.length === before) throw new Error(`Setup: warehouse at ${at} never completed`);
+      ids.push(ctx.state!.buildings.buildings[before]!.id);
+    }
+    return ids;
+  }
+
+  function runDrivenRest(): DrivenRestRun {
+    const ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32, staffed: true });
+    const state = ctx.state!;
+    state.cash = 500_000;
+
+    buildLivingQuartersAndComplete(ctx, '20,20');
+    const quarters = state.buildings.buildings.find(b => b.type === 'living_quarters')!;
+    const warehouseIds = constructWarehouses(ctx, ['6,10', '8,22', '12,14']);
+
+    // A tier-2 destroyer (2.6 m/tick) outpaces walking (2).
+    equipDemolition(ctx, 2);
+    const destroyer = state.vehicles.vehicles.find(v => v.type === 'building_destroyer')!;
+    expect(destroyer.tier).toBe(2);
+    for (const id of warehouseIds) {
+      const res = buildCommand(ctx, ['destroy', String(id)], {});
+      expect(res.success, res.output).toBe(true);
+    }
+
+    const run: DrivenRestRun = {
+      forcedRest: false, locomotionWhenRestStarted: null, insideQuartersWhenRestStarted: false,
+      vehicleFreeWhenRestStarted: false,
+      restTripEstTicks: null, restTripExecutedTicks: null, demolishedAll: false,
+    };
+    let driverId: number | null = null;
+    let tripStartTick: number | null = null;
+    for (let tick = 1; tick <= HORIZON_TICKS; tick++) {
+      for (const emp of state.employees.employees) {
+        if (emp.id !== driverId) emp.fatigue = Math.max(emp.fatigue, 60);
+      }
+      tickCommand(ctx, ['1'], {});
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      expectNoWorldInvariantViolations(state);
+
+      const driver = vehicleDriverId(destroyer);
+      if (driver !== null && !run.forcedRest) {
+        const emp = getEmployee(ctx, driver);
+        if (emp.activeActionId !== null) {
+          driverId = driver;
+          emp.fatigue = SOFT_FATIGUE;
+          run.forcedRest = true;
+        }
+      }
+      if (driverId !== null) {
+        const emp = getEmployee(ctx, driverId);
+        if (tripStartTick === null && emp.pendingActionType === 'rest' && emp.itinerary !== null
+          && emp.locomotion.kind === 'mounted') {
+          tripStartTick = tick;
+          run.restTripEstTicks = emp.itinerary.estTotalTicks;
+        }
+        if (tripStartTick !== null && run.restTripExecutedTicks === null && emp.restTicksRemaining !== null) {
+          run.restTripExecutedTicks = tick - tripStartTick;
+          run.locomotionWhenRestStarted = emp.locomotion.kind;
+          run.insideQuartersWhenRestStarted = quarters.occupantIds.includes(emp.id);
+          run.vehicleFreeWhenRestStarted = !destroyer.occupantIds.includes(emp.id) && vehicleDriverId(destroyer) !== emp.id;
+        }
+      }
+      run.demolishedAll = warehouseIds.every(id => !state.buildings.buildings.some(b => b.id === id));
+      if (run.restTripExecutedTicks !== null && run.demolishedAll) break;
+    }
+    return run;
+  }
+
+  let run: DrivenRestRun;
+  beforeAll(() => { run = runDrivenRest(); });
+
+  it('the demolition driver is pushed to a soft rest mid-run', () => {
+    expect(run.forcedRest).toBe(true);
+  });
+
+  it('the driven driver ends the first rest trip inside the living quarters, not mounted or standing on its approach cell', () => {
+    expect(run.locomotionWhenRestStarted).toBe('inside');
+    expect(run.insideQuartersWhenRestStarted).toBe(true);
+  });
+
+  it('the vehicle is left empty and free (not held by the resting driver) when the driver goes in', () => {
+    expect(run.vehicleFreeWhenRestStarted).toBe(true);
+  });
+
+  it('the planner estimate of the driven rest trip matches the ticks it took, within tolerance', () => {
+    expect(run.restTripEstTicks).not.toBeNull();
+    expect(run.restTripExecutedTicks).not.toBeNull();
+    const est = run.restTripEstTicks!;
+    expect(Math.abs(run.restTripExecutedTicks! - est)).toBeLessThanOrEqual(Math.max(6, est * 0.4));
+  });
+
+  it('the chained jobs still all complete after the rest (no world-invariant violation at any tick)', () => {
+    expect(run.demolishedAll).toBe(true);
+  });
+});
