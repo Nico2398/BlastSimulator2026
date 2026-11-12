@@ -235,7 +235,7 @@ export const KNOWN_TEXT_DEFECTS: readonly TextDefect[] = [
     key: 'event.lawsuit_mountaineer.desc',
     locale: 'fr',
     problem: 'Meaning inverted: the mountaineer sued for having seen the damaged mountain, not for the damage.',
-    expectedFix: 'Use "saccagé la montagne" instead of "vu la montagne saccagée".',
+    expectedFix: 'Use "le saccage de la montagne" instead of "vu la montagne saccagée".',
   },
   {
     key: 'event.lawsuit_patent_troll.title',

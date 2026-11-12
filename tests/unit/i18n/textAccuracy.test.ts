@@ -85,7 +85,7 @@ describe('event.politics_ / event.lawsuit_ calques — #2238 French rewrites', (
   ],
   [
     "event.lawsuit_mountaineer.desc",
-    "saccagé la montagne",
+    "le saccage de la montagne",
     "vu la montagne saccagée"
   ],
   [
