@@ -834,7 +834,10 @@ export function computeClimbComponents(
   };
 
   return {
-    canReach(sx, sz, tx, tz): boolean {
+    canReach(sx, sz, rawTx, rawTz): boolean {
+      // Resolve a fractional target to the cell it lies on, as the source is.
+      const tx = Math.round(navGrid.clampX(rawTx));
+      const tz = Math.round(navGrid.clampZ(rawTz));
       const targetLabel = labelAt(tx, tz);
       let reached = false;
       const from = forEachSourceLabel(sx, sz, l => { if (l === targetLabel) reached = true; });
