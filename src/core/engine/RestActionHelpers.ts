@@ -293,9 +293,9 @@ const REST_IN_PLACE_RADIUS = 1;
  * travel only, so the final leg alights on arrival unless this worker is the
  * only one who could reclaim it anyway (hasClaimableSameRoleFollowUp, #1122).
  */
-function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: number, z: number, emitter?: EventEmitter): void {
+function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: number, z: number, emitter?: EventEmitter, alwaysAlight = false): void {
   const result = moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
-  if (result.success && !hasClaimableSameRoleFollowUp(state, emp)) alightOnArrival(emp);
+  if (result.success && (alwaysAlight || !hasClaimableSameRoleFollowUp(state, emp))) alightOnArrival(emp);
 }
 
 /**
@@ -376,8 +376,11 @@ export function beginRestTravel(state: GameState, emp: Employee, x: number, z: n
   if (!viaBuilding?.success) {
     // Driven trip (#1122): see moveToAndFreeVehicleOnArrival.
     if (isMounted(emp.locomotion)) {
-      moveToAndFreeVehicleOnArrival(state, emp, x, z, emitter);
-      if (buildingId !== undefined) enterQuartersAfterAlight(state, emp, buildingId, x, z);
+      // Going into quarters always alights (a worker rests inside, #2225): the
+      // vehicle stays parked and dispatch replans the board leg after the rest.
+      const intoQuarters = buildingId !== undefined && state.buildings.buildings.some(b => b.id === buildingId);
+      moveToAndFreeVehicleOnArrival(state, emp, x, z, emitter, intoQuarters);
+      if (intoQuarters) enterQuartersAfterAlight(state, emp, buildingId!, x, z);
     } else moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
   }
   emp.pendingActionType = 'rest';
