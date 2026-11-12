@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Planned drill holes buried under on-ground rubble (#1937)
 
-import { fragmentFootprintCells, fragmentRestsOn } from '../nav/FragmentFootprint.js';
+import { fragmentBlocksVehicles, fragmentFootprintCells, fragmentRestsOn } from '../nav/FragmentFootprint.js';
 import { isProgressionSite, type GameState, type PendingAction } from '../state/GameState.js';
 import { findById } from '../state/IdIndex.js';
 import type { TrackedFragment } from '../economy/Logistics.js';
@@ -74,7 +74,7 @@ function rubbleIndexOf(state: GameState): BuriedCellIndex {
   const nav = state.navGrid;
   const value = new Set<number>();
   for (const tracked of fragments) {
-    if (!isHaulableRubble(tracked, sealed)) continue;
+    if (!isHaulableRubble(tracked, sealed) || !fragmentBlocksVehicles(tracked.fragment)) continue;
     for (const c of fragmentFootprintCells(tracked.fragment)) {
       if (nav === null || fragmentRestsOn(tracked.fragment, nav.cellAt(c.x, c.z)?.surfaceY)) value.add(cellKey(c.x, c.z));
     }

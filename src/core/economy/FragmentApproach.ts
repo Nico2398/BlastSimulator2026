@@ -14,7 +14,7 @@
 
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { GameState } from '../state/GameState.js';
-import { fragmentRingCells } from '../nav/FragmentFootprint.js';
+import { fragmentBlocksVehicles, fragmentFootprintCells, fragmentRingCells } from '../nav/FragmentFootprint.js';
 import type { NavCell } from '../nav/NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { vehicleReachesCell } from '../engine/ReachCache.js';
@@ -29,7 +29,9 @@ export function fragmentApproachCandidates(fragment: FragmentData, state: Pick<G
   if (!nav) return [{ x: Math.round(fragment.position.x), z: Math.round(fragment.position.z), ring: 0 }];
   // The ground under the rock: its own cell's surface, when the grid models terrain.
   const ground = nav.cellAt(Math.round(fragment.position.x), Math.round(fragment.position.z))?.surfaceY;
-  const ring = fragmentRingCells(fragment, FRAGMENT_APPROACH_REACH_CELLS);
+  // Gravel is driven over: its own cells are where a truck stands to scoop it.
+  const own = fragmentBlocksVehicles(fragment) ? [] : fragmentFootprintCells(fragment).map(c => ({ ...c, ring: 0 }));
+  const ring = [...own, ...fragmentRingCells(fragment, FRAGMENT_APPROACH_REACH_CELLS)];
   const ground1 = new Set(ring.filter(c => c.ring === 1 && isGround(nav.cellAt(c.x, c.z))).map(c => `${c.x},${c.z}`));
   return ring.filter(c => {
     const cell = nav.cellAt(c.x, c.z);

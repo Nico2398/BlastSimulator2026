@@ -7,11 +7,18 @@
 // cell it overlaps by more than FRAGMENT_FOOTPRINT_MIN_OVERLAP_M — on that
 // cell's ground: a rock lying at the foot of a crater wall does not block the
 // rim above it, and a rock sealed under intact rock blocks no surface at all.
-import { FRAGMENT_FOOTPRINT_MIN_OVERLAP_M, FRAGMENT_GROUND_TOLERANCE_M } from '../config/balance.js';
+import { FRAGMENT_DRIVABLE_MAX_VOLUME_M3, FRAGMENT_FOOTPRINT_MIN_OVERLAP_M, FRAGMENT_GROUND_TOLERANCE_M } from '../config/balance.js';
+
+/** Whether `fragment` blocks vehicles: anything bigger than the gravel they drive over (FRAGMENT_DRIVABLE_MAX_VOLUME_M3). */
+export function fragmentBlocksVehicles(fragment: FootprintFragment): boolean {
+  return fragment.volume === undefined || fragment.volume > FRAGMENT_DRIVABLE_MAX_VOLUME_M3 + 1e-9;
+}
 
 /** What the footprint reads of a fragment: its centre and, when known, its half-extents. */
 export interface FootprintFragment {
   readonly id?: number;
+  /** m³; absent counts as blocking (hand-built fixtures). */
+  readonly volume?: number;
   readonly position: { readonly x: number; readonly y?: number; readonly z: number };
   readonly halfExtents?: { readonly x: number; readonly y?: number; readonly z: number };
 }

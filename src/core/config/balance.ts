@@ -488,8 +488,20 @@ export const ORE_REPORT_ABSURDIUM_FRACTION = 0.3;
 
 // ─── Mining & Blasting ─────────────────────────────────────────────────────────
 
-/** Maximum fragment volume (m³) that can be hauled directly without secondary fragmentation. */
-export const OVERSIZED_FRAGMENT_THRESHOLD = 0.5;
+/**
+ * Maximum fragment volume (m³) that can be hauled directly without secondary fragmentation: above it a
+ * rock is a boulder for the fragmenter. Boulders come from the collar under the stemming and from weakly
+ * broken rock at the pattern's edges. Set where a well-designed shot leaves none: on the tutorial pit's
+ * guided 3x3 (4 m, 8 m deep, boomite filled under 2.5 m) the largest piece is 2.0 m³, while an
+ * underfilled or over-stemmed shot on the same ground leaves 13-62 pieces above it, up to 11 m³.
+ */
+export const OVERSIZED_FRAGMENT_THRESHOLD = 2.0;
+
+/**
+ * Largest fragment volume (m³) a vehicle drives over: one sub-cell of rock (`SUB_CELL_RESOLUTION`), the
+ * smallest piece a blast makes. Anything bigger blocks vehicles over its footprint (`fragmentBlocksVehicles`).
+ */
+export const FRAGMENT_DRIVABLE_MAX_VOLUME_M3 = 0.125;
 
 /** Speed threshold (m/s) above which a fragment is classified as a dangerous projection.
  *  Real blasting: fly-rock can travel 500m+ at high speed. Scaled for gameplay. */
@@ -696,7 +708,7 @@ export const SUB_CELL_RESOLUTION = 2;
  *  that (coarse: lifted burden, floor to grade, unsupported rock) contributes the
  *  base scaled by its intensity, so most of it seeds nothing and joins a
  *  neighbour's fragment — which is how an undercharged blast produces boulders.
- *  Two seeds per voxel at the good bound give fragments of about 0.5 m³ (haulable,
+ *  Two seeds per voxel at the good bound give fragments of about 0.5 m³ (well under
  *  `OVERSIZED_FRAGMENT_THRESHOLD`), four at the fines bound 0.25 m³, eight at the
  *  dust bound the 0.125 m³ floor of the sub-cell grid. */
 export const SEEDS_BASE = 2.0;

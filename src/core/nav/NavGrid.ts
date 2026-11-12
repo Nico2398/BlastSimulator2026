@@ -23,7 +23,7 @@ import {
   NAV_CLEARANCE_MAX_CELLS,
 } from '../config/balance.js';
 import * as reachability from './NavGridReachability.js';
-import { fragmentFootprintCells, fragmentRestsOn, type FootprintFragment } from './FragmentFootprint.js';
+import { fragmentBlocksVehicles, fragmentFootprintCells, fragmentRestsOn, type FootprintFragment } from './FragmentFootprint.js';
 import { NEIGHBOUR_OFFSETS_4, NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 
 // Read once: the step checks below run per A* neighbour and per flood-fill cell, and a transpiled import is a getter
@@ -323,7 +323,10 @@ export class NavGrid {
 
   /** Mark every cell `fragment` covers as occupied by it (`fragmentFootprintCells`). */
   addFragmentFootprint(fragment: FootprintFragment): void {
-    const cells = fragmentFootprintCells(fragment).filter(c => fragmentRestsOn(fragment, this.cellAt(c.x, c.z)?.surfaceY));
+    // Gravel is driven and walked over: only a rock that blocks vehicles marks the grid.
+    const cells = fragmentBlocksVehicles(fragment)
+      ? fragmentFootprintCells(fragment).filter(c => fragmentRestsOn(fragment, this.cellAt(c.x, c.z)?.surfaceY))
+      : [];
     for (const c of cells) this.addFragmentOccupant(c.x, c.z);
     if (fragment.id !== undefined) this.fragmentCells.set(fragment.id, cells);
   }
@@ -335,7 +338,9 @@ export class NavGrid {
    */
   removeFragmentFootprint(fragment: FootprintFragment): void {
     const recorded = fragment.id === undefined ? undefined : this.fragmentCells.get(fragment.id);
-    const cells = recorded ?? fragmentFootprintCells(fragment).filter(c => fragmentRestsOn(fragment, this.cellAt(c.x, c.z)?.surfaceY));
+    const cells = recorded ?? (fragmentBlocksVehicles(fragment)
+      ? fragmentFootprintCells(fragment).filter(c => fragmentRestsOn(fragment, this.cellAt(c.x, c.z)?.surfaceY))
+      : []);
     for (const c of cells) this.removeFragmentOccupant(c.x, c.z);
     if (fragment.id !== undefined) this.fragmentCells.delete(fragment.id);
   }
