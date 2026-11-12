@@ -16,6 +16,8 @@ import { readFileSync } from 'node:fs';
 import { createRunner } from '../../src/console/createRunner.js';
 import { computeDangerZone, isInZone, type ZoneBounds } from '../../src/core/entities/Zone.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
+import { canDriveTier } from '../../src/core/entities/VehicleDriverAssignment.js';
+import { isMounted } from '../../src/core/entities/EmployeeLocomotion.js';
 import { BLAST_DANGER_MARGIN_M } from '../../src/core/config/balance.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import type { Run } from '../helpers/playthrough.js';
@@ -40,6 +42,23 @@ interface Observation {
   listedAfterFire: number[];
   /** The employees standing in the zone when the horn sounded. */
   orderedOutIds: number[];
+}
+
+/** An evacuee this close to the destination they were heading for has arrived. */
+const ARRIVED_WITHIN_M = 2;
+
+/**
+ * True when `employeeId` is licensed for a driverless vehicle still in the danger zone and every other employee
+ * holding that licence has also left it: nobody else could rescue the vehicle (Contract C1 exception).
+ */
+function isOnlyRescuerLeft(state: GameState, employeeId: number, hasLeft: ReadonlySet<number>): boolean {
+  const zone = state.zone.activeZone;
+  const emp = state.employees.employees.find(e => e.id === employeeId);
+  if (!zone || !emp) return false;
+  return state.vehicles.vehicles.some(v =>
+    vehicleDriverId(v) === null && isInZone(v.x, v.z, zone) && canDriveTier(emp, v.type, v.tier)
+    && state.employees.employees.every(e =>
+      e.id === employeeId || !e.alive || !canDriveTier(e, v.type, v.tier) || hasLeft.has(e.id) || isMounted(e.locomotion)));
 }
 
 function cellOf(x: number, z: number): string {
@@ -124,6 +143,9 @@ function replayTutorialShot(): Observation {
         else if (hasLeft.has(emp.id)) {
           // Report the walk back in once, not every tick of it.
           hasLeft.delete(emp.id);
+          // Contract C1 exception: a driverless vehicle nobody else licensed for it can fetch is planned for the
+          // employee who left (three vehicles, two licensed drivers in the tutorial crew).
+          if (isOnlyRescuerLeft(s, emp.id, hasLeft)) continue;
           obs.reEntries.push(`tick ${t}: employee ${emp.id} re-entered the zone at ${emp.x.toFixed(1)},${emp.z.toFixed(1)}`);
         }
       }
@@ -135,7 +157,10 @@ function replayTutorialShot(): Observation {
       const dest = finalDestination(s, emp.id);
       const previous = lastDest.get(emp.id);
       if (dest !== null) {
-        if (previous && cellOf(previous.x, previous.z) !== cellOf(dest.x, dest.z)
+        // An evacuee who has reached the previous destination and is sent on a new trip in the same tick has not
+        // changed destination mid-journey.
+        const arrived = previous !== undefined && Math.hypot(emp.x - previous.x, emp.z - previous.z) <= ARRIVED_WITHIN_M;
+        if (previous && !arrived && cellOf(previous.x, previous.z) !== cellOf(dest.x, dest.z)
           && !isInZone(previous.x, previous.z, zone) && !emp.isMoveStuck && emp.moveConsecutiveFailures === 0) {
           obs.destinationChanges.push(`tick ${t}: employee ${emp.id} destination ${cellOf(previous.x, previous.z)} -> ${cellOf(dest.x, dest.z)}`);
         }
