@@ -31,6 +31,7 @@ import {
   AGENT_FREE_CELL_SEARCH_MAX_RADIUS,
   AGENT_FREE_CELL_MAX_RETURN_COST,
   IDLE_YIELD_SEARCH_RADIUS_CELLS,
+  RETURN_TRIP_DWELL_TICKS,
   BLOCK_EPISODE_ABANDON_LIMIT,
   REROUTE_CONTEST_MAX_DETOUR_COST,
 } from '../config/balance.js';
@@ -97,9 +98,8 @@ interface LocomotionResult {
    * Vehicle ids whose position was written this tick in a way I4
    * (`vehicle_moved_without_occupant`, WorldInvariants.ts) should treat as
    * legitimate (#1115) — either a genuine, occupant-validated drive leg, OR a
-   * deliberate system relocation with no occupant at all, like
-   * `relocateDriverlessVehicle` (below), which pushes here for exactly that
-   * case. Not a strict subset of `moved`: `moved` mixes employee AND vehicle
+   * deliberate system relocation with no occupant at all (none
+   * remains since #2231: a driverless vehicle is never moved). Not a strict subset of `moved`: `moved` mixes employee AND vehicle
    * ids from ordinary itinerary movement, while a driverless relocation
    * writes the vehicle's position and records it here without ever pushing
    * that same id into `moved`. WorldInvariants.ts's I4 check uses this as its
@@ -895,6 +895,7 @@ function pickIdleYieldCell(
   blocker: Occupant,
   blockerCell: { x: number; z: number },
   routeCells: ReadonlySet<string>,
+  canWalkTo: (x: number, z: number) => boolean,
 ): { x: number; z: number } | null {
   const grid = state.navGrid;
   const occupancy = state.agentOccupancy;
@@ -910,26 +911,35 @@ function pickIdleYieldCell(
     if (!cell || cell.type === 'blocked' || cell.type === 'void') return false;
     if (clearance !== undefined && !hasClearance(cell, clearance)) return false;
     if (!occupancy.isFreeFor(blocker, x, z) || isReservedByAnotherExactLeg(state, blocker, x, z)) return false;
-    return hasShortReturnRoute(grid, blockerCell.x, blockerCell.z, x, z);
+    return hasShortReturnRoute(grid, blockerCell.x, blockerCell.z, x, z) && canWalkTo(x, z);
   }, IDLE_YIELD_SEARCH_RADIUS_CELLS);
 }
 
+/** Who walks aside (#2231): the employee on foot, or the driver of an idle rig, with the vehicle's limits. */
+interface AsideWalker { emp: Employee; mover: Occupant; limits: DriveLimits }
+
 /**
- * Where `blocker` (standing at `at`) is relocated to (#1696): the nearest free cell, unless that lies on the
+ * Where `blocker` (standing at `at`) walks to (#1696): the nearest free cell, unless that lies on the
  * mover's route (or there is none) and `mayYield` — then a cell off the route. `yielded` marks the latter.
+ * Only a cell the walker can reach without passing through anyone qualifies (#2231): it walks there.
  */
 function relocationCell(
   state: GameState,
-  blocker: Occupant,
+  walker: AsideWalker,
   at: { x: number; z: number },
   routeCells: (() => ReadonlySet<string>) | undefined,
   mayYield: boolean,
 ): { cell: { x: number; z: number } | null; yielded: boolean } {
+  const blocker = walker.mover;
+  const from = { x: Math.round(at.x), z: Math.round(at.z) };
+  const canWalkTo = (x: number, z: number): boolean =>
+    findPathAvoidingOccupiedCells(state, walker.emp, blocker, from.x, from.z, x, z, walker.limits).found;
   const nearest = findNearestFreeCellForAgent(state, blocker, at.x, at.z);
-  const yieldCell = routeCells && mayYield && isOnRoute(nearest, routeCells)
-    ? pickIdleYieldCell(state, blocker, { x: Math.round(at.x), z: Math.round(at.z) }, routeCells())
-    : null;
-  return yieldCell ? { cell: yieldCell, yielded: true } : { cell: nearest, yielded: false };
+  const tryYield = routeCells !== undefined && mayYield && isOnRoute(nearest, routeCells);
+  if (!tryYield) return { cell: nearest && canWalkTo(nearest.x, nearest.z) ? nearest : null, yielded: false };
+  const yieldCell = pickIdleYieldCell(state, blocker, from, routeCells(), canWalkTo);
+  if (yieldCell) return { cell: yieldCell, yielded: true };
+  return { cell: nearest && !routeCells().has(`${nearest.x},${nearest.z}`) && canWalkTo(nearest.x, nearest.z) ? nearest : null, yielded: false };
 }
 
 function handleAgentOccupancyBlock(
@@ -995,7 +1005,7 @@ function handleAgentOccupancyBlock(
   const routeCells = (): ReadonlySet<string> =>
     cachedRouteCells ??= remainingRouteCells(state, emp, leg, driveLimits);
   if (destinationHeldByOther
-    && relocateIdleDestinationBlocker(state, occupancy, leg.destX, leg.destZ, result, false, routeCells)) {
+    && relocateIdleDestinationBlocker(state, occupancy, leg.destX, leg.destZ, false, routeCells)) {
     return 'blocked';
   }
 
@@ -1027,39 +1037,17 @@ function handleAgentOccupancyBlock(
     //   pre-empt the sidestep's own higher-id-gives-way tie-break for every
     //   stuck-vs-stuck contest, not just a genuinely inert corridor blocker.
     //
-    // Deliberately does NOT `return 'blocked'` on a successful relocation:
-    // the relocated occupant's own return trip (`returnAfterRelocate: true`)
-    // re-approaches the very cell it just vacated, and ceding this whole
-    // tick would let it walk straight back before THIS requester ever
-    // advances into the newly-freed corridor cell — the two sides trading
-    // places forever, never any closer to either one's own real
-    // destination. Retried immediately with a DIRECT, non-avoidance path —
-    // mirrors `advanceLeg`'s own ordinary pathfinding, which ignores
-    // employee occupancy entirely and only failed this tick because this
-    // one per-hop step was blocked — rather than the wide-ranging
-    // `findPathAvoidingOccupiedCells` below: that search treats every OTHER
-    // currently-held ring cell as impassable too, and its own corner-cutting
-    // route around all of them at extreme density can pass uncomfortably
-    // close to a third, entirely unrelated mover's own walk. A direct route
-    // to the now-open corridor cell has no reason to detour anywhere near
-    // one. Both failure modes (the perpetual swap, and the too-close
-    // detour) were confirmed live via this file's own "bounded-tick
-    // fairness" dense-grid reproduction (#1278) while developing this fix.
     const corridorOccupant = occupancy.holderOf(blockedStep.x, blockedStep.z);
     const corridorBlockerEmp = corridorOccupant?.kind === 'employee'
       ? state.employees.employees.find(e => e.id === corridorOccupant.id)
       : undefined;
+    // #2231: the corridor blocker now WALKS aside (it is not teleported), so the requester waits for the
+    // cell to clear rather than stepping into it on the same tick. Its return trip (`returnAfterRelocate`)
+    // starts only once it has arrived beside the corridor, by which time the requester has moved on.
     if (corridorOccupant?.kind === 'employee'
       && (!corridorBlockerEmp?.isMoveStuck || (corridorBlockerEmp && isOnReturnTripLeg(corridorBlockerEmp)))
-      && relocateIdleDestinationBlocker(state, occupancy, blockedStep.x, blockedStep.z, result, true, routeCells)
-      && state.navGrid) {
-      const direct = findPath(state.navGrid, {
-        agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
-        avoidVehicles: true, ...driveLimits,
-      });
-      if (direct.found) {
-        return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, direct, occupancy, result);
-      }
+      && relocateIdleDestinationBlocker(state, occupancy, blockedStep.x, blockedStep.z, true, routeCells)) {
+      return 'blocked';
     }
 
     // (#1274) No `exemptOccupant` here: this branch only ever runs when
@@ -1293,16 +1281,17 @@ function handleAgentOccupancyBlock(
  * toward, stealing it out from under the requester's own arrival. `moveTo`
  * degrades gracefully on refusal — the employee just stays at the free
  * cell, no worse off than without this parameter. A vehicle occupant has no
- * analog: `relocateDriverlessVehicle`'s teleport already matches the
- * pre-#1278 driverless-blocker relocation's own no-return-trip precedent,
- * regardless of this flag.
+ * analog: a driverless vehicle is never moved (#2231); a
+ * driver idling in a rig drives it clear, with no return trip.
+ *
+ * #2231: nothing is teleported. The blocker walks (`moveTo`) to the free
+ * cell; with `returnAfterRelocate` a second leg walks it back afterwards.
  */
 function relocateIdleDestinationBlocker(
   state: GameState,
   occupancy: AgentOccupancy,
   destX: number,
   destZ: number,
-  result: LocomotionResult,
   returnAfterRelocate = false,
   routeCells?: () => ReadonlySet<string>,
 ): boolean {
@@ -1323,86 +1312,55 @@ function relocateIdleDestinationBlocker(
     // idle occupant.
     if (!emp || emp.collapsing || (employeeWorkState(emp) !== 'idle' && !isOnReturnTripLeg(emp))) return false;
 
+    // Already stepping aside (#2231): its walk is under way, nothing to re-plan. A leg heading for the
+    // contested cell itself is a return trip walking back into it, and is displaced again below.
+    const walking = emp.itinerary?.legs[0];
+    if (walking?.returnTrip && (walking.destX !== destX || walking.destZ !== destZ)) return true;
+
     const originX = emp.x;
     const originZ = emp.z;
     // #1696: the nearest free cell is just the next corridor cell when it lies on the mover's route, and
     // returning there walks the idle employee back into it — so step off the route instead, no return trip.
-    const { cell: freeCell, yielded } = relocationCell(state, occupant, emp, routeCells, employeeWorkState(emp) === 'idle');
+    const { cell: freeCell, yielded } = relocationCell(state, { emp, mover: occupant, limits: {} }, emp, routeCells, employeeWorkState(emp) === 'idle');
     if (!freeCell) return false;
 
-    occupancy.tryMove(occupant, freeCell.x, freeCell.z);
-    teleportEmployeeTo(emp, freeCell.x, freeCell.z);
-    result.moved.push(emp.id);
-    if (returnAfterRelocate && !yielded) {
-      moveTo(state, emp.id, { x: originX, z: originZ }, { allowUnreachable: true });
-      const returnLeg = emp.itinerary?.legs[0];
-      if (returnLeg) {
-        returnLeg.neverSpread = true;
-        returnLeg.returnTrip = true;
-      }
+    // #2231: the blocker walks to the free cell — no jump. Its leg is a return-trip leg (inert to the
+    // contest ladder, no claim on any cell) and never spreads onto a consolation cell.
+    if (!moveTo(state, emp.id, { x: freeCell.x, z: freeCell.z }, { allowUnreachable: true }).success) return false;
+    const asideLeg = emp.itinerary?.legs[0];
+    if (!asideLeg) return false;
+    asideLeg.neverSpread = true;
+    asideLeg.returnTrip = true;
+    if (returnAfterRelocate && !yielded && emp.itinerary) {
+      // Hold at the free cell a few ticks first, or the two legs run in one tick and it is back before the
+      // requester has stepped into the cell it cleared.
+      asideLeg.dwellTicks = RETURN_TRIP_DWELL_TICKS;
+      const { crossesVehicles: _unused, dwellTicks: _dwell, ...base } = asideLeg;
+      emp.itinerary.legs.push({ ...base, destX: originX, destZ: originZ, originalDestX: null, originalDestZ: null });
     }
     return true;
   }
 
   // occupant.kind === 'vehicle'
-  const parked = idleParkedVehicleOf(state, occupant);
-  // #1709: a rig an idle driller still sits in (waiting out the shift, nothing
-  // queued) is as inert as a driverless one — it must not wall off a work cell
-  // (a charging truck's hole) for the rest of the shift. Driver and vehicle
-  // move together so the mount stays position-consistent (I2).
-  const idleDriven = parked === undefined ? idleDrivenVehicleOf(state, occupant) : undefined;
-  const vehicle = parked ?? idleDriven;
+  // #2231: a driverless vehicle is never moved — nothing drives it, and only the locomotion tick writes a
+  // vehicle's x/z. The mover settles elsewhere (destination spreading) or waits.
+  if (idleParkedVehicleOf(state, occupant) !== undefined) return false;
+  // #1709: a rig an idle driller still sits in (waiting out the shift, nothing queued) must not wall off a
+  // work cell (a charging truck's hole) for the rest of the shift: its driver drives it clear.
+  const vehicle = idleDrivenVehicleOf(state, occupant);
   if (!vehicle) return false;
-
-  const { cell: freeCell } = relocationCell(state, occupant, vehicle, routeCells, true);
+  const driver = state.employees.employees.find(e => e.id === vehicle.occupantIds[0]);
+  if (!driver) return false;
+  const driving = driver.itinerary?.legs[0];
+  if (driving?.returnTrip) return true;
+  const { cell: freeCell } = relocationCell(state, { emp: driver, mover: occupant, limits: driveLimitsOf(state, vehicle) }, vehicle, routeCells, true);
   if (!freeCell) return false;
-  if (idleDriven) {
-    for (const riderId of vehicle.occupantIds) {
-      const rider = state.employees.employees.find(e => e.id === riderId);
-      if (!rider) continue;
-      teleportEmployeeTo(rider, freeCell.x, freeCell.z);
-      result.moved.push(rider.id);
-    }
-  }
-
-  // AgentOccupancy first (findNearestFreeCellForAgent already read against
-  // it), then the vehicle's own position/NavCell bookkeeping — mirrors the
-  // existing driverless-blocker relocation split (relocateDriverlessVehicle)
-  // rather than inventing a new vehicle-movement path.
-  occupancy.tryMove(occupant, freeCell.x, freeCell.z);
-  relocateDriverlessVehicle(state, vehicle, freeCell.x, freeCell.z, result);
+  if (!moveTo(state, driver.id, { x: freeCell.x, z: freeCell.z }, { allowUnreachable: true }).success) return false;
+  const driveLeg = driver.itinerary?.legs[0];
+  if (!driveLeg) return false;
+  driveLeg.neverSpread = true;
+  driveLeg.returnTrip = true;
   return true;
-}
-
-/**
- * Direct repositioning for a driverless idle blocker (#689/#1087 follow-up):
- * no driver exists to drive it clear through the ordinary itinerary
- * machinery, and none is needed — an unreserved, driverless vehicle has no
- * task of its own in flight to interrupt, so it is simply placed on (x, z)
- * outright. Keeps NavCell.vehicleOccupied in sync via
- * updateVehicleCellOccupancy so foot/vehicle pathfinding immediately sees
- * the old cell as free and the new one as occupied.
- *
- * Records `blocker.id` into `result.vehiclesMoved` (#1115) — WorldInvariants.ts's
- * I4 check treats that set as the whole authoritative "moved legitimately
- * this tick" signal, and this is the one mover in the file that genuinely,
- * deliberately moves a vehicle with no occupant at all: without recording it
- * here too, every driverless-blocker relocation reads as I4's exact "moved
- * with nobody ever driving it" violation the instant I4 becomes fatal —
- * confirmed live via tutorial-interactive-revolt.integration.test.ts's own
- * #707 repro.
- */
-function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number, z: number, result: LocomotionResult): void {
-  const prevX = Math.floor(blocker.x);
-  const prevZ = Math.floor(blocker.z);
-
-  blocker.x = x;
-  blocker.z = z;
-  result.vehiclesMoved.push(blocker.id);
-
-  // A driverless blocker is stationary both before and after this instant
-  // teleport (#1138) — there is no vehicle-native 'moving' state left to read.
-  updateVehicleCellOccupancy(state, blocker, true, true, prevX, prevZ);
 }
 
 /** True when a foot route from (fromX, fromZ) to (toX, toZ) exists and costs at most `AGENT_FREE_CELL_MAX_RETURN_COST`. */

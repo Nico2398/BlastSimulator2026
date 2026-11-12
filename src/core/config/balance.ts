@@ -3582,3 +3582,10 @@ export const PROJECTION_ZONE_OPACITY = 0.5;
 export const BLAST_REPORT_MAX_HOLE_REASONS = 6;
 /** Share of the broken rock crushed into fines or dust from which the report calls the shot overcharged (#2202). */
 export const OVERCHARGE_NOTE_MIN_FINES_SHARE = 0.25;
+
+/**
+ * Ticks an idle employee that walked aside for a mover (#2231) waits at the free cell before its return
+ * trip starts. Without it both legs run in one tick (walking speed covers several cells) and it is back on
+ * the cell before the mover has stepped into it.
+ */
+export const RETURN_TRIP_DWELL_TICKS = 3;
