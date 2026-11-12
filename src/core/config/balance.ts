@@ -3589,3 +3589,9 @@ export const OVERCHARGE_NOTE_MIN_FINES_SHARE = 0.25;
  * the cell before the mover has stepped into it.
  */
 export const RETURN_TRIP_DWELL_TICKS = 3;
+
+/**
+ * Standing employees a walk aside (#2231) may have to pass on its way to the free cell it picked. One lets an
+ * idle crew member clear a 1-wide corridor past another; a wall of them (a blocker boxed in) means no walk.
+ */
+export const ASIDE_MAX_CROSSED_EMPLOYEES = 1;

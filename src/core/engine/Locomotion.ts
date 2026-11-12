@@ -32,6 +32,7 @@ import {
   AGENT_FREE_CELL_MAX_RETURN_COST,
   IDLE_YIELD_SEARCH_RADIUS_CELLS,
   RETURN_TRIP_DWELL_TICKS,
+  ASIDE_MAX_CROSSED_EMPLOYEES,
   BLOCK_EPISODE_ABANDON_LIMIT,
   REROUTE_CONTEST_MAX_DETOUR_COST,
 } from '../config/balance.js';
@@ -916,7 +917,7 @@ function pickIdleYieldCell(
 }
 
 /** Who walks aside (#2231): the employee on foot, or the driver of an idle rig, with the vehicle's limits. */
-interface AsideWalker { emp: Employee; mover: Occupant; limits: DriveLimits }
+interface AsideWalker { emp: Employee; mover: Occupant; limits: DriveLimits; requester: Occupant }
 
 /**
  * Where `blocker` (standing at `at`) walks to (#1696): the nearest free cell, unless that lies on the
@@ -932,14 +933,31 @@ function relocationCell(
 ): { cell: { x: number; z: number } | null; yielded: boolean } {
   const blocker = walker.mover;
   const from = { x: Math.round(at.x), z: Math.round(at.z) };
-  const canWalkTo = (x: number, z: number): boolean =>
-    findPathAvoidingOccupiedCells(state, walker.emp, blocker, from.x, from.z, x, z, walker.limits).found;
-  const nearest = findNearestFreeCellForAgent(state, blocker, at.x, at.z);
-  const tryYield = routeCells !== undefined && mayYield && isOnRoute(nearest, routeCells);
-  if (!tryYield) return { cell: nearest && canWalkTo(nearest.x, nearest.z) ? nearest : null, yielded: false };
-  const yieldCell = pickIdleYieldCell(state, blocker, from, routeCells(), canWalkTo);
-  if (yieldCell) return { cell: yieldCell, yielded: true };
-  return { cell: nearest && !routeCells().has(`${nearest.x},${nearest.z}`) && canWalkTo(nearest.x, nearest.z) ? nearest : null, yielded: false };
+  // A parked vehicle is crossed on foot and one standing employee is passed (the walker's own ladder moves
+  // it on in turn); a wall of them, or the cell of the mover it makes way for, can never be walked through.
+  const occupancy = state.agentOccupancy;
+  const requesterCell = occupancy?.cellOfOccupant(walker.requester);
+  const canWalkTo = (x: number, z: number): boolean => {
+    if (!state.navGrid || !occupancy) return false;
+    const route = findPath(state.navGrid, {
+      agentId: walker.emp.id, fromX: from.x, fromZ: from.z, toX: x, toZ: z, avoidVehicles: false, ...walker.limits,
+    });
+    if (!route.found || route.waypoints.some(w => w.x === requesterCell?.x && w.z === requesterCell?.z)) return false;
+    const crowd = route.waypoints.filter(w => {
+      const held = occupancy.holderOf(w.x, w.z);
+      return held?.kind === 'employee' && held.id !== walker.emp.id;
+    }).length;
+    return crowd <= ASIDE_MAX_CROSSED_EMPLOYEES;
+  };
+  const nearestFree = findNearestFreeCellForAgent(state, blocker, at.x, at.z);
+  const nearest = nearestFree && canWalkTo(nearestFree.x, nearestFree.z) ? nearestFree : null;
+  const mayStepOffRoute = routeCells !== undefined && mayYield;
+  if (nearest && !(mayStepOffRoute && isOnRoute(nearest, routeCells))) return { cell: nearest, yielded: false };
+  if (mayStepOffRoute) {
+    const yieldCell = pickIdleYieldCell(state, blocker, from, routeCells(), canWalkTo);
+    if (yieldCell) return { cell: yieldCell, yielded: true };
+  }
+  return { cell: nearest, yielded: false };
 }
 
 function handleAgentOccupancyBlock(
@@ -1005,7 +1023,7 @@ function handleAgentOccupancyBlock(
   const routeCells = (): ReadonlySet<string> =>
     cachedRouteCells ??= remainingRouteCells(state, emp, leg, driveLimits);
   if (destinationHeldByOther
-    && relocateIdleDestinationBlocker(state, occupancy, leg.destX, leg.destZ, false, routeCells)) {
+    && relocateIdleDestinationBlocker(state, occupancy, leg.destX, leg.destZ, mover, false, routeCells)) {
     return 'blocked';
   }
 
@@ -1046,7 +1064,7 @@ function handleAgentOccupancyBlock(
     // starts only once it has arrived beside the corridor, by which time the requester has moved on.
     if (corridorOccupant?.kind === 'employee'
       && (!corridorBlockerEmp?.isMoveStuck || (corridorBlockerEmp && isOnReturnTripLeg(corridorBlockerEmp)))
-      && relocateIdleDestinationBlocker(state, occupancy, blockedStep.x, blockedStep.z, true, routeCells)) {
+      && relocateIdleDestinationBlocker(state, occupancy, blockedStep.x, blockedStep.z, mover, true, routeCells)) {
       return 'blocked';
     }
 
@@ -1292,6 +1310,7 @@ function relocateIdleDestinationBlocker(
   occupancy: AgentOccupancy,
   destX: number,
   destZ: number,
+  requester: Occupant,
   returnAfterRelocate = false,
   routeCells?: () => ReadonlySet<string>,
 ): boolean {
@@ -1321,7 +1340,7 @@ function relocateIdleDestinationBlocker(
     const originZ = emp.z;
     // #1696: the nearest free cell is just the next corridor cell when it lies on the mover's route, and
     // returning there walks the idle employee back into it — so step off the route instead, no return trip.
-    const { cell: freeCell, yielded } = relocationCell(state, { emp, mover: occupant, limits: {} }, emp, routeCells, employeeWorkState(emp) === 'idle');
+    const { cell: freeCell, yielded } = relocationCell(state, { emp, mover: occupant, limits: {}, requester }, emp, routeCells, employeeWorkState(emp) === 'idle');
     if (!freeCell) return false;
 
     // #2231: the blocker walks to the free cell — no jump. Its leg is a return-trip leg (inert to the
@@ -1353,7 +1372,7 @@ function relocateIdleDestinationBlocker(
   if (!driver) return false;
   const driving = driver.itinerary?.legs[0];
   if (driving?.returnTrip) return true;
-  const { cell: freeCell } = relocationCell(state, { emp: driver, mover: occupant, limits: driveLimitsOf(state, vehicle) }, vehicle, routeCells, true);
+  const { cell: freeCell } = relocationCell(state, { emp: driver, mover: occupant, limits: driveLimitsOf(state, vehicle), requester }, vehicle, routeCells, true);
   if (!freeCell) return false;
   if (!moveTo(state, driver.id, { x: freeCell.x, z: freeCell.z }, { allowUnreachable: true }).success) return false;
   const driveLeg = driver.itinerary?.legs[0];
