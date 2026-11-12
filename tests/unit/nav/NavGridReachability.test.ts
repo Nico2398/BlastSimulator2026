@@ -255,7 +255,7 @@ describe('computeClimbComponents.canReach with a fractional target (#2228)', () 
   it('a stranded source reaches the fractional position of its own cell', () => {
     const components = computeClimbComponents(makeGrid(threeRegions));
     expect(components.canReach(10, 5, 10.3, 5.3)).toBe(true);
-    expect(components.canReach(10, 5, 9.7, 5.7)).toBe(true);
+    expect(components.canReach(10, 5, 9.7, 4.7)).toBe(true);
   });
 
   it('a fractional target outside the grid is still rejected', () => {
