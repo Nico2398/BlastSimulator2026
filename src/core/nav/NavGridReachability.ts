@@ -746,6 +746,7 @@ export interface ClimbComponents {
    * symmetric under `isLegalStep`, so reachability between them is "same
    * component"; a source that is itself impassable (stranded by a blast) reaches
    * its own cell plus the components of the legal neighbours it can step onto.
+   * A fractional target resolves to the cell it lies on, as the source does.
    */
   canReach(sx: number, sz: number, tx: number, tz: number): boolean;
   /**
