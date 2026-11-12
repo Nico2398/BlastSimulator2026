@@ -76,6 +76,23 @@ describe('ui.shady.exposure_note — #1410 describes the real consequence of exp
   });
 });
 
+describe('fr.json ui.* — #2236 calques rewritten', () => {
+  const cases: [string, RegExp, RegExp][] = [
+    ['ui.modifier.work_stoppage', /Arrêt de travail/, /Arrêt des travaux/],
+    ['ui.crew.location_bench', /Palier/, /Gradin/],
+    ['ui.event.category.lawsuit', /Poursuite/, /Procès/],
+    ['ui.shady.frame_label', /MONTER UN COUP/, /MONTER UN DOSSIER/],
+    ['ui.permit.all_met', /chercher plus fort/, /plus en profondeur/],
+  ];
+  for (const [key, bad, good] of cases) {
+    it(`${key} is recorded as a known defect and no longer reads as the calque`, () => {
+      expect(KNOWN_TEXT_DEFECTS.find((d) => d.key === key && d.locale === 'fr')).toBeTruthy();
+      expect(fr[key]).not.toMatch(bad);
+      expect(fr[key]).toMatch(good);
+    });
+  }
+});
+
 describe('event.politics_ / event.lawsuit_ calques — #2238 French rewrites', () => {
   const cases: ReadonlyArray<readonly [string, string, string]> = [
   [

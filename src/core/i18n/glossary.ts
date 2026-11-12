@@ -226,6 +226,36 @@ export const KNOWN_TEXT_DEFECTS: readonly TextDefect[] = [
     expectedFix: 'Emboutez -> Embauchez.',
   },
   {
+    key: 'ui.modifier.work_stoppage',
+    locale: 'fr',
+    problem: "'Arrêt de travail' means sick leave in French, not a halt of works.",
+    expectedFix: 'Arrêt des travaux.',
+  },
+  {
+    key: 'ui.crew.location_bench',
+    locale: 'fr',
+    problem: "'Palier' (landing) calques the bench; an open-pit bench is a 'gradin'.",
+    expectedFix: 'Gradin {bench} ({x}, {z}).',
+  },
+  {
+    key: 'ui.event.category.lawsuit',
+    locale: 'fr',
+    problem: "'Poursuite' reads as a chase, not a lawsuit.",
+    expectedFix: 'Procès.',
+  },
+  {
+    key: 'ui.shady.frame_label',
+    locale: 'fr',
+    problem: "'Monter un coup' means to set up a scheme, not to frame someone.",
+    expectedFix: 'MONTER UN DOSSIER.',
+  },
+  {
+    key: 'ui.permit.all_met',
+    locale: 'fr',
+    problem: "'chercher plus fort' is a calque of 'look harder'.",
+    expectedFix: 'chercher plus en profondeur.',
+  },
+  {
     key: 'event.lawsuit_wrongful_death.res0',
     locale: 'fr',
     problem: 'Says "décès injustifié" (calque of wrongful death) where the desc and title say "homicide involontaire".',
