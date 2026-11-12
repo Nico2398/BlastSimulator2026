@@ -1249,6 +1249,16 @@ window.__loadingScreenHide = () => { loadingScreen.hide(); };
 uiManager.setGameConsole(window.__gameConsole);
 // The tutorial only runs scripted demonstrations through this console, so its commands make no player sound.
 tutorial.setGameConsole((cmd) => runGameCommand(cmd, { scripted: true }));
+// The ripple converges on a tile-pick stage's region centre: project it to CSS pixels, null when behind the camera.
+tutorial.setRegionProjector((region) => {
+  const { x, z } = regionCenter(region);
+  const cx = x + 0.5;
+  const cz = z + 0.5;
+  const ndc = scene.cameraController.projectToNDC(cx, gameRenderer.raycastSurfaceY(cx, cz) ?? gameRenderer.surfaceYAt(cx, cz), cz);
+  if (ndc.z >= 1) return null;
+  const rect = canvas.getBoundingClientRect();
+  return { x: rect.left + (ndc.x * 0.5 + 0.5) * rect.width, y: rect.top + (1 - (ndc.y * 0.5 + 0.5)) * rect.height };
+});
 
 // Tutorial start bridge (Puppeteer) + console command (scenario tests)
 window.__startTutorial = () => tutorial.start(ctx.state ?? undefined);
