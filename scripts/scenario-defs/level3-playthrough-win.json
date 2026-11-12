@@ -938,7 +938,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -960,7 +960,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -982,7 +982,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1004,7 +1004,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1034,7 +1034,7 @@
           "cash": -50000
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1061,7 +1061,7 @@
           "cash": -25000
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1088,7 +1088,7 @@
           "cash": -35000
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1115,7 +1115,7 @@
           "cash": -30000
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1142,7 +1142,7 @@
           "cash": -25000
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1165,7 +1165,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1187,7 +1187,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1209,7 +1209,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1232,7 +1232,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 44,
+          "tickCount": 46,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1508,7 +1508,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 94,
+          "tickCount": 96,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1785,8 +1785,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 474,
-          "cash": 1728416,
+          "tickCount": 476,
+          "cash": 1726502,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1894,7 +1894,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 475,
+          "tickCount": 477,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -2081,8 +2081,8 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.58820748458615,
-          "safety": 50,
+          "wellBeing": 98.60539408779708,
+          "safety": 50.00000007207725,
           "ecology": 49.73138380152293,
           "nuisance": 49.328459503807316
         },

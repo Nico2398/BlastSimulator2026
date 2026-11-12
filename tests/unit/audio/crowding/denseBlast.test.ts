@@ -14,12 +14,12 @@ const COLLAPSE = 'ore-haul-dispatch';
 const HAULING = 'blast-debris-stranded-ramp';
 const RUN_TIMEOUT_MS = 60_000;
 /**
- * The shot is fired 47 s in: each hole is filled to its stemming (12 kg of boomite), which takes the crew longer to
+ * The shot is fired 54 s in (47 s while a blocker teleported aside, #2231: it walks now): each hole is filled to its stemming (12 kg of boomite), which takes the crew longer to
  * load than the 6 kg breakout charge it replaced (37 s before; #1774), and the 3 s after it are the shot's own; the
- * hauling after it is not needed here. The next step runs to 56 s, into the hauling (the first loads and boulder
+ * hauling after it is not needed here. The next step runs past it, into the hauling (the first loads and boulder
  * breaks): that is HAULING's budget, not the collapse's.
  */
-const THROUGH_THE_SHOT_S = 50;
+const THROUGH_THE_SHOT_S = 57;
 
 beforeAll(() => {
   scenarioRun(COLLAPSE, 8, THROUGH_THE_SHOT_S);

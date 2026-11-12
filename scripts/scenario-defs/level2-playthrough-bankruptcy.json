@@ -973,7 +973,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7425
+          "cash": -7419
         },
         "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1667: the two hired blasters now arrive with the tier-1 truck licence (+$50 salary each), so per-cycle payroll deltas rose by $100 and the tick-100 balance by $1,000 (-78648->-79648). #1843: licences pay flat (level-1 bonus), so payroll is lower again; cash re-measured (deterministic, exact checks kept)."
       },
@@ -1137,7 +1137,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 63.49733564315114,
+          "safety": 63.180954737909325,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": false,
@@ -1210,7 +1210,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -73576,
+          "cash": -73570,
           "tickCount": 100,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1332,7 +1332,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 69.64468884304124,
+          "safety": 69.45376412555228,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1523,7 +1523,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 69.64468884304124,
+          "safety": 69.45376412555228,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1663,7 +1663,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 69.64468884304124,
+          "safety": 69.45376412555228,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1688,7 +1688,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 69.64468884304124,
+          "safety": 69.45376412555228,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1713,7 +1713,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 69.64468884304124,
+          "safety": 69.45376412555228,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,

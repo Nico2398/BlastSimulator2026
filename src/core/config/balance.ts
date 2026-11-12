@@ -3582,3 +3582,16 @@ export const PROJECTION_ZONE_OPACITY = 0.5;
 export const BLAST_REPORT_MAX_HOLE_REASONS = 6;
 /** Share of the broken rock crushed into fines or dust from which the report calls the shot overcharged (#2202). */
 export const OVERCHARGE_NOTE_MIN_FINES_SHARE = 0.25;
+
+/**
+ * Ticks an idle employee that walked aside for a mover (#2231) waits at the free cell before its return
+ * trip starts. Without it both legs run in one tick (walking speed covers several cells) and it is back on
+ * the cell before the mover has stepped into it.
+ */
+export const RETURN_TRIP_DWELL_TICKS = 3;
+
+/**
+ * Standing employees a walk aside (#2231) may have to pass on its way to the free cell it picked. One lets an
+ * idle crew member clear a 1-wide corridor past another; a wall of them (a blocker boxed in) means no walk.
+ */
+export const ASIDE_MAX_CROSSED_EMPLOYEES = 1;
