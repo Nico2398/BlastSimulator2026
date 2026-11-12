@@ -192,11 +192,13 @@ export class SettingsPanel extends PanelBase {
     });
     this.locale.bindText(policyNote, 'ui.settings.policy_moved');
 
+    // The session controls lead: Return to Main Menu used to sit below the 11-row keyboard list, ~350 px
+    // under the fold of a 720p panel, and a player looking for the way out never scrolled that far.
     body.append(
+      this.sessionSection,
       langHeader, langRow,
       audioHeader, ...audioRows, creditsBtn,
       keyboardHeader, keyboardBox,
-      this.sessionSection,
       policyNote,
     );
 

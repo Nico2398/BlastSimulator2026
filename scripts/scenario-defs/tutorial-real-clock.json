@@ -902,6 +902,36 @@
     },
     {
       "command": "state",
+      "timeout": 120,
+      "role": "player",
+      "interactionOnly": true,
+      "description": "#2233: during the evacuation the player pauses and picks 8x on the top bar. The waiting dock is non-blocking (no scrim), so both clicks land; the sequence still auto-fires afterwards.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top [data-action=\"pause-toggle\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top button[data-speed=\"8\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "isPaused": false,
+          "deathCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
       "timeout": 300,
       "role": "player",
       "description": "#1362: wait for the automatic fire -- the blast clears the plan (holeCount 0) only once the evacuation finished and the sequence fired.",

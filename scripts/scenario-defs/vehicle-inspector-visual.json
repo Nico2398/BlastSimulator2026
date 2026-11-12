@@ -424,14 +424,14 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": "[data-action=\"confirm-yes\"]"
         },
         {
           "type": "screenshot"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": "[data-action=\"confirm-yes\"]"
         }
       ],
       "role": "player",
