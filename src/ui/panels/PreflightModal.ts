@@ -255,6 +255,8 @@ export class PreflightModal {
     this.chipEl.style.display = this.waiting && this.dockHidden ? '' : 'none';
   }
   get visible(): boolean { return this.open; }
+  /** Esc has something to do: close the idle box, or collapse the shown dock. A showing chip leaves Esc to other layers. */
+  get escapable(): boolean { return this.open && (!this.waiting || !this.dockHidden); }
 
   update(state: GameState, _weather?: WeatherState): void {
     if (!this.open) return;
