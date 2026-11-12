@@ -1,0 +1,206 @@
+{
+  "name": "i18n-french-panels-visual",
+  "description": "#2236: Crew, Fleet, Contracts, Build, Operations, Blast panels and the level-end screen in French, screenshotted to check for truncation/overflow.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32 staffed:true cash:200000",
+      "timeout": 60,
+      "role": "setup",
+      "description": "Staffed game",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32 staffed:true cash:200000"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "observe",
+      "description": "Switch to French",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-settings-panel"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-settings-panel [data-lang=\"fr\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "observe",
+      "description": "employees panel in French",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "observe",
+      "description": "vehicles panel in French",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel, .bs-vehicle-panel, #bs-fleet-panel"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "observe",
+      "description": "contracts panel in French",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel, .bs-contract-panel, #bs-contracts-panel"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "observe",
+      "description": "build panel in French",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel, .bs-build-panel"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "observe",
+      "description": "ops panel in French",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-ops-panel, #bs-operations-panel, .bs-ops-panel"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "observe",
+      "description": "blast panel in French",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        }
+      ]
+    },
+    {
+      "command": "board start quarterTicks:48 ore:1 profit:1000",
+      "timeout": 60,
+      "role": "bootstrap",
+      "description": "",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "board start quarterTicks:48 ore:1 profit:1000"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:levelEndReason equals:fired max_ticks:200",
+      "timeout": 150,
+      "role": "setup",
+      "description": "",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "levelEndReason",
+          "equals": "fired",
+          "maxTicks": 200,
+          "timeoutMs": 120000
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "observe",
+      "description": "Level-end in French",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-level-end-screen",
+          "timeoutMs": 30000
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        }
+      ]
+    }
+  ]
+}
