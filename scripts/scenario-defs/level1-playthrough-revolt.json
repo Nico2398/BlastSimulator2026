@@ -1,6 +1,6 @@
 {
   "name": "level1-playthrough-revolt",
-  "description": "Level 1 worker revolt scenario: an aggressive 9-hole krackle blast, then a 12-strong crew with no rest relief sinks wellBeing to its floor and the site revolts. #1431 (rebuilt after #1313 froze the mine at level end): the opening is funded ($1,050,000, solvent throughout) and two living quarters keep wellBeing up through the drill and the blast, so the blast fires well before the revolt (#1649: charging is truck-worked, so later than the original 478) while the level is still running (killing the idle crew near the pattern). wellBeing then falls to 0 and stays there for REVOLT_TICKS, and the worker revolt (levelEndReason 'worker_revolt', never bankruptcy) is the only end, at tick 560 (rally point: was 717 before the crew and hires spawned around the rally flag; the blast fires at 403 and kills 5; #1773: 629 -> 560 once well-being became a managed score beside the quarters). #1709: the pattern is 3x3, not 4x4 -- crew rest trips now park the rig and walk to the quarters, which slows the 16-hole charging run past the 120-tick wellBeing-zero window, so the revolt landed before the blast; the 9-hole pattern charges and fires first again. Everything after it asserts the frozen state. #1895: the charge order waits out the explosives delivery, so the blast fires later and the revolt that ends the level lands at tick 993 (was 708). Fill mode: the 1 m-stemming krackle fill (14.3 kg per hole) takes longer to load, so the blast fires at tick 618 and the revolt lands at tick 701 (was 674).",
+  "description": "Level 1 worker revolt scenario: an aggressive 9-hole krackle blast, then a 12-strong crew with no rest relief sinks wellBeing to its floor and the site revolts. #1431 (rebuilt after #1313 froze the mine at level end): the opening is funded ($1,050,000, solvent throughout) and two living quarters keep wellBeing up through the drill and the blast, so the blast fires well before the revolt (#1649: charging is truck-worked, so later than the original 478) while the level is still running (killing the idle crew near the pattern). wellBeing then falls to 0 and stays there for REVOLT_TICKS, and the worker revolt (levelEndReason 'worker_revolt', never bankruptcy) is the only end, at tick 560 (rally point: was 717 before the crew and hires spawned around the rally flag; the blast fires at 403 and kills 5; #1773: 629 -> 560 once well-being became a managed score beside the quarters). #1709: the pattern is 3x3, not 4x4 -- crew rest trips now park the rig and walk to the quarters, which slows the 16-hole charging run past the 120-tick wellBeing-zero window, so the revolt landed before the blast; the 9-hole pattern charges and fires first again. Everything after it asserts the frozen state. #1895: the charge order waits out the explosives delivery, so the blast fires later and the revolt that ends the level lands at tick 993 (was 708). Fill mode: the 1 m-stemming krackle fill (14.3 kg per hole) takes longer to load, so the blast fires at tick 618 and the revolt lands at tick 701 (was 674). #2225: a driven rest trip now ends inside the quarters like a walked one, so the crew rests (and the revolt lands) later, at tick 806.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow staffed:true cash:1050000",
@@ -866,7 +866,7 @@
           "levelEndReason": "worker_revolt",
           "revolted": true,
           "bankrupt": false,
-          "tickCount": 701,
+          "tickCount": 806,
           "deathCount": 4,
           "wellBeing": 0,
           "holeCount": 0,
@@ -891,7 +891,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -922,7 +922,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -943,7 +943,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -974,7 +974,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -995,7 +995,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1026,7 +1026,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1047,7 +1047,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1078,7 +1078,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1099,7 +1099,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1130,7 +1130,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1151,7 +1151,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1182,7 +1182,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1203,7 +1203,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1234,7 +1234,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1255,7 +1255,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1286,7 +1286,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1307,7 +1307,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1338,7 +1338,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1359,7 +1359,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1390,7 +1390,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1411,7 +1411,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1442,7 +1442,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1463,7 +1463,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1494,7 +1494,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1515,7 +1515,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1546,7 +1546,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1567,7 +1567,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1598,7 +1598,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1619,7 +1619,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1650,7 +1650,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1671,7 +1671,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1702,7 +1702,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1723,7 +1723,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1754,7 +1754,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1775,7 +1775,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1806,7 +1806,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1827,7 +1827,7 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 4
@@ -1858,7 +1858,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 701,
+          "tickCount": 806,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1895,7 +1895,7 @@
           "levelEndReason": "worker_revolt",
           "revolted": true,
           "bankrupt": false,
-          "tickCount": 701,
+          "tickCount": 806,
           "deathCount": 4,
           "wellBeing": 0,
           "employeeCount": 12
@@ -1914,7 +1914,7 @@
       "expect": {
         "equals": {
           "bankrupt": false,
-          "tickCount": 701
+          "tickCount": 806
         }
       }
     },
@@ -1929,7 +1929,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 701,
+          "tickCount": 806,
           "employeeCount": 12
         }
       }
@@ -1949,7 +1949,7 @@
           "levelEndReason": "worker_revolt",
           "revolted": true,
           "bankrupt": false,
-          "tickCount": 701,
+          "tickCount": 806,
           "deathCount": 4,
           "wellBeing": 0,
           "employeeCount": 12

@@ -1900,7 +1900,7 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.41201880401213,
+          "wellBeing": 98.22284141633202,
           "safety": 50,
           "ecology": 99.4987325160721,
           "nuisance": 48.871831290180225
@@ -2692,8 +2692,8 @@
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.21257599228024,
-          "safety": 50.00000031822935,
+          "wellBeing": 98.07080138901065,
+          "safety": 50.00000000344652,
           "ecology": 99.37244411241298,
           "nuisance": 48.55611028103245
         },
@@ -3728,10 +3728,10 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 95.8480431263386,
+          "wellBeing": 97.12469971813678,
           "safety": 2.9404,
-          "ecology": 50.39829534276786,
-          "nuisance": 49.11844690611368
+          "ecology": 49.04446304699438,
+          "nuisance": 48.86389528326628
         },
         "changedBy": {
           "tickCount": 0
@@ -4240,7 +4240,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4265,7 +4265,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4287,7 +4287,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4309,7 +4309,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4330,7 +4330,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4353,7 +4353,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4374,7 +4374,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4402,7 +4402,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4421,7 +4421,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4444,7 +4444,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4474,7 +4474,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -4516,7 +4516,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4540,14 +4540,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 87.56455888506632,
-          "safety": 2.9404,
-          "ecology": 53.59515850394413,
-          "nuisance": 48.76380748318706
+          "wellBeing": 93.53806212405746,
+          "safety": 0,
+          "ecology": 74.56441882485184,
+          "nuisance": 48.66559828587714
         },
         "changedBy": {
           "tickCount": 0
@@ -4567,14 +4567,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 87.56455888506632,
-          "safety": 2.9404,
-          "ecology": 53.59515850394413,
-          "nuisance": 48.76380748318706
+          "wellBeing": 93.53806212405746,
+          "safety": 0,
+          "ecology": 74.56441882485184,
+          "nuisance": 48.66559828587714
         },
         "changedBy": {
           "tickCount": 0
