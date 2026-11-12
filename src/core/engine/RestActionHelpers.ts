@@ -305,7 +305,7 @@ function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: numbe
  * entering the building. The vehicle stays parked where the driver left it. No-op
  * when the drive does not end in an alight (the driver keeps the vehicle).
  */
-function enterQuartersAfterAlight(state: GameState, emp: Employee, buildingId: number, x: number, z: number): void {
+function enterQuartersAfterAlight(emp: Employee, buildingId: number, x: number, z: number): void {
   const itinerary = emp.itinerary;
   const last = itinerary?.legs[itinerary.legs.length - 1];
   if (!itinerary || !last || last.onArrive.kind !== 'alight') return;
@@ -380,7 +380,7 @@ export function beginRestTravel(state: GameState, emp: Employee, x: number, z: n
       // vehicle stays parked and dispatch replans the board leg after the rest.
       const intoQuarters = buildingId !== undefined && state.buildings.buildings.some(b => b.id === buildingId);
       moveToAndFreeVehicleOnArrival(state, emp, x, z, emitter, intoQuarters);
-      if (intoQuarters) enterQuartersAfterAlight(state, emp, buildingId!, x, z);
+      if (intoQuarters) enterQuartersAfterAlight(emp, buildingId!, x, z);
     } else moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
   }
   emp.pendingActionType = 'rest';
