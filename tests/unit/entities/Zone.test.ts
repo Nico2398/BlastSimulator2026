@@ -1063,8 +1063,8 @@ describe('clearZone plans a mounted driver\'s first trip around the vehicle only
     return { state, vehicles, employees, hauler, digger, pilot, relief };
   }
 
-  it('orders the pilot to take the digger out on their first trip, and the relief driver to fetch the hauler', () => {
-    const { state, vehicles, employees, hauler, digger, pilot, relief } = fixture(2320, true);
+  it('orders the pilot to take the digger out on their first trip, and leaves the hauler awaiting its relief driver', () => {
+    const { state, vehicles, employees, hauler, digger, pilot } = fixture(2320, true);
 
     const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
 
@@ -1073,7 +1073,6 @@ describe('clearZone plans a mounted driver\'s first trip around the vehicle only
     // The hauler keeps the pilot in its seat until they step off, so its relief driver is sent on a later pass.
     expect(result.awaitingRescuerVehicleIds).toEqual([hauler.id]);
     expect(pilot.itinerary!.legs.some(l => l.vehicleId === digger.id)).toBe(true);
-    expect(relief).not.toBeNull();
   });
 
   it('keeps the pilot on their own vehicle when nobody else is licensed for it', () => {
