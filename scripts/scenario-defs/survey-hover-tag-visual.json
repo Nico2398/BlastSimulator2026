@@ -264,6 +264,10 @@
       "timeout": 60,
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]"
+        },
+        {
           "type": "cameraFocus",
           "x": 19.5,
           "z": 24.5,

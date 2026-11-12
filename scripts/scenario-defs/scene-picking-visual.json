@@ -167,6 +167,10 @@
       "description": "Frame the building dead-centre, then hover it \u2014 the tag should appear once the 60ms debounce settles, showing the building's name and HP",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]"
+        },
+        {
           "type": "command",
           "command": "state"
         },
@@ -300,6 +304,10 @@
         {
           "type": "command",
           "command": "state"
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
         },
         {
           "type": "clickIfPresent",

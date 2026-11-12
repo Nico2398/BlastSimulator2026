@@ -35,6 +35,9 @@ export default defineConfig({
         // Dev-only model viewer page: same host-bound construction as main.ts,
         // proven by `npm run models:preview` in a real browser.
         'src/model-viewer.ts',
+        // Dev-only thumbnail studio page: a WebGL host, proven by `npm run thumbs:build`
+        // in a real browser; the shots it renders are catalogued and tested in Thumbnails.ts.
+        'src/thumb-studio.ts',
         // Dev-only sound lab page: a DOM and AudioContext host. Its logic lives in
         // src/audio/lab/** (covered); `npm run sounds:check` drives it in a real browser.
         'src/sound-lab.ts',
