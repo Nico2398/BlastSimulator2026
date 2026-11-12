@@ -400,10 +400,10 @@ function solidVoxel(): VoxelData {
 }
 
 /** Minimal on-ground FragmentData fixture for occupancy tests. */
-function makeFragment(id: number, x: number, z: number): FragmentData {
+function makeFragment(id: number, x: number, z: number, y = 0): FragmentData {
   return {
     id,
-    position: { x, y: 0, z },
+    position: { x, y, z },
     volume: 0.3,
     mass: 1000,
     rockId: 'cruite',
@@ -528,7 +528,9 @@ describe('buildGameNavGrid (task 6.10)', () => {
       }
     }
 
-    addBlastFragments(state.logistics, [makeFragment(1, 4, 4)]);
+    // Resting on the 5-voxel-deep surface (centre 0.5 m above y=5): a rock below a cell's
+    // surface does not occupy it (`fragmentRestsOn`).
+    addBlastFragments(state.logistics, [makeFragment(1, 4, 4, 5.5)]);
     purchaseVehicle(state.vehicles, 'rock_digger', 6, 6);
     // vehicle.state defaults to 'idle' (stationary) — buildNavGrid only seeds
     // vehicleOccupied for a non-'moving' vehicle.

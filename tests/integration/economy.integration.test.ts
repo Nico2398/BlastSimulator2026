@@ -1086,6 +1086,9 @@ describe('Economy', () => {
 
   it('collects ore automatically once ore-priority ranking lets ore-bearing fragments jump a full warehouse queue (#671)', () => {
     ctx = makeGameContext({ mineType: 'desert', seed: '20', size: '64', staffed: true, cash: '200000' });
+    // Collected ore is the stock under test: auto-sell would sell it off inside the window (measured: 2.6 t collected
+    // by tick 100, all sold by tick 199), so it is turned off, as a player keeping stock for a contract would.
+    ctx.state!.contracts.autoSell = false;
     // Krackle filling each 8 m hole up to 2.5 m of stemming, holes 4 m apart: the reference design the blast energy is
     // calibrated on (EXPLOSIVE_ENERGY_SCALE), and a charge that breaks out (#1724). A weaker one leaves the rock sealed,
     // which gets no haul order (#1774).

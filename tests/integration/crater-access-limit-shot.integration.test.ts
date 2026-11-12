@@ -15,6 +15,7 @@ import {
   addSpoilHeaps, craterCells, cutPit, dropRubble, fireLimitShot, makeCraterSite, restockShotFleet, thinRubble, type CraterSite, type LimitShot,
 } from '../helpers/craterAccessFixture.js';
 import { tickUntilFresh } from '../helpers/blastFixtures.js';
+import { withRubbleSetAside } from '../helpers/rubble.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { isFragmentSealed } from '../../src/core/economy/SealedFragments.js';
 import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
@@ -196,8 +197,9 @@ describe('a shot that deepens an opened crater (#2086, #2095)', () => {
 
     tickSite(site, () => state.plannedRamps.length === 0, DIG_TICKS);
     expect(state.plannedRamps).toEqual([]);
-    // The ramp lands flush on the deepened floor: its end tile is on the vehicle network.
-    expect(siteVehicleReach(state)!(40, 37)).toBe(true);
+    // The ramp lands flush on the deepened floor: its end tile is on the vehicle network. Rubble blocks vehicles and the
+    // deepening shot's rock can lie on that tile until it is hauled, so the terrain claim is read with rubble set aside.
+    expect(withRubbleSetAside(state, () => siteVehicleReach(state)!(40, 37))).toBe(true);
     tickSite(site, () => false, DIG_TICKS);
     // What stays is rubble on the terrace and the old floor the shot left standing above the deepened one: no ramp
     // reaches those, the player levels the ground or leaves them (the pip says so).

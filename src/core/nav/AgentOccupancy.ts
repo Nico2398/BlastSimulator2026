@@ -16,6 +16,7 @@
 // the full rebuild is one-shot, never repeated per tick.
 
 import type { GameState } from '../state/GameState.js';
+import type { Employee } from '../entities/Employee.js';
 import { isOccupyingHost } from '../entities/EmployeeLocomotion.js';
 
 /** The two kinds of entity that can hold ground-cell occupancy — an employee on foot, or a vehicle. */
@@ -119,13 +120,37 @@ function registerUnheldAgents(state: GameState, occupancy: AgentOccupancy): void
     if (!emp.alive) continue;
     if (isOccupyingHost(emp.locomotion)) continue;
     if (occupancy.cellOfOccupant({ kind: 'employee', id: emp.id }) !== null) continue;
-    occupancy.tryMove({ kind: 'employee', id: emp.id }, Math.round(emp.x), Math.round(emp.z));
+    const cell = groundCellOf(emp.x, emp.z, emp);
+    occupancy.tryMove({ kind: 'employee', id: emp.id }, cell.x, cell.z);
   }
 
   for (const vehicle of state.vehicles.vehicles) {
     if (occupancy.cellOfOccupant({ kind: 'vehicle', id: vehicle.id }) !== null) continue;
-    occupancy.tryMove({ kind: 'vehicle', id: vehicle.id }, Math.round(vehicle.x), Math.round(vehicle.z));
+    const driverId = vehicle.occupantIds[0];
+    const driver = driverId === undefined ? undefined : state.employees.employees.find(e => e.id === driverId);
+    const cell = groundCellOf(vehicle.x, vehicle.z, driver);
+    occupancy.tryMove({ kind: 'vehicle', id: vehicle.id }, cell.x, cell.z);
   }
+}
+
+/**
+ * The cell an agent at (x, z) holds: the live map claims a cell only when a hop lands on it
+ * (AgentAdvance.ts), so a mover caught mid-hop still holds the hop's origin, whichever cell
+ * its position rounds to. `mover` carries the committed hop (the walker, or a vehicle's driver).
+ */
+function groundCellOf(x: number, z: number, mover: Employee | undefined): { x: number; z: number } {
+  // The hop's start: its origin cell, else the cell the current step was taken from.
+  const ox = mover?.committedOriginX ?? mover?.committedFromX, oz = mover?.committedOriginZ ?? mover?.committedFromZ;
+  const wx = mover?.committedWaypointX, wz = mover?.committedWaypointZ;
+  if (ox != null && oz != null && wx != null && wz != null) {
+    const eps = 1e-6;
+    const hop = Math.hypot(wx - ox, wz - oz);
+    const fromOrigin = Math.hypot(x - ox, z - oz);
+    if (hop > eps && fromOrigin > eps && fromOrigin < hop - eps && Math.hypot(x - wx, z - wz) > eps) {
+      return { x: Math.round(ox), z: Math.round(oz) };
+    }
+  }
+  return { x: Math.round(x), z: Math.round(z) };
 }
 
 /**
@@ -151,6 +176,15 @@ export function reconcileAgentOccupancy(state: GameState, occupancy: AgentOccupa
       ? aliveEmployeeIds.has(held.occupant.id)
       : vehicleIds.has(held.occupant.id);
     if (!exists) occupancy.release(held.occupant);
+  }
+
+  // A vehicle its driver left mid-hop never lands that hop: it stands where it stopped, on the cell its position
+  // rounds to, which is the cell a rebuild gives it (`groundCellOf` has no hop to read without a driver).
+  for (const vehicle of state.vehicles.vehicles) {
+    if (vehicle.occupantIds.length > 0) continue;
+    const held = occupancy.cellOfOccupant({ kind: 'vehicle', id: vehicle.id });
+    const x = Math.round(vehicle.x), z = Math.round(vehicle.z);
+    if (held !== null && (held.x !== x || held.z !== z)) occupancy.tryMove({ kind: 'vehicle', id: vehicle.id }, x, z);
   }
 
   registerUnheldAgents(state, occupancy);

@@ -30,7 +30,9 @@ import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
 
 const SEED = 42;
 
-function makeFragment(id: number, x: number, z: number, volume = 1.0, mass = 1000): FragmentData {
+// Default 3 m³: a boulder, above OVERSIZED_FRAGMENT_THRESHOLD (2.0 m³), so each rejection below
+// fails on the precondition it names rather than on the rock being too small to break.
+function makeFragment(id: number, x: number, z: number, volume = 3.0, mass = 1000): FragmentData {
   return {
     id,
     position: { x, y: 0, z },
@@ -114,7 +116,7 @@ describe('isBreakEligibleVehicle', () => {
 describe('requestBreakBoulder — precondition failures', () => {
   it('rejects an unknown vehicle ID', () => {
     const state = createGame({ seed: SEED });
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 1.0)]);
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 3.0)]);
 
     const result = requestBreakBoulder(state, 9999, 1);
 
@@ -129,7 +131,7 @@ describe('requestBreakBoulder — precondition failures', () => {
     const { employee } = hireEmployee(state.employees, 'driver', rng);
     assignSkill(state.employees, employee.id, 'driving.truck', 1);
     vehicle.occupantIds = [employee.id];
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 1.0)]);
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 3.0)]);
 
     const result = requestBreakBoulder(state, vehicle.id, 1);
 
@@ -140,7 +142,7 @@ describe('requestBreakBoulder — precondition failures', () => {
   it('rejects a rock_fragmenter with driverId: null', () => {
     const state = createGame({ seed: SEED });
     const vehicle = makeIdleFragmenter(state);
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 1.0)]);
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 3.0)]);
 
     const result = requestBreakBoulder(state, vehicle.id, 1);
 
@@ -152,7 +154,7 @@ describe('requestBreakBoulder — precondition failures', () => {
     const state = createGame({ seed: SEED });
     const vehicle = makeDrivenFragmenter(state);
     reserveVehicle(state.vehicles, vehicle.id, 42);
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 1.0)]);
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 3.0)]);
 
     const result = requestBreakBoulder(state, vehicle.id, 1);
 
@@ -173,7 +175,7 @@ describe('requestBreakBoulder — precondition failures', () => {
   it('rejects a fragment that is not on_ground (already in_transit)', () => {
     const state = createGame({ seed: SEED });
     const vehicle = makeDrivenFragmenter(state);
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 1.0)]);
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 3.0)]);
     state.logistics.fragments[0]!.state = 'in_transit';
 
     const result = requestBreakBoulder(state, vehicle.id, 1);
@@ -201,7 +203,7 @@ describe('requestBreakBoulder — happy path', () => {
     const state = createGame({ seed: SEED });
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenFragmenter(state, 0, 0);
-    const fragment = makeFragment(1, 5, 7, 1.0);
+    const fragment = makeFragment(1, 5, 7, 3.0);
     const actionsBefore = state.pendingActions.length;
     addBlastFragments(state.logistics, [fragment], state.navGrid);
     // requestBreakBoulder claims an already-self-dispatched fragment_debris

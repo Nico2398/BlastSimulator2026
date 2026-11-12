@@ -161,10 +161,13 @@ describe('FragmentGeneration — volume conservation', () => {
 // A charge 4 m under the surface of a bench (rock y 0..9, open air above). A modest one breaks
 // the rock round it and lifts the cap above it — rock broken with less energy than its
 // threshold, which seeds little and comes out in boulders. A heavier one fragments the cap too.
+// Measured at OVERSIZED_FRAGMENT_THRESHOLD 2.0 m³ over seeds 1-5, 21, 33: the modest charge leaves
+// 3-4 boulders, 4.6-6.7% of its fragments; the heavy one 10-16, 1.4-2.4% of a much larger count.
+// (At 60x the modest charge's largest piece is exactly 2.0 m³ on seed 33: no boulder at all.)
 const BENCH_SIZE = 15;
 const BENCH_TOP_Y = 9;
 const BENCH_CHARGE = { x: 7, y: BENCH_TOP_Y - 4, z: 7 };
-const MODEST_CHARGE = CRUITE * 60;
+const MODEST_CHARGE = CRUITE * 80;
 const HEAVY_CHARGE = CRUITE * 600;
 
 function benchBlast(energy: number, seed: number) {

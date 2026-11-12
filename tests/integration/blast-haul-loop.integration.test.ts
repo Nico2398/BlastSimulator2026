@@ -18,6 +18,7 @@ import { employeeClimbReach } from '../../src/core/engine/OrderReachability.js';
 import { upgradeFreightWarehousesToTier3 } from '../helpers/freightWarehouse.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
+import { totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 
 const RAMP_LANDING = { x: 32, z: 27 };
 
@@ -103,11 +104,15 @@ describe('blast, ramp to the floor, haul (#1723)', () => {
     // Hauled debris leaves its crater column, so follow the fragments that started there by id.
     const hauled = () => state.logistics.fragments.filter(f =>
       craterFragmentIds.has(f.fragment.id) && f.state !== 'on_ground').length;
-    const storedBefore = state.logistics.storedMassKg;
-    tickWhile(run, state, () => hauled() > 0 && state.logistics.storedMassKg > storedBefore, 1500);
+    // Barren rock lands on the spoil heap, ore in the warehouse (#1530): count both. Rubble blocks the truck, so it
+    // loads the crater's pile from its edge and hauls the loose rock around the crater as it comes; the first
+    // trips can all be barren, so the warehouse alone is not what "the hauler hauls" means.
+    const hauledKg = () => state.logistics.storedMassKg + totalSpoilKg(state.buildings.buildings);
+    const hauledBefore = hauledKg();
+    tickWhile(run, state, () => hauled() > 0 && hauledKg() > hauledBefore, 1500);
 
     expect(hauled()).toBeGreaterThan(0);
-    expect(state.logistics.storedMassKg).toBeGreaterThan(storedBefore);
+    expect(hauledKg()).toBeGreaterThan(hauledBefore);
     expect(assertWorldInvariants(state)).toEqual([]);
   }, 600_000);
 });

@@ -503,10 +503,12 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
    * Re-measured under the per-hole energy kernel (EXPLOSIVE_ENERGY_SCALE 25, drilling paid per metre), the shot filled at
    * the grade-0 permit's stemming: 630,090.0 (the 6 kg load it replaced read 698,831.7).
    * Re-measured once the kernel stopped breaking the rock under each hole's bottom (the crater floors flat at grade,
-   * so the shot breaks and sells less ore but every fragment stays reachable): 525,660.5. Floor is that measurement
-   * less about 5%, so a small balance move does not fail it while a stalled haul still does.
+   * so the shot breaks and sells less ore but every fragment stays reachable): 525,660.5.
+   * Re-measured once rubble blocked vehicles over its footprint, so a truck loads the muck pile from its edge instead of
+   * driving onto it, and boulders start at 2 m³: 495,672.7. Floor is that measurement less about 5%, so a small balance
+   * move does not fail it while a stalled haul still does.
    */
-  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 500_000;
+  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 470_000;
 
   interface OpeningTrace {
     endedAtTick: number | null;

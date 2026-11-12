@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { openingCraterGame, tickWhile, outOfReachCount, type OpeningGame } from '../helpers/openingCrater.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
+import { terrainStrandedDebris } from '../helpers/rubble.js';
 
 /** Ticks the core is given to order something on its own; it must do nothing. */
 const IDLE_TICKS = 1500;
@@ -15,7 +16,12 @@ const DIG_TICKS = 3000;
 /** Ticks after the dig for the classifier to see the new road and the haulers to carry ore out. */
 const RECLASSIFY_TICKS = 60;
 const HAUL_TICKS = 800;
-/** "Near zero": at most this share of the orders stranded before the ramp may still be out of reach. */
+/**
+ * "Near zero": at most this share of the orders the terrain stranded before the ramp may still be out of its reach.
+ * Rubble blocks vehicles, so the crater's pile is worked from its edge and its inner rock keeps the debris_out_of_reach
+ * stamp until the rock around it is hauled; whether the ramp opened the crater is read with rubble set aside
+ * (`terrainStrandedDebris`).
+ */
 const MAX_REMAINING_SHARE = 0.1;
 
 const constructionSpend = (g: OpeningGame, since: number) =>
@@ -54,7 +60,7 @@ describe('the suggested ramp opens the crater (C5)', () => {
 
   beforeAll(() => {
     g = openingCraterGame();
-    strandedBefore = outOfReachCount(g.state);
+    strandedBefore = terrainStrandedDebris(g.state).length;
     oreBefore = oreKg(g);
     orderedAt = g.state.tickCount;
     expect(g.run('build_ramp suggest order')).toMatchObject({ success: true });
@@ -71,7 +77,7 @@ describe('the suggested ramp opens the crater (C5)', () => {
 
   it('drops the out-of-reach count to near zero', () => {
     expect(strandedBefore).toBeGreaterThan(0);
-    expect(outOfReachCount(g.state)).toBeLessThanOrEqual(Math.floor(strandedBefore * MAX_REMAINING_SHARE));
+    expect(terrainStrandedDebris(g.state).length).toBeLessThanOrEqual(Math.floor(strandedBefore * MAX_REMAINING_SHARE));
   });
 
   it('has the crater\'s ore hauled to storage', () => {

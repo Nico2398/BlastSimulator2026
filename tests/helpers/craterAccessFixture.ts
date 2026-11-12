@@ -154,7 +154,7 @@ export function thinRubble(site: CraterSite, keepEvery: number): number {
   const { state } = site;
   const kept = state.logistics.fragments.filter((t, i) => {
     if (t.state !== 'on_ground' || i % keepEvery === 0) return true;
-    state.navGrid?.removeFragmentOccupant(Math.round(t.fragment.position.x), Math.round(t.fragment.position.z));
+    state.navGrid?.removeFragmentFootprint(t.fragment); // every cell it covers, not only its centre
     return false;
   });
   state.logistics.fragments = kept;

@@ -77,3 +77,7 @@ Records why the rules in the `gameplay-navmesh` skill exist: the issues that int
 ## Access ramp offer
 
 - The out-of-reach orders now come with a one-click proposed access ramp in the blast report and the Operations panel, planned by `planCraterAccess`, ordered only on the player's click (#2144).
+
+## 2026-11-12 — Rubble blocks vehicles over its footprint
+
+- **Why.** The owner: a fragment blocks the nav grid over its whole body, and trucks load from beside a pile instead of driving over it; gravel is driven over, a rock the size of a vehicle never. Replaced: "component labelling ignores fragment occupancy and a drive leg paths with `avoidVehicles: false`, so a ramp column buried under fragments is reachable" (drive legs used to cross rubble; a fragment marked only the cell of its centre).

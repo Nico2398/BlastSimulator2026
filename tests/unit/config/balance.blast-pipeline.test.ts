@@ -99,8 +99,8 @@ describe('Collection Rules', () => {
     expect(OVERSIZED_FRAGMENT_THRESHOLD).toBeDefined();
   });
 
-  it('OVERSIZED_FRAGMENT_THRESHOLD is 0.5 — fragments larger than 0.5 m³ require secondary breaking', () => {
-    expect(OVERSIZED_FRAGMENT_THRESHOLD).toBe(0.5);
+  it('OVERSIZED_FRAGMENT_THRESHOLD is 2.0 — fragments larger than 2.0 m³ require secondary breaking', () => {
+    expect(OVERSIZED_FRAGMENT_THRESHOLD).toBe(2.0);
   });
 
   // ── Structural invariant ───────────────────────────────────────────────────

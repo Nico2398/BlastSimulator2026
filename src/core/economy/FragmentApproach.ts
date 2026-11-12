@@ -14,7 +14,7 @@
 
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { GameState } from '../state/GameState.js';
-import { fragmentBlocksVehicles, fragmentFootprintCells, fragmentRingCells } from '../nav/FragmentFootprint.js';
+import { fragmentBlocksVehicles, fragmentFootprintCells, fragmentRestsOn, fragmentRingCells } from '../nav/FragmentFootprint.js';
 import type { NavCell } from '../nav/NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { vehicleReachesCell } from '../engine/ReachCache.js';
@@ -27,8 +27,16 @@ import { FRAGMENT_APPROACH_MAX_STEP_M, FRAGMENT_APPROACH_REACH_CELLS } from '../
 export function fragmentApproachCandidates(fragment: FragmentData, state: Pick<GameState, 'navGrid'>): Array<{ x: number; z: number; ring: number }> {
   const nav = state.navGrid;
   if (!nav) return [{ x: Math.round(fragment.position.x), z: Math.round(fragment.position.z), ring: 0 }];
-  // The ground under the rock: its own cell's surface, when the grid models terrain.
-  const ground = nav.cellAt(Math.round(fragment.position.x), Math.round(fragment.position.z))?.surfaceY;
+  // The ground the rock lies on: the highest surface among the cells under it that it rests on (`fragmentRestsOn`). A
+  // rock on a bench edge with its centre over the pit below is worked from the bench; a rock stacked on a pile from
+  // the floor the pile stands on. Its centre cell's surface when none is known.
+  let ground: number | undefined;
+  for (const c of fragmentFootprintCells(fragment)) {
+    const surfaceY = nav.cellAt(c.x, c.z)?.surfaceY;
+    if (surfaceY === undefined || !fragmentRestsOn(fragment, surfaceY)) continue;
+    if (ground === undefined || surfaceY > ground) ground = surfaceY;
+  }
+  ground ??= nav.cellAt(Math.round(fragment.position.x), Math.round(fragment.position.z))?.surfaceY;
   // Gravel is driven over: its own cells are where a truck stands to scoop it.
   const own = fragmentBlocksVehicles(fragment) ? [] : fragmentFootprintCells(fragment).map(c => ({ ...c, ring: 0 }));
   const ring = [...own, ...fragmentRingCells(fragment, FRAGMENT_APPROACH_REACH_CELLS)];
@@ -68,8 +76,9 @@ export function fragmentApproachCell(
   const free = fragmentApproachCandidates(fragment, state)
     .filter(c => !isCellOccupiedByOtherVehicle(state, c.x, c.z, excludeVehicleId) && !isCellHeldByOtherWorker(state, c.x, c.z, driverIds));
   if (free.length === 0) return null;
-  const reached = vehicle ? free.filter(c => vehicleReachesCell(state, vehicle, c.x, c.z)) : [];
-  const pool = reached.length > 0 ? reached : free;
+  // A vehicle is sent only where it can drive: with none of the free sides in its reach the order waits.
+  const pool = vehicle ? free.filter(c => vehicleReachesCell(state, vehicle, c.x, c.z)) : free;
+  if (pool.length === 0) return null;
   const from = vehicle ? { x: vehicle.x, z: vehicle.z } : fragment.position;
 
   let best = pool[0]!;

@@ -122,8 +122,11 @@ seeds(v) = SEEDS_BASE + SEEDS_PER_INTENSITY × (I − FM)  otherwise
 `seedCountForIntensity` (`FragmentGeneration.ts`) rolls the fractional part as one more seed with
 the blast's seeded chance and caps the count at `MAX_SEEDS_PER_VOXEL` (8). `SEEDS_BASE` and
 `SEEDS_PER_INTENSITY` are both 2: a voxel broken at its threshold seeds two (fragments of about
-0.5 m³, haulable under `OVERSIZED_FRAGMENT_THRESHOLD`), four at the fines bound (0.25 m³), eight at
-the dust bound (0.125 m³, the sub-cell floor). Rock broken with less energy than its threshold
+0.5 m³), four at the fines bound (0.25 m³), eight at the dust bound (0.125 m³, the sub-cell floor:
+gravel vehicles drive over, `FRAGMENT_DRIVABLE_MAX_VOLUME_M3`). Boulders, above
+`OVERSIZED_FRAGMENT_THRESHOLD` (2.0 m³), come from the collar under the stemming and the weakly broken
+pattern edges: the tutorial pit's guided 3x3 (4 m, 8 m deep, boomite filled under 2.5 m) leaves none,
+its largest piece 2.0 m³, while an underfilled or over-stemmed shot there leaves 13-62, up to 11 m³. Rock broken with less energy than its threshold
 (coarse: lifted burden, floor to grade, unsupported rock) seeds the base scaled by its intensity —
 under one seed below half its threshold — so the least-energised of it seeds **nothing** and is
 swallowed by a neighbouring cluster as one large boulder.

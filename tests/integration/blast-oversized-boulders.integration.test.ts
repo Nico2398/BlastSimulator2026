@@ -100,10 +100,12 @@ function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300): void {
  * (18,19) — same origin as economy.integration.test.ts's full-loop case: it
  * sits on the same flat NavGrid bench as the vehicle spawn and warehouse, so
  * fragments land somewhere a vehicle can actually reach. The holes, 5 m
- * apart, are filled up to the stemming with pop_rock, the weakest explosive
- * (1.375 kg/m): measured under the kernel energy model it breaks out with a
- * few hundred oversized fragments and zero projections. A partial 2 kg
- * charge, the old undercharge, now breaks nothing at all here.
+ * apart, are filled with pop_rock, the weakest explosive (1.375 kg/m), up to
+ * 4 m of stemming: half of each 8 m hole charged. Measured under the kernel
+ * energy model it breaks out into 254 fragments, 9 of them boulders past the
+ * 2 m³ oversized threshold (largest 6.6 m³), with zero projections. Filled up
+ * to 2 m it breaks finer: its largest piece is 2 m³, not past the threshold.
+ * A partial 2 kg charge, the old undercharge, breaks nothing at all here.
  */
 function blastUndercharged(ctx: GameContext): void {
   // Pop_rock fizzles in a hole that holds water: the weather is pinned dry, rain is not what this test is about.
@@ -123,7 +125,7 @@ function blastUndercharged(ctx: GameContext): void {
   const chargeResult = chargeCommand(ctx as any, [], {
     hole: '*',
     explosive: 'pop_rock',
-    stemming: '2m',
+    stemming: '4m',
   });
   expect(chargeResult.success).toBe(true);
   deliverExplosivesNow(ctx.state!); // timing downstream of the charge is the subject, not the delivery wait (#1895)

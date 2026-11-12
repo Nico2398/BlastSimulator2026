@@ -121,7 +121,7 @@ A pit floor is therefore only workable once a ramp reaches it: dispatch queues h
 - Plans that would free nothing: a plan identical to a built ramp (`state.builtRamps`) is skipped, and a spiral whose foot has no floor-level ground (within `CRATER_ACCESS_FLOOR_LEVEL_M`) inside `(RAMP_SPIRAL_RIM_GAP_WIDTHS + 1) x width` tiles is rejected: round a pit nested in a wider one the spiral rings the outer pit and ends beside nothing, so the floor is unplannable.
 - A walk-only pin (`walkOnlyPinnedBy`) on a queued order is dropped once the pinned employee can no longer serve it (`releaseUnservableWalkPins`, e.g. the vehicle was upgraded to a tier their licence does not cover); a permanent target is untouched.
 - Rubble is an obstacle to every walk, evacuation and rest trips included: a worker a rubble ring boxes in reads `stranded` and the armed shot waits for the player to clear a path or fire anyway.
-- Ramp reachability and the executor agree on rubble: component labelling ignores fragment occupancy and a drive leg paths with `avoidVehicles: false`, so a ramp column buried under fragments is reachable; only haul orders on a genuinely sealed cell stay `debris_out_of_reach`.
+- Ramp reachability and the executor agree on rubble: at vehicle clearance both the labelling and every drive route treat rubble as an obstacle (`rubbleBlocksMover`), so a ramp layer under rubble is dug from a free column of its own or beside it (`retargetRampLayers`); crater access judges its floors with rubble set aside (`withRubbleSetAside`), since rubble is hauled, not ramped round.
 - A ramp layer none of whose own or sibling columns the digger reaches falls back to a column beside its cells, else beside the ramp's other segments (`retargetBesideRampLayers`), rather than staying `target_unreachable`: a digger on a crater floor starts a ramp that lands flush beside it from its foot.
 
 ## Dynamic NavGrid Updates
@@ -160,6 +160,12 @@ Debris no actor able to haul it can reach is a legitimate state, not a defect (p
 counting as a failure or a blocked order, is shown as a single summary indication (neutral top-bar
 pip, no toast or log entry), and resumes on its own once connected. Player-ordered unreachable
 actions (survey, place_building, ramp layers, ...) still get `target_unreachable` and the per-order warning. Every unreachable queued action, debris included, also draws a red ghost.
+
+## Rubble
+
+A fragment occupies every cell its body covers (`fragmentFootprintCells`, `FragmentFootprint.ts`; a cell counts when the rock overlaps it by more than `FRAGMENT_FOOTPRINT_MIN_OVERLAP_M`), on the ground it rests on (`fragmentRestsOn`: a rock below a cell's surface, sealed under intact rock or lying at the foot of a wall, occupies nothing above it). Gravel, a fragment of at most `FRAGMENT_DRIVABLE_MAX_VOLUME_M3` (one sub-cell), is driven and walked over and occupies nothing (`fragmentBlocksVehicles`). `NavGrid.addFragmentFootprint` / `removeFragmentFootprint` mark and unmark exactly the cells a rock was marked on; every change bumps `fragmentRevision`, and reachability caches key on it alongside `revision`.
+
+Rubble blocks vehicles on every route and in every labelling at vehicle clearance (`rubbleBlocksMover`); a worker on foot steps round it when there is a way and over it when there is not. A hauler or breaker works a rock from a free cell up to `FRAGMENT_APPROACH_REACH_CELLS` from its footprint, nearest ring first, never through a wall, within `FRAGMENT_APPROACH_MAX_STEP_M` of the ground the rock lies on, never on a cell another vehicle or a worker holds, and only one it can drive to (`fragmentApproachCell`); a haul or breaker order is reachable when one of those cells is. A pile is therefore worked from its edge: the rock inside it reads `debris_out_of_reach` until the rock around it is hauled. `terrainStrandedDebris` (`TerrainStrandedDebris.ts`) names what terrain alone strands. A debris order whose plan just found no route is passed over for `DEBRIS_FAILED_PLAN_RETRY_TICKS`. Buried planned holes use the same cell rule.
 
 ## Building Approach Cells
 

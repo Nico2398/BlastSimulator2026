@@ -3655,8 +3655,8 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:59,59",
-      "description": "#560: right at the very edge of this file's 64x64 world -- holes reach x/z=61, 2-3 cells from the true boundary at 63 -- the same boundary/skirt wall closure #559 already covers at the interior-ish edges cycles 1-4 use (starts 20,20 / 45,20 / 5,45 / 5,5), now proven with a real blast right at the site's own outer edge, where the depth-limited skirt (#560) has the least margin to work with. #601-followup round 3 (issue #631, real interaction-mode finding): one increment click on the spacing stepper before dragging -- cycle 4's own grid decrements it down to 1 (see grid 1's own comment: spacing persists across grid operations within a session), and this cycle never accounted for un-decrementing it back to 2 before its own drag. Confirmed via direct trace: without the click, the (59,59)-(61,61) drag rectangle at the inherited spacing:1 computes a 3x3 grid (orderedHoleCount:9), not this step's own declared 2x2 (orderedHoleCount:4).",
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:59,53",
+      "description": "#560: right at the very edge of this file's 64x64 world -- holes reach x/z=61, 2-3 cells from the true boundary at 63 -- the same boundary/skirt wall closure #559 already covers at the interior-ish edges cycles 1-4 use (starts 20,20 / 45,20 / 5,45 / 5,5), now proven with a real blast right at the site's own outer edge, where the depth-limited skirt (#560) has the least margin to work with. #601-followup round 3 (issue #631, real interaction-mode finding): one increment click on the spacing stepper before dragging -- cycle 4's own grid decrements it down to 1 (see grid 1's own comment: spacing persists across grid operations within a session), and this cycle never accounted for un-decrementing it back to 2 before its own drag. Confirmed via direct trace: without the click, the (59,59)-(61,61) drag rectangle at the inherited spacing:1 computes a 3x3 grid (orderedHoleCount:9), not this step's own declared 2x2 (orderedHoleCount:4). Rubble blocks vehicles over its footprint: moved from (59,59)-(61,61) to (59,53)-(61,55), still reaching x=61, two cells from the east boundary. The earlier cycles' flyrock lies along that boundary and over the (59..63, 59..63) corner, on the old (61,61) hole's cell among it; no vehicle here hauls it away, so the rig could never stand on that hole and the cycle stalled at 3 of 4. The new cells are clear of it, and the blast still opens a crater against the site's outer edge.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -3687,7 +3687,7 @@
         {
           "type": "focusTile",
           "x": 59,
-          "z": 59,
+          "z": 53,
           "distance": 45,
           "yaw": 180,
           "pitch": 60
@@ -3695,9 +3695,9 @@
         {
           "type": "dragTiles",
           "x1": 59,
-          "z1": 59,
+          "z1": 53,
           "x2": 61,
-          "z2": 61
+          "z2": 55
         },
         {
           "type": "screenshot"
@@ -3843,7 +3843,7 @@
       "timeout": 70,
       "frames": 6,
       "interval": 50,
-      "description": "#560: this step's own default post-step screenshot (plus the 6 extra frames above) is the proof artifact for this cycle -- inspect it for a closed boundary/skirt wall around the crater at the site's true edge, no see-through gap to whatever lies beyond (59,59)-(61,61).",
+      "description": "#560: this step's own default post-step screenshot (plus the 6 extra frames above) is the proof artifact for this cycle -- inspect it for a closed boundary/skirt wall around the crater at the site's true edge, no see-through gap to whatever lies beyond (59,53)-(61,55).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -3909,11 +3909,11 @@
       }
     },
     {
-      "command": "inspect 60,60,0",
+      "command": "inspect 60,54,0",
       "interaction": [
         {
           "type": "command",
-          "command": "inspect 60,60,0"
+          "command": "inspect 60,54,0"
         }
       ],
       "role": "observe"

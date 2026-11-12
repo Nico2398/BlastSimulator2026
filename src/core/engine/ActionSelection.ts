@@ -12,7 +12,7 @@ import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
 import { hasPlannedHolesOnSite, isDrillHoleBuried, trackedBuriesPlannedHole } from '../mining/BuriedHoles.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS, BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS, actionRankTier, ACTION_STARVATION_TICK_THRESHOLD, DEMOLITION_VEHICLE_TIER_SPEED } from '../config/balance.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS, BURIED_HOLE_HAUL_PRIORITY_BONUS_TICKS, actionRankTier, ACTION_STARVATION_TICK_THRESHOLD, DEBRIS_FAILED_PLAN_RETRY_TICKS, DEMOLITION_VEHICLE_TIER_SPEED } from '../config/balance.js';
 import { computeDemolitionDurationTicks } from '../entities/DemolitionDuration.js';
 import { readDemolishPayload } from './DemolishPayload.js';
 import { computeRampSegmentDurationTicks, isRampCellPending } from '../mining/Ramp.js';
@@ -522,6 +522,36 @@ export function selectBestActionForEmployee(
   return withUnderRepairIndex(state, () => selectWithinIndex(state, employee, candidates, isClaimable, fragmentOf));
 }
 
+/**
+ * Debris orders whose last plan found no route, and the tick until which a search passes over them (runtime only).
+ * Rubble blocks vehicles, so a rock whose only free side is held by a parked vehicle or a worker can rank cheapest on
+ * its estimate yet plan no route; without this, the same few such orders took every path attempt of every search and
+ * the crew idled beside a pile of reachable rock.
+ */
+const failedDebrisPlans = new WeakMap<GameState, Map<number, number>>();
+
+function isRestingAfterFailedPlan(state: GameState, action: PendingAction): boolean {
+  if (!isOnGroundDebris(state, action)) return false;
+  const until = failedDebrisPlans.get(state)?.get(action.id);
+  return until !== undefined && state.tickCount < until;
+}
+
+/**
+ * Only rock still on the ground rests after a failed plan: a loaded haul (the rock rides in a truck) can be planned
+ * only by that truck's driver, so other drivers failing it must never hold it back from them.
+ */
+function isOnGroundDebris(state: GameState, action: PendingAction): boolean {
+  if (!isAutoDebrisAction(action.type)) return false;
+  return resolveTrackedFragment(state, action, createFragmentLookup(state))?.state === 'on_ground';
+}
+
+function noteFailedPlan(state: GameState, action: PendingAction): void {
+  if (!isOnGroundDebris(state, action)) return;
+  let map = failedDebrisPlans.get(state);
+  if (map === undefined) failedDebrisPlans.set(state, map = new Map());
+  map.set(action.id, state.tickCount + DEBRIS_FAILED_PLAN_RETRY_TICKS);
+}
+
 function selectWithinIndex(
   state: GameState,
   employee: Employee,
@@ -548,6 +578,11 @@ function selectWithinIndex(
     const tracked = isAutoDebrisAction(a.type) ? fragmentOf(a.payload['fragmentId'] as number) : undefined;
     if (tracked !== undefined && tracked.state === 'on_ground') {
       return fragmentApproachCandidates(tracked.fragment, state).some(c => climbReach.canReach(employee.x, employee.z, c.x, c.z));
+    }
+    // A loaded haul starts at the truck that carries the rock.
+    if (tracked !== undefined && tracked.state === 'in_transit') {
+      const truck = state.vehicles.vehicles.find(v => String(v.id) === tracked.vehicleId);
+      if (truck !== undefined) return climbReach.canReach(employee.x, employee.z, Math.round(truck.x), Math.round(truck.z));
     }
     return climbReach.canReach(employee.x, employee.z, navGrid.clampX(a.targetX), navGrid.clampZ(a.targetZ));
   };
@@ -645,10 +680,14 @@ function searchTiers(
       if (best !== null && estimate >= bestAdjusted) break;
 
       if (!reachable(candidate)) continue;
+      if (isRestingAfterFailedPlan(state, candidate)) continue;
 
       attemptsSpent++;
       const resolved = resolveActionCost(state, employee, candidate);
-      if (resolved === null) continue;
+      if (resolved === null) {
+        noteFailedPlan(state, candidate);
+        continue;
+      }
       const adjusted = Math.max(0, resolved.totalTicks - bonus) - demandBonus; // sort key only; totalTicks stays real
       if (adjusted < bestAdjusted) {
         best = { action: candidate, totalTicks: resolved.totalTicks };

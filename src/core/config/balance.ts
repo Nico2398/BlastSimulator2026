@@ -2608,6 +2608,9 @@ export const FRAGMENT_APPROACH_MAX_STEP_M = 1.5;
  */
 export const FRAGMENT_APPROACH_REACH_CELLS = 2;
 
+/** Ticks a debris order whose plan just found no route is passed over by the crew's searches before it is tried again. */
+export const DEBRIS_FAILED_PLAN_RETRY_TICKS = 20;
+
 /** Fewest stranded cells that make a placement report a cutoff (#1391). */
 export const PLACEMENT_CUTOFF_MIN_CELLS = 1;
 

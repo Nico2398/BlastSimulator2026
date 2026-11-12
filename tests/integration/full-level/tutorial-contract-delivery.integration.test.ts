@@ -235,7 +235,12 @@ describe('Tutorial Level — Contract Delivery', () => {
     // long before that. Capped generously above what any same-map haul needs.
     let lastRefusal = '';
     let claimed = false;
+    // A claimed haul can be handed back to the open pool before the truck loads (its drive leg found no route
+    // that tick: rubble blocks vehicles, so the cell beside the rock it parks on can be taken), and the
+    // self-dispatching crew may then work nearer rock first. Claim it again whenever no one holds its order.
+    const held = (): boolean => ctx.state!.pendingActions.some(a => a.payload['fragmentId'] === fragmentId && a.holderId !== null);
     for (let i = 0; i < 300 && tracked()?.state !== 'stored'; i++) {
+      if (claimed && tracked()?.state === 'on_ground' && !held()) claimed = false;
       if (!claimed && tracked()?.state === 'on_ground') {
         const haulResult = vehicleCommand(ctx, ['haul', String(vehicleId)], { fragment: String(fragmentId) });
         claimed = haulResult.success;

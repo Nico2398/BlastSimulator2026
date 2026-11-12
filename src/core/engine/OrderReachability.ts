@@ -183,6 +183,11 @@ export function buildOrderReachability(
         if (tracked !== undefined && tracked.state === 'on_ground') {
           return fragmentApproachCandidates(tracked.fragment, state).some(c => canReach(key, c.x, c.z));
         }
+        // A loaded haul is worked from the truck that carries the rock, whatever now lies on the rock's old cell.
+        if (tracked !== undefined && tracked.state === 'in_transit') {
+          const truck = state.vehicles.vehicles.find(v => String(v.id) === tracked.vehicleId);
+          if (truck !== undefined) return canReach(key, Math.round(truck.x), Math.round(truck.z));
+        }
       }
       return canReach(key, action.targetX, action.targetZ);
     },

@@ -16,6 +16,7 @@ import { accumulateOreMass } from '../../src/core/mining/BlastOreReport.js';
 import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
+import { terrainStrandedDebris } from '../helpers/rubble.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { NavGrid, isStepClimbable } from '../../src/core/nav/NavGrid.js';
 import { NAV_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
@@ -133,10 +134,12 @@ describe.each(['west', 'east'] as const)('opening kit: blast, ramp from the %s, 
     expect(result.maxStuck).toBeLessThanOrEqual(MAX_STUCK_TICKS);
   });
 
-  it('most haulable debris is reachable (not debris_out_of_reach)', () => {
+  // Rubble blocks vehicles, so a pile is worked from its edge and the rock inside it reads debris_out_of_reach until the
+  // rock around it is hauled. What this guards is the ramp opening the crater, so only orders the terrain strands count.
+  it('most haulable debris is reachable over the terrain (the ramp opens the crater)', () => {
     const { state, haulable } = result;
     if (haulable.length === 0) throw new Error('blast produced no haulable fragments');
-    const outOfReach = state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach').length;
+    const outOfReach = terrainStrandedDebris(state).length;
     expect((haulable.length - outOfReach) / haulable.length).toBeGreaterThanOrEqual(MIN_ORDERED_SHARE);
   });
 

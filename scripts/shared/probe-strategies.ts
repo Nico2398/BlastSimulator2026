@@ -50,6 +50,7 @@
 //            A buy rule that cannot act (unaffordable, cooling down, failed) falls through to the
 //            next. Deposits are ranked on ground-truth ore, not a survey.
 
+import { terrainStrandedDebris } from '../../src/core/engine/TerrainStrandedDebris.js';
 import { createGameEngine } from './command-runner.js';
 import { runCommand } from '../../src/console/createRunner.js';
 import type { RunnerWithContext } from '../../src/console/createRunner.js';
@@ -265,11 +266,10 @@ function haulableOreOnGroundKg(state: GameState): number {
  * reinvest reload gate waits on this: ore stranded in a crater until a ramp reaches it is not ore the next shot competes
  * with, and counting it held desert_badlands full seed 8 at two blasts while 17-20 t sat out of reach for 3,000 ticks (#2126).
  */
-export function reachableHaulableOreKg(state: Pick<GameState, 'logistics' | 'pendingActions'>): number {
-  const stranded = new Set<unknown>();
-  for (const a of state.pendingActions) {
-    if (a.type === 'haul_debris' && a.blockedReason === 'debris_out_of_reach') stranded.add(a.payload['fragmentId']);
-  }
+export function reachableHaulableOreKg(state: GameState): number {
+  // Terrain-stranded only: rock inside a pile reads debris_out_of_reach until the rock around it goes, and is ore the
+  // next shot competes with all the same.
+  const stranded = new Set<unknown>(terrainStrandedDebris(state).filter(a => a.type === 'haul_debris').map(a => a.payload['fragmentId']));
   return fragmentOreKg(
     state.logistics.fragments
       .filter(f => f.state === 'on_ground' && !isOversized(f.fragment.volume) && !stranded.has(f.fragment.id))
@@ -1714,8 +1714,10 @@ function reachableOreRubbleKg(state: GameState): number {
   const reachable = new Set<number>();
   for (const a of state.pendingActions) {
     const id = (a.payload as { fragmentId: number }).fragmentId;
-    if (a.type === 'haul_debris' && a.blockedReason === null && ore.has(id)) reachable.add(id);
+    if (a.type === 'haul_debris' && ore.has(id)) reachable.add(id);
   }
+  // Rock inside a pile is reached once the rock around it goes; only what the terrain strands stays put.
+  for (const a of terrainStrandedDebris(state)) reachable.delete((a.payload as { fragmentId: number }).fragmentId);
   let kg = 0;
   for (const f of state.logistics.fragments) if (f.state === 'on_ground' && reachable.has(f.fragment.id)) kg += f.fragment.mass;
   return kg;

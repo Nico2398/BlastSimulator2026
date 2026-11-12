@@ -23,6 +23,7 @@ import {
   CHARGE_DEFAULT_STEMMING_M } from '../../src/core/config/balance.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { buildBlastReport } from '../../src/core/mining/BlastExecution.js';
+import { totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 
 /** tickUntilFresh that also keeps payroll from bankrupting the run: charging is worked from a truck by one crew member (#1649), so a charge pass spans far more payroll ticks than the starting cash covers. */
 function tickFunded(run: (cmd: string) => unknown, state: GameState, predicate: () => boolean, maxTicks: number): void {
@@ -1055,8 +1056,10 @@ describe('Blast execution — haulers keep hauling reachable debris past a crate
 
     const WINDOW = 400;
     const start = state().tickCount;
-    const movedFragments = () => state().logistics.fragments.filter(f => f.state !== 'on_ground').length;
-    const movedAtStart = movedFragments();
+    // Mass delivered: ore to the warehouse, barren rock to the spoil heap (#1530). A delivered barren piece leaves
+    // `logistics.fragments`, so counting pieces off the ground only sees the ones riding in a truck at that tick.
+    const hauledKg = () => state().logistics.storedMassKg + totalSpoilKg(state().buildings.buildings);
+    const hauledAtStart = hauledKg();
     let idleWhileReachable = 0;
     let peakQueued = -1;
     for (let i = 0; i < WINDOW; i++) {
@@ -1077,8 +1080,8 @@ describe('Blast execution — haulers keep hauling reachable debris past a crate
     expect(idleWhileReachable).toBeLessThan(WINDOW / 10);
     // Reachable rock keeps being hauled. The core's own crater-access ramp (#2082) opens the whole crater
     // to the crew early in the window and fragmenting its rubble spawns new haul orders as fast as they
-    // drain, so progress is counted in fragments moved off the ground, not in a shrinking queue.
-    if (peakQueued > 0) expect(movedFragments()).toBeGreaterThan(movedAtStart);
+    // drain, so progress is counted in mass delivered, not in a shrinking queue.
+    if (peakQueued > 0) expect(hauledKg()).toBeGreaterThan(hauledAtStart);
   }, 240_000);
 });
 
