@@ -1525,7 +1525,7 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
 // the requester having settled one cell short of its real target) rather
 // than via the stub's own thrown error.
 describe('tickLocomotion — agent occupancy destination-blocker relocation (#1278)', () => {
-  it('relocates an idle employee blocker off another mover\'s exact destination cell, letting the requester actually reach it', () => {
+  it('an idle employee blocker walks off another mover\'s exact destination cell (never teleported), letting the requester actually reach it', () => {
     const state = buildFlatNavGridState(10, 10);
     const rng = new Random(SEED);
 
@@ -1538,16 +1538,19 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
     const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 0, 2);
     expect(moveTo(state, mover.id, { x: 4, z: 2 }).success).toBe(true);
 
-    // Well under MOVE_STUCK_ABANDON_TICKS (30): one AGENT_OCCUPANCY_WAIT_TICKS
-    // wait, plus a handful of ticks for the ladder to actually resolve and the
-    // mover to close the last cell.
-    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + 10;
+    // Under MOVE_STUCK_ABANDON_TICKS: one AGENT_OCCUPANCY_WAIT_TICKS wait, then
+    // the blocker WALKS off (#2231) and the mover closes the last cell.
+    const TICK_BOUND = MOVE_STUCK_ABANDON_TICKS - 1;
     expect(TICK_BOUND).toBeLessThan(MOVE_STUCK_ABANDON_TICKS);
 
     const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
     let relocatedAtTick: number | null = null;
+    let maxStep = 0;
+    openMovementTrails(state);
     for (let i = 0; i < TICK_BOUND; i++) {
+      const px = blocker.x, pz = blocker.z;
       everAbandoned.push(...tickLocomotion(state).abandoned);
+      maxStep = Math.max(maxStep, Math.hypot(blocker.x - px, blocker.z - pz));
       if (relocatedAtTick === null && !(blocker.x === 4 && blocker.z === 2)) relocatedAtTick = i;
     }
 
@@ -1559,6 +1562,13 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
     expect(mover.x).toBe(4);
     expect(mover.z).toBe(2);
     expect(everAbandoned).toHaveLength(0);
+    // The blocker got off by walking: a continuous trail from its origin to where it stands.
+    expect(maxStep).toBeLessThanOrEqual(AGENT_WALK_SPEED + 1e-6);
+    const trail = blocker.walkTrail!;
+    expect(trail.relocated).toBe(false);
+    expect(trail.points.length).toBeGreaterThanOrEqual(2);
+    expect(trail.points[0]).toEqual({ x: 4, z: 2 });
+    expect(trail.points[trail.points.length - 1]).toEqual({ x: blocker.x, z: blocker.z });
   });
 
   it('boundary: a blocker with no free cell anywhere in its own neighbourhood is left in place, and the requester still resolves via the existing destination-spread fallback (regression pin)', () => {
@@ -1710,7 +1720,7 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
     expect(blocker.z).toBe(2);
   });
 
-  it('vehicle parity: relocates an idle, driverless, unreserved vehicle blocker off a foot mover\'s exact destination, through handleAgentOccupancyBlock (not the vehicle-only handleOccupancyBlock)', () => {
+  it('vehicle parity (#2231): a parked, driverless, unreserved vehicle on a foot mover\'s exact destination never moves; the mover settles on another free cell or waits', () => {
     const state = buildFlatNavGridState(10, 10);
     const rng = new Random(SEED);
 
@@ -1721,21 +1731,45 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
     const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 0, 2);
     expect(moveTo(state, mover.id, { x: 4, z: 2 }).success).toBe(true);
 
-    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + 10;
-    expect(TICK_BOUND).toBeLessThan(MOVE_STUCK_ABANDON_TICKS);
-
-    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
-    let relocatedAtTick: number | null = null;
+    // Far past the wait threshold AND the abandon threshold: "keeps its x/z forever".
+    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS + 60;
     for (let i = 0; i < TICK_BOUND; i++) {
-      everAbandoned.push(...tickLocomotion(state).abandoned);
-      if (relocatedAtTick === null && !(blocker.x === 4 && blocker.z === 2)) relocatedAtTick = i;
+      const result = tickLocomotion(state);
+      expect(blocker.x, `vehicle x changed on tick ${i}`).toBe(4);
+      expect(blocker.z, `vehicle z changed on tick ${i}`).toBe(2);
+      expect(result.vehiclesMoved).not.toContain(blocker.id);
+      expect(cellKey(mover.x, mover.z), `mover stood on the parked vehicle's cell on tick ${i}`).not.toBe('4,2');
     }
 
-    expect(relocatedAtTick, 'vehicle blocker never moved off (4,2)').not.toBeNull();
-    expect(relocatedAtTick!).toBeLessThan(MOVE_STUCK_ABANDON_TICKS);
-    expect(mover.x).toBe(4);
-    expect(mover.z).toBe(2);
-    expect(everAbandoned).toHaveLength(0);
+    // Either settled on another free cell next to the destination, or it was left waiting/abandoned short of it.
+    expect(Number.isNaN(mover.x)).toBe(false);
+    expect(Number.isNaN(mover.z)).toBe(false);
+    if (mover.itinerary === null) {
+      const dist = Math.max(Math.abs(mover.x - 4), Math.abs(mover.z - 2));
+      expect(dist).toBeLessThanOrEqual(AGENT_FREE_CELL_SEARCH_MAX_RADIUS + 1);
+    }
+  });
+
+  it('#2231: a parked vehicle on the destination is not moved even when the mover has nowhere else to settle (all neighbours held)', () => {
+    const grid = makeFlatNavGrid(21, 21);
+    const vx = 10;
+    const vz = 10;
+    const moverStart = { x: vx - 1, z: vz };
+    blockNeighbourhood(grid, vx, vz, AGENT_FREE_CELL_SEARCH_MAX_RADIUS, [moverStart]);
+    const state = createGame({ seed: SEED });
+    state.navGrid = grid;
+    const rng = new Random(SEED);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'charging_truck', vx, vz);
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, moverStart.x, moverStart.z);
+    expect(moveTo(state, mover.id, { x: vx, z: vz }, { allowUnreachable: true }).success).toBe(true);
+
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS + 40; i++) {
+      const result = tickLocomotion(state);
+      expect(vehicle.x).toBe(vx);
+      expect(vehicle.z).toBe(vz);
+      expect(result.vehiclesMoved).not.toContain(vehicle.id);
+    }
   });
 
   it('#1709: relocates an idle rig WITH its idle driller aboard off a foot mover\'s destination, keeping rider and vehicle in the same cell', () => {
@@ -1874,7 +1908,7 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
     }
   });
 
-  it('radius widening in isolation: relocateIdleDestinationBlocker only succeeds because AGENT_FREE_CELL_SEARCH_MAX_RADIUS reaches past a fully-saturated radius-2 neighbourhood', () => {
+  it('#2231: a blocker enclosed by occupied cells cannot walk out and stays put (the old radius-widening teleport is gone)', () => {
     const state = buildFlatNavGridState(30, 30);
     const rng = new Random(SEED);
 
@@ -1885,15 +1919,8 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
 
     const moverStart = { x: bx - 1, z: bz };
     const { employee: mover } = hireEmployee(state.employees, 'driller', rng, moverStart.x, moverStart.z);
-    // Hand-built with an 'enter_building' onArrive (mirrors this file's own
-    // #1203 fixture, buildingId 999 deliberately absent — irrelevant here
-    // since the mover never actually arrives before the assertions run) so
-    // `needsExactUnsharedCell` reads false and the PRE-EXISTING
-    // destination-spread ladder step can never resolve this block by
-    // retargeting the mover elsewhere. The only thing that can possibly
-    // clear this block is relocateIdleDestinationBlocker itself — isolating
-    // AGENT_FREE_CELL_SEARCH_MAX_RADIUS's own effect from the already-working
-    // spread mechanism this file's other #1278 fixtures above exercise.
+    // 'enter_building' arrival (mirrors this file's #1203 fixture, buildingId 999
+    // deliberately absent) so the destination-spread step cannot retarget the mover.
     mover.itinerary = {
       legs: [{
         mode: 'foot', vehicleId: null, destX: bx, destZ: bz,
@@ -1904,40 +1931,66 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
       estTotalTicks: 1,
     } satisfies Itinerary;
 
-    // Manual occupancy ledger (mirrors this file's own tie-break/two-cell
-    // fixtures above): every cell within Chebyshev distance 1-2 of the
-    // blocker is held by a real, alive filler employee — saturating the OLD,
-    // pre-#1278 radius-2 bound entirely — except the mover's own held cell —
-    // while radius 3-4 (AGENT_FREE_CELL_SEARCH_MAX_RADIUS) is left genuinely
-    // open, unheld, unblocked terrain.
+    // Every cell within Chebyshev distance 1-2 of the blocker is held by a real
+    // filler (except the mover's own held cell); radius 3-4 is open terrain the
+    // blocker has no way to walk to, since the cells between are all held.
     const occupancy = new AgentOccupancy();
-    const moverOccupant: Occupant = { kind: 'employee', id: mover.id };
-    const blockerOccupant: Occupant = { kind: 'employee', id: blocker.id };
-    expect(occupancy.tryMove(moverOccupant, moverStart.x, moverStart.z)).toBe(true);
-    expect(occupancy.tryMove(blockerOccupant, bx, bz)).toBe(true);
+    expect(occupancy.tryMove({ kind: 'employee', id: mover.id }, moverStart.x, moverStart.z)).toBe(true);
+    expect(occupancy.tryMove({ kind: 'employee', id: blocker.id }, bx, bz)).toBe(true);
     for (let dx = -2; dx <= 2; dx++) {
       for (let dz = -2; dz <= 2; dz++) {
-        if (dx === 0 && dz === 0) continue; // the blocker's own cell
-        if (dx === -1 && dz === 0) continue; // the mover's own held cell
+        if (dx === 0 && dz === 0) continue;
+        if (dx === -1 && dz === 0) continue;
         const { employee: filler } = hireEmployee(state.employees, 'driller', rng, 0, 0);
         expect(occupancy.tryMove({ kind: 'employee', id: filler.id }, bx + dx, bz + dz)).toBe(true);
       }
     }
     state.agentOccupancy = occupancy;
 
-    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + 10;
-    for (let i = 0; i < TICK_BOUND; i++) {
+    openMovementTrails(state);
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS + 20; i++) {
       tickLocomotion(state);
+      expect(blocker.x, `blocker moved on tick ${i}`).toBe(bx);
+      expect(blocker.z, `blocker moved on tick ${i}`).toBe(bz);
     }
+    expect(blocker.walkTrail!.relocated).toBe(false);
+    expect(blocker.walkTrail!.points).toEqual([{ x: bx, z: bz }]);
+  });
 
-    expect(blocker.x === bx && blocker.z === bz, 'blocker never escaped the saturated radius-2 neighbourhood').toBe(false);
-    const dist = Math.max(Math.abs(blocker.x - bx), Math.abs(blocker.z - bz));
-    // Could only have landed at radius 3 or 4 — everything within radius 2
-    // was deliberately left with nowhere free.
-    expect(dist).toBeGreaterThanOrEqual(3);
-    expect(dist).toBeLessThanOrEqual(AGENT_FREE_CELL_SEARCH_MAX_RADIUS);
-    expect(Number.isNaN(blocker.x)).toBe(false);
-    expect(Number.isNaN(blocker.z)).toBe(false);
+  it('#2231: free cells that exist but cannot be walked to (sealed off by terrain) do not move the blocker — no teleport', () => {
+    const state = buildFlatNavGridState(30, 30);
+    const rng = new Random(SEED);
+    const grid = state.navGrid!;
+
+    const bx = 15;
+    const bz = 15;
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, bx, bz);
+    const moverStart = { x: bx - 1, z: bz };
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, moverStart.x, moverStart.z);
+    mover.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: bx, destZ: bz,
+        arrival: 'exact', onArrive: { kind: 'enter_building', buildingId: 999 }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: bx, z: bz },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+    // Ring 1 sealed (except the mover's held cell); rings 2+ are open, free, flat terrain.
+    blockNeighbourhood(grid, bx, bz, 1, [moverStart]);
+
+    const occupancy = new AgentOccupancy();
+    expect(occupancy.tryMove({ kind: 'employee', id: mover.id }, moverStart.x, moverStart.z)).toBe(true);
+    expect(occupancy.tryMove({ kind: 'employee', id: blocker.id }, bx, bz)).toBe(true);
+    state.agentOccupancy = occupancy;
+
+    openMovementTrails(state);
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS + 20; i++) {
+      tickLocomotion(state);
+      expect(blocker.x, `blocker moved on tick ${i}`).toBe(bx);
+      expect(blocker.z, `blocker moved on tick ${i}`).toBe(bz);
+    }
+    expect(blocker.walkTrail!.points).toEqual([{ x: bx, z: bz }]);
   });
 
   it('relocates an idle blocker past a nearer cliff-adjacent cell to the nearest climbable free cell (#1672)', () => {
@@ -1983,6 +2036,71 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
     expect(blocker.x === bx && blocker.z === bz, 'blocker should have been relocated').toBe(false);
     expect(blocker.x === cliff.x && blocker.z === cliff.z, 'blocker must not step across the cliff').toBe(false);
     expect({ x: Math.floor(blocker.x), z: Math.floor(blocker.z) }).toEqual(climbable);
+  });
+  it('an idle blocker walks off its cell by a real walkable route, never stepping onto the unclimbable cliff-adjacent cell (#1672, #2231)', () => {
+    const state = buildFlatNavGridState(30, 30);
+    const rng = new Random(SEED);
+    const grid = state.navGrid!;
+
+    const bx = 15;
+    const bz = 15;
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, bx, bz);
+    const moverStart = { x: bx - 1, z: bz };
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, moverStart.x, moverStart.z);
+    mover.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: bx, destZ: bz,
+        arrival: 'exact', onArrive: { kind: 'enter_building', buildingId: 999 }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: bx, z: bz },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+
+    // Radius 1 and 2 sealed with terrain, except: the mover's held cell, a free
+    // cell one step east atop a 10-unit cliff (unclimbable from the blocker), a
+    // flat free cell two steps east, and a flat southern detour (z+1 row, x..x+2)
+    // that gives the blocker a genuine walkable route out.
+    const cliff = { x: bx + 1, z: bz };
+    const climbable = { x: bx + 2, z: bz };
+    const detour = [{ x: bx, z: bz + 1 }, { x: bx + 1, z: bz + 1 }, { x: bx + 2, z: bz + 1 }];
+    blockNeighbourhood(grid, bx, bz, 2, [moverStart, cliff, climbable, ...detour]);
+    const originY = grid.cellAt(bx, bz)!.surfaceY ?? 0;
+    grid.cellAt(bx, bz)!.surfaceY = originY;
+    grid.cellAt(cliff.x, cliff.z)!.surfaceY = originY + 10;
+    grid.cellAt(climbable.x, climbable.z)!.surfaceY = originY;
+    for (const d of detour) grid.cellAt(d.x, d.z)!.surfaceY = originY;
+
+    const occupancy = new AgentOccupancy();
+    expect(occupancy.tryMove({ kind: 'employee', id: mover.id }, moverStart.x, moverStart.z)).toBe(true);
+    expect(occupancy.tryMove({ kind: 'employee', id: blocker.id }, bx, bz)).toBe(true);
+    state.agentOccupancy = occupancy;
+
+    openMovementTrails(state);
+    let prev = { x: blocker.x, z: blocker.z };
+    let maxStep = 0;
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + 60; i++) {
+      tickLocomotion(state);
+      maxStep = Math.max(maxStep, Math.hypot(blocker.x - prev.x, blocker.z - prev.z));
+      prev = { x: blocker.x, z: blocker.z };
+      expect(
+        Math.floor(blocker.x) === cliff.x && Math.floor(blocker.z) === cliff.z,
+        `blocker stepped onto the cliff cell on tick ${i}`,
+      ).toBe(false);
+    }
+
+    expect(blocker.x === bx && blocker.z === bz, 'blocker should have walked off the destination').toBe(false);
+    expect(maxStep).toBeLessThanOrEqual(AGENT_WALK_SPEED + 1e-6);
+    const trail = blocker.walkTrail!;
+    expect(trail.relocated).toBe(false);
+    expect(trail.points.length).toBeGreaterThanOrEqual(2);
+    expect(trail.points[0]).toEqual({ x: bx, z: bz });
+    expect(trail.points[trail.points.length - 1]).toEqual({ x: blocker.x, z: blocker.z });
+    for (const p of trail.points) {
+      expect(Math.floor(p.x) === cliff.x && Math.floor(p.z) === cliff.z, 'trail crosses the cliff cell').toBe(false);
+    }
+    const dist = Math.max(Math.abs(blocker.x - bx), Math.abs(blocker.z - bz));
+    expect(dist).toBeLessThanOrEqual(AGENT_FREE_CELL_SEARCH_MAX_RADIUS);
   });
 });
 
@@ -2449,5 +2567,207 @@ describe('tickLocomotion — mid-hop position over a sealed pit cell (#1687)', (
     tickLocomotion(state);
 
     expect(employee.moveConsecutiveFailures).toBeGreaterThan(0);
+  });
+});
+
+// ── #2231: blockers move by walking only — no teleport ────────────────────
+//
+// An idle employee standing in a mover's way ends on a free cell having WALKED
+// there (continuous trail, per-tick displacement within AGENT_WALK_SPEED, never
+// a `relocated` trail). A driverless vehicle is never moved at all.
+describe('tickLocomotion — blockers walk, parked vehicles stay (#2231)', () => {
+  const WALK_EPS = 1e-6;
+
+  /** Asserts `trail` is a continuous walk from `origin` to wherever `agent` stands now. */
+  function expectContinuousWalk(
+    trail: { points: Array<{ x: number; z: number }>; relocated: boolean } | undefined,
+    origin: { x: number; z: number },
+    agent: { x: number; z: number },
+  ): void {
+    expect(trail).toBeDefined();
+    expect(trail!.relocated).toBe(false);
+    expect(trail!.points[0]).toEqual(origin);
+    expect(trail!.points[trail!.points.length - 1]).toEqual({ x: agent.x, z: agent.z });
+    for (let i = 1; i < trail!.points.length; i++) {
+      const a = trail!.points[i - 1]!;
+      const b = trail!.points[i]!;
+      expect(Math.hypot(b.x - a.x, b.z - a.z), `trail hop ${i} exceeds walking speed`).toBeLessThanOrEqual(AGENT_WALK_SPEED + WALK_EPS);
+    }
+  }
+
+  it('C1/C3: an idle employee blocking a 1-wide corridor walks aside (several walking ticks away), the mover gets through, none abandoned', () => {
+    const state = build1WideCorridorState(14, [3, 10]);
+    const rng = new Random(SEED);
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 1, 1);
+    const { employee: blocker } = hireEmployee(state.employees, 'blaster', rng, 6, 1);
+    expect(employeeWorkState(blocker)).toBe('idle');
+    expect(moveTo(state, mover.id, { x: 12, z: 1 }).success).toBe(true);
+
+    openMovementTrails(state);
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    let maxStep = 0;
+    let everLeft = false;
+    for (let i = 0; i < 300 && mover.itinerary !== null; i++) {
+      const px = blocker.x, pz = blocker.z;
+      const result = tickLocomotion(state);
+      everAbandoned.push(...result.abandoned);
+      maxStep = Math.max(maxStep, Math.hypot(blocker.x - px, blocker.z - pz));
+      if (cellKey(blocker.x, blocker.z) !== '6,1') everLeft = true;
+    }
+
+    expect(mover.itinerary, 'mover never arrived').toBeNull();
+    expect(Math.round(mover.x)).toBe(12);
+    expect(Math.round(mover.z)).toBe(1);
+    expect(everAbandoned).toHaveLength(0);
+    expect(everLeft, 'blocker never left the corridor cell').toBe(true);
+    expect(maxStep).toBeLessThanOrEqual(AGENT_WALK_SPEED + WALK_EPS);
+    // The nearest free cell off the mover's route is several cells away: reaching it
+    // by walking takes more than one hop, so the trail has intermediate points.
+    expect(blocker.walkTrail!.points.length).toBeGreaterThanOrEqual(3);
+    expectContinuousWalk(blocker.walkTrail, { x: 6, z: 1 }, blocker);
+  });
+
+  it('C1: the walking blocker keeps walking-speed displacement every tick of a longer run and lands on a free walkable cell', () => {
+    const state = build1WideCorridorState(14, [3, 10]);
+    const rng = new Random(SEED);
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 1, 1);
+    const { employee: blocker } = hireEmployee(state.employees, 'blaster', rng, 6, 1);
+    expect(moveTo(state, mover.id, { x: 12, z: 1 }).success).toBe(true);
+
+    openMovementTrails(state);
+    for (let i = 0; i < 300; i++) {
+      const px = blocker.x, pz = blocker.z;
+      tickLocomotion(state);
+      expect(Math.hypot(blocker.x - px, blocker.z - pz), `blocker jumped on tick ${i}`).toBeLessThanOrEqual(AGENT_WALK_SPEED + WALK_EPS);
+      const cell = state.navGrid!.cellAt(Math.round(blocker.x), Math.round(blocker.z));
+      expect(cell?.type, `blocker stands on a non-walkable cell on tick ${i}`).toBe('walkable');
+    }
+    expectContinuousWalk(blocker.walkTrail, { x: 6, z: 1 }, blocker);
+    expectNoSharedCells([mover, blocker]);
+  });
+
+  it('C1: an idle employee on a foot mover\'s destination ends on a free cell having walked there, not relocated', () => {
+    const state = buildFlatNavGridState(12, 8);
+    const rng = new Random(SEED);
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 6, 3);
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 1, 3);
+    expect(moveTo(state, mover.id, { x: 6, z: 3 }).success).toBe(true);
+
+    openMovementTrails(state);
+    let maxStep = 0;
+    for (let i = 0; i < MOVE_STUCK_ABANDON_TICKS - 1; i++) {
+      const px = blocker.x, pz = blocker.z;
+      tickLocomotion(state);
+      maxStep = Math.max(maxStep, Math.hypot(blocker.x - px, blocker.z - pz));
+    }
+
+    expect(cellKey(blocker.x, blocker.z)).not.toBe('6,3');
+    expect(maxStep).toBeLessThanOrEqual(AGENT_WALK_SPEED + WALK_EPS);
+    expect(blocker.walkTrail!.points.length).toBeGreaterThanOrEqual(2);
+    expectContinuousWalk(blocker.walkTrail, { x: 6, z: 3 }, blocker);
+    expectNoSharedCells([mover, blocker]);
+  });
+
+  it('C2: a parked, driverless vehicle in a 1-wide corridor never changes x/z while an on-foot mover passes it or gives up', () => {
+    const state = build1WideCorridorState(14, [3, 10]);
+    const rng = new Random(SEED);
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 1, 1);
+    const { vehicle: parked } = purchaseVehicle(state.vehicles, 'drill_rig', 6, 1);
+    expect(vehicleDriverId(parked)).toBeNull();
+    expect(moveTo(state, mover.id, { x: 12, z: 1 }, { allowUnreachable: true }).success).toBe(true);
+
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS + 100; i++) {
+      const result = tickLocomotion(state);
+      expect(parked.x, `parked vehicle x changed on tick ${i}`).toBe(6);
+      expect(parked.z, `parked vehicle z changed on tick ${i}`).toBe(1);
+      expect(result.vehiclesMoved).not.toContain(parked.id);
+    }
+  });
+
+  it('C4: across a crowded run no driverless vehicle changes x/z between ticks and none is ever listed in vehiclesMoved', () => {
+    const state = buildFlatNavGridState(24, 12);
+    const rng = new Random(SEED);
+
+    // Driverless vehicles: one on a mover's destination, one on another mover's
+    // route, one beside an idle employee, one far from everything.
+    const parkedSpots: Array<[Parameters<typeof purchaseVehicle>[1], number, number]> = [
+      ['drill_rig', 10, 4], ['charging_truck', 6, 8], ['debris_hauler', 14, 6], ['rock_digger', 20, 10],
+    ];
+    const parked = parkedSpots.map(([role, x, z]) => purchaseVehicle(state.vehicles, role, x, z).vehicle);
+    for (const v of parked) expect(vehicleDriverId(v)).toBeNull();
+    const origin = new Map(parked.map(v => [v.id, { x: v.x, z: v.z }]));
+
+    // Idle crew standing on destinations, a few movers.
+    const { employee: idleA } = hireEmployee(state.employees, 'blaster', rng, 12, 4);
+    const { employee: idleB } = hireEmployee(state.employees, 'blaster', rng, 14, 7);
+    expect(employeeWorkState(idleA)).toBe('idle');
+    expect(employeeWorkState(idleB)).toBe('idle');
+    const movers = [
+      { start: [1, 4], dest: [10, 4] }, // onto the parked rig
+      { start: [1, 8], dest: [12, 4] }, // onto idle crew
+      { start: [2, 6], dest: [14, 7] }, // onto idle crew
+      { start: [3, 2], dest: [14, 6] }, // onto the parked hauler
+      { start: [1, 10], dest: [20, 10] }, // onto the far digger
+    ] as const;
+    for (const m of movers) {
+      const { employee } = hireEmployee(state.employees, 'driller', rng, m.start[0], m.start[1]);
+      expect(moveTo(state, employee.id, { x: m.dest[0], z: m.dest[1] }, { allowUnreachable: true }).success).toBe(true);
+    }
+
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS + 120; i++) {
+      const result = tickLocomotion(state);
+      for (const v of parked) {
+        expect(v.x, `vehicle #${v.id} x changed on tick ${i}`).toBe(origin.get(v.id)!.x);
+        expect(v.z, `vehicle #${v.id} z changed on tick ${i}`).toBe(origin.get(v.id)!.z);
+        expect(result.vehiclesMoved, `vehicle #${v.id} listed as moved on tick ${i}`).not.toContain(v.id);
+      }
+    }
+  });
+
+  it('C5: a blocker with no walkable free cell is never moved by teleport: its position and trail stay untouched', () => {
+    const grid = makeFlatNavGrid(21, 21);
+    const bx = 10;
+    const bz = 10;
+    const moverStart = { x: bx - 1, z: bz };
+    // Free, flat cells exist at radius 2+, but ring 1 is sealed: no route out.
+    blockNeighbourhood(grid, bx, bz, 1, [moverStart]);
+    const state = createGame({ seed: SEED });
+    state.navGrid = grid;
+    const rng = new Random(SEED);
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, bx, bz);
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, moverStart.x, moverStart.z);
+    mover.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: bx, destZ: bz,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: bx, z: bz },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+
+    openMovementTrails(state);
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS + 20; i++) {
+      tickLocomotion(state);
+      expect(blocker.x, `blocker x changed on tick ${i}`).toBe(bx);
+      expect(blocker.z, `blocker z changed on tick ${i}`).toBe(bz);
+    }
+    expect(blocker.walkTrail!.points).toEqual([{ x: bx, z: bz }]);
+    expect(blocker.walkTrail!.relocated).toBe(false);
+  });
+
+  it('rejection: a busy (working) employee on the destination is neither walked off nor teleported', () => {
+    const state = buildFlatNavGridState(12, 8);
+    const rng = new Random(SEED);
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 6, 3);
+    blocker.activeActionId = 999;
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 1, 3);
+    expect(moveTo(state, mover.id, { x: 6, z: 3 }, { allowUnreachable: true }).success).toBe(true);
+
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS + 20; i++) {
+      tickLocomotion(state);
+      expect(blocker.x).toBe(6);
+      expect(blocker.z).toBe(3);
+    }
   });
 });
