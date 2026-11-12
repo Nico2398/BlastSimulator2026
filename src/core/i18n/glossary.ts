@@ -225,4 +225,58 @@ export const KNOWN_TEXT_DEFECTS: readonly TextDefect[] = [
     problem: "Uses 'Emboutez' where 'Embauchez' is meant.",
     expectedFix: 'Emboutez -> Embauchez.',
   },
+  {
+    key: 'game.subtitle',
+    locale: 'fr',
+    problem: "Used the tu form ('Creuse. Explose. Profite.') where the game addresses the player as vous.",
+    expectedFix: "Creusez. Explosez. Profitez.",
+  },
+  {
+    key: 'economy.negotiation.failure',
+    locale: 'fr',
+    problem: "'Négociation échouée.' is a calque of 'Negotiation failed.'; a negotiation does not 'échouer' as a participle adjective.",
+    expectedFix: "Échec de la négociation.",
+  },
+  {
+    key: 'saveload.slot_name',
+    locale: 'fr',
+    problem: "'Créneau' means time slot; a save slot is an 'emplacement'.",
+    expectedFix: "Emplacement {n}",
+  },
+  {
+    key: 'course.driving.truck',
+    locale: 'fr',
+    problem: "'Permis Conduite Camion' is a word-order calque of 'Truck Driving License'.",
+    expectedFix: "Permis de camion",
+  },
+  {
+    key: 'tutorial.stage.hire_surveyor',
+    locale: 'fr',
+    problem: "'à côté de prospecteur' drops the article.",
+    expectedFix: "à côté du prospecteur",
+  },
+  {
+    key: 'inspector.command_failed',
+    locale: 'fr',
+    problem: "'Action échouée' is a calque of 'Action failed'.",
+    expectedFix: "Échec de l'action",
+  },
+  {
+    key: 'mining.survey.failed',
+    locale: 'fr',
+    problem: "'relevé' is not the canonical Sondage action.",
+    expectedFix: "Échec du sondage.",
+  },
+  {
+    key: 'notification.corruption.scandal',
+    locale: 'fr',
+    problem: "'versé à {target}' gives 'à le juge' when {target} carries its article.",
+    expectedFix: "La tentative de corruption visant {target} ...",
+  },
+  {
+    key: 'tick.contract_completed_bonus',
+    locale: 'fr',
+    problem: "'Prime d'avance' means an advance payment, not an early-delivery bonus.",
+    expectedFix: "Prime de livraison anticipée",
+  },
 ] as const;
