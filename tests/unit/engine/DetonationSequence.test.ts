@@ -559,3 +559,61 @@ describe('held phase: wet water-sensitive charges (#1957)', () => {
     expect(detonationPhase(state)).toEqual({ kind: 'idle' });
   });
 });
+
+describe('evacuatedEmployeeIds across the arm / cancel cycle (#2230)', () => {
+  it('arming starts the list afresh: a stale id from an earlier evacuation is gone and the worker ordered out is listed', () => {
+    const state = chargedState();
+    const worker = addWorker(state, 22, 22);
+    state.zone.evacuatedEmployeeIds = [987];
+
+    armDetonation(state);
+
+    expect(state.zone.evacuatedEmployeeIds).not.toContain(987);
+    expect(state.zone.evacuatedEmployeeIds).toContain(worker.id);
+  });
+
+  it('arming with nobody in the zone leaves the list empty', () => {
+    const state = chargedState();
+    state.zone.evacuatedEmployeeIds = [987];
+
+    armDetonation(state);
+
+    expect(state.zone.evacuatedEmployeeIds ?? []).toEqual([]);
+  });
+
+  it('cancelling clears the list', () => {
+    const state = chargedState();
+    const worker = addWorker(state, 22, 22);
+    armDetonation(state);
+    expect(state.zone.evacuatedEmployeeIds).toContain(worker.id);
+
+    cancelDetonation(state);
+
+    expect(state.zone.evacuatedEmployeeIds ?? []).toEqual([]);
+  });
+
+  it('a re-evacuation while armed keeps the ids already listed and adds the newly ordered', () => {
+    const state = chargedState();
+    const first = addWorker(state, 22, 22);
+    armDetonation(state);
+    const second = addWorker(state, 24, 24); // walked into the zone after the horn
+    state.tickCount = DETONATION_REEVACUATE_INTERVAL_TICKS;
+
+    tickDetonation(state);
+
+    expect(state.zone.evacuatedEmployeeIds).toContain(first.id);
+    expect(state.zone.evacuatedEmployeeIds).toContain(second.id);
+  });
+
+  it('a second arm after a cancel does not carry the first shot\'s list over', () => {
+    const state = chargedState();
+    const worker = addWorker(state, 22, 22);
+    armDetonation(state);
+    cancelDetonation(state);
+    worker.x = 70; worker.z = 70; // left the zone for good
+
+    armDetonation(state);
+
+    expect(state.zone.evacuatedEmployeeIds ?? []).not.toContain(worker.id);
+  });
+});

@@ -11,8 +11,10 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { findSafeEvacuationCell, evacuateZone, isMidEvacuationWalk } from '../../../src/core/engine/Evacuation.js';
 import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { isEvacuationHoldActive } from '../../../src/core/engine/EvacuationHold.js';
-import { isInZone, type ZoneBounds } from '../../../src/core/entities/Zone.js';
+import { isInZone, evacuationCellKey, type ZoneBounds } from '../../../src/core/entities/Zone.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import type { Employee } from '../../../src/core/entities/Employee.js';
+import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { purchaseVehicle, getVehicleReservation, resolveVehicleDriver } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -568,5 +570,347 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     expect(vehicle.cargo).toEqual([]);
     const drivenBy4 = resolveVehicleDriver(vehicle, state.employees.employees);
     expect(isInZone(drivenBy4!.itinerary!.legs[0]!.destX, drivenBy4!.itinerary!.legs[0]!.destZ, zone)).toBe(false);
+  });
+});
+
+
+// ── #2230: shorter trips, no shared cells, destinations that hold, no re-entry ────────────────────────────────
+
+/** Where an employee's current itinerary ends, or null without one. */
+function itineraryEnd(employee: Employee): { x: number; z: number } | null {
+  const legs = employee.itinerary?.legs;
+  if (!legs || legs.length === 0) return null;
+  const last = legs[legs.length - 1]!;
+  return { x: last.destX, z: last.destZ };
+}
+
+function cellKeyOf(point: { x: number; z: number }): string {
+  return evacuationCellKey(point.x, point.z);
+}
+
+/** Replaces the cells of a flat grid with blocked ones. */
+function blockCells(grid: NavGrid, cells: Array<[number, number]>): void {
+  for (const [x, z] of cells) {
+    grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+  }
+}
+
+/**
+ * findSafeEvacuationCell with the contract's sixth parameter (#2230): the skeleton's declaration may lag behind it, so the
+ * avoid-cell calls go through this typed alias.
+ */
+const findSafeAvoiding = findSafeEvacuationCell as (
+  state: ReturnType<typeof createGame>, fromX: number, fromZ: number, zone: ZoneBounds,
+  vehicle?: Vehicle, avoidCells?: ReadonlySet<string>,
+) => { x: number; z: number } | null;
+
+describe('findSafeEvacuationCell avoidCells (#2230, C4)', () => {
+  const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+
+  it('skips a cell whose key is in avoidCells and returns another one clear of the zone', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const first = findSafeEvacuationCell(state, 16, 15, zone)!;
+
+    const next = findSafeAvoiding(state, 16, 15, zone, undefined, new Set([cellKeyOf(first)]));
+
+    expect(next).not.toBeNull();
+    expect(cellKeyOf(next!)).not.toBe(cellKeyOf(first));
+    expect(isInZone(next!.x, next!.z, {
+      x1: zone.x1 - EVACUATION_CLEARANCE_M, z1: zone.z1 - EVACUATION_CLEARANCE_M,
+      x2: zone.x2 + EVACUATION_CLEARANCE_M, z2: zone.z2 + EVACUATION_CLEARANCE_M,
+    })).toBe(false);
+  });
+
+  it('an empty avoidCells set changes nothing', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+
+    expect(findSafeAvoiding(state, 16, 15, zone, undefined, new Set())).toEqual(findSafeEvacuationCell(state, 16, 15, zone));
+  });
+
+  it('keeps skipping as more cells are avoided: every answer is a distinct cell', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const avoid = new Set<string>();
+    const keys: string[] = [];
+
+    for (let i = 0; i < 5; i++) {
+      const dest = findSafeAvoiding(state, 16, 15, zone, undefined, avoid);
+      expect(dest).not.toBeNull();
+      keys.push(cellKeyOf(dest!));
+      avoid.add(cellKeyOf(dest!));
+    }
+
+    expect(new Set(keys).size).toBe(5);
+  });
+
+  it('returns null when every cell of the map is avoided', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const everything = new Set<string>();
+    for (let x = 0; x < 40; x++) for (let z = 0; z < 40; z++) everything.add(evacuationCellKey(x, z));
+
+    expect(findSafeAvoiding(state, 16, 15, zone, undefined, everything)).toBeNull();
+  });
+
+  it('avoids the cell for a vehicle being driven out as well', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 16, 15);
+    const first = findSafeEvacuationCell(state, 16, 15, zone, vehicle)!;
+
+    const next = findSafeAvoiding(state, 16, 15, zone, vehicle, new Set([cellKeyOf(first)]));
+
+    expect(next).not.toBeNull();
+    expect(cellKeyOf(next!)).not.toBe(cellKeyOf(first));
+  });
+});
+
+describe('findSafeEvacuationCell stays on the near side of the zone (#2230, C5)', () => {
+  // A wide zone on a 60 x 60 map: from (30, 12) the nearest way out is north, 2 m from the edge, to (30, 4).
+  const zone: ZoneBounds = { x1: 10, z1: 10, x2: 50, z2: 30 };
+  const clearedZone: ZoneBounds = {
+    x1: zone.x1 - EVACUATION_CLEARANCE_M, z1: zone.z1 - EVACUATION_CLEARANCE_M,
+    x2: zone.x2 + EVACUATION_CLEARANCE_M, z2: zone.z2 + EVACUATION_CLEARANCE_M,
+  };
+  const FROM = { x: 30, z: 12 };
+  /** The far side of the zone is 24 m away; a short trip stays well inside this. */
+  const SHORT_TRIP_M = 12;
+
+  function distanceFrom(dest: { x: number; z: number }): number {
+    return Math.hypot(dest.x - FROM.x, dest.z - FROM.z);
+  }
+
+  it('baseline: the nearest edge is used when its projection is free', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(60);
+
+    const dest = findSafeEvacuationCell(state, FROM.x, FROM.z, zone)!;
+
+    expect(dest.z).toBeLessThan(zone.z1);
+    expect(distanceFrom(dest)).toBeLessThanOrEqual(SHORT_TRIP_M);
+  });
+
+  it('a blocked projection is replaced by a cell beside it along the same edge, not one across the zone', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(60);
+    blockCells(state.navGrid, [[30, 4]]);
+
+    const dest = findSafeEvacuationCell(state, FROM.x, FROM.z, zone)!;
+
+    expect(dest).not.toBeNull();
+    expect(isInZone(dest.x, dest.z, clearedZone)).toBe(false);
+    expect(dest.z).toBeLessThan(zone.z1);
+    expect(distanceFrom(dest)).toBeLessThanOrEqual(SHORT_TRIP_M);
+  });
+
+  it('a wall of blocked cells along the edge is skirted, still on the near side', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(60);
+    blockCells(state.navGrid, [[28, 4], [29, 4], [30, 4], [31, 4], [32, 4]]);
+
+    const dest = findSafeEvacuationCell(state, FROM.x, FROM.z, zone)!;
+
+    expect(dest).not.toBeNull();
+    expect(dest.z).toBeLessThan(zone.z1);
+    expect(distanceFrom(dest)).toBeLessThanOrEqual(SHORT_TRIP_M);
+  });
+
+  it('an avoided projection is replaced by a cell beside it along the same edge, not one across the zone', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(60);
+    const first = findSafeEvacuationCell(state, FROM.x, FROM.z, zone)!;
+
+    const dest = findSafeAvoiding(state, FROM.x, FROM.z, zone, undefined, new Set([cellKeyOf(first)]))!;
+
+    expect(dest).not.toBeNull();
+    expect(cellKeyOf(dest)).not.toBe(cellKeyOf(first));
+    expect(dest.z).toBeLessThan(zone.z1);
+    expect(distanceFrom(dest)).toBeLessThanOrEqual(SHORT_TRIP_M);
+  });
+
+  it('a projection past the map edge falls to the next nearest edge, a short trip along the zone', () => {
+    // East of (55, 20) the projection (62, 20) is off the 60-wide map; north and south are each 10 m away.
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(60);
+    const eastZone: ZoneBounds = { x1: 10, z1: 10, x2: 56, z2: 30 };
+
+    const dest = findSafeEvacuationCell(state, 55, 20, eastZone)!;
+
+    expect(dest).not.toBeNull();
+    expect(state.navGrid.containsCell(dest.x, dest.z)).toBe(true);
+    expect(Math.hypot(dest.x - 55, dest.z - 20)).toBeLessThanOrEqual(SHORT_TRIP_M + 4);
+  });
+
+  it('still returns null when nothing clear of the zone is reachable at all', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(22);
+
+    expect(findSafeEvacuationCell(state, 10, 10, { x1: -100, z1: -100, x2: 100, z2: 100 })).toBeNull();
+  });
+});
+
+describe('evacuateZone hands out distinct destinations and holds them (#2230, C3, C4)', () => {
+  const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+
+  function crewAt(state: ReturnType<typeof createGame>, positions: Array<[number, number]>): Employee[] {
+    const rng = new Random(EVACUATION_SEED);
+    return positions.map(([x, z]) => hireEmployee(state.employees, 'driller', rng, x, z).employee);
+  }
+
+  it('sends employees standing side by side in the zone to pairwise distinct cells', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const crew = crewAt(state, [[16, 15], [17, 15], [16, 14], [17, 16]]);
+
+    const result = evacuateZone(state, zone);
+
+    for (const e of crew) expect(result.orderedEmployeeIds).toContain(e.id);
+    const keys = crew.map(e => cellKeyOf(itineraryEnd(e)!));
+    expect(new Set(keys).size).toBe(crew.length);
+    for (const e of crew) expect(isInZone(itineraryEnd(e)!.x, itineraryEnd(e)!.z, zone)).toBe(false);
+  });
+
+  it('gives a walker and a driven vehicle leaving from the same spot different cells', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const rng = new Random(EVACUATION_SEED);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 16, 15);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, vehicle.x, vehicle.z);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const { employee: walker } = hireEmployee(state.employees, 'driller', rng, 16, 15);
+
+    const result = evacuateZone(state, zone);
+
+    expect(result.orderedVehicleIds).toContain(vehicle.id);
+    expect(result.orderedEmployeeIds).toContain(walker.id);
+    expect(cellKeyOf(itineraryEnd(driver)!)).not.toBe(cellKeyOf(itineraryEnd(walker)!));
+  });
+
+  it('never sends an evacuee to the cell an employee outside the zone stands on', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const [bystander, walker] = crewAt(state, [[26, 15], [16, 15]]) as [Employee, Employee];
+
+    evacuateZone(state, zone);
+
+    expect(cellKeyOf(itineraryEnd(walker)!)).not.toBe(evacuationCellKey(bystander.x, bystander.z));
+    expect(bystander.itinerary).toBeNull();
+  });
+
+  it('never sends an evacuee to the cell a parked vehicle stands on', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 26, 15);
+    const [walker] = crewAt(state, [[16, 15]]) as [Employee];
+
+    evacuateZone(state, zone);
+
+    expect(cellKeyOf(itineraryEnd(walker)!)).not.toBe(evacuationCellKey(vehicle.x, vehicle.z));
+  });
+
+  it('a second order on the same zone leaves a walker mid-way to its cell on the very same walk', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const [walker] = crewAt(state, [[16, 15]]) as [Employee];
+    evacuateZone(state, zone);
+    tickLocomotion(state);
+    const itinerary = walker.itinerary;
+    const end = itineraryEnd(walker);
+
+    const again = evacuateZone(state, zone);
+
+    expect(again.orderedEmployeeIds).toContain(walker.id);
+    expect(again.strandedEmployeeIds).not.toContain(walker.id);
+    expect(walker.itinerary).toBe(itinerary);
+    expect(itineraryEnd(walker)).toEqual(end);
+  });
+
+  it('a second order does not hand a newcomer the cell a kept walker is heading for', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const [early] = crewAt(state, [[16, 15]]) as [Employee];
+    evacuateZone(state, zone);
+    const keptEnd = itineraryEnd(early)!;
+    const [late] = crewAt(state, [[16, 15]]) as [Employee];
+
+    evacuateZone(state, zone);
+
+    expect(itineraryEnd(early)).toEqual(keptEnd);
+    expect(cellKeyOf(itineraryEnd(late)!)).not.toBe(cellKeyOf(keptEnd));
+  });
+
+  it('a stuck walker is given a new way out by a second order', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const [walker] = crewAt(state, [[16, 15]]) as [Employee];
+    evacuateZone(state, zone);
+    const itinerary = walker.itinerary;
+    walker.isMoveStuck = true;
+    walker.moveConsecutiveFailures = 10;
+
+    const again = evacuateZone(state, zone);
+
+    expect(again.orderedEmployeeIds).toContain(walker.id);
+    expect(walker.itinerary).not.toBeNull();
+    expect(walker.itinerary).not.toBe(itinerary);
+  });
+});
+
+describe('evacuateZone does not send an evacuee back in for a driverless vehicle (#2230, C1)', () => {
+  const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+
+  /**
+   * `leaver` ('driver': truck and excavator licences) is ordered out of an empty zone by a first evacuation, walks to
+   * (25, 15) and stands there. Then a driverless digger is left in the zone and the zone is evacuated again.
+   */
+  function reEvacuation(options: { relief: 'none' | 'idle' | 'resting' }) {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    const rng = new Random(EVACUATION_SEED);
+    const { employee: leaver } = hireEmployee(state.employees, 'driver', rng, 15, 15);
+    const first = evacuateZone(state, zone);
+    expect(first.orderedEmployeeIds).toContain(leaver.id);
+    expect(state.zone.evacuatedEmployeeIds).toContain(leaver.id);
+    // The leaver has walked out and stands outside.
+    leaver.x = 25; leaver.z = 15;
+    leaver.itinerary = null; leaver.destinationX = null; leaver.destinationZ = null;
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 15, 15);
+    vehicle.occupantIds = [];
+    let relief: Employee | null = null;
+    if (options.relief !== 'none') {
+      relief = hireEmployee(state.employees, 'driver', rng, 38, 38).employee;
+      if (options.relief === 'resting') relief.restTicksRemaining = 30;
+    }
+    const second = evacuateZone(state, zone);
+    return { state, leaver, relief, vehicle, second };
+  }
+
+  it('fetches the vehicle with another licensed driver who was never ordered out', () => {
+    const { leaver, relief, vehicle, second } = reEvacuation({ relief: 'idle' });
+
+    expect(relief!.pendingDriverVehicleId).toBe(vehicle.id);
+    expect(leaver.pendingDriverVehicleId).toBeNull();
+    expect(leaver.itinerary).toBeNull();
+    expect(second.orderedVehicleIds).toContain(vehicle.id);
+  });
+
+  it('waits for a resting licensed driver rather than ordering the one who left', () => {
+    const { leaver, vehicle, second } = reEvacuation({ relief: 'resting' });
+
+    expect(second.awaitingRescuerVehicleIds).toContain(vehicle.id);
+    expect(leaver.itinerary).toBeNull();
+    expect(leaver.pendingDriverVehicleId).toBeNull();
+  });
+
+  it('orders the one who left when nobody else is licensed for the vehicle', () => {
+    const { leaver, vehicle, second } = reEvacuation({ relief: 'none' });
+
+    expect(leaver.pendingDriverVehicleId).toBe(vehicle.id);
+    expect(second.orderedVehicleIds).toContain(vehicle.id);
+    expect(second.strandedVehicleIds).not.toContain(vehicle.id);
   });
 });
