@@ -3981,6 +3981,7 @@
   "ui.blast_workshop.preflight.detonating_remaining": "{count} encore dans la zone. Le tir part tout seul dès que tout le monde est sorti.",
   "ui.blast_workshop.preflight.stranded_names": "Impossible de quitter la zone : {names}. Tirer quand même ou annulez.",
   "ui.blast_workshop.preflight.fire_anyway": "Tirer quand même",
+  "ui.blast_workshop.preflight.hide_waiting": "Masquer",
   "ui.blast_workshop.preflight.cancel_detonation": "Annuler le blast",
   "ui.blast_workshop.preflight.ok_zone": "La zone dangereuse est dégagée.",
   "ui.blast_workshop.report.title": "Rapport de tir",

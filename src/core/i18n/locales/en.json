@@ -3981,6 +3981,7 @@
   "ui.blast_workshop.preflight.detonating_remaining": "{count} left in the zone. The blast fires on its own once everyone is out.",
   "ui.blast_workshop.preflight.stranded_names": "Cannot leave the zone: {names}. Blast anyway or cancel.",
   "ui.blast_workshop.preflight.fire_anyway": "Blast anyway",
+  "ui.blast_workshop.preflight.hide_waiting": "Hide",
   "ui.blast_workshop.preflight.cancel_detonation": "Cancel blast",
   "ui.blast_workshop.preflight.ok_zone": "Danger zone is clear.",
   "ui.blast_workshop.report.title": "Blast Report",

@@ -16,6 +16,9 @@ import { GUIDED_CLASS } from '../../../src/ui/tutorialGuide.js';
 import { RAILED_CONTROL_SELECTOR, isRailedControl, isControlLive, installActivationGuard } from '../../../src/ui/tutorialActivationGuard.js';
 import { injectStyles } from '../../../src/ui/styles.js';
 import { makeLocateButton } from '../../../src/ui/locateButton.js';
+import { PreflightModal } from '../../../src/ui/panels/PreflightModal.js';
+import { addHole } from '../../../src/core/mining/DrillPlan.js';
+import { createCharge } from '../../../src/core/mining/ChargePlan.js';
 
 // #903: a stage shaped like train-driller's final one — a `target` that
 // disappears (replaced by an "in training" status view, crewDetailSections.ts)
@@ -1776,4 +1779,108 @@ describe('The Crew roster Locate control is always allowed', () => {
     rails.refresh();
     expect(locate.classList.contains(ALLOWED_CLASS)).toBe(false);
   });
+});
+
+describe('TutorialRails — the real docked waiting card leaves the clock controls free (#2233)', () => {
+  function worker(id: number, name: string): GameState['employees']['employees'][number] {
+    return {
+      id, name, role: 'driller', salary: 500, morale: 60,
+      unionized: false, injured: false, alive: true, x: 11, z: 11,
+      qualifications: [], trainingState: null, activeActionId: null,
+      fatigue: 0, collapsing: false, interruptedActionPayload: null,
+      ticksWorked: 0, restTicksRemaining: null, restNeedKey: null, taskTicksRemaining: null,
+      activeTaskSkill: null, destinationX: null, destinationZ: null,
+      moveConsecutiveFailures: 0, isMoveStuck: false,
+      pendingRestDuration: null, pendingRestNeedKey: null, pendingTaskDuration: null,
+      pendingActionType: null, pendingActionPayload: null, pendingDriverVehicleId: null,
+      taskQueue: [], locomotion: { kind: 'on_foot' },
+      itinerary: null, vehicleWaitingTicks: 0,
+    };
+  }
+
+  /** Armed shot with a worker in the zone; `stranded` marks them unable to leave. */
+  function armed(stranded: boolean): GameState {
+    const s = state();
+    const hole = addHole({ nextHoleId: 1 }, s.drillHoles, 10, 10, 8, 0.15);
+    const charge = createCharge('boomite', 5, 2, hole.depth);
+    if ('charge' in charge) s.chargesByHole[hole.id] = charge.charge;
+    s.employees.employees.push(worker(7, 'Oz Trill'));
+    s.pendingDetonation = { armedTick: 0, strandedEmployeeIds: stranded ? [7] : [], strandedVehicleIds: [], lastEvacuationTick: 0 };
+    return s;
+  }
+
+  function hud(): { speeds: HTMLElement[]; pause: HTMLElement } {
+    const bar = document.createElement('div');
+    bar.id = 'bs-hud-top';
+    const group = document.createElement('div');
+    group.className = 'bs-speed-btn';
+    const pause = document.createElement('button');
+    pause.dataset['action'] = 'pause-toggle';
+    bar.append(pause, group);
+    const speeds = ['1', '2', '4', '8'].map((v) => {
+      const b = document.createElement('button');
+      b.dataset['speed'] = v;
+      group.appendChild(b);
+      return withBox(b);
+    });
+    document.body.appendChild(bar);
+    return { speeds, pause: withBox(pause) };
+  }
+
+  function mount(phase: 'evacuating' | 'stranded') {
+    const toolbar = document.createElement('div');
+    toolbar.id = 'bs-toolbar';
+    const openBtn = document.createElement('button');
+    openBtn.dataset['panel'] = 'blast';
+    toolbar.appendChild(openBtn);
+    document.body.appendChild(toolbar);
+    withBox(openBtn);
+    const panel = document.createElement('div');
+    panel.id = 'bs-blast-panel';
+    const exec = document.createElement('button');
+    exec.dataset['action'] = 'execute';
+    panel.appendChild(exec);
+    document.body.appendChild(panel);
+    withBox(exec);
+
+    const clock = hud();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const modal = new PreflightModal(container);
+    modal.setGameConsole(vi.fn().mockReturnValue({ success: true, output: '' }));
+    modal.show();
+    const s = armed(phase === 'stranded');
+    modal.update(s, 'sunny');
+    const q = (sel: string): HTMLElement => withBox(modal.root.querySelector(sel) as HTMLElement);
+    const waiting = q('[data-role="preflight-waiting"]');
+    const fire = q('[data-action="preflight-fire-anyway"]');
+    const cancel = q('[data-action="preflight-cancel-detonation"]');
+    return { modal, s, clock, waiting, fire, cancel };
+  }
+
+  for (const phase of ['evacuating', 'stranded'] as const) {
+    it(`${phase}: the stage targets the waiting block, Cancel blast is allowed, Blast anyway is not`, () => {
+      const { s, waiting, fire, cancel } = mount(phase);
+      expect(waiting.dataset['phase']).toBe(phase);
+      const rails = new TutorialRails();
+      rails.beginStep({ id: 'evacuate-zone' }, s);
+      rails.refresh(s);
+      expect(waiting.classList.contains(HIGHLIGHT_CLASS)).toBe(true);
+      expect(cancel.classList.contains(ALLOWED_CLASS)).toBe(true);
+      expect(fire.classList.contains(ALLOWED_CLASS)).toBe(false);
+    });
+
+    it(`${phase}: speed buttons and pause stay allowed and nothing covers them`, () => {
+      const { modal, s, clock } = mount(phase);
+      const rails = new TutorialRails();
+      rails.beginStep({ id: 'evacuate-zone' }, s);
+      rails.refresh(s);
+      for (const btn of [...clock.speeds, clock.pause]) {
+        expect(btn.classList.contains(ALLOWED_CLASS)).toBe(true);
+      }
+      // The overlay is the only full-screen thing that could sit on the HUD: it must be pointer-transparent and unpainted.
+      expect(modal.root.style.pointerEvents).toBe('none');
+      expect(['transparent', 'rgba(0, 0, 0, 0)']).toContain(modal.root.style.backgroundColor);
+    });
+  }
 });
