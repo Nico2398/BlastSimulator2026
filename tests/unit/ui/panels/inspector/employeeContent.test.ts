@@ -273,3 +273,25 @@ describe('employee inspector — live refresh', () => {
     expect(root.querySelector('[data-select-kind="building"][data-select-id="4"]')).not.toBeNull();
   });
 });
+
+describe('employee inspector picture (#2241)', () => {
+  it('carries the picture of the employee role with their initials', () => {
+    const e = makeEmployee({ role: 'blaster', name: 'Otto Rockwell' });
+    const p = build(e).view.portrait!;
+    expect(p.id).toBe('worker_blaster');
+    expect(p.monogram).toBe('OR');
+    expect(p.alt).toBe('Otto Rockwell');
+  });
+
+  it('two employees of different roles show different pictures', () => {
+    const a = build(makeEmployee({ id: 1, role: 'driller' })).view.portrait!;
+    const b = build(makeEmployee({ id: 2, role: 'surveyor' })).view.portrait!;
+    expect(a.id).not.toBe(b.id);
+  });
+
+  it('marks an injured or collapsing employee on the picture', () => {
+    expect(build(makeEmployee({ injured: true })).view.portrait!.state).toBe('injured');
+    expect(build(makeEmployee({ collapsing: true })).view.portrait!.state).toBe('collapsed');
+    expect(build(makeEmployee()).view.portrait!.state).toBe('none');
+  });
+});

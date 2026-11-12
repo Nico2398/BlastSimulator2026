@@ -1007,3 +1007,52 @@ describe('Inspector — reason lines are deduplicated (#1861)', () => {
     expect(lines[0]!.dataset['reason']).toBe('upgrade');
   });
 });
+
+describe('Inspector picture (#2241)', () => {
+  function hireAndShow(role: 'driller' | 'surveyor') {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    hireEmployee(state.employees, role, new Random(3));
+    const id = state.employees.employees.at(-1)!.id;
+    bar.show(entity('employee', id), state);
+    return { bar, root, state, id };
+  }
+
+  it('replaces the header icon chip with the employee picture, and grows the header to hold it', () => {
+    const { root } = hireAndShow('driller');
+    const header = root.firstElementChild as HTMLElement;
+    const tile = header.querySelector<HTMLElement>('.bs-inspector-portrait .bsx-portrait')!;
+    expect(tile.dataset['portrait']).toBe('worker_driller');
+    expect(header.querySelector<HTMLElement>('.bs-inspector-portrait')!.style.display).toBe('block');
+    expect(parseInt(header.style.height, 10)).toBeGreaterThan(46);
+    // The action strip still follows the body: the picture adds height to the header only.
+    expect(root.lastElementChild!.querySelector('button[data-action="dispatch_here"]')).not.toBeNull();
+  });
+
+  it('keeps the picture node across a per-frame refresh, and swaps it when the subject changes', () => {
+    const { bar, root, state, id } = hireAndShow('driller');
+    const before = root.querySelector('.bs-inspector-portrait .bsx-portrait');
+    bar.update(state);
+    expect(root.querySelector('.bs-inspector-portrait .bsx-portrait')).toBe(before);
+    state.employees.employees.find(e => e.id === id)!.injured = true;
+    bar.update(state);
+    expect(root.querySelector<HTMLElement>('.bs-inspector-portrait .bsx-portrait')!.dataset['state']).toBe('injured');
+  });
+
+  it('marks the page while open so a central window makes room, and clears it on hide', () => {
+    const { bar } = hireAndShow('surveyor');
+    expect(document.body.classList.contains('bs-inspector-open')).toBe(true);
+    bar.hide();
+    expect(document.body.classList.contains('bs-inspector-open')).toBe(false);
+  });
+
+  it('a kind without a picture (a hole) keeps the icon chip at the 46 px header', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    bar.show(entity('hole', holeNumericId(hole.id)), state);
+    const header = root.firstElementChild as HTMLElement;
+    expect(header.querySelector<HTMLElement>('.bs-inspector-portrait')!.style.display).toBe('none');
+    expect(header.style.height).toBe('46px');
+  });
+});

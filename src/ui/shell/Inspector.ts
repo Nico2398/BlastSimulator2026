@@ -17,11 +17,15 @@ import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
 import { el, button, reasonLine, panelRoot, panelHeader, panelHeaderButton, panelBody, replaceChildrenKeepingScroll } from '../dom.js';
 import { iconEl } from '../icons.js';
+import { portraitEl } from '../portraits.js';
 import { contentFor, type InspectorAction, type ActionSpec, type InspectorView, type InspectorLinks, type RampRepairOffer } from '../panels/inspector/InspectorContent.js';
 import { shellLayoutRegistry } from './LayoutRegistry.js';
 import { writeText } from '../panels/inspector/inspectorWidgets.js';
 import { attachWindowDrag, type WindowDrag } from './windowDrag.js';
 import { inspectorBounds } from '../panels/inspector/inspectorLayout.js';
+
+/** Edge of the header picture: large enough to read the role and tier, small enough to keep the actions on a 720 px screen. */
+const INSPECTOR_PORTRAIT_PX = 56;
 
 /** The text an action button shows: its literal label, else the translated key. */
 function actionLabel(a: ActionSpec): string {
@@ -31,6 +35,9 @@ function actionLabel(a: ActionSpec): string {
 export class Inspector {
   private readonly root: HTMLElement;
   private readonly iconChip: HTMLElement;
+  /** Holds the entity's picture (#2241) in place of the icon chip when its view supplies one. */
+  private readonly portraitSlot: HTMLElement;
+  private readonly header: HTMLElement;
   private readonly titleEl: HTMLElement;
   private readonly subEl: HTMLElement;
   private readonly locateBtn: HTMLButtonElement;
@@ -48,6 +55,7 @@ export class Inspector {
   private lastState: GameState | null = null;
   private shownSignature: string | null = null;
   private shownIcon: string | null = null;
+  private shownPortrait: string | null = null;
   private readonly drag: WindowDrag;
   private readonly onResize = (): void => this.reclamp();
 
@@ -71,6 +79,10 @@ export class Inspector {
       onClose: () => { this.hide(); this.onClose?.(); },
     });
     this.iconChip = parts.header.firstElementChild as HTMLElement;
+    this.header = parts.header;
+    this.portraitSlot = el('div', { className: 'bs-inspector-portrait' });
+    this.portraitSlot.style.display = 'none';
+    parts.header.insertBefore(this.portraitSlot, this.iconChip);
     this.titleEl = parts.titleEl;
     this.titleEl.style.letterSpacing = '.02em';
     this.subEl = el('div', { className: 'bsx-mono' });
@@ -131,6 +143,8 @@ export class Inspector {
     this.root.style.display = 'none';
     this.current = null;
     this.shownSignature = null;
+    // A central window narrows beside an open inspector (CenterStage.ts); give the room back.
+    document.body.classList.remove('bs-inspector-open');
   }
 
   /** Re-render in the new language; the window stays open on the same entity. */
@@ -168,6 +182,7 @@ export class Inspector {
       this.iconChip.replaceChildren(iconEl(view.icon, 15));
       this.shownIcon = view.icon;
     }
+    this.syncPortrait(view);
 
     const signature = `${view.signature}|${view.actions.map(a => a.action).join(',')}`;
     if (signature !== this.shownSignature) {
@@ -178,6 +193,29 @@ export class Inspector {
       this.syncDisabled(view);
     }
     this.root.style.display = 'flex';
+    document.body.classList.add('bs-inspector-open');
+  }
+
+  /**
+   * The picture replaces the icon chip and the header grows to hold it; the
+   * tile is rebuilt only when what it shows (model, state, badges) changes.
+   */
+  private syncPortrait(view: InspectorView): void {
+    const spec = view.portrait;
+    const key = spec ? `${spec.id}|${spec.state ?? ''}|${spec.badge ?? ''}|${spec.monogram ?? ''}|${spec.alt}` : null;
+    if (key === this.shownPortrait) return;
+    this.shownPortrait = key;
+    if (!spec) {
+      this.portraitSlot.replaceChildren();
+      this.portraitSlot.style.display = 'none';
+      this.iconChip.style.display = 'flex';
+      this.header.style.height = '46px';
+      return;
+    }
+    this.portraitSlot.replaceChildren(portraitEl(spec, INSPECTOR_PORTRAIT_PX));
+    this.portraitSlot.style.display = 'block';
+    this.iconChip.style.display = 'none';
+    this.header.style.height = `${INSPECTOR_PORTRAIT_PX + 14}px`;
   }
 
   /** Keep a dragged window fully visible; its height cap follows its new top edge. */

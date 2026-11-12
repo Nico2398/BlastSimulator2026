@@ -3582,3 +3582,18 @@ export const PROJECTION_ZONE_OPACITY = 0.5;
 export const BLAST_REPORT_MAX_HOLE_REASONS = 6;
 /** Share of the broken rock crushed into fines or dust from which the report calls the shot overcharged (#2202). */
 export const OVERCHARGE_NOTE_MIN_FINES_SHARE = 0.25;
+
+// ─── Contract outlook (#2243) ─────────────────────────────────────────────────
+
+/**
+ * Window (ticks) the per-material gathering rate is measured over: one in-game
+ * day. Hauling comes in bursts after each blast; a shorter window would swing
+ * from flood to zero between two shots and make every forecast flip-flop.
+ */
+export const ORE_RATE_WINDOW_TICKS = TICKS_PER_DAY;
+
+/** Projected supply at or above this multiple of the demand due by a deadline reads "on track"; below it, "at risk". */
+export const CONTRACT_OUTLOOK_SAFE_RATIO = 1.15;
+
+/** Projected supply below this multiple of the demand due by a deadline reads "will miss". */
+export const CONTRACT_OUTLOOK_MISS_RATIO = 0.75;

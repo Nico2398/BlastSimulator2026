@@ -8,7 +8,8 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody, flashStatus } from '../dom.js';
+import { el, card, button, sectionHeader, panelHeader, flashStatus } from '../dom.js';
+import { windowRoot, windowBody } from '../windowKit.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -64,7 +65,7 @@ export class ShadyPanel extends PanelBase {
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    super(panelRoot('bs-shady-panel'));
+    super(windowRoot('bs-shady-panel'));
 
     const { header, titleEl } = panelHeader({
       icon: 'shady',
@@ -73,7 +74,7 @@ export class ShadyPanel extends PanelBase {
     });
     this.locale.bindText(titleEl, 'ui.shady.title');
 
-    this.bodyEl = panelBody(11);
+    this.bodyEl = windowBody();
 
     const introEl = this.locale.bindText(
       el('span', { attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro);font-style:italic' } }),

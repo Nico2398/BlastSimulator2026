@@ -27,6 +27,8 @@ import { SettingsPanel } from './panels/SettingsPanel.js';
 import { MiniMap } from './MiniMap.js';
 import { TopBar } from './shell/TopBar.js';
 import { LeftColumn } from './shell/LeftColumn.js';
+import { CenterStage } from './shell/CenterStage.js';
+import { injectWindowStyles } from './windowStyles.js';
 import { ToolRail } from './shell/ToolRail.js';
 import { Toasts } from './shell/Toasts.js';
 import { ActivityLog } from './shell/ActivityLog.js';
@@ -49,6 +51,13 @@ import type { SpiralSurface } from '../core/mining/RampSpiral.js';
 
 
 export type PanelName = 'blast' | 'contracts' | 'finances' | 'ops' | 'build' | 'vehicles' | 'employees' | 'survey' | 'shady' | 'permits' | 'settings';
+
+/**
+ * Panels that open as a large central window (#2242). Blast and Survey stay in
+ * the left column — the scene they work on must stay in view — and Settings is
+ * its own centred modal.
+ */
+const CENTRAL_PANELS: ReadonlySet<PanelName> = new Set<PanelName>(['contracts', 'finances', 'ops', 'build', 'vehicles', 'employees', 'shady', 'permits']);
 
 export class UIManager {
   private readonly topBar: TopBar;
@@ -78,6 +87,7 @@ export class UIManager {
   private readonly settingsPanel: SettingsPanel;
   private readonly miniMap: MiniMap;
   private readonly leftColumn: LeftColumn;
+  private readonly centerStage: CenterStage;
 
   private openEntityHandler?: (kind: OpenableKind, id: number) => void;
   private mapFocusHandler?: (x: number, z: number) => void;
@@ -99,6 +109,7 @@ export class UIManager {
     // Redesign foundation (P0): additive token stylesheet + icon registry.
     // Coexists with the legacy stylesheet until each surface migrates.
     injectTokens();
+    injectWindowStyles();
     registerIcons();
 
     // Left column — panels (temporary adapter, per the implementation plan:
@@ -107,6 +118,9 @@ export class UIManager {
     // bounds so the inspector can keep clear of it (#1423).
     this.leftColumn = new LeftColumn(container);
     const leftCol = this.leftColumn.el;
+    // Central windows (#2242): the management panels open here, over the middle of the screen.
+    this.centerStage = new CenterStage(container);
+    const stage = this.centerStage.el;
 
     // Right column — minimap
     const rightCol = document.createElement('div');
@@ -140,29 +154,29 @@ export class UIManager {
     // its own; CrewPanel/FleetPanel (P6) will reach it once they exist.
     this.confirmModal = new ConfirmModal(container);
     this.blastUI.setConfirmHandler(config => this.confirmModal.show(config));
-    this.contractsPanel = new ContractsPanel(leftCol);
+    this.contractsPanel = new ContractsPanel(stage);
     this.contractsPanel.setCloseHandler(() => this.hideAllPanels());
     this.contractsPanel.setNavigateHandler((panel) => this.showPanel(panel));
-    this.financesPanel = new FinancesPanel(leftCol);
+    this.financesPanel = new FinancesPanel(stage);
     this.financesPanel.setCloseHandler(() => this.hideAllPanels());
-    this.operationsPanel = new OperationsPanel(leftCol);
+    this.operationsPanel = new OperationsPanel(stage);
     this.operationsPanel.setCloseHandler(() => this.hideAllPanels());
-    this.buildMenu = new BuildMenu(leftCol);
+    this.buildMenu = new BuildMenu(stage);
     this.buildMenu.setCloseHandler(() => this.hideAllPanels());
     this.buildMenu.setConfirmHandler(config => this.confirmModal.show(config));
     this.buildMenu.setFlowResultHandler(message => this.notify({ severity: 'info', title: message, body: '' }));
-    this.fleetPanel = new FleetPanel(leftCol);
+    this.fleetPanel = new FleetPanel(stage);
     this.fleetPanel.setCloseHandler(() => this.hideAllPanels());
-    this.crewPanel = new CrewPanel(leftCol);
+    this.crewPanel = new CrewPanel(stage);
     this.crewPanel.setCloseHandler(() => this.hideAllPanels());
     this.surveyPanel = new SurveyPanel(leftCol);
     this.surveyPanel.setCloseHandler(() => this.hideAllPanels());
     this.surveyPanel.setNotifyHandler(n => this.notify(n));
     this.surveyPanel.setHireSurveyorHandler(() => this.showCrewHiring('surveyor'));
-    this.shadyPanel = new ShadyPanel(leftCol);
+    this.shadyPanel = new ShadyPanel(stage);
     this.shadyPanel.setCloseHandler(() => this.hideAllPanels());
     this.shadyPanel.setConfirmHandler(config => this.confirmModal.show(config));
-    this.permitPanel = new PermitPanel(leftCol);
+    this.permitPanel = new PermitPanel(stage);
     this.permitPanel.setCloseHandler(() => this.hideAllPanels());
     // Settings appended to root container so its z-index:10000 beats the main menu (z-index:9999).
     // Inside leftCol's fixed stacking context it would be capped at z:100 relative to root.
@@ -682,6 +696,7 @@ export class UIManager {
       case 'settings': this.settingsPanel.show(); break;
     }
     this.toolRail.setActive(this.activePanel);
+    this.centerStage.setWindowOpen(CENTRAL_PANELS.has(name));
     if (changed) this.cues?.panelShown(true);
   }
 
@@ -709,6 +724,7 @@ export class UIManager {
   dispose(): void {
     this.topBar.dispose();
     this.leftColumn.dispose();
+    this.centerStage.dispose();
     this.toolRail.dispose();
     this.toasts.dispose();
     this.activityLog.dispose();
@@ -753,5 +769,6 @@ export class UIManager {
     this.permitPanel.hide();
     this.settingsPanel.hide();
     this.toolRail.setActive(null);
+    this.centerStage.setWindowOpen(false);
   }
 }

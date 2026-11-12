@@ -1,12 +1,14 @@
 /** Inspector content for vehicle selections (#1756, #1761). */
+import { vehiclePortraitSpec } from '../../portraits.js';
 import { t } from '../../../core/i18n/I18n.js';
-import { resolveVehicleDriver } from '../../../core/entities/Vehicle.js';
+import { getVehicleDefByTier, resolveVehicleDriver } from '../../../core/entities/Vehicle.js';
 import { computeVehicleStatus } from '../../../core/entities/VehicleStatus.js';
 import { formatDollars } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { describeStatus, vehicleDriverState } from '../../fleetDetailSections.js';
 import { upgradeDisabledReason, upgradeState } from './vehicleDetailParts.js';
 import { el } from '../../dom.js';
+import { fractionOf } from '../../../core/math/Fraction.js';
 import type { ActionSpec, InspectorLinks, KindContent } from './InspectorContent.js';
 import { kindLabel, syncSection } from './inspectorWidgets.js';
 import {
@@ -61,6 +63,7 @@ export const vehicleContent: KindContent = {
       title: t(`vehicle_type.${v.type}`),
       sub: `#${v.id} · ${kindLabel('vehicle')} · ${t('inspector.tier', { tier: v.tier })}`,
       icon: 'vehicle',
+      portrait: vehiclePortraitSpec(v.type, v.tier, t(`vehicle_type.${v.type}`), fractionOf(v.hp, getVehicleDefByTier(v.type, v.tier).maxHp)),
       status,
       signature: `${v.type}:${v.tier}:${vehicleDriverState(v, state.employees.employees).kind}`,
       get sections() { return [build()]; },

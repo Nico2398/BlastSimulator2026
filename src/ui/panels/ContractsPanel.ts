@@ -23,7 +23,8 @@
 import { PanelBase } from './PanelBase.js';
 import { FilterBarSelection, filterBar } from '../filterBar.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, explainable, fieldStyle, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll, flashStatus } from '../dom.js';
+import { el, explainable, fieldStyle, button, card, sectionHeader, emptyState, progressBar, panelHeader, scrollBoundedSection, replaceChildrenKeepingScroll, flashStatus } from '../dom.js';
+import { windowRoot, windowBody } from '../windowKit.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg, insufficientFundsText, wholeKg } from '../../core/economy/formatMoney.js';
@@ -42,6 +43,8 @@ import { stateRubbleStockKg, totalSpoilKg } from '../../core/economy/SpoilHeaps.
 import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
 import { earlyBonusExplain, heldExplain, negotiateExplain, offSiteExplain, penaltyExplain } from '../panelExplain.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import { contractMaterialKey, forecastContracts, forecastInputsFromState, offerOutlook, type ContractOutlook, type ForecastInputs, type MaterialOutlook } from '../../core/economy/ContractForecast.js';
+import { lineExplain, makeOutlookSection, makeTimelineSection, materialName, outlookPill, outlookSignature, rateText } from './contractOutlookView.js';
 
 
 const TYPE_ICON: Record<ContractType, IconName> = {
@@ -171,9 +174,11 @@ export class ContractsPanel extends PanelBase {
     available: new FilterBarSelection(), active: new FilterBarSelection(), closed: new FilterBarSelection(),
   };
   private lastState: GameState | null = null;
+  /** What the outlook and timeline last drew, so a tick rebuilds them only when a figure moved (#2243). */
+  private lastOutlookSignature = '';
 
   constructor(container: HTMLElement) {
-    super(panelRoot('bs-contract-panel'));
+    super(windowRoot('bs-contract-panel'));
 
     const { header, titleEl } = panelHeader({
       icon: 'contract',
@@ -182,7 +187,7 @@ export class ContractsPanel extends PanelBase {
     });
     this.locale.bindText(titleEl, 'ui.contracts.title');
 
-    this.bodyEl = panelBody(10);
+    this.bodyEl = windowBody();
 
     this.statusEl = el('div', {
       attrs: { class: 'bs-contract-status', style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-critical-text);min-height:14px' },
@@ -236,24 +241,28 @@ export class ContractsPanel extends PanelBase {
   private render(state: GameState): void {
     const managerLevel = bestAvailableManagerLevel(state.employees.employees);
     const siteOres = resolveContractOres(state);
+    const inputs = forecastInputsFromState(state);
+    const lines = forecastContracts(inputs);
+    this.lastOutlookSignature = outlookSignature(lines, state.contracts.active, state.tickCount);
     const activeHeader = sectionHeader(t('ui.contracts.active_count', { count: state.contracts.active.length }));
     const sections: (HTMLElement | null)[] = [
+      makeOutlookSection(lines),
+      makeTimelineSection(state.contracts.active, state.tickCount, lines),
       this.makeMarketSection(state, siteOres),
-      this.makeStorageStrip(state),
-      this.makeAutoStrip(state),
+      el('div', { className: 'bs-contract-strips', children: [this.makeStorageStrip(state), this.makeAutoStrip(state)] }),
       this.makeActiveSummaryStrip(state, activeHeader),
       sectionHeader(t('ui.contracts.available_count', { count: state.contracts.available.length })),
       ...this.makeListSection('available', {
         rows: state.contracts.available, maxPx: AVAILABLE_SECTION_MAX_PX, minRowsForBar: 0,
         defaultOrder: rows => orderOffers(rows, state.collectedOre, stateRubbleStockKg(state)),
-        makeRow: c => this.makeOfferedCard(c, state, managerLevel, siteOres),
+        makeRow: c => this.makeOfferedCard(c, state, managerLevel, siteOres, inputs),
         emptyText: t('ui.contracts.none'),
       }),
       activeHeader,
       ...this.makeListSection('active', {
         rows: state.contracts.active, maxPx: 200, minRowsForBar: FILTER_BAR_MIN_ROWS,
         defaultOrder: rows => [...rows],
-        makeRow: c => this.makeActiveCard(c, state),
+        makeRow: c => this.makeActiveCard(c, state, lines),
         emptyText: t('ui.contracts.none_active'),
       }),
       sectionHeader(t('ui.contracts.closed')),
@@ -303,12 +312,14 @@ export class ContractsPanel extends PanelBase {
     } else {
       rows = visible.map(spec.makeRow);
     }
-    return [bar, scrollBoundedSection(rows, spec.maxPx, { gap: SECTION_GAP_PX, scrollKey: kind })].filter((n): n is HTMLElement => n !== null);
+    // `bs-contract-list` lays the cards out as a grid in the central window (windowStyles.ts), where the bound lifts.
+    return [bar, scrollBoundedSection(rows, spec.maxPx, { gap: SECTION_GAP_PX, scrollKey: kind, className: `bs-contract-list bs-contract-list-${kind}` })].filter((n): n is HTMLElement => n !== null);
   }
 
   /** Time-left text and urgency colour tick every hour; patch them in place so scroll and typed input survive. */
   private refreshDynamic(state: GameState): void {
     this.refreshActiveSummary(state);
+    this.refreshOutlook(state);
     for (const c of state.contracts.active) {
       const cardEl = this.bodyEl.querySelector<HTMLElement>(`[data-contract-id="${c.id}"]`);
       if (!cardEl) continue;
@@ -323,13 +334,62 @@ export class ContractsPanel extends PanelBase {
     }
   }
 
+  /**
+   * Rebuild the outlook and the timeline in place when what they show moved —
+   * the hours tick down and hauls land between structural renders — and swap
+   * each active card's outlook pill.
+   */
+  private refreshOutlook(state: GameState): void {
+    const lines = forecastContracts(forecastInputsFromState(state));
+    const signature = outlookSignature(lines, state.contracts.active, state.tickCount);
+    if (signature === this.lastOutlookSignature) return;
+    this.lastOutlookSignature = signature;
+    this.bodyEl.querySelector(':scope > .bs-contract-outlook-section')?.replaceWith(makeOutlookSection(lines));
+    const timeline = makeTimelineSection(state.contracts.active, state.tickCount, lines);
+    const oldTimeline = this.bodyEl.querySelector(':scope > .bs-contract-timeline');
+    if (oldTimeline && timeline) oldTimeline.replaceWith(timeline);
+    else if (oldTimeline) oldTimeline.remove();
+    else if (timeline) this.bodyEl.querySelector(':scope > .bs-contract-outlook-section')?.after(timeline);
+    for (const c of state.contracts.active) {
+      const pill = this.bodyEl.querySelector(`[data-contract-id="${c.id}"] .bs-contract-outlook`);
+      const next = this.activeOutlookPill(c, lines);
+      if (pill && next) pill.replaceWith(next);
+    }
+    const inputs = forecastInputsFromState(state);
+    for (const c of state.contracts.available) {
+      this.bodyEl.querySelector(`[data-contract-id="${c.id}"] .bs-contract-fit .bs-contract-outlook`)?.replaceWith(this.offerOutlookPill(c, inputs));
+    }
+  }
+
+  /** The outlook of one active contract, explained in its material's numbers; null when it no longer needs anything. */
+  private activeOutlookPill(c: Contract, lines: readonly MaterialOutlook[]): HTMLElement | null {
+    for (const line of lines) {
+      const f = line.contracts.find(x => x.contractId === c.id);
+      if (!f) continue;
+      return outlookPill(f.outlook, t('ui.outlook.explain_contract', {
+        due: wholeKg(f.demandByDeadlineKg), hours: Math.round(f.hoursLeft), projected: wholeKg(f.projectedKg),
+      }) + ' ' + lineExplain(line));
+    }
+    return null;
+  }
+
+  /** Whether taking an offer now is safe, with the numbers behind it. */
+  private offerOutlookPill(c: Contract, inputs: ForecastInputs): HTMLElement {
+    const outlook: ContractOutlook = offerOutlook(c, inputs);
+    const key = contractMaterialKey(c);
+    return outlookPill(outlook, t('ui.outlook.explain_offer', {
+      stock: wholeKg((inputs.stockKg[key] ?? 0) + (inputs.inTransitKg[key] ?? 0)),
+      rate: rateText(inputs.rateKgPerHour[key] ?? 0), hours: c.deadlineTicks, kg: wholeKg(c.quantityKg),
+    }), t(`ui.outlook.offer_${outlook}`));
+  }
+
   /** Kilograms of `materialId` available to deliver — collected ore by type, or barren rock (heaps plus barren stored fragments) for rubble ('' materialId). */
   private storedOf(materialId: string, state: GameState): number {
     return materialId === '' ? stateRubbleStockKg(state) : (state.collectedOre[materialId] ?? 0);
   }
 
   private materialLabel(materialId: string): string {
-    return materialId === '' ? t('ui.contracts.material_rubble') : t(getOre(materialId)?.nameKey ?? materialId);
+    return materialName(materialId);
   }
 
   // ── Storage strip ──
@@ -477,7 +537,7 @@ export class ContractsPanel extends PanelBase {
     return 'var(--bsx-critical-text)';
   }
 
-  private makeActiveCard(c: Contract, state: GameState): HTMLElement {
+  private makeActiveCard(c: Contract, state: GameState, lines: readonly MaterialOutlook[]): HTMLElement {
     const remainingTicks = remainingTicksOf(c, state.tickCount);
     const color = this.urgencyColor(c, state.tickCount);
     const pct = c.quantityKg > 0 ? Math.round((c.deliveredKg / c.quantityKg) * 100) : 0;
@@ -497,6 +557,8 @@ export class ContractsPanel extends PanelBase {
         attrs: { style: `margin-left:auto;display:flex;align-items:center;gap:4px;font:700 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:${color}` },
       }),
     );
+    const outlook = this.activeOutlookPill(c, lines);
+    if (outlook) headRow.append(outlook);
 
     const progressLine = el('div');
     progressLine.style.cssText = 'display:flex;gap:12px;font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-secondary)';
@@ -575,7 +637,7 @@ export class ContractsPanel extends PanelBase {
 
   // ── Offered ──
 
-  private makeOfferedCard(c: Contract, state: GameState, managerLevel: number | null, siteOres: readonly string[]): HTMLElement {
+  private makeOfferedCard(c: Contract, state: GameState, managerLevel: number | null, siteOres: readonly string[], inputs: ForecastInputs): HTMLElement {
     const stored = this.storedOf(c.materialId, state);
     const havePct = c.quantityKg > 0 ? Math.min(100, Math.round((stored / c.quantityKg) * 100)) : 0;
     const haveColor = stored >= c.quantityKg ? 'var(--bsx-positive)' : 'var(--bsx-amber)';
@@ -674,7 +736,8 @@ export class ContractsPanel extends PanelBase {
       ? null
       : explainable(el('span', { text: t('ui.contracts.not_on_site'), attrs: { class: 'bs-contract-off-site', style: 'font:600 10px/1 var(--bsx-font-ui);color:var(--bsx-critical-text)' } }), offSiteExplain());
 
-    const cardEl = card([headRow, offSiteBadge, statRow, haveRow, termsRow, negBox, btnRow]);
+    const fit = el('div', { className: 'bs-contract-fit', children: [el('span', { text: t('ui.outlook.offer_label') }), this.offerOutlookPill(c, inputs)] });
+    const cardEl = card([headRow, offSiteBadge, statRow, haveRow, fit, termsRow, negBox, btnRow]);
     cardEl.dataset['contractId'] = String(c.id);
     // data-contract-type/data-contract-material, alongside data-contract-id
     // (#554): a fixed id is a moving target once the tick-based offer pool

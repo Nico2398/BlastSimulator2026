@@ -39,6 +39,7 @@
     "models:build": "npm run models:defs && python3 assets/models/blender/build.py",
     "models:manifest": "tsx scripts/model-manifest.ts",
     "models:preview": "tsx scripts/model-preview.ts",
+    "thumbs:build": "tsx scripts/render-thumbnails.ts",
     "sounds:check": "tsx scripts/sound-lab-check.ts",
     "audio:smoke": "tsx scripts/audio-smoke.ts"
   },
