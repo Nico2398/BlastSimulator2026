@@ -19,6 +19,7 @@ import type { RallyFlagMesh } from './RallyFlagMesh.js';
 import { findTrafficJams } from '../core/events/TrafficJams.js';
 import type { TaskProgressBar } from './TaskProgressBar.js';
 import type { EmployeePictograms } from './EmployeePictograms.js';
+import type { EmployeeMarkers } from './EmployeeMarkers.js';
 import type { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import type { SkyboxWeather } from './SkyboxWeather.js';
 import type { CloudLayer } from './ambient/CloudLayer.js';
@@ -61,6 +62,8 @@ export interface SyncDeps {
   lastSyncedTerrainRevision: number;
   taskProgress: TaskProgressBar | null;
   pictograms: EmployeePictograms | null;
+  /** Role-coloured crew pins; optional since not every SyncDeps caller (e.g. tests) builds one. */
+  employeeMarkers?: EmployeeMarkers | null;
   /** "<inside>/<capacity>" labels above people-holding buildings; optional since not every SyncDeps caller (e.g. tests) builds one (#1205). */
   buildingOccupancyLabels?: BuildingOccupancyLabels | null;
   skybox: SkyboxWeather | null;
@@ -195,6 +198,14 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
     deps.pictograms.sync(
       state.employees.employees,
       state.vehicles,
+      id => deps.characters!.getGroup(id),
+    );
+  }
+
+  // Crew pins — one per worker that has a mesh, so a hire is findable at any zoom
+  if (deps.employeeMarkers && deps.characters) {
+    deps.employeeMarkers.sync(
+      state.employees.employees,
       id => deps.characters!.getGroup(id),
     );
   }
