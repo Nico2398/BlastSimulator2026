@@ -929,6 +929,12 @@ export const BLAST_REACH_M_PER_SQRT_ENERGY = 0.045;
  */
 export const EVACUATION_CLEARANCE_M = 5;
 
+/** Spacing (m) of the candidate cells searched beside an edge projection when it is off the map, blocked or taken (#2230). */
+export const EVACUATION_LATERAL_STEP_M = 2;
+
+/** Candidate cells searched on each side of an edge projection (#2230). */
+export const EVACUATION_LATERAL_STEPS = 8;
+
 /**
  * Tiles a tutorial building's footprint must clear from `tutorialHazards()`
  * (drill/boxcut/vehicle-spawn points) for its fixed-map REGION pin to be

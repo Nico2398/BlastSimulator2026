@@ -175,12 +175,26 @@ export function findAvailableDriverForReposition(
   vehicle: Vehicle,
   vehicleState: VehicleState,
   employeeState: EmployeeState,
+  excludeEmployeeIds?: ReadonlySet<number>,
 ): Employee | null {
   const candidateIds = employeeState.employees
-    .filter(e => isIdleForReposition(e, vehicle))
+    .filter(e => isIdleForReposition(e, vehicle) && !excludeEmployeeIds?.has(e.id))
     .map(e => e.id);
 
   return rankQualifiedDriversByDistance(vehicle, vehicleState, employeeState, candidateIds)[0] ?? null;
+}
+
+/**
+ * True when an alive, uninjured employee outside `excludeEmployeeIds` holds the licence level `vehicle` needs: some
+ * other driver could rescue it, busy or not (#2230).
+ */
+export function hasOtherLicensedDriver(
+  vehicle: Vehicle,
+  employeeState: EmployeeState,
+  excludeEmployeeIds: ReadonlySet<number>,
+): boolean {
+  return employeeState.employees.some(e =>
+    e.alive && !e.injured && !excludeEmployeeIds.has(e.id) && canDriveTier(e, vehicle.type, vehicle.tier));
 }
 
 /** Alive, doing nothing at all, and not sitting in (or walking to) some other vehicle. */
