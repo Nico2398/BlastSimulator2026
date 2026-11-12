@@ -15,12 +15,19 @@ export type TrailHostKind = 'vehicle' | 'building';
 export type TrailHostEvent = 'board' | 'enter' | 'alight' | 'leave';
 
 /** A host transition recorded on the trail: the trail point it happened at and the host's position. */
-interface TrailHostMarker {
+export interface TrailHostMarker {
   pointIndex: number;
   event: TrailHostEvent;
   hostKind: TrailHostKind;
   hostX: number;
   hostZ: number;
+  /**
+   * Set on a vehicle's own trail (#2224): the employee riding it and the arc length of that
+   * employee's trail at the transition, so the renderer can hold the vehicle until the rider
+   * has boarded and stop it before the rider alights.
+   */
+  riderId?: number;
+  riderArc?: number;
 }
 
 export interface MovementTrail {
@@ -42,6 +49,11 @@ export interface MovementTrail {
 
 /** Upper bound on recorded points — a long console batch drops the oldest, never grows unbounded. */
 export const MOVEMENT_TRAIL_MAX_POINTS = 256;
+
+/** Arc length of a polyline (#2224 — the time base shared by a rider and its vehicle). */
+export function trailArcLength(_points: readonly TrailPoint[]): number {
+  throw new Error('not implemented');
+}
 
 /** Whether two positions are the same point for trail purposes. */
 export function isSameTrailPoint(a: TrailPoint, bx: number, bz: number): boolean {
@@ -103,6 +115,7 @@ export function appendHostTransition(
   hostKind: TrailHostKind,
   hostX: number,
   hostZ: number,
+  _rider?: { id: number; arc: number },
 ): void {
   const tail = trail.points[trail.points.length - 1];
   if (!tail || !isSameTrailPoint(tail, x, z)) trail.points.push({ x, z });

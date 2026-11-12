@@ -157,9 +157,9 @@ export class CharacterMesh {
     this.library = library;
   }
 
-  addEmployee(employee: Employee, surfaceY: number = 0, trail?: MovementTrail): void {
+  addEmployee(employee: Employee, surfaceY: number = 0, trail?: MovementTrail, spawnSpan?: TrailSpan): void {
     this.removeEmployee(employee.id); // a mesh still retiring is dropped first (#1589)
-    const exitSpan = exitSpanOf(trail);
+    const exitSpan = spawnSpan ?? exitSpanOf(trail);
     const start = exitSpan?.points[0] ?? employee;
     const group = new THREE.Group();
     const { instance, animator } = this.attachModel(group, employee);

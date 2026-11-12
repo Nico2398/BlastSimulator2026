@@ -22,6 +22,10 @@ export interface MovementTween {
   path: TrailPoint[] | null;
   /** Visible spans of the trail, split at host markers (#1589). Absent for a plain glide. */
   spans?: TrailSpan[] | undefined;
+  /** Window of the tween in which `path` plays; the mesh holds outside it (#2224). */
+  window?: RidingWindow | undefined;
+  /** Real seconds the mesh is still held hidden before/between spans (#2224). */
+  holdS?: number;
   /** Index into `spans` of the span currently playing (#1589). */
   spanIndex?: number;
   /** Real seconds the current span takes to play (#1589). */
@@ -33,6 +37,16 @@ export interface TrailSpan {
   points: TrailPoint[];
   /** True when the span ends at a board/enter marker, so the mesh retires there. */
   endsInHost: boolean;
+  /** Arc length of the trail before this span's first point (#2224). */
+  startArc: number;
+  /** Arc length of the hidden stretch (a ride) following this span, 0 for the last (#2224). */
+  gapAfter: number;
+}
+
+/** The fraction of a tween (0..1) during which a vehicle rides with its driver aboard (#2224). */
+export interface RidingWindow {
+  start: number;
+  end: number;
 }
 
 /** True for a host marker event that puts the character back on foot (#1589). */
@@ -48,7 +62,7 @@ function isExitEvent(event: string): boolean {
 export function visibleTrailSpans(trail: MovementTrail): TrailSpan[] {
   const { points, hostMarkers } = trail;
   if (points.length === 0) return [];
-  if (hostMarkers.length === 0) return [{ points: points.slice(), endsInHost: false }];
+  if (hostMarkers.length === 0) return [{ points: points.slice(), endsInHost: false, startArc: 0, gapAfter: 0 }];
   if (trail.relocated) return [];
   const last = points.length - 1;
   const spans: TrailSpan[] = [];
@@ -59,14 +73,14 @@ export function visibleTrailSpans(trail: MovementTrail): TrailSpan[] {
     const idx = Math.min(last, Math.max(0, m.pointIndex));
     const exits = isExitEvent(m.event);
     if (!exits && inBody) {
-      spans.push({ points: points.slice(start, idx + 1), endsInHost: true });
+      spans.push({ points: points.slice(start, idx + 1), endsInHost: true, startArc: 0, gapAfter: 0 });
       inBody = false;
     } else if (exits && !inBody) {
       start = idx;
       inBody = true;
     }
   }
-  if (inBody) spans.push({ points: points.slice(start), endsInHost: false });
+  if (inBody) spans.push({ points: points.slice(start), endsInHost: false, startArc: 0, gapAfter: 0 });
   return spans;
 }
 
@@ -77,6 +91,25 @@ export function visibleTrailSpans(trail: MovementTrail): TrailSpan[] {
 export function exitSpanOf(trail: MovementTrail | undefined): TrailSpan | undefined {
   if (!trail || trail.relocated || !trail.hostMarkers.some(m => isExitEvent(m.event))) return undefined;
   return visibleTrailSpans(trail).filter(sp => !sp.endsInHost).pop();
+}
+
+/**
+ * The first visible span of a trail that begins hosted (it opens with an alight/leave), or undefined.
+ * Its first point is where an employee mounted at batch start appears (#2224).
+ */
+export function leavingHostSpanOf(_trail: MovementTrail | undefined): TrailSpan | undefined {
+  throw new Error('not implemented');
+}
+
+/**
+ * The window of a vehicle's tween in which it drives, derived from the rider markers on its trail
+ * and the rider's own trail (#2224); undefined when the trail carries no usable rider marker.
+ */
+export function ridingWindowOf(
+  _vehicleTrail: MovementTrail | undefined,
+  _riderTrailOf: (id: number) => MovementTrail | undefined,
+): RidingWindow | undefined {
+  throw new Error('not implemented');
 }
 
 /** Arc length of a polyline. */
@@ -234,7 +267,9 @@ export function stepTween(
   targetX: number, targetZ: number,
   dt: number,
   trail?: MovementTrail,
+  window?: RidingWindow,
 ): { x: number; z: number } {
+  void window; // skeleton (#2224): the riding window is applied by the implementation
   // Target moved since the last step (new tick's position, a mid-glide
   // retarget, etc.) — restart from the entity's actual current rendered
   // position, not the tween's stale prev, or the mesh pops.
@@ -281,8 +316,9 @@ export function stepTweenWithHeight(
   dt: number,
   heightAt: (x: number, z: number) => number,
   trail?: MovementTrail,
+  window?: RidingWindow,
 ): { x: number; y: number; z: number } {
-  const eased = stepTween(tween, renderX, renderZ, targetX, targetZ, dt, trail);
+  const eased = stepTween(tween, renderX, renderZ, targetX, targetZ, dt, trail, window);
   return { x: eased.x, y: heightAt(eased.x, eased.z), z: eased.z };
 }
 
@@ -302,15 +338,16 @@ export function applyEasedPosition(
   dt: number,
   heightAt?: (x: number, z: number) => number,
   trail?: MovementTrail,
+  window?: RidingWindow,
 ): { x: number; z: number } {
   if (heightAt) {
-    const eased = stepTweenWithHeight(tween, fromX, fromZ, targetX, targetZ, dt, heightAt, trail);
+    const eased = stepTweenWithHeight(tween, fromX, fromZ, targetX, targetZ, dt, heightAt, trail, window);
     position.x = eased.x;
     position.y = eased.y;
     position.z = eased.z;
     return { x: eased.x, z: eased.z };
   }
-  const eased = stepTween(tween, fromX, fromZ, targetX, targetZ, dt, trail);
+  const eased = stepTween(tween, fromX, fromZ, targetX, targetZ, dt, trail, window);
   position.x = eased.x;
   position.z = eased.z;
   return { x: eased.x, z: eased.z };
