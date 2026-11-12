@@ -11,6 +11,7 @@ import { goalChipParams } from './tutorialStepsClosing.js';
 import { TUTORIAL_LEVEL_ID, isDefeatReason } from './tutorialTrigger.js';
 import { CARD_CLASS, GUIDED_CLASS } from './tutorialGuide.js';
 import { TutorialRails, type RailsStep } from './tutorialRails.js';
+import type { RegionProjector } from './tutorialRipple.js';
 import type { LocaleTextRegistry } from './localeText.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 
@@ -168,6 +169,11 @@ export class TutorialOverlay {
     // displayed step and re-runs the guide's stage-line lookup — the same
     // translation lookups render() already performs on every step change.
     this.render();
+  }
+
+  /** Supply the in-scene projection the ripple needs on tile-pick stages. */
+  setRegionProjector(_projector: RegionProjector | null): void {
+    throw new Error('not implemented');
   }
 
   dispose(): void {

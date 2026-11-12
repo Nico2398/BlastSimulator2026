@@ -10,6 +10,7 @@ import { stagesFor, PICKER_CANVAS, type TutorialStage } from './tutorialStages.j
 import {
   applyRails, clearRails, isReachable, isClippedByScroller, scrollTargetIntoView, resolveStageIndex, resolveWaitStatus, resolveOrderIssued, decideClock, DEFAULT_TICK_BUDGET,
 } from './tutorialGuide.js';
+import type { RippleStage } from './tutorialRipple.js';
 import { setPickerRegion } from './tutorialPickerRegion.js';
 import {
   SPEED_BUTTON_GROUP, PAUSE_TOGGLE_SELECTOR, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS,
@@ -59,6 +60,8 @@ export interface RailsView {
   waiting: boolean;
   /** Localised waiting line, or '' when `waiting` is false. */
   waitingHint: string;
+  /** What the tutorial ripple converges on; null while waiting, spent or without a stage. */
+  ripple: RippleStage | null;
 }
 
 export class TutorialRails {
@@ -113,7 +116,7 @@ export class TutorialRails {
     if (this.stages.length === 0) {
       clearRails();
       return {
-        hint: '', clockHeld: this.held, stageIndex: 0, stageTotal: 0, stageTarget: null, waiting: false, waitingHint: '',
+        hint: '', clockHeld: this.held, stageIndex: 0, stageTotal: 0, stageTarget: null, waiting: false, waitingHint: '', ripple: null,
       };
     }
 
@@ -134,6 +137,7 @@ export class TutorialRails {
       stageTarget: stage?.target ?? null,
       waiting: waitStatus.waiting,
       waitingHint: waitStatus.waitingKey ? t(waitStatus.waitingKey) : '',
+      ripple: null,
     };
   }
 
