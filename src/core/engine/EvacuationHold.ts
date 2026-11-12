@@ -119,6 +119,7 @@ export function clearResolvedEvacuationHolds(state: GameState): void {
 export function liftSpentZone(state: GameState): void {
   stripEvacuationHolds(state.pendingActions);
   state.zone.activeZone = null;
+  state.zone.evacuatedEmployeeIds = [];
 }
 
 function stripEvacuationHolds(actions: PendingAction[]): void {

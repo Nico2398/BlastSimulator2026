@@ -4,14 +4,14 @@
 
 import { isProgressionSite, type GameState } from '../state/GameState.js';
 import type { ZoneBounds, EvacuationDestination, EvacuationResult, SafeDestinationFinder } from '../entities/Zone.js';
-import { clearZone, isInZone, collectInZoneDriverIds, planDriverlessEvacuation } from '../entities/Zone.js';
+import { clearZone, isInZone, collectInZoneDriverIds, planDriverlessEvacuation, evacuationCellKey } from '../entities/Zone.js';
 import { findPath } from '../nav/Pathfinding.js';
 import { interruptActiveAction } from './TaskCancellation.js';
 import { releaseVehicleReservation } from './VehicleReservation.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation, vehicleMaxSlopeRatio, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
-import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
+import { EVACUATION_CLEARANCE_M, EVACUATION_LATERAL_STEP_M, EVACUATION_LATERAL_STEPS } from '../config/balance.js';
 import { isOnReturnTripLeg } from './Locomotion.js';
 import {
   EVACUATION_HOLD_KEY, discardStaleRestAction, releaseInZoneTaskQueueEntries, isMidEvacuationDrive,
@@ -131,7 +131,21 @@ function buildCandidates(fromX: number, fromZ: number, zone: ZoneBounds): Evacua
     { dist: fromZ - zone.z1, candidate: { x: fromX, z: zone.z1 - EVACUATION_CANDIDATE_OFFSET_M } },
     { dist: zone.z2 - fromZ, candidate: { x: fromX, z: zone.z2 + EVACUATION_CANDIDATE_OFFSET_M } },
   ];
-  const orderedEdges = edges.sort((a, b) => a.dist - b.dist).map(e => e.candidate);
+  const projections = edges.sort((a, b) => a.dist - b.dist).map(e => e.candidate);
+  // Beside each projection (#2230), so a projection that is off the map, blocked or taken is replaced by the nearest
+  // cell along the same edge rather than one on the far side of the zone. Nearest to the entity first.
+  const lateral: EvacuationDestination[] = [];
+  for (const p of projections) {
+    const alongX = p.z === fromZ;
+    for (let k = 1; k <= EVACUATION_LATERAL_STEPS; k++) {
+      const d = k * EVACUATION_LATERAL_STEP_M;
+      for (const sign of [-1, 1]) {
+        lateral.push(alongX ? { x: p.x, z: p.z + sign * d } : { x: p.x + sign * d, z: p.z });
+      }
+    }
+  }
+  const distance = (c: EvacuationDestination): number => Math.hypot(c.x - fromX, c.z - fromZ);
+  const orderedEdges = [...projections, ...lateral].sort((a, b) => distance(a) - distance(b));
 
   const corners: EvacuationDestination[] = [
     { x: zone.x1 - EVACUATION_CANDIDATE_OFFSET_M, z: zone.z1 - EVACUATION_CANDIDATE_OFFSET_M },
@@ -157,6 +171,7 @@ function buildCandidates(fromX: number, fromZ: number, zone: ZoneBounds): Evacua
  */
 export function findSafeEvacuationCell(
   state: GameState, fromX: number, fromZ: number, zone: ZoneBounds, vehicle?: Vehicle,
+  avoidCells?: ReadonlySet<string>,
 ): EvacuationDestination | null {
   if (!state.navGrid) return null;
 
@@ -167,6 +182,7 @@ export function findSafeEvacuationCell(
     : { requiredClearance: vehicleRequiredClearanceCells(vehicle), maxSlopeRatio: vehicleMaxSlopeRatio(isProgressionSite(state)) };
 
   for (const candidate of candidates) {
+    if (avoidCells?.has(evacuationCellKey(candidate.x, candidate.z))) continue;
     const cell = state.navGrid.cellAt(candidate.x, candidate.z);
     if (!cell || cell.type === 'blocked' || cell.type === 'void') continue;
 
@@ -283,7 +299,7 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
     state,
     state.vehicles,
     state.employees,
-    (fromX, fromZ, z, vehicle) => findSafeEvacuationCell(state, fromX, fromZ, z, vehicle),
+    (fromX, fromZ, z, vehicle, avoidCells) => findSafeEvacuationCell(state, fromX, fromZ, z, vehicle, avoidCells),
     (employee, vehicle) => canEmployeeReachVehicleForEvacuation(state, employee, vehicle),
   );
 }
