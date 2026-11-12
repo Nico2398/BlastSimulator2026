@@ -24,7 +24,7 @@ import type { Employee } from '../../src/core/entities/Employee.js';
 import { assignSkill } from '../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { purchaseVehicle, vehicleDriverId } from '../../src/core/entities/Vehicle.js';
-import { board } from '../../src/core/engine/Mount.js';
+import { board, leaveBuildingIfInside } from '../../src/core/engine/Mount.js';
 import { equipDemolition } from '../helpers/demolition.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
@@ -1207,7 +1207,8 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
 
     // The fix under test (#1122): arrival alighted the driver, freeing the
     // vehicle — it is not held for the whole rest, only for the travel.
-    expect(emp.locomotion).toEqual({ kind: 'on_foot' });
+    // #2225: the driver then walks into the quarters and rests inside.
+    expect(emp.locomotion).toEqual({ kind: 'inside', buildingId: 1 });
     expect(vehicle.occupantIds).not.toContain(empId);
     expect(vehicleDriverId(vehicle)).toBeNull();
 
@@ -1222,6 +1223,7 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
     const otherEmpId = hireOne(ctx, 'driller');
     assignSkill(state.employees, otherEmpId, 'driving.truck', 1);
     const otherEmp = getEmployee(ctx, otherEmpId);
+    leaveBuildingIfInside(state, otherEmp); // the new hire may have been sent to the quarters too (#2225)
     otherEmp.x = vehicle.x;
     otherEmp.z = vehicle.z;
     const boardResult = board(state, vehicle.id, otherEmpId);
