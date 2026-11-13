@@ -159,15 +159,15 @@ export function planDriverlessEvacuation(
   }
   // Any free licensed crew member qualifies, wherever they stand (#1648, #1746).
   let driver: Employee | null = inZoneDriver;
-  // Nobody ordered out of the zone is ever sent back for a vehicle: an evacuee takes one short route to a safe cell, and a
-  // return trip drains the gauge for a machine another licence holder may fetch (#2259). With no other licence holder
-  // the vehicle is left where it stands, stranded.
+  // Nobody ordered out of the zone is sent back for a vehicle while another licence holder could fetch it; only the
+  // sole licence holder is (#2230). A held-back employee leaves the vehicle awaiting that other driver.
   let heldBack = false;
   if (!driver) {
     let rescuer = findAvailableDriverForReposition(v, vehicles, employees, evacuatedEmployeeIds);
     if (rescuer === null && evacuatedEmployeeIds.size > 0) {
       const returning = findAvailableDriverForReposition(v, vehicles, employees);
-      heldBack = returning !== null && hasOtherLicensedDriver(v, employees, evacuatedEmployeeIds);
+      if (returning !== null && hasOtherLicensedDriver(v, employees, evacuatedEmployeeIds)) heldBack = true;
+      else rescuer = returning;
     }
     driver = rescuer !== null && canEmployeeReachVehicle(rescuer, v) ? rescuer : null;
   }

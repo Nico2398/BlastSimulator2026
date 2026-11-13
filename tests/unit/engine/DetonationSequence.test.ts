@@ -618,7 +618,7 @@ describe('evacuatedEmployeeIds across the arm / cancel cycle (#2230)', () => {
   });
 });
 
-describe('tickDetonation never sends an evacuated sole licence holder back for a vehicle (#2230, #2259)', () => {
+describe('tickDetonation orders the sole rescuer as soon as they are free (#2230)', () => {
   function armedWithDriverlessVehicle() {
     const state = chargedState();
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 22, 22);
@@ -629,19 +629,14 @@ describe('tickDetonation never sends an evacuated sole licence holder back for a
     return { state, vehicle, employee };
   }
 
-  it('does not send the evacuee back, inside the re-evacuation interval or after it', () => {
+  it('re-orders inside the re-evacuation interval, handing the vehicle to the freed rescuer', () => {
     const { state, vehicle, employee } = armedWithDriverlessVehicle();
     state.tickCount = state.pendingDetonation!.lastEvacuationTick + 1;
     expect(state.tickCount - state.pendingDetonation!.lastEvacuationTick).toBeLessThan(DETONATION_REEVACUATE_INTERVAL_TICKS);
 
     tickDetonation(state);
 
-    expect(employee.pendingDriverVehicleId).toBeNull();
-    expect(employee.itinerary).toBeNull();
-    state.tickCount += DETONATION_REEVACUATE_INTERVAL_TICKS;
-    tickDetonation(state);
-    expect(employee.pendingDriverVehicleId).not.toBe(vehicle.id);
-    expect(employee.itinerary).toBeNull();
+    expect(employee.pendingDriverVehicleId === vehicle.id || employee.itinerary !== null).toBe(true);
   });
 
   it('waits for the interval when the rescuer is still travelling', () => {

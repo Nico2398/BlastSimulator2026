@@ -7,6 +7,9 @@ import type { Employee } from '../entities/Employee.js';
 import { computeDangerZone, defineZone, isDangerZoneClear, isInZone } from '../entities/Zone.js';
 import { fizzlingHoles } from '../mining/WetHoles.js';
 import { evacuateZone } from './Evacuation.js';
+import { vehicleDriverId } from '../entities/Vehicle.js';
+import { isMounted } from '../entities/EmployeeLocomotion.js';
+import { canDriveTier, hasOtherLicensedDriver } from '../entities/VehicleDriverAssignment.js';
 import { liftSpentZone } from './EvacuationHold.js';
 import { isActive } from '../events/ActiveModifiers.js';
 import { t } from '../i18n/I18n.js';
@@ -134,6 +137,24 @@ function latchStuckWalkers(state: GameState, pending: PendingDetonation): void {
   }
 }
 
+/**
+ * True when an employee ordered out of the zone has just come to rest outside it and is the only licence holder able
+ * to fetch a driverless vehicle still inside (#2230): ordering them at once, rather than at the next interval, keeps
+ * ordinary dispatch from claiming them first.
+ */
+function soleRescuerIsFree(state: GameState): boolean {
+  const zone = state.zone.activeZone;
+  const evacuated = new Set(state.zone.evacuatedEmployeeIds ?? []);
+  if (zone === null || evacuated.size === 0) return false;
+  const free = state.employees.employees.filter(e =>
+    evacuated.has(e.id) && e.alive && !e.injured && e.itinerary === null && e.activeActionId === null
+    && e.destinationX === null && !isMounted(e.locomotion) && !isInZone(e.x, e.z, zone));
+  if (free.length === 0) return false;
+  return state.vehicles.vehicles.some(v =>
+    isInZone(v.x, v.z, zone) && vehicleDriverId(v) === null
+    && free.some(e => canDriveTier(e, v.type, v.tier)) && !hasOtherLicensedDriver(v, state.employees, evacuated));
+}
+
 /** Advance the sequence one tick and return the resulting phase. */
 export function tickDetonation(state: GameState): DetonationPhase {
   const pending = state.pendingDetonation;
@@ -143,7 +164,7 @@ export function tickDetonation(state: GameState): DetonationPhase {
     return { kind: 'idle' };
   }
   latchStuckWalkers(state, pending);
-  if ((state.tickCount - pending.lastEvacuationTick >= DETONATION_REEVACUATE_INTERVAL_TICKS)
+  if ((state.tickCount - pending.lastEvacuationTick >= DETONATION_REEVACUATE_INTERVAL_TICKS || soleRescuerIsFree(state))
     && !isDangerZoneClear(state.drillHoles, state.vehicles, state.employees)) {
     const stranded = orderEvacuation(state);
     if (stranded !== null) {
