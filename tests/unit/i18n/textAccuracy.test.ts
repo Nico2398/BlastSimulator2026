@@ -239,3 +239,28 @@ describe('event.mafia_ / event.weather_ calques — #2239 French rewrites', () =
     });
   }
 });
+
+describe('event.union_ / misc event calques — #2240 French rewrites', () => {
+  const cases: ReadonlyArray<readonly [string, string, string]> = [
+    ['event.legendary_vein.res0', 'tréranium', 'trérnium'],
+    ['event.union_ghost_backpay.res3', 'Chargé de Sécurité', 'Officier de Sécurité'],
+    ['event.union_lunch_thief.res0', 'voleur de casse-croûte', 'voleur de lunch'],
+    ['event.union_overtime_revolt.res1', 'devinettes', 'en pari'],
+    ['event.union_hazard_emotional.res2', 'Ce sont, techniquement', "C'est, techniquement"],
+    ['event.barren_blast.desc', 'sondage', 'relevé'],
+  ];
+
+  for (const [key, expected, old] of cases) {
+    it(`KNOWN_TEXT_DEFECTS records a fr defect for ${key}`, () => {
+      expect(KNOWN_TEXT_DEFECTS.find((d) => d.key === key && d.locale === 'fr')).toBeTruthy();
+    });
+
+    it(`fr.json "${key}" no longer says "${old}"`, () => {
+      expect(fr[key]).not.toContain(old);
+    });
+
+    it(`fr.json "${key}" says "${expected}"`, () => {
+      expect(fr[key]).toContain(expected);
+    });
+  }
+});
