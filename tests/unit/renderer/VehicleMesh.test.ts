@@ -8,7 +8,7 @@ import { hireEmployee, createEmployeeState } from '../../../src/core/entities/Em
 import { Random } from '../../../src/core/math/Random.js';
 import { VehicleMesh, BODY_TINT } from '../../../src/renderer/VehicleMesh.js';
 import type { VehicleStatusKind } from '../../../src/core/entities/VehicleStatus.js';
-import { WAITING_QUEUE_SLOT_OFFSETS } from '../../../src/core/config/balance.js';
+import { WAITING_QUEUE_SLOT_OFFSETS, WAITING_QUEUE_TARGET_REACH } from '../../../src/core/config/balance.js';
 import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
 import { MOVEMENT_TRAIL_MAX_POINTS, type MovementTrail, type TrailHostEvent, type TrailPoint } from '../../../src/core/entities/MovementTrail.js';
@@ -544,12 +544,13 @@ describe('waitingQueueOffset / waitingRenderPosition (#411, #1138)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
 
-    // Two vehicles converging on the same target from very different raw
-    // positions — the bug this guards against added the offset to each
-    // vehicle's own x/z, scattering them instead of anchoring to the target.
-    const v1 = makeVehicle(1, 'debris_hauler', 1, 1, 1);
+    // Two vehicles converging on the same target from different raw
+    // positions (both within WAITING_QUEUE_TARGET_REACH, #2232) — the bug this
+    // guards against added the offset to each vehicle's own x/z, scattering
+    // them instead of anchoring to the target.
+    const v1 = makeVehicle(1, 'debris_hauler', 19.2, 19.4, 1);
     const d1 = makeWaitingOccupant(v1, 20, 20);
-    const v2 = makeVehicle(2, 'debris_hauler', 40, 45, 1);
+    const v2 = makeVehicle(2, 'debris_hauler', 20.9, 20.8, 1);
     const d2 = makeWaitingOccupant(v2, 20, 20);
 
     const pool = [v1, v2];
@@ -568,7 +569,7 @@ describe('waitingQueueOffset / waitingRenderPosition (#411, #1138)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
 
-    const vehicles = [1, 2, 3, 4].map(id => makeVehicle(id, 'debris_hauler', id, id, 1));
+    const vehicles = [1, 2, 3, 4].map(id => makeVehicle(id, 'debris_hauler', 49 + id * 0.4, 49 + id * 0.3, 1));
     const employees = vehicles.map(v => makeWaitingOccupant(v, 50, 50));
 
     const positions = vehicles.map(v => vm.waitingRenderPosition(v, vehicles, employees));
@@ -603,7 +604,7 @@ describe('waitingQueueOffset / waitingRenderPosition (#411, #1138)', () => {
     // `sharingTarget.indexOf(id) % WAITING_QUEUE_SLOT_OFFSETS.length`, so the
     // (length + 1)th vehicle (index === length) wraps back to slot 0.
     const count = WAITING_QUEUE_SLOT_OFFSETS.length + 1;
-    const vehicles = Array.from({ length: count }, (_, i) => makeVehicle(i + 1, 'debris_hauler', i, i, 1));
+    const vehicles = Array.from({ length: count }, (_, i) => makeVehicle(i + 1, 'debris_hauler', 5 + (i % 3) * 0.3, 5 + Math.floor(i / 3) * 0.3, 1));
     const employees = vehicles.map(v => makeWaitingOccupant(v, 5, 5));
 
     const firstOffset = vm.waitingQueueOffset(vehicles[0]!, vehicles, employees);
@@ -620,9 +621,9 @@ describe('waitingQueueOffset / waitingRenderPosition (#411, #1138)', () => {
     const vm = new VehicleMesh(scene);
 
     const driverless = makeVehicle(1, 'drill_rig', 20, 20, 1); // no occupant at all
-    const v1 = makeVehicle(2, 'debris_hauler', 1, 1, 1);
+    const v1 = makeVehicle(2, 'debris_hauler', 19.2, 19.4, 1);
     const d1 = makeWaitingOccupant(v1, 20, 20);
-    const v2 = makeVehicle(3, 'debris_hauler', 40, 45, 1);
+    const v2 = makeVehicle(3, 'debris_hauler', 20.9, 20.8, 1);
     const d2 = makeWaitingOccupant(v2, 20, 20);
 
     const pool = [driverless, v1, v2];
@@ -1043,9 +1044,10 @@ describe('VehicleMesh — no riding window, the old glide (#2224)', () => {
     const vm = new VehicleMesh(scene);
     const a = makeVehicle(1, 'debris_hauler', X0, Z0);
     const b = makeVehicle(2, 'debris_hauler', X0 + 2, Z0);
-    const waitingA = makeWaitingOccupant(a, 40, Z0);
-    makeWaitingOccupant(b, 40, Z0);
-    const employees = [waitingA, makeWaitingOccupant(b, 40, Z0)];
+    // Target within WAITING_QUEUE_TARGET_REACH of both vehicles (#2232), so the slot render applies.
+    const waitingA = makeWaitingOccupant(a, X0 + 2, Z0);
+    makeWaitingOccupant(b, X0 + 2, Z0);
+    const employees = [waitingA, makeWaitingOccupant(b, X0 + 2, Z0)];
     const state = makeVehicleState([a, b]);
     vm.addVehicle(a, state, employees);
     vm.addVehicle(b, state, employees);
@@ -1054,7 +1056,85 @@ describe('VehicleMesh — no riding window, the old glide (#2224)', () => {
     a.walkTrail = trailOf(line(X0, X0 + 1), [riderMarker(0, 'board', waitingA.id, 9)]);
     waitingA.walkTrail = trailOf(line(X0 - 9, X0 + 1), []);
     for (let i = 0; i < 4; i++) vm.update([a, b], state, employees, FRAME_DT);
-    expect(vm.getPosition(1)!.x - X0).toBeGreaterThan(0.2);
+    expect(vm.getPosition(1)!.x - X0).toBeGreaterThan(0.1);
+    vm.dispose();
+  });
+});
+
+describe('VehicleMesh — a waiting vehicle far from its drive target stays at its own x/z (#2232)', () => {
+  const FAR_X = 60;
+  const FAR_Z = 70;
+
+  it('addVehicle places the mesh at the vehicle own position, not the far target', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(1, 'debris_hauler', 5, 8);
+    const d = makeWaitingOccupant(v, FAR_X, FAR_Z);
+    vm.addVehicle(v, makeVehicleState([v]), [d]);
+    expect(vm.getPosition(1)!.x).toBeCloseTo(5, 6);
+    expect(vm.getPosition(1)!.z).toBeCloseTo(8, 6);
+    vm.dispose();
+  });
+
+  it('update never glides the mesh toward the far target', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(1, 'debris_hauler', 5, 8);
+    const d = makeWaitingOccupant(v, FAR_X, FAR_Z);
+    const vs = makeVehicleState([v]);
+    vm.addVehicle(v, vs, [d]);
+    for (let i = 0; i < 60; i++) {
+      vm.update([v], vs, [d], 0.05);
+      expect(vm.getPosition(1)!.x).toBeCloseTo(5, 4);
+      expect(vm.getPosition(1)!.z).toBeCloseTo(8, 4);
+    }
+    vm.dispose();
+  });
+
+  it('a mesh that was driving settles at the vehicle own x/z once its driver starts waiting on a far target', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(1, 'debris_hauler', 5, 8);
+    const vs = makeVehicleState([v]);
+    vm.addVehicle(v, vs, []);
+    const d = makeWaitingOccupant(v, FAR_X, FAR_Z);
+    v.x = 6;
+    v.z = 9;
+    for (let i = 0; i < 80; i++) vm.update([v], vs, [d], 0.05);
+    expect(vm.getPosition(1)!.x).toBeCloseTo(6, 3);
+    expect(vm.getPosition(1)!.z).toBeCloseTo(9, 3);
+    vm.dispose();
+  });
+
+  it('a far waiter sharing its target with a near one still stays at its own x/z', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const far = makeVehicle(1, 'debris_hauler', 10, 10);
+    const near = makeVehicle(2, 'debris_hauler', FAR_X + 0.4, FAR_Z);
+    const employees = [makeWaitingOccupant(far, FAR_X, FAR_Z), makeWaitingOccupant(near, FAR_X, FAR_Z)];
+    const vs = makeVehicleState([far, near]);
+    vm.addVehicle(far, vs, employees);
+    vm.addVehicle(near, vs, employees);
+    for (let i = 0; i < 60; i++) vm.update([far, near], vs, employees, 0.05);
+    expect(vm.getPosition(1)!.x).toBeCloseTo(10, 4);
+    expect(vm.getPosition(1)!.z).toBeCloseTo(10, 4);
+    vm.dispose();
+  });
+
+  it('waitingRenderPosition on the mesh gives the own x/z for a far lone waiter, and the slot for two within reach', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const lone = makeVehicle(1, 'debris_hauler', 3, 4);
+    const loneDriver = makeWaitingOccupant(lone, FAR_X, FAR_Z);
+    expect(vm.waitingRenderPosition(lone, [lone], [loneDriver])).toEqual([3, 4]);
+
+    const a = makeVehicle(2, 'debris_hauler', FAR_X + WAITING_QUEUE_TARGET_REACH / 2, FAR_Z);
+    const b = makeVehicle(3, 'debris_hauler', FAR_X - WAITING_QUEUE_TARGET_REACH / 2, FAR_Z);
+    const employees = [makeWaitingOccupant(a, FAR_X, FAR_Z), makeWaitingOccupant(b, FAR_X, FAR_Z)];
+    const [o0x, o0z] = WAITING_QUEUE_SLOT_OFFSETS[0]!;
+    const [o1x, o1z] = WAITING_QUEUE_SLOT_OFFSETS[1]!;
+    expect(vm.waitingRenderPosition(a, [a, b], employees)).toEqual([FAR_X + o0x, FAR_Z + o0z]);
+    expect(vm.waitingRenderPosition(b, [a, b], employees)).toEqual([FAR_X + o1x, FAR_Z + o1z]);
     vm.dispose();
   });
 });

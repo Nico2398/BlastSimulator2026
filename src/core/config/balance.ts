@@ -464,6 +464,8 @@ export const BUILDING_APPROACH_RADIUS = 3;
  * for both instead of two numbers that could silently drift apart.
  */
 const SPACING = SPAWN_TILE_SPACING;
+/** Max distance (cells) from its shared drive target at which a waiting vehicle is drawn at its queue slot; farther vehicles render at their own x/z (#2232). */
+export const WAITING_QUEUE_TARGET_REACH = 1.5;
 export const WAITING_QUEUE_SLOT_OFFSETS: ReadonlyArray<readonly [number, number]> = [
   [0, 0],
   [SPACING, 0],
