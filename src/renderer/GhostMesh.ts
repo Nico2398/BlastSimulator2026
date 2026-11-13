@@ -36,7 +36,7 @@ export const GHOST_RENDER_ORDER = 10;
 // (sampled over sand: hue ~4 deg, R 255, G ~85, B ~73).
 export const GHOST_UNREACHABLE_COLOR = new THREE.Color(0xff0028);
 const GHOST_UNREACHABLE_EMISSIVE = new THREE.Color(0x500010);
-export const GHOST_UNREACHABLE_RIM_COLOR = new THREE.Color(0x680418);
+export const GHOST_UNREACHABLE_RIM_COLOR = new THREE.Color(0x680008);
 export const GHOST_UNREACHABLE_OPACITY_MIN = 0.25;
 export const GHOST_UNREACHABLE_OPACITY_MAX = 0.65;
 
