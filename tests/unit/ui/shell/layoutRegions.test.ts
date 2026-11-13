@@ -31,6 +31,10 @@ import { ActivityLog } from '../../../../src/ui/shell/ActivityLog.js';
 import { MiniMap } from '../../../../src/ui/MiniMap.js';
 import { LeftColumn, LEFT_COL_RIGHT_EDGE_PX } from '../../../../src/ui/shell/LeftColumn.js';
 import {
+  CenterStage, CENTER_WINDOW_MAX_WIDTH_PX, centerStageBounds, centerWindowBounds, dockedInspectorBounds,
+} from '../../../../src/ui/shell/CenterStage.js';
+import { EventNotices } from '../../../../src/ui/shell/EventNotices.js';
+import {
   LayoutRegistry,
   shellLayoutRegistry,
   rectsIntersect,
@@ -41,7 +45,7 @@ import {
 import { TOPBAR_HEIGHT_PX } from '../../../../src/ui/tokens.js';
 import { PANEL_WIDTH_PX } from '../../../../src/ui/dom.js';
 
-const EXPECTED_IDS = ['topbar', 'tool-rail', 'toasts', 'inspector', 'activity-log', 'minimap', 'left-col', 'modifier-chips'] as const;
+const EXPECTED_IDS = ['topbar', 'tool-rail', 'toasts', 'inspector', 'activity-log', 'minimap', 'left-col', 'modifier-chips', 'center-stage'] as const;
 
 /** Declared bounds of a registered region at a viewport, by id. */
 function boundsFor(id: string, viewport: { width: number; height: number }): Rect {
@@ -71,9 +75,11 @@ describe('shell regions — layout matrix (#956)', () => {
   let activityLog!: ActivityLog;
   let miniMap!: MiniMap;
   let leftColumn!: LeftColumn;
+  let centerStage!: CenterStage;
 
   beforeAll(() => {
     const container = mountContainer();
+    centerStage = new CenterStage(container);
     topBar = new TopBar(container);
     toolRail = new ToolRail(container, () => {});
     toasts = new Toasts(container);
@@ -93,9 +99,10 @@ describe('shell regions — layout matrix (#956)', () => {
     activityLog?.dispose();
     miniMap?.dispose();
     leftColumn?.dispose();
+    centerStage?.dispose();
   });
 
-  it('registers exactly the 8 expected shell regions on construction', () => {
+  it('registers exactly the 9 expected shell regions on construction', () => {
     const ids = shellLayoutRegistry.list().map(r => r.id).sort();
     expect(ids).toEqual([...EXPECTED_IDS].sort());
   });
@@ -338,5 +345,59 @@ describe('LayoutRegistry — overlap detection proof (fresh instance)', () => {
 
   it('rectWithinViewport accepts a rect flush against the viewport edges', () => {
     expect(rectWithinViewport(rect(0, 0, 1280, 720), { width: 1280, height: 720 })).toBe(true);
+  });
+});
+
+describe('central windows clear the HUD chrome a player still needs (#2242)', () => {
+  let container!: HTMLDivElement;
+  const regions: { dispose(): void }[] = [];
+
+  beforeAll(() => {
+    container = mountContainer();
+    regions.push(new CenterStage(container), new TopBar(container), new ToolRail(container, () => {}),
+      new Toasts(container), new MiniMap(container), new EventNotices(container));
+  });
+
+  afterAll(() => { for (const r of regions) r.dispose(); });
+
+  /** Chrome that stays clickable while a window is open: nothing a window draws may cover it. */
+  const CHROME = ['topbar', 'tool-rail', 'toasts', 'minimap', 'modifier-chips', 'event-notices'] as const;
+
+  it('the stage is an overlay region', () => {
+    expect(shellLayoutRegistry.list().find(r => r.id === 'center-stage')?.layer).toBe('overlay');
+  });
+
+  it.each(SHELL_VIEWPORT_MATRIX)('the stage, a window and the docked inspector miss every piece of chrome at %o', (viewport) => {
+    const boxes = {
+      stage: centerStageBounds(viewport),
+      window: centerWindowBounds(viewport, false),
+      narrowWindow: centerWindowBounds(viewport, true),
+      dockedInspector: dockedInspectorBounds(viewport),
+    };
+    const hits: string[] = [];
+    for (const [name, box] of Object.entries(boxes)) {
+      for (const id of CHROME) {
+        const other = boundsFor(id, viewport);
+        if (rectsIntersect(box, other)) hits.push(`${name} ${JSON.stringify(box)} covers ${id} ${JSON.stringify(other)}`);
+      }
+    }
+    expect(hits).toEqual([]);
+  });
+
+  it.each(SHELL_VIEWPORT_MATRIX)('a window and the inspector docked beside it share the stage without overlapping at %o', (viewport) => {
+    const stage = centerStageBounds(viewport);
+    const win = centerWindowBounds(viewport, true);
+    const insp = dockedInspectorBounds(viewport);
+    expect(rectsIntersect(win, insp)).toBe(false);
+    for (const box of [win, insp]) {
+      expect(box.x).toBeGreaterThanOrEqual(stage.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(stage.x + stage.width);
+    }
+  });
+
+  it.each(SHELL_VIEWPORT_MATRIX)('a window takes most of the screen, up to its cap, at %o', (viewport) => {
+    const stage = centerStageBounds(viewport);
+    expect(stage.width * stage.height).toBeGreaterThanOrEqual(0.5 * viewport.width * viewport.height);
+    expect(centerWindowBounds(viewport, false).width).toBe(Math.min(stage.width, CENTER_WINDOW_MAX_WIDTH_PX));
   });
 });

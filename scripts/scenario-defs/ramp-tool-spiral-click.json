@@ -147,6 +147,15 @@
       "description": "#1942: player arms the ramp tool, clicks the pit-rim tile (17,11) just north of the blasted pit, then clicks the Spiral button that appears for a single click on a rim, and presses Confirm. The tool previews the spiral proposal as a ghost and Confirm orders it. No console command stands in for a click; the command-mode equivalent is the ramp spiral order the tool issues.",
       "interaction": [
         {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]",
+          "timeout": 60000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },

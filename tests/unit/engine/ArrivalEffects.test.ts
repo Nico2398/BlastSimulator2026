@@ -274,6 +274,26 @@ describe('applyHaulUnload', () => {
     expect(vehicle.cargo).toEqual([]);
   });
 
+  it('logs what the delivery credited, ore and barren rest, for the gathering rate (#2243)', () => {
+    const state = createGame({ seed: SEED });
+    state.tickCount = 12;
+    const { vehicle } = makeDrivenHauler(state, 10, 10);
+    const fragment = makeFragment(1, 5, 5, 0.3, 1200);
+    fragment.oreDensities = { blingite: 0.5 };
+    addBlastFragments(state.logistics, [fragment]);
+    state.logistics.fragments[0]!.state = 'in_transit';
+    state.logistics.fragments[0]!.vehicleId = String(vehicle.id);
+    vehicle.cargo = [{ fragmentId: 1, massKg: 1200 }];
+    const oreBefore = state.collectedOre['blingite'] ?? 0;
+
+    applyHaulUnload(state, vehicle);
+
+    const entry = state.oreCollectionLog!.at(-1)!;
+    expect(entry.tick).toBe(12);
+    expect(entry.kg['blingite']).toBeCloseTo((state.collectedOre['blingite'] ?? 0) - oreBefore);
+    expect(entry.kg['blingite']! + entry.kg['']!).toBeCloseTo(1200);
+  });
+
   it('returns false without mutating collectedOre/storage when vehicle.cargo is already empty', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = makeDrivenHauler(state, 10, 10);

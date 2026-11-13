@@ -147,6 +147,10 @@
           "timeoutMs": 0
         },
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-vehicle-panel [data-panel-close]"
+        },
+        {
           "type": "clickEntity",
           "kind": "vehicle",
           "id": 4
@@ -154,6 +158,10 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"]"
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",

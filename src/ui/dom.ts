@@ -242,7 +242,8 @@ export function scrollBoundedSection(
   maxHeightPx: number,
   opts?: ScrollBoundedSectionOptions,
 ): HTMLElement {
-  const section = opts?.className ? el('div', { className: opts.className, children }) : el('div', { children });
+  // `bsx-bounded` lets a central window lift the bound: a window scrolls once, in its body (windowStyles.ts).
+  const section = el('div', { className: opts?.className ? `bsx-bounded ${opts.className}` : 'bsx-bounded', children });
   if (opts?.scrollKey) section.dataset['scrollKey'] = opts.scrollKey;
   section.style.cssText = [
     'overflow-y:auto', `max-height:${maxHeightPx}px`, 'flex-shrink:0',

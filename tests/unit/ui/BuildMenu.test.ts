@@ -95,7 +95,8 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
 
     const row = findPlacedRow(container, 1);
 
-    const info = row.querySelector<HTMLElement>('div');
+    // The label column, beside the building's picture (#2241).
+    const info = row.querySelector<HTMLElement>('.bs-build-row-info');
     expect(info).not.toBeNull();
     expect(info!.style.flex).toBe('1 1 100%');
     expect(info!.style.minWidth).toBe('0px');
@@ -116,7 +117,8 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
 
     const row = findPlacedRow(container, 2);
 
-    const info = row.querySelector<HTMLElement>('div');
+    // The label column, beside the building's picture (#2241).
+    const info = row.querySelector<HTMLElement>('.bs-build-row-info');
     expect(info).not.toBeNull();
     expect(info!.style.flex).toBe('1 1 100%');
     expect(info!.style.minWidth).toBe('0px');

@@ -110,3 +110,12 @@ Records why the rules in `.claude/skills/gameplay-game-design/SKILL.md` exist: t
 - Permits cap the charge kg and the pattern area per blast (`patternAreaM2`, the spacing × burden cells of the plan's holes) instead of the hole count, so a finer mesh over the same ground costs drilling (`DRILL_COST_PER_METRE`), not permit. Each grade's area is what its former hole limit covered at the default 4 m × 4 m cell: 9 / 16 / 36 / 81 / 196 / 400 holes became 144 / 256 / 576 / 1,296 / 3,136 / 6,400 m²; endless classes scale the area ×1.4 (`PERMIT_CLASS_AREA_FACTOR`, replacing `PERMIT_CLASS_HOLES_FACTOR`) with no `MAX_DRILL_GRID_HOLES` cap.
 - Previous wording: "each grade caps total charge kg and holes per blast ... (grade 0: 40 kg, 9 holes, $250; grade 1: 120 kg, 16 holes, $1,000; grade 5: 25,000 kg, 400 holes, $50,000; above 5, x1.6 kg, x1.4 holes capped at `MAX_DRILL_GRID_HOLES`, x1.5 fee per class)"; the footer read `9 / 9 holes`, and the Drill grid strip warned when cols x rows exceeded the hole limit.
 - Same rework, same skill: charges fill each hole up to the stemming (the explosive catalog's min/max kg per hole became a loaded density), and the tier-4 optimizer proposes an explosive and a stemming per hole instead of a kg. The blast-side record is in `gameplay-blast-system`'s history.
+
+## Delivery outlook (Nov 2026, #2243)
+
+Playtest: with several contracts running, nothing said whether the mine would make it — `collectedOre` holds only the
+stock on hand, and deliveries and sales draw it down, so no rate could be read back from it. The Contracts window now
+opens on a per-material outlook fed by a log of what hauls credited at the depot. Chosen defaults, all named in
+`balance.ts`: the rate is depot collection over one in-game day, divided by the whole day (a shorter window swings
+between blasts); the projection is linear and counts ore already on a truck but not ore still on the ground; contracts
+on one material draw its stock in deadline order; the outlook bands sit at 1.15x and 0.75x of the demand due.

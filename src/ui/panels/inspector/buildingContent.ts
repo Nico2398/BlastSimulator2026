@@ -1,4 +1,5 @@
 /** Inspector content for building selections (#1756, #1758). */
+import { buildingPortraitSpec } from '../../portraits.js';
 import { t } from '../../../core/i18n/I18n.js';
 import {
   getBuildingDef, getBuildingPeopleCapacity, nonZeroScoreEffects,
@@ -191,6 +192,7 @@ function siteView(state: GameState, id: number, status: BuildingStatus, links: I
     title: t(`building.${site.type}.t${site.tier}.name`),
     sub: `#${site.buildingId} · ${kindLabel('building')} · ${t('inspector.tier', { tier: site.tier })}`,
     icon: 'build',
+    portrait: buildingPortraitSpec(site.type, site.tier, t(`building.${site.type}.t${site.tier}.name`)),
     status: text,
     signature: `site:${site.type}:${site.tier}:${status.kind}:${builderSignature(status, builder)}`,
     get sections() {
@@ -229,6 +231,7 @@ export const buildingContent: KindContent = {
       title: t(`building.${b.type}.t${b.tier}.name`),
       sub: `#${b.id} · ${kindLabel('building')} · ${t('inspector.tier', { tier: b.tier })}`,
       icon: 'build',
+      portrait: buildingPortraitSpec(b.type, b.tier, t(`building.${b.type}.t${b.tier}.name`), hpFraction),
       status: text,
       signature: `${b.type}:${b.tier}:${status.kind}:${builderSignature(status, builder)}:${capacity}:${b.occupantIds.join(',')}:${occupantNames.join('|')}:${extras.map(x => x?.rowSignature ?? '').join('|')}`,
       get sections() {

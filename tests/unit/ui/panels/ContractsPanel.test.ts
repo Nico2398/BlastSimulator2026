@@ -528,6 +528,12 @@ function getBodyEl(panel: ContractsPanel): HTMLElement {
   return panel.root.children[1] as HTMLElement;
 }
 
+/** First body child after the delivery outlook and its timeline, which always lead the window (#2243). */
+function firstAfterOutlook(panel: ContractsPanel): HTMLElement {
+  return (Array.from(getBodyEl(panel).children) as HTMLElement[])
+    .find(k => !k.classList.contains('bs-contract-outlook-section') && !k.classList.contains('bs-contract-timeline'))!;
+}
+
 /**
  * Every direct child of `bodyEl` between the section header whose text
  * contains `label` and the next section header (or the end of bodyEl).
@@ -1320,7 +1326,8 @@ describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
     panel.update(runningState());
     const strip = stripOf(panel)!;
     expect(strip.classList.contains('bsx-section')).toBe(false);
-    expect(strip.closest('[data-scroll-key]')).toBeNull();
+    // The window body itself is keyed (its one scroll area, #2242); the strip sits outside every list section.
+    expect(strip.closest('[data-scroll-key]:not(.bsx-window-body)')).toBeNull();
     expect(strip.querySelector('[data-scroll-key]')).toBeNull();
     expect((Array.from(getBodyEl(panel).children) as HTMLElement[]).filter(c => c.classList.contains('bsx-section'))).toHaveLength(3);
   });
@@ -1631,9 +1638,9 @@ describe('ContractsPanel — market strip (progression)', () => {
   });
 
   describe('strip layout', () => {
-    it('sits first in the panel body', () => {
+    it('sits first in the panel body, right under the delivery outlook (#2243)', () => {
       const { panel } = render(progressionState());
-      expect(getBodyEl(panel).firstElementChild!.id).toBe('bs-contract-market');
+      expect(firstAfterOutlook(panel).id).toBe('bs-contract-market');
     });
 
     it('has one row per ore the site yields, in site order', () => {
@@ -1825,9 +1832,9 @@ describe('ContractsPanel — market strip (progression)', () => {
       expect(panel.root.querySelector('.bs-contract-buyer-badge')).toBeNull();
     });
 
-    it('keeps the storage strip first in the body', () => {
+    it('keeps the storage strip first in the body, right under the delivery outlook (#2243)', () => {
       const { panel } = render(makeState());
-      expect(getBodyEl(panel).firstElementChild!.querySelector('[data-action="goto-ops"]')).not.toBeNull();
+      expect(firstAfterOutlook(panel).querySelector('[data-action="goto-ops"]')).not.toBeNull();
     });
   });
 
@@ -2468,5 +2475,91 @@ describe('ContractsPanel — explanations (#2170)', () => {
       const badge = card(panel, 3).querySelector('.bs-contract-buyer-badge');
       expect(explainOf(badge).length).toBeGreaterThan(0);
     });
+  });
+});
+
+describe('ContractsPanel — delivery outlook (#2243)', () => {
+  /** Two contracts on dirtite (sharing 120 kg of stock) and one on rustite, with a day of dirtite hauling logged. */
+  function threeContracts(): GameState {
+    const state = makeState();
+    state.tickCount = 24;
+    state.collectedOre['dirtite'] = 120;
+    state.oreCollectionLog = [{ tick: 10, kg: { dirtite: 96 } }]; // 4 kg/h over the day
+    state.contracts.active.push(
+      makeContract({ id: 1, materialId: 'dirtite', quantityKg: 100, acceptedAtTick: 24, deadlineTicks: 10 }),
+      makeContract({ id: 2, materialId: 'dirtite', quantityKg: 100, acceptedAtTick: 24, deadlineTicks: 40 }),
+      makeContract({ id: 3, materialId: 'rustite', quantityKg: 500, acceptedAtTick: 24, deadlineTicks: 20 }),
+    );
+    return state;
+  }
+
+  function render(state: GameState): ContractsPanel {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(state);
+    return panel;
+  }
+
+  const row = (panel: ContractsPanel, material: string): HTMLElement =>
+    panel.root.querySelector<HTMLElement>(`.bsx-outlook-row[data-outlook-material="${material}"]`)!;
+
+  it('leads the window with one row per material the active contracts want', () => {
+    const panel = render(threeContracts());
+    const first = getBodyEl(panel).firstElementChild as HTMLElement;
+    expect(first.classList.contains('bs-contract-outlook-section')).toBe(true);
+    const materials = Array.from(panel.root.querySelectorAll<HTMLElement>('.bsx-outlook-row[data-outlook-material]')).map(r => r.dataset['outlookMaterial']);
+    expect(materials.sort()).toEqual(['dirtite', 'rustite']);
+  });
+
+  it('sums the demand of both dirtite contracts and counts the stock once', () => {
+    const text = row(render(threeContracts()), 'dirtite').textContent ?? '';
+    expect(text).toContain(t('ui.outlook.kg', { kg: '200' })); // due: 100 + 100
+    expect(text).toContain(t('ui.outlook.kg', { kg: '120' })); // in hand, once
+    expect(text).toContain(t('ui.outlook.contracts', { count: 2 }));
+  });
+
+  it('shows the gathering rate against the pace the deadlines need', () => {
+    const text = row(render(threeContracts()), 'dirtite').textContent ?? '';
+    expect(text).toContain(t('ui.outlook.rate', { kg: '4' }));
+    expect(text).toContain(t('ui.outlook.need_rate', { rate: t('ui.outlook.rate', { kg: '2' }) })); // 80 kg short over 40 h
+  });
+
+  it('gives each material and each active card its outlook state', () => {
+    const panel = render(threeContracts());
+    expect(row(panel, 'dirtite').dataset['outlook']).toBe('on_track'); // 120 + 4 × 40 = 280 ≥ 200 × 1.15
+    expect(row(panel, 'rustite').dataset['outlook']).toBe('will_miss');
+    const pill = (id: number) => panel.root.querySelector<HTMLElement>(`[data-contract-id="${id}"] .bs-contract-outlook`)!.dataset['outlook'];
+    expect(pill(1)).toBe('covered');
+    expect(pill(3)).toBe('will_miss');
+  });
+
+  it('puts every deadline on one timeline, soonest first', () => {
+    const panel = render(threeContracts());
+    const ids = Array.from(panel.root.querySelectorAll<HTMLElement>('.bs-contract-timeline [data-timeline-contract]')).map(r => r.dataset['timelineContract']);
+    expect(ids).toEqual(['1', '3', '2']);
+  });
+
+  it('flips to a worse outlook in place when the hauling stops, without a full rebuild', () => {
+    const state = threeContracts();
+    const panel = render(state);
+    const card = panel.root.querySelector('[data-contract-id="2"]');
+    state.tickCount = 40; // the day of hauling has rolled out of the window, deadlines drew closer
+    panel.update(state);
+    // No pace left: the 120 kg in hand against 200 kg due reads as a miss.
+    expect(row(panel, 'dirtite').dataset['outlook']).toBe('will_miss');
+    expect(panel.root.querySelector('[data-contract-id="2"]')).toBe(card);
+  });
+
+  it('says so when nothing is running, and tells each offer whether it fits', () => {
+    const state = makeState();
+    state.collectedOre['dirtite'] = 500;
+    state.contracts.available.push(makeContract({ id: 7, quantityKg: 100 }), makeContract({ id: 8, materialId: 'blingite', quantityKg: 100 }));
+    const panel = render(state);
+    expect(panel.root.querySelector('.bs-contract-outlook-section')!.textContent).toContain(t('ui.outlook.none'));
+    expect(panel.root.querySelector('.bs-contract-timeline')).toBeNull();
+    const fit = (id: number) => panel.root.querySelector<HTMLElement>(`[data-contract-id="${id}"] .bs-contract-fit .bs-contract-outlook`)!;
+    expect(fit(7).dataset['outlook']).toBe('covered');
+    expect(fit(8).dataset['outlook']).toBe('will_miss');
+    expect(fit(8).textContent).toBe(t('ui.outlook.offer_will_miss'));
   });
 });

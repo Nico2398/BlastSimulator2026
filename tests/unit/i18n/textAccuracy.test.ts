@@ -212,3 +212,55 @@ describe('event.politics_ / event.lawsuit_ calques — #2238 French rewrites', (
     });
   }
 });
+
+describe('event.mafia_ / event.weather_ calques — #2239 French rewrites', () => {
+  const cases: ReadonlyArray<readonly [string, string, string]> = [
+    ["event.mafia_hide_witness.res1", "quiconque", "qui que ce soit"],
+    ["event.mafia_police_raid_tip.res0", "descente", "raid"],
+    ["event.mafia_stolen_vehicles.res2_alt", "numéro de châssis", "numéro de série"],
+    ["event.mafia_tattoo_shop.res0", "posent", "pose exactement"],
+    ["event.weather_ore_hail.res1", "des bleus", "contusionner"],
+    ["event.weather_logo_cloud.res2", "produits dérivés", "goodies"],
+    ["event.weather_suspiciously_perfect.title", "Trop Beau pour Être Vrai", "Suspicieusement"],
+    ["event.mafia_zoning_favors.opt2", "Reclassement", "Rezonage"],
+  ];
+
+  for (const [key, expected, old] of cases) {
+    it(`KNOWN_TEXT_DEFECTS records a fr defect for ${key}`, () => {
+      expect(KNOWN_TEXT_DEFECTS.find((d) => d.key === key && d.locale === 'fr')).toBeTruthy();
+    });
+
+    it(`fr.json "${key}" no longer says "${old}"`, () => {
+      expect(fr[key]).not.toContain(old);
+    });
+
+    it(`fr.json "${key}" says "${expected}"`, () => {
+      expect(fr[key]).toContain(expected);
+    });
+  }
+});
+
+describe('event.union_ / misc event calques — #2240 French rewrites', () => {
+  const cases: ReadonlyArray<readonly [string, string, string]> = [
+    ['event.legendary_vein.res0', 'tréranium', 'trérnium'],
+    ['event.union_ghost_backpay.res3', 'Chargé de Sécurité', 'Officier de Sécurité'],
+    ['event.union_lunch_thief.res0', 'voleur de casse-croûte', 'voleur de lunch'],
+    ['event.union_overtime_revolt.res1', 'devinettes', 'en pari'],
+    ['event.union_hazard_emotional.res2', 'Ce sont, techniquement', "C'est, techniquement"],
+    ['event.barren_blast.desc', 'sondage', 'relevé'],
+  ];
+
+  for (const [key, expected, old] of cases) {
+    it(`KNOWN_TEXT_DEFECTS records a fr defect for ${key}`, () => {
+      expect(KNOWN_TEXT_DEFECTS.find((d) => d.key === key && d.locale === 'fr')).toBeTruthy();
+    });
+
+    it(`fr.json "${key}" no longer says "${old}"`, () => {
+      expect(fr[key]).not.toContain(old);
+    });
+
+    it(`fr.json "${key}" says "${expected}"`, () => {
+      expect(fr[key]).toContain(expected);
+    });
+  }
+});

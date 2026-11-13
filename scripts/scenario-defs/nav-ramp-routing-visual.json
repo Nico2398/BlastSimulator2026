@@ -104,6 +104,10 @@
       "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. Measured in a real browser until the dispatched command read `vehicle reposition 1 8 20`; never adjust it arithmetically.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel [data-panel-close]"
+        },
+        {
           "type": "clickEntity",
           "kind": "vehicle",
           "id": 1
@@ -213,6 +217,10 @@
       "command": "vehicle reposition 1 8 20",
       "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. Same click path again, now that the ramp exists: re-select the hauler (it has moved, so clickEntity resolves its live position rather than a baked one), pick (8,20) again and confirm; confirming closes the move strip so it cannot cover the ramp placement strip.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]"
+        },
         {
           "type": "clickEntity",
           "kind": "vehicle",

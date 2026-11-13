@@ -26,6 +26,7 @@ import type { HoleWater } from '../weather/WeatherEffects.js';
 import type { FinanceState } from '../economy/Finance.js';
 import { createFinanceState } from '../economy/Finance.js';
 import type { ContractState } from '../economy/Contract.js';
+import type { OreCollectionEntry } from '../economy/OreCollectionLog.js';
 import { createContractState } from '../economy/Contract.js';
 import type { LogisticsState } from '../economy/Logistics.js';
 import { createLogisticsState, onGroundFragmentData } from '../economy/Logistics.js';
@@ -458,6 +459,12 @@ export interface GameState {
   logistics: LogisticsState;
   /** Accumulated ore collected from fragments, keyed by ore type ID, value in kg. */
   collectedOre: Record<string, number>;
+  /**
+   * What hauls credited at the depot over the last day, per material, for the
+   * contract outlook's gathering rate (#2243). Optional: a save from before it
+   * existed simply starts with no history.
+   */
+  oreCollectionLog?: OreCollectionEntry[];
 
   /** Building state. */
   buildings: BuildingState;
@@ -645,6 +652,7 @@ export function createGame(config: GameConfig): GameState {
     contracts: createContractState(),
     logistics: createLogisticsState(),
     collectedOre: {},
+    oreCollectionLog: [],
     buildings: createBuildingState(),
     vehicles: createVehicleState(),
     employees: createEmployeeState(),

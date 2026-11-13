@@ -3601,3 +3601,18 @@ export const RETURN_TRIP_DWELL_TICKS = 3;
  * idle crew member clear a 1-wide corridor past another; a wall of them (a blocker boxed in) means no walk.
  */
 export const ASIDE_MAX_CROSSED_EMPLOYEES = 1;
+
+// ─── Contract outlook (#2243) ─────────────────────────────────────────────────
+
+/**
+ * Window (ticks) the per-material gathering rate is measured over: one in-game
+ * day. Hauling comes in bursts after each blast; a shorter window would swing
+ * from flood to zero between two shots and make every forecast flip-flop.
+ */
+export const ORE_RATE_WINDOW_TICKS = TICKS_PER_DAY;
+
+/** Projected supply at or above this multiple of the demand due by a deadline reads "on track"; below it, "at risk". */
+export const CONTRACT_OUTLOOK_SAFE_RATIO = 1.15;
+
+/** Projected supply below this multiple of the demand due by a deadline reads "will miss". */
+export const CONTRACT_OUTLOOK_MISS_RATIO = 0.75;

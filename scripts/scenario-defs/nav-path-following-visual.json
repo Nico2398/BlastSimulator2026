@@ -616,6 +616,10 @@
       "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. ",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel [data-panel-close]"
+        },
+        {
           "type": "clickEntity",
           "kind": "employee",
           "id": 5

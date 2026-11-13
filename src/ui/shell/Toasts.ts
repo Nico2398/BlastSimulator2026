@@ -11,9 +11,9 @@ import { TOPBAR_HEIGHT_PX, SPACING_3_PX } from '../tokens.js';
 import { MAX_TOASTS } from '../notify/NotificationCenter.js';
 
 /** Right offset of the toast stack, matching its `right:` inline style below. */
-const TOASTS_RIGHT_OFFSET_PX = 96;
+export const TOASTS_RIGHT_OFFSET_PX = 96;
 /** Toast stack width, matching its `width:` inline style below. */
-const TOASTS_WIDTH_PX = 296;
+export const TOASTS_WIDTH_PX = 296;
 /** Gap between stacked toasts, matching its `gap:` inline style below. */
 const TOASTS_GAP_PX = 7;
 /**

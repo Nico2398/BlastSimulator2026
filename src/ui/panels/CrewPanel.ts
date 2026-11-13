@@ -11,7 +11,8 @@
 import { PanelBase } from './PanelBase.js';
 import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
+import { el, explainable, gauge, panelHeader, replaceChildrenKeepingScroll } from '../dom.js';
+import { windowRoot, windowBody } from '../windowKit.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
@@ -19,7 +20,13 @@ import { FilterBarSelection, filterBar } from '../filterBar.js';
 import { HIRING_ROLES } from '../../core/entities/HiringPool.js';
 import { CREW_SORT_KEYS, CREW_STATUS_CHOICES, crewCriteriaFromSelection, filterEmployees } from '../crewFilter.js';
 import { makeHiringSection, hiringSignature } from './CrewHiring.js';
-import { moraleColor, makeAvatar, makeRoleMoraleLine, makeStatusTags, makeManagerEffect } from '../crewDetailSections.js';
+import { moraleColor, makeStatusTags, makeManagerEffect, describeActivity, bandColor, perHour } from '../crewDetailSections.js';
+import { cardGrid, kpiRow, kpiTile, windowSection } from '../windowKit.js';
+import { employeePortraitSpec, portraitEl } from '../portraits.js';
+import { staffCoverageSection, coverageSignature, syncStaffCoverage } from '../staffCoverageView.js';
+import { computeEmployeeActivity } from '../../core/entities/EmployeeActivity.js';
+import { NEED_THRESHOLDS } from '../../core/config/balance.js';
+import { fatigueExplain, moraleExplain } from '../statExplain.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 import { syncRowSelection, selectionChanged, type ListSelection } from '../selectionRoute.js';
 
@@ -38,9 +45,11 @@ export class CrewPanel extends PanelBase {
   private readonly rosterSelection = new FilterBarSelection();
   private onSelectEmployeeCb?: (employeeId: number) => void;
   private readonly locale = new LocaleTextRegistry();
+  /** Figures the coverage tiles last showed; they refresh in place, never through a roster rebuild. */
+  private coverageSignature = '';
 
   constructor(container: HTMLElement) {
-    super(panelRoot('bs-employee-panel'));
+    super(windowRoot('bs-employee-panel'));
 
     const { header, titleEl } = panelHeader({
       icon: 'crew',
@@ -53,7 +62,7 @@ export class CrewPanel extends PanelBase {
     // scenario coverage needs a stable hook onto the actual scrolling
     // element (this.el itself only clips — overflow:hidden — bodyEl is
     // where overflow-y:auto and the real scrollTop live).
-    this.bodyEl = panelBody(8, 'bsx-panel-body');
+    this.bodyEl = windowBody('bsx-panel-body');
 
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
@@ -150,9 +159,15 @@ export class CrewPanel extends PanelBase {
       if (fill) fill.style.width = `${e.morale}%`;
       if (fill) fill.style.background = color;
       if (value) { value.textContent = `${Math.round(e.morale)}%`; value.style.color = color; }
+      row.querySelector('.bs-crew-energy')?.replaceWith(this.makeEnergyGauge(e.fatigue));
+      const activity = row.querySelector<HTMLElement>('.bs-crew-activity');
+      const activityText = this.activityText(e, state);
+      if (activity && activity.textContent !== activityText) activity.textContent = activityText;
 
       row.querySelector('.bs-crew-status')?.replaceWith(makeStatusTags(e, state));
     }
+    this.bodyEl.querySelector('.bs-crew-kpis')?.replaceWith(this.makeKpis(state));
+    this.coverageSignature = syncStaffCoverage(this.bodyEl, state, this.coverageSignature);
   }
 
   /** Living employees that pass the roster bar, in its sort order. */
@@ -184,23 +199,31 @@ export class CrewPanel extends PanelBase {
       ? [el('div', { className: 'bsx-empty', text: t('ui.crew.none') })]
       : employees.length === 0
         ? [el('div', { className: 'bsx-empty', text: t('ui.crew.filter_no_match') })]
-        : employees.map(e => this.makeRosterCard(e, state));
-    // className hook: this inner div, not bodyEl, is now the roster's real
-    // scrolling container (overflow-y:auto lives here per scrollBoundedSection),
-    // so scenario coverage needs a stable selector for it (#964 CI fix).
+        : [cardGrid(employees.map(e => this.makeRosterCard(e, state)), 250)];
+    // The roster keeps its `bsx-roster-scroll` hook, but a window scrolls once, in its body (#2242).
+    const roster = el('div', { className: 'bsx-roster-scroll', children: living.length === 0 ? cards : [this.makeRosterBar(state), ...cards] });
+    roster.style.cssText = 'display:flex;flex-direction:column;gap:10px';
+    this.coverageSignature = coverageSignature(state);
     replaceChildrenKeepingScroll(this.bodyEl, [
-      scrollBoundedSection(living.length === 0 ? cards : [this.makeRosterBar(state), ...cards], 200, { gap: 8, className: 'bsx-roster-scroll', scrollKey: 'roster' }),
-      sectionHeader(t('ui.crew.hiring')),
-      ...makeHiringSection(state, (role, candidateId) => {
-        const wasOpen = this.openCandidateId === candidateId;
-        if (wasOpen) this.openCandidateId = null;
-        this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`);
-        if (wasOpen && this.lastState) { this.lastSignature = ''; this.update(this.lastState); }
-      }, {
-        selection: this.hiringSelection,
-        openCandidateId: this.openCandidateId,
-        onOpenCandidate: id => { this.openCandidateId = id; if (this.lastState) { this.lastSignature = ''; this.update(this.lastState); } },
-        onChange: () => { if (this.lastState) { this.lastSignature = ''; this.update(this.lastState); } },
+      living.length > 0 ? this.makeKpis(state) : null,
+      staffCoverageSection(state),
+      windowSection({ title: t('ui.crew.roster'), count: String(living.length), className: 'bs-crew-roster', children: [roster] }),
+      windowSection({
+        title: t('ui.crew.hiring'),
+        count: String(state.hiringPool.candidates.length),
+        note: t('ui.crew.hiring_note'),
+        className: 'bs-crew-hiring',
+        children: makeHiringSection(state, (role, candidateId) => {
+          const wasOpen = this.openCandidateId === candidateId;
+          if (wasOpen) this.openCandidateId = null;
+          this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`);
+          if (wasOpen && this.lastState) { this.lastSignature = ''; this.update(this.lastState); }
+        }, {
+          selection: this.hiringSelection,
+          openCandidateId: this.openCandidateId,
+          onOpenCandidate: id => { this.openCandidateId = id; if (this.lastState) { this.lastSignature = ''; this.update(this.lastState); } },
+          onChange: () => { if (this.lastState) { this.lastSignature = ''; this.update(this.lastState); } },
+        }),
       }),
     ]);
     if (this.pendingHiringRole) {
@@ -209,40 +232,90 @@ export class CrewPanel extends PanelBase {
     }
   }
 
-  private makeRosterCard(e: Employee, state: GameState): HTMLElement {
-    const row = el('div', { attrs: { 'data-employee-id': String(e.id), 'data-employee-role': e.role } });
-    row.style.cssText = `border-radius:var(--bsx-r-card);flex-shrink:0;border:1px solid ${
-      e.collapsing ? 'rgba(255,91,76,.4)' : 'var(--bsx-hairline)'
-    };background:var(--bsx-card)`;
+  /** Headcount, payroll, morale, energy, idle and hurt hands: the crew at a glance. */
+  private makeKpis(state: GameState): HTMLElement {
+    const living = state.employees.employees.filter(e => e.alive);
+    const n = Math.max(1, living.length);
+    const morale = living.reduce((a, e) => a + e.morale, 0) / n;
+    const energy = living.reduce((a, e) => a + e.fatigue, 0) / n;
+    const payroll = living.reduce((a, e) => a + perHour(e.salary), 0);
+    const idle = living.filter(e => computeEmployeeActivity(e, state.vehicles).kind === 'idle').length;
+    const hurt = living.filter(e => e.injured || e.collapsing).length;
+    const row = kpiRow([
+      kpiTile({ label: t('ui.crew.kpi_headcount'), value: String(living.length), key: 'headcount' }),
+      kpiTile({ label: t('ui.crew.kpi_payroll'), value: t('ui.crew.kpi_payroll_value', { amount: Math.round(payroll) }), key: 'payroll' }),
+      kpiTile({ label: t('ui.crew.kpi_morale'), value: `${Math.round(morale)}%`, tone: morale < 34 ? 'critical' : morale < 67 ? 'warn' : 'positive', key: 'morale', explain: moraleExplain() }),
+      kpiTile({ label: t('ui.crew.kpi_energy'), value: `${Math.round(energy)}%`, tone: energy < NEED_THRESHOLDS.fatigue.critical ? 'critical' : energy < NEED_THRESHOLDS.fatigue.low ? 'warn' : 'positive', key: 'energy', explain: fatigueExplain() }),
+      kpiTile({ label: t('ui.crew.kpi_idle'), value: String(idle), sub: t('ui.crew.kpi_idle_sub'), tone: idle > 0 ? 'info' : 'neutral', key: 'idle' }),
+      kpiTile({ label: t('ui.crew.kpi_hurt'), value: String(hurt), tone: hurt > 0 ? 'critical' : 'neutral', key: 'hurt' }),
+    ]);
+    row.classList.add('bs-crew-kpis');
+    return row;
+  }
 
-    const toggle = el('button', { className: 'bs-detail-toggle', attrs: { style: 'flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:10px 11px;border:0;background:transparent;color:var(--bsx-text-primary);cursor:pointer;text-align:left' } });
+  private activityText(e: Employee, state: GameState): string {
+    return describeActivity(computeEmployeeActivity(e, state.vehicles), state.vehicles);
+  }
+
+  /** Energy is the fatigue gauge read the friendly way round: full is rested. */
+  private makeEnergyGauge(fatigue: number): HTMLElement {
+    const th = NEED_THRESHOLDS.fatigue;
+    const row = gauge(t('ui.crew.need_fatigue'), fatigue, bandColor(fatigue, th.critical, th.low), { thresholdPct: th.low, labelWidth: 46, explain: fatigueExplain() });
+    row.classList.add('bs-crew-energy');
+    return row;
+  }
+
+  /** Morale as a gauge row whose fill and value keep the `bs-crew-morale-*` hooks refreshDynamic repaints. */
+  private makeMoraleGauge(morale: number): HTMLElement {
+    const color = moraleColor(morale);
+    const row = gauge(t('ui.crew.morale'), morale, color, { labelWidth: 46 });
+    row.querySelector('.bsx-gauge-fill')?.classList.add('bs-crew-morale-fill');
+    const value = row.querySelector<HTMLElement>('.bsx-gauge-value');
+    if (value) {
+      value.classList.add('bs-crew-morale-value');
+      value.textContent = `${Math.round(morale)}%`;
+      explainable(value, moraleExplain());
+    }
+    return row;
+  }
+
+  private makeRosterCard(e: Employee, state: GameState): HTMLElement {
+    const row = el('div', {
+      className: `bsx-ecard bs-crew-card${e.collapsing ? ' bs-crew-collapsing' : ''}`,
+      attrs: { 'data-employee-id': String(e.id), 'data-employee-role': e.role, 'data-clickable': '' },
+    });
+
+    // Coloured inline: a <button> otherwise paints buttontext, black on the dark card (textColour.test.ts).
+    const toggle = el('button', { className: 'bs-detail-toggle bsx-ecard-hit', attrs: { style: 'color:var(--bsx-text-primary)' } });
     toggle.addEventListener('click', () => {
       this.onSelectEmployeeCb?.(e.id);
     });
 
-    const avatar = makeAvatar(e);
-
-    const nameLine = el('div', { attrs: { style: 'display:flex;align-items:baseline;gap:6px' } });
-    nameLine.append(
-      el('span', { text: e.name, attrs: { style: 'font:600 12px/1 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }),
-      el('span', { text: `#${e.id}`, className: 'bsx-mono', attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' } }),
-    );
-
-    const roleLine = makeRoleMoraleLine(e);
-
+    const title = el('div', { className: 'bsx-ecard-title', children: [
+      el('span', { className: 'bsx-ecard-name', text: e.name }),
+      el('span', { className: 'bsx-ecard-note bsx-mono', text: `#${e.id}` }),
+    ] });
+    const sub = el('div', { className: 'bsx-ecard-sub', children: [
+      el('span', { text: t(`role.${e.role}`), attrs: { style: 'color:var(--bsx-text-secondary)' } }),
+      document.createTextNode(' · '),
+      el('span', { className: 'bs-crew-activity', text: this.activityText(e, state) }),
+    ] });
     const managerEffect = makeManagerEffect(e);
-    const col = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px;min-width:0;flex:1' }, children: managerEffect ? [nameLine, roleLine, managerEffect] : [nameLine, roleLine] });
+    const content = el('div', { className: 'bsx-ecard-content', children: [
+      el('div', { className: 'bsx-ecard-titles', children: [title, sub] }),
+      this.makeMoraleGauge(e.morale),
+      this.makeEnergyGauge(e.fatigue),
+      managerEffect,
+    ] });
+    toggle.append(portraitEl(employeePortraitSpec(e), 56), content);
 
-    toggle.append(avatar, col, makeStatusTags(e, state));
     const locateBtn = makeLocateButton({
       title: t('ui.crew.locate'),
       onClick: () => this.locateEmployee(e.id),
     });
     locateBtn.addEventListener('click', ev => ev.stopPropagation());
-    locateBtn.style.marginRight = '11px';
-    const header = el('div', { attrs: { style: 'display:flex;align-items:center' }, children: [toggle, locateBtn] });
-    row.appendChild(header);
-
+    const aside = el('div', { className: 'bs-crew-aside', children: [makeStatusTags(e, state), locateBtn] });
+    row.append(el('div', { className: 'bs-crew-card-main', children: [toggle, aside] }));
     return row;
   }
 }
