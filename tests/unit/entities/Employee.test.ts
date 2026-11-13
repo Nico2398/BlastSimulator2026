@@ -925,6 +925,18 @@ describe('Employee - tickNeedGauges (7.3)', () => {
     expect(employee.fatigue).toBeCloseTo(100 - NEED_DRAIN_RATES.fatigue.traveling, 5);
   });
 
+  it('evacuating drains fatigue less than traveling (#2259)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const a = hireEmployee(state, 'driller', rng).employee;
+    const b = hireEmployee(state, 'driller', rng).employee;
+    a.morale = 50;
+    b.morale = 50;
+    tickNeedGauges(a, 'evacuating');
+    tickNeedGauges(b, 'traveling');
+    expect(a.fatigue).toBeGreaterThan(b.fatigue);
+  });
+
   // -- Test 10 -----------------------------------------------------------
   it('extreme morale values: 0 (low) and 100 (high) both apply correct multipliers', () => {
     const state1 = createEmployeeState();

@@ -154,8 +154,8 @@ export function checkCollapse(employee: Employee): NeedKey | null {
  * Call this each tick for each employee.
  * All gauges are clamped to a minimum of 0.
  *
- * @param workState Four-state work classification (#680, #928) selecting the
- *   NEED_DRAIN_RATES tier — 'working' | 'idle' | 'resting' | 'traveling'.
+ * @param workState Five-state work classification (#680, #928, #2259) selecting the
+ *   NEED_DRAIN_RATES tier — 'working' | 'idle' | 'resting' | 'traveling' | 'evacuating'.
  */
 export function tickNeedGauges(employee: Employee, workState: EmployeeWorkState): void {
   // Injured employees' gauges are frozen while they recover (#1382).

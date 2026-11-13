@@ -1062,6 +1062,18 @@ describe('an evacuated employee claims no in-zone work while a live blast plan t
     expect(action.holderId).toBe(bystander.id);
   });
 
+  it('claims the in-zone action while the plan is live but no detonation is armed', () => {
+    const { state, evacuee, bystander } = armedZone();
+    state.pendingDetonation = null;
+    const action = makeAction({ id: 1, targetX: 15, targetZ: 15 });
+    state.pendingActions.push(action);
+
+    dispatchOnlyEvacuee(state, bystander);
+
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(evacuee.id);
+  });
+
   it('claims the in-zone pool action once the blast has fired and lifted the zone', () => {
     const { state, evacuee, bystander } = armedZone();
     const action = makeAction({ id: 1, targetX: 15, targetZ: 15 });
