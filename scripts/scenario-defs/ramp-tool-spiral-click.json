@@ -156,7 +156,7 @@
           "selector": "[data-action=\"report-close\"]"
         },
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"report-close\"]"
         },
         {
