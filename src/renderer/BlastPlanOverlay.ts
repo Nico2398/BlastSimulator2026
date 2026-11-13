@@ -324,11 +324,13 @@ export class BlastPlanOverlay {
         new THREE.Color(FRAG_COLOR_COARSE),
         t,
       );
-      const geo = new THREE.SphereGeometry(0.5, 6, 4);
-      const mat = new THREE.MeshBasicMaterial({ color });
+      // A flat ring lying on the hole top — a marker, not a floating sphere (#2226).
+      const geo = new THREE.RingGeometry(0.25, 0.5, 12);
+      const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
       const dot = new THREE.Mesh(geo, mat);
+      dot.rotation.x = -Math.PI / 2;
       dot.renderOrder = 16;
-      dot.position.set(hd.hole.x, hd.surfaceY + HOLE_HEIGHT + 0.6, hd.hole.z);
+      dot.position.set(hd.hole.x, hd.surfaceY + HOLE_HEIGHT + 0.1, hd.hole.z);
       this.group.add(dot);
     }
   }

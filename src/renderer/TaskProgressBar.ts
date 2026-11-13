@@ -14,6 +14,8 @@ import type { Employee } from '../core/entities/Employee.js';
 import type { VehicleState } from '../core/entities/Vehicle.js';
 import type { PendingAction } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction } from '../core/entities/EmployeeActivity.js';
+import { mountedVehicleId } from '../core/entities/EmployeeLocomotion.js';
+import { mountedWorkFraction } from '../core/entities/VehicleWorkProgress.js';
 import { createFillTween, stepFillTween, type FillTween } from './TaskFillEasing.js';
 import { GHOST_SIZE } from './GhostMesh.js';
 import { faceCamera } from './Billboard.js';
@@ -116,16 +118,20 @@ export class TaskProgressBar {
     pendingActions: readonly PendingAction[],
     getWorkerAnchor: (id: number) => THREE.Group | null,
     getSiteAnchor: (actionId: number) => THREE.Object3D | null,
-    _getVehicleAnchor?: (vehicleId: number) => THREE.Object3D | null,
+    getVehicleAnchor?: (vehicleId: number) => THREE.Object3D | null,
   ): void {
     const liveIds = new Set<number>();
     const employeeById = new Map<number, Employee>(employees.map(e => [e.id, e]));
 
     forEachEmployeeActivity(employees, vehicleState, liveIds, (employee, activity) => {
-      const anchor = getWorkerAnchor(employee.id);
-      const fraction = activity.kind === 'working' && activity.actionType !== 'place_building'
-        ? taskProgressFraction(activity)
-        : null;
+      // A mounted driver has no character mesh: the bar rides the vehicle instead (#2226).
+      const vehicleId = mountedVehicleId(employee.locomotion);
+      const workerAnchor = getWorkerAnchor(employee.id);
+      const mountedAnchor = workerAnchor === null && vehicleId !== null ? getVehicleAnchor?.(vehicleId) ?? null : null;
+      const anchor = workerAnchor ?? mountedAnchor;
+      let fraction: number | null = null;
+      if (mountedAnchor !== null) fraction = mountedWorkFraction(employee, vehicleState);
+      else if (activity.kind === 'working' && activity.actionType !== 'place_building') fraction = taskProgressFraction(activity);
 
       if (fraction === null || anchor === null) {
         this.bars.remove(employee.id);

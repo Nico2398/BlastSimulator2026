@@ -20,7 +20,7 @@ import { applyEasedPosition, createTween, ridingWindowOf, type MovementTween } f
 import { headingFromDelta, turnToward } from './Heading.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { vehicleModelId } from './models/ModelIds.js';
-import { createToonMaterial } from './models/CartoonMaterial.js';
+import { OVERLAY_Y_KEY } from './TaskProgressBar.js';
 
 /** Paint material every vehicle model exposes. */
 export const BODY_TINT = 'TintBody';
@@ -67,11 +67,10 @@ export class VehicleMesh {
   }
 
   /** Add a vehicle mesh to the scene at its position, optionally on a terrain surface. */
-  addVehicle(vehicle: Vehicle, vehicleState: VehicleState, employees: readonly Employee[], surfaceY: number = 0): void {
+  addVehicle(vehicle: Vehicle, _vehicleState: VehicleState, employees: readonly Employee[], surfaceY: number = 0): void {
     const group = new THREE.Group();
     const entry = this.attachModel(group, vehicle);
-    const status = computeVehicleStatus(vehicle, vehicleState, resolveVehicleDriver(vehicle, employees));
-    applyStateIndicator(group, status.kind, stateIndicatorHeight(entry.instance));
+    group.userData[OVERLAY_Y_KEY] = overlayY(entry.instance);
     const pool = [...Array.from(this.vehicles.values(), e => e.vehicle), vehicle];
     const [renderX, renderZ] = this.waitingRenderPosition(vehicle, pool, employees);
     group.position.set(renderX, surfaceY, renderZ);
@@ -113,7 +112,6 @@ export class VehicleMesh {
       const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, targetX, targetZ, dt, heightAt, trail, window);
       const status = computeVehicleStatus(v, vehicleState, resolveVehicleDriver(v, employees));
       this.animateMotion(entry, eased.x - fromX, eased.z - fromZ, dt, status.kind);
-      applyStateIndicator(entry.group, status.kind);
     }
   }
 
@@ -174,7 +172,7 @@ export class VehicleMesh {
   }
 
   /** Swap any stand-in box for the real model once its asset has loaded. */
-  refreshModels(vehicleState: VehicleState, employees: readonly Employee[]): void {
+  refreshModels(_vehicleState: VehicleState, _employees: readonly Employee[]): void {
     for (const entry of this.vehicles.values()) {
       if (!entry.instance.isFallback || !this.library.has(vehicleModelId(entry.vehicle.type, entry.vehicle.tier))) continue;
       entry.group.remove(entry.instance.root);
@@ -183,8 +181,7 @@ export class VehicleMesh {
       entry.instance = fresh.instance;
       entry.wheels = fresh.wheels;
       entry.flywheel = fresh.flywheel;
-      const status = computeVehicleStatus(entry.vehicle, vehicleState, resolveVehicleDriver(entry.vehicle, employees));
-      applyStateIndicator(entry.group, status.kind, stateIndicatorHeight(entry.instance));
+      entry.group.userData[OVERLAY_Y_KEY] = overlayY(entry.instance);
     }
   }
 
@@ -203,8 +200,8 @@ export class VehicleMesh {
   }
 
   /** The vehicle's root group, the anchor for billboards above it, or null if it isn't rendered. */
-  getAnchor(_id: number): THREE.Group | null {
-    throw new Error('not implemented');
+  getAnchor(id: number): THREE.Group | null {
+    return this.vehicles.get(id)?.group ?? null;
   }
 
   /** The model instance drawn for a vehicle, or null — exposes tint materials and nodes to tests. */
@@ -243,66 +240,14 @@ export class VehicleMesh {
 
 function disposeEntry(entry: VehicleEntry): void {
   entry.instance.dispose();
-  const marker = findStateIndicator(entry.group);
-  if (marker) {
-    marker.geometry.dispose();
-    (marker.material as THREE.Material).dispose();
-  }
 }
 
-/** Where the state marker floats: just above the model, in the group's unscaled space. */
-function stateIndicatorHeight(instance: ModelInstance): number {
-  return instance.bounds.max.y + STATE_INDICATOR_CLEARANCE;
-}
+/** Gap between the model's top and the billboards floating above it. */
+const OVERLAY_CLEARANCE = 0.5;
 
-// ---------- State indicator ----------
-
-/** Marker color per VehicleStatusKind (#1138 — replaces the deleted VehicleOperationalState). */
-export const STATE_COLOR_MAP: Record<VehicleStatusKind, number> = {
-  idle: 0x999999,     // grey — not working
-  moving: 0x3399ff,   // blue — en route
-  working: 0x33cc33,  // green — actively working
-  waiting: 0xffcc00,  // amber — blocked/waiting
-  broken: 0xff3333,   // red — broken down
-  stuck: 0xff6600,    // orange — stuck, needs attention
-  hauling: 0x33cc33,  // green — actively hauling/breaking
-};
-
-const STATE_INDICATOR_RADIUS = 0.25;
-/** Gap between the model's top and the marker. */
-const STATE_INDICATOR_CLEARANCE = 0.5;
-/** Marker height when no model bounds are known (the legacy placeholder's roof line). */
-const STATE_INDICATOR_DEFAULT_Y = 3.2;
-
-function findStateIndicator(group: THREE.Group): THREE.Mesh | undefined {
-  return group.children.find(
-    (child): child is THREE.Mesh => child instanceof THREE.Mesh && child.userData['isStateIndicator'] === true,
-  );
-}
-
-/**
- * Adds or updates a small colored marker on a vehicle's group reflecting its
- * operational state. Idempotent — reuses the existing marker mesh (tagged
- * group.userData.isStateIndicator) rather than adding a duplicate; `y`
- * repositions it when given.
- */
-export function applyStateIndicator(group: THREE.Group, state: VehicleStatusKind, y?: number): void {
-  const color = STATE_COLOR_MAP[state];
-  let marker = findStateIndicator(group);
-
-  if (!marker) {
-    marker = new THREE.Mesh(
-      new THREE.SphereGeometry(STATE_INDICATOR_RADIUS, 12, 8),
-      createToonMaterial({ color: new THREE.Color(color), name: 'stateIndicator' }),
-    );
-    marker.userData['isStateIndicator'] = true;
-    marker.position.set(0, y ?? STATE_INDICATOR_DEFAULT_Y, 0);
-    group.add(marker);
-    return;
-  }
-
-  if (y !== undefined) marker.position.y = y;
-  (marker.material as THREE.MeshToonMaterial).color.setHex(color);
+/** Where bars and pictograms float: just above the model, in the group's unscaled space. */
+function overlayY(instance: ModelInstance): number {
+  return instance.bounds.max.y + OVERLAY_CLEARANCE;
 }
 
 /** Rolling radius of a wheel node: half its height, since the axle runs level. */
