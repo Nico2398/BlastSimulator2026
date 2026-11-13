@@ -61,7 +61,7 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       // #557: never re-claim a stale evacuation-relay leftover while its
       // zone is still occupied — see isEvacuationHoldActive's own doc
       // comment (Evacuation.ts).
-      && !isEvacuationHoldActive(state, a)
+      && !isEvacuationHoldActive(state, a, employee)
       // #1130: a forced stuck-abandon release backs this action off for a
       // cooldown — see isActionPastStuckBackoff's own doc comment.
       && isActionPastStuckBackoff(state, a)
@@ -405,7 +405,7 @@ export function claimOnePoolCandidate(
     // constant's own doc comment, Evacuation.ts); clearResolvedEvacuationHolds
     // (called once per tick from tickEmployees) means this never permanently
     // blocks later work once the zone genuinely clears.
-    !isEvacuationHoldActive(state, a) &&
+    !isEvacuationHoldActive(state, a, employee) &&
     // #1130: see isActionPastStuckBackoff's own doc comment.
     isActionPastStuckBackoff(state, a) &&
     // The reachability sweep (OrderReachability.ts) already found no vehicle reaches it; the stamp clears on the

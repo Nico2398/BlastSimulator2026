@@ -15,11 +15,13 @@ export type NeedKey = 'fatigue';
  * - 'working': actively performing a task (drains fastest).
  * - 'idle': not working and not resting (e.g. routed toward a rest destination
  *   but not yet arrived).
+ * - 'evacuating': driving out of a zone on an evacuation order, or walking to the vehicle for it (#2259); drains far slower than
+ *   'traveling'.
  * - 'resting': actively resting (restTicksRemaining !== null).
  * - 'traveling': walking toward a claimed task or rest destination, not yet
  *   arrived (pendingTaskDuration or pendingRestDuration !== null).
  */
-export type EmployeeWorkState = 'working' | 'idle' | 'resting' | 'traveling';
+export type EmployeeWorkState = 'working' | 'idle' | 'resting' | 'traveling' | 'evacuating';
 
 /**
  * Returns a productivity multiplier (0.0–1.0) based on fatigue level.
@@ -152,8 +154,8 @@ export function checkCollapse(employee: Employee): NeedKey | null {
  * Call this each tick for each employee.
  * All gauges are clamped to a minimum of 0.
  *
- * @param workState Four-state work classification (#680, #928) selecting the
- *   NEED_DRAIN_RATES tier — 'working' | 'idle' | 'resting' | 'traveling'.
+ * @param workState Five-state work classification (#680, #928, #2259) selecting the
+ *   NEED_DRAIN_RATES tier — 'working' | 'idle' | 'resting' | 'traveling' | 'evacuating'.
  */
 export function tickNeedGauges(employee: Employee, workState: EmployeeWorkState): void {
   // Injured employees' gauges are frozen while they recover (#1382).

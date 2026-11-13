@@ -71,12 +71,24 @@ export const EVACUATION_HOLD_KEY = 'evacuationHold';
  * called once per tick from tickEmployees rather than implicitly from
  * inside a filter (#557 review).
  */
-export function isEvacuationHoldActive(state: GameState, action: PendingAction): boolean {
+export function isEvacuationHoldActive(state: GameState, action: PendingAction, employee?: Employee): boolean {
+  if (employee !== undefined && isBarredFromEvacuatedZone(state, action, employee)) return true;
   if (action.payload[EVACUATION_HOLD_KEY] !== true) return false;
   const zone = state.zone.activeZone;
   if (zone === null) return false;
   if (!isZoneClearOfEmployees(zone, state.employees)) return true;
   return isZoneStillBlastThreatened(state.drillHoles, zone);
+}
+
+/**
+ * True when `employee` was evacuated from the active zone and `action` targets a cell inside it while a live blast
+ * plan still threatens it (#2259). The stamp above only covers actions that existed when the evacuation was ordered;
+ * an action created afterwards (debris, a rest target) would walk the evacuee back in, to be evacuated again.
+ */
+function isBarredFromEvacuatedZone(state: GameState, action: PendingAction, employee: Employee): boolean {
+  const zone = state.zone.activeZone;
+  if (zone === null || state.pendingDetonation === null || !(state.zone.evacuatedEmployeeIds ?? []).includes(employee.id)) return false;
+  return isInZone(action.targetX, action.targetZ, zone) && isZoneStillBlastThreatened(state.drillHoles, zone);
 }
 
 /**

@@ -2051,9 +2051,15 @@ export function getResearchTaskDef(type: BuildingType, tier: 2 | 3): ResearchTas
  * `traveling` tier (#928): drain rate while walking toward a claimed task or
  * rest destination, not yet arrived (pendingTaskDuration/pendingRestDuration
  * !== null) — distinct from plain `idle` (nothing claimed at all).
+ *
+ * `evacuating` tier (#2259): drain rate while driving out of an evacuated
+ * zone (a reposition itinerary ending in an alight). Well below `traveling`,
+ * so a full evacuation never costs a rested worker most of their gauge.
  */
 export const NEED_DRAIN_RATES = {
-  fatigue: { working: 2, idle: 0.5, traveling: 1, resting: 0 },
+  // `evacuating`: a walk or drive ordered by a zone evacuation (#2259) — a rested worker fetching a vehicle across a
+  // pit still arrives with most of the gauge, so the clearing a shot demands never faints the crew.
+  fatigue: { working: 2, idle: 0.5, traveling: 1, evacuating: 0.25, resting: 0 },
 } as const;
 
 /** Threshold values for productivity/morale effects. */

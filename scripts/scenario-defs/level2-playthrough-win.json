@@ -1900,7 +1900,7 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 97.8577555440934,
+          "wellBeing": 98.21193238433585,
           "safety": 50,
           "ecology": 99.4987325160721,
           "nuisance": 48.871831290180225
@@ -2692,7 +2692,7 @@
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.22438719172143,
+          "wellBeing": 98.25767817159542,
           "safety": 50,
           "ecology": 99.37244411241298,
           "nuisance": 48.55611028103245
@@ -3728,10 +3728,10 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 95.16972876491634,
-          "safety": 0,
-          "ecology": 98.92800674371078,
-          "nuisance": 48.77392566992047
+          "wellBeing": 95.82263928401083,
+          "safety": 2.9404,
+          "ecology": 78.42192826475024,
+          "nuisance": 58.208639780895155
         },
         "changedBy": {
           "tickCount": 0
@@ -4544,10 +4544,10 @@
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 94.07196021039005,
+          "wellBeing": 98.12959138038434,
           "safety": 2.9404,
-          "ecology": 98.9908228570977,
-          "nuisance": 48.61380748318706
+          "ecology": 91.68996041193921,
+          "nuisance": 48.76380748318706
         },
         "changedBy": {
           "tickCount": 0
@@ -4571,10 +4571,10 @@
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 94.07196021039005,
+          "wellBeing": 98.12959138038434,
           "safety": 2.9404,
-          "ecology": 98.9908228570977,
-          "nuisance": 48.61380748318706
+          "ecology": 91.68996041193921,
+          "nuisance": 48.76380748318706
         },
         "changedBy": {
           "tickCount": 0

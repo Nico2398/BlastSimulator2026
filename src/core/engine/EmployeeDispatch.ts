@@ -15,6 +15,7 @@ import {
   type TickEmployeesResult,
 } from './EmployeeDispatchSteps.js';
 import { clearResolvedEvacuationHolds, isMidEvacuation } from './Evacuation.js';
+import { isMidEvacuationDrive } from './EvacuationHold.js';
 import { hasBlockedQueuedActionForVehicleRole } from './VehicleReservation.js';
 import { classifyQueuedOrders } from './OrderReachability.js';
 import { DEBRIS_CLASSIFY_PER_TICK } from '../config/balance.js';
@@ -212,7 +213,7 @@ export function tickEmployees(state: GameState, emitter?: EventEmitter): TickEmp
 /**
  * Work-state classification for NEED_DRAIN_RATES purposes (#680, extended to
  * 'traveling' by #928, and again for a vehicle-gated mid-drive by #1090's own
- * livelock follow-up). See EmployeeWorkState for the four states.
+ * livelock follow-up). See EmployeeWorkState for the five states.
  *
  * pendingTaskDuration/pendingRestDuration cover the on-foot outbound-walk and
  * return-to-rest cases (#928) — but a vehicle-gated action's own duration is
@@ -237,6 +238,7 @@ export function tickEmployees(state: GameState, emitter?: EventEmitter): TickEmp
  */
 export function employeeWorkState(emp: Employee): EmployeeWorkState {
   if (emp.restTicksRemaining !== null) return 'resting';
+  if (isMidEvacuationDrive(emp)) return 'evacuating';
   if (
     emp.pendingTaskDuration !== null || emp.pendingRestDuration !== null
     || emp.itinerary !== null || emp.destinationX !== null || emp.destinationZ !== null

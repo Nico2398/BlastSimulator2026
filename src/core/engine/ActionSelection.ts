@@ -503,7 +503,7 @@ export function findStarvedActionForEmployee(state: GameState, employee: Employe
   const candidates = state.pendingActions.filter(a =>
     isQueuedActionAvailableToEmployee(employee, a) &&
     a.requiredVehicleRole === null &&
-    !isEvacuationHoldActive(state, a) &&
+    !isEvacuationHoldActive(state, a, employee) &&
     isActionPastStuckBackoff(state, a) &&
     isHoleOrderClaimable(state, a) &&
     state.tickCount - a.queuedAtTick >= ACTION_STARVATION_TICK_THRESHOLD);
