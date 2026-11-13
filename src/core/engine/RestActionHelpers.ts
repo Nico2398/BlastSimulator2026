@@ -293,9 +293,31 @@ const REST_IN_PLACE_RADIUS = 1;
  * travel only, so the final leg alights on arrival unless this worker is the
  * only one who could reclaim it anyway (hasClaimableSameRoleFollowUp, #1122).
  */
-function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: number, z: number, emitter?: EventEmitter): void {
+function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: number, z: number, emitter?: EventEmitter, alwaysAlight = false): void {
   const result = moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
-  if (result.success && !hasClaimableSameRoleFollowUp(state, emp)) alightOnArrival(emp);
+  if (result.success && (alwaysAlight || !hasClaimableSameRoleFollowUp(state, emp))) alightOnArrival(emp);
+}
+
+/**
+ * #2225: a driven rest trip that alights on arrival (see
+ * moveToAndFreeVehicleOnArrival) continues on foot into the quarters, like the
+ * walk path: a trailing foot leg to the ring approach cell (x, z) that ends by
+ * entering the building. The vehicle stays parked where the driver left it. No-op
+ * when the drive does not end in an alight (the driver keeps the vehicle).
+ */
+function enterQuartersAfterAlight(emp: Employee, buildingId: number, x: number, z: number): void {
+  const itinerary = emp.itinerary;
+  const last = itinerary?.legs[itinerary.legs.length - 1];
+  if (!itinerary || !last || last.onArrive.kind !== 'alight') return;
+  itinerary.legs.push({
+    mode: 'foot',
+    vehicleId: null,
+    destX: x,
+    destZ: z,
+    arrival: 'exact',
+    onArrive: { kind: 'enter_building', buildingId },
+    estTicks: 0,
+  });
 }
 
 /**
@@ -310,7 +332,8 @@ function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: numbe
  * pre-#1709 mount continuity applies (keep the vehicle, free it on arrival
  * unless hasClaimableSameRoleFollowUp). A
  * faster vehicle, or one whose driver may not alight (loaded haul,
- * canReleaseDriver), drives the trip through moveTo/planItinerary as before so
+ * canReleaseDriver), drives the trip; a driven trip into quarters always
+ * alights on arrival and then enters the building (#2225) through moveTo/planItinerary as before so
  * the worker never desyncs from the vehicle (I2_mounted_position_mismatch,
  * WorldInvariants.ts). `allowUnreachable: true` (#1178): a genuinely
  * unreachable target still installs a best-effort itinerary. Sets
@@ -324,7 +347,8 @@ function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: numbe
  * who just parked), routes through `moveTo(state, emp.id, { buildingId }, ...)`
  * so the employee walks to the living_quarters' ring and enters it unseen on
  * arrival, like #1203's training-enrolment walk. A still-mounted (driven) trip
- * and the no-building rest-in-place case keep the plain (x, z) call. A
+ * drives to (x, z), then alights and enters the quarters (#2225); the
+ * no-building rest-in-place case keeps the plain (x, z) call. A
  * `buildingId` that no longer resolves (demolished between claim and dispatch)
  * falls back to the same plain (x, z) walk, since `moveTo`'s `{buildingId}`
  * overload refuses outright instead of installing a partial itinerary.
@@ -351,8 +375,13 @@ export function beginRestTravel(state: GameState, emp: Employee, x: number, z: n
     : undefined;
   if (!viaBuilding?.success) {
     // Driven trip (#1122): see moveToAndFreeVehicleOnArrival.
-    if (isMounted(emp.locomotion)) moveToAndFreeVehicleOnArrival(state, emp, x, z, emitter);
-    else moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
+    if (isMounted(emp.locomotion)) {
+      // Going into quarters always alights (a worker rests inside, #2225): the
+      // vehicle stays parked and dispatch replans the board leg after the rest.
+      const intoQuarters = buildingId !== undefined && state.buildings.buildings.some(b => b.id === buildingId);
+      moveToAndFreeVehicleOnArrival(state, emp, x, z, emitter, intoQuarters);
+      if (intoQuarters) enterQuartersAfterAlight(emp, buildingId!, x, z);
+    } else moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
   }
   emp.pendingActionType = 'rest';
 }

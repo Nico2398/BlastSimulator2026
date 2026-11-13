@@ -76,6 +76,67 @@ describe('ui.shady.exposure_note — #1410 describes the real consequence of exp
   });
 });
 
+// #2237 — fr calques (word-for-word English renderings) and a tu-form tagline.
+// Each key is recorded in KNOWN_TEXT_DEFECTS and its fr value guarded here.
+const CALQUE_FIXES: ReadonlyArray<{
+  key: string;
+  gone: string;
+  expected: string;
+}> = [
+  { key: 'game.subtitle', gone: 'Creuse. Explose. Profite.', expected: 'Creusez. Explosez. Profitez.' },
+  { key: 'economy.negotiation.failure', gone: 'Négociation échouée', expected: 'Échec de la négociation' },
+  { key: 'saveload.slot_name', gone: 'Créneau', expected: 'Emplacement' },
+  { key: 'course.driving.truck', gone: 'Permis Conduite', expected: 'Permis de camion' },
+  { key: 'tutorial.stage.hire_surveyor', gone: 'à côté de prospecteur', expected: 'à côté du prospecteur' },
+  { key: 'inspector.command_failed', gone: 'Action échouée', expected: "Échec de l'action" },
+  { key: 'mining.survey.failed', gone: 'relevé', expected: 'sondage' },
+  { key: 'notification.corruption.scandal', gone: 'versé à {target}', expected: 'visant {target}' },
+  { key: 'tick.contract_completed_bonus', gone: "Prime d'avance", expected: 'Prime de livraison anticipée' },
+];
+
+const placeholders = (s: string): string[] => (s.match(/\{[^}]+\}/g) ?? []).slice().sort();
+
+describe('#2237 — fr calque fixes are recorded in KNOWN_TEXT_DEFECTS', () => {
+  for (const { key } of CALQUE_FIXES) {
+    it(`glossary.ts records a fr defect for ${key}`, () => {
+      const defect = KNOWN_TEXT_DEFECTS.find((d) => d.key === key && d.locale === 'fr');
+      expect(defect, `KNOWN_TEXT_DEFECTS must hold a fr entry for ${key}`).toBeTruthy();
+      expect(defect?.problem.length ?? 0).toBeGreaterThan(0);
+      expect(defect?.expectedFix.length ?? 0).toBeGreaterThan(0);
+    });
+  }
+
+  it('records no en defect for these keys (en.json is untouched)', () => {
+    for (const { key } of CALQUE_FIXES) {
+      expect(KNOWN_TEXT_DEFECTS.find((d) => d.key === key && d.locale !== 'fr')).toBeUndefined();
+    }
+  });
+});
+
+describe('#2237 — fr.json calque fixes', () => {
+  for (const { key, gone, expected } of CALQUE_FIXES) {
+    it(`fr "${key}" no longer contains "${gone}"`, () => {
+      expect(fr[key]).toBeTypeOf('string');
+      expect(fr[key]).not.toContain(gone);
+    });
+
+    it(`fr "${key}" contains "${expected}"`, () => {
+      expect(fr[key]).toContain(expected);
+    });
+
+    it(`fr "${key}" keeps the placeholder set of en`, () => {
+      expect(en[key], `en.json must still carry ${key}`).toBeTypeOf('string');
+      expect(placeholders(fr[key] ?? '')).toEqual(placeholders(en[key] ?? ''));
+    });
+  }
+
+  it('game.subtitle drops the tu-form imperatives entirely', () => {
+    for (const verb of ['Creuse.', 'Explose.', 'Profite.']) {
+      expect(fr['game.subtitle']).not.toContain(verb);
+    }
+  });
+});
+
 describe('fr.json ui.* — #2236 calques rewritten', () => {
   const cases: [string, RegExp, RegExp][] = [
     ['ui.modifier.work_stoppage', /Arrêt de travail/, /Arrêt des travaux/],
@@ -89,6 +150,92 @@ describe('fr.json ui.* — #2236 calques rewritten', () => {
       expect(KNOWN_TEXT_DEFECTS.find((d) => d.key === key && d.locale === 'fr')).toBeTruthy();
       expect(fr[key]).not.toMatch(bad);
       expect(fr[key]).toMatch(good);
+    });
+  }
+});
+
+describe('event.politics_ / event.lawsuit_ calques — #2238 French rewrites', () => {
+  const cases: ReadonlyArray<readonly [string, string, string]> = [
+  [
+    "event.lawsuit_wrongful_death.res0",
+    "homicide involontaire",
+    "décès injustifié"
+  ],
+  [
+    "event.lawsuit_mountaineer.desc",
+    "le saccage de la montagne",
+    "vu la montagne saccagée"
+  ],
+  [
+    "event.lawsuit_patent_troll.title",
+    "Troll des Brevets",
+    "Chasseur de Brevets"
+  ],
+  [
+    "event.lawsuit_noise_restraining.res0",
+    "éloignement",
+    "ordonnance restrictive"
+  ],
+  [
+    "event.politics_celebrity_protest.res1",
+    "ce silence",
+    "cet silence"
+  ],
+  [
+    "event.politics_client_scandal.res0",
+    "éclaboussé par le scandale",
+    "client scandalisé"
+  ],
+  [
+    "event.politics_un_inspector.res1",
+    "procès-verbal",
+    "citation officielle"
+  ],
+  [
+    "event.politics_tax_reform.res1",
+    "société-écran",
+    "coquille offshore"
+  ]
+];
+
+  for (const [key, expected, old] of cases) {
+    it(`KNOWN_TEXT_DEFECTS records a fr defect for ${key}`, () => {
+      expect(KNOWN_TEXT_DEFECTS.find((d) => d.key === key && d.locale === 'fr')).toBeTruthy();
+    });
+
+    it(`fr.json "${key}" no longer says "${old}"`, () => {
+      expect(fr[key]).not.toContain(old);
+    });
+
+    it(`fr.json "${key}" says "${expected}"`, () => {
+      expect(fr[key]).toContain(expected);
+    });
+  }
+});
+
+describe('event.mafia_ / event.weather_ calques — #2239 French rewrites', () => {
+  const cases: ReadonlyArray<readonly [string, string, string]> = [
+    ["event.mafia_hide_witness.res1", "quiconque", "qui que ce soit"],
+    ["event.mafia_police_raid_tip.res0", "descente", "raid"],
+    ["event.mafia_stolen_vehicles.res2_alt", "numéro de châssis", "numéro de série"],
+    ["event.mafia_tattoo_shop.res0", "posent", "pose exactement"],
+    ["event.weather_ore_hail.res1", "des bleus", "contusionner"],
+    ["event.weather_logo_cloud.res2", "produits dérivés", "goodies"],
+    ["event.weather_suspiciously_perfect.title", "Trop Beau pour Être Vrai", "Suspicieusement"],
+    ["event.mafia_zoning_favors.opt2", "Reclassement", "Rezonage"],
+  ];
+
+  for (const [key, expected, old] of cases) {
+    it(`KNOWN_TEXT_DEFECTS records a fr defect for ${key}`, () => {
+      expect(KNOWN_TEXT_DEFECTS.find((d) => d.key === key && d.locale === 'fr')).toBeTruthy();
+    });
+
+    it(`fr.json "${key}" no longer says "${old}"`, () => {
+      expect(fr[key]).not.toContain(old);
+    });
+
+    it(`fr.json "${key}" says "${expected}"`, () => {
+      expect(fr[key]).toContain(expected);
     });
   }
 });
