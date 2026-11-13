@@ -10,7 +10,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
-import { appendHostTransition, type TrailHostEvent, type TrailHostKind } from '../entities/MovementTrail.js';
+import { appendHostTransition, trailArcLength, type TrailHostEvent, type TrailHostKind } from '../entities/MovementTrail.js';
 import type { Locomotion } from '../entities/EmployeeLocomotion.js';
 import { canAssignDriver, canReleaseDriver, vehicleDriverId } from '../entities/Vehicle.js';
 import { getBuildingDef, getBuildingPeopleCapacity } from '../entities/Building.js';
@@ -97,6 +97,17 @@ function markTransition(employee: Employee, event: TrailHostEvent, hostKind: Tra
 }
 
 /**
+ * Records the driver's board/alight on the vehicle's own trail, tagged with the driver's trail arc,
+ * so the renderer can hold the vehicle until the driver has boarded and stop it before they alight
+ * (#2224). No-op without a vehicle trail or for a passenger (the caller passes drivers only).
+ */
+function markDriverOnVehicle(vehicle: Vehicle, employee: Employee, event: 'board' | 'alight', arc?: number): void {
+  if (!vehicle.walkTrail) return;
+  const riderArc = arc ?? (employee.walkTrail ? trailArcLength(employee.walkTrail.points) : 0);
+  appendHostTransition(vehicle.walkTrail, vehicle.x, vehicle.z, event, 'vehicle', vehicle.x, vehicle.z, { id: employee.id, arc: riderArc });
+}
+
+/**
  * Whether two points are within one tile of each other (Chebyshev distance
  * <= 1) — the "close enough to board" test `board` itself uses. Locomotion.ts's
  * own adjacent-arrival leg check (#1089) computes the identical Chebyshev
@@ -135,6 +146,7 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   employee.x = vehicle.x;
   employee.z = vehicle.z;
   markTransition(employee, 'board', 'vehicle', vehicle.x, vehicle.z);
+  if (vehicleDriverId(vehicle) === employeeId) markDriverOnVehicle(vehicle, employee, 'board');
   // #1206: a mounted employee holds no ground cell of their own — the
   // vehicle they now ride claims one instead (AgentOccupancy.ts's own
   // rebuild already excludes a mounted/inside employee; releasing here keeps
@@ -187,7 +199,11 @@ function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, 
   const next = employee?.itinerary?.legs[1];
   const toward = destination ?? (next ? { x: next.destX, z: next.destZ } : undefined);
   const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z, toward);
+  // The rider's arc up to the vehicle's final position, read before the step onto the alight cell.
+  const wasDriver = vehicleDriverId(vehicle) === employeeId;
+  const arcAtVehicle = employee?.walkTrail ? trailArcLength(employee.walkTrail.points) : 0;
   releaseOccupant(state, vehicle, employeeId, employee, cell.x, cell.z);
+  if (employee && wasDriver) markDriverOnVehicle(vehicle, employee, 'alight', arcAtVehicle);
   if (employee) markTransition(employee, 'alight', 'vehicle', vehicle.x, vehicle.z);
   // A driver who alights mid-route (rest, death) leaves the vehicle parked on a
   // cell its drive leg never marked: without the flag, foot paths route through it

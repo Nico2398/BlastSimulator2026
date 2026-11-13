@@ -12,7 +12,7 @@ import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
 import { isSameTrailPoint, type MovementTrail } from '../core/entities/MovementTrail.js';
 import { tagPickable } from './Pickable.js';
 import {
-  applyEasedPosition, createTween, exitSpanOf, startSpanPlayback, stepSpanPlayback, trailLength, visibleTrailSpans, withLeadIn,
+  applyEasedPosition, createTween, exitSpanOf, MOVE_TWEEN_DURATION_S, startSpanPlayback, stepSpanPlayback, trailLength, visibleTrailSpans, withLeadIn,
   type MovementTween, type TrailSpan,
 } from './MovementInterpolation.js';
 import { headingFromDelta, turnToward } from './Heading.js';
@@ -157,9 +157,9 @@ export class CharacterMesh {
     this.library = library;
   }
 
-  addEmployee(employee: Employee, surfaceY: number = 0, trail?: MovementTrail): void {
+  addEmployee(employee: Employee, surfaceY: number = 0, trail?: MovementTrail, spawnSpan?: TrailSpan): void {
     this.removeEmployee(employee.id); // a mesh still retiring is dropped first (#1589)
-    const exitSpan = exitSpanOf(trail);
+    const exitSpan = spawnSpan ?? exitSpanOf(trail);
     const start = exitSpan?.points[0] ?? employee;
     const group = new THREE.Group();
     const { instance, animator } = this.attachModel(group, employee);
@@ -174,9 +174,12 @@ export class CharacterMesh {
       tween.targetZ = employee.z;
       startSpanPlayback(tween, [exitSpan], fullTrailLength);
     }
+    // A character leaving a vehicle stays hidden while it is still arriving (#2224).
+    const held = tween.elapsedS < 0;
+    group.visible = !held;
     this.characters.set(employee.id, {
       group, instance, animator, employee, evacuating: false,
-      tween, fullTrailLength, retiring: false, gapHidden: false,
+      tween, fullTrailLength, retiring: false, gapHidden: held,
     });
   }
 
@@ -402,8 +405,14 @@ export class CharacterMesh {
     // Hidden for the frame that crosses from one span to the next (the ride in between is not shown).
     entry.gapHidden = step.spanDone && !step.finished;
     if (step.finished && !entry.retiring) {
-      entry.tween.spans = undefined;
-      entry.tween.path = null;
+      // Snap the tween to its target so a later frame never glides back to the stale origin (#2224).
+      const { tween } = entry;
+      tween.spans = undefined;
+      tween.path = null;
+      tween.window = undefined;
+      tween.prevX = tween.targetX;
+      tween.prevZ = tween.targetZ;
+      tween.elapsedS = MOVE_TWEEN_DURATION_S;
     }
     return step.finished;
   }

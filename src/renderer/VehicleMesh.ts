@@ -16,7 +16,7 @@ import type { Employee } from '../core/entities/Employee.js';
 import { computeVehicleStatus, type VehicleStatusKind } from '../core/entities/VehicleStatus.js';
 import { waitingQueueOffset, waitingRenderPosition } from './VehicleWaitingQueue.js';
 import { tagPickable } from './Pickable.js';
-import { applyEasedPosition, createTween, type MovementTween } from './MovementInterpolation.js';
+import { applyEasedPosition, createTween, ridingWindowOf, type MovementTween } from './MovementInterpolation.js';
 import { headingFromDelta, turnToward } from './Heading.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { vehicleModelId } from './models/ModelIds.js';
@@ -108,7 +108,9 @@ export class VehicleMesh {
       // own cell — a waiting-queue offset is a render-only shift, not a drive.
       const onOwnCell = targetX === v.x && targetZ === v.z;
       const trail = onOwnCell ? v.walkTrail : undefined;
-      const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, targetX, targetZ, dt, heightAt, trail);
+      // The vehicle drives only while its driver is aboard: it waits for them to board and stops before they alight (#2224).
+      const window = ridingWindowOf(trail, id => employees.find(e => e.id === id)?.walkTrail);
+      const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, targetX, targetZ, dt, heightAt, trail, window);
       const status = computeVehicleStatus(v, vehicleState, resolveVehicleDriver(v, employees));
       this.animateMotion(entry, eased.x - fromX, eased.z - fromZ, dt, status.kind);
       applyStateIndicator(entry.group, status.kind);

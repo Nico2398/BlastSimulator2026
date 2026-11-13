@@ -8,7 +8,9 @@ import { isOccupyingHost } from '../core/entities/Employee.js';
 import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
-import { exitSpanOf } from './MovementInterpolation.js';
+import type { Employee } from '../core/entities/Employee.js';
+import type { MovementTrail } from '../core/entities/MovementTrail.js';
+import { exitSpanOf, leavingHostSpanOf } from './MovementInterpolation.js';
 
 /**
  * Terrain surface height for a building's whole footprint, not just its
@@ -32,6 +34,27 @@ export function buildingFootprintSurfaceY(
     if (h < min) min = h;
   }
   return min;
+}
+
+/** Trails whose leave-then-re-enter walk has already been drawn, so a re-sync of one batch draws it once. */
+const drawnLeavingTrails = new WeakSet<MovementTrail>();
+
+/**
+ * An employee that left a host and entered one again inside a single batch (mounted at its start, inside
+ * a building or mounted again at its end) has no mesh to retire — draw its walk from the exit to the
+ * door or seat anyway (#2224).
+ */
+function drawLeavingHostWalk(
+  characters: CharacterMesh, e: Employee, getSurfaceY: (x: number, z: number) => number,
+): void {
+  const trail = e.walkTrail;
+  if (!trail || drawnLeavingTrails.has(trail)) return;
+  const span = leavingHostSpanOf(trail);
+  if (!span || !span.endsInHost) return;
+  drawnLeavingTrails.add(trail);
+  const spawn = span.points[0]!;
+  characters.addEmployee(e, getSurfaceY(spawn.x, spawn.z), trail, span);
+  characters.retireEmployee(e);
 }
 
 /**
@@ -102,6 +125,8 @@ export function syncEntitySets(
         if (renderedEmployeeIds.has(e.id)) {
           characters.retireEmployee(e);
           renderedEmployeeIds.delete(e.id);
+        } else {
+          drawLeavingHostWalk(characters, e, getSurfaceY);
         }
         continue;
       }

@@ -21,6 +21,13 @@ interface TrailHostMarker {
   hostKind: TrailHostKind;
   hostX: number;
   hostZ: number;
+  /**
+   * Set on a vehicle's own trail (#2224): the employee riding it and the arc length of that
+   * employee's trail at the transition, so the renderer can hold the vehicle until the rider
+   * has boarded and stop it before the rider alights.
+   */
+  riderId?: number;
+  riderArc?: number;
 }
 
 export interface MovementTrail {
@@ -42,6 +49,15 @@ export interface MovementTrail {
 
 /** Upper bound on recorded points — a long console batch drops the oldest, never grows unbounded. */
 export const MOVEMENT_TRAIL_MAX_POINTS = 256;
+
+/** Arc length of a polyline (#2224 — the time base shared by a rider and its vehicle). */
+export function trailArcLength(points: readonly TrailPoint[]): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    total += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.z - points[i - 1]!.z);
+  }
+  return total;
+}
 
 /** Whether two positions are the same point for trail purposes. */
 export function isSameTrailPoint(a: TrailPoint, bx: number, bz: number): boolean {
@@ -103,9 +119,15 @@ export function appendHostTransition(
   hostKind: TrailHostKind,
   hostX: number,
   hostZ: number,
+  rider?: { id: number; arc: number },
 ): void {
   const tail = trail.points[trail.points.length - 1];
   if (!tail || !isSameTrailPoint(tail, x, z)) trail.points.push({ x, z });
-  trail.hostMarkers.push({ pointIndex: trail.points.length - 1, event, hostKind, hostX, hostZ });
+  const marker: TrailHostMarker = { pointIndex: trail.points.length - 1, event, hostKind, hostX, hostZ };
+  if (rider) {
+    marker.riderId = rider.id;
+    marker.riderArc = rider.arc;
+  }
+  trail.hostMarkers.push(marker);
   capTrail(trail);
 }
