@@ -6,7 +6,7 @@ import type { Vehicle, VehicleTier, VehicleState } from '../../../src/core/entit
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { hireEmployee, createEmployeeState } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { VehicleMesh, STATE_COLOR_MAP, applyStateIndicator, BODY_TINT } from '../../../src/renderer/VehicleMesh.js';
+import { VehicleMesh, BODY_TINT } from '../../../src/renderer/VehicleMesh.js';
 import type { VehicleStatusKind } from '../../../src/core/entities/VehicleStatus.js';
 import { WAITING_QUEUE_SLOT_OFFSETS } from '../../../src/core/config/balance.js';
 import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
@@ -355,98 +355,151 @@ describe('VehicleMesh — tier picks the model asset', () => {
   });
 });
 
-// ── Issue #411: operational-state visual indicator ─────────────────────────
-// Prior to this, VehicleOperationalState.working (and waiting/broken) all
-// rendered identically to idle since only position lerped — no color/marker
-// distinguished them. STATE_COLOR_MAP and applyStateIndicator close that gap,
-// following the same material-manipulation pattern as applyTierVariation.
-//
-// #1138: VehicleOperationalState (a Vehicle-native field) is deleted —
-// STATE_COLOR_MAP is now keyed by VehicleStatusKind (VehicleStatus.ts), the
-// fully-derived replacement, with two new kinds (stuck, hauling) that never
-// existed as a Vehicle.state value.
+// ── Issue #2226: no sphere floats above a vehicle ──────────────────────────
+// The state-colour sphere (#411) is gone: a vehicle group carries no sphere in any status. Broken and stuck
+// show a camera-facing pictogram instead (VehicleAlertPictograms.test.ts); working shows the task bar
+// (TaskProgressBar.test.ts).
 
-describe('STATE_COLOR_MAP (#411, #1138)', () => {
+describe('VehicleMesh — no state-indicator sphere (#2226)', () => {
   const ALL_KINDS: VehicleStatusKind[] = ['idle', 'moving', 'working', 'waiting', 'broken', 'stuck', 'hauling'];
 
-  it('has a numeric color entry for every VehicleStatusKind', () => {
-    for (const kind of ALL_KINDS) {
-      expect(STATE_COLOR_MAP[kind], `missing color for kind "${kind}"`).toBeTypeOf('number');
+  /** One vehicle plus the occupant that derives `kind` through computeVehicleStatus. */
+  function fixtureFor(kind: VehicleStatusKind): { v: Vehicle; vs: VehicleState; employees: Employee[] } {
+    const v = makeVehicle(1, 'debris_hauler', 0, 0, 1 as VehicleTier, kind === 'broken' ? 0 : 100);
+    const vs = makeVehicleState([v]);
+    const employees: Employee[] = [];
+    if (kind === 'stuck') employees.push(makeOccupant(v, { isMoveStuck: true, moveConsecutiveFailures: 9 }));
+    if (kind === 'waiting') employees.push(makeWaitingOccupant(v, 5, 5));
+    if (kind === 'working') employees.push(makeWorkingOccupant(v));
+    if (kind === 'moving') employees.push(makeOccupant(v, {
+      itinerary: {
+        legs: [{ mode: 'drive', vehicleId: v.id, destX: 9, destZ: 9, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5 }],
+        goal: { kind: 'reposition', x: 9, z: 9 }, workTicks: 0, estTotalTicks: 5,
+      },
+    }));
+    if (kind === 'hauling') {
+      const w = makeOccupant(v, {});
+      employees.push(w);
+      vs.reservations.push({ vehicleId: v.id, actionId: 1 });
     }
+    if (kind === 'idle') employees.push(makeOccupant(v, {}));
+    return { v, vs, employees };
+  }
+
+  /** Every mesh under `object` whose geometry is a sphere. */
+  function spheresUnder(object: THREE.Object3D): THREE.Mesh[] {
+    const out: THREE.Mesh[] = [];
+    object.traverse(c => {
+      if ((c as THREE.Mesh).isMesh && (c as THREE.Mesh).geometry instanceof THREE.SphereGeometry) out.push(c as THREE.Mesh);
+    });
+    return out;
+  }
+
+  it('no longer exports STATE_COLOR_MAP or applyStateIndicator', async () => {
+    const mod = await import('../../../src/renderer/VehicleMesh.js');
+    expect(mod).not.toHaveProperty('STATE_COLOR_MAP');
+    expect(mod).not.toHaveProperty('applyStateIndicator');
   });
 
-  it('assigns a color to each of the 7 kinds, with working and hauling deliberately sharing the "actively doing something" green', () => {
-    const colors = ALL_KINDS.map(k => STATE_COLOR_MAP[k]);
-    // working/hauling intentionally share a color (both read as "green,
-    // actively productive") — every other pair is still distinct.
-    const unique = new Set(colors);
-    expect(unique.size).toBe(ALL_KINDS.length - 1);
-    expect(STATE_COLOR_MAP.working).toBe(STATE_COLOR_MAP.hauling);
+  for (const kind of ALL_KINDS) {
+    it(`addVehicle leaves no sphere under a ${kind} vehicle`, () => {
+      const scene = new THREE.Scene();
+      const vm = new VehicleMesh(scene);
+      const { v, vs, employees } = fixtureFor(kind);
+      vm.addVehicle(v, vs, employees);
+      expect(spheresUnder(scene)).toHaveLength(0);
+      vm.dispose();
+    });
+
+    it(`update leaves no sphere under a ${kind} vehicle`, () => {
+      const scene = new THREE.Scene();
+      const vm = new VehicleMesh(scene);
+      const { v, vs, employees } = fixtureFor(kind);
+      vm.addVehicle(v, vs, employees);
+      vm.update([v], vs, employees, 0.1);
+      vm.update([v], vs, employees, 0.1);
+      expect(spheresUnder(scene)).toHaveLength(0);
+      vm.dispose();
+    });
+  }
+
+  it('a status change through update never adds a sphere (idle -> working -> broken)', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(1, 'drill_rig');
+    const vs = makeVehicleState([v]);
+    vm.addVehicle(v, vs, []);
+    const worker = makeWorkingOccupant(v);
+    vm.update([v], vs, [worker], 0.1);
+    expect(spheresUnder(scene)).toHaveLength(0);
+    v.hp = 0;
+    vm.update([v], vs, [worker], 0.1);
+    expect(spheresUnder(scene)).toHaveLength(0);
+    vm.dispose();
+  });
+
+  it('no vehicle child carries the legacy isStateIndicator tag', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const { v, vs, employees } = fixtureFor('working');
+    vm.addVehicle(v, vs, employees);
+    let tagged = 0;
+    scene.traverse(c => { if (c.userData['isStateIndicator']) tagged++; });
+    expect(tagged).toBe(0);
+    vm.dispose();
+  });
+
+  it('every role stays free of spheres, fallback model included', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const types: Vehicle['type'][] = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter', 'charging_truck'];
+    const vehicles = types.map((t, i) => makeVehicle(i + 1, t, i * 5, 0));
+    const vs = makeVehicleState(vehicles);
+    vehicles.forEach(v => vm.addVehicle(v, vs, []));
+    expect(spheresUnder(scene)).toHaveLength(0);
+    vm.dispose();
   });
 });
 
-describe('applyStateIndicator (#411)', () => {
-  /** Marker mesh contract: a single child tagged userData.isStateIndicator. */
-  function getIndicatorMeshes(group: THREE.Group): THREE.Mesh[] {
-    return group.children.filter(
-      (c): c is THREE.Mesh => c instanceof THREE.Mesh && c.userData?.['isStateIndicator'] === true,
-    );
-  }
-
-  it('adds exactly one state-indicator marker mesh to the group', () => {
-    const group = new THREE.Group();
-    applyStateIndicator(group, 'working');
-
-    expect(getIndicatorMeshes(group)).toHaveLength(1);
+describe('VehicleMesh.getAnchor (#2226)', () => {
+  it('returns the vehicle root group, the same object added to the scene', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(7, 'rock_digger', 3, 4);
+    vm.addVehicle(v, makeVehicleState([v]), []);
+    const anchor = vm.getAnchor(7);
+    expect(anchor).not.toBeNull();
+    expect(scene.children).toContain(anchor);
+    vm.dispose();
   });
 
-  it("marker material color matches STATE_COLOR_MAP['broken']", () => {
-    const group = new THREE.Group();
-    applyStateIndicator(group, 'broken');
-
-    const marker = getIndicatorMeshes(group)[0]!;
-    const mat = marker.material as THREE.MeshBasicMaterial | THREE.MeshPhongMaterial;
-    expect(mat.color.getHex()).toBe(STATE_COLOR_MAP['broken']);
+  it('returns null for an id that was never added', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    expect(vm.getAnchor(99)).toBeNull();
+    vm.dispose();
   });
 
-  it("marker material color matches STATE_COLOR_MAP['waiting']", () => {
-    const group = new THREE.Group();
-    applyStateIndicator(group, 'waiting');
-
-    const marker = getIndicatorMeshes(group)[0]!;
-    const mat = marker.material as THREE.MeshBasicMaterial | THREE.MeshPhongMaterial;
-    expect(mat.color.getHex()).toBe(STATE_COLOR_MAP['waiting']);
+  it('returns null after the vehicle is removed', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(7, 'rock_digger');
+    vm.addVehicle(v, makeVehicleState([v]), []);
+    vm.removeVehicle(7);
+    expect(vm.getAnchor(7)).toBeNull();
+    vm.dispose();
   });
 
-  it("marker material color matches STATE_COLOR_MAP['stuck']", () => {
-    const group = new THREE.Group();
-    applyStateIndicator(group, 'stuck');
-
-    const marker = getIndicatorMeshes(group)[0]!;
-    const mat = marker.material as THREE.MeshBasicMaterial | THREE.MeshPhongMaterial;
-    expect(mat.color.getHex()).toBe(STATE_COLOR_MAP['stuck']);
-  });
-
-  it('updates the existing marker in place on repeated calls rather than stacking duplicates', () => {
-    const group = new THREE.Group();
-    applyStateIndicator(group, 'idle');
-    applyStateIndicator(group, 'moving');
-    applyStateIndicator(group, 'working');
-
-    const markers = getIndicatorMeshes(group);
-    expect(markers).toHaveLength(1);
-    const mat = markers[0]!.material as THREE.MeshBasicMaterial | THREE.MeshPhongMaterial;
-    expect(mat.color.getHex()).toBe(STATE_COLOR_MAP['working']);
-  });
-
-  it('does not remove or alter the group\'s existing body meshes', () => {
-    const group = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshPhongMaterial({ color: 0xf5c518 }));
-    group.add(body);
-
-    applyStateIndicator(group, 'working');
-
-    expect(group.children).toContain(body);
+  it('distinguishes two vehicles', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const a = makeVehicle(1, 'drill_rig');
+    const b = makeVehicle(2, 'debris_hauler', 5, 5);
+    const vs = makeVehicleState([a, b]);
+    vm.addVehicle(a, vs, []);
+    vm.addVehicle(b, vs, []);
+    expect(vm.getAnchor(1)).not.toBe(vm.getAnchor(2));
+    vm.dispose();
   });
 });
 
@@ -666,7 +719,7 @@ describe('VehicleMesh — model animation (real assets)', () => {
     vm.dispose();
   });
 
-  it('refreshModels swaps a stand-in for the real model, keeping the state marker above it', async () => {
+  it('refreshModels swaps a stand-in for the real model and leaves no sphere above it (#2226)', async () => {
     const library = await loadedModelLibrary([]);
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene, library);
@@ -681,9 +734,9 @@ describe('VehicleMesh — model animation (real assets)', () => {
     const inst = vm.getInstance(1)!;
     expect(inst.isFallback).toBe(false);
     expect(inst.node('Mast')).not.toBeNull();
-    const group = scene.children[0] as THREE.Group;
-    const marker = group.children.find(c => c.userData['isStateIndicator']) as THREE.Mesh;
-    expect(marker.position.y).toBeGreaterThan(inst.bounds.max.y);
+    let spheres = 0;
+    scene.traverse(c => { if ((c as THREE.Mesh).isMesh && (c as THREE.Mesh).geometry instanceof THREE.SphereGeometry) spheres++; });
+    expect(spheres).toBe(0);
     vm.dispose();
   });
 });

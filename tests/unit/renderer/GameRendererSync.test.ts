@@ -23,6 +23,7 @@ import { addHole, holeNumericId } from '../../../src/core/mining/DrillPlan.js';
 import { columnOreValuePerM3 } from '../../../src/core/mining/BlastValueEstimate.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
+import { VehicleMesh } from '../../../src/renderer/VehicleMesh.js';
 import { RampArrowLayer } from '../../../src/renderer/RampArrow.js';
 import type { PlannedRamp } from '../../../src/core/state/GameState.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
@@ -621,5 +622,143 @@ describe('GameRenderer.syncFromContext — state replacement redraws the blast p
     renderer.syncFromContext(ctx);
 
     expect(renderer.pickables().filter(o => o.userData['entityKind'] === 'hole')).toHaveLength(0);
+  });
+});
+
+// ── #2226: vehicle anchors for the work bar and the alert pictograms ────────
+
+describe('syncGameRendererEntities() — vehicle anchors (#2226)', () => {
+  function stateWithVehicle(): { state: GameState; scene: THREE.Scene; vehicles: VehicleMesh } {
+    const state = createGame({ seed: 42, startingCash: 100_000 });
+    state.vehicles.vehicles.push({ id: 7, type: 'drill_rig', tier: 1, x: 4, z: 4, hp: 100, cargo: [], occupantIds: [] });
+    const scene = new THREE.Scene();
+    return { state, scene, vehicles: new VehicleMesh(scene) };
+  }
+
+  /** The zone-sync deps plus the fields #2226 adds, which the skeleton's SyncDeps does not declare yet. */
+  function depsWith(state: GameState, extra: Record<string, unknown>): SyncDeps {
+    return { ...makeZoneSyncDeps(state, new CharacterMesh(new THREE.Scene())), ...extra } as SyncDeps;
+  }
+
+  it('hands the task progress bar a vehicle-anchor lookup resolving to the vehicle mesh group', () => {
+    const { state, vehicles } = stateWithVehicle();
+    const taskProgress = { sync: vi.fn() };
+    const deps = depsWith(state, { vehicles, taskProgress, renderedVehicleIds: new Set<number>() });
+
+    syncGameRendererEntities(deps);
+
+    expect(taskProgress.sync).toHaveBeenCalledTimes(1);
+    const getVehicleAnchor = taskProgress.sync.mock.calls[0]![5] as (id: number) => THREE.Object3D | null;
+    expect(typeof getVehicleAnchor).toBe('function');
+    expect(getVehicleAnchor(7)).not.toBeNull();
+    expect(getVehicleAnchor(7)).toBe(vehicles.getAnchor(7));
+  });
+
+  it('the vehicle-anchor lookup answers null for an unknown vehicle id', () => {
+    const { state, vehicles } = stateWithVehicle();
+    const taskProgress = { sync: vi.fn() };
+    syncGameRendererEntities(depsWith(state, { vehicles, taskProgress, renderedVehicleIds: new Set<number>() }));
+
+    const getVehicleAnchor = taskProgress.sync.mock.calls[0]![5] as (id: number) => THREE.Object3D | null;
+    expect(getVehicleAnchor(999)).toBeNull();
+  });
+
+  it('the vehicle-anchor lookup answers null when no vehicle renderer is bound', () => {
+    const { state } = stateWithVehicle();
+    const taskProgress = { sync: vi.fn() };
+    syncGameRendererEntities(depsWith(state, { vehicles: null, taskProgress }));
+
+    const getVehicleAnchor = taskProgress.sync.mock.calls[0]![5] as (id: number) => THREE.Object3D | null;
+    expect(getVehicleAnchor(7)).toBeNull();
+  });
+
+  it('syncs the alert pictograms with the live roster, fleet state, employees and an anchor lookup', () => {
+    const { state, vehicles } = stateWithVehicle();
+    const vehicleAlerts = { sync: vi.fn() };
+    syncGameRendererEntities(depsWith(state, { vehicles, vehicleAlerts, renderedVehicleIds: new Set<number>() }));
+
+    expect(vehicleAlerts.sync).toHaveBeenCalledTimes(1);
+    const [roster, fleet, employees, getAnchor] = vehicleAlerts.sync.mock.calls[0]!;
+    expect(roster).toBe(state.vehicles.vehicles);
+    expect(fleet).toBe(state.vehicles);
+    expect(employees).toBe(state.employees.employees);
+    expect(getAnchor(7)).toBe(vehicles.getAnchor(7));
+    expect(getAnchor(999)).toBeNull();
+  });
+
+  it('syncs the alert pictograms with a null-returning lookup when no vehicle renderer is bound', () => {
+    const { state } = stateWithVehicle();
+    const vehicleAlerts = { sync: vi.fn() };
+    syncGameRendererEntities(depsWith(state, { vehicles: null, vehicleAlerts }));
+
+    const getAnchor = vehicleAlerts.sync.mock.calls[0]![3] as (id: number) => THREE.Object3D | null;
+    expect(getAnchor(7)).toBeNull();
+  });
+
+  it('syncs without error when no alert pictograms are bound', () => {
+    const { state, vehicles } = stateWithVehicle();
+    expect(() => syncGameRendererEntities(depsWith(state, { vehicles, vehicleAlerts: null, renderedVehicleIds: new Set<number>() }))).not.toThrow();
+  });
+});
+
+describe('GameRenderer.syncFromContext — vehicle work bar and alert pictogram, end to end (#2226)', () => {
+  function planesUnder(object: THREE.Object3D): number {
+    let n = 0;
+    object.traverse(c => { if ((c as THREE.Mesh).isMesh && (c as THREE.Mesh).geometry instanceof THREE.PlaneGeometry) n++; });
+    return n;
+  }
+  function spheresUnder(object: THREE.Object3D): number {
+    let n = 0;
+    object.traverse(c => { if ((c as THREE.Mesh).isMesh && (c as THREE.Mesh).geometry instanceof THREE.SphereGeometry) n++; });
+    return n;
+  }
+  function vehicleGroup(renderer: GameRenderer): THREE.Object3D {
+    const group = renderer.pickables().find(o => o.userData['entityKind'] === 'vehicle');
+    if (!group) throw new Error('no vehicle drawn');
+    return group;
+  }
+
+  function ctxWithVehicle(hp = 100) {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(1), 4, 4);
+    employee.locomotion = { kind: 'mounted', vehicleId: 7 };
+    state.vehicles.vehicles.push({ id: 7, type: 'drill_rig', tier: 1, x: 4, z: 4, hp, cargo: [], occupantIds: [employee.id] });
+    return { ctx, employee };
+  }
+
+  it('a mounted employee drilling puts a progress bar under the vehicle, and it goes when the work ends', () => {
+    const { ctx, employee } = ctxWithVehicle();
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+    const idle = planesUnder(vehicleGroup(renderer));
+
+    employee.taskTicksRemaining = 10;
+    employee.activeTaskTotalTicks = 20;
+    employee.pendingActionType = 'drill_hole';
+    renderer.syncFromContext(ctx);
+    expect(planesUnder(vehicleGroup(renderer))).toBeGreaterThan(idle);
+
+    employee.taskTicksRemaining = null;
+    delete employee.activeTaskTotalTicks;
+    renderer.syncFromContext(ctx);
+    expect(planesUnder(vehicleGroup(renderer))).toBe(idle);
+  });
+
+  it('a broken vehicle shows a pictogram plane, never a sphere, and repair removes it', () => {
+    const { ctx } = ctxWithVehicle(0);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    ctx.state!.vehicles.vehicles[0]!.hp = 100;
+    renderer.syncFromContext(ctx);
+    const healthy = planesUnder(vehicleGroup(renderer));
+
+    ctx.state!.vehicles.vehicles[0]!.hp = 0;
+    renderer.syncFromContext(ctx);
+    expect(planesUnder(vehicleGroup(renderer))).toBeGreaterThan(healthy);
+    expect(spheresUnder(vehicleGroup(renderer))).toBe(0);
+
+    ctx.state!.vehicles.vehicles[0]!.hp = 100;
+    renderer.syncFromContext(ctx);
+    expect(planesUnder(vehicleGroup(renderer))).toBe(healthy);
   });
 });
