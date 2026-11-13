@@ -30,7 +30,7 @@ const BAR_WIDTH  = 0.6;  // world units — proportionate to CharacterMesh's ~0.
 const BAR_HEIGHT = 0.08;
 /** Height above the anchor's local origin when the anchor does not say — clears a stand-in worker box. */
 const BAR_Y_OFFSET = 1.55;
-/** userData key on a worker's anchor group: the height that clears that worker's own hard hat. */
+/** userData key on an anchor group (worker or vehicle): the height that clears its own top. */
 export const OVERLAY_Y_KEY = 'overlayY';
 
 /** Where a worker-anchored overlay sits: above this worker's hat when his mesh says how tall it is. */
