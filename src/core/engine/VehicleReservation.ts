@@ -55,35 +55,9 @@ import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { vehicleReachesCell } from './ReachCache.js';
 
 /**
- * True when a `queued` (unclaimed) PendingAction exists whose
- * requiredVehicleRole matches `role` and whose targeting doesn't rule out
- * `employeeId` — untargeted (targetEmployeeId === null, open to whoever's
- * cheapest) or targeted at `employeeId` themself. An action targeted at a
- * DIFFERENT employee specifically is never a follow-up this employee could
- * ever claim, no matter how long it sits `queued`.
- *
- * #1090 follow-up: shared by ForceShiftRest.ts's hasClaimableSameRoleFollowUp
- * (defers a forced rest while a same-role follow-up is about to be picked
- * up) and EmployeeDispatch.ts's own idle-and-mounted-with-nothing-queued
- * check (alights an employee whose vehicle nothing needs any more, so it
- * doesn't sit hostage forever to a *different* employee's own targeted
- * claim on the same role) — both ask the identical question, "is a matching
- * action this employee could actually claim still out there for this role",
- * from opposite ends of the same gap #1090's own dismount-on-completion
- * deletion opened.
- */
-function hasQueuedActionForVehicleRole(state: GameState, role: VehicleRole, employeeId: number): boolean {
-  return state.pendingActions.some(a =>
-    a.status === 'queued'
-    && a.requiredVehicleRole === role
-    && (a.targetEmployeeId === null || a.targetEmployeeId === employeeId),
-  );
-}
-
-/**
  * True when `employee`, currently mounted, holds a vehicle whose role still
  * has a `queued` follow-up only `employee` could ever claim
- * (hasQueuedActionForVehicleRole above). Shared by ForceShiftRest.ts's
+ * (the queued, role-matching, untargeted-or-own actions). Shared by ForceShiftRest.ts's
  * forceShiftRestIfNeededByPolicy (defers a policy-forced rest while a
  * same-role follow-up is about to be picked up by the ordinary cost-ranked
  * pool dispatch — see its own call site's doc comment for the #1090 livelock
@@ -94,9 +68,7 @@ function hasQueuedActionForVehicleRole(state: GameState, role: VehicleRole, empl
  */
 export function hasClaimableSameRoleFollowUp(state: GameState, employee: Employee): boolean {
   if (!isMounted(employee.locomotion)) return false;
-  const vehicle = state.vehicles.vehicles.find(v => v.id === mountedVehicleId(employee.locomotion));
-  if (!vehicle) return false;
-  return hasQueuedActionForVehicleRole(state, vehicle.type, employee.id);
+  return claimableSameRoleFollowUps(state, employee).length > 0;
 }
 
 /**

@@ -224,8 +224,8 @@ function fatigueCoversTripToRest(state: GameState, emp: Employee, destX: number,
 }
 
 /**
- * Executing ticks of the costliest same-role job `emp` could claim next, or 0 when it would never fit a full gauge
- * (resting cannot help such a job, so it must not hold the worker in a rest loop, #945/#1123). The next claim is
+ * Executing ticks of the costliest same-role job `emp` could claim next that fits a full gauge (a job that never fits
+ * is ignored: resting cannot help it, so it must not hold the worker in a rest loop, #945/#1123), or 0. The next claim is
  * protected until done (#2229), so the deferral budgets it up front.
  */
 function nextJobTicksWorthResting(state: GameState, emp: Employee, destX: number, destZ: number): number {
@@ -234,9 +234,10 @@ function nextJobTicksWorthResting(state: GameState, emp: Employee, destX: number
   let worst = 0;
   for (const action of claimableSameRoleFollowUps(state, emp)) {
     const ticks = computeActionWorkTicks(state, emp, action);
-    if (ticks > worst) worst = ticks;
+    const fitsFullGauge = MAX_NEED_GAUGE - tripCost - ticks * drain >= NEED_REST_ARRIVAL_FATIGUE_FLOOR;
+    if (fitsFullGauge && ticks > worst) worst = ticks;
   }
-  return MAX_NEED_GAUGE - tripCost - worst * drain >= NEED_REST_ARRIVAL_FATIGUE_FLOOR ? worst : 0;
+  return worst;
 }
 
 /** Payload key counting the forced rests that cut a vehicle job's drive short before it arrived. */

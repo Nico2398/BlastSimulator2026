@@ -1063,18 +1063,18 @@ describe('Tutorial determinism (#1600)', () => {
   });
 });
 
-// ── #2229: the card order under `set_policy mode:continuous` never faints a worker before the blast ──
+// ── #2229: the card order under `set_policy mode:continuous` never faints a worker while charging ──
 //
 // The set-early-policy card applies continuous shifts and leaves the fatigue threshold at its default (60). Between two
 // fill-to-stemming charge jobs the charging-truck driver used to be sent on at fatigue ~32, a job costing more than the
 // gauge could cover, and `tickCollapse` fired `employee:collapsed` ("fainted") before the shot. The scripted scenarios
 // masked it with `fatigue:65`; this replay plays exactly what the cards say.
-describe('the tutorial card order under continuous shifts reaches the blast without a collapse (#2229)', () => {
+describe('the tutorial card order under continuous shifts reaches the end of charging without a collapse (#2229)', () => {
   /** Steps whose completion is a DOM action with no console equivalent (see playGuidedPhase above). */
   const DOM_ONLY_STEPS = new Set(['toggle-survey-overlay', 'scores', 'finances', 'needs']);
 
-  /** Plays the cards in order through the blast, `idleTicks` of waiting after every step. */
-  function replayToBlast(idleTicks: number) {
+  /** Plays the cards in order through the end of charging (the evacuation that follows is #2259), `idleTicks` of waiting after every step. */
+  function replayToEndOfCharging(idleTicks: number) {
     const { runner, ctx } = createRunner();
     const log: string[] = [];
     const run: Run = (cmd) => { log.push(cmd); return runner.run(cmd); };
@@ -1117,8 +1117,8 @@ describe('the tutorial card order under continuous shifts reaches the blast with
     return { state, log, collapsedIds, atZeroBeforeBlast, chargedHoles };
   }
 
-  it.each([0, 50])('with %i idle ticks between steps: no employee:collapsed and nobody at fatigue 0 before the blast', (idleTicks) => {
-    const { state, log, collapsedIds, atZeroBeforeBlast, chargedHoles } = replayToBlast(idleTicks);
+  it.each([0, 50])('with %i idle ticks between steps: no employee:collapsed and nobody at fatigue 0 through charging', (idleTicks) => {
+    const { state, log, collapsedIds, atZeroBeforeBlast, chargedHoles } = replayToEndOfCharging(idleTicks);
 
     // The replay really played the card's own policy, at the default threshold (no fatigue: override).
     expect(log).toContain('set_policy mode:continuous');

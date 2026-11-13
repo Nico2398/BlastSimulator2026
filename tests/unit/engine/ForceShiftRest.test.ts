@@ -1682,6 +1682,35 @@ describe('forceShiftRestIfNeededByPolicy — the next same-role job is budgeted 
     expect(employee.pendingRestDuration).toBeNull();
     expect(employee.activeActionId).toBeNull();
   });
+
+  // Review (#2229): a 60-tick job beside a 14-tick one. The 60-tick one never fits a full gauge, but the worker
+  // can still claim the 14-tick one and collapse, so the budget prices the worst job that does fit.
+  it('C4: a mixed queue (a 60-tick job beside a 14-tick one): the 14-tick job is still budgeted, the worker rests', () => {
+    const { state, employee } = idleChargerFixture(6);
+    queueCharge(state, employee, 2299, 60);
+    queueCharge(state, employee, 2300, 14);
+    employee.fatigue = 32;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
+  });
+
+  it('C5: low morale raises the job cost: fatigue that covers a 14-tick charge at morale 50 does not at morale 29', () => {
+    const normal = idleChargerFixture(6);
+    queueCharge(normal.state, normal.employee, 2301, 14);
+    normal.employee.fatigue = 40;
+    const low = idleChargerFixture(6);
+    queueCharge(low.state, low.employee, 2302, 14);
+    low.employee.fatigue = 40;
+    low.employee.morale = MORALE_THRESHOLDS.low - 1;
+
+    forceShiftRestIfNeededByPolicy(normal.state, normal.employee, [], []);
+    forceShiftRestIfNeededByPolicy(low.state, low.employee, [], []);
+
+    expect(normal.employee.pendingRestDuration).toBeNull();
+    expect(low.employee.pendingRestDuration).not.toBeNull();
+  });
 });
 
 describe('restTripFatigueCost — low-morale drain multiplier (#2229)', () => {
