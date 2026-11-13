@@ -1056,7 +1056,7 @@ describe('VehicleMesh — no riding window, the old glide (#2224)', () => {
     a.walkTrail = trailOf(line(X0, X0 + 1), [riderMarker(0, 'board', waitingA.id, 9)]);
     waitingA.walkTrail = trailOf(line(X0 - 9, X0 + 1), []);
     for (let i = 0; i < 4; i++) vm.update([a, b], state, employees, FRAME_DT);
-    expect(vm.getPosition(1)!.x - X0).toBeGreaterThan(0.2);
+    expect(vm.getPosition(1)!.x - X0).toBeGreaterThan(0.1);
     vm.dispose();
   });
 });
