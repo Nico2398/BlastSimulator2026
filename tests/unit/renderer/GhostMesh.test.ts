@@ -628,10 +628,26 @@ function makeGhostMesh(scene: THREE.Scene, library: ModelLibrary): GhostMesh {
   return new Ctor(scene, library);
 }
 
+/** Hue as the player sees it: the authored sRGB hex, not the linear working space. */
 function hueDegrees(color: THREE.Color): number {
   const hsl = { h: 0, s: 0, l: 0 };
-  color.getHSL(hsl);
+  color.getHSL(hsl, THREE.SRGBColorSpace);
   return hsl.h * 360;
+}
+
+/** Channels as authored (sRGB, 0..1). */
+function srgb(color: THREE.Color): { r: number; g: number; b: number } {
+  const rgb = { r: 0, g: 0, b: 0 };
+  color.getRGB(rgb, THREE.SRGBColorSpace);
+  return rgb;
+}
+
+/** True red: hue within 10 degrees of 0 (mod 360), red channel more than 3x green and blue (#2227). */
+function expectTrueRed(color: THREE.Color): void {
+  expect(hueDistance(hueDegrees(color), 0)).toBeLessThanOrEqual(10);
+  const { r, g, b } = srgb(color);
+  expect(r).toBeGreaterThan(3 * g);
+  expect(r).toBeGreaterThan(3 * b);
 }
 
 function hueDistance(a: number, b: number): number {
@@ -716,8 +732,43 @@ describe('unreachable (red) ghosts (#1306)', () => {
     const mat = (scene.children[0] as THREE.Mesh).material as THREE.MeshPhongMaterial;
     expect(mat).toBeInstanceOf(THREE.MeshPhongMaterial);
     expect(mat.transparent).toBe(true);
-    expect(mat.color.r).toBeGreaterThan(mat.color.b * 1.5);
-    expect(mat.color.r).toBeGreaterThan(mat.color.g * 1.5);
+    expectTrueRed(mat.color);
+    gm.dispose();
+  });
+
+  it('the unreachable base colour and rim constants are true red', () => {
+    expectTrueRed(GHOST_UNREACHABLE_COLOR);
+    expectTrueRed(GHOST_UNREACHABLE_RIM_COLOR);
+  });
+
+  it('a blocked (reachable) preview wears the same true-red material colour', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    gm.sync([makePreview(1, { unreachable: false, blocked: true })]);
+    const mat = (scene.children[0] as THREE.Mesh).material as THREE.MeshPhongMaterial;
+    expectTrueRed(mat.color);
+    expect(mat.color.equals(GHOST_UNREACHABLE_COLOR)).toBe(true);
+    gm.dispose();
+  });
+
+  it('an instanced debris ghost that is blocked draws with the true-red material', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    const [, , red] = gm.materials;
+    gm.sync([makePreview(1, { type: 'haul_debris', blocked: true })]);
+    expect(gm.batchOf(red!)!.count).toBe(1);
+    expectTrueRed((red as THREE.MeshPhongMaterial).color);
+    gm.dispose();
+  });
+
+  it('the red material is the only one of the three that is red; claimed and normal stay blue', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    const [normal, claimed, red] = gm.materials;
+    expectTrueRed((red as THREE.MeshPhongMaterial).color);
+    for (const mat of [normal, claimed] as THREE.MeshPhongMaterial[]) {
+      expect(mat.color.b).toBeGreaterThan(mat.color.r);
+    }
     gm.dispose();
   });
 
@@ -794,8 +845,7 @@ describe('unreachable (red) ghosts (#1306)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mat.onBeforeCompile!(shader as any, {} as any);
     const rim = shader.uniforms.rimColor!.value as THREE.Color;
-    expect(rim.r).toBeGreaterThan(rim.b);
-    expect(rim.r).toBeGreaterThan(rim.g);
+    expectTrueRed(rim);
     expect(rim.equals(GHOST_UNREACHABLE_RIM_COLOR)).toBe(true);
     expect(shader.fragmentShader).toContain('totalEmissiveRadiance += rimColor * rimIntensity * rimFresnel * rimOpacityCompensation;');
     gm.dispose();
