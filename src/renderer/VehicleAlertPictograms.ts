@@ -14,7 +14,7 @@ import { faceCamera } from './Billboard.js';
 import { EmployeeBillboardRoster } from './EmployeeBillboardRoster.js';
 import { createCanvas2d } from './createCanvas2d.js';
 
-export type VehicleAlertKind = 'broken' | 'stuck';
+type VehicleAlertKind = 'broken' | 'stuck';
 
 /** The alert a status shows above its vehicle, or null. */
 export function vehicleAlertKindFor(kind: VehicleStatusKind): VehicleAlertKind | null {

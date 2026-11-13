@@ -325,7 +325,7 @@ export class BlastPlanOverlay {
         t,
       );
       // A flat ring lying on the hole top — a marker, not a floating sphere (#2226).
-      const geo = new THREE.RingGeometry(0.25, 0.5, 12);
+      const geo = new THREE.CircleGeometry(0.5, 12);
       const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
       const dot = new THREE.Mesh(geo, mat);
       dot.rotation.x = -Math.PI / 2;
