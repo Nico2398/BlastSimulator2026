@@ -18,7 +18,7 @@ import {
   NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS, MAX_NEED_GAUGE,
   AGENT_WALK_SPEED, NEED_DRAIN_RATES, BUILDING_REPLENISH_RATES, NEED_REST_DURATIONS,
 } from '../config/balance.js';
-import { restCompletionMoraleCredit } from '../entities/EmployeeNeeds.js';
+import { restCompletionMoraleCredit, getMoraleDrainMultiplier } from '../entities/EmployeeNeeds.js';
 import { moveTo, alightOnArrival } from './MoveTo.js';
 import { leaveBuildingIfInside, alightIfMounted } from './Mount.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
@@ -455,7 +455,7 @@ export function restRoundTripWorthwhile(
   const trip = chooseRestTrip(state, emp, targetX, targetZ);
   if (trip === null) return true;
 
-  const travelCost = 2 * trip.estTicks * NEED_DRAIN_RATES.fatigue.traveling;
+  const travelCost = 2 * trip.estTicks * NEED_DRAIN_RATES.fatigue.traveling * getMoraleDrainMultiplier(emp.morale);
 
   const headroom = MAX_NEED_GAUGE - emp.fatigue;
   const maxRecovery = Math.min(headroom, BUILDING_REPLENISH_RATES.fatigue[building.tier] * NEED_REST_DURATIONS.fatigue);
@@ -508,7 +508,7 @@ export function restTripFatigueCost(
   targetZ: number,
 ): number | null {
   const trip = chooseRestTrip(state, emp, targetX, targetZ);
-  return trip === null ? null : trip.estTicks * NEED_DRAIN_RATES.fatigue.traveling;
+  return trip === null ? null : trip.estTicks * NEED_DRAIN_RATES.fatigue.traveling * getMoraleDrainMultiplier(emp.morale);
 }
 
 /** How an employee covers a rest trip. */

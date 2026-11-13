@@ -46,7 +46,9 @@ describe(`${SCENARIO} at 8x`, () => {
   });
 
   it('hushes the work around a shot and ducks the ambience under it', () => {
-    const work = sim().recorder.heard.filter(p => p.id.startsWith('work_'));
+    // The hush is WorkSounds' (sites with a worker). DistantLife's far-off work cue (key 'life') is a seeded ambience that
+    // is not suppressed by a shot; the rests of #2229 shifted the seeded run so one lands 0.6 s after the third shot.
+    const work = sim().recorder.heard.filter(p => p.id.startsWith('work_') && p.key !== 'life');
     for (const shot of shots()) {
       expect(work.filter(p => p.startS > shot.startS && p.startS < shot.startS + BLAST_AUDIO_CONFIG.workSuppressS - 0.1)).toEqual([]);
     }

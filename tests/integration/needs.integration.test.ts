@@ -1973,3 +1973,71 @@ describe('#2225 — chained vehicle jobs: a driver due a rest enters the quarter
     expect(run.demolishedAll).toBe(true);
   });
 });
+
+// #2229 — a charging-truck blaster chaining fill-to-stemming charges under the tutorial's policy.
+// Since #2223 a charge job runs 10-14 executing ticks (2 fatigue each). The between-jobs deferral budgeted only the
+// trip to rest, so the blaster was sent on to the next charge at fatigue ~32 and `tickCollapse` fainted him mid-job.
+// Collapse is a backstop for an unreachable rest, never the normal end of a charge chain.
+describe('#2229 — a charging-truck blaster chaining 9 charges under continuous/60 never collapses', () => {
+  const CHARGE_HORIZON_TICKS = 700;
+  const HOLES = 9;
+
+  /** Tutorial site, staffed, quarters built, continuous policy at its default threshold, 3x3 plan drilled; returns the blaster. */
+  function drilledTutorialSite() {
+    const engine = createGameEngine();
+    expect(runCommand(engine, 'campaign start level:tutorial_pit staffed:true').success).toBe(true);
+    const state = engine.ctx.state!;
+    state.cash = 5_000_000;
+    const refill = () => { for (const e of state.employees.employees) { e.fatigue = 100; e.ticksWorked = 0; } };
+    const step = () => {
+      runCommand(engine, 'tick 1');
+      if (state.events.pendingEvent) runCommand(engine, 'event choose 0');
+      if (state.isPaused) state.isPaused = false;
+    };
+
+    expect(runCommand(engine, 'build living_quarters at:8,15').success).toBe(true);
+    for (let i = 0; i < 100; i++) { refill(); step(); }
+    expect(state.buildings.buildings.some(b => b.type === 'living_quarters')).toBe(true);
+
+    expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
+    expect(state.sitePolicy.fatigueRestThreshold).toBe(60);
+    expect(runCommand(engine, 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:14,24').success).toBe(true);
+    for (let i = 0; i < 600 && state.plannedDrillHoles.length > 0; i++) { refill(); step(); }
+    expect(state.drillHoles.length).toBe(HOLES);
+
+    const blaster = state.employees.employees.find(e => {
+      const cats = e.qualifications.map(q => q.category);
+      return cats.includes('blasting') && cats.includes('driving.truck');
+    });
+    if (!blaster) throw new Error('Setup: staffed site has no charging-truck blaster');
+    expect(state.vehicles.vehicles.some(v => v.type === 'charging_truck')).toBe(true);
+    return { engine, state, blaster, refill, step };
+  }
+
+  it.each([100, 70, 55])('starting the charge chain at fatigue %i: no employee:collapsed, every hole charged, invariants hold', (startFatigue) => {
+    const { engine, state, blaster, refill, step } = drilledTutorialSite();
+    refill();
+    for (const e of state.employees.employees) e.fatigue = startFatigue;
+
+    const collapsedIds: number[] = [];
+    engine.ctx.emitter.on('employee:collapsed', (payload: unknown) => {
+      collapsedIds.push((payload as { employeeId: number }).employeeId);
+    });
+
+    expect(runCommand(engine, 'charge hole:* explosive:boomite stemming:2.5').success).toBe(true);
+    let minBlasterFatigue = Infinity;
+    let finishedAt: number | null = null;
+    for (let tick = 1; tick <= CHARGE_HORIZON_TICKS; tick++) {
+      step();
+      expectNoWorldInvariantViolations(state);
+      minBlasterFatigue = Math.min(minBlasterFatigue, blaster.fatigue);
+      if (Object.keys(state.plannedChargesByHole).length === 0) { finishedAt = tick; break; }
+    }
+
+    expect(finishedAt, 'the 9 charges never all landed').not.toBeNull();
+    expect(Object.keys(state.chargesByHole).length).toBe(HOLES);
+    expect(collapsedIds).toEqual([]);
+    expect(blaster.collapsing).toBe(false);
+    expect(minBlasterFatigue).toBeGreaterThan(0);
+  }, 120_000);
+});
