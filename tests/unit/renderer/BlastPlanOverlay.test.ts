@@ -313,3 +313,111 @@ describe('BlastPlanOverlay.reset (#1877)', () => {
     overlay.dispose();
   });
 });
+
+// ── #2226: the fragment-size marker is not a sphere ─────────────────────────
+
+describe('BlastPlanOverlay fragment-size markers (#2226)', () => {
+  const FRAG_COLOR_FINE = 0x22ff88;
+  const FRAG_COLOR_COARSE = 0xff4422;
+
+  function holeWithSize(id: string, x: number, sizeCm: number | undefined): HoleOverlayData {
+    const hd = makeHole(id, x, 0);
+    if (sizeCm === undefined) delete hd.predictedFragSizeCm;
+    else hd.predictedFragSizeCm = sizeCm;
+    return hd;
+  }
+
+  function optionsFor(softwareTier: number, sizes: Array<number | undefined>): BlastPlanOverlayOptions {
+    return {
+      softwareTier,
+      origin: new THREE.Vector3(20, 0, 20),
+      holes: sizes.map((s, i) => holeWithSize(`H${i + 1}`, i * 5, s)),
+    };
+  }
+
+  /**
+   * The markers tier 1 adds: the overlay group's extra children against tier 0 for the same holes
+   * (the heatmap lives in its own scene mesh, and arcs/waves only come at tier 2+), ordered by hole x.
+   */
+  function markersOf(sizes: Array<number | undefined>): THREE.Object3D[] {
+    const scene0 = new THREE.Scene();
+    const o0 = new BlastPlanOverlay(scene0, () => 0);
+    o0.show(optionsFor(0, sizes));
+    const base = overlayGroup(scene0).children.length;
+    o0.dispose();
+
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene, () => 0);
+    overlay.show(optionsFor(1, sizes));
+    const children = overlayGroup(scene).children;
+    const extra = children.slice(base);
+    expect(extra.length).toBe(children.length - base);
+    return [...extra].sort((a, b) => a.position.x - b.position.x);
+  }
+
+  const colourOf = (o: THREE.Object3D): number => ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).color.getHex();
+
+  it('adds one marker per hole with a predicted fragment size at tier 1', () => {
+    expect(markersOf([8, 20, 40])).toHaveLength(3);
+  });
+
+  it('adds no marker for a hole without a predicted fragment size', () => {
+    expect(markersOf([8, undefined, 40])).toHaveLength(2);
+  });
+
+  it('no marker is a SphereGeometry mesh', () => {
+    for (const marker of markersOf([8, 20, 40])) {
+      expect((marker as THREE.Mesh).isMesh).toBe(true);
+      expect((marker as THREE.Mesh).geometry).not.toBeInstanceOf(THREE.SphereGeometry);
+    }
+  });
+
+  it('no sphere exists anywhere in the overlay at any software tier', () => {
+    for (const tier of [0, 1, 2, 3, 4]) {
+      const scene = new THREE.Scene();
+      const overlay = new BlastPlanOverlay(scene, () => 0);
+      overlay.show({ ...optionsFor(tier, [8, 20, 40]), holes: optionsFor(tier, [8, 20, 40]).holes.map(h => ({ ...h, projectionSpeed: 20 })) });
+      let spheres = 0;
+      scene.traverse(o => { if ((o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry instanceof THREE.SphereGeometry) spheres++; });
+      expect(spheres, `tier ${tier}`).toBe(0);
+      overlay.dispose();
+    }
+  });
+
+  it('colours a fine hole (<= 10 cm) FRAG_COLOR_FINE', () => {
+    const [fine, finer] = markersOf([10, 4]);
+    expect(colourOf(fine!)).toBe(FRAG_COLOR_FINE);
+    expect(colourOf(finer!)).toBe(FRAG_COLOR_FINE);
+  });
+
+  it('colours a coarse hole (>= 30 cm) FRAG_COLOR_COARSE', () => {
+    const [coarse, coarser] = markersOf([30, 80]);
+    expect(colourOf(coarse!)).toBe(FRAG_COLOR_COARSE);
+    expect(colourOf(coarser!)).toBe(FRAG_COLOR_COARSE);
+  });
+
+  it('lerps between the two colours for a mid-size hole', () => {
+    const [mid] = markersOf([20]);
+    const expected = new THREE.Color().lerpColors(new THREE.Color(FRAG_COLOR_FINE), new THREE.Color(FRAG_COLOR_COARSE), 0.5).getHex();
+    expect(colourOf(mid!)).toBe(expected);
+    expect(colourOf(mid!)).not.toBe(FRAG_COLOR_FINE);
+    expect(colourOf(mid!)).not.toBe(FRAG_COLOR_COARSE);
+  });
+
+  it('sits each marker over its own hole', () => {
+    const markers = markersOf([8, 20, 40]);
+    markers.forEach((m, i) => {
+      expect(m.position.x).toBeCloseTo(i * 5, 5);
+      expect(m.position.y).toBeGreaterThan(8); // above the surface
+    });
+  });
+
+  it('clear removes the markers', () => {
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene, () => 0);
+    overlay.show(optionsFor(1, [8, 20]));
+    overlay.clear();
+    expect(overlayGroup(scene).children).toHaveLength(0);
+    overlay.dispose();
+  });
+});

@@ -14,6 +14,8 @@ import type { Employee } from '../core/entities/Employee.js';
 import type { VehicleState } from '../core/entities/Vehicle.js';
 import type { PendingAction } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction } from '../core/entities/EmployeeActivity.js';
+import { mountedVehicleId } from '../core/entities/EmployeeLocomotion.js';
+import { mountedWorkFraction } from '../core/entities/VehicleWorkProgress.js';
 import { createFillTween, stepFillTween, type FillTween } from './TaskFillEasing.js';
 import { GHOST_SIZE } from './GhostMesh.js';
 import { faceCamera } from './Billboard.js';
@@ -28,7 +30,7 @@ const BAR_WIDTH  = 0.6;  // world units — proportionate to CharacterMesh's ~0.
 const BAR_HEIGHT = 0.08;
 /** Height above the anchor's local origin when the anchor does not say — clears a stand-in worker box. */
 const BAR_Y_OFFSET = 1.55;
-/** userData key on a worker's anchor group: the height that clears that worker's own hard hat. */
+/** userData key on an anchor group (worker or vehicle): the height that clears its own top. */
 export const OVERLAY_Y_KEY = 'overlayY';
 
 /** Where a worker-anchored overlay sits: above this worker's hat when his mesh says how tall it is. */
@@ -116,15 +118,20 @@ export class TaskProgressBar {
     pendingActions: readonly PendingAction[],
     getWorkerAnchor: (id: number) => THREE.Group | null,
     getSiteAnchor: (actionId: number) => THREE.Object3D | null,
+    getVehicleAnchor?: (vehicleId: number) => THREE.Object3D | null,
   ): void {
     const liveIds = new Set<number>();
     const employeeById = new Map<number, Employee>(employees.map(e => [e.id, e]));
 
     forEachEmployeeActivity(employees, vehicleState, liveIds, (employee, activity) => {
-      const anchor = getWorkerAnchor(employee.id);
-      const fraction = activity.kind === 'working' && activity.actionType !== 'place_building'
-        ? taskProgressFraction(activity)
-        : null;
+      // A mounted driver has no character mesh: the bar rides the vehicle instead (#2226).
+      const vehicleId = mountedVehicleId(employee.locomotion);
+      const workerAnchor = getWorkerAnchor(employee.id);
+      const mountedAnchor = workerAnchor === null && vehicleId !== null ? getVehicleAnchor?.(vehicleId) ?? null : null;
+      const anchor = workerAnchor ?? mountedAnchor;
+      let fraction: number | null = null;
+      if (mountedAnchor !== null) fraction = mountedWorkFraction(employee, vehicleState);
+      else if (activity.kind === 'working' && activity.actionType !== 'place_building') fraction = taskProgressFraction(activity);
 
       if (fraction === null || anchor === null) {
         this.bars.remove(employee.id);

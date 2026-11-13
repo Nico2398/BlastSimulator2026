@@ -51,6 +51,7 @@ import type { RallyFlagMesh } from './RallyFlagMesh.js';
 import type { TrafficJamMarkerLayer } from './TrafficJamMarkerLayer.js';
 import type { TaskProgressBar } from './TaskProgressBar.js';
 import type { EmployeePictograms } from './EmployeePictograms.js';
+import type { VehicleAlertPictograms } from './VehicleAlertPictograms.js';
 import type { EmployeeMarkers } from './EmployeeMarkers.js';
 import type { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import type { SurveyConfidenceOverlayOptions } from './SurveyConfidenceOverlay.js';
@@ -121,6 +122,7 @@ export class GameRenderer {
   private rallyFlag: RallyFlagMesh | null = null;
   private taskProgress: TaskProgressBar | null = null;
   private pictograms: EmployeePictograms | null = null;
+  private vehicleAlerts: VehicleAlertPictograms | null = null;
   private employeeMarkers: EmployeeMarkers | null = null;
   private buildingOccupancyLabels: BuildingOccupancyLabels | null = null;
   private lastGrid: VoxelGrid | null = null;
@@ -361,6 +363,7 @@ export class GameRenderer {
       lastSyncedTerrainRevision: this.lastSyncedTerrainRevision,
       taskProgress: this.taskProgress,
       pictograms: this.pictograms,
+      vehicleAlerts: this.vehicleAlerts,
       employeeMarkers: this.employeeMarkers,
       buildingOccupancyLabels: this.buildingOccupancyLabels,
       skybox: this.skybox,
@@ -532,6 +535,7 @@ export class GameRenderer {
 
     this.taskProgress?.update(dt);
     this.pictograms?.update(dt);
+    this.vehicleAlerts?.update(dt);
     this.employeeMarkers?.update();
     this.buildingOccupancyLabels?.update(dt);
 
@@ -905,6 +909,7 @@ export class GameRenderer {
       characters: this.characters,
       taskProgress: this.taskProgress,
       pictograms: this.pictograms,
+      vehicleAlerts: this.vehicleAlerts,
       employeeMarkers: this.employeeMarkers,
       buildingOccupancyLabels: this.buildingOccupancyLabels,
       skybox: this.skybox,
@@ -970,6 +975,7 @@ export class GameRenderer {
     this.characters = deps.characters;
     this.taskProgress = deps.taskProgress;
     this.pictograms = deps.pictograms;
+    this.vehicleAlerts = deps.vehicleAlerts;
     this.employeeMarkers = deps.employeeMarkers;
     this.buildingOccupancyLabels = deps.buildingOccupancyLabels;
     this.skybox = deps.skybox;

@@ -19,6 +19,7 @@ import type { RallyFlagMesh } from './RallyFlagMesh.js';
 import { findTrafficJams } from '../core/events/TrafficJams.js';
 import type { TaskProgressBar } from './TaskProgressBar.js';
 import type { EmployeePictograms } from './EmployeePictograms.js';
+import type { VehicleAlertPictograms } from './VehicleAlertPictograms.js';
 import type { EmployeeMarkers } from './EmployeeMarkers.js';
 import type { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import type { SkyboxWeather } from './SkyboxWeather.js';
@@ -62,6 +63,7 @@ export interface SyncDeps {
   lastSyncedTerrainRevision: number;
   taskProgress: TaskProgressBar | null;
   pictograms: EmployeePictograms | null;
+  vehicleAlerts?: VehicleAlertPictograms | null;
   /** Role-coloured crew pins; optional since not every SyncDeps caller (e.g. tests) builds one. */
   employeeMarkers?: EmployeeMarkers | null;
   /** "<inside>/<capacity>" labels above people-holding buildings; optional since not every SyncDeps caller (e.g. tests) builds one (#1205). */
@@ -190,6 +192,17 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
       state.pendingActions,
       id => deps.characters!.getGroup(id),
       id => deps.ghosts?.getGroup(id) ?? null,
+      id => deps.vehicles?.getAnchor(id) ?? null,
+    );
+  }
+
+  // Broken and stuck vehicles show an alert pictogram (#2226)
+  if (deps.vehicleAlerts) {
+    deps.vehicleAlerts.sync(
+      state.vehicles.vehicles,
+      state.vehicles,
+      state.employees.employees,
+      id => deps.vehicles?.getAnchor(id) ?? null,
     );
   }
 
