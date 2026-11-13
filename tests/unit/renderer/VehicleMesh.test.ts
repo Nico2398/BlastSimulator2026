@@ -81,7 +81,7 @@ describe('VehicleMesh', () => {
     vm.dispose();
   });
 
-  it('vehicles have multiple children (composed shapes)', () => {
+  it('vehicles have a model root and no indicator sphere', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
     const types: Vehicle['type'][] = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter', 'charging_truck'];
@@ -89,7 +89,7 @@ describe('VehicleMesh', () => {
       const v = makeVehicle(0, type);
       vm.addVehicle(v, makeVehicleState([v]), []);
       const group = scene.children[0] as THREE.Group;
-      expect(group.children.length).toBeGreaterThan(1); // multi-part shapes
+      expect(group.children.length).toBeGreaterThanOrEqual(1); // model root present; no sphere indicator (#2226 C1)
       vm.clearAll();
     }
     vm.dispose();
