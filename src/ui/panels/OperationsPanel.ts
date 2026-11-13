@@ -17,7 +17,8 @@ import { coordLink, openerLink, type EntityOpener, type OpenableKind } from '../
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
 import { AccessRampOffer } from './AccessRampOffer.js';
-import { el, fieldStyle, card, sectionHeader, emptyState, chip, button, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
+import { el, fieldStyle, card, sectionHeader, emptyState, chip, button, panelHeader, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
+import { windowRoot, windowBody } from '../windowKit.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -111,7 +112,7 @@ export class OperationsPanel extends PanelBase {
   }
 
   constructor(container: HTMLElement) {
-    super(panelRoot('bs-operations-panel'));
+    super(windowRoot('bs-operations-panel'));
 
     const { header, titleEl } = panelHeader({
       icon: 'ops',
@@ -120,7 +121,7 @@ export class OperationsPanel extends PanelBase {
     });
     this.locale.bindText(titleEl, 'ui.operations.title');
 
-    this.bodyEl = panelBody(10);
+    this.bodyEl = windowBody();
 
     // Site policy controls are built once and reused across re-renders (they
     // carry live edit state — policyDirty, in-progress input values — that a
@@ -291,7 +292,7 @@ export class OperationsPanel extends PanelBase {
     const unclaimedNote = noteParts.join(' ');
 
     const barrenKg = barrenStoredMassKg(state.logistics.fragments, oreGradeScaleOf(state.world));
-    const wrap = el('div');
+    const wrap = el('div', { className: 'bs-ops-logistics' });
     wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
     wrap.append(
       this.makeLogisticsRow(t('ui.operations.on_ground'), t('ui.operations.fragment_count', { count: counts.onGround }), t('ui.operations.mass_kg', { kg: Math.round(onGroundKg).toLocaleString('en-US') })),

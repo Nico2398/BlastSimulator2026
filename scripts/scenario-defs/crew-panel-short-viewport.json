@@ -1,6 +1,6 @@
 {
   "name": "crew-panel-short-viewport",
-  "description": "Regression for the tutorial step 8 report: on a short browser window the Crew panel's roster and the sections below it had no way to scroll into view. Since #1765 roster rows no longer expand inline (selecting a row opens the inspector instead), so the roster itself must overflow its bounded wrapper at 1280x600 and scroll under a real wheel gesture. Proving it needs a real wheel gesture: clickSelector and expect.usable/blocked both call Element.scrollIntoView internally before acting, a DOM API no player has an equivalent for and one that is not gated by pointer-events. This file dispatches mousemove + wheel through Puppeteer's CDP input pipeline, the way a genuine gesture hit-tests, then reads the roster's own scrollTop. The read is waitForProperty rather than a bare assert because page.mouse.wheel() resolving does not mean Chrome has committed the scroll; waitForProperty polls instead of padding with a fixed delay and fails by name, reporting the last scrollTop it saw. The roster keeps the scroll while crew activity changes (#1592), and the Train action lives in the inspector's Training section, reached by clicking the roster row.",
+  "description": "Regression for the tutorial step 8 report: on a short browser window the Crew panel's roster and the sections below it had no way to scroll into view. Since #1765 roster rows no longer expand inline (selecting a row opens the inspector instead), so the Crew window's body (its one scroll area since #2242) must overflow at 1280x600 and scroll under a real wheel gesture. Proving it needs a real wheel gesture: clickSelector and expect.usable/blocked both call Element.scrollIntoView internally before acting, a DOM API no player has an equivalent for and one that is not gated by pointer-events. This file dispatches mousemove + wheel through Puppeteer's CDP input pipeline, the way a genuine gesture hit-tests, then reads the window body's own scrollTop. The read is waitForProperty rather than a bare assert because page.mouse.wheel() resolving does not mean Chrome has committed the scroll; waitForProperty polls instead of padding with a fixed delay and fails by name, reporting the last scrollTop it saw. The roster keeps the scroll while crew activity changes (#1592), and the Train action lives in the inspector's Training section, reached by clicking the roster row.",
   "steps": [
     {
       "command": "new_game seed:42 cash:150000",
@@ -116,7 +116,7 @@
     },
     {
       "command": "employee list",
-      "description": "#1592 regression, part 1. Command is a harmless placeholder (command mode has no 'wheel-scroll a panel'). While the driving_center is still a construction order, shrink to 1280x600, open Crew and wheel-scroll the overflowing roster by a real gesture. Rows are not expanded (#1765). The Train button is not asserted here; it lives in the inspector once the school stands.",
+      "description": "#1592 regression, part 1. Command is a harmless placeholder (command mode has no 'wheel-scroll a panel'). While the driving_center is still a construction order, shrink to 1280x600, open Crew and wheel-scroll the window by a real gesture: since the central window (#2242) the roster is a card grid and the window body is the one scroll area, so that is what scrolls; the earlier hire clicks left it scrolled down to Hiring, so the wheel first brings it back to the top. Rows are not expanded (#1765). The Train button is not asserted here; it lives in the inspector once the school stands.",
       "interaction": [
         {
           "type": "viewport",
@@ -134,12 +134,6 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-employee-panel .bsx-roster-scroll",
-          "property": "scrollTop",
-          "expectedValue": 0
         },
         {
           "type": "mousemove",
@@ -165,7 +159,7 @@
         },
         {
           "type": "waitForProperty",
-          "selector": "#bs-employee-panel .bsx-roster-scroll",
+          "selector": "#bs-employee-panel .bsx-panel-body",
           "property": "scrollTop",
           "expectedValue": 50,
           "timeoutMs": 5000
@@ -205,11 +199,11 @@
     },
     {
       "command": "employee list",
-      "description": "#1592 regression, part 2. The ticks of the previous step changed the crew's activity repeatedly; the roster must still sit where the wheel left it (scrollTop 50 - a refresh may not teleport it back). Nothing in this step clicks or scrolls.",
+      "description": "#1592 regression, part 2. The ticks of the previous step changed the crew's activity repeatedly; the window must still sit where the wheel left it (scrollTop 50 - a refresh may not teleport it back). Nothing in this step clicks or scrolls.",
       "interaction": [
         {
           "type": "assert",
-          "selector": "#bs-employee-panel .bsx-roster-scroll",
+          "selector": "#bs-employee-panel .bsx-panel-body",
           "property": "scrollTop",
           "expectedValue": 50
         },
@@ -219,7 +213,7 @@
         },
         {
           "type": "assert",
-          "selector": "#bs-employee-panel .bsx-roster-scroll",
+          "selector": "#bs-employee-panel .bsx-panel-body",
           "property": "scrollTop",
           "expectedValue": 50
         },

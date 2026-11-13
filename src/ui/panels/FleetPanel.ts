@@ -16,7 +16,8 @@ import { coordLink, type EntityOpener } from '../entityLinks.js';
 import { PanelBase } from './PanelBase.js';
 import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
+import { el, panelHeader, replaceChildrenKeepingScroll } from '../dom.js';
+import { windowRoot, windowBody } from '../windowKit.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -33,6 +34,11 @@ import { FLEET_SORT_KEYS, FLEET_STATUS_CHOICES, fleetCriteriaFromSelection, filt
 import { syncRowSelection, selectionChanged, type ListSelection } from '../selectionRoute.js';
 import { onRowBodyClick } from '../buildMenuRows.js';
 import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverNameLine } from '../fleetDetailSections.js';
+import { cardGrid, kpiRow, kpiTile, windowSection } from '../windowKit.js';
+import { portraitEl, vehiclePortraitSpec } from '../portraits.js';
+import { staffCoverageSection, coverageSignature, syncStaffCoverage } from '../staffCoverageView.js';
+import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
+import { fractionOf } from '../../core/math/Fraction.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
@@ -55,7 +61,7 @@ function tierLock(grade: number | undefined, tier: VehicleTier): TierLock | null
   return gate && refusal ? { refusal, label: vehicleTierLockLabel(gate.needed) } : null;
 }
 
-const TIER_BTN_BASE_STYLE = 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);color:var(--bsx-text-primary);text-align:left';
+const TIER_BTN_BASE_STYLE = 'display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:10px;border:1px solid var(--bsx-hairline);border-radius:9px;background:var(--bsx-card);color:var(--bsx-text-primary);text-align:left;width:100%;min-width:0;font:inherit'
 
 export class FleetPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -66,6 +72,8 @@ export class FleetPanel extends PanelBase {
   private readonly locale = new LocaleTextRegistry();
   private selection: ListSelection = null;
   private readonly filterSelection = new FilterBarSelection();
+  /** Figures the licence tiles last showed; they refresh in place, never through a list rebuild. */
+  private coverageSignature = '';
 
   private opener: EntityOpener | undefined;
 
@@ -75,7 +83,7 @@ export class FleetPanel extends PanelBase {
   }
 
   constructor(container: HTMLElement) {
-    super(panelRoot('bs-vehicle-panel'));
+    super(windowRoot('bs-vehicle-panel'));
 
     const { header, titleEl } = panelHeader({
       icon: 'vehicle',
@@ -84,7 +92,7 @@ export class FleetPanel extends PanelBase {
     });
     this.locale.bindText(titleEl, 'ui.fleet.title');
 
-    this.bodyEl = panelBody(9);
+    this.bodyEl = windowBody();
 
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
@@ -152,6 +160,8 @@ export class FleetPanel extends PanelBase {
 
   private refreshDynamic(state: GameState): void {
     this.syncTrafficBanner(state);
+    this.bodyEl.querySelector('.bs-fleet-kpis')?.replaceWith(this.makeKpis(state));
+    this.coverageSignature = syncStaffCoverage(this.bodyEl, state, this.coverageSignature, 'licences');
 
     for (const v of state.vehicles.vehicles) {
       const row = this.bodyEl.querySelector<HTMLElement>(`[data-vehicle-id="${v.id}"]`);
@@ -242,9 +252,12 @@ export class FleetPanel extends PanelBase {
 
   private render(state: GameState): void {
     const { vehicles } = state.vehicles;
-    const children: HTMLElement[] = [];
+    const children: (HTMLElement | null)[] = [];
     const banner = this.makeTrafficBanner(state);
     if (banner) children.push(this.tag(banner, 'bs-fleet-traffic'));
+    if (vehicles.length > 0) children.push(this.makeKpis(state));
+    this.coverageSignature = coverageSignature(state);
+    children.push(staffCoverageSection(state, 'licences'));
 
     const visible = this.visibleVehicles(state);
     const vehicleCards = vehicles.length === 0
@@ -252,20 +265,49 @@ export class FleetPanel extends PanelBase {
       : visible.length === 0
         ? [el('div', { className: 'bsx-empty', text: t('ui.fleet.filter_no_match') })]
         : visible.map(v => this.makeVehicleCard(v, state));
-    children.push(scrollBoundedSection(vehicles.length === 0 ? vehicleCards : [this.makeFleetBar(), ...vehicleCards], 200, { gap: 9, scrollKey: 'fleet' }));
-    children.push(sectionHeader(t('ui.fleet.dealership')), ...this.makeDealershipRows(state));
+    // The bar spans the grid's first row, so `[data-vehicle-id]:nth-of-type(n)` still counts it as before.
+    const grid = cardGrid(vehicles.length === 0 ? vehicleCards : [this.makeFleetBar(), ...vehicleCards], 270, 'bs-fleet-grid');
+    grid.dataset['scrollKey'] = 'fleet';
+    children.push(windowSection({ title: t('ui.fleet.vehicles'), count: String(vehicles.length), className: 'bs-fleet-list', children: [grid] }));
+    children.push(windowSection({
+      title: t('ui.fleet.dealership'), note: t('ui.fleet.dealership_note'), className: 'bs-fleet-dealership',
+      children: this.makeDealershipRows(state),
+    }));
     replaceChildrenKeepingScroll(this.bodyEl, children);
+  }
+
+  /** Fleet size and how much of it is earning: working, waiting, stuck, damaged. */
+  private makeKpis(state: GameState): HTMLElement {
+    const counts = { working: 0, waiting: 0, stuck: 0, damaged: 0 };
+    for (const v of state.vehicles.vehicles) {
+      const kind = computeVehicleStatus(v, state.vehicles, this.occupantOf(v, state)).kind;
+      if (kind === 'working' || kind === 'hauling' || kind === 'moving') counts.working++;
+      else if (kind === 'stuck') counts.stuck++;
+      else if (kind !== 'broken') counts.waiting++;
+      if (fractionOf(v.hp, getVehicleDefByTier(v.type, v.tier).maxHp) < 0.5) counts.damaged++;
+    }
+    const row = kpiRow([
+      kpiTile({ label: t('ui.fleet.kpi_vehicles'), value: String(state.vehicles.vehicles.length), key: 'vehicles' }),
+      kpiTile({ label: t('ui.fleet.kpi_working'), value: String(counts.working), tone: counts.working > 0 ? 'positive' : 'neutral', key: 'working' }),
+      kpiTile({ label: t('ui.fleet.kpi_waiting'), value: String(counts.waiting), sub: t('ui.fleet.kpi_waiting_sub'), tone: counts.waiting > 0 ? 'info' : 'neutral', key: 'waiting' }),
+      kpiTile({ label: t('ui.fleet.kpi_stuck'), value: String(counts.stuck), tone: counts.stuck > 0 ? 'warn' : 'neutral', key: 'stuck' }),
+      kpiTile({ label: t('ui.fleet.kpi_damaged'), value: String(counts.damaged), sub: t('ui.fleet.kpi_damaged_sub'), tone: counts.damaged > 0 ? 'critical' : 'neutral', key: 'damaged' }),
+    ]);
+    row.classList.add('bs-fleet-kpis');
+    return row;
   }
 
   // ── Dealership ──
 
   private makeDealershipRows(state: GameState): HTMLElement[] {
     return getAllVehicleRoles().map(role => {
-      const group = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px' } });
-      group.appendChild(el('span', { text: t(`vehicle_type.${role}`), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:var(--bsx-text-secondary)' } }));
+      const head = el('div', { className: 'bs-dealer-head', children: [
+        el('span', { className: 'bs-dealer-role', text: t(`vehicle_type.${role}`) }),
+        el('span', { className: 'bs-dealer-licence', text: t('ui.fleet.dealer_licence', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[role]}`) }) }),
+      ] });
       const tiers: VehicleTier[] = [1, 2, 3];
-      for (const tier of tiers) group.appendChild(this.makeTierButton(role, tier, state));
-      return group;
+      const grid = el('div', { className: 'bs-dealer-tiers', children: tiers.map(tier => this.makeTierButton(role, tier, state)) });
+      return el('div', { className: 'bs-dealer-group', attrs: { 'data-dealer-role': role }, children: [head, grid] });
     });
   }
 
@@ -276,9 +318,9 @@ export class FleetPanel extends PanelBase {
       className: 'bs-fleet-tier-btn',
       attrs: { style: TIER_BTN_BASE_STYLE, 'data-role': role, 'data-tier': String(tier), 'data-vtype': role },
     });
-    const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
+    const info = el('div', { className: 'bs-fleet-tier-info', attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
     info.append(
-      el('span', { text: t(getVehicleDefByTier(role, tier).nameKey), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+      el('span', { text: t(getVehicleDefByTier(role, tier).nameKey), attrs: { style: 'font:650 12px/1.15 var(--bsx-font-ui)' } }),
       el('span', {
         text: vehicleCardLine(def),
         className: 'bs-fleet-tier-desc',
@@ -291,8 +333,13 @@ export class FleetPanel extends PanelBase {
       }),
     );
     btn.dataset['stats'] = vehicleCardTooltip(def);
-    const cost = el('span', { text: formatDollars(def.purchaseCost), className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
-    btn.append(info, cost);
+    const cost = el('span', { text: formatDollars(def.purchaseCost), className: 'bsx-mono', attrs: { style: 'font-size:12px;font-weight:700;color:var(--bsx-amber)' } });
+    const top = el('div', { attrs: { style: 'display:flex;align-items:flex-start;gap:10px;min-width:0' }, children: [
+      portraitEl(vehiclePortraitSpec(role, tier, t(def.nameKey)), 72), info,
+    ] });
+    btn.append(top, el('div', { attrs: { style: 'display:flex;align-items:center;justify-content:space-between;gap:8px' }, children: [
+      el('span', { className: 'bs-fleet-tier-buy', text: t('ui.fleet.buy') }), cost,
+    ] }));
     this.applyTierButtonState(btn, cash >= def.purchaseCost, def.purchaseCost, tierLock(state.grade?.grade, tier));
     btn.addEventListener('click', () => this.gameConsole?.(`vehicle buy ${role} tier:${tier}`));
     return btn;
@@ -317,7 +364,7 @@ export class FleetPanel extends PanelBase {
     if (!lock) { badge?.remove(); return; }
     if (!badge) {
       badge = el('span', { className: 'bs-fleet-tier-lock', attrs: { style: 'font-size:10px;font-weight:600;color:var(--bsx-amber)' } });
-      btn.querySelector('div')?.appendChild(badge);
+      btn.querySelector('.bs-fleet-tier-info')?.appendChild(badge);
     }
     badge.textContent = lock.label;
   }
@@ -341,30 +388,30 @@ export class FleetPanel extends PanelBase {
   }
 
   private makeVehicleCard(v: Vehicle, state: GameState): HTMLElement {
-    const head = el('div', { attrs: { style: 'display:flex;align-items:flex-start;gap:9px' } });
-    const iconChip = el('div', { attrs: { style: 'width:26px;height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:var(--bsx-info)' }, children: [iconEl('vehicle', 14)] });
-    const nameCol = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
-    nameCol.append(
-      el('div', { attrs: { style: 'display:flex;align-items:baseline;gap:6px' }, children: [
-        el('span', { text: vehicleDisplayName(v.type, v.tier), attrs: { style: 'font:600 12px/1 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }),
-        el('span', { text: `#${v.id}`, className: 'bsx-mono', attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' } }),
+    const name = vehicleDisplayName(v.type, v.tier);
+    const head = el('div', { className: 'bsx-ecard-main' });
+    const nameCol = el('div', { className: 'bsx-ecard-titles', children: [
+      el('div', { className: 'bsx-ecard-title', children: [
+        el('span', { className: 'bsx-ecard-name', text: name }),
+        el('span', { className: 'bsx-ecard-note bsx-mono', text: `#${v.id}` }),
       ] }),
-      el('span', { text: t(`vehicle_type.${v.type}`), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
-    );
+      el('span', { className: 'bsx-ecard-sub', text: `${t(`vehicle_type.${v.type}`)} · ${t('inspector.tier', { tier: v.tier })}` }),
+    ] });
     const locateBtn = makeLocateButton({ title: t('ui.fleet.locate'), onClick: () => this.locateVehicle(v.id) });
     const parts = this.makeRowParts(v, state);
-    head.append(iconChip, nameCol, parts.status, locateBtn);
+    const hpFraction = fractionOf(v.hp, getVehicleDefByTier(v.type, v.tier).maxHp);
+    const content = el('div', { className: 'bsx-ecard-content', children: [
+      el('div', { className: 'bsx-ecard-titlerow', children: [nameCol, locateBtn] }),
+      el('div', { className: 'bsx-ecard-line', children: [parts.status] }),
+      parts.hp, parts.load, parts.driver,
+    ] });
+    head.append(portraitEl(vehiclePortraitSpec(v.type, v.tier, name, hpFraction), 72), content);
 
-    const rows: HTMLElement[] = [head, parts.hp];
-    if (parts.load) rows.push(parts.load);
-    rows.push(parts.driver);
-
-    const wrap = card(rows);
+    const wrap = el('div', { className: 'bsx-ecard bs-fleet-card', attrs: { 'data-clickable': '' }, children: [head] });
     wrap.dataset['vehicleId'] = String(v.id);
     // Mirrors the dealership buy buttons' own [data-vtype] so a tutorial stage
     // can scope its target to a vehicle TYPE (tutorialStages.ts, #557).
     wrap.dataset['vtype'] = v.type;
-    wrap.style.cursor = 'pointer';
     onRowBodyClick(wrap, () => this.onSelectVehicleCb?.(v.id));
     return wrap;
   }

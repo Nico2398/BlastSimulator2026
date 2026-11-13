@@ -22,7 +22,8 @@ import { financeCategoryExplain } from '../panelExplain.js';
 import { PanelBase } from './PanelBase.js';
 import { t, getLocale } from '../../core/i18n/I18n.js';
 import { formatGameDuration } from '../formatGameDuration.js';
-import { el, explainable, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
+import { el, explainable, card, sectionHeader, emptyState, progressBar, panelHeader, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
+import { windowRoot, windowBody } from '../windowKit.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatDollars } from '../../core/economy/formatMoney.js';
@@ -45,7 +46,7 @@ export class FinancesPanel extends PanelBase {
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
-    super(panelRoot('bs-finances-panel'));
+    super(windowRoot('bs-finances-panel'));
 
     const { header, titleEl } = panelHeader({
       icon: 'finance',
@@ -54,7 +55,7 @@ export class FinancesPanel extends PanelBase {
     });
     this.locale.bindText(titleEl, 'ui.finances.title');
 
-    this.bodyEl = panelBody(10);
+    this.bodyEl = windowBody();
 
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);

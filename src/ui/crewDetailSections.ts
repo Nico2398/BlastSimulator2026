@@ -468,7 +468,7 @@ export function makeDismissSection(e: Employee, onDismiss: () => void): HTMLElem
 // ── SHARED BUILDERS (Crew row + inspector, #1762) ──
 
 /** Role-coloured initials chip, shared by the roster card and the identity section. */
-export function makeAvatar(e: Employee): HTMLElement {
+function makeAvatar(e: Employee): HTMLElement {
   return el('div', { text: getInitials(e.name), attrs: { style: `width:30px;height:30px;flex:0 0 30px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:${roleColorHex(e.role)};color:#12161c;font:800 11px/1 var(--bsx-font-ui)` } });
 }
 
@@ -488,7 +488,7 @@ function makeMoraleMeter(e: Employee): HTMLElement[] {
 }
 
 /** Role label followed by the morale meter, shared by the roster card and the identity section. */
-export function makeRoleMoraleLine(e: Employee): HTMLElement {
+function makeRoleMoraleLine(e: Employee): HTMLElement {
   return el('div', { attrs: { style: 'display:flex;align-items:center;gap:7px' }, children: [
     el('span', { text: t(`role.${e.role}`), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }),
     ...makeMoraleMeter(e),

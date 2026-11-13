@@ -7,7 +7,8 @@
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
 import { permitStrikesExplain } from '../panelExplain.js';
-import { el, explainable, card, button, sectionHeader, progressBar, panelRoot, panelHeader, panelBody, flashStatus } from '../dom.js';
+import { el, explainable, card, button, sectionHeader, progressBar, panelHeader, flashStatus } from '../dom.js';
+import { windowRoot, windowBody } from '../windowKit.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -33,7 +34,7 @@ export class PermitPanel extends PanelBase {
   private lastState: GameState | null = null;
 
   constructor(container: HTMLElement) {
-    super(panelRoot('bs-permit-panel'));
+    super(windowRoot('bs-permit-panel'));
 
     const { header, titleEl } = panelHeader({
       icon: 'contract',
@@ -42,7 +43,7 @@ export class PermitPanel extends PanelBase {
     });
     this.locale.bindText(titleEl, 'ui.permit.title');
 
-    this.bodyEl = panelBody(11);
+    this.bodyEl = windowBody();
 
     const letterhead = card([
       this.locale.bindText(

@@ -1,4 +1,5 @@
 /** Inspector content for employee selections (#1756, #1762). */
+import { employeePortraitSpec } from '../../portraits.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { computeEmployeeActivity } from '../../../core/entities/EmployeeActivity.js';
 import { managementLevelOf, type Employee } from '../../../core/entities/Employee.js';
@@ -48,6 +49,7 @@ export const employeeContent: KindContent = {
       title: e.name,
       sub: `#${e.id} · ${kindLabel('employee')} · ${role}`,
       icon: 'person',
+      portrait: employeePortraitSpec(e),
       status: describeActivity(computeEmployeeActivity(e, state.vehicles), state.vehicles),
       signature: `${e.id}:${optional}`,
       get sections() { return [build()]; },

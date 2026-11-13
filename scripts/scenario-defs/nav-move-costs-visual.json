@@ -218,6 +218,10 @@
       "command": "vehicle reposition 6 12 10",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-vehicle-panel [data-panel-close]"
+        },
+        {
           "type": "clickEntity",
           "kind": "vehicle",
           "id": 6

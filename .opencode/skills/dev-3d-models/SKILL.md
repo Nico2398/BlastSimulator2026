@@ -79,7 +79,8 @@ Numbers that describe the model — a count, a radius, a floor height, a tier mu
 6. Look at it: `npm run dev &` then `npm run models:preview -- <id>`, and **open every PNG with the Read tool**. The viewer draws through the game's own `SceneManager`, so what it shows is what the player gets.
 7. Anything a player sees in place — a building on its footprint, a vehicle beside a worker — also needs an in-game capture at the camera distance the game actually plays at (`dev-visual-testing`).
 8. **Fix what the image showed, and go back to step 2.** One pass is a draft. **The visual loop** below is what says when it is finished.
-9. Commit the `.py`, the `.blend`, the `.glb` and the manifest in one commit.
+9. A worker, vehicle or building also has a portrait the UI shows on its cards and in the inspector (`src/renderer/models/Thumbnails.ts`): re-render it with `npm run thumbs:build -- <id>` and open `public/thumbs/<id>.webp` with the Read tool. `Thumbnails.test.ts` holds every portrait to its size budget.
+10. Commit the `.py`, the `.blend`, the `.glb`, the portrait and the manifest in one commit.
 
 A `.py` edit without a rebuilt `.glb` changes nothing the game or the tests can see: `ModelAssets.test.ts` parses the committed binary, not the source.
 

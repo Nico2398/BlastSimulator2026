@@ -28,8 +28,9 @@
 import { PanelBase } from './panels/PanelBase.js';
 import { t } from '../core/i18n/I18n.js';
 import { tierCompareExplain } from './buildingExplain.js';
-import { el, explainable, button, emptyState, panelRoot, panelHeader, panelBody, flashStatus } from './dom.js';
-import { iconEl } from './icons.js';
+import { el, explainable, button, emptyState, panelHeader, flashStatus } from './dom.js';
+import { windowRoot, windowBody } from './windowKit.js';
+import { buildingPortraitSpec, portraitEl } from './portraits.js';
 import { LocaleTextRegistry } from './localeText.js';
 import type { ClaimRefusalReason } from '../core/world/PlayableArea.js';
 import type { GameState } from '../core/state/GameState.js';
@@ -138,7 +139,7 @@ export class BuildMenu extends PanelBase {
   }
 
   constructor(container: HTMLElement) {
-    super(panelRoot('bs-build-panel'));
+    super(windowRoot('bs-build-panel'));
 
     const { header, titleEl } = panelHeader({
       icon: 'build',
@@ -147,7 +148,7 @@ export class BuildMenu extends PanelBase {
     });
     this.locale.bindText(titleEl, 'ui.build.title');
 
-    this.bodyEl = panelBody(10);
+    this.bodyEl = windowBody();
 
     this.catalogEl = el('div');
     this.catalogEl.id = 'bs-build-catalog';
@@ -460,7 +461,9 @@ export class BuildMenu extends PanelBase {
     this.locale.bindText(levelGroundBtn, 'ui.build.level_ground');
     levelGroundBtn.addEventListener('click', () => this.armLevelGroundTool());
 
-    wrap.append(this.sectionLabel('ui.build.ramp_section'), rampBtn, levelGroundBtn);
+    const tools = el('div', { className: 'bs-build-terrain-tools', children: [rampBtn, levelGroundBtn] });
+    tools.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+    wrap.append(this.sectionLabel('ui.build.ramp_section'), tools);
     return wrap;
   }
 
@@ -622,12 +625,15 @@ export class BuildMenu extends PanelBase {
   }
 
   private makeCatalogRow(type: BuildingType): HTMLElement {
-    const row = el('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--bsx-hairline);border-radius:6px;background:var(--bsx-card)';
+    const row = el('div', { className: 'bs-build-card' });
     row.dataset['buildType'] = type;
 
-    const iconChip = el('div', { children: [iconEl('build', 13)] });
-    iconChip.style.cssText = 'flex:0 0 auto;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:var(--bsx-amber)';
+    // The picture follows the tier picked below it (#2241, #2242).
+    const portraitSlot = el('div', { className: 'bs-build-portrait' });
+    const showPortrait = (tier: BuildingTier): void => {
+      portraitSlot.replaceChildren(portraitEl(buildingPortraitSpec(type, tier, t(`building.${type}.name`)), 72));
+    };
+    showPortrait((this.selectedTiers.get(type) ?? 1) as BuildingTier);
 
     // A basis rather than pure flex:1 — with a nowrap action button the name
     // column collapsed to nothing and the label overflowed across the controls.
@@ -692,6 +698,7 @@ export class BuildMenu extends PanelBase {
       this.selectedTiers.set(type, selected);
       this.updateCostDisplay(costEl, type, selected);
       refreshCardText(selected);
+      showPortrait(selected);
       this.refreshCatalogButtons(this.lastCash);
     });
 
@@ -721,7 +728,9 @@ export class BuildMenu extends PanelBase {
     researchBtn.classList.add('bs-build-research-btn');
     researchBtn.style.cssText = 'flex:0 1 auto;min-width:0;height:auto;padding:6px 8px;font-size:9px;white-space:normal;line-height:1.2;display:none';
 
-    row.append(iconChip, info, tierWrap, placeBtn, researchBtn);
+    const top = el('div', { className: 'bs-build-card-top', children: [portraitSlot, info] });
+    const actions = el('div', { className: 'bs-build-card-actions', children: [tierWrap, placeBtn, researchBtn] });
+    row.append(top, actions);
     return row;
   }
 
@@ -843,7 +852,8 @@ export class BuildMenu extends PanelBase {
 
     const info = placedInfoBlock(b, placedRowModel(b, state), () => focusCameraOn(b.x, b.z));
     onRowBodyClick(row, () => this.selectBuildingCb?.(b.id));
-    row.append(info);
+    const hp = getBuildingDef(b.type, b.tier).maxHp;
+    row.append(portraitEl(buildingPortraitSpec(b.type, b.tier, t(`building.${b.type}.name`), hp > 0 ? b.hp / hp : 1), 56), info);
     return row;
   }
 }

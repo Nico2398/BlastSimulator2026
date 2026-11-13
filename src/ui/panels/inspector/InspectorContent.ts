@@ -8,6 +8,7 @@ import { fragmentContent } from './fragmentContent.js';
 import { holeContent } from './holeContent.js';
 import { rampContent } from './rampContent.js';
 import type { ConfirmModalConfig } from '../ConfirmModal.js';
+import type { PortraitSpec } from '../../portraits.js';
 
 export type InspectorKind = EntityPick['kind'];
 
@@ -54,6 +55,8 @@ export interface InspectorView {
   readonly title: string;
   readonly sub: string;
   readonly icon: string;
+  /** Picture of the entity for the header (#2241); kinds without one keep the icon chip. */
+  readonly portrait?: PortraitSpec;
   readonly status: string;
   readonly signature: string;
   readonly sections: HTMLElement[];

@@ -886,6 +886,10 @@
       "role": "player",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-vehicle-panel [data-panel-close]"
+        },
+        {
           "type": "clickEntity",
           "kind": "building",
           "id": 1
