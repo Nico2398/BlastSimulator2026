@@ -32,7 +32,9 @@ import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
   WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, SHIFT_DURATIONS_TICKS,
   NEED_REST_ARRIVAL_FATIGUE_FLOOR, NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE,
+  NEED_DRAIN_RATES, NEED_MORALE_DRAIN_MULTIPLIERS, MORALE_THRESHOLDS,
 } from '../../../src/core/config/balance.js';
+import { computeActionWorkTicks } from '../../../src/core/engine/ActionSelection.js';
 
 const SEED = 42;
 
@@ -1546,5 +1548,171 @@ describe('forceShiftRestIfNeededByPolicy — vehicle work and the rest-trip budg
 
     expect(employee.pendingRestDuration).toBeNull();
     expect(employee.activeActionId).toBeNull();
+  });
+});
+
+// #2229: the between-jobs deferral budgeted the trip to rest but not the job about to be claimed. A charge job
+// (fill-to-stemming charges since #2223 run 10-14 executing ticks, 2 fatigue per tick) claimed at fatigue ~32 was
+// then protected unconditionally mid-execution, and the worker collapsed (`employee:collapsed`) before the shot.
+// Under continuous/60 the idle worker is sent to rest when fatigue minus the rest trip minus the next job's own
+// executing cost (executing ticks x working drain x morale drain multiplier) would end below the arrival floor.
+describe('forceShiftRestIfNeededByPolicy — the next same-role job is budgeted before it is claimed (#2229)', () => {
+  const WORKING_DRAIN = NEED_DRAIN_RATES.fatigue.working;
+  const NORMAL_MORALE = 50; // between MORALE_THRESHOLDS.low and .high: drain multiplier 1.0
+
+  /** Idle, mounted blaster on a charging_truck at (0,5), continuous/60, flat map, tier-1 Living Quarters at (lqX,5). */
+  function idleChargerFixture(lqX: number) {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    Object.assign(state.sitePolicy, { shiftMode: 'continuous', fatigueRestThreshold: 60 });
+    state.sitePolicy.revision = (state.sitePolicy.revision ?? 0) + 1;
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(90, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'charging_truck', 0, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    employee.morale = NORMAL_MORALE;
+    employee.activeActionId = null;
+    employee.ticksWorked = 2;
+    placeBuilding(state.buildings, 'living_quarters', lqX, 5, 100, 100, 1);
+    return { state, employee, vehicle };
+  }
+
+  /** A queued, untargeted charge_hole for the charging truck that executes in exactly `executingTicks`. */
+  function queueCharge(state: GameState, employee: Employee, id: number, executingTicks: number): PendingAction {
+    const action: PendingAction = {
+      id, type: 'charge_hole', requiredSkill: 'blasting', requiredVehicleRole: 'charging_truck',
+      targetX: 8, targetZ: 5, targetY: 0, payload: { resumeTicks: executingTicks },
+      targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+    expect(computeActionWorkTicks(state, employee, action)).toBe(executingTicks); // fixture guard
+    return action;
+  }
+
+  it('C1: fatigue 32, a 14-executing-tick charge queued, quarters nearby: sent to rest instead of claiming it', () => {
+    const { state, employee } = idleChargerFixture(6);
+    const charge = queueCharge(state, employee, 2290, 14);
+    employee.fatigue = 32;
+
+    const tripCost = restTripFatigueCost(state, employee, 6, 5);
+    expect(tripCost).not.toBeNull();
+    // Fixture guard: the trip alone is affordable, it is the job that would leave the worker under the floor.
+    expect(employee.fatigue - tripCost!).toBeGreaterThan(NEED_REST_ARRIVAL_FATIGUE_FLOOR);
+    expect(employee.fatigue - tripCost! - 14 * WORKING_DRAIN).toBeLessThan(NEED_REST_ARRIVAL_FATIGUE_FLOOR);
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
+    expect(employee.pendingRestDuration).not.toBeNull();
+    const rest = state.pendingActions.find(a => a.id === employee.activeActionId)!;
+    expect(rest.type).toBe('rest');
+    expect(charge.status).toBe('queued');
+    expect(charge.holderId).toBeNull();
+  });
+
+  it('C1: the deferral prices the job, not just the trip: the same fatigue with a 2-tick charge still defers the rest', () => {
+    const { state, employee } = idleChargerFixture(6);
+    const charge = queueCharge(state, employee, 2291, 2);
+    employee.fatigue = 32;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+    expect(charge.status).toBe('queued');
+  });
+
+  it('C1: at fatigue 60 (the threshold) a 14-executing-tick charge is still claimed, not rested for', () => {
+    const { state, employee } = idleChargerFixture(6);
+    queueCharge(state, employee, 2292, 14);
+    employee.fatigue = 60;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+  });
+
+  it('C1: the issue trace: fatigue 53.5 with a 10-executing-tick charge queued keeps working', () => {
+    const { state, employee } = idleChargerFixture(6);
+    queueCharge(state, employee, 2293, 10);
+    employee.fatigue = 53.5;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+  });
+
+  it('C1: a longer queued job pushes the rest earlier: the same fatigue that covers a 10-tick charge does not cover a 30-tick one', () => {
+    const short = idleChargerFixture(6);
+    queueCharge(short.state, short.employee, 2294, 10);
+    short.employee.fatigue = 50;
+    const long = idleChargerFixture(6);
+    queueCharge(long.state, long.employee, 2295, 30);
+    long.employee.fatigue = 50;
+
+    forceShiftRestIfNeededByPolicy(short.state, short.employee, [], []);
+    forceShiftRestIfNeededByPolicy(long.state, long.employee, [], []);
+
+    expect(short.employee.pendingRestDuration).toBeNull();
+    expect(long.employee.pendingRestDuration).not.toBeNull();
+  });
+
+  it('C1: above the policy threshold nothing is forced however long the queued job', () => {
+    const { state, employee } = idleChargerFixture(6);
+    queueCharge(state, employee, 2296, 14);
+    employee.fatigue = 61;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+  });
+
+  // #945/#1123 convergence: a rest that cannot buy the job is a rest loop (rest, walk back, still short).
+  it('C4: a job that cannot fit even a full gauge does not hold the worker in rest loops: it is claimed, not rested for', () => {
+    const { state, employee } = idleChargerFixture(6);
+    queueCharge(state, employee, 2298, 60); // 60 x 2 = 120 fatigue: more than a full gauge holds
+    employee.fatigue = 55;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+  });
+});
+
+describe('restTripFatigueCost — low-morale drain multiplier (#2229)', () => {
+  /** Idle on-foot worker at (0,5), flat map, Living Quarters at (30,5). */
+  function walkerFixture(morale: number) {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(90, 10);
+    placeBuilding(state.buildings, 'living_quarters', 30, 5, 100, 100, 1);
+    employee.morale = morale;
+    return { state, employee };
+  }
+
+  it('C5: morale under MORALE_THRESHOLDS.low costs 1.2 times the normal-morale trip', () => {
+    const normal = walkerFixture(50);
+    const low = walkerFixture(MORALE_THRESHOLDS.low - 1);
+    const normalCost = restTripFatigueCost(normal.state, normal.employee, 30, 5);
+    const lowCost = restTripFatigueCost(low.state, low.employee, 30, 5);
+
+    expect(normalCost).not.toBeNull();
+    expect(normalCost!).toBeGreaterThan(0);
+    expect(lowCost).not.toBeNull();
+    expect(lowCost!).toBeCloseTo(normalCost! * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
+  });
+
+  it('C5: morale exactly at MORALE_THRESHOLDS.low is not low: no multiplier', () => {
+    const normal = walkerFixture(50);
+    const edge = walkerFixture(MORALE_THRESHOLDS.low);
+
+    expect(restTripFatigueCost(edge.state, edge.employee, 30, 5)!)
+      .toBeCloseTo(restTripFatigueCost(normal.state, normal.employee, 30, 5)!, 5);
   });
 });

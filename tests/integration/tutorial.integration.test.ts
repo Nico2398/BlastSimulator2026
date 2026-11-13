@@ -1062,3 +1062,74 @@ describe('Tutorial determinism (#1600)', () => {
     expect(TUTORIAL_STEPS.find((s) => s.id === 'sell-ore')!.clockMustRun).toBeUndefined();
   });
 });
+
+// ── #2229: the card order under `set_policy mode:continuous` never faints a worker before the blast ──
+//
+// The set-early-policy card applies continuous shifts and leaves the fatigue threshold at its default (60). Between two
+// fill-to-stemming charge jobs the charging-truck driver used to be sent on at fatigue ~32, a job costing more than the
+// gauge could cover, and `tickCollapse` fired `employee:collapsed` ("fainted") before the shot. The scripted scenarios
+// masked it with `fatigue:65`; this replay plays exactly what the cards say.
+describe('the tutorial card order under continuous shifts reaches the blast without a collapse (#2229)', () => {
+  /** Steps whose completion is a DOM action with no console equivalent (see playGuidedPhase above). */
+  const DOM_ONLY_STEPS = new Set(['toggle-survey-overlay', 'scores', 'finances', 'needs']);
+
+  /** Plays the cards in order through the blast, `idleTicks` of waiting after every step. */
+  function replayToBlast(idleTicks: number) {
+    const { runner, ctx } = createRunner();
+    const log: string[] = [];
+    const run: Run = (cmd) => { log.push(cmd); return runner.run(cmd); };
+    expect(run('campaign start level:tutorial_pit').success).toBe(true);
+    const state = ctx.state!;
+
+    const collapsedIds: number[] = [];
+    ctx.emitter.on('employee:collapsed', (payload: unknown) => {
+      collapsedIds.push((payload as { employeeId: number }).employeeId);
+    });
+    const atZeroBeforeBlast: number[] = [];
+    let chargedHoles = 0;
+    const tick = () => {
+      playTick(run, state);
+      chargedHoles = Math.max(chargedHoles, Object.keys(state.chargesByHole).length);
+      if (state.levelStats.blastsPerformed > 0) return;
+      for (const e of state.employees.employees) {
+        if (e.alive && e.fatigue <= 0) atZeroBeforeBlast.push(e.id);
+      }
+    };
+
+    for (const step of TUTORIAL_STEPS) {
+      if (step.id === 'blast') break;
+      if (DOM_ONLY_STEPS.has(step.id)) continue;
+      const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
+      const maxTicks = Math.max(500, (step.tickBudget ?? 20) * 25);
+      const complete = () => step.isComplete(state, snapshot);
+      if (step.id === 'charge') {
+        for (let i = 0; i < 500 && state.plannedDrillHoles.length > 0; i++) tick();
+      }
+      if (step.id === 'evacuate-zone') {
+        expect(run('blast detonate').success).toBe(true);
+      }
+      for (const cmd of step.autoCommands ?? []) run(cmd);
+      const driver = state.employees.employees.find((e) => e.role === 'driver');
+      for (const cmd of step.commands ?? []) run(cmd.replace('<driverId>', String(driver?.id ?? '')));
+      for (let i = 0; i < maxTicks && !complete(); i++) tick();
+      expect(complete(), `tutorial step "${step.id}" never completed`).toBe(true);
+      for (let i = 0; i < idleTicks; i++) tick();
+    }
+    return { state, log, collapsedIds, atZeroBeforeBlast, chargedHoles };
+  }
+
+  it.each([0, 50])('with %i idle ticks between steps: no employee:collapsed and nobody at fatigue 0 before the blast', (idleTicks) => {
+    const { state, log, collapsedIds, atZeroBeforeBlast, chargedHoles } = replayToBlast(idleTicks);
+
+    // The replay really played the card's own policy, at the default threshold (no fatigue: override).
+    expect(log).toContain('set_policy mode:continuous');
+    expect(state.sitePolicy.shiftMode).toBe('continuous');
+    expect(state.sitePolicy.fatigueRestThreshold).toBe(60);
+    // ...and really charged and fired the nine-hole pattern.
+    expect(chargedHoles).toBeGreaterThanOrEqual(9);
+    expect(state.levelStats.blastsPerformed).toBeGreaterThan(0);
+
+    expect(collapsedIds).toEqual([]);
+    expect(atZeroBeforeBlast).toEqual([]);
+  }, 120_000);
+});
