@@ -15,7 +15,7 @@ export type NeedKey = 'fatigue';
  * - 'working': actively performing a task (drains fastest).
  * - 'idle': not working and not resting (e.g. routed toward a rest destination
  *   but not yet arrived).
- * - 'evacuating': walking or driving out of a zone on an evacuation order (#2259); drains far slower than
+ * - 'evacuating': driving out of a zone on an evacuation order, or walking to the vehicle for it (#2259); drains far slower than
  *   'traveling'.
  * - 'resting': actively resting (restTicksRemaining !== null).
  * - 'traveling': walking toward a claimed task or rest destination, not yet

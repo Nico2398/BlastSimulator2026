@@ -21,7 +21,7 @@ The employee has one gauge, `fatigue` (0–100; 100 = fully rested), on `Employe
 |-----------|-----------|------------------|
 | `working` | −2 | Actively performing a task |
 | `idle` | −0.5 | Not working, not resting, not traveling toward anything claimed |
-| `evacuating` | −0.25 | A walk or drive ordered by a zone evacuation (`isMidEvacuation`, #2259): the clearing a shot demands never costs a rested worker most of the gauge |
+| `evacuating` | −0.25 | A drive, or the walk to a vehicle, ordered by a zone evacuation (`isMidEvacuationDrive`): the clearing a shot demands never costs a rested worker most of the gauge |
 | `traveling` | −1 | Walking toward a claimed task or rest destination, not yet arrived (`pendingTaskDuration` or `pendingRestDuration` !== null) |
 | `resting` | 0 | Actively resting (`restTicksRemaining` !== null) — holds steady so accrued drain can't outpace the completion-time replenishment |
 
