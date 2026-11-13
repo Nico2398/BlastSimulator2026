@@ -929,6 +929,12 @@ export const BLAST_REACH_M_PER_SQRT_ENERGY = 0.045;
  */
 export const EVACUATION_CLEARANCE_M = 5;
 
+/** Spacing (m) of the candidate cells searched beside an edge projection when it is off the map, blocked or taken (#2230). */
+export const EVACUATION_LATERAL_STEP_M = 2;
+
+/** Candidate cells searched on each side of an edge projection (#2230). */
+export const EVACUATION_LATERAL_STEPS = 8;
+
 /**
  * Tiles a tutorial building's footprint must clear from `tutorialHazards()`
  * (drill/boxcut/vehicle-spawn points) for its fixed-map REGION pin to be
@@ -3582,6 +3588,19 @@ export const PROJECTION_ZONE_OPACITY = 0.5;
 export const BLAST_REPORT_MAX_HOLE_REASONS = 6;
 /** Share of the broken rock crushed into fines or dust from which the report calls the shot overcharged (#2202). */
 export const OVERCHARGE_NOTE_MIN_FINES_SHARE = 0.25;
+
+/**
+ * Ticks an idle employee that walked aside for a mover (#2231) waits at the free cell before its return
+ * trip starts. Without it both legs run in one tick (walking speed covers several cells) and it is back on
+ * the cell before the mover has stepped into it.
+ */
+export const RETURN_TRIP_DWELL_TICKS = 3;
+
+/**
+ * Standing employees a walk aside (#2231) may have to pass on its way to the free cell it picked. One lets an
+ * idle crew member clear a 1-wide corridor past another; a wall of them (a blocker boxed in) means no walk.
+ */
+export const ASIDE_MAX_CROSSED_EMPLOYEES = 1;
 
 // ─── Contract outlook (#2243) ─────────────────────────────────────────────────
 

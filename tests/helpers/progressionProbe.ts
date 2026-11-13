@@ -28,14 +28,16 @@ function leaves(v: unknown, path = ''): Array<[string, unknown]> {
 
 export function expectFiniteOrAllowedNull(r: RunResult, horizon: number): void {
   // Off the progression ladder (no grade state) every pit sample reads null.
+  // A run that ends in game over never reaches the later samples: those stay null, and `bankruptTick` says why.
+  const sampledAfterEnd = (tick: number): boolean => r.endReason?.startsWith('game_over') === true && tick > r.endTick;
   const offLadder = Object.values(r.metrics.pitDepthAt ?? {}).every(v => v === null);
   for (const [path, value] of leaves(r.metrics)) {
     if (value === null) {
       const m = /^cashAt\.(\d+)$/.exec(path);
       const pit = /^pitDepthAt\.(\d+)$/.exec(path);
       const allowed =
-        (m !== null && Number(m[1]) > horizon) ||
-        (pit !== null && (offLadder || Number(pit[1]) > horizon)) ||
+        (m !== null && (Number(m[1]) > horizon || sampledAfterEnd(Number(m[1])))) ||
+        (pit !== null && (offLadder || Number(pit[1]) > horizon || sampledAfterEnd(Number(pit[1])))) ||
         path === 'firstBlastSoldShareAt6000' ||
         path === 'boulderSoldShare' ||
         path === 'boulderOreSoldShare' ||

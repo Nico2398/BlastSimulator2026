@@ -359,13 +359,13 @@
       }
     },
     {
-      "command": "tick 10",
+      "command": "tick 30",
       "description": "Let the hauler reach the warehouse and unload. The delivery takes a few ticks after pickup; the fixed pad only advances the sim, the assertion below waits on the DOM.",
       "timeout": 60,
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "tick 30"
         }
       ],
       "role": "setup",
