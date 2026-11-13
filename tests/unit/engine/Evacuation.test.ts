@@ -947,6 +947,7 @@ describe('an evacuated employee claims no in-zone work while a live blast plan t
     state.navGrid = flatWalkableGrid(40);
     state.zone.activeZone = zone;
     state.drillHoles.push({ id: 'H1', x: 15, z: 15, depth: 6, diameter: 0.089 });
+    state.pendingDetonation = { armedTick: 0, strandedEmployeeIds: [], strandedVehicleIds: [], lastEvacuationTick: 0 };
     const rng = new Random(EVACUATION_SEED);
     const { employee: evacuee } = hireEmployee(state.employees, 'driller', rng, 30, 30);
     const { employee: bystander } = hireEmployee(state.employees, 'driller', rng, 31, 30);
@@ -1126,6 +1127,7 @@ describe('an evacuated worker takes one route out and stays out until the shot (
     state.navGrid = flatWalkableGrid(40);
     state.zone.activeZone = zone;
     state.drillHoles.push({ id: 'H1', x: 15, z: 15, depth: 6, diameter: 0.089 });
+    state.pendingDetonation = { armedTick: 0, strandedEmployeeIds: [], strandedVehicleIds: [], lastEvacuationTick: 0 };
     const rng = new Random(EVACUATION_SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 15, 15);
 
