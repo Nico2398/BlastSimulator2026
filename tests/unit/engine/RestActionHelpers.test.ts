@@ -8,6 +8,7 @@ import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { defineZone } from '../../../src/core/entities/Zone.js';
 import { purchaseVehicle, getAllVehicleRoles, getVehicleDefByTier, type VehicleRole } from '../../../src/core/entities/Vehicle.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { assertWorldInvariants } from '../../../src/core/state/WorldInvariants.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
@@ -1223,5 +1224,213 @@ describe('beginRestTravel — park the vehicle and walk (#1709)', () => {
     expect(last.destX).toBe(30);
     expect(last.destZ).toBe(5);
     expect(assertWorldInvariants(state)).toEqual([]);
+  });
+});
+
+// ── #2225: a driven rest trip ends inside the quarters, the vehicle parked at the alight cell ──
+
+describe('beginRestTravel — driven trip into living quarters (#2225)', () => {
+  const FAST_FIXTURES: Array<[VehicleRole, 1 | 2 | 3]> = [
+    ...getAllVehicleRoles()
+      .filter(r => getVehicleDefByTier(r, 1).speed > AGENT_WALK_SPEED)
+      .map((r): [VehicleRole, 1 | 2 | 3] => [r, 1]),
+    ...getAllVehicleRoles()
+      .filter(r => getVehicleDefByTier(r, 3).speed > AGENT_WALK_SPEED && getVehicleDefByTier(r, 1).speed <= AGENT_WALK_SPEED)
+      .map((r): [VehicleRole, 1 | 2 | 3] => [r, 3]),
+  ];
+  const MAX_TRIP_TICKS = 600;
+
+  /** Like mountedFixture, but the vehicle really is of the given tier (mountedFixture's tier argument lands in x). */
+  function tieredFixture(role: VehicleRole, tier: 1 | 2 | 3 = 1) {
+    const fixture = mountedFixture(role);
+    if (tier !== 1) {
+      const { vehicle } = purchaseVehicle(fixture.state.vehicles, role, 0, 5, tier);
+      fixture.vehicle.occupantIds = [];
+      vehicle.occupantIds = [fixture.employee.id];
+      fixture.employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+      return { ...fixture, vehicle };
+    }
+    return fixture;
+  }
+
+  /** Quarters 40 m along the row from the vehicle at (0,5); returns the approach cell as the rest target. */
+  function withQuarters(state: ReturnType<typeof mountedFixture>['state'], employee: ReturnType<typeof mountedFixture>['employee']) {
+    const placed = placeBuilding(state.buildings, 'living_quarters', 40, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
+    const building = placed.building!;
+    const target = resolveBuildingApproach(state, building, employee.x, employee.z);
+    return { building, target };
+  }
+
+  /** Tick locomotion until the itinerary is done; reports ticks taken and where the vehicle stood when the worker left it. */
+  function runTrip(
+    state: ReturnType<typeof mountedFixture>['state'],
+    employee: ReturnType<typeof mountedFixture>['employee'],
+    vehicle: ReturnType<typeof mountedFixture>['vehicle'],
+    checkInvariants = true,
+  ) {
+    let ticks = 0;
+    let vehicleAtAlight: { x: number; z: number } | null = null;
+    while (employee.itinerary !== null && ticks < MAX_TRIP_TICKS) {
+      tickLocomotion(state);
+      ticks++;
+      if (vehicleAtAlight === null && employee.locomotion.kind !== 'mounted') {
+        vehicleAtAlight = { x: vehicle.x, z: vehicle.z };
+      }
+      if (checkInvariants) expect(assertWorldInvariants(state)).toEqual([]);
+    }
+    return { ticks, vehicleAtAlight };
+  }
+
+  it('catalog has a vehicle strictly faster than walking', () => {
+    expect(FAST_FIXTURES.length).toBeGreaterThan(0);
+  });
+
+  it.each(FAST_FIXTURES)('%s tier %i: worker ends inside the quarters, an occupant of the building, vehicle empty', (role, tier) => {
+    const { state, employee, vehicle } = tieredFixture(role, tier);
+    const { building, target } = withQuarters(state, employee);
+
+    beginRestTravel(state, employee, target.x, target.z, building.id);
+    const { ticks } = runTrip(state, employee, vehicle);
+
+    expect(ticks).toBeLessThan(MAX_TRIP_TICKS);
+    expect(employee.itinerary).toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'inside', buildingId: building.id });
+    expect(building.occupantIds).toContain(employee.id);
+    expect(vehicle.occupantIds).not.toContain(employee.id);
+    expect(assertWorldInvariants(state)).toEqual([]);
+  });
+
+  it.each(FAST_FIXTURES)('%s tier %i: the vehicle stays parked within 1 tile of where the worker alighted', (role, tier) => {
+    const { state, employee, vehicle } = tieredFixture(role, tier);
+    const { building, target } = withQuarters(state, employee);
+
+    beginRestTravel(state, employee, target.x, target.z, building.id);
+    const driveLegs = employee.itinerary!.legs.filter(l => l.mode === 'drive');
+    expect(driveLegs.length).toBeGreaterThan(0);
+    const alightCell = driveLegs[driveLegs.length - 1]!;
+    runTrip(state, employee, vehicle);
+
+    expect(employee.locomotion.kind).toBe('inside');
+    expect(Math.hypot(vehicle.x - alightCell.destX, vehicle.z - alightCell.destZ)).toBeLessThanOrEqual(1);
+    // And it moved: the drive happened, the vehicle is not left at the start.
+    expect(vehicle.x).toBeGreaterThan(0);
+  });
+
+  it('the drive is faster than walking: it finishes in fewer ticks than the same trip on foot', () => {
+    const { state, employee, vehicle } = mountedFixture('debris_hauler');
+    const { building, target } = withQuarters(state, employee);
+    beginRestTravel(state, employee, target.x, target.z, building.id);
+    const driven = runTrip(state, employee, vehicle);
+
+    const foot = createGame({ seed: 42 });
+    const { employee: walker } = hireEmployee(foot.employees, 'driller', new Random(42), 0, 5);
+    foot.navGrid = makeFlatNavGrid(80, 12);
+    const placed = placeBuilding(foot.buildings, 'living_quarters', 40, 5, 100, 100, 1);
+    const walkTarget = resolveBuildingApproach(foot, placed.building!, walker.x, walker.z);
+    beginRestTravel(foot, walker, walkTarget.x, walkTarget.z, placed.building!.id);
+    let walked = 0;
+    while (walker.itinerary !== null && walked < MAX_TRIP_TICKS) { tickLocomotion(foot); walked++; }
+
+    expect(walker.locomotion.kind).toBe('inside');
+    expect(employee.locomotion.kind).toBe('inside');
+    expect(driven.ticks).toBeLessThan(walked);
+  });
+
+  it('planner estimate for the driven rest trip matches the executed ticks within tolerance', () => {
+    const { state, employee, vehicle } = mountedFixture('debris_hauler');
+    const { building, target } = withQuarters(state, employee);
+
+    beginRestTravel(state, employee, target.x, target.z, building.id);
+    const est = employee.itinerary!.estTotalTicks;
+    const { ticks } = runTrip(state, employee, vehicle);
+
+    expect(employee.locomotion.kind).toBe('inside');
+    expect(est).toBeGreaterThan(0);
+    expect(Math.abs(ticks - est)).toBeLessThanOrEqual(Math.max(4, est * 0.3));
+  });
+
+  it('pendingActionType stays "rest" for the whole driven trip', () => {
+    const { state, employee, vehicle } = mountedFixture('debris_hauler');
+    const { building, target } = withQuarters(state, employee);
+
+    beginRestTravel(state, employee, target.x, target.z, building.id);
+    let guard = 0;
+    while (employee.itinerary !== null && guard++ < MAX_TRIP_TICKS) {
+      expect(employee.pendingActionType).toBe('rest');
+      tickLocomotion(state);
+    }
+    expect(employee.locomotion.kind).toBe('inside');
+    expect(vehicle.occupantIds).toEqual([]);
+  });
+
+  // ── C3: unchanged behaviour ──
+
+  it.each(getAllVehicleRoles().filter(r => getVehicleDefByTier(r, 1).speed <= AGENT_WALK_SPEED))(
+    '%s (walk is at least as fast): still parks at the start and walks into the quarters',
+    (role) => {
+      const { state, employee, vehicle } = mountedFixture(role);
+      const { building, target } = withQuarters(state, employee);
+
+      beginRestTravel(state, employee, target.x, target.z, building.id);
+      runTrip(state, employee, vehicle);
+
+      expect(employee.locomotion).toEqual({ kind: 'inside', buildingId: building.id });
+      expect(building.occupantIds).toContain(employee.id);
+      expect(vehicle.x).toBe(0);
+      expect(vehicle.z).toBe(5);
+      expect(vehicle.occupantIds).toEqual([]);
+    },
+  );
+
+  it('resting in place, mounted: no quarters entered, the worker stays on the spot', () => {
+    const { state, employee, vehicle } = mountedFixture('debris_hauler');
+
+    beginRestTravel(state, employee, employee.x + 0.5, employee.z);
+    const { ticks } = runTrip(state, employee, vehicle);
+
+    expect(ticks).toBeLessThan(MAX_TRIP_TICKS);
+    expect(employee.locomotion.kind).not.toBe('inside');
+    expect(Math.hypot(employee.x - 0, employee.z - 5)).toBeLessThanOrEqual(2);
+    expect(Math.hypot(vehicle.x - 0, vehicle.z - 5)).toBeLessThanOrEqual(2);
+  });
+
+  it('a driver who may not alight (loaded haul): never ends inside the quarters, never desyncs from the vehicle', () => {
+    const { state, employee, vehicle } = mountedFixture('debris_hauler');
+    vehicle.cargo = [{ fragmentId: 1, massKg: 500 } as never];
+    state.pendingActions.push({
+      id: 903, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+      targetX: 5, targetZ: 5, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'assigned', holderId: employee.id, queuedAtTick: 0,
+    });
+    employee.activeActionId = 903;
+    const { building, target } = withQuarters(state, employee);
+
+    beginRestTravel(state, employee, target.x, target.z, building.id);
+    runTrip(state, employee, vehicle, false);
+
+    expect(employee.locomotion.kind).not.toBe('inside');
+    expect(building.occupantIds).not.toContain(employee.id);
+    if (employee.locomotion.kind === 'mounted') {
+      expect(vehicle.occupantIds).toContain(employee.id);
+      expect(Math.hypot(vehicle.x - employee.x, vehicle.z - employee.z)).toBeLessThan(1e-6);
+    }
+  });
+
+  it('a full quarters (no free bed) is not entered by a driven trip: the worker never becomes an occupant', () => {
+    const { state, employee, vehicle } = mountedFixture('debris_hauler');
+    const { building, target } = withQuarters(state, employee);
+    const capacity = getBuildingPeopleCapacity(building.type, building.tier);
+    for (let i = 0; i < capacity; i++) {
+      const { employee: guest } = hireEmployee(state.employees, 'driller', new Random(100 + i), 0, 0);
+      guest.locomotion = { kind: 'inside', buildingId: building.id };
+      building.occupantIds.push(guest.id);
+    }
+
+    beginRestTravel(state, employee, target.x, target.z, building.id);
+    runTrip(state, employee, vehicle);
+
+    expect(building.occupantIds).not.toContain(employee.id);
+    expect(employee.locomotion.kind).not.toBe('inside');
   });
 });
