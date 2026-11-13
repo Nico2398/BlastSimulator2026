@@ -25,6 +25,17 @@ function currentDriveTarget(vehicle: Vehicle, employees: readonly Employee[]): {
   return { x: leg.destX, z: leg.destZ };
 }
 
+/** Ascending ids of every pooled vehicle whose driver waits on exactly `target`. */
+function idsSharingTarget(target: { x: number; z: number }, pool: Vehicle[], employees: readonly Employee[]): number[] {
+  return pool
+    .filter(v => {
+      const t = currentDriveTarget(v, employees);
+      return t !== null && t.x === target.x && t.z === target.z;
+    })
+    .map(v => v.id)
+    .sort((a, b) => a - b);
+}
+
 /**
  * Render-only positional offset for a vehicle waiting on occupancy that
  * shares its drive target with other waiting vehicles (#411 round 2).
@@ -61,31 +72,13 @@ export function waitingQueueOffset(vehicle: Vehicle, pool: Vehicle[], employees:
   const target = currentDriveTarget(vehicle, employees);
   if (!target) return [0, 0];
 
-  const sharesTarget = (v: Vehicle): boolean => {
-    const t = currentDriveTarget(v, employees);
-    return t !== null && t.x === target.x && t.z === target.z;
-  };
-
-  const sharingTarget = pool
-    .filter(sharesTarget)
-    .map(v => v.id)
-    .sort((a, b) => a - b);
-
+  const sharingTarget = idsSharingTarget(target, pool, employees);
   if (sharingTarget.length <= 1) return [0, 0];
 
   const slot = sharingTarget.indexOf(vehicle.id) % WAITING_QUEUE_SLOT_OFFSETS.length;
   return WAITING_QUEUE_SLOT_OFFSETS[slot]!;
 }
 
-function sharesWithOthers(vehicle: Vehicle, pool: Vehicle[], employees: readonly Employee[]): boolean {
-  const target = currentDriveTarget(vehicle, employees);
-  if (!target) return false;
-  return pool.some(v => {
-    if (v.id === vehicle.id) return false;
-    const t = currentDriveTarget(v, employees);
-    return t !== null && t.x === target.x && t.z === target.z;
-  });
-}
 
 /**
  * Render position for a vehicle, folding in the waiting-queue slot offset
@@ -104,7 +97,7 @@ export function waitingRenderPosition(vehicle: Vehicle, pool: Vehicle[], employe
   // A vehicle still far from the shared target is drawn where it is (#2232).
   if (Math.hypot(vehicle.x - target.x, vehicle.z - target.z) > WAITING_QUEUE_TARGET_REACH) return [vehicle.x, vehicle.z];
   // A lone waiter has no queue to spread in: it stays at its own x/z too.
-  if (!sharesWithOthers(vehicle, pool, employees)) return [vehicle.x, vehicle.z];
+  if (idsSharingTarget(target, pool, employees).length <= 1) return [vehicle.x, vehicle.z];
   const [offsetX, offsetZ] = waitingQueueOffset(vehicle, pool, employees);
   return [target.x + offsetX, target.z + offsetZ];
 }
