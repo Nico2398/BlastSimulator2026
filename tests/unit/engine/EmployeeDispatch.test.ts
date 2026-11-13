@@ -2543,6 +2543,19 @@ describe('employeeWorkState (#680, #928)', () => {
     expect(employeeWorkState(employee)).toBe('traveling');
   });
 
+  it('returns "evacuating" for a reposition itinerary that ends by alighting (an evacuation drive, #2259)', () => {
+    const state = createGame({ seed: SEED });
+    const employee = makeIdleEmployee(state);
+    employee.itinerary = {
+      goal: { kind: 'reposition', x: 40, z: 40 },
+      legs: [{ mode: 'foot', vehicleId: null, destX: 40, destZ: 40, arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 9 }],
+      workTicks: 0,
+      estTotalTicks: 9,
+    };
+
+    expect(employeeWorkState(employee)).toBe('evacuating');
+  });
+
   // Synthetic construction, not a real code path: destinationX/Z are a
   // read-only derived mirror of itinerary (#1178), with no production writer
   // of their own (enforced by tests/unit/lint/SingleMovementEntry.test.ts).
