@@ -14,7 +14,9 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
 import { createRestPendingAction, resolveRestDestination, restTripFatigueCost, beginRestTravel, isMidClaimedTaskExecution, resolveRestBuildingId, POLICY_REST_TRIGGER } from './RestActionHelpers.js';
-import { isMidVehicleGatedWork, hasClaimableSameRoleFollowUp } from './VehicleReservation.js';
+import { getMoraleDrainMultiplier } from '../entities/EmployeeNeeds.js';
+import { computeActionWorkTicks } from './ActionSelection.js';
+import { isMidVehicleGatedWork, hasClaimableSameRoleFollowUp, claimableSameRoleFollowUps } from './VehicleReservation.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { isEnrolledInTraining } from '../entities/EmployeeTraining.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
@@ -213,10 +215,29 @@ function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
  * still holding the arrival floor plus the job allowance. An unplannable trip
  * counts as covered: nothing to cost, so nothing to cut the job short for.
  */
-function fatigueCoversTripToRest(state: GameState, emp: Employee, destX: number, destZ: number): boolean {
+function fatigueCoversTripToRest(state: GameState, emp: Employee, destX: number, destZ: number, jobTicks = 0): boolean {
   const cost = restTripFatigueCost(state, emp, destX, destZ);
   if (cost === null) return true;
-  return emp.fatigue - cost >= NEED_REST_ARRIVAL_FATIGUE_FLOOR + NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE;
+  const drain = NEED_DRAIN_RATES.fatigue.working * getMoraleDrainMultiplier(emp.morale);
+  const jobAllowance = Math.max(NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE, jobTicks * drain);
+  return emp.fatigue - cost >= NEED_REST_ARRIVAL_FATIGUE_FLOOR + jobAllowance;
+}
+
+/**
+ * Executing ticks of the costliest same-role job `emp` could claim next that fits a full gauge (a job that never fits
+ * is ignored: resting cannot help it, so it must not hold the worker in a rest loop, #945/#1123), or 0. The next claim is
+ * protected until done (#2229), so the deferral budgets it up front.
+ */
+function nextJobTicksWorthResting(state: GameState, emp: Employee, destX: number, destZ: number): number {
+  const tripCost = restTripFatigueCost(state, emp, destX, destZ) ?? 0;
+  const drain = NEED_DRAIN_RATES.fatigue.working * getMoraleDrainMultiplier(emp.morale);
+  let worst = 0;
+  for (const action of claimableSameRoleFollowUps(state, emp)) {
+    const ticks = computeActionWorkTicks(state, emp, action);
+    const fitsFullGauge = MAX_NEED_GAUGE - tripCost - ticks * drain >= NEED_REST_ARRIVAL_FATIGUE_FLOOR;
+    if (fitsFullGauge && ticks > worst) worst = ticks;
+  }
+  return worst;
 }
 
 /** Payload key counting the forced rests that cut a vehicle job's drive short before it arrived. */
@@ -414,7 +435,8 @@ export function forceShiftRestIfNeededByPolicy(
   // Idle gap between two same-role jobs (#1090): the follow-up is about to be claimed.
   const betweenVehicleJobs = emp.activeActionId === null && hasClaimableSameRoleFollowUp(state, emp);
   const vehicleJob = midVehicleWork || betweenVehicleJobs;
-  const covered = vehicleJob && fatigueCoversTripToRest(state, emp, dest.targetX, dest.targetZ);
+  const nextJobTicks = betweenVehicleJobs ? nextJobTicksWorthResting(state, emp, dest.targetX, dest.targetZ) : 0;
+  const covered = vehicleJob && fatigueCoversTripToRest(state, emp, dest.targetX, dest.targetZ, nextJobTicks);
   const shiftExpired = shouldForceRest(state.sitePolicy, { ...snapshot, fatigue: MAX_NEED_GAUGE }, true);
   // Mid-drive: keep driving while the gauge still covers the trip to the rest
   // building (#1673). Between jobs only a fatigue-threshold crossing waits on
