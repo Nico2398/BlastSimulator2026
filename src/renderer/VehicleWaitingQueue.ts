@@ -6,7 +6,7 @@
 import type { Vehicle } from '../core/entities/Vehicle.js';
 import { resolveVehicleDriver } from '../core/entities/Vehicle.js';
 import type { Employee } from '../core/entities/Employee.js';
-import { WAITING_QUEUE_SLOT_OFFSETS } from '../core/config/balance.js';
+import { WAITING_QUEUE_SLOT_OFFSETS, WAITING_QUEUE_TARGET_REACH } from '../core/config/balance.js';
 
 /**
  * The cell `vehicle`'s driver is currently queued to reach, or null when
@@ -77,6 +77,16 @@ export function waitingQueueOffset(vehicle: Vehicle, pool: Vehicle[], employees:
   return WAITING_QUEUE_SLOT_OFFSETS[slot]!;
 }
 
+function sharesWithOthers(vehicle: Vehicle, pool: Vehicle[], employees: readonly Employee[]): boolean {
+  const target = currentDriveTarget(vehicle, employees);
+  if (!target) return false;
+  return pool.some(v => {
+    if (v.id === vehicle.id) return false;
+    const t = currentDriveTarget(v, employees);
+    return t !== null && t.x === target.x && t.z === target.z;
+  });
+}
+
 /**
  * Render position for a vehicle, folding in the waiting-queue slot offset
  * (#411 round 4). For a vehicle waiting on occupancy the offset is anchored
@@ -84,11 +94,17 @@ export function waitingQueueOffset(vehicle: Vehicle, pool: Vehicle[], employees:
  * driving toward — rather than to the vehicle's own raw x/z, which can
  * differ slightly between vehicles even when they share a target and would
  * otherwise undermine the slot spacing. Every other vehicle gets a zero
- * offset and renders at its own x/z, unchanged.
+ * offset and renders at its own x/z, unchanged. #2232: the anchor applies only
+ * when two or more vehicles share the target and this one is within
+ * WAITING_QUEUE_TARGET_REACH of it; otherwise the vehicle renders at its own x/z.
  */
 export function waitingRenderPosition(vehicle: Vehicle, pool: Vehicle[], employees: readonly Employee[]): readonly [number, number] {
   const target = currentDriveTarget(vehicle, employees);
   if (!target) return [vehicle.x, vehicle.z];
+  // A vehicle still far from the shared target is drawn where it is (#2232).
+  if (Math.hypot(vehicle.x - target.x, vehicle.z - target.z) > WAITING_QUEUE_TARGET_REACH) return [vehicle.x, vehicle.z];
+  // A lone waiter has no queue to spread in: it stays at its own x/z too.
+  if (!sharesWithOthers(vehicle, pool, employees)) return [vehicle.x, vehicle.z];
   const [offsetX, offsetZ] = waitingQueueOffset(vehicle, pool, employees);
   return [target.x + offsetX, target.z + offsetZ];
 }
