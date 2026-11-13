@@ -87,7 +87,7 @@ export function isEvacuationHoldActive(state: GameState, action: PendingAction, 
  */
 function isBarredFromEvacuatedZone(state: GameState, action: PendingAction, employee: Employee): boolean {
   const zone = state.zone.activeZone;
-  if (zone === null || !(state.zone.evacuatedEmployeeIds ?? []).includes(employee.id)) return false;
+  if (zone === null || state.pendingDetonation === null || !(state.zone.evacuatedEmployeeIds ?? []).includes(employee.id)) return false;
   return isInZone(action.targetX, action.targetZ, zone) && isZoneStillBlastThreatened(state.drillHoles, zone);
 }
 
