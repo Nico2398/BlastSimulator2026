@@ -27,12 +27,16 @@ export const GHOST_SIZE = 0.9;           // box half-extent in metres
  */
 export const GHOST_RENDER_ORDER = 10;
 
-// Unreachable-order ghost look (#1306): a rose-leaning red, kept >= 15 degrees
+// Unreachable-order ghost look (#1306, true red #2227): hue ~351 degrees (sRGB),
+// within 10 degrees of 0 so it reads red, not pink, over sand; kept >= 15 degrees
 // of hue from the building exit marker (0xff4400, ~16 deg) and >= 30 degrees from
 // the ramp arrow (0xffd21f, ~49 deg) so none of the three can be mistaken for another.
-export const GHOST_UNREACHABLE_COLOR = new THREE.Color(0xff2a88);
-const GHOST_UNREACHABLE_EMISSIVE = new THREE.Color(0xcc1166);
-export const GHOST_UNREACHABLE_RIM_COLOR = new THREE.Color(0xff4a98);
+// The slight magenta tilt cancels the sand's yellow in the blend; emissive and rim stay
+// dim because bright ones overexposed the tone mapping and washed the ghost to salmon
+// (sampled over sand: hue ~4 deg, R 255, G ~85, B ~73).
+export const GHOST_UNREACHABLE_COLOR = new THREE.Color(0xff0028);
+const GHOST_UNREACHABLE_EMISSIVE = new THREE.Color(0x500010);
+export const GHOST_UNREACHABLE_RIM_COLOR = new THREE.Color(0x680008);
 export const GHOST_UNREACHABLE_OPACITY_MIN = 0.25;
 export const GHOST_UNREACHABLE_OPACITY_MAX = 0.65;
 
