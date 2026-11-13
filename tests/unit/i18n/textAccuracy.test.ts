@@ -153,3 +153,62 @@ describe('fr.json ui.* — #2236 calques rewritten', () => {
     });
   }
 });
+
+describe('event.politics_ / event.lawsuit_ calques — #2238 French rewrites', () => {
+  const cases: ReadonlyArray<readonly [string, string, string]> = [
+  [
+    "event.lawsuit_wrongful_death.res0",
+    "homicide involontaire",
+    "décès injustifié"
+  ],
+  [
+    "event.lawsuit_mountaineer.desc",
+    "le saccage de la montagne",
+    "vu la montagne saccagée"
+  ],
+  [
+    "event.lawsuit_patent_troll.title",
+    "Troll des Brevets",
+    "Chasseur de Brevets"
+  ],
+  [
+    "event.lawsuit_noise_restraining.res0",
+    "éloignement",
+    "ordonnance restrictive"
+  ],
+  [
+    "event.politics_celebrity_protest.res1",
+    "ce silence",
+    "cet silence"
+  ],
+  [
+    "event.politics_client_scandal.res0",
+    "éclaboussé par le scandale",
+    "client scandalisé"
+  ],
+  [
+    "event.politics_un_inspector.res1",
+    "procès-verbal",
+    "citation officielle"
+  ],
+  [
+    "event.politics_tax_reform.res1",
+    "société-écran",
+    "coquille offshore"
+  ]
+];
+
+  for (const [key, expected, old] of cases) {
+    it(`KNOWN_TEXT_DEFECTS records a fr defect for ${key}`, () => {
+      expect(KNOWN_TEXT_DEFECTS.find((d) => d.key === key && d.locale === 'fr')).toBeTruthy();
+    });
+
+    it(`fr.json "${key}" no longer says "${old}"`, () => {
+      expect(fr[key]).not.toContain(old);
+    });
+
+    it(`fr.json "${key}" says "${expected}"`, () => {
+      expect(fr[key]).toContain(expected);
+    });
+  }
+});
