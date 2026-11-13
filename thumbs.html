@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BlastSimulator2026 — thumbnail studio</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #1b212a; overflow: hidden; }
+      #thumb-canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <!-- Dev-only page: renders public/models/*.glb into transparent portrait
+         thumbnails through the game's own toon materials and outlines.
+         Driven by `npm run thumbs:build` (scripts/render-thumbnails.ts), which
+         writes public/thumbs/. Not part of the production build. -->
+    <canvas id="thumb-canvas"></canvas>
+    <script type="module" src="/src/thumb-studio.ts"></script>
+  </body>
+</html>

@@ -415,27 +415,15 @@ describe('FleetPanel', () => {
   });
 });
 
-// ── Scroll-bounded vehicle list section (#958) ──────────────────────────────
+// ── One scroll area (#958, #2242) ───────────────────────────────────────────
 //
-// bodyEl (this.el.append(header, this.bodyEl) in the constructor) is always
-// the panel root's second child. Vehicle rows (one per fleet vehicle,
-// unbounded) are rendered directly into bodyEl today, followed by the
-// DEALERSHIP sectionHeader and its fixed role × tier catalog rows — a large
-// fleet buries the dealership far below the panel's fold. The fix nests
-// every vehicle row inside one scrollBoundedSection wrapper standing before
-// the DEALERSHIP section header, leaving the dealership unwrapped, a
-// reachable bodyEl-level sibling.
+// bodyEl is the window root's second child and its only scroll area. #958
+// once bounded the vehicle list in its own scroll box so a large fleet could
+// not bury the dealership; the central window (#2242) lays the fleet out as a
+// card grid instead, followed by the dealership in the same single scroll.
 
 function getBodyEl(panel: FleetPanel): HTMLElement {
   return panel.root.children[1] as HTMLElement;
-}
-
-/** Every direct child of `bodyEl` before the section header whose text contains `label`. */
-function childrenBeforeSection(bodyEl: HTMLElement, label: string): HTMLElement[] {
-  const children = Array.from(bodyEl.children) as HTMLElement[];
-  const idx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(label));
-  if (idx === -1) throw new Error(`section header not found for label: ${label}`);
-  return children.slice(0, idx);
 }
 
 function makeManyVehicles(count: number): ReturnType<typeof makeVehicle>[] {
@@ -657,55 +645,45 @@ describe('FleetPanel — selected row highlight (#1767)', () => {
   });
 });
 
-describe('FleetPanel — scroll-bounded vehicle list section (#958)', () => {
-  it('nests all 12 vehicle rows inside a single bounded wrapper, not flattened directly into bodyEl', () => {
+describe('FleetPanel — one scroll area per window (#958, #2242)', () => {
+  const nestedScrollers = (root: HTMLElement): HTMLElement[] =>
+    Array.from(root.querySelectorAll<HTMLElement>('*')).filter(n => n.style.overflowY === 'auto' || n.style.overflowY === 'scroll');
+
+  it('lays all 12 vehicles out in one card grid inside the vehicles section', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(makeManyVehicles(12)));
+
+    const list = getBodyEl(panel).querySelector<HTMLElement>(':scope > .bs-fleet-list')!;
+    const grid = list.querySelector<HTMLElement>('.bs-fleet-grid')!;
+    expect(grid.querySelectorAll(':scope > [data-vehicle-id]').length).toBe(12);
+    expect(grid.dataset['scrollKey']).toBe('fleet');
+  });
+
+  it('nests no scroll area inside the body', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(makeManyVehicles(12)));
+    expect(nestedScrollers(getBodyEl(panel))).toEqual([]);
+  });
+
+  it('keeps the dealership outside the vehicle grid, every role and tier still resolving', () => {
     const { panel } = makePanel();
     panel.update(makeState(makeManyVehicles(12)));
 
     const bodyEl = getBodyEl(panel);
-    const preDealership = childrenBeforeSection(bodyEl, t('ui.fleet.dealership'));
-
-    expect(preDealership.length).toBe(1);
-    const wrapper = preDealership[0]!;
-    expect(wrapper.querySelectorAll('[data-vehicle-id]').length).toBe(12);
+    const grid = bodyEl.querySelector<HTMLElement>('.bs-fleet-grid')!;
+    const dealership = bodyEl.querySelector<HTMLElement>(':scope > .bs-fleet-dealership')!;
+    expect(grid.contains(dealership)).toBe(false);
+    // 6 roles × 3 tiers of dealership buttons still resolve.
+    expect(dealership.querySelectorAll('.bs-fleet-tier-btn').length).toBe(6 * 3);
   });
 
-  it('gives the vehicle wrapper inline overflow-y:auto and a numeric max-height (not vh/%)', () => {
-    const { panel } = makePanel();
-    panel.update(makeState(makeManyVehicles(12)));
-
-    const bodyEl = getBodyEl(panel);
-    const wrapper = childrenBeforeSection(bodyEl, t('ui.fleet.dealership'))[0]!;
-
-    expect(wrapper.style.overflowY).toBe('auto');
-    expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
-  });
-
-  it('keeps the DEALERSHIP section reachable as a bodyEl-level sibling, outside the vehicle wrapper', () => {
-    const { panel } = makePanel();
-    panel.update(makeState(makeManyVehicles(12)));
-
-    const bodyEl = getBodyEl(panel);
-    const children = Array.from(bodyEl.children) as HTMLElement[];
-    const dealershipIdx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(t('ui.fleet.dealership')));
-    expect(dealershipIdx).toBeGreaterThan(-1);
-
-    const vehicleWrapper = children[0]!;
-    expect(vehicleWrapper.contains(children[dealershipIdx]!)).toBe(false);
-    // 6 roles × 3 tiers of dealership buttons still resolve, unwrapped.
-    expect(bodyEl.querySelectorAll('.bs-fleet-tier-btn').length).toBe(6 * 3);
-  });
-
-  it('keeps bodyEl itself scrollable (overflow-y:auto unchanged) regardless of fleet size', () => {
+  it('keeps bodyEl itself scrollable (overflow-y:auto) regardless of fleet size', () => {
     const { panel: emptyPanel } = makePanel();
     emptyPanel.update(makeState([]));
-    const emptyBodyEl = getBodyEl(emptyPanel);
-
     const { panel: fullPanel } = makePanel();
     fullPanel.update(makeState(makeManyVehicles(12)));
-    const fullBodyEl = getBodyEl(fullPanel);
 
-    for (const bodyEl of [emptyBodyEl, fullBodyEl]) {
+    for (const bodyEl of [getBodyEl(emptyPanel), getBodyEl(fullPanel)]) {
       expect(bodyEl.style.overflowY).toBe('auto');
     }
   });

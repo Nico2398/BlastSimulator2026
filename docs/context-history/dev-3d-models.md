@@ -62,3 +62,11 @@ lift each; conformed the brow over the lids and pivoted it at its outer end.
 ## Verify a model change — the whole suite (Nov 2026)
 
 The page told a session to detach the whole `npm run test` suite (~500 s then). The model contract is proven by the model test files run by name; the whole suite is CI's.
+
+## Portraits follow their model (Nov 2026, #2241)
+
+The UI started showing a picture of every worker role, vehicle role and tier, and building type and tier — the
+inspector header and every card in the central windows. The pictures are rendered from the same `.glb` by
+`npm run thumbs:build` (`thumbs.html`, `src/thumb-studio.ts`) and committed under `public/thumbs/`, so a model change
+that skipped them would leave the card showing the old model. The change procedure gained the step that re-renders
+the touched id's portrait and reads it, and the commit it closes on carries the portrait with the `.glb`.

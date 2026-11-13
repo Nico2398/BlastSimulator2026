@@ -33,6 +33,8 @@ import { pickupFragment, reserveFragmentIds, deliverToDepot, deliverToSpoilHeap,
 import { warehouseUsedKgMap } from '../economy/FreightWarehouses.js';
 import { creditSpoilKg, haulDestinationOf } from '../economy/SpoilHeaps.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
+import { recordStateCollection, RUBBLE_MATERIAL_ID } from '../economy/OreCollectionLog.js';
+import { accumulateOreMass } from '../mining/BlastOreReport.js';
 import { findQueuedHaulAction } from '../economy/HaulDispatch.js';
 import { Random } from '../math/Random.js';
 import { scale, vec3, ZERO } from '../math/Vec3.js';
@@ -133,6 +135,14 @@ function loadExtraFragment(state: GameState, vehicle: Vehicle, fragmentId: numbe
   return true;
 }
 
+/** Kg a depot delivery of `fragment` adds per ore (as deliverToDepot credits it) plus its barren rest as rubble, for the gathering rate (#2243). */
+function depotCredit(fragment: Pick<FragmentData, 'mass' | 'volume' | 'oreDensities'>): Record<string, number> {
+  const ore: Record<string, number> = {};
+  accumulateOreMass(ore, fragment.volume, fragment.oreDensities);
+  const oreKg = Object.values(ore).reduce((a, b) => a + b, 0);
+  return { ...ore, [RUBBLE_MATERIAL_ID]: Math.max(0, fragment.mass - oreKg) };
+}
+
 /**
  * Delivers one carried fragment to its destination: barren rock is dumped on a
  * spoil heap and credited to that heap building (#1530), ore goes to a freight
@@ -153,9 +163,12 @@ function deliverCargoItem(
     if (!dumped) return false;
     const heap = state.buildings.buildings.find(b => b.id === dumped.heapId);
     if (heap) creditSpoilKg(heap, dumped.massKg);
+    recordStateCollection(state, { [RUBBLE_MATERIAL_ID]: dumped.massKg });
     return true;
   }
+  const credit = tracked ? depotCredit(tracked.fragment) : {};
   if (!deliverToDepot(state.logistics, fragmentId, state.collectedOre, warehouses, atX, atZ)) return false;
+  recordStateCollection(state, credit);
   // Ore concentrated on arrival (#2142): the warehouse keeps the ore, the barren remainder goes to a heap.
   const stored = state.logistics.fragments.find(f => f.fragment.id === fragmentId && f.state === 'stored');
   if (stored) concentrateStoredFragment(state.logistics, stored, state.buildings.buildings, warehouseUsedKgMap(state.logistics));

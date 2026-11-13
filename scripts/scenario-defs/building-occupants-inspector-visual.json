@@ -319,6 +319,10 @@
           "timeoutMs": 0
         },
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]"
+        },
+        {
           "type": "clickEntity",
           "kind": "building",
           "id": 2

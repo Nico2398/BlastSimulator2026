@@ -286,6 +286,10 @@
       "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. The three steps below stay console commands for a reason recorded there.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-vehicle-panel [data-panel-close]"
+        },
+        {
           "type": "clickEntity",
           "kind": "vehicle",
           "id": 1
@@ -318,6 +322,10 @@
     {
       "command": "vehicle reposition 2 37 33",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] > :first-child"

@@ -562,3 +562,24 @@ describe('vehicle inspector — hole target link (#2165)', () => {
     expect(root.querySelector('[data-select-kind="hole"]')).toBeNull();
   });
 });
+
+describe('vehicle inspector picture (#2241)', () => {
+  it('carries the picture of the vehicle role and tier, badged with the tier', () => {
+    const p = viewOf(makeState(makeVehicle({ type: 'drill_rig', tier: 1 }))).portrait!;
+    expect(p.id).toBe('vehicle_drill_rig_t1');
+    expect(p.badge).toBe('T1');
+  });
+
+  it('a drill rig T1 and a drill rig T3 show different pictures', () => {
+    const t1 = viewOf(makeState(makeVehicle({ type: 'drill_rig', tier: 1 }))).portrait!;
+    const t3 = viewOf(makeState(makeVehicle({ type: 'drill_rig', tier: 3 }))).portrait!;
+    expect(t1.id).not.toBe(t3.id);
+  });
+
+  it('shows a wreck once HP falls under a third, and a destroyed one at 0', () => {
+    const maxHp = getVehicleDefByTier('debris_hauler', 1).maxHp;
+    expect(viewOf(makeState(makeVehicle({ hp: maxHp }))).portrait!.state).toBe('none');
+    expect(viewOf(makeState(makeVehicle({ hp: maxHp * 0.2 }))).portrait!.state).toBe('wrecked');
+    expect(viewOf(makeState(makeVehicle({ hp: 0 }))).portrait!.state).toBe('destroyed');
+  });
+});
