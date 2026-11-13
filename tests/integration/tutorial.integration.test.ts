@@ -1131,3 +1131,94 @@ describe('the tutorial card order under continuous shifts reaches the end of cha
     expect(atZeroBeforeBlast).toEqual([]);
   }, 120_000);
 });
+
+// #2259: the card after charging. A worker evacuated for the shot took a long detour — driving to a safe cell, walking
+// back to quarters, driving out again — and a rested worker (fatigue 87) still fainted before the shot fired. Plays the
+// cards in order under continuous shifts (default threshold 60) through the `evacuate-zone` step, to the shot.
+describe('the tutorial evacuation under continuous shifts clears the zone without a collapse (#2259)', () => {
+  const DOM_ONLY_STEPS = new Set(['toggle-survey-overlay', 'scores', 'finances', 'needs']);
+  const RESTED_FATIGUE = 87;
+
+  /**
+   * Plays every card before `evacuate-zone` as the #2229 replay does, then (when `restedAt` is set) sets every living
+   * employee's fatigue to it, presses Fire -> Detonate and ticks until the blast has really fired.
+   */
+  function replayThroughEvacuation(restedAt: number | null, idleTicks = 0) {
+    const { runner, ctx } = createRunner();
+    const log: string[] = [];
+    const run: Run = (cmd) => { log.push(cmd); return runner.run(cmd); };
+    expect(run('campaign start level:tutorial_pit').success).toBe(true);
+    const state = ctx.state!;
+
+    const collapsedIds: number[] = [];
+    ctx.emitter.on('employee:collapsed', (payload: unknown) => {
+      collapsedIds.push((payload as { employeeId: number }).employeeId);
+    });
+
+    let reachedEvacuation = false;
+    let blastFired = false;
+    let lowestFatigueFromEvacuation = Infinity;
+    const tick = () => {
+      playTick(run, state);
+      if (!reachedEvacuation) return;
+      if (state.levelStats.blastsPerformed > 0) blastFired = true;
+      for (const e of state.employees.employees) {
+        if (e.alive) lowestFatigueFromEvacuation = Math.min(lowestFatigueFromEvacuation, e.fatigue);
+      }
+    };
+
+    for (const step of TUTORIAL_STEPS) {
+      if (step.id === 'blast') break;
+      if (DOM_ONLY_STEPS.has(step.id)) continue;
+      const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
+      const maxTicks = Math.max(500, (step.tickBudget ?? 20) * 25);
+      const complete = () => step.isComplete(state, snapshot);
+      if (step.id === 'evacuate-zone') {
+        reachedEvacuation = true;
+        if (restedAt !== null) {
+          for (const e of state.employees.employees) if (e.alive) e.fatigue = restedAt;
+        }
+        const armed = run('blast detonate');
+        expect(armed.success, armed.output).toBe(true);
+        for (let i = 0; i < maxTicks && !complete(); i++) tick();
+        expect(complete(), 'tutorial step "evacuate-zone" never completed').toBe(true);
+        break;
+      }
+      if (step.id === 'charge') {
+        for (let i = 0; i < 500 && state.plannedDrillHoles.length > 0; i++) tick();
+      }
+      for (const cmd of step.autoCommands ?? []) run(cmd);
+      const driver = state.employees.employees.find((e) => e.role === 'driver');
+      for (const cmd of step.commands ?? []) run(cmd.replace('<driverId>', String(driver?.id ?? '')));
+      for (let i = 0; i < maxTicks && !complete(); i++) tick();
+      expect(complete(), `tutorial step "${step.id}" never completed`).toBe(true);
+      for (let i = 0; i < idleTicks; i++) tick();
+    }
+    return { state, log, collapsedIds, blastFired, lowestFatigueFromEvacuation };
+  }
+
+  it.each([0, 50])('plays the cards as they stand with %i idle ticks between steps: no employee:collapsed through the evacuate-zone step, and the shot fires', (idleTicks) => {
+    const { state, log, collapsedIds } = replayThroughEvacuation(null, idleTicks);
+
+    expect(log).toContain('set_policy mode:continuous');
+    expect(state.sitePolicy.shiftMode).toBe('continuous');
+    expect(state.sitePolicy.fatigueRestThreshold).toBe(60);
+    expect(state.levelStats.blastsPerformed).toBeGreaterThan(0);
+    expect(collapsedIds).toEqual([]);
+  }, 180_000);
+
+  it.each([0, 50])('a rested crew (fatigue 87) evacuated for the shot does not collapse before it fires, with %i idle ticks between steps', (idleTicks) => {
+    const { state, collapsedIds, blastFired } = replayThroughEvacuation(RESTED_FATIGUE, idleTicks);
+
+    expect(blastFired).toBe(true);
+    expect(state.levelStats.blastsPerformed).toBeGreaterThan(0);
+    expect(collapsedIds).toEqual([]);
+  }, 180_000);
+
+  it.each([0, 50])('a rested crew loses less than half the gauge getting out of the zone, with %i idle ticks between steps: one short route, no shuttling', (idleTicks) => {
+    const { lowestFatigueFromEvacuation, collapsedIds } = replayThroughEvacuation(RESTED_FATIGUE, idleTicks);
+
+    expect(collapsedIds).toEqual([]);
+    expect(lowestFatigueFromEvacuation).toBeGreaterThan(RESTED_FATIGUE - 50);
+  }, 180_000);
+});

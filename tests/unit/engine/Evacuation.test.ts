@@ -10,7 +10,8 @@ import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { findSafeEvacuationCell, evacuateZone, isMidEvacuationWalk } from '../../../src/core/engine/Evacuation.js';
 import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
-import { isEvacuationHoldActive } from '../../../src/core/engine/EvacuationHold.js';
+import { isEvacuationHoldActive, liftSpentZone } from '../../../src/core/engine/EvacuationHold.js';
+import { tickEmployees } from '../../../src/core/engine/EmployeeDispatch.js';
 import { isInZone, evacuationCellKey, type ZoneBounds } from '../../../src/core/entities/Zone.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
@@ -18,7 +19,7 @@ import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { purchaseVehicle, getVehicleReservation, resolveVehicleDriver } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { EVACUATION_CLEARANCE_M } from '../../../src/core/config/balance.js';
+import { EVACUATION_CLEARANCE_M, ACTION_STARVATION_TICK_THRESHOLD } from '../../../src/core/config/balance.js';
 import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 
@@ -912,5 +913,254 @@ describe('evacuateZone does not send an evacuee back in for a driverless vehicle
     expect(leaver.pendingDriverVehicleId).toBe(vehicle.id);
     expect(second.orderedVehicleIds).toContain(vehicle.id);
     expect(second.strandedVehicleIds).not.toContain(vehicle.id);
+  });
+});
+
+// ── #2259, C1: an evacuated worker claims no work inside a zone a live blast plan still threatens ─────────────────────
+// The hold stamp only covers actions that existed when the order was given; an action created afterwards, or one a
+// worker reaches through the open pool or the starvation path, walked the evacuee straight back in.
+
+describe('an evacuated employee claims no in-zone work while a live blast plan threatens the zone (#2259, C1)', () => {
+  const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+
+  function makeAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+    return {
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+      queuedAtTick: 0,
+      ...overrides,
+    };
+  }
+
+  /**
+   * An armed zone over (10..20, 10..20) with a live drill plan inside it. Two drillers stand outside: `evacuee` is
+   * listed as evacuated, `bystander` never was. No action carries a hold stamp: they are all created after the order.
+   */
+  function armedZone() {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    state.zone.activeZone = zone;
+    state.drillHoles.push({ id: 'H1', x: 15, z: 15, depth: 6, diameter: 0.089 });
+    const rng = new Random(EVACUATION_SEED);
+    const { employee: evacuee } = hireEmployee(state.employees, 'driller', rng, 30, 30);
+    const { employee: bystander } = hireEmployee(state.employees, 'driller', rng, 31, 30);
+    state.zone.evacuatedEmployeeIds = [evacuee.id];
+    return { state, evacuee, bystander };
+  }
+
+  /** Dispatches `ticks` times with the bystander parked, so only the evacuee can claim. */
+  function dispatchOnlyEvacuee(state: ReturnType<typeof armedZone>['state'], bystander: Employee, ticks = 1): void {
+    bystander.restTicksRemaining = 100000;
+    for (let i = 0; i < ticks; i++) tickEmployees(state);
+  }
+
+  it('does not claim an action targeted at it whose target lies in the zone', () => {
+    const { state, evacuee, bystander } = armedZone();
+    const action = makeAction({ id: 1, targetX: 15, targetZ: 15, targetEmployeeId: evacuee.id });
+    state.pendingActions.push(action);
+
+    dispatchOnlyEvacuee(state, bystander);
+
+    expect(action.status).toBe('queued');
+    expect(action.holderId).toBeNull();
+    expect(evacuee.activeActionId).toBeNull();
+    expect(evacuee.taskQueue).toEqual([]);
+  });
+
+  it('does not claim an open-pool action whose target lies in the zone', () => {
+    const { state, evacuee, bystander } = armedZone();
+    const action = makeAction({ id: 1, targetX: 15, targetZ: 15 });
+    state.pendingActions.push(action);
+
+    dispatchOnlyEvacuee(state, bystander);
+
+    expect(action.status).toBe('queued');
+    expect(action.holderId).toBeNull();
+    expect(evacuee.activeActionId).toBeNull();
+  });
+
+  it('does not claim a starved in-zone pool action through the starvation promotion', () => {
+    const { state, evacuee, bystander } = armedZone();
+    state.tickCount = ACTION_STARVATION_TICK_THRESHOLD + 10;
+    const action = makeAction({ id: 1, targetX: 15, targetZ: 15, queuedAtTick: 0 });
+    state.pendingActions.push(action);
+
+    dispatchOnlyEvacuee(state, bystander);
+
+    expect(action.status).toBe('queued');
+    expect(evacuee.activeActionId).toBeNull();
+    expect(evacuee.taskQueue).toEqual([]);
+  });
+
+  it('stays out over many ticks: the in-zone action is never claimed, and the worker never walks toward it', () => {
+    const { state, evacuee, bystander } = armedZone();
+    const action = makeAction({ id: 1, targetX: 15, targetZ: 15 });
+    state.pendingActions.push(action);
+    const startX = evacuee.x;
+    const startZ = evacuee.z;
+
+    dispatchOnlyEvacuee(state, bystander, 60);
+
+    expect(action.status).toBe('queued');
+    expect(evacuee.x).toBe(startX);
+    expect(evacuee.z).toBe(startZ);
+  });
+
+  it('picks work outside the zone instead, when the pool holds both', () => {
+    const { state, evacuee, bystander } = armedZone();
+    const inZone = makeAction({ id: 1, targetX: 15, targetZ: 15 });
+    const outside = makeAction({ id: 2, targetX: 36, targetZ: 36 });
+    state.pendingActions.push(inZone, outside);
+
+    dispatchOnlyEvacuee(state, bystander);
+
+    expect(inZone.status).toBe('queued');
+    expect(outside.status).toBe('assigned');
+    expect(outside.holderId).toBe(evacuee.id);
+    expect(evacuee.activeActionId).toBe(2);
+  });
+
+  it('still claims an action targeted at it whose target is outside the zone', () => {
+    const { state, evacuee, bystander } = armedZone();
+    const action = makeAction({ id: 1, targetX: 36, targetZ: 36, targetEmployeeId: evacuee.id });
+    state.pendingActions.push(action);
+
+    dispatchOnlyEvacuee(state, bystander);
+
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(evacuee.id);
+  });
+
+  it('an employee who was not evacuated claims the in-zone action as before', () => {
+    const { state, evacuee, bystander } = armedZone();
+    evacuee.restTicksRemaining = 100000;
+    const action = makeAction({ id: 1, targetX: 15, targetZ: 15 });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(bystander.id);
+  });
+
+  it('an employee who was not evacuated claims an in-zone action targeted at it as before', () => {
+    const { state, evacuee, bystander } = armedZone();
+    evacuee.restTicksRemaining = 100000;
+    const action = makeAction({ id: 1, targetX: 15, targetZ: 15, targetEmployeeId: bystander.id });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(bystander.id);
+  });
+
+  it('claims the in-zone pool action once the blast has fired and lifted the zone', () => {
+    const { state, evacuee, bystander } = armedZone();
+    const action = makeAction({ id: 1, targetX: 15, targetZ: 15 });
+    state.pendingActions.push(action);
+    dispatchOnlyEvacuee(state, bystander);
+    expect(action.status).toBe('queued');
+
+    state.drillHoles = [];
+    liftSpentZone(state);
+    dispatchOnlyEvacuee(state, bystander);
+
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(evacuee.id);
+  });
+
+  it('claims the in-zone targeted action once the blast has fired and lifted the zone', () => {
+    const { state, evacuee, bystander } = armedZone();
+    const action = makeAction({ id: 1, targetX: 15, targetZ: 15, targetEmployeeId: evacuee.id });
+    state.pendingActions.push(action);
+    dispatchOnlyEvacuee(state, bystander);
+    expect(action.status).toBe('queued');
+
+    state.drillHoles = [];
+    liftSpentZone(state);
+    dispatchOnlyEvacuee(state, bystander);
+
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(evacuee.id);
+  });
+
+  it('claims the in-zone action when the drill plan is gone though the zone is still drawn (no blast threatens it)', () => {
+    const { state, evacuee, bystander } = armedZone();
+    state.drillHoles = [];
+    const action = makeAction({ id: 1, targetX: 15, targetZ: 15 });
+    state.pendingActions.push(action);
+
+    dispatchOnlyEvacuee(state, bystander);
+
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(evacuee.id);
+  });
+
+  it('claims the in-zone action when the live plan lies elsewhere and never overlaps the zone', () => {
+    const { state, evacuee, bystander } = armedZone();
+    state.drillHoles = [{ id: 'H9', x: 500, z: 500, depth: 6, diameter: 0.089 }];
+    const action = makeAction({ id: 1, targetX: 15, targetZ: 15 });
+    state.pendingActions.push(action);
+
+    dispatchOnlyEvacuee(state, bystander);
+
+    expect(action.status).toBe('assigned');
+    expect(action.holderId).toBe(evacuee.id);
+  });
+});
+
+// ── #2259, C2: one shortest route out; no shuttling ──────────────────────────────────────────────────────────────────
+
+describe('an evacuated worker takes one route out and stays out until the shot (#2259, C2)', () => {
+  const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+
+  it('walks out once, never claims the in-zone work created after the order, and is not re-ordered', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    state.zone.activeZone = zone;
+    state.drillHoles.push({ id: 'H1', x: 15, z: 15, depth: 6, diameter: 0.089 });
+    const rng = new Random(EVACUATION_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 15, 15);
+
+    const first = evacuateZone(state, zone);
+    expect(first.orderedEmployeeIds).toContain(employee.id);
+    // Work appears after the order: nothing carries a hold stamp.
+    state.pendingActions.push({
+      id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 15, targetZ: 15, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: state.tickCount,
+    });
+
+    let travelled = 0;
+    let prevX = employee.x;
+    let prevZ = employee.z;
+    let leftZoneAt = -1;
+    let backInZoneAfterLeaving = false;
+    for (let t = 0; t < 400; t++) {
+      state.tickCount++;
+      tickEmployees(state);
+      tickLocomotion(state);
+      travelled += Math.hypot(employee.x - prevX, employee.z - prevZ);
+      prevX = employee.x; prevZ = employee.z;
+      const inside = isInZone(employee.x, employee.z, zone);
+      if (!inside && leftZoneAt < 0) leftZoneAt = t;
+      if (inside && leftZoneAt >= 0) backInZoneAfterLeaving = true;
+    }
+
+    expect(leftZoneAt).toBeGreaterThanOrEqual(0);
+    expect(backInZoneAfterLeaving).toBe(false);
+    expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+    // One trip to the safe cell: the walk is no longer than the straight line to where the worker ended, plus slack
+    // for the grid's eight-way steps. A walk out and back adds twice the distance.
+    const direct = Math.hypot(employee.x - 15, employee.z - 15);
+    expect(travelled).toBeLessThanOrEqual(direct * 1.5 + 2);
+    expect(isInZone(employee.x, employee.z, zone)).toBe(false);
   });
 });
