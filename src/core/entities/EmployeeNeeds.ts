@@ -116,7 +116,7 @@ export function replenishNeed(
  * - morale < 30: ×1.20 (faster drain — unhappy workers let themselves go)
  * - otherwise:   ×1.00 (standard drain)
  */
-function getMoraleDrainMultiplier(morale: number): number {
+export function getMoraleDrainMultiplier(morale: number): number {
   if (morale > MORALE_THRESHOLDS.high) return NEED_MORALE_DRAIN_MULTIPLIERS.high;
   if (morale < MORALE_THRESHOLDS.low) return NEED_MORALE_DRAIN_MULTIPLIERS.low;
   return NEED_MORALE_DRAIN_MULTIPLIERS.normal;

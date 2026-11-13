@@ -100,6 +100,21 @@ export function hasClaimableSameRoleFollowUp(state: GameState, employee: Employe
 }
 
 /**
+ * The queued same-role follow-ups `employee`, currently mounted, could claim
+ * next (the actions hasClaimableSameRoleFollowUp counts). Empty when unmounted.
+ */
+export function claimableSameRoleFollowUps(state: GameState, employee: Employee): PendingAction[] {
+  if (!isMounted(employee.locomotion)) return [];
+  const vehicle = state.vehicles.vehicles.find(v => v.id === mountedVehicleId(employee.locomotion));
+  if (!vehicle) return [];
+  return state.pendingActions.filter(a =>
+    a.status === 'queued'
+    && a.requiredVehicleRole === vehicle.type
+    && (a.targetEmployeeId === null || a.targetEmployeeId === employee.id),
+  );
+}
+
+/**
  * True when a `queued` PendingAction requires `role` and is targeted at
  * someone other than `employeeId` (or is untargeted) — i.e. genuine demand
  * for this role that `employeeId` cannot itself be the one to satisfy (an
