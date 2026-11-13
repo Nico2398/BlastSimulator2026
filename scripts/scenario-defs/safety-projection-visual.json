@@ -588,7 +588,6 @@
       "commandOutcome": "either",
       "expect": {
         "decreased": [
-          "ecology",
           "nuisance"
         ],
         "note": "Fill mode: the armed detonation fires inside this first walkout batch (tick 599; the batch stops as it fires), so the vibration dip in ecology/nuisance lands here. Under the old trajectory two events halted this batch at tick 586 and the shot landed in the next one; by the third batch nuisance is already recovering toward 50 (47.39 -> 48.39 over 619 -> 639), so the dip is asserted on the batch the shot actually fires in."
@@ -613,6 +612,12 @@
         }
       ],
       "role": "setup",
+      "expect": {
+        "decreased": [
+          "ecology"
+        ],
+        "note": "The blast fires inside the previous batch; the random event it halts on is resolved by the step itself and can lift ecology back above the dip (interaction mode), so the ecology drop is asserted one batch later, where the blast aftermath lands."
+      },
       "commandOutcome": "either"
     },
     {
