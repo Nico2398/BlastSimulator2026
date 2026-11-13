@@ -405,4 +405,40 @@ export const KNOWN_TEXT_DEFECTS: readonly TextDefect[] = [
     problem: '"Rezonage" is an invented calque of "rezoning".',
     expectedFix: 'Use "Reclassement" instead of "Rezonage".',
   },
+  {
+    key: 'event.legendary_vein.res0',
+    locale: 'fr',
+    problem: '"trérnium" is a misspelling of the ore name "tréranium" used in the same event.',
+    expectedFix: 'Use "tréranium".',
+  },
+  {
+    key: 'event.union_ghost_backpay.res3',
+    locale: 'fr',
+    problem: '"Officier de Sécurité" is a calque of Safety Officer; French has no such rank on a mine site.',
+    expectedFix: 'Use "Chargé de Sécurité Émérite".',
+  },
+  {
+    key: 'event.union_lunch_thief.res0',
+    locale: 'fr',
+    problem: '"voleur de lunch" is an anglicism; the event title already says "casse-croûte".',
+    expectedFix: 'Use "voleur de casse-croûte".',
+  },
+  {
+    key: 'event.union_overtime_revolt.res1',
+    locale: 'fr',
+    problem: '"transforme les réflexes en pari" is a clumsy rendering of "turns muscle memory into guesswork".',
+    expectedFix: 'Use "transforme les automatismes en devinettes".',
+  },
+  {
+    key: 'event.union_hazard_emotional.res2',
+    locale: 'fr',
+    problem: 'Number disagreement: "C\'est ... toujours des bouchons" (singular verb, plural noun).',
+    expectedFix: 'Use "Ce sont, techniquement, toujours des bouchons d\'oreille."',
+  },
+  {
+    key: 'event.barren_blast.desc',
+    locale: 'fr',
+    problem: '"Le relevé" is not the canonical Sondage action, and "a donné presque rien" is ungrammatical.',
+    expectedFix: "Le tir n'a presque rien donné. Le sondage était bien trop optimiste.",
+  },
 ] as const;
