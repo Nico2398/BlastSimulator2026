@@ -290,7 +290,7 @@
           "type": "assert",
           "selector": ".bs-tutorial-box .bs-panel-title",
           "property": "textContent",
-          "expectedValue": "Étude du Terrain"
+          "expectedValue": "Sonder le Terrain"
         }
       ],
       "role": "player"
