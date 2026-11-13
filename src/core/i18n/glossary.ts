@@ -357,4 +357,52 @@ export const KNOWN_TEXT_DEFECTS: readonly TextDefect[] = [
     problem: '"coquille offshore" is a calque of shell company; French says "société-écran".',
     expectedFix: 'Use "société-écran" instead of "coquille offshore".',
   },
+  {
+    key: 'event.mafia_hide_witness.res1',
+    locale: 'fr',
+    problem: '"Cacher qui que ce soit est purement refusé" mixes a calque of "outright" ("purement") with a clumsy "qui que ce soit".',
+    expectedFix: 'Use "Cacher quiconque est refusé catégoriquement".',
+  },
+  {
+    key: 'event.mafia_police_raid_tip.res0',
+    locale: 'fr',
+    problem: '"raid" is an English word; a police raid is a "descente de police".',
+    expectedFix: 'Use "descente" instead of "raid".',
+  },
+  {
+    key: 'event.mafia_stolen_vehicles.res2_alt',
+    locale: 'fr',
+    problem: '"numéro de série" misses the vehicle-specific term for a VIN.',
+    expectedFix: 'Use "numéro de châssis" instead of "numéro de série".',
+  },
+  {
+    key: 'event.mafia_tattoo_shop.res0',
+    locale: 'fr',
+    problem: 'Agreement error: plural subject "des aiguilles" with singular verb "pose".',
+    expectedFix: 'Use "posent" instead of "pose".',
+  },
+  {
+    key: 'event.weather_ore_hail.res1',
+    locale: 'fr',
+    problem: '"se font contusionner" is a calque of "get bruised".',
+    expectedFix: 'Use "se font des bleus" instead of "se font contusionner".',
+  },
+  {
+    key: 'event.weather_logo_cloud.res2',
+    locale: 'fr',
+    problem: '"goodies" is untranslated English merchandise jargon.',
+    expectedFix: 'Use "produits dérivés" instead of "goodies".',
+  },
+  {
+    key: 'event.weather_suspiciously_perfect.title',
+    locale: 'fr',
+    problem: '"Suspicieusement" means mistrustfully, not suspiciously (calque).',
+    expectedFix: 'Use "Trop Beau pour Être Vrai" instead of "Suspicieusement Parfait".',
+  },
+  {
+    key: 'event.mafia_zoning_favors.opt2',
+    locale: 'fr',
+    problem: '"Rezonage" is an invented calque of "rezoning".',
+    expectedFix: 'Use "Reclassement" instead of "Rezonage".',
+  },
 ] as const;
