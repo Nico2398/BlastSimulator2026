@@ -791,3 +791,262 @@ describe('TaskProgressBar', () => {
     });
   });
 });
+
+// ── #2226: a mounted employee's work shows on the vehicle ───────────────────
+// A mounted employee has no character mesh (getWorkerAnchor -> null), so a timed action or a haul load dwell
+// puts the bar on the vehicle anchor instead.
+
+describe('vehicle-anchored progress bar (#2226)', () => {
+  const MOUNTED: Partial<Employee> = { locomotion: { kind: 'mounted', vehicleId: 7 } };
+
+  function makeLeg(overrides: Record<string, unknown> = {}) {
+    return {
+      mode: 'drive' as const, vehicleId: 7, destX: 5, destZ: 5, arrival: 'exact' as const,
+      onArrive: { kind: 'effect' as const, effectId: 'haul_load' as const }, estTicks: 6,
+      ...overrides,
+    };
+  }
+
+  function makeItinerary(...legs: ReturnType<typeof makeLeg>[]) {
+    return { legs, goal: { kind: 'work' as const, actionId: 1 }, workTicks: 0, estTotalTicks: 10 };
+  }
+
+  function setup() {
+    const scene = new THREE.Scene();
+    const bar = new TaskProgressBar(scene, makeCamera());
+    const vehicleAnchor = new THREE.Group();
+    scene.add(vehicleAnchor);
+    const getVehicleAnchor = (id: number): THREE.Object3D | null => (id === 7 ? vehicleAnchor : null);
+    return { scene, bar, vehicleAnchor, getVehicleAnchor };
+  }
+
+  function syncMounted(
+    bar: TaskProgressBar,
+    employees: Employee[],
+    getVehicleAnchor: (id: number) => THREE.Object3D | null,
+    getWorkerAnchor: (id: number) => THREE.Group | null = () => null,
+  ): void {
+    bar.sync(employees, NO_VEHICLES, NO_PENDING_ACTIONS, getWorkerAnchor, NO_SITE_ANCHOR, getVehicleAnchor);
+  }
+
+  it('a mounted employee on a timed drill_hole gets one bar under the vehicle anchor', () => {
+    const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+    const emp = makeEmployee({ id: 1, ...MOUNTED, taskTicksRemaining: 10, activeTaskTotalTicks: 20, pendingActionType: 'drill_hole' });
+
+    syncMounted(bar, [emp], getVehicleAnchor);
+
+    expect(bar.count).toBeGreaterThanOrEqual(1);
+    expect(collectMeshes(vehicleAnchor).length).toBeGreaterThan(0);
+    bar.dispose();
+  });
+
+  it('the fill scale equals the task fraction', () => {
+    const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+    const emp = makeEmployee({ id: 1, ...MOUNTED, taskTicksRemaining: 5, activeTaskTotalTicks: 20, pendingActionType: 'drill_hole' });
+
+    syncMounted(bar, [emp], getVehicleAnchor);
+
+    expect(findFillMesh(vehicleAnchor).scale.x).toBeCloseTo(0.75, 5);
+    bar.dispose();
+  });
+
+  it('the fill grows as ticksRemaining shrinks', () => {
+    const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+    const emp = makeEmployee({ id: 1, ...MOUNTED, taskTicksRemaining: 15, activeTaskTotalTicks: 20, pendingActionType: 'charge_hole' });
+    syncMounted(bar, [emp], getVehicleAnchor);
+    const before = findFillMesh(vehicleAnchor).scale.x;
+
+    emp.taskTicksRemaining = 5;
+    syncMounted(bar, [emp], getVehicleAnchor);
+    bar.update(10); // converge any easing
+
+    expect(findFillMesh(vehicleAnchor).scale.x).toBeGreaterThan(before);
+    expect(findFillMesh(vehicleAnchor).scale.x).toBeCloseTo(0.75, 5);
+    bar.dispose();
+  });
+
+  it('the bar is removed once the work ends', () => {
+    const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+    const emp = makeEmployee({ id: 1, ...MOUNTED, taskTicksRemaining: 5, activeTaskTotalTicks: 20, pendingActionType: 'drill_hole' });
+    syncMounted(bar, [emp], getVehicleAnchor);
+    expect(bar.count).toBeGreaterThanOrEqual(1);
+
+    emp.taskTicksRemaining = null;
+    delete emp.activeTaskTotalTicks;
+    syncMounted(bar, [emp], getVehicleAnchor);
+
+    expect(bar.count).toBe(0);
+    expect(collectMeshes(vehicleAnchor)).toHaveLength(0);
+    bar.dispose();
+  });
+
+  it('a mounted employee with a worker anchor keeps the bar on the worker anchor, not the vehicle', () => {
+    const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+    const workerAnchor = new THREE.Group();
+    const emp = makeEmployee({ id: 1, ...MOUNTED, taskTicksRemaining: 10, activeTaskTotalTicks: 20, pendingActionType: 'drill_hole' });
+
+    syncMounted(bar, [emp], getVehicleAnchor, id => (id === 1 ? workerAnchor : null));
+
+    expect(collectMeshes(workerAnchor).length).toBeGreaterThan(0);
+    expect(collectMeshes(vehicleAnchor)).toHaveLength(0);
+    expect(bar.count).toBe(1);
+    bar.dispose();
+  });
+
+  it('an on-foot employee with no worker anchor gets no bar even when a vehicle anchor is offered', () => {
+    const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+    const emp = makeEmployee({ id: 1, taskTicksRemaining: 10, activeTaskTotalTicks: 20, pendingActionType: 'drill_hole' });
+
+    syncMounted(bar, [emp], getVehicleAnchor);
+
+    expect(bar.count).toBe(0);
+    expect(collectMeshes(vehicleAnchor)).toHaveLength(0);
+    bar.dispose();
+  });
+
+  it('a mounted employee whose vehicle has no anchor gets no bar', () => {
+    const { bar } = setup();
+    const emp = makeEmployee({ id: 1, ...MOUNTED, taskTicksRemaining: 10, activeTaskTotalTicks: 20, pendingActionType: 'drill_hole' });
+
+    syncMounted(bar, [emp], () => null);
+
+    expect(bar.count).toBe(0);
+    bar.dispose();
+  });
+
+  it('omitting getVehicleAnchor keeps the old behaviour: no bar for a mounted employee', () => {
+    const { bar } = setup();
+    const emp = makeEmployee({ id: 1, ...MOUNTED, taskTicksRemaining: 10, activeTaskTotalTicks: 20, pendingActionType: 'drill_hole' });
+
+    bar.sync([emp], NO_VEHICLES, NO_PENDING_ACTIONS, () => null, NO_SITE_ANCHOR);
+
+    expect(bar.count).toBe(0);
+    bar.dispose();
+  });
+
+  it('place_building from a mounted employee gets only the site bar, none on the vehicle', () => {
+    const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+    const siteAnchor = new THREE.Group();
+    const holder = makeEmployee({ id: 1, ...MOUNTED, taskTicksRemaining: 10, activeTaskTotalTicks: 20, pendingActionType: 'place_building' });
+    const action = makePendingAction({ id: 50, holderId: 1 });
+
+    bar.sync([holder], NO_VEHICLES, [action], () => null, id => (id === 50 ? siteAnchor : null), getVehicleAnchor);
+
+    expect(collectMeshes(siteAnchor).length).toBeGreaterThan(0);
+    expect(collectMeshes(vehicleAnchor)).toHaveLength(0);
+    expect(bar.count).toBe(1);
+    bar.dispose();
+  });
+
+  it('a queued action with no timer gets no bar', () => {
+    const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+    const emp = makeEmployee({ id: 1, ...MOUNTED, pendingActionType: 'drill_hole' });
+
+    syncMounted(bar, [emp], getVehicleAnchor);
+
+    expect(bar.count).toBe(0);
+    expect(collectMeshes(vehicleAnchor)).toHaveLength(0);
+    bar.dispose();
+  });
+
+  it('an idle mounted employee gets no bar', () => {
+    const { bar, getVehicleAnchor } = setup();
+    syncMounted(bar, [makeEmployee({ id: 1, ...MOUNTED })], getVehicleAnchor);
+    expect(bar.count).toBe(0);
+    bar.dispose();
+  });
+
+  it('a mounted employee only driving (itinerary, no dwell, no timer) gets no bar', () => {
+    const { bar, getVehicleAnchor } = setup();
+    const emp = makeEmployee({ id: 1, ...MOUNTED, itinerary: makeItinerary(makeLeg({ onArrive: { kind: 'none' } })) });
+    syncMounted(bar, [emp], getVehicleAnchor);
+    expect(bar.count).toBe(0);
+    bar.dispose();
+  });
+
+  describe('haul loading dwell (#2199)', () => {
+    it('a started dwell countdown gets a bar at (dwellTicks - dwellLeft) / dwellTicks', () => {
+      const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+      const emp = makeEmployee({ id: 1, ...MOUNTED, pendingActionType: 'haul_debris', itinerary: makeItinerary(makeLeg({ dwellTicks: 4, dwellLeft: 1 })) });
+
+      syncMounted(bar, [emp], getVehicleAnchor);
+
+      expect(bar.count).toBeGreaterThanOrEqual(1);
+      expect(findFillMesh(vehicleAnchor).scale.x).toBeCloseTo(0.75, 5);
+      bar.dispose();
+    });
+
+    it('the dwell bar grows as the countdown runs down', () => {
+      const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+      const emp = makeEmployee({ id: 1, ...MOUNTED, pendingActionType: 'haul_debris', itinerary: makeItinerary(makeLeg({ dwellTicks: 4, dwellLeft: 4 })) });
+      syncMounted(bar, [emp], getVehicleAnchor);
+      expect(findFillMesh(vehicleAnchor).scale.x).toBeCloseTo(0, 5);
+
+      emp.itinerary!.legs[0]!.dwellLeft = 2;
+      syncMounted(bar, [emp], getVehicleAnchor);
+      bar.update(10);
+
+      expect(findFillMesh(vehicleAnchor).scale.x).toBeCloseTo(0.5, 5);
+      bar.dispose();
+    });
+
+    it('a leg with a dwell but no started countdown gets no bar', () => {
+      const { bar, getVehicleAnchor } = setup();
+      const emp = makeEmployee({ id: 1, ...MOUNTED, pendingActionType: 'haul_debris', itinerary: makeItinerary(makeLeg({ dwellTicks: 4 })) });
+      syncMounted(bar, [emp], getVehicleAnchor);
+      expect(bar.count).toBe(0);
+      bar.dispose();
+    });
+
+    it('the bar disappears when the dwell leg is gone', () => {
+      const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+      const emp = makeEmployee({ id: 1, ...MOUNTED, pendingActionType: 'haul_debris', itinerary: makeItinerary(makeLeg({ dwellTicks: 4, dwellLeft: 2 })) });
+      syncMounted(bar, [emp], getVehicleAnchor);
+      expect(bar.count).toBeGreaterThanOrEqual(1);
+
+      emp.itinerary = makeItinerary(makeLeg({ onArrive: { kind: 'none' } }));
+      syncMounted(bar, [emp], getVehicleAnchor);
+
+      expect(bar.count).toBe(0);
+      expect(collectMeshes(vehicleAnchor)).toHaveLength(0);
+      bar.dispose();
+    });
+  });
+
+  it('a fragment action without a work timer gets no bar', () => {
+    const { bar, getVehicleAnchor } = setup();
+    const emp = makeEmployee({
+      id: 1, ...MOUNTED, pendingActionType: 'fragment_debris',
+      itinerary: makeItinerary(makeLeg({ onArrive: { kind: 'effect', effectId: 'boulder_split' } })),
+    });
+    syncMounted(bar, [emp], getVehicleAnchor);
+    expect(bar.count).toBe(0);
+    bar.dispose();
+  });
+
+  it('two mounted workers on two vehicles each get their own bar under their own anchor', () => {
+    const scene = new THREE.Scene();
+    const bar = new TaskProgressBar(scene, makeCamera());
+    const a7 = new THREE.Group();
+    const a8 = new THREE.Group();
+    scene.add(a7, a8);
+    const anchors = new Map<number, THREE.Object3D>([[7, a7], [8, a8]]);
+    const e1 = makeEmployee({ id: 1, locomotion: { kind: 'mounted', vehicleId: 7 }, taskTicksRemaining: 10, activeTaskTotalTicks: 20, pendingActionType: 'drill_hole' });
+    const e2 = makeEmployee({ id: 2, locomotion: { kind: 'mounted', vehicleId: 8 }, taskTicksRemaining: 5, activeTaskTotalTicks: 20, pendingActionType: 'drill_hole' });
+
+    syncMounted(bar, [e1, e2], id => anchors.get(id) ?? null);
+
+    expect(bar.count).toBeGreaterThanOrEqual(2);
+    expect(findFillMesh(a7).scale.x).toBeCloseTo(0.5, 5);
+    expect(findFillMesh(a8).scale.x).toBeCloseTo(0.75, 5);
+    bar.dispose();
+  });
+
+  it('dispose leaves nothing under the vehicle anchor', () => {
+    const { bar, vehicleAnchor, getVehicleAnchor } = setup();
+    const emp = makeEmployee({ id: 1, ...MOUNTED, taskTicksRemaining: 10, activeTaskTotalTicks: 20, pendingActionType: 'drill_hole' });
+    syncMounted(bar, [emp], getVehicleAnchor);
+    bar.dispose();
+    expect(vehicleAnchor.children).toHaveLength(0);
+  });
+});

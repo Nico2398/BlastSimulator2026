@@ -24,6 +24,7 @@ import { VehicleMesh } from './VehicleMesh.js';
 import { CharacterMesh } from './CharacterMesh.js';
 import { TaskProgressBar } from './TaskProgressBar.js';
 import { EmployeePictograms } from './EmployeePictograms.js';
+import { VehicleAlertPictograms } from './VehicleAlertPictograms.js';
 import { EmployeeMarkers } from './EmployeeMarkers.js';
 import { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import { SkyboxWeather } from './SkyboxWeather.js';
@@ -82,6 +83,7 @@ export interface SceneSetupDeps {
   characters: CharacterMesh | null;
   taskProgress: TaskProgressBar | null;
   pictograms: EmployeePictograms | null;
+  vehicleAlerts: VehicleAlertPictograms | null;
   /** Role-coloured pins that keep every worker findable at any zoom. */
   employeeMarkers: EmployeeMarkers | null;
   buildingOccupancyLabels: BuildingOccupancyLabels | null;
@@ -189,6 +191,7 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   // Non-working activity pictograms — billboarded above employees who
   // aren't working, naming why (#1013)
   deps.pictograms = new EmployeePictograms(scene, deps.sm.camera);
+  deps.vehicleAlerts = new VehicleAlertPictograms(scene, deps.sm.camera);
 
   // Crew pins — a worker is a speck at the default framing, so each carries a pin that keeps one
   // size on screen at any zoom
@@ -439,6 +442,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.rallyFlag?.dispose();
   deps.taskProgress?.dispose();
   deps.pictograms?.dispose();
+  deps.vehicleAlerts?.dispose();
   deps.employeeMarkers?.dispose();
   deps.buildingOccupancyLabels?.dispose();
 
@@ -477,6 +481,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.rallyFlag = null;
   deps.taskProgress = null;
   deps.pictograms = null;
+  deps.vehicleAlerts = null;
   deps.employeeMarkers = null;
   deps.buildingOccupancyLabels = null;
   deps.lastGrid = null;
