@@ -202,6 +202,11 @@ export class VehicleMesh {
     return this.vehicles.get(id)?.group.position.clone() ?? null;
   }
 
+  /** The vehicle's root group, the anchor for billboards above it, or null if it isn't rendered. */
+  getAnchor(_id: number): THREE.Group | null {
+    throw new Error('not implemented');
+  }
+
   /** The model instance drawn for a vehicle, or null — exposes tint materials and nodes to tests. */
   getInstance(id: number): ModelInstance | null {
     return this.vehicles.get(id)?.instance ?? null;

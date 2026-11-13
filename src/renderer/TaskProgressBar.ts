@@ -116,6 +116,7 @@ export class TaskProgressBar {
     pendingActions: readonly PendingAction[],
     getWorkerAnchor: (id: number) => THREE.Group | null,
     getSiteAnchor: (actionId: number) => THREE.Object3D | null,
+    _getVehicleAnchor?: (vehicleId: number) => THREE.Object3D | null,
   ): void {
     const liveIds = new Set<number>();
     const employeeById = new Map<number, Employee>(employees.map(e => [e.id, e]));
