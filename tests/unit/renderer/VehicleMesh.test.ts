@@ -10,6 +10,8 @@ import { VehicleMesh, STATE_COLOR_MAP, applyStateIndicator, BODY_TINT } from '..
 import type { VehicleStatusKind } from '../../../src/core/entities/VehicleStatus.js';
 import { WAITING_QUEUE_SLOT_OFFSETS } from '../../../src/core/config/balance.js';
 import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
+import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
+import { MOVEMENT_TRAIL_MAX_POINTS, type MovementTrail, type TrailHostEvent, type TrailPoint } from '../../../src/core/entities/MovementTrail.js';
 import { loadedModelLibrary } from '../../helpers/models.js';
 
 function makeVehicle(id: number, type: Vehicle['type'], x = 0, z = 0, tier = 1 as VehicleTier, hp = 100): Vehicle {
@@ -682,6 +684,324 @@ describe('VehicleMesh — model animation (real assets)', () => {
     const group = scene.children[0] as THREE.Group;
     const marker = group.children.find(c => c.userData['isStateIndicator']) as THREE.Mesh;
     expect(marker.position.y).toBeGreaterThan(inst.bounds.max.y);
+    vm.dispose();
+  });
+});
+
+
+// ── Vehicle and rider share one timeline (#2224) ────────────────────────────
+// A vehicle mesh holds still until its driver, boarding in the same batch, has walked up and vanished into
+// it, and stops before an alighting driver is drawn. Each case drives real CharacterMesh + VehicleMesh
+// frames through the public API, with hand-built walk trails.
+
+const FRAME_DT = 1 / 64; // exact in binary
+const BATCH_SIZES = [1, 2, 4, 8] as const;
+const X0 = 20;
+const Z0 = 10;
+
+function makeRider(x: number, z: number): Employee {
+  const id = _nextEmployeeId++;
+  const { employee } = hireEmployee(createEmployeeState(), 'driller', new Random(id), x, z);
+  employee.id = id;
+  return employee;
+}
+
+/** Unit-cell polyline along z=Z0 from x=`from` to x=`to` inclusive. */
+function line(from: number, to: number): TrailPoint[] {
+  const out: TrailPoint[] = [];
+  const dir = to >= from ? 1 : -1;
+  for (let x = from; x !== to + dir; x += dir) out.push({ x, z: Z0 });
+  return out;
+}
+
+function riderMarker(pointIndex: number, event: TrailHostEvent, riderId?: number, riderArc?: number) {
+  return {
+    pointIndex, event, hostKind: 'vehicle' as const, hostX: X0, hostZ: Z0,
+    ...(riderId !== undefined ? { riderId } : {}),
+    ...(riderArc !== undefined ? { riderArc } : {}),
+  };
+}
+
+function trailOf(points: TrailPoint[], hostMarkers: MovementTrail['hostMarkers'], relocated = false): MovementTrail {
+  return { points, relocated, hostMarkers };
+}
+
+interface Rig {
+  scene: THREE.Scene;
+  vm: VehicleMesh;
+  cm: CharacterMesh;
+  vehicle: Vehicle;
+  state: VehicleState;
+  driver: Employee;
+}
+
+/** A vehicle at (X0, Z0) and its driver, both meshes added at their batch-start positions. */
+function rig(driverStartX: number, driverMeshed: boolean): Rig {
+  const scene = new THREE.Scene();
+  const vm = new VehicleMesh(scene);
+  const cm = new CharacterMesh(scene);
+  const vehicle = makeVehicle(1, 'debris_hauler', X0, Z0);
+  const driver = makeRider(driverStartX, Z0);
+  const state = makeVehicleState([vehicle]);
+  vm.addVehicle(vehicle, state, [driver]);
+  if (driverMeshed) cm.addEmployee(driver, 0);
+  return { scene, vm, cm, vehicle, state, driver };
+}
+
+interface Sample { charVisible: boolean; charExists: boolean; vx: number; vz: number }
+
+function runFrames(r: Rig, seconds: number, dt = FRAME_DT): Sample[] {
+  const out: Sample[] = [];
+  const n = Math.round(seconds / dt);
+  for (let i = 0; i < n; i++) {
+    r.cm.update([r.driver], dt);
+    r.vm.update([r.vehicle], r.state, [r.driver], dt);
+    const g = r.cm.getGroup(r.driver.id);
+    const p = r.vm.getPosition(r.vehicle.id)!;
+    out.push({ charVisible: g?.visible === true, charExists: g !== null, vx: p.x, vz: p.z });
+  }
+  return out;
+}
+
+/** The batch in which `driver` walks `walk` cells to the vehicle, boards it and rides `ride` cells. */
+function boardBatch(r: Rig, walk: number, ride: number): void {
+  const { vehicle, driver } = r;
+  vehicle.x = X0 + ride;
+  vehicle.walkTrail = trailOf(line(X0, X0 + ride), [riderMarker(0, 'board', driver.id, walk)]);
+  driver.x = vehicle.x;
+  driver.z = vehicle.z;
+  driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+  vehicle.occupantIds = [driver.id];
+  driver.walkTrail = trailOf(
+    line(X0 - walk, X0 + ride),
+    [{ pointIndex: walk, event: 'board', hostKind: 'vehicle', hostX: X0, hostZ: Z0 }],
+  );
+  r.cm.retireEmployee(driver);
+}
+
+/** The batch in which `driver`, riding at batch start, is driven `ride` cells, steps out one cell on and walks `walk` more. */
+function alightBatch(r: Rig, ride: number, walk: number): void {
+  const { vehicle, driver } = r;
+  vehicle.x = X0 + ride;
+  vehicle.walkTrail = trailOf(line(X0, X0 + ride), [riderMarker(ride, 'alight', driver.id, ride)]);
+  vehicle.occupantIds = [];
+  driver.x = X0 + ride + 1 + walk;
+  driver.z = Z0;
+  driver.locomotion = { kind: 'on_foot' };
+  driver.walkTrail = trailOf(
+    line(X0, X0 + ride + 1 + walk),
+    [{ pointIndex: ride + 1, event: 'alight', hostKind: 'vehicle', hostX: X0 + ride, hostZ: Z0 }],
+  );
+  r.cm.addEmployee(driver, 0, driver.walkTrail);
+}
+
+describe('VehicleMesh — holds still until the boarding driver is inside (#2224)', () => {
+  for (const batch of BATCH_SIZES) {
+    it(`batch of ${batch}: the vehicle mesh stays at its batch-start position in every frame the boarding character is visible`, () => {
+      const walk = batch;
+      const ride = 2 * batch;
+      const r = rig(X0 - walk, true);
+      boardBatch(r, walk, ride);
+      const frames = runFrames(r, 1.5);
+      const shown = frames.filter(f => f.charVisible);
+      expect(shown.length).toBeGreaterThan(0); // the walk to the vehicle was on screen
+      for (const f of shown) {
+        expect(f.vx).toBeCloseTo(X0, 2);
+        expect(f.vz).toBeCloseTo(Z0, 2);
+      }
+      r.vm.dispose(); r.cm.dispose();
+    });
+
+    it(`batch of ${batch}: once the driver is gone the vehicle drives on and ends at its target`, () => {
+      const r = rig(X0 - batch, true);
+      boardBatch(r, batch, 2 * batch);
+      const frames = runFrames(r, 1.5);
+      expect(r.cm.count).toBe(0);
+      const moved = frames.filter(f => !f.charExists && f.vx > X0 + 1e-3);
+      expect(moved.length).toBeGreaterThan(0);
+      expect(frames[frames.length - 1]!.vx).toBeCloseTo(X0 + 2 * batch, 6);
+      // The vehicle never drives backwards or overshoots.
+      for (let i = 1; i < frames.length; i++) expect(frames[i]!.vx).toBeGreaterThanOrEqual(frames[i - 1]!.vx - 1e-9);
+      for (const f of frames) expect(f.vx).toBeLessThanOrEqual(X0 + 2 * batch + 1e-9);
+      r.vm.dispose(); r.cm.dispose();
+    });
+
+    it(`batch of ${batch}: the vehicle moves for the first time no earlier than the frame the driver vanishes`, () => {
+      const r = rig(X0 - batch, true);
+      boardBatch(r, batch, 2 * batch);
+      const frames = runFrames(r, 1.5);
+      const firstMove = frames.findIndex(f => f.vx > X0 + 1e-3);
+      const goneAt = frames.findIndex(f => !f.charExists);
+      expect(goneAt).toBeGreaterThanOrEqual(0);
+      expect(firstMove).toBeGreaterThanOrEqual(goneAt - 1);
+      r.vm.dispose(); r.cm.dispose();
+    });
+  }
+
+  it('only the locomotion tick writes the vehicle position: the renderer leaves vehicle.x/z alone', () => {
+    const r = rig(X0 - 2, true);
+    boardBatch(r, 2, 4);
+    runFrames(r, 1.5);
+    expect(r.vehicle.x).toBe(X0 + 4);
+    expect(r.vehicle.z).toBe(Z0);
+    r.vm.dispose(); r.cm.dispose();
+  });
+});
+
+describe('VehicleMesh — stops before the alighting driver is drawn (#2224)', () => {
+  for (const batch of BATCH_SIZES) {
+    it(`batch of ${batch}: the vehicle mesh is stationary at the alight point in every frame the character is visible`, () => {
+      const ride = 2 * batch;
+      const r = rig(X0, false);
+      alightBatch(r, ride, batch);
+      const frames = runFrames(r, 1.5);
+      let prevX = X0;
+      let shown = 0;
+      frames.forEach(f => {
+        if (f.charVisible) {
+          shown++;
+          expect(Math.abs(f.vx - (X0 + ride))).toBeLessThanOrEqual(1);
+          expect(Math.abs(f.vx - prevX)).toBeLessThan(1e-6);
+        }
+        prevX = f.vx;
+      });
+      expect(shown).toBeGreaterThan(0);
+      r.vm.dispose(); r.cm.dispose();
+    });
+
+    it(`batch of ${batch}: the vehicle was driving before the driver appeared (it did not stand still the whole batch)`, () => {
+      const ride = 2 * batch;
+      const r = rig(X0, false);
+      alightBatch(r, ride, batch);
+      const frames = runFrames(r, 1.5);
+      const firstShown = frames.findIndex(f => f.charVisible);
+      expect(firstShown).toBeGreaterThan(0);
+      expect(frames.slice(0, firstShown).some(f => f.vx > X0 + 1e-3 && f.vx < X0 + ride - 1e-3)).toBe(true);
+      expect(frames[firstShown]!.vx).toBeCloseTo(X0 + ride, 6);
+      r.vm.dispose(); r.cm.dispose();
+    });
+  }
+
+  it('the driver then walks away from a vehicle that stays parked', () => {
+    const r = rig(X0, false);
+    alightBatch(r, 4, 3);
+    const frames = runFrames(r, 2);
+    const last = frames[frames.length - 1]!;
+    expect(last.charVisible).toBe(true);
+    expect(last.vx).toBeCloseTo(X0 + 4, 6);
+    expect(r.cm.getPosition(r.driver.id)!.x).toBeCloseTo(X0 + 4 + 1 + 3, 6);
+    r.vm.dispose(); r.cm.dispose();
+  });
+});
+
+describe('VehicleMesh — board and alight in the same batch (#2224)', () => {
+  for (const batch of BATCH_SIZES) {
+    it(`ride of ${batch} cells: the vehicle drives only while the driver is hidden, and parks wherever the driver is seen`, () => {
+      const walk = 2;
+      const ride = batch;
+      const r = rig(X0 - walk, true);
+      const { vehicle, driver } = r;
+      vehicle.x = X0 + ride;
+      vehicle.walkTrail = trailOf(line(X0, X0 + ride), [
+        riderMarker(0, 'board', driver.id, walk),
+        riderMarker(ride, 'alight', driver.id, walk + ride),
+      ]);
+      driver.x = X0 + ride + 1 + 2;
+      driver.walkTrail = trailOf(line(X0 - walk, X0 + ride + 3), [
+        { pointIndex: walk, event: 'board', hostKind: 'vehicle', hostX: X0, hostZ: Z0 },
+        { pointIndex: walk + ride + 1, event: 'alight', hostKind: 'vehicle', hostX: X0 + ride, hostZ: Z0 },
+      ]);
+
+      const frames = runFrames(r, 1.5);
+      let prevX = X0;
+      let sawDriving = false;
+      for (const f of frames) {
+        if (f.charVisible) {
+          expect(Math.abs(f.vx - prevX)).toBeLessThan(1e-6);
+          const atStart = Math.abs(f.vx - X0) < 1e-3;
+          const atEnd = Math.abs(f.vx - (X0 + ride)) < 1e-3;
+          expect(atStart || atEnd).toBe(true);
+        } else if (f.charExists && f.vx > X0 + 1e-3 && f.vx < X0 + ride - 1e-3) {
+          sawDriving = true;
+        }
+        prevX = f.vx;
+      }
+      if (ride > 1) expect(sawDriving).toBe(true);
+      expect(frames[frames.length - 1]!.vx).toBeCloseTo(X0 + ride, 6);
+      expect(frames[frames.length - 1]!.charVisible).toBe(true);
+      r.vm.dispose(); r.cm.dispose();
+    });
+  }
+});
+
+describe('VehicleMesh — no riding window, the old glide (#2224)', () => {
+  const FAR = 8;
+  const movedAfter = (r: Rig, frames: number): number => {
+    for (let i = 0; i < frames; i++) r.vm.update([r.vehicle], r.state, [r.driver], FRAME_DT);
+    return r.vm.getPosition(r.vehicle.id)!.x - X0;
+  };
+
+  it('a rider trail flagged relocated gives no window: the vehicle moves from the first frames', () => {
+    const r = rig(X0 - 2, false);
+    const { vehicle, driver } = r;
+    vehicle.x = X0 + FAR;
+    vehicle.walkTrail = trailOf(line(X0, X0 + FAR), [riderMarker(0, 'board', driver.id, 6)]);
+    driver.walkTrail = trailOf(line(X0 - 2, X0 + FAR), [], true);
+    expect(movedAfter(r, 4)).toBeGreaterThan(0.2);
+    r.vm.dispose();
+  });
+
+  it('a capped rider trail gives no window', () => {
+    const r = rig(X0 - 2, false);
+    const { vehicle, driver } = r;
+    vehicle.x = X0 + FAR;
+    vehicle.walkTrail = trailOf(line(X0, X0 + FAR), [riderMarker(0, 'board', driver.id, 100)]);
+    driver.walkTrail = trailOf(Array.from({ length: MOVEMENT_TRAIL_MAX_POINTS }, (_, i) => ({ x: X0 - 2 + i * 0.1, z: Z0 })), []);
+    expect(movedAfter(r, 4)).toBeGreaterThan(0.2);
+    r.vm.dispose();
+  });
+
+  it('a rider the employees list does not hold gives no window', () => {
+    const r = rig(X0 - 2, false);
+    const { vehicle, driver } = r;
+    vehicle.x = X0 + FAR;
+    vehicle.walkTrail = trailOf(line(X0, X0 + FAR), [riderMarker(0, 'board', driver.id, 6)]);
+    for (let i = 0; i < 4; i++) r.vm.update([vehicle], r.state, [], FRAME_DT);
+    expect(r.vm.getPosition(vehicle.id)!.x - X0).toBeGreaterThan(0.2);
+    r.vm.dispose();
+  });
+
+  it('a drive with no rider markers (driver aboard all batch) moves from the first frame and ends on target', () => {
+    const r = rig(X0, false);
+    const { vehicle, driver } = r;
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    vehicle.occupantIds = [driver.id];
+    vehicle.x = X0 + FAR;
+    vehicle.walkTrail = trailOf(line(X0, X0 + FAR), []);
+    driver.walkTrail = trailOf(line(X0, X0 + FAR), []);
+    expect(movedAfter(r, 4)).toBeGreaterThan(0.2);
+    for (let i = 0; i < 80; i++) r.vm.update([vehicle], r.state, [driver], FRAME_DT);
+    expect(r.vm.getPosition(vehicle.id)!.x).toBeCloseTo(X0 + FAR, 6);
+    r.vm.dispose();
+  });
+
+  it('a waiting-queue offset render is a render-only shift: no window, the mesh glides to its slot at once', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const a = makeVehicle(1, 'debris_hauler', X0, Z0);
+    const b = makeVehicle(2, 'debris_hauler', X0 + 2, Z0);
+    const waitingA = makeWaitingOccupant(a, 40, Z0);
+    makeWaitingOccupant(b, 40, Z0);
+    const employees = [waitingA, makeWaitingOccupant(b, 40, Z0)];
+    const state = makeVehicleState([a, b]);
+    vm.addVehicle(a, state, employees);
+    vm.addVehicle(b, state, employees);
+    a.x = X0 + 1;
+    // A rider marker that, if honoured, would hold the mesh for 90% of the tween.
+    a.walkTrail = trailOf(line(X0, X0 + 1), [riderMarker(0, 'board', waitingA.id, 9)]);
+    waitingA.walkTrail = trailOf(line(X0 - 9, X0 + 1), []);
+    for (let i = 0; i < 4; i++) vm.update([a, b], state, employees, FRAME_DT);
+    expect(vm.getPosition(1)!.x - X0).toBeGreaterThan(0.2);
     vm.dispose();
   });
 });

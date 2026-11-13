@@ -2,7 +2,7 @@
 // Pure per-tick position easing shared by CharacterMesh and VehicleMesh.
 
 import { describe, it, expect } from 'vitest';
-import type { MovementTrail, TrailPoint } from '../../../src/core/entities/MovementTrail.js';
+import { MOVEMENT_TRAIL_MAX_POINTS, type MovementTrail, type TrailPoint } from '../../../src/core/entities/MovementTrail.js';
 import {
   createTween,
   computeInterpolatedPosition,
@@ -14,6 +14,11 @@ import {
   visibleTrailSpans,
   trailLength,
   stepSpanPlayback,
+  startSpanPlayback,
+  applyEasedPosition,
+  leavingHostSpanOf,
+  ridingWindowOf,
+  type RidingWindow,
   type TrailSpan,
 } from '../../../src/renderer/MovementInterpolation.js';
 
@@ -474,7 +479,7 @@ describe('stepSpanPlayback (#1589)', () => {
     return tween;
   }
   const straight = (cells: number): TrailSpan =>
-    ({ points: [{ x: 0, z: 0 }, { x: cells, z: 0 }], endsInHost: true });
+    ({ points: [{ x: 0, z: 0 }, { x: cells, z: 0 }], endsInHost: true, startArc: 0, gapAfter: 0 });
 
   for (const cells of [1, 2, 4]) {
     it(`batch of ${cells}: a span of ${cells} cells completes in the proportional share of the tween`, () => {
@@ -504,7 +509,7 @@ describe('stepSpanPlayback (#1589)', () => {
   });
 
   it('finished stays false when a span completes but another follows', () => {
-    const second: TrailSpan = { points: [{ x: 5, z: 0 }, { x: 6, z: 0 }], endsInHost: false };
+    const second: TrailSpan = { points: [{ x: 5, z: 0 }, { x: 6, z: 0 }], endsInHost: false, startArc: 0, gapAfter: 0 };
     const tween = spanTween([straight(2), second], 3);
     const r = stepSpanPlayback(tween, 0, 0, 100, 3);
     expect(r.spanDone).toBe(true);
@@ -512,7 +517,7 @@ describe('stepSpanPlayback (#1589)', () => {
   });
 
   it('follows a turn along the span instead of cutting the chord', () => {
-    const span: TrailSpan = { points: [{ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 2, z: 2 }], endsInHost: true };
+    const span: TrailSpan = { points: [{ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 2, z: 2 }], endsInHost: true, startArc: 0, gapAfter: 0 };
     const tween = spanTween([span], 4);
     const r = stepSpanPlayback(tween, 0, 0, MOVE_TWEEN_DURATION_S / 2, 4);
     expect(r.x).toBeCloseTo(2, 9);
@@ -520,11 +525,342 @@ describe('stepSpanPlayback (#1589)', () => {
   });
 
   it('fullTrailLength 0 finishes on the next frame', () => {
-    const span: TrailSpan = { points: [{ x: 3, z: 3 }], endsInHost: false };
+    const span: TrailSpan = { points: [{ x: 3, z: 3 }], endsInHost: false, startArc: 0, gapAfter: 0 };
     const tween = spanTween([span], 0);
     const r = stepSpanPlayback(tween, 3, 3, 0.016, 0);
     expect(r.finished).toBe(true);
     expect(r.x).toBe(3);
     expect(r.z).toBe(3);
+  });
+});
+
+// ── Shared rider / vehicle timeline (#2224) ─────────────────────────────────
+
+describe('visibleTrailSpans — startArc and gapAfter (#2224)', () => {
+  it('no markers: the one span starts at arc 0 and has no gap after it', () => {
+    const [span] = visibleTrailSpans(trailOf(pts(0, 1, 2)));
+    expect(span!.startArc).toBe(0);
+    expect(span!.gapAfter).toBe(0);
+  });
+
+  it('board then alight: the second span starts after the first plus the hidden ride', () => {
+    const spans = visibleTrailSpans(trailOf(pts(0, 1, 2, 3, 4, 5), [marker(2, 'board'), marker(4, 'alight')]));
+    expect(spans).toHaveLength(2);
+    expect(spans[0]!.startArc).toBeCloseTo(0, 9);
+    expect(spans[0]!.gapAfter).toBeCloseTo(2, 9);
+    expect(spans[1]!.startArc).toBeCloseTo(4, 9);
+    expect(spans[1]!.gapAfter).toBe(0);
+  });
+
+  it('a trail that begins hosted: the span starts at the arc length before the exit point', () => {
+    const [span] = visibleTrailSpans(trailOf(pts(0, 2, 5, 6, 7), [marker(3, 'alight')]));
+    expect(span!.startArc).toBeCloseTo(6, 9);
+    expect(span!.gapAfter).toBe(0);
+  });
+
+  it('alight then board: one span with a start arc and no gap after it', () => {
+    const [span] = visibleTrailSpans(trailOf(pts(0, 1, 2, 3, 4), [marker(1, 'alight'), marker(4, 'board')]));
+    expect(span!.startArc).toBeCloseTo(1, 9);
+    expect(span!.gapAfter).toBe(0);
+  });
+
+  it('three spans: every gap and start arc is measured on the full polyline, diagonals included', () => {
+    const points: TrailPoint[] = [
+      { x: 0, z: 0 }, { x: 3, z: 0 }, // span 1 (len 3), board at 1
+      { x: 3, z: 4 },                 // ride, len 4
+      { x: 6, z: 8 },                 // alight at 3 (hop 5 from idx 2)
+      { x: 6, z: 10 },                // board at 4
+      { x: 6, z: 11 }, { x: 8, z: 11 }, // alight at 5 .. end
+    ];
+    const markers: Marker[] = [marker(1, 'board'), marker(3, 'alight'), marker(4, 'board'), marker(5, 'alight')];
+    const spans = visibleTrailSpans({ points, relocated: false, hostMarkers: markers });
+    expect(spans).toHaveLength(3);
+    expect(spans.map(sp => sp.startArc)).toEqual([
+      expect.closeTo(0, 9), expect.closeTo(3 + 4 + 5, 9), expect.closeTo(3 + 4 + 5 + 2 + 1, 9),
+    ]);
+    expect(spans[0]!.gapAfter).toBeCloseTo(4 + 5, 9);
+    expect(spans[1]!.gapAfter).toBeCloseTo(1, 9);
+    expect(spans[2]!.gapAfter).toBe(0);
+  });
+
+  it('startArc + span length + gapAfter chains into the next span startArc', () => {
+    const spans = visibleTrailSpans(trailOf(pts(0, 1, 2, 3, 4, 5, 6, 7), [marker(2, 'board'), marker(4, 'alight'), marker(5, 'board'), marker(6, 'alight')]));
+    for (let i = 0; i + 1 < spans.length; i++) {
+      const a = spans[i]!;
+      expect(a.startArc + trailLength(a.points) + a.gapAfter).toBeCloseTo(spans[i + 1]!.startArc, 9);
+    }
+  });
+});
+
+describe('leavingHostSpanOf (#2224)', () => {
+  it('is undefined for no trail, an empty trail and a trail without markers', () => {
+    expect(leavingHostSpanOf(undefined)).toBeUndefined();
+    expect(leavingHostSpanOf(trailOf([]))).toBeUndefined();
+    expect(leavingHostSpanOf(trailOf(pts(0, 1, 2)))).toBeUndefined();
+  });
+
+  it('is undefined when the first host marker is a board (the employee began on foot)', () => {
+    expect(leavingHostSpanOf(trailOf(pts(0, 1, 2, 3), [marker(1, 'board'), marker(3, 'alight')]))).toBeUndefined();
+  });
+
+  it('is undefined when the first host marker is an enter', () => {
+    expect(leavingHostSpanOf(trailOf(pts(0, 1, 2), [marker(2, 'enter')]))).toBeUndefined();
+  });
+
+  it('is undefined for a relocated trail', () => {
+    expect(leavingHostSpanOf(trailOf(pts(0, 1, 2), [marker(0, 'alight')], true))).toBeUndefined();
+  });
+
+  it('alight .. board: the span between the markers, ending in the host', () => {
+    const span = leavingHostSpanOf(trailOf(pts(0, 1, 2, 3, 4), [marker(1, 'alight'), marker(4, 'board')]));
+    expect(span).toBeDefined();
+    expect(xsOf(span!)).toEqual([1, 2, 3, 4]);
+    expect(span!.endsInHost).toBe(true);
+    expect(span!.startArc).toBeCloseTo(1, 9);
+  });
+
+  it('alight .. enter: the walk to the door', () => {
+    const span = leavingHostSpanOf(trailOf(pts(0, 1, 2, 3, 4, 5), [marker(2, 'alight'), marker(5, 'enter')]));
+    expect(xsOf(span!)).toEqual([2, 3, 4, 5]);
+    expect(span!.endsInHost).toBe(true);
+    expect(span!.startArc).toBeCloseTo(2, 9);
+  });
+
+  it('leave behaves like alight', () => {
+    const span = leavingHostSpanOf(trailOf(pts(0, 1, 2), [marker(0, 'leave')]));
+    expect(xsOf(span!)).toEqual([0, 1, 2]);
+    expect(span!.endsInHost).toBe(false);
+  });
+
+  it('alight with no later host marker: the span runs to the end of the trail', () => {
+    const span = leavingHostSpanOf(trailOf(pts(0, 1, 2, 3), [marker(1, 'alight')]));
+    expect(xsOf(span!)).toEqual([1, 2, 3]);
+    expect(span!.endsInHost).toBe(false);
+  });
+
+  it('returns only the first span when the trail hosts the employee again and again', () => {
+    const span = leavingHostSpanOf(trailOf(pts(0, 1, 2, 3, 4, 5, 6), [
+      marker(1, 'alight'), marker(2, 'board'), marker(4, 'alight'), marker(6, 'board'),
+    ]));
+    expect(xsOf(span!)).toEqual([1, 2]);
+    expect(span!.endsInHost).toBe(true);
+  });
+
+  it('a zero-length span (alight and enter on the same point) is still returned', () => {
+    const span = leavingHostSpanOf(trailOf(pts(0, 1, 2), [marker(2, 'alight'), marker(2, 'enter')]));
+    expect(span).toBeDefined();
+    expect(xsOf(span!)).toEqual([2]);
+    expect(span!.endsInHost).toBe(true);
+  });
+});
+
+describe('ridingWindowOf (#2224)', () => {
+  // The rider walked 2 cells to the vehicle, rode 4, stepped out one cell and walked 2 more: 9 cells in all.
+  const riderPoints = pts(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+  const riderTrail = trailOf(riderPoints, [marker(2, 'board'), marker(7, 'alight')]);
+  const lookup = (id: number): MovementTrail | undefined => (id === 7 ? riderTrail : undefined);
+  const riderMarker = (event: 'board' | 'alight', arc: number, riderId = 7): Marker =>
+    ({ pointIndex: 0, event, hostKind: 'vehicle', hostX: 0, hostZ: 0, riderId, riderArc: arc });
+  const vehicleTrail = (...markers: Marker[]): MovementTrail => trailOf(pts(10, 11, 12), markers);
+
+  it('board and alight: start and end are the rider arcs as fractions of the rider trail length', () => {
+    const w = ridingWindowOf(vehicleTrail(riderMarker('board', 2), riderMarker('alight', 6)), lookup)!;
+    expect(w.start).toBeCloseTo(2 / 9, 9);
+    expect(w.end).toBeCloseTo(6 / 9, 9);
+  });
+
+  it('board only: the vehicle drives to the end of the tween', () => {
+    const w = ridingWindowOf(vehicleTrail(riderMarker('board', 3)), lookup)!;
+    expect(w.start).toBeCloseTo(3 / 9, 9);
+    expect(w.end).toBe(1);
+  });
+
+  it('alight only: the vehicle drives from the start of the tween', () => {
+    const w = ridingWindowOf(vehicleTrail(riderMarker('alight', 6)), lookup)!;
+    expect(w.start).toBe(0);
+    expect(w.end).toBeCloseTo(6 / 9, 9);
+  });
+
+  it('several pairs: the first board and the last alight bound the window', () => {
+    const w = ridingWindowOf(vehicleTrail(
+      riderMarker('board', 1), riderMarker('alight', 3), riderMarker('board', 4), riderMarker('alight', 8),
+    ), lookup)!;
+    expect(w.start).toBeCloseTo(1 / 9, 9);
+    expect(w.end).toBeCloseTo(8 / 9, 9);
+  });
+
+  it('asks for the trail of the rider named on the marker', () => {
+    const asked: number[] = [];
+    ridingWindowOf(vehicleTrail(riderMarker('board', 2)), id => { asked.push(id); return riderTrail; });
+    expect(asked.length).toBeGreaterThan(0);
+    expect(new Set(asked)).toEqual(new Set([7]));
+  });
+
+  it('is undefined without a vehicle trail', () => {
+    expect(ridingWindowOf(undefined, lookup)).toBeUndefined();
+  });
+
+  it('is undefined when the vehicle trail has no markers or none names a rider', () => {
+    expect(ridingWindowOf(vehicleTrail(), lookup)).toBeUndefined();
+    expect(ridingWindowOf(vehicleTrail(marker(0, 'board'), marker(1, 'alight')), lookup)).toBeUndefined();
+  });
+
+  it('is undefined when the rider has no trail', () => {
+    expect(ridingWindowOf(vehicleTrail(riderMarker('board', 2)), () => undefined)).toBeUndefined();
+    expect(ridingWindowOf(vehicleTrail(riderMarker('board', 2, 99)), lookup)).toBeUndefined();
+  });
+
+  it('is undefined when the rider trail was relocated', () => {
+    const relocated = { ...riderTrail, relocated: true };
+    expect(ridingWindowOf(vehicleTrail(riderMarker('board', 2)), () => relocated)).toBeUndefined();
+  });
+
+  it('is undefined when the rider trail has no length', () => {
+    const still = trailOf(pts(4));
+    expect(ridingWindowOf(vehicleTrail(riderMarker('board', 0)), () => still)).toBeUndefined();
+    const stacked = trailOf([{ x: 4, z: 0 }, { x: 4, z: 0 }]);
+    expect(ridingWindowOf(vehicleTrail(riderMarker('board', 0)), () => stacked)).toBeUndefined();
+  });
+
+  it('is undefined when the rider trail hit the point cap (its early arcs were dropped)', () => {
+    const capped = trailOf(Array.from({ length: MOVEMENT_TRAIL_MAX_POINTS }, (_, i) => ({ x: i, z: 0 })));
+    expect(ridingWindowOf(vehicleTrail(riderMarker('board', 100)), () => capped)).toBeUndefined();
+  });
+
+  it('start never exceeds end for a rider who boards and alights in order', () => {
+    const w = ridingWindowOf(vehicleTrail(riderMarker('board', 2), riderMarker('alight', 6)), lookup)!;
+    expect(w.start).toBeLessThanOrEqual(w.end);
+  });
+});
+
+describe('stepTween with a riding window (#2224)', () => {
+  const route = pts(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+  const trail = trailOf(route);
+  const dt = MOVE_TWEEN_DURATION_S / 16; // exact in binary
+  const run = (window: RidingWindow | undefined, frames: number): number[] => {
+    const tween = createTween(0, 0);
+    const xs: number[] = [];
+    let rx = 0, rz = 0;
+    for (let i = 0; i < frames; i++) {
+      const p = stepTween(tween, rx, rz, 10, 0, dt, trail, window);
+      xs.push(p.x);
+      rx = p.x; rz = p.z;
+    }
+    return xs;
+  };
+
+  it('holds the start until the window opens, drives, then holds the end', () => {
+    const xs = run({ start: 0.5, end: 0.75 }, 20);
+    for (let i = 0; i < 8; i++) expect(xs[i]).toBeCloseTo(0, 6); // t <= 0.5 s
+    expect(xs[9]!).toBeGreaterThan(0);
+    expect(xs[9]!).toBeLessThan(10);
+    for (let i = 13; i < 20; i++) expect(xs[i]).toBeCloseTo(10, 6); // t >= 0.8125 s
+  });
+
+  it('only ever moves forward through the window', () => {
+    const xs = run({ start: 0.25, end: 0.75 }, 20);
+    for (let i = 1; i < xs.length; i++) expect(xs[i]!).toBeGreaterThanOrEqual(xs[i - 1]! - 1e-9);
+    expect(xs[19]!).toBeCloseTo(10, 6);
+  });
+
+  it('a window opening at 0 and closing at 1 is the same drive as no window', () => {
+    const plain = run(undefined, 20);
+    const full = run({ start: 0, end: 1 }, 20);
+    full.forEach((x, i) => expect(x).toBeCloseTo(plain[i]!, 6));
+  });
+
+  it('a window already closed when the move begins leaves the vehicle at its end', () => {
+    const xs = run({ start: 0, end: 0.25 }, 20);
+    for (let i = 5; i < 20; i++) expect(xs[i]).toBeCloseTo(10, 6); // t >= 0.3125 s
+  });
+
+  it('stepTweenWithHeight holds the start with the start height, then the end with the end height', () => {
+    const tween = createTween(0, 0);
+    const heightAt = (x: number) => x * 2;
+    let rx = 0, rz = 0;
+    const early = stepTweenWithHeight(tween, rx, rz, 10, 0, dt, heightAt, trail, { start: 0.5, end: 0.75 });
+    expect(early.x).toBeCloseTo(0, 6);
+    expect(early.y).toBeCloseTo(0, 6);
+    rx = early.x; rz = early.z;
+    let last = early;
+    for (let i = 0; i < 19; i++) {
+      last = stepTweenWithHeight(tween, rx, rz, 10, 0, dt, heightAt, trail, { start: 0.5, end: 0.75 });
+      rx = last.x; rz = last.z;
+    }
+    expect(last.x).toBeCloseTo(10, 6);
+    expect(last.y).toBeCloseTo(20, 6);
+  });
+
+  it('applyEasedPosition writes the held position into the target object', () => {
+    const tween = createTween(0, 0);
+    const position = { x: 0, y: 0, z: 0 };
+    applyEasedPosition(position, tween, 0, 0, 10, 0, dt, undefined, trail, { start: 0.5, end: 0.75 });
+    expect(position.x).toBeCloseTo(0, 6);
+    let x = position.x;
+    for (let i = 0; i < 19; i++) {
+      const eased = applyEasedPosition(position, tween, x, 0, 10, 0, dt, undefined, trail, { start: 0.5, end: 0.75 });
+      x = eased.x;
+    }
+    expect(position.x).toBeCloseTo(10, 6);
+  });
+});
+
+describe('stepSpanPlayback — hidden stretches before and between spans (#2224)', () => {
+  const dt = MOVE_TWEEN_DURATION_S / 32; // exact in binary
+
+  function playback(spans: TrailSpan[], fullLen: number) {
+    const tween = createTween(spans[0]!.points[0]!.x, spans[0]!.points[0]!.z);
+    startSpanPlayback(tween, spans, fullLen);
+    return tween;
+  }
+
+  it('holds the mesh hidden for D * startArc / fullTrailLength before the first span', () => {
+    // The span is the last 4 of an 8-cell trail: hidden for the first half of the tween, then 4 cells in the second half.
+    const span: TrailSpan = { points: [{ x: 4, z: 0 }, { x: 8, z: 0 }], endsInHost: false, startArc: 4, gapAfter: 0 };
+    const tween = playback([span], 8);
+    let r = { x: 4, z: 0, spanDone: false, finished: false };
+    for (let i = 1; i <= 15; i++) { // t = i / 32 s, up to 0.469 s
+      r = stepSpanPlayback(tween, r.x, r.z, dt, 8);
+      expect(r.spanDone).toBe(true);
+      expect(r.finished).toBe(false);
+    }
+    for (let i = 16; i < 25; i++) r = stepSpanPlayback(tween, r.x, r.z, dt, 8);
+    // t = 0.75 s: a quarter of the tween into the span's half
+    expect(r.spanDone).toBe(false);
+    expect(r.x).toBeCloseTo(6, 6);
+    for (let i = 25; i < 35; i++) r = stepSpanPlayback(tween, r.x, r.z, dt, 8);
+    expect(r.finished).toBe(true);
+    expect(r.x).toBeCloseTo(8, 6);
+  });
+
+  it('holds the mesh hidden for D * gapAfter / fullTrailLength between two spans', () => {
+    const first: TrailSpan = { points: [{ x: 0, z: 0 }, { x: 2, z: 0 }], endsInHost: true, startArc: 0, gapAfter: 4 };
+    const second: TrailSpan = { points: [{ x: 6, z: 0 }, { x: 8, z: 0 }], endsInHost: false, startArc: 6, gapAfter: 0 };
+    const tween = playback([first, second], 8);
+    let r = { x: 0, z: 0, spanDone: false, finished: false };
+    for (let i = 1; i <= 6; i++) { // t <= 0.1875 s: the first span still plays
+      r = stepSpanPlayback(tween, r.x, r.z, dt, 8);
+      expect(r.spanDone).toBe(false);
+    }
+    for (let i = 7; i <= 9; i++) r = stepSpanPlayback(tween, r.x, r.z, dt, 8); // cross the first span's end (t = 0.25 s)
+    for (let i = 10; i <= 22; i++) { // t from 0.3125 to 0.6875 s: inside the hidden ride
+      r = stepSpanPlayback(tween, r.x, r.z, dt, 8);
+      expect(r.spanDone).toBe(true);
+      expect(r.finished).toBe(false);
+    }
+    for (let i = 23; i <= 28; i++) r = stepSpanPlayback(tween, r.x, r.z, dt, 8); // t = 0.875 s
+    expect(r.spanDone).toBe(false);
+    expect(r.x).toBeCloseTo(7, 6); // halfway along the second span, which opened at 0.75 s
+    for (let i = 29; i <= 34; i++) r = stepSpanPlayback(tween, r.x, r.z, dt, 8);
+    expect(r.finished).toBe(true);
+    expect(r.x).toBeCloseTo(8, 6);
+  });
+
+  it('a span with no start arc and no gap plays at once (no hold)', () => {
+    const span: TrailSpan = { points: [{ x: 0, z: 0 }, { x: 4, z: 0 }], endsInHost: false, startArc: 0, gapAfter: 0 };
+    const tween = playback([span], 8);
+    const r = stepSpanPlayback(tween, 0, 0, dt, 8);
+    expect(r.spanDone).toBe(false);
+    expect(r.x).toBeGreaterThan(0);
   });
 });

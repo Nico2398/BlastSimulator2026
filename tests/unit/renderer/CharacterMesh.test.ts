@@ -9,7 +9,7 @@ import {
   GARMENT_COLORS, GARMENT_TINT, HAIR_COLORS, HAIR_TINT, hairFor, paletteFor, ROLE_COLORS, ROLE_TINT, SKIN_TINT, SKIN_TONES,
 } from '../../../src/renderer/CharacterMesh.js';
 import { loadedModelLibrary } from '../../helpers/models.js';
-import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
+import { MOVE_TWEEN_DURATION_S, type TrailSpan } from '../../../src/renderer/MovementInterpolation.js';
 
 function makeEmployee(id: number, overrides: Partial<Employee> = {}): Employee {
   return {
@@ -820,6 +820,234 @@ describe('CharacterMesh — board then alight in one batch (#1589)', () => {
     expect(sawHidden).toBe(true);
     expect(cm.getGroup(1)!.visible).toBe(true);
     expect(cm.getPosition(1)!.x).toBeCloseTo(5, 9);
+    cm.dispose();
+  });
+});
+
+// ── One timeline for rider and vehicle (#2224) ──────────────────────────────
+
+const FRAME_DT = 1 / 64; // exact in binary, so frame counts are exact
+const BATCH_SIZES = [1, 2, 4, 8] as const;
+
+interface Frame { exists: boolean; visible: boolean; x: number; z: number }
+
+/** Plays `seconds` of frames and records what a viewer would see after each one. */
+function playFrames(cm: CharacterMesh, emp: Employee, seconds: number, dt = FRAME_DT): Frame[] {
+  const frames: Frame[] = [];
+  const n = Math.round(seconds / dt);
+  for (let i = 0; i < n; i++) {
+    cm.update([emp], dt);
+    const g = cm.getGroup(emp.id);
+    frames.push({ exists: g !== null, visible: g?.visible ?? false, x: g?.position.x ?? NaN, z: g?.position.z ?? NaN });
+  }
+  return frames;
+}
+
+const xs = (...values: number[]): Array<[number, number]> => values.map(x => [x, 0]);
+
+/** Hidden run (frames where the mesh exists but is not visible) between the first and last visible frame. */
+function hiddenFramesBetweenVisible(frames: Frame[]): number {
+  const first = frames.findIndex(f => f.visible);
+  let last = -1;
+  frames.forEach((f, i) => { if (f.visible) last = i; });
+  if (first < 0) return 0;
+  return frames.slice(first, last + 1).filter(f => f.exists && !f.visible).length;
+}
+
+describe('CharacterMesh — board then alight in one batch keeps the ride hidden (#2224)', () => {
+  for (const ride of BATCH_SIZES) {
+    it(`ride of ${ride} cells: hidden for D * ride / trail length, then shown at the alight point`, () => {
+      // walk 2 to the vehicle, ride `ride` cells, step out one cell, walk 2 more
+      const total = 2 + ride + 1 + 2;
+      const points = xs(...Array.from({ length: total + 1 }, (_, i) => i));
+      const boardIdx = 2;
+      const alightIdx = 2 + ride + 1;
+      const cm = new CharacterMesh(new THREE.Scene());
+      const emp = makeEmployee(1, { x: 0, z: 0 });
+      cm.addEmployee(emp, 0);
+      emp.x = total;
+      emp.walkTrail = hostTrail(points, [[boardIdx, 'board'], [alightIdx, 'alight']], boardIdx, 0);
+
+      const frames = playFrames(cm, emp, 1.5);
+      const hiddenS = hiddenFramesBetweenVisible(frames) * FRAME_DT;
+      const expectedS = MOVE_TWEEN_DURATION_S * (ride + 1) / total; // board point .. alight point
+      expect(Math.abs(hiddenS - expectedS)).toBeLessThanOrEqual(3 * FRAME_DT);
+      expect(frames.every(f => f.exists)).toBe(true);
+      const last = frames[frames.length - 1]!;
+      expect(last.visible).toBe(true);
+      expect(last.x).toBeCloseTo(total, 6);
+      cm.dispose();
+    });
+
+    it(`ride of ${ride} cells: never pops mid-ride; first shown frame is at the alight point, last hidden one is before it`, () => {
+      const total = 2 + ride + 1 + 2;
+      const points = xs(...Array.from({ length: total + 1 }, (_, i) => i));
+      const alightIdx = 2 + ride + 1;
+      const cm = new CharacterMesh(new THREE.Scene());
+      const emp = makeEmployee(1, { x: 0, z: 0 });
+      cm.addEmployee(emp, 0);
+      emp.x = total;
+      emp.walkTrail = hostTrail(points, [[2, 'board'], [alightIdx, 'alight']], 2, 0);
+
+      const frames = playFrames(cm, emp, 1.5);
+      const stepMax = (total / MOVE_TWEEN_DURATION_S) * FRAME_DT * 1.5 + 1e-6;
+      const firstHidden = frames.findIndex(f => f.exists && !f.visible);
+      expect(firstHidden).toBeGreaterThan(0);
+      // Until it vanishes it is on the walk to the vehicle.
+      for (let i = 0; i < firstHidden; i++) expect(frames[i]!.x).toBeLessThanOrEqual(2 + 1e-6);
+      expect(frames[firstHidden - 1]!.x).toBeGreaterThanOrEqual(2 - stepMax);
+      // The first frame it reappears it stands at the alight point.
+      const reappear = frames.findIndex((f, i) => i > firstHidden && f.visible);
+      expect(reappear).toBeGreaterThan(firstHidden);
+      expect(Math.abs(frames[reappear]!.x - alightIdx)).toBeLessThanOrEqual(stepMax);
+      // From then on every frame moves at walking pace at most.
+      for (let i = reappear + 1; i < frames.length; i++) {
+        expect(Math.abs(frames[i]!.x - frames[i - 1]!.x)).toBeLessThanOrEqual(stepMax);
+      }
+      cm.dispose();
+    });
+  }
+
+  it('hidden time grows with the ride: a 4-cell ride hides the mesh twice as long as a 2-cell ride on the same trail length', () => {
+    const hiddenFor = (rideCells: number, tail: number): number => {
+      const total = 2 + rideCells + 1 + tail;
+      const cm = new CharacterMesh(new THREE.Scene());
+      const emp = makeEmployee(1, { x: 0, z: 0 });
+      cm.addEmployee(emp, 0);
+      emp.x = total;
+      emp.walkTrail = hostTrail(xs(...Array.from({ length: total + 1 }, (_, i) => i)), [[2, 'board'], [2 + rideCells + 1, 'alight']], 2, 0);
+      const n = hiddenFramesBetweenVisible(playFrames(cm, emp, 1.5));
+      cm.dispose();
+      return n;
+    };
+    // Both trails are 11 cells long: 2 + 2 + 1 + 6 and 2 + 4 + 1 + 4.
+    const short = hiddenFor(2, 6);
+    const long = hiddenFor(4, 4);
+    expect(short).toBeGreaterThan(0);
+    expect(long / short).toBeGreaterThan(1.5);
+    expect(long / short).toBeLessThan(2.7);
+  });
+
+  it('the mesh stays hidden for the whole ride even at large frame steps (a 4x-speed frame loop)', () => {
+    const total = 11;
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    emp.x = total;
+    emp.walkTrail = hostTrail(xs(...Array.from({ length: total + 1 }, (_, i) => i)), [[2, 'board'], [7, 'alight']], 2, 0);
+    const frames = playFrames(cm, emp, 1.5, 1 / 30);
+    // No visible frame may sit between the board point and the alight point.
+    for (const f of frames) if (f.visible) expect(f.x < 2 + 1e-6 || f.x > 7 - 0.5).toBe(true);
+    cm.dispose();
+  });
+});
+
+describe('CharacterMesh — leaving a vehicle waits for the ride (#2224)', () => {
+  // The vehicle carried the employee from x=0 to x=5 (cells 0..5), the employee stepped out onto x=6 and walked to x=9.
+  const alightTrail = () => hostTrail(xs(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), [[6, 'alight']], 5, 0);
+
+  it('a character spawned at an alight marker stays hidden for D * startArc / trail length', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 9, z: 0 });
+    emp.walkTrail = alightTrail();
+    cm.addEmployee(emp, 0, emp.walkTrail);
+    const frames = playFrames(cm, emp, 2);
+    const firstVisible = frames.findIndex(f => f.visible);
+    const expectedS = MOVE_TWEEN_DURATION_S * 6 / 9;
+    expect(firstVisible).toBeGreaterThan(0);
+    expect(Math.abs(firstVisible * FRAME_DT - expectedS)).toBeLessThanOrEqual(3 * FRAME_DT);
+    // It appears at the alight cell, not further along.
+    expect(Math.abs(frames[firstVisible]!.x - 6)).toBeLessThanOrEqual((9 / MOVE_TWEEN_DURATION_S) * FRAME_DT * 2 + 1e-6);
+    cm.dispose();
+  });
+
+  it('is first shown only after the hidden stretch and keeps its place on the walk: no frame before it shows the mesh', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 9, z: 0 });
+    emp.walkTrail = alightTrail();
+    cm.addEmployee(emp, 0, emp.walkTrail);
+    const frames = playFrames(cm, emp, 2);
+    const firstVisible = frames.findIndex(f => f.visible);
+    expect(firstVisible).toBeGreaterThan(0);
+    for (let i = 0; i < firstVisible; i++) expect(frames[i]!.visible).toBe(false);
+    for (let i = firstVisible; i < frames.length; i++) expect(frames[i]!.visible).toBe(true);
+    cm.dispose();
+  });
+
+  for (const batch of BATCH_SIZES) {
+    it(`batch of ${batch}: after its spans end no frame jumps further than walking pace, and it rests on the target`, () => {
+      // `batch` cells of ride, one hop out, then up to `batch` cells of walk
+      const total = batch + 1 + batch;
+      const cm = new CharacterMesh(new THREE.Scene());
+      const emp = makeEmployee(1, { x: total, z: 0 });
+      emp.walkTrail = hostTrail(xs(...Array.from({ length: total + 1 }, (_, i) => i)), [[batch + 1, 'alight']], batch, 0);
+      cm.addEmployee(emp, 0, emp.walkTrail);
+      const frames = playFrames(cm, emp, 3);
+      const stepMax = (total / MOVE_TWEEN_DURATION_S) * FRAME_DT * 1.5 + 1e-6;
+      for (let i = 1; i < frames.length; i++) {
+        if (frames[i]!.visible && frames[i - 1]!.visible) {
+          expect(Math.hypot(frames[i]!.x - frames[i - 1]!.x, frames[i]!.z - frames[i - 1]!.z)).toBeLessThanOrEqual(stepMax);
+        }
+      }
+      // The last second is spent standing exactly on the target, never drifting back.
+      for (const f of frames.slice(-64)) {
+        expect(f.visible).toBe(true);
+        expect(f.x).toBeCloseTo(total, 6);
+        expect(f.z).toBeCloseTo(0, 6);
+      }
+      cm.dispose();
+    });
+  }
+
+  it('a plain walk (no host markers) is unaffected: visible from the first frame and never held', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    emp.x = 4;
+    emp.walkTrail = hostTrail(xs(0, 1, 2, 3, 4), [], 0, 0);
+    const frames = playFrames(cm, emp, 1.5);
+    expect(frames.every(f => f.visible)).toBe(true);
+    expect(frames[0]!.x).toBeGreaterThan(0);
+    expect(frames[frames.length - 1]!.x).toBeCloseTo(4, 6);
+    cm.dispose();
+  });
+
+  it('after the spans of a board..alight batch end, a further tick towards a new target walks on from the rest point', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    emp.x = 8;
+    emp.walkTrail = hostTrail(xs(0, 1, 2, 3, 4, 5, 6, 7, 8), [[2, 'board'], [6, 'alight']], 2, 0);
+    playFrames(cm, emp, 1.5);
+    expect(cm.getPosition(1)!.x).toBeCloseTo(8, 6);
+
+    emp.x = 10;
+    emp.walkTrail = hostTrail(xs(8, 9, 10), [], 0, 0);
+    const frames = playFrames(cm, emp, 1.5);
+    const stepMax = (2 / MOVE_TWEEN_DURATION_S) * FRAME_DT * 1.5 + 1e-6;
+    expect(frames[0]!.x).toBeGreaterThanOrEqual(8 - 1e-6);
+    for (let i = 1; i < frames.length; i++) expect(Math.abs(frames[i]!.x - frames[i - 1]!.x)).toBeLessThanOrEqual(stepMax);
+    expect(frames[frames.length - 1]!.x).toBeCloseTo(10, 6);
+    cm.dispose();
+  });
+});
+
+describe('CharacterMesh.addEmployee — spawnSpan (#2224)', () => {
+  it('spawnSpan overrides the trail exit span: the mesh appears at the spawn span start and walks it to the target', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 8, z: 0 });
+    // The trail's own exit span would start at x=2; the span handed in starts at x=6, after a 6-cell hidden ride.
+    emp.walkTrail = hostTrail(xs(0, 1, 2, 3, 4, 5, 6, 7, 8), [[2, 'alight']], 2, 0);
+    const spawn: TrailSpan = { points: [{ x: 6, z: 0 }, { x: 7, z: 0 }, { x: 8, z: 0 }], endsInHost: false, startArc: 6, gapAfter: 0 };
+    cm.addEmployee(emp, 0, emp.walkTrail, spawn);
+    expect(cm.getPosition(1)!.x).toBeCloseTo(6, 9);
+
+    const frames = playFrames(cm, emp, 2);
+    const shown = frames.filter(f => f.visible);
+    expect(shown.length).toBeGreaterThan(0);
+    for (const f of shown) expect(f.x).toBeGreaterThanOrEqual(6 - 1e-6);
+    expect(frames.findIndex(f => f.visible)).toBeGreaterThan(0); // held hidden for the ride first
+    expect(frames[frames.length - 1]!.x).toBeCloseTo(8, 6);
     cm.dispose();
   });
 });

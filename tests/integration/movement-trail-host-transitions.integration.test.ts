@@ -16,7 +16,9 @@ import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
 import { runCommand } from '../../src/console/createRunner.js';
 import { serializeGameState } from '../../src/console-api.js';
 import { hasLevelEnded } from '../../src/core/engine/GameOverConditions.js';
-import { MOVEMENT_TRAIL_MAX_POINTS, type TrailHostEvent } from '../../src/core/entities/MovementTrail.js';
+import {
+  MOVEMENT_TRAIL_MAX_POINTS, type TrailHostEvent,
+} from '../../src/core/entities/MovementTrail.js';
 
 type Tally = Record<TrailHostEvent, Map<number, number>>;
 const newTally = (): Tally => ({ board: new Map(), alight: new Map(), enter: new Map(), leave: new Map() });
