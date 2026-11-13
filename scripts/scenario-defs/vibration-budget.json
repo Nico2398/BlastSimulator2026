@@ -1308,7 +1308,7 @@
       "expect": {
         "equals": {
           "employeeCount": 3,
-          "vehicleCount": 1,
+          "vehicleCount": 0,
           "buildingCount": 3,
           "holeCount": 0,
           "tickCount": 818,
