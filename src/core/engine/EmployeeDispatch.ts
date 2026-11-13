@@ -237,6 +237,7 @@ export function tickEmployees(state: GameState, emitter?: EventEmitter): TickEmp
  */
 export function employeeWorkState(emp: Employee): EmployeeWorkState {
   if (emp.restTicksRemaining !== null) return 'resting';
+  if (isMidEvacuation(emp)) return 'evacuating';
   if (
     emp.pendingTaskDuration !== null || emp.pendingRestDuration !== null
     || emp.itinerary !== null || emp.destinationX !== null || emp.destinationZ !== null

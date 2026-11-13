@@ -21,10 +21,11 @@ The employee has one gauge, `fatigue` (0–100; 100 = fully rested), on `Employe
 |-----------|-----------|------------------|
 | `working` | −2 | Actively performing a task |
 | `idle` | −0.5 | Not working, not resting, not traveling toward anything claimed |
+| `evacuating` | −0.25 | A walk or drive ordered by a zone evacuation (`isMidEvacuation`, #2259): the clearing a shot demands never costs a rested worker most of the gauge |
 | `traveling` | −1 | Walking toward a claimed task or rest destination, not yet arrived (`pendingTaskDuration` or `pendingRestDuration` !== null) |
 | `resting` | 0 | Actively resting (`restTicksRemaining` !== null) — holds steady so accrued drain can't outpace the completion-time replenishment |
 
-`tickNeedGauges` (`src/core/entities/EmployeeNeeds.ts`) selects the tier via the `EmployeeWorkState` union (`'working' | 'idle' | 'resting' | 'traveling'`, also exported from `Employee.ts`). The `traveling` tier is symmetric in both directions — it applies identically whether the employee is walking to start a task or walking to start a rest, and only for the walk itself; once arrived, drain switches to `working` or `resting` respectively.
+`tickNeedGauges` (`src/core/entities/EmployeeNeeds.ts`) selects the tier via the `EmployeeWorkState` union (`'working' | 'idle' | 'resting' | 'traveling' | 'evacuating'`, also exported from `Employee.ts`). The `traveling` tier is symmetric in both directions — it applies identically whether the employee is walking to start a task or walking to start a rest, and only for the walk itself; once arrived, drain switches to `working` or `resting` respectively.
 
 **Rate modifiers** — applied to the selected tier's base rate (`getMoraleDrainMultiplier`, `NEED_MORALE_DRAIN_MULTIPLIERS`, `MORALE_THRESHOLDS`):
 - Morale > 70: drain rate ×0.85
@@ -151,7 +152,7 @@ The well-being score (0-100, `updateScores` in `src/core/scores/ScoreManager.ts`
 
 ## Types
 
-The single `fatigue` gauge (0–100) and `collapsing` live on `Employee` in `src/core/entities/Employee.ts`, alongside the rest state the needs system drives — `restTicksRemaining`, `restNeedKey`, `pendingRestDuration`, `pendingRestNeedKey`, `ticksWorked`. `NeedKey` (currently just `'fatigue'`) and `EmployeeWorkState` (`'working' | 'idle' | 'resting' | 'traveling'`) are defined in `src/core/entities/EmployeeNeeds.ts` and re-exported from `Employee.ts`. That file is the authority on their names and shapes; thresholds and rates are in `src/core/config/balance.ts`.
+The single `fatigue` gauge (0–100) and `collapsing` live on `Employee` in `src/core/entities/Employee.ts`, alongside the rest state the needs system drives — `restTicksRemaining`, `restNeedKey`, `pendingRestDuration`, `pendingRestNeedKey`, `ticksWorked`. `NeedKey` (currently just `'fatigue'`) and `EmployeeWorkState` (`'working' | 'idle' | 'resting' | 'traveling' | 'evacuating'`) are defined in `src/core/entities/EmployeeNeeds.ts` and re-exported from `Employee.ts`. That file is the authority on their names and shapes; thresholds and rates are in `src/core/config/balance.ts`.
 
 The worker-revolt defeat tip names the real cause (`revoltCause`, `src/core/scores/RevoltCause.ts`): continuous shift mode -> `no_rest_policy` (highest precedence), else no active Living Quarters -> `no_housing`, else `morale_drain`; the level-end screen shows `ui.level_end.defeat.worker_revolt.tip.<cause>`.
 
