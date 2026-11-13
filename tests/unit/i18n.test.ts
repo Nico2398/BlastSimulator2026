@@ -19,7 +19,7 @@ describe('i18n — locale management', () => {
     setLocale('en');
     expect(t('game.subtitle')).toBe('Dig. Blast. Profit.');
     setLocale('fr');
-    expect(t('game.subtitle')).toBe('Creuse. Explose. Profite.');
+    expect(t('game.subtitle')).toBe('Creusez. Explosez. Profitez.');
     setLocale('en');
     expect(t('game.subtitle')).toBe('Dig. Blast. Profit.');
   });
@@ -40,7 +40,7 @@ describe('i18n — translations', () => {
 
   it('game.subtitle is translated in fr', () => {
     setLocale('fr');
-    expect(t('game.subtitle')).toBe('Creuse. Explose. Profite.');
+    expect(t('game.subtitle')).toBe('Creusez. Explosez. Profitez.');
   });
 });
 
