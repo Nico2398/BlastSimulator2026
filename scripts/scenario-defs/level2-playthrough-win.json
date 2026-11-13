@@ -3730,7 +3730,7 @@
           "surveyCount": 3,
           "wellBeing": 95.16972876491634,
           "safety": 0,
-          "ecology": 82.2777047485909,
+          "ecology": 98.92800674371078,
           "nuisance": 53.01419722609583
         },
         "changedBy": {
@@ -4547,7 +4547,7 @@
           "wellBeing": 94.07196021039005,
           "safety": 2.9404,
           "ecology": 98.9908228570977,
-          "nuisance": 58.663807483187064
+          "nuisance": 48.61380748318706
         },
         "changedBy": {
           "tickCount": 0
@@ -4574,7 +4574,7 @@
           "wellBeing": 94.07196021039005,
           "safety": 2.9404,
           "ecology": 98.9908228570977,
-          "nuisance": 58.663807483187064
+          "nuisance": 48.61380748318706
         },
         "changedBy": {
           "tickCount": 0
