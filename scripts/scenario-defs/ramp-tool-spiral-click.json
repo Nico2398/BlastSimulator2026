@@ -144,8 +144,12 @@
     {
       "command": "ramp spiral from:17,11 depth:8 grade:12 width:3 dir:cw",
       "timeout": 90,
-      "description": "#1942: player arms the ramp tool, clicks the pit-rim tile (17,11) just north of the blasted pit, then clicks the Spiral button that appears for a single click on a rim, and presses Confirm. The tool previews the spiral proposal as a ghost and Confirm orders it. No console command stands in for a click; the command-mode equivalent is the ramp spiral order the tool issues.",
+      "description": "#1942: player closes the blast report (its playback-gated open can land mid-click on a loaded runner and cover the tool), then arms the ramp tool, clicks the pit-rim tile (17,11) just north of the blasted pit, then clicks the Spiral button that appears for a single click on a rim, and presses Confirm. The tool previews the spiral proposal as a ghost and Confirm orders it. No console command stands in for a click; the command-mode equivalent is the ramp spiral order the tool issues.",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"report-close\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
