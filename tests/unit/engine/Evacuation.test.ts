@@ -907,12 +907,12 @@ describe('evacuateZone does not send an evacuee back in for a driverless vehicle
     expect(leaver.pendingDriverVehicleId).toBeNull();
   });
 
-  it('orders the one who left when nobody else is licensed for the vehicle', () => {
+  it('still does not send the one who left when nobody else is licensed: the vehicle stays, stranded (#2259)', () => {
     const { leaver, vehicle, second } = reEvacuation({ relief: 'none' });
 
-    expect(leaver.pendingDriverVehicleId).toBe(vehicle.id);
-    expect(second.orderedVehicleIds).toContain(vehicle.id);
-    expect(second.strandedVehicleIds).not.toContain(vehicle.id);
+    expect(leaver.pendingDriverVehicleId).toBeNull();
+    expect(second.orderedVehicleIds).not.toContain(vehicle.id);
+    expect(second.strandedVehicleIds).toContain(vehicle.id);
   });
 });
 

@@ -988,27 +988,27 @@ describe('clearZone does not send an employee who left the zone back in for a ve
     expect(result.orderedVehicleIds).toContain(vehicle.id);
   });
 
-  it('still orders the leaver when no other licensed driver exists for that vehicle (exception: nobody else can rescue it)', () => {
+  it('still does not order the leaver when no other licensed driver exists for that vehicle (#2259)', () => {
     const { state, vehicles, employees, vehicle, leaver } = fixture(2314, null);
 
     const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
 
-    expect(leaver.pendingDriverVehicleId).toBe(vehicle.id);
-    expect(result.orderedVehicleIds).toContain(vehicle.id);
-    expect(result.strandedVehicleIds).not.toContain(vehicle.id);
+    expect(leaver.pendingDriverVehicleId).toBeNull();
+    expect(result.orderedVehicleIds).not.toContain(vehicle.id);
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
   });
 
-  it('still orders the leaver when the only other licensed driver is injured and cannot rescue it', () => {
+  it('still does not order the leaver when the only other licensed driver is injured (#2259)', () => {
     const { state, vehicles, employees, vehicle, leaver, other } = fixture(2315, { x: 40, z: 40 });
     other!.injured = true;
 
     const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
 
-    expect(leaver.pendingDriverVehicleId).toBe(vehicle.id);
-    expect(result.orderedVehicleIds).toContain(vehicle.id);
+    expect(leaver.pendingDriverVehicleId).toBeNull();
+    expect(result.orderedVehicleIds).not.toContain(vehicle.id);
   });
 
-  it('still orders the leaver when the other employee holds no licence for that vehicle', () => {
+  it('still does not order the leaver when the other employee holds no licence for that vehicle (#2259)', () => {
     const state = makeState(2316);
     const { vehicles, employees } = state;
     const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
@@ -1018,8 +1018,8 @@ describe('clearZone does not send an employee who left the zone back in for a ve
 
     const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
 
-    expect(leaver.pendingDriverVehicleId).toBe(vehicle.id);
-    expect(result.orderedVehicleIds).toContain(vehicle.id);
+    expect(leaver.pendingDriverVehicleId).toBeNull();
+    expect(result.orderedVehicleIds).not.toContain(vehicle.id);
   });
 
   it('treats an employee who is listed but has drifted back into the zone like any other employee in the zone', () => {
