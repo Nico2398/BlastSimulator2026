@@ -64,13 +64,8 @@
       "description": "The player arms the ramp tool, sets depth 6, clicks the start (15,15), the corner (15,27) and the end (25,27) tile and presses Confirm: one dig order per segment.",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-build-panel [data-panel-close]",
-          "timeoutMs": 0
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
+          "type": "ensurePanel",
+          "panel": "build"
         },
         {
           "type": "clickSelector",
@@ -121,11 +116,6 @@
       "command": "employee cancel 1",
       "description": "The player clicks the building's ghost in the scene. The Inspector opens on the order (not a building: none stands yet) with its Cancel button, and pressing it cancels that order.",
       "interaction": [
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-build-panel [data-panel-close]",
-          "timeoutMs": 0
-        },
         {
           "type": "cameraFocus",
           "x": 2,
