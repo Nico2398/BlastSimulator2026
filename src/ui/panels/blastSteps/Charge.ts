@@ -292,8 +292,12 @@ export class ChargeStep {
   }
 
   /** The water block leads the step while water matters, and sits last otherwise (#2268). */
-  private placeWaterBlock(_mattersNow: boolean): void {
-    throw new Error('not implemented');
+  private placeWaterBlock(mattersNow: boolean): void {
+    if (mattersNow) {
+      if (this.el.firstElementChild !== this.waterEl) this.el.prepend(this.waterEl);
+    } else if (this.el.lastElementChild !== this.waterEl) {
+      this.el.append(this.waterEl);
+    }
   }
 
   dispose(): void { this.el.remove(); }
