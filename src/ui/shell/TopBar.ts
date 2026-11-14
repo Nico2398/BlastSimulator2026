@@ -536,6 +536,7 @@ export class TopBar {
     link.dataset['action'] = 'water-open';
     applyLinkStyle(link);
     link.style.alignSelf = 'flex-start';
+    link.style.setProperty('font', '500 11px/1.4 var(--bsx-font-ui)');
     link.addEventListener('click', () => { this.closeWeatherPopover(); this.onOpenWater?.(); });
     return link;
   }

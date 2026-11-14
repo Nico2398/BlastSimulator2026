@@ -98,7 +98,7 @@ function tubeButtons(offer: WaterFixOffer, io: WaterFixIO, reasons: HTMLElement)
 
 /** The fixes a water warning row carries: drain, tube (and buy tubing), and a link to the Charge step's water section. */
 export function buildWaterFixes(offer: WaterFixOffer, io: WaterFixIO): HTMLElement {
-  const root = el('div', { attrs: { 'data-role': 'water-fixes', style: 'display:flex;flex-direction:column;gap:5px;margin-top:5px' } });
+  const root = el('div', { attrs: { 'data-role': 'water-fixes', style: 'display:flex;flex-direction:column;gap:5px;margin-top:5px;font:500 11px/1.4 var(--bsx-font-ui)' } });
   const actions = el('div', { attrs: { style: 'display:flex;flex-wrap:wrap;gap:6px;align-items:center' } });
   const reasons = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px' } });
   if (offer.porousBlockedIds.length > 0) {
