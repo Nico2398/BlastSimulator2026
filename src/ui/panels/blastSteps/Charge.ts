@@ -288,6 +288,12 @@ export class ChargeStep {
     );
     this.renderDrain(wet, drainViews);
     this.renderTubingCard(untubed, wet.filter(id => !tubedSet.has(id)).length, tubed.length === holes.length && wet.length === 0, state.tubingState.inventory, rainSoon);
+    this.placeWaterBlock(wet.length > 0 || (rainSoon && untubed.length > 0));
+  }
+
+  /** The water block leads the step while water matters, and sits last otherwise (#2268). */
+  private placeWaterBlock(_mattersNow: boolean): void {
+    throw new Error('not implemented');
   }
 
   dispose(): void { this.el.remove(); }
