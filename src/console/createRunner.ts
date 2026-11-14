@@ -31,6 +31,7 @@ import {
   levelGroundCommand,
   weatherCommand,
   tubingCommand,
+  tubeOnDrillCommand,
   buyCommand,
   drainHoleCommand,
   surveyCommand,
@@ -253,6 +254,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('install_tubing', 'Install tubing on a hole (hole:3)', (_args, named) =>
     tubingCommand(ctx, ['install'], named),
+  );
+  runner.register('tube_on_drill', 'Tube holes as they are drilled (on|off)', (args, named) =>
+    tubeOnDrillCommand(ctx, args, named),
   );
 
   // --- Economy commands (Phase 4) ---

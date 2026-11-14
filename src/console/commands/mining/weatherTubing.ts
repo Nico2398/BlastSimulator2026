@@ -126,3 +126,12 @@ export function buyCommand(
   if (named['explosive'] !== undefined) return { success: false, output: t('mining.buy.explosive_at_loading') };
   return tubingCommand(ctx, ['buy'], named);
 }
+
+/** `tube_on_drill [on|off]` — switch or report tubing holes as they are drilled (#2269). */
+export function tubeOnDrillCommand(
+  _ctx: MiningContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  throw new Error('not implemented');
+}
