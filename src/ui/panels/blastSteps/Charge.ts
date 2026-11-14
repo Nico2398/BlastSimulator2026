@@ -86,6 +86,8 @@ export class ChargeStep {
   private readonly optimizer: ChargeOptimizerBlock;
   private readonly tubingCardEl: HTMLElement;
   private readonly drainEl: HTMLElement;
+  /** Drain button and tubing block, the target of the water warnings' link (#2267). */
+  private readonly waterEl: HTMLElement;
 
   private gameConsole?: GameConsoleFn;
   private gridProvider: () => VoxelGrid | null = () => null;
@@ -176,11 +178,13 @@ export class ChargeStep {
     tubingHeader.append(this.locale.bindText(el('span', { className: 'bsx-section-label' }), 'ui.blast_workshop.charge.tubing_section'), el('span', { className: 'bsx-section-rule' }));
     this.tubingCardEl = el('div');
     this.drainEl = el('div');
+    this.waterEl = el('div', { attrs: { 'data-role': 'water-section' } });
+    this.waterEl.append(this.drainEl, tubingHeader, this.tubingCardEl);
 
     // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
       productHeader, this.productListEl, this.capacityLineEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.optimizer.root, this.patternLineEl, this.paidOnFillEl, this.permitKgEl, this.permitKgWarningEl,
-      this.holeList.root, this.drainEl, tubingHeader, this.tubingCardEl,
+      this.holeList.root, this.waterEl,
     );
     container.appendChild(this.el);
   }
@@ -188,6 +192,9 @@ export class ChargeStep {
   get root(): HTMLElement { return this.el; }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+
+  /** Scroll the drain and tubing block into view (no-op where the DOM cannot scroll). */
+  revealWater(): void { this.waterEl.scrollIntoView?.({ block: 'start' }); }
 
   /** Grid the cards and hole rows read their predicted band mix from (#2203). */
   setGridProvider(fn: () => VoxelGrid | null): void {

@@ -4,7 +4,8 @@
 // floating Saves and Return-to-Map buttons main.ts used to create ad-hoc
 // (spec §5 defect: they collided with the event chip).
 
-import type { EntityOpener } from '../entityLinks.js';
+import { applyLinkStyle, type EntityOpener } from '../entityLinks.js';
+import { unprotectedSensitiveHoles } from '../../core/mining/WetHoles.js';
 import { iconEl } from '../icons.js';
 import { el, explainable, sectionHeader, progressBar } from '../dom.js';
 import { boardExplain, weatherExplain } from '../hudExplain.js';
@@ -128,6 +129,7 @@ export class TopBar {
   private onTogglePause?: () => void;
   private onNavigate?: (panel: PanelName) => void;
   private onOpenLog?: () => void;
+  private onOpenWater?: () => void;
   private onOpenSaves?: () => void;
   private onSiteMap?: () => void;
 
@@ -323,7 +325,7 @@ export class TopBar {
   setTogglePauseHandler(cb: () => void): void { this.onTogglePause = cb; }
   setNavigateHandler(cb: (panel: PanelName) => void): void { this.onNavigate = cb; }
   /** Where the weather advisory's water link leads (#2267). */
-  setOpenWaterHandler(_cb: () => void): void { throw new Error('not implemented'); }
+  setOpenWaterHandler(cb: () => void): void { this.onOpenWater = cb; }
   setOpenLogHandler(cb: () => void): void { this.onOpenLog = cb; }
   setOpenSavesHandler(cb: () => void): void { this.onOpenSaves = cb; }
   setSiteMapHandler(cb: () => void): void { this.onSiteMap = cb; }
@@ -509,15 +511,33 @@ export class TopBar {
     }));
     body.appendChild(bandsRow);
 
+    const advisoryText = el('span', { text: this.advisoryText(advisory), attrs: { style: 'font:400 11px/1.45 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } });
+    const advisoryCol = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px;flex:1' }, children: [advisoryText] });
+    if (this.advisoryNeedsWater(state, advisory)) advisoryCol.appendChild(this.waterLink());
     body.appendChild(el('div', {
       attrs: { style: 'display:flex;gap:9px;padding:10px 11px;border-radius:5px;background:rgba(85,168,255,.07);border:1px solid rgba(85,168,255,.24)' },
       children: [
         el('div', { attrs: { style: 'color:var(--bsx-info);padding-top:1px' }, children: [iconEl('water', 14)] }),
-        el('span', { text: this.advisoryText(advisory), attrs: { style: 'font:400 11px/1.45 var(--bsx-font-ui);color:var(--bsx-text-secondary);flex:1' } }),
+        advisoryCol,
       ],
     }));
 
     this.weatherPopoverEl.replaceChildren(header, body);
+  }
+
+  /** Holes already take on water, or rain is near and charged holes stand untubed: the water section holds the fix (#2267). */
+  private advisoryNeedsWater(state: GameState, advisory: WeatherAdvisory): boolean {
+    if (advisory.kind === 'clear') return false;
+    return (advisory.kind === 'wet' && advisory.uncoveredHoles > 0) || unprotectedSensitiveHoles(state).length > 0;
+  }
+
+  private waterLink(): HTMLElement {
+    const link = el('button', { text: t('ui.blast_workshop.water_fix.open'), attrs: { type: 'button' } });
+    link.dataset['action'] = 'water-open';
+    applyLinkStyle(link);
+    link.style.alignSelf = 'flex-start';
+    link.addEventListener('click', () => { this.closeWeatherPopover(); this.onOpenWater?.(); });
+    return link;
   }
 
   private advisoryText(advisory: WeatherAdvisory): string {
