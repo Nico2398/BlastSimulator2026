@@ -30,7 +30,7 @@ export interface WaterFixOffer {
   readonly stock: number;
 }
 
-export interface WaterFixIO {
+interface WaterFixIO {
   readonly run: (command: string) => void;
   readonly openWater?: (() => void) | undefined;
 }
@@ -75,7 +75,7 @@ function drainButton(offer: WaterFixOffer, io: WaterFixIO, reasons: HTMLElement)
     dataAction: 'water-drain',
     onClick: () => { for (const id of offer.drainableIds) io.run(`drain_hole hole:${id}`); },
   });
-  if (offer.drainableIds.length === 0) disable(btn, reasons, drainReasonText('porous_untubed'));
+  if (offer.drainableIds.length === 0) disable(btn, reasons, drainReasonText(offer.porousBlockedIds.length > 0 ? 'porous_untubed' : 'dry'));
   else if (offer.cash < offer.drainCost) disable(btn, reasons, drainReasonText('insufficient_funds'));
   return btn;
 }
@@ -106,7 +106,7 @@ export function buildWaterFixes(offer: WaterFixOffer, io: WaterFixIO): HTMLEleme
     first.dataset['role'] = 'water-tube-first';
     reasons.appendChild(first);
   }
-  if (offer.wetCount > 0) actions.appendChild(drainButton(offer, io, reasons));
+  if (offer.target === 'wet' || offer.wetCount > 0) actions.appendChild(drainButton(offer, io, reasons));
   if (offer.tubeIds.length > 0) actions.append(...tubeButtons(offer, io, reasons));
   const link = el('button', { text: t('ui.blast_workshop.water_fix.open'), attrs: { type: 'button' } });
   link.dataset['action'] = 'water-open';

@@ -59,6 +59,12 @@ function waterLink(links: InspectorLinks): HTMLElement {
   return link;
 }
 
+function groundRow(ground: GroundKind, links: InspectorLinks): HTMLElement {
+  const row = tagged(valueRow(t('inspector.hole.ground'), t(`inspector.hole.ground_${ground}`)), 'data-hole-ground', ground);
+  if (ground === 'wet') row.append(waterLink(links));
+  return row;
+}
+
 function buildFactsSection(hole: DrillHole, ordered: boolean, state: GameState, links: InspectorLinks): HTMLElement {
   const ground = groundOf(hole.id, state);
   const rows = [
@@ -66,8 +72,7 @@ function buildFactsSection(hole: DrillHole, ordered: boolean, state: GameState, 
     valueRow(t('inspector.hole.diameter'), t('inspector.depth_value', { depth: hole.diameter })),
     tagged(valueRow(t('inspector.hole.state'), t(ordered ? 'inspector.hole.state_ordered' : 'inspector.hole.state_drilled')),
       'data-hole-state', ordered ? 'ordered' : 'drilled'),
-    tagged(valueRow(t('inspector.hole.ground'), t(`inspector.hole.ground_${ground}`)), 'data-hole-ground', ground),
-    ...(ground === 'wet' ? [waterLink(links)] : []),
+    groundRow(ground, links),
     noteLine(t('inspector.hole.workshop_note')),
   ];
   return sectionOf(t('inspector.section.details'), rows);
