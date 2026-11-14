@@ -53,6 +53,7 @@ export class GhostInstanceBatch {
     this.mesh.setMatrixAt(slot, GhostInstanceBatch.matrix.makeTranslation(x, y, z));
     this.mesh.count = this.ids.length;
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.invalidateBounds();
     return slot;
   }
 
@@ -69,11 +70,18 @@ export class GhostInstanceBatch {
     this.ids.pop();
     this.mesh.count = this.ids.length;
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.invalidateBounds();
   }
 
   dispose(): void {
     this.scene.remove(this.mesh);
     this.mesh.dispose();
+  }
+
+  /** A raycast tests the bounds computed at the first one: drop them so the next one sees the slots as they are now. */
+  private invalidateBounds(): void {
+    this.mesh.boundingSphere = null;
+    this.mesh.boundingBox = null;
   }
 
   private createMesh(capacity: number): THREE.InstancedMesh {
