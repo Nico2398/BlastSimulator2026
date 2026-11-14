@@ -50,6 +50,7 @@ export class Inspector {
   private onCommand: ((command: string) => void) | null = null;
   private onConfirm: ((config: ConfirmModalConfig) => void) | null = null;
   private onNavigate: ((panel: 'crew') => void) | null = null;
+  private onOpenWater: (() => void) | null = null;
   private rampRepairQuote: ((rampId: number) => RampRepairOffer) | null = null;
   private current: EntityPick | null = null;
   private lastState: GameState | null = null;
@@ -64,6 +65,7 @@ export class Inspector {
     run: command => this.onCommand?.(command),
     confirm: config => this.onConfirm?.(config),
     navigate: panel => this.onNavigate?.(panel),
+    openWater: () => this.onOpenWater?.(),
     rampRepairQuote: rampId => this.rampRepairQuote?.(rampId) ?? { kind: 'refused', errorKey: 'mining.repair_ramp.intact', errorParams: { id: rampId } },
   };
 
@@ -113,6 +115,8 @@ export class Inspector {
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirm = cb; }
   /** Panel-opening sink for links such as a vehicle's "Train someone in Crew". */
   setNavigateHandler(cb: (panel: 'crew') => void): void { this.onNavigate = cb; }
+  /** Where a wet hole's water link leads (#2267). */
+  setOpenWaterHandler(cb: () => void): void { this.onOpenWater = cb; }
 
   /** Supplies ramp repair quotes from the terrain (#2045); without one the Repair action never shows. */
   setRampRepairQuote(fn: (rampId: number) => RampRepairOffer): void { this.rampRepairQuote = fn; }

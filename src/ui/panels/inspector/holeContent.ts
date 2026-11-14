@@ -6,7 +6,8 @@ import type { HoleCharge } from '../../../core/mining/ChargePlan.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { isHoleFlooded } from '../../../core/weather/WeatherEffects.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import type { KindContent } from './InspectorContent.js';
+import { waterOpenLink } from '../waterFixes.js';
+import type { InspectorLinks, KindContent } from './InspectorContent.js';
 import { detailBody, kgText, kindLabel, noteLine, sectionOf, syncSection, tagged, valueRow } from './inspectorWidgets.js';
 
 type ChargeKind = 'charged' | 'ordered' | 'none';
@@ -48,27 +49,33 @@ function buildChargeSection(holeId: string, state: GameState): HTMLElement {
   return section;
 }
 
-function buildFactsSection(hole: DrillHole, ordered: boolean, state: GameState): HTMLElement {
+function groundRow(ground: GroundKind, links: InspectorLinks): HTMLElement {
+  const row = tagged(valueRow(t('inspector.hole.ground'), t(`inspector.hole.ground_${ground}`)), 'data-hole-ground', ground);
+  if (ground === 'wet') row.append(waterOpenLink(() => links.openWater?.()));
+  return row;
+}
+
+function buildFactsSection(hole: DrillHole, ordered: boolean, state: GameState, links: InspectorLinks): HTMLElement {
   const ground = groundOf(hole.id, state);
   const rows = [
     valueRow(t('inspector.depth'), t('inspector.depth_value', { depth: hole.depth })),
     valueRow(t('inspector.hole.diameter'), t('inspector.depth_value', { depth: hole.diameter })),
     tagged(valueRow(t('inspector.hole.state'), t(ordered ? 'inspector.hole.state_ordered' : 'inspector.hole.state_drilled')),
       'data-hole-state', ordered ? 'ordered' : 'drilled'),
-    tagged(valueRow(t('inspector.hole.ground'), t(`inspector.hole.ground_${ground}`)), 'data-hole-ground', ground),
+    groundRow(ground, links),
     noteLine(t('inspector.hole.workshop_note')),
   ];
   return sectionOf(t('inspector.section.details'), rows);
 }
 
 export const holeContent: KindContent = {
-  view(entity, state) {
+  view(entity, state, links) {
     const drilled = state.drillHoles.find(h => holeNumericId(h.id) === entity.id);
     const hole = drilled ?? state.plannedDrillHoles.find(h => holeNumericId(h.id) === entity.id);
     if (!hole) return null;
     const ordered = !drilled;
     const builders: Array<[string, () => HTMLElement]> = [
-      ['bs-hole-facts', () => buildFactsSection(hole, ordered, state)],
+      ['bs-hole-facts', () => buildFactsSection(hole, ordered, state, links)],
       ['bs-hole-charge', () => buildChargeSection(hole.id, state)],
     ];
     return {

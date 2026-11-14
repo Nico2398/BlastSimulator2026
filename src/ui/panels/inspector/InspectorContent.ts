@@ -41,6 +41,8 @@ export interface InspectorLinks {
   readonly confirm: (config: ConfirmModalConfig) => void;
   /** Open a panel (the Crew panel from a vehicle's "no licensed driver" row). */
   readonly navigate?: (panel: 'crew') => void;
+  /** Open the Blast Workshop on the Charge step's water section (#2267). */
+  readonly openWater?: () => void;
   /** What repairing a built ramp would cost now, or why it cannot be repaired (#2045); absent without terrain. */
   readonly rampRepairQuote?: (rampId: number) => RampRepairOffer;
 }

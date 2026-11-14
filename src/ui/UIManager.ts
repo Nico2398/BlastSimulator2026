@@ -141,6 +141,7 @@ export class UIManager {
     this.topBar.setTogglePauseHandler(() => this.onTogglePauseCb?.());
     this.topBar.setNavigateHandler((panel) => this.showPanel(panel));
     this.topBar.setOpenLogHandler(() => this.activityLog.toggle());
+    this.topBar.setOpenWaterHandler(() => this.showWaterSection());
 
     // Panels in left column
     this.blastUI = new BlastWorkshop(leftCol);
@@ -149,6 +150,7 @@ export class UIManager {
     // container like eventModal, not leftCol.
     this.preflightModal = new PreflightModal(container);
     this.blastUI.setFireRequestedHandler(() => this.preflightModal.show());
+    this.preflightModal.setOpenWaterHandler(() => this.showWaterSection());
     this.blastReportModal = new BlastReportModal(container);
     // Shared confirm-before-destructive-action overlay — no owner panel of
     // its own; CrewPanel/FleetPanel (P6) will reach it once they exist.
@@ -480,6 +482,12 @@ export class UIManager {
   showCrewHiring(role: EmployeeRole): void {
     this.showPanel('employees');
     this.crewPanel.revealHiring(role);
+  }
+
+  /** Open the Blast Workshop on the Charge step with its water section (drain, tubing) in view (#2267). */
+  showWaterSection(): void {
+    this.showPanel('blast');
+    this.blastUI.showWaterSection();
   }
 
   /** Register a notification: appears as a toast now, stays in the activity log. */

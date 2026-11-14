@@ -102,6 +102,7 @@ export class BlastWorkshop extends PanelBase {
     this.chargeStep = new ChargeStep(bodyOuter);
     this.previewStep = new PreviewStep(bodyOuter);
     this.fireStep = new FireStep(bodyOuter);
+    this.fireStep.setOpenWaterHandler(() => this.showWaterSection());
 
     this.heatmapView = new EnergyHeatmapView(this.el);
     this.el.append(header, stripWrap, this.heatmapView.root, bodyOuter);
@@ -134,6 +135,7 @@ export class BlastWorkshop extends PanelBase {
   setGameConsole(fn: GameConsoleFn): void {
     this.drillStep.setGameConsole(fn);
     this.chargeStep.setGameConsole(fn);
+    this.fireStep.setGameConsole(fn);
     this.previewStep.setGameConsole(fn);
   }
 
@@ -160,6 +162,12 @@ export class BlastWorkshop extends PanelBase {
 
   get energyHeatmapVisible(): boolean {
     return this.heatmapView.isVisible;
+  }
+
+  /** Lands on the Charge step with its water section (drain and tubing) scrolled into view (#2267). */
+  showWaterSection(): void {
+    this.setActiveStep(2, true);
+    this.chargeStep.revealWater();
   }
 
   override show(): void {
