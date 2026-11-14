@@ -35,7 +35,8 @@
       "expect": {
         "equals": {
           "cash": 50000
-        }
+        },
+        "usable": "#bs-main-menu #bs-menu-sandbox"
       }
     },
     {
