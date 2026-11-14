@@ -2650,3 +2650,41 @@ describe('serialize/deserialize — ore saturation (#1930)', () => {
     expect(deserialize(JSON.stringify(parsed)).saturation).toBeUndefined();
   });
 });
+
+describe('tubingState.tubeOnDrill save/load (#2269)', () => {
+  it('survives a serialize/deserialize round trip when on', () => {
+    const state = createGame({ seed: 42 });
+    state.tubingState.tubeOnDrill = true;
+    state.tubingState.inventory = 2;
+    const restored = deserialize(serialize(state));
+    expect(restored.tubingState.tubeOnDrill).toBe(true);
+    expect(restored.tubingState.inventory).toBe(2);
+  });
+
+  it('survives a round trip when off', () => {
+    const state = createGame({ seed: 42 });
+    state.tubingState.tubeOnDrill = false;
+    expect(deserialize(serialize(state)).tubingState.tubeOnDrill).toBe(false);
+  });
+
+  it('a save whose tubingState predates the field loads with it false', () => {
+    const state = createGame({ seed: 42 });
+    state.tubingState.inventory = 3;
+    state.tubingState.installedHoles.add('H1');
+    const parsed = JSON.parse(serialize(state)) as Record<string, unknown>;
+    delete (parsed['tubingState'] as Record<string, unknown>)['tubeOnDrill'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.tubingState.tubeOnDrill).toBe(false);
+    expect(restored.tubingState.inventory).toBe(3);
+    expect(restored.tubingState.installedHoles).toEqual(new Set(['H1']));
+  });
+
+  it('a save with no tubingState at all loads with the setting false', () => {
+    const state = createGame({ seed: 42 });
+    const parsed = JSON.parse(serialize(state)) as Record<string, unknown>;
+    delete parsed['tubingState'];
+    expect(deserialize(JSON.stringify(parsed)).tubingState.tubeOnDrill).toBe(false);
+  });
+});
