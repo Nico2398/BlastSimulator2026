@@ -2,6 +2,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PreflightModal, PREFLIGHT_DOCK_ROLE, PREFLIGHT_HIDE_ACTION, PREFLIGHT_CHIP_ROLE, PREFLIGHT_SHOW_ACTION } from '../../../../src/ui/panels/PreflightModal.js';
 import { setHoleWater, wetAllHoles } from '../../../helpers/holeWater.js';
+import { waterFixConsole, waterScene } from '../../../helpers/waterFixConsole.js';
+import { HOLE_DRAIN_COST_PER_HOLE } from '../../../../src/core/config/balance.js';
+import { wetHoles } from '../../../../src/core/mining/WetHoles.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
@@ -1517,6 +1520,191 @@ describe('PreflightModal — non-blocking waiting dock (#2233)', () => {
       modal.update(state, 'sunny');
       expect(modal.visible).toBe(false);
       expect(modal.root.style.display).toBe('none');
+    });
+  });
+});
+
+// ── #2267: the wet and rain-risk rows carry the fix they name ──
+
+describe('PreflightModal — water fixes (#2267)', () => {
+  const FIXES = '[data-role="water-fixes"]';
+  const DRAIN = '[data-action="water-drain"]';
+  const TUBE = '[data-action="water-tube"]';
+  const BUY = '[data-action="water-buy-tubing"]';
+  const OPEN = '[data-action="water-open"]';
+  const REASON = '[data-role="water-fix-reason"]';
+  const TUBE_FIRST = '[data-role="water-tube-first"]';
+  const RAIN_ROW = '[data-role="preflight-rain-risk"]';
+
+  beforeEach(() => { setLocale('en'); document.body.innerHTML = ''; });
+
+  function mountFor(state: GameState) {
+    const { modal } = makeModal();
+    const run = waterFixConsole(state);
+    modal.setGameConsole(run);
+    const openWater = vi.fn();
+    modal.setOpenWaterHandler(openWater);
+    modal.show();
+    modal.update(state, state.weather.current);
+    return { modal, run, openWater };
+  }
+
+  const btn = (modal: PreflightModal, sel: string) => modal.root.querySelector<HTMLButtonElement>(sel);
+
+  describe('wet row', () => {
+    it('offers drain at its cost, tubing and the water-section link', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, stock: 5, cash: 1000 });
+      const { modal } = mountFor(state);
+
+      expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.warn_wet', { count: 2, percent: 10 }));
+      expect(modal.root.querySelectorAll(FIXES)).toHaveLength(1);
+      expect(btn(modal, DRAIN)!.disabled).toBe(false);
+      expect(btn(modal, DRAIN)!.textContent).toContain(`$${2 * HOLE_DRAIN_COST_PER_HOLE}`);
+      expect(btn(modal, TUBE)!.disabled).toBe(false);
+      expect(btn(modal, OPEN)).not.toBeNull();
+    });
+
+    it('drain runs drain_hole per hole, the warning clears and cash drops by the cost', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, cash: 1000 });
+      const { modal, run } = mountFor(state);
+
+      btn(modal, DRAIN)!.click();
+
+      expect(run.mock.calls.map(c => c[0])).toEqual(['drain_hole hole:H1', 'drain_hole hole:H2']);
+      expect(state.cash).toBe(1000 - 2 * HOLE_DRAIN_COST_PER_HOLE);
+      expect(wetHoles(state)).toEqual([]);
+      modal.update(state, 'sunny');
+      expect(modal.root.querySelector(FIXES)).toBeNull();
+      expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.ok_dry'));
+    });
+
+    it('a porous untubed hole: tube-first line, drain disabled, tubing offered; after tubing the row drains it', () => {
+      const state = waterScene({ holes: 1, wetLevel: 0.9, porosity: 0.35, stock: 2, cash: 500 });
+      const { modal, run } = mountFor(state);
+
+      expect(modal.root.querySelector(TUBE_FIRST)).not.toBeNull();
+      expect(btn(modal, DRAIN)!.disabled).toBe(true);
+      btn(modal, DRAIN)!.click();
+      expect(run).not.toHaveBeenCalled();
+
+      btn(modal, TUBE)!.click();
+      expect(run.mock.calls.map(c => c[0])).toEqual(['install_tubing hole:H1']);
+      modal.update(state, 'sunny');
+      expect(modal.root.querySelector(TUBE_FIRST)).toBeNull();
+      expect(btn(modal, DRAIN)!.disabled).toBe(false);
+
+      btn(modal, DRAIN)!.click();
+      expect(state.cash).toBe(500 - HOLE_DRAIN_COST_PER_HOLE);
+      expect(wetHoles(state)).toEqual([]);
+    });
+
+    it('short stock: tube disabled with a reason; buy offered and runs `buy amount:10`', () => {
+      const state = waterScene({ holes: 3, wetLevel: 0.9, stock: 0, cash: 5000 });
+      const { modal, run } = mountFor(state);
+
+      expect(btn(modal, TUBE)!.disabled).toBe(true);
+      expect(modal.root.querySelector(REASON)).not.toBeNull();
+      btn(modal, BUY)!.click();
+      expect(run.mock.calls.map(c => c[0])).toEqual(['buy amount:10']);
+
+      modal.update(state, 'sunny');
+      expect(btn(modal, TUBE)!.disabled).toBe(false);
+      expect(btn(modal, BUY)).toBeNull();
+    });
+
+    it('buy is shown disabled when cash is short', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, stock: 0, cash: 100 });
+      const { modal, run } = mountFor(state);
+      expect(btn(modal, BUY)!.disabled).toBe(true);
+      btn(modal, BUY)!.click();
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it('drain is shown disabled with a reason when cash cannot pay for it', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, stock: 5, cash: HOLE_DRAIN_COST_PER_HOLE });
+      const { modal, run } = mountFor(state);
+      expect(btn(modal, DRAIN)!.disabled).toBe(true);
+      expect(modal.root.querySelector(REASON)).not.toBeNull();
+      btn(modal, DRAIN)!.click();
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it('wet holes with only water-resistant charges carry no fixes', () => {
+      const state = waterScene({ holes: 2, explosive: 'krackle', wetLevel: 0.9 });
+      const { modal } = mountFor(state);
+      expect(modal.root.querySelector(FIXES)).toBeNull();
+    });
+  });
+
+  describe('rain-risk row', () => {
+    it('offers tubing and the link, no drain', () => {
+      const state = waterScene({ holes: 2, weather: 'light_rain', stock: 5 });
+      const { modal } = mountFor(state);
+
+      expect(modal.root.querySelector(RAIN_ROW)).not.toBeNull();
+      expect(modal.root.querySelectorAll(FIXES)).toHaveLength(1);
+      expect(btn(modal, DRAIN)).toBeNull();
+      expect(btn(modal, TUBE)).not.toBeNull();
+      expect(btn(modal, OPEN)).not.toBeNull();
+    });
+
+    it('tubes the exposed holes and the warning clears', () => {
+      const state = waterScene({ holes: 2, weather: 'storm', stock: 5 });
+      state.tubingState.installedHoles = new Set(['H1']);
+      const { modal, run } = mountFor(state);
+
+      btn(modal, TUBE)!.click();
+
+      expect(run.mock.calls.map(c => c[0])).toEqual(['install_tubing hole:H2']);
+      modal.update(state, 'storm');
+      expect(modal.root.querySelector(RAIN_ROW)).toBeNull();
+      expect(modal.root.querySelector(FIXES)).toBeNull();
+    });
+
+    it('short stock disables tube with a reason', () => {
+      const state = waterScene({ holes: 3, weather: 'light_rain', stock: 1, cash: 5000 });
+      const { modal } = mountFor(state);
+      expect(btn(modal, TUBE)!.disabled).toBe(true);
+      expect(modal.root.querySelector(REASON)).not.toBeNull();
+      expect(btn(modal, BUY)).not.toBeNull();
+    });
+
+    it('no fixes in dry weather over dry holes', () => {
+      const state = waterScene({ holes: 2, weather: 'sunny', stock: 5 });
+      const { modal } = mountFor(state);
+      expect(modal.root.querySelector(FIXES)).toBeNull();
+    });
+  });
+
+  describe('water-section link', () => {
+    it('hides the modal first, then calls the handler', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, stock: 5 });
+      const { modal } = makeModal();
+      modal.setGameConsole(waterFixConsole(state));
+      const visibleWhenCalled: boolean[] = [];
+      modal.setOpenWaterHandler(() => { visibleWhenCalled.push(modal.visible); });
+      modal.show();
+      modal.update(state, 'sunny');
+
+      btn(modal, OPEN)!.click();
+
+      expect(visibleWhenCalled).toEqual([false]);
+      expect(modal.visible).toBe(false);
+    });
+
+    it('does not run any console command', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, stock: 5 });
+      const { modal, run } = mountFor(state);
+      btn(modal, OPEN)!.click();
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it('the rain-risk row link also hides the modal and calls the handler', () => {
+      const state = waterScene({ holes: 1, weather: 'light_rain', stock: 5 });
+      const { modal, openWater } = mountFor(state);
+      btn(modal, OPEN)!.click();
+      expect(openWater).toHaveBeenCalledTimes(1);
+      expect(modal.visible).toBe(false);
     });
   });
 });

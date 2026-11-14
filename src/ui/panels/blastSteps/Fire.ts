@@ -26,11 +26,13 @@ import { buildingsInBlastReach, type BuildingAtRisk } from '../../../core/mining
 import { buildingRiskText } from '../buildingRiskText.js';
 import { evacuationVerdictsForZone, type VehicleEvacuationVerdict } from '../../../core/engine/Evacuation.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
+import type { GameConsoleFn } from '../../gameConsole.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
 import { BreakoutWarningMemo } from '../breakoutWarningMemo.js';
 import { breakoutWarningFor } from '../breakoutWarningText.js';
 import { assembleBlastPlan } from '../../../core/mining/BlastPlan.js';
+import { buildWaterFixes, waterFixKey, waterFixOffer, type WaterFixTarget } from '../waterFixes.js';
 import { permitPreview, type PermitPreview } from '../permitPreview.js';
 
 
@@ -68,7 +70,14 @@ export class FireStep {
   private readonly breakoutMemo = new BreakoutWarningMemo();
   private lastSignature = '';
   private opener: EntityOpener | undefined;
+  private gameConsole: GameConsoleFn | undefined;
+  private openWater: (() => void) | undefined;
   private readonly locale = new LocaleTextRegistry();
+
+  setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; this.lastSignature = ''; }
+
+  /** Where the water-section link in the wet and rain-risk rows leads (#2267). */
+  setOpenWaterHandler(cb: () => void): void { this.openWater = cb; this.lastSignature = ''; }
 
   /** Supplies the voxel grid the breakout warning predicts against (#2003). */
   setGridProvider(fn: () => VoxelGrid | null): void { this.gridProvider = fn; }
@@ -121,7 +130,7 @@ export class FireStep {
       this.breakoutMemo.get(state, assembleBlastPlan(state.drillHoles, state.chargesByHole), this.gridProvider()),
       { nothing: 'ui.blast_workshop.fire.check_breakout_nothing', none: 'ui.blast_workshop.fire.check_breakout_none', partial: 'ui.blast_workshop.fire.check_breakout_partial' },
     );
-    const signature = JSON.stringify({ breakoutText, zone, occupants: occupantKeys, wetCount: wet.length, fizzleCount: fizzled.length, exposedCount: exposed.length, permit, atRisk });
+    const signature = JSON.stringify({ breakoutText, zone, occupants: occupantKeys, wetCount: wet.length, fizzleCount: fizzled.length, exposedCount: exposed.length, water: waterFixKey(state), permit, atRisk });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
@@ -130,7 +139,7 @@ export class FireStep {
 
     const occupants = zone ? this.occupants(state, zone, verdicts) : [];
     this.renderZoneList(occupants, zone !== null);
-    this.renderChecklist(state.drillHoles.length, wet.length, fizzled.length, exposed.length, occupants, permit, atRisk, breakoutText);
+    this.renderChecklist(state, state.drillHoles.length, wet.length, fizzled.length, exposed.length, occupants, permit, atRisk, breakoutText);
   }
 
   refreshLocale(): void {
@@ -206,15 +215,15 @@ export class FireStep {
     return row;
   }
 
-  private renderChecklist(holeCount: number, wetCount: number, fizzleCount: number, exposedCount: number, occupants: Occupant[], permit: PermitPreview | null, atRisk: BuildingAtRisk[], breakoutText: string | null): void {
+  private renderChecklist(state: GameState, holeCount: number, wetCount: number, fizzleCount: number, exposedCount: number, occupants: Occupant[], permit: PermitPreview | null, atRisk: BuildingAtRisk[], breakoutText: string | null): void {
     const dryOk = fizzleCount === 0;
     const occupantCount = occupants.length;
     const strandedCount = occupants.filter(o => o.verdict === 'stranded').length;
     const zoneOk = occupantCount === 0;
     this.checklistEl.replaceChildren(
       !dryOk || exposedCount === 0
-        ? this.makeCheckRow(dryOk, dryRowText(holeCount, wetCount, fizzleCount))
-        : this.makeWarnRow(t('ui.blast_workshop.fire.check_rain_risk', { count: exposedCount }), 'rain-risk-check'),
+        ? this.makeCheckRow(dryOk, dryRowText(holeCount, wetCount, fizzleCount), dryOk ? undefined : this.waterFixes(state, 'wet'))
+        : this.makeWarnRow(t('ui.blast_workshop.fire.check_rain_risk', { count: exposedCount }), 'rain-risk-check', {}, this.waterFixes(state, 'rain')),
       this.makeCheckRow(zoneOk, zoneOk
         ? t('ui.blast_workshop.fire.check_zone_clear')
         : strandedCount > 0
@@ -227,8 +236,8 @@ export class FireStep {
   }
 
   /** An unticked checklist row tagged for tests and scenarios; warns, never blocks the shot. */
-  private makeWarnRow(text: string, role: string, extra: Record<string, string> = {}): HTMLElement {
-    const row = this.makeCheckRow(false, text);
+  private makeWarnRow(text: string, role: string, extra: Record<string, string> = {}, fixes?: HTMLElement): HTMLElement {
+    const row = this.makeCheckRow(false, text, fixes);
     row.dataset['role'] = role;
     Object.assign(row.dataset, extra);
     return row;
@@ -245,12 +254,21 @@ export class FireStep {
     return row;
   }
 
-  private makeCheckRow(ok: boolean, text: string): HTMLElement {
+  private waterFixes(state: GameState, target: WaterFixTarget): HTMLElement {
+    return buildWaterFixes(waterFixOffer(state, target), {
+      run: cmd => { this.gameConsole?.(cmd); this.lastSignature = ''; },
+      openWater: this.openWater,
+    });
+  }
+
+  private makeCheckRow(ok: boolean, text: string, fixes?: HTMLElement): HTMLElement {
     const row = el('div');
     row.style.cssText = 'display:flex;gap:8px;align-items:flex-start';
     row.append(
       el('div', { attrs: { style: `color:${ok ? 'var(--bsx-positive)' : 'var(--bsx-amber)'};padding-top:1px` }, children: [iconEl(ok ? 'check' : 'warn', 12)] }),
-      el('span', { text, attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
+      fixes
+        ? el('div', { children: [el('span', { text, attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }), fixes] })
+        : el('span', { text, attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
     );
     return row;
   }

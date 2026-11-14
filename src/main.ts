@@ -1400,6 +1400,7 @@ inspector.setCloseHandler(() => scenePicking.clearSelection());
 inspector.setCommandHandler((command) => reportIfFailed(t('inspector.command_failed'), window.__gameConsole(command)));
 inspector.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
 inspector.setNavigateHandler(() => uiManager.showPanel('employees'));
+inspector.setOpenWaterHandler(() => uiManager.showWaterSection());
 // Ramp repair quotes (#2045): one per ramp per terrain revision, not per frame.
 let repairQuotes: { revision: number; byRamp: Map<number, RampRepairOffer> } | null = null;
 inspector.setRampRepairQuote(rampId => {

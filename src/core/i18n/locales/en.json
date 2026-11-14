@@ -4997,5 +4997,10 @@
   "ui.outlook.timeline_label": "{material} #{id} · {kg} kg",
   "ui.outlook.hours_left": "{hours}h",
   "ui.outlook.now": "now",
-  "ui.outlook.tonnes": "{t} t"
+  "ui.outlook.tonnes": "{t} t",
+  "ui.blast_workshop.water_fix.drain": "Drain {count} · {cost}",
+  "ui.blast_workshop.water_fix.tube": "Tube {count}",
+  "ui.blast_workshop.water_fix.open": "Open water controls",
+  "ui.blast_workshop.water_fix.buy_funds": "Not enough cash to buy tubing.",
+  "ui.blast_workshop.water_fix.tube_first": "{count} wet hole(s) sit in porous rock and refill until tubed. Tube them first, then drain."
 }

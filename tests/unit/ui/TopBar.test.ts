@@ -3,7 +3,9 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TopBar, formatBalance } from '../../../src/ui/shell/TopBar.js';
 import { NotificationCenter } from '../../../src/ui/notify/NotificationCenter.js';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { ALL_WEATHER_STATES, createWeatherCycle, setWeather, type WeatherCycleState } from '../../../src/core/weather/WeatherCycle.js';
+import { ALL_WEATHER_STATES, createWeatherCycle, forecast, setWeather, type WeatherCycleState } from '../../../src/core/weather/WeatherCycle.js';
+import { computeWeatherAdvisory } from '../../../src/core/weather/WeatherAdvisory.js';
+import { waterScene } from '../../helpers/waterFixConsole.js';
 import { hireEmployee, PAY_CYCLE_TICKS } from '../../../src/core/entities/Employee.js';
 import { addIncome, addExpense } from '../../../src/core/economy/Finance.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -1124,5 +1126,132 @@ describe('TopBar crew pips open the employee (#2169)', () => {
     expect(nav).toHaveBeenCalledWith('contracts');
     expect(open).not.toHaveBeenCalled();
     topBar.dispose();
+  });
+});
+
+// ── #2267: the weather advisory links to the Charge step's water section ──
+
+describe('TopBar weather advisory water link (#2267)', () => {
+  const OPEN = '[data-action="water-open"]';
+
+  /** A sunny desert cycle whose forecast brings rain within 14 days, found by seed. */
+  function rainIncomingCycle(): WeatherCycleState {
+    for (let seed = 1; seed < 2000; seed++) {
+      const cycle = createWeatherCycle(seed, undefined, 'desert');
+      const probe = createGame({ seed: 1, mineType: 'desert' });
+      const advisory = computeWeatherAdvisory(probe, cycle.current, forecast(cycle, 14, 'desert'));
+      if (advisory.kind === 'rain_incoming') return cycle;
+    }
+    throw new Error('no seed forecasts incoming rain');
+  }
+
+  const wetCycle = () => createWeatherCycle(1, 'storm', 'desert');
+  const clearCycle = () => createWeatherCycle(1, 'sunny', 'desert');
+
+  function open(state: ReturnType<typeof waterScene>, cycle: WeatherCycleState) {
+    setLocale('en');
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const topBar = new TopBar(container);
+    const center = new NotificationCenter();
+    const onOpenWater = vi.fn();
+    topBar.setOpenWaterHandler(onOpenWater);
+    state.weather = cycle;
+    topBar.update(state, center);
+    const weatherBtn = container.querySelector<HTMLButtonElement>('.bs-weather')!;
+    weatherBtn.click();
+    const popover = weatherBtn.nextElementSibling as HTMLElement;
+    return { topBar, popover, onOpenWater, link: popover.querySelector<HTMLElement>(OPEN) };
+  }
+
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  it('the fixture cycles really are rain_incoming, wet and clear advisories', () => {
+    const probe = createGame({ seed: 1, mineType: 'desert' });
+    const kind = (c: WeatherCycleState) => computeWeatherAdvisory(probe, c.current, forecast(c, 14, 'desert')).kind;
+    expect(kind(rainIncomingCycle())).toBe('rain_incoming');
+    expect(kind(wetCycle())).toBe('wet');
+    expect(kind(clearCycle())).toBe('clear');
+  });
+
+  describe('links', () => {
+    it('wet advisory with wet holes', () => {
+      const { link, topBar } = open(waterScene({ holes: 2, explosive: 'krackle', wetLevel: 0.9 }), wetCycle());
+      expect(link).not.toBeNull();
+      topBar.dispose();
+    });
+
+    it('wet advisory with no wet hole but charged water-sensitive untubed holes', () => {
+      const { link, topBar } = open(waterScene({ holes: 2 }), wetCycle());
+      expect(link).not.toBeNull();
+      topBar.dispose();
+    });
+
+    it('rain-incoming advisory with charged water-sensitive untubed holes', () => {
+      const { link, topBar } = open(waterScene({ holes: 2 }), rainIncomingCycle());
+      expect(link).not.toBeNull();
+      topBar.dispose();
+    });
+
+    it('clicking the link calls the open-water handler once', () => {
+      const { link, onOpenWater, topBar } = open(waterScene({ holes: 2, wetLevel: 0.9 }), wetCycle());
+      link!.click();
+      expect(onOpenWater).toHaveBeenCalledTimes(1);
+      topBar.dispose();
+    });
+  });
+
+  describe('no link', () => {
+    it('clear advisory, even with wet holes and exposed charges', () => {
+      const { link, topBar } = open(waterScene({ holes: 2, wetLevel: 0.9 }), clearCycle());
+      expect(link).toBeNull();
+      topBar.dispose();
+    });
+
+    it('wet advisory with no holes at all', () => {
+      const { link, topBar } = open(waterScene({ holes: 0 }), wetCycle());
+      expect(link).toBeNull();
+      topBar.dispose();
+    });
+
+    it('wet advisory when the only charged holes are tubed and dry', () => {
+      const state = waterScene({ holes: 2 });
+      state.tubingState.installedHoles = new Set(['H1', 'H2']);
+      const { link, topBar } = open(state, wetCycle());
+      expect(link).toBeNull();
+      topBar.dispose();
+    });
+
+    it('wet advisory when the charges are water-resistant and the holes dry', () => {
+      const { link, topBar } = open(waterScene({ holes: 2, explosive: 'krackle' }), wetCycle());
+      expect(link).toBeNull();
+      topBar.dispose();
+    });
+
+    it('rain-incoming advisory with no holes', () => {
+      const { link, topBar } = open(waterScene({ holes: 0 }), rainIncomingCycle());
+      expect(link).toBeNull();
+      topBar.dispose();
+    });
+
+    it('rain-incoming advisory when the charged holes are tubed', () => {
+      const state = waterScene({ holes: 2 });
+      state.tubingState.installedHoles = new Set(['H1', 'H2']);
+      const { link, topBar } = open(state, rainIncomingCycle());
+      expect(link).toBeNull();
+      topBar.dispose();
+    });
+
+    it('rain-incoming advisory when the charges are water-resistant', () => {
+      const { link, topBar } = open(waterScene({ holes: 2, explosive: 'krackle' }), rainIncomingCycle());
+      expect(link).toBeNull();
+      topBar.dispose();
+    });
+
+    it('rain-incoming advisory when the holes are charged-free', () => {
+      const { link, topBar } = open(waterScene({ holes: 2, explosive: null }), rainIncomingCycle());
+      expect(link).toBeNull();
+      topBar.dispose();
+    });
   });
 });

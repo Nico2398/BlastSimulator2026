@@ -534,8 +534,9 @@ describe('en.json / fr.json — key-set parity', () => {
     // #2233: +1 preflight hide-waiting key: 4917.
     // UI rework (#2241-#2243): +79 keys — crew and fleet key figures, staff coverage tiles,
     // the contract delivery outlook and timeline, and the window section labels.
-    // #2265: +3 keys (cancel ramp, cancel all, cancel-all console report): 4999.
-    expect(Object.keys(en).length).toBe(4999);
+    // #2267: +5 water-fix keys (ui.blast_workshop.water_fix.*): 5001.
+    // #2265: +3 keys (cancel ramp, cancel all, cancel-all console report): 5004.
+    expect(Object.keys(en).length).toBe(5004);
   });
 
   it('carries the weak-explosive warning key no more, and the breaks-nothing keys in both locales (#2197)', () => {

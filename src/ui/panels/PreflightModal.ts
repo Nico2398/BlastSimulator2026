@@ -34,6 +34,7 @@ import { detonationPhase, type DetonationPhase } from '../../core/engine/Detonat
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
 import { buildingRiskText } from './buildingRiskText.js';
 import { permitPreview } from './permitPreview.js';
+import { buildWaterFixes, waterFixKey, waterFixOffer, type WaterFixTarget } from './waterFixes.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -46,13 +47,13 @@ export const PREFLIGHT_HIDE_ACTION = 'preflight-hide-waiting';
 export const PREFLIGHT_CHIP_ROLE = 'preflight-waiting-chip';
 export const PREFLIGHT_SHOW_ACTION = 'preflight-show-waiting';
 
-interface Warning { ok: boolean; text: string; role?: string; buildingType?: string }
+interface Warning { ok: boolean; text: string; role?: string; buildingType?: string; fixes?: WaterFixTarget }
 
 /** The dry-charges row: wet beats rain risk beats all-clear. */
 function dryWarning(wetCount: number, fizzleCount: number, rainExposedCount: number): Warning {
-  if (fizzleCount > 0) return { ok: false, text: t('ui.blast_workshop.preflight.warn_wet', { count: fizzleCount, percent: wetFizzlePercent() }) };
+  if (fizzleCount > 0) return { ok: false, text: t('ui.blast_workshop.preflight.warn_wet', { count: fizzleCount, percent: wetFizzlePercent() }), fixes: 'wet' };
   if (rainExposedCount > 0) {
-    return { ok: false, text: t('ui.blast_workshop.preflight.warn_rain_risk', { count: rainExposedCount }), role: 'preflight-rain-risk' };
+    return { ok: false, text: t('ui.blast_workshop.preflight.warn_rain_risk', { count: rainExposedCount }), role: 'preflight-rain-risk', fixes: 'rain' };
   }
   if (wetCount > 0) return { ok: true, text: t('ui.blast_workshop.preflight.ok_wet_resistant', { count: wetCount }) };
   return { ok: true, text: t('ui.blast_workshop.preflight.ok_dry') };
@@ -119,6 +120,8 @@ export class PreflightModal {
   private waiting = false;
 
   private gameConsole?: GameConsoleFn;
+  private openWater: (() => void) | undefined;
+  private state: GameState | null = null;
   private open = false;
   /** True once DETONATE was pressed: the modal closes when the sequence ends (#1362). */
   private awaitingDetonation = false;
@@ -238,6 +241,9 @@ export class PreflightModal {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
+  /** Where the water-section link in the wet and rain-risk rows leads; the modal closes first (#2267). */
+  setOpenWaterHandler(cb: () => void): void { this.openWater = cb; this.lastSignature = ''; }
+
   show(): void { this.open = true; this.awaitingDetonation = false; this.dockHidden = false; this.refusalEl.textContent = ''; this.overlay.style.display = ''; this.lastSignature = ''; }
   /** While a detonation is armed, hiding collapses to the chip instead of closing: the shot stays findable. */
   hide(): void {
@@ -297,11 +303,12 @@ export class PreflightModal {
 
     const signature = JSON.stringify({
       permit, undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage, brokenVoxels, charged, holeCoverage,
-      preview: state.lastBlastPreview, wetCount: wet.length, fizzleCount: fizzled.length, rainExposedCount: rainExposed.length, occupantCount,
+      preview: state.lastBlastPreview, wetCount: wet.length, fizzleCount: fizzled.length, rainExposedCount: rainExposed.length, water: waterFixKey(state), occupantCount,
       walls: wallFaces.map(w => wallWarningText(w)), breakoutText, phase, protectedCount: protectedHoles.length, buildingsAtRisk, loadingCount, errorCount: validationErrors.length,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
+    this.state = state;
 
     this.renderWaiting(phase);
     this.detonateBtn.disabled = validationErrors.length > 0;
@@ -415,13 +422,23 @@ export class PreflightModal {
   private makeWarningRow(w: Warning): HTMLElement {
     const row = el('div');
     row.style.cssText = 'display:flex;gap:8px;align-items:flex-start';
+    const textSpan = el('span', { text: w.text, attrs: { style: 'font:400 12px/1.45 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } });
     row.append(
       el('div', { attrs: { style: `color:${w.ok ? 'var(--bsx-positive)' : 'var(--bsx-amber)'};padding-top:1px` }, children: [iconEl(w.ok ? 'check' : 'warn', 13)] }),
-      el('span', { text: w.text, attrs: { style: 'font:400 12px/1.45 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
+      w.fixes && this.state
+        ? el('div', { children: [textSpan, this.waterFixes(this.state, w.fixes)] })
+        : textSpan,
     );
     if (w.role) row.dataset['role'] = w.role;
     if (w.buildingType) row.dataset['buildingType'] = w.buildingType;
     return row;
+  }
+
+  private waterFixes(state: GameState, target: WaterFixTarget): HTMLElement {
+    return buildWaterFixes(waterFixOffer(state, target), {
+      run: cmd => { this.gameConsole?.(cmd); this.lastSignature = ''; },
+      openWater: () => { this.hide(); this.openWater?.(); },
+    });
   }
 
   private detonate(): void {

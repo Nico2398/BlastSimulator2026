@@ -4997,5 +4997,10 @@
   "ui.outlook.timeline_label": "{material} n°{id} · {kg} kg",
   "ui.outlook.hours_left": "{hours} h",
   "ui.outlook.now": "maintenant",
-  "ui.outlook.tonnes": "{t} t"
+  "ui.outlook.tonnes": "{t} t",
+  "ui.blast_workshop.water_fix.drain": "Vidanger {count} · {cost}",
+  "ui.blast_workshop.water_fix.tube": "Tuber {count}",
+  "ui.blast_workshop.water_fix.open": "Ouvrir les commandes d'eau",
+  "ui.blast_workshop.water_fix.buy_funds": "Pas assez d'argent pour acheter du tubage.",
+  "ui.blast_workshop.water_fix.tube_first": "{count} trou(s) humide(s) en roche poreuse se remplissent tant qu'ils ne sont pas tubés. Tubez-les d'abord, puis vidangez."
 }
