@@ -15,6 +15,7 @@ export function permitRefusalText(
   switch (refusal) {
     case 'no_ladder': return t('permit.no_ladder');
     case 'pending': return t('permit.refusal.pending');
+    case 'tier_incomplete': return t('permit.refusal.tier_incomplete');
     case 'unmet_targets': {
       const targets = unmet.map(kind => t(`permit.kind.${kind}`)).join(', ');
       return t('permit.refusal.unmet_targets', { targets });

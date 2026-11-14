@@ -139,6 +139,8 @@ export function generateContracts(
   buyerGrade?: number,
   /** Per-ore market saturation reading, discounting oversold ores (#1930). */
   saturation?: SaturationReader,
+  /** Offers added to the refresh by the tier perk (#2277). */
+  _extraOffers = 0,
 ): void {
   // Only refresh if enough time has passed
   if (currentTick - state.lastRefreshTick < CONTRACT_REFRESH_INTERVAL && state.available.length > 0) return;

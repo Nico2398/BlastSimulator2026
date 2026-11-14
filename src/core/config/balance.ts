@@ -1438,7 +1438,7 @@ export const VEHICLE_SCRAP_RESIDUAL_FRACTION = 0.4;
 export const VEHICLE_MAX_TIER: VehicleTier = 3;
 
 /** Mine grade at which each vehicle tier becomes purchasable on progression sites (#1928). */
-export const VEHICLE_TIER_UNLOCK_GRADE: Readonly<Record<VehicleTier, number>> = { 1: 0, 2: 2, 3: 4 };
+export const VEHICLE_TIER_UNLOCK_GRADE: Readonly<Record<VehicleTier, number>> = { 1: 0, 2: 1, 3: 2 };
 
 /**
  * Base excavation voxels/tick for a tier-1 rock digger (#555 ramp
@@ -3075,7 +3075,7 @@ export const PRODUCTION_SUPPLY_QTY_KG = { min: 4_000, max: 8_000 } as const;
 /** Supply quantity multiplier on `PRODUCTION_SUPPLY_QTY_KG` per buyer tier (#1929). */
 export const BUYER_SUPPLY_QTY_FACTOR = { local: 0.5, regional: 1, national: 6, global: 25 } as const;
 /** Mine grade at which each buyer tier starts offering contracts (#1929). */
-export const BUYER_UNLOCK_GRADE = { local: 0, regional: 1, national: 3, global: 5 } as const;
+export const BUYER_UNLOCK_GRADE = { local: 0, regional: 1, national: 2, global: 3 } as const;
 /** Ore-sale lot size range (kg) per buyer tier (#1929); local lots are 100-1000 kg by design. */
 export const BUYER_ORE_SALE_QTY_KG = {
   local: { min: 100, max: 1_000 },
@@ -3243,45 +3243,80 @@ export const EVENT_BALANCE_PERMANENT_DAYS = 365;
 /** Reference crew size used to turn per-employee event effects into totals when comparing options. */
 export const EVENT_BALANCE_REFERENCE_CREW = 5;
 
-// ── Mine grades (#1921) ──────────────────────────────────────────────────────
-/** One target a grade asks for; `no_death` value is the look-back window in ticks. */
+// ── Mine grades (#1921) and tiers (#2277) ────────────────────────────────────
+/** One target a grade or tier asks for; `no_death` value is the look-back window in ticks. */
 export interface MineGradeTargetConfig {
   kind: 'ore_kg' | 'blasts' | 'depth_m' | 'rock_m3' | 'safety' | 'ecology' | 'neighbours' | 'no_death';
   value: number;
 }
-/** One named grade of the permit ladder. */
+/** What a tier's perk improves; each perk adds its `value` to a running total along the ladder. */
+export type MineTierPerkKind = 'notification_fee_pct' | 'processing_pct' | 'inspection_pct' | 'contract_offers';
+/** One small perk a tier grants on top of its caps. */
+export interface MineTierPerk {
+  kind: MineTierPerkKind;
+  value: number;
+}
+/** One tier of a grade: the targets that complete it (cumulative counters) and the perk reaching it grants (none at G0 tier 1). */
+export interface MineTierConfig {
+  targets: readonly MineGradeTargetConfig[];
+  perk: MineTierPerk | null;
+}
+/** One named grade (a zone of the mine): the fee and paperwork to enter it, its three tiers and the zone mastery. */
 export interface MineGradeConfig {
   nameKey: string;
+  /** Fee to enter this grade from the one below (0 for the start grade). */
   fee: number;
+  /** Ticks of Ministry paperwork to enter this grade. */
   processingTicks: number;
-  targets: readonly MineGradeTargetConfig[];
+  /** Zone mastery: what must be delivered before leaving this grade (plain ore delivered until #2278). */
+  mastery: readonly MineGradeTargetConfig[];
+  tiers: readonly [MineTierConfig, MineTierConfig, MineTierConfig];
 }
-/** Named grades 1-5, keyed by grade number (v1 defaults, re-tuned by calibration tasks). */
+/** Tiers per named grade. */
+export const MINE_TIERS_PER_GRADE = 3;
+/** Last named grade (G3 Meteorite); grades above it are endless classes with no tiers. */
+export const MINE_LAST_NAMED_GRADE = 3;
+/** Ladder step (grade x tier) of G3 tier 3, the last named step; classes continue above it. */
+export const MINE_LAST_NAMED_RUNG = 11;
+/** Perk size per perk kind: fee and processing and inspection discounts in percent, offers in count per refresh. */
+const PERK_FEE: MineTierPerk = { kind: 'notification_fee_pct', value: 5 };
+const PERK_PROCESSING: MineTierPerk = { kind: 'processing_pct', value: 5 };
+const PERK_INSPECTION: MineTierPerk = { kind: 'inspection_pct', value: 5 };
+const PERK_OFFER: MineTierPerk = { kind: 'contract_offers', value: 1 };
+/** Four named grades x three tiers (v1 defaults, re-tuned by calibration tasks). Tier targets are cumulative counters. */
 export const MINE_GRADES: Readonly<Record<number, MineGradeConfig>> = {
-  1: { nameKey: 'permit.grade.1', fee: 20_000, processingTicks: 48, targets: [
-    { kind: 'ore_kg', value: 5_000 }, { kind: 'blasts', value: 2 } ] },
-  2: { nameKey: 'permit.grade.2', fee: 75_000, processingTicks: 72, targets: [
-    { kind: 'ore_kg', value: 30_000 }, { kind: 'depth_m', value: 10 }, { kind: 'safety', value: 40 } ] },
-  3: { nameKey: 'permit.grade.3', fee: 250_000, processingTicks: 96, targets: [
-    { kind: 'ore_kg', value: 150_000 }, { kind: 'depth_m', value: 20 }, { kind: 'neighbours', value: 35 }, { kind: 'no_death', value: 1_000 } ] },
-  4: { nameKey: 'permit.grade.4', fee: 800_000, processingTicks: 120, targets: [
-    { kind: 'ore_kg', value: 600_000 }, { kind: 'depth_m', value: 30 }, { kind: 'safety', value: 50 }, { kind: 'ecology', value: 30 } ] },
-  5: { nameKey: 'permit.grade.5', fee: 2_500_000, processingTicks: 144, targets: [
-    { kind: 'ore_kg', value: 2_500_000 }, { kind: 'depth_m', value: 40 }, { kind: 'neighbours', value: 40 }, { kind: 'no_death', value: 2_000 } ] },
+  0: { nameKey: 'permit.grade.0', fee: 0, processingTicks: 0, mastery: [{ kind: 'ore_kg', value: 6_000 }], tiers: [
+    { perk: null, targets: [{ kind: 'ore_kg', value: 500 }, { kind: 'blasts', value: 1 }] },
+    { perk: PERK_FEE, targets: [{ kind: 'ore_kg', value: 1_500 }, { kind: 'blasts', value: 2 }] },
+    { perk: PERK_PROCESSING, targets: [{ kind: 'ore_kg', value: 3_500 }, { kind: 'blasts', value: 3 }] } ] },
+  1: { nameKey: 'permit.grade.1', fee: 20_000, processingTicks: 48, mastery: [{ kind: 'ore_kg', value: 32_000 }], tiers: [
+    { perk: PERK_INSPECTION, targets: [{ kind: 'ore_kg', value: 10_000 }, { kind: 'depth_m', value: 4 }] },
+    { perk: PERK_OFFER, targets: [{ kind: 'ore_kg', value: 16_000 }, { kind: 'depth_m', value: 6 }, { kind: 'safety', value: 30 }] },
+    { perk: PERK_FEE, targets: [{ kind: 'ore_kg', value: 22_000 }, { kind: 'depth_m', value: 10 }, { kind: 'safety', value: 40 }] } ] },
+  2: { nameKey: 'permit.grade.2', fee: 120_000, processingTicks: 72, mastery: [{ kind: 'ore_kg', value: 160_000 }], tiers: [
+    { perk: PERK_PROCESSING, targets: [{ kind: 'ore_kg', value: 60_000 }, { kind: 'depth_m', value: 14 }] },
+    { perk: PERK_INSPECTION, targets: [{ kind: 'ore_kg', value: 90_000 }, { kind: 'depth_m', value: 17 }, { kind: 'no_death', value: 1_000 }] },
+    { perk: PERK_OFFER, targets: [{ kind: 'ore_kg', value: 120_000 }, { kind: 'depth_m', value: 20 }, { kind: 'neighbours', value: 35 }] } ] },
+  3: { nameKey: 'permit.grade.3', fee: 800_000, processingTicks: 120, mastery: [{ kind: 'ore_kg', value: 2_500_000 }], tiers: [
+    { perk: PERK_FEE, targets: [{ kind: 'ore_kg', value: 400_000 }, { kind: 'depth_m', value: 26 }, { kind: 'safety', value: 45 }] },
+    { perk: PERK_PROCESSING, targets: [{ kind: 'ore_kg', value: 650_000 }, { kind: 'depth_m', value: 30 }, { kind: 'ecology', value: 30 }] },
+    { perk: PERK_INSPECTION, targets: [{ kind: 'ore_kg', value: 1_200_000 }, { kind: 'depth_m', value: 34 }, { kind: 'safety', value: 50 }] } ] },
 };
 /** Ore target multiplier per endless class above the last named grade. */
 export const MINE_GRADE_CLASS_ORE_FACTOR = 2.5;
-/** Rock-broken target (m³) of endless class 1. */
+/** Rock-broken target (m³) of endless class 2 (class 1 asks G3 tier 3 and its mastery). */
 export const MINE_GRADE_CLASS_ROCK_BASE_M3 = 60_000;
 /** Rock-broken target multiplier per further class. */
 export const MINE_GRADE_CLASS_ROCK_FACTOR = 2;
+/** Fee of endless class 1. */
+export const MINE_GRADE_CLASS_BASE_FEE = 2_500_000;
 /** Fee multiplier per further class. */
 export const MINE_GRADE_CLASS_FEE_FACTOR = 2;
 /** Processing ticks of every endless class. */
 export const MINE_GRADE_CLASS_PROCESSING_TICKS = 144;
 
 /**
- * Blast limits and filing fee of one permit grade. The permit caps the explosive and the ground a shot
+ * Blast limits and filing fee of one permit step. The permit caps the explosive and the ground a shot
  * works (the area of its holes' pattern cells, `patternAreaM2`), not how many holes do it: a finer mesh
  * over the same ground costs drilling, never permit.
  */
@@ -3290,15 +3325,30 @@ export interface PermitLimitConfig {
   maxAreaM2: number;
   fee: number;
 }
-/** Per-blast limits of grades 0-5, keyed by grade number. Each area is what the grade's former hole
- *  limit covered at the default 4 m x 4 m cell (9, 16, 36, 81, 196 and 400 holes). */
+/** Per-blast limits of the 12 named ladder steps, keyed by rung (grade x 3 + tier - 1): geometric steps from the
+ *  old grade-0 caps at G0 tier 1 up to the old grade-5 caps at G3 tier 3. */
 export const PERMIT_LIMITS: Readonly<Record<number, PermitLimitConfig>> = {
   0: { maxChargeKg: 40, maxAreaM2: 144, fee: 250 },
-  1: { maxChargeKg: 120, maxAreaM2: 256, fee: 1_000 },
-  2: { maxChargeKg: 800, maxAreaM2: 576, fee: 3_000 },
-  3: { maxChargeKg: 2_500, maxAreaM2: 1_296, fee: 8_000 },
-  4: { maxChargeKg: 8_000, maxAreaM2: 3_136, fee: 20_000 },
-  5: { maxChargeKg: 25_000, maxAreaM2: 6_400, fee: 50_000 },
+  1: { maxChargeKg: 70, maxAreaM2: 200, fee: 400 },
+  2: { maxChargeKg: 130, maxAreaM2: 290, fee: 650 },
+  3: { maxChargeKg: 230, maxAreaM2: 400, fee: 1_050 },
+  4: { maxChargeKg: 420, maxAreaM2: 570, fee: 1_700 },
+  5: { maxChargeKg: 750, maxAreaM2: 800, fee: 2_800 },
+  6: { maxChargeKg: 1_300, maxAreaM2: 1_140, fee: 4_500 },
+  7: { maxChargeKg: 2_400, maxAreaM2: 1_600, fee: 7_300 },
+  8: { maxChargeKg: 4_300, maxAreaM2: 2_260, fee: 11_800 },
+  9: { maxChargeKg: 7_700, maxAreaM2: 3_190, fee: 19_000 },
+  10: { maxChargeKg: 14_000, maxAreaM2: 4_500, fee: 31_000 },
+  11: { maxChargeKg: 25_000, maxAreaM2: 6_400, fee: 50_000 },
+};
+/** Caps of the former grades 0-5 (the ladder before tiers, #1921): a legacy save lands on the first step that holds them. */
+export const LEGACY_PERMIT_LIMITS: Readonly<Record<number, { maxChargeKg: number; maxAreaM2: number }>> = {
+  0: { maxChargeKg: 40, maxAreaM2: 144 },
+  1: { maxChargeKg: 120, maxAreaM2: 256 },
+  2: { maxChargeKg: 800, maxAreaM2: 576 },
+  3: { maxChargeKg: 2_500, maxAreaM2: 1_296 },
+  4: { maxChargeKg: 8_000, maxAreaM2: 3_136 },
+  5: { maxChargeKg: 25_000, maxAreaM2: 6_400 },
 };
 /** Charge-limit multiplier per endless class above the last named grade. */
 export const PERMIT_CLASS_CHARGE_FACTOR = 1.6;

@@ -37,17 +37,15 @@ export interface InspectionVerdict {
   suspended: boolean;
 }
 
-/** Limits of a grade; endless classes above grade 5 scale by the class factors. */
-export function permitLimitsFor(grade: number): PermitLimitConfig {
-  const named = PERMIT_LIMITS[Math.max(0, grade)];
-  if (named) return { ...named };
-  const top = PERMIT_LIMITS[LAST_NAMED_GRADE]!;
-  const k = grade - LAST_NAMED_GRADE;
-  return {
-    maxChargeKg: Math.round(top.maxChargeKg * PERMIT_CLASS_CHARGE_FACTOR ** k),
-    maxAreaM2: Math.round(top.maxAreaM2 * PERMIT_CLASS_AREA_FACTOR ** k),
-    fee: Math.round(top.fee * PERMIT_CLASS_FEE_FACTOR ** k),
-  };
+/** Limits of a ladder step (see `gradeRung`); endless classes above G3 tier 3 scale by the class factors, the fee less the notification-fee perk. */
+export function permitLimitsForRung(_rung: number): PermitLimitConfig {
+  void [PERMIT_LIMITS, PERMIT_CLASS_CHARGE_FACTOR, PERMIT_CLASS_AREA_FACTOR, PERMIT_CLASS_FEE_FACTOR];
+  throw new Error('not implemented');
+}
+
+/** Limits of a grade and tier; tier defaults to 1 (classes have one). */
+export function permitLimitsFor(_grade: number, _tier = 1): PermitLimitConfig {
+  throw new Error('not implemented');
 }
 
 function limitsUnlockParams(grade: number): Record<string, string | number> {
@@ -61,11 +59,11 @@ for (const grade of LIMIT_LINE_GRADES) {
 
 /** Compare a blast plan — its charges and the area (m²) of its pattern cells — against the permit of `grade`. */
 export function preFireCheck(
-  grade: number,
+  rung: number,
   charges: Readonly<Record<string, { amountKg: number }>>,
   planAreaM2: number,
 ): PreFireCheck {
-  const limits = permitLimitsFor(grade);
+  const limits = permitLimitsForRung(rung);
   let planKg = 0;
   for (const c of Object.values(charges)) planKg += c.amountKg;
   const kgOver = Math.max(0, planKg - limits.maxChargeKg) / limits.maxChargeKg;
@@ -80,7 +78,7 @@ export function liveStrikes(strikeTicks: readonly number[], tick: number): numbe
 }
 
 /** Chance an inspector turns up for a blast over limit by `overshoot`. */
-export function inspectionChance(overshoot: number): number {
+export function inspectionChance(overshoot: number, _rung = 0): number {
   return Math.min(1, PERMIT_INSPECTION_BASE_CHANCE + overshoot);
 }
 
@@ -90,8 +88,8 @@ export function inspectionFine(fee: number, overshoot: number): number {
 }
 
 /** Roll whether the inspection happens. */
-export function rollInspection(rng: Random, overshoot: number): boolean {
-  return rng.next() < inspectionChance(overshoot);
+export function rollInspection(rng: Random, overshoot: number, rung = 0): boolean {
+  return rng.next() < inspectionChance(overshoot, rung);
 }
 
 /** Resolve an over-limit blast: roll, fine, strike, suspend, emit `progression:blast_inspected`. */

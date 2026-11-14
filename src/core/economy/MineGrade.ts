@@ -9,12 +9,17 @@ import { takePermitDelay } from '../events/ActiveModifiers.js';
 import { parseColumnKey } from '../mining/SurveyColumn.js';
 import {
   MINE_GRADES,
+  MINE_LAST_NAMED_GRADE,
+  MINE_TIERS_PER_GRADE,
   MINE_GRADE_CLASS_ORE_FACTOR,
   MINE_GRADE_CLASS_ROCK_BASE_M3,
   MINE_GRADE_CLASS_ROCK_FACTOR,
+  MINE_GRADE_CLASS_BASE_FEE,
   MINE_GRADE_CLASS_FEE_FACTOR,
   MINE_GRADE_CLASS_PROCESSING_TICKS,
   type MineGradeTargetConfig,
+  type MineTierPerk,
+  type PermitLimitConfig,
 } from '../config/balance.js';
 
 export type GradeTargetKind = MineGradeTargetConfig['kind'];
@@ -36,6 +41,8 @@ interface GradeDef {
 
 export interface GradeState {
   grade: number;
+  /** Tier within the grade, 1-3 (always 1 on an endless class). */
+  tier: number;
   oreDeliveredKg: number;
   deepestPitM: number;
   rockBrokenM3: number;
@@ -58,14 +65,48 @@ export interface GradeTargetStatus {
   needed: number;
 }
 
-export type GradeApplyRefusal = 'no_ladder' | 'pending' | 'unmet_targets' | 'insufficient_funds';
+export type GradeApplyRefusal = 'no_ladder' | 'pending' | 'tier_incomplete' | 'unmet_targets' | 'insufficient_funds';
 
 type GradeApplyResult =
   | { ok: true; fee: number; toGrade: number }
   | { ok: false; refusal: GradeApplyRefusal; unmet?: GradeTargetKind[] };
 
-/** Last grade with a named table entry; classes start above it. */
-export const LAST_NAMED_GRADE = 5;
+/** Last grade with a named table entry (G3 Meteorite); classes start above it. */
+export const LAST_NAMED_GRADE = MINE_LAST_NAMED_GRADE;
+
+/** One tier of a named grade: what completes it, what reaching it grants. */
+export interface TierDef {
+  grade: number;
+  tier: number;
+  targets: readonly GradeTargetDef[];
+  perk: MineTierPerk | null;
+  limits: PermitLimitConfig;
+}
+
+/** Ladder step of a site: grade x tier for grades 0-3, then one step per endless class. */
+export function gradeRung(_g: Pick<GradeState, 'grade' | 'tier'>): number {
+  throw new Error('not implemented');
+}
+
+/** Definition of a tier of a named grade (0-3); undefined for a class or an out-of-range tier. */
+export function tierDef(_grade: number, _tier: number): TierDef | undefined {
+  throw new Error('not implemented');
+}
+
+/** Per-target progress toward completing the current tier; empty without a ladder or on a class. */
+export function currentTierTargets(_state: GameState): GradeTargetStatus[] {
+  throw new Error('not implemented');
+}
+
+/** Raises the tier while the current tier's targets are met; returns the tiers gained. Emits `progression:tier_up` per step. */
+export function advanceGradeTier(_state: GameState, _emitter?: Pick<EventEmitter, 'emit'>): number {
+  throw new Error('not implemented');
+}
+
+/** Where a pre-tier save's grade (0-5, then classes) lands on the new ladder, never below the caps it held. */
+export function migrateLegacyGrade(_oldGrade: number): { grade: number; tier: number } {
+  throw new Error('not implemented');
+}
 
 /** Target amount for display: whole numbers as-is, fractions floored to one decimal. */
 export function formatGradeAmount(n: number): string {
@@ -74,7 +115,7 @@ export function formatGradeAmount(n: number): string {
 
 /** Fresh grade state of a progression site: grade 0, nothing tracked. */
 export function createGradeState(): GradeState {
-  return { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null };
+  return { grade: 0, tier: 1, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null };
 }
 
 function isCount(v: unknown): v is number {
@@ -95,33 +136,17 @@ export function sanitizeGradeState(raw: unknown): GradeState | undefined {
   const inspectionRolls = isWholeCount(r['inspectionRolls']) ? r['inspectionRolls'] : 0;
   const unseenApproval = isWholeCount(r['unseenApproval']) ? r['unseenApproval'] : null;
   const lastBlastChargeShare = typeof r['lastBlastChargeShare'] === 'number' && Number.isFinite(r['lastBlastChargeShare']) && r['lastBlastChargeShare'] >= 0 ? r['lastBlastChargeShare'] : 0;
-  if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks, inspectionRolls, lastBlastChargeShare, unseenApproval };
+  if (pending === null) return { grade, tier: 1, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks, inspectionRolls, lastBlastChargeShare, unseenApproval };
   if (typeof pending !== 'object' || Array.isArray(pending)) return undefined;
   const p = pending as Record<string, unknown>;
   if (!isWholeCount(p['toGrade']) || !isWholeCount(p['ticksLeft'])) return undefined;
-  return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] }, strikeTicks, inspectionRolls, lastBlastChargeShare, unseenApproval };
+  return { grade, tier: 1, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] }, strikeTicks, inspectionRolls, lastBlastChargeShare, unseenApproval };
 }
 
-/** Definition of a grade: 0 is the start permit, 1-5 are named, above that endless classes. */
-export function gradeDef(grade: number): GradeDef {
-  if (grade <= 0) return { grade: 0, nameKey: 'permit.grade.0', fee: 0, processingTicks: 0, targets: [] };
-  const named = MINE_GRADES[grade];
-  if (named) return { grade, nameKey: named.nameKey, fee: named.fee, processingTicks: named.processingTicks, targets: named.targets };
-
-  const k = grade - LAST_NAMED_GRADE;
-  const top = MINE_GRADES[LAST_NAMED_GRADE]!;
-  const topOre = top.targets.find(tg => tg.kind === 'ore_kg')!.value;
-  return {
-    grade,
-    nameKey: 'permit.grade.class',
-    nameParams: { n: k },
-    fee: Math.round(top.fee * MINE_GRADE_CLASS_FEE_FACTOR ** k),
-    processingTicks: MINE_GRADE_CLASS_PROCESSING_TICKS,
-    targets: [
-      { kind: 'ore_kg', value: Math.round(topOre * MINE_GRADE_CLASS_ORE_FACTOR ** k) },
-      { kind: 'rock_m3', value: Math.round(MINE_GRADE_CLASS_ROCK_BASE_M3 * MINE_GRADE_CLASS_ROCK_FACTOR ** (k - 1)) },
-    ],
-  };
+/** Definition of entering a grade: 0 is the start permit, 1-3 are named, above that endless classes. */
+export function gradeDef(_grade: number): GradeDef {
+  void [MINE_GRADES, MINE_TIERS_PER_GRADE, MINE_GRADE_CLASS_ORE_FACTOR, MINE_GRADE_CLASS_ROCK_BASE_M3, MINE_GRADE_CLASS_ROCK_FACTOR, MINE_GRADE_CLASS_BASE_FEE, MINE_GRADE_CLASS_FEE_FACTOR, MINE_GRADE_CLASS_PROCESSING_TICKS];
+  throw new Error('not implemented');
 }
 
 /** Per-target progress toward the next grade; empty without a ladder. */
