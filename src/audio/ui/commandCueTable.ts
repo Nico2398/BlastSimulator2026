@@ -60,6 +60,8 @@ export const COMMAND_CUES: Readonly<Record<string, VerbRule>> = {
   level_ground: CANCELLABLE_ORDER,
   drain_hole: { otherwise: ORDER },
   install_tubing: { otherwise: ORDER },
+  // A setting, like a policy: nothing is ordered or paid.
+  tube_on_drill: { otherwise: { cue: 'ui_tab' } },
   zone: { subs: { clear: ORDER, status: null }, otherwise: null },
   research: { subs: { queue: ORDER, status: null }, otherwise: null },
   permit: { subs: { apply: CONFIRM, status: null }, otherwise: null },

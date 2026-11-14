@@ -17,6 +17,7 @@ import { Random } from '../math/Random.js';
 import { completeVehicleGatedAction } from './VehicleReservation.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../mining/SurveyCalc.js';
 import { landDrilledHole, drillHoleCost } from '../mining/DrillPlan.js';
+import { tubeDrilledHole } from '../mining/Tubing.js';
 import { landLoadedCharge } from '../mining/ChargePlan.js';
 import { canAffordChargeLoad, loadChargeExplosive } from '../mining/ChargeLoad.js';
 import { prefetchBlastZone } from '../mining/BlastExecution.js';
@@ -198,6 +199,7 @@ export function applyTaskCompletion(
         state.drillHoles.push(drilled);
         // Paid as the hole is finished: what a finer mesh over the same ground costs (DRILL_COST_PER_METRE).
         deductExpense(state, drillHoleCost(drilled.depth, drilled.diameter), 'drilling', `Drilling: hole ${drilled.id}`);
+        tubeDrilledHole(state.tubingState, drilled.id); // before any weather tick can wet it (#2269)
         autoChargeHole(state, drilled);
         if (state.navGrid && grid) {
           const cx = Math.floor(drilled.x);

@@ -543,3 +543,60 @@ describe('applyTaskCompletion — a drilled hole is paid for as it lands', () =>
     expect(state.drillHoles).toEqual([]);
   });
 });
+
+describe('applyTaskCompletion — a drilled hole is tubed as it lands (#2269)', () => {
+  function tubeFixture(stock: number, on: boolean) {
+    const state = createGame({ seed: SEED });
+    const { employee } = hireEmployee(state.employees, 'blaster', new Random(SEED), 0, 0);
+    state.plannedDrillHoles.push({ id: 'H1', x: 20, z: 20, depth: 8, diameter: 0.089 });
+    state.plannedDrillHoles.push({ id: 'H2', x: 22, z: 20, depth: 8, diameter: 0.089 });
+    state.tubingState.inventory = stock;
+    state.tubingState.tubeOnDrill = on;
+    const finish = (holeId: string) => applyTaskCompletion(state, null, employee, baseProgress({
+      actionType: 'drill_hole',
+      actionPayload: { holeId },
+    }), new EventEmitter());
+    return { state, finish };
+  }
+
+  it('tubes the hole from stock at completion while the setting is on', () => {
+    const { state, finish } = tubeFixture(5, true);
+    finish('H1');
+    expect(state.drillHoles.map(h => h.id)).toEqual(['H1']);
+    expect(state.tubingState.installedHoles.has('H1')).toBe(true);
+    expect(state.tubingState.inventory).toBe(4);
+  });
+
+  it('installs nothing while the setting is off', () => {
+    const { state, finish } = tubeFixture(5, false);
+    finish('H1');
+    expect(state.drillHoles.map(h => h.id)).toEqual(['H1']);
+    expect(state.tubingState.installedHoles.size).toBe(0);
+    expect(state.tubingState.inventory).toBe(5);
+  });
+
+  it('lands the hole untubed, without error, when stock is empty', () => {
+    const { state, finish } = tubeFixture(0, true);
+    expect(() => finish('H1')).not.toThrow();
+    expect(state.drillHoles.map(h => h.id)).toEqual(['H1']);
+    expect(state.tubingState.installedHoles.size).toBe(0);
+    expect(state.tubingState.inventory).toBe(0);
+  });
+
+  it('tubes holes until stock runs out, then drills the rest untubed', () => {
+    const { state, finish } = tubeFixture(1, true);
+    finish('H1');
+    finish('H2');
+    expect(state.drillHoles.map(h => h.id)).toEqual(['H1', 'H2']);
+    expect([...state.tubingState.installedHoles]).toEqual(['H1']);
+    expect(state.tubingState.inventory).toBe(0);
+  });
+
+  it('rejection: a drill order whose hole left the plan tubes nothing and spends no stock', () => {
+    const { state, finish } = tubeFixture(5, true);
+    finish('H99');
+    expect(state.drillHoles).toEqual([]);
+    expect(state.tubingState.installedHoles.size).toBe(0);
+    expect(state.tubingState.inventory).toBe(5);
+  });
+});

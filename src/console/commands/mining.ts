@@ -16,5 +16,5 @@ export type { RampSegmentActionPayload } from './mining/ramp.js';
 export { buildRampCommand, rampCommand, cancelRampCommand, widenRampCommand, repairRampCommand, rampFlowCommand } from './mining/ramp.js';
 export type { LevelGroundActionPayload } from './mining/level.js';
 export { levelGroundCommand, cancelLevelGroundCommand } from './mining/level.js';
-export { weatherCommand, tubingCommand, buyCommand, drainHoleCommand } from './mining/weatherTubing.js';
+export { weatherCommand, tubingCommand, buyCommand, drainHoleCommand, tubeOnDrillCommand } from './mining/weatherTubing.js';
 export { surveyCommand } from './mining/survey.js';

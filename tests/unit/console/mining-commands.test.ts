@@ -12,6 +12,7 @@ import {
   previewCommand,
   surveyCommand,
   tubingCommand,
+  tubeOnDrillCommand,
 } from '../../../src/console/commands/mining.js';
 import { computeDrillHoleDurationTicks } from '../../../src/core/mining/DrillPlan.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
@@ -36,6 +37,7 @@ import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
 import { RAMP_DEFAULT_WIDTH, BLAST_PREVIEW_SHAPE } from '../../../src/core/config/balance.js';
+import { createRunner } from '../../../src/console/createRunner.js';
 import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 /** Cost per metre of a default-width ramp. */
 const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
@@ -2432,5 +2434,94 @@ describe('blastCommand — no breakout report line (#1724)', () => {
   it('says nothing about it when nothing was cleared, whatever brokeOut says', () => {
     const result = fireWith(false, 0);
     expect(result.output).not.toContain(t('mining.blast.no_breakout'));
+  });
+});
+
+// ── tube_on_drill (#2269) ─────────────────────────────────────────────────────
+
+describe('tubeOnDrillCommand (#2269)', () => {
+  it('`on` sets the setting and reports it on', () => {
+    const ctx = makeMiningContext();
+    const result = tubeOnDrillCommand(ctx, ['on'], {});
+    expect(result.success).toBe(true);
+    expect(ctx.state!.tubingState.tubeOnDrill).toBe(true);
+    expect(result.output).toMatch(/\bon\b/i);
+    expect(result.output).not.toMatch(/\boff\b/i);
+  });
+
+  it('`off` clears the setting and reports it off', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.tubingState.tubeOnDrill = true;
+    const result = tubeOnDrillCommand(ctx, ['off'], {});
+    expect(result.success).toBe(true);
+    expect(ctx.state!.tubingState.tubeOnDrill).toBe(false);
+    expect(result.output).toMatch(/\boff\b/i);
+    expect(result.output).not.toMatch(/\bon\b/i);
+  });
+
+  it('no argument reports the current state without changing it', () => {
+    const ctx = makeMiningContext();
+    const off = tubeOnDrillCommand(ctx, [], {});
+    expect(off.success).toBe(true);
+    expect(off.output).toMatch(/\boff\b/i);
+    expect(ctx.state!.tubingState.tubeOnDrill).toBe(false);
+
+    ctx.state!.tubingState.tubeOnDrill = true;
+    const on = tubeOnDrillCommand(ctx, [], {});
+    expect(on.success).toBe(true);
+    expect(on.output).toMatch(/\bon\b/i);
+    expect(ctx.state!.tubingState.tubeOnDrill).toBe(true);
+  });
+
+  it('rejects any other argument with a usage message and leaves the setting alone', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.tubingState.tubeOnDrill = true;
+    const result = tubeOnDrillCommand(ctx, ['maybe'], {});
+    expect(result.success).toBe(false);
+    expect(result.output.length).toBeGreaterThan(0);
+    expect(result.output).not.toContain('No game loaded');
+    expect(ctx.state!.tubingState.tubeOnDrill).toBe(true);
+  });
+
+  it('requires a loaded game', () => {
+    const ctx = makeEmptyGameContext();
+    const result = tubeOnDrillCommand(ctx, ['on'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No game loaded');
+  });
+
+  it('toggling does not touch stock or holes already tubed', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.tubingState.inventory = 4;
+    ctx.state!.tubingState.installedHoles.add('H1');
+    tubeOnDrillCommand(ctx, ['on'], {});
+    tubeOnDrillCommand(ctx, ['off'], {});
+    expect(ctx.state!.tubingState.inventory).toBe(4);
+    expect([...ctx.state!.tubingState.installedHoles]).toEqual(['H1']);
+  });
+
+  it('is registered as the console command tube_on_drill', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('new_game mine_type:desert seed:42').success).toBe(true);
+    const on = runner.run('tube_on_drill on');
+    expect(on.success).toBe(true);
+    expect(ctx.state!.tubingState.tubeOnDrill).toBe(true);
+    expect(runner.run('tube_on_drill off').success).toBe(true);
+    expect(ctx.state!.tubingState.tubeOnDrill).toBe(false);
+  });
+
+  it('a pattern drilled with the setting on and stock lands tubed, through the game loop', () => {
+    const ctx = makeMiningContext();
+    const state = ctx.state!;
+    state.cash = 999_999;
+    tubingCommand(ctx, ['buy'], { amount: '10' });
+    tubeOnDrillCommand(ctx, ['on'], {});
+    const stockBefore = state.tubingState.inventory;
+    const res = drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.089' });
+    expect(res.success).toBe(true);
+    driveDrillPlanToCompletion(ctx);
+    expect(state.drillHoles.length).toBeGreaterThan(0);
+    for (const h of state.drillHoles) expect(state.tubingState.installedHoles.has(h.id)).toBe(true);
+    expect(state.tubingState.inventory).toBe(stockBefore - state.drillHoles.length);
   });
 });

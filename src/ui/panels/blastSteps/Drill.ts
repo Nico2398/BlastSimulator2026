@@ -8,7 +8,7 @@
 
 import { t } from '../../../core/i18n/I18n.js';
 import type { EntityOpener } from '../../entityLinks.js';
-import { el, chip, emptyState, scrollBoundedSection, type ChipTone } from '../../dom.js';
+import { el, chip, button, emptyState, scrollBoundedSection, type ChipTone } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { SavedPlansList, savedPlansSignature } from './SavedPlansList.js';
@@ -21,7 +21,7 @@ import type { DrillHole, GridLayout, PlannedHole } from '../../../core/mining/Dr
 import type { VehicleTier } from '../../../core/entities/Vehicle.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { formatGameDuration } from '../../formatGameDuration.js';
-import { hasTubing } from '../../../core/mining/Tubing.js';
+import { TUBING_BUY_AMOUNT, TUBING_COST, hasTubing } from '../../../core/mining/Tubing.js';
 import { buriedHolesOf } from '../../../core/mining/BuriedHoles.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
 import { hoverRefusal, type PlacementKit } from '../../scene/PlacementKit.js';
@@ -53,6 +53,8 @@ export class DrillStep {
   /** "used / limit m²" of pattern area against the permit, always visible (#2167). */
   private readonly permitAreaEl: HTMLElement;
   private readonly holeListEl: HTMLElement;
+  /** Tube-as-drilled toggle, tubing stock against planned holes and its shortfall (#2269). */
+  private readonly tubeEl: HTMLElement;
   private readonly clearRowEl: HTMLElement;
   private readonly clearBtn: HTMLButtonElement;
   private readonly savedPlans: SavedPlansList;
@@ -157,7 +159,10 @@ export class DrillStep {
     this.commandNoticeEl.setAttribute('role', 'status');
     this.commandNoticeEl.dataset['role'] = 'drill-notice';
 
-    this.el.append(gridBtn, toolRow, this.commandNoticeEl, this.clearRowEl, statStrip, holesHeader, this.holeListEl, this.savedPlans.root);
+    this.tubeEl = el('div');
+    this.tubeEl.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:8px 10px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-well)';
+
+    this.el.append(gridBtn, toolRow, this.commandNoticeEl, this.tubeEl, this.clearRowEl, statStrip, holesHeader, this.holeListEl, this.savedPlans.root);
     container.appendChild(this.el);
   }
 
@@ -186,6 +191,7 @@ export class DrillStep {
       holes: holes.map(h => [h.id, h.x, h.z, h.depth, h.diameter, h.spacingM, h.burdenM]),
       ordered: ordered.map(h => [h.id, h.x, h.z, h.depth, h.diameter, h.spacingM, h.burdenM]),
       tubed: [...state.tubingState.installedHoles].sort(),
+      tubeOnDrill: state.tubingState.tubeOnDrill, tubeStock: state.tubingState.inventory,
       wet: [...wet].sort(),
       buried: [...buried].sort(),
       pattern: this.lastGridPattern,
@@ -209,6 +215,7 @@ export class DrillStep {
       : t('ui.blast_workshop.drill.planned', { count: totalCount });
     this.clearBtn.disabled = totalCount === 0;
     this.renderPermitArea(state);
+    this.renderTubeBlock(state);
 
     this.renderClearRow(totalCount);
     this.savedPlans.render(state.savedPlans);
@@ -221,6 +228,48 @@ export class DrillStep {
       ...ordered.map(h => this.makeOrderedHoleRow(h, buried.has(h.id))),
       ...holes.map(h => this.makeHoleRow(h, state, wet)),
     );
+  }
+
+  /** The option, the stock against the planned holes with a buy action for the shortfall, and holes drilled bare. */
+  private renderTubeBlock(state: GameState): void {
+    const tubing = state.tubingState;
+    const on = tubing.tubeOnDrill;
+    const planned = state.plannedDrillHoles.length;
+    const shortfall = Math.max(0, planned - tubing.inventory);
+    const untubed = state.drillHoles.filter(h => !hasTubing(tubing, h.id)).length;
+
+    const toggle = el('button', { className: on ? 'bsx-btn bsx-btn-warn' : 'bsx-btn', text: t('ui.blast_workshop.drill.tube_on_drill') });
+    toggle.dataset['action'] = 'tube-on-drill';
+    toggle.dataset['on'] = String(on);
+    toggle.setAttribute('aria-pressed', String(on));
+    toggle.addEventListener('click', () => this.runAndNotify(`tube_on_drill ${on ? 'off' : 'on'}`));
+
+    const stock = el('span', {
+      text: t('ui.blast_workshop.drill.tube_stock', { stock: tubing.inventory, planned }),
+      attrs: { style: 'font:600 11px/1.3 var(--bsx-font-mono);color:var(--bsx-text-muted)' },
+    });
+    stock.dataset['role'] = 'tube-stock';
+    const stockRow = el('div', { children: [stock] });
+    stockRow.style.cssText = 'display:flex;align-items:center;gap:8px';
+    if (shortfall > 0) {
+      const buyBtn = button('ghost', t('ui.blast_workshop.charge.tubing_buy', { count: TUBING_BUY_AMOUNT, cost: `$${formatMoney(TUBING_BUY_AMOUNT * TUBING_COST)}` }), {
+        dataAction: 'tubing-buy',
+        onClick: () => this.runAndNotify(`buy amount:${TUBING_BUY_AMOUNT}`),
+      });
+      buyBtn.style.cssText += ';margin-left:auto;height:28px';
+      stockRow.appendChild(buyBtn);
+    }
+
+    const rows: HTMLElement[] = [toggle, stockRow];
+    if (shortfall > 0 && on) {
+      rows.push(el('span', { text: t('ui.blast_workshop.drill.tube_shortfall', { count: shortfall }), attrs: { style: 'font:500 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }));
+    }
+    if (on && untubed > 0) {
+      const bare = el('span', { text: t('ui.blast_workshop.drill.tube_untubed', { count: untubed }), attrs: { style: 'font:600 11px/1.3 var(--bsx-font-ui);color:var(--bsx-warn, #ffb020)' } });
+      bare.dataset['role'] = 'tube-untubed';
+      rows.push(bare);
+    }
+    this.tubeEl.replaceChildren(...rows);
   }
 
   private renderPermitArea(state: GameState): void {

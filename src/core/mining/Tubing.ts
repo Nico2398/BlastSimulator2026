@@ -19,10 +19,12 @@ export interface TubingState {
   inventory: number;
   /** Set of hole IDs with tubing installed. */
   installedHoles: Set<string>;
+  /** While on, each hole is tubed from stock the moment its drilling completes (#2269). */
+  tubeOnDrill: boolean;
 }
 
 export function createTubingState(): TubingState {
-  return { inventory: 0, installedHoles: new Set() };
+  return { inventory: 0, installedHoles: new Set(), tubeOnDrill: false };
 }
 
 // ── Operations ──
@@ -83,4 +85,15 @@ export function clearTubing(state: TubingState): void {
 /** Check if a hole has tubing installed. */
 export function hasTubing(state: TubingState, holeId: string): boolean {
   return state.installedHoles.has(holeId);
+}
+
+/** Switch the tube-as-drilled setting. */
+export function setTubeOnDrill(state: TubingState, on: boolean): void {
+  state.tubeOnDrill = on;
+}
+
+/** Tube a freshly drilled hole from stock when the setting is on. Returns whether tubing was installed. */
+export function tubeDrilledHole(state: TubingState, holeId: string): boolean {
+  if (!state.tubeOnDrill) return false;
+  return installTubing(state, holeId, [holeId]).success;
 }

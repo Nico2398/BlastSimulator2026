@@ -7,7 +7,7 @@ import {
   addHole, holeNumericId, createGridPlan, gridCellPositions, drillHoleCost, estimateDrillWorkTicks,
 } from '../../../../../src/core/mining/DrillPlan.js';
 import type { DrillHole } from '../../../../../src/core/mining/DrillPlan.js';
-import { installTubing, buyTubing } from '../../../../../src/core/mining/Tubing.js';
+import { installTubing, buyTubing, TUBING_BUY_AMOUNT } from '../../../../../src/core/mining/Tubing.js';
 import {
   DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, HOLE_CELL_MAX_SIDE_M,
 } from '../../../../../src/core/config/balance.js';
@@ -1703,5 +1703,221 @@ describe('DrillStep — hole rows open the inspector (#2168)', () => {
     rowOf(step.root, 0).click();
 
     expect(opener.open).not.toHaveBeenCalled();
+  });
+});
+
+describe('DrillStep — tube holes as they are drilled (#2269)', () => {
+  const toggleOf = (root: HTMLElement) => root.querySelector('[data-action="tube-on-drill"]') as HTMLElement | null;
+  const stockOf = (root: HTMLElement) => root.querySelector('[data-role="tube-stock"]') as HTMLElement | null;
+  const buyOf = (root: HTMLElement) => root.querySelector('[data-action="tubing-buy"]') as HTMLButtonElement | null;
+  const untubedOf = (root: HTMLElement) => root.querySelector('[data-role="tube-untubed"]') as HTMLElement | null;
+  const isShown = (e: HTMLElement | null) => e !== null && !e.hidden && e.style.display !== 'none';
+
+  function planHoles(state: ReturnType<typeof makeState>, count: number): void {
+    for (let i = 0; i < count; i++) {
+      state.plannedDrillHoles.push({ id: `P${i + 1}`, x: 10 + i * 3, z: 10, depth: 8, diameter: DRILL_HOLE_DEFAULT_DIAMETER_M });
+    }
+  }
+
+  describe('the toggle', () => {
+    it('is shown, reads off by default', () => {
+      const { step } = makeStep();
+      step.update(makeState(), 'sunny');
+      const toggle = toggleOf(step.root);
+      expect(toggle).not.toBeNull();
+      expect(toggle!.dataset['on']).toBe('false');
+    });
+
+    it('reflects the setting being on', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      state.tubingState.tubeOnDrill = true;
+      step.update(state, 'sunny');
+      expect(toggleOf(step.root)!.dataset['on']).toBe('true');
+    });
+
+    it('follows the state on a later update', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      step.update(state, 'sunny');
+      state.tubingState.tubeOnDrill = true;
+      step.update(state, 'sunny');
+      expect(toggleOf(step.root)!.dataset['on']).toBe('true');
+      state.tubingState.tubeOnDrill = false;
+      step.update(state, 'sunny');
+      expect(toggleOf(step.root)!.dataset['on']).toBe('false');
+    });
+
+    it('clicking while off runs `tube_on_drill on` and writes no state itself', () => {
+      const { step, gameConsole } = makeStep();
+      const state = makeState();
+      step.update(state, 'sunny');
+      toggleOf(step.root)!.click();
+      expect(gameConsole).toHaveBeenCalledTimes(1);
+      expect(String(gameConsole.mock.calls[0]![0]).trim().replace(/\s+/g, ' ')).toBe('tube_on_drill on');
+      expect(state.tubingState.tubeOnDrill).toBe(false);
+    });
+
+    it('clicking while on runs `tube_on_drill off` and writes no state itself', () => {
+      const { step, gameConsole } = makeStep();
+      const state = makeState();
+      state.tubingState.tubeOnDrill = true;
+      step.update(state, 'sunny');
+      toggleOf(step.root)!.click();
+      expect(gameConsole).toHaveBeenCalledTimes(1);
+      expect(String(gameConsole.mock.calls[0]![0]).trim().replace(/\s+/g, ' ')).toBe('tube_on_drill off');
+      expect(state.tubingState.tubeOnDrill).toBe(true);
+    });
+  });
+
+  describe('stock against planned holes', () => {
+    it('shows both numbers: stock and planned holes', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      state.tubingState.inventory = 3;
+      planHoles(state, 7);
+      step.update(state, 'sunny');
+      const text = stockOf(step.root)!.textContent ?? '';
+      expect(text).toContain('3');
+      expect(text).toContain('7');
+    });
+
+    it('follows stock and plan changes on a later update', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      state.tubingState.inventory = 3;
+      planHoles(state, 7);
+      step.update(state, 'sunny');
+      state.tubingState.inventory = 12;
+      state.plannedDrillHoles.pop();
+      step.update(state, 'sunny');
+      const text = stockOf(step.root)!.textContent ?? '';
+      expect(text).toContain('12');
+      expect(text).toContain('6');
+      expect(text).not.toContain('7');
+    });
+
+    it('is shown with no holes planned', () => {
+      const { step } = makeStep();
+      step.update(makeState(), 'sunny');
+      expect(stockOf(step.root)).not.toBeNull();
+    });
+
+    it('offers a buy button when stock is below the planned holes', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      state.tubingState.inventory = 2;
+      planHoles(state, 5);
+      step.update(state, 'sunny');
+      expect(buyOf(step.root)).not.toBeNull();
+    });
+
+    it('the buy button runs the same console purchase as the Charge card', () => {
+      const { step, gameConsole } = makeStep();
+      const state = makeState();
+      state.tubingState.inventory = 2;
+      planHoles(state, 5);
+      step.update(state, 'sunny');
+      buyOf(step.root)!.click();
+      expect(gameConsole).toHaveBeenCalledWith(`buy amount:${TUBING_BUY_AMOUNT}`);
+    });
+
+    it('has no buy button when stock equals the planned holes', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      state.tubingState.inventory = 5;
+      planHoles(state, 5);
+      step.update(state, 'sunny');
+      expect(buyOf(step.root)).toBeNull();
+    });
+
+    it('has no buy button when stock exceeds the planned holes', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      state.tubingState.inventory = 9;
+      planHoles(state, 5);
+      step.update(state, 'sunny');
+      expect(buyOf(step.root)).toBeNull();
+    });
+
+    it('has no buy button with nothing planned and no stock', () => {
+      const { step } = makeStep();
+      step.update(makeState(), 'sunny');
+      expect(buyOf(step.root)).toBeNull();
+    });
+
+    it('the buy button appears once the plan outgrows the stock', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      state.tubingState.inventory = 4;
+      planHoles(state, 4);
+      step.update(state, 'sunny');
+      expect(buyOf(step.root)).toBeNull();
+      state.plannedDrillHoles.push({ id: 'P9', x: 40, z: 10, depth: 8, diameter: DRILL_HOLE_DEFAULT_DIAMETER_M });
+      step.update(state, 'sunny');
+      expect(buyOf(step.root)).not.toBeNull();
+    });
+  });
+
+  describe('holes drilled without tubing', () => {
+    function drilledState(untubed: number, tubed: number, on: boolean) {
+      const state = makeState();
+      const counter = { nextHoleId: 1 };
+      for (let i = 0; i < untubed + tubed; i++) {
+        const h = addHole(counter, state.drillHoles, 10 + i * 3, 20, 8, 0.089);
+        if (i >= untubed) state.tubingState.installedHoles.add(h.id);
+      }
+      state.tubingState.tubeOnDrill = on;
+      return state;
+    }
+
+    it('shows the count of drilled holes without tubing while the option is on', () => {
+      const { step } = makeStep();
+      step.update(drilledState(3, 2, true), 'sunny');
+      const el = untubedOf(step.root);
+      expect(isShown(el)).toBe(true);
+      expect(el!.textContent).toContain('3');
+    });
+
+    it('is not shown when every drilled hole is tubed', () => {
+      const { step } = makeStep();
+      step.update(drilledState(0, 4, true), 'sunny');
+      expect(isShown(untubedOf(step.root))).toBe(false);
+    });
+
+    it('is not shown when the option is off', () => {
+      const { step } = makeStep();
+      step.update(drilledState(3, 2, false), 'sunny');
+      expect(isShown(untubedOf(step.root))).toBe(false);
+    });
+
+    it('is not shown with no holes drilled', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      state.tubingState.tubeOnDrill = true;
+      step.update(state, 'sunny');
+      expect(isShown(untubedOf(step.root))).toBe(false);
+    });
+
+    it('does not count holes still only planned', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      state.tubingState.tubeOnDrill = true;
+      planHoles(state, 6);
+      step.update(state, 'sunny');
+      expect(isShown(untubedOf(step.root))).toBe(false);
+    });
+
+    it('follows the count as tubing lands on a later update', () => {
+      const { step } = makeStep();
+      const state = drilledState(3, 0, true);
+      step.update(state, 'sunny');
+      expect(untubedOf(step.root)!.textContent).toContain('3');
+      state.tubingState.installedHoles.add(state.drillHoles[0]!.id);
+      state.tubingState.installedHoles.add(state.drillHoles[1]!.id);
+      step.update(state, 'sunny');
+      expect(untubedOf(step.root)!.textContent).toContain('1');
+      expect(untubedOf(step.root)!.textContent).not.toContain('3');
+    });
   });
 });
