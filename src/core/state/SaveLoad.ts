@@ -861,6 +861,7 @@ export function deserialize(json: string): GameState {
     restoreSetField(tubingRaw, 'installedHoles');
   }
   ensureField(tubingRaw, 'inventory', v => typeof v === 'number', 0);
+  ensureField(tubingRaw, 'tubeOnDrill', v => typeof v === 'boolean', false);
 
   // v7 → v8: PendingAction/GhostPreview gained a lifecycle (status/holderId,
   // claimed). A pre-v8 save's *dispatched-and-idle-claimed* actions were

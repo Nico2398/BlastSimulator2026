@@ -10,7 +10,7 @@ import {
   ALL_WEATHER_STATES,
   type WeatherState,
 } from '../../../core/weather/WeatherCycle.js';
-import { buyTubing, installTubing } from '../../../core/mining/Tubing.js';
+import { buyTubing, installTubing, setTubeOnDrill } from '../../../core/mining/Tubing.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { drainHoles, type DrainBlock } from '../../../core/mining/HoleDrain.js';
@@ -129,9 +129,17 @@ export function buyCommand(
 
 /** `tube_on_drill [on|off]` — switch or report tubing holes as they are drilled (#2269). */
 export function tubeOnDrillCommand(
-  _ctx: MiningContext,
-  _args: string[],
+  ctx: MiningContext,
+  args: string[],
   _named: Record<string, string>,
 ): CommandResult {
-  throw new Error('not implemented');
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+  const tubing = ctx.state!.tubingState;
+  const arg = args[0];
+  if (arg !== undefined) {
+    if (arg !== 'on' && arg !== 'off') return { success: false, output: t('mining.tubing.on_drill_usage') };
+    setTubeOnDrill(tubing, arg === 'on');
+  }
+  return { success: true, output: t(tubing.tubeOnDrill ? 'mining.tubing.on_drill_on' : 'mining.tubing.on_drill_off') };
 }

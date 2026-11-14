@@ -88,11 +88,12 @@ export function hasTubing(state: TubingState, holeId: string): boolean {
 }
 
 /** Switch the tube-as-drilled setting. */
-export function setTubeOnDrill(_state: TubingState, _on: boolean): void {
-  throw new Error('not implemented');
+export function setTubeOnDrill(state: TubingState, on: boolean): void {
+  state.tubeOnDrill = on;
 }
 
 /** Tube a freshly drilled hole from stock when the setting is on. Returns whether tubing was installed. */
-export function tubeDrilledHole(_state: TubingState, _holeId: string): boolean {
-  throw new Error('not implemented');
+export function tubeDrilledHole(state: TubingState, holeId: string): boolean {
+  if (!state.tubeOnDrill) return false;
+  return installTubing(state, holeId, [holeId]).success;
 }
