@@ -3810,7 +3810,6 @@
   "ui.blast_workshop.drill.tube_stock": "Tubing stock {stock} / {planned} planned holes",
   "ui.blast_workshop.drill.tube_shortfall": "{count} planned holes will be drilled untubed",
   "ui.blast_workshop.drill.tube_untubed": "{count} holes drilled without tubing",
-  "ui.blast_workshop.drill.tube_buy": "Buy {count} · {cost}",
   "ui.blast_workshop.drill.planned_buried": "{count} planned ({buried} buried)",
   "ui.blast_workshop.drill.no_holes": "No holes yet. Use the Grid Tool or Add Hole to start a plan.",
   "ui.blast_workshop.drill.status_tubed": "TUBED",

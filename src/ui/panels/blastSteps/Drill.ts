@@ -252,7 +252,7 @@ export class DrillStep {
     const stockRow = el('div', { children: [stock] });
     stockRow.style.cssText = 'display:flex;align-items:center;gap:8px';
     if (shortfall > 0) {
-      const buyBtn = button('ghost', t('ui.blast_workshop.drill.tube_buy', { count: TUBING_BUY_AMOUNT, cost: `$${formatMoney(TUBING_BUY_AMOUNT * TUBING_COST)}` }), {
+      const buyBtn = button('ghost', t('ui.blast_workshop.charge.tubing_buy', { count: TUBING_BUY_AMOUNT, cost: `$${formatMoney(TUBING_BUY_AMOUNT * TUBING_COST)}` }), {
         dataAction: 'tubing-buy',
         onClick: () => this.runAndNotify(`buy amount:${TUBING_BUY_AMOUNT}`),
       });

@@ -3810,7 +3810,6 @@
   "ui.blast_workshop.drill.tube_stock": "Stock de tubage {stock} / {planned} trous prévus",
   "ui.blast_workshop.drill.tube_shortfall": "{count} trous prévus seront forés sans tubage",
   "ui.blast_workshop.drill.tube_untubed": "{count} trous forés sans tubage",
-  "ui.blast_workshop.drill.tube_buy": "Acheter {count} · {cost}",
   "ui.blast_workshop.drill.planned_buried": "{count} prévus ({buried} enfouis)",
   "ui.blast_workshop.drill.no_holes": "Pas encore de trous. Utilisez la Grille ou Ajouter un trou pour commencer un plan.",
   "ui.blast_workshop.drill.status_tubed": "TUBÉ",
