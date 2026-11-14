@@ -536,8 +536,9 @@ describe('en.json / fr.json — key-set parity', () => {
     // the contract delivery outlook and timeline, and the window section labels.
     // #2267: +5 water-fix keys (ui.blast_workshop.water_fix.*): 5001.
     // #2265: +3 keys (cancel ramp, cancel all, cancel-all console report): 5004.
-    // #2269: +7 keys (tube-as-drilled console and Drill step): 5011.
-    expect(Object.keys(en).length).toBe(5011);
+    // #2269: +7 keys (tube-as-drilled console and Drill step).
+    // #2266: +12 keys (order inspector view, hole orders section): 5023.
+    expect(Object.keys(en).length).toBe(5023);
   });
 
   it('carries the weak-explosive warning key no more, and the breaks-nothing keys in both locales (#2197)', () => {

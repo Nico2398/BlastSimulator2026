@@ -23,6 +23,8 @@ export interface ShortcutCallbacks {
   /** Toggle the survey confidence overlay's player-facing visibility. */
   onToggleSurveyOverlay?: () => void;
   onToggleWallOverlay?: () => void;
+  /** Cancel the pending order `id` the way its inspector's Cancel button does (#2266). */
+  cancelOrder?: (id: number) => void;
 }
 
 interface ShortcutOptions {
@@ -36,6 +38,8 @@ interface ShortcutOptions {
    * false the shortcut is swallowed (preventDefault, no callback).
    */
   isControlLive?: (selector: string) => boolean;
+  /** Id of the pending order selected in the scene, or null when none is (#2266). */
+  selectedOrderId?: () => number | null;
 }
 
 /** Game speed each digit key selects. */
@@ -103,6 +107,11 @@ export class KeyboardShortcuts {
         case 'Escape':
           callbacks.onEscape();
           break;
+        case 'Delete': {
+          const orderId = this.options.selectedOrderId?.() ?? null;
+          if (orderId !== null) callbacks.cancelOrder?.(orderId);
+          break;
+        }
       }
     };
 
