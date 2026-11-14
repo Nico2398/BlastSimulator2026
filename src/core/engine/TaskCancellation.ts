@@ -705,7 +705,7 @@ export function releaseInjuredEmployeesQueues(state: GameState): void {
   }
 }
 
-export interface CancelLinkedResult {
+interface CancelLinkedResult {
   success: boolean;
   error?: 'not-found' | 'not-cancellable';
   /** Every action removed, the requested one first. */
