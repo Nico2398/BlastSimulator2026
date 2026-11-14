@@ -13,6 +13,9 @@ import { getLevel } from '../core/campaign/Level.js';
 import type { SaveBackend, SaveMeta } from '../core/state/SaveBackend.js';
 import { TUTORIAL_STEPS } from './tutorialSteps.js';
 
+/** Menu start of a new campaign is closed until the campaign gets its design pass (#2276). */
+const NEW_CAMPAIGN_OPEN = false;
+
 export type OnNewCampaign = () => void;
 export type OnContinue = (slotId: string) => void;
 export type OnLoad = () => void;
@@ -94,7 +97,15 @@ export class MainMenu {
     this.resumeBtn = this.makeContinueStyleButton('menu.resume', 'bs-menu-resume');
     this.resumeBtn.addEventListener('click', () => this.onResume?.());
 
-    const newCampaignBtn = this.makeMenuButton('blast', 'menu.new_campaign', () => this.onNewCampaign?.());
+    // Campaign start is closed from the menu until the campaign gets its own
+    // design pass (#2276): visible, disabled, badged. Continue/Load still open
+    // saves; console `campaign start` is untouched. `onNewCampaign` stays wired
+    // in main.ts behind NEW_CAMPAIGN_OPEN.
+    const newCampaignBtn = this.makeMenuButton('blast', 'menu.new_campaign', () => { if (NEW_CAMPAIGN_OPEN) this.onNewCampaign?.(); });
+    newCampaignBtn.el.disabled = true;
+    newCampaignBtn.el.setAttribute('aria-disabled', 'true');
+    newCampaignBtn.hintEl.className = 'bsx-menu-badge';
+    this.locale.bindText(newCampaignBtn.hintEl, 'ui.menu.coming_soon');
     // Stable id (same convention as bs-menu-sandbox below) — scenario defs
     // click this to reach the world map; `.bsx-menu-btn` alone is shared by
     // every menu button and would resolve to whichever renders first in DOM

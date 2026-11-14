@@ -1,6 +1,6 @@
 {
   "name": "campaign-meta-flow",
-  "description": "Issue #1326: the campaign meta-flow end to end with real clicks. Main menu New Campaign -> Portfolio -> start Dusty Hollow -> win -> level-end Continue into Grumpstone Ridge -> TopBar Site Map and Back to site -> save -> Settings Return to Menu -> main-menu Continue reloads the save -> bankruptcy -> level-end Retry restarts the level. Command mode checks the state numbers; interaction mode proves every menu, card and button is reachable by clicking.",
+  "description": "Issue #1326: the campaign meta-flow end to end with real clicks. Console campaign start of Dusty Hollow (menu New Campaign is Coming soon, #2276) -> win -> level-end Continue into Grumpstone Ridge -> TopBar Site Map and Back to site -> save -> bankruptcy -> level-end Retry restarts the level. Command mode checks the state numbers; interaction mode proves every menu, card and button is reachable by clicking.",
   "steps": [
     {
       "command": "state",
@@ -15,34 +15,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "state",
-      "description": "Player clicks New Campaign; the Portfolio must offer Dusty Hollow's Start. `state` is the inert paired command. Command mode has no game yet, so the inert `state` may be refused.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-main-menu #bs-menu-new-campaign"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "usable": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]",
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
       "command": "campaign start level:dusty_hollow staffed:false",
-      "description": "Player starts Dusty Hollow from its Portfolio card; the HUD must be reachable. Command mode has no portfolio, so the paired command starts the same level.",
+      "description": "Setup: the main menu's New Campaign is closed (Coming soon, #2276), so Dusty Hollow starts through the console; the HUD must be reachable.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
+          "type": "command",
+          "command": "campaign start level:dusty_hollow staffed:false"
         },
         {
           "type": "awaitUsable",
@@ -50,7 +28,7 @@
           "timeoutMs": 60000
         }
       ],
-      "role": "player",
+      "role": "setup",
       "expect": {
         "usable": "#bs-saveload-btn",
         "equals": {
@@ -517,7 +495,7 @@
     },
     {
       "command": "state",
-      "description": "#1312: Player backs out to the sandbox site, returns to the main menu through Settings and clicks New Campaign; progress exists so a confirm modal must appear. The 500 ms wait copies the scroll preamble above: no observable condition exists to poll for the wheel's compositor scroll settling.",
+      "description": "#2276: Player backs out to the sandbox site and returns to the main menu through Settings. New Campaign is closed (disabled, Coming soon) while Sandbox stays usable. The 500 ms wait copies the scroll preamble above: no observable condition exists to poll for the wheel's compositor scroll settling.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -566,40 +544,20 @@
           "selector": "#bs-main-menu #bs-menu-new-campaign"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-main-menu #bs-menu-new-campaign"
+          "type": "awaitUsable",
+          "selector": "#bs-main-menu #bs-menu-sandbox"
         },
         {
-          "type": "awaitUsable",
-          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]"
+          "type": "assert",
+          "selector": "#bs-main-menu #bs-menu-new-campaign",
+          "property": "disabled",
+          "expectedValue": true
         }
       ],
       "role": "player",
       "expect": {
-        "usable": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]",
-        "blocked": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
-      }
-    },
-    {
-      "command": "state",
-      "description": "#1312: Player confirms Erase and Start Over; the Portfolio shows only level 1 unlocked: Dusty Hollow startable, Grumpstone Ridge locked (no start button). The lock row is waited on directly since a locked card has no Start control to probe.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-world-map div[data-level=\"grumpstone_ridge\"] [data-role=\"lock\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "usable": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
+        "usable": "#bs-main-menu #bs-menu-sandbox",
+        "blocked": "#bs-main-menu #bs-menu-new-campaign"
       }
     }
   ]

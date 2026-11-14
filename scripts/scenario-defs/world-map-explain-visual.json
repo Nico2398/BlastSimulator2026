@@ -16,46 +16,16 @@
     },
     {
       "command": "state",
-      "description": "Player opens Settings and clicks Return to Main Menu, then confirms; the main menu returns. `state` is the inert paired command.",
+      "description": "Player opens the Portfolio from the sandbox Site Map button (the menu's New Campaign is closed, #2276). `state` is the inert paired command.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"settings\"]"
-        },
-        {
           "type": "awaitUsable",
-          "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]"
+          "selector": ".bs-return-map",
+          "timeoutMs": 60000
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-main-menu #bs-menu-new-campaign"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "usable": "#bs-main-menu #bs-menu-new-campaign"
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "state",
-      "description": "Player clicks New Campaign; the Portfolio opens. `state` is the inert paired command.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-main-menu #bs-menu-new-campaign"
+          "selector": ".bs-return-map"
         },
         {
           "type": "awaitUsable",
