@@ -29,15 +29,16 @@ describe('MainMenu (12.8)', () => {
     menu.dispose();
   });
 
-  it('calls onNewCampaign callback when button clicked', () => {
+  it('does not call onNewCampaign when the (disabled) New Campaign button is clicked (#2276)', () => {
     const cb = vi.fn();
     const menu = new MainMenu(container);
     menu.setOnNewCampaign(cb);
     menu.show();
     const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
       .find(b => b.textContent?.includes(t('menu.new_campaign')));
+    expect(btn).toBeDefined();
     btn?.click();
-    expect(cb).toHaveBeenCalledOnce();
+    expect(cb).not.toHaveBeenCalled();
     menu.dispose();
   });
 
@@ -576,9 +577,9 @@ describe('MainMenu — refreshLocale() wired through UIManager\'s language handl
     openSettingsFromMainMenu();
     clickFrenchButton();
 
-    const newCampaignBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-      .find((b) => b.textContent === t('menu.new_campaign'));
-    expect(newCampaignBtn, 'New Campaign button must show the French label').toBeDefined();
+    const newCampaignBtn = container.querySelector<HTMLButtonElement>('#bs-menu-new-campaign');
+    expect(newCampaignBtn, 'New Campaign button must show the French label').not.toBeNull();
+    expect(newCampaignBtn!.textContent).toContain(t('menu.new_campaign'));
     expect(before).not.toEqual(
       Array.from(container.querySelectorAll<HTMLButtonElement>('button')).map((b) => b.textContent),
     );
@@ -726,5 +727,186 @@ describe('MainMenu — locale persistence (#1324)', () => {
     expect(container.textContent).not.toContain('dig');
     expect(getLocale()).toBe('fr');
     menu.dispose();
+  });
+});
+
+// ── New Campaign is disabled and badged "Coming soon" (#2276) ────────────────
+
+describe('MainMenu — New Campaign disabled with a Coming soon badge (#2276)', () => {
+  let container: HTMLDivElement;
+  let menu: MainMenu;
+
+  beforeEach(() => {
+    setLocale('en');
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    menu = new MainMenu(container);
+  });
+
+  afterEach(() => {
+    menu.dispose();
+    container.remove();
+    setLocale('en');
+  });
+
+  const campaignBtn = () => container.querySelector<HTMLButtonElement>('#bs-menu-new-campaign');
+  const badgeOf = (b: HTMLElement | null) => b?.querySelector<HTMLElement>('.bsx-menu-badge') ?? null;
+
+  it('stays rendered in the menu', () => {
+    menu.show();
+    expect(campaignBtn()).not.toBeNull();
+    expect(campaignBtn()!.textContent).toContain(t('menu.new_campaign'));
+  });
+
+  it('is disabled and aria-disabled', () => {
+    menu.show();
+    expect(campaignBtn()!.disabled).toBe(true);
+    expect(campaignBtn()!.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('is disabled before show() is called, from construction', () => {
+    expect(campaignBtn()!.disabled).toBe(true);
+    expect(campaignBtn()!.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('carries a .bsx-menu-badge inside the button with the Coming soon text', () => {
+    menu.show();
+    const badge = badgeOf(campaignBtn());
+    expect(badge).not.toBeNull();
+    expect(badge!.textContent).toBe(t('ui.menu.coming_soon'));
+    expect(badge!.textContent).toBe('Coming soon');
+  });
+
+  it('badge text follows a language switch to French and back', () => {
+    menu.show();
+    const frPill = Array.from(container.querySelectorAll<HTMLButtonElement>('.bsx-menu-lang-pill'))
+      .find((p) => p.textContent === 'FR')!;
+    const enPill = Array.from(container.querySelectorAll<HTMLButtonElement>('.bsx-menu-lang-pill'))
+      .find((p) => p.textContent === 'EN')!;
+
+    frPill.click();
+    expect(getLocale()).toBe('fr');
+    expect(badgeOf(campaignBtn())!.textContent).toBe(t('ui.menu.coming_soon'));
+    expect(badgeOf(campaignBtn())!.textContent).toBe('Bientôt disponible');
+    // still disabled after the re-render
+    expect(campaignBtn()!.disabled).toBe(true);
+
+    enPill.click();
+    expect(badgeOf(campaignBtn())!.textContent).toBe('Coming soon');
+  });
+
+  it('badge shows French text when constructed under the fr locale', () => {
+    menu.dispose();
+    setLocale('fr');
+    menu = new MainMenu(container);
+    menu.show();
+    expect(badgeOf(campaignBtn())!.textContent).toBe('Bientôt disponible');
+  });
+
+  it('refreshLocale() keeps the badge and the disabled state', () => {
+    menu.show();
+    menu.refreshLocale();
+    expect(badgeOf(campaignBtn())).not.toBeNull();
+    expect(campaignBtn()!.disabled).toBe(true);
+  });
+
+  it('click() never invokes the onNewCampaign callback', () => {
+    const cb = vi.fn();
+    menu.setOnNewCampaign(cb);
+    menu.show();
+    campaignBtn()!.click();
+    expect(cb).not.toHaveBeenCalled();
+  });
+
+  it('a dispatched click event never invokes the callback', () => {
+    const cb = vi.fn();
+    menu.setOnNewCampaign(cb);
+    menu.show();
+    campaignBtn()!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(cb).not.toHaveBeenCalled();
+  });
+
+  it('clicking the badge itself never invokes the callback', () => {
+    const cb = vi.fn();
+    menu.setOnNewCampaign(cb);
+    menu.show();
+    const badge = badgeOf(campaignBtn());
+    expect(badge).not.toBeNull();
+    badge!.click();
+    badge!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(cb).not.toHaveBeenCalled();
+  });
+
+  it('a callback registered after show() or re-registered is still never invoked', () => {
+    menu.show();
+    const first = vi.fn();
+    const second = vi.fn();
+    menu.setOnNewCampaign(first);
+    menu.setOnNewCampaign(second);
+    campaignBtn()!.click();
+    expect(first).not.toHaveBeenCalled();
+    expect(second).not.toHaveBeenCalled();
+  });
+
+  it('Sandbox still invokes its callback, is enabled and has no badge', () => {
+    const cb = vi.fn();
+    menu.setOnSandbox(cb);
+    menu.show();
+    const btn = container.querySelector<HTMLButtonElement>('#bs-menu-sandbox')!;
+    expect(btn.disabled).toBe(false);
+    expect(btn.getAttribute('aria-disabled')).not.toBe('true');
+    expect(badgeOf(btn)).toBeNull();
+    btn.click();
+    expect(cb).toHaveBeenCalledOnce();
+  });
+
+  it('Tutorial still invokes its callback, is enabled and has no badge', () => {
+    const cb = vi.fn();
+    menu.setOnTutorial(cb);
+    menu.show();
+    const btn = container.querySelector<HTMLButtonElement>('#bs-menu-tutorial')!;
+    expect(btn.disabled).toBe(false);
+    expect(btn.getAttribute('aria-disabled')).not.toBe('true');
+    expect(badgeOf(btn)).toBeNull();
+    btn.click();
+    expect(cb).toHaveBeenCalledOnce();
+  });
+
+  it('Load and Settings stay enabled, badge-free and clickable', () => {
+    const onLoad = vi.fn();
+    const onSettings = vi.fn();
+    menu.setOnLoad(onLoad);
+    menu.setOnSettings(onSettings);
+    menu.show();
+    const load = container.querySelector<HTMLButtonElement>('#bs-menu-load')!;
+    const settings = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find((b) => b.textContent?.includes(t('menu.settings')))!;
+    for (const b of [load, settings]) {
+      expect(b.disabled).toBe(false);
+      expect(badgeOf(b)).toBeNull();
+    }
+    load.click();
+    settings.click();
+    expect(onLoad).toHaveBeenCalledOnce();
+    expect(onSettings).toHaveBeenCalledOnce();
+  });
+
+  it('the badge is the only .bsx-menu-badge in the menu', () => {
+    menu.show();
+    expect(container.querySelectorAll('.bsx-menu-badge')).toHaveLength(1);
+  });
+
+  it('Continue still routes to onContinue with the most recent save (unchanged)', async () => {
+    const cb = vi.fn();
+    menu.setOnContinue(cb);
+    menu.setBackend(fakeBackend([
+      { slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '$9,000 — Day 2', levelId: 'dusty_hollow' },
+    ]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+    const btn = container.querySelector<HTMLButtonElement>('#bs-menu-continue')!;
+    expect(btn.disabled).toBe(false);
+    btn.click();
+    expect(cb).toHaveBeenCalledWith('slot_1');
   });
 });
