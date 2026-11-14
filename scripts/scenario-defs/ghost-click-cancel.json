@@ -1,0 +1,208 @@
+{
+  "name": "ghost-click-cancel",
+  "description": "#2266: a player orders a living quarters and a two-leg ramp, then cancels both by clicking their ghosts in the scene. The building ghost opens the order view in the Inspector and its Cancel button removes the order and refunds its cost; a ramp-segment ghost opens a view with one whole-order cancel, which the Delete key presses: every segment goes, the selection clears and the refund lands. Role 'player' only: Build panel clicks, ghost clicks, the Inspector's button, the Delete key. No crew is staffed, so nothing is built or dug before the cancels.",
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0,
+          "orderedBuildingCount": 0,
+          "orderedRampSegmentCount": 0
+        },
+        "note": "Clean site, no orders."
+      }
+    },
+    {
+      "command": "build living_quarters at:2,6",
+      "description": "The player opens the Build panel and orders a living quarters on tile (2,6): the first pending order, a ghost on the ground.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 6
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "pendingActionCount": 1,
+          "orderedBuildingCount": 1
+        },
+        "note": "Cost charged at order time, one construction order queued."
+      }
+    },
+    {
+      "command": "build_ramp path:15,15;15,27;25,27 depth:6 width:3",
+      "timeout": 90,
+      "description": "The player arms the ramp tool, sets depth 6, clicks the start (15,15), the corner (15,27) and the end (25,27) tile and presses Confirm: one dig order per segment.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 15
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 27
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 27
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount",
+          "pendingActionCount"
+        ],
+        "note": "Ramp segments queued next to the building order."
+      }
+    },
+    {
+      "command": "employee cancel 1",
+      "description": "The player clicks the building's ghost in the scene. The Inspector opens on the order (not a building: none stands yet) with its Cancel button, and pressing it cancels that order.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "order",
+          "id": 1
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"order\"][data-id=\"1\"] [data-order-cancel]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"order\"][data-id=\"1\"] [data-order-cancel]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedBuildingCount": 0
+        },
+        "note": "The building order is gone and its cost refunded; the ramp orders stay."
+      }
+    },
+    {
+      "command": "employee cancel 2 all",
+      "description": "The player clicks the ghost of a ramp segment: the Inspector shows one whole-order cancel button (no per-segment cancel). Delete presses it: every segment goes and the selection clears.",
+      "interaction": [
+        {
+          "type": "clickEntity",
+          "kind": "order",
+          "id": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"order\"][data-id=\"2\"] [data-order-cancel]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "keypress",
+          "key": "Delete"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "cash"
+        ],
+        "equals": {
+          "pendingActionCount": 0,
+          "orderedRampSegmentCount": 0
+        },
+        "note": "Every segment order cancelled, refund landed, no order left."
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0,
+          "orderedBuildingCount": 0,
+          "orderedRampSegmentCount": 0
+        }
+      }
+    }
+  ]
+}
