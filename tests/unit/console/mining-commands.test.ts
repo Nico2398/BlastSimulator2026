@@ -1907,7 +1907,7 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
     expect(ctx.state!.plannedRamps.find(r => r.id === rampId)).toBeUndefined();
   });
 
-  it('the generic "employee cancel <id>" path cancels only one segment of a multi-segment ramp, leaving the rest untouched', () => {
+  it('the generic "employee cancel <id>" path cancels the whole ramp from any one segment, refunding every undug segment (#2265)', () => {
     const ctx = makeMiningContext();
 
     const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '2' });
@@ -1917,41 +1917,26 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
     const totalSegments = ramp.segments.length;
     expect(totalSegments).toBeGreaterThan(1);
 
-    // Cancel segment index 1 (still queued — segment 0 is the only one
-    // claimable first, per isRampSegmentClaimable) via the generic
-    // Operations-panel cancel path, not build_ramp's own cancel command.
     const targetTracker = ramp.segments.find(s => s.index === 1)!;
-    const otherTrackers = ramp.segments.filter(s => s.index !== 1);
+    const allActionIds = ramp.segments.map(s => s.actionId);
     const cashBefore = ctx.state!.cash;
-    // Segment cost is the order's total cost split evenly across every
-    // layer (#925) — see the cancel test above for why a flat
-    // RAMP_COST_PER_METER no longer applies.
-    const segmentCost = (5 * RAMP_COST_PER_METER) / totalSegments;
+    const totalSegmentCost = ramp.segments.reduce((sum, seg) => {
+      const action = ctx.state!.pendingActions.find(a => a.id === seg.actionId)!;
+      return sum + (action.payload['segmentCost'] as number);
+    }, 0);
 
     const result = employeeCommand(ctx, ['cancel', String(targetTracker.actionId)], {});
 
     expect(result.success).toBe(true);
-    // Only that one segment's cost is refunded.
-    expect(ctx.state!.cash).toBe(cashBefore + segmentCost);
+    expect(ctx.state!.cash - cashBefore).toBeCloseTo(totalSegmentCost, 6);
     expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
 
-    // The PlannedRamp survives — other segments remain outstanding.
-    const survivingRamp = ctx.state!.plannedRamps.find(r => r.id === rampId);
-    expect(survivingRamp).toBeDefined();
-    expect(survivingRamp!.segments.find(s => s.index === 1)).toBeUndefined();
-    expect(survivingRamp!.segments).toHaveLength(totalSegments - 1);
-
-    // Every other segment's own tracking is unaffected.
-    for (const other of otherTrackers) {
-      const stillThere = survivingRamp!.segments.find(s => s.index === other.index);
-      expect(stillThere).toEqual(other);
-      const stillQueued = ctx.state!.pendingActions.find(a => a.id === other.actionId);
-      expect(stillQueued).toBeDefined();
+    // No planned ramp is left, so no gap can remain.
+    expect(ctx.state!.plannedRamps.find(r => r.id === rampId)).toBeUndefined();
+    for (const id of allActionIds) {
+      expect(ctx.state!.pendingActions.find(a => a.id === id)).toBeUndefined();
+      expect(ctx.state!.ghostPreviews.find(g => g.id === id)).toBeUndefined();
     }
-
-    // The cancelled segment's own action/ghost are gone.
-    expect(ctx.state!.pendingActions.find(a => a.id === targetTracker.actionId)).toBeUndefined();
-    expect(ctx.state!.ghostPreviews.find(g => g.id === targetTracker.actionId)).toBeUndefined();
   });
 
   it('refunds exactly the cost actually charged at order time when every segment is cancelled before any work is done (#925 code review)', () => {

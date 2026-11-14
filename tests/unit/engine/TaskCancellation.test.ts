@@ -13,6 +13,8 @@ import { Random } from '../../../src/core/math/Random.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { releaseDeadEmployeeActions, releaseInjuredEmployeeQueue, releaseInjuredEmployeesQueues, cancelAction, interruptActiveAction, releaseEmployeeFromWorld, fireEmployeeFromWorld } from '../../../src/core/engine/TaskCancellation.js';
+import { cancelActionWithLinked, linkedActionIds } from '../../../src/core/engine/TaskCancellation.js';
+import type { GameState } from '../../../src/core/state/GameState.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { purchaseVehicle, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { createEmployeeState, hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
@@ -1206,5 +1208,355 @@ describe('interruptActiveAction — id is queued ahead, not the active action (#
     expect(stray.holderId).toBeNull();
     expect(emp.activeActionId).toBeNull();
     expect(emp.itinerary).toBeNull();
+  });
+});
+
+
+// ── Linked cancellation (#2265) ──────────────────────────────────────────────
+
+const SEGMENT_COST = 100;
+
+/** A planned ramp of `count` segments, one dig action each (ids base..base+count-1); segments in `dug` are done with no action left. */
+function seedRamp(state: GameState, rampId: number, base: number, count: number, dug: number[] = []): number[] {
+  const segments = [];
+  const actionIds: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const isDug = dug.includes(i);
+    segments.push({ index: i, actionId: base + i, cells: [], region: null, done: isDug });
+    if (isDug) continue;
+    actionIds.push(base + i);
+    state.pendingActions.push(makeAction({
+      id: base + i, type: 'dig_ramp_segment', targetX: i, targetZ: 0,
+      payload: { rampId, segmentIndex: i, cells: [], region: null, segmentCost: SEGMENT_COST },
+    }));
+    state.ghostPreviews.push({ id: base + i, type: 'dig_ramp_segment', targetX: i, targetZ: 0, targetY: 0, claimed: false });
+  }
+  state.plannedRamps.push({
+    id: rampId,
+    def: { originX: 0, originZ: 0, direction: 'south', length: count, targetDepth: 6 },
+    footprint: { minX: 0, maxX: count, minZ: 0, maxZ: 2 },
+    segments,
+  });
+  return actionIds;
+}
+
+function seedHoles(state: GameState, type: 'drill_hole' | 'charge_hole', base: number, count: number): number[] {
+  const ids: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const holeId = `${type}-H${i}`;
+    ids.push(base + i);
+    if (type === 'drill_hole') state.plannedDrillHoles.push({ id: holeId, x: i, z: 3, depth: 6, diameter: 0.1 });
+    else state.plannedChargesByHole[holeId] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    state.pendingActions.push(makeAction({ id: base + i, type, payload: { holeId } }));
+    state.ghostPreviews.push({ id: base + i, type, targetX: i, targetZ: 3, targetY: 0, claimed: false });
+  }
+  return ids;
+}
+
+const pendingIds = (state: GameState): number[] => state.pendingActions.map(a => a.id);
+
+describe('cancelAction on a ramp segment cancels the whole ramp (#2265)', () => {
+  it('cancelling any one segment removes every undug segment of that ramp and refunds their sum', () => {
+    const state = createGame({ seed: SEED });
+    seedRamp(state, 1, 10, 5);
+    const cash = state.cash;
+
+    const result = cancelAction(state, 12);
+
+    expect(result.success).toBe(true);
+    expect(pendingIds(state)).toEqual([]);
+    expect(state.cash - cash).toBeCloseTo(5 * SEGMENT_COST, 6);
+  });
+
+  it('removes the ghost of every cancelled segment', () => {
+    const state = createGame({ seed: SEED });
+    seedRamp(state, 1, 10, 4);
+
+    cancelAction(state, 10);
+
+    expect(state.ghostPreviews).toHaveLength(0);
+  });
+
+  it('releases the planned ramp: no entry left, so no gap can remain', () => {
+    const state = createGame({ seed: SEED });
+    seedRamp(state, 1, 10, 4);
+
+    cancelAction(state, 11);
+
+    expect(state.plannedRamps.find(r => r.id === 1)).toBeUndefined();
+    expect(state.plannedRamps).toHaveLength(0);
+  });
+
+  it('cancelling the last segment (boundary) behaves the same as the first', () => {
+    const state = createGame({ seed: SEED });
+    seedRamp(state, 1, 10, 4);
+    const cash = state.cash;
+
+    expect(cancelAction(state, 13).success).toBe(true);
+
+    expect(pendingIds(state)).toEqual([]);
+    expect(state.plannedRamps).toHaveLength(0);
+    expect(state.cash - cash).toBeCloseTo(4 * SEGMENT_COST, 6);
+  });
+
+  it('refunds only the segments not yet dug and leaves the dug ones alone', () => {
+    const state = createGame({ seed: SEED });
+    seedRamp(state, 1, 10, 5, [0, 1]);
+    const cash = state.cash;
+
+    const result = cancelAction(state, 13);
+
+    expect(result.success).toBe(true);
+    expect(state.cash - cash).toBeCloseTo(3 * SEGMENT_COST, 6);
+    expect(pendingIds(state)).toEqual([]);
+    expect(state.plannedRamps).toHaveLength(0);
+  });
+
+  it('records the refund of all segments on the finances ledger', () => {
+    const state = createGame({ seed: SEED });
+    seedRamp(state, 1, 10, 3);
+    const refundsBefore = state.finances.transactions.filter(tx => tx.category === 'refund').reduce((n, tx) => n + tx.amount, 0);
+
+    cancelAction(state, 10);
+
+    const refunds = state.finances.transactions.filter(tx => tx.category === 'refund').reduce((n, tx) => n + tx.amount, 0);
+    expect(refunds - refundsBefore).toBeCloseTo(3 * SEGMENT_COST, 6);
+  });
+
+  it('leaves the actions and the planned entry of a different ramp untouched', () => {
+    const state = createGame({ seed: SEED });
+    seedRamp(state, 1, 10, 3);
+    const other = seedRamp(state, 2, 20, 3);
+
+    cancelAction(state, 11);
+
+    expect(pendingIds(state)).toEqual(other);
+    expect(state.plannedRamps.map(r => r.id)).toEqual([2]);
+    expect(state.plannedRamps[0]!.segments).toHaveLength(3);
+  });
+
+  it('releases an employee holding one of the segments back to idle', () => {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED));
+    seedRamp(state, 1, 10, 3);
+    const held = state.pendingActions.find(a => a.id === 11)!;
+    held.status = 'in_progress';
+    held.holderId = employee.id;
+    employee.activeActionId = held.id;
+    employee.taskTicksRemaining = 4;
+
+    cancelAction(state, 10);
+
+    expect(employee.activeActionId).toBeNull();
+    expect(employee.taskTicksRemaining).toBeNull();
+    expect(pendingIds(state)).toEqual([]);
+  });
+});
+
+describe('cancelAction on a drill or charge order stays single (#2265)', () => {
+  it('cancels only the one drill_hole and releases only its planned hole', () => {
+    const state = createGame({ seed: SEED });
+    const ids = seedHoles(state, 'drill_hole', 30, 4);
+
+    const result = cancelAction(state, ids[1]!);
+
+    expect(result.success).toBe(true);
+    expect(pendingIds(state)).toEqual([ids[0], ids[2], ids[3]]);
+    expect(state.plannedDrillHoles.map(h => h.id)).toEqual(['drill_hole-H0', 'drill_hole-H2', 'drill_hole-H3']);
+  });
+
+  it('cancels only the one charge_hole and releases only its planned charge', () => {
+    const state = createGame({ seed: SEED });
+    const ids = seedHoles(state, 'charge_hole', 40, 3);
+
+    expect(cancelAction(state, ids[0]!).success).toBe(true);
+
+    expect(pendingIds(state)).toEqual([ids[1], ids[2]]);
+    expect(Object.keys(state.plannedChargesByHole).sort()).toEqual(['charge_hole-H1', 'charge_hole-H2']);
+  });
+});
+
+describe('linkedActionIds (#2265)', () => {
+  it('for a ramp segment lists every undug segment action of the ramp, its own id included', () => {
+    const state = createGame({ seed: SEED });
+    const ramp = seedRamp(state, 1, 10, 5, [0]);
+    seedRamp(state, 2, 20, 2);
+
+    const ids = linkedActionIds(state, state.pendingActions.find(a => a.id === 12)!);
+
+    expect([...ids].sort((a, b) => a - b)).toEqual(ramp);
+  });
+
+  it('for a drill_hole lists every outstanding drill_hole action and nothing else', () => {
+    const state = createGame({ seed: SEED });
+    const drills = seedHoles(state, 'drill_hole', 30, 3);
+    seedHoles(state, 'charge_hole', 40, 2);
+
+    const ids = linkedActionIds(state, state.pendingActions.find(a => a.id === drills[1])!);
+
+    expect([...ids].sort((a, b) => a - b)).toEqual(drills);
+  });
+
+  it('for a charge_hole lists every outstanding charge_hole action and nothing else', () => {
+    const state = createGame({ seed: SEED });
+    seedHoles(state, 'drill_hole', 30, 2);
+    const charges = seedHoles(state, 'charge_hole', 40, 3);
+
+    const ids = linkedActionIds(state, state.pendingActions.find(a => a.id === charges[2])!);
+
+    expect([...ids].sort((a, b) => a - b)).toEqual(charges);
+  });
+
+  it('for any other type is just the action itself', () => {
+    const state = createGame({ seed: SEED });
+    state.pendingActions.push(makeAction({ id: 50, type: 'general_work' }), makeAction({ id: 51, type: 'general_work' }));
+
+    expect(linkedActionIds(state, state.pendingActions[0]!)).toEqual([50]);
+  });
+});
+
+describe('cancelActionWithLinked (#2265)', () => {
+  it('on a ramp segment cancels all undug segments, requested one first, with the summed refund', () => {
+    const state = createGame({ seed: SEED });
+    seedRamp(state, 1, 10, 4);
+    const cash = state.cash;
+
+    const result = cancelActionWithLinked(state, 12);
+
+    expect(result.success).toBe(true);
+    expect(result.cancelled!.map(a => a.id)[0]).toBe(12);
+    expect(result.cancelled!.map(a => a.id).sort((a, b) => a - b)).toEqual([10, 11, 12, 13]);
+    expect(result.refunded!).toBeCloseTo(4 * SEGMENT_COST, 6);
+    expect(state.cash - cash).toBeCloseTo(4 * SEGMENT_COST, 6);
+    expect(pendingIds(state)).toEqual([]);
+    expect(state.plannedRamps).toHaveLength(0);
+    expect(state.ghostPreviews).toHaveLength(0);
+  });
+
+  it('on a ramp with dug segments cancels and refunds only the undug ones', () => {
+    const state = createGame({ seed: SEED });
+    seedRamp(state, 1, 10, 4, [0, 1]);
+
+    const result = cancelActionWithLinked(state, 10 + 2);
+
+    expect(result.cancelled!.map(a => a.id).sort((a, b) => a - b)).toEqual([12, 13]);
+    expect(result.refunded!).toBeCloseTo(2 * SEGMENT_COST, 6);
+  });
+
+  it('on a drill_hole cancels every outstanding drill_hole and releases every planned hole', () => {
+    const state = createGame({ seed: SEED });
+    const drills = seedHoles(state, 'drill_hole', 30, 4);
+    const charges = seedHoles(state, 'charge_hole', 40, 2);
+
+    const result = cancelActionWithLinked(state, drills[2]!);
+
+    expect(result.success).toBe(true);
+    expect(result.cancelled![0]!.id).toBe(drills[2]);
+    expect(result.cancelled!.map(a => a.id).sort((a, b) => a - b)).toEqual(drills);
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(pendingIds(state)).toEqual(charges);
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(2);
+  });
+
+  it('on a charge_hole cancels every outstanding charge_hole and releases every planned charge', () => {
+    const state = createGame({ seed: SEED });
+    const drills = seedHoles(state, 'drill_hole', 30, 2);
+    const charges = seedHoles(state, 'charge_hole', 40, 3);
+
+    const result = cancelActionWithLinked(state, charges[0]!);
+
+    expect(result.success).toBe(true);
+    expect(result.cancelled!.map(a => a.id).sort((a, b) => a - b)).toEqual(charges);
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+    expect(pendingIds(state)).toEqual(drills);
+    expect(state.plannedDrillHoles).toHaveLength(2);
+  });
+
+  it('on a single-action type cancels only that action and refunds its order cost', () => {
+    const state = createGame({ seed: SEED });
+    state.pendingActions.push(
+      makeAction({ id: 60, type: 'survey', payload: { method: 'seismic', orderCost: 3000 } }),
+      makeAction({ id: 61, type: 'survey', payload: { method: 'seismic', orderCost: 3000 } }),
+    );
+    const cash = state.cash;
+
+    const result = cancelActionWithLinked(state, 60);
+
+    expect(result.success).toBe(true);
+    expect(result.cancelled!.map(a => a.id)).toEqual([60]);
+    expect(result.refunded).toBe(3000);
+    expect(state.cash - cash).toBe(3000);
+    expect(pendingIds(state)).toEqual([61]);
+  });
+
+  it('reports a refund of 0 when the cancelled orders charged nothing at order time', () => {
+    const state = createGame({ seed: SEED });
+    const ids = seedHoles(state, 'drill_hole', 30, 2);
+
+    const result = cancelActionWithLinked(state, ids[0]!);
+
+    expect(result.refunded).toBe(0);
+    expect(result.cancelled).toHaveLength(2);
+  });
+
+  it('reports every freed building footprint when a place_building order is cancelled', () => {
+    const state = createGame({ seed: SEED });
+    state.plannedBuildings.push({ id: 1, buildingId: 10, type: 'geology_lab', tier: 1, x: 5, z: 5, actionId: 70, cost: 1000 });
+    state.pendingActions.push(makeAction({ id: 70, type: 'place_building', payload: { buildingOrderId: 1, cost: 1000 } }));
+
+    const result = cancelActionWithLinked(state, 70);
+
+    expect(result.success).toBe(true);
+    expect(result.freedFootprints).toHaveLength(1);
+    expect(result.freedFootprints![0]).toMatchObject({ x: 5, z: 5 });
+    expect(result.refunded).toBe(1000);
+    expect(state.plannedBuildings).toHaveLength(0);
+  });
+
+  it('releases a holder of one of the linked actions', () => {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED));
+    const ids = seedHoles(state, 'drill_hole', 30, 3);
+    const held = state.pendingActions.find(a => a.id === ids[2])!;
+    held.status = 'in_progress';
+    held.holderId = employee.id;
+    employee.activeActionId = held.id;
+
+    cancelActionWithLinked(state, ids[0]!);
+
+    expect(employee.activeActionId).toBeNull();
+    expect(pendingIds(state)).toEqual([]);
+  });
+
+  it('rejects an unknown id with not-found and changes nothing', () => {
+    const state = createGame({ seed: SEED });
+    const ids = seedHoles(state, 'drill_hole', 30, 2);
+
+    const result = cancelActionWithLinked(state, 9999);
+
+    expect(result).toMatchObject({ success: false, error: 'not-found' });
+    expect(pendingIds(state)).toEqual(ids);
+  });
+
+  it('rejects a rest action with not-cancellable and changes nothing', () => {
+    const state = createGame({ seed: SEED });
+    state.pendingActions.push(makeAction({ id: 80, type: 'rest', status: 'assigned', targetEmployeeId: 1 }));
+
+    const result = cancelActionWithLinked(state, 80);
+
+    expect(result).toMatchObject({ success: false, error: 'not-cancellable' });
+    expect(pendingIds(state)).toEqual([80]);
+  });
+
+  it('cancels only the requested rest-free action when a rest action is queued beside a drill order', () => {
+    const state = createGame({ seed: SEED });
+    const ids = seedHoles(state, 'drill_hole', 30, 2);
+    state.pendingActions.push(makeAction({ id: 81, type: 'rest', status: 'assigned', targetEmployeeId: 1 }));
+
+    cancelActionWithLinked(state, ids[0]!);
+
+    expect(pendingIds(state)).toEqual([81]);
   });
 });

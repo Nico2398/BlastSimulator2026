@@ -1562,3 +1562,189 @@ describe('OperationsPanel — entity links: incidents (#2165)', () => {
     expect(panel.root.querySelector('button[data-select-kind]')).toBeNull();
   });
 });
+
+// ── Cancel a whole order (#2265) ─────────────────────────────────────────────
+//
+// A ramp segment's button cancels the whole ramp; drill and charge rows offer
+// Cancel (this hole) and Cancel all N (the whole order); every other single
+// action keeps its single Cancel.
+
+describe('OperationsPanel — cancelling whole orders (#2265)', () => {
+  function addOrders(state: GameState, type: PendingAction['type'], firstId: number, count: number): number[] {
+    const ids: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const id = firstId + i;
+      ids.push(id);
+      const payload = type === 'dig_ramp_segment'
+        ? { rampId: 1, segmentIndex: i, cells: [], region: null, segmentCost: 100 }
+        : { holeId: `${type}-${i}` };
+      state.pendingActions.push(makePendingActionFixture({ id, type, targetX: i, targetZ: 7, payload }));
+      state.ghostPreviews.push({ id, type, targetX: i, targetZ: 7, targetY: 0, claimed: false });
+    }
+    return ids;
+  }
+
+  function render(state: GameState): ReturnType<typeof makePanel> {
+    const made = makePanel();
+    made.panel.show();
+    made.panel.update(state);
+    return made;
+  }
+
+  const cancelBtn = (root: HTMLElement, id: number): HTMLButtonElement | null =>
+    root.querySelector<HTMLButtonElement>(`[data-cancel-action="${id}"]`);
+  const cancelAllBtn = (root: HTMLElement, id: number): HTMLButtonElement | null =>
+    root.querySelector<HTMLButtonElement>(`[data-cancel-all-action="${id}"]`);
+
+  describe('ramp segment rows', () => {
+    it('label the button as cancelling the ramp, not the plain Cancel', () => {
+      const state = makeState();
+      const ids = addOrders(state, 'dig_ramp_segment', 21, 3);
+      const { panel } = render(state);
+
+      const btn = cancelBtn(panel.root, ids[1]!);
+
+      expect(btn).not.toBeNull();
+      expect(btn!.textContent).toBe(t('ui.operations.work_queue_cancel_ramp'));
+      expect(btn!.textContent).not.toBe(t('ui.operations.work_queue_cancel'));
+    });
+
+    it('every segment row has the button and none has a separate Cancel all', () => {
+      const state = makeState();
+      const ids = addOrders(state, 'dig_ramp_segment', 21, 3);
+      const { panel } = render(state);
+
+      for (const id of ids) expect(cancelBtn(panel.root, id)).not.toBeNull();
+      expect(panel.root.querySelectorAll('[data-cancel-all-action]')).toHaveLength(0);
+    });
+
+    it('clicking it fires "employee cancel <id> all" for that row', () => {
+      const state = makeState();
+      const ids = addOrders(state, 'dig_ramp_segment', 21, 3);
+      const { panel, gameConsole } = render(state);
+
+      cancelBtn(panel.root, ids[2]!)!.click();
+
+      expect(gameConsole).toHaveBeenCalledTimes(1);
+      expect(gameConsole).toHaveBeenCalledWith(`employee cancel ${ids[2]} all`);
+    });
+  });
+
+  describe('drill_hole rows', () => {
+    it('show Cancel and "Cancel all N" with N the outstanding drill orders', () => {
+      const state = makeState();
+      const ids = addOrders(state, 'drill_hole', 31, 4);
+      const { panel } = render(state);
+
+      const single = cancelBtn(panel.root, ids[0]!);
+      const all = cancelAllBtn(panel.root, ids[0]!);
+
+      expect(single!.textContent).toBe(t('ui.operations.work_queue_cancel'));
+      expect(all).not.toBeNull();
+      expect(all!.textContent).toBe(t('ui.operations.work_queue_cancel_all', { count: 4 }));
+    });
+
+    it('Cancel fires "employee cancel <id>" and Cancel all fires "employee cancel <id> all"', () => {
+      const state = makeState();
+      const ids = addOrders(state, 'drill_hole', 31, 3);
+      const { panel, gameConsole } = render(state);
+
+      cancelBtn(panel.root, ids[1]!)!.click();
+      expect(gameConsole).toHaveBeenLastCalledWith(`employee cancel ${ids[1]}`);
+
+      cancelAllBtn(panel.root, ids[1]!)!.click();
+      expect(gameConsole).toHaveBeenLastCalledWith(`employee cancel ${ids[1]} all`);
+      expect(gameConsole).toHaveBeenCalledTimes(2);
+    });
+
+    it('counts only drill orders, not other pending actions', () => {
+      const state = makeState();
+      const ids = addOrders(state, 'drill_hole', 31, 2);
+      addOrders(state, 'charge_hole', 41, 5);
+      state.pendingActions.push(makePendingActionFixture({ id: 51, type: 'general_work' }));
+      state.ghostPreviews.push({ id: 51, type: 'general_work', targetX: 3, targetZ: 7, targetY: 0, claimed: false });
+      const { panel } = render(state);
+
+      expect(cancelAllBtn(panel.root, ids[0]!)!.textContent).toBe(t('ui.operations.work_queue_cancel_all', { count: 2 }));
+    });
+
+    it('offers only the single Cancel when one drill order is outstanding (boundary)', () => {
+      const state = makeState();
+      const ids = addOrders(state, 'drill_hole', 31, 1);
+      const { panel } = render(state);
+
+      expect(cancelBtn(panel.root, ids[0]!)!.textContent).toBe(t('ui.operations.work_queue_cancel'));
+      expect(panel.root.querySelectorAll('[data-cancel-all-action]')).toHaveLength(0);
+    });
+
+    it('follows the outstanding count when an order is gone on the next update', () => {
+      const state = makeState();
+      const ids = addOrders(state, 'drill_hole', 31, 3);
+      const { panel } = render(state);
+      state.pendingActions = state.pendingActions.filter(a => a.id !== ids[2]);
+      state.ghostPreviews = state.ghostPreviews.filter(g => g.id !== ids[2]);
+
+      panel.update(state);
+
+      expect(cancelAllBtn(panel.root, ids[0]!)!.textContent).toBe(t('ui.operations.work_queue_cancel_all', { count: 2 }));
+    });
+  });
+
+  describe('charge_hole rows', () => {
+    it('show Cancel and "Cancel all N" with N the outstanding charge orders', () => {
+      const state = makeState();
+      addOrders(state, 'drill_hole', 31, 2);
+      const ids = addOrders(state, 'charge_hole', 41, 3);
+      const { panel } = render(state);
+
+      expect(cancelBtn(panel.root, ids[2]!)!.textContent).toBe(t('ui.operations.work_queue_cancel'));
+      expect(cancelAllBtn(panel.root, ids[2]!)!.textContent).toBe(t('ui.operations.work_queue_cancel_all', { count: 3 }));
+    });
+
+    it('Cancel all fires "employee cancel <id> all"', () => {
+      const state = makeState();
+      const ids = addOrders(state, 'charge_hole', 41, 2);
+      const { panel, gameConsole } = render(state);
+
+      cancelAllBtn(panel.root, ids[0]!)!.click();
+
+      expect(gameConsole).toHaveBeenCalledWith(`employee cancel ${ids[0]} all`);
+    });
+
+    it('offers only the single Cancel when one charge order is outstanding', () => {
+      const state = makeState();
+      const ids = addOrders(state, 'charge_hole', 41, 1);
+      const { panel } = render(state);
+
+      expect(cancelBtn(panel.root, ids[0]!)).not.toBeNull();
+      expect(panel.root.querySelectorAll('[data-cancel-all-action]')).toHaveLength(0);
+    });
+  });
+
+  describe('single-action rows', () => {
+    it('keep the plain Cancel, no Cancel all, and "employee cancel <id>"', () => {
+      const state = makeState();
+      addOrders(state, 'general_work', 61, 3);
+      const { panel, gameConsole } = render(state);
+
+      const btn = cancelBtn(panel.root, 62)!;
+      expect(btn.textContent).toBe(t('ui.operations.work_queue_cancel'));
+      expect(panel.root.querySelectorAll('[data-cancel-all-action]')).toHaveLength(0);
+
+      btn.click();
+      expect(gameConsole).toHaveBeenCalledWith('employee cancel 62');
+    });
+  });
+
+  it('labels exist in en and fr, the all label carrying {count}', async () => {
+    const en = (await import('../../../../src/core/i18n/locales/en.json')).default as Record<string, string>;
+    const fr = (await import('../../../../src/core/i18n/locales/fr.json')).default as Record<string, string>;
+    for (const key of ['ui.operations.work_queue_cancel_ramp', 'ui.operations.work_queue_cancel_all']) {
+      expect(en[key], `en ${key}`).toBeDefined();
+      expect(fr[key], `fr ${key}`).toBeDefined();
+      expect(fr[key]).not.toBe(en[key]);
+    }
+    expect(en['ui.operations.work_queue_cancel_all']).toContain('{count}');
+    expect(fr['ui.operations.work_queue_cancel_all']).toContain('{count}');
+  });
+});

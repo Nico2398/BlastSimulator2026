@@ -1,0 +1,145 @@
+{
+  "name": "ramp-cancel-whole",
+  "description": "#2265: a player orders a two-leg ramp with the Build panel's ramp tool, opens Operations and presses the Cancel ramp button on one of its Work Queue rows. Every undug segment's order goes with it (no half ramp, no ghost left), the planned ramp is released and the refund of all segments lands. Role 'player' only: Build panel clicks, the Operations tab, the row's button. Staffed site with nobody crewing the excavator, so no segment is dug before the cancel.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0,
+          "orderedRampSegmentCount": 0,
+          "builtRampCount": 0
+        },
+        "note": "Staffed site, no orders, no ramps. The excavator stays uncrewed on purpose: nothing is dug before the cancel."
+      }
+    },
+    {
+      "command": "build_ramp path:15,15;15,27;25,27 depth:6 width:3",
+      "timeout": 90,
+      "description": "The player arms the ramp tool, sets depth 6, clicks the start (15,15), the corner (15,27) and the end (25,27) tile and presses Confirm: a two-leg ramp, one dig order per segment, the whole cost charged at order time.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 15
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 27
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 27
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount",
+          "pendingActionCount"
+        ],
+        "note": "Cash charged, segments queued as pending dig orders."
+      }
+    },
+    {
+      "command": "state full",
+      "description": "The player opens Operations: the ramp's segments are listed in the Work Queue, each row with a button that cancels the whole ramp.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-operations-panel"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-operations-panel [data-cancel-action=\"1\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-operations-panel [data-cancel-action=\"1\"]",
+        "note": "The first segment's row offers its cancel button."
+      }
+    },
+    {
+      "command": "employee cancel 1 all",
+      "description": "The player presses the button on one segment's row (the first). It cancels every undug segment of the ramp, not just that row.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-operations-panel [data-cancel-action=\"1\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "cash"
+        ],
+        "equals": {
+          "pendingActionCount": 0,
+          "orderedRampSegmentCount": 0,
+          "builtRampCount": 0
+        },
+        "note": "The refund of every segment lands, no dig order (so no ghost) is left, the planned ramp is released and nothing was built."
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0,
+          "orderedRampSegmentCount": 0
+        }
+      }
+    }
+  ]
+}

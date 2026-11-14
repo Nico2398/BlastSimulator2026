@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Console commands for employees
 // Roster, hiring, pay, skills, and training.
 
-import { fireEmployeeFromWorld } from '../../core/engine/TaskCancellation.js';
+import { fireEmployeeFromWorld, cancelActionWithLinked } from '../../core/engine/TaskCancellation.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import {
@@ -324,6 +324,9 @@ export function employeeCommand(
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
       if (isNaN(id)) return { success: false, output: t('employees.cancel_usage') };
 
+      // A ramp segment never cancels alone, so it reports the whole ramp too (#2265).
+      const isRampSegment = state.pendingActions.find(a => a.id === id)?.type === 'dig_ramp_segment';
+      if (args[2] === 'all' || named['all'] === 'true' || isRampSegment) return cancelWithLinked(ctx, state, id);
       const result = cancelAction(state, id);
       if (!result.success) {
         const message = result.error === 'not-cancellable'
@@ -348,3 +351,17 @@ export function employeeCommand(
   }
 }
 
+
+/** `employee cancel <id> all`: the action with its linked actions, one report line (#2265). */
+function cancelWithLinked(ctx: GameContext, state: NonNullable<GameContext['state']>, id: number): CommandResult {
+  const result = cancelActionWithLinked(state, id);
+  if (!result.success) {
+    const key = result.error === 'not-cancellable' ? 'employees.cancel_not_cancellable' : 'employees.cancel_action_not_found';
+    return { success: false, output: t(key, { id }) };
+  }
+  for (const f of result.freedFootprints ?? []) emitFootprintOccupancyChanged(ctx, f.x, f.z, f.sizeX, f.sizeZ);
+  const refundSuffix = result.refunded! > 0
+    ? t('employees.cancel_refund_suffix', { amount: formatMoney(result.refunded!) })
+    : '';
+  return { success: true, output: t('employees.cancel_all_success', { count: result.cancelled!.length, refundSuffix }) };
+}

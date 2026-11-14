@@ -62,6 +62,19 @@ export interface CancelActionResult {
  */
 export function cancelAction(state: GameState, actionId: number): CancelActionResult {
   const action = state.pendingActions.find(a => a.id === actionId);
+  if (action?.type === 'dig_ramp_segment') {
+    // A ramp segment never cancels alone: that would leave a gap (#2265).
+    const all = cancelActionWithLinked(state, actionId);
+    if (!all.success) return { success: false, error: all.error! };
+    const result: CancelActionResult = { success: true, action: all.cancelled![0]!, refunded: all.refunded! };
+    if (all.freedFootprints?.[0]) result.freedFootprint = all.freedFootprints[0];
+    return result;
+  }
+  return cancelOne(state, actionId);
+}
+
+function cancelOne(state: GameState, actionId: number): CancelActionResult {
+  const action = state.pendingActions.find(a => a.id === actionId);
   if (!action) return { success: false, error: 'not-found' };
   if (action.type === 'rest') return { success: false, error: 'not-cancellable' };
 
@@ -690,4 +703,50 @@ export function releaseInjuredEmployeesQueues(state: GameState): void {
     const hasReleasable = emp.taskQueue.some(id => pool.get(id)?.type !== 'rest');
     if (hasReleasable || targetedIds.has(emp.id)) releaseInjuredEmployeeQueue(state, emp.id);
   }
+}
+
+interface CancelLinkedResult {
+  success: boolean;
+  error?: 'not-found' | 'not-cancellable';
+  /** Every action removed, the requested one first. */
+  cancelled?: PendingAction[];
+  /** Sum of the refunds of every cancelled action. */
+  refunded?: number;
+  freedFootprints?: FreedFootprint[];
+}
+
+/**
+ * Ids of the actions that cancel together with `action` (its own id included):
+ * every segment of its ramp, or every outstanding order of its drill / charge
+ * type (those carry no pattern id, so the order is the whole outstanding set).
+ */
+export function linkedActionIds(state: GameState, action: PendingAction): number[] {
+  const ids = [action.id];
+  const rampId = action.payload['rampId'];
+  const linked = (a: PendingAction): boolean => {
+    if (a.id === action.id || a.type !== action.type) return false;
+    if (action.type === 'dig_ramp_segment') return a.payload['rampId'] === rampId;
+    return action.type === 'drill_hole' || action.type === 'charge_hole';
+  };
+  for (const a of state.pendingActions) if (linked(a)) ids.push(a.id);
+  return ids;
+}
+
+/** Cancel an action together with its linked actions (#2265). */
+export function cancelActionWithLinked(state: GameState, actionId: number): CancelLinkedResult {
+  const action = state.pendingActions.find(a => a.id === actionId);
+  if (!action) return { success: false, error: 'not-found' };
+  if (action.type === 'rest') return { success: false, error: 'not-cancellable' };
+
+  const cancelled: PendingAction[] = [];
+  const freedFootprints: FreedFootprint[] = [];
+  let refunded = 0;
+  for (const id of linkedActionIds(state, action)) {
+    const one = cancelOne(state, id);
+    if (!one.success) continue;
+    cancelled.push(one.action!);
+    refunded += one.refunded ?? 0;
+    if (one.freedFootprint) freedFootprints.push(one.freedFootprint);
+  }
+  return { success: true, cancelled, refunded, freedFootprints };
 }

@@ -34,14 +34,8 @@ export function releasePlannedOrderForCancelledAction(
     const ramp = state.plannedRamps.find(r => r.id === rampId);
     if (!ramp) return null;
 
-    const segmentIndex = action.payload['segmentIndex'];
-    const idx = ramp.segments.findIndex(s => s.index === segmentIndex);
-    if (idx !== -1) ramp.segments.splice(idx, 1);
-
-    if (!ramp.segments.some(s => !s.done)) {
-      const rampIdx = state.plannedRamps.findIndex(r => r.id === rampId);
-      if (rampIdx !== -1) state.plannedRamps.splice(rampIdx, 1);
-    }
+    // A ramp is released whole: never splice one segment out of it (#2265).
+    state.plannedRamps.splice(state.plannedRamps.indexOf(ramp), 1);
     return null;
   }
 
