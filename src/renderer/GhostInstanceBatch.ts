@@ -35,6 +35,12 @@ export class GhostInstanceBatch {
     return this.ids.length;
   }
 
+  /** Ghost id in `slot`, or null when the slot holds none (#2266). */
+  idAt(slot: number): number | null {
+    void slot;
+    throw new Error('not implemented');
+  }
+
   /** The drawn object, for tests and inspection. */
   get object(): THREE.InstancedMesh {
     return this.mesh;

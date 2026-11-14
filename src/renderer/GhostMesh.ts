@@ -464,6 +464,23 @@ export class GhostMesh {
     return this.entries.get(id)?.root ?? null;
   }
 
+  /** Every object a raycast can hit to select an order: plain ghost roots and instanced batch meshes (#2266). */
+  pickables(): THREE.Object3D[] {
+    throw new Error('not implemented');
+  }
+
+  /** Pending-action id of the ghost a raycast hit (`object`, plus `instanceId` for an instanced one), or null (#2266). */
+  actionIdAt(object: THREE.Object3D, instanceId?: number): number | null {
+    void object; void instanceId;
+    throw new Error('not implemented');
+  }
+
+  /** World position of the ghost for pending action `id`, or null when it has none (#2266). */
+  getPosition(id: number): THREE.Vector3 | null {
+    void id;
+    throw new Error('not implemented');
+  }
+
   dispose(): void {
     this.clearAll();
     for (const batch of this.batches.values()) batch.dispose();

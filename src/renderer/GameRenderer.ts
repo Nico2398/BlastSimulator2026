@@ -73,8 +73,9 @@ import type { Steps } from '../core/engine/Steps.js';
 import { modelLibrary } from './models/ModelLibrary.js';
 import {
   raycastSurfaceY, surfaceYAt, smoothSurfaceYAt, pickables,
-  resolveFragmentId, entityWorldPosition, rampIdAtTile, type PickingDeps,
+  resolveFragmentId, resolveGhostId, entityWorldPosition, rampIdAtTile, type PickingDeps,
 } from './GameRendererPicking.js';
+import type { PickableKind } from './Pickable.js';
 
 /** Wind fed to the rain before a level has a WindState. */
 const CALM_WIND: WindVector = { x: 0, z: 0 };
@@ -685,13 +686,18 @@ export class GameRenderer {
     return resolveFragmentId(this.pickingDeps(), bucketIndex, instanceId);
   }
 
+  /** Resolve a ghost raycast hit to its pending-action id (#2266). See GameRendererPicking.ts. */
+  resolveGhostId(object: THREE.Object3D, instanceId?: number): number | null {
+    return resolveGhostId(this.pickingDeps(), object, instanceId);
+  }
+
   /** Id of the built ramp whose corridor covers a tile, or null (#1298). See GameRendererPicking.ts. */
   rampIdAtTile(tileX: number, tileZ: number): number | null {
     return rampIdAtTile(this.pickingDeps(), tileX, tileZ);
   }
 
   /** Current world-space position of a live entity, for hover-tag/highlight placement. See GameRendererPicking.ts. */
-  entityWorldPosition(kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole' | 'ramp', id: number): THREE.Vector3 | null {
+  entityWorldPosition(kind: PickableKind, id: number): THREE.Vector3 | null {
     return entityWorldPosition(this.pickingDeps(), kind, id);
   }
 
@@ -1031,6 +1037,7 @@ export class GameRenderer {
       characters: this.characters,
       fragments: this.fragments,
       blastOverlay: this.blastOverlay,
+      ghosts: this.ghosts,
       builtRamps: this.lastState?.builtRamps ?? [],
       getTerrainSurfaceY: (x, z) => this.getTerrainSurfaceY(x, z),
       getSmoothTerrainSurfaceY: (x, z) => this.getSmoothTerrainSurfaceY(x, z),

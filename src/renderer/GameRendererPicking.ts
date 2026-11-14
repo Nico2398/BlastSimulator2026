@@ -10,6 +10,8 @@ import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
 import type { FragmentMesh } from './FragmentMesh.js';
+import type { GhostMesh } from './GhostMesh.js';
+import type { PickableKind } from './Pickable.js';
 import type { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { findRampAtTile } from '../core/mining/RampWidening.js';
 import type { BuiltRamp } from '../core/state/GameState.js';
@@ -23,6 +25,8 @@ export interface PickingDeps {
   characters: CharacterMesh | null;
   fragments: FragmentMesh | null;
   blastOverlay: BlastPlanOverlay | null;
+  /** Ghosts of pending orders (#2266). */
+  ghosts: GhostMesh | null;
   /** Finished ramps of the loaded game (#1298) — terrain features, so they have no mesh of their own to pick. */
   builtRamps?: readonly BuiltRamp[];
   getTerrainSurfaceY: (x: number, z: number) => number;
@@ -92,12 +96,19 @@ export function pickables(deps: PickingDeps): THREE.Object3D[] {
     ...(deps.characters?.pickables() ?? []),
     ...(deps.fragments?.pickables() ?? []),
     ...(deps.blastOverlay?.pickables() ?? []),
+    ...(deps.ghosts?.pickables() ?? []),
   ];
 }
 
 /** Resolve a fragment-bucket raycast hit (bucketIndex, instanceId) to the fragment id occupying that slot. */
 export function resolveFragmentId(deps: PickingDeps, bucketIndex: number, instanceId: number): number | null {
   return deps.fragments?.fragmentIdAt(bucketIndex, instanceId) ?? null;
+}
+
+/** Resolve a ghost raycast hit to the pending-action id of its order, or null (#2266). */
+export function resolveGhostId(deps: PickingDeps, object: THREE.Object3D, instanceId?: number): number | null {
+  void deps; void object; void instanceId;
+  throw new Error('not implemented');
 }
 
 /**
@@ -109,7 +120,7 @@ export function resolveFragmentId(deps: PickingDeps, bucketIndex: number, instan
  */
 export function entityWorldPosition(
   deps: PickingDeps,
-  kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole' | 'ramp',
+  kind: PickableKind,
   id: number,
 ): THREE.Vector3 | null {
   switch (kind) {
@@ -118,6 +129,7 @@ export function entityWorldPosition(
     case 'employee': return deps.characters?.getPosition(id) ?? null;
     case 'fragment': return deps.fragments?.fragmentPosition(id) ?? null;
     case 'hole': return deps.blastOverlay?.getHolePosition(id) ?? null;
+    case 'order': return deps.ghosts?.getPosition(id) ?? null;
     case 'ramp': {
       const f = deps.builtRamps?.find(r => r.id === id)?.footprint;
       if (!f) return null;

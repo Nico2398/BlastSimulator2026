@@ -29,6 +29,7 @@ const DEFAULT_RADIUS: Record<PickableKind, number> = {
   // equal-radius amber ring would sit flush against instead of surrounding.
   hole: 1.0,
   ramp: 2.0,
+  order: 1.2,
 };
 
 export class EntityHighlight {
