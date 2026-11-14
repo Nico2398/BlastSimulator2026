@@ -186,6 +186,17 @@ describe('employee cancel <id> (#2265)', () => {
     expect(state.plannedRamps).toHaveLength(0);
   });
 
+  it('accepts the named form id:<id> all:true (C5) and reports the count', () => {
+    const { run, state } = start();
+    expect(run('drill_plan grid rows:1 cols:3 spacing:4 depth:8 start:14,14').success).toBe(true);
+    const orders = ofType(state, 'drill_hole');
+    expect(orders.length).toBeGreaterThan(1);
+    const result = run(`employee cancel id:${orders[0]!.id} all:true`);
+    expect(result.success).toBe(true);
+    expect(result.output).toContain(`${orders.length}`);
+    expect(ofType(state, 'drill_hole')).toHaveLength(0);
+  });
+
   it('prints the usage line without an id', () => {
     const { run } = start();
     expect(run('employee cancel')).toEqual({ success: false, output: t('employees.cancel_usage') });

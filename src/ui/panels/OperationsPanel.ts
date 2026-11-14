@@ -328,7 +328,12 @@ export class OperationsPanel extends PanelBase {
    */
   private makePlayerRows(state: GameState): HTMLElement[] {
     if (this.model.player.length === 0 && this.model.debris.length === 0) return [emptyState(t('ui.operations.work_queue_empty'))];
-    return this.model.player.map(a => this.makeWorkQueueRow(a, state, true));
+    // Drill and charge orders cancel together: count each type once per render (#2265).
+    const typeCounts = new Map<PendingAction['type'], number>();
+    for (const a of this.model.player) {
+      if (a.type === 'drill_hole' || a.type === 'charge_hole') typeCounts.set(a.type, (typeCounts.get(a.type) ?? 0) + 1);
+    }
+    return this.model.player.map(a => this.makeWorkQueueRow(a, state, true, typeCounts));
   }
 
   private makeDebrisGroups(state: GameState): HTMLElement[] {
@@ -414,7 +419,7 @@ export class OperationsPanel extends PanelBase {
     this.debrisEl.replaceChildren(...this.makeDebrisGroups(this.lastState));
   }
 
-  private makeWorkQueueRow(action: PendingAction, state: GameState, cancellable: boolean): HTMLElement {
+  private makeWorkQueueRow(action: PendingAction, state: GameState, cancellable: boolean, typeCounts?: Map<PendingAction['type'], number>): HTMLElement {
     const holder = action.holderId !== null
       ? state.employees.employees.find(e => e.id === action.holderId)
       : undefined;
@@ -458,9 +463,7 @@ export class OperationsPanel extends PanelBase {
       cancelBtn.dataset['cancelAction'] = String(action.id);
       cancelBtn.addEventListener('click', () => this.gameConsole?.(isRamp ? cancelAllCommand(action.id) : cancelCommand(action.id)));
       footRow.append(cancelBtn);
-      const linkedCount = action.type === 'drill_hole' || action.type === 'charge_hole'
-        ? this.model.player.filter(a => a.type === action.type).length
-        : 0;
+      const linkedCount = typeCounts?.get(action.type) ?? 0;
       if (linkedCount > 1) {
         const allBtn = button('danger', t('ui.operations.work_queue_cancel_all', { count: linkedCount }));
         allBtn.style.cssText = SMALL_BTN_STYLE;

@@ -324,7 +324,9 @@ export function employeeCommand(
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
       if (isNaN(id)) return { success: false, output: t('employees.cancel_usage') };
 
-      if (args[2] === 'all') return cancelWithLinked(ctx, state, id);
+      // A ramp segment never cancels alone, so it reports the whole ramp too (#2265).
+      const isRampSegment = state.pendingActions.find(a => a.id === id)?.type === 'dig_ramp_segment';
+      if (args[2] === 'all' || named['all'] === 'true' || isRampSegment) return cancelWithLinked(ctx, state, id);
       const result = cancelAction(state, id);
       if (!result.success) {
         const message = result.error === 'not-cancellable'
