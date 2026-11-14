@@ -37,9 +37,10 @@ describe('wireProgressionNotifications (#1926)', () => {
 
   const text = (n: NotifyInput) => `${n.title} ${n.body}`;
 
-  it('subscribes to both progression events', () => {
+  it('subscribes to the progression events, the tier-up included (#2277)', () => {
     expect(emitter.has('progression:grade_applied')).toBe(true);
     expect(emitter.has('progression:grade_approved')).toBe(true);
+    expect(emitter.has('progression:tier_up')).toBe(true);
   });
 
   it('does not notify before any event fires', () => {
@@ -56,13 +57,57 @@ describe('wireProgressionNotifications (#1926)', () => {
   it('grade_approved notifies once and names the grade', () => {
     emitter.fire('progression:grade_approved', { grade: 1 });
     expect(notified).toHaveLength(1);
-    expect(text(notified[0]!)).toContain('Hobby Quarry Licence');
+    expect(text(notified[0]!)).toContain('Depth');
+    expect(notified[0]!.body).toBe(t('notification.progression.approved', { name: t('permit.grade.1') }));
     expect(text(notified[0]!)).not.toMatch(/\{\w+\}|progression\./);
   });
 
   it('names an endless class grade by its class name', () => {
-    emitter.fire('progression:grade_approved', { grade: 7 });
-    expect(text(notified[0]!)).toContain(t(gradeDef(7).nameKey, gradeDef(7).nameParams));
+    emitter.fire('progression:grade_approved', { grade: 5 });
+    expect(text(notified[0]!)).toContain(t(gradeDef(5).nameKey, gradeDef(5).nameParams));
+  });
+
+  describe('tier-up toast (#2277)', () => {
+    it('notifies once, naming the grade and the new tier', () => {
+      emitter.fire('progression:tier_up', { grade: 1, tier: 2 });
+      expect(notified).toHaveLength(1);
+      expect(notified[0]!.body).toBe(t('notification.progression.tier_up', { name: t('permit.grade.1'), tier: 2 }));
+      expect(text(notified[0]!)).not.toMatch(/\{\w+\}|progression\.|notification\./);
+    });
+
+    it.each([[0, 2], [0, 3], [2, 3], [3, 2]])('grade %i tier %i names both', (grade, tier) => {
+      emitter.fire('progression:tier_up', { grade, tier });
+      expect(notified[0]!.body).toContain(t(`permit.grade.${grade}`));
+      expect(notified[0]!.body).toContain(String(tier));
+    });
+
+    it('a cascade of two tier-ups raises two toasts, in order', () => {
+      emitter.fire('progression:tier_up', { grade: 0, tier: 2 });
+      emitter.fire('progression:tier_up', { grade: 0, tier: 3 });
+      expect(notified).toHaveLength(2);
+      expect(notified[0]!.body).not.toBe(notified[1]!.body);
+    });
+
+    it('is not the grade-approval toast', () => {
+      emitter.fire('progression:tier_up', { grade: 1, tier: 2 });
+      emitter.fire('progression:grade_approved', { grade: 1 });
+      expect(notified[0]!.body).not.toBe(notified[1]!.body);
+      expect(notified[1]!.body).toBe(t('notification.progression.approved', { name: t('permit.grade.1') }));
+    });
+
+    it('follows the active locale', () => {
+      emitter.fire('progression:tier_up', { grade: 1, tier: 2 });
+      setLocale('fr');
+      emitter.fire('progression:tier_up', { grade: 1, tier: 2 });
+      expect(notified[1]!.body).not.toBe(notified[0]!.body);
+    });
+
+    it('has text in both locales', () => {
+      for (const loc of ['en', 'fr']) {
+        setLocale(loc as 'en' | 'fr');
+        expect(t('notification.progression.tier_up', { name: 'N', tier: 2 })).not.toBe('notification.progression.tier_up');
+      }
+    });
   });
 
   it('each event raises exactly one toast per firing', () => {

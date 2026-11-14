@@ -23,29 +23,29 @@ function snapshot(s: ReturnType<typeof sandbox>['state']) {
 describe('vehicle tier gate (#1928)', () => {
   beforeAll(() => setLocale('en'));
 
-  it.each(ROLES)('grade 1 refuses a tier-2 %s, naming both grades, with state untouched', (role: VehicleRole) => {
-    const { runner, state } = sandbox(1);
+  it.each(ROLES)('grade 0 refuses a tier-2 %s, naming both grades, with state untouched', (role: VehicleRole) => {
+    const { runner, state } = sandbox(0);
     const before = snapshot(state);
     const r = runner.run(`vehicle buy ${role} tier:2`);
     expect(r.success).toBe(false);
-    expect(r.output).toContain('Hobby Quarry Licence');
-    expect(r.output).toContain('Licensed Quarry');
+    expect(r.output).toContain('Surface');
+    expect(r.output).toContain('Depth');
     expect(snapshot(state)).toEqual(before);
   });
 
-  it.each(ROLES)('grade 2 sells a tier-2 %s but refuses tier 3 naming the grade-4 class', (role: VehicleRole) => {
-    const { runner, state } = sandbox(2);
+  it.each(ROLES)('grade 1 sells a tier-2 %s but refuses tier 3 naming grade 2', (role: VehicleRole) => {
+    const { runner, state } = sandbox(1);
     expect(runner.run(`vehicle buy ${role} tier:2`).success).toBe(true);
     const before = snapshot(state);
     const r = runner.run(`vehicle buy ${role} tier:3`);
     expect(r.success).toBe(false);
-    expect(r.output).toContain('Licensed Quarry');
-    expect(r.output).toContain('Strategic National Excavation');
+    expect(r.output).toContain('Depth');
+    expect(r.output).toContain('Distance');
     expect(snapshot(state)).toEqual(before);
   });
 
-  it.each(ROLES)('grade 4 sells a tier-3 %s', (role: VehicleRole) => {
-    const { runner, state } = sandbox(4);
+  it.each(ROLES)('grade 2 sells a tier-3 %s', (role: VehicleRole) => {
+    const { runner, state } = sandbox(2);
     const before = state.vehicles.vehicles.length;
     expect(runner.run(`vehicle buy ${role} tier:3`).success).toBe(true);
     expect(state.vehicles.vehicles.length).toBe(before + 1);
@@ -58,28 +58,28 @@ describe('vehicle tier gate (#1928)', () => {
   });
 
   it('the grade check precedes the cash check', () => {
-    const { runner, state } = sandbox(1, 0);
+    const { runner, state } = sandbox(0, 0);
     const r = runner.run('vehicle buy debris_hauler tier:2');
     expect(r.success).toBe(false);
-    expect(r.output).toContain('Licensed Quarry');
+    expect(r.output).toContain('Depth');
     expect(r.output).not.toMatch(/insufficient|funds/i);
     expect(state.cash).toBe(0);
   });
 
-  it('upgrade to tier 2 is refused at grade 1 with tier and cash unchanged', () => {
-    const { runner, state } = sandbox(1);
+  it('upgrade to tier 2 is refused at grade 0 with tier and cash unchanged', () => {
+    const { runner, state } = sandbox(0);
     runner.run('vehicle buy debris_hauler');
     const v = state.vehicles.vehicles[state.vehicles.vehicles.length - 1]!;
     const cash = state.cash;
     const r = runner.run(`vehicle upgrade ${v.id}`);
     expect(r.success).toBe(false);
-    expect(r.output).toContain('Licensed Quarry');
+    expect(r.output).toContain('Depth');
     expect(v.tier).toBe(1);
     expect(state.cash).toBe(cash);
   });
 
-  it('at grade 2 upgrade to tier 2 works, then tier 3 is refused until grade 4', () => {
-    const { runner, state } = sandbox(2);
+  it('at grade 1 upgrade to tier 2 works, then tier 3 is refused until grade 2', () => {
+    const { runner, state } = sandbox(1);
     runner.run('vehicle buy debris_hauler');
     const v = state.vehicles.vehicles[state.vehicles.vehicles.length - 1]!;
     expect(runner.run(`vehicle upgrade ${v.id}`).success).toBe(true);
@@ -87,11 +87,11 @@ describe('vehicle tier gate (#1928)', () => {
     const cash = state.cash;
     const r = runner.run(`vehicle upgrade ${v.id}`);
     expect(r.success).toBe(false);
-    expect(r.output).toContain('Strategic National Excavation');
+    expect(r.output).toContain('Distance');
     expect(v.tier).toBe(2);
     expect(state.cash).toBe(cash);
 
-    state.grade!.grade = 4;
+    state.grade!.grade = 2;
     expect(runner.run(`vehicle upgrade ${v.id}`).success).toBe(true);
     expect(v.tier).toBe(3);
   });

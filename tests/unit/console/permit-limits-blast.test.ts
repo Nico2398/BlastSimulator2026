@@ -356,13 +356,15 @@ describe('permit status shows limits, fee and strikes (#1923)', () => {
     expect(lapsed).toBe(clean);
   });
 
-  it('follows the grade: grade 1 shows its own limits', () => {
+  it.each([[0, 3], [1, 1], [1, 2], [3, 3]])('follows the grade and tier: grade %i tier %i shows its own limits (#2277)', (grade, tier) => {
     const { run, state } = sandbox();
-    state.grade!.grade = 1;
+    state.grade!.grade = grade;
+    state.grade!.tier = tier;
+    const l = permitLimitsFor(grade, tier);
     const r = run('permit status');
-    expect(r.output).toContain('120');
-    expect(r.output).toContain(`${permitLimitsFor(1).maxAreaM2} m²`);
-    expect(r.output).toContain(formatMoney(1_000));
+    expect(r.output).toContain(`${l.maxChargeKg} kg`);
+    expect(r.output).toContain(`${l.maxAreaM2} m²`);
+    expect(r.output).toContain(formatMoney(l.fee));
   });
 
   it('never shows the inspection chance', () => {

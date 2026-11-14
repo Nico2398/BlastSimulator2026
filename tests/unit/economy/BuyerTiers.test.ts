@@ -10,7 +10,8 @@ import {
   buyerPriceFactor,
   type BuyerTierId,
 } from '../../../src/core/economy/BuyerTiers.js';
-import { PRODUCTION_SUPPLY_QTY_KG } from '../../../src/core/config/balance.js';
+import { PRODUCTION_SUPPLY_QTY_KG, BUYER_UNLOCK_GRADE } from '../../../src/core/config/balance.js';
+import { unlockLinesFor } from '../../../src/core/economy/MineGrade.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
@@ -29,8 +30,9 @@ describe('BUYER_TIERS table', () => {
     expect(BUYER_TIERS.map(b => b.id)).toEqual(IDS);
   });
 
-  it('unlock grades are 0, 1, 3, 5', () => {
-    expect(BUYER_TIERS.map(b => b.unlockGrade)).toEqual([0, 1, 3, 5]);
+  it('unlock grades are 0, 1, 2, 3: one tier of buyer per named grade (#2277)', () => {
+    expect(BUYER_TIERS.map(b => b.unlockGrade)).toEqual([0, 1, 2, 3]);
+    expect(BUYER_UNLOCK_GRADE).toEqual({ local: 0, regional: 1, national: 2, global: 3 });
   });
 
   it('ore-sale quantity ranges and steps follow the spec', () => {
@@ -74,18 +76,17 @@ describe('unlockedBuyerTiers', () => {
     expect(idsAt(0)).toEqual(['local']);
   });
 
-  it('grades 1 and 2 add regional', () => {
+  it('grade 1 adds regional', () => {
     expect(idsAt(1)).toEqual(['local', 'regional']);
-    expect(idsAt(2)).toEqual(['local', 'regional']);
   });
 
-  it('grades 3 and 4 add national', () => {
-    expect(idsAt(3)).toEqual(['local', 'regional', 'national']);
-    expect(idsAt(4)).toEqual(['local', 'regional', 'national']);
+  it('grade 2 adds national', () => {
+    expect(idsAt(2)).toEqual(['local', 'regional', 'national']);
   });
 
-  it('grade 5 and above unlock everything', () => {
-    expect(idsAt(5)).toEqual(IDS);
+  it('grade 3 and above unlock everything, endless classes included', () => {
+    expect(idsAt(3)).toEqual(IDS);
+    expect(idsAt(4)).toEqual(IDS);
     expect(idsAt(6)).toEqual(IDS);
     expect(idsAt(40)).toEqual(IDS);
   });
@@ -100,8 +101,8 @@ describe('pickBuyerTier', () => {
   it('never picks a locked tier', () => {
     const rng = new Random(7);
     for (let i = 0; i < 500; i++) {
-      expect(['local', 'regional']).toContain(pickBuyerTier(rng, 2).id);
-      expect(['local', 'regional', 'national']).toContain(pickBuyerTier(rng, 4).id);
+      expect(['local', 'regional']).toContain(pickBuyerTier(rng, 1).id);
+      expect(['local', 'regional', 'national']).toContain(pickBuyerTier(rng, 2).id);
     }
   });
 
@@ -114,11 +115,11 @@ describe('pickBuyerTier', () => {
     expect(local / n).toBeLessThan(0.55);
   });
 
-  it('grade 5 follows the renormalized weights and reaches every tier', () => {
+  it('grade 3 follows the renormalized weights and reaches every tier', () => {
     const rng = new Random(99);
     const counts: Record<string, number> = { local: 0, regional: 0, national: 0, global: 0 };
     const n = 8000;
-    for (let i = 0; i < n; i++) counts[pickBuyerTier(rng, 5).id]!++;
+    for (let i = 0; i < n; i++) counts[pickBuyerTier(rng, 3).id]!++;
     expect(counts.local! / n).toBeGreaterThan(0.31);
     expect(counts.local! / n).toBeLessThan(0.39);
     expect(counts.national! / n).toBeGreaterThan(0.16);
@@ -128,7 +129,7 @@ describe('pickBuyerTier', () => {
   });
 
   it('consumes exactly one nextFloat draw per pick, also at grade 0', () => {
-    for (const g of [0, 1, 5]) {
+    for (const g of [0, 1, 3]) {
       const a = new Random(11);
       const b = new Random(11);
       pickBuyerTier(a, g);
@@ -138,7 +139,7 @@ describe('pickBuyerTier', () => {
   });
 
   it('is deterministic for a seed', () => {
-    const run = () => { const r = new Random(3); return Array.from({ length: 30 }, () => pickBuyerTier(r, 5).id); };
+    const run = () => { const r = new Random(3); return Array.from({ length: 30 }, () => pickBuyerTier(r, 3).id); };
     expect(run()).toEqual(run());
   });
 });
@@ -227,6 +228,15 @@ describe('buyer tier i18n', () => {
       expect(fr[key], `fr ${key}`).toBeTruthy();
       expect(t(key)).toBe(en[key]);
     }
+  });
+
+  it('each buyer tier announces itself in the unlock list of the grade that opens it (#2277)', () => {
+    for (const id of ['regional', 'national', 'global'] as const) {
+      const keys = unlockLinesFor(BUYER_UNLOCK_GRADE[id]).map(l => l.key);
+      expect(keys, `grade ${BUYER_UNLOCK_GRADE[id]}`).toContain(`progression.unlock.buyer.${id}`);
+    }
+    expect(unlockLinesFor(1).map(l => l.key)).not.toContain('progression.unlock.buyer.national');
+    expect(unlockLinesFor(2).map(l => l.key)).not.toContain('progression.unlock.buyer.global');
   });
 
   it('unlock lines for the buyer tiers have keys in both locales', () => {

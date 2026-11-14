@@ -1782,7 +1782,7 @@ describe('ContractsPanel — market strip (progression)', () => {
     it('names the national board and the grade it needs', () => {
       setLocale('en');
       const text = lockedText(0)!;
-      expect(text).toContain('National Ore Railway Board: needs Industrial Pit');
+      expect(text).toContain('National Ore Railway Board: needs Distance');
       expect(text).toContain(lockedLine('national'));
     });
 
@@ -1799,14 +1799,14 @@ describe('ContractsPanel — market strip (progression)', () => {
       expect(text).toContain(lockedLine('global'));
     });
 
-    it('at grade 3 only global is left', () => {
-      const text = lockedText(3)!;
+    it('at grade 2 only global is left', () => {
+      const text = lockedText(2)!;
       expect(text).not.toContain(lockedLine('national'));
       expect(text).toContain(lockedLine('global'));
     });
 
-    it('is absent once every tier is unlocked (grade 5)', () => {
-      expect(lockedText(5)).toBeNull();
+    it('is absent once every tier is unlocked (grade 3)', () => {
+      expect(lockedText(3)).toBeNull();
     });
 
     it('updates when the permit grade rises', () => {
@@ -1814,7 +1814,7 @@ describe('ContractsPanel — market strip (progression)', () => {
       const state = progressionState(0);
       panel.show();
       panel.update(state);
-      state.grade!.grade = 5;
+      state.grade!.grade = 3;
       panel.update(state);
       expect(panel.root.querySelector('.bs-market-locked')).toBeNull();
     });

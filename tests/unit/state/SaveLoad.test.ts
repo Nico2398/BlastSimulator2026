@@ -12,7 +12,9 @@ import { hireEmployee, BASE_SALARIES, calculateQualificationBonus } from '../../
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { rampLegsOf } from '../../../src/core/mining/RampPath.js';
 import { updateScores } from '../../../src/core/scores/ScoreManager.js';
-import { SCORE_DECAY_RATE } from '../../../src/core/config/balance.js';
+import { SCORE_DECAY_RATE, LEGACY_PERMIT_LIMITS } from '../../../src/core/config/balance.js';
+import { createGradeState, gradeRung, migrateLegacyGrade } from '../../../src/core/economy/MineGrade.js';
+import { permitLimitsForRung } from '../../../src/core/economy/PermitLimits.js';
 
 const TEST_SAVE_DIR = path.join(process.cwd(), 'tmp-test-saves');
 
@@ -2440,7 +2442,7 @@ describe('serialize/deserialize — mine grade state (#1921)', () => {
   it('round-trips the grade state including a pending countdown', () => {
     const state = createGame({ seed: 42 });
     state.grade = {
-      grade: 1, oreDeliveredKg: 31_000, deepestPitM: 12.5, rockBrokenM3: 800, blastsFired: 5, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null,
+      grade: 1, tier: 2, oreDeliveredKg: 31_000, deepestPitM: 12.5, rockBrokenM3: 800, blastsFired: 5, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null,
       pending: { toGrade: 2, ticksLeft: 31 },
     };
     expect(deserialize(serialize(state)).grade).toEqual(state.grade);
@@ -2448,7 +2450,7 @@ describe('serialize/deserialize — mine grade state (#1921)', () => {
 
   it('round-trips a grade state with nothing pending', () => {
     const state = createGame({ seed: 42 });
-    state.grade = { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null };
+    state.grade = { grade: 0, tier: 1, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null };
     expect(deserialize(serialize(state)).grade).toEqual(state.grade);
   });
 
@@ -2460,6 +2462,85 @@ describe('serialize/deserialize — mine grade state (#1921)', () => {
   it('a malformed grade state is dropped on load', () => {
     const parsed = JSON.parse(serialize(createGame({ seed: 42 }))) as Record<string, unknown>;
     parsed['grade'] = { grade: 'two', oreDeliveredKg: -3, pending: 7 };
+    expect(deserialize(JSON.stringify(parsed)).grade).toBeUndefined();
+  });
+
+  it.each([[0, 1], [0, 3], [1, 2], [2, 3], [3, 1], [3, 3]])('round-trips grade %i at tier %i (#2277)', (grade, tier) => {
+    const state = createGame({ seed: 42 });
+    state.grade = { ...createGradeState(), grade, tier, oreDeliveredKg: 12_345 };
+    const loaded = deserialize(serialize(state)).grade;
+    expect(loaded).toEqual(state.grade);
+    expect(loaded!.tier).toBe(tier);
+  });
+
+  it('round-trips an endless class at tier 1 (#2277)', () => {
+    const state = createGame({ seed: 42 });
+    state.grade = { ...createGradeState(), grade: 6, tier: 1 };
+    expect(deserialize(serialize(state)).grade).toEqual(state.grade);
+  });
+
+  it.each([0, 4, 1.5, -1, 'high'])('a malformed tier (%s) drops the grade state on load (#2277)', (tier) => {
+    const parsed = JSON.parse(serialize(createGame({ seed: 42 }))) as Record<string, unknown>;
+    parsed['grade'] = { ...createGradeState(), grade: 1, tier };
+    expect(deserialize(JSON.stringify(parsed)).grade).toBeUndefined();
+  });
+});
+
+describe('deserialize — a save from before grade tiers migrates onto the new ladder (#2277)', () => {
+  /** A save as the pre-tier game wrote it: the grade sub-state has no `tier`. */
+  function legacySave(oldGrade: number, extra: Record<string, unknown> = {}): string {
+    const state = createGame({ seed: 42 });
+    state.grade = { ...createGradeState(), grade: oldGrade, oreDeliveredKg: 777, blastsFired: 4, deepestPitM: 5 };
+    const parsed = JSON.parse(serialize(state)) as Record<string, unknown>;
+    const grade = { ...(parsed['grade'] as Record<string, unknown>), ...extra };
+    delete grade['tier'];
+    parsed['grade'] = grade;
+    return JSON.stringify(parsed);
+  }
+
+  it('old grade 0 loads as grade 0 tier 1', () => {
+    expect(deserialize(legacySave(0)).grade).toMatchObject({ grade: 0, tier: 1 });
+  });
+
+  it('old grade 5 loads as grade 3 tier 3', () => {
+    expect(deserialize(legacySave(5)).grade).toMatchObject({ grade: 3, tier: 3 });
+  });
+
+  it.each([6, 7, 10])('old class grade %i loads as grade minus two at tier 1', (old) => {
+    expect(deserialize(legacySave(old)).grade).toMatchObject({ grade: old - 2, tier: 1 });
+  });
+
+  it.each([0, 1, 2, 3, 4, 5, 6, 9])('old grade %i loads where migrateLegacyGrade says', (old) => {
+    expect(deserialize(legacySave(old)).grade).toMatchObject(migrateLegacyGrade(old));
+  });
+
+  it.each([0, 1, 2, 3, 4, 5])('old grade %i never loses a granted blast cap', (old) => {
+    const g = deserialize(legacySave(old)).grade!;
+    const l = permitLimitsForRung(gradeRung(g));
+    expect(l.maxChargeKg).toBeGreaterThanOrEqual(LEGACY_PERMIT_LIMITS[old]!.maxChargeKg);
+    expect(l.maxAreaM2).toBeGreaterThanOrEqual(LEGACY_PERMIT_LIMITS[old]!.maxAreaM2);
+  });
+
+  it('keeps the trackers across the migration', () => {
+    expect(deserialize(legacySave(3)).grade).toMatchObject({ oreDeliveredKg: 777, blastsFired: 4, deepestPitM: 5 });
+  });
+
+  it('a pending application and an unseen approval map onto the new grades', () => {
+    const loaded = deserialize(legacySave(5, { pending: { toGrade: 6, ticksLeft: 33 }, unseenApproval: 5 })).grade!;
+    expect(loaded.pending).toEqual({ toGrade: migrateLegacyGrade(6).grade, ticksLeft: 33 });
+    expect(loaded.pending!.toGrade).toBeGreaterThan(loaded.grade);
+    expect(loaded.unseenApproval).toBe(3);
+  });
+
+  it('a legacy save reserialized is new-format and loads unchanged', () => {
+    const once = deserialize(legacySave(2));
+    const twice = deserialize(serialize(once));
+    expect(twice.grade).toEqual(once.grade);
+  });
+
+  it('a legacy save with a malformed grade state is still dropped', () => {
+    const parsed = JSON.parse(legacySave(2)) as Record<string, unknown>;
+    (parsed['grade'] as Record<string, unknown>)['oreDeliveredKg'] = -5;
     expect(deserialize(JSON.stringify(parsed)).grade).toBeUndefined();
   });
 });
@@ -2604,7 +2685,7 @@ describe('deserialize — ramp legs (#1939)', () => {
 describe('serialize/deserialize — ore saturation (#1930)', () => {
   function glutGame() {
     const state = createGame({ seed: 42 });
-    state.grade = { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null };
+    state.grade = { grade: 0, tier: 1, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0, unseenApproval: null };
     state.saturation = { dirtite: { level: 0.5, tick: 120 }, rustite: { level: 0.25, tick: 90 } };
     return state;
   }

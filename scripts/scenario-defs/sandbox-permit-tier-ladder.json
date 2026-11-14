@@ -1,0 +1,127 @@
+{
+  "name": "sandbox-permit-tier-ladder",
+  "description": "Grade tiers (#2277): a sandbox site started on grade 1 tier 2 shows the Permits panel's four grades (grade 1 marked current), the three tiers of the Depth grade with tier 1 done, tier 2 current and tier 3 locked, and a grade-up Apply button that stays disabled until tier 3 and the zone mastery are reached: the console refuses the same application as tier_incomplete and nothing is charged.",
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 ore_grade:1 grade:1 tier:2",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 ore_grade:1 grade:1 tier:2"
+        }
+      ],
+      "description": "Progression site started on rung grade 1, tier 2 (tier defaults to 1; classes force it to 1).",
+      "expect": {
+        "equals": {
+          "mineGrade": {
+            "grade": 1,
+            "tier": 2,
+            "pendingTicksLeft": null
+          }
+        }
+      }
+    },
+    {
+      "command": "permit status",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "permit status"
+        }
+      ],
+      "description": "Status names the grade and tier and lists the targets of the current tier plus the grade-up checklist."
+    },
+    {
+      "command": "permit status",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"permits\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"permit-tier\"][data-tier=\"3\"]"
+        }
+      ],
+      "description": "Open the Permits panel from the tool rail; the three tier blocks of the current grade are listed.",
+      "expect": {
+        "equals": {
+          "mineGrade": {
+            "grade": 1,
+            "tier": 2,
+            "pendingTicksLeft": null
+          }
+        }
+      }
+    },
+    {
+      "command": "permit status",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"permit-grade\"][data-grade=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"permit-grade\"][data-grade=\"1\"][data-current=\"true\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"permit-tier\"][data-tier=\"1\"][data-state=\"done\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"permit-tier\"][data-tier=\"2\"][data-state=\"current\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"permit-tier\"][data-tier=\"3\"][data-state=\"locked\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"permit-tier\"][data-tier=\"2\"] [data-role=\"tier-perk\"]"
+        }
+      ],
+      "description": "Four grades listed with Depth marked current; tier 1 done, tier 2 current, tier 3 locked; each tier block carries its perk line.",
+      "expect": {
+        "equals": {
+          "mineGrade": {
+            "grade": 1,
+            "tier": 2,
+            "pendingTicksLeft": null
+          }
+        }
+      }
+    },
+    {
+      "command": "permit apply",
+      "role": "guard",
+      "commandOutcome": "refused",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-action=\"permit-apply\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"permit-apply-reason\"]"
+        }
+      ],
+      "description": "Below tier 3 the grade-up Apply button is present but disabled with its refusal text, so a player cannot apply; the console refuses the same application (tier_incomplete).",
+      "expect": {
+        "blocked": "#bs-permit-panel [data-action=\"permit-apply\"]",
+        "equals": {
+          "mineGrade": {
+            "grade": 1,
+            "tier": 2,
+            "pendingTicksLeft": null
+          }
+        }
+      }
+    }
+  ]
+}
