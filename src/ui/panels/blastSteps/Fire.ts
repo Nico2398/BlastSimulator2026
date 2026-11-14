@@ -26,6 +26,7 @@ import { buildingsInBlastReach, type BuildingAtRisk } from '../../../core/mining
 import { buildingRiskText } from '../buildingRiskText.js';
 import { evacuationVerdictsForZone, type VehicleEvacuationVerdict } from '../../../core/engine/Evacuation.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
+import type { GameConsoleFn } from '../../gameConsole.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
 import { BreakoutWarningMemo } from '../breakoutWarningMemo.js';
@@ -69,6 +70,11 @@ export class FireStep {
   private lastSignature = '';
   private opener: EntityOpener | undefined;
   private readonly locale = new LocaleTextRegistry();
+
+  setGameConsole(_fn: GameConsoleFn): void { throw new Error('not implemented'); }
+
+  /** Where the water-section link in the wet and rain-risk rows leads (#2267). */
+  setOpenWaterHandler(_cb: () => void): void { throw new Error('not implemented'); }
 
   /** Supplies the voxel grid the breakout warning predicts against (#2003). */
   setGridProvider(fn: () => VoxelGrid | null): void { this.gridProvider = fn; }

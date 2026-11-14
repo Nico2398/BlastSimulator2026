@@ -79,6 +79,13 @@ export function wetFizzlePercent(): number {
   return Math.round(waterEffect(true, true, false) * 100);
 }
 
+/** Charged untubed holes holding a water-sensitive charge, whether or not it rains now (sorted). */
+export function unprotectedSensitiveHoles(
+  _state: Pick<GameState, 'drillHoles' | 'chargesByHole' | 'tubingState'>,
+): string[] {
+  throw new Error('not implemented');
+}
+
 /** Charged untubed holes with a water-sensitive charge while rain falls (wet or dry); [] when not raining, sorted. */
 export function rainExposedHoles(
   state: Pick<GameState, 'drillHoles' | 'chargesByHole' | 'tubingState' | 'weather'>,

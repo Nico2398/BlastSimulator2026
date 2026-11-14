@@ -238,6 +238,9 @@ export class PreflightModal {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
+  /** Where the water-section link in the wet and rain-risk rows leads; the modal closes first (#2267). */
+  setOpenWaterHandler(_cb: () => void): void { throw new Error('not implemented'); }
+
   show(): void { this.open = true; this.awaitingDetonation = false; this.dockHidden = false; this.refusalEl.textContent = ''; this.overlay.style.display = ''; this.lastSignature = ''; }
   /** While a detonation is armed, hiding collapses to the chip instead of closing: the shot stays findable. */
   hide(): void {

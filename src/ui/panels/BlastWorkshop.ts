@@ -162,6 +162,9 @@ export class BlastWorkshop extends PanelBase {
     return this.heatmapView.isVisible;
   }
 
+  /** Lands on the Charge step with its water section (drain and tubing) scrolled into view (#2267). */
+  showWaterSection(): void { throw new Error('not implemented'); }
+
   override show(): void {
     super.show();
     this.autoAdvance = true;

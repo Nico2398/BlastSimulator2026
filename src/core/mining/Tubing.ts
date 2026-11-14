@@ -9,6 +9,9 @@ import { formatMoney } from '../economy/formatMoney.js';
 // Real casing: ~$10-50/m for PVC, $100-500/m for steel. Scaled for gameplay.
 export const TUBING_COST = 50;
 
+/** Units one "buy" action purchases. */
+export const TUBING_BUY_AMOUNT = 10;
+
 // ── State ──
 
 export interface TubingState {

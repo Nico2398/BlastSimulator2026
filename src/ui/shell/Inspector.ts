@@ -113,6 +113,7 @@ export class Inspector {
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirm = cb; }
   /** Panel-opening sink for links such as a vehicle's "Train someone in Crew". */
   setNavigateHandler(cb: (panel: 'crew') => void): void { this.onNavigate = cb; }
+  setOpenWaterHandler(_cb: () => void): void { throw new Error('not implemented'); }
 
   /** Supplies ramp repair quotes from the terrain (#2045); without one the Repair action never shows. */
   setRampRepairQuote(fn: (rampId: number) => RampRepairOffer): void { this.rampRepairQuote = fn; }

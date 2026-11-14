@@ -322,6 +322,8 @@ export class TopBar {
   setSpeedChangeHandler(cb: (speed: number) => void): void { this.onSpeedChange = cb; }
   setTogglePauseHandler(cb: () => void): void { this.onTogglePause = cb; }
   setNavigateHandler(cb: (panel: PanelName) => void): void { this.onNavigate = cb; }
+  /** Where the weather advisory's water link leads (#2267). */
+  setOpenWaterHandler(_cb: () => void): void { throw new Error('not implemented'); }
   setOpenLogHandler(cb: () => void): void { this.onOpenLog = cb; }
   setOpenSavesHandler(cb: () => void): void { this.onOpenSaves = cb; }
   setSiteMapHandler(cb: () => void): void { this.onSiteMap = cb; }

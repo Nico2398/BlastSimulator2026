@@ -38,7 +38,7 @@ import { chargeKgPerMetre } from '../../../core/mining/HoleDiameter.js';
 import { rainWithinTicks } from '../../../core/weather/WeatherCycle.js';
 import { rainExposedHoles, wetHoles } from '../../../core/mining/WetHoles.js';
 import { drainBlockReason } from '../../../core/mining/HoleDrain.js';
-import { TUBING_COST, hasTubing } from '../../../core/mining/Tubing.js';
+import { TUBING_BUY_AMOUNT, TUBING_COST, hasTubing } from '../../../core/mining/Tubing.js';
 import { MIN_STEMMING_M, CHARGE_DEFAULT_STEMMING_M, HOLE_DRAIN_COST_PER_HOLE, DRILL_HOLE_DEFAULT_DIAMETER_M, TICKS_PER_DAY } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { defaultStemmingM } from '../../../core/economy/PermitDefaults.js';
@@ -55,7 +55,6 @@ import { ChargeOptimizerBlock } from './chargeOptimizerBlock.js';
 const DEFAULT_EXPLOSIVE = 'boomite';
 /** Stemming stepper increment (m); 0.1 keeps 2.5 and whole-metre values reachable. */
 const STEMMING_STEP_M = 0.1;
-const TUBING_BUY_AMOUNT = 10;
 
 /** Explosive the step preselects: the pattern's, else the default (#2016). */
 function preferredExplosiveId(
