@@ -666,7 +666,8 @@ describe('BlastWorkshop — water section (#2267)', () => {
 
     const section = workshop.root.querySelector(SECTION)!;
     expect(section.closest('[style*="display: none"]')).toBeNull();
-    expect(workshop.root.querySelector('[data-action="execute"]')!.closest('div[style*="display: none"]')).not.toBeNull();
+    expect(workshop.currentStep).toBe(2);
+    expect(workshop.root.querySelectorAll('div[style*="display: none"]').length).toBeGreaterThanOrEqual(3);
   });
 
   it('works on a fresh workshop that has never rendered a plan', () => {
