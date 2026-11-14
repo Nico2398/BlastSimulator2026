@@ -19,7 +19,7 @@ import { setLocale } from '../../../../../src/core/i18n/I18n.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
 import { chargeKgLimitWarning, permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
 import { stemmingExplain } from '../../../../../src/ui/blastWorkshopExplain.js';
-import { pinnedDryCycle, pinnedCycle, rainAfterCycle } from '../../../../helpers/weatherCycles.js';
+import { pinnedDryCycle, pinnedCycle, rainAfterCycle, dryForCycle } from '../../../../helpers/weatherCycles.js';
 import { recommendedRangeText } from '../../../../../src/ui/bandMix.js';
 import { permitLimitsFor } from '../../../../../src/core/economy/PermitLimits.js';
 
@@ -2188,6 +2188,285 @@ describe('ChargeStep — charge optimizer (#2204)', () => {
       (step.root.querySelector(APPLY_ALL) as HTMLButtonElement).click();
       const wet = gameConsole.mock.calls.map(c => parseCharge(c[0] as string)).filter(c => c.hole === holes[0]!.id);
       for (const c of wet) expect(getExplosive(c.explosive)!.waterSensitive).toBe(false);
+    });
+  });
+});
+
+describe('ChargeStep — water block leads while water matters (#2268)', () => {
+  const water = (step: ChargeStep) => step.root.querySelector('[data-role="water-section"]') as HTMLElement;
+  const first = (step: ChargeStep) => step.root.firstElementChild;
+  const last = (step: ChargeStep) => step.root.lastElementChild;
+  const chargeAll = (step: ChargeStep) => step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
+
+  /** Two dry untubed holes under a pinned dry sky: water does not matter. */
+  function dryState() {
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.089);
+    state.weather = pinnedDryCycle();
+    return state;
+  }
+
+  describe('C1: a wet hole puts the block first', () => {
+    it('is the root first child, before the product list, when a hole is wet', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      setHoleWater(state, [state.drillHoles[0]!.id]);
+      step.update(state, 'sunny');
+
+      expect(water(step)).not.toBeNull();
+      expect(first(step)).toBe(water(step));
+      expect(step.root.firstElementChild).not.toBe(step.root.querySelector('.bsx-section'));
+    });
+
+    it('still holds the drain button and the tubing card', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      wetAllHoles(state);
+      step.update(state, 'sunny');
+
+      expect(water(step).querySelector('[data-action="drain-holes"]')).not.toBeNull();
+      expect(water(step).querySelector('[data-action="tubing-buy"]')).not.toBeNull();
+      expect(water(step).querySelector('[data-action="tubing-install"]')).not.toBeNull();
+    });
+
+    it('is first even when the only wet hole is tubed (wet is wet)', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      const [h1] = state.drillHoles;
+      setHoleWater(state, [h1!.id]);
+      state.tubingState.installedHoles.add(h1!.id);
+      step.update(state, 'sunny');
+
+      expect(first(step)).toBe(water(step));
+    });
+
+    it('precedes the explosive product cards in document order', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      wetAllHoles(state);
+      step.update(state, 'sunny');
+
+      const pos = water(step).compareDocumentPosition(card(step, 'boomite'));
+      expect(pos & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
+
+  describe('C2: rain due within a day with an untubed hole puts the block first', () => {
+    it('is first on dry holes when rain is forecast and a hole is untubed', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      state.weather = rainAfterCycle(8, 'desert');
+      step.update(state, 'sunny');
+
+      expect(first(step)).toBe(water(step));
+    });
+
+    it('is first when rain is due and only some holes are tubed', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      state.weather = rainAfterCycle(8, 'desert');
+      state.tubingState.installedHoles.add(state.drillHoles[0]!.id);
+      step.update(state, 'sunny');
+
+      expect(first(step)).toBe(water(step));
+    });
+
+    it('is first while it is raining now on dry untubed holes', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      state.weather = pinnedCycle('heavy_rain');
+      step.update(state, 'heavy_rain');
+
+      expect(first(step)).toBe(water(step));
+    });
+
+    it('is last when rain is due but every hole is tubed', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      state.weather = rainAfterCycle(8, 'desert');
+      for (const h of state.drillHoles) state.tubingState.installedHoles.add(h.id);
+      step.update(state, 'sunny');
+
+      expect(last(step)).toBe(water(step));
+    });
+
+    it('is last when rain is due but there are no holes', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      state.weather = rainAfterCycle(8, 'desert');
+      step.update(state, 'sunny');
+
+      expect(last(step)).toBe(water(step));
+    });
+  });
+
+  describe('C3: dry holes in dry weather leave the block last', () => {
+    it('is the root last child, after the hole list', () => {
+      const { step } = makeStep();
+      step.update(dryState(), 'sunny');
+
+      expect(last(step)).toBe(water(step));
+      expect(first(step)).not.toBe(water(step));
+      const holeRow = step.root.querySelector('[data-hole]') as HTMLElement;
+      expect(holeRow).not.toBeNull();
+      expect(holeRow.compareDocumentPosition(water(step)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('is last with no holes in dry weather', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      state.weather = pinnedDryCycle();
+      step.update(state, 'sunny');
+
+      expect(last(step)).toBe(water(step));
+    });
+
+    it('is last when rain is further off than a day', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      state.weather = dryForCycle(48, 'desert');
+      step.update(state, 'sunny');
+
+      expect(last(step)).toBe(water(step));
+    });
+
+    it('is last when every dry hole is tubed', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      for (const h of state.drillHoles) state.tubingState.installedHoles.add(h.id);
+      step.update(state, 'sunny');
+
+      expect(last(step)).toBe(water(step));
+    });
+  });
+
+  describe('C4: the block moves on the next update', () => {
+    it('moves first when a hole turns wet, and back last when it is drained', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      step.update(state, 'sunny');
+      expect(last(step)).toBe(water(step));
+
+      setHoleWater(state, [state.drillHoles[1]!.id]);
+      step.update(state, 'sunny');
+      expect(first(step)).toBe(water(step));
+
+      delete state.holeWater[state.drillHoles[1]!.id];
+      step.update(state, 'sunny');
+      expect(last(step)).toBe(water(step));
+      expect(first(step)).not.toBe(water(step));
+    });
+
+    it('moves first when rain turns up and back last when it clears', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      step.update(state, 'sunny');
+      expect(last(step)).toBe(water(step));
+
+      state.weather = rainAfterCycle(8, 'desert');
+      step.update(state, 'sunny');
+      expect(first(step)).toBe(water(step));
+
+      state.weather = pinnedDryCycle();
+      step.update(state, 'sunny');
+      expect(last(step)).toBe(water(step));
+    });
+
+    it('moves last once every untubed hole is tubed while only rain made it matter', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      state.weather = rainAfterCycle(8, 'desert');
+      step.update(state, 'sunny');
+      expect(first(step)).toBe(water(step));
+
+      for (const h of state.drillHoles) state.tubingState.installedHoles.add(h.id);
+      step.update(state, 'sunny');
+      expect(last(step)).toBe(water(step));
+    });
+
+    it('moves last when the last wet hole is tubed and dried, in dry weather', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      const [h1, h2] = state.drillHoles;
+      setHoleWater(state, [h1!.id]);
+      step.update(state, 'sunny');
+      expect(first(step)).toBe(water(step));
+
+      delete state.holeWater[h1!.id];
+      state.tubingState.installedHoles.add(h1!.id);
+      state.tubingState.installedHoles.add(h2!.id);
+      step.update(state, 'sunny');
+      expect(last(step)).toBe(water(step));
+    });
+
+    it('stays one element in the root across moves (no duplicate block)', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      step.update(state, 'sunny');
+      wetAllHoles(state);
+      step.update(state, 'sunny');
+      state.holeWater = {};
+      step.update(state, 'sunny');
+      wetAllHoles(state);
+      step.update(state, 'sunny');
+
+      expect(step.root.querySelectorAll('[data-role="water-section"]')).toHaveLength(1);
+      expect(step.root.querySelectorAll('[data-action="drain-holes"]')).toHaveLength(1);
+    });
+  });
+
+  describe('C5: hooks and the fit line stay put', () => {
+    it('keeps the fit line immediately after charge-all with the block first', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      wetAllHoles(state);
+      step.update(state, 'sunny');
+
+      expect(first(step)).toBe(water(step));
+      expect(chargeAll(step).nextElementSibling?.querySelectorAll('.bsx-reason') ?? []).toHaveLength(0);
+      expect(chargeAll(step).nextElementSibling?.textContent ?? '').toBe('');
+    });
+
+    it('keeps the fit line immediately after charge-all with the block last', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.089);
+      state.weather = pinnedDryCycle();
+      step.update(state, 'sunny');
+      stepStemmingTo(step, 4);
+      step.update(state, 'sunny');
+
+      expect(last(step)).toBe(water(step));
+      expect(chargeAll(step).disabled).toBe(true);
+      expect(chargeAll(step).nextElementSibling?.textContent ?? '').toContain(t('ui.blast_workshop.charge.no_room_reason', { depth: 4, stemming: 4 }));
+    });
+
+    it('keeps the drain-holes, tubing-buy and tubing-install hooks working while the block leads', () => {
+      const { step, gameConsole } = makeStep();
+      const state = dryState();
+      const [h1, h2] = state.drillHoles;
+      state.cash = 1000;
+      state.tubingState.inventory = 5;
+      wetAllHoles(state);
+      step.update(state, 'sunny');
+      expect(first(step)).toBe(water(step));
+
+      (step.root.querySelector('[data-action="drain-holes"]') as HTMLButtonElement).click();
+      expect(gameConsole).toHaveBeenCalledWith('drain_hole hole:*');
+      (step.root.querySelector('[data-action="tubing-install"]') as HTMLButtonElement).click();
+      expect(gameConsole).toHaveBeenCalledWith(`install_tubing hole:${h1!.id}`);
+      expect(gameConsole).toHaveBeenCalledWith(`install_tubing hole:${h2!.id}`);
+      expect(step.root.querySelector('[data-action="tubing-buy"]')).not.toBeNull();
+    });
+
+    it('revealWater still works with the block first (no throw)', () => {
+      const { step } = makeStep();
+      const state = dryState();
+      wetAllHoles(state);
+      step.update(state, 'sunny');
+
+      expect(() => step.revealWater()).not.toThrow();
     });
   });
 });
