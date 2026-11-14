@@ -35,6 +35,11 @@ export class GhostInstanceBatch {
     return this.ids.length;
   }
 
+  /** Ghost id in `slot`, or null when the slot holds none (#2266). */
+  idAt(slot: number): number | null {
+    return this.ids[slot] ?? null;
+  }
+
   /** The drawn object, for tests and inspection. */
   get object(): THREE.InstancedMesh {
     return this.mesh;
@@ -48,6 +53,7 @@ export class GhostInstanceBatch {
     this.mesh.setMatrixAt(slot, GhostInstanceBatch.matrix.makeTranslation(x, y, z));
     this.mesh.count = this.ids.length;
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.invalidateBounds();
     return slot;
   }
 
@@ -64,6 +70,7 @@ export class GhostInstanceBatch {
     this.ids.pop();
     this.mesh.count = this.ids.length;
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.invalidateBounds();
   }
 
   dispose(): void {
@@ -71,10 +78,18 @@ export class GhostInstanceBatch {
     this.mesh.dispose();
   }
 
+  /** A raycast tests the bounds computed at the first one: drop them so the next one sees the slots as they are now. */
+  private invalidateBounds(): void {
+    this.mesh.boundingSphere = null;
+    this.mesh.boundingBox = null;
+  }
+
   private createMesh(capacity: number): THREE.InstancedMesh {
     const mesh = new THREE.InstancedMesh(this.geometry, this.material, capacity);
     mesh.count = 0;
     mesh.renderOrder = this.renderOrder;
+    // Marks the batch an order ghost for a pick; the id comes from the hit's instanceId (idAt), not userData.
+    mesh.userData['entityKind'] = 'order';
     // Instances spread over the whole site: the batch's own bounds would be its first cube's.
     mesh.frustumCulled = false;
     markSceneOverlay(mesh);

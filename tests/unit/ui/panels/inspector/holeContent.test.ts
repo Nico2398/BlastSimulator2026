@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { holeContent } from '../../../../../src/ui/panels/inspector/holeContent.js';
 import type { InspectorLinks, InspectorView } from '../../../../../src/ui/panels/inspector/InspectorContent.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
-import type { GameState } from '../../../../../src/core/state/GameState.js';
+import type { ActionType, GameState, PendingAction } from '../../../../../src/core/state/GameState.js';
 import { addHole, holeNumericId } from '../../../../../src/core/mining/DrillPlan.js';
 import { t, setLocale } from '../../../../../src/core/i18n/I18n.js';
 
@@ -210,5 +210,114 @@ describe('hole inspector water link (#2267)', () => {
     s.tubingState.installedHoles.add(hole.id);
     view.sync(root);
     expect(root.querySelector(OPEN)).toBeNull();
+  });
+});
+
+// ── #2266: the outstanding orders of a hole carry their cancel controls ──
+
+describe('hole inspector orders (#2266)', () => {
+  const ORDERS = '[data-hole-orders]';
+  const CANCEL = '[data-order-cancel]';
+  const CANCEL_ALL = '[data-order-cancel-all]';
+
+  function order(id: number, type: ActionType, holeId: string): PendingAction {
+    return {
+      id, type, requiredSkill: null, requiredVehicleRole: null,
+      targetX: 10, targetZ: 10, targetY: 0, payload: { holeId },
+      targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+  }
+
+  function mountWith(s: GameState, holeId: string, run: (c: string) => void = () => {}): HTMLElement {
+    const l = { select: () => {}, run, confirm: () => {} } as InspectorLinks;
+    return mount(holeContent.view({ kind: 'hole', id: holeNumericId(holeId) }, s, l)!);
+  }
+
+  function orderedHole(s: GameState) {
+    return addHole({ nextHoleId: 1 }, s.plannedDrillHoles, 12, 12, 6, 0.1);
+  }
+
+  it('a plain drilled hole without orders shows no orders section and no cancel buttons', () => {
+    const s = makeState();
+    s.pendingActions = [];
+    const hole = drilled(s);
+    const root = mountWith(s, hole.id);
+    expect(root.querySelector(ORDERS)).toBeNull();
+    expect(root.querySelector(CANCEL)).toBeNull();
+    expect(root.querySelector(CANCEL_ALL)).toBeNull();
+  });
+
+  it('an ordered hole shows its drill order with a Cancel button running the command', () => {
+    const s = makeState();
+    const hole = orderedHole(s);
+    s.pendingActions = [order(71, 'drill_hole', hole.id)];
+    const run = vi.fn();
+    const root = mountWith(s, hole.id, run);
+    const section = root.querySelector(ORDERS)!;
+    expect(section).not.toBeNull();
+    expect(section.querySelectorAll(CANCEL)).toHaveLength(1);
+    expect(section.querySelector(CANCEL_ALL)).toBeNull();
+    section.querySelector<HTMLElement>(CANCEL)!.click();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledWith('employee cancel 71');
+  });
+
+  it('a charge order on a drilled hole shows the same controls', () => {
+    const s = makeState();
+    const hole = drilled(s);
+    s.plannedChargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 1 };
+    s.pendingActions = [order(72, 'charge_hole', hole.id)];
+    const run = vi.fn();
+    const root = mountWith(s, hole.id, run);
+    const section = root.querySelector(ORDERS)!;
+    expect(section).not.toBeNull();
+    expect(section.querySelectorAll(CANCEL)).toHaveLength(1);
+    section.querySelector<HTMLElement>(CANCEL)!.click();
+    expect(run).toHaveBeenCalledWith('employee cancel 72');
+  });
+
+  it('a hole with a drill order and a charge order shows controls for each', () => {
+    const s = makeState();
+    const hole = orderedHole(s);
+    s.plannedChargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 1 };
+    s.pendingActions = [order(71, 'drill_hole', hole.id), order(72, 'charge_hole', hole.id)];
+    const run = vi.fn();
+    const root = mountWith(s, hole.id, run);
+    const buttons = Array.from(root.querySelector(ORDERS)!.querySelectorAll<HTMLElement>(CANCEL));
+    expect(buttons).toHaveLength(2);
+    for (const b of buttons) b.click();
+    expect(run.mock.calls.map(c => c[0]).sort()).toEqual(['employee cancel 71', 'employee cancel 72']);
+  });
+
+  it('offers Cancel all N when other holes have outstanding orders of the same kind', () => {
+    const s = makeState();
+    const hole = orderedHole(s);
+    s.pendingActions = [order(71, 'drill_hole', hole.id), order(73, 'drill_hole', 'other-1'), order(74, 'drill_hole', 'other-2')];
+    const run = vi.fn();
+    const root = mountWith(s, hole.id, run);
+    const section = root.querySelector(ORDERS)!;
+    const all = section.querySelector<HTMLElement>(CANCEL_ALL)!;
+    expect(all.textContent).toContain('Cancel all 3');
+    all.click();
+    expect(run).toHaveBeenCalledWith('employee cancel 71 all');
+  });
+
+  it('orders of other holes add no controls of their own', () => {
+    const s = makeState();
+    const hole = drilled(s);
+    s.pendingActions = [order(73, 'drill_hole', 'other-1'), order(74, 'charge_hole', 'other-2')];
+    const root = mountWith(s, hole.id);
+    expect(root.querySelector(ORDERS)).toBeNull();
+    expect(root.querySelector(CANCEL)).toBeNull();
+  });
+
+  it('keeps the rest of the hole inspector', () => {
+    const s = makeState();
+    const hole = orderedHole(s);
+    s.pendingActions = [order(71, 'drill_hole', hole.id)];
+    const root = mountWith(s, hole.id);
+    expect(root.querySelector('[data-hole-state="ordered"]')).not.toBeNull();
+    expect(root.querySelector('[data-hole-charge="none"]')).not.toBeNull();
+    expect(root.textContent).toContain('Blast Workshop');
   });
 });

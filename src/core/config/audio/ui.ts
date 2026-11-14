@@ -42,6 +42,7 @@ export const UI_SELECTION_PITCH_CENTS = {
   hole: 300,
   ramp: -250,
   fragment: 500,
+  order: 0,
 } as const;
 
 /** How command cues are shaped in time. */

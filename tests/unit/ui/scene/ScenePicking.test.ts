@@ -6,6 +6,8 @@ import { BuildingMesh } from '../../../../src/renderer/BuildingMesh.js';
 import { VehicleMesh } from '../../../../src/renderer/VehicleMesh.js';
 import { CharacterMesh } from '../../../../src/renderer/CharacterMesh.js';
 import { FragmentMesh } from '../../../../src/renderer/FragmentMesh.js';
+import { GhostMesh } from '../../../../src/renderer/GhostMesh.js';
+import type { GhostPreview } from '../../../../src/core/state/GameState.js';
 import { TerrainMesh } from '../../../../src/renderer/TerrainMesh.js';
 import { VoxelGrid, type VoxelData } from '../../../../src/core/world/VoxelGrid.js';
 import type { GameRenderer } from '../../../../src/renderer/GameRenderer.js';
@@ -29,6 +31,7 @@ function makeFakeRenderer(opts: {
   terrainMeshes?: THREE.Mesh[];
   landscapeMeshes?: THREE.Mesh[];
   fragments?: FragmentMesh;
+  ghosts?: GhostMesh;
 }): GameRenderer {
   return {
     pickables: () => opts.pickables ?? [],
@@ -39,6 +42,8 @@ function makeFakeRenderer(opts: {
     landscape: opts.landscapeMeshes ? { meshes: opts.landscapeMeshes } : null,
     resolveFragmentId: (bucketIndex: number, instanceId: number) =>
       opts.fragments?.fragmentIdAt(bucketIndex, instanceId) ?? null,
+    resolveGhostId: (object: THREE.Object3D, instanceId?: number) =>
+      opts.ghosts?.actionIdAt(object, instanceId) ?? null,
   } as unknown as GameRenderer;
 }
 
@@ -953,5 +958,215 @@ describe('pickScene — ramps (#1298)', () => {
     const result = pickScene(0, 0, camera, renderer);
     expect(result.entity).toEqual(expect.objectContaining({ kind: 'ramp', id: 2 }));
     expect(result.entity!.distance).toBeGreaterThan(0);
+  });
+});
+
+// ── #2266: a pending order's ghost is pickable ───────────────────────────
+
+describe('pickScene — order ghosts (#2266)', () => {
+  function ghostPreview(id: number, overrides: Partial<GhostPreview> = {}): GhostPreview {
+    return { id, type: 'drill_hole', targetX: 5.5, targetY: 4, targetZ: 5.5, claimed: false, ...overrides };
+  }
+
+  function debrisPreview(id: number, overrides: Partial<GhostPreview> = {}): GhostPreview {
+    return ghostPreview(id, { type: 'haul_debris', ...overrides });
+  }
+
+  function fragment(id: number, y: number) {
+    return {
+      id, position: { x: 5.5, y, z: 5.5 }, volume: 1, mass: 1000,
+      rockId: 'sandite', oreDensities: {}, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.4, y: 0.4, z: 0.4 }, shapeSeed: id, origin: { x: 5.5, y, z: 5.5 },
+    };
+  }
+
+  it('resolves a plain ghost hit to an order pick carrying the action id', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    gm.sync([ghostPreview(42, { targetY: 0 })]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: gm.pickables(), ghosts: gm });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5.5, 5.5), renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'order', id: 42 }));
+    expect(result.terrain).toBeNull();
+    gm.dispose();
+  });
+
+  it('resolves an instanced debris ghost hit to the order in the hit slot', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    gm.sync([
+      debrisPreview(31, { targetX: 2.5, targetZ: 2.5, targetY: 0 }),
+      debrisPreview(32, { targetX: 5.5, targetZ: 5.5, targetY: 0 }),
+      debrisPreview(33, { targetX: 7.5, targetZ: 7.5, targetY: 0 }),
+    ]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: gm.pickables(), ghosts: gm });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5.5, 5.5), renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'order', id: 32 }));
+    gm.dispose();
+  });
+
+  it('picks a debris ghost added after an earlier pick had already hit the batch', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    gm.sync([debrisPreview(31, { targetX: 2.5, targetZ: 2.5, targetY: 0 })]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: gm.pickables(), ghosts: gm });
+    expect(pickScene(0, 0, makeTopDownCamera(2.5, 2.5), renderer).entity).toEqual(expect.objectContaining({ kind: 'order', id: 31 }));
+
+    gm.sync([debrisPreview(31, { targetX: 2.5, targetZ: 2.5, targetY: 0 }), debrisPreview(32, { targetX: 30.5, targetZ: 30.5, targetY: 0 })]);
+    scene.updateMatrixWorld(true);
+    const after = makeFakeRenderer({ pickables: gm.pickables(), ghosts: gm });
+    expect(pickScene(0, 0, makeTopDownCamera(30.5, 30.5), after).entity).toEqual(expect.objectContaining({ kind: 'order', id: 32 }));
+    gm.dispose();
+  });
+
+  it('a ghost standing in front of the terrain is picked, not the ground', () => {
+    const scene = new THREE.Scene();
+    const tm = makeSolidTerrain(8, 4, 8); // surface at y=4
+    const gm = new GhostMesh(scene);
+    gm.sync([ghostPreview(42, { targetY: 4 })]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: gm.pickables(), ghosts: gm, terrainMeshes: tm.meshes });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5.5, 5.5, 60), renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'order', id: 42 }));
+    gm.dispose();
+    tm.dispose();
+  });
+
+  it('an instanced debris ghost standing in front of the terrain is picked', () => {
+    const scene = new THREE.Scene();
+    const tm = makeSolidTerrain(8, 4, 8);
+    const gm = new GhostMesh(scene);
+    gm.sync([debrisPreview(42, { targetY: 4 })]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: gm.pickables(), ghosts: gm, terrainMeshes: tm.meshes });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5.5, 5.5, 60), renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'order', id: 42 }));
+    gm.dispose();
+    tm.dispose();
+  });
+
+  it('terrain in front of a ghost occludes it', () => {
+    const scene = new THREE.Scene();
+    const tm = makeSolidTerrain(8, 4, 8);
+    const gm = new GhostMesh(scene);
+    gm.sync([ghostPreview(42, { targetY: -10 })]); // buried well below the surface
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: gm.pickables(), ghosts: gm, terrainMeshes: tm.meshes });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5.5, 5.5, 60), renderer);
+    expect(result.entity).toBeNull();
+    expect(result.terrain).toEqual(expect.objectContaining({ tileX: 5, tileZ: 5 }));
+    gm.dispose();
+    tm.dispose();
+  });
+
+  it('a building in front of a ghost occludes it', () => {
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene);
+    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true, occupantIds: [] }, 10);
+    const gm = new GhostMesh(scene);
+    gm.sync([ghostPreview(42, { targetX: 5, targetZ: 5, targetY: 0 })]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: [...bm.pickables(), ...gm.pickables()], ghosts: gm });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5, 5, 60), renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'building', id: 1 }));
+    bm.dispose();
+    gm.dispose();
+  });
+
+  it('a ghost in front of a building is picked over it', () => {
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene);
+    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true, occupantIds: [] }, 0);
+    const gm = new GhostMesh(scene);
+    gm.sync([ghostPreview(42, { targetX: 5, targetZ: 5, targetY: 40 })]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: [...bm.pickables(), ...gm.pickables()], ghosts: gm });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5, 5, 60), renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'order', id: 42 }));
+    bm.dispose();
+    gm.dispose();
+  });
+
+  it('raw-ground picks (selectRamps=false) see through a plain ghost to the terrain beneath', () => {
+    const scene = new THREE.Scene();
+    const tm = makeSolidTerrain(8, 4, 8);
+    const gm = new GhostMesh(scene);
+    gm.sync([ghostPreview(42, { targetY: 4 })]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: gm.pickables(), ghosts: gm, terrainMeshes: tm.meshes });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5.5, 5.5, 60), renderer, undefined, false);
+    expect(result.entity).toBeNull();
+    expect(result.terrain).toEqual(expect.objectContaining({ tileX: 5, tileZ: 5 }));
+    gm.dispose();
+    tm.dispose();
+  });
+
+  it('raw-ground picks (selectRamps=false) see through an instanced debris ghost to the terrain beneath', () => {
+    const scene = new THREE.Scene();
+    const tm = makeSolidTerrain(8, 4, 8);
+    const gm = new GhostMesh(scene);
+    gm.sync([debrisPreview(42, { targetY: 4 })]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: gm.pickables(), ghosts: gm, terrainMeshes: tm.meshes });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5.5, 5.5, 60), renderer, undefined, false);
+    expect(result.entity).toBeNull();
+    expect(result.terrain).toEqual(expect.objectContaining({ tileX: 5, tileZ: 5 }));
+    gm.dispose();
+    tm.dispose();
+  });
+
+  it('raw-ground picks still stop at a building standing in front of a ghost', () => {
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene);
+    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true, occupantIds: [] }, 10);
+    const gm = new GhostMesh(scene);
+    gm.sync([ghostPreview(42, { targetX: 5, targetZ: 5, targetY: 0 })]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: [...bm.pickables(), ...gm.pickables()], ghosts: gm });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5, 5, 60), renderer, undefined, false);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'building', id: 1 }));
+    bm.dispose();
+    gm.dispose();
+  });
+
+  it('an instanced debris ghost never hides the fragment under it', () => {
+    const scene = new THREE.Scene();
+    const fm = new FragmentMesh(scene, new THREE.MeshBasicMaterial());
+    fm.spawnFragments([fragment(12, 0.5)]);
+    const gm = new GhostMesh(scene);
+    // The ghost cube's top (y 1.2) is above the rock's: the ray meets the ghost first.
+    gm.sync([debrisPreview(42, { targetY: 0.3 })]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: [...fm.pickables(), ...gm.pickables()], fragments: fm, ghosts: gm });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5.5, 5.5), renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'fragment', id: 12 }));
+    fm.dispose();
+    gm.dispose();
+  });
+
+  it('a hit on something that is no ghost resolves no order', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    gm.sync([ghostPreview(42, { targetX: 20.5, targetZ: 20.5, targetY: 0 })]);
+    scene.updateMatrixWorld(true);
+    const renderer = makeFakeRenderer({ pickables: gm.pickables(), ghosts: gm });
+
+    const result = pickScene(0, 0, makeTopDownCamera(5.5, 5.5), renderer);
+    expect(result.entity).toBeNull();
+    gm.dispose();
   });
 });

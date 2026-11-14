@@ -373,3 +373,104 @@ describe('KeyboardShortcuts — rails-aware shortcuts (#1597)', () => {
     ks.dispose();
   });
 });
+
+describe('KeyboardShortcuts — Delete cancels the selected order (#2266)', () => {
+  let cancelOrder: ReturnType<typeof vi.fn>;
+  let ks: KeyboardShortcuts;
+
+  function make(selected: number | null, extra: { isSuppressed?: () => boolean } = {}): void {
+    cancelOrder = vi.fn();
+    ks = new KeyboardShortcuts(
+      {
+        togglePause: vi.fn(), setSpeed: vi.fn(), togglePanel: vi.fn(), quickSave: vi.fn(), onEscape: vi.fn(),
+        cancelOrder,
+      },
+      { selectedOrderId: () => selected, ...extra },
+    );
+  }
+
+  it('Delete with an order selected cancels that order', () => {
+    make(42);
+    fireKey('Delete');
+    expect(cancelOrder).toHaveBeenCalledTimes(1);
+    expect(cancelOrder).toHaveBeenCalledWith(42);
+    ks.dispose();
+  });
+
+  it('treats order id 0 as a selected order', () => {
+    make(0);
+    fireKey('Delete');
+    expect(cancelOrder).toHaveBeenCalledTimes(1);
+    expect(cancelOrder).toHaveBeenCalledWith(0);
+    ks.dispose();
+  });
+
+  it('Delete with no order selected does nothing', () => {
+    make(null);
+    fireKey('Delete');
+    expect(cancelOrder).not.toHaveBeenCalled();
+    ks.dispose();
+  });
+
+  it('reads the selection at the time of the key press', () => {
+    let selected: number | null = null;
+    cancelOrder = vi.fn();
+    ks = new KeyboardShortcuts(
+      { togglePause: vi.fn(), setSpeed: vi.fn(), togglePanel: vi.fn(), quickSave: vi.fn(), onEscape: vi.fn(), cancelOrder },
+      { selectedOrderId: () => selected },
+    );
+    fireKey('Delete');
+    expect(cancelOrder).not.toHaveBeenCalled();
+    selected = 7;
+    fireKey('Delete');
+    expect(cancelOrder).toHaveBeenCalledTimes(1);
+    expect(cancelOrder).toHaveBeenCalledWith(7);
+    selected = null;
+    fireKey('Delete');
+    expect(cancelOrder).toHaveBeenCalledTimes(1);
+    ks.dispose();
+  });
+
+  it('does nothing when no selectedOrderId option or no cancelOrder callback is wired', () => {
+    const unwired = vi.fn();
+    const noOption = new KeyboardShortcuts({ togglePause: vi.fn(), setSpeed: vi.fn(), togglePanel: vi.fn(), quickSave: vi.fn(), onEscape: vi.fn(), cancelOrder: unwired });
+    expect(() => fireKey('Delete')).not.toThrow();
+    expect(unwired).not.toHaveBeenCalled();
+    noOption.dispose();
+    const noCallback = new KeyboardShortcuts(
+      { togglePause: vi.fn(), setSpeed: vi.fn(), togglePanel: vi.fn(), quickSave: vi.fn(), onEscape: vi.fn() },
+      { selectedOrderId: () => 3 },
+    );
+    expect(() => fireKey('Delete')).not.toThrow();
+    noCallback.dispose();
+  });
+
+  it('is swallowed while typing in an input', () => {
+    make(42);
+    fireKey('Delete', document.createElement('input'));
+    expect(cancelOrder).not.toHaveBeenCalled();
+    ks.dispose();
+  });
+
+  it('is swallowed while shortcuts are suppressed', () => {
+    make(42, { isSuppressed: () => true });
+    fireKey('Delete');
+    expect(cancelOrder).not.toHaveBeenCalled();
+    ks.dispose();
+  });
+
+  it('is swallowed while shortcuts are disabled', () => {
+    make(42);
+    ks.setEnabled(false);
+    fireKey('Delete');
+    expect(cancelOrder).not.toHaveBeenCalled();
+    ks.dispose();
+  });
+
+  it('Backspace is not Delete', () => {
+    make(42);
+    fireKey('Backspace');
+    expect(cancelOrder).not.toHaveBeenCalled();
+    ks.dispose();
+  });
+});

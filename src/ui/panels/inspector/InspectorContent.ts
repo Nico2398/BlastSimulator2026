@@ -7,6 +7,7 @@ import { employeeContent } from './employeeContent.js';
 import { fragmentContent } from './fragmentContent.js';
 import { holeContent } from './holeContent.js';
 import { rampContent } from './rampContent.js';
+import { orderContent } from './orderContent.js';
 import type { ConfirmModalConfig } from '../ConfirmModal.js';
 import type { PortraitSpec } from '../../portraits.js';
 
@@ -79,6 +80,7 @@ const CONTENT: Record<InspectorKind, KindContent> = {
   fragment: fragmentContent,
   hole: holeContent,
   ramp: rampContent,
+  order: orderContent,
 };
 
 export function contentFor(kind: InspectorKind): KindContent {

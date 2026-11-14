@@ -5,8 +5,10 @@ import { hasTubing } from '../../../core/mining/Tubing.js';
 import type { HoleCharge } from '../../../core/mining/ChargePlan.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { isHoleFlooded } from '../../../core/weather/WeatherEffects.js';
-import type { GameState } from '../../../core/state/GameState.js';
+import type { GameState, PendingAction } from '../../../core/state/GameState.js';
+import { ACTION_LABEL_KEY } from '../../crewDetailSections.js';
 import { waterOpenLink } from '../waterFixes.js';
+import { orderControls } from './orderContent.js';
 import type { InspectorLinks, KindContent } from './InspectorContent.js';
 import { detailBody, kgText, kindLabel, noteLine, sectionOf, syncSection, tagged, valueRow } from './inspectorWidgets.js';
 
@@ -68,26 +70,47 @@ function buildFactsSection(hole: DrillHole, ordered: boolean, state: GameState, 
   return sectionOf(t('inspector.section.details'), rows);
 }
 
+/** Outstanding drill and charge orders aimed at this hole (#2266). */
+function ordersOf(holeId: string, state: GameState): PendingAction[] {
+  return state.pendingActions.filter(a =>
+    (a.type === 'drill_hole' || a.type === 'charge_hole') && a.payload['holeId'] === holeId);
+}
+
+/** Cancel controls of each outstanding order on the hole, or null when it has none. */
+function buildOrdersSection(holeId: string, state: GameState, links: InspectorLinks): HTMLElement | null {
+  const orders = ordersOf(holeId, state);
+  if (orders.length === 0) return null;
+  const rows: HTMLElement[] = [];
+  for (const order of orders) {
+    rows.push(noteLine(t(ACTION_LABEL_KEY[order.type])), ...orderControls(order, state, links));
+  }
+  const section = sectionOf(t('inspector.hole.section.orders'), rows);
+  section.setAttribute('data-hole-orders', '');
+  return section;
+}
+
 export const holeContent: KindContent = {
   view(entity, state, links) {
     const drilled = state.drillHoles.find(h => holeNumericId(h.id) === entity.id);
     const hole = drilled ?? state.plannedDrillHoles.find(h => holeNumericId(h.id) === entity.id);
     if (!hole) return null;
     const ordered = !drilled;
-    const builders: Array<[string, () => HTMLElement]> = [
+    const builders: Array<[string, () => HTMLElement | null]> = [
       ['bs-hole-facts', () => buildFactsSection(hole, ordered, state, links)],
       ['bs-hole-charge', () => buildChargeSection(hole.id, state)],
+      ['bs-hole-orders', () => buildOrdersSection(hole.id, state, links)],
     ];
     return {
       title: hole.id,
       sub: `#${entity.id} · ${kindLabel('hole')}`,
       icon: 'hole',
       status: t(ordered ? 'inspector.hole.state_ordered' : 'inspector.hole.state_drilled'),
-      signature: `${hole.id}:${ordered ? 'ordered' : 'drilled'}:${chargeOf(hole.id, state).kind}`,
+      signature: `${hole.id}:${ordered ? 'ordered' : 'drilled'}:${chargeOf(hole.id, state).kind}:${ordersOf(hole.id, state).map(o => o.id).join(',')}`,
       get sections() {
         const body = detailBody('bs-hole-detail');
         for (const [className, make] of builders) {
           const node = make();
+          if (node === null) continue;
           node.classList.add(className);
           body.append(node);
         }

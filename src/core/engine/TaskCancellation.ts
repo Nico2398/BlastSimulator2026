@@ -494,7 +494,7 @@ function clearHolderWalkFields(emp: Employee): void {
  * Order-time cost already charged for an action — survey, ramp segment,
  * building, level ground and charge orders; 0 for everything else. Used by cancelAction to compute the refund.
  */
-function actionOrderCost(action: PendingAction): number {
+export function actionOrderCost(action: PendingAction): number {
   if (action.type === 'dig_ramp_segment') return (action.payload['segmentCost'] as number) ?? 0;
   // A building order is one atomic unit, not segmented like a ramp — the
   // FULL construction cost was charged at order time (buildOrder.ts) and is
