@@ -127,9 +127,15 @@
           "timeoutMs": 0
         },
         {
-          "type": "clickEntity",
-          "kind": "order",
-          "id": 1
+          "type": "cameraFocus",
+          "x": 2,
+          "z": 5,
+          "distance": 15
+        },
+        {
+          "type": "click",
+          "x": 640,
+          "y": 360
         },
         {
           "type": "awaitUsable",
