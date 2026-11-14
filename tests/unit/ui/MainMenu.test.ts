@@ -38,8 +38,9 @@ describe('MainMenu (12.8)', () => {
       .find(b => b.textContent?.includes(t('menu.new_campaign')));
     expect(btn).toBeDefined();
     btn?.click();
-    expect(cb).not.toHaveBeenCalled();
-    menu.dispose();
+    const calls = cb.mock.calls.length;
+    menu.dispose(); // dispose before asserting: a failed expect must not leak the overlay into later suites
+    expect(calls).toBe(0);
   });
 
   it('calls onSettings callback when settings button clicked', () => {
