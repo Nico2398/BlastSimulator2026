@@ -4356,7 +4356,7 @@
   "employees.train_school_closed": "{buildingType} #{buildingId} is closed — cannot train {skill} there for now.",
   "employees.train_already_enrolled": "{name} is already in training.",
   "employees.train_injured": "{name} is injured and cannot train.",
-  "employees.cancel_usage": "Usage: employee cancel <action-id> [all]",
+  "employees.cancel_usage": "Usage: employee cancel <action-id>",
   "employees.cancel_not_cancellable": "Action #{id} cannot be cancelled.",
   "employees.cancel_action_not_found": "Action #{id} not found.",
   "employees.cancel_refund_suffix": " ${amount} refunded.",
