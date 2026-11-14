@@ -55,7 +55,7 @@ export function pickScene(
   // through crew and vehicles: a crater full of fragments, or a tile someone
   // stands on, is still a tile a player can order a ramp or a drill plan onto.
   // Buildings keep occluding.
-  const hits = selectRamps ? allHits : allHits.filter(h => !isTransientOccluder(h.object));
+  const hits = selectRamps ? withoutShadowingDebrisGhosts(allHits) : allHits.filter(h => !isTransientOccluder(h.object));
   const closest = hits[0];
   if (!closest) return EMPTY_PICK;
 
@@ -99,14 +99,39 @@ function rubbleCoveredHit(hits: readonly THREE.Intersection[]): THREE.Intersecti
   return null;
 }
 
-/** Movable or loose things a raw-ground pick looks through: fragments, employees, vehicles. */
+/** Movable or loose things a raw-ground pick looks through: fragments, employees, vehicles, order ghosts. */
 function isTransientOccluder(object: THREE.Object3D): boolean {
-  if (object.userData['entityKind'] === 'fragment') return true;
+  if (object.userData['entityKind'] === 'fragment' || object.userData['entityKind'] === 'order') return true;
   const tagged = resolveTaggedAncestor(object);
-  return tagged !== null && (tagged.kind === 'employee' || tagged.kind === 'vehicle');
+  return tagged !== null && (tagged.kind === 'employee' || tagged.kind === 'vehicle' || tagged.kind === 'order');
+}
+
+/** A hit on an instanced (auto-debris) ghost batch: it carries the order mark but no id of its own. */
+function isInstancedGhostHit(hit: THREE.Intersection): boolean {
+  return hit.object.userData['entityKind'] === 'order' && hit.object.userData['entityId'] === undefined;
+}
+
+/**
+ * A debris ghost cube sits on the very fragment it orders hauled: where a
+ * fragment is hit in front of the ground, the ghost never hides it, so a click
+ * on loose rock still selects the rock.
+ */
+function withoutShadowingDebrisGhosts(hits: THREE.Intersection[]): THREE.Intersection[] {
+  if (!hits.some(isInstancedGhostHit)) return hits;
+  const fragment = hits.find(h => h.object.userData['entityKind'] === 'fragment');
+  if (fragment === undefined) return hits;
+  const ground = hits.find(h => !isInstancedGhostHit(h) && h.object.userData['entityKind'] !== 'fragment' && resolveTaggedAncestor(h.object) === null);
+  if (ground !== undefined && ground.distance < fragment.distance) return hits;
+  return hits.filter(h => !isInstancedGhostHit(h));
 }
 
 function resolveHitToEntity(hit: THREE.Intersection, renderer: GameRenderer): EntityPick | null {
+  if (isInstancedGhostHit(hit)) {
+    const orderId = hit.instanceId === undefined ? null : renderer.resolveGhostId(hit.object, hit.instanceId);
+    if (orderId === null) return null;
+    return { kind: 'order', id: orderId, point: hit.point.clone(), distance: hit.distance };
+  }
+
   // Fragments are leaf InstancedMesh objects (no wrapping Group), tagged with
   // a bucket index rather than an entityId — resolve the instance hit first.
   if (hit.object.userData['entityKind'] === 'fragment') {

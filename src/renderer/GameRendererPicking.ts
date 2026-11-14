@@ -107,8 +107,7 @@ export function resolveFragmentId(deps: PickingDeps, bucketIndex: number, instan
 
 /** Resolve a ghost raycast hit to the pending-action id of its order, or null (#2266). */
 export function resolveGhostId(deps: PickingDeps, object: THREE.Object3D, instanceId?: number): number | null {
-  void deps; void object; void instanceId;
-  throw new Error('not implemented');
+  return deps.ghosts?.actionIdAt(object, instanceId) ?? null;
 }
 
 /**

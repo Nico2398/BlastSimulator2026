@@ -1544,7 +1544,17 @@ new KeyboardShortcuts({
     gameRenderer.setWallOverlayVisible(visible);
     uiManager.setWallOverlayVisible(visible);
   },
-}, { isSuppressed: fullScreenMenuUp, isControlLive });
+  // Delete cancels the selected order like its Cancel button: a ramp segment cancels whole (#2266).
+  cancelOrder: (id) => {
+    const action = ctx.state?.pendingActions.find(a => a.id === id);
+    if (!action || action.type === 'rest') return;
+    window.__gameConsole(action.type === 'dig_ramp_segment' ? `employee cancel ${id} all` : `employee cancel ${id}`);
+  },
+}, {
+  isSuppressed: fullScreenMenuUp,
+  isControlLive,
+  selectedOrderId: () => (scenePicking.selection?.kind === 'order' ? scenePicking.selection.id : null),
+});
 
 // --- Render loop + game tick timer ---
 // The game ticks at BASE_TICK_MS intervals, adjusted for time scale.

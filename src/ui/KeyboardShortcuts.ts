@@ -107,6 +107,11 @@ export class KeyboardShortcuts {
         case 'Escape':
           callbacks.onEscape();
           break;
+        case 'Delete': {
+          const orderId = this.options.selectedOrderId?.() ?? null;
+          if (orderId !== null) callbacks.cancelOrder?.(orderId);
+          break;
+        }
       }
     };
 

@@ -37,8 +37,7 @@ export class GhostInstanceBatch {
 
   /** Ghost id in `slot`, or null when the slot holds none (#2266). */
   idAt(slot: number): number | null {
-    void slot;
-    throw new Error('not implemented');
+    return this.ids[slot] ?? null;
   }
 
   /** The drawn object, for tests and inspection. */
@@ -81,6 +80,8 @@ export class GhostInstanceBatch {
     const mesh = new THREE.InstancedMesh(this.geometry, this.material, capacity);
     mesh.count = 0;
     mesh.renderOrder = this.renderOrder;
+    // Marks the batch an order ghost for a pick; the id comes from the hit's instanceId (idAt), not userData.
+    mesh.userData['entityKind'] = 'order';
     // Instances spread over the whole site: the batch's own bounds would be its first cube's.
     mesh.frustumCulled = false;
     markSceneOverlay(mesh);

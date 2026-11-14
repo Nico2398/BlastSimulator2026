@@ -11,6 +11,7 @@ import { instantiateBuildingModel } from './BuildingMesh.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { markSceneOverlay } from './post/SceneOverlay.js';
 import { GhostInstanceBatch } from './GhostInstanceBatch.js';
+import { resolveTaggedAncestor, tagPickable } from './Pickable.js';
 
 // ---------- Config ----------
 
@@ -338,6 +339,7 @@ export class GhostMesh {
       ? this.createBuildingEntry(placed, placed.building)
       : this.createBoxEntry(placed);
     entry.preview = preview;
+    tagPickable(entry.root, 'order', preview.id);
     this.applyMaterial(entry);
     return entry;
   }
@@ -466,19 +468,29 @@ export class GhostMesh {
 
   /** Every object a raycast can hit to select an order: plain ghost roots and instanced batch meshes (#2266). */
   pickables(): THREE.Object3D[] {
-    throw new Error('not implemented');
+    const roots = [...this.entries.values()].map(entry => entry.root);
+    const batches = [...this.batches.values()].map(batch => batch.object);
+    return [...roots, ...batches];
   }
 
   /** Pending-action id of the ghost a raycast hit (`object`, plus `instanceId` for an instanced one), or null (#2266). */
   actionIdAt(object: THREE.Object3D, instanceId?: number): number | null {
-    void object; void instanceId;
-    throw new Error('not implemented');
+    if (instanceId !== undefined) {
+      for (const batch of this.batches.values()) {
+        if (batch.object === object) return batch.idAt(instanceId);
+      }
+    }
+    const tagged = resolveTaggedAncestor(object);
+    return tagged?.kind === 'order' ? tagged.id : null;
   }
 
   /** World position of the ghost for pending action `id`, or null when it has none (#2266). */
   getPosition(id: number): THREE.Vector3 | null {
-    void id;
-    throw new Error('not implemented');
+    const entry = this.entries.get(id);
+    if (entry !== undefined) return entry.root.position.clone();
+    const ghost = this.instanced.get(id);
+    if (ghost === undefined) return null;
+    return new THREE.Vector3(ghost.preview.targetX, ghost.targetY + GHOST_SIZE / 2, ghost.preview.targetZ);
   }
 
   dispose(): void {
