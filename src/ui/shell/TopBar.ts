@@ -4,7 +4,8 @@
 // floating Saves and Return-to-Map buttons main.ts used to create ad-hoc
 // (spec §5 defect: they collided with the event chip).
 
-import { applyLinkStyle, type EntityOpener } from '../entityLinks.js';
+import type { EntityOpener } from '../entityLinks.js';
+import { waterOpenLink } from '../panels/waterFixes.js';
 import { unprotectedSensitiveHoles } from '../../core/mining/WetHoles.js';
 import { iconEl } from '../icons.js';
 import { el, explainable, sectionHeader, progressBar } from '../dom.js';
@@ -532,12 +533,9 @@ export class TopBar {
   }
 
   private waterLink(): HTMLElement {
-    const link = el('button', { text: t('ui.blast_workshop.water_fix.open'), attrs: { type: 'button' } });
-    link.dataset['action'] = 'water-open';
-    applyLinkStyle(link);
+    const link = waterOpenLink(() => { this.closeWeatherPopover(); this.onOpenWater?.(); });
     link.style.alignSelf = 'flex-start';
     link.style.setProperty('font', '500 11px/1.4 var(--bsx-font-ui)');
-    link.addEventListener('click', () => { this.closeWeatherPopover(); this.onOpenWater?.(); });
     return link;
   }
 

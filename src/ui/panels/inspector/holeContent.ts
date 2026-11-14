@@ -6,8 +6,7 @@ import type { HoleCharge } from '../../../core/mining/ChargePlan.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { isHoleFlooded } from '../../../core/weather/WeatherEffects.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { el } from '../../dom.js';
-import { applyLinkStyle } from '../../entityLinks.js';
+import { waterOpenLink } from '../waterFixes.js';
 import type { InspectorLinks, KindContent } from './InspectorContent.js';
 import { detailBody, kgText, kindLabel, noteLine, sectionOf, syncSection, tagged, valueRow } from './inspectorWidgets.js';
 
@@ -50,18 +49,9 @@ function buildChargeSection(holeId: string, state: GameState): HTMLElement {
   return section;
 }
 
-/** A wet, untubed hole: facts stay here, the fix lives in the Charge step's water section (#2267). */
-function waterLink(links: InspectorLinks): HTMLElement {
-  const link = el('button', { text: t('ui.blast_workshop.water_fix.open'), attrs: { type: 'button' } });
-  link.dataset['action'] = 'water-open';
-  applyLinkStyle(link);
-  link.addEventListener('click', () => links.openWater?.());
-  return link;
-}
-
 function groundRow(ground: GroundKind, links: InspectorLinks): HTMLElement {
   const row = tagged(valueRow(t('inspector.hole.ground'), t(`inspector.hole.ground_${ground}`)), 'data-hole-ground', ground);
-  if (ground === 'wet') row.append(waterLink(links));
+  if (ground === 'wet') row.append(waterOpenLink(() => links.openWater?.()));
   return row;
 }
 

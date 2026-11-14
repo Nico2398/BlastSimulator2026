@@ -96,6 +96,15 @@ function tubeButtons(offer: WaterFixOffer, io: WaterFixIO, reasons: HTMLElement)
   return [tube, buy];
 }
 
+/** The link that opens the Charge step's water section; one look and one data-action everywhere it appears. */
+export function waterOpenLink(onClick: () => void): HTMLButtonElement {
+  const link = el('button', { text: t('ui.blast_workshop.water_fix.open'), attrs: { type: 'button' } });
+  link.dataset['action'] = 'water-open';
+  applyLinkStyle(link);
+  link.addEventListener('click', onClick);
+  return link;
+}
+
 /** The fixes a water warning row carries: drain, tube (and buy tubing), and a link to the Charge step's water section. */
 export function buildWaterFixes(offer: WaterFixOffer, io: WaterFixIO): HTMLElement {
   const root = el('div', { attrs: { 'data-role': 'water-fixes', style: 'display:flex;flex-direction:column;gap:5px;margin-top:5px;font:500 11px/1.4 var(--bsx-font-ui)' } });
@@ -108,11 +117,7 @@ export function buildWaterFixes(offer: WaterFixOffer, io: WaterFixIO): HTMLEleme
   }
   if (offer.target === 'wet' || offer.wetCount > 0) actions.appendChild(drainButton(offer, io, reasons));
   if (offer.tubeIds.length > 0) actions.append(...tubeButtons(offer, io, reasons));
-  const link = el('button', { text: t('ui.blast_workshop.water_fix.open'), attrs: { type: 'button' } });
-  link.dataset['action'] = 'water-open';
-  applyLinkStyle(link);
-  link.addEventListener('click', () => io.openWater?.());
-  actions.appendChild(link);
+  actions.appendChild(waterOpenLink(() => io.openWater?.()));
   root.appendChild(actions);
   if (reasons.childElementCount > 0) root.appendChild(reasons);
   return root;
