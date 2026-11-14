@@ -50,6 +50,7 @@ const SHIFT_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous'];
 const SMALL_BTN_STYLE = 'height:24px;padding:0 10px;font:600 10px/1 var(--bsx-font-mono)';
 
 const cancelCommand = (id: number): string => `employee cancel ${id}`;
+const cancelAllCommand = (id: number): string => `employee cancel ${id} all`;
 
 const WORK_QUEUE_STATUS_KEY: Record<PendingActionStatus, string> = {
   queued: 'ui.operations.work_queue_status_queued',
@@ -450,11 +451,23 @@ export class OperationsPanel extends PanelBase {
     const footRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
     footRow.append(holderNode);
     if (cancellable) {
-      const cancelBtn = button('danger', t('ui.operations.work_queue_cancel'));
+      // A ramp cancels whole; a drill or charge order offers one hole or all of them (#2265).
+      const isRamp = action.type === 'dig_ramp_segment';
+      const cancelBtn = button('danger', t(isRamp ? 'ui.operations.work_queue_cancel_ramp' : 'ui.operations.work_queue_cancel'));
       cancelBtn.style.cssText = `margin-left:auto;${SMALL_BTN_STYLE}`;
       cancelBtn.dataset['cancelAction'] = String(action.id);
-      cancelBtn.addEventListener('click', () => this.gameConsole?.(cancelCommand(action.id)));
+      cancelBtn.addEventListener('click', () => this.gameConsole?.(isRamp ? cancelAllCommand(action.id) : cancelCommand(action.id)));
       footRow.append(cancelBtn);
+      const linkedCount = action.type === 'drill_hole' || action.type === 'charge_hole'
+        ? this.model.player.filter(a => a.type === action.type).length
+        : 0;
+      if (linkedCount > 1) {
+        const allBtn = button('danger', t('ui.operations.work_queue_cancel_all', { count: linkedCount }));
+        allBtn.style.cssText = SMALL_BTN_STYLE;
+        allBtn.dataset['cancelAllAction'] = String(action.id);
+        allBtn.addEventListener('click', () => this.gameConsole?.(cancelAllCommand(action.id)));
+        footRow.append(allBtn);
+      }
     }
 
     row.append(headRow);
