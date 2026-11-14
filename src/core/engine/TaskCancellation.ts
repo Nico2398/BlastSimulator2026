@@ -691,3 +691,23 @@ export function releaseInjuredEmployeesQueues(state: GameState): void {
     if (hasReleasable || targetedIds.has(emp.id)) releaseInjuredEmployeeQueue(state, emp.id);
   }
 }
+
+export interface CancelLinkedResult {
+  success: boolean;
+  error?: 'not-found' | 'not-cancellable';
+  /** Every action removed, the requested one first. */
+  cancelled?: PendingAction[];
+  /** Sum of the refunds of every cancelled action. */
+  refunded?: number;
+  freedFootprints?: FreedFootprint[];
+}
+
+/** Ids of the actions that cancel together with `action` (its own id included). */
+export function linkedActionIds(_state: GameState, _action: PendingAction): number[] {
+  throw new Error('not implemented');
+}
+
+/** Cancel an action together with its linked actions (#2265). */
+export function cancelActionWithLinked(_state: GameState, _actionId: number): CancelLinkedResult {
+  throw new Error('not implemented');
+}
