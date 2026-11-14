@@ -2,6 +2,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FireStep } from '../../../../../src/ui/panels/blastSteps/Fire.js';
 import { wetAllHoles } from '../../../../helpers/holeWater.js';
+import { waterFixConsole, waterScene } from '../../../../helpers/waterFixConsole.js';
+import { HOLE_DRAIN_COST_PER_HOLE } from '../../../../../src/core/config/balance.js';
+import { wetHoles } from '../../../../../src/core/mining/WetHoles.js';
 import { readFileSync } from 'node:fs';
 import type { EntityOpener } from '../../../../../src/ui/entityLinks.js';
 import { t, setLocale } from '../../../../../src/core/i18n/I18n.js';
@@ -742,5 +745,236 @@ describe('FireStep — danger-zone occupants link to their entity (#2168)', () =
     step.update(state, 'sunny');
 
     expect(step.root.querySelector('button[data-select-kind]')).toBeNull();
+  });
+});
+
+// ── #2267: the wet and rain-risk rows carry the fix they name ──
+
+describe('FireStep water fixes (#2267)', () => {
+  const FIXES = '[data-role="water-fixes"]';
+  const DRAIN = '[data-action="water-drain"]';
+  const TUBE = '[data-action="water-tube"]';
+  const BUY = '[data-action="water-buy-tubing"]';
+  const OPEN = '[data-action="water-open"]';
+  const REASON = '[data-role="water-fix-reason"]';
+  const TUBE_FIRST = '[data-role="water-tube-first"]';
+
+  beforeEach(() => { setLocale('en'); document.body.innerHTML = ''; });
+
+  function mountFor(state: GameState, withConsole = true) {
+    const { step } = makeStep();
+    const run = waterFixConsole(state);
+    if (withConsole) step.setGameConsole(run);
+    const openWater = vi.fn();
+    step.setOpenWaterHandler(openWater);
+    step.update(state, state.weather.current);
+    return { step, run, openWater };
+  }
+
+  const btn = (step: FireStep, sel: string) => step.root.querySelector<HTMLButtonElement>(sel);
+
+  describe('wet row', () => {
+    it('offers drain at its cost, tubing, and the water-section link, in place', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, stock: 5, cash: 1000 });
+      const { step } = mountFor(state);
+
+      expect(step.root.querySelectorAll(FIXES)).toHaveLength(1);
+      expect(step.root.textContent).toContain(t('ui.blast_workshop.fire.check_wet', { count: 2, percent: 10 }));
+      expect(btn(step, DRAIN)).not.toBeNull();
+      expect(btn(step, DRAIN)!.disabled).toBe(false);
+      expect(btn(step, DRAIN)!.textContent).toContain(`$${2 * HOLE_DRAIN_COST_PER_HOLE}`);
+      expect(btn(step, TUBE)).not.toBeNull();
+      expect(btn(step, TUBE)!.disabled).toBe(false);
+      expect(btn(step, OPEN)).not.toBeNull();
+      expect(step.root.querySelector(TUBE_FIRST)).toBeNull();
+    });
+
+    it('clicking drain runs drain_hole once per hole; the warning clears and cash drops by the drain cost', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, stock: 0, cash: 1000 });
+      const { step, run } = mountFor(state);
+
+      btn(step, DRAIN)!.click();
+
+      expect(run.mock.calls.map(c => c[0])).toEqual(['drain_hole hole:H1', 'drain_hole hole:H2']);
+      expect(state.cash).toBe(1000 - 2 * HOLE_DRAIN_COST_PER_HOLE);
+      expect(wetHoles(state)).toEqual([]);
+      step.update(state, 'sunny');
+      expect(step.root.querySelector(FIXES)).toBeNull();
+      expect(step.root.textContent).not.toContain(t('ui.blast_workshop.fire.check_wet', { count: 2, percent: 10 }));
+      expect(step.root.textContent).toContain(t('ui.blast_workshop.fire.check_dry', { count: 2 }));
+    });
+
+    it('a porous untubed hole: says tube first, drain is disabled, tubing is offered', () => {
+      const state = waterScene({ holes: 1, wetLevel: 0.9, porosity: 0.35, stock: 3 });
+      const { step, run } = mountFor(state);
+
+      const line = step.root.querySelector(TUBE_FIRST);
+      expect(line).not.toBeNull();
+      expect(line!.textContent!.trim()).not.toBe('');
+      expect(btn(step, DRAIN)!.disabled).toBe(true);
+      expect(btn(step, TUBE)!.disabled).toBe(false);
+      btn(step, DRAIN)!.click();
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it('after tubing, the same row drains the porous hole', () => {
+      const state = waterScene({ holes: 1, wetLevel: 0.9, porosity: 0.35, stock: 3, cash: 500 });
+      const { step, run } = mountFor(state);
+
+      btn(step, TUBE)!.click();
+      expect(run.mock.calls.map(c => c[0])).toEqual(['install_tubing hole:H1']);
+      expect(state.tubingState.installedHoles.has('H1')).toBe(true);
+
+      step.update(state, 'sunny');
+      expect(step.root.querySelector(TUBE_FIRST)).toBeNull();
+      expect(btn(step, DRAIN)!.disabled).toBe(false);
+
+      btn(step, DRAIN)!.click();
+      expect(run.mock.calls.at(-1)![0]).toBe('drain_hole hole:H1');
+      expect(state.cash).toBe(500 - HOLE_DRAIN_COST_PER_HOLE);
+      expect(wetHoles(state)).toEqual([]);
+      step.update(state, 'sunny');
+      expect(step.root.querySelector(FIXES)).toBeNull();
+    });
+
+    it('short tubing stock: tube is disabled with a stock/need reason and buy is offered', () => {
+      const state = waterScene({ holes: 3, wetLevel: 0.9, stock: 1, cash: 5000 });
+      const { step, run } = mountFor(state);
+
+      expect(btn(step, TUBE)!.disabled).toBe(true);
+      expect([...step.root.querySelectorAll(REASON)].some(r => r.textContent!.includes('1') && r.textContent!.includes('3'))).toBe(true);
+      expect(btn(step, BUY)!.disabled).toBe(false);
+
+      btn(step, BUY)!.click();
+      expect(run.mock.calls.map(c => c[0])).toEqual(['buy amount:10']);
+      expect(state.tubingState.inventory).toBe(11);
+      expect(state.cash).toBe(5000 - 500);
+
+      step.update(state, 'sunny'); // stock and cash moved, holes did not: the row must still repaint
+      expect(btn(step, TUBE)!.disabled).toBe(false);
+      expect(btn(step, BUY)).toBeNull();
+    });
+
+    it('buy is shown disabled when cash is short', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, stock: 0, cash: 100 });
+      const { step, run } = mountFor(state);
+
+      expect(btn(step, BUY)).not.toBeNull();
+      expect(btn(step, BUY)!.disabled).toBe(true);
+      btn(step, BUY)!.click();
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it('drain is shown disabled with a reason when cash cannot pay for it', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, stock: 5, cash: 0 });
+      const { step, run } = mountFor(state);
+
+      expect(btn(step, DRAIN)).not.toBeNull();
+      expect(btn(step, DRAIN)!.disabled).toBe(true);
+      expect(step.root.querySelector(REASON)).not.toBeNull();
+      btn(step, DRAIN)!.click();
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it('cash exactly equal to the drain total leaves drain enabled', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, cash: 2 * HOLE_DRAIN_COST_PER_HOLE });
+      const { step } = mountFor(state);
+      expect(btn(step, DRAIN)!.disabled).toBe(false);
+    });
+
+    it('does not offer tubing once every wet hole is tubed', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, stock: 5 });
+      state.tubingState.installedHoles = new Set(['H1', 'H2']);
+      const { step } = mountFor(state);
+      expect(btn(step, TUBE)).toBeNull();
+      expect(btn(step, DRAIN)).not.toBeNull();
+    });
+
+    it('the link calls the open-water handler once and runs no command', () => {
+      const state = waterScene({ holes: 2, wetLevel: 0.9, stock: 5 });
+      const { step, run, openWater } = mountFor(state);
+
+      btn(step, OPEN)!.click();
+
+      expect(openWater).toHaveBeenCalledTimes(1);
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it('wet holes with only water-resistant charges are a ticked row with no fixes', () => {
+      const state = waterScene({ holes: 2, explosive: 'krackle', wetLevel: 0.9, stock: 5 });
+      const { step } = mountFor(state);
+      expect(step.root.querySelector(FIXES)).toBeNull();
+    });
+
+    it('clicking without a console wired does nothing and does not throw', () => {
+      const state = waterScene({ holes: 1, wetLevel: 0.9, cash: 1000 });
+      const { step } = mountFor(state, false);
+      expect(() => btn(step, DRAIN)!.click()).not.toThrow();
+      expect(state.cash).toBe(1000);
+    });
+  });
+
+  describe('rain-risk row', () => {
+    it('offers tubing for the exposed holes and the link, but no drain', () => {
+      const state = waterScene({ holes: 2, weather: 'light_rain', stock: 5 });
+      const { step } = mountFor(state);
+
+      expect(step.root.querySelector('[data-role="rain-risk-check"]')).not.toBeNull();
+      expect(step.root.querySelectorAll(FIXES)).toHaveLength(1);
+      expect(btn(step, DRAIN)).toBeNull();
+      expect(btn(step, TUBE)).not.toBeNull();
+      expect(btn(step, OPEN)).not.toBeNull();
+    });
+
+    it('clicking tube installs on every exposed hole, and the warning clears', () => {
+      const state = waterScene({ holes: 2, weather: 'storm', stock: 5 });
+      state.tubingState.installedHoles = new Set(); // both exposed
+      const { step, run } = mountFor(state);
+
+      btn(step, TUBE)!.click();
+
+      expect(run.mock.calls.map(c => c[0])).toEqual(['install_tubing hole:H1', 'install_tubing hole:H2']);
+      step.update(state, 'storm');
+      expect(step.root.querySelector('[data-role="rain-risk-check"]')).toBeNull();
+      expect(step.root.querySelector(FIXES)).toBeNull();
+    });
+
+    it('tubes only the holes that are still exposed', () => {
+      const state = waterScene({ holes: 3, weather: 'storm', stock: 5 });
+      state.tubingState.installedHoles = new Set(['H1']);
+      const { step, run } = mountFor(state);
+
+      btn(step, TUBE)!.click();
+
+      expect(run.mock.calls.map(c => c[0])).toEqual(['install_tubing hole:H2', 'install_tubing hole:H3']);
+    });
+
+    it('short stock: tube disabled with a reason, buy offered', () => {
+      const state = waterScene({ holes: 3, weather: 'light_rain', stock: 0, cash: 5000 });
+      const { step } = mountFor(state);
+
+      expect(btn(step, TUBE)!.disabled).toBe(true);
+      expect(step.root.querySelector(REASON)).not.toBeNull();
+      expect(btn(step, BUY)!.disabled).toBe(false);
+    });
+
+    it('the link calls the open-water handler', () => {
+      const state = waterScene({ holes: 1, weather: 'light_rain', stock: 5 });
+      const { step, openWater } = mountFor(state);
+      btn(step, OPEN)!.click();
+      expect(openWater).toHaveBeenCalledTimes(1);
+    });
+
+    it('no fixes when it is not raining and holes are dry', () => {
+      const state = waterScene({ holes: 2, weather: 'sunny', stock: 5 });
+      const { step } = mountFor(state);
+      expect(step.root.querySelector(FIXES)).toBeNull();
+    });
+
+    it('no fixes when the charges are water-resistant', () => {
+      const state = waterScene({ holes: 2, explosive: 'krackle', weather: 'storm', stock: 5 });
+      const { step } = mountFor(state);
+      expect(step.root.querySelector(FIXES)).toBeNull();
+    });
   });
 });

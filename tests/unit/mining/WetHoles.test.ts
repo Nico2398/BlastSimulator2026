@@ -9,6 +9,7 @@ import {
   classifyWetChargedHoles,
   fizzlingHoles,
   rainExposedHoles,
+  unprotectedSensitiveHoles,
   wetFizzlePercent,
 } from '../../../src/core/mining/WetHoles.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -372,6 +373,70 @@ describe('rainExposedHoles (#1957)', () => {
     const state = stateWith([]);
     state.weather.current = 'storm';
     expect(rainExposedHoles(state)).toEqual([]);
+  });
+});
+
+describe('unprotectedSensitiveHoles (#2267)', () => {
+  const charge = (explosiveId: string) => ({ explosiveId, amountKg: 8, stemmingM: 2 });
+
+  it('lists charged untubed water-sensitive holes, sorted, with no rain falling', () => {
+    const state = stateWith(['H3', 'H1', 'H2']);
+    state.chargesByHole = { H3: charge('boomite'), H1: charge('boomite'), H2: charge('obliviax') };
+    state.weather.current = 'sunny';
+    expect(unprotectedSensitiveHoles(state)).toEqual(['H1', 'H2', 'H3']);
+  });
+
+  it('gives the same answer in rain: it is not rain-gated', () => {
+    const state = stateWith(['H1', 'H2']);
+    state.chargesByHole = { H1: charge('boomite'), H2: charge('boomite') };
+    state.weather.current = 'sunny';
+    const dry = unprotectedSensitiveHoles(state);
+    state.weather.current = 'storm';
+    expect(unprotectedSensitiveHoles(state)).toEqual(dry);
+    expect(dry).toEqual(['H1', 'H2']);
+  });
+
+  it('counts wet and dry holes alike', () => {
+    const state = stateWith(['H1', 'H2']);
+    state.chargesByHole = { H1: charge('boomite'), H2: charge('boomite') };
+    setHoleWater(state, ['H1'], 0.9);
+    expect(unprotectedSensitiveHoles(state)).toEqual(['H1', 'H2']);
+  });
+
+  it('excludes tubed holes', () => {
+    const state = stateWith(['H1', 'H2']);
+    state.chargesByHole = { H1: charge('boomite'), H2: charge('boomite') };
+    state.tubingState.installedHoles = new Set(['H1']);
+    expect(unprotectedSensitiveHoles(state)).toEqual(['H2']);
+  });
+
+  it('excludes uncharged holes', () => {
+    const state = stateWith(['H1', 'H2']);
+    state.chargesByHole = { H1: charge('boomite') };
+    expect(unprotectedSensitiveHoles(state)).toEqual(['H1']);
+  });
+
+  it('excludes water-resistant charges', () => {
+    const state = stateWith(['H1']);
+    state.chargesByHole = { H1: charge('krackle') };
+    expect(unprotectedSensitiveHoles(state)).toEqual([]);
+  });
+
+  it('excludes an unknown explosive without throwing', () => {
+    const state = stateWith(['H1']);
+    state.chargesByHole = { H1: charge('no_such_explosive') };
+    expect(() => unprotectedSensitiveHoles(state)).not.toThrow();
+    expect(unprotectedSensitiveHoles(state)).toEqual([]);
+  });
+
+  it('ignores a charge recorded for a hole that is not drilled', () => {
+    const state = stateWith(['H1']);
+    state.chargesByHole = { H1: charge('boomite'), GONE: charge('boomite') };
+    expect(unprotectedSensitiveHoles(state)).toEqual(['H1']);
+  });
+
+  it('is empty with no holes', () => {
+    expect(unprotectedSensitiveHoles(stateWith([]))).toEqual([]);
   });
 });
 

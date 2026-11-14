@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BlastWorkshop } from '../../../../src/ui/panels/BlastWorkshop.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../src/core/mining/DrillPlan.js';
@@ -9,6 +9,9 @@ import { assembleBlastPlan } from '../../../../src/core/mining/BlastPlan.js';
 import { wetHoleIdsFor } from '../../../../src/core/mining/WetHoles.js';
 import { planHeatmap, sectionAtZ } from '../../../../src/core/mining/EnergyHeatmap.js';
 import { FRAGMENTATION_BANDS } from '../../../../src/core/mining/FragmentationBand.js';
+
+import { HOLE_DRAIN_COST_PER_HOLE } from '../../../../src/core/config/balance.js';
+import { waterFixConsole, waterScene } from '../../../helpers/waterFixConsole.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -572,5 +575,133 @@ describe('BlastWorkshop — energy heatmap section', () => {
     const lastFine = bands.map(fine).lastIndexOf(true);
     expect(lastFine).toBeGreaterThan(0);
     expect(bands.slice(lastFine + 1).every(b => b === 'intact')).toBe(true);
+  });
+});
+
+// ── #2267: opening the workshop on the Charge step's water section ──
+
+describe('BlastWorkshop — water section (#2267)', () => {
+  const SECTION = '[data-role="water-section"]';
+  /** Every scrollIntoView call: the element it ran on, and whether the Charge step was displayed by then. */
+  let scrolled: Array<{ el: Element; chargeStepShown: boolean }>;
+  let original: unknown;
+
+  beforeEach(() => {
+    scrolled = [];
+    original = (Element.prototype as unknown as Record<string, unknown>)['scrollIntoView'];
+    (Element.prototype as unknown as Record<string, unknown>)['scrollIntoView'] = function (this: Element) {
+      scrolled.push({ el: this, chargeStepShown: this.closest('[style*="display: none"]') === null });
+    };
+  });
+
+  afterEach(() => {
+    if (original === undefined) delete (Element.prototype as unknown as Record<string, unknown>)['scrollIntoView'];
+    else (Element.prototype as unknown as Record<string, unknown>)['scrollIntoView'] = original;
+  });
+
+  /** Two charged, wet, untubed holes: the plan is complete, so the panel sits on the Fire step. */
+  function wetPlan() {
+    return waterScene({ holes: 2, wetLevel: 0.9, stock: 5, cash: 1000 });
+  }
+
+  it('lands on the Charge step even when the plan has auto-advanced to Fire', () => {
+    const { workshop } = makeWorkshop();
+    workshop.show();
+    const state = wetPlan();
+    workshop.update(state, 'sunny');
+    expect(workshop.currentStep).toBe(4);
+
+    workshop.showWaterSection();
+
+    expect(workshop.currentStep).toBe(2);
+  });
+
+  it('scrolls the water section into view once the Charge step is displayed', () => {
+    const { workshop } = makeWorkshop();
+    workshop.show();
+    const state = wetPlan();
+    workshop.update(state, 'sunny');
+
+    workshop.showWaterSection();
+
+    const section = workshop.root.querySelector(SECTION)!;
+    expect(section).not.toBeNull();
+    const calls = scrolled.filter(c => c.el === section);
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every(c => c.chargeStepShown)).toBe(true);
+  });
+
+  it('the water section wraps the drain button, the tubing header and the tubing card', () => {
+    const { workshop } = makeWorkshop();
+    workshop.show();
+    workshop.update(wetPlan(), 'sunny');
+
+    const sections = workshop.root.querySelectorAll(SECTION);
+    expect(sections).toHaveLength(1);
+    const section = sections[0]!;
+    expect(section.querySelector('[data-action="drain-holes"]')).not.toBeNull();
+    expect(section.querySelector('.bsx-section')).not.toBeNull();
+    expect(section.querySelector('[data-action="tubing-install"]')).not.toBeNull();
+  });
+
+  it('the player\'s choice sticks: later updates do not auto-advance away from the Charge step', () => {
+    const { workshop } = makeWorkshop();
+    workshop.show();
+    const state = wetPlan();
+    workshop.update(state, 'sunny');
+
+    workshop.showWaterSection();
+    workshop.update(state, 'sunny');
+    workshop.update(state, 'sunny');
+
+    expect(workshop.currentStep).toBe(2);
+  });
+
+  it('shows the Charge step and hides the others', () => {
+    const { workshop } = makeWorkshop();
+    workshop.show();
+    workshop.update(wetPlan(), 'sunny');
+
+    workshop.showWaterSection();
+
+    const section = workshop.root.querySelector(SECTION)!;
+    expect(section.closest('[style*="display: none"]')).toBeNull();
+    expect(workshop.root.querySelector('[data-action="execute"]')!.closest('div[style*="display: none"]')).not.toBeNull();
+  });
+
+  it('works on a fresh workshop that has never rendered a plan', () => {
+    const { workshop } = makeWorkshop();
+    workshop.show();
+
+    expect(() => workshop.showWaterSection()).not.toThrow();
+
+    expect(workshop.currentStep).toBe(2);
+    expect(scrolled.some(c => c.el === workshop.root.querySelector(SECTION))).toBe(true);
+  });
+
+  it('calling it twice is harmless', () => {
+    const { workshop } = makeWorkshop();
+    workshop.show();
+    workshop.update(wetPlan(), 'sunny');
+    workshop.showWaterSection();
+    workshop.showWaterSection();
+    expect(workshop.currentStep).toBe(2);
+  });
+
+  it('the game console reaches the Fire step: its drain action runs through it', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const workshop = new BlastWorkshop(container);
+    const state = wetPlan();
+    const run = waterFixConsole(state);
+    workshop.setGameConsole(run);
+    workshop.show();
+    workshop.update(state, 'sunny');
+    expect(workshop.currentStep).toBe(4);
+
+    workshop.root.querySelector<HTMLButtonElement>('[data-action="water-drain"]')!.click();
+
+    expect(run.mock.calls.map(c => c[0])).toEqual(['drain_hole hole:H1', 'drain_hole hole:H2']);
+    expect(state.cash).toBe(1000 - 2 * HOLE_DRAIN_COST_PER_HOLE);
   });
 });

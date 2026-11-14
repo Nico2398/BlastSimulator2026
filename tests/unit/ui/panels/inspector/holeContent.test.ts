@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // Drill hole inspector content (#1769): depth, diameter, state, charge, ground.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { holeContent } from '../../../../../src/ui/panels/inspector/holeContent.js';
 import type { InspectorLinks, InspectorView } from '../../../../../src/ui/panels/inspector/InspectorContent.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
@@ -119,5 +119,96 @@ describe('hole inspector', () => {
     const before = viewOf(s, hole.id).signature;
     s.chargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 6, stemmingM: 2 };
     expect(viewOf(s, hole.id).signature).not.toBe(before);
+  });
+});
+
+// ── #2267: a wet untubed hole links to the Charge step's water section ──
+
+describe('hole inspector water link (#2267)', () => {
+  const OPEN = '[data-action="water-open"]';
+  const GROUND = '[data-hole-ground]';
+
+  function linksWith(openWater: () => void): InspectorLinks {
+    return { select: () => {}, run: () => {}, confirm: () => {}, openWater } as InspectorLinks;
+  }
+
+  function viewWith(s: GameState, holeId: string, l: InspectorLinks): InspectorView {
+    return holeContent.view({ kind: 'hole', id: holeNumericId(holeId) }, s, l)!;
+  }
+
+  function wetHole() {
+    const s = makeState();
+    const hole = drilled(s);
+    s.holeWater[hole.id] = { level: 1, porosity: 0.5 } as GameState['holeWater'][string];
+    return { s, hole };
+  }
+
+  it('the ground row of a wet untubed hole carries the link', () => {
+    const { s, hole } = wetHole();
+    const root = mount(viewWith(s, hole.id, linksWith(() => {})));
+    const ground = root.querySelector(GROUND)!;
+    expect(ground.getAttribute('data-hole-ground')).toBe('wet');
+    expect(ground.querySelector(OPEN)).not.toBeNull();
+  });
+
+  it('clicking the link calls openWater once', () => {
+    const { s, hole } = wetHole();
+    const openWater = vi.fn();
+    const root = mount(viewWith(s, hole.id, linksWith(openWater)));
+    root.querySelector<HTMLElement>(`${GROUND} ${OPEN}`)!.click();
+    expect(openWater).toHaveBeenCalledTimes(1);
+  });
+
+  it('a dry hole has no link', () => {
+    const s = makeState();
+    const hole = drilled(s);
+    const root = mount(viewWith(s, hole.id, linksWith(() => {})));
+    expect(root.querySelector('[data-hole-ground="dry"]')).not.toBeNull();
+    expect(root.querySelector(OPEN)).toBeNull();
+  });
+
+  it('a tubed hole has no link, even while it still holds water', () => {
+    const { s, hole } = wetHole();
+    s.tubingState.installedHoles.add(hole.id);
+    const root = mount(viewWith(s, hole.id, linksWith(() => {})));
+    expect(root.querySelector('[data-hole-ground="tubed"]')).not.toBeNull();
+    expect(root.querySelector(OPEN)).toBeNull();
+  });
+
+  it('an ordered hole that is not drilled yet has no link', () => {
+    const s = makeState();
+    const hole = addHole({ nextHoleId: 1 }, s.plannedDrillHoles, 12, 12, 6, 0.1);
+    const root = mount(viewWith(s, hole.id, linksWith(() => {})));
+    expect(root.querySelector(OPEN)).toBeNull();
+  });
+
+  it('the inspector stays facts-only: no drain or tube action, no actions list', () => {
+    const { s, hole } = wetHole();
+    const view = viewWith(s, hole.id, linksWith(() => {}));
+    const root = mount(view);
+    expect(view.actions).toEqual([]);
+    expect(root.querySelector('[data-action="water-drain"], [data-action="water-tube"], [data-action="water-buy-tubing"]')).toBeNull();
+    expect(root.querySelector('[data-action="drain-holes"], [data-action="tubing-install"]')).toBeNull();
+  });
+
+  it('building the view for a wet hole without an openWater link does not throw', () => {
+    const { s, hole } = wetHole();
+    expect(() => mount(viewOf(s, hole.id))).not.toThrow();
+  });
+
+  it('sync adds the link when a dry hole turns wet, and removes it once tubed', () => {
+    const s = makeState();
+    const hole = drilled(s);
+    const view = viewWith(s, hole.id, linksWith(() => {}));
+    const root = mount(view);
+    expect(root.querySelector(OPEN)).toBeNull();
+
+    s.holeWater[hole.id] = { level: 1, porosity: 0.5 } as GameState['holeWater'][string];
+    view.sync(root);
+    expect(root.querySelector(`${GROUND} ${OPEN}`)).not.toBeNull();
+
+    s.tubingState.installedHoles.add(hole.id);
+    view.sync(root);
+    expect(root.querySelector(OPEN)).toBeNull();
   });
 });
