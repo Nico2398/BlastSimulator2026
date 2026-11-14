@@ -28,7 +28,7 @@ function isLinkedOnly(action: PendingAction): boolean {
   return action.type === 'dig_ramp_segment';
 }
 
-function cancelCommand(action: PendingAction): string {
+export function cancelCommand(action: PendingAction): string {
   return isLinkedOnly(action) ? `employee cancel ${action.id} all` : `employee cancel ${action.id}`;
 }
 

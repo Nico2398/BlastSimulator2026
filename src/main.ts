@@ -91,6 +91,7 @@ import { hasLevelEnded } from './core/engine/GameOverConditions.js';
 import { outstandingChargeBlockedReason } from './core/mining/ChargeOrder.js';
 import { wetHoles } from './core/mining/WetHoles.js';
 import { getSurfaceY } from './core/entities/BuildingPlacement.js';
+import { cancelCommand, isEngineOwnedAction } from './ui/panels/inspector/orderContent.js';
 
 // --- 3D Scene ---
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -1547,8 +1548,8 @@ new KeyboardShortcuts({
   // Delete cancels the selected order like its Cancel button: a ramp segment cancels whole (#2266).
   cancelOrder: (id) => {
     const action = ctx.state?.pendingActions.find(a => a.id === id);
-    if (!action || action.type === 'rest') return;
-    window.__gameConsole(action.type === 'dig_ramp_segment' ? `employee cancel ${id} all` : `employee cancel ${id}`);
+    if (!action || isEngineOwnedAction(action)) return;
+    window.__gameConsole(cancelCommand(action));
   },
 }, {
   isSuppressed: fullScreenMenuUp,
