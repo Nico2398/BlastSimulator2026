@@ -101,7 +101,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   averageMorale: { type: 'number', description: 'Mean morale (0-100) of the living employees; 50 with none' },
   muckPile: { type: 'object', optional: true, description: 'Fragment size, speed and clearance spread after a blast' },
   unseenApprovalGrade: { type: 'number', optional: true, description: 'Grade whose approval letter the player has not dismissed yet; null when none (#1926)' },
-  mineGrade: { type: 'object', optional: true, description: 'Mine-grade permit state {grade, pendingTicksLeft}; null on a site with no permit ladder (#1921)' },
+  mineGrade: { type: 'object', optional: true, description: 'Mine-grade permit state {grade, tier, pendingTicksLeft}; null on a site with no permit ladder (#1921)' },
   storedMassKg: { type: 'number', description: 'Mass held in warehouse storage (LogisticsState.storedMassKg)' },
   storedSpoilKg: { type: 'number', description: 'Barren rock dumped on spoil heaps (sum of Building.storedSpoilKg), never counted in storedMassKg' },
   collectedOreTotal: { type: 'number', description: 'Sum across every material key in state.collectedOre (kg, #671)' },

@@ -11,7 +11,8 @@ import {
 import { isWaterSensitiveCharge, wetHoleIdsFor } from './WetHoles.js';
 import type { GameState } from '../state/GameState.js';
 import { resolveAvailableExplosives } from '../campaign/Level.js';
-import { permitLimitsFor } from '../economy/PermitLimits.js';
+import { gradeRung } from '../economy/MineGrade.js';
+import { permitLimitsForRung } from '../economy/PermitLimits.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { OPTIMIZER_SWEEP_STEPS, OPTIMIZER_MIN_SWEEP_STEPS, OPTIMIZER_WORK_BUDGET, OPTIMIZER_GOOD_TOLERANCE } from '../config/balance.js';
@@ -199,6 +200,6 @@ export function optimizerOptionsFor(
   return {
     explosiveIds: resolveAvailableExplosives(state.campaign.activeLevelId),
     wetHoleIds: wetHoleIdsFor(state),
-    ...(state.grade ? { maxTotalKg: permitLimitsFor(state.grade.grade).maxChargeKg } : {}),
+    ...(state.grade ? { maxTotalKg: permitLimitsForRung(gradeRung(state.grade)).maxChargeKg } : {}),
   };
 }

@@ -58,7 +58,8 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
-import { nextGradeTargets } from '../../src/core/economy/MineGrade.js';
+import { nextGradeTargets, LAST_NAMED_GRADE } from '../../src/core/economy/MineGrade.js';
+import { permitLimitsFor } from '../../src/core/economy/PermitLimits.js';
 import { getOperatingCostPerHour } from '../../src/core/economy/OperatingFinance.js';
 import { getBuildingDef, getDefSize, getUpgradeCost, type BuildingTier } from '../../src/core/entities/Building.js';
 import { FREIGHT_WAREHOUSE_CAPACITY_KG, SPOIL_HEAP_CAPACITY_KG } from '../../src/core/config/balance.js';
@@ -67,7 +68,7 @@ import { computeVehicleUpgradeCost } from '../../src/core/entities/VehicleUpgrad
 import { ROLE_LICENCE_REQUIRED, canDriveTier, countLicenceHolders, licenceLevelOfSkill } from '../../src/core/entities/VehicleDriverAssignment.js';
 import { isEnrolledInTraining } from '../../src/core/entities/EmployeeTraining.js';
 import {
-  DRILL_HOLE_DIAMETER_OPTIONS_M, DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M, DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS, PERMIT_LIMITS,
+  DRILL_HOLE_DIAMETER_OPTIONS_M, DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M, DRILL_RIG_MAX_DEPTH_M, DRILL_RIG_MAX_DIAMETER_M, HIRING_COSTS,
   VEHICLE_MAX_SLOPE_RATIO, WALL_BERM_MIN_WIDTH_M, WALL_SAFE_FACE_HEIGHT_M_BY_TIER, needRestSearchRadius,
 } from '../../src/core/config/balance.js';
 import { gradeDef } from '../../src/core/economy/MineGrade.js';
@@ -102,7 +103,7 @@ import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { findBuildingApproachCell } from '../../src/core/nav/BuildingApproach.js';
 import { vehicleMaxSlopeRatio } from '../../src/core/entities/Vehicle.js';
 import { isProgressionSite } from '../../src/core/state/GameState.js';
-import { NAV_CLEARANCE_VEHICLE_CELLS } from '../../src/core/config/balance.js';
+import { NAV_CLEARANCE_VEHICLE_CELLS, MINE_TIERS_PER_GRADE } from '../../src/core/config/balance.js';
 import { haulDestinationOf } from '../../src/core/economy/SpoilHeaps.js';
 import { terrainConfigOf } from '../../src/console/commands/world.js';
 import { resolveStarterDeposit } from '../../src/core/world/StarterDeposit.js';
@@ -1312,7 +1313,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const deepen = crater !== undefined && (depthOpen || m.yardBound === true);
   const pitM = state.grade?.deepestPitM ?? 0;
   const rigDiameterM = fleetBestRigLimit(DRILL_RIG_MAX_DIAMETER_M, vehicles);
-  const limit: PermitLimit = PERMIT_LIMITS[Math.min(gradeOf(s), 5)]!;
+  const limit: PermitLimit = permitLimitsFor(gradeOf(s), state.grade?.tier ?? 1);
   const explosive = getExplosive(shotExplosive(s))!;
   // Each hole takes the fullest charge it holds, in the bore whose charge column is longest, so the pattern breaks out
   // of the deepest holes; the permit then sets how many holes, and the charge how close they stand. Spreading the
@@ -1700,7 +1701,7 @@ function ladderPermit(s: ProbeSession, m: LadderMemory): void {
   if (!g || (m.maxGrade !== null && g.grade >= m.maxGrade)) return;
   const targets = nextGradeTargets(s.state);
   const fee = gradeDef(g.grade + 1).fee;
-  if (shouldApplyPermit(targets.length > 0 && targets.every(t => t.met), g.pending !== null, s.state.cash, fee, LADDER_CASH_RESERVE)) {
+  if (shouldApplyPermit((g.grade > LAST_NAMED_GRADE || g.tier >= MINE_TIERS_PER_GRADE) && targets.length > 0 && targets.every(t => t.met), g.pending !== null, s.state.cash, fee, LADDER_CASH_RESERVE)) {
     s.run('permit apply');
   }
 }

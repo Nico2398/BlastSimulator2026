@@ -579,12 +579,12 @@ export class TopBar {
     }
     this.gradeTracked = g ? { grade: g.grade, allMet } : null;
 
-    const sig = g ? `${g.grade}` : '';
+    const sig = g ? `${g.grade}:${g.tier}` : '';
     if (sig === this.lastGradeSig) return;
     this.lastGradeSig = sig;
     if (!grade) { this.gradeWrap.style.display = 'none'; return; }
     this.gradeWrap.style.display = 'flex';
-    this.gradeText.textContent = t('shell.topbar.grade', { name: t(grade.nameKey, grade.nameParams) });
+    this.gradeText.textContent = t('shell.topbar.grade', { name: t(grade.nameKey, grade.nameParams), tier: g!.tier });
   }
 
   /** Show the quarter countdown and board confidence on board levels. */

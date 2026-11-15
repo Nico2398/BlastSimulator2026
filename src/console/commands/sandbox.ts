@@ -29,7 +29,8 @@ import { vehicleMaxSlopeRatio } from '../../core/entities/Vehicle.js';
 import { isStaffedComposition, resolveStartingSite } from '../../core/state/StartingBuildings.js';
 import { staffedSuffix, parseOptionalStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
-import { createGradeState } from '../../core/economy/MineGrade.js';
+import { createGradeState, extraContractOffers, LAST_NAMED_GRADE } from '../../core/economy/MineGrade.js';
+import { MINE_TIERS_PER_GRADE } from '../../core/config/balance.js';
 import { isValidOreGradeScale } from '../../core/economy/OreGrade.js';
 
 /** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
@@ -67,6 +68,15 @@ function parseOreGradeArg(raw: string | undefined): { scale?: number; error?: st
   return { scale: value };
 }
 
+function parseStartTierArg(raw: string | undefined): { tier?: number; error?: string } {
+  if (raw === undefined) return {};
+  const value = Number(raw);
+  if (raw.trim() === '' || !Number.isInteger(value) || value < 1 || value > MINE_TIERS_PER_GRADE) {
+    return { error: t('sandbox.invalid_tier', { value: raw, max: MINE_TIERS_PER_GRADE }) };
+  }
+  return { tier: value };
+}
+
 function parseStartGradeArg(raw: string | undefined): { grade?: number; error?: string } {
   if (raw === undefined) return {};
   const value = Number(raw);
@@ -77,7 +87,7 @@ function parseStartGradeArg(raw: string | undefined): { grade?: number; error?: 
 }
 
 /**
- * `sandbox start [biome:… kit:digger|full seed:… ore_grade:0..1 grade:N …]` (`difficulty:` is a legacy alias for `kit:`)
+ * `sandbox start [biome:… kit:digger|full seed:… ore_grade:0..1 grade:N tier:M …]` (`difficulty:` is a legacy alias for `kit:`)
  *
  * Unlike `campaign start`, this needs no prior `new_game` and is gated by no
  * unlock: a sandbox site is created from nothing, which is the whole point of
@@ -116,6 +126,11 @@ export function sandboxCommand(
   const startGrade = parseStartGradeArg(named['grade']);
   if (startGrade.error) {
     return { success: false, output: startGrade.error };
+  }
+
+  const startTier = parseStartTierArg(named['tier']);
+  if (startTier.error) {
+    return { success: false, output: startTier.error };
   }
 
   const config = clampSandboxConfig(requested);
@@ -162,9 +177,11 @@ export function sandboxCommand(
     ctx.state.grade = createGradeState();
     // `grade:N` starts the site at permit grade N (scenarios reach later grades without playing the ladder).
     if (startGrade.grade !== undefined) ctx.state.grade.grade = startGrade.grade;
+    // `tier:M` picks the tier within a named grade; endless classes have one.
+    if (startTier.tier !== undefined && ctx.state.grade.grade <= LAST_NAMED_GRADE) ctx.state.grade.tier = startTier.tier;
   }
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
-  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state), ctx.state.grade?.grade);
+  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state), ctx.state.grade?.grade, undefined, extraContractOffers(ctx.state.grade));
 
   return {
     success: true,

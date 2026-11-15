@@ -4,12 +4,16 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { ContractType } from './Contract.js';
+import { tierPerksAt } from './TierPerks.js';
 import { deductExpense } from './Finance.js';
 import { takePermitDelay } from '../events/ActiveModifiers.js';
 import { parseColumnKey } from '../mining/SurveyColumn.js';
 import {
   MINE_GRADES,
   MINE_LAST_NAMED_GRADE,
+  MINE_LAST_NAMED_RUNG,
+  PERMIT_LIMITS,
+  LEGACY_PERMIT_LIMITS,
   MINE_TIERS_PER_GRADE,
   MINE_GRADE_CLASS_ORE_FACTOR,
   MINE_GRADE_CLASS_ROCK_BASE_M3,
@@ -84,28 +88,63 @@ export interface TierDef {
 }
 
 /** Ladder step of a site: grade x tier for grades 0-3, then one step per endless class. */
-export function gradeRung(_g: Pick<GradeState, 'grade' | 'tier'>): number {
-  throw new Error('not implemented');
+export function gradeRung(g: Pick<GradeState, 'grade' | 'tier'>): number {
+  if (g.grade > LAST_NAMED_GRADE) return MINE_LAST_NAMED_RUNG + (g.grade - LAST_NAMED_GRADE);
+  const tier = Math.min(MINE_TIERS_PER_GRADE, Math.max(1, g.tier || 1));
+  return Math.max(0, g.grade) * MINE_TIERS_PER_GRADE + tier - 1;
 }
 
 /** Definition of a tier of a named grade (0-3); undefined for a class or an out-of-range tier. */
-export function tierDef(_grade: number, _tier: number): TierDef | undefined {
-  throw new Error('not implemented');
+export function tierDef(grade: number, tier: number): TierDef | undefined {
+  const cfg = MINE_GRADES[grade]?.tiers[tier - 1];
+  if (!cfg) return undefined;
+  const rung = gradeRung({ grade, tier });
+  return { grade, tier, targets: cfg.targets, perk: cfg.perk, limits: { ...PERMIT_LIMITS[rung]! } };
+}
+
+/** Per-target progress toward completing tier `tier` of the current grade; empty without a ladder or on a class. */
+export function tierTargetStatuses(state: GameState, tier: number): GradeTargetStatus[] {
+  const g = state.grade;
+  const def = g ? tierDef(g.grade, tier) : undefined;
+  return g && def ? def.targets.map(({ kind, value }) => targetStatus(state, g, kind, value)) : [];
 }
 
 /** Per-target progress toward completing the current tier; empty without a ladder or on a class. */
-export function currentTierTargets(_state: GameState): GradeTargetStatus[] {
-  throw new Error('not implemented');
+export function currentTierTargets(state: GameState): GradeTargetStatus[] {
+  return tierTargetStatuses(state, state.grade?.tier ?? 1);
+}
+
+function targetStatus(state: GameState, g: GradeState, kind: GradeTargetKind, value: number): GradeTargetStatus {
+  const current = targetProgress(state, g, kind, value);
+  return { kind, met: current >= value, current, needed: value };
 }
 
 /** Raises the tier while the current tier's targets are met; returns the tiers gained. Emits `progression:tier_up` per step. */
-export function advanceGradeTier(_state: GameState, _emitter?: Pick<EventEmitter, 'emit'>): number {
-  throw new Error('not implemented');
+export function advanceGradeTier(state: GameState, emitter?: Pick<EventEmitter, 'emit'>): number {
+  const g = state.grade;
+  if (!g || g.grade > LAST_NAMED_GRADE) return 0;
+  let gained = 0;
+  while (g.tier < MINE_TIERS_PER_GRADE && currentTierTargets(state).every(t => t.met)) {
+    g.tier++;
+    gained++;
+    emitter?.emit('progression:tier_up', { grade: g.grade, tier: g.tier });
+  }
+  return gained;
 }
 
 /** Where a pre-tier save's grade (0-5, then classes) lands on the new ladder, never below the caps it held. */
-export function migrateLegacyGrade(_oldGrade: number): { grade: number; tier: number } {
-  throw new Error('not implemented');
+export function migrateLegacyGrade(oldGrade: number): { grade: number; tier: number } {
+  const legacyCount = Object.keys(LEGACY_PERMIT_LIMITS).length;
+  if (oldGrade >= legacyCount) return { grade: oldGrade - (legacyCount - 1 - LAST_NAMED_GRADE), tier: 1 };
+  const held = LEGACY_PERMIT_LIMITS[Math.max(0, oldGrade)]!;
+  let rung = 0;
+  while (rung < MINE_LAST_NAMED_RUNG && (PERMIT_LIMITS[rung]!.maxChargeKg < held.maxChargeKg || PERMIT_LIMITS[rung]!.maxAreaM2 < held.maxAreaM2)) rung++;
+  return { grade: Math.floor(rung / MINE_TIERS_PER_GRADE), tier: (rung % MINE_TIERS_PER_GRADE) + 1 };
+}
+
+/** Contract offers the site's tier perks add to every board refresh; 0 without a ladder. */
+export function extraContractOffers(g: GradeState | undefined): number {
+  return g ? tierPerksAt(gradeRung(g)).extraContractOffers : 0;
 }
 
 /** Target amount for display: whole numbers as-is, fractions floored to one decimal. */
@@ -134,29 +173,51 @@ export function sanitizeGradeState(raw: unknown): GradeState | undefined {
   if (!isWholeCount(grade) || !isCount(oreDeliveredKg) || !isCount(deepestPitM) || !isCount(rockBrokenM3) || !isWholeCount(blastsFired)) return undefined;
   const strikeTicks = Array.isArray(r['strikeTicks']) && r['strikeTicks'].every(isWholeCount) ? [...r['strikeTicks'] as number[]] : [];
   const inspectionRolls = isWholeCount(r['inspectionRolls']) ? r['inspectionRolls'] : 0;
-  const unseenApproval = isWholeCount(r['unseenApproval']) ? r['unseenApproval'] : null;
+  const unseenRaw = isWholeCount(r['unseenApproval']) ? r['unseenApproval'] : null;
   const lastBlastChargeShare = typeof r['lastBlastChargeShare'] === 'number' && Number.isFinite(r['lastBlastChargeShare']) && r['lastBlastChargeShare'] >= 0 ? r['lastBlastChargeShare'] : 0;
-  if (pending === null) return { grade, tier: 1, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks, inspectionRolls, lastBlastChargeShare, unseenApproval };
+  const hasTier = r['tier'] !== undefined;
+  if (hasTier && (!isWholeCount(r['tier']) || r['tier'] < 1 || r['tier'] > MINE_TIERS_PER_GRADE)) return undefined;
+  const map = (old: number): { grade: number; tier: number } => hasTier ? { grade: old, tier: old === grade ? r['tier'] as number : 1 } : migrateLegacyGrade(old);
+  const here = map(grade);
+  const tier = here.grade > LAST_NAMED_GRADE ? 1 : here.tier;
+  const unseenApproval = unseenRaw === null ? null : map(unseenRaw).grade;
+  const base = { grade: here.grade, tier, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, strikeTicks, inspectionRolls, lastBlastChargeShare, unseenApproval };
+  if (pending === null) return { ...base, pending: null };
   if (typeof pending !== 'object' || Array.isArray(pending)) return undefined;
   const p = pending as Record<string, unknown>;
   if (!isWholeCount(p['toGrade']) || !isWholeCount(p['ticksLeft'])) return undefined;
-  return { grade, tier: 1, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] }, strikeTicks, inspectionRolls, lastBlastChargeShare, unseenApproval };
+  const toGrade = Math.max(map(p['toGrade']).grade, here.grade + 1);
+  return { ...base, pending: { toGrade, ticksLeft: p['ticksLeft'] } };
 }
 
 /** Definition of entering a grade: 0 is the start permit, 1-3 are named, above that endless classes. */
-export function gradeDef(_grade: number): GradeDef {
-  void [MINE_GRADES, MINE_TIERS_PER_GRADE, MINE_GRADE_CLASS_ORE_FACTOR, MINE_GRADE_CLASS_ROCK_BASE_M3, MINE_GRADE_CLASS_ROCK_FACTOR, MINE_GRADE_CLASS_BASE_FEE, MINE_GRADE_CLASS_FEE_FACTOR, MINE_GRADE_CLASS_PROCESSING_TICKS];
-  throw new Error('not implemented');
+export function gradeDef(grade: number): GradeDef {
+  if (grade <= 0) return { grade: 0, nameKey: MINE_GRADES[0]!.nameKey, fee: 0, processingTicks: 0, targets: [] };
+  const top = MINE_GRADES[LAST_NAMED_GRADE]!;
+  const entry = (below: number): GradeTargetDef[] => [...MINE_GRADES[below]!.tiers[MINE_TIERS_PER_GRADE - 1]!.targets, ...MINE_GRADES[below]!.mastery];
+  const named = MINE_GRADES[grade];
+  if (named) return { grade, nameKey: named.nameKey, fee: named.fee, processingTicks: named.processingTicks, targets: entry(grade - 1) };
+
+  const k = grade - LAST_NAMED_GRADE;
+  const topOre = top.mastery.find(tg => tg.kind === 'ore_kg')!.value;
+  return {
+    grade,
+    nameKey: 'permit.grade.class',
+    nameParams: { n: k },
+    fee: Math.round(MINE_GRADE_CLASS_BASE_FEE * MINE_GRADE_CLASS_FEE_FACTOR ** (k - 1)),
+    processingTicks: MINE_GRADE_CLASS_PROCESSING_TICKS,
+    targets: k === 1 ? entry(LAST_NAMED_GRADE) : [
+      { kind: 'ore_kg', value: Math.round(topOre * MINE_GRADE_CLASS_ORE_FACTOR ** (k - 1)) },
+      { kind: 'rock_m3', value: Math.round(MINE_GRADE_CLASS_ROCK_BASE_M3 * MINE_GRADE_CLASS_ROCK_FACTOR ** (k - 2)) },
+    ],
+  };
 }
 
 /** Per-target progress toward the next grade; empty without a ladder. */
 export function nextGradeTargets(state: GameState): GradeTargetStatus[] {
   const g = state.grade;
   if (!g) return [];
-  return gradeDef(g.grade + 1).targets.map(({ kind, value }): GradeTargetStatus => {
-    const current = targetProgress(state, g, kind, value);
-    return { kind, met: current >= value, current, needed: value };
-  });
+  return gradeDef(g.grade + 1).targets.map(({ kind, value }) => targetStatus(state, g, kind, value));
 }
 
 /** Current value of one target kind; `no_death` reads as ticks since the last death, capped at the window. */
@@ -219,6 +280,7 @@ export function permitApplyBlocker(
   const g = state.grade;
   if (!g) return { refusal: 'no_ladder', unmet: [] };
   if (g.pending) return { refusal: 'pending', unmet: [] };
+  if (g.grade <= LAST_NAMED_GRADE && g.tier < MINE_TIERS_PER_GRADE) return { refusal: 'tier_incomplete', unmet: [] };
   const unmet = nextGradeTargets(state).filter(s => !s.met).map(s => s.kind);
   if (unmet.length > 0) return { refusal: 'unmet_targets', unmet };
   if (state.cash < gradeDef(g.grade + 1).fee) return { refusal: 'insufficient_funds', unmet: [] };
@@ -237,7 +299,9 @@ export function applyForGrade(state: GameState, emitter?: Pick<EventEmitter, 'em
   const toGrade = g.grade + 1;
   const def = gradeDef(toGrade);
   deductExpense(state, def.fee, 'permits', `Permit fee: grade ${toGrade}`);
-  g.pending = { toGrade, ticksLeft: flooredTicks(def.processingTicks + takePermitDelay(state.events.activeModifiers)) };
+  const perks = tierPerksAt(gradeRung(g));
+  const base = Math.round(def.processingTicks * (1 - perks.processingDiscountPct / 100));
+  g.pending = { toGrade, ticksLeft: flooredTicks(base + takePermitDelay(state.events.activeModifiers)) };
   emitter?.emit('progression:grade_applied', { toGrade, fee: def.fee });
   return { ok: true, fee: def.fee, toGrade };
 }
@@ -267,6 +331,7 @@ export function shiftPendingApplication(g: GradeState, ticks: number): boolean {
 export function approvePendingApplication(g: GradeState, emitter?: Pick<EventEmitter, 'emit'>): boolean {
   if (!g.pending) return false;
   g.grade = g.pending.toGrade;
+  g.tier = 1;
   g.pending = null;
   g.unseenApproval = g.grade;
   emitter?.emit('progression:grade_approved', { grade: g.grade });

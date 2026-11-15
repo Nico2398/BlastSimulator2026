@@ -32,6 +32,7 @@ import type { ConfirmModalConfig } from '../ConfirmModal.js';
 import { planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
 import { gridAreaLimitWarning, permitPreview } from '../permitPreview.js';
 import { defaultGridDepthM } from '../../../core/economy/PermitDefaults.js';
+import { gradeRung } from '../../../core/economy/MineGrade.js';
 import { holeStatusExplain, drillFieldExplain } from '../../blastWorkshopExplain.js';
 import { buildReplacePatternConfirm } from '../../replacePatternConfirm.js';
 import {
@@ -179,7 +180,7 @@ export class DrillStep {
 
   update(state: GameState, _weather?: WeatherState): void {
     this.lastState = state;
-    if (!this.playerAdjustedDepth) this.gridDepth = Math.min(defaultGridDepthM(state.grade?.grade), this.reachM());
+    if (!this.playerAdjustedDepth) this.gridDepth = Math.min(defaultGridDepthM(state.grade ? gradeRung(state.grade) : undefined), this.reachM());
     const holes = state.drillHoles;
     const ordered = state.plannedDrillHoles;
     const totalCount = holes.length + ordered.length;
@@ -198,7 +199,7 @@ export class DrillStep {
       spacing: this.gridSpacing, burden: this.gridBurden, layout: this.gridLayout, depth: this.gridDepth, diameter: this.gridDiameter,
       confirmingClear: this.confirmingClear,
       savedPlans: savedPlansSignature(state.savedPlans),
-      permitGrade: state.grade?.grade ?? null,
+      permitGrade: state.grade ? gradeRung(state.grade) : null,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;

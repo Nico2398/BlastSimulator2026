@@ -20,7 +20,9 @@ function share(v: number | null): string {
 
 function grades(r: RunResult): string {
   const entries = Object.entries(r.metrics.gradeReachedTick).sort(([a], [b]) => Number(a) - Number(b));
-  return entries.length === 0 ? NONE : entries.map(([g, t]) => `g${g}@${t}`).join(' ');
+  const tiers = Object.entries(r.metrics.tierReachedTick ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  const all = [...entries.map(([g, t]) => `g${g}@${t}`), ...tiers.map(([k, t]) => `t${k}@${t}`)];
+  return all.length === 0 ? NONE : all.join(' ');
 }
 
 function gradeCash(r: RunResult): string {

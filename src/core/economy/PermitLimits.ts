@@ -2,7 +2,8 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import { LAST_NAMED_GRADE, registerUnlockLine, type GradeState } from './MineGrade.js';
+import { LAST_NAMED_GRADE, gradeRung, registerUnlockLine, type GradeState } from './MineGrade.js';
+import { tierPerksAt } from './TierPerks.js';
 import { formatMoney } from './formatMoney.js';
 import { Random, rollSeed } from '../math/Random.js';
 import { chargeFine } from './Finance.js';
@@ -10,7 +11,7 @@ import { isEventShielded, markShielded } from './BribeProtection.js';
 import { pushModifier } from '../events/ActiveModifiers.js';
 import { clampScore } from '../scores/ScoreManager.js';
 import {
-  PERMIT_LIMITS, PERMIT_CLASS_CHARGE_FACTOR, PERMIT_CLASS_AREA_FACTOR, PERMIT_CLASS_FEE_FACTOR,
+  PERMIT_LIMITS, MINE_LAST_NAMED_RUNG, PERMIT_CLASS_CHARGE_FACTOR, PERMIT_CLASS_AREA_FACTOR, PERMIT_CLASS_FEE_FACTOR,
   PERMIT_INSPECTION_BASE_CHANCE, PERMIT_FINE_FEE_MULTIPLIER, PERMIT_CAUGHT_NEIGHBOUR_PENALTY,
   PERMIT_STRIKES_TO_SUSPEND, type PermitLimitConfig, PERMIT_STRIKE_WINDOW_TICKS, PERMIT_SUSPENSION_TICKS,
   INSPECTION_EVENT_TAG,
@@ -38,14 +39,21 @@ export interface InspectionVerdict {
 }
 
 /** Limits of a ladder step (see `gradeRung`); endless classes above G3 tier 3 scale by the class factors, the fee less the notification-fee perk. */
-export function permitLimitsForRung(_rung: number): PermitLimitConfig {
-  void [PERMIT_LIMITS, PERMIT_CLASS_CHARGE_FACTOR, PERMIT_CLASS_AREA_FACTOR, PERMIT_CLASS_FEE_FACTOR];
-  throw new Error('not implemented');
+export function permitLimitsForRung(rung: number): PermitLimitConfig {
+  const r = Math.max(0, Math.floor(rung));
+  const named = PERMIT_LIMITS[Math.min(r, MINE_LAST_NAMED_RUNG)]!;
+  const k = Math.max(0, r - MINE_LAST_NAMED_RUNG);
+  const discount = 1 - tierPerksAt(r).notificationFeeDiscountPct / 100;
+  return {
+    maxChargeKg: Math.round(named.maxChargeKg * PERMIT_CLASS_CHARGE_FACTOR ** k),
+    maxAreaM2: Math.round(named.maxAreaM2 * PERMIT_CLASS_AREA_FACTOR ** k),
+    fee: Math.round(named.fee * PERMIT_CLASS_FEE_FACTOR ** k * discount),
+  };
 }
 
 /** Limits of a grade and tier; tier defaults to 1 (classes have one). */
-export function permitLimitsFor(_grade: number, _tier = 1): PermitLimitConfig {
-  throw new Error('not implemented');
+export function permitLimitsFor(grade: number, tier = 1): PermitLimitConfig {
+  return permitLimitsForRung(gradeRung({ grade, tier }));
 }
 
 function limitsUnlockParams(grade: number): Record<string, string | number> {
@@ -78,8 +86,9 @@ export function liveStrikes(strikeTicks: readonly number[], tick: number): numbe
 }
 
 /** Chance an inspector turns up for a blast over limit by `overshoot`. */
-export function inspectionChance(overshoot: number, _rung = 0): number {
-  return Math.min(1, PERMIT_INSPECTION_BASE_CHANCE + overshoot);
+export function inspectionChance(overshoot: number, rung = 0): number {
+  const discount = 1 - tierPerksAt(rung).inspectionDiscountPct / 100;
+  return Math.min(1, (PERMIT_INSPECTION_BASE_CHANCE + overshoot) * discount);
 }
 
 /** Fine for a caught blast. */
@@ -112,7 +121,7 @@ export function resolveOvershoot(
     const rolls = g.inspectionRolls ?? 0;
     g.inspectionRolls = rolls + 1;
     verdict.rolled = true;
-    verdict.caught = rollInspection(new Random(rollSeed(state.seed, tick, rolls)), check.overshoot);
+    verdict.caught = rollInspection(new Random(rollSeed(state.seed, tick, rolls)), check.overshoot, gradeRung(g));
   }
 
   if (verdict.caught) {

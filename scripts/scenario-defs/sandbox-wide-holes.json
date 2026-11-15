@@ -3,19 +3,20 @@
   "description": "Hole diameter (#1934): with only a tier-1 rig a 127 mm grid is refused, and an 89 mm, 8 m hole holds 12 kg of boomite under 2 m of stemming (2 kg/m), so a 16 kg charge does not fit it. After buying a tier-2 rig the player steps the Drill diameter to 127 mm, drills two 8 m holes, fills each with boomite to the same 2 m of stemming (24.4 kg, about 4.07 kg/m instead of 2) and fires.",
   "steps": [
     {
-      "command": "sandbox start biome:desert_badlands kit:full seed:42 grade:4",
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 grade:3 tier:2",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:desert_badlands kit:full seed:42 grade:4"
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 grade:3 tier:2"
         }
       ],
       "description": "Progression site (kit:full): tier-1 drill rig only, so only 89 mm holes can be drilled at first.",
       "expect": {
         "equals": {
           "mineGrade": {
-            "grade": 4,
+            "grade": 3,
+            "tier": 2,
             "pendingTicksLeft": null
           }
         }

@@ -11,11 +11,12 @@
           "command": "sandbox start biome:desert_badlands kit:full seed:42"
         }
       ],
-      "description": "Progression site at grade 0: the Backyard Dig Permit allows 40 kg of charge and 144 m\u00b2 of pattern per blast.",
+      "description": "Progression site at grade 0: the Surface permit allows 40 kg of charge and 144 m\u00b2 of pattern per blast.",
       "expect": {
         "equals": {
           "mineGrade": {
             "grade": 0,
+            "tier": 1,
             "pendingTicksLeft": null
           }
         }
