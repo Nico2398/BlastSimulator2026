@@ -257,4 +257,11 @@ describe('freshSites site floors per footprint area (#2298)', () => {
     expect(sites.length).toBeGreaterThan(0);
     expect(sites.every(holdsColumn(big))).toBe(true);
   });
+
+  it('keeps the unscaled floors when the rules ask for the reference floors (campaign levels)', () => {
+    const grid = oneColumn(0.9, 3);
+    expect(freshSites(grid, 0, 3, [], { protectedZones: [], referenceFloors: true })).toEqual([]);
+    expect(freshSites(grid, 0, 3, [], { protectedZones: [], referenceFloors: true, minOre: 1 })).toEqual([]);
+    expect(freshSites(grid, 0, 3, [], { protectedZones: [], referenceFloors: false }).length).toBe(1);
+  });
 });

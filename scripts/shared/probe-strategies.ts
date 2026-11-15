@@ -1400,7 +1400,8 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
       // A pit to bench instead makes the buildings a hard limit for a fresh site, not a last resort.
       const benchFailedRecently = m.benchFailedTick !== undefined && s.state.tickCount - m.benchFailedTick < LADDER_BENCH_RETRY_TICKS;
       // A campaign level keeps the reference floors: its competent run wins on the first blast's ore, and the one-hole
-      // shots the scaled floor admits bleed its payroll into bankruptcy (shareholder summit, #2298's remainder).
+      // shots the scaled floor admits bleed its payroll into bankruptcy (shareholder summit).
+      // TODO(#2301): drop referenceFloors once the summit competent test passes without it.
       const referenceFloors = !sandboxRun(s);
       const benchInstead = !deepen && !depthOpen && crater !== undefined && !benchFailedRecently;
       const rules = benchInstead
