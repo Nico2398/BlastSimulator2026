@@ -1,6 +1,6 @@
 {
   "name": "campaign-meta-flow",
-  "description": "Issue #1326: the campaign meta-flow end to end with real clicks. Console campaign start of Dusty Hollow (menu New Campaign is Coming soon, #2276) -> win -> level-end Continue into Grumpstone Ridge -> TopBar Site Map and Back to site -> save -> bankruptcy -> level-end Retry restarts the level. Command mode checks the state numbers; interaction mode proves every menu, card and button is reachable by clicking.",
+  "description": "Issue #1326: the campaign meta-flow end to end with real clicks. Console campaign start of Dusty Hollow (menu New Campaign is Coming soon, #2276) -> win -> level-end Continue into Grumpstone Ridge -> TopBar Site Map and Back to site -> save -> Settings Return to Menu -> main-menu Continue reloads the save -> bankruptcy -> level-end Retry restarts the level. Command mode checks the state numbers; interaction mode proves every menu, card and button is reachable by clicking.",
   "steps": [
     {
       "command": "state",

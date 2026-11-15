@@ -99,11 +99,12 @@ export class MainMenu {
 
     // Campaign start is closed from the menu until the campaign gets its own
     // design pass (#2276): visible, disabled, badged. Continue/Load still open
-    // saves; console `campaign start` is untouched. `onNewCampaign` stays wired
-    // in main.ts behind NEW_CAMPAIGN_OPEN.
+    // saves; console `campaign start` is untouched. The callback stays registered
+    // but the button is disabled; NEW_CAMPAIGN_OPEN is a second guard.
     const newCampaignBtn = this.makeMenuButton('blast', 'menu.new_campaign', () => { if (NEW_CAMPAIGN_OPEN) this.onNewCampaign?.(); });
     newCampaignBtn.el.disabled = true;
     newCampaignBtn.el.setAttribute('aria-disabled', 'true');
+    newCampaignBtn.hintEl.removeAttribute('style'); // inline hint style would override the badge CSS
     newCampaignBtn.hintEl.className = 'bsx-menu-badge';
     this.locale.bindText(newCampaignBtn.hintEl, 'ui.menu.coming_soon');
     // Stable id (same convention as bs-menu-sandbox below) — scenario defs
