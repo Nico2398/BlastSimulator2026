@@ -6,6 +6,8 @@ import {
   terrainInfoCommand,
   surveyCommand,
   ensureLandscape,
+  oreIslandsCommand,
+  terrainConfigOf,
 } from '../../src/console/commands/world.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { STARTING_CASH, STARTING_SITE_STAFFED_COMPOSITION, DEFAULT_GRID_SIZE } from '../../src/core/config/balance.js';
@@ -14,7 +16,10 @@ import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { computeVoxelColumnSurfaceY, computeColumnRangeY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
-import { MAX_TERRAIN_GEN_DIMENSION } from '../../src/core/world/TerrainGen.js';
+import { MAX_TERRAIN_GEN_DIMENSION, buildTerrainContext } from '../../src/core/world/TerrainGen.js';
+import { createRunner } from '../../src/console/createRunner.js';
+import { t } from '../../src/core/i18n/I18n.js';
+import { ORE_ISLAND_ORE_IDS } from '../../src/core/config/balance.js';
 
 /**
  * Dig a pit at column (x, z) down from its current surface through
@@ -380,5 +385,75 @@ describe('Console — world commands', () => {
       const second = ensureLandscape(ctx, { ...params, seed: params.seed + 1 });
       expect(second!.groundLevelY).toBe(first!.groundLevelY);
     });
+  });
+});
+
+describe('Console — ore_islands (#2284)', () => {
+  function startSandbox(seed: number): GameContext {
+    const { runner, ctx } = createRunner();
+    const result = runner.run(`sandbox start biome:green_foothills seed:${seed}`);
+    expect(result.success, result.output).toBe(true);
+    return ctx;
+  }
+
+  it('C6 fails with the no-game message when no game is loaded', () => {
+    const result = oreIslandsCommand(makeEmptyGameContext(), [], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('console.no_game_loaded'));
+  });
+
+  it('C6 is registered on the runner as ore_islands and fails without a game', () => {
+    const { runner } = createRunner();
+    const result = runner.run('ore_islands');
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('console.no_game_loaded'));
+  });
+
+  it('C6 lists every island of a progression site: its ores, one line each at least', () => {
+    for (const seed of [42, 1]) {
+      const ctx = startSandbox(seed);
+      const config = terrainConfigOf(ctx.state!)!;
+      const islands = buildTerrainContext(config).oreIslands!.list();
+      expect(islands.length).toBeGreaterThanOrEqual(3);
+
+      const result = oreIslandsCommand(ctx, [], {});
+      expect(result.success, result.output).toBe(true);
+      const lines = result.output.split('\n').filter(l => l.trim() !== '');
+      expect(lines.length).toBeGreaterThanOrEqual(islands.length);
+      for (const island of islands) {
+        for (const id of island.oreIds) expect(result.output).toContain(id);
+      }
+    }
+  });
+
+  it('C6 reports each island centre and its distance from spawn', () => {
+    const ctx = startSandbox(42);
+    const islands = buildTerrainContext(terrainConfigOf(ctx.state!)!).oreIslands!.list();
+    const out = oreIslandsCommand(ctx, [], {}).output;
+    // Every island's centre and distance appear as a whole number, however the line rounds it.
+    for (const island of islands) {
+      for (const value of [island.x, island.z, island.distance]) {
+        const near = [Math.floor(value), Math.round(value), Math.ceil(value)].map(String);
+        expect(near.some(n => out.includes(n)), `${value} in output`).toBe(true);
+      }
+    }
+  });
+
+  it('C6 through the runner, lists the same islands as the command', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('sandbox start biome:green_foothills seed:42').success).toBe(true);
+    const viaRunner = runner.run('ore_islands');
+    expect(viaRunner.success).toBe(true);
+    expect(viaRunner.output).toBe(oreIslandsCommand(ctx, [], {}).output);
+    expect(ORE_ISLAND_ORE_IDS.some(id => viaRunner.output.includes(id))).toBe(true);
+  });
+
+  it('C5 a game without ore deposits has no islands: success with a "none" line', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: '42' });
+    expect(ctx.state!.world!.oreDeposits).toBeUndefined();
+    const result = oreIslandsCommand(ctx, [], {});
+    expect(result.success).toBe(true);
+    expect(result.output.toLowerCase()).toContain('none');
+    for (const id of ORE_ISLAND_ORE_IDS) expect(result.output).not.toContain(id);
   });
 });

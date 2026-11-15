@@ -3,9 +3,11 @@
 import { describe, it, expect } from 'vitest';
 import { PlayableArea } from '../../../src/core/world/PlayableArea.js';
 import { generateTerrain, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
-import { VoxelGrid, CHUNK_SIZE } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, CHUNK_SIZE, computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
 import { MAX_CLAIM_BRIDGE_CHUNKS } from '../../../src/core/config/balance.js';
 import type { ProtectedStructures } from '../../../src/core/world/Structures.js';
+import { ORE_ISLAND_DEPTH_M, ORE_ISLAND_ORE_IDS } from '../../../src/core/config/balance.js';
+import { REFERENCE_SEEDS, islandConfig, islandsOf } from '../../helpers/oreIslandSite.js';
 
 // The site's declared height under the old sizeY-carrying TerrainConfig was
 // 24 — kept here as a named constant so the scan-bound loops below (which
@@ -555,5 +557,64 @@ describe('PlayableArea.previewClaimArea (#1396)', () => {
     const { area } = makeArea();
     area.adoptStructures(structuresProtectingChunk(2, 0));
     expect(area.previewClaimArea({ minX: 34, minZ: 10, maxX: 35, maxZ: 11 })).toBe(area.previewClaim(34, 10));
+  });
+});
+
+describe('PlayableArea.claimArea over an ore island (#2284)', () => {
+  /** Claim the chunk over each of a seed's nearest islands on a fresh site, until one is taken. */
+  function claimNearestIsland(seed: number): { grid: VoxelGrid; island: { x: number; z: number } } | null {
+    for (const island of islandsOf(seed).list().slice(0, 3)) {
+      const config = islandConfig(seed);
+      const grid = generateTerrain(config);
+      const area = new PlayableArea(grid, config);
+      const result = area.claimArea([{ x: Math.round(island.x), z: Math.round(island.z) }]);
+      if (result.claimed) return { grid, island };
+    }
+    return null;
+  }
+
+  it('C4 a chunk over a reference island can be claimed through the bridge on at least one reference seed', () => {
+    const outcomes = REFERENCE_SEEDS.map(seed => ({ seed, claimed: claimNearestIsland(seed) !== null }));
+    expect(outcomes.some(o => o.claimed), JSON.stringify(outcomes)).toBe(true);
+  });
+
+  it('a claimed island chunk generates ground that holds the island ore', () => {
+    let checked = 0;
+    for (const seed of REFERENCE_SEEDS) {
+      const claimed = claimNearestIsland(seed);
+      if (!claimed) continue;
+      const { grid, island } = claimed;
+      const cx = Math.round(island.x), cz = Math.round(island.z);
+      expect(grid.containsColumn(cx, cz)).toBe(true);
+      let ore = 0;
+      for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) {
+        const x = cx + dx, z = cz + dz;
+        if (!grid.containsColumn(x, z)) continue;
+        const surface = computeVoxelColumnSurfaceY(grid, x, z);
+        if (surface === null) continue;
+        for (let y = surface; y >= surface - ORE_ISLAND_DEPTH_M - 2; y--) {
+          const here = grid.oresAt(x, y, z);
+          if (here && ORE_ISLAND_ORE_IDS.some(id => (here[id] ?? 0) > 0)) ore++;
+        }
+      }
+      expect(ore, `seed ${seed}`).toBeGreaterThan(0);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('the starting site itself holds no G2 ore', () => {
+    for (const seed of REFERENCE_SEEDS) {
+      const config = islandConfig(seed);
+      const grid = generateTerrain(config);
+      for (let x = grid.minX; x < grid.maxX; x += 2) for (let z = grid.minZ; z < grid.maxZ; z += 2) {
+        const surface = computeVoxelColumnSurfaceY(grid, x, z);
+        if (surface === null) continue;
+        for (let y = surface; y >= surface - 40; y -= 2) {
+          const here = grid.oresAt(x, y, z);
+          for (const id of ORE_ISLAND_ORE_IDS) expect(here?.[id] ?? 0, `seed ${seed} ${id} at ${x},${y},${z}`).toBe(0);
+        }
+      }
+    }
   });
 });
