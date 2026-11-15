@@ -477,7 +477,8 @@ export class SurveyPanel extends PanelBase {
       choices: [...ores].sort((a, b) => richest(b) - richest(a) || a.localeCompare(b)).map(value => ({ value, label: t(`ore.${value}.name`) })),
       groups: [{
         id: 'method', label: t('ui.survey.filter_method'),
-        choices: METHOD_ORDER.map(value => ({ value, label: t(`survey.${value}`) })),
+        // Ore-reading methods only: a prospection holds islands, no ore estimates, so no ore filter selects it.
+        choices: METHOD_ORDER.filter(value => value !== 'prospection').map(value => ({ value, label: t(`survey.${value}`) })),
       }],
       sorts: [],
       onChange: () => {
