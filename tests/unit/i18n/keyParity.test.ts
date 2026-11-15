@@ -542,7 +542,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #2276: +1 (coming_soon badge).
     // #2278: +15 keys (ore stock lines, spoil send confirmation, console spoil, auto-sold ores line): 5049.
     // #2279: +2 keys (survey method lock refusal and card label): 5051.
-    expect(Object.keys(en).length).toBe(5051);
+    // #2286: +4 keys (long-range prospection card, note, island row, empty list): 5055.
+    expect(Object.keys(en).length).toBe(5055);
   });
 
   it('carries the weak-explosive warning key no more, and the breaks-nothing keys in both locales (#2197)', () => {

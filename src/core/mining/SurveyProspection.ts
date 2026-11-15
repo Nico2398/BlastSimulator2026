@@ -18,7 +18,7 @@ export interface ProspectedIsland {
 }
 
 /** Inputs of a prospection read. */
-export interface ProspectionParams {
+interface ProspectionParams {
   centerX: number;
   centerZ: number;
   skillLevel: number;

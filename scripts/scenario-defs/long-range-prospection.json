@@ -109,10 +109,6 @@
       }
     },
     {
-      "command": "survey islands",
-      "role": "observe"
-    },
-    {
       "command": "state",
       "role": "player",
       "timeout": 90,
