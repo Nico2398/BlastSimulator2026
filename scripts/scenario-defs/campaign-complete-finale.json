@@ -15,34 +15,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "state",
-      "description": "Player clicks New Campaign; Portfolio must offer Dusty Hollow's Start. Inert paired `state`.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-main-menu #bs-menu-new-campaign"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "usable": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]",
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
       "command": "campaign start level:dusty_hollow staffed:false",
-      "description": "Player starts Dusty Hollow from its Portfolio card.",
+      "description": "Setup: the main menu's New Campaign is closed (Coming soon, #2276), so Dusty Hollow starts through the console; the HUD must be reachable.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
+          "type": "command",
+          "command": "campaign start level:dusty_hollow staffed:false"
         },
         {
           "type": "awaitUsable",
@@ -50,7 +28,7 @@
           "timeoutMs": 60000
         }
       ],
-      "role": "player",
+      "role": "setup",
       "expect": {
         "usable": "#bs-saveload-btn",
         "equals": {

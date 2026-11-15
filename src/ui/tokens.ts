@@ -452,6 +452,18 @@ export const TOKENS_CSS = `
   transition: background .12s, border-color .12s, color .12s;
 }
 .bsx-menu-btn:hover { border-color: var(--bsx-amber); color: var(--bsx-amber); background: rgba(255,176,46,.08); }
+.bsx-menu-btn:disabled { opacity: .55; cursor: not-allowed; }
+.bsx-menu-btn:disabled:hover { border-color: rgba(255,255,255,.12); color: inherit; background: rgba(20,25,32,.72); }
+.bsx-menu-badge {
+  margin-left: auto;
+  padding: 3px 7px;
+  border-radius: 3px;
+  background: var(--bsx-amber);
+  color: #1a1a1a;
+  font: 700 9px/1 var(--bsx-font-ui);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
 .bsx-menu-btn-continue {
   display: flex;
   align-items: center;
