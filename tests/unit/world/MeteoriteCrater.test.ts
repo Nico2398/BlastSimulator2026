@@ -14,7 +14,7 @@ import {
 } from '../../../src/core/config/balance.js';
 import { CHUNK_SIZE } from '../../../src/core/world/VoxelGrid.js';
 import {
-  REFERENCE_SEEDS, SPAWN, islandsOf, structuresOf, distanceFromSpawn,
+  REFERENCE_SEEDS, SPAWN, islandContext, islandsOf, structuresOf, distanceFromSpawn,
 } from '../../helpers/oreIslandSite.js';
 
 /** A camera reach no base reaches past: the whole footprint must lie beyond it. */
@@ -167,8 +167,10 @@ describe('MeteoriteCrater protected-ground veto (C3)', () => {
   it('no crater on a reference world touches a village, river or landmark', () => {
     for (const seed of REFERENCE_SEEDS) {
       const structures = structuresOf(seed);
-      const { x, z } = infoOf(seed);
-      const square = squareAround(x, z, METEORITE_CRATER_OUTER_RADIUS_M);
+      // The wired crater: the veto is the protected-structure set itself, as the claim path builds it.
+      const wired = islandContext(seed).crater?.info;
+      if (!wired) throw new Error(`seed ${seed}: no crater placed`);
+      const square = squareAround(wired.x, wired.z, METEORITE_CRATER_OUTER_RADIUS_M);
       expect(rectTouchesProtectedStructure(structures, square), `seed ${seed}`).toBe(false);
     }
   });
