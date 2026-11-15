@@ -51,8 +51,8 @@ const ROOT = join(import.meta.dirname, '../../..');
  */
 const HARDCODED_STRING_ALLOWLIST: readonly string[] = [
   'src/ui/MainMenu.ts:78',
-  'src/ui/MainMenu.ts:130',
-  'src/ui/MainMenu.ts:132',
+  'src/ui/MainMenu.ts:131',
+  'src/ui/MainMenu.ts:133',
 ];
 
 interface Violation {
