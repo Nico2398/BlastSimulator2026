@@ -3574,6 +3574,7 @@
   "shell.rail.settings": "Settings",
   "shell.topbar.day": "Day {day}",
   "shell.topbar.grade": "Permit: {name} T{tier}",
+  "shell.topbar.grade_class": "Permit: {name}",
   "shell.topbar.grade_tip": "Your mining permit grade. Click to open the Ministry of Holes.",
   "shell.topbar.board": "Q{quarter} · {days}d · {confidence}%",
   "shell.topbar.objective": "Profit {profit} / {target}",

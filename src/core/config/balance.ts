@@ -3279,9 +3279,13 @@ export const MINE_LAST_NAMED_GRADE = 3;
 /** Ladder step (grade x tier) of G3 tier 3, the last named step; classes continue above it. */
 export const MINE_LAST_NAMED_RUNG = 11;
 /** Perk size per perk kind: fee and processing and inspection discounts in percent, offers in count per refresh. */
+/** Perk: notification fee -5%. */
 const PERK_FEE: MineTierPerk = { kind: 'notification_fee_pct', value: 5 };
+/** Perk: grade processing time -5%. */
 const PERK_PROCESSING: MineTierPerk = { kind: 'processing_pct', value: 5 };
+/** Perk: inspection chance -5%. */
 const PERK_INSPECTION: MineTierPerk = { kind: 'inspection_pct', value: 5 };
+/** Perk: +1 contract offer per board refresh. */
 const PERK_OFFER: MineTierPerk = { kind: 'contract_offers', value: 1 };
 /** Four named grades x three tiers (v1 defaults, re-tuned by calibration tasks). Tier targets are cumulative counters. */
 export const MINE_GRADES: Readonly<Record<number, MineGradeConfig>> = {

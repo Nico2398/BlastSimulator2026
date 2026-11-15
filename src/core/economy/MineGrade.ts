@@ -281,7 +281,8 @@ export function permitApplyBlocker(
   if (!g) return { refusal: 'no_ladder', unmet: [] };
   if (g.pending) return { refusal: 'pending', unmet: [] };
   if (g.grade <= LAST_NAMED_GRADE && g.tier < MINE_TIERS_PER_GRADE) return { refusal: 'tier_incomplete', unmet: [] };
-  const unmet = nextGradeTargets(state).filter(s => !s.met).map(s => s.kind);
+  // Tier 3 and the mastery both name ore: list each unmet kind once.
+  const unmet = [...new Set(nextGradeTargets(state).filter(s => !s.met).map(s => s.kind))];
   if (unmet.length > 0) return { refusal: 'unmet_targets', unmet };
   if (state.cash < gradeDef(g.grade + 1).fee) return { refusal: 'insufficient_funds', unmet: [] };
   return null;

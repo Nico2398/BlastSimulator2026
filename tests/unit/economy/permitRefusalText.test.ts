@@ -79,7 +79,7 @@ describe('permitApplyBlocker (#1924)', () => {
 
   it('lists every unmet kind on a fresh site', () => {
     const s = progression();
-    const expected = nextGradeTargets(s).map(x => x.kind);
+    const expected = [...new Set(nextGradeTargets(s).map(x => x.kind))];
     expect(permitApplyBlocker(s)).toEqual({ refusal: 'unmet_targets', unmet: expected });
   });
 

@@ -3574,6 +3574,7 @@
   "shell.rail.settings": "Paramètres",
   "shell.topbar.day": "Jour {day}",
   "shell.topbar.grade": "Permis : {name} P{tier}",
+  "shell.topbar.grade_class": "Permis : {name}",
   "shell.topbar.grade_tip": "Le grade de votre permis d'exploitation. Cliquez pour ouvrir le Ministère des Trous.",
   "shell.topbar.board": "T{quarter} · {days} j · {confidence} %",
   "shell.topbar.objective": "Bénéfice {profit} / {target}",

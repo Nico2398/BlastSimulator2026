@@ -18,7 +18,7 @@ import { computeWeatherAdvisory, type WeatherAdvisory } from '../../core/weather
 import { formatDollars } from '../../core/economy/formatMoney.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import { getLevelObjective } from '../../core/campaign/LevelObjective.js';
-import { gradeDef, nextGradeTargets } from '../../core/economy/MineGrade.js';
+import { gradeDef, LAST_NAMED_GRADE, nextGradeTargets } from '../../core/economy/MineGrade.js';
 import { boardTicksLeft } from '../../core/economy/Board.js';
 import { getOperatingSummary } from '../../core/economy/OperatingFinance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
@@ -584,7 +584,9 @@ export class TopBar {
     this.lastGradeSig = sig;
     if (!grade) { this.gradeWrap.style.display = 'none'; return; }
     this.gradeWrap.style.display = 'flex';
-    this.gradeText.textContent = t('shell.topbar.grade', { name: t(grade.nameKey, grade.nameParams), tier: g!.tier });
+    const name = t(grade.nameKey, grade.nameParams);
+    // Endless classes have no tiers.
+    this.gradeText.textContent = g!.grade > LAST_NAMED_GRADE ? t('shell.topbar.grade_class', { name }) : t('shell.topbar.grade', { name, tier: g!.tier });
   }
 
   /** Show the quarter countdown and board confidence on board levels. */
