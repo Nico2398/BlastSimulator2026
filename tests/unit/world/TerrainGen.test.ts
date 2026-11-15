@@ -13,6 +13,15 @@ import { sampleSurfaceHeightY, sampleSurfaceVoxelY, applyPitMask, sampleBaseHeig
 import { getOre, orePermitGrade } from '../../../src/core/world/OreCatalog.js';
 import { OreVeinSampler } from '../../../src/core/world/OreVeins.js';
 import { getAllLevels } from '../../../src/core/campaign/Level.js';
+import { computeVoxelColumnSurfaceY, CompositionPalette } from '../../../src/core/world/VoxelGrid.js';
+import { sampleLandscapeColumn } from '../../../src/core/world/LandscapeMap.js';
+import { MeteoriteCrater } from '../../../src/core/world/MeteoriteCrater.js';
+import {
+  METEORITE_ROCK_ID, METEORITE_CRATER_OUTER_RADIUS_M, METEORITE_CRATER_RIM_RADIUS_M, METEORITE_CRATER_DEPTH_M,
+  METEORITE_CRATER_RIM_HEIGHT_M, METEORITE_BODY_RADIUS_M, ORE_ISLAND_DEPTH_M,
+} from '../../../src/core/config/balance.js';
+import { REFERENCE_SEEDS, islandConfig, islandContext, islandsOf } from '../../helpers/oreIslandSite.js';
+import type { StructureSet } from '../../../src/core/world/Structures.js';
 
 function makeConfig(seed: number, biomeId = 'desert_badlands'): TerrainConfig {
   const biome = getBiome(biomeId)!;
@@ -1025,5 +1034,246 @@ describe('TerrainGen — ore grade layers on a progression site (#2281)', () => 
   it('C6 a site with ore deposits off keeps its catalog windows: G0 ore still occurs below 5 m', () => {
     const { oreDeposits: _omit, ...legacy } = sandboxTerrainConfig('desert_badlands', 42);
     expect(oreVoxels(legacy).some(([d, id]) => d > ORE_G0_LAYER_DEPTH_M && orePermitGrade(id) === 0)).toBe(true);
+  });
+});
+
+// ── Meteorite crater in the generated terrain (#2287) ─────────────────────────────────────────────
+
+describe('TerrainContext.crater (C1)', () => {
+  it('is present on a progression site and carries one placed crater', () => {
+    for (const seed of REFERENCE_SEEDS) {
+      const crater = islandContext(seed).crater;
+      expect(crater, `seed ${seed}`).toBeInstanceOf(MeteoriteCrater);
+      expect(crater!.info, `seed ${seed}`).not.toBeNull();
+    }
+  });
+
+  it('is null when ore deposits are off', () => {
+    expect(islandContext(42, false).crater).toBeNull();
+  });
+
+  it('is null when the oreDeposits flag is absent (campaign sites)', () => {
+    expect(islandContext(42, undefined).crater).toBeNull();
+  });
+
+  it('is deterministic per seed and differs between seeds', () => {
+    const a = islandContext(1).crater!.info;
+    clearTerrainContextMemo();
+    expect(islandContext(1).crater!.info).toEqual(a);
+    expect(islandContext(2).crater!.info).not.toEqual(a);
+  });
+});
+
+describe('meteorite crater — surface height (C4)', () => {
+  const EMPTY_STRUCTURES: StructureSet = { overlays: [], spatialIndex: new Map(), rivers: [], villages: [], trees: [], landmarks: [] };
+
+  /** Same seed and size, ore deposits off: the natural ground with no crater. */
+  function natural(seed: number) {
+    return buildTerrainContext(islandConfig(seed, false));
+  }
+
+  function points(seed: number): Array<[string, number, number]> {
+    const { x, z } = islandContext(seed).crater!.info!;
+    return [
+      ['centre', x, z],
+      ['rim east', x + METEORITE_CRATER_RIM_RADIUS_M, z],
+      ['rim north', x, z + METEORITE_CRATER_RIM_RADIUS_M],
+      ['inside the bowl', x + 6, z - 4],
+      ['beyond the crater', x + METEORITE_CRATER_OUTER_RADIUS_M + 10, z],
+    ];
+  }
+
+  it('sampleSurfaceHeightY dips at the centre and rises at the rim relative to the natural ground', () => {
+    for (const seed of REFERENCE_SEEDS) {
+      const on = islandContext(seed);
+      const off = natural(seed);
+      const [, cx, cz] = points(seed)[0]!;
+      const dip = sampleSurfaceHeightY(on.worldGen, cx, cz) - sampleSurfaceHeightY(off.worldGen, cx, cz);
+      expect(dip, `seed ${seed}`).toBeLessThan(-METEORITE_CRATER_DEPTH_M * 0.75);
+      const [, rx, rz] = points(seed)[1]!;
+      const rise = sampleSurfaceHeightY(on.worldGen, rx, rz) - sampleSurfaceHeightY(off.worldGen, rx, rz);
+      expect(rise, `seed ${seed}`).toBeGreaterThan(METEORITE_CRATER_RIM_HEIGHT_M * 0.75);
+    }
+  });
+
+  it('sampleSurfaceHeightY adds exactly the crater relief at every column', () => {
+    for (const seed of REFERENCE_SEEDS) {
+      const on = islandContext(seed);
+      const off = natural(seed);
+      for (const [label, x, z] of points(seed)) {
+        const delta = sampleSurfaceHeightY(on.worldGen, x, z) - sampleSurfaceHeightY(off.worldGen, x, z);
+        expect(delta, `seed ${seed} ${label}`).toBeCloseTo(on.crater!.reliefAt(x, z), 5);
+      }
+    }
+  });
+
+  it('sampleSurfaceVoxelY follows the crater: lower at the centre, higher at the rim', () => {
+    for (const seed of REFERENCE_SEEDS) {
+      const on = islandContext(seed);
+      const off = natural(seed);
+      const [, cx, cz] = points(seed)[0]!;
+      expect(sampleSurfaceVoxelY(on.worldGen, cx, cz) - sampleSurfaceVoxelY(off.worldGen, cx, cz))
+        .toBeLessThanOrEqual(-Math.floor(METEORITE_CRATER_DEPTH_M * 0.75));
+      const [, rx, rz] = points(seed)[1]!;
+      expect(sampleSurfaceVoxelY(on.worldGen, rx, rz) - sampleSurfaceVoxelY(off.worldGen, rx, rz))
+        .toBeGreaterThanOrEqual(Math.floor(METEORITE_CRATER_RIM_HEIGHT_M * 0.75));
+    }
+  });
+
+  it('leaves the ground beyond the crater and the starting site untouched', () => {
+    for (const seed of REFERENCE_SEEDS) {
+      const on = islandContext(seed);
+      const off = natural(seed);
+      const [, bx, bz] = points(seed)[4]!;
+      for (const [x, z] of [[bx, bz], [32, 32], [10, 50], [-120, 40]] as const) {
+        expect(sampleSurfaceHeightY(on.worldGen, x, z)).toBe(sampleSurfaceHeightY(off.worldGen, x, z));
+        expect(sampleSurfaceVoxelY(on.worldGen, x, z)).toBe(sampleSurfaceVoxelY(off.worldGen, x, z));
+      }
+    }
+  });
+
+  it('sampleLandscapeColumn agrees with the crater: same dip at the centre, same rise at the rim', () => {
+    for (const seed of [42, 1]) {
+      const on = islandContext(seed);
+      const off = natural(seed);
+      const bias = islandConfig(seed).climateBias;
+      const palette = new CompositionPalette();
+      for (const [label, x, z] of points(seed)) {
+        const landOn = sampleLandscapeColumn(on.worldGen, bias, EMPTY_STRUCTURES, on.strata, palette, x, z).height;
+        const landOff = sampleLandscapeColumn(off.worldGen, bias, EMPTY_STRUCTURES, off.strata, palette, x, z).height;
+        expect(landOn - landOff, `seed ${seed} ${label}`).toBeCloseTo(on.crater!.reliefAt(x, z), 5);
+      }
+    }
+  });
+});
+
+describe('meteorite crater — generated voxels (C4, C5)', () => {
+  /** Claim every chunk within `reach` m of (x, z) so reads there materialise. */
+  function claimAround(grid: ReturnType<typeof generateTerrain>, x: number, z: number, reach: number): void {
+    for (let cx = Math.floor((x - reach) / CHUNK_SIZE); cx <= Math.floor((x + reach) / CHUNK_SIZE); cx++) {
+      for (let cz = Math.floor((z - reach) / CHUNK_SIZE); cz <= Math.floor((z + reach) / CHUNK_SIZE); cz++) grid.addChunk(cx, cz);
+    }
+  }
+
+  function topY(grid: ReturnType<typeof generateTerrain>, x: number, z: number): number {
+    const y = computeVoxelColumnSurfaceY(grid, x, z);
+    if (y === null) throw new Error(`no solid ground at ${x},${z}`);
+    return y;
+  }
+
+  const SEEDS = [42, 1];
+
+  it('the generated surface dips at the centre column and rises at the rim, against the natural ground', () => {
+    for (const seed of SEEDS) {
+      const { x, z } = islandContext(seed).crater!.info!;
+      const cx = Math.round(x);
+      const cz = Math.round(z);
+      const rx = cx + METEORITE_CRATER_RIM_RADIUS_M;
+      const withCrater = generateTerrain(islandConfig(seed));
+      const bare = generateTerrain(islandConfig(seed, false));
+      for (const grid of [withCrater, bare]) claimAround(grid, x, z, METEORITE_CRATER_OUTER_RADIUS_M + 2);
+      expect(topY(withCrater, cx, cz) - topY(bare, cx, cz), `seed ${seed} centre`)
+        .toBeLessThanOrEqual(-Math.floor(METEORITE_CRATER_DEPTH_M * 0.75));
+      expect(topY(withCrater, rx, cz) - topY(bare, rx, cz), `seed ${seed} rim`)
+        .toBeGreaterThanOrEqual(Math.floor(METEORITE_CRATER_RIM_HEIGHT_M * 0.75));
+      const far = cx + METEORITE_CRATER_OUTER_RADIUS_M + 6;
+      expect(topY(withCrater, far, cz), `seed ${seed} beyond`).toBe(topY(bare, far, cz));
+    }
+  });
+
+  it('holds meteoritic rock with treranium below the floor, within the body radius', () => {
+    for (const seed of SEEDS) {
+      const { x, z } = islandContext(seed).crater!.info!;
+      const grid = generateTerrain(islandConfig(seed));
+      claimAround(grid, x, z, METEORITE_CRATER_OUTER_RADIUS_M + 2);
+      const cx = Math.round(x);
+      const cz = Math.round(z);
+      for (const [dx, dz] of [[0, 0], [4, 0], [0, -4], [-3, 3]] as const) {
+        const top = topY(grid, cx + dx, cz + dz);
+        for (const depth of [4, 8]) {
+          const y = top - depth;
+          expect(grid.dominantRockAt(cx + dx, y, cz + dz), `seed ${seed} ${dx},${dz} depth ${depth}`).toBe(METEORITE_ROCK_ID);
+          expect(grid.oresAt(cx + dx, y, cz + dz)?.treranium ?? 0, `seed ${seed} ${dx},${dz} depth ${depth}`).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('holds no meteoritic rock and no treranium outside the body, inside the crater footprint', () => {
+    for (const seed of SEEDS) {
+      const { x, z } = islandContext(seed).crater!.info!;
+      const grid = generateTerrain(islandConfig(seed));
+      claimAround(grid, x, z, METEORITE_CRATER_OUTER_RADIUS_M + 2);
+      const cx = Math.round(x);
+      const cz = Math.round(z);
+      for (let dx = -METEORITE_CRATER_OUTER_RADIUS_M; dx <= METEORITE_CRATER_OUTER_RADIUS_M; dx += 2) {
+        for (let dz = -METEORITE_CRATER_OUTER_RADIUS_M; dz <= METEORITE_CRATER_OUTER_RADIUS_M; dz += 2) {
+          if (Math.hypot(dx, dz) <= METEORITE_BODY_RADIUS_M + 1.5) continue;
+          const top = topY(grid, cx + dx, cz + dz);
+          for (let depth = 0; depth <= 25; depth += 3) {
+            const y = top - depth;
+            expect(grid.dominantRockAt(cx + dx, y, cz + dz), `seed ${seed} ${dx},${dz} depth ${depth}`).not.toBe(METEORITE_ROCK_ID);
+            expect(grid.oresAt(cx + dx, y, cz + dz)?.treranium ?? 0, `seed ${seed} ${dx},${dz} depth ${depth}`).toBe(0);
+          }
+        }
+      }
+    }
+  });
+
+  it('a site without ore deposits has no meteoritic rock or treranium where the crater would be', () => {
+    for (const seed of SEEDS) {
+      const { x, z } = islandContext(seed).crater!.info!;
+      const grid = generateTerrain(islandConfig(seed, false));
+      claimAround(grid, x, z, METEORITE_CRATER_OUTER_RADIUS_M + 2);
+      const cx = Math.round(x);
+      const cz = Math.round(z);
+      for (let dx = -METEORITE_BODY_RADIUS_M; dx <= METEORITE_BODY_RADIUS_M; dx += 2) {
+        for (let dz = -METEORITE_BODY_RADIUS_M; dz <= METEORITE_BODY_RADIUS_M; dz += 2) {
+          const top = topY(grid, cx + dx, cz + dz);
+          for (let depth = 0; depth <= 20; depth += 4) {
+            expect(grid.dominantRockAt(cx + dx, top - depth, cz + dz)).not.toBe(METEORITE_ROCK_ID);
+            expect(grid.oresAt(cx + dx, top - depth, cz + dz)?.treranium ?? 0).toBe(0);
+          }
+        }
+      }
+    }
+  });
+
+  it('holds no treranium on the starting site, the starter deposit included', () => {
+    for (const seed of SEEDS) {
+      const grid = generateTerrain(islandConfig(seed));
+      for (let x = 0; x < 64; x += 2) {
+        for (let z = 0; z < 64; z += 2) {
+          const top = topY(grid, x, z);
+          for (let y = top; y >= top - 30; y -= 2) {
+            expect(grid.oresAt(x, y, z)?.treranium ?? 0, `seed ${seed} at ${x},${y},${z}`).toBe(0);
+            expect(grid.dominantRockAt(x, y, z)).not.toBe(METEORITE_ROCK_ID);
+          }
+        }
+      }
+    }
+  });
+
+  it('holds no treranium and no meteoritic rock in the ore islands', () => {
+    const seed = 42;
+    const grid = generateTerrain(islandConfig(seed));
+    for (const island of islandsOf(seed).list().slice(0, 3)) {
+      claimAround(grid, island.x, island.z, island.radius + 2);
+      const ix = Math.round(island.x);
+      const iz = Math.round(island.z);
+      let oreSeen = false;
+      for (let dx = -island.radius; dx <= island.radius; dx += 2) {
+        for (let dz = -island.radius; dz <= island.radius; dz += 2) {
+          const top = topY(grid, ix + dx, iz + dz);
+          for (let depth = 0; depth <= ORE_ISLAND_DEPTH_M + 2; depth++) {
+            const ores = grid.oresAt(ix + dx, top - depth, iz + dz);
+            if (ores && Object.keys(ores).length > 0) oreSeen = true;
+            expect(ores?.treranium ?? 0, `island ${island.x},${island.z} at ${dx},${dz} depth ${depth}`).toBe(0);
+            expect(grid.dominantRockAt(ix + dx, top - depth, iz + dz)).not.toBe(METEORITE_ROCK_ID);
+          }
+        }
+      }
+      expect(oreSeen, `island ${island.x},${island.z} still holds its own ore`).toBe(true);
+    }
   });
 });

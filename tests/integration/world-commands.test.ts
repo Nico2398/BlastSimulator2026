@@ -9,6 +9,7 @@ import {
   oreIslandsCommand,
   terrainConfigOf,
 } from '../../src/console/commands/world.js';
+import * as worldCommands from '../../src/console/commands/world.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { STARTING_CASH, STARTING_SITE_STAFFED_COMPOSITION, DEFAULT_GRID_SIZE } from '../../src/core/config/balance.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
@@ -19,7 +20,7 @@ import { computeVoxelColumnSurfaceY, computeColumnRangeY, type VoxelGrid } from 
 import { MAX_TERRAIN_GEN_DIMENSION, buildTerrainContext } from '../../src/core/world/TerrainGen.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { t } from '../../src/core/i18n/I18n.js';
-import { ORE_ISLAND_ORE_IDS } from '../../src/core/config/balance.js';
+import { ORE_ISLAND_ORE_IDS, METEORITE_CRATER_MIN_DISTANCE_M, METEORITE_CRATER_MAX_DISTANCE_M } from '../../src/core/config/balance.js';
 
 /**
  * Dig a pit at column (x, z) down from its current surface through
@@ -455,5 +456,90 @@ describe('Console — ore_islands (#2284)', () => {
     expect(result.success).toBe(true);
     expect(result.output.toLowerCase()).toContain('none');
     for (const id of ORE_ISLAND_ORE_IDS) expect(result.output).not.toContain(id);
+  });
+});
+
+// Reached through the module namespace: the skeleton declares no `meteoriteCraterCommand` export yet.
+const meteoriteCraterCommand = (worldCommands as unknown as Record<string, (c: GameContext, a: string[], n: Record<string, string>) => { success: boolean; output: string }>)
+  .meteoriteCraterCommand as (c: GameContext, a: string[], n: Record<string, string>) => { success: boolean; output: string };
+
+describe('Console — meteorite_crater (#2287)', () => {
+  function startSandbox(seed: number): GameContext {
+    const { runner, ctx } = createRunner();
+    const result = runner.run(`sandbox start biome:green_foothills seed:${seed}`);
+    expect(result.success, result.output).toBe(true);
+    return ctx;
+  }
+
+  /** The whole-number readings a printed value may take, however the line rounds it. */
+  function appearsIn(output: string, value: number): boolean {
+    return [Math.floor(value), Math.round(value), Math.ceil(value)].map(String).some(n => output.includes(n));
+  }
+
+  it('C7 fails with the no-game message when no game is loaded', () => {
+    const result = meteoriteCraterCommand(makeEmptyGameContext(), [], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('console.no_game_loaded'));
+  });
+
+  it('C7 is registered on the runner as meteorite_crater and fails without a game', () => {
+    const { runner } = createRunner();
+    const result = runner.run('meteorite_crater');
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('console.no_game_loaded'));
+  });
+
+  it('C7 prints the centre, radius and distance from spawn of a progression site crater', () => {
+    for (const seed of [42, 1]) {
+      const ctx = startSandbox(seed);
+      const info = buildTerrainContext(terrainConfigOf(ctx.state!)!).crater!.info!;
+      const result = meteoriteCraterCommand(ctx, [], {});
+      expect(result.success, result.output).toBe(true);
+      expect(result.output.toLowerCase()).not.toContain('none');
+      for (const [label, value] of [['x', info.x], ['z', info.z], ['radius', info.radius], ['distance', info.distance]] as const) {
+        expect(appearsIn(result.output, value), `seed ${seed} ${label} ${value} in: ${result.output}`).toBe(true);
+      }
+    }
+  });
+
+  it('C7 reports a distance inside the crater placement range', () => {
+    const ctx = startSandbox(42);
+    const info = buildTerrainContext(terrainConfigOf(ctx.state!)!).crater!.info!;
+    expect(info.distance).toBeGreaterThanOrEqual(METEORITE_CRATER_MIN_DISTANCE_M - 1);
+    expect(info.distance).toBeLessThanOrEqual(METEORITE_CRATER_MAX_DISTANCE_M + 1);
+  });
+
+  it('C7 through the runner, prints the same as the command', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('sandbox start biome:green_foothills seed:42').success).toBe(true);
+    const viaRunner = runner.run('meteorite_crater');
+    expect(viaRunner.success).toBe(true);
+    expect(viaRunner.output).toBe(meteoriteCraterCommand(ctx, [], {}).output);
+  });
+
+  it('C7 differs between seeds', () => {
+    const a = meteoriteCraterCommand(startSandbox(42), [], {}).output;
+    const b = meteoriteCraterCommand(startSandbox(1), [], {}).output;
+    expect(a).not.toBe(b);
+  });
+
+  it('C7 is read-only: the game state and grid are untouched', () => {
+    const ctx = startSandbox(42);
+    const before = JSON.stringify(ctx.state);
+    const grid = ctx.grid;
+    const chunks = grid!.ownedChunks().length;
+    meteoriteCraterCommand(ctx, [], {});
+    meteoriteCraterCommand(ctx, [], {});
+    expect(JSON.stringify(ctx.state)).toBe(before);
+    expect(ctx.grid).toBe(grid);
+    expect(ctx.grid!.ownedChunks().length).toBe(chunks);
+  });
+
+  it('C1 a game without ore deposits has no crater: success with the "none" line', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: '42' });
+    expect(ctx.state!.world!.oreDeposits).toBeUndefined();
+    const result = meteoriteCraterCommand(ctx, [], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toBe('Meteorite crater: none');
   });
 });

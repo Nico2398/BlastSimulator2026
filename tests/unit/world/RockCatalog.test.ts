@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { getRock, getAllRocks, oresYieldedByRocks, getSafeFaceHeightM } from '../../../src/core/world/RockCatalog.js';
 import { WALL_SAFE_FACE_HEIGHT_M_BY_TIER } from '../../../src/core/config/balance.js';
 import { getAllOres } from '../../../src/core/world/OreCatalog.js';
+import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
+import { METEORITE_ROCK_ID, METEORITE_ROCK_ENERGY_ABSORPTION } from '../../../src/core/config/balance.js';
+import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 
 describe('RockCatalog', () => {
   it('getRock returns valid data for cruite', () => {
@@ -141,5 +144,63 @@ describe('oresYieldedByRocks (#1364)', () => {
     it('getSafeFaceHeightM agrees with the catalog for every rock', () => {
       for (const rock of getAllRocks()) expect(getSafeFaceHeightM(rock.id), rock.id).toBe(rock.safeFaceHeightM);
     });
+  });
+});
+
+describe('meteoritic rock (#2287)', () => {
+  it('is in the catalog under METEORITE_ROCK_ID with its own i18n keys', () => {
+    const rock = getRock(METEORITE_ROCK_ID);
+    expect(rock).toBeDefined();
+    expect(rock!.id).toBe('meteorite');
+    expect(rock!.nameKey).toBe('rock.meteorite.name');
+    expect(rock!.descKey).toBe('rock.meteorite.desc');
+  });
+
+  it('is hardness tier 5 and absorbs METEORITE_ROCK_ENERGY_ABSORPTION per voxel', () => {
+    const rock = getRock(METEORITE_ROCK_ID)!;
+    expect(rock.hardnessTier).toBe(5);
+    expect(rock.energyAbsorption).toBe(METEORITE_ROCK_ENERGY_ABSORPTION);
+  });
+
+  it('absorbs more energy than every other rock', () => {
+    const rock = getRock(METEORITE_ROCK_ID)!;
+    for (const other of getAllRocks()) {
+      if (other.id === METEORITE_ROCK_ID) continue;
+      expect(rock.energyAbsorption, other.id).toBeGreaterThan(other.energyAbsorption);
+    }
+  });
+
+  it('has a density, a colour and a porosity like any rock', () => {
+    const rock = getRock(METEORITE_ROCK_ID)!;
+    expect(rock.density).toBeGreaterThan(0);
+    expect(rock.porosity).toBeGreaterThanOrEqual(0);
+    expect(rock.porosity).toBeLessThanOrEqual(1);
+    expect(rock.color).toMatch(/^#[0-9a-fA-F]{6}$/);
+  });
+
+  it('shares the tier-5 safe face height', () => {
+    expect(getSafeFaceHeightM(METEORITE_ROCK_ID)).toBe(WALL_SAFE_FACE_HEIGHT_M_BY_TIER[5]);
+  });
+
+  it('is in no biome dominant rock list: it occurs only in the crater body', () => {
+    for (const biome of getAllBiomes()) {
+      expect(biome.dominantRocks, biome.id).not.toContain(METEORITE_ROCK_ID);
+    }
+  });
+
+  it('has a name and a description in both locales', () => {
+    for (const locale of ['en', 'fr'] as const) {
+      setLocale(locale);
+      for (const key of ['rock.meteorite.name', 'rock.meteorite.desc']) {
+        const text = t(key);
+        expect(text, `${locale} ${key}`).not.toBe(key);
+        expect(text.length, `${locale} ${key}`).toBeGreaterThan(0);
+      }
+    }
+    setLocale('en');
+  });
+
+  it('an unknown rock id is still unknown', () => {
+    expect(getRock('meteorite_x')).toBeUndefined();
   });
 });
