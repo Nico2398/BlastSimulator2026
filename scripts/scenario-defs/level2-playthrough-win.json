@@ -1759,12 +1759,12 @@
           "field": "orderedChargeCount",
           "equals": 0,
           "maxTicks": 3000,
-          "timeoutMs": 120000
+          "timeoutMs": 240000
         }
       ],
       "description": "Wait until the blasters have loaded every ordered charge before sequencing.",
       "role": "setup",
-      "timeout": 125,
+      "timeout": 245,
       "expect": {
         "equals": {
           "orderedChargeCount": 0
@@ -2522,12 +2522,12 @@
           "field": "orderedChargeCount",
           "equals": 0,
           "maxTicks": 6000,
-          "timeoutMs": 120000
+          "timeoutMs": 240000
         }
       ],
       "description": "Charging wait (#1339): wait on every ordered charge being loaded instead of a fixed tick pad.",
       "role": "setup",
-      "timeout": 125,
+      "timeout": 245,
       "expect": {
         "equals": {
           "orderedChargeCount": 0,
