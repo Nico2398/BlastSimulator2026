@@ -539,7 +539,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #2269: +7 keys (tube-as-drilled console and Drill step).
     // #2266: +12 keys (order inspector view, hole orders section): 5023.
     // #2277: +17 tier keys (grade names, tier labels and perks, refusal, console, notice), -7 keys of the old grades 4 and 5: 5032.
-    expect(Object.keys(en).length).toBe(5033);
+    // #2276: +1 (coming_soon badge).
+    expect(Object.keys(en).length).toBe(5034);
   });
 
   it('carries the weak-explosive warning key no more, and the breaks-nothing keys in both locales (#2197)', () => {
