@@ -1,7 +1,7 @@
 // Grade-gated vehicle tiers on progression sites (#1928).
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { VEHICLE_TIER_UNLOCK_GRADE } from '../config/balance.js';
-import { gradeDef, registerUnlockLine } from './MineGrade.js';
+import { gradeName, registerUnlockLine } from './MineGrade.js';
 import { t } from '../i18n/I18n.js';
 
 /** Null when allowed (or grade is undefined: non-progression site); else the grade needed. */
@@ -9,11 +9,6 @@ export function vehicleTierGate(grade: number | undefined, tier: VehicleTier): {
   if (grade === undefined) return null;
   const needed = VEHICLE_TIER_UNLOCK_GRADE[tier];
   return grade >= needed ? null : { needed };
-}
-
-function gradeName(grade: number): string {
-  const def = gradeDef(grade);
-  return t(def.nameKey, def.nameParams);
 }
 
 /** Dealer refusal text for a gated purchase or upgrade; null when allowed (or non-progression site). */

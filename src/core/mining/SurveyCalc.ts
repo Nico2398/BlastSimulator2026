@@ -9,7 +9,6 @@ import {
   SURVEY_SEISMIC_GROUP_SIZE,
   SURVEY_COSTS,
   SURVEY_DURATION_TICKS,
-  SURVEY_DEPTH_BELOW_SURFACE,
   SURVEY_DEPTH_BAND_METRES,
 } from '../config/balance.js';
 import { factorFor, scaledCost, type ActiveModifier } from '../events/ActiveModifiers.js';
@@ -19,6 +18,7 @@ import { averageSolidOreDensity, clamp, roundToEstimateStep } from './SurveyEsti
 import { buildDepthProfile, type SurveyDepthBand } from './SurveyDepthProfile.js';
 import { surveyColumnKey } from './SurveyColumn.js';
 import { isColumnInSurveyDisc } from './SurveyStaleness.js';
+import { surveyMethodGate, surveyDepthM } from './SurveyGate.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 
 /** The three supported methods for surveying a mining site. */
@@ -56,6 +56,8 @@ export interface SurveyResult {
   depthProfile?: Record<string, SurveyDepthBand[]>;
   /** Surface Y (anchorY) each column was sampled from, keyed `"x,z"`. Every method, aerial included. Absent in legacy saves. */
   surfaceYs?: Record<string, number>;
+  /** Metres below the surface this survey read. Absent in legacy saves: the method's full depth applies. */
+  depthM?: number;
   /** Set once a blast clears a column inside this survey's disc. Absent means fresh. */
   stale?: boolean;
 }
@@ -70,6 +72,8 @@ export interface EstimateSurveyParams {
   /** Surveyor skill level 1–5. Higher values reduce noise. */
   skillLevel: number;
   completedTick: number;
+  /** Mine grade of the site when the survey was taken; caps the depth read. Absent on a non-progression site (full depth). */
+  grade?: number | undefined;
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -103,7 +107,7 @@ function computeSeismicOreDensity(
  *
  * - Confidence = clamp(1 − finalError, 0, 1)  where finalError = BASE_ERROR × (1 − skillBonus).
  * - Coverage is a disc of COVERAGE_RADIUS[method] around (centerX, centerZ).
- * - Each method samples SURVEY_DEPTH_BELOW_SURFACE[method] layers from the surface down.
+ * - Each method samples surveyDepthM(method, grade) layers (surface band only below grade 1) from the surface down.
  * - Seismic: Y values grouped into consecutive triplets (a trailing group may be smaller); group-average → column-average → add noise.
  * - core_sample / aerial: plain average of sampled solid-voxel densities → add noise.
  * - Values are clamped to [0,1], rounded to nearest 0.05; zero estimates are omitted.
@@ -116,7 +120,8 @@ export function estimateSurveyResult(
   params: EstimateSurveyParams,
   rng: Random,
 ): SurveyResult {
-  const { id, method, centerX, centerZ, surveyorId, skillLevel, completedTick } = params;
+  const { id, method, centerX, centerZ, surveyorId, skillLevel, completedTick, grade } = params;
+  const depthM = surveyDepthM(method, grade);
 
   const skillBonus = (skillLevel - 1) * SURVEY_SKILL_BONUS_PER_LEVEL;
   const finalError = SURVEY_BASE_ERROR[method] * (1 - skillBonus);
@@ -138,7 +143,7 @@ export function estimateSurveyResult(
 
       if (!isColumnInSurveyDisc({ method, centerX, centerZ }, x, z)) continue;
 
-      // Window: SURVEY_DEPTH_BELOW_SURFACE[method] layers, descending from the
+      // Window: depthM layers, descending from the
       // anchor. Aerial anchors on the first empty layer above ground (voxel
       // storage has no vertical cap, #1183); the others on the top solid voxel.
       const anchorY = method === 'aerial'
@@ -146,7 +151,7 @@ export function estimateSurveyResult(
         : computeVoxelColumnSurfaceY(grid, x, z);
       if (anchorY === null) continue; // no ground in this column, nothing to sample
       const yLevels: number[] = [];
-      for (let y = anchorY; y > anchorY - SURVEY_DEPTH_BELOW_SURFACE[method]; y--) yLevels.push(y);
+      for (let y = anchorY; y > anchorY - depthM; y--) yLevels.push(y);
 
       // Collect ore IDs present in any solid voxel in the sampled range
       const allOreIds = new Set<string>();
@@ -180,14 +185,14 @@ export function estimateSurveyResult(
   }
 
   if (method === 'aerial') {
-    return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, surfaceYs };
+    return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, surfaceYs, depthM };
   }
   const depthProfile: Record<string, SurveyDepthBand[]> = {};
   for (const { x, z, yLevels } of windows) {
     const bands = buildDepthProfile(grid, x, z, yLevels, SURVEY_DEPTH_BAND_METRES[method], finalError, rng);
     if (bands.length > 0) depthProfile[surveyColumnKey(x, z)] = bands;
   }
-  return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, depthProfile, surfaceYs };
+  return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, depthProfile, surfaceYs, depthM };
 }
 
 export {
@@ -215,7 +220,9 @@ export interface RunSurveyParams {
  */
 export interface RunSurveyResult {
   success: boolean;
-  error?: 'insufficient_funds' | 'no_surveyor';
+  error?: 'insufficient_funds' | 'no_surveyor' | 'method_locked';
+  /** Grade that opens the method, set with `method_locked`. */
+  neededGrade?: number;
   actionId?: number;
 }
 
@@ -239,6 +246,8 @@ export interface RunSurveyResult {
  */
 export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyResult {
   const { method, centerX, centerZ } = params;
+  const gate = surveyMethodGate(state.grade?.grade, method);
+  if (gate !== null) return { success: false, error: 'method_locked', neededGrade: gate.needed };
   const cost = surveyCostFor(method, state.events.activeModifiers, state.tickCount);
 
   if (state.cash < cost) {

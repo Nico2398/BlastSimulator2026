@@ -1486,3 +1486,121 @@ describe('SurveyCalc — computeBlastOreReport follows fragment origin depth (#1
     expect(r.estimatedYieldKg).toBeCloseTo(kg(2, 0.4) + kg(3, 0.8), 6);
   });
 });
+
+// ── #2279: grade caps the depth a survey reads ────────────────────────────────
+
+describe('SurveyCalc — estimateSurveyResult depth cap by grade (#2279)', () => {
+  const TOP = 60;
+  /** Column (5,*,5), granite y=0..60; gold 1.0 at the listed depths below the surface (metres), none elsewhere. */
+  function gridWithGoldAt(depths: (d: number) => boolean): VoxelGrid {
+    const grid = new VoxelGrid(11, 11);
+    for (let y = 0; y <= TOP; y++) {
+      grid.setVoxel(5, y, 5, {
+        composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
+        density: 1,
+        oreDensities: depths(TOP - y) ? { gold: 1.0 } : {},
+        fractureModifier: 1.0,
+      });
+    }
+    return grid;
+  }
+  const everywhere = () => gridWithGoldAt(() => true);
+  const run = (grid: VoxelGrid, method: SurveyMethod, grade?: number) =>
+    estimateSurveyResult(
+      grid,
+      { ...BASE_PARAMS, method, centerX: 5, centerZ: 5, skillLevel: 5, ...(grade === undefined ? {} : { grade }) },
+      new Random(12345),
+    );
+  const deepestM = (r: SurveyResult) => Math.max(...(r.depthProfile?.['5,5'] ?? []).map(b => b.toM));
+  const shallowestM = (r: SurveyResult) => Math.min(...(r.depthProfile?.['5,5'] ?? []).map(b => b.fromM));
+
+  it('a grade 0 seismic survey reads only 8 m: bands stop at the window edge', () => {
+    const r = run(everywhere(), 'seismic', 0);
+    expect(shallowestM(r)).toBe(0);
+    expect(deepestM(r)).toBe(8);
+  });
+
+  it('a grade 0 seismic survey splits the window into the 5 m surface band and the 3 m remainder', () => {
+    const bands = run(everywhere(), 'seismic', 0).depthProfile?.['5,5'];
+    expect(bands?.map(b => [b.fromM, b.toM])).toEqual([[0, 5], [5, 8]]);
+  });
+
+  it('a grade 1 seismic survey reads the full 25 m', () => {
+    expect(deepestM(run(everywhere(), 'seismic', 1))).toBe(25);
+  });
+
+  it('a seismic survey with no grade reads the full 25 m (non-progression site)', () => {
+    expect(deepestM(run(everywhere(), 'seismic'))).toBe(25);
+  });
+
+  it('a core sample at grade 1 reads the full 40 m', () => {
+    expect(deepestM(run(everywhere(), 'core_sample', 1))).toBe(40);
+  });
+
+  it('a core sample with no grade reads the full 40 m', () => {
+    expect(deepestM(run(everywhere(), 'core_sample'))).toBe(40);
+  });
+
+  it('ore below the G0 window is invisible to a grade 0 seismic survey, visible at grade 1', () => {
+    const grid = gridWithGoldAt(d => d >= 10 && d <= 12);
+    const g0 = run(grid, 'seismic', 0);
+    expect(g0.depthProfile?.['5,5']).toBeUndefined();
+    expect(g0.estimates['5,5']).toBeUndefined();
+    const g1 = run(grid, 'seismic', 1);
+    expect(g1.depthProfile?.['5,5']?.map(b => [b.fromM, b.toM])).toEqual([[10, 15]]);
+    expect(g1.estimates['5,5']?.['gold']).toBeGreaterThan(0);
+  });
+
+  it('ore just inside the window (6-7 m down) is seen at grade 0 in the 5-8 m band', () => {
+    const grid = gridWithGoldAt(d => d === 6 || d === 7);
+    const bands = run(grid, 'seismic', 0).depthProfile?.['5,5'];
+    expect(bands?.map(b => [b.fromM, b.toM])).toEqual([[5, 8]]);
+  });
+
+  it('ore just outside the window (8 m down) is not seen at grade 0', () => {
+    const grid = gridWithGoldAt(d => d === 8);
+    const r = run(grid, 'seismic', 0);
+    expect(r.depthProfile?.['5,5']).toBeUndefined();
+    expect(r.estimates['5,5']).toBeUndefined();
+  });
+
+  it('shallow ore is seen identically in kind at grade 0 and grade 1', () => {
+    const grid = gridWithGoldAt(d => d <= 2);
+    expect(run(grid, 'seismic', 0).depthProfile?.['5,5']?.[0]?.fromM).toBe(0);
+    expect(run(grid, 'seismic', 1).depthProfile?.['5,5']?.[0]?.fromM).toBe(0);
+  });
+
+  it('an aerial survey is the same at every grade, 2 m deep', () => {
+    const grid = everywhere();
+    const reference = run(grid, 'aerial');
+    for (const grade of [0, 1, 2]) expect(run(grid, 'aerial', grade)).toEqual(reference);
+  });
+
+  it('aerial ignores ore below 2 m at every grade', () => {
+    const grid = gridWithGoldAt(d => d >= 3);
+    for (const grade of [undefined, 0, 1]) expect(run(grid, 'aerial', grade).estimates['5,5']).toBeUndefined();
+  });
+
+  it('with grade 1 or none the result matches the same call with no grade at all', () => {
+    const grid = everywhere();
+    expect(run(grid, 'seismic', 1)).toEqual(run(grid, 'seismic'));
+    expect(run(grid, 'core_sample', 1)).toEqual(run(grid, 'core_sample'));
+  });
+
+  it('the same seed gives a deep-equal capped result', () => {
+    expect(run(everywhere(), 'seismic', 0)).toEqual(run(everywhere(), 'seismic', 0));
+  });
+
+  it('keeps the surface anchor in surfaceYs when capped', () => {
+    expect(run(everywhere(), 'seismic', 0).surfaceYs).toEqual({ '5,5': TOP });
+  });
+
+  it('a stored result keeps its depth: a later grade-up never changes it', () => {
+    const grid = everywhere();
+    const stored = run(grid, 'seismic', 0);
+    const snapshot = JSON.parse(JSON.stringify(stored));
+    run(grid, 'seismic', 1); // a later survey at the higher grade
+    expect(JSON.parse(JSON.stringify(stored))).toEqual(snapshot);
+    expect(deepestM(stored)).toBe(8);
+  });
+});

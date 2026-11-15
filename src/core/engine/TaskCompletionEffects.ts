@@ -177,6 +177,7 @@ export function applyTaskCompletion(
         surveyorId: emp.id,
         skillLevel,
         completedTick: state.tickCount,
+        grade: state.grade?.grade,
       }, new Random(state.seed + state.tickCount + emp.id));
       state.surveyResults.push(surveyResult);
       if (method === 'seismic') {

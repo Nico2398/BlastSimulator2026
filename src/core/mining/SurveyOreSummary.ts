@@ -54,7 +54,7 @@ function surveyedColumnCount(
 
 /** Summarise a survey per ore, valued in `marketId` (#1681), sorted by estimatedValue descending; unknown ore ids are skipped. */
 export function summarizeSurveyOres(
-  survey: Pick<SurveyResult, 'method' | 'estimates' | 'confidence' | 'centerX' | 'centerZ'>,
+  survey: Pick<SurveyResult, 'method' | 'depthM' | 'estimates' | 'confidence' | 'centerX' | 'centerZ'>,
   marketId: MarketId,
 ): OreAreaSummary[] {
   const columnKeys = Object.keys(survey.estimates);
@@ -80,7 +80,7 @@ export function summarizeSurveyOres(
     const typicalGrade = Math.min(a.peak, a.sum / a.columns); // clamp: float sum drift can exceed the peak
     // Mirrors BlastValueEstimate: volume x oreValuePerM3 x confidence,
     // with 1 m^2 per column and the method's scan depth as the volume.
-    const volume = a.columns * SURVEY_DEPTH_BELOW_SURFACE[survey.method];
+    const volume = a.columns * (survey.depthM ?? SURVEY_DEPTH_BELOW_SURFACE[survey.method]);
     const estimatedTonnes = (volume * typicalGrade * ORE_DENSITY_KG_M3) / KG_PER_TONNE;
     out.push({
       oreId,

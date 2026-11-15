@@ -19,9 +19,10 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { surveyCostFor, type SurveyMethod, type SurveyResult } from '../../core/mining/SurveyCalc.js';
+import { surveyMethodGate, surveyMethodLockLabel, surveyDepthM } from '../../core/mining/SurveyGate.js';
 import { isSurveyStale } from '../../core/mining/SurveyStaleness.js';
 import {
-  SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS, SURVEY_DEPTH_BELOW_SURFACE,
+  SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS,
   SEISMIC_SURVEY_DAMAGE_RADIUS, SEISMIC_SURVEY_DAMAGE_HP,
 } from '../../core/config/balance.js';
 import { armPointPick, type PlacementKit } from '../scene/PlacementKit.js';
@@ -83,6 +84,8 @@ export class SurveyPanel extends PanelBase {
   private statusIsTransient = false;
   private statusTimer: ReturnType<typeof setTimeout> | null = null;
   private lastState: GameState | null = null;
+  /** Grade the method cards were last built for; a change rebuilds them. */
+  private cardsGrade: number | undefined;
   private readonly filterSelection = new FilterBarSelection();
   private readonly locale = new LocaleTextRegistry();
 
@@ -204,6 +207,11 @@ export class SurveyPanel extends PanelBase {
 
   update(state: GameState): void {
     this.lastState = state;
+    if (state.grade?.grade !== this.cardsGrade) {
+      this.cardsGrade = state.grade?.grade;
+      this.methodsEl.replaceChildren();
+      this.buildMethodList();
+    }
     if (state.world) {
       this.worldSizeX = state.world.sizeX;
       this.worldSizeZ = state.world.sizeZ;
@@ -312,7 +320,9 @@ export class SurveyPanel extends PanelBase {
   private makeMethodCard(method: SurveyMethod): HTMLElement {
     const radius = SURVEY_COVERAGE_RADIUS[method];
     const accuracy = Math.round((1 - SURVEY_BASE_ERROR[method]) * 100);
-    const selected = method === this.selectedMethod;
+    const gate = surveyMethodGate(this.lastState?.grade?.grade, method);
+    const locked = gate !== null;
+    const selected = method === this.selectedMethod && !locked;
 
     // A plain div, not a <button>: the tutorial rails' button rule would block
     // it unless it were the stage target, and seismic is pre-selected so the
@@ -322,8 +332,9 @@ export class SurveyPanel extends PanelBase {
     const row = el('div', {
       className: 'bs-survey-method',
       attrs: {
-        style: `display:flex;flex-direction:column;gap:7px;padding:10px 11px;border:1px solid ${selected ? 'var(--bsx-info)' : 'var(--bsx-hairline)'};border-radius:5px;background:${selected ? 'rgba(85,168,255,.08)' : 'var(--bsx-card)'};cursor:pointer;text-align:left`,
+        style: `display:flex;flex-direction:column;gap:7px;padding:10px 11px;border:1px solid ${selected ? 'var(--bsx-info)' : 'var(--bsx-hairline)'};border-radius:5px;background:${selected ? 'rgba(85,168,255,.08)' : 'var(--bsx-card)'};cursor:${locked ? 'not-allowed' : 'pointer'};${locked ? 'opacity:.55;' : ''}text-align:left`,
         'data-method': method,
+        ...(locked ? { 'data-locked': 'true', 'aria-disabled': 'true' } : {}),
       },
     });
     if (selected) row.classList.add('selected');
@@ -339,7 +350,7 @@ export class SurveyPanel extends PanelBase {
     meta.append(
       el('span', { text: t('ui.survey.method_accuracy', { pct: accuracy }) }),
       el('span', { text: radius > 0 ? t('ui.survey.radius_cells', { radius }) : t('ui.survey.radius_point') }),
-      el('span', { text: t('ui.survey.depth_metres', { depth: SURVEY_DEPTH_BELOW_SURFACE[method] }) }),
+      el('span', { text: t('ui.survey.depth_metres', { depth: surveyDepthM(method, this.lastState?.grade?.grade) }) }),
       el('span', { text: t('ui.survey.duration_ticks', { ticks: SURVEY_DURATION_TICKS[method] }) }),
     );
 
@@ -349,6 +360,14 @@ export class SurveyPanel extends PanelBase {
     });
 
     row.append(head, meta, note);
+    if (gate !== null) {
+      row.append(el('span', {
+        text: surveyMethodLockLabel(gate.needed),
+        className: 'bs-survey-method-lock',
+        attrs: { style: 'font:600 10px/1.4 var(--bsx-font-ui);color:var(--bsx-amber)' },
+      }));
+      return row;
+    }
     row.addEventListener('click', () => this.selectMethod(method));
     return row;
   }
