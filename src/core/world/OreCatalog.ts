@@ -97,6 +97,8 @@ const ORES: readonly OreType[] = [
     depthMin: 25, depthMax: 55,
   },
   {
+    // On progression sites (oreDeposits) treranium is hosted only by the meteorite crater's body
+    // (MeteoriteCrater.ts, #2287); campaign sites still draw it from this catalog entry.
     id: 'treranium',
     permitGrade: 3,
     nameKey: 'ore.treranium.name',

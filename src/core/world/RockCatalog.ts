@@ -1,6 +1,6 @@
 import { MaterialRecipe } from './SurfaceMaterialCatalog.js';
 import { getAllOres } from './OreCatalog.js';
-import { WALL_SAFE_FACE_HEIGHT_M_BY_TIER } from '../config/balance.js';
+import { METEORITE_ROCK_ENERGY_ABSORPTION, METEORITE_ROCK_ID, WALL_SAFE_FACE_HEIGHT_M_BY_TIER } from '../config/balance.js';
 
 // BlastSimulator2026 — Rock type catalog
 // 10 fictional rock types spanning hardness tiers 1–5.
@@ -280,6 +280,28 @@ const ROCKS: readonly RockType[] = [
     detailFreq: 1.40,
     veinStrength: 0.40,
     contrast: 0.50,
+    recipe: MaterialRecipe.Warp,
+    freqAlt: 0.62,
+    warp: 3.0,
+  },
+  {
+    // Sits in no biome's strata: only the meteorite crater's body holds it (#2287).
+    id: METEORITE_ROCK_ID,
+    nameKey: 'rock.meteorite.name',
+    descKey: 'rock.meteorite.desc',
+    hardnessTier: 5,
+    safeFaceHeightM: safeFaceHeightForTier(5),
+    energyAbsorption: METEORITE_ROCK_ENERGY_ABSORPTION,
+    density: 3500,
+    porosity: 0.01,
+    oreProbabilities: { treranium: 0.5 },
+    color: '#3a2a4a',
+    noiseFreq: 0.02,
+    levelBias: 0.8,
+    macroFreq: 0.40,
+    detailFreq: 1.60,
+    veinStrength: 0.50,
+    contrast: 0.60,
     recipe: MaterialRecipe.Warp,
     freqAlt: 0.62,
     warp: 3.0,

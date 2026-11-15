@@ -12,6 +12,7 @@
 // parameter and ships one neutral default until then.
 
 import { WorldNoiseFields } from './NoiseFields.js';
+import type { MeteoriteCrater } from './MeteoriteCrater.js';
 import {
   evalSpline,
   DEFAULT_BASE_SPLINE,
@@ -190,6 +191,8 @@ export interface WorldGenContext {
   readonly centerHeight: number;
   readonly groundOffset: number;
   readonly pitMask: PitMaskShape;
+  /** The meteorite crater (#2287), reshaping the ground where it sits; absent on sites without one. */
+  readonly crater?: MeteoriteCrater;
 }
 
 /**
@@ -220,16 +223,19 @@ export function createWorldGenContext(
   return { fields, shapingAt, playableRect, centerHeight, groundOffset, pitMask };
 }
 
-/** Surface voxel Y for column (x, z), including the pit mask and vertical datum. */
-export function sampleSurfaceVoxelY(ctx: WorldGenContext, x: number, z: number): number {
+/** Height at (x, z) after the pit mask and the crater's relief, before the vertical datum. */
+function shapedHeight(ctx: WorldGenContext, x: number, z: number): number {
   const raw = sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z));
   const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z, ctx.pitMask);
-  return heightToVoxelY(masked, ctx.groundOffset);
+  return masked + (ctx.crater?.reliefAt(x, z) ?? 0);
+}
+
+/** Surface voxel Y for column (x, z), including the pit mask, crater relief and vertical datum. */
+export function sampleSurfaceVoxelY(ctx: WorldGenContext, x: number, z: number): number {
+  return heightToVoxelY(shapedHeight(ctx, x, z), ctx.groundOffset);
 }
 
 /** Continuous (unrounded) surface Y for column (x, z) — the height the mesh should actually land on. */
 export function sampleSurfaceHeightY(ctx: WorldGenContext, x: number, z: number): number {
-  const raw = sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z));
-  const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z, ctx.pitMask);
-  return heightToVoxelYContinuous(masked, ctx.groundOffset);
+  return heightToVoxelYContinuous(shapedHeight(ctx, x, z), ctx.groundOffset);
 }

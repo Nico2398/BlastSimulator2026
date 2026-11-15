@@ -80,7 +80,7 @@ export function sampleLandscapeColumn(
   const shapingInput = weights.map(w => ({ shaping: biomeShaping(w.biome), weight: w.weight }));
   const raw = sampleBaseHeight(worldGen.fields, x, z, shapingInput);
   const masked = applyPitMask(raw, worldGen.centerHeight, worldGen.playableRect, x, z, worldGen.pitMask);
-  const overlaid = applyOverlays(structureSet, x, z, masked);
+  const overlaid = applyOverlays(structureSet, x, z, masked) + (worldGen.crater?.reliefAt(x, z) ?? 0);
   // Same offset the playable grid's own columns land at — site and landscape
   // read the same unclamped height directly, so the two agree with no band
   // trick needed (#1189).
@@ -94,7 +94,11 @@ export function sampleLandscapeColumn(
   // range of its own upper edge (#458 T2.1 boundary-agreement fix).
   const surfaceYEquivalent = Math.round(height);
   const boundaries = strata.boundariesAt(x, z);
-  const composition = strata.compositionAt(x, surfaceYEquivalent - 1, z, 1, boundaries);
+  // The crater's body shows through on the surface where it reaches it, so the bowl reads on the minimap.
+  const body = worldGen.crater?.bodyAt(x, z, 1);
+  const composition = body
+    ? { rocks: [{ rockId: body.rockId, coefficient: 1 }] }
+    : strata.compositionAt(x, surfaceYEquivalent - 1, z, 1, boundaries);
   const surfCompId = palette.intern(composition);
 
   return { height, biomeId, surfCompId };

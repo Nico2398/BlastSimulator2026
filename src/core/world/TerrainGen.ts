@@ -6,14 +6,14 @@
 import { VoxelGrid, surfaceDensityAt, MAX_TERRAIN_GEN_DIMENSION, isValidVoxelY, type VoxelChunkSource } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
-import type { PitMaskShape } from '../config/balance.js';
+import { ORE_GRADE_SCALE_DEFAULT, type PitMaskShape } from '../config/balance.js';
 import { isValidOreGradeScale } from '../economy/OreGrade.js';
-import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
+import { createWorldGenContext, sampleSurfaceHeightY, type Rect, type WorldGenContext } from './WorldGen.js';
 import { WorldNoiseFields } from './NoiseFields.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
 import { OreVeinSampler } from './OreVeins.js';
 import { OreIslands } from './OreIslands.js';
-import type { MeteoriteCrater } from './MeteoriteCrater.js';
+import { MeteoriteCrater } from './MeteoriteCrater.js';
 import { buildProtectedStructures, rectTouchesProtectedStructure, type ProtectedStructures } from './Structures.js';
 import { pickStarterDeposit, starterPocketAt, type StarterDeposit } from './StarterDeposit.js';
 
@@ -271,10 +271,19 @@ function ownedConfig(config: TerrainConfig): TerrainConfig {
 function computeTerrainContext(config: TerrainConfig): TerrainContext {
   const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, oreDeposits, pitMask, oreGradeScale } = config;
 
-  const worldGen = createWorldGenContext(seed, sizeX, datum, sizeZ, (fields) => (x, z) => {
+  const baseWorldGen = createWorldGenContext(seed, sizeX, datum, sizeZ, (fields) => (x, z) => {
     const weights = selectBiomeWeights(fields.temperature(x, z), fields.humidity(x, z), climateBias, 1.0);
     return weights.map(w => ({ shaping: biomeShaping(w.biome), weight: w.weight }));
   }, pitMask);
+  // One lazy protected-structure set shared by every feature that must keep clear of villages, rivers and landmarks.
+  let protectedStructures: ProtectedStructures | null = null;
+  const touchesProtected = (rect: Rect): boolean => {
+    protectedStructures ??= buildProtectedStructures(seed, baseWorldGen.fields, baseWorldGen.shapingAt, baseWorldGen.playableRect);
+    return rectTouchesProtectedStructure(protectedStructures, rect);
+  };
+  const spawn = { x: sizeX / 2, z: sizeZ / 2 };
+  const crater = oreDeposits === true ? new MeteoriteCrater(seed, spawn, touchesProtected) : null;
+  const worldGen: WorldGenContext = crater ? { ...baseWorldGen, crater } : baseWorldGen;
 
   const biome = centerBiome(worldGen.fields, sizeX, sizeZ, climateBias);
 
@@ -282,13 +291,7 @@ function computeTerrainContext(config: TerrainConfig): TerrainContext {
     ? buildMixedHardnessStrata(biome.dominantRocks)
     : buildStrataProfile(biome.dominantRocks);
   const strata = new StrataSampler(seed, profile);
-  let protectedStructures: ProtectedStructures | null = null;
-  const oreIslands = oreDeposits === true
-    ? new OreIslands(seed, { x: sizeX / 2, z: sizeZ / 2 }, (rect) => {
-      protectedStructures ??= buildProtectedStructures(seed, worldGen.fields, worldGen.shapingAt, worldGen.playableRect);
-      return rectTouchesProtectedStructure(protectedStructures, rect);
-    })
-    : null;
+  const oreIslands = oreDeposits === true ? new OreIslands(seed, spawn, touchesProtected) : null;
   const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true, ...(oreIslands ? { islands: oreIslands } : {}), ...(oreGradeScale !== undefined ? { gradeScale: oreGradeScale } : {}) });
 
   const starterDeposit = pickStarterDeposit(config, worldGen);
@@ -300,7 +303,7 @@ function computeTerrainContext(config: TerrainConfig): TerrainContext {
     oreVeins,
     starterDeposit: starterDeposit ? Object.freeze(starterDeposit) : null,
     oreIslands,
-    crater: null,
+    crater,
   });
 }
 
@@ -337,6 +340,16 @@ function generateColumnRange(
     // Depth is still measured from the rounded surface, so which stratum a
     // voxel belongs to is unchanged by the sub-voxel surface placement.
     const depth = Math.max(0, surfaceY - y);
+    const body = terrain.crater?.bodyAt(x, z, depth) ?? null;
+    if (body) {
+      const bodyComp = grid.palette.intern({ rocks: [{ rockId: body.rockId, coefficient: 1 }] });
+      const scale = config.oreGradeScale ?? ORE_GRADE_SCALE_DEFAULT;
+      const ore = scale === ORE_GRADE_SCALE_DEFAULT
+        ? body.oreDensities
+        : Object.fromEntries(Object.entries(body.oreDensities).map(([id, d]) => [id, d * scale]));
+      grid.writeGeneratedVoxel(x, y, z, bodyComp, ore, density);
+      continue;
+    }
     const pocket = starter ? starterPocketAt(starter, x, z, depth, config.oreGradeScale) : null;
     const composition = pocket ? pocket.composition : strata.compositionAt(x, y, z, depth, boundaries);
     const compId = grid.palette.intern(composition);
