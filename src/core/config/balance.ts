@@ -3429,24 +3429,17 @@ export const ORE_DEPTH_BLEND_M = 3;
 /**
  * Sandbox-only deep ore content (#1933). With ore deposits on, a (rock, ore) pair here replaces the
  * RockCatalog host probability, so deeper rock pays more without touching campaign rocks or Level 1's
- * contract ores. A row only changes (rock, ore) pairs whose sandbox window starts at 15 m or deeper (sparkium 15, craktonite 28, absurdium 30), so ore at 0-10 m is identical to the catalog's.
+ * contract ores. Only sparkium (window from 15 m) is overridden: G2 and G3 ores are not in ordinary ground (#2281),
+ * and every pair is lifted to ORE_PROGRESSION_HOST_FLOOR by the sandbox helpers.
  */
 export const SANDBOX_DEEP_ORE_AFFINITY: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   cruite: { sparkium: 0.22 },
   sandite: { sparkium: 0.22 },
-  molite: { craktonite: 0.20, absurdium: 0.38 },
   grumpite: { sparkium: 0.20 },
-  clunkite: { sparkium: 0.12, craktonite: 0.10, absurdium: 0.50 },
-  obstiite: { sparkium: 0, craktonite: 0.06, absurdium: 0.44 },
+  clunkite: { sparkium: 0.12 },
   gnarlite: { sparkium: 0.17 },
   absurdite: { sparkium: 0.15 },
-  titanite: { sparkium: 0.08, absurdium: 0.75 },
-};
-
-/** Sandbox-only depth windows [min, max] metres replacing the OreCatalog window: deep ores start deeper so deep bands out-earn mid ones. */
-export const SANDBOX_ORE_DEPTH_WINDOWS: Readonly<Record<string, readonly [number, number]>> = {
-  craktonite: [28, 45],
-  absurdium: [30, 55],
+  titanite: { sparkium: 0.08 },
 };
 
 /**
@@ -3476,7 +3469,7 @@ export const STARTER_DEPOSIT_KEEP_CLEAR_HALF_M = 6;
 export const STARTER_DEPOSIT_POCKET_DEPTH_M = 8;
 /** Ore fills the pocket's inner core of this radius (m) down to this depth (m); covers the reference shot with margin. */
 export const STARTER_DEPOSIT_ORE_CORE_RADIUS_M = 6;
-export const STARTER_DEPOSIT_ORE_DEPTH_M = 6;
+export const STARTER_DEPOSIT_ORE_DEPTH_M = ORE_G0_LAYER_DEPTH_M;
 /**
  * Stored ore density (0-1) of the pocket before the site grade scale. 0.14 sold too little for the poorest seeds to carry
  * their payroll: on desert_badlands seeds 1 and 12 the best shallow shot site holds 12-24 t, against 50-120 t on most (#2126).
