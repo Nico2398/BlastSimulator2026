@@ -8,7 +8,7 @@ import { oreValuePerKg, type MarketId } from '../../../src/core/economy/Market.j
 import { ORE_DENSITY_KG_M3, SURVEY_COVERAGE_RADIUS, SURVEY_DEPTH_BELOW_SURFACE } from '../../../src/core/config/balance.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 
-type Input = Pick<SurveyResult, 'method' | 'estimates' | 'confidence' | 'centerX' | 'centerZ'>;
+type Input = Pick<SurveyResult, 'method' | 'depthM' | 'estimates' | 'confidence' | 'centerX' | 'centerZ'>;
 
 const summarizeSurveyOres = (survey: Input, market: MarketId = 'legacy') => summarizeInMarket(survey, market);
 const columnOreValuePerM3 = (d: Record<string, number>, market: MarketId = 'legacy') => columnValueInMarket(d, market);
@@ -244,5 +244,14 @@ describe('summarizeSurveyOres — market pricing (#1681)', () => {
   it('columnOreValuePerM3 prices in the given market', () => {
     expect(columnOreValuePerM3({ rustite: 0.5 }, 'production'))
       .toBeCloseTo(0.5 * ORE_DENSITY_KG_M3 * oreValuePerKg('rustite', 'production'), 3);
+  });
+});
+
+describe('summarizeSurveyOres with a stored depth', () => {
+  it('uses the depth the survey was taken at, not the method full depth', () => {
+    const base = { method: 'seismic' as const, centerX: 30, centerZ: 30, confidence: 1, estimates: { '30,30': { sparkium: 0.2 } } };
+    const [full] = summarizeSurveyOres(base);
+    const [capped] = summarizeSurveyOres({ ...base, depthM: 8 });
+    expect(capped!.estimatedTonnes).toBeCloseTo(full!.estimatedTonnes * (8 / SURVEY_DEPTH_BELOW_SURFACE.seismic), 5);
   });
 });

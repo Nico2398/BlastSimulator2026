@@ -661,6 +661,7 @@ describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start s
     expect(runner.run(`sandbox start biome:${biome} kit:digger seed:42 staffed:true ore_grade:1`).success).toBe(true);
     runner.run('time resume');
     const state = ctx.state!;
+    state.grade!.grade = 1; // core sampling opens at G1 (survey gate)
     // The free kit has no surveyor: hire one and grant geology, as a player would via the roster.
     expect(runner.run('employee hire role:surveyor').success).toBe(true);
     const surveyor = state.employees.employees.slice(-1)[0]!;

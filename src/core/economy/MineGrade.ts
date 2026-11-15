@@ -7,6 +7,7 @@ import type { ContractType } from './Contract.js';
 import { tierPerksAt } from './TierPerks.js';
 import { deductExpense } from './Finance.js';
 import { takePermitDelay } from '../events/ActiveModifiers.js';
+import { t } from '../i18n/I18n.js';
 import { parseColumnKey } from '../mining/SurveyColumn.js';
 import {
   MINE_GRADES,
@@ -191,6 +192,12 @@ export function sanitizeGradeState(raw: unknown): GradeState | undefined {
 }
 
 /** Definition of entering a grade: 0 is the start permit, 1-3 are named, above that endless classes. */
+/** Localized grade name. */
+export function gradeName(grade: number): string {
+  const def = gradeDef(grade);
+  return t(def.nameKey, def.nameParams);
+}
+
 export function gradeDef(grade: number): GradeDef {
   if (grade <= 0) return { grade: 0, nameKey: MINE_GRADES[0]!.nameKey, fee: 0, processingTicks: 0, targets: [] };
   const top = MINE_GRADES[LAST_NAMED_GRADE]!;
