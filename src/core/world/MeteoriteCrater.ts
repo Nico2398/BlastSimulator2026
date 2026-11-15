@@ -14,7 +14,7 @@ import { MIN_STORED_DENSITY } from './OreVeins.js';
 import type { Rect } from './WorldGen.js';
 
 /** The crater's placement: centre, outer radius and distance from spawn, in metres. */
-export interface MeteoriteCraterInfo {
+interface MeteoriteCraterInfo {
   readonly x: number;
   readonly z: number;
   readonly radius: number;
@@ -22,7 +22,7 @@ export interface MeteoriteCraterInfo {
 }
 
 /** What the crater body holds at one voxel. */
-export interface CraterBody {
+interface CraterBody {
   readonly rockId: string;
   readonly oreDensities: Readonly<Record<string, number>>;
 }
