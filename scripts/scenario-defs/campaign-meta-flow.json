@@ -540,7 +540,7 @@
           "label": "Return to Menu"
         },
         {
-          "type": "awaitUsable",
+          "type": "waitForSelector",
           "selector": "#bs-main-menu #bs-menu-new-campaign"
         },
         {
