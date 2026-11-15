@@ -25,6 +25,13 @@ import {
 } from '../../../src/core/mining/SurveyCalc.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { vec3 } from '../../../src/core/math/Vec3.js';
+// ── #2286 additions ───────────────────────────────────────────────────────────
+import type { OreIsland } from '../../../src/core/world/OreIslands.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
+import {
+  SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS, SURVEY_BASE_ERROR, SURVEY_SKILL_BONUS_PER_LEVEL,
+  SURVEY_METHOD_UNLOCK_GRADE, ORE_ISLAND_MAX_DISTANCE_M, ORE_ISLAND_RADIUS_MAX_M,
+} from '../../../src/core/config/balance.js';
 
 // ── Deterministic fixture ─────────────────────────────────────────────────────
 // All required fields are set to fixed values so every test that derives a
@@ -72,11 +79,17 @@ describe('SurveyCalc — SurveyMethod', () => {
     expect(m).toBe('aerial');
   });
 
-  it('SurveyMethod union contains exactly three members', () => {
-    expect(SURVEY_METHODS).toHaveLength(3);
+  it("'prospection' is a valid SurveyMethod value (#2286)", () => {
+    const m: SurveyMethod = 'prospection';
+    expect(m).toBe('prospection');
+  });
+
+  it('SurveyMethod union contains exactly four members', () => {
+    expect(SURVEY_METHODS).toHaveLength(4);
     expect(SURVEY_METHODS).toContain('seismic');
     expect(SURVEY_METHODS).toContain('core_sample');
     expect(SURVEY_METHODS).toContain('aerial');
+    expect(SURVEY_METHODS).toContain('prospection');
   });
 });
 
@@ -1318,8 +1331,8 @@ describe('SurveyCalc — surfaceYs (#1703)', () => {
     expect(r.surfaceYs).toEqual({ '5,5': TOP + 1 });
   });
 
-  it('has a surface for every column that has estimates, for every method', () => {
-    for (const method of SURVEY_METHODS) {
+  it('has a surface for every column that has estimates, for every voxel-reading method', () => {
+    for (const method of SURVEY_METHODS.filter(m => m !== 'prospection')) {
       const r = run(method);
       expect(Object.keys(r.estimates).length).toBeGreaterThan(0);
       expect(Object.keys(r.surfaceYs ?? {}).sort()).toEqual(Object.keys(r.estimates).sort());
@@ -1602,5 +1615,182 @@ describe('SurveyCalc — estimateSurveyResult depth cap by grade (#2279)', () =>
     run(grid, 'seismic', 1); // a later survey at the higher grade
     expect(JSON.parse(JSON.stringify(stored))).toEqual(snapshot);
     expect(deepestM(stored)).toBe(8);
+  });
+});
+
+// ── Long-range prospection (#2286) ───────────────────────────────────────────
+
+describe('SurveyCalc — prospection balance (#2286, C2)', () => {
+  it('covers every ore island from the base', () => {
+    expect(SURVEY_COVERAGE_RADIUS.prospection).toBeGreaterThanOrEqual(ORE_ISLAND_MAX_DISTANCE_M + ORE_ISLAND_RADIUS_MAX_M);
+  });
+
+  it('costs more than a seismic survey', () => {
+    expect(SURVEY_COSTS.prospection).toBeGreaterThan(SURVEY_COSTS.seismic);
+  });
+
+  it('takes longer than a seismic survey', () => {
+    expect(SURVEY_DURATION_TICKS.prospection).toBeGreaterThan(SURVEY_DURATION_TICKS.seismic);
+  });
+
+  it('opens at grade 2', () => {
+    expect(SURVEY_METHOD_UNLOCK_GRADE.prospection).toBe(2);
+  });
+});
+
+describe('SurveyCalc — estimateSurveyResult for prospection (#2286, C3)', () => {
+  const ISLANDS: OreIsland[] = [
+    { x: 300, z: 60, radius: 18, oreIds: ['craktonite'], distance: 268 },
+    { x: -250, z: 70, radius: 26, oreIds: ['absurdium', 'craktonite'], distance: 282 },
+  ];
+  const params = (over: Partial<EstimateSurveyParams> = {}): EstimateSurveyParams => ({
+    id: 5, method: 'prospection', centerX: 32, centerZ: 32, surveyorId: 9, skillLevel: 3, completedTick: 77,
+    islands: ISLANDS, ...over,
+  });
+  const expectedConfidence = (skill: number): number =>
+    Math.min(1, Math.max(0, 1 - SURVEY_BASE_ERROR.prospection * (1 - (skill - 1) * SURVEY_SKILL_BONUS_PER_LEVEL)));
+
+  it('echoes id, method, centre, surveyor and tick', () => {
+    const r = estimateSurveyResult(new VoxelGrid(8, 8), params(), new Random(1));
+    expect(r).toMatchObject({ id: 5, method: 'prospection', centerX: 32, centerZ: 32, surveyorId: 9, completedTick: 77 });
+  });
+
+  it('carries the prospected islands and no per-voxel detail', () => {
+    const r = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: 5 }), new Random(1));
+    expect(r.islands).toHaveLength(ISLANDS.length);
+    expect(r.estimates).toEqual({});
+    expect(r.depthProfile).toBeUndefined();
+  });
+
+  it('reads no voxel: a grid full of ore changes nothing', () => {
+    const withOre = estimateSurveyResult(makeOreGrid(), params({ skillLevel: 5 }), new Random(1));
+    const bare = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: 5 }), new Random(1));
+    expect(withOre.estimates).toEqual({});
+    expect(withOre.islands).toEqual(bare.islands);
+  });
+
+  it.each([1, 2, 3, 4, 5])('confidence at skill %i follows the base error and skill bonus', (skill) => {
+    const r = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: skill }), new Random(1));
+    expect(r.confidence).toBeCloseTo(expectedConfidence(skill), 10);
+    expect(r.confidence).toBeGreaterThanOrEqual(0);
+    expect(r.confidence).toBeLessThanOrEqual(1);
+  });
+
+  it('confidence grows with skill', () => {
+    const at = (skill: number): number => estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: skill }), new Random(1)).confidence;
+    expect(at(5)).toBeGreaterThan(at(1));
+  });
+
+  it('at the top skill reports each in-range island with its first ore, at its centre', () => {
+    const r = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: 5 }), new Random(1));
+    expect(r.islands).toContainEqual({ x: 300, z: 60, radius: 16, oreId: 'craktonite' });
+    expect(r.islands).toContainEqual({ x: -250, z: 70, radius: 24, oreId: 'absurdium' });
+  });
+
+  it('leaves out an island beyond the coverage radius', () => {
+    const far: OreIsland = { x: 32 + SURVEY_COVERAGE_RADIUS.prospection + 60, z: 32, radius: 20, oreIds: ['craktonite'], distance: 999 };
+    const r = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: 5, islands: [...ISLANDS, far] }), new Random(1));
+    expect(r.islands).toHaveLength(ISLANDS.length);
+    expect(r.islands!.some(i => i.x === far.x)).toBe(false);
+  });
+
+  it('an empty island list gives an empty islands array at the top skill', () => {
+    const r = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: 5, islands: [] }), new Random(1));
+    expect(r.islands).toEqual([]);
+    expect(r.estimates).toEqual({});
+  });
+
+  it('the same seed gives the same result', () => {
+    const a = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: 1 }), new Random(21));
+    const b = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: 1 }), new Random(21));
+    expect(a).toEqual(b);
+  });
+
+  it('other methods carry no islands', () => {
+    for (const method of ['seismic', 'core_sample', 'aerial'] as const) {
+      const r = estimateSurveyResult(makeOreGrid(), params({ method, centerX: 10, centerZ: 10 }), new Random(1));
+      expect(r.islands).toBeUndefined();
+    }
+  });
+});
+
+describe('SurveyCalc — runSurvey for prospection (#2286, C1)', () => {
+  const surveyorState = (cash: number, grade: number | undefined): ReturnType<typeof createGame> => {
+    const state = createGame({ seed: 42, startingCash: cash });
+    const { employee } = hireEmployee(state.employees, 'surveyor', new Random(99));
+    assignSkill(state.employees, employee.id, 'geology', 1);
+    if (grade !== undefined) state.grade = { ...createGradeState(), grade };
+    return state;
+  };
+  const PARAMS: RunSurveyParams = { method: 'prospection', centerX: 32, centerZ: 32 };
+
+  it.each([0, 1])('below G2 (grade %i) fails method_locked and names grade 2', (grade) => {
+    const state = surveyorState(1_000_000, grade);
+    expect(runSurvey(state, PARAMS)).toEqual({ success: false, error: 'method_locked', neededGrade: 2 });
+  });
+
+  it('a locked prospection mutates nothing', () => {
+    const state = surveyorState(1_000_000, 1);
+    const cash = state.cash;
+    const nextId = state.nextPendingActionId;
+    const transactions = state.finances.transactions.length;
+    runSurvey(state, PARAMS);
+    expect(state.cash).toBe(cash);
+    expect(state.pendingActions).toHaveLength(0);
+    expect(state.ghostPreviews).toHaveLength(0);
+    expect(state.nextPendingActionId).toBe(nextId);
+    expect(state.finances.transactions).toHaveLength(transactions);
+  });
+
+  it('at G2 it queues a prospection action and charges its cost', () => {
+    const state = surveyorState(1_000_000, 2);
+    const result = runSurvey(state, PARAMS);
+    expect(result.success).toBe(true);
+    expect(state.cash).toBe(1_000_000 - SURVEY_COSTS.prospection);
+    const pending = state.pendingActions.filter(a => a.type === 'survey');
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.payload).toMatchObject({
+      method: 'prospection', centerX: 32, centerZ: 32, durationTicks: SURVEY_DURATION_TICKS.prospection,
+    });
+  });
+
+  it('a site with no grade is open', () => {
+    const state = surveyorState(1_000_000, undefined);
+    expect(runSurvey(state, PARAMS).success).toBe(true);
+  });
+
+  it('refuses without a surveyor, as every method does', () => {
+    const state = createGame({ seed: 42, startingCash: 1_000_000 });
+    state.grade = { ...createGradeState(), grade: 2 };
+    expect(runSurvey(state, PARAMS)).toEqual({ success: false, error: 'no_surveyor' });
+  });
+
+  it('refuses when cash is one short, charging nothing', () => {
+    const state = surveyorState(SURVEY_COSTS.prospection - 1, 2);
+    expect(runSurvey(state, PARAMS)).toEqual({ success: false, error: 'insufficient_funds' });
+    expect(state.cash).toBe(SURVEY_COSTS.prospection - 1);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+});
+
+describe('SurveyCalc — markSurveysStaleByBlast ignores prospection (#2286, C6)', () => {
+  const prospectionAt = (id: number, x: number, z: number): SurveyResult => ({
+    ...BASE_RESULT, id, method: 'prospection', centerX: x, centerZ: z, estimates: {},
+    islands: [{ x: 300, z: 60, radius: 16, oreId: 'craktonite' }],
+  });
+
+  it('never marks a prospection result stale, even for a column at its centre', () => {
+    const surveys = [prospectionAt(1, 10, 10)];
+    expect(markSurveysStaleByBlast(surveys, ['10,10', '11,11', '300,60'])).toBe(0);
+    expect(surveys[0]!.stale).toBeUndefined();
+    expect(isSurveyStale(surveys[0]!)).toBe(false);
+  });
+
+  it('stales a seismic neighbour while leaving the prospection result fresh', () => {
+    const seismic: SurveyResult = { ...BASE_RESULT, id: 2, method: 'seismic', centerX: 10, centerZ: 10 };
+    const prospection = prospectionAt(3, 10, 10);
+    expect(markSurveysStaleByBlast([seismic, prospection], ['10,10'])).toBe(1);
+    expect(isSurveyStale(seismic)).toBe(true);
+    expect(isSurveyStale(prospection)).toBe(false);
   });
 });

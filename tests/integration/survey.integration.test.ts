@@ -147,10 +147,10 @@ describe('Survey system', () => {
 
   // ── 3. Every SURVEY_METHOD works ──────────────────────────────────────────
 
-  it('all SURVEY_METHODS can estimate', () => {
+  it('all voxel-reading SURVEY_METHODS can estimate', () => {
     const grid = makeOreGrid(30);
 
-    for (const method of SURVEY_METHODS) {
+    for (const method of SURVEY_METHODS.filter(m => m !== 'prospection')) {
       const result = runSurveyOnGrid(grid, method, 10, 10);
       expect(result).toBeDefined();
       expect(result.method).toBe(method);
