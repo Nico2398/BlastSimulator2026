@@ -3,7 +3,7 @@
 // layer, G1 ores below it, and G2/G3 ores are not in ordinary ground. Campaign rocks and the shared catalog are untouched.
 
 import { ORE_G0_LAYER_DEPTH_M, ORE_PROGRESSION_HOST_FLOOR, SANDBOX_DEEP_ORE_AFFINITY } from '../config/balance.js';
-import { getAllOres, type OreType } from './OreCatalog.js';
+import { getAllOres, getOre, type OreType } from './OreCatalog.js';
 import { getRock } from './RockCatalog.js';
 
 /** Highest ore grade ordinary ground holds. */
@@ -18,7 +18,7 @@ function inOrdinaryGround(ore: OreType): boolean {
  * ORE_PROGRESSION_HOST_FLOOR so every biome holds both grades. 0 for a G2/G3 ore or an unknown rock.
  */
 export function sandboxHostProbability(rockId: string, oreId: string): number {
-  const ore = getAllOres().find(o => o.id === oreId);
+  const ore = getOre(oreId);
   const rock = getRock(rockId);
   if (!ore || !rock || !inOrdinaryGround(ore)) return 0;
   const base = SANDBOX_DEEP_ORE_AFFINITY[rockId]?.[oreId] ?? rock.oreProbabilities[oreId] ?? 0;
