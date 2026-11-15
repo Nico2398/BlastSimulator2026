@@ -1386,11 +1386,12 @@ describe('untiered boards stay byte-identical (#1929)', () => {
     for (const c of withUndefined) expect(c).not.toHaveProperty('buyerTier');
   });
 
-  it('a legacy market ignores buyerGrade', () => {
-    const graded = tieredBoards(42, 20, 5, 'legacy');
-    expect(graded).toEqual(boardsOver('legacy', 42, 20));
-    for (const c of graded) expect(c).not.toHaveProperty('buyerTier');
-    expect(tieredBoards(42, 20, 5, 'unset')).toEqual(boardsOver(undefined, 42, 20));
+  it('a legacy market grows no buyer tiers from buyerGrade (it only restricts the ores, #2278)', () => {
+    for (const market of ['legacy', 'unset'] as const) {
+      const graded = tieredBoards(42, 20, 5, market);
+      for (const c of graded) expect(c).not.toHaveProperty('buyerTier');
+      for (const c of graded.filter(o => o.type !== 'rubble_disposal')) expect(getOre(c.materialId)!.permitGrade).toBe(3);
+    }
   });
 });
 

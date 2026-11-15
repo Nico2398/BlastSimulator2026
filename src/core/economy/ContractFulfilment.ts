@@ -219,13 +219,14 @@ export type OreStockStatus = 'auto_sold' | 'waiting' | 'above_grade';
 
 /** Catalog ores of grades below `grade` — the ones automatic sale covers; none at G0 or without a grade (#2278). */
 export function autoSellOreIds(grade: number | undefined): string[] {
-  const g = Math.min(grade ?? 0, ORE_MAX_PERMIT_GRADE + 1);
+  const g = Math.min(grade ?? 0, ORE_MAX_PERMIT_GRADE);
   return getAllOres().filter(o => o.permitGrade < g).map(o => o.id);
 }
 
 /** Status of a stored ore at the site's `grade`: sold automatically, waiting for a contract, or above the grade (#2278). */
 export function oreStockStatus(oreId: string, grade: number | undefined, autoSellOn: boolean): OreStockStatus {
-  const g = Math.min(grade ?? 0, ORE_MAX_PERMIT_GRADE);
+  if (grade === undefined) return 'waiting';
+  const g = Math.min(grade, ORE_MAX_PERMIT_GRADE);
   const oreGrade = orePermitGrade(oreId) ?? 0;
   if (oreGrade > g) return 'above_grade';
   return oreGrade < g && autoSellOn ? 'auto_sold' : 'waiting';

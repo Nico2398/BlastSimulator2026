@@ -227,6 +227,7 @@ export function contractCommand(
       if (!oreId) return { success: false, output: t('economy.contract.usage_spoil') };
       if (orePermitGrade(oreId) === undefined) return { success: false, output: t('logistics.spoil_ore_unknown', { material: oreId }) };
       const preview = spoilOrePreview(state, oreId);
+      if (!(preview.kg > 0)) return { success: false, output: t((state.collectedOre[oreId] ?? 0) > 0 ? 'logistics.spoil_ore_no_room' : 'logistics.spoil_ore_no_stock', { material: oreId }) };
       if (args[2] !== 'confirm') {
         return { success: true, output: t('economy.contract.spoil_preview', { ore: t(`ore.${oreId}.name`), kg: Math.floor(preview.kg), value: formatDollars(preview.valueLost), id: oreId }) };
       }
