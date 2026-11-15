@@ -18,6 +18,7 @@ import { subSeed, cellRand } from '../math/Hash.js';
 import { getAllOres, type OreType } from './OreCatalog.js';
 import { getRock } from './RockCatalog.js';
 import { sandboxHostProbability, sandboxOreWindow } from './SandboxDeepOre.js';
+import type { OreIslands } from './OreIslands.js';
 import type { VoxelRockComposition } from './VoxelGrid.js';
 
 /** Along-strike frequency; 6.7x lower than across-strike elongates veins along the strike axis. */
@@ -26,7 +27,7 @@ const CROSS_FREQ = 0.10;
 const RICHNESS_WEIGHT = 0.9;
 const DENSITY_GAIN = 4;
 /** Sparse storage cutoff — densities at or below this are dropped, not stored as ~0 entries. */
-const MIN_STORED_DENSITY = 0.05;
+export const MIN_STORED_DENSITY = 0.05;
 
 interface OreField {
   readonly noise: NoiseFunction3D;
@@ -100,15 +101,19 @@ interface OreVeinOptions {
   readonly gradeScale?: number;
   /** Gate veins to discrete deposits by rarity tier; off keeps the legacy continuous veins. */
   readonly deposits?: boolean;
+  /** Ore islands (#2284): the only source of G2 ore. */
+  readonly islands?: OreIslands;
 }
 
 /** Samples per-ore anisotropic vein density from rock composition + a depth window (#458 A12). */
 export class OreVeinSampler {
   private readonly fields = new Map<string, OreField>();
   private readonly gradeScale: number;
+  private readonly islands: OreIslands | undefined;
 
   constructor(seed: number, options: OreVeinOptions = {}) {
     this.gradeScale = options.gradeScale ?? ORE_GRADE_SCALE_DEFAULT;
+    this.islands = options.islands;
     for (const ore of getAllOres()) {
       const rng = new Random(subSeed(seed, `ore:${ore.id}`));
       const noise = createNoise3D(() => rng.next());
@@ -156,6 +161,12 @@ export class OreVeinSampler {
           const stored = field.deposit ? depthGraded(rounded, depth) : rounded;
           result[ore.id] = this.gradeScale === ORE_GRADE_SCALE_DEFAULT ? stored : stored * this.gradeScale;
         }
+      }
+    }
+
+    if (this.islands) {
+      for (const [oreId, density] of Object.entries(this.islands.densitiesAt(x, z, depth))) {
+        result[oreId] = this.gradeScale === ORE_GRADE_SCALE_DEFAULT ? density : density * this.gradeScale;
       }
     }
 

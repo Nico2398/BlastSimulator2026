@@ -146,6 +146,7 @@ export const SILENT_COMMANDS: Readonly<Record<string, string>> = {
   fragment: 'alias of fragments',
   inspect: 'read-only report',
   terrain_info: 'read-only report',
+  ore_islands: 'read-only report',
   landscape_info: 'read-only report',
   preview: 'read-only report',
   blast_preview: 'read-only report',

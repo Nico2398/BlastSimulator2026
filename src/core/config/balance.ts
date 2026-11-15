@@ -3190,6 +3190,23 @@ export const ORE_DEPOSIT_RARITY_COVERAGE: Readonly<Record<string, number>> = {
 export const ORE_G1_DEPOSIT_CUTOFF = 0.4;
 /** Least host probability a G0 or G1 ore has in any rock on a progression site (#2281): every biome holds both grades whatever its host rocks. */
 export const ORE_PROGRESSION_HOST_FLOOR = 0.1;
+// Ore islands (#2284): G2 ores (craktonite, absurdium) sit in discrete far-off patches on progression sites.
+/** Ore ids the islands hold: the G2 ores, found nowhere else. */
+export const ORE_ISLAND_ORE_IDS: readonly string[] = ['craktonite', 'absurdium'];
+/** Metres from spawn within which no island ore lies: far enough that walking there is a real trip (14 chunks). */
+export const ORE_ISLAND_MIN_DISTANCE_M = 224;
+/** Furthest island centre from spawn (m): 20 chunks, inside what one claim bridge reaches (MAX_CLAIM_BRIDGE_CHUNKS = 24). */
+export const ORE_ISLAND_MAX_DISTANCE_M = 320;
+/** Side (m) of the grid cell holding at most one island candidate; an island never crosses its cell. */
+export const ORE_ISLAND_CELL_M = 64;
+/** Chance a cell inside the distance window holds an island: sparse enough that prospection is the way to find one. */
+export const ORE_ISLAND_CHANCE = 0.3;
+export const ORE_ISLAND_RADIUS_MIN_M = 10;
+export const ORE_ISLAND_RADIUS_MAX_M = 18;
+/** Island ore lies within this many metres below the surface (the first two benches): the challenge is distance, not depth. */
+export const ORE_ISLAND_DEPTH_M = 10;
+/** Stored ore density at an island core, before the site grade scale. */
+export const ORE_ISLAND_CORE_DENSITY = 0.6;
 /** Multiplier boosting vein density at a deposit core. */
 export const ORE_DEPOSIT_CORE_GAIN = 3;
 /** Width of the soft falloff at a deposit edge, in deposit-field units. */

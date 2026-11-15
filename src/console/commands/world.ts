@@ -779,6 +779,21 @@ export function landscapeInfoCommand(
   };
 }
 
+/** Lists the ore islands of the current world: centre, ores, distance from spawn (#2284). */
+export function oreIslandsCommand(
+  ctx: GameContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  if (!ctx.state) return { success: false, output: t('console.no_game_loaded') };
+  const config = terrainConfigOf(ctx.state);
+  if (!config) return { success: false, output: t('world.landscape_unknown_mine_type', { mineType: ctx.state.mineType }) };
+  const islands = buildTerrainContext(config).oreIslands?.list() ?? [];
+  if (islands.length === 0) return { success: true, output: 'Ore islands: none' };
+  const lines = islands.map((i) => `  (${i.x}, ${i.z}) ${i.oreIds.join('+')} radius ${i.radius}m, ${Math.round(i.distance)}m from spawn`);
+  return { success: true, output: [`Ore islands: ${islands.length}`, ...lines].join('\n') };
+}
+
 export function surveyCommand(
   ctx: GameContext,
   args: string[],

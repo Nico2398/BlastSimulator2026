@@ -6,8 +6,10 @@ import { getOre, getAllOres, orePermitGrade } from '../../../src/core/world/OreC
 import { getAllRocks } from '../../../src/core/world/RockCatalog.js';
 import { ORE_RARITY_TIERS } from '../../helpers/oreRarity.js';
 import { SEEDS, BLOCK, MAX_DEPTH, sampleSite, blockIndexOf, shareBelow, richestDecileOverMedian, argmax, peakBlockByOre, type SiteOre } from '../../helpers/oreSite.js';
-import { ORE_DEPOSIT_RARITY_COVERAGE, ORE_DEPTH_MULTIPLIER_BANDS, ORE_DEPTH_BLEND_M, ORE_G0_LAYER_DEPTH_M } from '../../../src/core/config/balance.js';
+import { ORE_DEPOSIT_RARITY_COVERAGE, ORE_DEPTH_MULTIPLIER_BANDS, ORE_DEPTH_BLEND_M, ORE_G0_LAYER_DEPTH_M, ORE_ISLAND_DEPTH_M, ORE_ISLAND_ORE_IDS } from '../../../src/core/config/balance.js';
 import { createRunner } from '../../../src/console/createRunner.js';
+import type { OreIslands } from '../../../src/core/world/OreIslands.js';
+import { SPAWN, islandContext, islandsOf } from '../../helpers/oreIslandSite.js';
 
 // cruite: dirtite 0.40 (depth 0-10), rustite 0.15 (depth 0-15). No blingite entry at all.
 const CRUITE_COMPOSITION: VoxelRockComposition = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
@@ -767,5 +769,90 @@ describe('ore grade layers over a whole sandbox site, every biome (#2281)', () =
     const desert = getAllBiomes().find(b => b.id === 'desert_badlands')!;
     const legacy = sampleSite(desert, 42);
     expect(kgIn(legacy, G0, ORE_G0_LAYER_DEPTH_M + 1, MAX_DEPTH)).toBeGreaterThan(0);
+  });
+});
+
+describe('G2 ore only inside ore islands (#2284)', () => {
+  const ROCK_IDS = getAllRocks().map(r => r.id);
+  const ALL_ROCKS_BLEND: VoxelRockComposition = { rocks: ROCK_IDS.map(rockId => ({ rockId, coefficient: 1 / ROCK_IDS.length })) };
+  const g2Of = (found: Record<string, number>): string[] => Object.keys(found).filter(id => ORE_ISLAND_ORE_IDS.includes(id));
+
+  /** The first island column and depth that holds ore, with the island densities there. */
+  function oreSpot(islands: OreIslands): { x: number; z: number; depth: number; densities: Record<string, number> } {
+    for (const island of islands.list()) {
+      for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
+        for (let depth = 0; depth <= ORE_ISLAND_DEPTH_M; depth++) {
+          const densities = islands.densitiesAt(island.x + dx, island.z + dz, depth);
+          if (Object.keys(densities).length > 0) return { x: island.x + dx, z: island.z + dz, depth, densities };
+        }
+      }
+    }
+    throw new Error('no island holds ore');
+  }
+
+  it('C1 a deposit sampler without islands holds no G2 ore at any depth, in any rock', () => {
+    const sampler = new OreVeinSampler(42, { deposits: true });
+    for (const depth of [0, 5, 10, 18, 25, 30, 45, 55]) {
+      for (let x = 0; x < 160; x += 8) for (let z = 0; z < 160; z += 8) {
+        expect(g2Of(sampler.densitiesAt(x, 0, z, depth, ALL_ROCKS_BLEND, 3.0)), `${x},${z} at ${depth} m`).toEqual([]);
+      }
+    }
+  });
+
+  it('C1 a sampler given islands holds no G2 ore outside them: not at spawn, not in the open ground around it', () => {
+    const islands = islandsOf(42);
+    const sampler = new OreVeinSampler(42, { deposits: true, islands });
+    for (const depth of [0, 3, ORE_ISLAND_DEPTH_M, 20, 30, 45]) {
+      expect(g2Of(sampler.densitiesAt(SPAWN.x, 0, SPAWN.z, depth, ALL_ROCKS_BLEND, 3.0))).toEqual([]);
+      for (let x = -100; x < 160; x += 20) for (let z = -100; z < 160; z += 20) {
+        expect(g2Of(sampler.densitiesAt(x, 0, z, depth, ALL_ROCKS_BLEND, 3.0)), `${x},${z} at ${depth} m`).toEqual([]);
+      }
+    }
+  });
+
+  it('C2 a sampler given islands returns the island densities for G2 ores inside an island', () => {
+    const islands = islandsOf(42);
+    const sampler = new OreVeinSampler(42, { deposits: true, islands });
+    const spot = oreSpot(islands);
+    const found = sampler.densitiesAt(spot.x, 0, spot.z, spot.depth, ALL_ROCKS_BLEND, 1.0);
+    for (const [id, density] of Object.entries(spot.densities)) {
+      expect(ORE_ISLAND_ORE_IDS).toContain(id);
+      expect(found[id], id).toBe(density);
+    }
+  });
+
+  it('C2 island ore is gone below the island depth even though the column is in an island', () => {
+    const islands = islandsOf(42);
+    const sampler = new OreVeinSampler(42, { deposits: true, islands });
+    const spot = oreSpot(islands);
+    for (const depth of [ORE_ISLAND_DEPTH_M + 1, 25, 40]) {
+      expect(g2Of(sampler.densitiesAt(spot.x, 0, spot.z, depth, ALL_ROCKS_BLEND, 1.0))).toEqual([]);
+    }
+  });
+
+  it('island densities are scaled by the sampler grade scale', () => {
+    const islands = islandsOf(42);
+    const spot = oreSpot(islands);
+    const scaled = new OreVeinSampler(42, { deposits: true, islands, gradeScale: 2 })
+      .densitiesAt(spot.x, 0, spot.z, spot.depth, ALL_ROCKS_BLEND, 1.0);
+    for (const [id, density] of Object.entries(spot.densities)) expect(scaled[id]).toBeCloseTo(density * 2, 5);
+  });
+
+  it('the terrain context wires its islands in: G2 ore at an island, none at spawn', () => {
+    const context = islandContext(42);
+    const spot = oreSpot(context.oreIslands!);
+    const at = context.oreVeins.densitiesAt(spot.x, 0, spot.z, spot.depth, ALL_ROCKS_BLEND, 1.0);
+    expect(g2Of(at).length).toBeGreaterThan(0);
+    expect(g2Of(context.oreVeins.densitiesAt(SPAWN.x, 0, SPAWN.z, spot.depth, ALL_ROCKS_BLEND, 1.0))).toEqual([]);
+  });
+
+  it('C5 a legacy (deposits off) context carries no islands and its sampler is untouched by them', () => {
+    const legacy = islandContext(42, false);
+    expect(legacy.oreIslands).toBeNull();
+    const plain = new OreVeinSampler(42);
+    for (let x = 0; x < 64; x += 8) for (let z = 0; z < 64; z += 8) {
+      expect(legacy.oreVeins.densitiesAt(x, 0, z, 20, ALL_ROCKS_BLEND, 1.0))
+        .toEqual(plain.densitiesAt(x, 0, z, 20, ALL_ROCKS_BLEND, 1.0));
+    }
   });
 });
