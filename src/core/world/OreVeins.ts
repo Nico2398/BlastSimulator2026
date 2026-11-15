@@ -3,7 +3,7 @@
 // gets its own sub-seeded 3D ridged field, rotated into a per-ore strike
 // direction and stretched along it (6.7x lower frequency along strike than
 // across it) so veins read as elongated seams rather than isotropic blobs.
-// With deposits on, hosting and windows come from SandboxDeepOre and density is graded by depth (#1933) before the site grade scale (#1932).
+// With deposits on, hosting and windows come from SandboxDeepOre (G0 in the top layer, G1 below, G2/G3 absent, #2281) and density is graded by depth (#1933) before the site grade scale (#1932).
 // Gated by a per-ore depth window and weighted by how strongly the voxel's
 // actual rock blend hosts that ore — honours the composition weighting the
 // old scheme only approximated.
@@ -11,6 +11,7 @@
 import { createNoise3D, type NoiseFunction3D } from 'simplex-noise';
 import {
   ORE_DEPOSIT_CORE_GAIN, ORE_DEPTH_BLEND_M, ORE_DEPTH_MULTIPLIER_BANDS, ORE_GRADE_SCALE_DEFAULT, ORE_DEPOSIT_EDGE_WIDTH, ORE_DEPOSIT_FREQ, ORE_DEPOSIT_RARITY_COVERAGE,
+  ORE_G1_DEPOSIT_CUTOFF,
 } from '../config/balance.js';
 import { Random } from '../math/Random.js';
 import { subSeed, cellRand } from '../math/Hash.js';
@@ -64,7 +65,9 @@ function depositLayer(seed: number, ore: OreType): NonNullable<OreField['deposit
   const rng = new Random(subSeed(seed, `ore-deposit:${ore.id}`));
   // Every catalog rarity has a coverage entry (unit-tested); a missing one would
   // read as cutoff 0, i.e. near-continuous veins, rather than crash the game.
-  return { noise: createNoise3D(() => rng.next()), cutoff: ORE_DEPOSIT_RARITY_COVERAGE[ore.rarity] ?? 0 };
+  // G1 ores share one wider cutoff so a second bench under the opening area finds one (#2281); G0 keeps its rarity cutoff.
+  const cutoff = ore.permitGrade === 1 ? ORE_G1_DEPOSIT_CUTOFF : ORE_DEPOSIT_RARITY_COVERAGE[ore.rarity] ?? 0;
+  return { noise: createNoise3D(() => rng.next()), cutoff };
 }
 
 /**
@@ -128,7 +131,9 @@ export class OreVeinSampler {
       const field = this.fields.get(ore.id);
       if (!field) continue;
       const sandbox = field.deposit !== undefined;
-      const [depthMin, depthMax] = sandbox ? sandboxOreWindow(ore) : [ore.depthMin, ore.depthMax];
+      const window = sandbox ? sandboxOreWindow(ore) : [ore.depthMin, ore.depthMax] as const;
+      if (!window) continue;
+      const [depthMin, depthMax] = window;
       if (depth < depthMin || depth > depthMax) continue;
 
       const affinity = hostRockAffinity(composition, ore.id, sandbox);

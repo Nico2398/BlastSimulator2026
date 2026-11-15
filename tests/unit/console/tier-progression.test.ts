@@ -14,9 +14,10 @@ function sandbox(args = '', biome = 'desert_badlands') {
   return { runner, ctx, state: ctx.state! };
 }
 
-/** Empties the board, ticks to the next scheduled refresh (the pipeline refreshes on `CONTRACT_REFRESH_INTERVAL` boundaries), and counts the offers it posted. A tropical site yields ores of every grade, so the grade-bound ore offers (#2278) never empty the board. */
+/** Empties the board, ticks to the next scheduled refresh (the pipeline refreshes on `CONTRACT_REFRESH_INTERVAL` boundaries), and counts the offers it posted. Ordinary ground holds no G2/G3 ore (#2281), so a high-grade board is rubble offers only: the spoil heap holds enough rock for them. */
 function offersPerRefresh(args: string): number {
   const { runner, state } = sandbox(args, 'tropical');
+  for (const b of state.buildings.buildings) if (b.type === 'spoil_heap') b.storedSpoilKg = 1_000_000;
   state.contracts.available = [];
   state.contracts.lastRefreshTick = state.tickCount - 10_000;
   runner.run(`tick ${CONTRACT_REFRESH_INTERVAL - (state.tickCount % CONTRACT_REFRESH_INTERVAL)}`);

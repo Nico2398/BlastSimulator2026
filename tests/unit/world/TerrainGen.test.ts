@@ -10,7 +10,7 @@ import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 import { getBiome, getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
 import { VoxelGrid, chunkIndexOf, CHUNK_SIZE, getDominantRockId, MAX_VOXEL_ABS_Y } from '../../../src/core/world/VoxelGrid.js';
 import { sampleSurfaceHeightY, sampleSurfaceVoxelY, applyPitMask, sampleBaseHeight, type WorldGenContext } from '../../../src/core/world/WorldGen.js';
-import { getOre } from '../../../src/core/world/OreCatalog.js';
+import { getOre, orePermitGrade } from '../../../src/core/world/OreCatalog.js';
 import { OreVeinSampler } from '../../../src/core/world/OreVeins.js';
 import { getAllLevels } from '../../../src/core/campaign/Level.js';
 
@@ -681,7 +681,7 @@ describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
 
 import { isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import { sampleBaseHeight as sampleRawHeight } from '../../../src/core/world/WorldGen.js';
-import { SANDBOX_FLAT_PAD_TARGET, SANDBOX_PIT_MASK, type PitMaskShape } from '../../../src/core/config/balance.js';
+import { SANDBOX_FLAT_PAD_TARGET, SANDBOX_PIT_MASK, ORE_G0_LAYER_DEPTH_M, type PitMaskShape } from '../../../src/core/config/balance.js';
 import { sandboxTerrainConfig, flatPadShare } from '../../helpers/sandboxSite.js';
 
 describe('sandbox site blend (#1734)', () => {
@@ -970,5 +970,60 @@ describe('buildTerrainContext memo', () => {
     clearTerrainContextMemo();
     const config = sandbox(901);
     expect(buildTerrainContext(config)).toBe(buildTerrainContext(config));
+  });
+});
+
+// Ore grade layers in generated sandbox terrain (#2281).
+
+describe('TerrainGen — ore grade layers on a progression site (#2281)', () => {
+  const BIOME_IDS = getAllBiomes().map(b => b.id);
+  const MAX_SCAN_DEPTH = 36;
+
+  /** Every ore voxel of a generated site: [depth below the rounded surface, ore id, in the starter pocket]. */
+  function oreVoxels(config: TerrainConfig): Array<readonly [number, string, boolean]> {
+    const grid = generateTerrain(config);
+    const ctx = buildTerrainContext(config);
+    const pocket = ctx.starterDeposit;
+    const out: Array<readonly [number, string, boolean]> = [];
+    for (let x = 0; x < config.sizeX; x += 2) for (let z = 0; z < config.sizeZ; z += 2) {
+      const top = Math.round(sampleSurfaceHeightY(ctx.worldGen, x, z));
+      const inPocket = pocket !== null && Math.hypot(x - pocket.x, z - pocket.z) <= pocket.radius + 1;
+      for (let depth = 0; depth < MAX_SCAN_DEPTH; depth++) {
+        for (const oreId of Object.keys(grid.oresAt(x, top - depth, z) ?? {})) out.push([depth, oreId, inPocket]);
+      }
+    }
+    return out;
+  }
+
+  for (const biomeId of BIOME_IDS) {
+    describe(biomeId, () => {
+      const config = sandboxTerrainConfig(biomeId, 42);
+
+      it('C1 no G1 ore above the G0 layer, no G0 ore below it (outside the starter pocket)', () => {
+        for (const [depth, oreId, inPocket] of oreVoxels(config)) {
+          if (inPocket) continue;
+          const grade = orePermitGrade(oreId)!;
+          if (depth < ORE_G0_LAYER_DEPTH_M) expect(grade, `${oreId} at ${depth} m`).toBe(0);
+          if (depth > ORE_G0_LAYER_DEPTH_M) expect(grade, `${oreId} at ${depth} m`).toBe(1);
+        }
+      });
+
+      it('C2 no G2 or G3 ore anywhere, the starter pocket included', () => {
+        for (const [depth, oreId] of oreVoxels(config)) {
+          expect(orePermitGrade(oreId)! <= 1, `${oreId} at ${depth} m`).toBe(true);
+        }
+      });
+
+      it('C3 holds G0 ore in the top layer and G1 ore below it', () => {
+        const voxels = oreVoxels(config);
+        expect(voxels.some(([d, id]) => d < ORE_G0_LAYER_DEPTH_M && orePermitGrade(id) === 0)).toBe(true);
+        expect(voxels.some(([d, id]) => d > ORE_G0_LAYER_DEPTH_M && orePermitGrade(id) === 1)).toBe(true);
+      });
+    });
+  }
+
+  it('C6 a site with ore deposits off keeps its catalog windows: G0 ore still occurs below 5 m', () => {
+    const { oreDeposits: _omit, ...legacy } = sandboxTerrainConfig('desert_badlands', 42);
+    expect(oreVoxels(legacy).some(([d, id]) => d > ORE_G0_LAYER_DEPTH_M && orePermitGrade(id) === 0)).toBe(true);
   });
 });
