@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../../src/console/createRunner.js';
-import { CONTRACTS_PER_REFRESH } from '../../../src/core/config/balance.js';
+import { CONTRACTS_PER_REFRESH, CONTRACT_REFRESH_INTERVAL } from '../../../src/core/config/balance.js';
 import { gradeRung } from '../../../src/core/economy/MineGrade.js';
 import { meetTargets, tierTargets, perkTotals } from '../../helpers/gradeLadder.js';
 
@@ -14,12 +14,12 @@ function sandbox(args = '') {
   return { runner, ctx, state: ctx.state! };
 }
 
-/** Empties the board so the next tick refreshes it, ticks once, and counts the offers the refresh posted. */
+/** Empties the board, ticks to the next scheduled refresh (the pipeline refreshes on `CONTRACT_REFRESH_INTERVAL` boundaries), and counts the offers it posted. */
 function offersPerRefresh(args: string): number {
   const { runner, state } = sandbox(args);
   state.contracts.available = [];
   state.contracts.lastRefreshTick = state.tickCount - 10_000;
-  runner.run('tick 1');
+  runner.run(`tick ${CONTRACT_REFRESH_INTERVAL - (state.tickCount % CONTRACT_REFRESH_INTERVAL)}`);
   return state.contracts.available.length;
 }
 

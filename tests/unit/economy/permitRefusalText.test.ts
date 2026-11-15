@@ -8,14 +8,14 @@ import { permitRefusalText } from '../../../src/core/economy/permitRefusalText.j
 
 function progression(): GameState {
   const s = createGame({ seed: 42, mineType: 'desert' });
-  s.grade = createGradeState();
+  s.grade = { ...createGradeState(), tier: 3 };
   s.cash = 1_000_000;
   return s;
 }
 
 function meetTargets(s: GameState): void {
-  s.grade!.oreDeliveredKg = 5_000;
-  s.grade!.blastsFired = 2;
+  s.grade!.oreDeliveredKg = 6_000;
+  s.grade!.blastsFired = 3;
 }
 
 describe('permitRefusalText (#1924)', () => {
@@ -73,7 +73,7 @@ describe('permitApplyBlocker (#1924)', () => {
 
   it('reports unmet_targets with the unmet kinds', () => {
     const s = progression();
-    s.grade!.oreDeliveredKg = 5_000;
+    s.grade!.oreDeliveredKg = 6_000;
     expect(permitApplyBlocker(s)).toEqual({ refusal: 'unmet_targets', unmet: ['blasts'] });
   });
 

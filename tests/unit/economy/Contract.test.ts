@@ -1396,11 +1396,11 @@ describe('untiered boards stay byte-identical (#1929)', () => {
 describe('buyer unlock lines (#1929)', () => {
   const keys = (g: number) => unlockLinesFor(g).map(l => l.key);
 
-  it.each([[1, 'regional'], [3, 'national'], [5, 'global']] as const)('grade %i lists the %s buyer', (g, id) => {
+  it.each([[1, 'regional'], [2, 'national'], [3, 'global']] as const)('grade %i lists the %s buyer', (g, id) => {
     expect(keys(g)).toContain(`progression.unlock.buyer.${id}`);
   });
 
-  it.each([2, 4, 6])('grade %i lists no buyer line', (g) => {
+  it.each([4, 5, 6])('grade %i lists no buyer line', (g) => {
     expect(keys(g).filter(k => k.startsWith('progression.unlock.buyer.'))).toEqual([]);
   });
 

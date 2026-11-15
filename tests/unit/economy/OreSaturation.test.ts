@@ -23,15 +23,14 @@ describe('marketDepthKg', () => {
     expect(marketDepthKg('treranium', 0)).toBe(2_000);
   });
 
-  it.each([[1, 2], [3, 5], [5, 12]])('grade %i multiplies depth by %i', (grade, mult) => {
+  it.each([[1, 2], [2, 5], [3, 12]])('grade %i multiplies depth by %i', (grade, mult) => {
     expect(marketDepthKg('dirtite', grade)).toBe(20_000 * mult);
     expect(marketDepthKg('absurdium', grade)).toBe(3_000 * mult);
   });
 
-  it('a grade between unlocks uses the highest unlocked tier', () => {
-    expect(marketDepthKg('rustite', 2)).toBe(marketDepthKg('rustite', 1));
+  it('a grade past the last unlock uses the highest unlocked tier', () => {
     expect(marketDepthKg('rustite', 4)).toBe(marketDepthKg('rustite', 3));
-    expect(marketDepthKg('rustite', 9)).toBe(marketDepthKg('rustite', 5));
+    expect(marketDepthKg('rustite', 9)).toBe(marketDepthKg('rustite', 3));
   });
 
   it('depth never shrinks as the grade rises', () => {
