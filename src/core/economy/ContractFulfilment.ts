@@ -1,17 +1,18 @@
 // BlastSimulator2026 — Delivery of stored ore to active contracts, by hand or automatically.
 
-import { AUTO_SALE_DWELL_TICKS, FRAGMENT_SPLIT_EPSILON_KG, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
+import { FRAGMENT_SPLIT_EPSILON_KG, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
 import { acceptContract, deliverMaterials, isAutoDeliverable, isPaidClearance, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
 import { addExpense, addIncome, type FinanceState } from './Finance.js';
 import { consumeStoredOre, type LogisticsState } from './Logistics.js';
-import { rubbleStockKg } from './SpoilHeaps.js';
+import { rubbleStockKg, totalSpoilRoomKg } from './SpoilHeaps.js';
 import type { Contract, ContractType } from './Contract.js';
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { recordOreDelivery } from './MineGrade.js';
 import { recordOreSale, saturationAt } from './OreSaturation.js';
-import { autoSalePricePerKg } from './Market.js';
+import { autoSalePricePerKg, oreValuePerKg } from './Market.js';
+import { getAllOres, orePermitGrade, ORE_MAX_PERMIT_GRADE } from '../world/OreCatalog.js';
 import { oreGradeScaleOf } from './OreGrade.js';
 import { recordBoardOre } from './Board.js';
 import type { Building } from '../entities/Building.js';
@@ -158,14 +159,15 @@ export interface AutoSale {
 }
 
 /**
- * Sell stored ore no active contract claims, once it has stayed unclaimed for AUTO_SALE_DWELL_TICKS (#2145).
- * Performs the whole sale on `state`: draws the ore down, books `sales` income, records saturation and mine grade.
+ * Sell stored ore of a grade below the site's, at once, when no active contract claims it (#2145, #2278).
+ * Current-grade and higher-grade ore is never sold; at G0 (or without a grade) nothing is. Performs the whole sale on `state`: draws the ore down, books `sales` income, records saturation and mine grade.
  * Sells nothing when `state.contracts.autoSell === false`.
  */
 export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[] {
   const contracts = state.contracts;
   if (contracts.autoSell === false) return [];
-  const since = (contracts.autoSaleSince ??= {});
+  const sellable = new Set(autoSellOreIds(state.grade?.grade));
+  if (sellable.size === 0) return [];
   const claimed: Record<string, number> = {};
   for (const c of contracts.active) {
     if (c.type === 'rubble_disposal' || c.completed || c.expired) continue;
@@ -175,12 +177,7 @@ export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[]
   const gradeScale = oreGradeScaleOf(state.world);
   for (const [oreId, stock] of Object.entries(state.collectedOre)) {
     const unclaimed = stock - (claimed[oreId] ?? 0);
-    if (!(unclaimed > FRAGMENT_SPLIT_EPSILON_KG)) {
-      delete since[oreId];
-      continue;
-    }
-    since[oreId] ??= tick;
-    if (tick - since[oreId]! < AUTO_SALE_DWELL_TICKS) continue;
+    if (!sellable.has(oreId) || !(unclaimed > FRAGMENT_SPLIT_EPSILON_KG)) continue;
     const consumed = consumeStoredOre(state.logistics, state.collectedOre, oreId, unclaimed, state.buildings.buildings, gradeScale);
     if (!consumed.success || !(consumed.consumedKg > 0)) continue;
     const kg = consumed.consumedKg;
@@ -192,7 +189,6 @@ export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[]
     recordOreDelivery(state.grade, 'ore_sale', kg);
     recordBoardOre(state.board, 'ore_sale', kg);
     if (state.grade !== undefined) recordOreSale((state.saturation ??= {}), oreId, kg, tick, state.grade.grade);
-    delete since[oreId];
     sales.push({ oreId, kg, payment });
   }
   return sales;
@@ -222,16 +218,21 @@ export function autoAcceptRubbleClearances(contracts: ContractState, rubbleStock
 export type OreStockStatus = 'auto_sold' | 'waiting' | 'above_grade';
 
 /** Catalog ores of grades below `grade` — the ones automatic sale covers; none at G0 or without a grade (#2278). */
-export function autoSellOreIds(_grade: number | undefined): string[] {
-  throw new Error('not implemented');
+export function autoSellOreIds(grade: number | undefined): string[] {
+  const g = Math.min(grade ?? 0, ORE_MAX_PERMIT_GRADE + 1);
+  return getAllOres().filter(o => o.permitGrade < g).map(o => o.id);
 }
 
 /** Status of a stored ore at the site's `grade`: sold automatically, waiting for a contract, or above the grade (#2278). */
-export function oreStockStatus(_oreId: string, _grade: number | undefined, _autoSellOn: boolean): OreStockStatus {
-  throw new Error('not implemented');
+export function oreStockStatus(oreId: string, grade: number | undefined, autoSellOn: boolean): OreStockStatus {
+  const g = Math.min(grade ?? 0, ORE_MAX_PERMIT_GRADE);
+  const oreGrade = orePermitGrade(oreId) ?? 0;
+  if (oreGrade > g) return 'above_grade';
+  return oreGrade < g && autoSellOn ? 'auto_sold' : 'waiting';
 }
 
 /** What sending `oreId` to the spoil heaps would move (kg: stock capped at heap room) and lose (market value) (#2278). */
-export function spoilOrePreview(_state: GameState, _oreId: string): { kg: number; valueLost: number } {
-  throw new Error('not implemented');
+export function spoilOrePreview(state: GameState, oreId: string): { kg: number; valueLost: number } {
+  const kg = Math.max(0, Math.min(state.collectedOre[oreId] ?? 0, totalSpoilRoomKg(state.buildings.buildings)));
+  return { kg, valueLost: kg * oreValuePerKg(oreId, state.contracts.market ?? 'legacy') };
 }

@@ -3,6 +3,7 @@
 
 import { saturationFactor, type SaturationReader } from './OreSaturation.js';
 import { oreContractBasePrice, resolveMarket, type MarketId, type MarketRange } from './Market.js';
+import { oresOfPermitGrade } from '../world/OreCatalog.js';
 import { Random } from '../math/Random.js';
 import { buyerDeadlineRange, buyerPriceFactor, buyerSupplyQtyRange, pickBuyerTier, type BuyerTier, type BuyerTierId } from './BuyerTiers.js';
 import type { ScriptedOreSaleOffer } from '../config/balance.js';
@@ -97,7 +98,7 @@ export interface ContractState {
   autoSell?: boolean;
   /** Automatic acceptance of paying rubble clearances; absent = the level's default (#2145). */
   autoClearRubble?: boolean;
-  /** Tick each ore was first seen unclaimed in storage, for the automatic-sale dwell (#2145). */
+  /** Unused since #2278 (automatic sale has no dwell); removed once the old tests that name it are re-premised. */
   autoSaleSince?: Record<string, number>;
 }
 
@@ -181,7 +182,9 @@ function commonOres(ores: readonly string[], market: MarketId | undefined): stri
  * barren rock for the smallest rubble offer). A rubble offer is sized to `rubbleStockKg`
  * (#1892); when the stock is under the market's smallest rubble quantity the roll becomes an ore sale.
  */
-function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number, buyerGrade?: number, saturation?: SaturationReader): Contract | null {
+function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, siteOres: readonly string[], rubbleStockKg: number, buyerGrade?: number, saturation?: SaturationReader): Contract | null {
+  // Ore offers cover only the current grade's ores; a site with no grade offers every ore (#2278).
+  const availableOres = buyerGrade === undefined ? siteOres : oresOfPermitGrade(siteOres, buyerGrade);
   const profile = resolveMarket(state.market);
   const typeRoll = rng.nextFloat(0, 1);
   // A site whose rocks yield no ore has nothing to sell or supply: rubble only.

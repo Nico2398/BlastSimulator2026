@@ -126,11 +126,12 @@ export function oreIndexOf(id: string): number {
 }
 
 /** Permit grade of an ore; undefined for an unknown id (#2278). */
-export function orePermitGrade(_id: string): number | undefined {
-  throw new Error('not implemented');
+export function orePermitGrade(id: string): number | undefined {
+  return ORE_MAP.get(id)?.permitGrade;
 }
 
 /** The ids among `ids` whose permit grade is `grade` (a grade above G3 counts as G3), in input order (#2278). */
-export function oresOfPermitGrade(_ids: readonly string[], _grade: number): string[] {
-  throw new Error('not implemented');
+export function oresOfPermitGrade(ids: readonly string[], grade: number): string[] {
+  const wanted = Math.min(grade, ORE_MAX_PERMIT_GRADE);
+  return ids.filter(id => orePermitGrade(id) === wanted);
 }

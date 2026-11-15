@@ -159,6 +159,7 @@ export class UIManager {
     this.contractsPanel = new ContractsPanel(stage);
     this.contractsPanel.setCloseHandler(() => this.hideAllPanels());
     this.contractsPanel.setNavigateHandler((panel) => this.showPanel(panel));
+    this.contractsPanel.setConfirmHandler((cfg) => this.showConfirm(cfg));
     this.financesPanel = new FinancesPanel(stage);
     this.financesPanel.setCloseHandler(() => this.hideAllPanels());
     this.operationsPanel = new OperationsPanel(stage);

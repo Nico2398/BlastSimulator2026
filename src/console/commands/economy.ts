@@ -23,8 +23,9 @@ import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js'
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { FRAGMENT_SPLIT_EPSILON_KG } from '../../core/config/balance.js';
 import { negotiateContractAtTick, negotiationRefusalReason } from '../../core/economy/Negotiation.js';
-import { deliverStoredOre, settleDelivery } from '../../core/economy/ContractFulfilment.js';
-import { getFragmentCounts } from '../../core/economy/Logistics.js';
+import { autoSellOreIds, deliverStoredOre, settleDelivery, spoilOrePreview } from '../../core/economy/ContractFulfilment.js';
+import { orePermitGrade } from '../../core/world/OreCatalog.js';
+import { getFragmentCounts, sendOreToSpoilHeap } from '../../core/economy/Logistics.js';
 import { stateRubbleStockKg, type StoredFragmentLike } from '../../core/economy/SpoilHeaps.js';
 import { oreGradeScaleOf } from '../../core/economy/OreGrade.js';
 import type { Building } from '../../core/entities/Building.js';
@@ -152,6 +153,13 @@ function resolveContract(
   return contract;
 }
 
+/** The `contract auto` line naming the ores automatic sale covers at the site's grade (#2278). */
+function autoSellOresLine(grade: number | undefined): string {
+  const ids = autoSellOreIds(grade);
+  if (ids.length === 0) return t('economy.contract.auto_ores_none');
+  return t('economy.contract.auto_ores', { ores: ids.map(id => t(`ore.${id}.name`)).join(', ') });
+}
+
 export function contractCommand(
   ctx: GameContext,
   args: string[],
@@ -204,6 +212,7 @@ export function contractCommand(
         return { success: true, output: [
           t('economy.contract.auto_line', { name: t('economy.contract.auto_sell_name'), state: t(autoFulfilmentEnabled(state, 'autoSell') ? 'economy.contract.auto_on' : 'economy.contract.auto_off') }),
           t('economy.contract.auto_line', { name: t('economy.contract.auto_rubble_name'), state: t(autoFulfilmentEnabled(state, 'autoClearRubble') ? 'economy.contract.auto_on' : 'economy.contract.auto_off') }),
+          autoSellOresLine(state.grade?.grade),
         ].join('\n') };
       }
       const key = target === 'sell' || target === 'rubble' ? keys[target] : undefined;
@@ -211,6 +220,19 @@ export function contractCommand(
       if (!key || value === undefined) return { success: false, output: t('economy.contract.usage_auto') };
       state.contracts[key] = value;
       return { success: true, output: t('economy.contract.auto_line', { name: t(target === 'sell' ? 'economy.contract.auto_sell_name' : 'economy.contract.auto_rubble_name'), state: t(value ? 'economy.contract.auto_on' : 'economy.contract.auto_off') }) };
+    }
+
+    case 'spoil': {
+      const oreId = args[1];
+      if (!oreId) return { success: false, output: t('economy.contract.usage_spoil') };
+      if (orePermitGrade(oreId) === undefined) return { success: false, output: t('logistics.spoil_ore_unknown', { material: oreId }) };
+      const preview = spoilOrePreview(state, oreId);
+      if (args[2] !== 'confirm') {
+        return { success: true, output: t('economy.contract.spoil_preview', { ore: t(`ore.${oreId}.name`), kg: Math.floor(preview.kg), value: formatDollars(preview.valueLost), id: oreId }) };
+      }
+      const sent = sendOreToSpoilHeap(state.logistics, state.collectedOre, state.buildings.buildings, oreId, oreGradeScaleOf(state.world));
+      if (!sent.success) return { success: false, output: sent.error };
+      return { success: true, output: t('economy.contract.spoil_done', { ore: t(`ore.${oreId}.name`), kg: Math.floor(sent.data.kg) }) };
     }
 
     case 'accept': {

@@ -39,10 +39,12 @@ import type { GameState } from '../../core/state/GameState.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { negotiationRefusalReason } from '../../core/economy/Negotiation.js';
 import { contractAcceptBlocker, contractTotal, isFillableSaleOffer, isPaidClearance, isWinningSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
-import { stateRubbleStockKg, totalSpoilKg } from '../../core/economy/SpoilHeaps.js';
+import { stateRubbleStockKg, totalSpoilKg, totalSpoilRoomKg } from '../../core/economy/SpoilHeaps.js';
 import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
 import { earlyBonusExplain, heldExplain, negotiateExplain, offSiteExplain, penaltyExplain } from '../panelExplain.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import type { ConfirmModalConfig } from './ConfirmModal.js';
+import { oreStockStatus, spoilOrePreview } from '../../core/economy/ContractFulfilment.js';
 import { contractMaterialKey, forecastContracts, forecastInputsFromState, offerOutlook, type ContractOutlook, type ForecastInputs, type MaterialOutlook } from '../../core/economy/ContractForecast.js';
 import { lineExplain, makeOutlookSection, makeTimelineSection, materialName, outlookPill, outlookSignature, rateText } from './contractOutlookView.js';
 
@@ -168,6 +170,7 @@ export class ContractsPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private gameConsole?: GameConsoleFn;
   private onNavigateCb?: (panel: 'ops') => void;
+  private onConfirmCb?: (cfg: ConfirmModalConfig) => void;
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
   private readonly selections: Record<ListSectionKind, FilterBarSelection> = {
@@ -199,6 +202,7 @@ export class ContractsPanel extends PanelBase {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setNavigateHandler(cb: (panel: 'ops') => void): void { this.onNavigateCb = cb; }
+  setConfirmHandler(cb: (cfg: ConfirmModalConfig) => void): void { this.onConfirmCb = cb; }
 
 
   update(state: GameState): void {
@@ -213,6 +217,7 @@ export class ContractsPanel extends PanelBase {
       neg: state.contracts.lastNegotiation,
       sel: Object.values(this.selections).map(x => `${x.filter}|${x.sort}`),
       auto: [autoFulfilmentEnabled(state, 'autoSell'), autoFulfilmentEnabled(state, 'autoClearRubble')],
+      grade: state.grade?.grade, heapKg: Math.round(totalSpoilRoomKg(state.buildings.buildings)),
       managerLevel: bestAvailableManagerLevel(state.employees.employees),
       market: market && {
         grade: market.grade,
@@ -249,7 +254,7 @@ export class ContractsPanel extends PanelBase {
       makeOutlookSection(lines),
       makeTimelineSection(state.contracts.active, state.tickCount, lines),
       this.makeMarketSection(state, siteOres),
-      el('div', { className: 'bs-contract-strips', children: [this.makeStorageStrip(state), this.makeAutoStrip(state)] }),
+      el('div', { className: 'bs-contract-strips', children: [this.makeStorageStrip(state), this.makeAutoStrip(state), this.makeOreStockStrip(state)] }),
       this.makeActiveSummaryStrip(state, activeHeader),
       sectionHeader(t('ui.contracts.available_count', { count: state.contracts.available.length })),
       ...this.makeListSection('available', {
@@ -473,6 +478,49 @@ export class ContractsPanel extends PanelBase {
       toggle('sell', 'autoSell', 'ui.contracts.auto_sell', 'ui.contracts.auto_sell_hint'),
       toggle('rubble', 'autoClearRubble', 'ui.contracts.auto_rubble', 'ui.contracts.auto_rubble_hint'),
     ]);
+  }
+
+  // ── Ore stock lines and spoil send (#2278) ──
+
+  private makeOreStockStrip(state: GameState): HTMLElement | null {
+    const grade = state.grade?.grade;
+    const autoOn = autoFulfilmentEnabled(state, 'autoSell');
+    const rows = Object.entries(state.collectedOre).filter(([, kg]) => kg > 0.5).map(([oreId, kg]) => {
+      const status = oreStockStatus(oreId, grade, autoOn);
+      const name = getOre(oreId) ? t(getOre(oreId)!.nameKey) : oreId;
+      const spoil = button('ghost', t('ui.contracts.spoil_ore'), {
+        dataAction: `spoil-ore-${oreId}`,
+        onClick: () => this.confirmSpoil(oreId),
+      });
+      spoil.setAttribute('data-spoil-ore', oreId);
+      spoil.style.cssText = 'height:24px;padding:0 8px;font-size:10px;flex-shrink:0';
+      const text = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:2px;min-width:0;flex:1' } });
+      text.append(
+        el('span', { text: `${name} ${wholeKg(kg)} kg`, attrs: { style: 'font:600 11px/1.2 var(--bsx-font-ui)' } }),
+        el('span', { text: t(`ui.contracts.stock_status_${status}`), attrs: { 'data-ore-stock-status': status, style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+      );
+      const row = el('div', { attrs: { 'data-ore-stock-row': oreId, 'data-status': status, style: 'display:flex;align-items:center;gap:8px' } });
+      row.append(text, spoil);
+      return row;
+    });
+    if (rows.length === 0) return null;
+    return card([sectionHeader(t('ui.contracts.stock_status_title')), ...rows]);
+  }
+
+  /** Ask before sending an ore's stock to the spoil heaps: the confirmation states the kg and value lost. */
+  private confirmSpoil(oreId: string): void {
+    const state = this.lastState;
+    if (!state) return;
+    const { kg, valueLost } = spoilOrePreview(state, oreId);
+    if (!(kg > 0)) { this.setStatus(t('logistics.spoil_ore_no_room', { material: oreId })); return; }
+    const ore = getOre(oreId);
+    this.onConfirmCb?.({
+      icon: 'trash',
+      title: t('ui.contracts.spoil_confirm_title'),
+      body: t('ui.contracts.spoil_confirm_body', { ore: ore ? t(ore.nameKey) : oreId, kg: wholeKg(kg), value: formatMoney(valueLost) }),
+      confirmLabel: t('ui.contracts.spoil_ore'),
+      onConfirm: () => this.gameConsole?.(`contract spoil ${oreId} confirm`),
+    });
   }
 
   // ── Active summary strip ──
