@@ -26,9 +26,10 @@ export function defaultStemmingM(
   grade: number | undefined,
   holes: readonly Pick<DrillHole, 'depth' | 'diameter'>[],
   explosiveId: string,
+  tier = 1,
 ): number {
   if (grade === undefined || holes.length === 0) return CHARGE_DEFAULT_STEMMING_M;
-  const limitKg = permitLimitsFor(grade).maxChargeKg;
+  const limitKg = permitLimitsFor(grade, tier).maxChargeKg;
   let kgPerMetre = 0;
   let fullColumnKg = 0;
   for (const h of holes) {

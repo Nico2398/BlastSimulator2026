@@ -74,6 +74,7 @@
           "levelEnded": false,
           "mineGrade": {
             "grade": 0,
+            "tier": 1,
             "pendingTicksLeft": null
           }
         },
@@ -98,6 +99,7 @@
         "equals": {
           "mineGrade": {
             "grade": 0,
+            "tier": 1,
             "pendingTicksLeft": null
           }
         }

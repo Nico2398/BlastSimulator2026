@@ -322,3 +322,21 @@ describe('sales/cost metrics from the ledger (#2117)', () => {
     expect(m.salesCostWindows.every(v => v === null)).toBe(true);
   });
 });
+
+describe('MetricsObserver tiers (#2277)', () => {
+  it('records the tick each tier was first reached, keyed grade.tier, leaving the start tier out', () => {
+    const obs = new MetricsObserver();
+    const at = (tick: number, grade: number, tier: number) => {
+      const s = synthetic({ tick }) as unknown as { grade: { grade: number; tier: number } };
+      s.grade.grade = grade;
+      s.grade.tier = tier;
+      obs.onTick(s as unknown as GameState);
+    };
+    at(10, 0, 1);
+    at(20, 0, 2);
+    at(30, 0, 2);
+    at(40, 0, 3);
+    at(50, 1, 1);
+    expect(obs.finalize().tierReachedTick).toEqual({ '0.2': 20, '0.3': 40, '1.1': 50 });
+  });
+});

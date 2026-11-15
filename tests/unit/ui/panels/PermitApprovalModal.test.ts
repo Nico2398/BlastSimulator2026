@@ -49,7 +49,7 @@ describe('PermitApprovalModal (#1926)', () => {
     modal.update(makeState(1));
     expect(modal.visible).toBe(true);
     expect(container.textContent).toContain(t(gradeDef(1).nameKey, gradeDef(1).nameParams));
-    expect(container.textContent).toContain('Hobby Quarry Licence');
+    expect(container.textContent).toContain('Depth');
   });
 
   it('shows a stamp element', () => {
@@ -121,7 +121,7 @@ describe('PermitApprovalModal (#1926)', () => {
     state.grade!.unseenApproval = 2;
     modal.update(state);
     expect(modal.visible).toBe(true);
-    expect(container.textContent).toContain('Licensed Quarry');
+    expect(container.textContent).toContain('Distance');
   });
 
   it('reopens from state on the first update, as after a save/load round trip', () => {
@@ -131,7 +131,7 @@ describe('PermitApprovalModal (#1926)', () => {
     const { modal, container } = makeModal();
     modal.update(restored);
     expect(modal.visible).toBe(true);
-    expect(container.textContent).toContain('Licensed Quarry');
+    expect(container.textContent).toContain('Distance');
   });
 
   it('refreshLocale rebuilds the content in the new language', () => {

@@ -30,7 +30,7 @@ export interface GradeVerdict {
   status: 'in' | 'early' | 'late' | 'missed';
 }
 
-/** Target tick window [min, max] in which each grade should be reached. */
+/** Target tick window [min, max] in which each grade should be reached. TODO(#2295): still keyed by the pre-tier numbering. */
 export const GRADE_TARGET_WINDOWS: Readonly<Record<number, readonly [number, number]>> = {
   3: [8000, 14000],
   4: [15000, 25000],

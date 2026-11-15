@@ -702,9 +702,9 @@ describe('FleetPanel dealership grade gate (#1928)', () => {
     return state;
   }
 
-  it('at grade 1 tier-2 and tier-3 buttons are locked with a "Needs <grade>" line, tier 1 is open', () => {
+  it('at grade 0 tier-2 and tier-3 buttons are locked with a "Needs <grade>" line, tier 1 is open', () => {
     const { panel } = makePanel();
-    panel.update(progressionState(1));
+    panel.update(progressionState(0));
     const t1 = tierBtn(panel, 'debris_hauler', 1);
     const t2 = tierBtn(panel, 'debris_hauler', 2);
     const t3 = tierBtn(panel, 'debris_hauler', 3);
@@ -713,15 +713,15 @@ describe('FleetPanel dealership grade gate (#1928)', () => {
     expect(t1.querySelector('.bs-fleet-tier-lock')).toBeNull();
     expect(t2.disabled).toBe(true);
     expect(t2.dataset['locked']).toBe('grade');
-    expect(t2.querySelector('.bs-fleet-tier-lock')!.textContent).toBe('Needs Licensed Quarry');
+    expect(t2.querySelector('.bs-fleet-tier-lock')!.textContent).toBe('Needs Depth');
     expect(t3.disabled).toBe(true);
     expect(t3.dataset['locked']).toBe('grade');
-    expect(t3.querySelector('.bs-fleet-tier-lock')!.textContent).toBe('Needs Strategic National Excavation');
+    expect(t3.querySelector('.bs-fleet-tier-lock')!.textContent).toBe('Needs Distance');
   });
 
   it('every role is locked the same way', () => {
     const { panel } = makePanel();
-    panel.update(progressionState(1));
+    panel.update(progressionState(0));
     const locked = [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')]
       .filter(b => b.dataset['locked'] === 'grade');
     expect(locked.length).toBe(6 * 2);
@@ -731,7 +731,7 @@ describe('FleetPanel dealership grade gate (#1928)', () => {
     const { panel } = makePanel();
     const calls: string[] = [];
     panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    panel.update(progressionState(1));
+    panel.update(progressionState(0));
     tierBtn(panel, 'debris_hauler', 2).click();
     expect(calls).toEqual([]);
   });
@@ -740,9 +740,9 @@ describe('FleetPanel dealership grade gate (#1928)', () => {
     const { panel } = makePanel();
     const calls: string[] = [];
     panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    const state = progressionState(1);
+    const state = progressionState(0);
     panel.update(state);
-    state.grade!.grade = 2;
+    state.grade!.grade = 1;
     panel.update(state);
     const t2 = tierBtn(panel, 'debris_hauler', 2);
     expect(t2.disabled).toBe(false);
@@ -753,9 +753,9 @@ describe('FleetPanel dealership grade gate (#1928)', () => {
     expect(calls).toContain('vehicle buy debris_hauler tier:2');
   });
 
-  it('grade 4 unlocks tier 3', () => {
+  it('grade 2 unlocks tier 3', () => {
     const { panel } = makePanel();
-    panel.update(progressionState(4));
+    panel.update(progressionState(2));
     expect(tierBtn(panel, 'debris_hauler', 3).disabled).toBe(false);
   });
 

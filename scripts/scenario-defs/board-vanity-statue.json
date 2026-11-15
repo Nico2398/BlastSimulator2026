@@ -3,19 +3,20 @@
   "description": "Vanity projects need a board (#2052): on a grade-5 sandbox with no board the Build menu has no Vanity section and cash is untouched. Once a board is attached (`board start`), the player builds the CEO Statue from the Vanity section: exactly $250,000 is charged, board confidence rises and average crew morale dips once (mandatory saluting).",
   "steps": [
     {
-      "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true grade:5",
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true grade:3 tier:3",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true grade:5"
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 staffed:true grade:3 tier:3"
         }
       ],
       "description": "Progression site opened at grade 5, the top of the ladder: no board attached.",
       "expect": {
         "equals": {
           "mineGrade": {
-            "grade": 5,
+            "grade": 3,
+            "tier": 3,
             "pendingTicksLeft": null
           }
         }

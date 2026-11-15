@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   permitLimitsFor,
+  permitLimitsForRung,
   preFireCheck,
   liveStrikes,
   inspectionChance,
@@ -10,12 +11,13 @@ import {
   rollInspection,
   resolveOvershoot,
 } from '../../../src/core/economy/PermitLimits.js';
-import { createGradeState, sanitizeGradeState, type GradeState } from '../../../src/core/economy/MineGrade.js';
+import { createGradeState, sanitizeGradeState, gradeRung, type GradeState } from '../../../src/core/economy/MineGrade.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { Random, rollSeed } from '../../../src/core/math/Random.js';
 import { isActive } from '../../../src/core/events/ActiveModifiers.js';
-import { DRILL_GRID_DEFAULT_SPACING_M, PERMIT_CLASS_AREA_FACTOR, PERMIT_LIMITS } from '../../../src/core/config/balance.js';
+import { DRILL_GRID_DEFAULT_SPACING_M, PERMIT_CLASS_AREA_FACTOR, PERMIT_CLASS_CHARGE_FACTOR, PERMIT_CLASS_FEE_FACTOR, PERMIT_LIMITS } from '../../../src/core/config/balance.js';
+import { RUNGS, NAMED_GRADES, TIERS, rungOf, gradeTierOfRung, perkTotals } from '../../helpers/gradeLadder.js';
 
 const SEED = 42;
 
@@ -49,38 +51,93 @@ function findTick(overshoot: number, wantInspected: boolean, salt = 0): number {
   throw new Error(`no tick with inspected=${wantInspected}`);
 }
 
-describe('permitLimitsFor', () => {
-  it.each([
-    [0, 40, 144, 250],
-    [1, 120, 256, 1_000],
-    [2, 800, 576, 3_000],
-    [3, 2_500, 1_296, 8_000],
-    [4, 8_000, 3_136, 20_000],
-    [5, 25_000, 6_400, 50_000],
-  ])('grade %i: %i kg, %i m², $%i fee', (grade, kg, area, fee) => {
-    expect(permitLimitsFor(grade)).toEqual({ maxChargeKg: kg, maxAreaM2: area, fee });
+/** Table fee less the notification-fee perk of the rung, however the rounding falls. */
+function expectDiscountedFee(actual: number, tableFee: number, rung: number): void {
+  const exact = tableFee * (1 - perkTotals(rung).notification_fee_pct / 100);
+  expect(Math.abs(actual - exact)).toBeLessThanOrEqual(1.5);
+}
+
+describe('permitLimitsFor and permitLimitsForRung (#2277)', () => {
+  it('grade 0 tier 1 keeps the old grade-0 caps and fee: 40 kg, 144 m², $250', () => {
+    expect(permitLimitsFor(0, 1)).toEqual({ maxChargeKg: 40, maxAreaM2: 144, fee: 250 });
+    expect(permitLimitsForRung(0)).toEqual({ maxChargeKg: 40, maxAreaM2: 144, fee: 250 });
   });
 
-  it('grade 6 is the first endless class: 1.6x charge, 1.4x area, 1.5x fee', () => {
-    expect(PERMIT_CLASS_AREA_FACTOR).toBe(1.4);
-    expect(permitLimitsFor(6)).toEqual({ maxChargeKg: 40_000, maxAreaM2: 8_960, fee: 75_000 });
+  it('grade 3 tier 3 reaches the old grade-5 caps: 25,000 kg and 6,400 m²', () => {
+    const l = permitLimitsFor(3, 3);
+    expect(l.maxChargeKg).toBe(25_000);
+    expect(l.maxAreaM2).toBe(6_400);
+    expect(permitLimitsForRung(11)).toEqual(l);
   });
 
-  it('grade 7 compounds the class factors', () => {
-    expect(permitLimitsFor(7)).toEqual({
-      maxChargeKg: Math.round(25_000 * 1.6 ** 2),
-      maxAreaM2: Math.round(6_400 * 1.4 ** 2),
-      fee: Math.round(50_000 * 1.5 ** 2),
-    });
+  it('tier defaults to 1', () => {
+    for (const g of NAMED_GRADES) expect(permitLimitsFor(g)).toEqual(permitLimitsFor(g, 1));
   });
 
-  it('endless classes follow the formula for grade 5 + k', () => {
-    for (let k = 1; k <= 8; k++) {
-      const l = permitLimitsFor(5 + k);
-      expect(l.maxChargeKg).toBe(Math.round(25_000 * 1.6 ** k));
-      expect(l.fee).toBe(Math.round(50_000 * 1.5 ** k));
-      expect(l.maxAreaM2).toBe(Math.round(6_400 * 1.4 ** k));
+  it('grade x tier maps onto the rung table, and the two entry points agree', () => {
+    for (const g of NAMED_GRADES) for (const tier of TIERS) {
+      const rung = rungOf(g, tier);
+      expect(permitLimitsFor(g, tier)).toEqual(permitLimitsForRung(rung));
+      expect(permitLimitsForRung(rung).maxChargeKg).toBe(PERMIT_LIMITS[rung]!.maxChargeKg);
+      expect(permitLimitsForRung(rung).maxAreaM2).toBe(PERMIT_LIMITS[rung]!.maxAreaM2);
     }
+  });
+
+  it('caps rise at every tier and never fall: strictly increasing charge and area across all 12 steps', () => {
+    for (let rung = 1; rung <= 11; rung++) {
+      const a = permitLimitsForRung(rung - 1);
+      const b = permitLimitsForRung(rung);
+      const { grade, tier } = gradeTierOfRung(rung);
+      expect(b.maxChargeKg, `grade ${grade} tier ${tier} charge`).toBeGreaterThan(a.maxChargeKg);
+      expect(b.maxAreaM2, `grade ${grade} tier ${tier} area`).toBeGreaterThan(a.maxAreaM2);
+    }
+  });
+
+  it('caps rise through the endless classes too, from the last named step', () => {
+    for (let rung = 12; rung <= 40; rung++) {
+      expect(permitLimitsForRung(rung).maxChargeKg).toBeGreaterThan(permitLimitsForRung(rung - 1).maxChargeKg);
+      expect(permitLimitsForRung(rung).maxAreaM2).toBeGreaterThan(permitLimitsForRung(rung - 1).maxAreaM2);
+    }
+  });
+
+  it('the notification fee is the table fee less the rung\'s notification-fee perk', () => {
+    for (const rung of RUNGS) expectDiscountedFee(permitLimitsForRung(rung).fee, PERMIT_LIMITS[rung]!.fee, rung);
+  });
+
+  it('a rung with a notification-fee perk pays less than the table fee', () => {
+    const rung = [...RUNGS].reverse().find(r => perkTotals(r).notification_fee_pct > 0)!;
+    expect(permitLimitsForRung(rung).fee).toBeLessThan(PERMIT_LIMITS[rung]!.fee);
+  });
+
+  it('the first class is grade 4: 1.6x charge, 1.4x area, 1.5x fee from the last named step', () => {
+    expect(PERMIT_CLASS_AREA_FACTOR).toBe(1.4);
+    expect(PERMIT_CLASS_CHARGE_FACTOR).toBe(1.6);
+    expect(PERMIT_CLASS_FEE_FACTOR).toBe(1.5);
+    const l = permitLimitsFor(4);
+    expect(l.maxChargeKg).toBe(40_000);
+    expect(l.maxAreaM2).toBe(8_960);
+    expectDiscountedFee(l.fee, 75_000, 11);
+  });
+
+  it('grade 5 compounds the class factors', () => {
+    const l = permitLimitsFor(5);
+    expect(l.maxChargeKg).toBe(Math.round(25_000 * 1.6 ** 2));
+    expect(l.maxAreaM2).toBe(Math.round(6_400 * 1.4 ** 2));
+    expectDiscountedFee(l.fee, Math.round(50_000 * 1.5 ** 2), 11);
+  });
+
+  it('endless classes follow the formula for grade 3 + k, and the rung 11 + k reads the same', () => {
+    for (let k = 1; k <= 8; k++) {
+      const l = permitLimitsFor(3 + k);
+      expect(l.maxChargeKg).toBe(Math.round(25_000 * 1.6 ** k));
+      expect(l.maxAreaM2).toBe(Math.round(6_400 * 1.4 ** k));
+      expect(permitLimitsForRung(11 + k)).toEqual(l);
+    }
+  });
+
+  it('a class is a step above the last named one in charge and area', () => {
+    expect(permitLimitsFor(4).maxChargeKg).toBeGreaterThan(permitLimitsFor(3, 3).maxChargeKg);
+    expect(permitLimitsFor(4).maxAreaM2).toBeGreaterThan(permitLimitsFor(3, 3).maxAreaM2);
   });
 
   it('charge, area and fee keep growing deep into the endless classes: the area has no hole cap to stop at', () => {
@@ -91,27 +148,27 @@ describe('permitLimitsFor', () => {
     }
   });
 
-  it('limits grow with every grade', () => {
-    for (let grade = 0; grade < 20; grade++) {
-      const a = permitLimitsFor(grade);
-      const b = permitLimitsFor(grade + 1);
-      expect(b.maxChargeKg).toBeGreaterThan(a.maxChargeKg);
-      expect(b.fee).toBeGreaterThan(a.fee);
-      expect(b.maxAreaM2).toBeGreaterThan(a.maxAreaM2);
-    }
-  });
-
-  it('agrees with the balance table for the named grades', () => {
-    for (const [grade, cfg] of Object.entries(PERMIT_LIMITS)) {
-      expect(permitLimitsFor(Number(grade))).toEqual(cfg);
+  it('the grade and tier order is the rung order: every (grade, tier) is above the one before it', () => {
+    let prev = permitLimitsFor(0, 1);
+    for (const g of NAMED_GRADES) for (const tier of TIERS) {
+      if (g === 0 && tier === 1) continue;
+      const l = permitLimitsFor(g, tier);
+      expect(l.maxChargeKg).toBeGreaterThan(prev.maxChargeKg);
+      expect(l.maxAreaM2).toBeGreaterThan(prev.maxAreaM2);
+      prev = l;
     }
   });
 
   it('returns a fresh object, never the shared balance entry', () => {
     const a = permitLimitsFor(0);
     a.fee = 1;
+    a.maxChargeKg = 1;
     expect(permitLimitsFor(0).fee).toBe(250);
     expect(PERMIT_LIMITS[0]!.fee).toBe(250);
+    expect(PERMIT_LIMITS[0]!.maxChargeKg).toBe(40);
+    const b = permitLimitsForRung(3);
+    b.maxAreaM2 = 1;
+    expect(permitLimitsForRung(3).maxAreaM2).toBe(PERMIT_LIMITS[3]!.maxAreaM2);
   });
 });
 
@@ -176,29 +233,42 @@ describe('preFireCheck', () => {
     expect(c.overshoot).toBe(0);
   });
 
-  it('a higher grade admits the same plan and charges its own fee', () => {
+  it('a higher tier admits the same plan and charges its own fee', () => {
     const c = preFireCheck(1, charges(9, 5), areaOf(9));
     expect(c.over).toBe(false);
-    expect(c.fee).toBe(1_000);
-    expect(c.limits).toEqual(permitLimitsFor(1));
+    expect(c.fee).toBe(permitLimitsForRung(1).fee);
+    expect(c.limits).toEqual(permitLimitsForRung(1));
+  });
+
+  it('the plan that is over the first step is within the second: a tier-up widens the permit', () => {
+    expect(preFireCheck(0, charges(9, 5), areaOf(9)).over).toBe(true);
+    expect(preFireCheck(1, charges(9, 5), areaOf(9)).over).toBe(false);
+  });
+
+  it('takes the rung, not the grade: rung 11 holds a plan rung 8 refuses', () => {
+    const big = charges(1, permitLimitsForRung(11).maxChargeKg);
+    expect(preFireCheck(11, big, areaOf(1)).over).toBe(false);
+    expect(preFireCheck(8, big, areaOf(1)).over).toBe(true);
   });
 
   it('the fee is due even when the plan is tiny', () => {
-    expect(preFireCheck(2, charges(1, 1), areaOf(1)).fee).toBe(3_000);
+    expect(preFireCheck(8, charges(1, 1), areaOf(1)).fee).toBe(permitLimitsForRung(8).fee);
   });
 
   it('works on an endless class', () => {
-    const l = permitLimitsFor(7);
-    const c = preFireCheck(7, charges(1, l.maxChargeKg * 2), areaOf(1));
+    const rung = gradeRung({ grade: 5, tier: 1 });
+    const l = permitLimitsForRung(rung);
+    const c = preFireCheck(rung, charges(1, l.maxChargeKg * 2), areaOf(1));
     expect(c.over).toBe(true);
     expect(c.overshoot).toBeCloseTo(1, 10);
     expect(c.fee).toBe(l.fee);
   });
 
   it('measures an endless class\'s area against its own, larger limit', () => {
-    const l = permitLimitsFor(6);
-    expect(preFireCheck(6, {}, l.maxAreaM2).over).toBe(false);
-    expect(preFireCheck(6, {}, l.maxAreaM2 * 1.5).overshoot).toBeCloseTo(0.5, 10);
+    const rung = gradeRung({ grade: 4, tier: 1 });
+    const l = permitLimitsForRung(rung);
+    expect(preFireCheck(rung, {}, l.maxAreaM2).over).toBe(false);
+    expect(preFireCheck(rung, {}, l.maxAreaM2 * 1.5).overshoot).toBeCloseTo(0.5, 10);
   });
 });
 
@@ -215,6 +285,34 @@ describe('inspectionChance', () => {
 
   it('a hair over the limit is still a quarter chance', () => {
     expect(inspectionChance(0.0001)).toBeCloseTo(0.2501, 10);
+  });
+
+  it('the rung defaults to 0: no perk', () => {
+    expect(inspectionChance(0.125, 0)).toBe(inspectionChance(0.125));
+  });
+
+  it.each(RUNGS)('rung %i cuts the base chance by its inspection perk', (rung) => {
+    const pct = perkTotals(rung).inspection_pct;
+    expect(inspectionChance(0.125, rung)).toBeCloseTo(0.375 * (1 - pct / 100), 10);
+  });
+
+  it('a higher rung never raises the chance, and the top rung lowers it', () => {
+    for (let rung = 1; rung <= 11; rung++) {
+      expect(inspectionChance(0.125, rung)).toBeLessThanOrEqual(inspectionChance(0.125, rung - 1) + 1e-12);
+    }
+    expect(inspectionChance(0.125, 11)).toBeLessThan(inspectionChance(0.125, 0));
+  });
+
+  it('stays a probability at every rung, however far over the limit', () => {
+    for (const rung of [0, 5, 11, 14, 40]) {
+      const c = inspectionChance(50, rung);
+      expect(c).toBeGreaterThan(0);
+      expect(c).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('an endless class keeps the perks of the last named step', () => {
+    expect(inspectionChance(0.125, 14)).toBeCloseTo(inspectionChance(0.125, 11), 10);
   });
 });
 
@@ -254,6 +352,22 @@ describe('rollInspection', () => {
     const outcomes = new Set<boolean>();
     for (let tick = 1; tick < 200; tick++) outcomes.add(predictedInspection(tick, 0, 0.125));
     expect(outcomes).toEqual(new Set([true, false]));
+  });
+
+  it('a higher rung inspects less often over the same ticks, never more', () => {
+    let low = 0;
+    let high = 0;
+    for (let tick = 1; tick < 3000; tick++) {
+      if (rollInspection(new Random(rollSeed(SEED, tick, 0)), 0.125, 0)) low++;
+      if (rollInspection(new Random(rollSeed(SEED, tick, 0)), 0.125, 11)) high++;
+    }
+    expect(high).toBeLessThan(low);
+  });
+
+  it('rung 0 is the default', () => {
+    for (let tick = 1; tick < 200; tick++) {
+      expect(rollInspection(new Random(rollSeed(SEED, tick, 0)), 0.125, 0)).toBe(rollInspection(new Random(rollSeed(SEED, tick, 0)), 0.125));
+    }
   });
 
   it('a larger overshoot inspects at least as often', () => {
@@ -409,6 +523,27 @@ describe('resolveOvershoot', () => {
     emitter.on('progression:blast_inspected', e => seen.push(e));
     resolveOvershoot(state, g, check(), emitter);
     expect(seen).toEqual([expect.objectContaining({ caught: false, fine: 0 })]);
+  });
+
+  it('the tier perk spares a roll the first step would have caught (the site\'s own rung decides)', () => {
+    const planKg = 1.125 * permitLimitsForRung(11).maxChargeKg;
+    const lowPlan = preFireCheck(0, charges(1, 45), areaOf(1));
+    const highPlan = preFireCheck(11, charges(1, planKg), areaOf(1));
+    const c0 = inspectionChance(lowPlan.overshoot, 0);
+    const c11 = inspectionChance(highPlan.overshoot, 11);
+    expect(c11).toBeLessThan(c0);
+    let tick = -1;
+    for (let t = 1; t < 5000 && tick < 0; t++) {
+      const r = new Random(rollSeed(SEED, t, 0)).next();
+      if (r >= c11 + 1e-9 && r < c0 - 1e-9) tick = t;
+    }
+    expect(tick).toBeGreaterThan(0);
+    const first = site(tick);
+    expect(resolveOvershoot(first.state, first.g, lowPlan, first.emitter).caught).toBe(true);
+    const top = site(tick);
+    top.g.grade = 3;
+    top.g.tier = 3;
+    expect(resolveOvershoot(top.state, top.g, highPlan, top.emitter).caught).toBe(false);
   });
 
   describe('strikes and suspension', () => {

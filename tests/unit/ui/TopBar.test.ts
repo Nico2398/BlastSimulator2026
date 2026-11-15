@@ -16,6 +16,8 @@ import { createBoardState } from '../../../src/core/economy/Board.js';
 import { BOARD_CONFIDENCE_MET_GAIN, BOARD_CONFIDENCE_MISS_PENALTY } from '../../../src/core/config/balance.js';
 import type { EntityOpener } from '../../../src/ui/entityLinks.js';
 import { createGradeState, gradeDef } from '../../../src/core/economy/MineGrade.js';
+import { MINE_GRADES } from '../../../src/core/config/balance.js';
+import { meetTargets, tierTargets } from '../../helpers/gradeLadder.js';
 import en from '../../../src/core/i18n/locales/en.json';
 import fr from '../../../src/core/i18n/locales/fr.json';
 
@@ -874,6 +876,58 @@ describe('TopBar grade chip (#1924)', () => {
     topBar.dispose();
   });
 
+  it('shows the tier next to the grade name through shell.topbar.grade (#2277)', () => {
+    setLocale('en');
+    const { topBar, center, chip } = mountBar();
+    topBar.update(gradeState(), center);
+    expect(chip()!.textContent).toContain(t('shell.topbar.grade', { name: t('permit.grade.0'), tier: 1 }));
+    topBar.dispose();
+  });
+
+  it.each([[0, 2], [1, 3], [2, 1], [3, 3]])('grade %i tier %i reads as such on the chip', (grade, tier) => {
+    setLocale('en');
+    const { topBar, center, chip } = mountBar();
+    const s = gradeState();
+    s.grade!.grade = grade;
+    s.grade!.tier = tier;
+    topBar.update(s, center);
+    expect(chip()!.textContent).toContain(t('shell.topbar.grade', { name: t(`permit.grade.${grade}`), tier }));
+    topBar.dispose();
+  });
+
+  it('a tier-up changes the chip text without a grade change', () => {
+    setLocale('en');
+    const { topBar, center, chip } = mountBar();
+    const s = gradeState();
+    topBar.update(s, center);
+    const before = chip()!.textContent;
+    s.grade!.tier = 2;
+    topBar.update(s, center);
+    expect(chip()!.textContent).not.toBe(before);
+    expect(chip()!.textContent).toContain(t('shell.topbar.grade', { name: t('permit.grade.0'), tier: 2 }));
+    topBar.dispose();
+  });
+
+  it('the grade chip text is built in the active locale, tier included', () => {
+    setLocale('fr');
+    const { topBar, center, chip } = mountBar();
+    const s = gradeState();
+    s.grade!.tier = 3;
+    topBar.update(s, center);
+    expect(chip()!.textContent).toContain(t('shell.topbar.grade', { name: t('permit.grade.0'), tier: 3 }));
+    topBar.dispose();
+  });
+
+  it('an endless class shows its class name on the chip', () => {
+    setLocale('en');
+    const { topBar, center, chip } = mountBar();
+    const s = gradeState();
+    s.grade!.grade = 5;
+    topBar.update(s, center);
+    expect(chip()!.textContent).toContain(t('permit.grade.class', { n: 2 }));
+    topBar.dispose();
+  });
+
   it('click navigates to permits', () => {
     const { topBar, center, onNavigate, chip } = mountBar();
     topBar.update(gradeState(), center);
@@ -887,12 +941,13 @@ describe('TopBar grade chip (#1924)', () => {
     const pulseMs = (TopBarModule as Record<string, unknown>)['GRADE_CHIP_PULSE_MS'] as number;
     const { topBar, center, chip } = mountBar();
     const s = gradeState();
+    s.grade!.tier = 3;
     topBar.update(s, center);
     expect(chip()!.dataset['pulse']).not.toBe('true');
-    s.grade!.oreDeliveredKg = 5_000;
+    meetTargets(s, MINE_GRADES[0]!.mastery);
     topBar.update(s, center);
-    expect(chip()!.dataset['pulse']).not.toBe('true'); // one target still unmet
-    s.grade!.blastsFired = 2;
+    expect(chip()!.dataset['pulse']).not.toBe('true'); // the tier-3 blasts target is still unmet
+    meetTargets(s, tierTargets(0, 3));
     topBar.update(s, center);
     expect(chip()!.dataset['pulse']).toBe('true');
     vi.advanceTimersByTime(pulseMs - 1);
@@ -907,9 +962,10 @@ describe('TopBar grade chip (#1924)', () => {
     const pulseMs = (TopBarModule as Record<string, unknown>)['GRADE_CHIP_PULSE_MS'] as number;
     const { topBar, center, chip } = mountBar();
     const s = gradeState();
+    s.grade!.tier = 3;
     topBar.update(s, center);
-    s.grade!.oreDeliveredKg = 5_000;
-    s.grade!.blastsFired = 2;
+    meetTargets(s, MINE_GRADES[0]!.mastery);
+    meetTargets(s, tierTargets(0, 3));
     topBar.update(s, center);
     vi.advanceTimersByTime(pulseMs);
     topBar.update(s, center);
@@ -921,10 +977,11 @@ describe('TopBar grade chip (#1924)', () => {
   it('does not pulse when the targets become met while an application is pending', () => {
     const { topBar, center, chip } = mountBar();
     const s = gradeState();
+    s.grade!.tier = 3;
     s.grade!.pending = { toGrade: 1, ticksLeft: 10 };
     topBar.update(s, center);
-    s.grade!.oreDeliveredKg = 5_000;
-    s.grade!.blastsFired = 2;
+    meetTargets(s, MINE_GRADES[0]!.mastery);
+    meetTargets(s, tierTargets(0, 3));
     topBar.update(s, center);
     expect(chip()!.dataset['pulse']).not.toBe('true');
     topBar.dispose();

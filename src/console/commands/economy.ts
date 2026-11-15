@@ -2,6 +2,7 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
+import { extraContractOffers } from '../../core/economy/MineGrade.js';
 import { getBalance, getFinancialReport, type FinanceState } from '../../core/economy/Finance.js';
 import { getProfitShortfall } from '../../core/campaign/LevelObjective.js';
 import {
@@ -164,7 +165,7 @@ export function contractCommand(
 
   switch (sub) {
     case 'list': {
-      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade, saturationReader(state.saturation, state.tickCount));
+      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade, saturationReader(state.saturation, state.tickCount), extraContractOffers(state.grade));
       ensureScriptedOreSale(state.contracts, resolveScriptedOreSale(state), resolveContractPriceMultiplier(state));
       if (state.contracts.available.length === 0) {
         return { success: true, output: t('ui.contracts.none') };

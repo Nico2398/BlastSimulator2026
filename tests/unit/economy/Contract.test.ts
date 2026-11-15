@@ -1396,11 +1396,11 @@ describe('untiered boards stay byte-identical (#1929)', () => {
 describe('buyer unlock lines (#1929)', () => {
   const keys = (g: number) => unlockLinesFor(g).map(l => l.key);
 
-  it.each([[1, 'regional'], [3, 'national'], [5, 'global']] as const)('grade %i lists the %s buyer', (g, id) => {
+  it.each([[1, 'regional'], [2, 'national'], [3, 'global']] as const)('grade %i lists the %s buyer', (g, id) => {
     expect(keys(g)).toContain(`progression.unlock.buyer.${id}`);
   });
 
-  it.each([2, 4, 6])('grade %i lists no buyer line', (g) => {
+  it.each([4, 5, 6])('grade %i lists no buyer line', (g) => {
     expect(keys(g).filter(k => k.startsWith('progression.unlock.buyer.'))).toEqual([]);
   });
 
@@ -1537,5 +1537,66 @@ describe('boards without saturation are unchanged (#1930)', () => {
   it('a board without a buyer grade (campaign) ignores saturation', () => {
     const all1 = satOf(Object.fromEntries(ALL_ORES.map(o => [o, 1])));
     expect(saturatedBoards(42, 30, undefined, all1)).toEqual(saturatedBoards(42, 30, undefined, undefined));
+  });
+});
+
+describe('generateContracts — extra offers from the tier perk (#2277)', () => {
+  const refresh = (state: ReturnType<typeof createContractState>, tick: number, extra?: number, seed = 42) =>
+    generateContracts(state, new Random(seed + tick), tick, 1, ALL_ORES, Infinity, undefined, undefined, extra);
+
+  it('adds as many offers to a refresh as the perk grants', () => {
+    for (const extra of [0, 1, 2, 3]) {
+      const state = createContractState();
+      refresh(state, 0, extra);
+      expect(state.available).toHaveLength(CONTRACTS_PER_REFRESH + extra);
+    }
+  });
+
+  it('omitting the argument is the same as granting none', () => {
+    const plain = createContractState();
+    const zero = createContractState();
+    generateContracts(plain, new Random(42), 0, 1, ALL_ORES, Infinity);
+    generateContracts(zero, new Random(42), 0, 1, ALL_ORES, Infinity, undefined, undefined, 0);
+    expect(plain.available).toHaveLength(CONTRACTS_PER_REFRESH);
+    expect(zero.available).toEqual(plain.available);
+  });
+
+  it('a refresh that is too early adds nothing, perk or not', () => {
+    const state = createContractState();
+    refresh(state, 0, 2);
+    const before = state.available.length;
+    refresh(state, CONTRACT_REFRESH_INTERVAL - 1, 2);
+    expect(state.available).toHaveLength(before);
+  });
+
+  it('the extra offers are fresh ones with their own ids', () => {
+    const state = createContractState();
+    refresh(state, 0, 2);
+    const ids = state.available.map(c => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const c of state.available) expect(c.quantityKg).toBeGreaterThan(0);
+  });
+
+  it('each later refresh adds the extra offers again', () => {
+    const state = createContractState();
+    refresh(state, 0, 1);
+    refresh(state, CONTRACT_REFRESH_INTERVAL, 1);
+    expect(state.available).toHaveLength(Math.min(MAX_AVAILABLE_CONTRACTS, 2 * (CONTRACTS_PER_REFRESH + 1)));
+  });
+
+  it('the board never grows past its cap, the oldest offers making room for the extras', () => {
+    const state = createContractState();
+    for (let n = 0; n < 6; n++) refresh(state, n * CONTRACT_REFRESH_INTERVAL, 3);
+    expect(state.available.length).toBeLessThanOrEqual(MAX_AVAILABLE_CONTRACTS);
+    const sixth = state.available.map(c => c.id);
+    expect(Math.max(...sixth)).toBe(state.nextId - 1);
+  });
+
+  it('a larger perk leaves the board at least as full', () => {
+    const small = createContractState();
+    const large = createContractState();
+    refresh(small, 0, 0);
+    refresh(large, 0, 3);
+    expect(large.available.length).toBeGreaterThan(small.available.length);
   });
 });

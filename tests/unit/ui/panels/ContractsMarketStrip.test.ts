@@ -46,13 +46,12 @@ describe('lockedBuyerTiers', () => {
 
   it('drops a tier exactly at its unlock grade (boundary)', () => {
     expect(ids(1)).toEqual(['national', 'global']);
-    expect(ids(2)).toEqual(['national', 'global']);
-    expect(ids(3)).toEqual(['global']);
-    expect(ids(4)).toEqual(['global']);
+    expect(ids(2)).toEqual(['global']);
+    expect(ids(3)).toEqual([]);
   });
 
-  it('is empty at grade 5 and beyond', () => {
-    expect(ids(5)).toEqual([]);
+  it('is empty at grade 3 and beyond', () => {
+    expect(ids(4)).toEqual([]);
     expect(ids(12)).toEqual([]);
   });
 

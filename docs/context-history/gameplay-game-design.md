@@ -119,3 +119,15 @@ opens on a per-material outlook fed by a log of what hauls credited at the depot
 `balance.ts`: the rate is depot collection over one in-game day, divided by the whole day (a shorter window swings
 between blasts); the projection is linear and counts ore already on a truck but not ore still on the ground; contracts
 on one material draw its stock in deadline order; the outlook bands sit at 1.15x and 0.75x of the demand due.
+
+## 2026-11-15 — Grade tiers (#2277, epic #2275)
+
+The permit ladder of six grades (0-5, then classes) became four named grades with three tiers each. The old
+ladder asked the player to wait out a fee and a Ministry delay for every step, including the small ones; tiers give a
+free, automatic step inside a grade, and the Ministry flow stays for the grade-up. Chosen defaults (all in `balance.ts`,
+all v1 numbers for calibration): tier targets are cumulative counters, so an over-delivered site climbs several tiers
+at once after a grade-up; the zone-mastery target is plain delivered ore until #2278 defines mastery; caps rise
+geometrically from the old grade-0 caps to the old grade-5 caps over twelve rungs; one small perk per tier from rung 1
+(fee, processing, inspection, +1 contract offer, in a fixed cycle); buyer tiers move to grades 0-3 and vehicle tier 2/3
+to grades 1/2. Old saves migrate to the lowest rung whose caps cover the old grade's, so no player loses a granted cap.
+The probe's grade windows were left on the old numbering (a recalibration belongs to the calibration task).

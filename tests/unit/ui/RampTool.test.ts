@@ -72,7 +72,7 @@ const RIM: Tile = { x: 14, z: 30 };
 function makeState(over: { cash?: number; progression?: boolean } = {}): GameState {
   const s = createGame({ seed: 42, mineType: 'desert' });
   s.cash = over.cash ?? 10_000_000;
-  if (over.progression) s.grade = { grade: 1, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null };
+  if (over.progression) s.grade = { grade: 1, tier: 1, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null };
   return s;
 }
 

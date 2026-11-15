@@ -13,10 +13,16 @@ import {
 } from '../../../src/core/economy/MineGrade.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { tierPerksAt } from '../../../src/core/economy/TierPerks.js';
 import { makeEffectWorld, mod } from '../../helpers/eventEffectWorld.js';
 
 function pendingGrade(ticksLeft: number, toGrade = 1): GradeState {
   return { ...createGradeState(), grade: toGrade - 1, pending: { toGrade, ticksLeft } };
+}
+
+/** Processing ticks after the processing perk of ladder step `rung` (rounded, never below one). */
+function perkedTicks(ticks: number, rung: number): number {
+  return Math.max(1, Math.round(ticks * (1 - tierPerksAt(rung).processingDiscountPct / 100)));
 }
 
 function siteWith(g: GradeState | undefined, safety = 70) {
@@ -207,27 +213,28 @@ describe('applyPermitProcessing — next application', () => {
   });
 
   it('the next applyForGrade adds the delay once', () => {
-    const { state } = siteWith({ ...createGradeState(), oreDeliveredKg: 5_000, blastsFired: 2 });
+    const { state } = siteWith({ ...createGradeState(), tier: 3, oreDeliveredKg: 6_000, blastsFired: 3 });
     state.cash = 1_000_000;
     applyPermitProcessing(shift(48, { next: true }), { state, grid: null }, 100);
     const r = applyForGrade(state);
     expect(r.ok).toBe(true);
-    expect(state.grade!.pending!.ticksLeft).toBe(gradeDef(1).processingTicks + 48);
+    expect(state.grade!.pending!.ticksLeft).toBe(perkedTicks(gradeDef(1).processingTicks, 2) + 48);
     expect(takePermitDelay(state.events.activeModifiers)).toBe(0);
   });
 
   it('a second application is no longer delayed', () => {
-    const { state } = siteWith({ ...createGradeState(), oreDeliveredKg: 5_000, blastsFired: 2 });
+    const { state } = siteWith({ ...createGradeState(), tier: 3, oreDeliveredKg: 6_000, blastsFired: 3 });
     state.cash = 1_000_000;
     applyPermitProcessing(shift(48, { next: true }), { state, grid: null }, 100);
     applyForGrade(state);
     state.grade!.pending = null;
     state.grade!.grade = 1;
-    Object.assign(state.grade!, { oreDeliveredKg: 30_000, deepestPitM: 10 });
+    state.grade!.tier = 3;
+    Object.assign(state.grade!, { oreDeliveredKg: 40_000, deepestPitM: 10 });
     state.scores.safety = 60;
     const r = applyForGrade(state);
     expect(r.ok).toBe(true);
-    expect(state.grade!.pending!.ticksLeft).toBe(gradeDef(2).processingTicks);
+    expect(state.grade!.pending!.ticksLeft).toBe(perkedTicks(gradeDef(2).processingTicks, 5));
   });
 });
 

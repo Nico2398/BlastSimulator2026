@@ -15,7 +15,7 @@ import type { WarehouseLoss } from '../../../core/economy/FreightWarehouses.js';
 import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
-import { blastPitDepthM, recordBlastChargeShare, recordGradeBlast } from '../../../core/economy/MineGrade.js';
+import { blastPitDepthM, gradeRung, recordBlastChargeShare, recordGradeBlast } from '../../../core/economy/MineGrade.js';
 import { preFireCheck, resolveOvershoot, type InspectionVerdict } from '../../../core/economy/PermitLimits.js';
 import { deductExpense } from '../../../core/economy/Finance.js';
 import { recordBlastResult, snapshotStats, updateDepth } from '../../../core/campaign/SuccessTracker.js';
@@ -136,7 +136,7 @@ export function* fireBlastSteps(
   const permitLines: string[] = [];
   const grade = ctx.state!.grade;
   if (grade) {
-    const check = preFireCheck(grade.grade, plan.charges, patternAreaM2(plan.holes));
+    const check = preFireCheck(gradeRung(grade), plan.charges, patternAreaM2(plan.holes));
     recordBlastChargeShare(grade, check.planKg, check.limits.maxChargeKg);
     deductExpense(ctx.state!, check.fee, 'permits', 'Blast Notification Form B-52');
     permitLines.push(t('mining.blast.permit_fee', { fee: formatMoney(check.fee) }));

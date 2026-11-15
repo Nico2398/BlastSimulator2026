@@ -42,6 +42,7 @@ import { TUBING_BUY_AMOUNT, TUBING_COST, hasTubing } from '../../../core/mining/
 import { MIN_STEMMING_M, CHARGE_DEFAULT_STEMMING_M, HOLE_DRAIN_COST_PER_HOLE, DRILL_HOLE_DEFAULT_DIAMETER_M, TICKS_PER_DAY } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { defaultStemmingM } from '../../../core/economy/PermitDefaults.js';
+import { gradeRung } from '../../../core/economy/MineGrade.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
 import type { GameState } from '../../../core/state/GameState.js';
@@ -254,7 +255,7 @@ export class ChargeStep {
       holeGeometry: holes.map(h => [h.x, h.z, h.depth, h.diameter]),
       level: state.campaign.activeLevelId,
       selected: this.selectedExplosiveId, stem: this.stemmingM,
-      permitGrade: state.grade?.grade ?? null,
+      permitGrade: state.grade ? gradeRung(state.grade) : null,
       tier: state.softwareTier,
       // Hole ids *and* their charges, not just a count: a per-hole charge
       // changes neither the hole list nor anything else in the signature, so a
@@ -529,7 +530,7 @@ export class ChargeStep {
   /** Until the player steps the stemming, open at the permit-derived default for the planned and drilled holes (#2101). */
   private followPermitDefault(state: GameState): void {
     if (this.playerAdjustedStemming) return;
-    const stemming = defaultStemmingM(state.grade?.grade, [...state.drillHoles, ...state.plannedDrillHoles], this.selectedExplosiveId);
+    const stemming = defaultStemmingM(state.grade?.grade, [...state.drillHoles, ...state.plannedDrillHoles], this.selectedExplosiveId, state.grade?.tier);
     if (stemming === this.stemmingM) return;
     this.stemmingM = stemming;
     this.stemmingValueEl.textContent = `${this.stemmingM.toFixed(1)} m`;

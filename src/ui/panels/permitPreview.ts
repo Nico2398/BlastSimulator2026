@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Permit preview: view model of a plan against the mine's permit (#1925)
 
-import type { GradeState } from '../../core/economy/MineGrade.js';
+import { gradeRung, type GradeState } from '../../core/economy/MineGrade.js';
 import { preFireCheck, liveStrikes, inspectionChance, inspectionFine } from '../../core/economy/PermitLimits.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -47,13 +47,13 @@ export function permitPreview(
   tick: number,
 ): PermitPreview | null {
   if (!grade) return null;
-  const check = preFireCheck(grade.grade, plan.charges, patternAreaM2(plan.holes));
+  const check = preFireCheck(gradeRung(grade), plan.charges, patternAreaM2(plan.holes));
   const strikeTicks = grade.strikeTicks ?? [];
   const strikes = liveStrikes(strikeTicks, tick).length;
   const kg = Math.round(check.planKg * 10) / 10;
-  const chance = check.over ? inspectionChance(check.overshoot) : 0;
+  const chance = check.over ? inspectionChance(check.overshoot, gradeRung(grade)) : 0;
   const fine = check.over ? inspectionFine(check.fee, check.overshoot) : 0;
-  const consequenceText = check.over ? consequenceOf(check, strikes) : '';
+  const consequenceText = check.over ? consequenceOf(check, strikes, gradeRung(grade)) : '';
   return {
     over: check.over,
     kgOver: check.planKg > check.limits.maxChargeKg,
@@ -101,16 +101,16 @@ function overPermitConsequence(
   areaM2: number,
   tick: number,
 ): { limits: ReturnType<typeof preFireCheck>['limits']; consequence: string } | null {
-  const check = preFireCheck(grade.grade, charges, areaM2);
+  const check = preFireCheck(gradeRung(grade), charges, areaM2);
   if (!check.over) return null;
   const strikes = liveStrikes(grade.strikeTicks ?? [], tick).length;
-  return { limits: check.limits, consequence: consequenceOf(check, strikes) };
+  return { limits: check.limits, consequence: consequenceOf(check, strikes, gradeRung(grade)) };
 }
 
 /** Inspection chance, fine and strikes against the ban threshold, for an over-permit check. */
-function consequenceOf(check: ReturnType<typeof preFireCheck>, strikes: number): string {
+function consequenceOf(check: ReturnType<typeof preFireCheck>, strikes: number, rung: number): string {
   return t('permit.preview.consequence', {
-    chance: Math.round(inspectionChance(check.overshoot) * 100),
+    chance: Math.round(inspectionChance(check.overshoot, rung) * 100),
     fine: formatMoney(inspectionFine(check.fee, check.overshoot)),
     strikes,
     limit: PERMIT_STRIKES_TO_SUSPEND,

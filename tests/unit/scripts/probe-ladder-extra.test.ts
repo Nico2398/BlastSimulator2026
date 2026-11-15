@@ -61,3 +61,14 @@ describe('floorToKgResolution', () => {
     expect(floorToKgResolution(4)).toBe(4);
   });
 });
+
+describe('formatGradeSummary tiers (#2277)', () => {
+  it('lists each tier reached with its median tick after the grades', () => {
+    const r = run({ 1: 100 }, { 1: 5 });
+    r.metrics.tierReachedTick = { '0.2': 300, '0.3': 700 };
+    const out = formatGradeSummary([r]);
+    const rows = out.split('\n').slice(2);
+    expect(rows.find(x => x.includes('| t0.2 |'))).toContain('300');
+    expect(rows.find(x => x.includes('| t0.3 |'))).toContain('700');
+  });
+});

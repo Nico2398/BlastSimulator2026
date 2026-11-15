@@ -2,7 +2,8 @@
 // Mine-grade ladder: current grade stamp, next-grade targets, fee, apply button, pending application.
 // DOM contracts: [data-role="permit-stamp"], [data-target="<kind>"][data-met],
 // [data-role="target-bar"], [data-action="permit-apply"], [data-role="permit-apply-reason"],
-// [data-role="permit-pending"].
+// [data-role="permit-pending"]; the ladder: [data-role="permit-grade"][data-grade][data-current],
+// [data-role="permit-tier"][data-tier][data-state], [data-role="tier-perk"] (tier-block targets use [data-tier-target], never [data-target]).
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -12,8 +13,12 @@ import { windowRoot, windowBody } from '../windowKit.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { gradeDef, nextGradeTargets, permitApplyBlocker, formatGradeAmount, type GradeTargetStatus } from '../../core/economy/MineGrade.js';
-import { permitLimitTexts } from '../../core/economy/permitLimitText.js';
+import {
+  gradeDef, gradeRung, nextGradeTargets, permitApplyBlocker, formatGradeAmount, tierDef, tierTargetStatuses,
+  LAST_NAMED_GRADE, type GradeTargetStatus,
+} from '../../core/economy/MineGrade.js';
+import { MINE_TIERS_PER_GRADE } from '../../core/config/balance.js';
+import { permitLimitTexts, tierPerkText } from '../../core/economy/permitLimitText.js';
 import { permitRefusalText } from '../../core/economy/permitRefusalText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -22,6 +27,13 @@ const MICRO_STYLE = 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-m
 const LABEL_STYLE = 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-muted)';
 const STAMP_STYLE = 'margin:0 auto;transform:rotate(-4deg);white-space:nowrap;padding:4px 9px;border:2px solid var(--bsx-critical-text);border-radius:4px;'
   + 'color:var(--bsx-critical-text);font:800 11px/1 var(--bsx-font-ui);letter-spacing:.2em;opacity:.85';
+
+/** Tier block look by state: the current tier carries an amber rule, passed tiers recede, later ones are dimmer still. */
+const TIER_STATE_STYLE = {
+  current: 'border-left:2px solid var(--bsx-amber)',
+  done: 'border-left:2px solid transparent;opacity:.65',
+  locked: 'border-left:2px solid transparent;opacity:.5',
+} as const;
 
 export class PermitPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -88,8 +100,9 @@ export class PermitPanel extends PanelBase {
     if (!g) return 'none';
     const next = gradeDef(g.grade + 1);
     const targetFlags = targets.map(s => `${s.kind}:${s.met ? 1 : 0}`).join(',');
-    const { limits, strikes } = permitLimitTexts(g.grade, g.strikeTicks ?? [], state.tickCount);
-    return [g.grade, g.pending ? g.pending.toGrade : '-', targetFlags, state.cash >= next.fee ? 1 : 0, limits, strikes].join('|');
+    const { limits, strikes } = permitLimitTexts(gradeRung(g), g.strikeTicks ?? [], state.tickCount);
+    const tierFlags = this.tierIndices(g.grade).map(n => tierTargetStatuses(state, n).map(x => (x.met ? 1 : 0)).join('')).join('/');
+    return [g.grade, g.tier, tierFlags, g.pending ? g.pending.toGrade : '-', targetFlags, state.cash >= next.fee ? 1 : 0, limits, strikes].join('|');
   }
 
   private render(state: GameState, targets: readonly GradeTargetStatus[]): void {
@@ -102,12 +115,12 @@ export class PermitPanel extends PanelBase {
     const next = gradeDef(g.grade + 1);
     const nextName = t(next.nameKey, next.nameParams);
 
-    const limitTexts = permitLimitTexts(g.grade, g.strikeTicks ?? [], state.tickCount);
+    const limitTexts = permitLimitTexts(gradeRung(g), g.strikeTicks ?? [], state.tickCount);
     const currentCard = card([
       el('span', { text: t('ui.permit.current_label'), attrs: { style: LABEL_STYLE } }),
       el('div', { attrs: { style: 'display:flex;align-items:center;justify-content:center;padding:10px 0 6px' }, children: [
         el('span', {
-          text: `${t('ui.permit.stamp')} - ${t(current.nameKey, current.nameParams)}`,
+          text: `${t('ui.permit.stamp')} - ${t('ui.permit.stamp_tier', { name: t(current.nameKey, current.nameParams), tier: g.tier })}`,
           attrs: { 'data-role': 'permit-stamp', style: STAMP_STYLE },
         }),
       ] }),
@@ -125,7 +138,51 @@ export class PermitPanel extends PanelBase {
     ];
     nextChildren.push(g.pending ? this.pendingBlock() : this.applyBlock(state));
 
-    this.contentEl.replaceChildren(currentCard, card(nextChildren));
+    const ladder = [this.gradesCard(g.grade), ...(g.grade <= LAST_NAMED_GRADE ? [this.tiersCard(state)] : [])];
+    this.contentEl.replaceChildren(currentCard, ...ladder, card(nextChildren));
+  }
+
+  private tierIndices(grade: number): number[] {
+    return grade <= LAST_NAMED_GRADE ? Array.from({ length: MINE_TIERS_PER_GRADE }, (_, i) => i + 1) : [];
+  }
+
+  /** The four named grades (and the endless class the site is in, if any), the current one marked. */
+  private gradesCard(current: number): HTMLElement {
+    const shown = Array.from({ length: LAST_NAMED_GRADE + 1 }, (_, i) => i);
+    if (current > LAST_NAMED_GRADE) shown.push(current);
+    const rows = shown.map(n => {
+      const def = gradeDef(n);
+      const row = el('div', { text: t(def.nameKey, def.nameParams), attrs: { 'data-role': 'permit-grade', style: `font:${n === current ? 700 : 400} 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-${n === current ? 'primary' : 'muted'})` } });
+      row.dataset['grade'] = String(n);
+      row.dataset['current'] = String(n === current);
+      return row;
+    });
+    return card([el('span', { text: t('ui.permit.grades_label'), attrs: { style: LABEL_STYLE } }), ...rows]);
+  }
+
+  /** The current grade's three tiers: caps, targets and the perk each one grants. */
+  private tiersCard(state: GameState): HTMLElement {
+    const g = state.grade!;
+    const grade = gradeDef(g.grade);
+    const blocks = this.tierIndices(g.grade).map(n => {
+      const def = tierDef(g.grade, n)!;
+      const tierState = n < g.tier ? 'done' : n === g.tier ? 'current' : 'locked';
+      const block = el('div', { attrs: { 'data-role': 'permit-tier', style: `display:flex;flex-direction:column;gap:3px;padding:4px 0 4px 6px;${TIER_STATE_STYLE[tierState]}` } });
+      block.dataset['tier'] = String(n);
+      block.dataset['state'] = tierState;
+      block.append(
+        el('span', { text: t('ui.permit.tier_row', { tier: n }), attrs: { style: LABEL_STYLE } }),
+        el('span', { text: t('ui.permit.tier_caps', { kg: def.limits.maxChargeKg, area: def.limits.maxAreaM2 }), attrs: { style: MICRO_STYLE } }),
+        ...def.targets.map(x => {
+          const line = el('span', { attrs: { style: MICRO_STYLE } });
+          line.dataset['tierTarget'] = x.kind;
+          return line;
+        }),
+        el('span', { text: tierPerkText(g.grade, n), attrs: { 'data-role': 'tier-perk', style: MICRO_STYLE + ';font-style:italic' } }),
+      );
+      return block;
+    });
+    return card([el('span', { text: t('ui.permit.tiers_label', { name: t(grade.nameKey, grade.nameParams) }), attrs: { style: LABEL_STYLE } }), ...blocks]);
   }
 
   private targetRow(s: GradeTargetStatus): HTMLElement {
@@ -163,14 +220,25 @@ export class PermitPanel extends PanelBase {
   private refreshDynamic(state: GameState, targets: readonly GradeTargetStatus[]): void {
     const g = state.grade;
     if (!g) return;
-    for (const s of targets) {
-      const row = this.contentEl.querySelector<HTMLElement>(`[data-target="${s.kind}"]`);
-      if (!row) continue;
+    const rows = this.contentEl.querySelectorAll<HTMLElement>('[data-target]');
+    targets.forEach((s, i) => {
+      const row = rows[i];
+      if (!row) return;
       row.dataset['met'] = String(s.met);
       row.querySelector<HTMLElement>('[data-role="target-text"]')!.textContent =
         t(`permit.target.${s.kind}`, { current: formatGradeAmount(s.current), needed: formatGradeAmount(s.needed) });
       const pct = s.needed > 0 ? Math.min(100, (s.current / s.needed) * 100) : 100;
       row.querySelector<HTMLElement>('[data-role="target-bar"]')!.style.width = `${pct}%`;
+    });
+
+    for (const block of Array.from(this.contentEl.querySelectorAll<HTMLElement>('[data-role="permit-tier"]'))) {
+      const statuses = tierTargetStatuses(state, Number(block.dataset['tier']));
+      statuses.forEach((s, i) => {
+        const line = block.querySelectorAll<HTMLElement>('[data-tier-target]')[i];
+        if (!line) return;
+        line.dataset['met'] = String(s.met);
+        line.textContent = `${s.met ? '[x]' : '[ ]'} ${t(`permit.target.${s.kind}`, { current: formatGradeAmount(s.current), needed: formatGradeAmount(s.needed) })}`;
+      });
     }
 
     const pendingEl = this.contentEl.querySelector<HTMLElement>('[data-role="permit-countdown"]');

@@ -32,6 +32,7 @@ import type { ConfirmModalConfig } from '../ConfirmModal.js';
 import { planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
 import { gridAreaLimitWarning, permitPreview } from '../permitPreview.js';
 import { defaultGridDepthM } from '../../../core/economy/PermitDefaults.js';
+import { gradeRung } from '../../../core/economy/MineGrade.js';
 import { holeStatusExplain, drillFieldExplain } from '../../blastWorkshopExplain.js';
 import { buildReplacePatternConfirm } from '../../replacePatternConfirm.js';
 import {
@@ -198,7 +199,7 @@ export class DrillStep {
       spacing: this.gridSpacing, burden: this.gridBurden, layout: this.gridLayout, depth: this.gridDepth, diameter: this.gridDiameter,
       confirmingClear: this.confirmingClear,
       savedPlans: savedPlansSignature(state.savedPlans),
-      permitGrade: state.grade?.grade ?? null,
+      permitGrade: state.grade ? gradeRung(state.grade) : null,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;

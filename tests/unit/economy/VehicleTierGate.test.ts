@@ -18,11 +18,11 @@ const TIERS: VehicleTier[] = [1, 2, 3];
 describe('VehicleTierGate (#1928)', () => {
   beforeAll(() => setLocale('en'));
 
-  it('balance table unlocks tiers at grades 0 / 2 / 4', () => {
-    expect(VEHICLE_TIER_UNLOCK_GRADE).toEqual({ 1: 0, 2: 2, 3: 4 });
+  it('balance table unlocks tiers at grades 0 / 1 / 2 (#2277)', () => {
+    expect(VEHICLE_TIER_UNLOCK_GRADE).toEqual({ 1: 0, 2: 1, 3: 2 });
   });
 
-  it.each([[1, 0], [2, 2], [3, 4]] as const)('tier %i needs grade %i', (tier, grade) => {
+  it.each([[1, 0], [2, 1], [3, 2]] as const)('tier %i needs grade %i', (tier, grade) => {
     expect(vehicleTierGate(-1, tier)).toEqual({ needed: grade });
   });
 
@@ -34,39 +34,42 @@ describe('VehicleTierGate (#1928)', () => {
     expect(vehicleTierGate(0, 1)).toBeNull();
   });
 
-  it('tier 2 is gated below grade 2 and names the grade needed', () => {
-    expect(vehicleTierGate(0, 2)).toEqual({ needed: 2 });
-    expect(vehicleTierGate(1, 2)).toEqual({ needed: 2 });
+  it('tier 2 is gated at grade 0 and names grade 1', () => {
+    expect(vehicleTierGate(0, 2)).toEqual({ needed: 1 });
+    expect(vehicleTierGate(1, 2)).toBeNull();
     expect(vehicleTierGate(2, 2)).toBeNull();
   });
 
-  it('tier 3 is gated below grade 4', () => {
-    expect(vehicleTierGate(3, 3)).toEqual({ needed: 4 });
-    expect(vehicleTierGate(2, 3)).toEqual({ needed: 4 });
-    expect(vehicleTierGate(4, 3)).toBeNull();
+  it('tier 3 is gated below grade 2', () => {
+    expect(vehicleTierGate(0, 3)).toEqual({ needed: 2 });
+    expect(vehicleTierGate(1, 3)).toEqual({ needed: 2 });
+    expect(vehicleTierGate(2, 3)).toBeNull();
+    expect(vehicleTierGate(3, 3)).toBeNull();
     expect(vehicleTierGate(9, 3)).toBeNull();
   });
 
   it('refusal text names the current and the needed grade', () => {
-    const text = vehicleTierRefusal(1, 2);
-    expect(text).toBe('The dealer laughs at your Hobby Quarry Licence. Come back with a Licensed Quarry.');
+    setLocale('en');
+    expect(vehicleTierRefusal(0, 2)).toBe('The dealer laughs at your Surface. Come back with a Depth.');
+    expect(vehicleTierRefusal(1, 3)).toBe('The dealer laughs at your Depth. Come back with a Distance.');
   });
 
   it('lock label reads "Needs <grade name>"', () => {
-    expect(vehicleTierLockLabel(2)).toBe('Needs Licensed Quarry');
-    expect(vehicleTierLockLabel(4)).toBe('Needs Strategic National Excavation');
+    expect(vehicleTierLockLabel(1)).toBe('Needs Depth');
+    expect(vehicleTierLockLabel(2)).toBe('Needs Distance');
   });
 
-  it('registers unlock lines on grades 2 and 4 only', () => {
+  it('registers unlock lines on the grades that open a vehicle tier, and on no other', () => {
+    expect(unlockLinesFor(1).map(l => l.key)).toContain('progression.unlock.vehicle_tier.1');
     expect(unlockLinesFor(2).map(l => l.key)).toContain('progression.unlock.vehicle_tier.2');
-    expect(unlockLinesFor(4).map(l => l.key)).toContain('progression.unlock.vehicle_tier.4');
-    for (const g of [1, 3, 5]) {
-      expect(unlockLinesFor(g).map(l => l.key)).not.toContain(`progression.unlock.vehicle_tier.${g}`);
+    for (const g of [3, 4]) {
+      expect(unlockLinesFor(g).map(l => l.key).filter(k => k.includes('vehicle_tier'))).toEqual([]);
     }
+    expect(unlockLinesFor(1).map(l => l.key)).not.toContain('progression.unlock.vehicle_tier.2');
   });
 
   it('every new key has real text in en and fr', () => {
-    const keys = ['progression.unlock.vehicle_tier.2', 'progression.unlock.vehicle_tier.4', 'vehicle.tier_locked', 'ui.fleet.tier_locked'];
+    const keys = ['progression.unlock.vehicle_tier.1', 'progression.unlock.vehicle_tier.2', 'vehicle.tier_locked', 'ui.fleet.tier_locked'];
     const e = en as Record<string, string>;
     const f = fr as Record<string, string>;
     for (const k of keys) {
@@ -76,6 +79,7 @@ describe('VehicleTierGate (#1928)', () => {
     }
     expect(e['vehicle.tier_locked']).toBe('The dealer laughs at your {current}. Come back with a {needed}.');
     expect(e['ui.fleet.tier_locked']).toBe('Needs {grade}');
+    expect(t('progression.unlock.vehicle_tier.1')).not.toBe('progression.unlock.vehicle_tier.1');
     expect(t('progression.unlock.vehicle_tier.2')).not.toBe('progression.unlock.vehicle_tier.2');
   });
 });

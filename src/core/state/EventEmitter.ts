@@ -21,6 +21,8 @@ export interface GameEventMap {
   'mining:wall_slump': { x: number; z: number; volumeM3: number };
   /** A mine-grade application finished processing (#1921). */
   'progression:grade_approved': { grade: number };
+  /** A site met its current tier's targets and moved up a tier within its grade (no fee, no wait). */
+  'progression:tier_up': { grade: number; tier: number };
   /** A mine-grade application was filed and its fee booked (#1926). */
   'progression:ore_glut': { oreId: string; saturation: number };
   'progression:grade_applied': { toGrade: number; fee: number };

@@ -139,16 +139,19 @@ export function generateContracts(
   buyerGrade?: number,
   /** Per-ore market saturation reading, discounting oversold ores (#1930). */
   saturation?: SaturationReader,
+  /** Offers added to the refresh by the tier perk (#2277). */
+  extraOffers = 0,
 ): void {
   // Only refresh if enough time has passed
   if (currentTick - state.lastRefreshTick < CONTRACT_REFRESH_INTERVAL && state.available.length > 0) return;
 
-  // Evict oldest offers so exactly CONTRACTS_PER_REFRESH new ones fit.
-  const overflow = state.available.length + CONTRACTS_PER_REFRESH - MAX_AVAILABLE_CONTRACTS;
+  // Evict oldest offers so every new one fits.
+  const offers = CONTRACTS_PER_REFRESH + Math.max(0, extraOffers);
+  const overflow = state.available.length + offers - MAX_AVAILABLE_CONTRACTS;
   if (overflow > 0) state.available.splice(0, overflow);
 
   // A refresh may add fewer offers than CONTRACTS_PER_REFRESH: a rubble-only site with too little barren rock offers nothing.
-  for (let i = 0; i < CONTRACTS_PER_REFRESH; i++) {
+  for (let i = 0; i < offers; i++) {
     const offer = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg, buyerGrade, saturation);
     if (offer) state.available.push(offer);
   }

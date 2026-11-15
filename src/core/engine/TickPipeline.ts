@@ -55,7 +55,7 @@ import { syncRepairDispatch } from '../economy/RepairDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
 import { isHiringPoolDue, refreshHiringPool } from '../entities/HiringPool.js';
 import { checkDeadlines, ensureScriptedOreSale, generateContracts } from '../economy/Contract.js';
-import { advanceGradeApplication } from '../economy/MineGrade.js';
+import { advanceGradeApplication, advanceGradeTier, extraContractOffers } from '../economy/MineGrade.js';
 import { saturationReader } from '../economy/OreSaturation.js';
 import { autoAcceptRubbleClearances, autoDeliverContracts, autoSellUnclaimedOre, settleDelivery } from '../economy/ContractFulfilment.js';
 import { updateScores, clampScore, type ScoreInputs } from '../scores/ScoreManager.js';
@@ -226,6 +226,7 @@ export function runTick(
   if (autoFulfilmentEnabled(state, 'autoSell')) autoSellUnclaimedOre(state, state.tickCount);
   // 3b. Pending mine-grade application (#1921)
   advanceGradeApplication(state, emitter);
+  advanceGradeTier(state, emitter);
   // Expire overdue contracts and apply penalties
   const expired = checkDeadlines(state.contracts, state.tickCount);
   for (const { penalty } of expired) {
@@ -235,7 +236,7 @@ export function runTick(
 
   // 4. Auto-refresh available contracts on schedule
   if (state.tickCount % CONTRACT_REFRESH_INTERVAL === 0) {
-    generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade, saturationReader(state.saturation, state.tickCount));
+    generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state), state.grade?.grade, saturationReader(state.saturation, state.tickCount), extraContractOffers(state.grade));
     ensureScriptedOreSale(state.contracts, resolveScriptedOreSale(state), resolveContractPriceMultiplier(state));
   }
 

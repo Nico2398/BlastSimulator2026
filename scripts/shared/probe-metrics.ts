@@ -70,6 +70,8 @@ interface ProbeMetrics {
   ticksHaulWaitedOnFullStorage: number;
   boulderSoldShare: number | null;
   gradeReachedTick: Record<number, number>;
+  /** Tick each tier of a named grade was first reached, keyed `<grade>.<tier>`; the start tier is not listed. */
+  tierReachedTick?: Record<string, number>;
   /** Deepest pit (m) the grade tracker had measured by each cash sample tick; null past the run and throughout off the progression ladder. */
   pitDepthAt?: Record<number, number | null>;
   /** Cash at the tick each grade was first reached, by grade. */
@@ -168,6 +170,8 @@ export class MetricsObserver {
   private lastState: GameState | null = null;
   private readonly gradeReachedTick: Record<number, number> = {};
   private grade = 0;
+  private readonly tierReachedTick: Record<string, number> = {};
+  private tierSeen = '0.1';
   private readonly affordableTick: ProbeMetrics['affordableTick'] = {
     warehouseT2: null, researchCenter: null, secondHauler: null,
   };
@@ -249,6 +253,9 @@ export class MetricsObserver {
       this.gradeReachedTick[this.grade + 1] = t;
       this.gradeCashAt[this.grade + 1] = state.cash;
     }
+    const tierKey = `${grade}.${state.grade?.tier ?? 1}`;
+    if (tierKey !== this.tierSeen && state.grade && this.tierReachedTick[tierKey] === undefined) this.tierReachedTick[tierKey] = t;
+    this.tierSeen = tierKey;
     for (const key of Object.keys(this.costs) as Array<keyof typeof this.costs>) {
       if (this.affordableTick[key] === null && state.cash >= this.costs[key]) this.affordableTick[key] = t;
     }
@@ -281,6 +288,7 @@ export class MetricsObserver {
       ticksHaulWaitedOnFullStorage: this.haulWaitTicks,
       boulderSoldShare: this.boulderShare(),
       gradeReachedTick: { ...this.gradeReachedTick },
+      tierReachedTick: { ...this.tierReachedTick },
       gradeCashAt: { ...this.gradeCashAt },
       catalogBoughtTick: this.catalogBoughtTick,
       firstSaleTick: ledger.firstSaleTick,

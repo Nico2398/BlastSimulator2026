@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { acknowledgeApproval, applyForGrade, gradeDef, nextGradeTargets, formatGradeAmount, type GradeTargetStatus } from '../../core/economy/MineGrade.js';
+import { acknowledgeApproval, applyForGrade, currentTierTargets, gradeDef, gradeRung, nextGradeTargets, formatGradeAmount, type GradeTargetStatus } from '../../core/economy/MineGrade.js';
 import { permitRefusalText } from '../../core/economy/permitRefusalText.js';
 import { permitLimitTexts } from '../../core/economy/permitLimitText.js';
 import { requireGame } from './commandUtils.js';
@@ -21,12 +21,16 @@ function permitStatus(ctx: GameContext): CommandResult {
 
   const current = gradeDef(g.grade);
   const next = gradeDef(g.grade + 1);
-  const limitTexts = permitLimitTexts(g.grade, g.strikeTicks ?? [], state.tickCount);
+  const limitTexts = permitLimitTexts(gradeRung(g), g.strikeTicks ?? [], state.tickCount);
+  const tierTargets = currentTierTargets(state);
+  const tierBlock = tierTargets.length > 0 ? [t('permit.status.tier_targets', { tier: g.tier }), ...tierTargets.map(targetLine)] : [];
   const lines = [
-    t('permit.status.grade', { grade: g.grade, name: t(current.nameKey, current.nameParams) }),
+    t('permit.status.grade', { grade: g.grade, tier: g.tier, name: t(current.nameKey, current.nameParams) }),
     t('permit.status.next', { name: t(next.nameKey, next.nameParams), fee: formatMoney(next.fee), ticks: next.processingTicks }),
     limitTexts.limits,
     limitTexts.strikes,
+    ...tierBlock,
+    t('permit.status.grade_up'),
     ...nextGradeTargets(state).map(targetLine),
   ];
   if (g.pending) {
@@ -44,7 +48,7 @@ function permitApply(ctx: GameContext): CommandResult {
     const to = gradeDef(result.toGrade);
     return {
       success: true,
-      output: t('permit.apply.success', { name: t(to.nameKey, to.nameParams), fee: formatMoney(result.fee), ticks: to.processingTicks }),
+      output: t('permit.apply.success', { name: t(to.nameKey, to.nameParams), fee: formatMoney(result.fee), ticks: state.grade.pending?.ticksLeft ?? to.processingTicks }),
     };
   }
   const nextFee = gradeDef(state.grade.grade + 1).fee;

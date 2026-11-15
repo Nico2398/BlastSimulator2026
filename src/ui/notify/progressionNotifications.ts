@@ -6,7 +6,7 @@ import type { NotifyInput } from './NotificationCenter.js';
 import { t } from '../../core/i18n/I18n.js';
 import { gradeDef } from '../../core/economy/MineGrade.js';
 
-/** Wires progression:grade_applied and progression:grade_approved to `notify`. */
+/** Wires progression:grade_applied, tier_up and grade_approved to `notify`. */
 export function wireProgressionNotifications(
   emitter: Pick<EventEmitter, 'on'>,
   notify: (input: NotifyInput) => void,
@@ -16,6 +16,10 @@ export function wireProgressionNotifications(
   emitter.on('progression:grade_approved', ({ grade }) => {
     const def = gradeDef(grade);
     notify({ severity: 'info', title: t('notification.title.permit'), body: t('notification.progression.approved', { name: t(def.nameKey, def.nameParams) }) });
+  });
+  emitter.on('progression:tier_up', ({ grade, tier }) => {
+    const def = gradeDef(grade);
+    notify({ severity: 'info', title: t('notification.title.permit'), body: t('notification.progression.tier_up', { name: t(def.nameKey, def.nameParams), tier }) });
   });
   emitter.on('progression:ore_glut', ({ oreId }) =>
     notify({ severity: 'info', title: t('notification.title.market'), body: t('notification.market.glut', { ore: t(`ore.${oreId}.name`) }) }));

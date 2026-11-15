@@ -3,13 +3,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PermitPanel } from '../../../../src/ui/panels/PermitPanel.js';
 import { createGame, type GameState } from '../../../../src/core/state/GameState.js';
-import { createGradeState, gradeDef, nextGradeTargets, permitApplyBlocker } from '../../../../src/core/economy/MineGrade.js';
+import { createGradeState, gradeDef, nextGradeTargets, currentTierTargets, permitApplyBlocker, formatGradeAmount } from '../../../../src/core/economy/MineGrade.js';
 import { permitRefusalText } from '../../../../src/core/economy/permitRefusalText.js';
 import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
 import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
 import { permitLimitsFor } from '../../../../src/core/economy/PermitLimits.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
-import { PERMIT_STRIKES_TO_SUSPEND, PERMIT_STRIKE_WINDOW_TICKS, PERMIT_SUSPENSION_TICKS } from '../../../../src/core/config/balance.js';
+import { meetTargets, tierTargets } from '../../../helpers/gradeLadder.js';
+import { MINE_GRADES, PERMIT_STRIKES_TO_SUSPEND, PERMIT_STRIKE_WINDOW_TICKS, PERMIT_SUSPENSION_TICKS } from '../../../../src/core/config/balance.js';
 
 const PENDING_LINE = 'Your file is on the pile. The pile is on a desk. The desk is on holiday.';
 
@@ -24,10 +25,18 @@ function progression(): GameState {
   return s;
 }
 
+/** Tier 3 of grade 0 with the tier-3 targets and the zone mastery met: the grade-up application is open. */
 function meet(s: GameState): void {
-  s.grade!.oreDeliveredKg = 5_000;
-  s.grade!.blastsFired = 2;
+  s.grade!.tier = 3;
+  meetTargets(s, tierTargets(0, 3));
+  meetTargets(s, MINE_GRADES[0]!.mastery);
 }
+
+/** The grade-up checklist rows: `[data-target]` rows outside the tier blocks. */
+const checklistRows = (): HTMLElement[] =>
+  Array.from(panel.root.querySelectorAll<HTMLElement>('[data-target]')).filter(r => !r.closest('[data-role="permit-tier"]'));
+const tierEls = (): HTMLElement[] => Array.from(panel.root.querySelectorAll<HTMLElement>('[data-role="permit-tier"]'));
+const gradeEls = (): HTMLElement[] => Array.from(panel.root.querySelectorAll<HTMLElement>('[data-role="permit-grade"]'));
 
 const q = <T extends HTMLElement = HTMLElement>(sel: string): T | null => panel.root.querySelector<T>(sel);
 const applyBtn = (): HTMLButtonElement | null => q<HTMLButtonElement>('[data-action="permit-apply"]');
@@ -50,9 +59,12 @@ afterEach(() => {
 });
 
 describe('PermitPanel (#1924)', () => {
-  it('shows charge, pattern area and fee limits of the current grade', () => {
-    panel.update(progression());
-    const lim = permitLimitsFor(0);
+  it('shows charge, pattern area and fee limits of the current grade and tier', () => {
+    const s = progression();
+    s.grade!.grade = 1;
+    s.grade!.tier = 2;
+    panel.update(s);
+    const lim = permitLimitsFor(1, 2);
     const text = q('[data-role="permit-limits"]')!.textContent!;
     expect(text).toContain(`${lim.maxChargeKg} kg`);
     expect(text).toContain(`${lim.maxAreaM2} m²`);
@@ -84,49 +96,72 @@ describe('PermitPanel (#1924)', () => {
     expect(stamp!.textContent).toContain(t(gradeDef(0).nameKey));
   });
 
-  it('renders one row per next-grade target', () => {
+  it('renders one checklist row per grade-up target: tier-3 targets plus the zone mastery', () => {
     const s = progression();
     panel.update(s);
     const targets = nextGradeTargets(s);
     expect(targets.length).toBeGreaterThan(0);
-    for (const tg of targets) {
-      expect(panel.root.querySelectorAll(`[data-target="${tg.kind}"]`)).toHaveLength(1);
-    }
-    expect(panel.root.querySelectorAll('[data-target]')).toHaveLength(targets.length);
+    const rows = checklistRows();
+    expect(rows).toHaveLength(targets.length);
+    expect(new Set(rows.map(r => r.dataset['target']))).toEqual(new Set(targets.map(x => x.kind)));
   });
 
-  it('target bar width is min(100, current/needed*100)% and met rows are flagged', () => {
+  it('checklist bar width is min(100, current/needed*100)% and met rows are flagged', () => {
     const s = progression();
-    s.grade!.oreDeliveredKg = 2_500; // half of 5 t
-    s.grade!.blastsFired = 9; // over the target of 2
+    s.grade!.oreDeliveredKg = 2_500;
+    s.grade!.blastsFired = 9; // over every blasts target
     panel.update(s);
-    const ore = q('[data-target="ore_kg"]')!;
-    const blasts = q('[data-target="blasts"]')!;
-    const oreBar = ore.querySelector<HTMLElement>('[data-role="target-bar"]')!;
-    const blastBar = blasts.querySelector<HTMLElement>('[data-role="target-bar"]')!;
-    const need = nextGradeTargets(s).find(x => x.kind === 'ore_kg')!.needed;
-    expect(oreBar.style.width).toBe(`${Math.min(100, (2_500 / need) * 100)}%`);
-    expect(blastBar.style.width).toBe('100%');
-    expect(ore.dataset['met']).not.toBe('true');
-    expect(blasts.dataset['met']).toBe('true');
+    const targets = nextGradeTargets(s);
+    const rows = checklistRows();
+    rows.forEach((row, i) => {
+      const tg = targets[i]!;
+      expect(row.dataset['target']).toBe(tg.kind);
+      const bar = row.querySelector<HTMLElement>('[data-role="target-bar"]')!;
+      expect(bar.style.width).toBe(`${Math.min(100, (tg.current / tg.needed) * 100)}%`);
+      expect(row.dataset['met']).toBe(String(tg.met));
+    });
+    expect(rows.some(r => r.dataset['target'] === 'blasts' && r.dataset['met'] === 'true')).toBe(true);
+    expect(rows.some(r => r.dataset['target'] === 'ore_kg' && r.dataset['met'] !== 'true')).toBe(true);
   });
 
-  it('target row text carries current and needed values', () => {
+  it('checklist row text carries current and needed values', () => {
     const s = progression();
     s.grade!.blastsFired = 1;
     panel.update(s);
-    expect(q('[data-target="blasts"]')!.textContent).toContain(t('permit.target.blasts', { current: '1', needed: '2' }));
+    const need = tierTargets(0, 3).find(x => x.kind === 'blasts')!.value;
+    const row = checklistRows().find(r => r.dataset['target'] === 'blasts')!;
+    expect(row.textContent).toContain(t('permit.target.blasts', { current: '1', needed: String(need) }));
   });
 
-  it('shows the fee and the processing time', () => {
+  it('shows the fee of the next grade', () => {
     panel.update(progression());
-    const next = gradeDef(1);
-    expect(panel.root.textContent).toContain(formatMoney(next.fee));
-    expect(panel.root.textContent).toContain(formatGameDuration(next.processingTicks));
+    expect(panel.root.textContent).toContain(formatMoney(gradeDef(1).fee));
+  });
+
+  it('tier 1: Apply is disabled and the reason is the tier_incomplete refusal', () => {
+    const s = progression();
+    panel.update(s);
+    const btn = applyBtn()!;
+    expect(btn).not.toBeNull();
+    expect(btn.disabled).toBe(true);
+    expect(permitApplyBlocker(s)!.refusal).toBe('tier_incomplete');
+    expect(reason()).toBe(permitRefusalText('tier_incomplete', [], gradeDef(1).fee, s.cash));
+  });
+
+  it('tier 3 with the tier targets met but the mastery short: Apply is disabled, naming the unmet target', () => {
+    const s = progression();
+    s.grade!.tier = 3;
+    meetTargets(s, tierTargets(0, 3));
+    panel.update(s);
+    expect(applyBtn()!.disabled).toBe(true);
+    const b = permitApplyBlocker(s)!;
+    expect(b.refusal).toBe('unmet_targets');
+    expect(reason()).toBe(permitRefusalText(b.refusal, b.unmet, gradeDef(1).fee, s.cash));
   });
 
   it('unmet targets: Apply is disabled and the reason equals permitRefusalText', () => {
     const s = progression();
+    s.grade!.tier = 3;
     panel.update(s);
     const btn = applyBtn()!;
     expect(btn).not.toBeNull();
@@ -214,6 +249,19 @@ describe('PermitPanel (#1924)', () => {
     expect(q('[data-role="permit-stamp"]')!.textContent).toContain(t(gradeDef(1).nameKey));
   });
 
+  it('a tier-up re-renders: the Apply button follows the tier without a reopen', () => {
+    const s = progression();
+    s.grade!.tier = 3;
+    meetTargets(s, tierTargets(0, 3));
+    meetTargets(s, MINE_GRADES[0]!.mastery);
+    s.grade!.tier = 2;
+    panel.update(s);
+    expect(applyBtn()!.disabled).toBe(true);
+    s.grade!.tier = 3;
+    panel.update(s);
+    expect(applyBtn()!.disabled).toBe(false);
+  });
+
   it('refreshLocale re-renders in French', () => {
     const s = progression();
     panel.update(s);
@@ -224,12 +272,141 @@ describe('PermitPanel (#1924)', () => {
     expect(panel.root.textContent).toContain(t(gradeDef(0).nameKey));
   });
 
-  it('a state without grade shows the no-ladder text and no apply button or stamp', () => {
+  it('a state without grade shows the no-ladder text and no apply button, stamp, grades or tiers', () => {
     const s = createGame({ seed: 1, mineType: 'desert' });
     expect(() => panel.update(s)).not.toThrow();
     expect(panel.root.textContent).toContain(t('permit.no_ladder'));
     expect(applyBtn()).toBeNull();
     expect(q('[data-role="permit-stamp"]')).toBeNull();
+    expect(gradeEls()).toHaveLength(0);
+    expect(tierEls()).toHaveLength(0);
+  });
+});
+
+describe('PermitPanel — four grades and three tiers (#2277)', () => {
+  it('lists the four named grades, in order, each with its name', () => {
+    panel.update(progression());
+    const els = gradeEls();
+    expect(els.map(e => e.dataset['grade'])).toEqual(['0', '1', '2', '3']);
+    els.forEach((e, g) => expect(e.textContent).toContain(t(`permit.grade.${g}`)));
+  });
+
+  it.each([0, 1, 2, 3])('marks only grade %i as current', (grade) => {
+    const s = progression();
+    s.grade!.grade = grade;
+    panel.update(s);
+    const current = gradeEls().filter(e => e.dataset['current'] === 'true');
+    expect(current.map(e => e.dataset['grade'])).toEqual([String(grade)]);
+  });
+
+  it('the current mark moves when the grade is approved', () => {
+    const s = progression();
+    panel.update(s);
+    expect(gradeEls().find(e => e.dataset['current'] === 'true')!.dataset['grade']).toBe('0');
+    s.grade!.grade = 1;
+    panel.update(s);
+    expect(gradeEls().find(e => e.dataset['current'] === 'true')!.dataset['grade']).toBe('1');
+  });
+
+  it('shows the three tiers of the current grade, numbered 1-3', () => {
+    panel.update(progression());
+    expect(tierEls().map(e => e.dataset['tier'])).toEqual(['1', '2', '3']);
+  });
+
+  it.each([
+    [1, ['current', 'locked', 'locked']],
+    [2, ['done', 'current', 'locked']],
+    [3, ['done', 'done', 'current']],
+  ])('at tier %i the tier blocks read %j', (tier, states) => {
+    const s = progression();
+    s.grade!.tier = tier;
+    panel.update(s);
+    expect(tierEls().map(e => e.dataset['state'])).toEqual(states);
+  });
+
+  it('a tier-up flips the states on the next update', () => {
+    const s = progression();
+    panel.update(s);
+    expect(tierEls().map(e => e.dataset['state'])).toEqual(['current', 'locked', 'locked']);
+    s.grade!.tier = 2;
+    panel.update(s);
+    expect(tierEls().map(e => e.dataset['state'])).toEqual(['done', 'current', 'locked']);
+  });
+
+  it('the tiers follow the grade: grade 2 shows grade 2\'s tiers, back at tier 1', () => {
+    const s = progression();
+    s.grade!.grade = 2;
+    panel.update(s);
+    expect(tierEls().map(e => e.dataset['state'])).toEqual(['current', 'locked', 'locked']);
+    const tier1 = tierEls()[0]!;
+    for (const tg of tierTargets(2, 1)) expect(tier1.textContent).toContain(formatGradeAmount(tg.value));
+  });
+
+  it('every tier block carries its own target values', () => {
+    panel.update(progression());
+    tierEls().forEach((el, i) => {
+      for (const tg of tierTargets(0, i + 1)) expect(el.textContent, `tier ${i + 1} ${tg.kind}`).toContain(formatGradeAmount(tg.value));
+    });
+  });
+
+  it('the current tier shows live progress for each of its targets', () => {
+    const s = progression();
+    s.grade!.oreDeliveredKg = 300;
+    panel.update(s);
+    const cur = tierEls().find(e => e.dataset['state'] === 'current')!;
+    for (const tg of currentTierTargets(s)) {
+      expect(cur.textContent).toContain(t(`permit.target.${tg.kind}`, { current: formatGradeAmount(tg.current), needed: formatGradeAmount(tg.needed) }));
+    }
+  });
+
+  it('the live progress moves with the counters', () => {
+    const s = progression();
+    panel.update(s);
+    const before = tierEls().find(e => e.dataset['state'] === 'current')!.textContent;
+    s.grade!.oreDeliveredKg = 123;
+    panel.update(s);
+    expect(tierEls().find(e => e.dataset['state'] === 'current')!.textContent).not.toBe(before);
+  });
+
+  it('shows a perk line in every tier that grants one, a different one per tier', () => {
+    const s = progression();
+    s.grade!.grade = 1;
+    panel.update(s);
+    const perks = tierEls().map(e => e.querySelector('[data-role="tier-perk"]')?.textContent?.trim() ?? '');
+    expect(perks).toHaveLength(3);
+    for (const p of perks) {
+      expect(p.length).toBeGreaterThan(0);
+      expect(p).not.toMatch(/^[a-z_]+(\.[a-z_]+)+$/);
+    }
+    expect(new Set(perks).size).toBe(3);
+  });
+
+  it('speaks French in the perk lines after a locale change', () => {
+    const s = progression();
+    s.grade!.grade = 1;
+    panel.update(s);
+    const en = tierEls().map(e => e.querySelector('[data-role="tier-perk"]')?.textContent);
+    setLocale('fr');
+    panel.refreshLocale();
+    const fr = tierEls().map(e => e.querySelector('[data-role="tier-perk"]')?.textContent);
+    expect(fr).not.toEqual(en);
+    expect(fr.every(x => (x ?? '').length > 0)).toBe(true);
+  });
+
+  it('keeps the grade-up checklist rows apart from the tier blocks', () => {
+    const s = progression();
+    panel.update(s);
+    expect(checklistRows()).toHaveLength(nextGradeTargets(s).length);
+    expect(panel.root.querySelectorAll('[data-action="permit-apply"]')).toHaveLength(1);
+  });
+
+  it('an endless class has no tier blocks, but keeps its checklist and apply block', () => {
+    const s = progression();
+    s.grade!.grade = 4;
+    expect(() => panel.update(s)).not.toThrow();
+    expect(tierEls()).toHaveLength(0);
+    expect(checklistRows()).toHaveLength(nextGradeTargets(s).length);
+    expect(applyBtn()).not.toBeNull();
   });
 });
 
