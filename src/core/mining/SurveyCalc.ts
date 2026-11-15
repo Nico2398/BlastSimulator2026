@@ -70,6 +70,8 @@ export interface EstimateSurveyParams {
   /** Surveyor skill level 1–5. Higher values reduce noise. */
   skillLevel: number;
   completedTick: number;
+  /** Mine grade of the site when the survey was taken; caps the depth read. Absent on a non-progression site (full depth). */
+  grade?: number;
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -215,7 +217,9 @@ export interface RunSurveyParams {
  */
 export interface RunSurveyResult {
   success: boolean;
-  error?: 'insufficient_funds' | 'no_surveyor';
+  error?: 'insufficient_funds' | 'no_surveyor' | 'method_locked';
+  /** Grade that opens the method, set with `method_locked`. */
+  neededGrade?: number;
   actionId?: number;
 }
 

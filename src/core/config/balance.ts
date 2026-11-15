@@ -2298,6 +2298,19 @@ export const SURVEY_DEPTH_BELOW_SURFACE = {
   core_sample: 40,
 } as const;
 
+/** Mine grade at which each survey method opens on a progression site (#2279): surface methods at G0, depth methods from G1. */
+export const SURVEY_METHOD_UNLOCK_GRADE = {
+  aerial:      0,
+  seismic:     0,
+  core_sample: 1,
+} as const;
+
+/** Thickness in metres of the G0 band: G0 ores sit within this depth of the surface (#2279). */
+export const SURVEY_SURFACE_BAND_M = 5;
+
+/** Methods that read below the G0 band, so a surface-grade survey stops at the band edge plus one seismic group (#2279). */
+export const SURVEY_SURFACE_CAPPED_METHODS = ['seismic', 'core_sample'] as const;
+
 /** Voxels of partial-density rock that cap a column's top solid voxel (the survey anchor). */
 export const SURVEY_CAP_VOXELS = 1;
 
