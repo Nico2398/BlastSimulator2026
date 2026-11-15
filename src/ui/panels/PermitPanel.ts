@@ -28,6 +28,13 @@ const LABEL_STYLE = 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.14em;col
 const STAMP_STYLE = 'margin:0 auto;transform:rotate(-4deg);white-space:nowrap;padding:4px 9px;border:2px solid var(--bsx-critical-text);border-radius:4px;'
   + 'color:var(--bsx-critical-text);font:800 11px/1 var(--bsx-font-ui);letter-spacing:.2em;opacity:.85';
 
+/** Tier block look by state: the current tier carries an amber rule, passed tiers recede, later ones are dimmer still. */
+const TIER_STATE_STYLE = {
+  current: 'border-left:2px solid var(--bsx-amber)',
+  done: 'border-left:2px solid transparent;opacity:.65',
+  locked: 'border-left:2px solid transparent;opacity:.5',
+} as const;
+
 export class PermitPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private readonly contentEl: HTMLElement;
@@ -159,9 +166,10 @@ export class PermitPanel extends PanelBase {
     const grade = gradeDef(g.grade);
     const blocks = this.tierIndices(g.grade).map(n => {
       const def = tierDef(g.grade, n)!;
-      const block = el('div', { attrs: { 'data-role': 'permit-tier', style: 'display:flex;flex-direction:column;gap:3px;padding:4px 0' } });
+      const tierState = n < g.tier ? 'done' : n === g.tier ? 'current' : 'locked';
+      const block = el('div', { attrs: { 'data-role': 'permit-tier', style: `display:flex;flex-direction:column;gap:3px;padding:4px 0 4px 6px;${TIER_STATE_STYLE[tierState]}` } });
       block.dataset['tier'] = String(n);
-      block.dataset['state'] = n < g.tier ? 'done' : n === g.tier ? 'current' : 'locked';
+      block.dataset['state'] = tierState;
       block.append(
         el('span', { text: t('ui.permit.tier_row', { tier: n }), attrs: { style: LABEL_STYLE } }),
         el('span', { text: t('ui.permit.tier_caps', { kg: def.limits.maxChargeKg, area: def.limits.maxAreaM2 }), attrs: { style: MICRO_STYLE } }),

@@ -116,7 +116,7 @@ export function formatTable(results: readonly RunResult[]): string {
 /**
  * Per (biome, kit, strategy) group and grade: runs that reached it, median tick and cash at that
  * tick, and the verdict of the median tick against GRADE_TARGET_WINDOWS (grades without a window
- * report no verdict). A grade no run reached is listed 'missed'.
+ * report no verdict). A grade no run reached is listed 'missed'. Tiers reached (`t<grade>.<tier>`) follow, with their median tick.
  */
 export function formatGradeSummary(results: readonly RunResult[]): string {
   const headers = ['biome', 'kit', 'strategy', 'grade', 'reached', 'median tick', 'median cash', 'window', 'verdict'];
@@ -142,6 +142,13 @@ export function formatGradeSummary(results: readonly RunResult[]): string {
         first.biome, first.kit, first.strategy, String(grade), `${reached.length}/${runs.length}`,
         cell(tick), cell(cash), window ? `${window[0]}-${window[1]}` : NONE, verdict,
       ]));
+    }
+    const tierKeys = new Set<string>();
+    for (const r of runs) for (const k of Object.keys(r.metrics.tierReachedTick ?? {})) tierKeys.add(k);
+    for (const key of [...tierKeys].sort()) {
+      const reached = runs.filter(r => r.metrics.tierReachedTick?.[key] !== undefined);
+      const tick = median(reached.map(r => r.metrics.tierReachedTick![key]!));
+      lines.push(line([first.biome, first.kit, first.strategy, `t${key}`, `${reached.length}/${runs.length}`, cell(tick), NONE, NONE, NONE]));
     }
   }
   return lines.join('\n');
