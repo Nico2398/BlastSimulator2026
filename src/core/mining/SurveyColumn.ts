@@ -61,7 +61,7 @@ export function oresSurveyedAt(
   if (!survey.depthProfile && !survey.surfaceYs) return column; // legacy save
   if (typeof surfaceY !== 'number') return column;
   const depth = surfaceY - y;
-  if (depth < -SURVEY_CAP_VOXELS || depth >= SURVEY_DEPTH_BELOW_SURFACE[survey.method]) return undefined;
+  if (depth < -SURVEY_CAP_VOXELS || depth >= (survey.depthM ?? SURVEY_DEPTH_BELOW_SURFACE[survey.method])) return undefined;
   if (!survey.depthProfile) return depth < 0 ? undefined : column ?? {}; // aerial: top window carries the column estimate
   // The partial-density cap over the top solid voxel is blasted with it but was never sampled:
   // it reads as the top band, and counts as unscanned when that band holds no ore.

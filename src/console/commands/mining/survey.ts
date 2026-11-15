@@ -6,6 +6,7 @@ import type { MiningContext } from './types.js';
 import { requireGameWithSub } from './shared.js';
 import { runSurvey, surveyCostFor, SURVEY_METHODS, type SurveyMethod } from '../../../core/mining/SurveyCalc.js';
 import { SURVEY_COVERAGE_RADIUS } from '../../../core/config/balance.js';
+import { surveyMethodRefusal } from '../../../core/mining/SurveyGate.js';
 import { claimForAction, cellsInDisc } from '../siteExpansion.js';
 
 export function surveyCommand(
@@ -88,6 +89,9 @@ export function surveyCommand(
     return { success: false, output: t('mining.survey.invalid_coordinates') };
   }
 
+  const refusal = surveyMethodRefusal(ctx.state!.grade?.grade, method);
+  if (refusal !== null) return { success: false, output: refusal };
+
   const claim = claimForAction(ctx, cellsInDisc(x, z, SURVEY_COVERAGE_RADIUS[method]), 'survey');
   if (!claim.ok) return { success: false, output: claim.output! };
 
@@ -96,6 +100,9 @@ export function surveyCommand(
   if (!result.success) {
     if (result.error === 'insufficient_funds') {
       return { success: false, output: `Insufficient funds. ${method} survey costs $${surveyCostFor(method, ctx.state!.events.activeModifiers, ctx.state!.tickCount)}.` };
+    }
+    if (result.error === 'method_locked') {
+      return { success: false, output: surveyMethodRefusal(ctx.state!.grade?.grade, method) ?? t('mining.survey.failed') };
     }
     if (result.error === 'no_surveyor') {
       return { success: false, output: t('mining.survey.no_surveyor') };

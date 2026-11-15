@@ -10,6 +10,7 @@ import { SURVEY_COVERAGE_RADIUS } from '../../../../src/core/config/balance.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import type { PlacementKit } from '../../../../src/ui/scene/PlacementKit.js';
 import type { NotifyInput } from '../../../../src/ui/notify/NotificationCenter.js';
+import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -982,6 +983,158 @@ describe('SurveyPanel — results filter bar (#2162)', () => {
       state.surveyResults.push(makeSurveyResult({ id: 6, centerX: 6, centerZ: 6, estimates: { '6,6': { glimmerite: 0.2 } } }));
       panel.update(state);
       expect(bar(panel).querySelector(oreBtn('glimmerite'))).not.toBeNull();
+    });
+  });
+});
+
+// ── Method cards gated by mine grade (#2279) ────────────────────────────────
+
+function gradedState(grade: number | undefined, cash?: number): GameState {
+  const state = surveyorState(cash);
+  if (grade !== undefined) state.grade = { ...createGradeState(), grade };
+  return state;
+}
+
+describe('SurveyPanel — grade-gated method cards (#2279)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    for (const c of liveContainers) c.remove();
+    liveContainers.length = 0;
+  });
+
+  it('at grade 0 the core sample card is locked and disabled for assistive tech', () => {
+    const { panel } = makePanel();
+    panel.update(gradedState(0));
+    const card = method(panel, 'core_sample');
+    expect(card.getAttribute('data-locked')).toBe('true');
+    expect(card.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('at grade 0 the locked card states what opens it', () => {
+    const { panel } = makePanel();
+    panel.update(gradedState(0));
+    const text = method(panel, 'core_sample').textContent!;
+    expect(text).toContain('opens at G1');
+    expect(text).toContain('Depth');
+  });
+
+  it('at grade 0 aerial and seismic stay open and carry no lock text', () => {
+    const { panel } = makePanel();
+    panel.update(gradedState(0));
+    for (const m of ['aerial', 'seismic']) {
+      const card = method(panel, m);
+      expect(card.getAttribute('data-locked')).not.toBe('true');
+      expect(card.getAttribute('aria-disabled')).not.toBe('true');
+      expect(card.textContent).not.toContain('opens at');
+    }
+  });
+
+  it('clicking the locked card does not select it', () => {
+    const { panel } = makePanel();
+    panel.update(gradedState(0));
+    method(panel, 'core_sample').click();
+    expect(method(panel, 'core_sample').classList.contains('selected')).toBe(false);
+  });
+
+  it('clicking the locked card does not arm the target pick or send a survey', () => {
+    const { panel } = makePanel();
+    const { kit, controller } = makeKit();
+    const gameConsole = vi.fn(() => ({ success: true, output: 'ok' }));
+    panel.setGameConsole(gameConsole as never);
+    panel.setPlacementKit(kit);
+    panel.update(gradedState(0));
+    method(panel, 'core_sample').click();
+    expect(controller.arm).not.toHaveBeenCalled();
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  it('clicking the locked card leaves the previously selected method selected', () => {
+    const { panel } = makePanel();
+    panel.update(gradedState(0));
+    method(panel, 'aerial').click();
+    method(panel, 'core_sample').click();
+    expect(method(panel, 'aerial').classList.contains('selected')).toBe(true);
+    expect(method(panel, 'core_sample').classList.contains('selected')).toBe(false);
+  });
+
+  it('an open card at grade 0 still arms the pick when clicked', () => {
+    const { panel } = makePanel();
+    const { kit, controller } = makeKit();
+    panel.setPlacementKit(kit);
+    panel.update(gradedState(0));
+    method(panel, 'seismic').click();
+    expect(controller.arm).toHaveBeenCalledTimes(1);
+  });
+
+  it('at grade 1 the core sample card is enabled and selectable', () => {
+    const { panel } = makePanel();
+    const { kit, controller } = makeKit();
+    panel.setPlacementKit(kit);
+    panel.update(gradedState(1));
+    const card = method(panel, 'core_sample');
+    expect(card.getAttribute('data-locked')).not.toBe('true');
+    expect(card.getAttribute('aria-disabled')).not.toBe('true');
+    expect(card.textContent).not.toContain('opens at');
+    card.click();
+    expect(controller.arm).toHaveBeenCalledTimes(1);
+    expect(method(panel, 'core_sample').classList.contains('selected')).toBe(true);
+  });
+
+  it('a site with no grade locks nothing', () => {
+    const { panel } = makePanel();
+    panel.update(gradedState(undefined));
+    for (const m of ['aerial', 'seismic', 'core_sample']) {
+      expect(method(panel, m).getAttribute('data-locked')).not.toBe('true');
+      expect(method(panel, m).getAttribute('aria-disabled')).not.toBe('true');
+    }
+  });
+
+  it('the lock follows the grade across updates of the same panel', () => {
+    const { panel } = makePanel();
+    panel.update(gradedState(0));
+    expect(method(panel, 'core_sample').getAttribute('data-locked')).toBe('true');
+    panel.update(gradedState(1));
+    expect(method(panel, 'core_sample').getAttribute('data-locked')).not.toBe('true');
+    expect(method(panel, 'core_sample').textContent).not.toContain('opens at');
+  });
+
+  it('a locked card is still one of the three method cards', () => {
+    const { panel } = makePanel();
+    panel.update(gradedState(0));
+    expect(panel.root.querySelectorAll('[data-method]').length).toBe(3);
+  });
+
+  describe('depth shown per card follows the grade', () => {
+    it('grade 0: aerial 2 m, seismic 8 m', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(0));
+      expect(method(panel, 'aerial').textContent).toContain('2 m deep');
+      expect(method(panel, 'seismic').textContent).toContain('8 m deep');
+      expect(method(panel, 'seismic').textContent).not.toContain('25 m deep');
+    });
+
+    it('grade 1: aerial 2 m, seismic 25 m, core sample 40 m', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(1));
+      expect(method(panel, 'aerial').textContent).toContain('2 m deep');
+      expect(method(panel, 'seismic').textContent).toContain('25 m deep');
+      expect(method(panel, 'core_sample').textContent).toContain('40 m deep');
+    });
+
+    it('no grade: full depths on every card', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(undefined));
+      expect(method(panel, 'aerial').textContent).toContain('2 m deep');
+      expect(method(panel, 'seismic').textContent).toContain('25 m deep');
+      expect(method(panel, 'core_sample').textContent).toContain('40 m deep');
+    });
+
+    it('the seismic depth grows when the grade does, on the same panel', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(0));
+      expect(method(panel, 'seismic').textContent).toContain('8 m deep');
+      panel.update(gradedState(1));
+      expect(method(panel, 'seismic').textContent).toContain('25 m deep');
     });
   });
 });

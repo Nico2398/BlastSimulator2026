@@ -39,6 +39,8 @@ import { computeRampCost } from '../../../src/core/mining/Ramp.js';
 import { RAMP_DEFAULT_WIDTH, BLAST_PREVIEW_SHAPE } from '../../../src/core/config/balance.js';
 import { createRunner } from '../../../src/console/createRunner.js';
 import { fundForDeliveryWait } from '../../helpers/playthrough.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
+import { VoxelGrid, computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
 /** Cost per metre of a default-width ramp. */
 const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
 
@@ -2523,5 +2525,111 @@ describe('tubeOnDrillCommand (#2269)', () => {
     expect(state.drillHoles.length).toBeGreaterThan(0);
     for (const h of state.drillHoles) expect(state.tubingState.installedHoles.has(h.id)).toBe(true);
     expect(state.tubingState.inventory).toBe(stockBefore - state.drillHoles.length);
+  });
+});
+
+// ── survey: method gate by mine grade (#2279) ────────────────────────────────
+
+describe('surveyCommand — grade-gated methods (#2279)', () => {
+  function gradedContext(grade: number | undefined): MiningContext {
+    const ctx = makeMiningContext();
+    const { employee } = hireEmployee(ctx.state!.employees, 'surveyor', new Random(42));
+    assignSkill(ctx.state!.employees, employee.id, 'geology', 1);
+    ctx.state!.cash = 20_000;
+    if (grade !== undefined) ctx.state!.grade = { ...createGradeState(), grade };
+    return ctx;
+  }
+  const surveyActions = (ctx: MiningContext) => ctx.state!.pendingActions.filter(a => a.type === 'survey');
+
+  it('refuses core_sample at grade 0 on a progression site, naming the grade that opens it', () => {
+    const ctx = gradedContext(0);
+    const result = surveyCommand(ctx, ['core_sample'], { x: '16', z: '16' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Depth');
+  });
+
+  it('a refused core_sample is not queued and costs nothing', () => {
+    const ctx = gradedContext(0);
+    const cash = ctx.state!.cash;
+    surveyCommand(ctx, ['core_sample'], { x: '16', z: '16' });
+    expect(ctx.state!.cash).toBe(cash);
+    expect(surveyActions(ctx)).toHaveLength(0);
+  });
+
+  it.each(['aerial', 'seismic'])('allows %s at grade 0', (method) => {
+    const ctx = gradedContext(0);
+    const result = surveyCommand(ctx, [method], { x: '16', z: '16' });
+    expect(result.success, result.output).toBe(true);
+    expect(surveyActions(ctx)).toHaveLength(1);
+  });
+
+  it('allows core_sample at grade 1', () => {
+    const ctx = gradedContext(1);
+    const result = surveyCommand(ctx, ['core_sample'], { x: '16', z: '16' });
+    expect(result.success, result.output).toBe(true);
+    expect(surveyActions(ctx)).toHaveLength(1);
+  });
+
+  it('allows core_sample on a non-progression site (no grade)', () => {
+    const ctx = gradedContext(undefined);
+    const result = surveyCommand(ctx, ['core_sample'], { x: '16', z: '16' });
+    expect(result.success, result.output).toBe(true);
+  });
+
+  it('refuses through the console runner on a sandbox site that starts at grade 0', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('sandbox start biome:desert_badlands seed:42 grade:0').success).toBe(true);
+    const { employee } = hireEmployee(ctx.state!.employees, 'surveyor', new Random(42));
+    assignSkill(ctx.state!.employees, employee.id, 'geology', 1);
+    ctx.state!.cash = 20_000;
+    const cash = ctx.state!.cash;
+    const res = runner.run('survey core_sample x:16 z:16');
+    expect(res.success).toBe(false);
+    expect(res.output).toContain('Depth');
+    expect(ctx.state!.cash).toBe(cash);
+  });
+
+  describe('completion passes the site grade', () => {
+    /** Gold in every layer of the survey column, 45 m down, so any depth cap shows in the profile. */
+    function floodColumn(ctx: MiningContext, x: number, z: number): void {
+      const grid = ctx.grid as VoxelGrid;
+      const top = computeVoxelColumnSurfaceY(grid, x, z)!;
+      for (let d = 0; d < 45; d++) {
+        grid.setVoxel(x, top - d, z, {
+          composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
+          density: 1,
+          oreDensities: { gold: 1.0 },
+          fractureModifier: 1.0,
+        });
+      }
+    }
+    function surveyToCompletion(grade: number | undefined) {
+      const ctx = gradedContext(grade);
+      floodColumn(ctx, 16, 16);
+      const surveyor = ctx.state!.employees.employees[0]!;
+      surveyor.x = 16; surveyor.z = 16;
+      const res = surveyCommand(ctx, ['seismic'], { x: '16', z: '16' });
+      expect(res.success, res.output).toBe(true);
+      for (let i = 0; i < 600 && ctx.state!.surveyResults.length === 0; i++) {
+        for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
+        tickCommand(ctx, ['1'], {});
+      }
+      expect(ctx.state!.surveyResults).toHaveLength(1);
+      return ctx.state!.surveyResults[0]!;
+    }
+    const deepest = (r: ReturnType<typeof surveyToCompletion>) =>
+      Math.max(...(r.depthProfile?.['16,16'] ?? []).map(b => b.toM));
+
+    it('a seismic survey completed at grade 0 stops at the 8 m surface depth', () => {
+      expect(deepest(surveyToCompletion(0))).toBe(8);
+    });
+
+    it('a seismic survey completed at grade 1 reads the full 25 m', () => {
+      expect(deepest(surveyToCompletion(1))).toBe(25);
+    });
+
+    it('a seismic survey on a non-progression site reads the full 25 m', () => {
+      expect(deepest(surveyToCompletion(undefined))).toBe(25);
+    });
   });
 });
