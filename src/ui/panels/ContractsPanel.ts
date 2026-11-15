@@ -32,7 +32,7 @@ import { AUTO_SALE_PRICE_FACTOR } from '../../core/config/balance.js';
 import { autoFulfilmentEnabled, resolveContractOres } from '../../core/campaign/Level.js';
 import { getProfitShortfall } from '../../core/campaign/LevelObjective.js';
 import { getOre } from '../../core/world/OreCatalog.js';
-import { makeBuyerBadge, makeMarketStrip, type MarketStripInput } from './ContractsMarketStrip.js';
+import { lockedBuyerTiers, makeBuyerBadge, makeMarketStrip, type MarketStripInput } from './ContractsMarketStrip.js';
 import { saturationReader } from '../../core/economy/OreSaturation.js';
 import { oreContractBasePrice } from '../../core/economy/Market.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -411,7 +411,8 @@ export class ContractsPanel extends PanelBase {
 
   private makeMarketSection(state: GameState, ores: readonly string[]): HTMLElement | null {
     const input = this.marketInput(state, ores);
-    return input && ores.length > 0 ? makeMarketStrip(input) : null;
+    // A grade with no yielded ore of its own still shows the strip: its locked buyer row stays (#2278).
+    return input && (ores.length > 0 || lockedBuyerTiers(input.grade).length > 0) ? makeMarketStrip(input) : null;
   }
 
   private makeStorageStrip(state: GameState): HTMLElement {

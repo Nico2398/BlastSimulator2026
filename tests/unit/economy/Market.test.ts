@@ -176,15 +176,11 @@ describe('Shareholder Summit contract prices (#2117)', () => {
 
 import { autoSalePricePerKg } from '../../../src/core/economy/Market.js';
 import { saturationFactor } from '../../../src/core/economy/OreSaturation.js';
-import { AUTO_SALE_PRICE_FACTOR, AUTO_SALE_DWELL_TICKS } from '../../../src/core/config/balance.js';
+import { AUTO_SALE_PRICE_FACTOR } from '../../../src/core/config/balance.js';
 
 describe('auto sale constants (#2145)', () => {
   it('pays 0.6 of the market value', () => {
     expect(AUTO_SALE_PRICE_FACTOR).toBe(0.6);
-  });
-
-  it('waits 20 ticks', () => {
-    expect(AUTO_SALE_DWELL_TICKS).toBe(20);
   });
 });
 

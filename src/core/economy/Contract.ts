@@ -98,8 +98,6 @@ export interface ContractState {
   autoSell?: boolean;
   /** Automatic acceptance of paying rubble clearances; absent = the level's default (#2145). */
   autoClearRubble?: boolean;
-  /** Unused since #2278 (automatic sale has no dwell); removed once the old tests that name it are re-premised. */
-  autoSaleSince?: Record<string, number>;
 }
 
 export function createContractState(): ContractState {
