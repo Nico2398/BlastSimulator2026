@@ -511,6 +511,7 @@ import {
   SANDBOX_STARTING_CASH,
   SANDBOX_RUGGEDNESS_ROLLING_PV,
   SANDBOX_RUGGEDNESS_STEEP_PV,
+  ORE_G0_LAYER_DEPTH_M,
 } from '../../../src/core/config/balance.js';
 
 describe('sandboxBiomeTraits (#1686)', () => {
@@ -551,6 +552,38 @@ describe('sandboxBiomeTraits (#1686)', () => {
         expect(o.nameKey).toBe(def.nameKey);
         expect([o.depthMin, o.depthMax]).toEqual(sandboxOreWindow(def));
       }
+    }
+  });
+
+  it('C8 lists only G0 and G1 ores, and both grades, in every biome (#2281)', () => {
+    for (const b of getAllBiomes()) {
+      const ids = sandboxBiomeTraits(b.id).ores.map(o => o.oreId);
+      expect(ids, b.id).toEqual(['dirtite', 'rustite', 'blingite', 'gloomium', 'sparkium']);
+      for (const id of ids) expect([0, 1], `${b.id}/${id}`).toContain(getOre(id)!.permitGrade);
+      for (const id of ['craktonite', 'absurdium', 'treranium']) expect(ids, b.id).not.toContain(id);
+    }
+  });
+
+  it('C8 depth windows sit inside their grade band: G0 within the top layer, G1 from it down (#2281)', () => {
+    for (const b of getAllBiomes()) {
+      for (const o of sandboxBiomeTraits(b.id).ores) {
+        if (getOre(o.oreId)!.permitGrade === 0) {
+          expect(o.depthMin, `${b.id}/${o.oreId}`).toBeGreaterThanOrEqual(0);
+          expect(o.depthMax, `${b.id}/${o.oreId}`).toBeLessThanOrEqual(ORE_G0_LAYER_DEPTH_M);
+        } else {
+          expect(o.depthMin, `${b.id}/${o.oreId}`).toBeGreaterThanOrEqual(ORE_G0_LAYER_DEPTH_M);
+          expect(o.depthMax, `${b.id}/${o.oreId}`).toBeGreaterThan(o.depthMin);
+        }
+      }
+    }
+  });
+
+  it('C8 the aggregate ore depth runs from the surface to the deepest G1 window, in every biome (#2281)', () => {
+    const deepestG1 = Math.max(...['blingite', 'gloomium', 'sparkium'].map(id => getOre(id)!.depthMax));
+    for (const b of getAllBiomes()) {
+      const traits = sandboxBiomeTraits(b.id);
+      expect(traits.oreDepthMin, b.id).toBe(0);
+      expect(traits.oreDepthMax, b.id).toBe(deepestG1);
     }
   });
 

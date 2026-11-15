@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { OreVeinSampler, oreDepthMultiplier } from '../../../src/core/world/OreVeins.js';
 import type { VoxelRockComposition } from '../../../src/core/world/VoxelGrid.js';
 import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
-import { getOre, getAllOres } from '../../../src/core/world/OreCatalog.js';
+import { getOre, getAllOres, orePermitGrade } from '../../../src/core/world/OreCatalog.js';
+import { getAllRocks } from '../../../src/core/world/RockCatalog.js';
 import { ORE_RARITY_TIERS } from '../../helpers/oreRarity.js';
 import { SEEDS, BLOCK, MAX_DEPTH, sampleSite, blockIndexOf, shareBelow, richestDecileOverMedian, argmax, peakBlockByOre, type SiteOre } from '../../helpers/oreSite.js';
-import { ORE_DEPOSIT_RARITY_COVERAGE, ORE_DEPTH_MULTIPLIER_BANDS, ORE_DEPTH_BLEND_M } from '../../../src/core/config/balance.js';
-import { createHash } from 'node:crypto';
+import { ORE_DEPOSIT_RARITY_COVERAGE, ORE_DEPTH_MULTIPLIER_BANDS, ORE_DEPTH_BLEND_M, ORE_G0_LAYER_DEPTH_M } from '../../../src/core/config/balance.js';
 import { createRunner } from '../../../src/console/createRunner.js';
 
 // cruite: dirtite 0.40 (depth 0-10), rustite 0.15 (depth 0-15). No blingite entry at all.
@@ -472,16 +472,24 @@ describe('ore depth multiplier in densitiesAt (#1933)', () => {
     for (const depth of [12, 15, 25, 39]) expect(holds(field(sampler, depth, 2.0)), `d${depth}`).toEqual(ref);
   });
 
-  it('depths 1-9 m (multiplier 1) are untouched: same density as the 5 m reading for ores in both windows', () => {
+  it('depths 1-4 m (multiplier 1) are untouched: same density as the 0 m reading for a G0 ore', () => {
     const sampler = new OreVeinSampler(42, { deposits: true });
     const read = (depth: number) => {
       const out: Array<number | null> = [];
       for (let x = 0; x < 40; x++) for (let z = 0; z < 40; z++) out.push(sampler.densitiesAt(x, 0, z, depth, CRUITE_COMPOSITION, 1.0)['rustite'] ?? null);
       return out;
     };
-    const ref = read(5);
+    const ref = read(0);
     expect(ref.some(d => d !== null)).toBe(true);
-    for (let depth = 1; depth <= 9; depth++) expect(read(depth), `d${depth}`).toEqual(ref);
+    for (let depth = 1; depth <= 4; depth++) expect(read(depth), `d${depth}`).toEqual(ref);
+  });
+
+  it('depths 6-9 m (multiplier 1) are untouched: same density as the 8 m reading for a G1 ore', () => {
+    const sampler = new OreVeinSampler(42, { deposits: true });
+    const read = (depth: number) => field(sampler, depth, 2.0);
+    const ref = read(8);
+    expect(ref.some(d => d !== null)).toBe(true);
+    for (const depth of [6, 7, 9]) expect(read(depth), `d${depth}`).toEqual(ref);
   });
 
   it('deposits off: density does not change with depth (no boost on legacy veins)', () => {
@@ -520,35 +528,244 @@ describe('ore depth multiplier in densitiesAt (#1933)', () => {
   });
 });
 
-describe('sandbox deposits above 10 m are byte-identical to main (#1933)', () => {
-  const ROCKS = ['cruite', 'sandite', 'molite', 'grumpite', 'clunkite', 'stubite', 'obstiite', 'gnarlite', 'absurdite', 'titanite'];
-
-  it('0-10 m densities, every rock, seeds 1 and 42, hash to the value captured on main before #1933', () => {
-    const lines: string[] = [];
-    let ore = 0;
-    for (const seed of [1, 42]) {
-      const sampler = new OreVeinSampler(seed, { deposits: true });
-      for (const rockId of ROCKS) for (let d = 0; d <= 10; d++) for (let x = 0; x < 24; x++) for (let z = 0; z < 24; z++) {
-        const dens = sampler.densitiesAt(x, 0, z, d, { rocks: [{ rockId, coefficient: 1 }] }, 1.0);
-        if (Object.keys(dens).length) ore++;
-        lines.push(JSON.stringify(dens));
-      }
-    }
-    expect(ore).toBe(4836);
-    expect(createHash('sha1').update(lines.join('\n')).digest('hex')).toBe('14cb47364f7c79a699f566b98f98c0d10ecb4cf8');
-  });
-
-  it('a deposit ore reads richer at 30 m than at 5 m in the same column and rock', () => {
+describe('sandbox deposits: depth pays (#1933)', () => {
+  it('a deposit ore reads richer at 30 m than at 6 m in the same column and rock', () => {
     const sampler = new OreVeinSampler(42, { deposits: true });
     const comp: VoxelRockComposition = { rocks: [{ rockId: 'molite', coefficient: 1 }] };
     let both = 0;
     for (let x = 0; x < 60; x++) for (let z = 0; z < 60; z++) {
-      const shallow = sampler.densitiesAt(x, 0, z, 5, comp, 2.0)['blingite'];
+      const shallow = sampler.densitiesAt(x, 0, z, 6, comp, 2.0)['blingite'];
       const deep = sampler.densitiesAt(x, 0, z, 30, comp, 2.0)['blingite'];
       if (shallow === undefined) continue;
       both++;
       expect(deep, `x${x} z${z}`).toBeGreaterThanOrEqual(shallow);
     }
     expect(both).toBeGreaterThan(20);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ore grade layers on a progression site (#2281)
+// ---------------------------------------------------------------------------
+
+describe('ore grade layers on a progression site (#2281)', () => {
+  const G0 = ['dirtite', 'rustite'];
+  const G1 = ['blingite', 'gloomium', 'sparkium'];
+  const G2_G3 = ['craktonite', 'absurdium', 'treranium'];
+  const ROCK_IDS = getAllRocks().map(r => r.id);
+  const ALL_ROCKS_BLEND: VoxelRockComposition = { rocks: ROCK_IDS.map(rockId => ({ rockId, coefficient: 1 / ROCK_IDS.length })) };
+
+  /** Every ore id found over a lattice of columns (step apart) at one depth. */
+  function oresFound(sampler: OreVeinSampler, depth: number, composition: VoxelRockComposition, richness: number, lattice = 30, step = 4): Set<string> {
+    const found = new Set<string>();
+    for (let i = 0; i < lattice; i++) for (let j = 0; j < lattice; j++) {
+      for (const id of Object.keys(sampler.densitiesAt(i * step, 0, j * step, depth, composition, richness))) found.add(id);
+    }
+    return found;
+  }
+  const single = (rockId: string): VoxelRockComposition => ({ rocks: [{ rockId, coefficient: 1 }] });
+
+  describe('C1 G0 only in the top layer, G1 only below it', () => {
+    for (const rockId of ROCK_IDS) {
+      for (const seed of [1, 42]) {
+        it(`${rockId} seed ${seed}: no G1 ore above ${ORE_G0_LAYER_DEPTH_M} m, no G0 ore below it`, () => {
+          const sampler = new OreVeinSampler(seed, { deposits: true });
+          for (const depth of [0, 1, 2, 3, 4]) {
+            const found = oresFound(sampler, depth, single(rockId), 2.0);
+            for (const id of G1) expect(found.has(id), `${id} at ${depth} m`).toBe(false);
+          }
+          for (const depth of [6, 7, 8, 10, 15, 25, 40]) {
+            const found = oresFound(sampler, depth, single(rockId), 2.0);
+            for (const id of G0) expect(found.has(id), `${id} at ${depth} m`).toBe(false);
+          }
+        });
+      }
+    }
+
+    it('the blend of every rock obeys the layers over a finer depth sweep', () => {
+      const sampler = new OreVeinSampler(7, { deposits: true });
+      for (let depth = 0; depth <= 20; depth++) {
+        const found = oresFound(sampler, depth, ALL_ROCKS_BLEND, 3.0, 20, 5);
+        for (const id of found) {
+          const grade = orePermitGrade(id)!;
+          if (depth < ORE_G0_LAYER_DEPTH_M) expect(grade, `${id} at ${depth} m`).toBe(0);
+          if (depth > ORE_G0_LAYER_DEPTH_M) expect(grade, `${id} at ${depth} m`).toBe(1);
+        }
+      }
+    });
+
+    it('the layers are not vacuous: G0 ore is found in the top layer and G1 ore below it', () => {
+      const sampler = new OreVeinSampler(42, { deposits: true });
+      expect(G0.some(id => oresFound(sampler, 3, ALL_ROCKS_BLEND, 2.0).has(id))).toBe(true);
+      expect(G1.some(id => oresFound(sampler, 12, ALL_ROCKS_BLEND, 2.0).has(id))).toBe(true);
+    });
+  });
+
+  describe('C2 no G2 or G3 ore in ordinary ground', () => {
+    for (const rockId of ROCK_IDS) {
+      it(`${rockId}: craktonite, absurdium and treranium never occur at any depth`, () => {
+        const sampler = new OreVeinSampler(42, { deposits: true });
+        for (const depth of [0, 5, 10, 18, 25, 30, 40, 55, 80, 150]) {
+          const found = oresFound(sampler, depth, single(rockId), 3.0);
+          for (const id of G2_G3) expect(found.has(id), `${id} at ${depth} m`).toBe(false);
+        }
+      });
+    }
+
+    it('across seeds, the blend of every rock holds none of them at depth', () => {
+      for (const seed of [1, 7, 42]) {
+        const sampler = new OreVeinSampler(seed, { deposits: true });
+        for (const depth of [20, 30, 45, 60]) {
+          const found = oresFound(sampler, depth, ALL_ROCKS_BLEND, 3.0, 20, 5);
+          for (const id of G2_G3) expect(found.has(id), `seed ${seed}: ${id} at ${depth} m`).toBe(false);
+        }
+      }
+    });
+  });
+
+  describe('C3 every rock holds both grades', () => {
+    for (const rockId of ROCK_IDS) {
+      it(`${rockId}: yields a G0 ore at 3 m and a G1 ore at 12 m over a few seeds`, () => {
+        const g0 = new Set<string>();
+        const g1 = new Set<string>();
+        for (const seed of [1, 7, 42]) {
+          const sampler = new OreVeinSampler(seed, { deposits: true });
+          for (const id of oresFound(sampler, 3, single(rockId), 1.0, 40, 3)) g0.add(id);
+          for (const id of oresFound(sampler, 12, single(rockId), 1.0, 40, 3)) g1.add(id);
+        }
+        expect(G0.some(id => g0.has(id)), 'a G0 ore').toBe(true);
+        expect(G1.some(id => g1.has(id)), 'a G1 ore').toBe(true);
+      });
+    }
+  });
+
+  describe('C4 G1 ores start at their catalog depth and density grows with depth', () => {
+    it('no gloomium above 8 m and no sparkium above 15 m, but both below', () => {
+      const sampler = new OreVeinSampler(42, { deposits: true });
+      for (const depth of [5, 6, 7]) expect(oresFound(sampler, depth, ALL_ROCKS_BLEND, 3.0).has('gloomium'), `gloomium ${depth} m`).toBe(false);
+      for (const depth of [5, 8, 12, 14]) expect(oresFound(sampler, depth, ALL_ROCKS_BLEND, 3.0).has('sparkium'), `sparkium ${depth} m`).toBe(false);
+      expect(oresFound(sampler, 10, ALL_ROCKS_BLEND, 3.0).has('gloomium')).toBe(true);
+      expect(oresFound(sampler, 20, ALL_ROCKS_BLEND, 3.0).has('sparkium')).toBe(true);
+    });
+
+    it('blingite occurs right below the G0 layer', () => {
+      const sampler = new OreVeinSampler(42, { deposits: true });
+      expect(oresFound(sampler, 6, ALL_ROCKS_BLEND, 3.0).has('blingite')).toBe(true);
+    });
+
+    for (const [oreId, shallow, deep] of [['blingite', 6, 25], ['gloomium', 9, 25], ['sparkium', 16, 33]] as const) {
+      it(`${oreId}: the same voxel is never poorer at ${deep} m than at ${shallow} m, and some are richer`, () => {
+        const sampler = new OreVeinSampler(42, { deposits: true });
+        let held = 0, richer = 0;
+        for (let x = 0; x < 60; x++) for (let z = 0; z < 60; z++) {
+          const a = sampler.densitiesAt(x, 0, z, shallow, ALL_ROCKS_BLEND, 2.0)[oreId];
+          const b = sampler.densitiesAt(x, 0, z, deep, ALL_ROCKS_BLEND, 2.0)[oreId];
+          if (a === undefined) continue;
+          held++;
+          expect(b, `x${x} z${z}`).toBeDefined();
+          expect(b!).toBeGreaterThanOrEqual(a);
+          if (b! > a) richer++;
+        }
+        expect(held).toBeGreaterThan(20);
+        expect(richer).toBeGreaterThan(0);
+      });
+    }
+  });
+
+  describe('C6 deposits off: the catalog windows and host rocks apply as before', () => {
+    it('a legacy sampler still holds a G0 ore below 5 m (dirtite to 10 m)', () => {
+      const sampler = new OreVeinSampler(42);
+      expect(oresFound(sampler, 8, single('cruite'), 1.0, 40, 3).has('dirtite')).toBe(true);
+    });
+
+    it('a legacy sampler still holds a G2 ore where the catalog hosts it (gnarlite, craktonite from 18 m)', () => {
+      const sampler = new OreVeinSampler(42);
+      expect(oresFound(sampler, 25, single('gnarlite'), 2.0, 40, 3).has('craktonite')).toBe(true);
+    });
+
+    it('a legacy sampler still holds a G3 ore where the catalog hosts it (titanite, treranium from 32 m)', () => {
+      const sampler = new OreVeinSampler(42);
+      expect(oresFound(sampler, 40, single('titanite'), 2.0, 40, 3).has('treranium')).toBe(true);
+    });
+
+    it('a legacy sampler hosts only what the catalog says: titanite holds no G0 ore', () => {
+      const sampler = new OreVeinSampler(42);
+      const found = oresFound(sampler, 3, single('titanite'), 3.0, 40, 3);
+      for (const id of G0) expect(found.has(id)).toBe(false);
+    });
+
+    it('a legacy sampler holds a G1 ore where the catalog starts it (molite, blingite from 5 m) and none above it', () => {
+      const sampler = new OreVeinSampler(42);
+      expect(oresFound(sampler, 8, single('molite'), 1.0, 40, 3).has('blingite')).toBe(true);
+      expect(oresFound(sampler, 3, single('molite'), 3.0, 40, 3).has('blingite')).toBe(false);
+    });
+  });
+});
+
+describe('ore grade layers over a whole sandbox site, every biome (#2281)', () => {
+  const G0 = ['dirtite', 'rustite'];
+  const G1 = ['blingite', 'gloomium', 'sparkium'];
+  const G2_G3 = ['craktonite', 'absurdium', 'treranium'];
+
+  /** Total kg of the given ores over the depths in [from, to] (sampled depths only). */
+  function kgIn(site: SiteOre, ores: readonly string[], from: number, to: number): number {
+    let total = 0;
+    for (let d = from; d <= to && d < MAX_DEPTH; d++) for (const id of ores) total += site.oreKgByDepth[d]?.[id] ?? 0;
+    return total;
+  }
+
+  for (const biome of getAllBiomes()) {
+    describe(biome.id, () => {
+      for (const seed of SEEDS) {
+        it(`seed ${seed}: C1 no G1 ore above ${ORE_G0_LAYER_DEPTH_M} m and no G0 ore below it`, () => {
+          const site = sampleSite(biome, seed, { oreDeposits: true });
+          expect(kgIn(site, G1, 0, ORE_G0_LAYER_DEPTH_M - 1)).toBe(0);
+          expect(kgIn(site, G0, ORE_G0_LAYER_DEPTH_M + 1, MAX_DEPTH)).toBe(0);
+        });
+
+        it(`seed ${seed}: C2 no G2 or G3 ore at any depth`, () => {
+          const site = sampleSite(biome, seed, { oreDeposits: true });
+          expect(kgIn(site, G2_G3, 0, MAX_DEPTH)).toBe(0);
+        });
+      }
+
+      it('C3 holds G0 ore above the layer and G1 ore below it, over the sampled seeds', () => {
+        let g0 = 0, g1 = 0;
+        for (const seed of SEEDS) {
+          const site = sampleSite(biome, seed, { oreDeposits: true });
+          g0 += kgIn(site, G0, 0, ORE_G0_LAYER_DEPTH_M);
+          g1 += kgIn(site, G1, ORE_G0_LAYER_DEPTH_M, MAX_DEPTH);
+        }
+        expect(g0).toBeGreaterThan(0);
+        expect(g1).toBeGreaterThan(0);
+      });
+
+      it('C4 gloomium only from 8 m and sparkium only from 15 m', () => {
+        for (const seed of SEEDS) {
+          const site = sampleSite(biome, seed, { oreDeposits: true });
+          expect(kgIn(site, ['gloomium'], 0, 7), `seed ${seed} gloomium`).toBe(0);
+          expect(kgIn(site, ['sparkium'], 0, 14), `seed ${seed} sparkium`).toBe(0);
+        }
+      });
+    });
+  }
+
+  it('C4 blingite occurs right below the layer, gloomium and sparkium deeper, somewhere across biomes and seeds', () => {
+    let blingite = 0, gloomium = 0, sparkium = 0;
+    for (const biome of getAllBiomes()) for (const seed of SEEDS) {
+      const site = sampleSite(biome, seed, { oreDeposits: true });
+      blingite += kgIn(site, ['blingite'], ORE_G0_LAYER_DEPTH_M, 9);
+      gloomium += kgIn(site, ['gloomium'], 8, MAX_DEPTH);
+      sparkium += kgIn(site, ['sparkium'], 15, MAX_DEPTH);
+    }
+    expect(blingite).toBeGreaterThan(0);
+    expect(gloomium).toBeGreaterThan(0);
+    expect(sparkium).toBeGreaterThan(0);
+  });
+
+  it('C6 a site with ore deposits off is not banded: it still holds G0 ore below the layer (the helper has teeth)', () => {
+    const desert = getAllBiomes().find(b => b.id === 'desert_badlands')!;
+    const legacy = sampleSite(desert, 42);
+    expect(kgIn(legacy, G0, ORE_G0_LAYER_DEPTH_M + 1, MAX_DEPTH)).toBeGreaterThan(0);
   });
 });
