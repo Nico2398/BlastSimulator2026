@@ -40,7 +40,7 @@ export function markSurveysStaleByBlast(
   const columns = clearedColumns.map(parseColumnKey);
   let marked = 0;
   for (const survey of surveys) {
-    if (isSurveyStale(survey) || survey.method === 'prospection') continue; // an island map outlives every blast
+    if (isSurveyStale(survey)) continue;
     if (columns.some(c => isColumnInSurveyDisc(survey, c.x, c.z))) {
       survey.stale = true;
       marked++;

@@ -1,7 +1,7 @@
 ---
 name: gameplay-survey-system
 description: >
-  Rock composition and survey system for BlastSimulator2026: 3 survey methods (seismic,
+  Rock composition and survey system for BlastSimulator2026: 4 survey methods (seismic,
   core sample, aerial, prospection), estimation algorithm with Gaussian noise and skill scaling,
   and ore grade reporting post-blast. Use when implementing or
   modifying surveys, ore discovery, voxel composition, or post-blast ore yield mechanics.
@@ -13,7 +13,7 @@ Players should not know exactly what ore is in ground — discovery is rewarding
 
 ## Survey Methods
 
-Three tools with different cost/accuracy/coverage tradeoffs:
+Four tools with different cost/accuracy/coverage tradeoffs:
 
 | Method | Tool | i18n Key | Cost ($) | Time (ticks) | Accuracy | Coverage |
 |--------|------|---------|---------|-------------|---------|---------|

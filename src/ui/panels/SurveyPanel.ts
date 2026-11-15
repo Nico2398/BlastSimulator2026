@@ -580,7 +580,9 @@ export class SurveyPanel extends PanelBase {
         el('span', { text: t('ui.survey.island_at', { x: island.x, z: island.z, radius: island.radius }), className: 'bsx-mono', attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' } }),
       );
       row.appendChild(makeLocateButton({ title: t('ui.survey.locate'), size: 22, onClick: () => focusCameraOn(island.x, island.z) }));
-      row.addEventListener('click', () => focusCameraOn(island.x, island.z));
+      row.addEventListener('click', e => {
+        if (!(e.target as Element).closest('button')) focusCameraOn(island.x, island.z);
+      });
       list.appendChild(row);
     }
     return list;
