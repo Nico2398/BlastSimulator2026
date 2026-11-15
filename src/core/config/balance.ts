@@ -2311,6 +2311,9 @@ export const SURVEY_SURFACE_BAND_M = 5;
 /** Methods that read below the G0 band, so a surface-grade survey stops at the band edge plus one seismic group (#2279). */
 export const SURVEY_SURFACE_CAPPED_METHODS = ['seismic', 'core_sample'] as const;
 
+/** First mine grade at which depth methods read their full window; below it they stop at the surface band (#2279). */
+export const SURVEY_FULL_DEPTH_GRADE = 1;
+
 /** Voxels of partial-density rock that cap a column's top solid voxel (the survey anchor). */
 export const SURVEY_CAP_VOXELS = 1;
 
