@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { freshSites } from '../../../scripts/shared/probe-strategies.js';
+import { LADDER_SITE_ORE_FLOOR } from '../../../scripts/shared/probe-ladder-policy.js';
 
 const SIZE = 40;
 const SPAN = 4;
@@ -135,18 +136,36 @@ describe('freshSites', () => {
   });
 });
 
+/** The probe's reference shot footprint (3x3 holes 4 m apart); the site floors are quoted at this span. */
+const REF_SPAN = 8;
+
+/** A square ore patch of `side` columns from `lo`, `depth` layers of density `density` at the surface; the rest barren rock. */
+function gridWithSquare(lo: number, side: number, depth: number, density: number): VoxelGrid {
+  const grid = new VoxelGrid(SIZE, SIZE);
+  for (let x = 0; x < SIZE; x++) {
+    for (let z = 0; z < SIZE; z++) {
+      for (let y = 0; y < GROUND_TOP; y++) {
+        const ore = y >= GROUND_TOP - depth && x >= lo && x < lo + side && z >= lo && z < lo + side ? { cruite_ore: density } : undefined;
+        grid.fillVoxel(x, y, z, 1, ore);
+      }
+    }
+  }
+  return grid;
+}
+
 describe('freshSites minOre (#2126)', () => {
-  /** A site whose whole footprint lies on the patch: (SPAN + 1)^2 columns, DEPTH layers of ore density 1. */
-  const FULL_PATCH_ORE = (SPAN + 1) ** 2 * DEPTH;
+  /** A reference-span site whose whole footprint lies on the patch: (REF_SPAN + 1)^2 columns, DEPTH layers of ore density 1. */
+  const FULL_PATCH_ORE = (REF_SPAN + 1) ** 2 * DEPTH;
+  const patch = (): VoxelGrid => gridWithSquare(8, REF_SPAN + 1, DEPTH, 1);
 
   it('keeps only the sites holding at least minOre', () => {
-    const sites = freshSites(gridWithPatch(true), SPAN, DEPTH, [], { protectedZones: [], minOre: FULL_PATCH_ORE });
-    expect(sites.map(c => [c.x, c.z])).toEqual([[PATCH.lo, PATCH.lo]]);
+    const sites = freshSites(patch(), REF_SPAN, DEPTH, [], { protectedZones: [], minOre: FULL_PATCH_ORE });
+    expect(sites.map(c => [c.x, c.z])).toEqual([[8, 8]]);
   });
 
   it('never returns a site under the floor, even when that leaves none', () => {
     expect(freshSites(gridWithPatch(false), SPAN, DEPTH, [], { protectedZones: [], minOre: 1 })).toEqual([]);
-    expect(freshSites(gridWithPatch(true), SPAN, DEPTH, [], { protectedZones: [], minOre: FULL_PATCH_ORE + 1 })).toEqual([]);
+    expect(freshSites(patch(), REF_SPAN, DEPTH, [], { protectedZones: [], minOre: FULL_PATCH_ORE + 1 })).toEqual([]);
   });
 
   it('changes nothing at a floor of 0: every site holds at least no ore', () => {
@@ -155,3 +174,87 @@ describe('freshSites minOre (#2126)', () => {
   });
 });
 
+describe('freshSites site floors per footprint area (#2298)', () => {
+  const ORE_COLUMN = { x: 10, z: 10 };
+  /** One ore column at ORE_COLUMN holding `total` ore summed over `depth` layers. */
+  const oneColumn = (total: number, depth: number): VoxelGrid => {
+    const grid = new VoxelGrid(SIZE, SIZE);
+    for (let x = 0; x < SIZE; x++) {
+      for (let z = 0; z < SIZE; z++) {
+        for (let y = 0; y < GROUND_TOP; y++) {
+          const ore = y >= GROUND_TOP - depth && x === ORE_COLUMN.x && z === ORE_COLUMN.z ? { cruite_ore: total / depth } : undefined;
+          grid.fillVoxel(x, y, z, 1, ore);
+        }
+      }
+    }
+    return grid;
+  };
+  const holdsColumn = (span: number) => (c: { x: number; z: number }): boolean =>
+    c.x <= ORE_COLUMN.x && c.x + span >= ORE_COLUMN.x && c.z <= ORE_COLUMN.z && c.z + span >= ORE_COLUMN.z;
+
+  it('finds a site for a 1x1 shot on a single ore column holding under the reference floor', () => {
+    const sites = freshSites(oneColumn(0.9, 3), 0, 3, [], { protectedZones: [], minOre: LADDER_SITE_ORE_FLOOR });
+    expect(sites.map(c => [c.x, c.z])).toEqual([[ORE_COLUMN.x, ORE_COLUMN.z]]);
+  });
+
+  it('finds that site with the site floor alone, no minOre', () => {
+    const sites = freshSites(oneColumn(0.9, 3), 0, 3, [], { protectedZones: [] });
+    expect(sites.map(c => [c.x, c.z])).toEqual([[ORE_COLUMN.x, ORE_COLUMN.z]]);
+  });
+
+  it('scales minOre by footprint area: a floor quoted at the reference span is 81 times lower for a 1x1 shot', () => {
+    const ref = (REF_SPAN + 1) ** 2;
+    const grid = oneColumn(1.5, 3);
+    expect(freshSites(grid, 0, 3, [], { protectedZones: [], minOre: ref }).length).toBe(1);
+    expect(freshSites(oneColumn(0.5, 3), 0, 3, [], { protectedZones: [], minOre: ref })).toEqual([]);
+  });
+
+  it('scales the site floor: ore far under the reference floor, but over its per-area share, is kept', () => {
+    expect(freshSites(oneColumn(0.02, 1), 0, 1, [], { protectedZones: [] }).length).toBe(1);
+  });
+
+  it('still drops a 1x1 site holding under the scaled floor while ore remains elsewhere', () => {
+    expect(freshSites(oneColumn(0.003, 1), 0, 1, [], { protectedZones: [] })).toEqual([]);
+  });
+
+  it('drops 1x1 sites holding exactly no ore while ore remains elsewhere', () => {
+    const sites = freshSites(oneColumn(0.9, 3), 0, 3, [], { protectedZones: [] });
+    expect(sites.length).toBeGreaterThan(0);
+    expect(sites.every(holdsColumn(0))).toBe(true);
+  });
+
+  it('keeps every 1x1 site when the whole ground is barren', () => {
+    const grid = oneColumn(0, 3);
+    const sites = freshSites(grid, 0, 3, [], { protectedZones: [] });
+    expect(sites.length).toBe(freshSites(grid, 0, 3, []).length);
+    expect(sites.length).toBeGreaterThan(1);
+  });
+
+  it('keeps the floor at its reference value at the reference span: a site under it is dropped', () => {
+    const grid = oneColumn(0.5, 3);
+    const plain = freshSites(grid, REF_SPAN, 3, []);
+    expect(plain.some(holdsColumn(REF_SPAN))).toBe(true);
+    expect(freshSites(grid, REF_SPAN, 3, [], { protectedZones: [] })).toEqual([]);
+  });
+
+  it('keeps a reference-span site holding at least the reference floor', () => {
+    const sites = freshSites(oneColumn(1.5, 3), REF_SPAN, 3, [], { protectedZones: [] });
+    expect(sites.length).toBeGreaterThan(0);
+    expect(sites.every(holdsColumn(REF_SPAN))).toBe(true);
+  });
+
+  it('never raises the floor above its reference value for a span larger than the reference', () => {
+    const big = REF_SPAN + 4;
+    // (13 / 9)^2 is about 2.1: a floor scaled up by area would drop 1.5 ore, the capped reference floor of 1 keeps it.
+    const sites = freshSites(oneColumn(1.5, 3), big, 3, [], { protectedZones: [] });
+    expect(sites.length).toBeGreaterThan(0);
+    expect(sites.every(holdsColumn(big))).toBe(true);
+  });
+
+  it('never raises minOre above its reference value for a span larger than the reference', () => {
+    const big = REF_SPAN + 4;
+    const sites = freshSites(oneColumn(1.5, 3), big, 3, [], { protectedZones: [], minOre: 1 });
+    expect(sites.length).toBeGreaterThan(0);
+    expect(sites.every(holdsColumn(big))).toBe(true);
+  });
+});
