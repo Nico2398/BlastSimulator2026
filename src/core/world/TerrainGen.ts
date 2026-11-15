@@ -12,7 +12,8 @@ import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } fro
 import { WorldNoiseFields } from './NoiseFields.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
 import { OreVeinSampler } from './OreVeins.js';
-import type { OreIslands } from './OreIslands.js';
+import { OreIslands } from './OreIslands.js';
+import { buildProtectedStructures, rectTouchesProtectedStructure, type ProtectedStructures } from './Structures.js';
 import { pickStarterDeposit, starterPocketAt, type StarterDeposit } from './StarterDeposit.js';
 
 /**
@@ -278,7 +279,14 @@ function computeTerrainContext(config: TerrainConfig): TerrainContext {
     ? buildMixedHardnessStrata(biome.dominantRocks)
     : buildStrataProfile(biome.dominantRocks);
   const strata = new StrataSampler(seed, profile);
-  const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true, ...(oreGradeScale !== undefined ? { gradeScale: oreGradeScale } : {}) });
+  let protectedStructures: ProtectedStructures | null = null;
+  const oreIslands = oreDeposits === true
+    ? new OreIslands(seed, { x: sizeX / 2, z: sizeZ / 2 }, (rect) => {
+      protectedStructures ??= buildProtectedStructures(seed, worldGen.fields, worldGen.shapingAt, worldGen.playableRect);
+      return rectTouchesProtectedStructure(protectedStructures, rect);
+    })
+    : null;
+  const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true, ...(oreIslands ? { islands: oreIslands } : {}), ...(oreGradeScale !== undefined ? { gradeScale: oreGradeScale } : {}) });
 
   const starterDeposit = pickStarterDeposit(config, worldGen);
   Object.freeze(worldGen.playableRect);
@@ -288,7 +296,7 @@ function computeTerrainContext(config: TerrainConfig): TerrainContext {
     strata,
     oreVeins,
     starterDeposit: starterDeposit ? Object.freeze(starterDeposit) : null,
-    oreIslands: null,
+    oreIslands,
   });
 }
 

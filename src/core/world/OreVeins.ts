@@ -109,9 +109,11 @@ interface OreVeinOptions {
 export class OreVeinSampler {
   private readonly fields = new Map<string, OreField>();
   private readonly gradeScale: number;
+  private readonly islands: OreIslands | undefined;
 
   constructor(seed: number, options: OreVeinOptions = {}) {
     this.gradeScale = options.gradeScale ?? ORE_GRADE_SCALE_DEFAULT;
+    this.islands = options.islands;
     for (const ore of getAllOres()) {
       const rng = new Random(subSeed(seed, `ore:${ore.id}`));
       const noise = createNoise3D(() => rng.next());
@@ -159,6 +161,12 @@ export class OreVeinSampler {
           const stored = field.deposit ? depthGraded(rounded, depth) : rounded;
           result[ore.id] = this.gradeScale === ORE_GRADE_SCALE_DEFAULT ? stored : stored * this.gradeScale;
         }
+      }
+    }
+
+    if (this.islands) {
+      for (const [oreId, density] of Object.entries(this.islands.densitiesAt(x, z, depth))) {
+        result[oreId] = this.gradeScale === ORE_GRADE_SCALE_DEFAULT ? density : density * this.gradeScale;
       }
     }
 
