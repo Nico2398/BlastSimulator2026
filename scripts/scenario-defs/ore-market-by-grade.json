@@ -161,11 +161,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+          "selector": "[data-action=\"preflight-detonate\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+          "selector": "[data-action=\"preflight-detonate\"]"
         }
       ],
       "description": "G0 blast: arm the sequence; the crew evacuates the pattern before it fires, so nobody is lost.",
@@ -505,11 +505,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+          "selector": "[data-action=\"preflight-detonate\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+          "selector": "[data-action=\"preflight-detonate\"]"
         }
       ],
       "description": "G1 blast: arm the sequence; the crew evacuates the pattern before it fires, so nobody is lost.",
