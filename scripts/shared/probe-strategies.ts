@@ -432,8 +432,6 @@ export interface FreshSiteRules {
   forbiddenZones?: readonly ProtectedZone[];
   /** Least ore (summed voxel densities, as `rankDeposits` counts it) a site must hold to be shot at all; none when unset. */
   minOre?: number;
-  /** Hold the ore floors at their reference-footprint value whatever the shot's span (`footprintOreScale`); scaled by area when unset. */
-  referenceFloors?: boolean;
 }
 
 /**
@@ -469,7 +467,7 @@ function ruledSites(
   grid: VoxelGrid, span: number, depth: number, earlier: readonly (Pattern & { span?: number })[], rules?: FreshSiteRules,
   allowed: (c: Pattern) => boolean = () => true,
 ): Pattern[] {
-  const areaScale = rules?.referenceFloors === true ? 1 : footprintOreScale(span);
+  const areaScale = footprintOreScale(span);
   const free = rankDeposits(grid, span, depth)
     .filter(c => allowed(c) && c.ore >= (rules?.minOre ?? -Infinity) * areaScale
       && !earlier.some(o => overlapsShot({ ...c, span }, o, earlier.length > 0 ? BERM_GAP : 0)));
@@ -1399,14 +1397,10 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
       m.holeCapM = depth;
       // A pit to bench instead makes the buildings a hard limit for a fresh site, not a last resort.
       const benchFailedRecently = m.benchFailedTick !== undefined && s.state.tickCount - m.benchFailedTick < LADDER_BENCH_RETRY_TICKS;
-      // A campaign level keeps the reference floors: its competent run wins on the first blast's ore, and the one-hole
-      // shots the scaled floor admits bleed its payroll into bankruptcy (shareholder summit).
-      // TODO(#2301): drop referenceFloors once the summit competent test passes without it.
-      const referenceFloors = !sandboxRun(s);
       const benchInstead = !deepen && !depthOpen && crater !== undefined && !benchFailedRecently;
       const rules = benchInstead
-        ? { protectedZones: [], forbiddenZones: [...rampZones, ...buildingZones], referenceFloors }
-        : { protectedZones: buildingZones, forbiddenZones: [...rampZones, ...buildingGround], referenceFloors };
+        ? { protectedZones: [], forbiddenZones: [...rampZones, ...buildingZones] }
+        : { protectedZones: buildingZones, forbiddenZones: [...rampZones, ...buildingGround] };
       tryOnce(s, m, 'shot', () => {
         for (const step of LADDER_SHRINK_STEPS) {
           const n = Math.max(1, Math.round(side * step));
