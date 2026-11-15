@@ -450,6 +450,15 @@ export function freshSites(
 }
 
 /**
+ * Ore floors are set for the reference shot's footprint; a smaller shot sums ore over fewer columns (a 1x1 shot, one),
+ * so its floor shrinks with its area. At the full floor, the tier-0 ladder's one-hole shot found no site after its first
+ * blast and went bankrupt on seed 42 (#2298). Never above 1: a wider shot keeps the reference floor.
+ */
+function footprintOreScale(span: number): number {
+  return Math.min(1, ((span + 1) / (SHOT_SPAN + 1)) ** 2);
+}
+
+/**
  * Free sites the rules keep, richest first. `allowed` drops a site before the richest is weighed: measured against a
  * best site under a ramp, every site a shot may take read as too poor, and the seed-42 full-kit ladder fired nothing
  * from t5800 on, 9.5 t of ore short of grade 3.
@@ -458,13 +467,14 @@ function ruledSites(
   grid: VoxelGrid, span: number, depth: number, earlier: readonly (Pattern & { span?: number })[], rules?: FreshSiteRules,
   allowed: (c: Pattern) => boolean = () => true,
 ): Pattern[] {
+  const areaScale = footprintOreScale(span);
   const free = rankDeposits(grid, span, depth)
-    .filter(c => allowed(c) && c.ore >= (rules?.minOre ?? -Infinity)
+    .filter(c => allowed(c) && c.ore >= (rules?.minOre ?? -Infinity) * areaScale
       && !earlier.some(o => overlapsShot({ ...c, span }, o, earlier.length > 0 ? BERM_GAP : 0)));
   if (!rules) return free;
   const groundOreKgRemaining = free.reduce((sum, c) => sum + c.ore, 0);
   const floored = free.filter(c => decideFreshShotSite({
-    oreKgUnderSite: c.ore, siteOreKgFloor: LADDER_SITE_ORE_FLOOR, groundOreKgRemaining,
+    oreKgUnderSite: c.ore, siteOreKgFloor: LADDER_SITE_ORE_FLOOR * areaScale, groundOreKgRemaining,
   }) === 'fire');
   // Buildings are shot over only when no other site is left: weighed against the richest site by the warehouses, the
   // sites clear of them read as too poor and a shot took two warehouses and their ore.
