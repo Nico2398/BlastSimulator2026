@@ -578,6 +578,12 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
     for (const ore of offered) expect(DESERT_ORES).toContain(ore);
   });
 
+  it('a grade 1 sandbox site offers every G1 ore its layers hold, whatever the catalog hosts in its rocks (#2281)', () => {
+    const { ctx } = start('sandbox start biome:volcanic_flats kit:digger seed:42');
+    ctx.state!.grade = { ...ctx.state!.grade!, grade: 1 };
+    expect(resolveContractOres(ctx.state!)).toEqual(['blingite', 'gloomium', 'sparkium']);
+  });
+
   it('starting the same site twice rebuilds identical voxels', () => {
     const a = start('sandbox start biome:desert_badlands kit:digger seed:29');
     const b = start('sandbox start biome:desert_badlands kit:digger seed:29');

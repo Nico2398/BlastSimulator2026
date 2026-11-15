@@ -14,6 +14,7 @@ import { getBiome } from '../world/BiomeCatalog.js';
 import { siteRockIds } from '../world/Strata.js';
 import { resolveGeneratedBiome } from '../world/TerrainGen.js';
 import { oresYieldedByRocks } from '../world/RockCatalog.js';
+import { sandboxOresYieldedByRocks } from '../world/SandboxDeepOre.js';
 
 // ── Types ──
 
@@ -365,7 +366,9 @@ function siteYieldedOres(state: GameState): readonly string[] {
     ? [level.terrainSeed, level.climateBias] as const
     : [state.seed, world.climateBias ?? declared.climateCenter] as const;
   const generated = resolveGeneratedBiome(seed, world.baseSizeX, world.baseSizeZ, climateBias);
-  return oresYieldedByRocks(siteRockIds(generated.dominantRocks, world.mixedRockHardness ?? false));
+  // A site with ore deposits holds the ores its layers hold (#2281), so offers ask for ore the pit can give.
+  const yields = world.oreDeposits === true ? sandboxOresYieldedByRocks : oresYieldedByRocks;
+  return yields(siteRockIds(generated.dominantRocks, world.mixedRockHardness ?? false));
 }
 
 /**

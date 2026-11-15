@@ -47,7 +47,7 @@
           "type": "waitForProperty",
           "selector": "#bs-sandbox-biome-ores",
           "property": "textContent",
-          "expectedValue": "Ores: Dirtite, Rustite, Blingite, Gloomium, Sparkium, Craktonite, Absurdium, Treranium (from 0 m down)",
+          "expectedValue": "Ores: Dirtite, Rustite, Blingite, Gloomium, Sparkium (from 0 m down)",
           "timeoutMs": 5000
         },
         {
