@@ -27,7 +27,7 @@ const CROSS_FREQ = 0.10;
 const RICHNESS_WEIGHT = 0.9;
 const DENSITY_GAIN = 4;
 /** Sparse storage cutoff — densities at or below this are dropped, not stored as ~0 entries. */
-const MIN_STORED_DENSITY = 0.05;
+export const MIN_STORED_DENSITY = 0.05;
 
 interface OreField {
   readonly noise: NoiseFunction3D;

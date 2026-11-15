@@ -8,6 +8,7 @@ import {
   ORE_ISLAND_MIN_DISTANCE_M, ORE_ISLAND_ORE_IDS, ORE_ISLAND_RADIUS_MAX_M, ORE_ISLAND_RADIUS_MIN_M,
 } from '../config/balance.js';
 import { cellRand, subSeed } from '../math/Hash.js';
+import { MIN_STORED_DENSITY } from './OreVeins.js';
 import type { Rect } from './WorldGen.js';
 
 /** One island: centre cell, radius in metres, the ores it holds and its distance from spawn. */
@@ -25,8 +26,6 @@ const PAIR_DISC_OFFSET = 0.35;
 /** Share of single-ore islands holding the first ore; the rest of the draw splits second-ore-only and both. */
 const FIRST_ORE_ONLY_SHARE = 0.5;
 const SECOND_ORE_ONLY_SHARE = 0.75;
-/** Stored density below which a column is dropped (matches OreVeins' sparse cutoff). */
-const MIN_DENSITY = 0.05;
 /** Extra clearance around an island's bounding square when asking whether it touches a protected structure. */
 const PROTECTED_CLEARANCE_M = 8;
 
@@ -63,7 +62,7 @@ export class OreIslands {
       if (d >= disc.r) continue;
       const t = 1 - d / disc.r;
       const density = Math.round(ORE_ISLAND_CORE_DENSITY * t * t * (3 - 2 * t) * 100) / 100;
-      if (density <= MIN_DENSITY) continue;
+      if (density <= MIN_STORED_DENSITY) continue;
       result[disc.oreId] = Math.max(result[disc.oreId] ?? 0, density);
     }
     return result;
