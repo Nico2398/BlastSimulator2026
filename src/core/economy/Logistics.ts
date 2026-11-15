@@ -628,3 +628,17 @@ export function concentrateStoredOre(
   }
   return movedKg;
 }
+
+/**
+ * Send all stored stock of `oreId` to the spoil heaps, where it counts as barren rock; its value is lost (#2278).
+ * Moves at most the heaps' total room; fails, changing nothing, with no stock, no room or an unknown ore.
+ */
+export function sendOreToSpoilHeap(
+  _state: LogisticsState,
+  _collectedOre: Record<string, number>,
+  _buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[],
+  _oreId: string,
+  _gradeScale = ORE_GRADE_SCALE_DEFAULT,
+): { success: true; data: { kg: number } } | { success: false; error: string } {
+  throw new Error('not implemented');
+}

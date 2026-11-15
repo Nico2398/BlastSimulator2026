@@ -217,3 +217,21 @@ export function autoAcceptRubbleClearances(contracts: ContractState, rubbleStock
   }
   return accepted;
 }
+
+/** Why a stored ore is or is not selling (#2278). */
+export type OreStockStatus = 'auto_sold' | 'waiting' | 'above_grade';
+
+/** Catalog ores of grades below `grade` — the ones automatic sale covers; none at G0 or without a grade (#2278). */
+export function autoSellOreIds(_grade: number | undefined): string[] {
+  throw new Error('not implemented');
+}
+
+/** Status of a stored ore at the site's `grade`: sold automatically, waiting for a contract, or above the grade (#2278). */
+export function oreStockStatus(_oreId: string, _grade: number | undefined, _autoSellOn: boolean): OreStockStatus {
+  throw new Error('not implemented');
+}
+
+/** What sending `oreId` to the spoil heaps would move (kg: stock capped at heap room) and lose (market value) (#2278). */
+export function spoilOrePreview(_state: GameState, _oreId: string): { kg: number; valueLost: number } {
+  throw new Error('not implemented');
+}
