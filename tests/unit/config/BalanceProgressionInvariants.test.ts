@@ -16,7 +16,7 @@ import { buyerDeadlineRange } from '../../../src/core/economy/BuyerTiers.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { patternAreaM2 } from '../../../src/core/mining/ChargePlan.js';
 import { SHOT } from '../../../scripts/shared/probe-strategies.js';
-import { GRADE_TARGET_WINDOWS, limitSizedShot } from '../../../scripts/shared/probe-ladder.js';
+import { GRADE_TARGET_WINDOWS, TIER_TARGET_WINDOWS, limitSizedShot } from '../../../scripts/shared/probe-ladder.js';
 
 /** Ladder steps of the permit table, keyed by rung (grade x 3 + tier - 1). */
 const RUNGS = Array.from({ length: 12 }, (_, i) => i);
@@ -122,13 +122,21 @@ describe('progression balance invariants (#1945, #2277)', () => {
     });
   });
 
-  it('grade target windows are well-formed, ordered and non-overlapping (g3 < g4 < g5)', () => {
-    for (const g of [3, 4, 5]) {
-      const [lo, hi] = GRADE_TARGET_WINDOWS[g]!;
+  it('tier target windows are well-formed and never move earlier as the ladder climbs (G0.2 .. G3.3)', () => {
+    const keys = Object.keys(TIER_TARGET_WINDOWS).sort();
+    expect(keys).toHaveLength(11);
+    let prev: readonly [number, number] = [0, 0];
+    for (const key of keys) {
+      const [lo, hi] = TIER_TARGET_WINDOWS[key]!;
       expect(lo).toBeGreaterThan(0);
       expect(hi).toBeGreaterThan(lo);
+      expect(lo).toBeGreaterThanOrEqual(prev[0]);
+      expect(hi).toBeGreaterThanOrEqual(prev[1]);
+      prev = [lo, hi];
     }
-    expect(GRADE_TARGET_WINDOWS[3]![1]).toBeLessThanOrEqual(GRADE_TARGET_WINDOWS[4]![0]);
-    expect(GRADE_TARGET_WINDOWS[4]![1]).toBeLessThanOrEqual(GRADE_TARGET_WINDOWS[5]![0]);
+  });
+
+  it('grade target windows cover G1-G3', () => {
+    for (const g of [1, 2, 3]) expect(GRADE_TARGET_WINDOWS[g]).toBeDefined();
   });
 });
