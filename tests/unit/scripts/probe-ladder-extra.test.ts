@@ -33,6 +33,16 @@ describe('formatGradeSummary', () => {
     expect(rows.find(r => r.includes('| t3.3 |'))).toContain('missed');
   });
 
+  it('shows the window and verdict of a reached tier, and none for an unwindowed one', () => {
+    const r = run({}, {});
+    r.metrics.tierReachedTick = { '1.1': 1000, '0.1': 5 };
+    const rows = formatGradeSummary([r]).split('\n').slice(2);
+    const t11 = rows.find(x => x.includes('| t1.1 |'))!;
+    expect(t11).toContain('800-1600');
+    expect(t11).toContain('in');
+    expect(rows.find(x => x.includes('| t0.1 |'))).not.toContain('missed');
+  });
+
   it('takes the median over runs of one group', () => {
     const out = formatGradeSummary([run({ 3: 5000 }, { 3: 1 }), run({ 3: 20000 }, { 3: 1 })]);
     expect(out).toContain('2/2');

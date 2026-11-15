@@ -30,9 +30,6 @@ export interface GradeVerdict {
   status: 'in' | 'early' | 'late' | 'missed';
 }
 
-/** Named mine grades of #2277 by number (G0 Surface ... G3 Meteorite); a grade past G3 is a Planetary Crater class and has no window. */
-export const GRADE_NAMES: readonly string[] = ['Surface', 'Depth', 'Distance', 'Meteorite'];
-
 /**
  * Target tick window [min, max] in which each tier should be reached, keyed `<grade>.<tier>` like the probe's
  * `tierReachedTick` (G0..G3, tiers 1-3; G0.1 is the start). Calibrated on the `ladder` strategy at the reference site

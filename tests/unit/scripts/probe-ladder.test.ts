@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  GRADE_NAMES,
   GRADE_TARGET_WINDOWS,
   TIER_TARGET_WINDOWS,
   windowStatus,
@@ -260,8 +259,7 @@ describe('target windows', () => {
   });
 
   it('cover every tier of the four named grades but the G0 start', () => {
-    expect(GRADE_NAMES).toEqual(['Surface', 'Depth', 'Distance', 'Meteorite']);
-    const keys = GRADE_NAMES.flatMap((_, g) => [1, 2, 3].map(t => `${g}.${t}`)).filter(k => k !== '0.1');
+    const keys = [0, 1, 2, 3].flatMap(g => [1, 2, 3].map(t => `${g}.${t}`)).filter(k => k !== '0.1');
     expect(Object.keys(TIER_TARGET_WINDOWS).sort()).toEqual(keys.sort());
   });
 });
