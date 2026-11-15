@@ -498,7 +498,7 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
    * Re-measured once the starter warehouse stopped holding 100 kg of Krackle, so the first shot is bought at list price
    * as it is loaded (#2153; the sandbox starting cash is unchanged): 498,088.2.
    * Re-measured once a hauler stood HAUL_LOAD_TICKS = 1 at each fragment it loaded (#2199; the same run read 516,693.7
-   * with the dwell off, and hauls 88 loads in 1500 ticks against 95): 448,106.0.
+   *, and hauls 88 loads in 1500 ticks against 95): 448,106.0.
    * Re-measured once dust-band rock lost DUST_LOSS_SHARE of its mass and ore (#2198): 420,205.8.
    * Re-measured under the per-hole energy kernel (EXPLOSIVE_ENERGY_SCALE 25, drilling paid per metre), the shot filled at
    * the grade-0 permit's stemming: 630,090.0 (the 6 kg load it replaced read 698,831.7).
