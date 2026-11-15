@@ -128,7 +128,9 @@ export class OreVeinSampler {
       const field = this.fields.get(ore.id);
       if (!field) continue;
       const sandbox = field.deposit !== undefined;
-      const [depthMin, depthMax] = sandbox ? sandboxOreWindow(ore) : [ore.depthMin, ore.depthMax];
+      const window = sandbox ? sandboxOreWindow(ore) : [ore.depthMin, ore.depthMax] as const;
+      if (!window) continue;
+      const [depthMin, depthMax] = window;
       if (depth < depthMin || depth > depthMax) continue;
 
       const affinity = hostRockAffinity(composition, ore.id, sandbox);

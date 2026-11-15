@@ -598,11 +598,14 @@ export const HOLE_CELL_MAX_SIDE_M = 8;
  *  steps it (#1069), same reasoning as DRILL_GRID_DEFAULT_SPACING_M; 8 m matches the tutorial's
  *  scripted plan (#1330). */
 export const DRILL_GRID_DEFAULT_DEPTH_M = 8;
+/** Depth (m) of the G0 layer on a progression site (#2281): G0 ores occur above it, G1 ores from it down.
+ *  It is also the G0 default hole depth (DRILL_GRID_DEFAULT_DEPTH_BY_GRADE_M), so a G0 shot clears exactly the G0 layer. */
+export const ORE_G0_LAYER_DEPTH_M = 5;
 /** Grid default depth (m) per permit grade (#2101): the depth where the permit-derived
  *  default charge still breaks out on the softest sandbox rock. 5 m at grade 0 matches the
  *  probe's SHOT. A grade with no entry keeps DRILL_GRID_DEFAULT_DEPTH_M; a site without a
  *  permit never reads this map. */
-export const DRILL_GRID_DEFAULT_DEPTH_BY_GRADE_M: Readonly<Record<number, number>> = { 0: 5 };
+export const DRILL_GRID_DEFAULT_DEPTH_BY_GRADE_M: Readonly<Record<number, number>> = { 0: ORE_G0_LAYER_DEPTH_M };
 
 /** Ticks to load a charge at the reference amount (#554). */
 export const CHARGE_HOLE_BASE_DURATION_TICKS = 4;
@@ -3167,6 +3170,10 @@ export const ORE_DEPOSIT_RARITY_COVERAGE: Readonly<Record<string, number>> = {
   very_rare: 0.65,
   legendary: 0.72,
 };
+/** Deposit-field cutoff of every G1 ore on a progression site (#2281): below the uncommon/rare rarity cutoffs so a second bench under the opening area finds G1 ore. */
+export const ORE_G1_DEPOSIT_CUTOFF = 0.4;
+/** Least host probability a G0 or G1 ore has in any rock on a progression site (#2281): every biome holds both grades whatever its host rocks. */
+export const ORE_PROGRESSION_HOST_FLOOR = 0.1;
 /** Multiplier boosting vein density at a deposit core. */
 export const ORE_DEPOSIT_CORE_GAIN = 3;
 /** Width of the soft falloff at a deposit edge, in deposit-field units. */

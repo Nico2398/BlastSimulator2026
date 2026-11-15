@@ -12,8 +12,8 @@ export function sandboxHostProbability(rockId: string, oreId: string): number {
   return override ?? getRock(rockId)?.oreProbabilities[oreId] ?? 0;
 }
 
-/** Depth window [min, max] of an ore on a sandbox site. */
-export function sandboxOreWindow(ore: OreType): readonly [number, number] {
+/** Depth window [min, max] of an ore on a sandbox site; null for an ore the ordinary ground does not hold (G2, G3). */
+export function sandboxOreWindow(ore: OreType): readonly [number, number] | null {
   return SANDBOX_ORE_DEPTH_WINDOWS[ore.id] ?? [ore.depthMin, ore.depthMax];
 }
 
