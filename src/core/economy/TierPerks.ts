@@ -3,7 +3,7 @@
 import { MINE_GRADES, MINE_LAST_NAMED_RUNG, MINE_TIERS_PER_GRADE } from '../config/balance.js';
 
 /** Perks in force at a ladder step, summed over every step reached. */
-export interface TierPerks {
+interface TierPerks {
   /** Percent off the notification fee of the permit limits. */
   notificationFeeDiscountPct: number;
   /** Percent off the processing time of a grade application. */

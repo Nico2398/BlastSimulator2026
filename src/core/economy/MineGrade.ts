@@ -79,7 +79,7 @@ type GradeApplyResult =
 export const LAST_NAMED_GRADE = MINE_LAST_NAMED_GRADE;
 
 /** One tier of a named grade: what completes it, what reaching it grants. */
-export interface TierDef {
+interface TierDef {
   grade: number;
   tier: number;
   targets: readonly GradeTargetDef[];

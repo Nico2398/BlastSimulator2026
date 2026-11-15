@@ -602,7 +602,7 @@ export const DRILL_GRID_DEFAULT_DEPTH_M = 8;
  *  default charge still breaks out on the softest sandbox rock. 5 m at grade 0 matches the
  *  probe's SHOT. A grade with no entry keeps DRILL_GRID_DEFAULT_DEPTH_M; a site without a
  *  permit never reads this map. */
-export const DRILL_GRID_DEFAULT_DEPTH_BY_GRADE_M: Readonly<Record<number, number>> = { 0: 5, 1: 5, 2: 5 };
+export const DRILL_GRID_DEFAULT_DEPTH_BY_GRADE_M: Readonly<Record<number, number>> = { 0: 5 };
 
 /** Ticks to load a charge at the reference amount (#554). */
 export const CHARGE_HOLE_BASE_DURATION_TICKS = 4;

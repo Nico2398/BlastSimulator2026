@@ -32,9 +32,9 @@ export interface GradeVerdict {
 
 /** Target tick window [min, max] in which each grade should be reached. */
 export const GRADE_TARGET_WINDOWS: Readonly<Record<number, readonly [number, number]>> = {
-  1: [4000, 9000],
-  2: [12000, 22000],
-  3: [30000, 50000],
+  3: [8000, 14000],
+  4: [15000, 25000],
+  5: [30000, 45000],
 };
 
 /** Per-hole charge is kept to this resolution (kg) so the console command parses it back exactly. */

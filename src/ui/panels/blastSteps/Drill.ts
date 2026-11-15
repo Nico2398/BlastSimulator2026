@@ -180,7 +180,7 @@ export class DrillStep {
 
   update(state: GameState, _weather?: WeatherState): void {
     this.lastState = state;
-    if (!this.playerAdjustedDepth) this.gridDepth = Math.min(defaultGridDepthM(state.grade ? gradeRung(state.grade) : undefined), this.reachM());
+    if (!this.playerAdjustedDepth) this.gridDepth = Math.min(defaultGridDepthM(state.grade?.grade), this.reachM());
     const holes = state.drillHoles;
     const ordered = state.plannedDrillHoles;
     const totalCount = holes.length + ordered.length;

@@ -6,12 +6,12 @@ import {
 import { chargeKgPerMetre } from '../mining/HoleDiameter.js';
 import { fillChargeKg } from '../mining/ChargePlan.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
-import { permitLimitsForRung } from './PermitLimits.js';
+import { permitLimitsFor } from './PermitLimits.js';
 
-/** Grid depth (m) the Drill step opens at; `undefined` rung (see `gradeRung`) = site without a permit. */
-export function defaultGridDepthM(rung: number | undefined): number {
-  if (rung === undefined) return DRILL_GRID_DEFAULT_DEPTH_M;
-  return DRILL_GRID_DEFAULT_DEPTH_BY_GRADE_M[rung] ?? DRILL_GRID_DEFAULT_DEPTH_M;
+/** Grid depth (m) the Drill step opens at; `undefined` grade = site without a permit. */
+export function defaultGridDepthM(grade: number | undefined): number {
+  if (grade === undefined) return DRILL_GRID_DEFAULT_DEPTH_M;
+  return DRILL_GRID_DEFAULT_DEPTH_BY_GRADE_M[grade] ?? DRILL_GRID_DEFAULT_DEPTH_M;
 }
 
 /**
@@ -23,12 +23,13 @@ export function defaultGridDepthM(rung: number | undefined): number {
  * would have to stay empty) also keeps the default, and the over-permit warning says so.
  */
 export function defaultStemmingM(
-  rung: number | undefined,
+  grade: number | undefined,
   holes: readonly Pick<DrillHole, 'depth' | 'diameter'>[],
   explosiveId: string,
+  tier = 1,
 ): number {
-  if (rung === undefined || holes.length === 0) return CHARGE_DEFAULT_STEMMING_M;
-  const limitKg = permitLimitsForRung(rung).maxChargeKg;
+  if (grade === undefined || holes.length === 0) return CHARGE_DEFAULT_STEMMING_M;
+  const limitKg = permitLimitsFor(grade, tier).maxChargeKg;
   let kgPerMetre = 0;
   let fullColumnKg = 0;
   for (const h of holes) {

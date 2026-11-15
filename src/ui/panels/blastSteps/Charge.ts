@@ -530,7 +530,7 @@ export class ChargeStep {
   /** Until the player steps the stemming, open at the permit-derived default for the planned and drilled holes (#2101). */
   private followPermitDefault(state: GameState): void {
     if (this.playerAdjustedStemming) return;
-    const stemming = defaultStemmingM(state.grade ? gradeRung(state.grade) : undefined, [...state.drillHoles, ...state.plannedDrillHoles], this.selectedExplosiveId);
+    const stemming = defaultStemmingM(state.grade?.grade, [...state.drillHoles, ...state.plannedDrillHoles], this.selectedExplosiveId, state.grade?.tier);
     if (stemming === this.stemmingM) return;
     this.stemmingM = stemming;
     this.stemmingValueEl.textContent = `${this.stemmingM.toFixed(1)} m`;
