@@ -4,7 +4,7 @@ import {
   SURVEY_METHOD_UNLOCK_GRADE, SURVEY_SURFACE_BAND_M, SURVEY_SURFACE_CAPPED_METHODS, SURVEY_FULL_DEPTH_GRADE,
   SURVEY_DEPTH_BELOW_SURFACE, SURVEY_SEISMIC_GROUP_SIZE,
 } from '../config/balance.js';
-import { gradeDef } from '../economy/MineGrade.js';
+import { gradeName } from '../economy/MineGrade.js';
 import { t } from '../i18n/I18n.js';
 
 /** Null when the method is open (or grade is undefined: non-progression site); else the grade that opens it. */
@@ -12,11 +12,6 @@ export function surveyMethodGate(grade: number | undefined, method: SurveyMethod
   if (grade === undefined) return null;
   const needed = SURVEY_METHOD_UNLOCK_GRADE[method];
   return grade >= needed ? null : { needed };
-}
-
-function gradeName(grade: number): string {
-  const def = gradeDef(grade);
-  return t(def.nameKey, def.nameParams);
 }
 
 /** Console refusal text for a locked method, naming the grades; null when open (or non-progression site). */

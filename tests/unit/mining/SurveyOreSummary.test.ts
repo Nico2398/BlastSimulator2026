@@ -246,3 +246,12 @@ describe('summarizeSurveyOres — market pricing (#1681)', () => {
       .toBeCloseTo(0.5 * ORE_DENSITY_KG_M3 * oreValuePerKg('rustite', 'production'), 3);
   });
 });
+
+describe('summarizeSurveyOres with a stored depth', () => {
+  it('uses the depth the survey was taken at, not the method full depth', () => {
+    const base = { method: 'seismic' as const, centerX: 30, centerZ: 30, confidence: 1, estimates: { '30,30': { sparkium: 0.2 } } };
+    const [full] = summarizeSurveyOres(base);
+    const [capped] = summarizeSurveyOres({ ...base, depthM: 8 });
+    expect(capped!.estimatedTonnes).toBeCloseTo(full!.estimatedTonnes * (8 / SURVEY_DEPTH_BELOW_SURFACE.seismic), 5);
+  });
+});

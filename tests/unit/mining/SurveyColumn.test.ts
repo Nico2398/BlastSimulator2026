@@ -188,3 +188,11 @@ describe('oresSurveyedAt (#1703)', () => {
     expect(() => oresSurveyedAt(s, 12, 8, SURFACE - 2)).not.toThrow();
   });
 });
+
+describe('oresSurveyedAt with a stored depth', () => {
+  it('reads nothing below the depth the survey was taken at', () => {
+    const s: SurveyResult = { ...makeSurvey(1, 10, ['12,8']), surfaceYs: { '12,8': 20 }, depthM: 8 };
+    expect(oresSurveyedAt(s, 12, 8, 20 - 10)).toBeUndefined();
+    expect(oresSurveyedAt(s, 12, 8, 20 - 4)).toBeDefined();
+  });
+});

@@ -56,6 +56,8 @@ export interface SurveyResult {
   depthProfile?: Record<string, SurveyDepthBand[]>;
   /** Surface Y (anchorY) each column was sampled from, keyed `"x,z"`. Every method, aerial included. Absent in legacy saves. */
   surfaceYs?: Record<string, number>;
+  /** Metres below the surface this survey read. Absent in legacy saves: the method's full depth applies. */
+  depthM?: number;
   /** Set once a blast clears a column inside this survey's disc. Absent means fresh. */
   stale?: boolean;
 }
@@ -183,14 +185,14 @@ export function estimateSurveyResult(
   }
 
   if (method === 'aerial') {
-    return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, surfaceYs };
+    return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, surfaceYs, depthM };
   }
   const depthProfile: Record<string, SurveyDepthBand[]> = {};
   for (const { x, z, yLevels } of windows) {
     const bands = buildDepthProfile(grid, x, z, yLevels, SURVEY_DEPTH_BAND_METRES[method], finalError, rng);
     if (bands.length > 0) depthProfile[surveyColumnKey(x, z)] = bands;
   }
-  return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, depthProfile, surfaceYs };
+  return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, depthProfile, surfaceYs, depthM };
 }
 
 export {
