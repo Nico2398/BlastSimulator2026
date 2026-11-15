@@ -327,15 +327,15 @@ describe('SandboxPanel', () => {
     }
   });
 
-  it('open-ended ore depth reads "from N m down" and never leaks the sentinel (#1731)', () => {
+  it('the ore depth line never leaks the unbounded sentinel: sandbox ores are G0 and G1, all with a finite window (#1731, #2281)', () => {
     panel.show();
     for (const id of ['tropical_karst', 'volcanic_flats']) {
       changeSelect('biome', id);
       const shown = text('bs-sandbox-biome-ores');
-      const min = sandboxBiomeTraits(id).oreDepthMin;
-      expect(shown, id).toContain(`from ${min} m down`);
+      const tr = sandboxBiomeTraits(id);
+      expect(tr.oreDepthMax, id).toBeLessThan(ORE_DEPTH_UNBOUNDED);
+      expect(shown, id).toContain(`depth ${tr.oreDepthMin}-${tr.oreDepthMax} m`);
       expect(shown, id).not.toContain('999');
-      expect(shown, id).not.toContain(`${min}-`);
     }
   });
 

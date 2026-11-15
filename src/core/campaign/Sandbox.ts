@@ -218,7 +218,9 @@ export function sandboxBiomeTraits(biomeId: string): SandboxBiomeTraits {
   const ores = sandboxOresYieldedByRocks(biome.dominantRocks).flatMap(id => {
     const ore = getOre(id);
     if (!ore) return [];
-    const [depthMin, depthMax] = sandboxOreWindow(ore);
+    const window = sandboxOreWindow(ore);
+    if (!window) return [];
+    const [depthMin, depthMax] = window;
     return [{ oreId: id, nameKey: ore.nameKey, depthMin, depthMax }];
   });
 

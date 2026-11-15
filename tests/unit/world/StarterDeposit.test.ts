@@ -8,12 +8,14 @@ import { sampleSurfaceHeightY } from '../../../src/core/world/WorldGen.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllLevels } from '../../../src/core/campaign/Level.js';
+import { orePermitGrade } from '../../../src/core/world/OreCatalog.js';
 import {
   SANDBOX_FLAT_PAD_MAX_SPREAD,
   STARTER_DEPOSIT_MAX_DISTANCE_M,
   STARTER_DEPOSIT_MIN_DISTANCE_M,
   STARTER_DEPOSIT_POCKET_RADIUS_M,
   STARTER_DEPOSIT_EDGE_MARGIN_M,
+  ORE_G0_LAYER_DEPTH_M,
 } from '../../../src/core/config/balance.js';
 import { sandboxTerrainConfig } from '../../helpers/sandboxSite.js';
 
@@ -152,6 +154,39 @@ describe('TerrainContext.starterDeposit (#2116)', () => {
 });
 
 describe('generated starter deposit voxels (#2116)', () => {
+  it.each(cases)('C5 (#2281) %s seed %i: the starter ore is a G0 ore', (biome, seed) => {
+    const { oreId } = deposit(sandboxTerrainConfig(biome, seed));
+    expect(orePermitGrade(oreId)).toBe(0);
+  });
+
+  it.each(cases)('C5 (#2281) %s seed %i: the starter ore lies within the G0 layer, none of it below', (biome, seed) => {
+    const config = sandboxTerrainConfig(biome, seed);
+    const d = deposit(config);
+    const grid = generateTerrain(config);
+    const { worldGen } = buildTerrainContext(config);
+    const r = STARTER_DEPOSIT_POCKET_RADIUS_M + 1;
+    for (let x = d.x - r; x <= d.x + r; x++) for (let z = d.z - r; z <= d.z + r; z++) {
+      // depth exactly as the generator measures it: from the rounded surface height
+      const top = Math.round(sampleSurfaceHeightY(worldGen, x, z));
+      for (let depth = ORE_G0_LAYER_DEPTH_M + 1; depth <= ORE_G0_LAYER_DEPTH_M + 4; depth++) {
+        expect(grid.oresAt(x, top - depth, z)?.[d.oreId] ?? 0, `column ${x},${z} holds ${d.oreId} at ${depth} m`).toBe(0);
+      }
+    }
+  });
+
+  it.each(cases)('C5 (#2281) %s seed %i: no G1 ore sits inside the pocket above the G0 layer', (biome, seed) => {
+    const config = sandboxTerrainConfig(biome, seed);
+    const d = deposit(config);
+    const grid = generateTerrain(config);
+    for (let x = d.x - HALF; x <= d.x + HALF; x++) for (let z = d.z - HALF; z <= d.z + HALF; z++) {
+      for (let depth = 0; depth < ORE_G0_LAYER_DEPTH_M - 1; depth++) {
+        for (const oreId of Object.keys(grid.oresAt(x, surfaceY(grid, x, z) - depth, z) ?? {})) {
+          expect(orePermitGrade(oreId), `column ${x},${z} depth ${depth}: ${oreId}`).toBe(0);
+        }
+      }
+    }
+  });
+
   it.each(cases)('C4 %s seed %i: ground under the 9x9 footprint is flat within the pad spread cap', (biome, seed) => {
     const config = sandboxTerrainConfig(biome, seed);
     const d = deposit(config);
