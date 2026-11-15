@@ -41,6 +41,7 @@ import {
 } from '../../../src/core/config/balance.js';
 import type { Contract } from '../../../src/core/economy/Contract.js';
 import { resolveMarket, oreContractBasePrice } from '../../../src/core/economy/Market.js';
+import { getOre } from '../../../src/core/world/OreCatalog.js';
 const ALL_ORES: readonly string[] = Object.keys(ORE_PRICES);
 
 /** A minimal offered contract — only the fields hasFillableOreSaleOffer reads carry meaning. */
@@ -1598,5 +1599,81 @@ describe('generateContracts — extra offers from the tier perk (#2277)', () => 
     refresh(small, 0, 0);
     refresh(large, 0, 3);
     expect(large.available.length).toBeGreaterThan(small.available.length);
+  });
+});
+
+// ── #2278: offers name only the current grade's ores ────────────────────────
+
+describe('generateContracts by buyer grade (#2278)', () => {
+  /** Ore ids of every ore_sale and supply offer over many refreshes, one fresh state per seed. */
+  function offeredOres(grade: number | undefined, available: readonly string[] = ALL_ORES, market?: 'production'): Set<string> {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 60; seed++) {
+      const state = createContractState();
+      if (market) state.market = market;
+      generateContracts(state, new Random(seed), 0, 1, available, 100_000, grade);
+      for (const c of state.available) if (c.type !== 'rubble_disposal') seen.add(c.materialId);
+    }
+    return seen;
+  }
+
+  it.each([[0, ['dirtite', 'rustite']], [1, ['blingite', 'gloomium', 'sparkium']], [2, ['craktonite', 'absurdium']], [3, ['treranium']]])(
+    'grade %i offers only that grade\'s ores', (grade, owned) => {
+      const seen = offeredOres(grade as number);
+      expect(seen.size).toBeGreaterThan(0);
+      for (const ore of seen) expect(owned, ore).toContain(ore);
+    },
+  );
+
+  it('the same holds on the production market with a buyer tier', () => {
+    for (const grade of [0, 1, 2, 3]) {
+      for (const ore of offeredOres(grade, ALL_ORES, 'production')) {
+        expect(getOre(ore)!.permitGrade, `grade ${grade} ${ore}`).toBe(grade);
+      }
+    }
+  });
+
+  it('a class grade above 3 offers only G3 ores', () => {
+    const seen = offeredOres(5);
+    expect(seen.size).toBeGreaterThan(0);
+    for (const ore of seen) expect(getOre(ore)!.permitGrade).toBe(3);
+  });
+
+  it('every ore of the grade shows up across many refreshes (none is starved)', () => {
+    expect([...offeredOres(1)].sort()).toEqual(['blingite', 'gloomium', 'sparkium']);
+  });
+
+  it('intersects with the site\'s ores: a grade-1 site yielding only dirtite and blingite offers blingite', () => {
+    const seen = offeredOres(1, ['dirtite', 'rustite', 'blingite']);
+    expect([...seen]).toEqual(['blingite']);
+  });
+
+  it('a site that yields none of the grade\'s ores offers rubble only', () => {
+    const state = createContractState();
+    generateContracts(state, new Random(42), 0, 1, ['dirtite', 'rustite'], 100_000, 2);
+    expect(state.available.length).toBeGreaterThan(0);
+    for (const c of state.available) expect(c.type).toBe('rubble_disposal');
+  });
+
+  it('a site that yields none of the grade\'s ores and holds no rubble offers nothing', () => {
+    const state = createContractState();
+    generateContracts(state, new Random(42), 0, 1, ['dirtite'], 0, 3);
+    expect(state.available).toEqual([]);
+  });
+
+  it('rubble clearances are unchanged by the grade', () => {
+    let rubble = 0;
+    for (let seed = 1; seed <= 60; seed++) {
+      const state = createContractState();
+      generateContracts(state, new Random(seed), 0, 1, ALL_ORES, 100_000, 0);
+      rubble += state.available.filter(c => c.type === 'rubble_disposal').length;
+    }
+    expect(rubble).toBeGreaterThan(0);
+  });
+
+  it('without a buyer grade the offers are not grade-restricted', () => {
+    const seen = offeredOres(undefined);
+    const grades = new Set([...seen].map(o => getOre(o)!.permitGrade));
+    expect(grades.size).toBeGreaterThan(1);
   });
 });
