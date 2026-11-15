@@ -3,7 +3,7 @@ import { getAllOres } from './OreCatalog.js';
 import { METEORITE_ROCK_ENERGY_ABSORPTION, METEORITE_ROCK_ID, WALL_SAFE_FACE_HEIGHT_M_BY_TIER } from '../config/balance.js';
 
 // BlastSimulator2026 — Rock type catalog
-// 10 fictional rock types spanning hardness tiers 1–5.
+// 11 fictional rock types spanning hardness tiers 1–5.
 // Real-world basis documented per entry.
 
 export interface RockType {
