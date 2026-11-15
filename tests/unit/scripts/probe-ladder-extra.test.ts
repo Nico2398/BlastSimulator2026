@@ -29,11 +29,12 @@ describe('formatGradeSummary', () => {
     const g3 = rows.find(r => r.includes('| 3 |'))!;
     expect(g3).toContain('9000');
     expect(g3).toContain('in');
-    expect(rows.find(r => r.includes('| 4 |'))).toContain('missed');
+    expect(rows.find(r => r.includes('| 2 |'))).toContain('missed');
+    expect(rows.find(r => r.includes('| t3.3 |'))).toContain('missed');
   });
 
   it('takes the median over runs of one group', () => {
-    const out = formatGradeSummary([run({ 3: 8000 }, { 3: 1 }), run({ 3: 20000 }, { 3: 1 })]);
+    const out = formatGradeSummary([run({ 3: 5000 }, { 3: 1 }), run({ 3: 20000 }, { 3: 1 })]);
     expect(out).toContain('2/2');
   });
 });

@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  GRADE_NAMES,
   GRADE_TARGET_WINDOWS,
+  TIER_TARGET_WINDOWS,
+  windowStatus,
   fullHoleSide,
   gradeVerdicts,
   holeSpacingForChargeM,
@@ -217,21 +220,21 @@ describe('shouldBench', () => {
 
 describe('gradeVerdicts', () => {
   it('classifies in, early, late and missed windows', () => {
-    const v = gradeVerdicts({ 3: 9000, 4: 10000, 5: 50000 }, GRADE_TARGET_WINDOWS);
-    expect(v.map(x => [x.grade, x.status])).toEqual([[3, 'in'], [4, 'early'], [5, 'late']]);
-    expect(v[0]!.tick).toBe(9000);
-    expect(v[0]!.window).toEqual(GRADE_TARGET_WINDOWS[3]);
+    const v = gradeVerdicts({ 1: 1000, 2: 100, 3: 50000 }, GRADE_TARGET_WINDOWS);
+    expect(v.map(x => [x.grade, x.status])).toEqual([[1, 'in'], [2, 'early'], [3, 'late']]);
+    expect(v[0]!.tick).toBe(1000);
+    expect(v[0]!.window).toEqual(GRADE_TARGET_WINDOWS[1]);
   });
 
   it('reports a missing grade as missed with a null tick, never omitted', () => {
-    const v = gradeVerdicts({ 3: 9000 }, GRADE_TARGET_WINDOWS);
+    const v = gradeVerdicts({ 1: 1000 }, GRADE_TARGET_WINDOWS);
     expect(v).toHaveLength(3);
-    expect(v[1]).toMatchObject({ grade: 4, tick: null, status: 'missed' });
-    expect(v[2]).toMatchObject({ grade: 5, tick: null, status: 'missed' });
+    expect(v[1]).toMatchObject({ grade: 2, tick: null, status: 'missed' });
+    expect(v[2]).toMatchObject({ grade: 3, tick: null, status: 'missed' });
   });
 
   it('treats window bounds as inclusive', () => {
-    const v = gradeVerdicts({ 3: 8000, 4: 25000, 5: 30000 }, GRADE_TARGET_WINDOWS);
+    const v = gradeVerdicts({ 1: GRADE_TARGET_WINDOWS[1]![0], 2: GRADE_TARGET_WINDOWS[2]![1], 3: GRADE_TARGET_WINDOWS[3]![0] }, GRADE_TARGET_WINDOWS);
     expect(v.map(x => x.status)).toEqual(['in', 'in', 'in']);
   });
 
@@ -240,10 +243,25 @@ describe('gradeVerdicts', () => {
   });
 });
 
-describe('GRADE_TARGET_WINDOWS', () => {
-  it('pins the target windows', () => {
-    expect(GRADE_TARGET_WINDOWS[3]).toEqual([8000, 14000]);
-    expect(GRADE_TARGET_WINDOWS[4]).toEqual([15000, 25000]);
-    expect(GRADE_TARGET_WINDOWS[5]).toEqual([30000, 45000]);
+describe('windowStatus', () => {
+  it('is inclusive at both bounds and missed for a null tick', () => {
+    expect(windowStatus(10, [10, 20])).toBe('in');
+    expect(windowStatus(20, [10, 20])).toBe('in');
+    expect(windowStatus(9, [10, 20])).toBe('early');
+    expect(windowStatus(21, [10, 20])).toBe('late');
+    expect(windowStatus(null, [10, 20])).toBe('missed');
+  });
+});
+
+describe('target windows', () => {
+  it('key grades G1-G3 on the first tier window', () => {
+    expect(Object.keys(GRADE_TARGET_WINDOWS)).toEqual(['1', '2', '3']);
+    for (const g of [1, 2, 3]) expect(GRADE_TARGET_WINDOWS[g]).toEqual(TIER_TARGET_WINDOWS[`${g}.1`]);
+  });
+
+  it('cover every tier of the four named grades but the G0 start', () => {
+    expect(GRADE_NAMES).toEqual(['Surface', 'Depth', 'Distance', 'Meteorite']);
+    const keys = GRADE_NAMES.flatMap((_, g) => [1, 2, 3].map(t => `${g}.${t}`)).filter(k => k !== '0.1');
+    expect(Object.keys(TIER_TARGET_WINDOWS).sort()).toEqual(keys.sort());
   });
 });

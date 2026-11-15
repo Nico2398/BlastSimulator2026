@@ -2,7 +2,7 @@
 
 import type { ProbeOptions } from './probe-config.js';
 import { CASH_SAMPLE_TICKS, SALES_COST_WINDOW_STARTS, type RunResult } from './probe-metrics.js';
-import { GRADE_TARGET_WINDOWS, gradeVerdicts, type GradeVerdict } from './probe-ladder.js';
+import { GRADE_TARGET_WINDOWS, TIER_TARGET_WINDOWS, gradeVerdicts, windowStatus, type GradeVerdict } from './probe-ladder.js';
 
 type Cell = number | string | null;
 
@@ -116,7 +116,8 @@ export function formatTable(results: readonly RunResult[]): string {
 /**
  * Per (biome, kit, strategy) group and grade: runs that reached it, median tick and cash at that
  * tick, and the verdict of the median tick against GRADE_TARGET_WINDOWS (grades without a window
- * report no verdict). A grade no run reached is listed 'missed'. Tiers reached (`t<grade>.<tier>`) follow, with their median tick.
+ * report no verdict). A grade no run reached is listed 'missed'. Tiers (`t<grade>.<tier>`) follow, with their median tick and
+ * the verdict against TIER_TARGET_WINDOWS.
  */
 export function formatGradeSummary(results: readonly RunResult[]): string {
   const headers = ['biome', 'kit', 'strategy', 'grade', 'reached', 'median tick', 'median cash', 'window', 'verdict'];
@@ -144,11 +145,16 @@ export function formatGradeSummary(results: readonly RunResult[]): string {
       ]));
     }
     const tierKeys = new Set<string>();
+    for (const k of Object.keys(TIER_TARGET_WINDOWS)) tierKeys.add(k);
     for (const r of runs) for (const k of Object.keys(r.metrics.tierReachedTick ?? {})) tierKeys.add(k);
     for (const key of [...tierKeys].sort()) {
       const reached = runs.filter(r => r.metrics.tierReachedTick?.[key] !== undefined);
       const tick = median(reached.map(r => r.metrics.tierReachedTick![key]!));
-      lines.push(line([first.biome, first.kit, first.strategy, `t${key}`, `${reached.length}/${runs.length}`, cell(tick), NONE, NONE, NONE]));
+      const window = TIER_TARGET_WINDOWS[key];
+      lines.push(line([
+        first.biome, first.kit, first.strategy, `t${key}`, `${reached.length}/${runs.length}`, cell(tick), NONE,
+        window ? `${window[0]}-${window[1]}` : NONE, window ? windowStatus(tick, window) : NONE,
+      ]));
     }
   }
   return lines.join('\n');
