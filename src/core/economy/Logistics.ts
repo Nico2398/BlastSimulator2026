@@ -5,9 +5,10 @@ import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass, clampCollectedOre, decrementCollectedOre, oreContributionKg } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
+import { orePermitGrade } from '../world/OreCatalog.js';
 import type { WarehouseSite } from '../entities/BuildingWarehouse.js';
 import { pickWarehouse, warehouseFreeKg, warehouseUsedKgMap } from './FreightWarehouses.js';
-import { creditSpoilHeaps, totalSpoilRoomKg, drawSpoilKg, haulDestinationOf, isBarrenFragment, isStoredBarren, rubbleStockKg } from './SpoilHeaps.js';
+import { creditSpoilHeaps, creditSpoilKg, spoilHeapRoomKg, totalSpoilRoomKg, drawSpoilKg, haulDestinationOf, isBarrenFragment, isStoredBarren, rubbleStockKg } from './SpoilHeaps.js';
 import type { Building } from '../entities/Building.js';
 import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
@@ -627,4 +628,37 @@ export function concentrateStoredOre(
     movedKg += concentrateStoredFragment(state, tracked, buildings, reservedKg);
   }
   return movedKg;
+}
+
+/**
+ * Send all stored stock of `oreId` to the spoil heaps, where it counts as barren rock; its value is lost (#2278).
+ * Moves at most the heaps' total room; fails, changing nothing, with no stock, no room or an unknown ore.
+ */
+export function sendOreToSpoilHeap(
+  state: LogisticsState,
+  collectedOre: Record<string, number>,
+  buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[],
+  oreId: string,
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
+): { success: true; data: { kg: number } } | { success: false; error: string } {
+  if (orePermitGrade(oreId) === undefined) return { success: false, error: t('logistics.spoil_ore_unknown', { material: oreId }) };
+  const stock = collectedOre[oreId] ?? 0;
+  const kg = Math.min(stock, totalSpoilRoomKg(buildings));
+  if (!(kg > FRAGMENT_SPLIT_EPSILON_KG)) {
+    return { success: false, error: t(stock > FRAGMENT_SPLIT_EPSILON_KG ? 'logistics.spoil_ore_no_room' : 'logistics.spoil_ore_no_stock', { material: oreId }) };
+  }
+  const consumed = consumeStoredOre(state, collectedOre, oreId, kg, buildings, gradeScale);
+  if (!consumed.success || !(consumed.consumedKg > 0)) {
+    return { success: false, error: consumed.error ?? t('logistics.spoil_ore_no_stock', { material: oreId }) };
+  }
+  let remaining = consumed.consumedKg;
+  for (const b of buildings) {
+    if (remaining <= 0) break;
+    if (b.type !== 'spoil_heap') continue;
+    const put = Math.min(remaining, spoilHeapRoomKg(b));
+    if (put <= 0) continue;
+    creditSpoilKg(b, put);
+    remaining -= put;
+  }
+  return { success: true, data: { kg: consumed.consumedKg - remaining } };
 }

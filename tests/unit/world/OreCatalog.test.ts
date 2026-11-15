@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getOre, getAllOres } from '../../../src/core/world/OreCatalog.js';
+import { getOre, getAllOres, orePermitGrade, oresOfPermitGrade } from '../../../src/core/world/OreCatalog.js';
 import { getAllRocks, getRock } from '../../../src/core/world/RockCatalog.js';
 import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
 import { ORE_RARITY_TIERS } from '../../helpers/oreRarity.js';
@@ -93,4 +93,66 @@ describe('OreCatalog', () => {
       });
     }
   }
+});
+
+// --- permit grades: each grade owns its ores (#2278) ---
+
+const GRADE_OF: Record<string, number> = {
+  dirtite: 0, rustite: 0,
+  blingite: 1, gloomium: 1, sparkium: 1,
+  craktonite: 2, absurdium: 2,
+  treranium: 3,
+};
+
+describe('OreCatalog permit grades (#2278)', () => {
+  for (const [id, grade] of Object.entries(GRADE_OF)) {
+    it(`${id} belongs to grade ${grade}`, () => {
+      expect(getOre(id)!.permitGrade).toBe(grade);
+    });
+  }
+
+  it('every catalog ore has an integer permit grade between 0 and 3', () => {
+    for (const ore of getAllOres()) {
+      expect(Number.isInteger(ore.permitGrade), ore.id).toBe(true);
+      expect(ore.permitGrade, ore.id).toBeGreaterThanOrEqual(0);
+      expect(ore.permitGrade, ore.id).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('the table covers every catalog ore and every grade owns at least one', () => {
+    expect(getAllOres().map(o => o.id).sort()).toEqual(Object.keys(GRADE_OF).sort());
+    for (const g of [0, 1, 2, 3]) expect(getAllOres().some(o => o.permitGrade === g), `grade ${g}`).toBe(true);
+  });
+
+  it('a pricier ore never sits in a lower grade than a cheaper one', () => {
+    const byValue = [...getAllOres()].sort((a, b) => a.valuePerKg - b.valuePerKg);
+    for (let i = 1; i < byValue.length; i++) {
+      expect(byValue[i]!.permitGrade, byValue[i]!.id).toBeGreaterThanOrEqual(byValue[i - 1]!.permitGrade);
+    }
+  });
+
+  it('orePermitGrade reads the catalog and is undefined for an unknown id', () => {
+    expect(orePermitGrade('rustite')).toBe(0);
+    expect(orePermitGrade('sparkium')).toBe(1);
+    expect(orePermitGrade('treranium')).toBe(3);
+    expect(orePermitGrade('unobtainium')).toBeUndefined();
+  });
+
+  it('oresOfPermitGrade keeps the ids of that grade, in input order', () => {
+    const ids = ['treranium', 'sparkium', 'dirtite', 'blingite', 'rustite'];
+    expect(oresOfPermitGrade(ids, 0)).toEqual(['dirtite', 'rustite']);
+    expect(oresOfPermitGrade(ids, 1)).toEqual(['sparkium', 'blingite']);
+    expect(oresOfPermitGrade(ids, 2)).toEqual([]);
+    expect(oresOfPermitGrade(ids, 3)).toEqual(['treranium']);
+  });
+
+  it('oresOfPermitGrade counts a grade above 3 as 3', () => {
+    expect(oresOfPermitGrade(['dirtite', 'treranium'], 4)).toEqual(['treranium']);
+    expect(oresOfPermitGrade(['dirtite', 'treranium'], 9)).toEqual(['treranium']);
+  });
+
+  it('oresOfPermitGrade drops unknown ids and handles an empty list', () => {
+    expect(oresOfPermitGrade(['unobtainium', 'dirtite'], 0)).toEqual(['dirtite']);
+    expect(oresOfPermitGrade([], 1)).toEqual([]);
+  });
 });

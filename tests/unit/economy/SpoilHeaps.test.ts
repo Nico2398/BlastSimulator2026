@@ -8,7 +8,7 @@ import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD, SPOIL_HEAP_CAPACITY_KG } from '../
 import {
   creditSpoilHeaps, creditSpoilKg, spoilHeapRoomKg, totalSpoilRoomKg, drawSpoilKg, barrenStoredMassKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg, barrenOverflowKg, stateBarrenOverflowKg,
 } from '../../../src/core/economy/SpoilHeaps.js';
-import { addBlastFragments, createLogisticsState, deliverToSpoilHeap, concentrateStoredFragment, concentrateStoredOre } from '../../../src/core/economy/Logistics.js';
+import { addBlastFragments, createLogisticsState, deliverToSpoilHeap, concentrateStoredFragment, concentrateStoredOre, sendOreToSpoilHeap } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import { BUILDING_DEFS } from '../../../src/core/entities/BuildingDefs.js';
@@ -632,5 +632,139 @@ describe('concentrated rock is spoil like any other (#2142)', () => {
 
     expect(drawSpoilKg(heaps, 1_000)).toBe(1_000);
     expect(heaps[0]!.storedSpoilKg).toBeCloseTo(2_000, 6);
+  });
+});
+
+// ── #2278: sending a stored ore to the spoil heaps ──────────────────────────
+
+describe('sendOreToSpoilHeap (#2278)', () => {
+  const oreFrag = (id: number, kg: number, ore: string): FragmentData => ({
+    id, position: { x: 0, y: 0, z: 0 }, volume: kg / 2500, mass: kg * 5, rockId: 'sandite', oreDensities: { [ore]: 1.0 },
+    initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false, halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: id,
+    origin: { x: 0, y: 0, z: 0 },
+  });
+  function stockOf(stock: Record<string, number>) {
+    const logistics = createLogisticsState(10_000_000);
+    const collectedOre: Record<string, number> = {};
+    let id = 1;
+    for (const [ore, kg] of Object.entries(stock)) {
+      const f = oreFrag(id++, kg, ore);
+      logistics.fragments.push({ fragment: f, state: 'stored', vehicleId: null, warehouseId: 1 });
+      logistics.storedMassKg += f.mass;
+      collectedOre[ore] = kg;
+    }
+    return { logistics, collectedOre };
+  }
+  const roomHeap = (roomKg: number) => ({ type: 'spoil_heap' as const, tier: 1 as const, storedSpoilKg: SPOIL_HEAP_CAPACITY_KG - roomKg });
+
+  it('moves the whole stock of the ore out of collectedOre and reports the kg', () => {
+    const { logistics, collectedOre } = stockOf({ blingite: 400, rustite: 250 });
+    const heaps = [pile(0)];
+    const r = sendOreToSpoilHeap(logistics, collectedOre, heaps, 'blingite');
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.data.kg).toBeCloseTo(400, 6);
+    expect(collectedOre['blingite'] ?? 0).toBeCloseTo(0, 6);
+  });
+
+  it('leaves every other ore\'s stock alone', () => {
+    const { logistics, collectedOre } = stockOf({ blingite: 400, rustite: 250 });
+    sendOreToSpoilHeap(logistics, collectedOre, [pile(0)], 'blingite');
+    expect(collectedOre['rustite']).toBeCloseTo(250, 6);
+  });
+
+  it('the heaps gain the kg moved as barren stock: totalSpoilKg and rubbleStockKg rise', () => {
+    const { logistics, collectedOre } = stockOf({ blingite: 400 });
+    const heaps = [pile(1_000)];
+    const rubbleBefore = rubbleStockKg(logistics.fragments, heaps);
+    const r = sendOreToSpoilHeap(logistics, collectedOre, heaps, 'blingite');
+    if (!r.success) throw new Error(r.error);
+    expect(totalSpoilKg(heaps)).toBeCloseTo(1_000 + r.data.kg, 6);
+    expect(rubbleStockKg(logistics.fragments, heaps)).toBeCloseTo(rubbleBefore + r.data.kg, 6);
+  });
+
+  it('works for any ore grade, treranium included', () => {
+    const { logistics, collectedOre } = stockOf({ treranium: 90 });
+    const heaps = [pile(0)];
+    const r = sendOreToSpoilHeap(logistics, collectedOre, heaps, 'treranium');
+    expect(r.success).toBe(true);
+    expect(collectedOre['treranium'] ?? 0).toBeCloseTo(0, 6);
+    expect(totalSpoilKg(heaps)).toBeCloseTo(90, 6);
+  });
+
+  it('moves only what the heaps have room for', () => {
+    const { logistics, collectedOre } = stockOf({ blingite: 400 });
+    const heaps = [roomHeap(150)];
+    const r = sendOreToSpoilHeap(logistics, collectedOre, heaps, 'blingite');
+    if (!r.success) throw new Error(r.error);
+    expect(r.data.kg).toBeCloseTo(150, 6);
+    expect(collectedOre['blingite']).toBeCloseTo(250, 6);
+    expect(totalSpoilKg(heaps)).toBeCloseTo(SPOIL_HEAP_CAPACITY_KG - 150 + 150, 6);
+    expect(totalSpoilRoomKg(heaps)).toBeCloseTo(0, 6);
+  });
+
+  it('draws on the room of several heaps together', () => {
+    const { logistics, collectedOre } = stockOf({ blingite: 180 });
+    const heaps = [roomHeap(100), roomHeap(100)];
+    const before = totalSpoilKg(heaps);
+    const r = sendOreToSpoilHeap(logistics, collectedOre, heaps, 'blingite');
+    if (!r.success) throw new Error(r.error);
+    expect(r.data.kg).toBeCloseTo(180, 6);
+    expect(totalSpoilKg(heaps)).toBeCloseTo(before + 180, 6);
+    expect(collectedOre['blingite'] ?? 0).toBeCloseTo(0, 6);
+  });
+
+  it('fails and changes nothing when no heap has room', () => {
+    const { logistics, collectedOre } = stockOf({ blingite: 400 });
+    const heaps = [pile(SPOIL_HEAP_CAPACITY_KG)];
+    const r = sendOreToSpoilHeap(logistics, collectedOre, heaps, 'blingite');
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error.length).toBeGreaterThan(0);
+    expect(collectedOre['blingite']).toBeCloseTo(400, 6);
+    expect(heaps[0]!.storedSpoilKg).toBe(SPOIL_HEAP_CAPACITY_KG);
+  });
+
+  it('fails and changes nothing when there is no spoil heap at all', () => {
+    const { logistics, collectedOre } = stockOf({ blingite: 400 });
+    const massBefore = logistics.storedMassKg;
+    const r = sendOreToSpoilHeap(logistics, collectedOre, [], 'blingite');
+    expect(r.success).toBe(false);
+    expect(collectedOre['blingite']).toBeCloseTo(400, 6);
+    expect(logistics.storedMassKg).toBe(massBefore);
+  });
+
+  it('fails and changes nothing when the ore has no stock', () => {
+    const { logistics, collectedOre } = stockOf({ blingite: 400 });
+    const heaps = [pile(0)];
+    const r = sendOreToSpoilHeap(logistics, collectedOre, heaps, 'rustite');
+    expect(r.success).toBe(false);
+    expect(totalSpoilKg(heaps)).toBe(0);
+    expect(collectedOre['blingite']).toBeCloseTo(400, 6);
+  });
+
+  it('fails when the stock is below the epsilon', () => {
+    const { logistics, collectedOre } = stockOf({ blingite: 400 });
+    collectedOre['rustite'] = 1e-9;
+    const heaps = [pile(0)];
+    expect(sendOreToSpoilHeap(logistics, collectedOre, heaps, 'rustite').success).toBe(false);
+    expect(totalSpoilKg(heaps)).toBe(0);
+  });
+
+  it('fails for an unknown ore id, even with a stock under that name', () => {
+    const { logistics, collectedOre } = stockOf({ blingite: 400 });
+    collectedOre['unobtainium'] = 500;
+    const heaps = [pile(0)];
+    expect(sendOreToSpoilHeap(logistics, collectedOre, heaps, 'unobtainium').success).toBe(false);
+    expect(totalSpoilKg(heaps)).toBe(0);
+    expect(collectedOre['unobtainium']).toBe(500);
+  });
+
+  it('a second send of the same ore fails: nothing left to move', () => {
+    const { logistics, collectedOre } = stockOf({ blingite: 400 });
+    const heaps = [pile(0)];
+    expect(sendOreToSpoilHeap(logistics, collectedOre, heaps, 'blingite').success).toBe(true);
+    const after = totalSpoilKg(heaps);
+    expect(sendOreToSpoilHeap(logistics, collectedOre, heaps, 'blingite').success).toBe(false);
+    expect(totalSpoilKg(heaps)).toBe(after);
   });
 });

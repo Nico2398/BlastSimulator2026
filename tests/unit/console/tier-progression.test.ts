@@ -6,17 +6,17 @@ import { CONTRACTS_PER_REFRESH, CONTRACT_REFRESH_INTERVAL } from '../../../src/c
 import { gradeRung } from '../../../src/core/economy/MineGrade.js';
 import { meetTargets, tierTargets, perkTotals } from '../../helpers/gradeLadder.js';
 
-function sandbox(args = '') {
+function sandbox(args = '', biome = 'desert_badlands') {
   const { runner, ctx } = createRunner();
-  const started = runner.run(`sandbox start biome:desert_badlands seed:42 ${args}`.trim());
+  const started = runner.run(`sandbox start biome:${biome} seed:42 ${args}`.trim());
   expect(started.success, started.output).toBe(true);
   ctx.state!.events.eventFreqMultiplier = 0;
   return { runner, ctx, state: ctx.state! };
 }
 
-/** Empties the board, ticks to the next scheduled refresh (the pipeline refreshes on `CONTRACT_REFRESH_INTERVAL` boundaries), and counts the offers it posted. */
+/** Empties the board, ticks to the next scheduled refresh (the pipeline refreshes on `CONTRACT_REFRESH_INTERVAL` boundaries), and counts the offers it posted. A tropical site yields ores of every grade, so the grade-bound ore offers (#2278) never empty the board. */
 function offersPerRefresh(args: string): number {
-  const { runner, state } = sandbox(args);
+  const { runner, state } = sandbox(args, 'tropical');
   state.contracts.available = [];
   state.contracts.lastRefreshTick = state.tickCount - 10_000;
   runner.run(`tick ${CONTRACT_REFRESH_INTERVAL - (state.tickCount % CONTRACT_REFRESH_INTERVAL)}`);

@@ -5,7 +5,8 @@ import { createGame, createWorldState, type GameState } from '../../../src/core/
 import { generateTerrain, resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
-import { getAllOres } from '../../../src/core/world/OreCatalog.js';
+import { getAllOres, getOre } from '../../../src/core/world/OreCatalog.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { sandboxLevelDef, SANDBOX_DEFAULTS, SANDBOX_LEVEL_ID } from '../../../src/core/campaign/Sandbox.js';
 import {
   TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE,
@@ -663,5 +664,66 @@ describe('autoFulfilmentEnabled (#2145)', () => {
     tutorial.contracts.autoClearRubble = true;
     expect(autoFulfilmentEnabled(tutorial, 'autoSell')).toBe(false);
     expect(autoFulfilmentEnabled(tutorial, 'autoClearRubble')).toBe(true);
+  });
+});
+
+describe('resolveContractOres by permit grade (#2278)', () => {
+  const ALL_ORE_IDS = getAllOres().map(o => o.id);
+
+  function levelState(levelId: string, grade?: number): GameState {
+    const level = getLevel(levelId)!;
+    const state = createGame({ seed: level.terrainSeed, mineType: level.biome });
+    state.world = createWorldState(level.gridX, level.datum, level.gridZ, false);
+    state.world.mixedRockHardness = level.mixedRockHardness;
+    state.campaign.activeLevelId = levelId;
+    if (grade !== undefined) state.grade = { ...createGradeState(), grade };
+    return state;
+  }
+
+  it('on a site without a grade the ores are not grade-restricted', () => {
+    expect([...resolveContractOres(levelState('tutorial_pit'))].sort()).toEqual(['blingite', 'dirtite', 'rustite']);
+  });
+
+  it('grade 0 offers the G0 ores the site yields', () => {
+    expect([...resolveContractOres(levelState('tutorial_pit', 0))].sort()).toEqual(['dirtite', 'rustite']);
+  });
+
+  it('grade 1 offers the G1 ores the site yields, not the G0 ones', () => {
+    expect([...resolveContractOres(levelState('tutorial_pit', 1))]).toEqual(['blingite']);
+  });
+
+  it('a grade whose ores the site does not yield offers no ore', () => {
+    expect([...resolveContractOres(levelState('tutorial_pit', 2))]).toEqual([]);
+    expect([...resolveContractOres(levelState('tutorial_pit', 3))]).toEqual([]);
+  });
+
+  it('every level and grade: exactly the site\'s ores whose permit grade is the current grade (G3 for a class grade)', () => {
+    for (const level of getAllLevels()) {
+      const open = [...resolveContractOres(levelState(level.id))];
+      for (const grade of [0, 1, 2, 3, 4, 7]) {
+        const expected = open.filter(o => getOre(o)!.permitGrade === Math.min(grade, 3));
+        expect([...resolveContractOres(levelState(level.id, grade))], `${level.id} grade ${grade}`).toEqual(expected);
+      }
+    }
+  });
+
+  it('keeps ore catalog order', () => {
+    for (const grade of [0, 1, 2, 3]) {
+      const ores = [...resolveContractOres(levelState('treranium_depths', grade))];
+      expect(ores).toEqual(ALL_ORE_IDS.filter(o => ores.includes(o)));
+    }
+  });
+
+  it('an unknown biome with a grade falls back to that grade\'s ores', () => {
+    const at = (grade: number): GameState => {
+      const state = createGame({ seed: 1, mineType: 'no_such_biome' });
+      state.campaign.activeLevelId = null;
+      state.grade = { ...createGradeState(), grade };
+      return state;
+    };
+    expect([...resolveContractOres(at(0))].sort()).toEqual(['dirtite', 'rustite']);
+    expect([...resolveContractOres(at(2))].sort()).toEqual(['absurdium', 'craktonite']);
+    expect([...resolveContractOres(at(3))]).toEqual(['treranium']);
+    expect([...resolveContractOres(at(4))]).toEqual(['treranium']);
   });
 });

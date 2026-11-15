@@ -1,18 +1,19 @@
-// BlastSimulator2026 — Integration: stored ore sells itself on the menu-default sandbox (#2145).
+// BlastSimulator2026 — Integration: ore sells by grade on the sandbox (#2145, re-premised by #2278).
 //
-// A player who never opens the Contracts panel used to hoard every kilo until the warehouse
-// filled and hauling stopped. Ore no contract claims is now sold automatically, at a discount,
-// once it has waited a few ticks. `contract auto sell off` switches it off.
+// Each permit grade owns its ores. Contracts concern the current grade's ores; ores of lower
+// grades are a commodity that sells itself at a discount, at once; nothing sells itself at G0, so
+// a G0 player earns through base-ore contracts. `contract auto sell off` switches the sale off.
 //
 // Opening: desert_badlands, Digger kit, seed 12345, the 3x3 shot on the flattest ore pad and an
-// access ramp, as in ore-concentration-2142. The player never accepts or delivers a contract.
+// access ramp, as in ore-concentration-2142. The opening shot yields rustite (a G0 ore).
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { SANDBOX_FLAT_PAD_SIZE } from '../../src/core/config/balance.js';
-import { fundForDeliveryWait, clearBlastZone, playTick } from '../helpers/playthrough.js';
+import { fundForDeliveryWait, clearBlastZone, playTick, playContracts } from '../helpers/playthrough.js';
+import { getOre } from '../../src/core/world/OreCatalog.js';
 
 const BIOME = 'desert_badlands';
 const OPENING_SEED = 12345;
@@ -51,11 +52,14 @@ function flattestPad(grid: VoxelGrid, depthM: number): { x0: number; z0: number 
 
 const oreKg = (state: GameState): number => Object.values(state.collectedOre).reduce((a, b) => a + b, 0);
 
-/** Opening shot, access ramp, then `PLAY_TICKS` of ordinary play that never touches a contract. */
-function playOpening(autoSell: boolean | undefined) {
+/**
+ * Opening shot, access ramp, then `PLAY_TICKS` of ordinary play at permit `grade`. The player touches
+ * no contract unless `withContracts`, which plays them as the Contracts panel offers (`playContracts`).
+ */
+function playOpening(autoSell: boolean | undefined, grade: number, withContracts = false) {
   const { runner, ctx } = createRunner();
   const run = (c: string) => runner.run(c);
-  expect(run(`sandbox start biome:${BIOME} kit:digger seed:${OPENING_SEED}`)).toMatchObject({ success: true });
+  expect(run(`sandbox start biome:${BIOME} kit:digger seed:${OPENING_SEED} grade:${grade}`)).toMatchObject({ success: true });
   const state = ctx.state!;
   state.events.eventFreqMultiplier = 0; // a pending event halts `tick`
   if (autoSell === false) expect(run('contract auto sell off')).toMatchObject({ success: true });
@@ -82,15 +86,18 @@ function playOpening(autoSell: boolean | undefined) {
   for (let i = 0; i < PLAY_TICKS; i++) {
     refresh(state);
     playTick(run, state);
+    if (withContracts) playContracts(run, state);
     peakOreKg = Math.max(peakOreKg, oreKg(state));
   }
   const salesIncome = state.finances.transactions.filter(tx => tx.type === 'income' && tx.category === 'sales');
   return { state, run, salesIncome, peakOreKg, cashBeforePlay };
 }
 
-describe(`default sandbox: unclaimed ore sells itself (${BIOME}, Digger kit, seed ${OPENING_SEED}, #2145)`, () => {
+const lowerGradeOnly = (oreId: string, grade: number): boolean => (getOre(oreId)?.permitGrade ?? Infinity) < grade;
+
+describe(`G0 sandbox: nothing sells itself, ore waits for a contract (${BIOME}, Digger kit, seed ${OPENING_SEED}, #2278)`, () => {
   let played: ReturnType<typeof playOpening>;
-  beforeAll(() => { played = playOpening(undefined); }, T);
+  beforeAll(() => { played = playOpening(undefined, 0); }, T);
 
   it('the player never opened a contract: nothing was accepted by hand', () => {
     const { state } = played;
@@ -102,13 +109,70 @@ describe(`default sandbox: unclaimed ore sells itself (${BIOME}, Digger kit, see
     expect(played.peakOreKg).toBeGreaterThan(0);
   });
 
-  it('books sales income from the ore without any contract', () => {
+  it('books no sales income: automatic sale does not exist at G0', () => {
+    expect(played.salesIncome).toEqual([]);
+  });
+
+  it('keeps every kilo it hauled', () => {
+    const { state, peakOreKg } = played;
+    expect(oreKg(state)).toBeGreaterThanOrEqual(peakOreKg - 1);
+  });
+
+  it('the stored ore is all G0 ore, waiting', () => {
+    for (const oreId of Object.keys(played.state.collectedOre)) expect(getOre(oreId)!.permitGrade, oreId).toBe(0);
+  });
+});
+
+describe(`G0 sandbox: a player earns through base-ore contracts (${BIOME}, Digger kit, seed ${OPENING_SEED}, #2278)`, () => {
+  let played: ReturnType<typeof playOpening>;
+  beforeAll(() => { played = playOpening(undefined, 0, true); }, T);
+
+  it('the hauled ore brings in contract income', () => {
+    const income = played.state.finances.transactions.filter(tx => tx.type === 'income' && tx.category === 'contracts');
+    expect(income.length).toBeGreaterThan(0);
+  });
+
+  it('no automatic sale happens beside the contracts', () => {
+    expect(played.salesIncome).toEqual([]);
+  });
+
+  it('every ore contract the player filled named a G0 ore', () => {
+    const ore = played.state.contracts.completedHistory.filter(c => c.type !== 'rubble_disposal');
+    expect(ore.length).toBeGreaterThan(0);
+    for (const c of ore) expect(getOre(c.materialId)!.permitGrade, `contract #${c.id}`).toBe(0);
+  });
+
+  it('every ore offer on the board names a G0 ore', () => {
+    for (const c of played.state.contracts.available) {
+      if (c.type !== 'rubble_disposal') expect(getOre(c.materialId)!.permitGrade, `offer #${c.id}`).toBe(0);
+    }
+  });
+});
+
+describe(`G1 sandbox: lower-grade ore sells itself on top (${BIOME}, Digger kit, seed ${OPENING_SEED}, #2145, #2278)`, () => {
+  let played: ReturnType<typeof playOpening>;
+  beforeAll(() => { played = playOpening(undefined, 1); }, T);
+
+  it('the player never opened a contract: nothing was accepted by hand', () => {
+    const { state } = played;
+    const all = [...state.contracts.active, ...state.contracts.completedHistory];
+    for (const c of all) expect(c.autoAccepted, `contract #${c.id}`).toBe(true);
+  });
+
+  it('ore reached storage after the opening shot', () => {
+    expect(played.peakOreKg).toBeGreaterThan(0);
+  });
+
+  it('books sales income from the G0 ore without any contract', () => {
     expect(played.salesIncome.length).toBeGreaterThan(0);
     for (const tx of played.salesIncome) expect(tx.amount).toBeGreaterThan(0);
   });
 
-  it('every sales transaction is an auto sale of a named ore', () => {
-    for (const tx of played.salesIncome) expect(tx.description).toMatch(/^Auto sale: \w+/);
+  it('every sales transaction is an auto sale of a named ore of a lower grade', () => {
+    for (const tx of played.salesIncome) {
+      expect(tx.description).toMatch(/^Auto sale: \w+/);
+      expect(lowerGradeOnly(tx.description.replace('Auto sale: ', ''), 1), tx.description).toBe(true);
+    }
   });
 
   it('sold ore left storage: the warehouse holds less ore than was ever hauled in', () => {
@@ -122,9 +186,9 @@ describe(`default sandbox: unclaimed ore sells itself (${BIOME}, Digger kit, see
   });
 });
 
-describe(`autoSell off: ore stays in storage (${BIOME}, Digger kit, seed ${OPENING_SEED}, #2145)`, () => {
+describe(`G1 autoSell off: ore stays in storage (${BIOME}, Digger kit, seed ${OPENING_SEED}, #2145, #2278)`, () => {
   let played: ReturnType<typeof playOpening>;
-  beforeAll(() => { played = playOpening(false); }, T);
+  beforeAll(() => { played = playOpening(false, 1); }, T);
 
   it('the switch is recorded', () => {
     expect(played.state.contracts.autoSell).toBe(false);
@@ -143,11 +207,11 @@ describe(`autoSell off: ore stays in storage (${BIOME}, Digger kit, seed ${OPENI
     expect(oreKg(state)).toBeGreaterThanOrEqual(peakOreKg - 1);
   });
 
-  it('turning it back on sells the stock once the dwell has passed', () => {
+  it('turning it back on sells the stock at once, with no dwell', () => {
     const { state, run } = played;
     expect(run('contract auto sell on')).toMatchObject({ success: true });
     const before = state.finances.transactions.filter(tx => tx.category === 'sales').length;
-    for (let i = 0; i < 100; i++) { refresh(state); playTick(run, state); }
+    for (let i = 0; i < 3; i++) { refresh(state); playTick(run, state); }
     expect(state.finances.transactions.filter(tx => tx.category === 'sales').length).toBeGreaterThan(before);
   });
 });

@@ -18,6 +18,8 @@ import { BUYER_TIERS, buyerTierNameKey } from '../../../../src/core/economy/Buye
 import { oreSaturationTrend } from '../../../../src/core/economy/OreSaturation.js';
 import { resolveContractOres } from '../../../../src/core/campaign/Level.js';
 import { getOre } from '../../../../src/core/world/OreCatalog.js';
+import { oreValuePerKg } from '../../../../src/core/economy/Market.js';
+import type { Building } from '../../../../src/core/entities/Building.js';
 import { CONTRACT_EARLY_BONUS_DEADLINE_FRACTION, NEGOTIATION_MAX_IMPROVEMENT, NEGOTIATION_MAX_WORSENING } from '../../../../src/core/config/balance.js';
 
 function makeState(): GameState {
@@ -2561,5 +2563,149 @@ describe('ContractsPanel — delivery outlook (#2243)', () => {
     expect(fit(7).dataset['outlook']).toBe('covered');
     expect(fit(8).dataset['outlook']).toBe('will_miss');
     expect(fit(8).textContent).toBe(t('ui.outlook.offer_will_miss'));
+  });
+});
+
+// ── #2278: ore stock lines by grade, and sending an ore to the spoil heap ──
+
+describe('ContractsPanel ore stock lines (#2278)', () => {
+  const rowSel = (ore: string) => `[data-ore-stock-row="${ore}"]`;
+  const btnSel = (ore: string) => `[data-spoil-ore="${ore}"]`;
+  type ConfirmCfg = { title: string; body: string; onConfirm: () => void };
+
+  function stockedState(grade: number | undefined, stock: Record<string, number>): GameState {
+    const state = makeState();
+    state.tickCount = 100;
+    if (grade !== undefined) state.grade = { ...createGradeState(), grade };
+    for (const [ore, kg] of Object.entries(stock)) state.collectedOre[ore] = kg;
+    // One empty tier 1 spoil heap, so a send has room.
+    state.buildings.buildings.push({ id: 900, type: 'spoil_heap', tier: 1, storedSpoilKg: 0 } as unknown as Building);
+    return state;
+  }
+
+  function render(state: GameState) {
+    const made = makePanel();
+    made.panel.show();
+    made.panel.update(state);
+    return made;
+  }
+
+  /** setConfirmHandler is the panel's new seam to the shared confirm modal; collect what it is handed. */
+  function captureConfirms(panel: ContractsPanel): ConfirmCfg[] {
+    const configs: ConfirmCfg[] = [];
+    (panel as unknown as { setConfirmHandler(cb: (cfg: ConfirmCfg) => void): void }).setConfirmHandler(c => configs.push(c));
+    return configs;
+  }
+
+  const rowOf = (panel: ContractsPanel, ore: string): HTMLElement | null => panel.root.querySelector<HTMLElement>(rowSel(ore));
+
+  it('shows one row per stored ore, tagged with its status', () => {
+    const { panel } = render(stockedState(1, { dirtite: 300, blingite: 200, craktonite: 50 }));
+    expect(rowOf(panel, 'dirtite')!.dataset['status']).toBe('auto_sold');
+    expect(rowOf(panel, 'blingite')!.dataset['status']).toBe('waiting');
+    expect(rowOf(panel, 'craktonite')!.dataset['status']).toBe('above_grade');
+  });
+
+  it('shows no row for an ore with no stock', () => {
+    const { panel } = render(stockedState(1, { dirtite: 300 }));
+    expect(rowOf(panel, 'blingite')).toBeNull();
+    expect(panel.root.querySelectorAll('[data-ore-stock-row]')).toHaveLength(1);
+  });
+
+  it('shows no stock row at all when nothing is stored', () => {
+    const { panel } = render(stockedState(1, {}));
+    expect(panel.root.querySelectorAll('[data-ore-stock-row]')).toHaveLength(0);
+  });
+
+  it('prints the status in words the player can read', () => {
+    setLocale('en');
+    const { panel } = render(stockedState(1, { dirtite: 300, blingite: 200, craktonite: 50 }));
+    expect(rowOf(panel, 'dirtite')!.textContent).toMatch(/sold automatically/i);
+    expect(rowOf(panel, 'blingite')!.textContent).toMatch(/waiting for a contract/i);
+    expect(rowOf(panel, 'craktonite')!.textContent).toMatch(/above your grade/i);
+  });
+
+  it('a lower-grade ore waits once automatic sale is switched off', () => {
+    const state = stockedState(2, { dirtite: 300 });
+    state.contracts.autoSell = false;
+    const { panel } = render(state);
+    expect(rowOf(panel, 'dirtite')!.dataset['status']).toBe('waiting');
+  });
+
+  it('at grade 0 stored rustite waits for a contract', () => {
+    const { panel } = render(stockedState(0, { rustite: 100 }));
+    expect(rowOf(panel, 'rustite')!.dataset['status']).toBe('waiting');
+  });
+
+  it('on a site without a grade every stored ore waits', () => {
+    const { panel } = render(stockedState(undefined, { dirtite: 100, treranium: 10 }));
+    expect(rowOf(panel, 'dirtite')!.dataset['status']).toBe('waiting');
+    expect(rowOf(panel, 'treranium')!.dataset['status']).toBe('waiting');
+  });
+
+  it('a row appears and its status follows the state on the next update', () => {
+    const state = stockedState(1, {});
+    const { panel } = render(state);
+    state.collectedOre['dirtite'] = 80;
+    panel.update(state);
+    expect(rowOf(panel, 'dirtite')!.dataset['status']).toBe('auto_sold');
+    state.contracts.autoSell = false;
+    panel.update(state);
+    expect(rowOf(panel, 'dirtite')!.dataset['status']).toBe('waiting');
+  });
+
+  it('every row carries a spoil-heap button for its ore', () => {
+    const { panel } = render(stockedState(1, { dirtite: 300, craktonite: 50 }));
+    expect(rowOf(panel, 'dirtite')!.querySelector(btnSel('dirtite'))).not.toBeNull();
+    expect(rowOf(panel, 'craktonite')!.querySelector(btnSel('craktonite'))).not.toBeNull();
+    expect(panel.root.querySelectorAll('[data-spoil-ore]')).toHaveLength(2);
+  });
+
+  it('clicking the button asks for confirmation stating the kg and the value lost, and runs no command yet', () => {
+    const state = stockedState(1, { blingite: 300 });
+    const { panel, gameConsole } = render(state);
+    const configs = captureConfirms(panel);
+    panel.root.querySelector<HTMLButtonElement>(btnSel('blingite'))!.click();
+    expect(configs).toHaveLength(1);
+    const body = configs[0]!.body;
+    expect(body).toContain('300');
+    const lost = 300 * oreValuePerKg('blingite', state.contracts.market ?? 'legacy');
+    expect(body.includes(formatMoney(lost)) || body.includes(String(Math.round(lost)))).toBe(true);
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  it('states the kg as a whole number', () => {
+    const { panel } = render(stockedState(1, { blingite: 300.4 }));
+    const configs = captureConfirms(panel);
+    panel.root.querySelector<HTMLButtonElement>(btnSel('blingite'))!.click();
+    expect(configs[0]!.body).toContain('300');
+    expect(configs[0]!.body).not.toContain('300.4');
+  });
+
+  it('confirming runs `contract spoil <ore> confirm` through the game console', () => {
+    const { panel, gameConsole } = render(stockedState(1, { blingite: 300 }));
+    const configs = captureConfirms(panel);
+    panel.root.querySelector<HTMLButtonElement>(btnSel('blingite'))!.click();
+    configs[0]!.onConfirm();
+    expect(gameConsole).toHaveBeenCalledWith('contract spoil blingite confirm');
+  });
+
+  it('each ore\'s button confirms its own ore', () => {
+    const { panel, gameConsole } = render(stockedState(1, { dirtite: 300, craktonite: 50 }));
+    const configs = captureConfirms(panel);
+    panel.root.querySelector<HTMLButtonElement>(btnSel('craktonite'))!.click();
+    configs[0]!.onConfirm();
+    expect(gameConsole).toHaveBeenCalledTimes(1);
+    expect(gameConsole).toHaveBeenCalledWith('contract spoil craktonite confirm');
+  });
+
+  it('the confirmation names the ore at the heaps\' limit, not the full stock, when room is short', () => {
+    const state = stockedState(1, { blingite: 300 });
+    (state.buildings.buildings[state.buildings.buildings.length - 1] as { storedSpoilKg: number }).storedSpoilKg = 1_500_000 - 120;
+    const { panel } = render(state);
+    const configs = captureConfirms(panel);
+    panel.root.querySelector<HTMLButtonElement>(btnSel('blingite'))!.click();
+    expect(configs[0]!.body).toContain('120');
+    expect(configs[0]!.body).not.toMatch(/(?<![\d,.])300(?![\d,.])/);
   });
 });

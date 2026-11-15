@@ -561,22 +561,33 @@ describe('settleDelivery saturation (#1930)', () => {
   });
 });
 
-// ── Automatic ore sale and rubble clearance (#2145) ─────────────────────────
+// ── Automatic ore sale and rubble clearance (#2145, re-premised by grade in #2278) ──
 
 import {
   autoSellUnclaimedOre,
   autoAcceptRubbleClearances,
+  autoSellOreIds,
+  oreStockStatus,
+  spoilOrePreview,
 } from '../../../src/core/economy/ContractFulfilment.js';
-import { AUTO_SALE_DWELL_TICKS, AUTO_SALE_PRICE_FACTOR } from '../../../src/core/config/balance.js';
+import { AUTO_SALE_PRICE_FACTOR } from '../../../src/core/config/balance.js';
 import { oreValuePerKg } from '../../../src/core/economy/Market.js';
 import { saturationFactor } from '../../../src/core/economy/OreSaturation.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { createBoardState } from '../../../src/core/economy/Board.js';
+import { SPOIL_HEAP_CAPACITY_KG } from '../../../src/core/config/balance.js';
+import type { Building } from '../../../src/core/entities/Building.js';
 
-/** A game whose warehouse holds the given kg of each ore, as stored fragments plus the ledger. */
-function gameWithOre(stock: Record<string, number>, opts: { grade?: boolean } = {}): GameState {
+/**
+ * A game whose warehouse holds the given kg of each ore, as stored fragments plus the ledger.
+ * `opts.grade` makes it a progression site at that permit grade; without it the site has no grade.
+ */
+function gameWithOre(stock: Record<string, number>, opts: { grade?: number } = {}): GameState {
   const state = createGame({ seed: 42 });
-  if (opts.grade) state.grade = createGradeState();
+  if (opts.grade !== undefined) {
+    state.grade = createGradeState();
+    state.grade.grade = opts.grade;
+  }
   state.logistics = createLogisticsState(1_000_000);
   state.collectedOre = {};
   let id = 1;
@@ -590,247 +601,358 @@ function gameWithOre(stock: Record<string, number>, opts: { grade?: boolean } = 
   return state;
 }
 
-/** Pretend the ore has already sat unclaimed since tick 0. */
-function dwelled(state: GameState, ...ores: string[]): GameState {
-  state.contracts.autoSaleSince = Object.fromEntries(ores.map(o => [o, 0]));
-  return state;
-}
-
-const DWELLED_TICK = AUTO_SALE_DWELL_TICKS + 1;
+/** G0 ore: sold automatically from grade 1 up. */
+const LOWER = 'dirtite';
 const autoSaleIncome = (state: GameState) =>
   state.finances.transactions.filter(tx => tx.type === 'income' && tx.category === 'sales');
 
-describe('autoSellUnclaimedOre: the sale (#2145)', () => {
-  it('sells unclaimed ore after the dwell at the discounted market price and books it', () => {
-    const state = dwelled(gameWithOre({ blingite: 300 }), 'blingite');
+describe('autoSellUnclaimedOre: the sale (#2145, #2278)', () => {
+  it('sells lower-grade ore at the discounted market price and books it', () => {
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
     const cash = state.cash;
-    const sales = autoSellUnclaimedOre(state, DWELLED_TICK);
-    const price = AUTO_SALE_PRICE_FACTOR * oreValuePerKg('blingite', state.contracts.market) * saturationFactor(0);
+    const sales = autoSellUnclaimedOre(state, 0);
+    const price = AUTO_SALE_PRICE_FACTOR * oreValuePerKg(LOWER, state.contracts.market ?? 'legacy') * saturationFactor(0);
     expect(sales).toHaveLength(1);
-    expect(sales[0]!.oreId).toBe('blingite');
+    expect(sales[0]!.oreId).toBe(LOWER);
     expect(sales[0]!.kg).toBeCloseTo(300, 6);
     expect(sales[0]!.payment).toBeCloseTo(300 * price, 6);
     expect(state.cash).toBeCloseTo(cash + 300 * price, 6);
   });
 
   it('draws the ore out of storage', () => {
-    const state = dwelled(gameWithOre({ blingite: 300 }), 'blingite');
-    autoSellUnclaimedOre(state, DWELLED_TICK);
-    expect(state.collectedOre['blingite'] ?? 0).toBeCloseTo(0, 6);
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
+    autoSellUnclaimedOre(state, 0);
+    expect(state.collectedOre[LOWER] ?? 0).toBeCloseTo(0, 6);
   });
 
   it('books one sales income transaction labelled "Auto sale: <oreId>"', () => {
-    const state = dwelled(gameWithOre({ blingite: 300 }), 'blingite');
-    autoSellUnclaimedOre(state, DWELLED_TICK);
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
+    autoSellUnclaimedOre(state, 0);
     const income = autoSaleIncome(state);
     expect(income).toHaveLength(1);
-    expect(income[0]!.description).toBe('Auto sale: blingite');
-    expect(income[0]!.amount).toBeCloseTo(300 * AUTO_SALE_PRICE_FACTOR * oreValuePerKg('blingite', state.contracts.market), 6);
+    expect(income[0]!.description).toBe(`Auto sale: ${LOWER}`);
+    expect(income[0]!.amount).toBeCloseTo(300 * AUTO_SALE_PRICE_FACTOR * oreValuePerKg(LOWER, state.contracts.market ?? 'legacy'), 6);
   });
 
-  it('sells every unclaimed ore separately, each at its own price', () => {
-    const state = dwelled(gameWithOre({ blingite: 100, dirtite: 200 }), 'blingite', 'dirtite');
-    const sales = autoSellUnclaimedOre(state, DWELLED_TICK);
-    expect(sales.map(s => s.oreId).sort()).toEqual(['blingite', 'dirtite']);
-    const market = state.contracts.market;
-    expect(sales.find(s => s.oreId === 'blingite')!.payment).toBeCloseTo(100 * AUTO_SALE_PRICE_FACTOR * oreValuePerKg('blingite', market), 6);
+  it('sells every lower-grade ore separately, each at its own price', () => {
+    const state = gameWithOre({ rustite: 100, dirtite: 200 }, { grade: 1 });
+    const sales = autoSellUnclaimedOre(state, 0);
+    expect(sales.map(s => s.oreId).sort()).toEqual(['dirtite', 'rustite']);
+    const market = state.contracts.market ?? 'legacy';
+    expect(sales.find(s => s.oreId === 'rustite')!.payment).toBeCloseTo(100 * AUTO_SALE_PRICE_FACTOR * oreValuePerKg('rustite', market), 6);
     expect(sales.find(s => s.oreId === 'dirtite')!.payment).toBeCloseTo(200 * AUTO_SALE_PRICE_FACTOR * oreValuePerKg('dirtite', market), 6);
-    expect(autoSaleIncome(state).map(tx => tx.description).sort()).toEqual(['Auto sale: blingite', 'Auto sale: dirtite']);
+    expect(autoSaleIncome(state).map(tx => tx.description).sort()).toEqual(['Auto sale: dirtite', 'Auto sale: rustite']);
   });
 
   it('cuts the price by the ore\'s current saturation', () => {
-    const state = dwelled(gameWithOre({ blingite: 300 }, { grade: true }), 'blingite');
-    state.saturation = { blingite: { level: 0.8, tick: DWELLED_TICK } };
-    const sales = autoSellUnclaimedOre(state, DWELLED_TICK);
-    const price = AUTO_SALE_PRICE_FACTOR * oreValuePerKg('blingite', state.contracts.market) * saturationFactor(0.8);
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
+    state.saturation = { [LOWER]: { level: 0.8, tick: 0 } };
+    const sales = autoSellUnclaimedOre(state, 0);
+    const price = AUTO_SALE_PRICE_FACTOR * oreValuePerKg(LOWER, state.contracts.market ?? 'legacy') * saturationFactor(0.8);
     expect(sales[0]!.payment).toBeCloseTo(300 * price, 6);
   });
 
   it('sells nothing and returns an empty list when storage holds no ore', () => {
-    const state = gameWithOre({});
+    const state = gameWithOre({}, { grade: 1 });
     const cash = state.cash;
-    expect(autoSellUnclaimedOre(state, DWELLED_TICK)).toEqual([]);
+    expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
     expect(state.cash).toBe(cash);
     expect(state.finances.transactions).toEqual([]);
+  });
+
+  it('ignores stock below the fragment epsilon', () => {
+    const state = gameWithOre({}, { grade: 1 });
+    state.collectedOre[LOWER] = 1e-9;
+    expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
+    expect(state.finances.transactions).toEqual([]);
+  });
+});
+
+describe('autoSellUnclaimedOre: by grade (#2278)', () => {
+  it('sells at the very first call, with no dwell wait', () => {
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
+    expect(autoSellUnclaimedOre(state, 0)).toHaveLength(1);
+  });
+
+  it('sells at any tick, however early after the ore arrived', () => {
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
+    expect(autoSellUnclaimedOre(state, 7)).toHaveLength(1);
+    expect(state.collectedOre[LOWER] ?? 0).toBeCloseTo(0, 6);
+  });
+
+  it('sells nothing at grade 0, whatever the ore', () => {
+    const state = gameWithOre({ dirtite: 100, rustite: 100, blingite: 100, treranium: 100 }, { grade: 0 });
+    const cash = state.cash;
+    expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
+    expect(autoSellUnclaimedOre(state, 10_000)).toEqual([]);
+    expect(state.cash).toBe(cash);
+    expect(state.finances.transactions).toEqual([]);
+    expect(state.collectedOre['dirtite']).toBeCloseTo(100, 6);
+  });
+
+  it('sells nothing on a site without a grade', () => {
+    const state = gameWithOre({ dirtite: 100, rustite: 100, blingite: 100 });
+    expect(state.grade).toBeUndefined();
+    expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
+    expect(autoSellUnclaimedOre(state, 10_000)).toEqual([]);
+    expect(state.finances.transactions).toEqual([]);
+  });
+
+  it('never sells current-grade ore', () => {
+    const state = gameWithOre({ blingite: 300, gloomium: 100, sparkium: 50 }, { grade: 1 });
+    const cash = state.cash;
+    expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
+    expect(autoSellUnclaimedOre(state, 10_000)).toEqual([]);
+    expect(state.cash).toBe(cash);
+    expect(state.collectedOre['blingite']).toBeCloseTo(300, 6);
+  });
+
+  it('never sells higher-grade ore', () => {
+    const state = gameWithOre({ craktonite: 300, treranium: 100 }, { grade: 1 });
+    expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
+    expect(autoSellUnclaimedOre(state, 10_000)).toEqual([]);
+    expect(state.collectedOre['craktonite']).toBeCloseTo(300, 6);
+    expect(state.collectedOre['treranium']).toBeCloseTo(100, 6);
+  });
+
+  it('sells only the lower grades of a mixed stock at grade 2', () => {
+    const state = gameWithOre({ dirtite: 100, rustite: 100, blingite: 100, craktonite: 100, treranium: 100 }, { grade: 2 });
+    const sales = autoSellUnclaimedOre(state, 0);
+    expect(sales.map(s => s.oreId).sort()).toEqual(['blingite', 'dirtite', 'rustite']);
+    expect(state.collectedOre['craktonite']).toBeCloseTo(100, 6);
+    expect(state.collectedOre['treranium']).toBeCloseTo(100, 6);
+  });
+
+  it('a class grade above 3 sells every ore below G3 and keeps treranium', () => {
+    const state = gameWithOre({ dirtite: 100, craktonite: 100, treranium: 100 }, { grade: 5 });
+    const sales = autoSellUnclaimedOre(state, 0);
+    expect(sales.map(s => s.oreId).sort()).toEqual(['craktonite', 'dirtite']);
+    expect(state.collectedOre['treranium']).toBeCloseTo(100, 6);
   });
 });
 
 describe('autoSellUnclaimedOre: claims (#2145)', () => {
   it('never sells ore an active contract claims in full', () => {
-    const state = dwelled(gameWithOre({ blingite: 100 }), 'blingite');
-    state.contracts.active.push(contract({ quantityKg: 100 }));
+    const state = gameWithOre({ [LOWER]: 100 }, { grade: 1 });
+    state.contracts.active.push(contract({ materialId: LOWER, quantityKg: 100 }));
     const cash = state.cash;
-    expect(autoSellUnclaimedOre(state, DWELLED_TICK)).toEqual([]);
+    expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
     expect(state.cash).toBe(cash);
-    expect(state.collectedOre['blingite']).toBeCloseTo(100, 6);
+    expect(state.collectedOre[LOWER]).toBeCloseTo(100, 6);
   });
 
   it('sells only the unclaimed remainder of part-claimed ore', () => {
-    const state = dwelled(gameWithOre({ blingite: 300 }), 'blingite');
-    state.contracts.active.push(contract({ quantityKg: 100 }));
-    const sales = autoSellUnclaimedOre(state, DWELLED_TICK);
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
+    state.contracts.active.push(contract({ materialId: LOWER, quantityKg: 100 }));
+    const sales = autoSellUnclaimedOre(state, 0);
     expect(sales).toHaveLength(1);
     expect(sales[0]!.kg).toBeCloseTo(200, 6);
-    expect(state.collectedOre['blingite']).toBeCloseTo(100, 6);
+    expect(state.collectedOre[LOWER]).toBeCloseTo(100, 6);
   });
 
   it('claims only what the contract still needs: delivered kg no longer claims stock', () => {
-    const state = dwelled(gameWithOre({ blingite: 300 }), 'blingite');
-    state.contracts.active.push(contract({ quantityKg: 100, deliveredKg: 60 }));
-    const sales = autoSellUnclaimedOre(state, DWELLED_TICK);
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
+    state.contracts.active.push(contract({ materialId: LOWER, quantityKg: 100, deliveredKg: 60 }));
+    const sales = autoSellUnclaimedOre(state, 0);
     expect(sales[0]!.kg).toBeCloseTo(260, 6);
-    expect(state.collectedOre['blingite']).toBeCloseTo(40, 6);
+    expect(state.collectedOre[LOWER]).toBeCloseTo(40, 6);
   });
 
   it('a held contract still claims its ore', () => {
-    const state = dwelled(gameWithOre({ blingite: 100 }), 'blingite');
-    state.contracts.active.push(contract({ quantityKg: 100, held: true }));
-    expect(autoSellUnclaimedOre(state, DWELLED_TICK)).toEqual([]);
-    expect(state.collectedOre['blingite']).toBeCloseTo(100, 6);
+    const state = gameWithOre({ [LOWER]: 100 }, { grade: 1 });
+    state.contracts.active.push(contract({ materialId: LOWER, quantityKg: 100, held: true }));
+    expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
+    expect(state.collectedOre[LOWER]).toBeCloseTo(100, 6);
   });
 
   it('claims of several contracts for one ore add up', () => {
-    const state = dwelled(gameWithOre({ blingite: 300 }), 'blingite');
-    state.contracts.active.push(contract({ id: 1, quantityKg: 100 }), contract({ id: 2, type: 'supply', quantityKg: 150 }));
-    const sales = autoSellUnclaimedOre(state, DWELLED_TICK);
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
+    state.contracts.active.push(
+      contract({ id: 1, materialId: LOWER, quantityKg: 100 }),
+      contract({ id: 2, materialId: LOWER, type: 'supply', quantityKg: 150 }),
+    );
+    const sales = autoSellUnclaimedOre(state, 0);
     expect(sales[0]!.kg).toBeCloseTo(50, 6);
   });
 
   it('a claim larger than the stock sells nothing', () => {
-    const state = dwelled(gameWithOre({ blingite: 100 }), 'blingite');
-    state.contracts.active.push(contract({ quantityKg: 500 }));
-    expect(autoSellUnclaimedOre(state, DWELLED_TICK)).toEqual([]);
+    const state = gameWithOre({ [LOWER]: 100 }, { grade: 1 });
+    state.contracts.active.push(contract({ materialId: LOWER, quantityKg: 500 }));
+    expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
   });
 
   it('a contract for another ore does not protect this one', () => {
-    const state = dwelled(gameWithOre({ blingite: 100, dirtite: 100 }), 'blingite', 'dirtite');
+    const state = gameWithOre({ rustite: 100, dirtite: 100 }, { grade: 1 });
     state.contracts.active.push(contract({ materialId: 'dirtite', quantityKg: 100 }));
-    const sales = autoSellUnclaimedOre(state, DWELLED_TICK);
-    expect(sales.map(s => s.oreId)).toEqual(['blingite']);
+    const sales = autoSellUnclaimedOre(state, 0);
+    expect(sales.map(s => s.oreId)).toEqual(['rustite']);
     expect(state.collectedOre['dirtite']).toBeCloseTo(100, 6);
   });
-});
 
-describe('autoSellUnclaimedOre: dwell (#2145)', () => {
-  it('records the tick an ore was first seen unclaimed, and sells nothing yet', () => {
-    const state = gameWithOre({ blingite: 300 });
-    expect(autoSellUnclaimedOre(state, 7)).toEqual([]);
-    expect(state.contracts.autoSaleSince!['blingite']).toBe(7);
-    expect(state.collectedOre['blingite']).toBeCloseTo(300, 6);
-  });
-
-  it('keeps the first-seen tick on later calls', () => {
-    const state = gameWithOre({ blingite: 300 });
-    autoSellUnclaimedOre(state, 7);
-    autoSellUnclaimedOre(state, 9);
-    expect(state.contracts.autoSaleSince!['blingite']).toBe(7);
-  });
-
-  it('sells nothing before the dwell has elapsed', () => {
-    const state = gameWithOre({ blingite: 300 });
-    autoSellUnclaimedOre(state, 100);
-    const cash = state.cash;
-    expect(autoSellUnclaimedOre(state, 100 + AUTO_SALE_DWELL_TICKS - 1)).toEqual([]);
-    expect(state.cash).toBe(cash);
-    expect(state.collectedOre['blingite']).toBeCloseTo(300, 6);
-  });
-
-  it('sells once the dwell has elapsed since the first sighting', () => {
-    const state = gameWithOre({ blingite: 300 });
-    autoSellUnclaimedOre(state, 100);
-    const sales = autoSellUnclaimedOre(state, 100 + AUTO_SALE_DWELL_TICKS + 1);
-    expect(sales).toHaveLength(1);
-    expect(sales[0]!.kg).toBeCloseTo(300, 6);
-  });
-
-  it('claiming all the stock resets the dwell', () => {
-    const state = gameWithOre({ blingite: 100 });
-    autoSellUnclaimedOre(state, 0);
-    state.contracts.active.push(contract({ quantityKg: 100 }));
-    expect(autoSellUnclaimedOre(state, 10)).toEqual([]);
-    state.contracts.active.length = 0; // contract gone: the ore is unclaimed again, but its clock restarts
-    expect(autoSellUnclaimedOre(state, 11)).toEqual([]);
-    expect(autoSellUnclaimedOre(state, 11 + AUTO_SALE_DWELL_TICKS - 1)).toEqual([]);
-    expect(autoSellUnclaimedOre(state, 11 + AUTO_SALE_DWELL_TICKS + 1)).toHaveLength(1);
-  });
-
-  it('an empty store resets the dwell', () => {
-    const state = gameWithOre({ blingite: 100 });
-    autoSellUnclaimedOre(state, 0);
-    state.collectedOre['blingite'] = 0;
-    state.logistics.fragments.length = 0;
-    expect(autoSellUnclaimedOre(state, 10)).toEqual([]);
-    const restocked = gameWithOre({ blingite: 100 });
-    state.logistics = restocked.logistics;
-    state.collectedOre = restocked.collectedOre;
-    expect(autoSellUnclaimedOre(state, 11)).toEqual([]);
-    expect(autoSellUnclaimedOre(state, 11 + AUTO_SALE_DWELL_TICKS - 1)).toEqual([]);
-    expect(autoSellUnclaimedOre(state, 11 + AUTO_SALE_DWELL_TICKS + 1)).toHaveLength(1);
-  });
-
-  it('ores keep separate dwell clocks', () => {
-    const state = gameWithOre({ blingite: 100 });
-    autoSellUnclaimedOre(state, 0);
-    const extra = gameWithOre({ dirtite: 50 });
-    state.logistics.fragments.push(...extra.logistics.fragments);
-    state.logistics.storedMassKg += extra.logistics.storedMassKg;
-    state.collectedOre['dirtite'] = 50;
-    autoSellUnclaimedOre(state, 15);
-    const sales = autoSellUnclaimedOre(state, AUTO_SALE_DWELL_TICKS + 1);
-    expect(sales.map(s => s.oreId)).toEqual(['blingite']);
-    expect(state.collectedOre['dirtite']).toBeCloseTo(50, 6);
+  it('a completed or expired contract no longer claims its ore', () => {
+    const state = gameWithOre({ [LOWER]: 100 }, { grade: 1 });
+    state.contracts.active.push(contract({ materialId: LOWER, quantityKg: 100, completed: true }));
+    expect(autoSellUnclaimedOre(state, 0)).toHaveLength(1);
   });
 });
 
 describe('autoSellUnclaimedOre: saturation and grade (#2145)', () => {
   it('records the sale against the ore\'s market saturation', () => {
-    const state = dwelled(gameWithOre({ dirtite: 10_000 }, { grade: true }), 'dirtite');
+    const state = gameWithOre({ dirtite: 10_000 }, { grade: 1 });
     expect(state.saturation).toBeUndefined();
-    autoSellUnclaimedOre(state, DWELLED_TICK);
-    expect(saturationAt(state.saturation!['dirtite'], DWELLED_TICK)).toBeGreaterThan(0);
+    autoSellUnclaimedOre(state, 0);
+    expect(saturationAt(state.saturation!['dirtite'], 0)).toBeGreaterThan(0);
   });
 
   it('counts the kg toward mine grade ore delivered', () => {
-    const state = dwelled(gameWithOre({ blingite: 300 }, { grade: true }), 'blingite');
-    autoSellUnclaimedOre(state, DWELLED_TICK);
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
+    autoSellUnclaimedOre(state, 0);
     expect(state.grade!.oreDeliveredKg).toBeCloseTo(300, 6);
   });
 
   it('counts the kg toward the board\'s ore tally', () => {
-    const state = dwelled(gameWithOre({ blingite: 300 }, { grade: true }), 'blingite');
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
     state.board = createBoardState({ quarterTicks: 1000, oreTargetT: 10, profitTarget: 1000 }, 0);
-    autoSellUnclaimedOre(state, DWELLED_TICK);
+    autoSellUnclaimedOre(state, 0);
     expect(state.board.oreDeliveredKg).toBeCloseTo(300, 6);
   });
 
   it('a second sale of the same ore pays less than the first', () => {
-    const state = dwelled(gameWithOre({ dirtite: 10_000 }, { grade: true }), 'dirtite');
-    const first = autoSellUnclaimedOre(state, DWELLED_TICK)[0]!;
+    const state = gameWithOre({ dirtite: 10_000 }, { grade: 1 });
+    const first = autoSellUnclaimedOre(state, 0)[0]!;
     const more = gameWithOre({ dirtite: 10_000 });
     state.logistics = more.logistics;
     state.collectedOre = more.collectedOre;
-    state.contracts.autoSaleSince = { dirtite: 0 };
-    const second = autoSellUnclaimedOre(state, DWELLED_TICK)[0]!;
+    const second = autoSellUnclaimedOre(state, 0)[0]!;
     expect(second.payment / second.kg).toBeLessThan(first.payment / first.kg);
   });
 });
 
 describe('autoSellUnclaimedOre: switch (#2145)', () => {
   it('sells nothing with autoSell false, however long the ore has waited', () => {
-    const state = dwelled(gameWithOre({ blingite: 300 }, { grade: true }), 'blingite');
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
     state.contracts.autoSell = false;
     const cash = state.cash;
-    expect(autoSellUnclaimedOre(state, DWELLED_TICK + 1000)).toEqual([]);
+    expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
+    expect(autoSellUnclaimedOre(state, 1000)).toEqual([]);
     expect(state.cash).toBe(cash);
-    expect(state.collectedOre['blingite']).toBeCloseTo(300, 6);
+    expect(state.collectedOre[LOWER]).toBeCloseTo(300, 6);
     expect(state.finances.transactions).toEqual([]);
     expect(state.saturation).toBeUndefined();
   });
 
   it('sells with autoSell explicitly true', () => {
-    const state = dwelled(gameWithOre({ blingite: 300 }), 'blingite');
+    const state = gameWithOre({ [LOWER]: 300 }, { grade: 1 });
     state.contracts.autoSell = true;
-    expect(autoSellUnclaimedOre(state, DWELLED_TICK)).toHaveLength(1);
+    expect(autoSellUnclaimedOre(state, 0)).toHaveLength(1);
+  });
+});
+
+describe('autoSellOreIds (#2278)', () => {
+  it('lists nothing at grade 0 or without a grade', () => {
+    expect(autoSellOreIds(0)).toEqual([]);
+    expect(autoSellOreIds(undefined)).toEqual([]);
+  });
+
+  it('at grade 1 lists the G0 ores', () => {
+    expect([...autoSellOreIds(1)].sort()).toEqual(['dirtite', 'rustite']);
+  });
+
+  it('at grade 2 lists the G0 and G1 ores', () => {
+    expect([...autoSellOreIds(2)].sort()).toEqual(['blingite', 'dirtite', 'gloomium', 'rustite', 'sparkium']);
+  });
+
+  it('at grade 3 lists every ore but treranium', () => {
+    const ids = autoSellOreIds(3);
+    expect(ids).toHaveLength(7);
+    expect(ids).not.toContain('treranium');
+  });
+
+  it('a class grade above 3 lists the same ores as grade 3', () => {
+    expect([...autoSellOreIds(4)].sort()).toEqual([...autoSellOreIds(3)].sort());
+  });
+});
+
+describe('oreStockStatus (#2278)', () => {
+  it('an ore of a lower grade is auto_sold when automatic sale is on', () => {
+    expect(oreStockStatus('dirtite', 1, true)).toBe('auto_sold');
+    expect(oreStockStatus('blingite', 2, true)).toBe('auto_sold');
+    expect(oreStockStatus('craktonite', 3, true)).toBe('auto_sold');
+  });
+
+  it('a lower-grade ore waits when automatic sale is off', () => {
+    expect(oreStockStatus('dirtite', 1, false)).toBe('waiting');
+    expect(oreStockStatus('blingite', 3, false)).toBe('waiting');
+  });
+
+  it('a current-grade ore waits for a contract, whatever the switch', () => {
+    expect(oreStockStatus('rustite', 0, true)).toBe('waiting');
+    expect(oreStockStatus('rustite', 0, false)).toBe('waiting');
+    expect(oreStockStatus('gloomium', 1, true)).toBe('waiting');
+    expect(oreStockStatus('treranium', 3, true)).toBe('waiting');
+  });
+
+  it('a higher-grade ore is above_grade, whatever the switch', () => {
+    expect(oreStockStatus('blingite', 0, true)).toBe('above_grade');
+    expect(oreStockStatus('blingite', 0, false)).toBe('above_grade');
+    expect(oreStockStatus('treranium', 2, true)).toBe('above_grade');
+  });
+
+  it('without a grade every ore waits', () => {
+    expect(oreStockStatus('dirtite', undefined, true)).toBe('waiting');
+    expect(oreStockStatus('treranium', undefined, true)).toBe('waiting');
+    expect(oreStockStatus('dirtite', undefined, false)).toBe('waiting');
+  });
+
+  it('a class grade above 3 counts as grade 3', () => {
+    expect(oreStockStatus('treranium', 5, true)).toBe('waiting');
+    expect(oreStockStatus('craktonite', 5, true)).toBe('auto_sold');
+  });
+});
+
+/** A game holding `ore` in the warehouse and one tier 1 spoil heap with `heapRoomKg` of room left. */
+function gameWithHeap(ore: Record<string, number>, heapRoomKg: number): GameState {
+  const state = gameWithOre(ore, { grade: 1 });
+  const heap = { id: 1, type: 'spoil_heap', tier: 1, storedSpoilKg: SPOIL_HEAP_CAPACITY_KG - heapRoomKg } as unknown as Building;
+  state.buildings.buildings.push(heap);
+  return state;
+}
+
+describe('spoilOrePreview (#2278)', () => {
+  it('reports the stock and its market value when the heaps have room', () => {
+    const state = gameWithHeap({ blingite: 300 }, 10_000);
+    const preview = spoilOrePreview(state, 'blingite');
+    expect(preview.kg).toBeCloseTo(300, 6);
+    expect(preview.valueLost).toBeCloseTo(300 * oreValuePerKg('blingite', state.contracts.market ?? 'legacy'), 6);
+  });
+
+  it('caps the kg at the heaps\' total room and prices only that', () => {
+    const state = gameWithHeap({ blingite: 300 }, 120);
+    const preview = spoilOrePreview(state, 'blingite');
+    expect(preview.kg).toBeCloseTo(120, 6);
+    expect(preview.valueLost).toBeCloseTo(120 * oreValuePerKg('blingite', state.contracts.market ?? 'legacy'), 6);
+  });
+
+  it('reports nothing when no heap has room', () => {
+    const state = gameWithHeap({ blingite: 300 }, 0);
+    expect(spoilOrePreview(state, 'blingite')).toEqual({ kg: 0, valueLost: 0 });
+  });
+
+  it('reports nothing for an ore with no stock', () => {
+    const state = gameWithHeap({ blingite: 300 }, 10_000);
+    expect(spoilOrePreview(state, 'rustite')).toEqual({ kg: 0, valueLost: 0 });
+  });
+
+  it('values the ore at the state\'s market', () => {
+    const state = gameWithHeap({ blingite: 100 }, 10_000);
+    state.contracts.market = 'production';
+    expect(spoilOrePreview(state, 'blingite').valueLost).toBeCloseTo(100 * oreValuePerKg('blingite', 'production'), 6);
+  });
+
+  it('changes nothing in the state', () => {
+    const state = gameWithHeap({ blingite: 300 }, 10_000);
+    spoilOrePreview(state, 'blingite');
+    expect(state.collectedOre['blingite']).toBeCloseTo(300, 6);
   });
 });
 

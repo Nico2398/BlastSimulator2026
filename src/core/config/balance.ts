@@ -2496,8 +2496,6 @@ export const OPERATING_INCOME_CATEGORIES = ['sales', 'contracts'] as const;
 
 /** Share of the board's base ore price an automatic sale of unclaimed stored ore pays (#2145). */
 export const AUTO_SALE_PRICE_FACTOR = 0.6;
-/** Ticks stored ore must stay unclaimed by any contract before it is sold automatically (#2145). */
-export const AUTO_SALE_DWELL_TICKS = 20;
 
 /** Base demolition duration (ticks) per footprint cell, before tier scaling (#1392). */
 export const DEMOLITION_BASE_TICKS_PER_FOOTPRINT_CELL = 3;

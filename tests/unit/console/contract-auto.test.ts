@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../../src/console/createRunner.js';
 import { autoFulfilmentEnabled } from '../../../src/core/campaign/Level.js';
+import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 
 function sandbox() {
   const { runner, ctx } = createRunner();
@@ -65,5 +66,46 @@ describe('contract auto (#2145)', () => {
     expect(runner.run('contract auto rubble 1').success).toBe(false);
     expect(state.contracts.autoSell).toBeUndefined();
     expect(state.contracts.autoClearRubble).toBeUndefined();
+  });
+});
+
+describe('contract auto names the ores automatic sale covers (#2278)', () => {
+  const ALL = ['dirtite', 'rustite', 'blingite', 'gloomium', 'sparkium', 'craktonite', 'absurdium', 'treranium'];
+  const nameOf = (ore: string): string => t(`ore.${ore}.name`);
+
+  function siteAt(grade: number) {
+    setLocale('en');
+    const { runner } = createRunner();
+    expect(runner.run(`sandbox start biome:desert_badlands kit:full seed:42 grade:${grade}`).success).toBe(true);
+    return runner;
+  }
+
+  it('at grade 0 it names no ore: nothing sells automatically', () => {
+    const r = siteAt(0).run('contract auto');
+    expect(r.success).toBe(true);
+    for (const ore of ALL) expect(r.output, ore).not.toContain(nameOf(ore));
+  });
+
+  it('at grade 1 it names the G0 ores and no other', () => {
+    const r = siteAt(1).run('contract auto');
+    expect(r.success).toBe(true);
+    for (const ore of ['dirtite', 'rustite']) expect(r.output, ore).toContain(nameOf(ore));
+    for (const ore of ['blingite', 'gloomium', 'sparkium', 'craktonite', 'absurdium', 'treranium']) expect(r.output, ore).not.toContain(nameOf(ore));
+  });
+
+  it('at grade 2 it names the G0 and G1 ores, never the G2 or G3 ones', () => {
+    const r = siteAt(2).run('contract auto');
+    for (const ore of ['dirtite', 'rustite', 'blingite', 'gloomium', 'sparkium']) expect(r.output, ore).toContain(nameOf(ore));
+    for (const ore of ['craktonite', 'absurdium', 'treranium']) expect(r.output, ore).not.toContain(nameOf(ore));
+  });
+
+  it('the listing differs between grade 0 and grade 1', () => {
+    expect(siteAt(1).run('contract auto').output).not.toBe(siteAt(0).run('contract auto').output);
+  });
+
+  it('switching sale off keeps the command succeeding', () => {
+    const runner = siteAt(1);
+    expect(runner.run('contract auto sell off').success).toBe(true);
+    expect(runner.run('contract auto').success).toBe(true);
   });
 });
