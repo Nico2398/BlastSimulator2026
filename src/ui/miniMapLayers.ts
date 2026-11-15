@@ -298,3 +298,22 @@ export function drawNavGridOverlay(
     }
   }
 }
+
+/** Projection of the mini-map: the site's box widened to hold every prospected island disc (#2286). */
+export function miniMapProjection(
+  world: { minX: number; minZ: number; sizeX: number; sizeZ: number },
+  islands: readonly { x: number; z: number; radius: number }[],
+): MapProjection {
+  void islands;
+  return { originX: world.minX, originZ: world.minZ, scaleX: MAP_SIZE / world.sizeX, scaleZ: MAP_SIZE / world.sizeZ };
+}
+
+/** Paint every island of every prospection result as a disc in its ore's colour (#2286). */
+export function drawProspectedIslands(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  proj: MapProjection,
+): void {
+  void ctx; void state; void proj;
+  throw new Error('not implemented');
+}

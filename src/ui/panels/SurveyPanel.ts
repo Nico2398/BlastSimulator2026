@@ -377,6 +377,7 @@ export class SurveyPanel extends PanelBase {
       case 'core_sample': return t('ui.survey.note_core_sample');
       case 'seismic': return t('ui.survey.note_seismic', { radius: SEISMIC_SURVEY_DAMAGE_RADIUS, hp: SEISMIC_SURVEY_DAMAGE_HP });
       case 'aerial': return t('ui.survey.note_aerial');
+      case 'prospection': return t('ui.survey.note_prospection');
     }
   }
 
