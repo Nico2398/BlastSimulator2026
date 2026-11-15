@@ -17,6 +17,7 @@ export function isColumnInSurveyDisc(
   x: number,
   z: number,
 ): boolean {
+  if (survey.method === 'prospection') return false; // an island map reads no column
   const dx = x - survey.centerX;
   const dz = z - survey.centerZ;
   return Math.sqrt(dx * dx + dz * dz) <= SURVEY_COVERAGE_RADIUS[survey.method];
@@ -39,7 +40,7 @@ export function markSurveysStaleByBlast(
   const columns = clearedColumns.map(parseColumnKey);
   let marked = 0;
   for (const survey of surveys) {
-    if (isSurveyStale(survey)) continue;
+    if (isSurveyStale(survey) || survey.method === 'prospection') continue; // an island map outlives every blast
     if (columns.some(c => isColumnInSurveyDisc(survey, c.x, c.z))) {
       survey.stale = true;
       marked++;

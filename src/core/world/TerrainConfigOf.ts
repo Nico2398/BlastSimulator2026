@@ -3,7 +3,7 @@
 
 import type { GameState, WorldState } from '../state/GameState.js';
 import { getBiome } from './BiomeCatalog.js';
-import { type TerrainConfig } from './TerrainGen.js';
+import { buildTerrainContext, type TerrainConfig } from './TerrainGen.js';
 import type { OreIsland } from './OreIslands.js';
 import type { PitMaskShape } from '../config/balance.js';
 
@@ -46,6 +46,6 @@ export function terrainConfigOf(state: GameState): TerrainConfig | null {
 
 /** Every ore island of the state's world (#2286); empty with no terrain config or no deposits. */
 export function oreIslandsOf(state: GameState): readonly OreIsland[] {
-  void state;
-  throw new Error('not implemented');
+  const config = terrainConfigOf(state);
+  return config ? buildTerrainContext(config).oreIslands?.list() ?? [] : [];
 }

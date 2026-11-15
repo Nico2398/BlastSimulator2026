@@ -19,7 +19,7 @@ import { buildDepthProfile, type SurveyDepthBand } from './SurveyDepthProfile.js
 import { surveyColumnKey } from './SurveyColumn.js';
 import { isColumnInSurveyDisc } from './SurveyStaleness.js';
 import { surveyMethodGate, surveyDepthM } from './SurveyGate.js';
-import type { ProspectedIsland } from './SurveyProspection.js';
+import { prospectIslands, type ProspectedIsland } from './SurveyProspection.js';
 import type { OreIsland } from '../world/OreIslands.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 
@@ -127,7 +127,11 @@ export function estimateSurveyResult(
   rng: Random,
 ): SurveyResult {
   const { id, method, centerX, centerZ, surveyorId, skillLevel, completedTick, grade } = params;
-  if (method === 'prospection') throw new Error('not implemented');
+  if (method === 'prospection') {
+    const confidence = clamp(1 - SURVEY_BASE_ERROR.prospection * (1 - (skillLevel - 1) * SURVEY_SKILL_BONUS_PER_LEVEL), 0, 1);
+    const found = prospectIslands(params.islands ?? [], { centerX, centerZ, skillLevel }, rng);
+    return { id, method, centerX, centerZ, surveyorId, completedTick, estimates: {}, confidence, islands: found };
+  }
   const depthM = surveyDepthM(method, grade);
 
   const skillBonus = (skillLevel - 1) * SURVEY_SKILL_BONUS_PER_LEVEL;
