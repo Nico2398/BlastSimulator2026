@@ -1,0 +1,142 @@
+{
+  "name": "long-range-prospection",
+  "description": "#2286: at grade 2 a player runs a long-range prospection from the Survey panel (no point pick), and the islands it finds appear on the minimap in their ore colours and in the results list; clicking one centres the camera on it.",
+  "steps": [
+    {
+      "command": "sandbox start biome:green_foothills seed:42 grade:2",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:green_foothills seed:42 grade:2"
+        }
+      ],
+      "description": "Grade 2 site: the prospection method is open.",
+      "expect": {
+        "equals": {
+          "surveyCount": 1
+        },
+        "note": "the sandbox starts with one free starter survey"
+      }
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -1200
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 5 skill:geology level:5",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 5 skill:geology level:5"
+        }
+      ],
+      "description": "Test-only bootstrap: raises the new surveyor to the top skill so the island map carries no noise. The player-facing path is `employee train`."
+    },
+    {
+      "command": "survey prospection",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"prospection\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        }
+      ],
+      "description": "Run straight from the base: no tile pick opens, the survey is queued and paid for.",
+      "expect": {
+        "changedBy": {
+          "cash": -12000
+        },
+        "equals": {
+          "surveyCount": 1
+        },
+        "note": "arrival-gated: queued and paid for, not yet completed"
+      }
+    },
+    {
+      "command": "wait_until field:surveyCount equals:2 max_ticks:400",
+      "role": "setup",
+      "timeout": 180,
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "waitUntil",
+          "field": "surveyCount",
+          "equals": 2,
+          "maxTicks": 400,
+          "timeoutMs": 150000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "surveyCount": 2
+        }
+      }
+    },
+    {
+      "command": "survey islands",
+      "role": "observe"
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "timeout": 90,
+      "description": "The result card lists the detected islands; the minimap now spans the whole prospected area with each island in its ore colour. A click on an island row centres the camera on it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-survey-panel [data-island]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-island]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    }
+  ]
+}
