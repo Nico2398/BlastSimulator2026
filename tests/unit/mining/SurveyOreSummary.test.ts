@@ -8,7 +8,7 @@ import { oreValuePerKg, type MarketId } from '../../../src/core/economy/Market.j
 import { ORE_DENSITY_KG_M3, SURVEY_COVERAGE_RADIUS, SURVEY_DEPTH_BELOW_SURFACE } from '../../../src/core/config/balance.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 
-type Input = Pick<SurveyResult, 'method' | 'estimates' | 'confidence' | 'centerX' | 'centerZ'>;
+type Input = Pick<SurveyResult, 'method' | 'depthM' | 'estimates' | 'confidence' | 'centerX' | 'centerZ'>;
 
 const summarizeSurveyOres = (survey: Input, market: MarketId = 'legacy') => summarizeInMarket(survey, market);
 const columnOreValuePerM3 = (d: Record<string, number>, market: MarketId = 'legacy') => columnValueInMarket(d, market);
