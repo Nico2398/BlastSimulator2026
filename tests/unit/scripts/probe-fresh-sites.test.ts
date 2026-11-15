@@ -258,10 +258,9 @@ describe('freshSites site floors per footprint area (#2298)', () => {
     expect(sites.every(holdsColumn(big))).toBe(true);
   });
 
-  it('keeps the unscaled floors when the rules ask for the reference floors (campaign levels)', () => {
+  it('scales the floors by footprint area for every run, campaign levels included (#2301)', () => {
     const grid = oneColumn(0.9, 3);
-    expect(freshSites(grid, 0, 3, [], { protectedZones: [], referenceFloors: true })).toEqual([]);
-    expect(freshSites(grid, 0, 3, [], { protectedZones: [], referenceFloors: true, minOre: 1 })).toEqual([]);
-    expect(freshSites(grid, 0, 3, [], { protectedZones: [], referenceFloors: false }).length).toBe(1);
+    expect(freshSites(grid, 0, 3, [], { protectedZones: [] }).length).toBe(1);
+    expect(freshSites(grid, 0, 3, [], { protectedZones: [], minOre: 1 }).length).toBe(1);
   });
 });
