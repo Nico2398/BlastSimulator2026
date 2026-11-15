@@ -3709,3 +3709,31 @@ export const CONTRACT_OUTLOOK_SAFE_RATIO = 1.15;
 
 /** Projected supply below this multiple of the demand due by a deadline reads "will miss". */
 export const CONTRACT_OUTLOOK_MISS_RATIO = 0.75;
+
+// Meteorite crater (#2287): the one G3 site, found only far out, holding treranium in ultra-hard meteoritic rock.
+/** Id of the meteoritic rock: found only in the crater body. */
+export const METEORITE_ROCK_ID = 'meteorite';
+/** Nearest the crater centre lies to spawn (m): its near edge clears the farthest ore island edge (320 + 18 m). */
+export const METEORITE_CRATER_MIN_DISTANCE_M = 364;
+/** Furthest the crater centre lies from spawn (m): inside the claim bridge (MAX_CLAIM_BRIDGE_CHUNKS = 24, 384 m). */
+export const METEORITE_CRATER_MAX_DISTANCE_M = 376;
+/** Radius (m) beyond which the crater leaves the terrain untouched. */
+export const METEORITE_CRATER_OUTER_RADIUS_M = 24;
+/** Radius (m) of the raised rim's crest. */
+export const METEORITE_CRATER_RIM_RADIUS_M = 19;
+/** Metres the floor sits below the natural ground at the centre. */
+export const METEORITE_CRATER_DEPTH_M = 8;
+/** Metres the rim crest stands above the natural ground. */
+export const METEORITE_CRATER_RIM_HEIGHT_M = 3;
+/** Horizontal radius (m) of the meteoritic rock body under the floor. */
+export const METEORITE_BODY_RADIUS_M = 14;
+/** Metres below the floor at which the body ends (centre column). */
+export const METEORITE_BODY_DEPTH_M = 20;
+/** Metres of ordinary ground left on top of the body at the centre. */
+export const METEORITE_BODY_TOP_DEPTH_M = 1;
+/** Stored treranium density at the body core, before the site grade scale. */
+export const METEORITE_TRERANIUM_CORE_DENSITY = 0.8;
+/** Energy per voxel the meteoritic rock absorbs: the hardest rock in the catalog, so low-energy explosives barely crack it. */
+export const METEORITE_ROCK_ENERGY_ABSORPTION = 5000;
+/** Candidate spots tried before giving up on placing the crater. */
+export const METEORITE_CRATER_PLACEMENT_ATTEMPTS = 64;
