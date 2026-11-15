@@ -10,7 +10,7 @@ export const SITE_SIZE = 64;
 export const SPAWN = { x: SITE_SIZE / 2, z: SITE_SIZE / 2 } as const;
 
 /** A progression-site (ore deposits on) config over the default 64 m site. */
-export function islandConfig(seed: number, oreDeposits: boolean | undefined = true): TerrainConfig {
+export function islandConfig(seed: number, oreDeposits?: boolean): TerrainConfig {
   return {
     sizeX: SITE_SIZE, sizeZ: SITE_SIZE, datum: Math.floor(SITE_SIZE * 0.55),
     seed, climateBias: [0, 0],
@@ -18,8 +18,8 @@ export function islandConfig(seed: number, oreDeposits: boolean | undefined = tr
   };
 }
 
-export function islandContext(seed: number, oreDeposits: boolean | undefined = true): TerrainContext {
-  return buildTerrainContext(islandConfig(seed, oreDeposits));
+export function islandContext(seed: number, ...flag: [oreDeposits?: boolean]): TerrainContext {
+  return buildTerrainContext(islandConfig(seed, flag.length === 0 ? true : flag[0]));
 }
 
 /** The seed's ore islands; fails loudly when the context carries none. */
