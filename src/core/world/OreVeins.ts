@@ -18,6 +18,7 @@ import { subSeed, cellRand } from '../math/Hash.js';
 import { getAllOres, type OreType } from './OreCatalog.js';
 import { getRock } from './RockCatalog.js';
 import { sandboxHostProbability, sandboxOreWindow } from './SandboxDeepOre.js';
+import type { OreIslands } from './OreIslands.js';
 import type { VoxelRockComposition } from './VoxelGrid.js';
 
 /** Along-strike frequency; 6.7x lower than across-strike elongates veins along the strike axis. */
@@ -100,6 +101,8 @@ interface OreVeinOptions {
   readonly gradeScale?: number;
   /** Gate veins to discrete deposits by rarity tier; off keeps the legacy continuous veins. */
   readonly deposits?: boolean;
+  /** Ore islands (#2284): the only source of G2 ore. */
+  readonly islands?: OreIslands;
 }
 
 /** Samples per-ore anisotropic vein density from rock composition + a depth window (#458 A12). */

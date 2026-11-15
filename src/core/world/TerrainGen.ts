@@ -12,6 +12,7 @@ import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } fro
 import { WorldNoiseFields } from './NoiseFields.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
 import { OreVeinSampler } from './OreVeins.js';
+import type { OreIslands } from './OreIslands.js';
 import { pickStarterDeposit, starterPocketAt, type StarterDeposit } from './StarterDeposit.js';
 
 /**
@@ -126,6 +127,8 @@ export interface TerrainContext {
   readonly oreVeins: OreVeinSampler;
   /** The sandbox starter deposit (#2116); null when ore deposits are off. */
   readonly starterDeposit: StarterDeposit | null;
+  /** The G2 ore islands (#2284); null when ore deposits are off. */
+  readonly oreIslands: OreIslands | null;
 }
 
 /** Dominant climate-weighted biome at the playable centre — what terrain generation lands on. */
@@ -285,6 +288,7 @@ function computeTerrainContext(config: TerrainConfig): TerrainContext {
     strata,
     oreVeins,
     starterDeposit: starterDeposit ? Object.freeze(starterDeposit) : null,
+    oreIslands: null,
   });
 }
 

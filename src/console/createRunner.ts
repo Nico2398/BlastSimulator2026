@@ -11,6 +11,7 @@ import {
   inspectCommand,
   terrainInfoCommand,
   landscapeInfoCommand,
+  oreIslandsCommand,
   buildNavGridSyncTarget,
 } from './commands/world.js';
 import {
@@ -195,6 +196,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('landscape_info', 'Build (if needed) and show the landscape zone tile count/layout', (args, named) =>
     landscapeInfoCommand(ctx, args, named),
+  );
+  runner.register('ore_islands', 'List the G2 ore islands of this world: centre, ores, distance from spawn', (args, named) =>
+    oreIslandsCommand(ctx, args, named),
   );
   runner.register('survey', 'Survey terrain (seismic|core_sample|aerial) x:<X> z:<Z>', (args, named) =>
     surveyCommand(ctx, args, named),

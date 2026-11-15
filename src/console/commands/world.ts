@@ -779,6 +779,15 @@ export function landscapeInfoCommand(
   };
 }
 
+/** Lists the ore islands of the current world: centre, ores, distance from spawn (#2284). */
+export function oreIslandsCommand(
+  _ctx: GameContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  throw new Error('not implemented');
+}
+
 export function surveyCommand(
   ctx: GameContext,
   args: string[],
