@@ -19,13 +19,13 @@ function sandbox(options: { grade?: number; skill?: number | null; cash?: number
   const grade = options.grade === undefined ? '' : ` grade:${options.grade}`;
   const started = runner.run(`sandbox start biome:green_foothills seed:42${grade}`);
   expect(started.success, started.output).toBe(true);
-  ctx.state!.cash = options.cash ?? 1_000_000;
   if (options.skill !== null) {
     expect(employeeCommand(ctx, ['hire'], { role: 'surveyor' }).success).toBe(true);
     const id = ctx.state!.employees.employees.slice(-1)[0]!.id;
     const skill = employeeCommand(ctx, ['assign_skill', String(id)], { skill: 'geology', level: String(options.skill ?? 5) });
     expect(skill.success, skill.output).toBe(true);
   }
+  ctx.state!.cash = options.cash ?? 1_000_000; // after the hire, which is paid from cash
   return { runner, ctx };
 }
 
