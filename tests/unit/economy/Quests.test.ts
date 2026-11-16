@@ -12,6 +12,8 @@ import {
   completeQuest,
   unlockedExplosiveTier,
   explosiveLockedByQuest,
+  questForVehicleTier,
+  questRewardLine,
   type QuestState,
 } from '../../../src/core/economy/Quests.js';
 import { getAllQuests, getQuest } from '../../../src/core/economy/QuestCatalog.js';
@@ -32,10 +34,33 @@ import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import {
   QUEST_T2_CLEAN_BLASTS, QUEST_T2_EXPLOSIVE_KG,
   QUEST_T3_CLEAN_BLASTS, QUEST_T3_ROCK_KG, QUEST_T3_SAFETY_SCORE,
+  QUEST_V2_FLEET_SIZE, QUEST_V2_ROCK_KG,
+  QUEST_V3_FLEET_SIZE, QUEST_V3_ROCK_KG, QUEST_V3_SAFETY_SCORE,
 } from '../../../src/core/config/balance.js';
+import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 
 const T2 = 'quest_explosive_t2';
 const T3 = 'quest_explosive_t3';
+const V2 = 'quest_vehicle_t2';
+const V3 = 'quest_vehicle_t3';
+
+/** `n` placeholder vehicles: the fleet_size objective counts the list and reads nothing else. */
+function setFleet(s: GameState, n: number): void {
+  s.vehicles.vehicles = Array.from({ length: n }, (_, i) => ({ id: i + 1, type: 'debris_hauler', tier: 1 }) as Vehicle);
+}
+
+/** Drive every objective of a quest to exactly its target, whatever kinds it uses. */
+function meetQuest(s: GameState, id: string): void {
+  for (const o of getQuest(id)!.objectives) {
+    switch (o.kind) {
+      case 'fleet_size': setFleet(s, o.target); break;
+      case 'rock_kg': s.quests!.rockKg = o.target; break;
+      case 'clean_blasts': s.quests!.cleanBlasts = o.target; break;
+      case 'explosive_kg': s.quests!.explosiveKg = o.target; break;
+      case 'safety_score': s.scores.safety = o.target; break;
+    }
+  }
+}
 
 function questSite(): GameState {
   const s = createGame({ seed: 42, mineType: 'desert' });
@@ -68,8 +93,8 @@ const ids = (list: readonly { id: string }[]): string[] => list.map(e => e.id);
 describe('quest catalog (#2280 C2, C4)', () => {
   beforeAll(() => setLocale('en'));
 
-  it('lists the two explosive quests', () => {
-    expect(getAllQuests().map(q => q.id).sort()).toEqual([T2, T3]);
+  it('lists the two explosive quests and the two vehicle quests', () => {
+    expect(getAllQuests().map(q => q.id).sort()).toEqual([T2, T3, V2, V3].sort());
   });
 
   it('getQuest finds a quest by id and returns undefined for an unknown id', () => {
@@ -133,6 +158,265 @@ describe('quest catalog (#2280 C2, C4)', () => {
 
   it('the two quests have distinct titles', () => {
     expect(t(getQuest(T2)!.titleKey)).not.toBe(t(getQuest(T3)!.titleKey));
+  });
+});
+
+describe('vehicle quests in the catalog (#2282 C1, C6)', () => {
+  it('V2 rewards vehicle tier 2, has no prerequisite and is given by the dealer', () => {
+    const q = getQuest(V2)!;
+    expect(q.reward).toEqual({ kind: 'vehicle_tier', tier: 2 });
+    expect(q.requires ?? []).toEqual([]);
+    expect(q.giverKey).toBe('quest.giver.dealer');
+  });
+
+  it('V3 rewards vehicle tier 3, requires V2 and is given by the dealer', () => {
+    const q = getQuest(V3)!;
+    expect(q.reward).toEqual({ kind: 'vehicle_tier', tier: 3 });
+    expect(q.requires).toEqual([V2]);
+    expect(q.giverKey).toBe('quest.giver.dealer');
+  });
+
+  it('the dealer is not the explosives supplier', () => {
+    expect(getQuest(V2)!.giverKey).not.toBe(getQuest(T2)!.giverKey);
+  });
+
+  it('V2 objectives use fleet size and rock broken, at the balance targets', () => {
+    const q = getQuest(V2)!;
+    expect(q.objectives.find(o => o.kind === 'fleet_size')!.target).toBe(QUEST_V2_FLEET_SIZE);
+    expect(q.objectives.find(o => o.kind === 'rock_kg')!.target).toBe(QUEST_V2_ROCK_KG);
+  });
+
+  it('V3 objectives use fleet size, rock broken and the safety score, at the balance targets', () => {
+    const q = getQuest(V3)!;
+    expect(q.objectives.find(o => o.kind === 'fleet_size')!.target).toBe(QUEST_V3_FLEET_SIZE);
+    expect(q.objectives.find(o => o.kind === 'rock_kg')!.target).toBe(QUEST_V3_ROCK_KG);
+    expect(q.objectives.find(o => o.kind === 'safety_score')!.target).toBe(QUEST_V3_SAFETY_SCORE);
+  });
+
+  it('the tier-3 fleet asks for more than the tier-2 fleet', () => {
+    expect(QUEST_V3_FLEET_SIZE).toBeGreaterThan(QUEST_V2_FLEET_SIZE);
+    expect(QUEST_V3_ROCK_KG).toBeGreaterThan(QUEST_V2_ROCK_KG);
+  });
+
+  it('every vehicle quest has distinct title and pitch texts in en and fr', () => {
+    for (const locale of ['en', 'fr'] as const) {
+      setLocale(locale);
+      for (const id of [V2, V3]) {
+        const q = getQuest(id)!;
+        for (const key of [q.giverKey, q.titleKey, q.pitchKey]) {
+          expect(t(key), `${locale} ${key}`).not.toBe(key);
+          expect(t(key).trim().length).toBeGreaterThan(0);
+        }
+      }
+      expect(t(getQuest(V2)!.titleKey)).not.toBe(t(getQuest(V3)!.titleKey));
+    }
+    setLocale('en');
+  });
+});
+
+describe('questForVehicleTier and questRewardLine (#2282 C6)', () => {
+  beforeAll(() => setLocale('en'));
+
+  it('finds the quest opening each vehicle tier', () => {
+    expect(questForVehicleTier(2)?.id).toBe(V2);
+    expect(questForVehicleTier(3)?.id).toBe(V3);
+  });
+
+  it('tier 1 has no quest', () => {
+    expect(questForVehicleTier(1)).toBeUndefined();
+  });
+
+  it('the reward line of a vehicle quest is real text naming the tier, differing per quest', () => {
+    const two = questRewardLine(getQuest(V2)!);
+    const three = questRewardLine(getQuest(V3)!);
+    expect(two).not.toMatch(/\{\w+\}|quest\.reward/);
+    expect(three).not.toMatch(/\{\w+\}|quest\.reward/);
+    expect(two).toContain('2');
+    expect(three).toContain('3');
+    expect(two).not.toBe(three);
+  });
+
+  it('the reward line of an explosive quest still names its explosives', () => {
+    const line = questRewardLine(getQuest(T2)!);
+    expect(line).not.toMatch(/\{\w+\}|quest\.reward/);
+    for (const e of explosivesOfTier(2)) expect(line).toContain(t(e.nameKey));
+  });
+
+  it('the vehicle and explosive reward lines read differently', () => {
+    expect(questRewardLine(getQuest(V2)!)).not.toBe(questRewardLine(getQuest(T2)!));
+  });
+
+  it('reads in French too', () => {
+    const en = questRewardLine(getQuest(V2)!);
+    setLocale('fr');
+    const fr = questRewardLine(getQuest(V2)!);
+    setLocale('en');
+    expect(fr).not.toBe(en);
+    expect(fr).not.toMatch(/\{\w+\}|quest\.reward/);
+  });
+});
+
+describe('the fleet_size objective and vehicle quest completion (#2282 C5)', () => {
+  it('fleet_size progress is the number of vehicles owned', () => {
+    const s = questSite();
+    const read = () => questObjectiveStatuses(s, getQuest(V2)!).find(o => o.kind === 'fleet_size')!;
+    expect(read().current).toBe(0);
+    setFleet(s, 2);
+    expect(read().current).toBe(2);
+    setFleet(s, 5);
+    expect(read().current).toBe(5);
+    expect(read().needed).toBe(QUEST_V2_FLEET_SIZE);
+  });
+
+  it('fleet_size is met at exactly its target and not one vehicle short', () => {
+    const s = questSite();
+    setFleet(s, QUEST_V2_FLEET_SIZE - 1);
+    expect(questObjectiveStatuses(s, getQuest(V2)!).find(o => o.kind === 'fleet_size')!.met).toBe(false);
+    setFleet(s, QUEST_V2_FLEET_SIZE);
+    expect(questObjectiveStatuses(s, getQuest(V2)!).find(o => o.kind === 'fleet_size')!.met).toBe(true);
+  });
+
+  it('fleet_size is a gauge: losing a vehicle lowers it', () => {
+    const s = questSite();
+    setFleet(s, QUEST_V2_FLEET_SIZE);
+    setFleet(s, QUEST_V2_FLEET_SIZE - 1);
+    expect(questObjectiveStatuses(s, getQuest(V2)!).find(o => o.kind === 'fleet_size')!.current).toBe(QUEST_V2_FLEET_SIZE - 1);
+  });
+
+  it('V2 completes when its objectives are met, emitting quest:completed once', () => {
+    const s = questSite();
+    const emitter = new EventEmitter();
+    const seen = collect(emitter);
+    meetQuest(s, V2);
+    expect(advanceQuests(s, emitter)).toContain(V2);
+    expect(isQuestCompleted(s, V2)).toBe(true);
+    expect(seen.filter(id => id === V2)).toEqual([V2]);
+    expect(advanceQuests(s, emitter)).not.toContain(V2);
+    expect(seen.filter(id => id === V2)).toEqual([V2]);
+  });
+
+  it('V2 stays open with the fleet one vehicle short', () => {
+    const s = questSite();
+    meetQuest(s, V2);
+    setFleet(s, QUEST_V2_FLEET_SIZE - 1);
+    expect(advanceQuests(s)).not.toContain(V2);
+    expect(isQuestCompleted(s, V2)).toBe(false);
+  });
+
+  it('V2 stays open when only the rock total is short', () => {
+    const s = questSite();
+    meetQuest(s, V2);
+    s.quests!.rockKg = QUEST_V2_ROCK_KG - 1;
+    expect(advanceQuests(s)).not.toContain(V2);
+  });
+
+  it('V3 never completes while V2 is open, even with its own objectives met', () => {
+    const s = questSite();
+    meetQuest(s, V3);
+    const done = advanceQuests(s);
+    expect(done).not.toContain(V3);
+    expect(isQuestCompleted(s, V3)).toBe(false);
+  });
+
+  it('with V2 completed, V3 waits on its objectives and then completes', () => {
+    const s = questSite();
+    completeQuest(s, V2);
+    expect(advanceQuests(s)).not.toContain(V3);
+    meetQuest(s, V3);
+    expect(advanceQuests(s)).toContain(V3);
+    expect(isQuestCompleted(s, V3)).toBe(true);
+  });
+
+  it('V3 stays open when the safety score is short', () => {
+    const s = questSite();
+    completeQuest(s, V2);
+    meetQuest(s, V3);
+    s.scores.safety = QUEST_V3_SAFETY_SCORE - 1;
+    expect(advanceQuests(s)).not.toContain(V3);
+  });
+
+  it('V2 then V3 complete in one call, V2 first, when both are met', () => {
+    const s = questSite();
+    const emitter = new EventEmitter();
+    const seen = collect(emitter);
+    meetQuest(s, V2);
+    meetQuest(s, V3);
+    const done = advanceQuests(s, emitter);
+    expect(done.indexOf(V2)).toBeGreaterThanOrEqual(0);
+    expect(done.indexOf(V3)).toBeGreaterThan(done.indexOf(V2));
+    expect(seen.indexOf(V3)).toBeGreaterThan(seen.indexOf(V2));
+  });
+
+  it('a site without quests completes nothing', () => {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    setFleet(s, 20);
+    expect(advanceQuests(s, new EventEmitter())).toEqual([]);
+  });
+
+  it('the tick pipeline completes a met vehicle quest', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('sandbox start biome:desert_badlands seed:42').success).toBe(true);
+    const s = ctx.state!;
+    s.cash = 500_000_000;
+    // Real purchases, so the tick can run the fleet: the objective counts what the player owns.
+    const target = getQuest(V2)!.objectives.find(o => o.kind === 'fleet_size')!.target;
+    while (s.vehicles.vehicles.length < target) expect(runner.run('vehicle buy debris_hauler tier:1').success).toBe(true);
+    for (const o of getQuest(V2)!.objectives) {
+      if (o.kind === 'rock_kg') s.quests!.rockKg = o.target;
+      if (o.kind === 'clean_blasts') s.quests!.cleanBlasts = o.target;
+      if (o.kind === 'explosive_kg') s.quests!.explosiveKg = o.target;
+      if (o.kind === 'safety_score') s.scores.safety = o.target;
+    }
+    expect(isQuestCompleted(s, V2)).toBe(false);
+    runTick(s, null, new Random(s.seed + s.tickCount), new EventEmitter(), { checkInvariants: false });
+    expect(isQuestCompleted(s, V2)).toBe(true);
+  });
+
+  it('the permit grade never matters to a vehicle quest', () => {
+    for (const grade of [0, 3]) {
+      const s = questSite();
+      s.grade!.grade = grade;
+      meetQuest(s, V2);
+      expect(advanceQuests(s)).toContain(V2);
+    }
+  });
+});
+
+describe('vehicle quests do not touch the explosive tiers (#2282 C6)', () => {
+  it('completing the vehicle quests leaves the explosive tier at 1', () => {
+    const s = questSite();
+    completeQuest(s, V2);
+    completeQuest(s, V3);
+    expect(unlockedExplosiveTier(s)).toBe(1);
+  });
+
+  it('explosive quests do not change the vehicle gate', () => {
+    const s = questSite();
+    completeQuest(s, T2);
+    completeQuest(s, T3);
+    expect(isQuestCompleted(s, V2)).toBe(false);
+  });
+
+  it('a tier-2 explosive stays locked by the explosive quest, not by a vehicle quest', () => {
+    const s = questSite();
+    completeQuest(s, V2);
+    completeQuest(s, V3);
+    const locked = explosiveLockedByQuest(s, explosivesOfTier(2)[0]!.id);
+    expect(locked?.id).toBe(T2);
+  });
+});
+
+describe('vehicle quests in saves (#2282)', () => {
+  it('sanitizeQuestState keeps the vehicle quest ids', () => {
+    const out = sanitizeQuestState({ completed: [V2, V3, 'quest_nope'], cleanBlasts: 0, explosiveKg: 0, rockKg: 0 });
+    expect(out?.completed).toEqual([V2, V3]);
+  });
+
+  it('a save round-trips completed vehicle quests', () => {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    s.grade = createGradeState();
+    s.quests = { completed: [V2], cleanBlasts: 0, explosiveKg: 0, rockKg: 7 };
+    expect(deserialize(serialize(s)).quests?.completed).toEqual([V2]);
   });
 });
 

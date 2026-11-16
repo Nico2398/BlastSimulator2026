@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { floorToKgResolution, mayBuyVehicleTier, shouldBench } from '../../../scripts/shared/probe-ladder.js';
 import { formatGradeSummary } from '../../../scripts/shared/probe-report.js';
-import { VEHICLE_TIER_UNLOCK_GRADE } from '../../../src/core/config/balance.js';
+import { createQuestState } from '../../../src/core/economy/Quests.js';
 import type { RunResult } from '../../../scripts/shared/probe-metrics.js';
 
 function run(grades: Record<number, number>, cash: Record<number, number>): RunResult {
@@ -57,12 +57,15 @@ describe('shouldBench', () => {
   });
 });
 
-describe('mayBuyVehicleTier boundaries', () => {
-  it('unlocks at exactly the unlock grade, not one below', () => {
-    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2] - 1)).toBe(false);
-    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2])).toBe(true);
-    expect(mayBuyVehicleTier(3, VEHICLE_TIER_UNLOCK_GRADE[3] - 1)).toBe(false);
-    expect(mayBuyVehicleTier(3, VEHICLE_TIER_UNLOCK_GRADE[3])).toBe(true);
+describe('mayBuyVehicleTier boundaries (#2282)', () => {
+  it('unlocks exactly when the tier quest is completed, not before', () => {
+    const open = { quests: createQuestState() };
+    const t2 = { quests: { ...createQuestState(), completed: ['quest_vehicle_t2'] } };
+    const t3 = { quests: { ...createQuestState(), completed: ['quest_vehicle_t3'] } };
+    expect(mayBuyVehicleTier(2, open)).toBe(false);
+    expect(mayBuyVehicleTier(2, t2)).toBe(true);
+    expect(mayBuyVehicleTier(3, t2)).toBe(false);
+    expect(mayBuyVehicleTier(3, t3)).toBe(true);
   });
 });
 
