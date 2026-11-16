@@ -58,7 +58,7 @@ describe('the tick pipeline no longer runs research (#2283 C5)', () => {
 
 describe('the research code surface is deleted (#2283 C5)', () => {
   it('BuildingResearch.ts no longer exists', () => {
-    expect(existsSync(join(ROOT, 'src/core/entities/BuildingResearch.ts'))).toBe(false);
+    expect(existsSync(join(ROOT, 'src/core/entities', 'BuildingResearch.ts'))).toBe(false);
   });
 
   it('Building exports nothing about research', () => {

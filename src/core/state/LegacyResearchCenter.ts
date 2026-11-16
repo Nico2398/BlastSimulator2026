@@ -33,13 +33,13 @@ function isLegacy(type: string): boolean {
 function cancelLegacySites(state: GameState): void {
   for (const site of [...state.plannedBuildings]) {
     if (!isLegacy(site.type)) continue;
+    // The site goes first: cancelling the action would otherwise look up the removed type's footprint.
+    state.plannedBuildings.splice(state.plannedBuildings.indexOf(site), 1);
     if (state.pendingActions.some(a => a.id === site.actionId)) {
       cancelAction(state, site.actionId);
     } else {
       refund(state, site.cost, 'Research Center order cancelled (save migration)');
     }
-    const idx = state.plannedBuildings.findIndex(pb => pb.id === site.id);
-    if (idx !== -1) state.plannedBuildings.splice(idx, 1);
   }
 }
 
@@ -56,11 +56,11 @@ function removeLegacyBuildings(state: GameState): void {
 
 /** Drop the research queue, refunding each task's cost. */
 function dropLegacyQueue(state: GameState): void {
-  const holder = state.buildings as unknown as { researchQueue?: unknown; unlockedTiers: Record<string, unknown> };
+  const holder = state.buildings as unknown as { researchQueue?: unknown; unlockedTiers?: Record<string, unknown> };
   const queue = Array.isArray(holder.researchQueue) ? (holder.researchQueue as LegacyResearchTask[]) : [];
   for (const task of queue) refund(state, typeof task.cost === 'number' ? task.cost : 0, 'Research cancelled (save migration)');
   delete holder.researchQueue;
-  delete holder.unlockedTiers[LEGACY_TYPE];
+  if (holder.unlockedTiers) delete holder.unlockedTiers[LEGACY_TYPE];
 }
 
 /** Remove every trace of the Research Center from a loaded save. Idempotent. */

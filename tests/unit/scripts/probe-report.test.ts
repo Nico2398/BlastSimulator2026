@@ -20,7 +20,7 @@ function makeResult(seed: number, over: Partial<RunResult['metrics']> = {}): Run
       gradeCashAt: { 1: 90000, 2: 80000 },
       catalogBoughtTick: null,
       boulderOreSoldShare: null,
-      affordableTick: { warehouseT2: 1500, researchCenter: null, secondHauler: 2000 },
+      affordableTick: { warehouseT2: 1500, secondHauler: 2000 },
       firstSaleTick: null,
       salesCostRatio: null,
       salesCostWindows: [null, null, null, null],
@@ -58,7 +58,7 @@ describe('probe-report formatTable', () => {
     const header = lines[0]!.toLowerCase();
     for (const col of [
       'seed', 'biome', 'kit', 'strategy', 'low cash', 'low tick', 'bankrupt', 'blasts',
-      'warehousefull', 'boulder', 'grade', 'warehouset2', 'researchcenter', 'secondhauler',
+      'warehousefull', 'boulder', 'grade', 'warehouset2', 'secondhauler',
     ]) {
       expect(header).toContain(col);
     }

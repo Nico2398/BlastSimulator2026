@@ -10,7 +10,7 @@ import { getBedCapacity } from '../entities/BuildingWellbeing.js';
 import { getExplosive, type ExplosiveTier } from '../world/ExplosiveCatalog.js';
 import { getAllQuests, getQuest } from './QuestCatalog.js';
 
-export type QuestObjectiveKind =
+type QuestObjectiveKind =
   'clean_blasts' | 'explosive_kg' | 'rock_kg' | 'safety_score' | 'buildings_built' | 'crew_housed';
 
 interface QuestObjectiveDef {

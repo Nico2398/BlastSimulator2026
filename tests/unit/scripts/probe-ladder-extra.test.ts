@@ -11,7 +11,7 @@ function run(grades: Record<number, number>, cash: Record<number, number>): RunR
       cashAt: { 1000: null, 3000: null, 6000: null, 10000: null }, lowPointCash: 0, lowPointTick: 0, bankruptTick: null,
       firstBlastSoldShareAt6000: null, blastsFired: 0, warehouseFullTick: null, ticksHaulWaitedOnFullStorage: 0,
       boulderSoldShare: null, gradeReachedTick: grades, gradeCashAt: cash, catalogBoughtTick: null,
-      boulderOreSoldShare: null, affordableTick: { warehouseT2: null, researchCenter: null, secondHauler: null },
+      boulderOreSoldShare: null, affordableTick: { warehouseT2: null, secondHauler: null },
       firstSaleTick: null, salesCostRatio: null, salesCostWindows: [],
     },
     endTick: 1000,

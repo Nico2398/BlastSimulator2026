@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UIManager } from '../../../src/ui/UIManager.js';
 import { MiniMap } from '../../../src/ui/MiniMap.js';
 import { createGame } from '../../../src/core/state/GameState.js';
+import { createQuestState } from '../../../src/core/economy/Quests.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler } from '../../../src/ui/scene/PlacementController.js';
@@ -95,6 +96,7 @@ describe('UIManager — building flows without the Build panel (#1758)', () => {
   });
 
   it('upgradeBuilding on a locked tier does not upgrade', () => {
+    state.quests = createQuestState();
     ui.update(state);
     ui.upgradeBuilding(7);
     expect(gameConsole).not.toHaveBeenCalledWith(expect.stringContaining('build upgrade'));

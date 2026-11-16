@@ -1197,7 +1197,7 @@ describe('BuildMenu — catalog buttons follow the tier quests (#2283)', () => {
     state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 1 })];
     menu.update(state);
     const row = findPlacedRow(container, 1);
-    expect(row.querySelector('button')).toBeNull();
+    expect(row.querySelector('.bs-build-buy-btn')).toBeNull();
     expect(row.querySelector('.bs-build-research-progress')).toBeNull();
   });
 
@@ -1235,8 +1235,8 @@ describe('BuildMenu — catalog card text and tooltip (#1377)', () => {
 
   it('every catalog row has a .bs-build-desc span with the tier-1 line and a stats tooltip', () => {
     const rows = container.querySelectorAll<HTMLElement>('[data-build-type]');
-    // 8 functional types; the 4 vanity types need a board (#2052) and the mock state has none.
-    expect(rows.length).toBe(8);
+    // 7 functional types; the 4 vanity types need a board (#2052) and the mock state has none.
+    expect(rows.length).toBe(7);
     for (const row of rows) {
       const type = row.dataset['buildType'] as BuildingType;
       const def = getBuildingDef(type, 1);

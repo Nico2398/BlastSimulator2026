@@ -1284,6 +1284,6 @@ describe('courseTerms and schoolCourses (#1760)', () => {
 
   it('returns no courses for a non-school building', () => {
     expect(schoolCourses(makeBuilding({ type: 'living_quarters' }), [])).toEqual([]);
-    expect(schoolCourses(makeBuilding({ type: 'geology_lab', outOfService: true }), [])).toEqual([]);
+    expect(schoolCourses(makeBuilding({ type: 'freight_warehouse' }), [])).toEqual([]);
   });
 });
