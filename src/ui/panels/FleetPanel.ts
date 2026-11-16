@@ -352,7 +352,7 @@ export class FleetPanel extends PanelBase {
     const stats = btn.dataset['stats'] ?? '';
     if (lock) btn.title = `${stats}\n${lock.refusal}`;
     else btn.title = affordable ? stats : `${stats}\n${t('ui.fleet.tip.cannot_afford', { cost: formatMoney(purchaseCost) })}`;
-    if (lock) btn.dataset['locked'] = 'grade'; else delete btn.dataset['locked'];
+    if (lock) btn.dataset['locked'] = 'quest'; else delete btn.dataset['locked'];
     // Rewrite the whole attribute: mutating btn.style piecemeal can drop the var() colour in some CSSOM implementations.
     btn.setAttribute('style', `${TIER_BTN_BASE_STYLE};opacity:${usable ? '1' : '.45'};cursor:${usable ? 'pointer' : 'not-allowed'}`);
     this.syncTierLockBadge(btn, lock);

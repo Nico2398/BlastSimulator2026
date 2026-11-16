@@ -6,7 +6,8 @@
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
-import { getExplosive, type ExplosiveTier } from '../world/ExplosiveCatalog.js';
+import { t } from '../i18n/I18n.js';
+import { explosivesOfTier, getExplosive, type ExplosiveTier } from '../world/ExplosiveCatalog.js';
 import { getAllQuests, getQuest } from './QuestCatalog.js';
 
 type QuestObjectiveKind = 'clean_blasts' | 'explosive_kg' | 'rock_kg' | 'safety_score' | 'fleet_size';
@@ -166,11 +167,14 @@ export function explosiveLockedByQuest(state: Pick<GameState, 'quests'>, explosi
 }
 
 /** The quest whose reward opens vehicle `tier`, if any. */
-export function questForVehicleTier(_tier: VehicleTier): QuestDef | undefined {
-  throw new Error('not implemented');
+export function questForVehicleTier(tier: VehicleTier): QuestDef | undefined {
+  return getAllQuests().find(q => q.reward.kind === 'vehicle_tier' && q.reward.tier === tier);
 }
 
 /** Localized reward line of a quest, whatever its reward kind. */
-export function questRewardLine(_def: QuestDef): string {
-  throw new Error('not implemented');
+export function questRewardLine(def: QuestDef): string {
+  const { reward } = def;
+  if (reward.kind === 'vehicle_tier') return t('quest.reward.vehicle_tier', { tier: reward.tier });
+  const explosives = explosivesOfTier(reward.tier).map(e => t(e.nameKey)).join(', ');
+  return t('quest.reward', { tier: reward.tier, explosives });
 }

@@ -26,8 +26,11 @@ export function wireProgressionNotifications(
   emitter.on('quest:completed', ({ questId }) => {
     const quest = getQuest(questId);
     if (!quest) return;
-    const explosives = explosivesOfTier(quest.reward.tier).map(e => t(e.nameKey)).join(', ');
-    notify({ severity: 'info', title: t('notification.title.quest'), body: t('notification.quest.completed', { title: t(quest.titleKey), explosives }) });
+    const title = t(quest.titleKey);
+    const body = quest.reward.kind === 'vehicle_tier'
+      ? t('notification.quest.completed_vehicles', { title, tier: quest.reward.tier })
+      : t('notification.quest.completed', { title, explosives: explosivesOfTier(quest.reward.tier).map(e => t(e.nameKey)).join(', ') });
+    notify({ severity: 'info', title: t('notification.title.quest'), body });
   });
   emitter.on('progression:ore_glut', ({ oreId }) =>
     notify({ severity: 'info', title: t('notification.title.market'), body: t('notification.market.glut', { ore: t(`ore.${oreId}.name`) }) }));

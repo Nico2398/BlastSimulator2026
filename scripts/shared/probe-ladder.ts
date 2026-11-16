@@ -2,6 +2,7 @@
 
 import type { GameState } from '../../src/core/state/GameState.js';
 import type { VehicleTier } from '../../src/core/entities/Vehicle.js';
+import { vehicleTierGate } from '../../src/core/economy/VehicleTierGate.js';
 import {
   DRILL_HOLE_DIAMETER_OPTIONS_M,
   DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M,
@@ -110,8 +111,8 @@ export function pickDiameter(rigMaxDiameterM: number): number {
 }
 
 /** Tier the dealer sells: its quest is done (or the site has none); every tier climbs the same 20° so no ramp gates it (#2045). */
-export function mayBuyVehicleTier(_tier: VehicleTier, _state: Pick<GameState, 'quests'>): boolean {
-  throw new Error('not implemented');
+export function mayBuyVehicleTier(tier: VehicleTier, state: Pick<GameState, 'quests'>): boolean {
+  return vehicleTierGate(state, tier) === null;
 }
 
 /** First affordable catalog entry not owned, keeping `reserve` cash back; null if none. */
